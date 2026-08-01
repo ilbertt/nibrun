@@ -1,13 +1,17 @@
 # Three buckets rather than one with prefix-scoped rules: each has a different
 # lifecycle, and each feeds exactly one config value, so no name is ever
-# rewritten on the way to the box. Account-id suffix for globally unique names.
+# rewritten on the way to the box.
+#
+# Region suffix because the S3 namespace is global while a bucket is not: AWS
+# holds a deleted name for up to hours, so an unqualified name collides with the
+# one the previous region just released.
 
 # --- Deploy bundles ---
 #
 # The runtime bundle CI uploads and the instance downloads (compose files,
 # on-box scripts). Disposable — every deploy writes a new one.
 resource "aws_s3_bucket" "deploy" {
-  bucket        = "nibrun-deploy-${data.aws_caller_identity.current.account_id}"
+  bucket        = "${local.resource_name_prefix}-deploy-${var.region}"
   force_destroy = true
 
   tags = {
@@ -41,7 +45,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "deploy" {
 # Written nightly by the pg-backup sidecar. Longer retention than the bundles,
 # and never force-destroyed.
 resource "aws_s3_bucket" "backups" {
-  bucket = "nibrun-backups-${data.aws_caller_identity.current.account_id}"
+  bucket = "${local.resource_name_prefix}-backups-${var.region}"
 
   tags = {
     Name = "${local.resource_name_prefix}-backups"
@@ -88,7 +92,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
 # The binaries users upload. Customer data that outlives any single deploy, so
 # it is versioned and never force-destroyed.
 resource "aws_s3_bucket" "artifacts" {
-  bucket = "nibrun-artifacts-${data.aws_caller_identity.current.account_id}"
+  bucket = "${local.resource_name_prefix}-artifacts-${var.region}"
 
   tags = {
     Name = "${local.resource_name_prefix}-artifacts"
