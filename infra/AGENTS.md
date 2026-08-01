@@ -32,12 +32,16 @@ Then point an A record at `terraform output public_ip`, DNS-only (grey cloud).
 
 ## Deploying
 
-CI pushes images, uploads a bundle to S3, and triggers `on_box_deploy.sh` over
-SSM RunCommand — no SSH, no key material in CI. Secrets are never passed
-through: Terraform generates them into `/nibrun/…` and the instance reads them
-with its own role.
+`.github/workflows/cd.yml`, on every push to main: build both images, apply
+Terraform, upload a bundle to S3, then trigger `on_box_deploy.sh` over SSM
+RunCommand — no SSH, no key material in CI. Secrets are never passed through:
+Terraform generates them into `/nibrun/…` and the instance reads them with its
+own role. Terraform runs under the admin bootstrap role; everything after it
+drops to the scoped deploy role.
 
-Release images must be public — the box pulls with no registry credentials.
+Two repository variables: `AWS_TERRAFORM_ROLE_ARN` (bootstrap stack output) and
+`API_HOSTNAME`. Both GHCR packages must be public — the box pulls with no
+registry credentials.
 
-The workflows do not exist yet; `enable_github_deploy` already creates the role
-they will assume.
+`workflow_dispatch` takes `allow_destroy` for the times a plan legitimately
+replaces something.

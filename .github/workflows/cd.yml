@@ -1,0 +1,131 @@
+name: cd
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      allow_destroy:
+        description: "Apply even if the plan destroys or replaces resources"
+        type: boolean
+        default: false
+
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+
+env:
+  # Authoritative: passed to Terraform as TF_VAR_region, so the two cannot drift.
+  AWS_REGION: eu-west-2
+  NO_COLOR: "1"
+
+jobs:
+  cd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve image URIs
+        id: images
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "api=${repo}/api:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "pg_backup=${repo}/pg-backup:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push api
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.images.outputs.api }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      - name: Build and push pg-backup
+        uses: docker/build-push-action@v6
+        with:
+          context: infra/pg-backup
+          push: true
+          tags: ${{ steps.images.outputs.pg_backup }}
+          cache-from: type=gha,scope=pg-backup
+          cache-to: type=gha,scope=pg-backup,mode=max
+
+      - name: Configure AWS credentials (Terraform role)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          # The wrapper prints extra output around every command, which would end
+          # up inside `terraform output -raw` captures below.
+          terraform_wrapper: false
+
+      - name: Terraform apply
+        id: tf
+        working-directory: infra/terraform
+        env:
+          TF_VAR_region: ${{ env.AWS_REGION }}
+          TF_VAR_api_hostname: ${{ vars.API_HOSTNAME }}
+        run: |
+          set -euo pipefail
+          terraform init -input=false
+          terraform plan -input=false -out=tfplan
+          if [ "${{ inputs.allow_destroy }}" != "true" ]; then
+            ../deploy/check_terraform_destroy_plan.sh tfplan
+          fi
+          terraform apply -input=false tfplan
+          for output in api_hostname api_s3_bucket api_s3_endpoint pg_backup_bucket \
+                        deploy_bucket data_volume_id deploy_group ssm_secret_prefix \
+                        github_deploy_role_arn; do
+            echo "${output}=$(terraform output -raw "$output")" >> "$GITHUB_OUTPUT"
+          done
+
+      # Drops from admin to the scoped role for everything that touches the app.
+      - name: Configure AWS credentials (deploy role)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ steps.tf.outputs.github_deploy_role_arn }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify images are public
+        env:
+          API_IMAGE_URI: ${{ steps.images.outputs.api }}
+          PG_BACKUP_IMAGE_URI: ${{ steps.images.outputs.pg_backup }}
+        run: infra/deploy/verify_public_images.sh
+
+      - name: Upload runtime bundle
+        id: bundle
+        run: |
+          set -euo pipefail
+          infra/deploy/package_runtime_bundle.sh bundle.tar.gz
+          url="s3://${{ steps.tf.outputs.deploy_bucket }}/bundles/${GITHUB_SHA}.tar.gz"
+          aws s3 cp bundle.tar.gz "$url"
+          echo "url=${url}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy via SSM
+        env:
+          BUNDLE_URL: ${{ steps.bundle.outputs.url }}
+          DEPLOY_GROUP: ${{ steps.tf.outputs.deploy_group }}
+          SSM_SECRET_PREFIX: ${{ steps.tf.outputs.ssm_secret_prefix }}
+          DATA_VOLUME_ID: ${{ steps.tf.outputs.data_volume_id }}
+          API_IMAGE_URI: ${{ steps.images.outputs.api }}
+          API_HOSTNAME: ${{ steps.tf.outputs.api_hostname }}
+          API_S3_BUCKET: ${{ steps.tf.outputs.api_s3_bucket }}
+          API_S3_ENDPOINT: ${{ steps.tf.outputs.api_s3_endpoint }}
+          PG_BACKUP_IMAGE_URI: ${{ steps.images.outputs.pg_backup }}
+          PG_BACKUP_BUCKET: ${{ steps.tf.outputs.pg_backup_bucket }}
+        run: infra/deploy/ssm_deploy.sh

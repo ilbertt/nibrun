@@ -32,6 +32,10 @@ output "data_volume_id" {
   value       = aws_ebs_volume.data.id
 }
 
+output "ssm_secret_prefix" {
+  value = var.ssm_secret_prefix
+}
+
 output "deploy_group" {
   description = "SSM targeting tag used by the deploy workflow."
   value       = local.resource_name_prefix

@@ -32,6 +32,14 @@ variable "vpc_cidr_block" {
 variable "api_hostname" {
   type        = string
   description = "Public hostname the api is served on. Point an A record at the elastic IP."
+
+  # CI passes the API_HOSTNAME repository variable straight through, and an unset
+  # variable arrives as an empty string. Fail the plan rather than deploy an api
+  # whose BASE_URL is "https://".
+  validation {
+    condition     = trimspace(var.api_hostname) != ""
+    error_message = "api_hostname must not be empty."
+  }
 }
 
 variable "enable_github_deploy" {
