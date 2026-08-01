@@ -23,10 +23,15 @@ data "aws_iam_policy_document" "github_assume" {
       variable = "token.actions.githubusercontent.com:aud"
       values   = ["sts.amazonaws.com"]
     }
+    # Two forms: GitHub emits owner and repo with their immutable numeric ids on
+    # repositories where that is enabled, and the plain names elsewhere.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:ref:refs/heads/${var.github_branch}"]
+      values = [
+        "repo:${var.github_repo}:ref:refs/heads/${var.github_branch}",
+        "repo:${local.github_owner}@*/${local.github_name}@*:ref:refs/heads/${var.github_branch}",
+      ]
     }
   }
 }
