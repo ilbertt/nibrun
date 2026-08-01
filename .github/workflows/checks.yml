@@ -29,26 +29,10 @@ jobs:
       - name: Check JS Codestyle
         run: bun check:codestyle
 
-  terraform:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v6
-
-      - uses: ./.github/actions/prepare
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
-
-      # Formatting and validation only — no credentials, no state.
-      - name: Check Terraform
-        run: bun run --filter @repo/internal-scripts terraform-check
-
   checks-passed:
     if: always()
     name: checks:required
-    needs: [types, codestyle, terraform]
+    needs: [types, codestyle]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed

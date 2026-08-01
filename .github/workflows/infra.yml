@@ -1,0 +1,83 @@
+name: infra
+
+# No paths filter: infra-passed is a required check, and a check gated by a path
+# filter never reports on the PRs it skips, leaving them unmergeable. The plan
+# script decides for itself whether anything under infra/terraform changed.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-2
+
+jobs:
+  terraform-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/prepare
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      # Formatting and validity only — no credentials, no state.
+      - name: Check Terraform
+        run: bun run --filter @repo/internal-scripts terraform-check
+
+  terraform-plan:
+    # On main the deploy plans and applies for real; planning again here would
+    # only race it.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The script diffs against the base branch to decide whether to plan.
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      # Read-only, and a different role from the deploy: a pull request presents
+      # a different OIDC subject than a push to main.
+      - name: Configure AWS credentials (plan role)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform plan
+        env:
+          TF_VAR_region: ${{ env.AWS_REGION }}
+          TF_VAR_api_hostname: ${{ vars.API_HOSTNAME }}
+        run: bun run --filter @repo/internal-scripts terraform-plan
+
+  infra-passed:
+    if: always()
+    name: infra:required
+    needs: [terraform-check, terraform-plan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "Some jobs failed or were cancelled"
+            exit 1
+          fi
+          echo "All infra jobs passed"
