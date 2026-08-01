@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import * as core from '@actions/core';
 import { $ } from 'bun';
 import { requiredEnv } from '#shared/env.ts';
 
@@ -41,18 +42,16 @@ try {
       console.log(`Public pull check passed: ${image}`);
     } else {
       failed.push(image);
-      console.log(
-        `::error title=GHCR package is not public::${image} cannot be pulled anonymously. Make the GHCR package public, then rerun this workflow.`,
+      core.error(
+        `${image} cannot be pulled anonymously. Make the GHCR package public, then rerun this workflow.`,
+        { title: 'GHCR package is not public' },
       );
     }
   }
 
   if (failed.length > 0) {
-    console.error(
-      '\nnibrun release images must be public because the box pulls them without registry credentials.',
-    );
-    console.error(
-      'Set each nibrun container package to Public under https://github.com/ilbertt?tab=packages',
+    core.setFailed(
+      'nibrun release images must be public because the box pulls them without registry credentials. Set each nibrun container package to Public under https://github.com/ilbertt?tab=packages',
     );
     process.exit(1);
   }

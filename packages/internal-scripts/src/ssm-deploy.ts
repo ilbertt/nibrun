@@ -1,5 +1,6 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import * as core from '@actions/core';
 import { aws } from '#shared/aws.ts';
 import { optionalEnv, requiredEnv } from '#shared/env.ts';
 
@@ -44,7 +45,7 @@ const instanceId = (
 ).trim();
 
 if (!instanceId || instanceId === 'None') {
-  console.log(`::error::No running EC2 instance found for DeployGroup=${deployGroup}`);
+  core.setFailed(`No running EC2 instance found for DeployGroup=${deployGroup}`);
   process.exit(1);
 }
 console.log(`Target instance: ${instanceId}`);
@@ -79,7 +80,7 @@ for (let attempt = 0; attempt < SSM_REGISTRATION_ATTEMPTS; attempt++) {
 }
 
 if (!online) {
-  console.log(`::error::Instance ${instanceId} did not register with SSM within 10 minutes`);
+  core.setFailed(`Instance ${instanceId} did not register with SSM within 10 minutes`);
   process.exit(1);
 }
 
@@ -166,6 +167,6 @@ console.log(invocation?.StandardOutputContent ?? '');
 
 if (status !== 'Success') {
   console.error(invocation?.StandardErrorContent ?? '');
-  console.log(`::error::Deploy command did not succeed (status: ${status})`);
+  core.setFailed(`Deploy command did not succeed (status: ${status})`);
   process.exit(1);
 }

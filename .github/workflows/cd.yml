@@ -95,14 +95,11 @@ jobs:
           PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
         run: bun run --filter @repo/internal-scripts verify-public-images
 
-      - name: Upload runtime bundle
+      - name: Publish runtime bundle
         id: bundle
-        run: |
-          set -euo pipefail
-          bun run --filter @repo/internal-scripts package-runtime-bundle
-          url="s3://${{ steps.tf.outputs.deploy_bucket }}/bundles/${GITHUB_SHA}.tar.gz"
-          aws s3 cp bundle.tar.gz "$url"
-          echo "url=${url}" >> "$GITHUB_OUTPUT"
+        env:
+          DEPLOY_BUCKET: ${{ steps.tf.outputs.deploy_bucket }}
+        run: bun run --filter @repo/internal-scripts publish-runtime-bundle
 
       - name: Deploy via SSM
         env:

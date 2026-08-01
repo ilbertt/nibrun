@@ -7,7 +7,7 @@
   },
   "scripts": {
     "build-and-push-image": "bun run src/build-and-push-image.ts",
-    "package-runtime-bundle": "bun run src/package-runtime-bundle.ts",
+    "publish-runtime-bundle": "bun run src/publish-runtime-bundle.ts",
     "ssm-deploy": "bun run src/ssm-deploy.ts",
     "terraform-apply": "bun run src/terraform-apply.ts",
     "verify-public-images": "bun run src/verify-public-images.ts",
@@ -16,5 +16,8 @@
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.1"
   }
 }

@@ -1,5 +1,6 @@
-import { appendFile } from 'node:fs/promises';
+import * as core from '@actions/core';
 import { $ } from 'bun';
+import { writeSummary } from '#shared/actions.ts';
 import { optionalEnv } from '#shared/env.ts';
 import { terraformDir } from '#shared/paths.ts';
 
@@ -35,12 +36,16 @@ const green = style('32');
 const cyan = style('36');
 
 async function group<T>({ title, run }: { title: string; run: () => Promise<T> }): Promise<T> {
-  console.log(inActions ? `::group::${title}` : bold(cyan(`\n▸ ${title}`)));
+  if (inActions) {
+    core.startGroup(title);
+  } else {
+    console.log(bold(cyan(`\n▸ ${title}`)));
+  }
   try {
     return await run();
   } finally {
     if (inActions) {
-      console.log('::endgroup::');
+      core.endGroup();
     }
   }
 }
@@ -86,10 +91,16 @@ if (optionalEnv('ALLOW_DESTROY') !== 'true') {
     for (const address of unexpected) {
       console.log(red(`  - ${address}`));
     }
-    console.log('\nRerun via workflow_dispatch with allow_destroy enabled if this is intended.');
-    console.log(
-      `::error title=Destructive terraform plan blocked::Plan destroys/replaces: ${unexpected.join(' ')}`,
+    await writeSummary(
+      [
+        '## Destructive terraform plan blocked',
+        '',
+        ...unexpected.map((address) => `- \`${address}\``),
+        '',
+        'Rerun via workflow_dispatch with `allow_destroy` enabled if this is intended.',
+      ].join('\n'),
     );
+    core.setFailed(`Plan destroys/replaces: ${unexpected.join(' ')}`);
     process.exit(1);
   }
 
@@ -111,23 +122,14 @@ const outputs = (await terraform(['output', '-json']).quiet().json()) as Record<
   { value: string }
 >;
 
-const githubOutput = optionalEnv('GITHUB_OUTPUT');
-const lines: string[] = [];
+console.log(green(bold('\n✓ applied')));
 
 for (const name of DEPLOY_OUTPUTS) {
   const value = outputs[name]?.value;
   if (value === undefined) {
-    console.log(red(`Missing terraform output: ${name}`));
+    core.setFailed(`Missing terraform output: ${name}`);
     process.exit(1);
   }
-  lines.push(`${name}=${value}`);
-}
-
-if (githubOutput) {
-  await appendFile(githubOutput, `${lines.join('\n')}\n`);
-}
-
-console.log(green(bold('\n✓ applied')));
-for (const line of lines) {
-  console.log(`  ${line}`);
+  core.setOutput(name, value);
+  console.log(`  ${name}=${value}`);
 }
