@@ -30,12 +30,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Resolve image URIs
-        id: images
-        run: |
-          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
-          echo "api=${repo}/api:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "pg_backup=${repo}/pg-backup:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      # GHCR rejects uppercase, and expressions have no lowercase function.
+      - name: Resolve image repository
+        id: registry
+        run: echo "repo=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v3
         with:
@@ -44,23 +42,24 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push api
-        uses: docker/build-push-action@v6
+        id: api_image
+        uses: ./.github/actions/build-and-push-docker
         with:
+          image-repository: ${{ steps.registry.outputs.repo }}/api
+          image-tag: ${{ github.sha }}
           context: .
-          file: apps/api/Dockerfile
-          push: true
-          tags: ${{ steps.images.outputs.api }}
-          cache-from: type=gha,scope=api
-          cache-to: type=gha,scope=api,mode=max
+          dockerfile: apps/api/Dockerfile
+          cache-scope: api
 
       - name: Build and push pg-backup
-        uses: docker/build-push-action@v6
+        id: pg_backup_image
+        uses: ./.github/actions/build-and-push-docker
         with:
+          image-repository: ${{ steps.registry.outputs.repo }}/pg-backup
+          image-tag: ${{ github.sha }}
           context: infra/pg-backup
-          push: true
-          tags: ${{ steps.images.outputs.pg_backup }}
-          cache-from: type=gha,scope=pg-backup
-          cache-to: type=gha,scope=pg-backup,mode=max
+          dockerfile: infra/pg-backup/Dockerfile
+          cache-scope: pg-backup
 
       - name: Configure AWS credentials (Terraform role)
         uses: aws-actions/configure-aws-credentials@v6
@@ -103,8 +102,8 @@ jobs:
 
       - name: Verify images are public
         env:
-          API_IMAGE_URI: ${{ steps.images.outputs.api }}
-          PG_BACKUP_IMAGE_URI: ${{ steps.images.outputs.pg_backup }}
+          API_IMAGE_URI: ${{ steps.api_image.outputs.image-uri }}
+          PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
         run: infra/deploy/verify_public_images.sh
 
       - name: Upload runtime bundle
@@ -122,10 +121,10 @@ jobs:
           DEPLOY_GROUP: ${{ steps.tf.outputs.deploy_group }}
           SSM_SECRET_PREFIX: ${{ steps.tf.outputs.ssm_secret_prefix }}
           DATA_VOLUME_ID: ${{ steps.tf.outputs.data_volume_id }}
-          API_IMAGE_URI: ${{ steps.images.outputs.api }}
+          API_IMAGE_URI: ${{ steps.api_image.outputs.image-uri }}
           API_HOSTNAME: ${{ steps.tf.outputs.api_hostname }}
           API_S3_BUCKET: ${{ steps.tf.outputs.api_s3_bucket }}
           API_S3_ENDPOINT: ${{ steps.tf.outputs.api_s3_endpoint }}
-          PG_BACKUP_IMAGE_URI: ${{ steps.images.outputs.pg_backup }}
+          PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
           PG_BACKUP_BUCKET: ${{ steps.tf.outputs.pg_backup_bucket }}
         run: infra/deploy/ssm_deploy.sh

@@ -1,0 +1,67 @@
+name: Build and push Docker image
+description: Build an image and push it to the registry, skipping the build if that tag already exists.
+
+inputs:
+  image-repository:
+    description: Target image repository, without a tag.
+    required: true
+  image-tag:
+    description: Image tag to publish.
+    required: true
+  context:
+    description: Docker build context.
+    required: true
+  dockerfile:
+    description: Path to the Dockerfile.
+    required: true
+  cache-scope:
+    description: GitHub Actions cache scope; keep distinct per image to avoid collisions.
+    required: true
+
+outputs:
+  image-uri:
+    description: The immutable image reference to deploy.
+    value: ${{ steps.tags.outputs.immutable }}
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare tags
+      id: tags
+      shell: bash
+      env:
+        IMAGE_REPOSITORY: ${{ inputs.image-repository }}
+        IMAGE_TAG: ${{ inputs.image-tag }}
+      run: echo "immutable=$IMAGE_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+    # Tags are immutable (the commit sha), so a re-run on the same commit has
+    # nothing to rebuild.
+    - name: Check for existing image
+      id: existing-image
+      shell: bash
+      env:
+        IMAGE_URI: ${{ steps.tags.outputs.immutable }}
+      run: |
+        if docker manifest inspect "$IMAGE_URI" >/dev/null 2>&1; then
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+          echo "Image $IMAGE_URI already exists; skipping build." >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Set up Docker Buildx
+      if: steps.existing-image.outputs.exists != 'true'
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and push image
+      if: steps.existing-image.outputs.exists != 'true'
+      shell: bash
+      env:
+        IMAGE_REPOSITORY: ${{ inputs.image-repository }}
+        IMAGE_TAG: ${{ inputs.image-tag }}
+        BUILD_CONTEXT: ${{ inputs.context }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+        CACHE_FROM: type=gha,scope=${{ inputs.cache-scope }}
+        CACHE_TO: type=gha,mode=max,scope=${{ inputs.cache-scope }}
+        SOURCE_LABEL: https://github.com/${{ github.repository }}
+      run: infra/deploy/build_and_push_image.sh
