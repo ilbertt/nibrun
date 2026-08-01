@@ -45,21 +45,21 @@ resource "aws_iam_role" "github_deploy" {
 data "aws_iam_policy_document" "github_deploy" {
   count = var.enable_github_deploy ? 1 : 0
 
-  # Upload the control-plane and agent bundles.
+  # Upload the runtime bundle.
   statement {
-    sid       = "BundlesWrite"
+    sid       = "BundleWrite"
     actions   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket"]
     resources = [aws_s3_bucket.deploy.arn, "${aws_s3_bucket.deploy.arn}/*"]
   }
 
-  # Find the target instances behind the deploy tags.
+  # Find the target instance behind the deploy tag.
   statement {
     sid       = "Ec2Describe"
     actions   = ["ec2:DescribeInstances"]
     resources = ["*"]
   }
 
-  # Trigger the deploy on the instances and read command status.
+  # Trigger the deploy on the instance and read command status.
   statement {
     sid       = "SsmSend"
     actions   = ["ssm:SendCommand"]
@@ -69,24 +69,6 @@ data "aws_iam_policy_document" "github_deploy" {
     sid       = "SsmStatus"
     actions   = ["ssm:DescribeInstanceInformation", "ssm:GetCommandInvocation", "ssm:ListCommandInvocations", "ssm:ListCommands"]
     resources = ["*"]
-  }
-
-  # Publish apps/www to the CDN origin and drop the edge cache.
-  dynamic "statement" {
-    for_each = var.enable_www_cdn ? [1] : []
-    content {
-      sid       = "WwwPublish"
-      actions   = ["s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
-      resources = [aws_s3_bucket.www[0].arn, "${aws_s3_bucket.www[0].arn}/*"]
-    }
-  }
-  dynamic "statement" {
-    for_each = var.enable_www_cdn ? [1] : []
-    content {
-      sid       = "WwwInvalidate"
-      actions   = ["cloudfront:CreateInvalidation", "cloudfront:GetInvalidation"]
-      resources = [aws_cloudfront_distribution.www[0].arn]
-    }
   }
 }
 

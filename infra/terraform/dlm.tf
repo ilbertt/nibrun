@@ -22,12 +22,10 @@ resource "aws_iam_role_policy_attachment" "dlm" {
   policy_arn = "arn:aws:iam::aws:policy/AWSDataLifecycleManagerServiceRole"
 }
 
-# Covers the control-plane volume and every host volume — they all carry the
-# same Backup tag. Postgres also gets a nightly logical dump to S3 (pg-backup);
-# these snapshots are the block-level counterpart and the only backup customer
-# app data has.
+# Block-level counterpart to pg-backup's nightly logical dump, and the only
+# backup anything on the volume other than Postgres has.
 resource "aws_dlm_lifecycle_policy" "data" {
-  description        = "Daily snapshots of the nibrun data volumes"
+  description        = "Daily snapshots of the nibrun data volume"
   execution_role_arn = aws_iam_role.dlm.arn
   state              = "ENABLED"
 

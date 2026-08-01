@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds the tarball the control-plane box downloads from S3 and unpacks into
-# /opt/nibrun. Everything the on-box deploy touches has to be in here.
+# Builds the tarball the box downloads from S3 and unpacks into /opt/nibrun.
+# Everything the on-box deploy touches has to be in here.
 #
 # Nothing from apps/ is included: the api, gateway and dashboard all ship as
 # container images, and the gateway bakes its Caddyfile in — so there is no
@@ -28,7 +28,7 @@ cmd=(
   -C "$repo_root"
   docker-compose.yml docker-compose.prod.yml
   -C "$repo_root/infra/deploy"
-  on_control_plane_deploy.sh ensure_data_volume.sh
+  on_box_deploy.sh ensure_data_volume.sh
 )
 
 printf '$'

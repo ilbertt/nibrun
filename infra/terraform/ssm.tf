@@ -1,6 +1,6 @@
-# Secrets the instances read at deploy time. Generated once and kept in state
-# (the S3 backend is encrypted + access-controlled), so a deploy never carries
-# a credential through CI.
+# Secrets the instance reads at deploy time. Generated once and kept in state
+# (the S3 backend is encrypted + access-controlled), so a deploy never carries a
+# credential through CI.
 
 resource "random_password" "db" {
   length  = 32
@@ -8,14 +8,6 @@ resource "random_password" "db" {
 }
 
 resource "random_password" "better_auth_secret" {
-  length  = 48
-  special = false
-}
-
-# Presented by the agent when it dials the control plane's socket. Both fleets
-# read the same parameter, so rotating it means redeploying the control plane
-# and every host — do the control plane first, or hosts will be rejected.
-resource "random_password" "host_token" {
   length  = 48
   special = false
 }
@@ -37,15 +29,5 @@ resource "aws_ssm_parameter" "better_auth_secret" {
 
   tags = {
     Name = "${local.resource_name_prefix}-better-auth-secret"
-  }
-}
-
-resource "aws_ssm_parameter" "host_token" {
-  name  = "${var.ssm_secret_prefix}/host_token"
-  type  = "SecureString"
-  value = random_password.host_token.result
-
-  tags = {
-    Name = "${local.resource_name_prefix}-host-token"
   }
 }

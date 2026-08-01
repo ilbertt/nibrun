@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fails a plan that would destroy or replace anything not explicitly allowed.
-# The data volumes hold customer app data and the artifacts bucket holds their
-# uploaded binaries, so an unnoticed replace is unrecoverable.
+# The data volume holds Postgres and the artifacts bucket holds users' uploaded
+# binaries, so an unnoticed replace is unrecoverable.
 set -euo pipefail
 
 plan_file="${1:-tfplan}"

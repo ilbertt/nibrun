@@ -8,17 +8,3 @@ provider "aws" {
     }
   }
 }
-
-# CloudFront only accepts ACM certificates issued in us-east-1, regardless of
-# where the rest of the stack lives.
-provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
-
-  default_tags {
-    tags = {
-      Project   = "nibrun"
-      ManagedBy = "terraform"
-    }
-  }
-}

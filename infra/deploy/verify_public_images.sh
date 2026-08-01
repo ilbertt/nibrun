@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The control-plane box pulls its images with no registry credentials, so every
-# release image has to be anonymously pullable. Checked here, in CI, rather than
-# discovered as a failed `compose pull` mid-deploy.
+# The box pulls its images with no registry credentials, so every release image
+# has to be anonymously pullable. Checked here, in CI, rather than discovered as
+# a failed `compose pull` mid-deploy.
 set -euo pipefail
 
 images=("$@")
@@ -37,7 +37,7 @@ done
 if [ "$failed" -ne 0 ]; then
   {
     echo
-    echo "nibrun release images must be public because the control-plane host pulls them without registry credentials."
+    echo "nibrun release images must be public because the host pulls them without registry credentials."
     echo "Check the package settings under https://github.com/ilbertt?tab=packages and set each nibrun container package visibility to Public."
   } >&2
   exit 1

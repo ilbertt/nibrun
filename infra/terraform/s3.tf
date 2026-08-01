@@ -48,9 +48,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "deploy" {
 
 # --- Artifacts bucket ---
 #
-# The binaries users upload, which the api writes and compute hosts read when
-# they start a guest. Separate from the deploy bucket: this one holds customer
-# data and outlives any single deploy, so it is versioned and never
+# The binaries users upload. Separate from the deploy bucket: this one holds
+# customer data and outlives any single deploy, so it is versioned and never
 # force-destroyed.
 resource "aws_s3_bucket" "artifacts" {
   bucket = "nibrun-artifacts-${data.aws_caller_identity.current.account_id}"
