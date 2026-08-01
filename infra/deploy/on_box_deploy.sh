@@ -8,9 +8,16 @@ cd "$(dirname "$0")"
 
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
-: "${API_IMAGE_URI:?}" "${PG_BACKUP_IMAGE_URI:?}" "${SSM_SECRET_PREFIX:?}" \
-  "${APP_HOSTNAME:?}" "${AWS_DEFAULT_REGION:?}" "${DATA_VOLUME_ID:?}" \
-  "${DEPLOY_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
+: "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_S3_BUCKET:?}" \
+  "${PG_BACKUP_IMAGE_URI:?}" "${PG_BACKUP_BUCKET:?}" \
+  "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" "${DATA_VOLUME_ID:?}"
+
+# Fixed prod config that no infrastructure value feeds, still overridable from
+# the deploy so it never has to be edited here.
+API_PORT="${API_PORT:-3000}"
+API_LOG_LEVEL="${API_LOG_LEVEL:-info}"
+POSTGRES_USER="${POSTGRES_USER:-nibrun}"
+POSTGRES_DB="${POSTGRES_DB:-nibrun}"
 
 log "Ensuring the persistent data volume is mounted and holds the data-bearing volumes"
 bash ensure_data_volume.sh
@@ -20,31 +27,30 @@ secret() {
     --query Parameter.Value --output text
 }
 
-DB_PASSWORD="$(secret db_password)"
+POSTGRES_PASSWORD="$(secret postgres_password)"
 API_BETTER_AUTH_SECRET="$(secret api_better_auth_secret)"
 
 umask 077
 cat > .env <<EOF
-APP_HOSTNAME=${APP_HOSTNAME}
-AWS_REGION=${AWS_DEFAULT_REGION}
-AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+AWS_REGION=${AWS_REGION}
 
-POSTGRES_USER=nibrun
-POSTGRES_PASSWORD=${DB_PASSWORD}
-POSTGRES_DB=nibrun
+POSTGRES_USER=${POSTGRES_USER}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_DB=${POSTGRES_DB}
 
 API_IMAGE_URI=${API_IMAGE_URI}
-API_PORT=3000
-API_BASE_URL=https://${APP_HOSTNAME}
-API_DATABASE_URL=postgres://nibrun:${DB_PASSWORD}@postgres:5432/nibrun
+API_HOSTNAME=${API_HOSTNAME}
+API_PORT=${API_PORT}
+API_BASE_URL=https://${API_HOSTNAME}
+API_DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
 API_BETTER_AUTH_SECRET=${API_BETTER_AUTH_SECRET}
-API_LOG_LEVEL=info
+API_LOG_LEVEL=${API_LOG_LEVEL}
 # Real S3, so no endpoint override and no static keys — the api picks up the
 # instance role over IMDS (the instance allows two hops so containers reach it).
-API_S3_BUCKET=${ARTIFACTS_BUCKET}
+API_S3_BUCKET=${API_S3_BUCKET}
 
 PG_BACKUP_IMAGE_URI=${PG_BACKUP_IMAGE_URI}
-BACKUP_BUCKET=${DEPLOY_BUCKET}
+PG_BACKUP_BUCKET=${PG_BACKUP_BUCKET}
 EOF
 
 compose="docker compose -f docker-compose.yml -f docker-compose.prod.yml"

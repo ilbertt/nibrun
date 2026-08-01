@@ -1,8 +1,11 @@
-# --- Deploy bucket ---
+# Three buckets rather than one with prefix-scoped rules: each has a different
+# lifecycle, and each feeds exactly one config value, so no name is ever
+# rewritten on the way to the box. Account-id suffix for globally unique names.
+
+# --- Deploy bundles ---
 #
-# Holds the runtime bundles the deploy workflow uploads and the instances
-# download (compose files, on-box scripts, the compiled agent binary), plus the
-# nightly Postgres dumps. Account-id suffix for a globally unique name.
+# The runtime bundle CI uploads and the instance downloads (compose files,
+# on-box scripts). Disposable — every deploy writes a new one.
 resource "aws_s3_bucket" "deploy" {
   bucket        = "nibrun-deploy-${data.aws_caller_identity.current.account_id}"
   force_destroy = true
@@ -26,31 +29,64 @@ resource "aws_s3_bucket_lifecycle_configuration" "deploy" {
   rule {
     id     = "expire-old-bundles"
     status = "Enabled"
-    filter {
-      prefix = "bundles/"
-    }
+    filter {}
     expiration {
       days = 30
     }
   }
+}
+
+# --- Postgres dumps ---
+#
+# Written nightly by the pg-backup sidecar. Longer retention than the bundles,
+# and never force-destroyed.
+resource "aws_s3_bucket" "backups" {
+  bucket = "nibrun-backups-${data.aws_caller_identity.current.account_id}"
+
+  tags = {
+    Name = "${local.resource_name_prefix}-backups"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "backups" {
+  bucket                  = aws_s3_bucket.backups.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "backups" {
+  bucket = aws_s3_bucket.backups.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "backups" {
+  bucket = aws_s3_bucket.backups.id
 
   rule {
     id     = "expire-old-backups"
     status = "Enabled"
-    filter {
-      prefix = "backups/"
-    }
+    filter {}
     expiration {
       days = 90
     }
   }
 }
 
-# --- Artifacts bucket ---
+# --- Artifacts ---
 #
-# The binaries users upload. Separate from the deploy bucket: this one holds
-# customer data and outlives any single deploy, so it is versioned and never
-# force-destroyed.
+# The binaries users upload. Holds customer data and outlives any single deploy,
+# so it is versioned and never force-destroyed.
 resource "aws_s3_bucket" "artifacts" {
   bucket = "nibrun-artifacts-${data.aws_caller_identity.current.account_id}"
 

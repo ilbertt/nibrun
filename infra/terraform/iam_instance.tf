@@ -31,11 +31,12 @@ data "aws_iam_policy_document" "instance" {
     resources = [aws_s3_bucket.deploy.arn, "${aws_s3_bucket.deploy.arn}/*"]
   }
 
-  # Upload nightly pg_dump backups.
+  # Upload nightly pg_dump backups. Write-only: a compromised box must not be
+  # able to read or delete the history it is appending to.
   statement {
     sid       = "BackupsWrite"
     actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.deploy.arn}/backups/*"]
+    resources = ["${aws_s3_bucket.backups.arn}/*"]
   }
 
   # The api owns the artifact lifecycle: it takes the upload and deletes it when

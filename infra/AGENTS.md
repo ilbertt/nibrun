@@ -3,23 +3,25 @@
 AWS, one stack, one box. `bootstrap/` is one-time CloudFormation, `terraform/`
 owns the resources, `deploy/` is what CI runs, `pg-backup/` is the nightly dump
 sidecar. The EC2 instance runs the compose stack — api and Postgres — behind an
-elastic IP, with a persistent EBS volume at `/data` and two S3 buckets:
-`artifacts` for user uploads, `deploy` for runtime bundles and Postgres dumps.
-Nothing terminates TLS yet. The gateway, compute hosts and the CDN come later.
+elastic IP, with a persistent EBS volume at `/data` and three S3 buckets:
+artifacts for user uploads, backups for Postgres dumps, deploy for runtime
+bundles. Nothing terminates TLS yet. The gateway, compute hosts and the CDN come
+later.
 
-Everything the api container reads is prefixed `API_`; `POSTGRES_*` is the
-database, and the handful of unprefixed keys are box-level.
+Config carries its component's prefix — `API_`, `POSTGRES_`, `PG_BACKUP_` — and
+keeps one name from the Terraform output through the SSM command to the `.env`
+the box writes. Nothing is aliased in transit, so nothing can drift.
 
 ## First run
 
-The domain is not bought yet, so `hostname` has no default — pass it at apply
-time.
+The domain is not bought yet, so `api_hostname` has no default — pass it at
+apply time.
 
 ```sh
 # Console → CloudFormation → upload bootstrap/github-oidc-bootstrap.yaml, once.
 cd infra/terraform
 terraform init
-terraform apply -var hostname=…
+terraform apply -var api_hostname=…
 ```
 
 Then point an A record at `terraform output public_ip`, DNS-only (grey cloud).

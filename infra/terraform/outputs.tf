@@ -1,3 +1,6 @@
+# Outputs that feed the deploy carry the exact name the environment variable
+# has, all the way to the .env the box writes — nothing is renamed in transit.
+
 output "public_ip" {
   description = "Point the hostname's A record at this, DNS-only / not proxied."
   value       = aws_eip.app.public_ip
@@ -7,17 +10,18 @@ output "public_ipv6" {
   value = one(aws_instance.app.ipv6_addresses)
 }
 
-output "hostname" {
-  value = var.hostname
+output "api_hostname" {
+  value = var.api_hostname
 }
 
-output "instance_id" {
-  value = aws_instance.app.id
+output "api_s3_bucket" {
+  description = "User-uploaded binaries."
+  value       = aws_s3_bucket.artifacts.bucket
 }
 
-output "deploy_group_tag" {
-  description = "SSM targeting tag used by the deploy workflow."
-  value       = local.resource_name_prefix
+output "pg_backup_bucket" {
+  description = "Nightly Postgres dumps."
+  value       = aws_s3_bucket.backups.bucket
 }
 
 output "data_volume_id" {
@@ -25,14 +29,18 @@ output "data_volume_id" {
   value       = aws_ebs_volume.data.id
 }
 
+output "deploy_group" {
+  description = "SSM targeting tag used by the deploy workflow."
+  value       = local.resource_name_prefix
+}
+
 output "deploy_bucket" {
-  description = "Runtime bundles and Postgres dumps."
+  description = "Where CI uploads the runtime bundle; the box downloads it from the resulting URL."
   value       = aws_s3_bucket.deploy.bucket
 }
 
-output "artifacts_bucket" {
-  description = "User-uploaded binaries."
-  value       = aws_s3_bucket.artifacts.bucket
+output "instance_id" {
+  value = aws_instance.app.id
 }
 
 output "github_deploy_role_arn" {

@@ -6,9 +6,9 @@
 set -euo pipefail
 
 : "${BUNDLE_URL:?}" "${DEPLOY_GROUP:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}"
-: "${API_IMAGE_URI:?}" "${PG_BACKUP_IMAGE_URI:?}"
-: "${APP_HOSTNAME:?}"
-: "${DATA_VOLUME_ID:?}" "${DEPLOY_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
+: "${DATA_VOLUME_ID:?}"
+: "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_S3_BUCKET:?}"
+: "${PG_BACKUP_IMAGE_URI:?}" "${PG_BACKUP_BUCKET:?}"
 
 instance_id=$(aws ec2 describe-instances \
   --filters "Name=tag:DeployGroup,Values=${DEPLOY_GROUP}" "Name=instance-state-name,Values=running" \
@@ -35,14 +35,15 @@ if [ "$ssm_online" != "true" ]; then
 fi
 
 # Config the on-box script needs, shell-quoted by jq @sh so a value can never
-# break out of the export line. Secrets are not here — the box reads those from
-# SSM itself.
+# break out of the export line. Every name here is the name the box writes into
+# .env — nothing is rewritten in transit. Secrets are absent; the box reads
+# those from SSM itself.
 exports=$(jq -rn \
-  --arg api_image "$API_IMAGE_URI" --arg pg_backup_image "$PG_BACKUP_IMAGE_URI" \
-  --arg prefix "$SSM_SECRET_PREFIX" --arg host "$APP_HOSTNAME" \
+  --arg api_image "$API_IMAGE_URI" --arg api_hostname "$API_HOSTNAME" \
+  --arg api_s3_bucket "$API_S3_BUCKET" --arg pg_backup_image "$PG_BACKUP_IMAGE_URI" \
+  --arg pg_backup_bucket "$PG_BACKUP_BUCKET" --arg prefix "$SSM_SECRET_PREFIX" \
   --arg region "$AWS_REGION" --arg data_volume "$DATA_VOLUME_ID" \
-  --arg deploy_bucket "$DEPLOY_BUCKET" --arg artifacts "$ARTIFACTS_BUCKET" \
-  '"export API_IMAGE_URI=\($api_image|@sh) PG_BACKUP_IMAGE_URI=\($pg_backup_image|@sh) SSM_SECRET_PREFIX=\($prefix|@sh) APP_HOSTNAME=\($host|@sh) AWS_DEFAULT_REGION=\($region|@sh) DATA_VOLUME_ID=\($data_volume|@sh) DEPLOY_BUCKET=\($deploy_bucket|@sh) ARTIFACTS_BUCKET=\($artifacts|@sh)"')
+  '"export API_IMAGE_URI=\($api_image|@sh) API_HOSTNAME=\($api_hostname|@sh) API_S3_BUCKET=\($api_s3_bucket|@sh) PG_BACKUP_IMAGE_URI=\($pg_backup_image|@sh) PG_BACKUP_BUCKET=\($pg_backup_bucket|@sh) SSM_SECRET_PREFIX=\($prefix|@sh) AWS_REGION=\($region|@sh) DATA_VOLUME_ID=\($data_volume|@sh)"')
 
 # The bootstrap-marker wait ensures Docker/Compose/AWS CLI are installed
 # (user_data) before we deploy onto a brand-new box.

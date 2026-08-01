@@ -29,9 +29,9 @@ variable "vpc_cidr_block" {
 
 # No default, deliberately: the domain is not bought yet, and a placeholder
 # would silently become what everything points at.
-variable "hostname" {
+variable "api_hostname" {
   type        = string
-  description = "Public hostname served over HTTPS. Point an A record at the elastic IP."
+  description = "Public hostname the api is served on. Point an A record at the elastic IP."
 }
 
 variable "enable_github_deploy" {
