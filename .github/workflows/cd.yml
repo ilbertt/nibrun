@@ -27,7 +27,7 @@ jobs:
   cd:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/prepare
 
@@ -36,7 +36,7 @@ jobs:
         id: registry
         run: echo "repo=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -69,12 +69,12 @@ jobs:
         run: bun run --filter @repo/internal-scripts verify-public-images
 
       - name: Configure AWS credentials (Terraform apply role)
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ vars.AWS_TERRAFORM_APPLY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           # The wrapper wraps every command in extra output, which would end up
           # inside the JSON terraform-apply parses.
@@ -95,7 +95,7 @@ jobs:
 
       # Drops from admin to the scoped role for everything that touches the app.
       - name: Configure AWS credentials (deploy role)
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ steps.tf.outputs.github_deploy_role_arn }}
           aws-region: ${{ env.AWS_REGION }}
