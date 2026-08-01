@@ -3,11 +3,6 @@ variable "region" {
   default = "eu-west-2"
 }
 
-variable "environment" {
-  type    = string
-  default = "dev"
-}
-
 # --- Control plane (apps/api + apps/gateway + Postgres, one box) ---
 
 variable "control_plane_instance_type" {
@@ -51,7 +46,7 @@ variable "root_volume_size" {
 variable "vpc_cidr_block" {
   type        = string
   default     = "10.43.0.0/16"
-  description = "IPv4 CIDR block for the environment-owned VPC."
+  description = "IPv4 CIDR block for the VPC."
 }
 
 # The gateway is the only thing allowed to reach a guest, and only on this
@@ -69,8 +64,8 @@ variable "guest_port_max" {
 # --- Public hostnames ---
 #
 # No defaults, deliberately: the domains are not settled. A placeholder here
-# would silently become what every environment points at, and the two-domain
-# split below only holds if someone chooses both on purpose.
+# would silently become what everything points at, and the two-domain split
+# below only holds if someone chooses both on purpose. Pass them at apply time.
 
 variable "api_hostname" {
   type        = string
@@ -114,8 +109,8 @@ variable "enable_www_cdn" {
 
 variable "enable_github_deploy" {
   type        = bool
-  description = "Create the GitHub Actions OIDC deploy role. Local AWS CLI deployments do not need it."
-  default     = false
+  description = "Create the GitHub Actions OIDC deploy role. Set false to apply before the bootstrap stack exists, since the role looks up the OIDC provider it creates."
+  default     = true
 }
 
 variable "github_repo" {
@@ -132,5 +127,5 @@ variable "github_branch" {
 
 variable "ssm_secret_prefix" {
   type    = string
-  default = "/nibrun/dev"
+  default = "/nibrun"
 }

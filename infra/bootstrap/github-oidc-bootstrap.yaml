@@ -21,7 +21,7 @@ Parameters:
   StateBucketName:
     Type: String
     Default: nibrun-tfstate
-    Description: Must match bucket in infra/terraform/backends/*.conf.
+    Description: Must match the backend bucket in infra/terraform/versions.tf.
 
 Conditions:
   ShouldCreateOidcProvider: !Equals [!Ref CreateOidcProvider, "true"]
@@ -85,5 +85,5 @@ Outputs:
     Description: Set this as the AWS_TERRAFORM_ROLE_ARN variable in the GitHub repo.
     Value: !GetAtt TerraformRole.Arn
   StateBucket:
-    Description: Backend bucket for infra/terraform/backends/*.conf.
+    Description: Backend bucket declared in infra/terraform/versions.tf.
     Value: !Ref StateBucket

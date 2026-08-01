@@ -4,7 +4,7 @@
 # download (compose files, on-box scripts, the compiled agent binary), plus the
 # nightly Postgres dumps. Account-id suffix for a globally unique name.
 resource "aws_s3_bucket" "deploy" {
-  bucket        = "nibrun-deploy-${data.aws_caller_identity.current.account_id}-${var.environment}"
+  bucket        = "nibrun-deploy-${data.aws_caller_identity.current.account_id}"
   force_destroy = true
 
   tags = {
@@ -53,7 +53,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "deploy" {
 # data and outlives any single deploy, so it is versioned and never
 # force-destroyed.
 resource "aws_s3_bucket" "artifacts" {
-  bucket = "nibrun-artifacts-${data.aws_caller_identity.current.account_id}-${var.environment}"
+  bucket = "nibrun-artifacts-${data.aws_caller_identity.current.account_id}"
 
   tags = {
     Name = "${local.resource_name_prefix}-artifacts"

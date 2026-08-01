@@ -9,7 +9,7 @@
 locals {
   www_aliases     = var.enable_www_cdn ? concat([var.www_hostname], var.www_alternate_hostnames) : []
   www_origin_id   = "${local.resource_name_prefix}-www"
-  www_bucket_name = "nibrun-www-${data.aws_caller_identity.current.account_id}-${var.environment}"
+  www_bucket_name = "nibrun-www-${data.aws_caller_identity.current.account_id}"
 }
 
 resource "aws_s3_bucket" "www" {

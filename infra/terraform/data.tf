@@ -13,12 +13,12 @@ data "aws_availability_zones" "available" {
 
 locals {
   availability_zone    = data.aws_availability_zones.available.names[0]
-  resource_name_prefix = "nibrun-${var.environment}"
+  resource_name_prefix = "nibrun"
 
   # SSM RunCommand targets each fleet by these tags; the deploy scripts take
   # them as DEPLOY_GROUP.
-  control_plane_deploy_group = "nibrun-${var.environment}-control-plane"
-  host_deploy_group          = "nibrun-${var.environment}-host"
+  control_plane_deploy_group = "nibrun-control-plane"
+  host_deploy_group          = "nibrun-host"
 
   ssm_param_arn_prefix = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${var.ssm_secret_prefix}"
 }

@@ -5,7 +5,7 @@
 
 resource "aws_security_group" "control_plane" {
   name        = "${local.resource_name_prefix}-control-plane"
-  description = "nibrun ${var.environment} control plane (api + gateway)"
+  description = "nibrun control plane (api + gateway)"
   vpc_id      = aws_vpc.app.id
 
   tags = {
@@ -74,7 +74,7 @@ resource "aws_vpc_security_group_egress_rule" "control_plane_all_ipv6" {
 # has to reach a host to schedule onto it.
 resource "aws_security_group" "host" {
   name        = "${local.resource_name_prefix}-host"
-  description = "nibrun ${var.environment} compute host (agent + guests)"
+  description = "nibrun compute host (agent + guests)"
   vpc_id      = aws_vpc.app.id
 
   tags = {

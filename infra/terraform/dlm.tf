@@ -27,7 +27,7 @@ resource "aws_iam_role_policy_attachment" "dlm" {
 # these snapshots are the block-level counterpart and the only backup customer
 # app data has.
 resource "aws_dlm_lifecycle_policy" "data" {
-  description        = "Daily snapshots of the nibrun ${var.environment} data volumes"
+  description        = "Daily snapshots of the nibrun data volumes"
   execution_role_arn = aws_iam_role.dlm.arn
   state              = "ENABLED"
 

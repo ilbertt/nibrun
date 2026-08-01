@@ -3,9 +3,8 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "nibrun"
-      Environment = var.environment
-      ManagedBy   = "terraform"
+      Project   = "nibrun"
+      ManagedBy = "terraform"
     }
   }
 }
@@ -18,9 +17,8 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "nibrun"
-      Environment = var.environment
-      ManagedBy   = "terraform"
+      Project   = "nibrun"
+      ManagedBy = "terraform"
     }
   }
 }
