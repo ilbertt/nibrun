@@ -44,9 +44,8 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      # Account-suffixed: S3 names are global, and a bare one both collides with
-      # other accounts and cannot be recreated straight after a delete.
-      BucketName: !Sub nibrun-tfstate-${AWS::AccountId}
+      # S3 names are global, so this has to be unique across every AWS account.
+      BucketName: nibrun-infra-tfstate
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
