@@ -46,6 +46,4 @@ const argv = [
 
 // Echoed so a failing CI build can be reproduced by copy-paste.
 core.info(`$ ${argv.map((arg) => $.escape(arg)).join(' ')}`);
-// `bun run --filter` runs from the package directory, so the context and
-// dockerfile inputs would resolve against packages/internal-scripts.
 await $`${argv}`.cwd(repoRoot);
