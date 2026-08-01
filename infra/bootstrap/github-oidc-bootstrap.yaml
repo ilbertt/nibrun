@@ -34,6 +34,11 @@ Resources:
       Url: https://token.actions.githubusercontent.com
       ClientIdList:
         - sts.amazonaws.com
+      Tags:
+        - Key: Project
+          Value: nibrun
+        - Key: ManagedBy
+          Value: cloudformation
 
   # Terraform's own state. Versioned so a corrupted or truncated state file is
   # recoverable, and retained on stack deletion so tearing down the bootstrap
@@ -55,6 +60,11 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: nibrun
+        - Key: ManagedBy
+          Value: cloudformation
 
   TerraformRole:
     Type: AWS::IAM::Role
@@ -79,6 +89,11 @@ Resources:
       # stable (it only ever runs from your repo's main branch).
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AdministratorAccess
+      Tags:
+        - Key: Project
+          Value: nibrun
+        - Key: ManagedBy
+          Value: cloudformation
 
 Outputs:
   TerraformRoleArn:
