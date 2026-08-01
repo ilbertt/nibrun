@@ -1,8 +1,9 @@
 # infra
 
 AWS, one stack, one box. `bootstrap/` is one-time CloudFormation, `terraform/`
-owns the resources, `deploy/` is what CI runs, `pg-backup/` is the nightly dump
-sidecar. The EC2 instance runs the compose stack — api and Postgres — behind an
+owns the resources, `pg-backup/` is the nightly dump sidecar. `deploy/` holds
+only the two scripts that run *on* the box, which is why they are shell — the
+instance has no Bun. Everything CI runs lives in `@repo/internal-scripts`. The EC2 instance runs the compose stack — api and Postgres — behind an
 elastic IP, with a persistent EBS volume at `/data` and three S3 buckets:
 artifacts for user uploads, backups for Postgres dumps, deploy for runtime
 bundles. MinIO stands in for S3 locally only — `docker-compose.prod.yml` parks

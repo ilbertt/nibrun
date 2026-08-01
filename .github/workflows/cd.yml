@@ -30,6 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: ./.github/actions/prepare
+
       # GHCR rejects uppercase, and expressions have no lowercase function.
       - name: Resolve image repository
         id: registry
@@ -84,7 +86,7 @@ jobs:
           terraform init -input=false
           terraform plan -input=false -out=tfplan
           if [ "${{ inputs.allow_destroy }}" != "true" ]; then
-            ../deploy/check_terraform_destroy_plan.sh tfplan
+            bun run --filter @repo/internal-scripts check-terraform-destroy-plan
           fi
           terraform apply -input=false tfplan
           for output in api_hostname api_s3_bucket api_s3_endpoint pg_backup_bucket \
@@ -104,13 +106,13 @@ jobs:
         env:
           API_IMAGE_URI: ${{ steps.api_image.outputs.image-uri }}
           PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
-        run: infra/deploy/verify_public_images.sh
+        run: bun run --filter @repo/internal-scripts verify-public-images
 
       - name: Upload runtime bundle
         id: bundle
         run: |
           set -euo pipefail
-          infra/deploy/package_runtime_bundle.sh bundle.tar.gz
+          bun run --filter @repo/internal-scripts package-runtime-bundle
           url="s3://${{ steps.tf.outputs.deploy_bucket }}/bundles/${GITHUB_SHA}.tar.gz"
           aws s3 cp bundle.tar.gz "$url"
           echo "url=${url}" >> "$GITHUB_OUTPUT"
@@ -127,4 +129,4 @@ jobs:
           API_S3_ENDPOINT: ${{ steps.tf.outputs.api_s3_endpoint }}
           PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
           PG_BACKUP_BUCKET: ${{ steps.tf.outputs.pg_backup_bucket }}
-        run: infra/deploy/ssm_deploy.sh
+        run: bun run --filter @repo/internal-scripts ssm-deploy

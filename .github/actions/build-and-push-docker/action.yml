@@ -64,4 +64,4 @@ runs:
         CACHE_FROM: type=gha,scope=${{ inputs.cache-scope }}
         CACHE_TO: type=gha,mode=max,scope=${{ inputs.cache-scope }}
         SOURCE_LABEL: https://github.com/${{ github.repository }}
-      run: infra/deploy/build_and_push_image.sh
+      run: bun run --filter @repo/internal-scripts build-and-push-image
