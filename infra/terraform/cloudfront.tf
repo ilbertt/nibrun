@@ -47,6 +47,11 @@ resource "aws_acm_certificate" "www" {
 
   lifecycle {
     create_before_destroy = true
+
+    precondition {
+      condition     = trimspace(var.www_hostname) != ""
+      error_message = "www_hostname must be set when enable_www_cdn is true."
+    }
   }
 }
 

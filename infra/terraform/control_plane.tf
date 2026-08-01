@@ -42,7 +42,7 @@ resource "aws_instance" "control_plane" {
 }
 
 # Stable public IP. Both the api hostname and the customer-app wildcard point
-# here — see infra/README.md for the DNS records to create.
+# here — see infra/AGENTS.md for the DNS records to create.
 resource "aws_eip" "control_plane" {
   instance = aws_instance.control_plane.id
   domain   = "vpc"

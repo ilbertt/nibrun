@@ -68,38 +68,40 @@ variable "guest_port_max" {
 
 # --- Public hostnames ---
 #
-# nibrun deliberately spans two registrable domains: the dashboard and control
-# plane live on nibrun.com, customer apps on nibrun.app, so customer JS is never
-# in the dashboard's cookie scope.
+# No defaults, deliberately: the domains are not settled. A placeholder here
+# would silently become what every environment points at, and the two-domain
+# split below only holds if someone chooses both on purpose.
 
 variable "api_hostname" {
   type        = string
   description = "Public hostname for the control plane and the dashboard it embeds. Also the origin compute hosts dial for the agent socket."
-  default     = "app.nibrun.com"
 }
 
 variable "apps_domain" {
   type        = string
-  description = "Registrable domain customer apps are served from. The gateway answers for *.<apps_domain>; point a wildcard A record at the control-plane IP."
-  default     = "nibrun.app"
-}
+  description = "Registrable domain customer apps are served from; the gateway answers for *.<apps_domain>. Must be a different registrable domain from api_hostname, so customer JS is never in the dashboard's cookie scope."
 
-variable "www_hostname" {
-  type        = string
-  description = "Public hostname for the statically rendered landing/docs site (apps/www) behind CloudFront."
-  default     = "nibrun.com"
-}
-
-variable "www_alternate_hostnames" {
-  type        = list(string)
-  description = "Extra names the CDN distribution answers for, e.g. the www. alias."
-  default     = ["www.nibrun.com"]
+  validation {
+    condition     = length(regexall("[.]", var.apps_domain)) >= 1 && !endswith(var.apps_domain, ".")
+    error_message = "apps_domain must be a bare registrable domain, e.g. example.com — no scheme, no wildcard, no trailing dot."
+  }
 }
 
 variable "acme_email" {
   type        = string
   description = "Contact address Let's Encrypt is given when the gateway requests certificates."
-  default     = "ops@nibrun.com"
+}
+
+variable "www_hostname" {
+  type        = string
+  description = "Public hostname for the statically rendered landing/docs site (apps/www) behind CloudFront. Only read when enable_www_cdn is set."
+  default     = ""
+}
+
+variable "www_alternate_hostnames" {
+  type        = list(string)
+  description = "Extra names the CDN distribution answers for, e.g. the www. alias."
+  default     = []
 }
 
 variable "enable_www_cdn" {
