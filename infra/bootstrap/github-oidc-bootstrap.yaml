@@ -122,12 +122,18 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               # Pull requests from forks get no token at all, so this is branches
-              # in this repository only. Both subject forms, as above.
+              # in this repository only. Also assumable from main, so a plan can
+              # be run there without applying. Both subject forms, as above.
               StringLike:
                 token.actions.githubusercontent.com:sub:
                   - !Sub repo:${GitHubRepo}:pull_request
                   - !Sub
                     - repo:${Owner}@*/${Name}@*:pull_request
+                    - Owner: !Select [0, !Split ["/", !Ref GitHubRepo]]
+                      Name: !Select [1, !Split ["/", !Ref GitHubRepo]]
+                  - !Sub repo:${GitHubRepo}:ref:refs/heads/main
+                  - !Sub
+                    - repo:${Owner}@*/${Name}@*:ref:refs/heads/main
                     - Owner: !Select [0, !Split ["/", !Ref GitHubRepo]]
                       Name: !Select [1, !Split ["/", !Ref GitHubRepo]]
       ManagedPolicyArns:
