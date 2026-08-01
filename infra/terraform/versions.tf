@@ -6,7 +6,7 @@ terraform {
   backend "s3" {
     bucket       = "nibrun-tfstate"
     key          = "nibrun/terraform.tfstate"
-    region       = "eu-west-2"
+    region       = "eu-central-1"
     encrypt      = true
     use_lockfile = true
   }

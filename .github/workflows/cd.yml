@@ -21,7 +21,7 @@ permissions:
 
 env:
   # Authoritative: passed to Terraform as TF_VAR_region, so the two cannot drift.
-  AWS_REGION: eu-west-2
+  AWS_REGION: eu-central-1
 
 jobs:
   cd:

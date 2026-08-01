@@ -18,7 +18,7 @@ permissions:
   id-token: write
 
 env:
-  AWS_REGION: eu-west-2
+  AWS_REGION: eu-central-1
 
 jobs:
   terraform-check:
