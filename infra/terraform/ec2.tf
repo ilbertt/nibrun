@@ -16,9 +16,11 @@ resource "aws_instance" "app" {
     volume_type = "gp3"
     encrypted   = true
 
-    tags = {
+    # Nested block tags are the one place default_tags has historically not
+    # reached, so merge them in rather than rely on provider behaviour.
+    tags = merge(local.common_tags, {
       Name = "${local.resource_name_prefix}-root"
-    }
+    })
   }
 
   metadata_options {

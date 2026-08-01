@@ -62,6 +62,12 @@ jobs:
           dockerfile: infra/pg-backup/Dockerfile
           cache-scope: pg-backup
 
+      - name: Verify images are public
+        env:
+          API_IMAGE_URI: ${{ steps.api_image.outputs.image-uri }}
+          PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
+        run: bun run --filter @repo/internal-scripts verify-public-images
+
       - name: Configure AWS credentials (Terraform role)
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -88,12 +94,6 @@ jobs:
         with:
           role-to-assume: ${{ steps.tf.outputs.github_deploy_role_arn }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Verify images are public
-        env:
-          API_IMAGE_URI: ${{ steps.api_image.outputs.image-uri }}
-          PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
-        run: bun run --filter @repo/internal-scripts verify-public-images
 
       - name: Publish runtime bundle
         id: bundle
