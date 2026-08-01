@@ -6,8 +6,8 @@ set -euo pipefail
 
 images=("$@")
 if [ "${#images[@]}" -eq 0 ]; then
-  : "${API_IMAGE_URI:?}" "${GATEWAY_IMAGE_URI:?}" "${PG_BACKUP_IMAGE_URI:?}"
-  images=("$API_IMAGE_URI" "$GATEWAY_IMAGE_URI" "$PG_BACKUP_IMAGE_URI")
+  : "${API_IMAGE_URI:?}" "${PG_BACKUP_IMAGE_URI:?}"
+  images=("$API_IMAGE_URI" "$PG_BACKUP_IMAGE_URI")
 fi
 
 docker_config="$(mktemp -d)"

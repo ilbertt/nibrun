@@ -2,25 +2,27 @@
 
 AWS, one stack, one box. `bootstrap/` is one-time CloudFormation, `terraform/`
 owns the resources, `deploy/` is what CI runs, `pg-backup/` is the nightly dump
-sidecar. The EC2 instance runs the whole compose stack — api, gateway, Postgres
-— behind an elastic IP, with a persistent EBS volume at `/data` and two S3
-buckets: `artifacts` for user uploads, `deploy` for runtime bundles and Postgres
-dumps. Compute hosts and the CDN come later.
+sidecar. The EC2 instance runs the compose stack — api and Postgres — behind an
+elastic IP, with a persistent EBS volume at `/data` and two S3 buckets:
+`artifacts` for user uploads, `deploy` for runtime bundles and Postgres dumps.
+Nothing terminates TLS yet. The gateway, compute hosts and the CDN come later.
+
+Everything the api container reads is prefixed `API_`; `POSTGRES_*` is the
+database, and the handful of unprefixed keys are box-level.
 
 ## First run
 
-The domain is not bought yet, so `hostname` and `acme_email` have no defaults —
-pass them at apply time.
+The domain is not bought yet, so `hostname` has no default — pass it at apply
+time.
 
 ```sh
 # Console → CloudFormation → upload bootstrap/github-oidc-bootstrap.yaml, once.
 cd infra/terraform
 terraform init
-terraform apply -var hostname=… -var acme_email=…
+terraform apply -var hostname=…
 ```
 
-Then point an A record at `terraform output public_ip`, DNS-only (grey cloud) —
-a proxy in front of the gateway breaks the ACME challenge.
+Then point an A record at `terraform output public_ip`, DNS-only (grey cloud).
 
 ## Deploying
 

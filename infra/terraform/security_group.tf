@@ -3,10 +3,10 @@ resource "aws_security_group" "instance" {
   description = "nibrun instance"
   vpc_id      = aws_vpc.app.id
 
-  # Public HTTPS, terminated by the gateway. Port 80 is needed for the ACME
-  # HTTP-01 challenge and to redirect to HTTPS.
+  # Public surface. Nothing on the box terminates TLS yet, so 443 is open ahead
+  # of whatever does; 80 also carries the ACME HTTP-01 challenge once it exists.
   ingress {
-    description      = "HTTP (ACME + redirect)"
+    description      = "HTTP"
     from_port        = 80
     to_port          = 80
     protocol         = "tcp"
@@ -22,9 +22,7 @@ resource "aws_security_group" "instance" {
     ipv6_cidr_blocks = ["::/0"]
   }
 
-  # No inbound SSH: shell access is via SSM Session Manager. The gateway's admin
-  # API (:2019) is never exposed either — the api reaches it over the compose
-  # network.
+  # No inbound SSH: shell access is via SSM Session Manager.
 
   egress {
     description      = "All outbound"

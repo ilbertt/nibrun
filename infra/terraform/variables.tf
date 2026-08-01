@@ -6,7 +6,7 @@ variable "region" {
 variable "instance_type" {
   type        = string
   default     = "t3.large"
-  description = "Runs the whole compose stack: api, gateway and Postgres."
+  description = "Runs the whole compose stack: api and Postgres."
 }
 
 variable "root_volume_size" {
@@ -18,7 +18,7 @@ variable "root_volume_size" {
 variable "data_volume_size" {
   type        = number
   default     = 50
-  description = "Persistent data EBS volume size in GB. Backs Postgres and the gateway's certificate store. Survives instance replacement."
+  description = "Persistent data EBS volume size in GB. Backs Postgres. Survives instance replacement."
 }
 
 variable "vpc_cidr_block" {
@@ -32,11 +32,6 @@ variable "vpc_cidr_block" {
 variable "hostname" {
   type        = string
   description = "Public hostname served over HTTPS. Point an A record at the elastic IP."
-}
-
-variable "acme_email" {
-  type        = string
-  description = "Contact address Let's Encrypt is given when the gateway requests certificates."
 }
 
 variable "enable_github_deploy" {

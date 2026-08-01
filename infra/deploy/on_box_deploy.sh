@@ -8,9 +8,9 @@ cd "$(dirname "$0")"
 
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
-: "${API_IMAGE_URI:?}" "${GATEWAY_IMAGE_URI:?}" "${PG_BACKUP_IMAGE_URI:?}" \
-  "${SSM_SECRET_PREFIX:?}" "${APP_HOSTNAME:?}" "${ACME_EMAIL:?}" \
-  "${AWS_DEFAULT_REGION:?}" "${DATA_VOLUME_ID:?}" "${DEPLOY_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
+: "${API_IMAGE_URI:?}" "${PG_BACKUP_IMAGE_URI:?}" "${SSM_SECRET_PREFIX:?}" \
+  "${APP_HOSTNAME:?}" "${AWS_DEFAULT_REGION:?}" "${DATA_VOLUME_ID:?}" \
+  "${DEPLOY_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
 
 log "Ensuring the persistent data volume is mounted and holds the data-bearing volumes"
 bash ensure_data_volume.sh
@@ -21,38 +21,30 @@ secret() {
 }
 
 DB_PASSWORD="$(secret db_password)"
-BETTER_AUTH_SECRET="$(secret better_auth_secret)"
+API_BETTER_AUTH_SECRET="$(secret api_better_auth_secret)"
 
 umask 077
 cat > .env <<EOF
-POSTGRES_USER=nibrun
-POSTGRES_PASSWORD=${DB_PASSWORD}
-POSTGRES_DB=nibrun
-DATABASE_URL=postgres://nibrun:${DB_PASSWORD}@postgres:5432/nibrun
-
-PORT=3000
-BASE_URL=https://${APP_HOSTNAME}
-BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-
-# Real S3, so no S3_ENDPOINT override and no static keys — the api picks up the
-# instance role over IMDS (the instance allows two hops so containers reach it).
-S3_BUCKET=${ARTIFACTS_BUCKET}
+APP_HOSTNAME=${APP_HOSTNAME}
 AWS_REGION=${AWS_DEFAULT_REGION}
 AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
 
-# Reached over the compose network only; the gateway's admin port is never
-# published to the host.
-GATEWAY_ADMIN_URL=http://gateway:2019
-
-APP_HOSTNAME=${APP_HOSTNAME}
-ACME_EMAIL=${ACME_EMAIL}
+POSTGRES_USER=nibrun
+POSTGRES_PASSWORD=${DB_PASSWORD}
+POSTGRES_DB=nibrun
 
 API_IMAGE_URI=${API_IMAGE_URI}
-GATEWAY_IMAGE_URI=${GATEWAY_IMAGE_URI}
+API_PORT=3000
+API_BASE_URL=https://${APP_HOSTNAME}
+API_DATABASE_URL=postgres://nibrun:${DB_PASSWORD}@postgres:5432/nibrun
+API_BETTER_AUTH_SECRET=${API_BETTER_AUTH_SECRET}
+API_LOG_LEVEL=info
+# Real S3, so no endpoint override and no static keys — the api picks up the
+# instance role over IMDS (the instance allows two hops so containers reach it).
+API_S3_BUCKET=${ARTIFACTS_BUCKET}
+
 PG_BACKUP_IMAGE_URI=${PG_BACKUP_IMAGE_URI}
 BACKUP_BUCKET=${DEPLOY_BUCKET}
-
-LOG_LEVEL=info
 EOF
 
 compose="docker compose -f docker-compose.yml -f docker-compose.prod.yml"

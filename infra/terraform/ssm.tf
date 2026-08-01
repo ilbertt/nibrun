@@ -7,7 +7,7 @@ resource "random_password" "db" {
   special = false # used inside a postgres:// URL, keep it URL-safe
 }
 
-resource "random_password" "better_auth_secret" {
+resource "random_password" "api_better_auth_secret" {
   length  = 48
   special = false
 }
@@ -22,12 +22,12 @@ resource "aws_ssm_parameter" "db_password" {
   }
 }
 
-resource "aws_ssm_parameter" "better_auth_secret" {
-  name  = "${var.ssm_secret_prefix}/better_auth_secret"
+resource "aws_ssm_parameter" "api_better_auth_secret" {
+  name  = "${var.ssm_secret_prefix}/api_better_auth_secret"
   type  = "SecureString"
-  value = random_password.better_auth_secret.result
+  value = random_password.api_better_auth_secret.result
 
   tags = {
-    Name = "${local.resource_name_prefix}-better-auth-secret"
+    Name = "${local.resource_name_prefix}-api-better-auth-secret"
   }
 }

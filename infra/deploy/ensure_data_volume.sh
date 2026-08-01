@@ -38,4 +38,4 @@ mountpoint -q /data || mount /data
 
 # Docker does not create missing host directories for local volumes with
 # `o: bind` driver_opts (unlike container bind mounts) — volume creation fails.
-mkdir -p /data/volumes/postgres-data /data/volumes/gateway-data
+mkdir -p /data/volumes/postgres-data

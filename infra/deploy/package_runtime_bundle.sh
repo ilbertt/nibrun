@@ -2,9 +2,9 @@
 # Builds the tarball the box downloads from S3 and unpacks into /opt/nibrun.
 # Everything the on-box deploy touches has to be in here.
 #
-# Nothing from apps/ is included: the api, gateway and dashboard all ship as
-# container images, and the gateway bakes its Caddyfile in — so there is no
-# config to bind-mount and nothing to reload after an image swap.
+# Nothing from apps/ is included: the api ships as a container image with the
+# dashboard embedded, so there is no config to bind-mount and nothing to reload
+# after an image swap.
 set -euo pipefail
 
 output_path="${1:-${BUNDLE_PATH:-}}"

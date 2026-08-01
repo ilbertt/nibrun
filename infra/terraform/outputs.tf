@@ -11,10 +11,6 @@ output "hostname" {
   value = var.hostname
 }
 
-output "acme_email" {
-  value = var.acme_email
-}
-
 output "instance_id" {
   value = aws_instance.app.id
 }

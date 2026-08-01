@@ -6,8 +6,8 @@
 set -euo pipefail
 
 : "${BUNDLE_URL:?}" "${DEPLOY_GROUP:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}"
-: "${API_IMAGE_URI:?}" "${GATEWAY_IMAGE_URI:?}" "${PG_BACKUP_IMAGE_URI:?}"
-: "${APP_HOSTNAME:?}" "${ACME_EMAIL:?}"
+: "${API_IMAGE_URI:?}" "${PG_BACKUP_IMAGE_URI:?}"
+: "${APP_HOSTNAME:?}"
 : "${DATA_VOLUME_ID:?}" "${DEPLOY_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
 
 instance_id=$(aws ec2 describe-instances \
@@ -38,12 +38,11 @@ fi
 # break out of the export line. Secrets are not here — the box reads those from
 # SSM itself.
 exports=$(jq -rn \
-  --arg api_image "$API_IMAGE_URI" --arg gateway_image "$GATEWAY_IMAGE_URI" \
-  --arg pg_backup_image "$PG_BACKUP_IMAGE_URI" --arg prefix "$SSM_SECRET_PREFIX" \
-  --arg host "$APP_HOSTNAME" --arg acme "$ACME_EMAIL" --arg region "$AWS_REGION" \
-  --arg data_volume "$DATA_VOLUME_ID" --arg deploy_bucket "$DEPLOY_BUCKET" \
-  --arg artifacts "$ARTIFACTS_BUCKET" \
-  '"export API_IMAGE_URI=\($api_image|@sh) GATEWAY_IMAGE_URI=\($gateway_image|@sh) PG_BACKUP_IMAGE_URI=\($pg_backup_image|@sh) SSM_SECRET_PREFIX=\($prefix|@sh) APP_HOSTNAME=\($host|@sh) ACME_EMAIL=\($acme|@sh) AWS_DEFAULT_REGION=\($region|@sh) DATA_VOLUME_ID=\($data_volume|@sh) DEPLOY_BUCKET=\($deploy_bucket|@sh) ARTIFACTS_BUCKET=\($artifacts|@sh)"')
+  --arg api_image "$API_IMAGE_URI" --arg pg_backup_image "$PG_BACKUP_IMAGE_URI" \
+  --arg prefix "$SSM_SECRET_PREFIX" --arg host "$APP_HOSTNAME" \
+  --arg region "$AWS_REGION" --arg data_volume "$DATA_VOLUME_ID" \
+  --arg deploy_bucket "$DEPLOY_BUCKET" --arg artifacts "$ARTIFACTS_BUCKET" \
+  '"export API_IMAGE_URI=\($api_image|@sh) PG_BACKUP_IMAGE_URI=\($pg_backup_image|@sh) SSM_SECRET_PREFIX=\($prefix|@sh) APP_HOSTNAME=\($host|@sh) AWS_DEFAULT_REGION=\($region|@sh) DATA_VOLUME_ID=\($data_volume|@sh) DEPLOY_BUCKET=\($deploy_bucket|@sh) ARTIFACTS_BUCKET=\($artifacts|@sh)"')
 
 # The bootstrap-marker wait ensures Docker/Compose/AWS CLI are installed
 # (user_data) before we deploy onto a brand-new box.
