@@ -19,7 +19,7 @@ resource "aws_iam_role" "dlm" {
 
 resource "aws_iam_role_policy_attachment" "dlm" {
   role       = aws_iam_role.dlm.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSDataLifecycleManagerServiceRole"
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole"
 }
 
 # Block-level counterpart to pg-backup's nightly logical dump, and the only
