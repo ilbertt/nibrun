@@ -11,6 +11,7 @@
     "ssm-deploy": "bun run src/ssm-deploy.ts",
     "terraform-apply": "bun run src/terraform-apply.ts",
     "terraform-check": "bun run src/terraform-check.ts",
+    "terraform-plan": "bun run src/terraform-plan.ts",
     "verify-public-images": "bun run src/verify-public-images.ts",
     "check:types": "bun run --bun tsc"
   },
