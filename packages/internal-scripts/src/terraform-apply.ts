@@ -45,7 +45,9 @@ async function group<T>({ title, run }: { title: string; run: () => Promise<T> }
   }
 }
 
-const terraform = (args: string[]) => $`terraform ${args}`.cwd(terraformDir);
+function terraform(args: string[]) {
+  return $`terraform ${args}`.cwd(terraformDir);
+}
 
 await group({
   title: 'terraform init',

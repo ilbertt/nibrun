@@ -1,6 +1,6 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { $ } from 'bun';
+import { aws } from '#shared/aws.ts';
 import { optionalEnv, requiredEnv } from '#shared/env.ts';
 
 const SSM_REGISTRATION_ATTEMPTS = 60;
@@ -24,8 +24,6 @@ const onBoxEnv: Record<string, string> = {
   DATA_VOLUME_ID: requiredEnv('DATA_VOLUME_ID'),
   AWS_REGION: requiredEnv('AWS_REGION'),
 };
-
-const aws = (args: string[]) => $`aws ${args}`;
 
 // POSIX single quoting: the one form with no metacharacters inside it, so a
 // value can never break out of the export line it lands in.
