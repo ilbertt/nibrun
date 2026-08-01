@@ -18,10 +18,6 @@ Parameters:
     Description: >
       Set to false if the account already has the GitHub OIDC provider — there
       can only be one per account, and a second stack creating it will fail.
-  StateBucketName:
-    Type: String
-    Default: nibrun-tfstate
-    Description: Must match the backend bucket in infra/terraform/versions.tf.
 
 Conditions:
   ShouldCreateOidcProvider: !Equals [!Ref CreateOidcProvider, "true"]
@@ -48,7 +44,9 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Ref StateBucketName
+      # Account-suffixed: S3 names are global, and a bare one both collides with
+      # other accounts and cannot be recreated straight after a delete.
+      BucketName: !Sub nibrun-tfstate-${AWS::AccountId}
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -165,5 +163,5 @@ Outputs:
     Description: Set this as the AWS_PLAN_ROLE_ARN variable in the GitHub repo.
     Value: !GetAtt TerraformPlanRole.Arn
   StateBucket:
-    Description: Backend bucket declared in infra/terraform/versions.tf.
+    Description: Must match the backend bucket in infra/terraform/versions.tf.
     Value: !Ref StateBucket
