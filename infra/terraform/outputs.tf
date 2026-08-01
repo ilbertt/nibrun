@@ -54,8 +54,3 @@ output "github_deploy_role_arn" {
   description = "Set as AWS_DEPLOY_ROLE_ARN in GitHub repo variables."
   value       = var.enable_github_deploy ? aws_iam_role.github_deploy[0].arn : null
 }
-
-output "github_plan_role_arn" {
-  description = "Set as AWS_PLAN_ROLE_ARN in GitHub repo variables."
-  value       = var.enable_github_deploy ? aws_iam_role.github_plan[0].arn : null
-}

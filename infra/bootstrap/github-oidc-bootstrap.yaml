@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  One-time bootstrap for nibrun. Creates the GitHub OIDC provider and the
-  Terraform role that GitHub Actions assumes to manage all other infra, plus the
-  S3 bucket holding Terraform state.
+  One-time bootstrap for nibrun. Creates the GitHub OIDC provider, the two roles
+  GitHub Actions assumes to run Terraform — apply from main, plan from a pull
+  request — and the S3 bucket holding Terraform state.
   Deploy this once in the AWS Console (CloudFormation > Create stack > upload this
   file). After it exists, everything else is managed by Terraform in CI.
 
@@ -95,10 +95,56 @@ Resources:
         - Key: ManagedBy
           Value: cloudformation
 
+  # Terraform cannot own this: it is what CI assumes in order to run a plan, so
+  # a fresh account could never plan before its first apply. Read-only, and its
+  # policy references nothing Terraform manages.
+  TerraformPlanRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: nibrun-terraform-plan
+      Description: Assumed by GitHub Actions to plan Terraform on pull requests.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # Pull requests from forks get no token at all, so this is
+                # branches in this repository only.
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubRepo}:pull_request
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Policies:
+        # ReadOnlyAccess deliberately omits kms:Decrypt, without which
+        # refreshing a SecureString parameter fails.
+        - PolicyName: kms-decrypt-via-ssm
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+      Tags:
+        - Key: Project
+          Value: nibrun
+        - Key: ManagedBy
+          Value: cloudformation
+
 Outputs:
   TerraformRoleArn:
     Description: Set this as the AWS_TERRAFORM_ROLE_ARN variable in the GitHub repo.
     Value: !GetAtt TerraformRole.Arn
+  TerraformPlanRoleArn:
+    Description: Set this as the AWS_PLAN_ROLE_ARN variable in the GitHub repo.
+    Value: !GetAtt TerraformPlanRole.Arn
   StateBucket:
     Description: Backend bucket declared in infra/terraform/versions.tf.
     Value: !Ref StateBucket
