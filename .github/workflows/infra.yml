@@ -69,6 +69,14 @@ jobs:
         with:
           terraform_wrapper: false
 
+      # TEMPORARY: prints the OIDC claims the trust policy has to match.
+      - name: Show OIDC subject
+        run: |
+          curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
+            | jq -r .value | cut -d. -f2 \
+            | python3 -c "import sys,base64,json;d=sys.stdin.read().strip();c=json.loads(base64.urlsafe_b64decode(d+'='*(-len(d)%4)));print(json.dumps({k:c.get(k) for k in ('sub','aud','repository','event_name','ref','workflow_ref')},indent=2))"
+
       - name: Report a missing plan role
         if: env.PLAN_ROLE == ''
         run: echo "::warning title=Terraform plan skipped::Set the AWS_PLAN_ROLE_ARN repository variable to terraform output github_plan_role_arn."
