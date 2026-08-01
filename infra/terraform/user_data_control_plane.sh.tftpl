@@ -1,0 +1,27 @@
+#!/bin/bash
+set -euxo pipefail
+
+dnf update -y
+dnf install -y docker unzip
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+# Not guaranteed on minimal AL2023, and the deploy script needs it.
+if ! command -v aws >/dev/null 2>&1; then
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+  unzip -q /tmp/awscliv2.zip -d /tmp
+  /tmp/aws/install
+fi
+
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/download/v2.32.4/docker-compose-linux-x86_64" \
+  -o /usr/libexec/docker/cli-plugins/docker-compose
+chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+mkdir -p /opt/nibrun
+chown ec2-user:ec2-user /opt/nibrun
+
+# Completion marker — the deploy workflow waits for this before deploying, so it
+# never runs before Docker/Compose/AWS CLI are installed. Kept outside
+# /opt/nibrun because the deploy command writes into that directory.
+touch /opt/nibrun-bootstrap.done

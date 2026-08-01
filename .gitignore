@@ -40,3 +40,13 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # frameworks
 .tanstack
+
+# terraform — state lives in the S3 backend, never on disk.
+# .terraform.lock.hcl is deliberately NOT ignored: commit it so CI resolves the
+# same provider versions.
+**/.terraform/
+*.tfplan
+*.tfstate
+*.tfstate.*
+*.auto.tfvars.json
+crash.log

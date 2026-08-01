@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  One-time bootstrap for nibrun. Creates the GitHub OIDC provider and the
+  Terraform role that GitHub Actions assumes to manage all other infra, plus the
+  S3 bucket holding Terraform state.
+  Deploy this once in the AWS Console (CloudFormation > Create stack > upload this
+  file). After it exists, everything else is managed by Terraform in CI.
+
+Parameters:
+  GitHubRepo:
+    Type: String
+    Default: ilbertt/nibrun
+    Description: owner/repo allowed to assume the Terraform role.
+  CreateOidcProvider:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >
+      Set to false if the account already has the GitHub OIDC provider — there
+      can only be one per account, and a second stack creating it will fail.
+  StateBucketName:
+    Type: String
+    Default: nibrun-tfstate
+    Description: Must match bucket in infra/terraform/backends/*.conf.
+
+Conditions:
+  ShouldCreateOidcProvider: !Equals [!Ref CreateOidcProvider, "true"]
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+
+  # Terraform's own state. Versioned so a corrupted or truncated state file is
+  # recoverable, and retained on stack deletion so tearing down the bootstrap
+  # never takes the record of every other resource with it.
+  StateBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref StateBucketName
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  TerraformRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: nibrun-terraform
+      Description: Assumed by GitHub Actions to run Terraform for nibrun.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - !Sub repo:${GitHubRepo}:ref:refs/heads/main
+      # Broad for a first dev setup. Scope down later once the resource set is
+      # stable (it only ever runs from your repo's main branch).
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+Outputs:
+  TerraformRoleArn:
+    Description: Set this as the AWS_TERRAFORM_ROLE_ARN variable in the GitHub repo.
+    Value: !GetAtt TerraformRole.Arn
+  StateBucket:
+    Description: Backend bucket for infra/terraform/backends/*.conf.
+    Value: !Ref StateBucket
