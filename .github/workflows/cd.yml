@@ -83,8 +83,7 @@ jobs:
       - name: Terraform apply
         id: tf
         # The AWS provider retries some failures far longer than a deploy should
-        # wait, and the job default is six hours. Note a kill here strands the
-        # state lock: the next run needs `terraform force-unlock`.
+        # wait, and the job default is six hours.
         timeout-minutes: 15
         env:
           TF_VAR_region: ${{ env.AWS_REGION }}
