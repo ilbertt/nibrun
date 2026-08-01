@@ -22,7 +22,6 @@ permissions:
 env:
   # Authoritative: passed to Terraform as TF_VAR_region, so the two cannot drift.
   AWS_REGION: eu-west-2
-  NO_COLOR: "1"
 
 jobs:
   cd:
@@ -71,29 +70,17 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          # The wrapper prints extra output around every command, which would end
-          # up inside `terraform output -raw` captures below.
+          # The wrapper wraps every command in extra output, which would end up
+          # inside the JSON terraform-apply parses.
           terraform_wrapper: false
 
       - name: Terraform apply
         id: tf
-        working-directory: infra/terraform
         env:
           TF_VAR_region: ${{ env.AWS_REGION }}
           TF_VAR_api_hostname: ${{ vars.API_HOSTNAME }}
-        run: |
-          set -euo pipefail
-          terraform init -input=false
-          terraform plan -input=false -out=tfplan
-          if [ "${{ inputs.allow_destroy }}" != "true" ]; then
-            bun run --filter @repo/internal-scripts check-terraform-destroy-plan
-          fi
-          terraform apply -input=false tfplan
-          for output in api_hostname api_s3_bucket api_s3_endpoint pg_backup_bucket \
-                        deploy_bucket data_volume_id deploy_group ssm_secret_prefix \
-                        github_deploy_role_arn; do
-            echo "${output}=$(terraform output -raw "$output")" >> "$GITHUB_OUTPUT"
-          done
+          ALLOW_DESTROY: ${{ inputs.allow_destroy }}
+        run: bun run --filter @repo/internal-scripts terraform-apply
 
       # Drops from admin to the scoped role for everything that touches the app.
       - name: Configure AWS credentials (deploy role)

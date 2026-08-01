@@ -7,9 +7,9 @@
   },
   "scripts": {
     "build-and-push-image": "bun run src/build-and-push-image.ts",
-    "check-terraform-destroy-plan": "bun run src/check-terraform-destroy-plan.ts",
     "package-runtime-bundle": "bun run src/package-runtime-bundle.ts",
     "ssm-deploy": "bun run src/ssm-deploy.ts",
+    "terraform-apply": "bun run src/terraform-apply.ts",
     "verify-public-images": "bun run src/verify-public-images.ts",
     "check:types": "bun run --bun tsc"
   },
