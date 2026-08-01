@@ -1,8 +1,7 @@
 import * as core from '@actions/core';
-import { $ } from 'bun';
 import { writeSummary } from '#shared/actions.ts';
 import { optionalEnv } from '#shared/env.ts';
-import { terraformDir } from '#shared/paths.ts';
+import { terraform } from '#shared/terraform.ts';
 
 const PLAN_FILE = 'tfplan';
 
@@ -48,10 +47,6 @@ async function group<T>({ title, run }: { title: string; run: () => Promise<T> }
       core.endGroup();
     }
   }
-}
-
-function terraform(args: string[]) {
-  return $`terraform ${args}`.cwd(terraformDir);
 }
 
 await group({
