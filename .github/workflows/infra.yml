@@ -56,10 +56,10 @@ jobs:
 
       # Read-only, and a different role from the deploy: a pull request presents
       # a different OIDC subject than a push to main.
-      - name: Configure AWS credentials (plan role)
+      - name: Configure AWS credentials (Terraform plan role)
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_TERRAFORM_PLAN_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform plan

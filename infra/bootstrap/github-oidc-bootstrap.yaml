@@ -63,11 +63,11 @@ Resources:
         - Key: ManagedBy
           Value: cloudformation
 
-  TerraformRole:
+  TerraformApplyRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: nibrun-terraform
-      Description: Assumed by GitHub Actions to run Terraform for nibrun.
+      RoleName: nibrun-terraform-apply
+      Description: Assumed by GitHub Actions to apply Terraform for nibrun.
       MaxSessionDuration: 3600
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -155,11 +155,11 @@ Resources:
           Value: cloudformation
 
 Outputs:
-  TerraformRoleArn:
-    Description: Set this as the AWS_TERRAFORM_ROLE_ARN variable in the GitHub repo.
-    Value: !GetAtt TerraformRole.Arn
+  TerraformApplyRoleArn:
+    Description: Set this as the AWS_TERRAFORM_APPLY_ROLE_ARN variable in the GitHub repo.
+    Value: !GetAtt TerraformApplyRole.Arn
   TerraformPlanRoleArn:
-    Description: Set this as the AWS_PLAN_ROLE_ARN variable in the GitHub repo.
+    Description: Set this as the AWS_TERRAFORM_PLAN_ROLE_ARN variable in the GitHub repo.
     Value: !GetAtt TerraformPlanRole.Arn
   StateBucket:
     Description: Must match the backend bucket in infra/terraform/versions.tf.

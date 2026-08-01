@@ -51,6 +51,6 @@ output "instance_id" {
 }
 
 output "github_deploy_role_arn" {
-  description = "Set as AWS_DEPLOY_ROLE_ARN in GitHub repo variables."
+  description = "Assumed by the deploy steps, after Terraform has run."
   value       = var.enable_github_deploy ? aws_iam_role.github_deploy[0].arn : null
 }

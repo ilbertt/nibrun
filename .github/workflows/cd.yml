@@ -68,10 +68,10 @@ jobs:
           PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
         run: bun run --filter @repo/internal-scripts verify-public-images
 
-      - name: Configure AWS credentials (Terraform role)
+      - name: Configure AWS credentials (Terraform apply role)
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_TERRAFORM_APPLY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - uses: hashicorp/setup-terraform@v3

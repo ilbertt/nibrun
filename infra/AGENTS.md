@@ -40,9 +40,9 @@ Terraform generates them into `/nibrun/…` and the instance reads them with its
 own role. Terraform runs under the admin bootstrap role; everything after it
 drops to the scoped deploy role.
 
-Three repository variables: `AWS_TERRAFORM_ROLE_ARN` and `AWS_PLAN_ROLE_ARN`,
-both bootstrap stack outputs, and `API_HOSTNAME`. Both GHCR packages must be
-public — the box pulls with no registry credentials.
+Three repository variables: `AWS_TERRAFORM_APPLY_ROLE_ARN` and
+`AWS_TERRAFORM_PLAN_ROLE_ARN`, both bootstrap stack outputs, and `API_HOSTNAME`.
+Both GHCR packages must be public — the box pulls with no registry credentials.
 
 `workflow_dispatch` takes `allow_destroy` for the times a plan legitimately
 replaces something.
