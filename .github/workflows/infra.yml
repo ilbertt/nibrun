@@ -52,11 +52,6 @@ jobs:
     # only race it.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    env:
-      # Created by terraform itself, so it does not exist until the first apply.
-      # Until the variable is set the plan steps skip rather than fail on empty
-      # credentials, and start working on their own once it is.
-      PLAN_ROLE: ${{ vars.AWS_PLAN_ROLE_ARN }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -69,21 +64,15 @@ jobs:
         with:
           terraform_wrapper: false
 
-      - name: Report a missing plan role
-        if: env.PLAN_ROLE == ''
-        run: echo "::warning title=Terraform plan skipped::Set the AWS_PLAN_ROLE_ARN repository variable to terraform output github_plan_role_arn."
-
       # Read-only, and a different role from the deploy: a pull request presents
       # a different OIDC subject than a push to main.
       - name: Configure AWS credentials (plan role)
-        if: env.PLAN_ROLE != ''
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: ${{ env.PLAN_ROLE }}
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform plan
-        if: env.PLAN_ROLE != ''
         env:
           TF_VAR_region: ${{ env.AWS_REGION }}
           TF_VAR_api_hostname: ${{ vars.API_HOSTNAME }}
