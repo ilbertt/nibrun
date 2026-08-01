@@ -9,15 +9,20 @@ cd "$(dirname "$0")"
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
 : "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_S3_BUCKET:?}" \
-  "${PG_BACKUP_IMAGE_URI:?}" "${PG_BACKUP_BUCKET:?}" \
+  "${API_S3_ENDPOINT:?}" "${PG_BACKUP_IMAGE_URI:?}" "${PG_BACKUP_BUCKET:?}" \
   "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" "${DATA_VOLUME_ID:?}"
 
-# Fixed prod config that no infrastructure value feeds, still overridable from
-# the deploy so it never has to be edited here.
+# Per-deployment values no infrastructure resource feeds, still overridable from
+# the deploy so they never have to be edited here. The host port bindings are
+# loopback-only in docker-compose.yml; they are not the public surface. The
+# MinIO ports are set because compose substitutes the whole file even though
+# production does not run that service.
 API_PORT="${API_PORT:-3000}"
-API_LOG_LEVEL="${API_LOG_LEVEL:-info}"
-POSTGRES_USER="${POSTGRES_USER:-nibrun}"
-POSTGRES_DB="${POSTGRES_DB:-nibrun}"
+API_DB_USER="${API_DB_USER:-nibrun}"
+API_DB_NAME="${API_DB_NAME:-nibrun}"
+API_DB_PORT="${API_DB_PORT:-5432}"
+API_S3_PORT="${API_S3_PORT:-9000}"
+API_S3_CONSOLE_PORT="${API_S3_CONSOLE_PORT:-9001}"
 
 log "Ensuring the persistent data volume is mounted and holds the data-bearing volumes"
 bash ensure_data_volume.sh
@@ -27,27 +32,35 @@ secret() {
     --query Parameter.Value --output text
 }
 
-POSTGRES_PASSWORD="$(secret postgres_password)"
+API_DB_PASSWORD="$(secret api_db_password)"
 API_BETTER_AUTH_SECRET="$(secret api_better_auth_secret)"
+API_S3_ACCESS_KEY_ID="$(secret api_s3_access_key_id)"
+API_S3_SECRET_ACCESS_KEY="$(secret api_s3_secret_access_key)"
 
+# Every key here is a compose substitution variable; docker-compose.yml maps each
+# onto the name the image expects. Values fixed by the compose topology
+# (container ports, internal service URLs) deliberately do not appear.
 umask 077
 cat > .env <<EOF
 AWS_REGION=${AWS_REGION}
-
-POSTGRES_USER=${POSTGRES_USER}
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-POSTGRES_DB=${POSTGRES_DB}
 
 API_IMAGE_URI=${API_IMAGE_URI}
 API_HOSTNAME=${API_HOSTNAME}
 API_PORT=${API_PORT}
 API_BASE_URL=https://${API_HOSTNAME}
-API_DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
 API_BETTER_AUTH_SECRET=${API_BETTER_AUTH_SECRET}
-API_LOG_LEVEL=${API_LOG_LEVEL}
-# Real S3, so no endpoint override and no static keys — the api picks up the
-# instance role over IMDS (the instance allows two hops so containers reach it).
+
+API_DB_USER=${API_DB_USER}
+API_DB_PASSWORD=${API_DB_PASSWORD}
+API_DB_NAME=${API_DB_NAME}
+API_DB_PORT=${API_DB_PORT}
+
+API_S3_ENDPOINT=${API_S3_ENDPOINT}
 API_S3_BUCKET=${API_S3_BUCKET}
+API_S3_ACCESS_KEY_ID=${API_S3_ACCESS_KEY_ID}
+API_S3_SECRET_ACCESS_KEY=${API_S3_SECRET_ACCESS_KEY}
+API_S3_PORT=${API_S3_PORT}
+API_S3_CONSOLE_PORT=${API_S3_CONSOLE_PORT}
 
 PG_BACKUP_IMAGE_URI=${PG_BACKUP_IMAGE_URI}
 PG_BACKUP_BUCKET=${PG_BACKUP_BUCKET}

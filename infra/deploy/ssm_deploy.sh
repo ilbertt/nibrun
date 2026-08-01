@@ -7,7 +7,7 @@ set -euo pipefail
 
 : "${BUNDLE_URL:?}" "${DEPLOY_GROUP:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}"
 : "${DATA_VOLUME_ID:?}"
-: "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_S3_BUCKET:?}"
+: "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_S3_BUCKET:?}" "${API_S3_ENDPOINT:?}"
 : "${PG_BACKUP_IMAGE_URI:?}" "${PG_BACKUP_BUCKET:?}"
 
 instance_id=$(aws ec2 describe-instances \
@@ -40,10 +40,11 @@ fi
 # those from SSM itself.
 exports=$(jq -rn \
   --arg api_image "$API_IMAGE_URI" --arg api_hostname "$API_HOSTNAME" \
-  --arg api_s3_bucket "$API_S3_BUCKET" --arg pg_backup_image "$PG_BACKUP_IMAGE_URI" \
-  --arg pg_backup_bucket "$PG_BACKUP_BUCKET" --arg prefix "$SSM_SECRET_PREFIX" \
-  --arg region "$AWS_REGION" --arg data_volume "$DATA_VOLUME_ID" \
-  '"export API_IMAGE_URI=\($api_image|@sh) API_HOSTNAME=\($api_hostname|@sh) API_S3_BUCKET=\($api_s3_bucket|@sh) PG_BACKUP_IMAGE_URI=\($pg_backup_image|@sh) PG_BACKUP_BUCKET=\($pg_backup_bucket|@sh) SSM_SECRET_PREFIX=\($prefix|@sh) AWS_REGION=\($region|@sh) DATA_VOLUME_ID=\($data_volume|@sh)"')
+  --arg api_s3_bucket "$API_S3_BUCKET" --arg api_s3_endpoint "$API_S3_ENDPOINT" \
+  --arg pg_backup_image "$PG_BACKUP_IMAGE_URI" --arg pg_backup_bucket "$PG_BACKUP_BUCKET" \
+  --arg prefix "$SSM_SECRET_PREFIX" --arg region "$AWS_REGION" \
+  --arg data_volume "$DATA_VOLUME_ID" \
+  '"export API_IMAGE_URI=\($api_image|@sh) API_HOSTNAME=\($api_hostname|@sh) API_S3_BUCKET=\($api_s3_bucket|@sh) API_S3_ENDPOINT=\($api_s3_endpoint|@sh) PG_BACKUP_IMAGE_URI=\($pg_backup_image|@sh) PG_BACKUP_BUCKET=\($pg_backup_bucket|@sh) SSM_SECRET_PREFIX=\($prefix|@sh) AWS_REGION=\($region|@sh) DATA_VOLUME_ID=\($data_volume|@sh)"')
 
 # The bootstrap-marker wait ensures Docker/Compose/AWS CLI are installed
 # (user_data) before we deploy onto a brand-new box.

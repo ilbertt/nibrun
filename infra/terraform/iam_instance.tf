@@ -39,14 +39,6 @@ data "aws_iam_policy_document" "instance" {
     resources = ["${aws_s3_bucket.backups.arn}/*"]
   }
 
-  # The api owns the artifact lifecycle: it takes the upload and deletes it when
-  # the app goes away.
-  statement {
-    sid       = "ArtifactsReadWrite"
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
-    resources = [aws_s3_bucket.artifacts.arn, "${aws_s3_bucket.artifacts.arn}/*"]
-  }
-
   # Read deployment secrets.
   statement {
     sid       = "SsmRead"

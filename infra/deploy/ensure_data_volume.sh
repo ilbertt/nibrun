@@ -38,4 +38,6 @@ mountpoint -q /data || mount /data
 
 # Docker does not create missing host directories for local volumes with
 # `o: bind` driver_opts (unlike container bind mounts) — volume creation fails.
+# Only Postgres: production talks to real S3, so MinIO does not run here and
+# has no volume to back.
 mkdir -p /data/volumes/postgres-data

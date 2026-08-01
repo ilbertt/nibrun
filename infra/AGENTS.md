@@ -5,8 +5,12 @@ owns the resources, `deploy/` is what CI runs, `pg-backup/` is the nightly dump
 sidecar. The EC2 instance runs the compose stack — api and Postgres — behind an
 elastic IP, with a persistent EBS volume at `/data` and three S3 buckets:
 artifacts for user uploads, backups for Postgres dumps, deploy for runtime
-bundles. Nothing terminates TLS yet. The gateway, compute hosts and the CDN come
-later.
+bundles. MinIO stands in for S3 locally only — `docker-compose.prod.yml` parks
+it on an inactive profile and points the api at the real bucket.
+
+Nothing terminates TLS yet, and the compose port bindings are loopback-only, so
+a deployed box is not publicly reachable. The gateway, compute hosts and the CDN
+come later.
 
 Config carries its component's prefix — `API_`, `POSTGRES_`, `PG_BACKUP_` — and
 keeps one name from the Terraform output through the SSM command to the `.env`

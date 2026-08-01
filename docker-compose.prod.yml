@@ -3,13 +3,51 @@
 #
 # Differences from local:
 #   - The api runs a released image instead of a local build.
-#   - Data-bearing volumes are bind-backed by the persistent disk mounted at
-#     /data, so they survive instance replacement.
+#   - Object storage is real S3, so MinIO does not run.
+#   - Postgres is bind-backed by the persistent disk mounted at /data, so it
+#     survives instance replacement.
+#   - A backup sidecar streams a nightly dump off the box.
 
 services:
   api:
     build: !reset null
     image: ${API_IMAGE_URI}
+    environment:
+      - S3_ENDPOINT=${API_S3_ENDPOINT}
+    # Replaced, not merged: the local stack waits for minio-prepare, which does
+    # not run here.
+    depends_on: !override
+      postgres-db:
+        condition: service_healthy
+
+  # Both exist only to stand in for S3 locally. An inactive profile is how a
+  # service gets switched off from an override file.
+  minio:
+    profiles: [local]
+  minio-prepare:
+    profiles: [local]
+
+  # Needs the instance role to reach S3, which is why it is prod-only. AWS
+  # credentials come from IMDS, which the instance allows two hops for so
+  # containers can read it.
+  pg-backup:
+    image: ${PG_BACKUP_IMAGE_URI}
+    container_name: pg-backup
+    environment:
+      # pg_dumpall dumps the whole cluster, roles included, so this has to be
+      # the superuser — which the api's role is, since it owns the database.
+      PGHOST: postgres-db
+      PGUSER: ${API_DB_USER}
+      PGPASSWORD: ${API_DB_PASSWORD}
+      PGDATABASE: ${API_DB_NAME}
+      PG_BACKUP_BUCKET: ${PG_BACKUP_BUCKET}
+      AWS_REGION: ${AWS_REGION}
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    restart: always
+    networks:
+      - nibrun
 
 volumes:
   postgres-data:
@@ -17,8 +55,3 @@ volumes:
       type: none
       o: bind
       device: /data/volumes/postgres-data
-  minio-data:
-    driver_opts:
-      type: none
-      o: bind
-      device: /data/volumes/minio-data

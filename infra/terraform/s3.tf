@@ -85,8 +85,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
 
 # --- Artifacts ---
 #
-# The binaries users upload. Holds customer data and outlives any single deploy,
-# so it is versioned and never force-destroyed.
+# The binaries users upload. Customer data that outlives any single deploy, so
+# it is versioned and never force-destroyed.
 resource "aws_s3_bucket" "artifacts" {
   bucket = "nibrun-artifacts-${data.aws_caller_identity.current.account_id}"
 

@@ -15,8 +15,11 @@ output "api_hostname" {
 }
 
 output "api_s3_bucket" {
-  description = "User-uploaded binaries."
-  value       = aws_s3_bucket.artifacts.bucket
+  value = aws_s3_bucket.artifacts.bucket
+}
+
+output "api_s3_endpoint" {
+  value = "https://s3.${var.region}.amazonaws.com"
 }
 
 output "pg_backup_bucket" {
