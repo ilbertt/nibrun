@@ -4,6 +4,8 @@ interface CustomProcessEnv {
   readonly BASE_URL?: string;
   readonly DATABASE_URL: string;
   readonly BETTER_AUTH_SECRET: string;
+  readonly GITHUB_CLIENT_ID: string;
+  readonly GITHUB_CLIENT_SECRET: string;
   readonly S3_ENDPOINT: string;
   readonly S3_BUCKET: string;
   readonly S3_ACCESS_KEY_ID: string;
@@ -36,6 +38,8 @@ type Env = {
   BASE_URL: URL;
   DATABASE_URL: string;
   BETTER_AUTH_SECRET: string;
+  GITHUB_CLIENT_ID: string;
+  GITHUB_CLIENT_SECRET: string;
   S3_ENDPOINT: URL;
   S3_BUCKET: string;
   S3_ACCESS_KEY_ID: string;
@@ -48,6 +52,8 @@ function loadEnv(): Env {
     BASE_URL: new URL(optional({ name: 'BASE_URL', defaultValue: DEFAULT_BASE_URL })),
     DATABASE_URL: required('DATABASE_URL'),
     BETTER_AUTH_SECRET: required('BETTER_AUTH_SECRET'),
+    GITHUB_CLIENT_ID: required('GITHUB_CLIENT_ID'),
+    GITHUB_CLIENT_SECRET: required('GITHUB_CLIENT_SECRET'),
     S3_ENDPOINT: new URL(required('S3_ENDPOINT')),
     S3_BUCKET: required('S3_BUCKET'),
     S3_ACCESS_KEY_ID: required('S3_ACCESS_KEY_ID'),

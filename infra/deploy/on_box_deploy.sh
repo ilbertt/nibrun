@@ -8,9 +8,10 @@ cd "$(dirname "$0")"
 
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
-: "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_S3_BUCKET:?}" \
-  "${API_S3_ENDPOINT:?}" "${PG_BACKUP_IMAGE_URI:?}" "${PG_BACKUP_BUCKET:?}" \
-  "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" "${DATA_VOLUME_ID:?}"
+: "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_GITHUB_CLIENT_ID:?}" \
+  "${API_S3_BUCKET:?}" "${API_S3_ENDPOINT:?}" "${PG_BACKUP_IMAGE_URI:?}" \
+  "${PG_BACKUP_BUCKET:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" \
+  "${DATA_VOLUME_ID:?}"
 
 # Per-deployment values no infrastructure resource feeds, still overridable from
 # the deploy so they never have to be edited here. The host port bindings are
@@ -34,6 +35,7 @@ secret() {
 
 API_DB_PASSWORD="$(secret api_db_password)"
 API_BETTER_AUTH_SECRET="$(secret api_better_auth_secret)"
+API_GITHUB_CLIENT_SECRET="$(secret api_github_client_secret)"
 API_S3_ACCESS_KEY_ID="$(secret api_s3_access_key_id)"
 API_S3_SECRET_ACCESS_KEY="$(secret api_s3_secret_access_key)"
 
@@ -49,6 +51,8 @@ API_HOSTNAME=${API_HOSTNAME}
 API_PORT=${API_PORT}
 API_BASE_URL=https://${API_HOSTNAME}
 API_BETTER_AUTH_SECRET=${API_BETTER_AUTH_SECRET}
+API_GITHUB_CLIENT_ID=${API_GITHUB_CLIENT_ID}
+API_GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
 
 API_DB_USER=${API_DB_USER}
 API_DB_PASSWORD=${API_DB_PASSWORD}

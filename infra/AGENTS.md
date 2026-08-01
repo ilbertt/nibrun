@@ -26,10 +26,16 @@ apply time.
 # Console → CloudFormation → upload bootstrap/github-oidc-bootstrap.yaml, once.
 cd infra/terraform
 terraform init
-terraform apply -var api_hostname=…
+terraform apply -var api_hostname=… \
+  -var api_github_client_id=… -var api_github_client_secret=…
 ```
 
 Then point an A record at `terraform output public_ip`, DNS-only (grey cloud).
+
+Sign-in needs a GitHub OAuth App whose callback URL is
+`https://<api_hostname>/api/auth/callback/github`. Its two halves are the only
+credentials that enter from outside — everything else Terraform generates
+itself.
 
 ## Deploying
 
@@ -40,8 +46,12 @@ Terraform generates them into `/nibrun/…` and the instance reads them with its
 own role. Terraform runs under the admin bootstrap role; everything after it
 drops to the scoped deploy role.
 
-Three repository variables: `AWS_TERRAFORM_APPLY_ROLE_ARN` and
-`AWS_TERRAFORM_PLAN_ROLE_ARN`, both bootstrap stack outputs, and `API_HOSTNAME`.
+Four repository variables: `AWS_TERRAFORM_APPLY_ROLE_ARN` and
+`AWS_TERRAFORM_PLAN_ROLE_ARN`, both bootstrap stack outputs, `API_HOSTNAME`, and
+`API_GITHUB_CLIENT_ID`. One repository secret, `API_GITHUB_CLIENT_SECRET`:
+Terraform reads it into an SSM parameter the instance decrypts for itself, so it
+never reaches the deploy's own environment — RunCommand keeps its parameters in
+command history, in the clear, for 30 days.
 Both GHCR packages must be public — the box pulls with no registry credentials.
 
 `workflow_dispatch` takes `allow_destroy` for the times a plan legitimately

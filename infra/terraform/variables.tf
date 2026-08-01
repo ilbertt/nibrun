@@ -42,6 +42,33 @@ variable "api_hostname" {
   }
 }
 
+# The GitHub OAuth App users sign in with. Its callback URL is tied to
+# api_hostname, so an app is per-deployment — GitHub allows one callback URL per
+# OAuth App. Both halves are created by hand, so unlike every other credential
+# here they enter from outside rather than being generated.
+variable "api_github_client_id" {
+  type        = string
+  description = "Client ID of the GitHub OAuth App. CI passes the API_GITHUB_CLIENT_ID repository variable through."
+
+  # Empty arrives as "" from an unset repository variable, and an api booted
+  # without it crashes on startup — fail the plan instead.
+  validation {
+    condition     = trimspace(var.api_github_client_id) != ""
+    error_message = "api_github_client_id must not be empty."
+  }
+}
+
+variable "api_github_client_secret" {
+  type        = string
+  sensitive   = true
+  description = "Client secret of the GitHub OAuth App. CI passes the API_GITHUB_CLIENT_SECRET repository secret through."
+
+  validation {
+    condition     = trimspace(var.api_github_client_secret) != ""
+    error_message = "api_github_client_secret must not be empty."
+  }
+}
+
 variable "enable_github_deploy" {
   type        = bool
   description = "Create the GitHub Actions OIDC deploy role. Set false to apply before the bootstrap stack exists, since the role looks up the OIDC provider it creates."

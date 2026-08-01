@@ -33,6 +33,20 @@ resource "aws_ssm_parameter" "api_better_auth_secret" {
   }
 }
 
+# The one secret Terraform cannot generate: it belongs to a GitHub OAuth App
+# created by hand, so it enters from the repository secret of the same name.
+# Landing it here rather than in the deploy's environment is deliberate — SSM
+# RunCommand keeps its parameters in command history, in the clear, for 30 days.
+resource "aws_ssm_parameter" "api_github_client_secret" {
+  name  = "${var.ssm_secret_prefix}/api_github_client_secret"
+  type  = "SecureString"
+  value = var.api_github_client_secret
+
+  tags = {
+    Name = "${local.resource_name_prefix}-api-github-client-secret"
+  }
+}
+
 # Credentials of the api's own IAM user (iam_api.tf), not generated here.
 resource "aws_ssm_parameter" "api_s3_access_key_id" {
   name  = "${var.ssm_secret_prefix}/api_s3_access_key_id"

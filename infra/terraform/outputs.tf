@@ -14,6 +14,11 @@ output "api_hostname" {
   value = var.api_hostname
 }
 
+output "api_github_client_id" {
+  description = "Public half of the GitHub OAuth App credentials; the secret half is read from SSM on the box."
+  value       = var.api_github_client_id
+}
+
 output "api_s3_bucket" {
   value = aws_s3_bucket.artifacts.bucket
 }

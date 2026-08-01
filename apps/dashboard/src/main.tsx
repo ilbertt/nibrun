@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { getRouter } from '#router.tsx';
 
 const queryClient = new QueryClient();
-const router = getRouter();
+const router = getRouter(queryClient);
 
 const rootElement = document.getElementById('app')!;
 
