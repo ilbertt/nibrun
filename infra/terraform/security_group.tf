@@ -3,16 +3,16 @@ resource "aws_security_group" "instance" {
   description = "nibrun instance"
   vpc_id      = aws_vpc.app.id
 
-  # Public surface. Nothing on the box terminates TLS yet, so 443 is open ahead
-  # of whatever does; 80 also carries the ACME HTTP-01 challenge once it exists.
-  ingress {
-    description      = "HTTP"
-    from_port        = 80
-    to_port          = 80
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
-  }
+  # The entire public surface: Caddy, terminating TLS. No port 80 — the zone is
+  # Full (strict), so Cloudflare always reaches the origin over 443, and there is
+  # no ACME challenge to answer because the certificate is a Cloudflare Origin
+  # Certificate.
+  #
+  # Open to the world rather than pinned to Cloudflare's published ranges
+  # because the origin authenticates the edge itself: Authenticated Origin Pulls
+  # means a connection without Cloudflare's client certificate is refused during
+  # the handshake, wherever it comes from. That holds without tracking a list
+  # that changes underneath us, and it fails closed rather than locking us out.
   ingress {
     description      = "HTTPS"
     from_port        = 443

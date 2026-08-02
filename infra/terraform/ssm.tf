@@ -47,6 +47,35 @@ resource "aws_ssm_parameter" "api_github_client_secret" {
   }
 }
 
+# The proxy's TLS material. Both halves land here rather than in the deploy's
+# own environment, for the same reason the OAuth App secret does — and the
+# certificate rides along even though it is public, so the box has one way to
+# read both.
+#
+# Encoded rather than stored as-is because a PEM is multi-line: the box reads
+# parameters with `aws ssm get-parameter --output text`, which mangles that, and
+# has no jq to read the JSON form instead. base64encode emits a single line, so
+# on_box_deploy.sh only has to decode.
+resource "aws_ssm_parameter" "caddy_tls_cert" {
+  name  = "${var.ssm_secret_prefix}/caddy_tls_cert"
+  type  = "SecureString"
+  value = base64encode(var.caddy_tls_cert)
+
+  tags = {
+    Name = "${local.resource_name_prefix}-caddy-tls-cert"
+  }
+}
+
+resource "aws_ssm_parameter" "caddy_tls_key" {
+  name  = "${var.ssm_secret_prefix}/caddy_tls_key"
+  type  = "SecureString"
+  value = base64encode(var.caddy_tls_key)
+
+  tags = {
+    Name = "${local.resource_name_prefix}-caddy-tls-key"
+  }
+}
+
 # Credentials of the api's own IAM user (iam_api.tf), not generated here.
 resource "aws_ssm_parameter" "api_s3_access_key_id" {
   name  = "${var.ssm_secret_prefix}/api_s3_access_key_id"

@@ -69,6 +69,37 @@ variable "api_github_client_secret" {
   }
 }
 
+# The Cloudflare Origin Certificate the proxy serves, and its key. Issued by
+# hand like the OAuth App credentials, and split the same way: the certificate
+# is handed to every client that connects, so it enters from a repository
+# variable, while the key enters from a repository secret. Both are the PEM
+# exactly as Cloudflare issues it; the base64 the box decodes is applied on the
+# way into SSM, in ssm.tf, so nobody has to encode anything by hand.
+variable "caddy_tls_cert" {
+  type        = string
+  description = "PEM of the Cloudflare Origin Certificate. CI passes the CADDY_TLS_CERT repository variable through."
+
+  # An unset repository variable arrives as an empty string, and the failure
+  # would otherwise surface as a broken handshake on the box, not a failed plan.
+  validation {
+    condition     = strcontains(var.caddy_tls_cert, "BEGIN CERTIFICATE")
+    error_message = "caddy_tls_cert must be a PEM certificate."
+  }
+}
+
+variable "caddy_tls_key" {
+  type        = string
+  sensitive   = true
+  description = "PEM of the Cloudflare Origin Certificate's private key. CI passes the CADDY_TLS_KEY repository secret through."
+
+  # Matches both the PKCS#8 and SEC1 headers, so an ECC key is as acceptable as
+  # an RSA one.
+  validation {
+    condition     = strcontains(var.caddy_tls_key, "PRIVATE KEY")
+    error_message = "caddy_tls_key must be a PEM private key."
+  }
+}
+
 variable "enable_github_deploy" {
   type        = bool
   description = "Create the GitHub Actions OIDC deploy role. Set false to apply before the bootstrap stack exists, since the role looks up the OIDC provider it creates."

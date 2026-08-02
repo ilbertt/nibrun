@@ -39,10 +39,27 @@ API_GITHUB_CLIENT_SECRET="$(secret api_github_client_secret)"
 API_S3_ACCESS_KEY_ID="$(secret api_s3_access_key_id)"
 API_S3_SECRET_ACCESS_KEY="$(secret api_s3_secret_access_key)"
 
+# Everything written from here on carries a secret: the PEMs below, then .env.
+umask 077
+
+# The origin certificate Caddy serves. Held base64-encoded in SSM because a PEM
+# is multi-line and `--output text` mangles that, with no jq here to read the
+# JSON form instead; Terraform does the encoding (ssm.tf).
+write_pem() {
+  secret "$1" | base64 -d > "$2"
+}
+
+log "Writing the origin TLS material"
+mkdir -p tls
+write_pem caddy_tls_cert tls/origin.crt
+write_pem caddy_tls_key tls/origin.key
+
+# Makes a rotated certificate reach Caddy; see docker-compose.prod.yml.
+CADDY_TLS_CERT_FINGERPRINT="$(sha256sum tls/origin.crt | cut -d' ' -f1)"
+
 # Every key here is a compose substitution variable; docker-compose.yml maps each
 # onto the name the image expects. Values fixed by the compose topology
 # (container ports, internal service URLs) deliberately do not appear.
-umask 077
 cat > .env <<EOF
 AWS_REGION=${AWS_REGION}
 
@@ -53,6 +70,7 @@ API_BASE_URL=https://${API_HOSTNAME}
 API_BETTER_AUTH_SECRET=${API_BETTER_AUTH_SECRET}
 API_GITHUB_CLIENT_ID=${API_GITHUB_CLIENT_ID}
 API_GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
+CADDY_TLS_CERT_FINGERPRINT=${CADDY_TLS_CERT_FINGERPRINT}
 
 API_DB_USER=${API_DB_USER}
 API_DB_PASSWORD=${API_DB_PASSWORD}

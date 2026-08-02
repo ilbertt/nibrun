@@ -90,6 +90,8 @@ jobs:
           TF_VAR_api_hostname: ${{ vars.API_HOSTNAME }}
           TF_VAR_api_github_client_id: ${{ vars.API_GITHUB_CLIENT_ID }}
           TF_VAR_api_github_client_secret: ${{ secrets.API_GITHUB_CLIENT_SECRET }}
+          TF_VAR_caddy_tls_cert: ${{ vars.CADDY_TLS_CERT }}
+          TF_VAR_caddy_tls_key: ${{ secrets.CADDY_TLS_KEY }}
           ALLOW_DESTROY: ${{ inputs.allow_destroy }}
         run: bun run --filter @repo/internal-scripts terraform-apply
 
