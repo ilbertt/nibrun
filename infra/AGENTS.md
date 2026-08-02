@@ -41,9 +41,6 @@ on. Enable that last one before the first deploy carrying a proxy — Caddy
 requires the client certificate it turns on, and without it every visitor gets a
 `525`.
 
-The OAuth App and the origin certificate are the only credentials that enter
-from outside — everything else Terraform generates itself.
-
 ## Deploying
 
 `.github/workflows/cd.yml`, on every push to main: build both images, apply
