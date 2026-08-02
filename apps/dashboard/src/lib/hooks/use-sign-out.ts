@@ -1,9 +1,11 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
 import { authClient } from '#lib/auth.ts';
 import { sessionQueryOptions } from '#queries/session.ts';
 
-export function useSignOut() {
+type SignOutResult = Awaited<ReturnType<typeof authClient.signOut>>;
+
+export function useSignOut(): UseMutationResult<SignOutResult, Error, void> {
   const queryClient = useQueryClient();
   const router = useRouter();
 
