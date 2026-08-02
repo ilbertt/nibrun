@@ -21,16 +21,11 @@ drift.
 
 ## First run
 
-The domain is not bought yet, so `api_hostname` has no default — pass it at
-apply time.
-
 ```sh
 # Console → CloudFormation → upload bootstrap/github-oidc-bootstrap.yaml, once.
 cd infra/terraform
 terraform init
-terraform apply -var api_hostname=… \
-  -var api_github_client_id=… -var api_github_client_secret=… \
-  -var caddy_tls_cert=… -var caddy_tls_key=…
+terraform apply # prompts for every variable without a default
 ```
 
 Then point an A record at `terraform output public_ip`, **proxied** (orange
@@ -40,14 +35,14 @@ Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
 
 Three zone settings, none of them in code: SSL/TLS **Full (strict)**; an
-**Origin Certificate** (ECC — Cloudflare's edge is its only client) whose halves
-become `caddy_tls_cert` and `caddy_tls_key`; and **Authenticated Origin Pulls →
-Global** on. Enable that last one before the first deploy carrying a proxy —
-Caddy requires the client certificate it turns on, and without it every visitor
-gets a `525`.
+**Origin Certificate** (ECC — Cloudflare's edge is its only client), whose two
+halves are the proxy's TLS inputs; and **Authenticated Origin Pulls → Global**
+on. Enable that last one before the first deploy carrying a proxy — Caddy
+requires the client certificate it turns on, and without it every visitor gets a
+`525`.
 
-Those five values are the only credentials that enter from outside — everything
-else Terraform generates itself.
+The OAuth App and the origin certificate are the only credentials that enter
+from outside — everything else Terraform generates itself.
 
 ## Deploying
 
@@ -58,13 +53,11 @@ Terraform generates them into `/nibrun/…` and the instance reads them with its
 own role. Terraform runs under the admin bootstrap role; everything after it
 drops to the scoped deploy role.
 
-Five repository variables: `AWS_TERRAFORM_APPLY_ROLE_ARN` and
-`AWS_TERRAFORM_PLAN_ROLE_ARN`, both bootstrap stack outputs, `API_HOSTNAME`,
-`API_GITHUB_CLIENT_ID`, and `CADDY_TLS_CERT`. Two repository secrets,
-`API_GITHUB_CLIENT_SECRET` and `CADDY_TLS_KEY` — a certificate is public, its
-key is not. Terraform reads each into an SSM parameter the instance decrypts for
-itself, so none reaches the deploy's own environment — RunCommand keeps its
-parameters in command history, in the clear, for 30 days.
+What the deploy needs arrives as repository variables and secrets — `cd.yml`
+holds the current set. Public values are variables, the rest are secrets, and
+Terraform reads each into an SSM parameter the instance decrypts for itself, so
+no secret reaches the deploy's own environment — RunCommand keeps its parameters
+in command history, in the clear, for 30 days.
 Both GHCR packages must be public — the box pulls with no registry credentials.
 
 `workflow_dispatch` takes `allow_destroy` for the times a plan legitimately
