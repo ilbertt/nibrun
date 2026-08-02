@@ -91,8 +91,8 @@ const exportLine = Object.entries(onBoxEnv)
 
 // The bootstrap-marker wait ensures Docker/Compose/AWS CLI are installed
 // (user_data) before we deploy onto a brand-new box. Extract in place (no rm
-// -rf) so the compose project keeps its identity and named volumes are not
-// orphaned.
+// -rf) so the compose project keeps its identity, named volumes are not
+// orphaned, and the directory Caddy bind-mounts keeps the inode it is holding.
 const remoteScript = `
 set -euo pipefail
 timeout 600 bash -c 'until [ -f /opt/nibrun-bootstrap.done ]; do echo waiting for instance bootstrap; sleep 5; done'

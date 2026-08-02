@@ -1,9 +1,7 @@
 # The public edge, and the only thing on the box listening off-loopback.
 # Cloudflare terminates the visitor's TLS; this terminates the edge-to-origin
 # leg. One hostname, one upstream — routing for user apps is a later phase.
-
 {
-	admin off
 	# No ACME: the certificate is a Cloudflare Origin Certificate, which the
 	# deploy fetches from SSM and writes into tls/ next to this file.
 	auto_https off
@@ -22,19 +20,23 @@ https://{$API_HOSTNAME} {
 		}
 	}
 
+	# The api serves nothing under /internal yet. Denying the namespace before
+	# it exists is the point: fleet-host agents reach the api over the private
+	# network, and a route added there later would otherwise be public from the
+	# moment it is written, with nothing to notice it.
+	@internal path /internal /internal/*
+	handle @internal {
+		respond 404
+	}
+
 	# A deploy replaces the api container, and its address with it. Dialling by
 	# name re-resolves on every attempt, and lb_try_duration holds the request
 	# open across the gap where nothing is listening rather than answering 502 —
 	# measured surviving 8s of downtime and a changed container address.
-	reverse_proxy api:3000 {
-		lb_try_duration 30s
-		lb_try_interval 250ms
+	handle {
+		reverse_proxy api:3000 {
+			lb_try_duration 30s
+			lb_try_interval 250ms
+		}
 	}
-}
-
-# Liveness for the compose healthcheck, on loopback inside the container: the
-# public listener demands a client certificate only Cloudflare holds, so nothing
-# on the box can probe it.
-http://127.0.0.1:2020 {
-	respond /healthz 200
 }

@@ -49,10 +49,12 @@ write_pem() {
   secret "$1" | base64 -d > "$2"
 }
 
+# Inside caddy/ because that whole directory is what gets mounted, and outside
+# the bundle's own files, which the next deploy overwrites.
 log "Writing the origin TLS material"
-mkdir -p tls
-write_pem caddy_tls_cert tls/origin.crt
-write_pem caddy_tls_key tls/origin.key
+mkdir -p caddy/tls
+write_pem caddy_tls_cert caddy/tls/origin.crt
+write_pem caddy_tls_key caddy/tls/origin.key
 
 # Every key here is a compose substitution variable; docker-compose.yml maps each
 # onto the name the image expects. Values fixed by the compose topology
@@ -127,14 +129,16 @@ EOF
 done
 
 # `up -d` leaves a container alone when only a bind-mounted file changed, so a
-# new Caddyfile or a re-issued certificate would go on being ignored. Reloading
-# in place picks both up without dropping a connection, which recreating the
-# edge would. The signal cannot report a bad config — Caddy logs it and keeps
-# the old one — so validate first and let the deploy fail on it instead. Compose
-# reports the signal as "Killing"; the container stays up.
+# new Caddyfile or a re-issued certificate would go on being ignored. Reload
+# picks both up with no dropped connections, where recreating the edge would
+# drop them, and a config that does not load fails the deploy without disturbing
+# the one already running.
+#
+# --force because a rotated certificate does not change the Caddyfile, and
+# without it Caddy compares the two configs, finds them identical and skips the
+# reload — leaving the old certificate served until something restarts it.
 log "Reloading Caddy"
-$compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
-$compose kill -s SIGUSR1 caddy
+$compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --force
 
 log "Compose service status"
 $compose ps -a --format 'table {{.Name}}\t{{.Status}}'

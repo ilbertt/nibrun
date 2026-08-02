@@ -9,10 +9,11 @@ import { repoRoot } from '#shared/paths.ts';
 const COMPOSE_FILES = ['docker-compose.yml', 'docker-compose.prod.yml'];
 // Shell, not TypeScript: these run on the box, which has no Bun.
 const ON_BOX_SCRIPTS = ['on_box_deploy.sh', 'ensure_data_volume.sh'];
-// The proxy's whole configuration. The CA is Cloudflare's public origin-pull
-// root, so it ships here rather than through SSM with the certificate it
-// verifies.
-const CADDY_FILES = ['Caddyfile', 'cloudflare-origin-pull-ca.pem'];
+// Ships as a directory because that is how it is mounted: the proxy reads
+// through the directory, so replacing a file in it cannot leave the running
+// container on the old inode. Holds the Caddyfile and Cloudflare's public
+// origin-pull CA — the certificate that CA verifies comes from SSM instead.
+const CADDY_DIR = 'caddy';
 
 const deployBucket = requiredEnv('DEPLOY_BUCKET');
 const revision = requiredEnv('GITHUB_SHA');
@@ -26,7 +27,7 @@ for (const composeFile of COMPOSE_FILES) {
 
 const bundlePath = join(tmpdir(), 'nibrun-bundle.tar.gz');
 
-await $`tar czf ${bundlePath} -C ${repoRoot} ${COMPOSE_FILES} -C ${join(repoRoot, 'infra/deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/caddy')} ${CADDY_FILES}`;
+await $`tar czf ${bundlePath} -C ${repoRoot} ${COMPOSE_FILES} -C ${join(repoRoot, 'infra/deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra')} ${CADDY_DIR}`;
 
 const url = `s3://${deployBucket}/bundles/${revision}.tar.gz`;
 await aws(['s3', 'cp', bundlePath, url]);

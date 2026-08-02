@@ -24,31 +24,36 @@ services:
   # The public edge, and the only container publishing a port off loopback. It
   # terminates the Cloudflare-to-origin TLS leg; the api keeps its own loopback
   # binding and its address on the compose network, and neither goes through
-  # here. Deliberately no depends_on either: the Caddyfile's retry window exists
-  # so the edge outlives an api being replaced, and tying this container's
-  # lifecycle to that service would work against it.
+  # here. Only 443: the zone is Full (strict), so Cloudflare never reaches the
+  # origin over 80, and there is no ACME challenge to answer.
   #
-  # Nothing here changes between deploys, so compose leaves the container
-  # running and the edge never blinks. New config and rotated certificates
-  # arrive through the reload in on_box_deploy.sh instead of a recreate.
+  # No depends_on: it makes compose restart Caddy whenever an upstream is
+  # recreated, which every deploy does to the api, taking the edge down for the
+  # upstream's health-gate window. The Caddyfile's lb_try_duration already rides
+  # out an api that is not accepting yet, on cold boot and during a recreate.
+  #
+  # Nothing here changes between deploys, so the container is left running and
+  # the edge never blinks; new config and re-issued certificates arrive through
+  # the reload in on_box_deploy.sh rather than a recreate. The whole directory
+  # is mounted, not the files in it, so replacing a file cannot leave the
+  # container holding the old inode.
   caddy:
     image: caddy:2.11-alpine
     container_name: caddy
-    environment:
-      - API_HOSTNAME=${API_HOSTNAME}
+    restart: always
     ports:
       - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./cloudflare-origin-pull-ca.pem:/etc/caddy/cloudflare-origin-pull-ca.pem:ro
-      - ./tls:/etc/caddy/tls:ro
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2020/healthz"]
+      test:
+        ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
-    restart: always
+      start_period: 15s
+    environment:
+      - API_HOSTNAME
+    volumes:
+      - ./caddy:/etc/caddy:ro
     networks:
       - nibrun
 
