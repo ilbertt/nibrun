@@ -7,6 +7,7 @@ const PLAN_FILE = 'tfplan';
 // Consumed by the deploy steps that follow, under these exact names.
 const DEPLOY_OUTPUTS = [
   'api_hostname',
+  'dozzle_hostname',
   'api_github_client_id',
   'api_s3_bucket',
   'api_s3_endpoint',
