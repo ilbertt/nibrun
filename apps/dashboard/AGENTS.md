@@ -10,18 +10,14 @@ One component per file, named after the component it exports —
 `src/components/`; a route file holds the one component that route mounts, always
 named `RouteComponent`, so every route reads the same way.
 
-Keep a component as small as it can be. Anything with its own state or behaviour
-is its own component, not a branch of its parent: `AppHeader` lays out the header
-and delegates the button to `SignOutButton`, which owns the sign-out itself.
+A component should read as markup. Push queries, mutations, derived state and
+effects into a hook, and split anything that owns state or behaviour of its own
+into its own component.
 
-A component should read as markup. Push anything else — queries, mutations,
-derived state, effects — into a hook, so what is left is the shape of the thing.
-
-Reach for a hook before a prop. State a component can read for itself does not
+Reach for a hook before a prop: state a component can read for itself does not
 belong in its signature, and nothing should be threaded through a component that
-does not use it. A prop is still right for what the parent genuinely decides
-about that child — `GithubSignInButton` is handed the callback the login route
-resolved, because where to return to is the route's call, not the button's.
+does not use it. Keep a prop for what the parent genuinely decides about the
+child.
 
 ## Hooks
 
