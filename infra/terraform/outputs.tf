@@ -14,6 +14,10 @@ output "api_hostname" {
   value = var.api_hostname
 }
 
+output "dozzle_hostname" {
+  value = var.dozzle_hostname
+}
+
 output "api_github_client_id" {
   description = "Public half of the GitHub OAuth App credentials; the secret half is read from SSM on the box."
   value       = var.api_github_client_id

@@ -11,7 +11,7 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 : "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_GITHUB_CLIENT_ID:?}" \
   "${API_S3_BUCKET:?}" "${API_S3_ENDPOINT:?}" "${PG_BACKUP_IMAGE_URI:?}" \
   "${PG_BACKUP_BUCKET:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" \
-  "${DATA_VOLUME_ID:?}"
+  "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}"
 
 # Per-deployment values no infrastructure resource feeds, still overridable from
 # the deploy so they never have to be edited here. The host port bindings are
@@ -86,6 +86,7 @@ API_S3_CONSOLE_PORT=${API_S3_CONSOLE_PORT}
 PG_BACKUP_IMAGE_URI=${PG_BACKUP_IMAGE_URI}
 PG_BACKUP_BUCKET=${PG_BACKUP_BUCKET}
 
+DOZZLE_HOSTNAME=${DOZZLE_HOSTNAME}
 DOZZLE_PORT=${DOZZLE_PORT}
 EOF
 
@@ -93,6 +94,20 @@ compose="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 
 log "Pulling images"
 $compose pull
+
+# Dozzle reads a user list holding a bcrypt hash, never the password itself, so
+# something has to do the hashing. Doing it here rather than in Terraform keeps
+# the salt out of state and makes rotation a matter of changing the parameter:
+# the file is rebuilt from it on every deploy. `generate` writes the file to
+# stdout and compose's own chatter to stderr, so the redirect stays clean, and
+# running it through compose takes the image version from docker-compose.yml
+# rather than repeating it here.
+log "Writing the Dozzle user list"
+mkdir -p dozzle/data
+$compose run --rm --no-deps -T --entrypoint /dozzle dozzle generate \
+  --name Admin --email "admin@${API_HOSTNAME}" \
+  --password "$(secret dozzle_password)" admin > dozzle/data/users.yml.new
+mv dozzle/data/users.yml.new dozzle/data/users.yml
 
 log "Starting services (up -d --remove-orphans)"
 $compose up -d --remove-orphans

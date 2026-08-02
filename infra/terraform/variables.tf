@@ -42,6 +42,21 @@ variable "api_hostname" {
   }
 }
 
+# Named on the origin certificate alongside api_hostname — one certificate, both
+# names, so the proxy has a single pair to serve. Adding a name here means
+# reissuing that certificate, not adding a second one.
+variable "dozzle_hostname" {
+  type        = string
+  description = "Public hostname the container logs are served on. Point an A record at the elastic IP."
+
+  # An unset repository variable arrives empty, and Caddy reads an empty site
+  # address as a catch-all — which would put the logs on the api's hostname.
+  validation {
+    condition     = trimspace(var.dozzle_hostname) != ""
+    error_message = "dozzle_hostname must not be empty."
+  }
+}
+
 # The GitHub OAuth App users sign in with. Its callback URL is tied to
 # api_hostname, so an app is per-deployment — GitHub allows one callback URL per
 # OAuth App. Both halves are created by hand, so unlike every other credential

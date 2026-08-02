@@ -88,6 +88,7 @@ jobs:
         env:
           TF_VAR_region: ${{ env.AWS_REGION }}
           TF_VAR_api_hostname: ${{ vars.API_HOSTNAME }}
+          TF_VAR_dozzle_hostname: ${{ vars.DOZZLE_HOSTNAME }}
           TF_VAR_api_github_client_id: ${{ vars.API_GITHUB_CLIENT_ID }}
           TF_VAR_api_github_client_secret: ${{ secrets.API_GITHUB_CLIENT_SECRET }}
           TF_VAR_caddy_tls_cert: ${{ vars.CADDY_TLS_CERT }}
@@ -116,6 +117,7 @@ jobs:
           DATA_VOLUME_ID: ${{ steps.tf.outputs.data_volume_id }}
           API_IMAGE_URI: ${{ steps.api_image.outputs.image-uri }}
           API_HOSTNAME: ${{ steps.tf.outputs.api_hostname }}
+          DOZZLE_HOSTNAME: ${{ steps.tf.outputs.dozzle_hostname }}
           API_GITHUB_CLIENT_ID: ${{ steps.tf.outputs.api_github_client_id }}
           API_S3_BUCKET: ${{ steps.tf.outputs.api_s3_bucket }}
           API_S3_ENDPOINT: ${{ steps.tf.outputs.api_s3_endpoint }}

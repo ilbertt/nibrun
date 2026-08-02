@@ -1,24 +1,32 @@
 # The public edge, and the only thing on the box listening off-loopback.
 # Cloudflare terminates the visitor's TLS; this terminates the edge-to-origin
-# leg. One hostname, one upstream — routing for user apps is a later phase.
+# leg. Two hostnames, two upstreams — routing for user apps is a later phase.
 {
 	# No ACME: the certificate is a Cloudflare Origin Certificate, which the
-	# deploy fetches from SSM and writes into tls/ next to this file.
+	# deploy fetches from SSM and writes into tls/ next to this file. It names
+	# every hostname below, so both sites serve the same pair.
 	auto_https off
 }
 
-https://{$API_HOSTNAME} {
-	# Authenticated Origin Pulls. The origin IP is discoverable, so the edge has
-	# to prove it is the edge: without a client certificate signed by
-	# Cloudflare's origin-pull CA the handshake is refused before any request is
-	# read. Turning this on also makes Caddy enforce SNI == Host, which closes
-	# Host-header spoofing along with it.
+# Authenticated Origin Pulls. The origin IP is discoverable, so the edge has to
+# prove it is the edge: without a client certificate signed by Cloudflare's
+# origin-pull CA the handshake is refused before any request is read. Turning
+# this on also makes Caddy enforce SNI == Host, which closes Host-header
+# spoofing along with it.
+#
+# A snippet because every site needs it identically, and a site that quietly
+# went without would accept connections straight from the origin IP.
+(origin_tls) {
 	tls /etc/caddy/tls/origin.crt /etc/caddy/tls/origin.key {
 		client_auth {
 			mode require_and_verify
 			trust_pool file /etc/caddy/cloudflare-origin-pull-ca.pem
 		}
 	}
+}
+
+https://{$API_HOSTNAME} {
+	import origin_tls
 
 	# The api serves nothing under /internal yet. Denying the namespace before
 	# it exists is the point: fleet-host agents reach the api over the private
@@ -39,4 +47,17 @@ https://{$API_HOSTNAME} {
 			lb_try_interval 250ms
 		}
 	}
+}
+
+# Container logs. Dozzle authenticates its own visitors (simple auth, prod only)
+# — the edge only gets them here, and deliberately does not add a second gate in
+# front of the login page.
+https://{$DOZZLE_HOSTNAME} {
+	import origin_tls
+
+	# Log streaming is a websocket; reverse_proxy upgrades it as-is. No
+	# lb_try_duration: nothing recreates this container on deploy, so there is no
+	# gap to ride out, and holding a request open would only delay the 502 that
+	# says Dozzle is actually down.
+	reverse_proxy dozzle:8080
 }

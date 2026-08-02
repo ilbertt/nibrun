@@ -76,6 +76,32 @@ resource "aws_ssm_parameter" "caddy_tls_key" {
   }
 }
 
+# The password for Dozzle's one login. Generated like every other secret here,
+# and read back the same way when you need it:
+#
+#   aws ssm get-parameter --name <ssm_secret_prefix>/dozzle_password \
+#     --with-decryption --query Parameter.Value --output text
+#
+# Only the password lives here, not the user list Dozzle actually reads. That
+# file holds a bcrypt hash, and bcrypt is salted — hashing it here would produce
+# a different value on every plan and rewrite the parameter on every apply. The
+# box hashes this into the file instead, once per deploy, so rotating the
+# password is just changing it here.
+resource "random_password" "dozzle_password" {
+  length  = 32
+  special = false
+}
+
+resource "aws_ssm_parameter" "dozzle_password" {
+  name  = "${var.ssm_secret_prefix}/dozzle_password"
+  type  = "SecureString"
+  value = random_password.dozzle_password.result
+
+  tags = {
+    Name = "${local.resource_name_prefix}-dozzle-password"
+  }
+}
+
 # Credentials of the api's own IAM user (iam_api.tf), not generated here.
 resource "aws_ssm_parameter" "api_s3_access_key_id" {
   name  = "${var.ssm_secret_prefix}/api_s3_access_key_id"

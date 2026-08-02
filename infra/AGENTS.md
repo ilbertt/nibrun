@@ -29,7 +29,7 @@ terraform apply # prompts for every variable without a default
 ```
 
 Then point an A record at `terraform output public_ip`, **proxied** (orange
-cloud).
+cloud) — one per hostname, `api_hostname` and `dozzle_hostname`.
 
 Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
@@ -40,6 +40,22 @@ halves are the proxy's TLS inputs; and **Authenticated Origin Pulls → Global**
 on. Enable that last one before the first deploy carrying a proxy — Caddy
 requires the client certificate it turns on, and without it every visitor gets a
 `525`.
+
+The certificate must name **every** hostname the proxy serves — both of them
+today. Caddy serves the one pair from every site block, so a hostname missing
+from it fails the handshake rather than falling back to anything. Adding a
+hostname later means reissuing that certificate and updating both halves, not
+issuing a second one.
+
+Dozzle's password is generated like every other secret. Read it back with:
+
+```sh
+aws ssm get-parameter --name "$(terraform -chdir=infra/terraform output -raw ssm_secret_prefix)/dozzle_password" \
+  --with-decryption --query Parameter.Value --output text
+```
+
+The username is `admin`. Rotating it is a matter of overwriting that parameter —
+the box rebuilds the hashed user list from it on the next deploy.
 
 ## Deploying
 

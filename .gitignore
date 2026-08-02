@@ -15,6 +15,9 @@ logs
 _.log
 report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
+# Dozzle's user list — rendered on the box from SSM, holds a password hash.
+dozzle/data/
+
 # dotenv environment variable files
 .env
 .env.development.local
