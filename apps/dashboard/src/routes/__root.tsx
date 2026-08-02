@@ -5,20 +5,19 @@ import { createRootRouteWithContext, Outlet, redirect } from '@tanstack/react-ro
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { AppHeader } from '#components/app-header.tsx';
 import { sessionQueryOptions } from '#queries/session.ts';
+import { Route as LoginRoute } from '#routes/login.tsx';
 
 import '../styles.css';
 
 // Guarding at the root, rather than under a pathless layout, is what makes it
 // impossible to add a route that forgets to ask for a session: every route is
 // already behind this, and signing in is the one path that cannot be.
-const SIGN_IN_PATH = '/login';
-
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ context, location }) => {
     const session = await context.queryClient.ensureQueryData(sessionQueryOptions);
 
-    if (!session && location.pathname !== SIGN_IN_PATH) {
-      throw redirect({ to: SIGN_IN_PATH, search: { redirect: location.href } });
+    if (!session && location.pathname !== LoginRoute.to) {
+      throw redirect({ to: LoginRoute.to, search: { redirect: location.href } });
     }
 
     return { session };

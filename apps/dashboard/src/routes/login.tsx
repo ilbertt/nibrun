@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { authClient } from '#lib/auth.ts';
+import { Route as IndexRoute } from '#routes/index.tsx';
 
 type LoginSearch = {
   redirect?: string;
@@ -12,7 +13,7 @@ export const Route = createFileRoute('/login')({
   }),
   beforeLoad: ({ context, search }) => {
     if (context.session) {
-      throw redirect({ href: search.redirect ?? '/' });
+      throw redirect({ href: search.redirect ?? IndexRoute.to });
     }
   },
   component: LoginPage,
@@ -25,7 +26,7 @@ function LoginPage() {
     mutationFn: async () => {
       const { error } = await authClient.signIn.social({
         provider: 'github',
-        callbackURL: redirectTo ?? '/',
+        callbackURL: redirectTo ?? IndexRoute.to,
       });
       if (error) {
         throw error;
