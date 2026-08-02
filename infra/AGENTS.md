@@ -47,16 +47,6 @@ from it fails the handshake rather than falling back to anything. Adding a
 hostname later means reissuing that certificate and updating both halves, not
 issuing a second one.
 
-Dozzle's password is generated like every other secret. Read it back with:
-
-```sh
-aws ssm get-parameter --name "$(terraform -chdir=infra/terraform output -raw ssm_secret_prefix)/dozzle_password" \
-  --with-decryption --query Parameter.Value --output text
-```
-
-The username is `admin`. Rotating it is a matter of overwriting that parameter —
-the box rebuilds the hashed user list from it on the next deploy.
-
 ## Deploying
 
 `.github/workflows/cd.yml`, on every push to main: build both images, apply
