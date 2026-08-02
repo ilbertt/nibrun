@@ -8,11 +8,6 @@ runs:
       with:
         bun-version-file: .bun-version
 
-    # TODO: remove this step once bun v1.4 is out and update .bun-version
-    - name: Bump bun to canary
-      shell: bash
-      run: bun upgrade --canary
-
     - name: Turbo Cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
@@ -21,6 +16,14 @@ runs:
         restore-keys: |
           ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.job }}-
 
+    # Installs on the pinned bun, before the canary bump: canary rejects a
+    # lockfile it has just written itself when a dependency carries a large set
+    # of optional peers (oven-sh/bun#20913).
     - name: Install dependencies
       shell: bash
       run: bun install --frozen-lockfile
+
+    # TODO: remove this step once bun v1.4 is out and update .bun-version
+    - name: Bump bun to canary
+      shell: bash
+      run: bun upgrade --canary
