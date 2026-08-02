@@ -1,23 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from '@tanstack/react-router';
-import { authClient } from '#lib/auth.ts';
-import { sessionQueryOptions } from '#queries/session.ts';
+import { useSession } from '#lib/hooks/use-session.ts';
+import { useSignOut } from '#lib/hooks/use-sign-out.ts';
 
 export function AppHeader() {
-  const { data: session } = useQuery(sessionQueryOptions);
-  const queryClient = useQueryClient();
-  const router = useRouter();
-
-  const signOut = useMutation({
-    mutationFn: async () => {
-      await authClient.signOut();
-    },
-    // Re-running the guard with no session is what sends the browser to /login.
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey });
-      await router.invalidate();
-    },
-  });
+  const session = useSession();
+  const signOut = useSignOut();
 
   if (!session) {
     return null;
