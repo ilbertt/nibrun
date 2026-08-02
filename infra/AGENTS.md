@@ -4,7 +4,7 @@ AWS, one stack, one box. `bootstrap/` is one-time CloudFormation, `terraform/`
 owns the resources, `pg-backup/` is the nightly dump sidecar, `caddy/` is the
 proxy's static config. `deploy/` holds only the two scripts that run *on* the
 box, which is why they are shell — the instance has no Bun. Everything CI runs
-lives in `@repo/internal-scripts`. The EC2 instance runs the compose stack — api and Postgres — behind an
+lives in `@repo/internal-scripts`. The EC2 instance runs the compose stack — api, Postgres and Dozzle — behind an
 elastic IP, with a persistent EBS volume at `/data` and three S3 buckets:
 artifacts for user uploads, backups for Postgres dumps, deploy for runtime
 bundles. MinIO stands in for S3 locally only — `docker-compose.prod.yml` parks
@@ -15,9 +15,9 @@ loopback and on the compose network, which is the path fleet-host agents take
 later. Compute hosts and the CDN still come later.
 
 Config carries its component's prefix — `API_`, `POSTGRES_`, `PG_BACKUP_`,
-`CADDY_` — and keeps one name from the Terraform output through the SSM command
-to the `.env` the box writes. Nothing is aliased in transit, so nothing can
-drift.
+`CADDY_`, `DOZZLE_` — and keeps one name from the Terraform output through the
+SSM command to the `.env` the box writes. Nothing is aliased in transit, so
+nothing can drift.
 
 ## First run
 

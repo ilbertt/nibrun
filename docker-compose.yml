@@ -1,4 +1,5 @@
-# Local stack: Postgres, MinIO, and the API. Copy .env.example to .env first.
+# Local stack: Postgres, MinIO, the API, and Dozzle. Copy .env.example to .env
+# first.
 #
 # Anything truly opinionated (internal service URLs, container ports, bucket
 # bootstrap) lives here, not in .env.
@@ -110,6 +111,30 @@ services:
         condition: service_healthy
       minio-prepare:
         condition: service_completed_successfully
+    networks:
+      - nibrun
+
+  # Every container's logs, read off the Docker socket, in local and prod alike.
+  # Loopback-only and unauthenticated on purpose: reaching it on the box takes an
+  # SSM port-forward, which already costs AWS credentials. The change that gives
+  # it a public route is the change that has to give it DOZZLE_AUTH_PROVIDER.
+  dozzle:
+    image: amir20/dozzle:v10.6
+    container_name: dozzle
+    environment:
+      - DOZZLE_NO_ANALYTICS=true
+    volumes:
+      # `:ro` covers the socket file, not the Docker API behind it — Dozzle only
+      # ever issues read calls, but nothing here is what stops it.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:${DOZZLE_PORT}:8080"
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
     networks:
       - nibrun
 

@@ -24,6 +24,7 @@ API_DB_NAME="${API_DB_NAME:-nibrun}"
 API_DB_PORT="${API_DB_PORT:-5432}"
 API_S3_PORT="${API_S3_PORT:-9000}"
 API_S3_CONSOLE_PORT="${API_S3_CONSOLE_PORT:-9001}"
+DOZZLE_PORT="${DOZZLE_PORT:-8080}"
 
 log "Ensuring the persistent data volume is mounted and holds the data-bearing volumes"
 bash ensure_data_volume.sh
@@ -84,6 +85,8 @@ API_S3_CONSOLE_PORT=${API_S3_CONSOLE_PORT}
 
 PG_BACKUP_IMAGE_URI=${PG_BACKUP_IMAGE_URI}
 PG_BACKUP_BUCKET=${PG_BACKUP_BUCKET}
+
+DOZZLE_PORT=${DOZZLE_PORT}
 EOF
 
 compose="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
