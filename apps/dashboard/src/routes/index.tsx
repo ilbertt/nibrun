@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { HealthStatus } from '#components/health-status.tsx';
 
-export const Route = createFileRoute('/')({ component: Home });
+export const Route = createFileRoute('/')({ component: RouteComponent });
 
-function Home() {
+function RouteComponent() {
   const { session } = Route.useRouteContext();
 
   return (

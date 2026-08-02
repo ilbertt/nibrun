@@ -22,10 +22,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
     return { session };
   },
-  component: RootComponent,
+  component: RouteComponent,
 });
 
-function RootComponent() {
+function RouteComponent() {
   return (
     <>
       <AppHeader />

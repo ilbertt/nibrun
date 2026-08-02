@@ -15,10 +15,10 @@ export const Route = createFileRoute('/login')({
       throw redirect({ href: search.redirect ?? IndexRoute.to });
     }
   },
-  component: LoginPage,
+  component: RouteComponent,
 });
 
-function LoginPage() {
+function RouteComponent() {
   const { redirect: redirectTo } = Route.useSearch();
 
   return (
