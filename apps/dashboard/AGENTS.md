@@ -5,15 +5,17 @@ to the api in development, so it is same-origin either way.
 
 ## Components
 
-`src/components/` holds one component per file, the file named after the
-component it exports — `sign-out-button.tsx` exports `SignOutButton`.
+One component per file, named after the component it exports —
+`sign-out-button.tsx` exports `SignOutButton`. Shared components live in
+`src/components/`; a route file holds the one component that route mounts.
 
 Keep a component as small as it can be. Anything with its own state or behaviour
 is its own component, not a branch of its parent: `AppHeader` lays out the header
 and delegates the button to `SignOutButton`, which owns the sign-out itself.
 
-A file under `src/routes/` is the exception, and only that: it pairs a route with
-the component that route mounts.
+A component should read as markup. Push anything else — queries, mutations,
+derived state, effects — into a hook, so what is left is the shape of the thing
+and the props it takes.
 
 ## Hooks
 
