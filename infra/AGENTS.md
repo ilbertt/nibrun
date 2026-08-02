@@ -85,9 +85,11 @@ parameters in command history, in the clear, for 30 days.
 Both GHCR packages must be public — the box pulls with no registry credentials,
 which is also why no certificate may be baked into an image.
 
-Rotating the origin certificate is a normal deploy: the fingerprint of the cert
-rides in Caddy's environment, so compose recreates the container that a changed
-bind mount alone would not.
+Editing the Caddyfile and rotating the origin certificate are both normal
+deploys. `up -d` leaves a container alone when only a bind-mounted file changed,
+so neither would otherwise take effect; the deploy validates the config and
+reloads Caddy in place instead, which recreating the edge would have paid for in
+dropped connections.
 
 `workflow_dispatch` takes `allow_destroy` for the times a plan legitimately
 replaces something.

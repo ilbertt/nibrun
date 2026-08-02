@@ -27,16 +27,15 @@ services:
   # here. Deliberately no depends_on either: the Caddyfile's retry window exists
   # so the edge outlives an api being replaced, and tying this container's
   # lifecycle to that service would work against it.
+  #
+  # Nothing here changes between deploys, so compose leaves the container
+  # running and the edge never blinks. New config and rotated certificates
+  # arrive through the reload in on_box_deploy.sh instead of a recreate.
   caddy:
     image: caddy:2.11-alpine
     container_name: caddy
     environment:
       - API_HOSTNAME=${API_HOSTNAME}
-      # Caddy never reads this, which is the point: compose recreates a
-      # container when its definition changes, never when a mounted file does,
-      # so a rotated certificate would otherwise sit unserved until something
-      # else happened to force a recreate.
-      - TLS_CERT_FINGERPRINT=${CADDY_TLS_CERT_FINGERPRINT}
     ports:
       - "443:443"
     volumes:

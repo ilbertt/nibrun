@@ -22,18 +22,13 @@ https://{$API_HOSTNAME} {
 		}
 	}
 
-	# A deploy replaces the api container, and its address with it, so the
-	# upstream is re-resolved rather than pinned at startup. lb_try_duration then
-	# holds a request open across the gap where no api exists instead of
-	# answering 502 — measured at 8s of downtime survived, well inside the window.
-	reverse_proxy {
-		dynamic a {
-			name api
-			port 3000
-			refresh 5s
-		}
+	# A deploy replaces the api container, and its address with it. Dialling by
+	# name re-resolves on every attempt, and lb_try_duration holds the request
+	# open across the gap where nothing is listening rather than answering 502 —
+	# measured surviving 8s of downtime and a changed container address.
+	reverse_proxy api:3000 {
 		lb_try_duration 30s
-		lb_try_interval 500ms
+		lb_try_interval 250ms
 	}
 }
 

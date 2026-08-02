@@ -54,9 +54,6 @@ mkdir -p tls
 write_pem caddy_tls_cert tls/origin.crt
 write_pem caddy_tls_key tls/origin.key
 
-# Makes a rotated certificate reach Caddy; see docker-compose.prod.yml.
-CADDY_TLS_CERT_FINGERPRINT="$(sha256sum tls/origin.crt | cut -d' ' -f1)"
-
 # Every key here is a compose substitution variable; docker-compose.yml maps each
 # onto the name the image expects. Values fixed by the compose topology
 # (container ports, internal service URLs) deliberately do not appear.
@@ -70,7 +67,6 @@ API_BASE_URL=https://${API_HOSTNAME}
 API_BETTER_AUTH_SECRET=${API_BETTER_AUTH_SECRET}
 API_GITHUB_CLIENT_ID=${API_GITHUB_CLIENT_ID}
 API_GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
-CADDY_TLS_CERT_FINGERPRINT=${CADDY_TLS_CERT_FINGERPRINT}
 
 API_DB_USER=${API_DB_USER}
 API_DB_PASSWORD=${API_DB_PASSWORD}
@@ -129,6 +125,16 @@ EOF
   fi
   sleep 5
 done
+
+# `up -d` leaves a container alone when only a bind-mounted file changed, so a
+# new Caddyfile or a re-issued certificate would go on being ignored. Reloading
+# in place picks both up without dropping a connection, which recreating the
+# edge would. The signal cannot report a bad config — Caddy logs it and keeps
+# the old one — so validate first and let the deploy fail on it instead. Compose
+# reports the signal as "Killing"; the container stays up.
+log "Reloading Caddy"
+$compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile
+$compose kill -s SIGUSR1 caddy
 
 log "Compose service status"
 $compose ps -a --format 'table {{.Name}}\t{{.Status}}'
