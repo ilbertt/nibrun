@@ -11,9 +11,12 @@ export function useSignOut(): UseMutationResult<SignOutResult, Error, void> {
 
   return useMutation({
     mutationFn: () => authClient.signOut(),
+    // Dropped, not invalidated: the guard reads the session with
+    // `ensureQueryData`, which serves whatever is cached without regard for
+    // staleness, so an invalidated entry would still hand it the signed-in user.
     // Re-running the guard with no session is what sends the browser to /login.
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey });
+      queryClient.removeQueries({ queryKey: sessionQueryOptions.queryKey });
       await router.invalidate();
     },
   });
