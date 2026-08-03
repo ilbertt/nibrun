@@ -1,10 +1,13 @@
+import { useSearch } from '@tanstack/react-router';
 import { Button } from '#components/ui/button.tsx';
 import { Field, FieldError } from '#components/ui/field.tsx';
 import { GithubIcon } from '#icons/github-icon.tsx';
 import { useSignIn } from '#lib/hooks/use-sign-in.ts';
+import { Route as IndexRoute } from '#routes/index.tsx';
 
-export function GithubSignInButton({ callbackURL }: { callbackURL: string }) {
-  const signIn = useSignIn(callbackURL);
+export function GithubSignInButton() {
+  const { redirect } = useSearch({ from: '/login' });
+  const signIn = useSignIn(redirect ?? IndexRoute.to);
 
   return (
     <Field data-invalid={signIn.isError || undefined}>
