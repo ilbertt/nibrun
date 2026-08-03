@@ -20,6 +20,7 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${FIRECRACKER_DIRECTORY:?}" \
   "${CADDY_VERSION:?}" "${CADDY_URL:?}" "${CADDY_SHA256:?}" \
   "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${APP_DOMAIN:?}" \
+  "${CONTROL_PLANE_INTERNAL_URL:?}" "${VPC_CIDR_BLOCK:?}" \
   "${GUEST_IMAGES_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
 
 # Empty until a guest image is adopted in infra/app-host/versions.json. A host
@@ -235,9 +236,13 @@ chmod 0600 /var/lib/nibrun/bootstrap-token.new
 changed_file /var/lib/nibrun/bootstrap-token && NEEDS_RESTART+=(agent) || true
 
 cat > /etc/nibrun/agent.env.new <<EOF
-AGENT_CONTROL_PLANE_URL=https://${API_HOSTNAME}
+AGENT_CONTROL_PLANE_URL=${CONTROL_PLANE_INTERNAL_URL}
 AGENT_BOOTSTRAP_TOKEN_FILE=/var/lib/nibrun/bootstrap-token
 AGENT_ARTIFACT_BUCKET=${ARTIFACTS_BUCKET}
+# A tenant microVM reaching the api's internal port would be reaching it as the
+# host, with the host's standing. Named here rather than left to the blanket
+# private-address rule, so the ruleset on the box says why.
+AGENT_CONTROL_PLANE_CIDRS=${VPC_CIDR_BLOCK}
 AGENT_AWS_REGION=${AWS_REGION}
 # The same prefix ZeroFS is pointed at, from the one variable both are rendered
 # from: a volume naming a prefix this host does not serve is refused, so the two

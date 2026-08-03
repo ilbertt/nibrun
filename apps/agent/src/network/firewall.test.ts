@@ -44,6 +44,19 @@ describe('the three isolation rules are never optional', () => {
     expect(dropsFrom(ruleset).some((line) => line.includes('203.0.113.10/32'))).toBe(true);
   });
 
+  // The api's internal routes are reachable from this host and from nowhere else, so a tenant
+  // that could reach them would be reaching them with the host's standing. Denied before the
+  // forwarding rule that gives guests the internet, or the accept would win.
+  test('a guest cannot reach the control plane before it is allowed out', () => {
+    const vpc = '10.43.0.0/16';
+    const lines = renderRuleset(state({ controlPlaneCidrs: [vpc] })).split('\n');
+    const denied = lines.findIndex((line) => line.includes(vpc) && line.includes('drop'));
+    const allowedOut = lines.findIndex((line) => line.includes('masquerade'));
+
+    expect(denied).toBeGreaterThan(-1);
+    expect(allowedOut).toBeGreaterThan(denied);
+  });
+
   test('every private destination is denied, not only the ones enumerated', () => {
     const drops = dropsFrom(renderRuleset(state())).join('\n');
     for (const cidr of ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '169.254.0.0/16']) {

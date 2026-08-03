@@ -120,6 +120,7 @@ jobs:
       ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
       API_S3_ENDPOINT: ${{ fromJSON(needs.terraform.outputs.values).api_s3_endpoint }}
       PG_BACKUP_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).pg_backup_bucket }}
+      INTERNAL_PORT: ${{ fromJSON(needs.terraform.outputs.values).internal_port }}
       API_IMAGE_URI: ${{ needs.images.outputs.repository }}/api:${{ github.sha }}
       PG_BACKUP_IMAGE_URI: ${{ needs.images.outputs.repository }}/pg-backup:${{ github.sha }}
     steps:
@@ -157,6 +158,8 @@ jobs:
       ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
       API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
       APP_DOMAIN: ${{ fromJSON(needs.terraform.outputs.values).app_domain }}
+      CONTROL_PLANE_INTERNAL_URL: ${{ fromJSON(needs.terraform.outputs.values).control_plane_internal_url }}
+      VPC_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_cidr_block }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

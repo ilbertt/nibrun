@@ -49,6 +49,29 @@ https://{$API_HOSTNAME} {
 	}
 }
 
+# The private listener, reachable only from an app host: the security group
+# admits this port from the app hosts' group and nothing else, and the public
+# edge above answers 404 for the same paths. Plain HTTP — a Cloudflare Origin
+# Certificate names hostnames, and an agent dials a private address.
+#
+# It is a separate listener rather than another path on 443 because Cloudflare
+# closes a proxied request at about 100 seconds, and the agent long-polls for up
+# to 300. Routing control traffic through the edge would break the poll, not
+# merely expose it.
+:{$INTERNAL_PORT} {
+	@internal path /internal/*
+	handle @internal {
+		reverse_proxy api:3000 {
+			lb_try_duration 30s
+			lb_try_interval 250ms
+		}
+	}
+
+	handle {
+		respond 404
+	}
+}
+
 # Container logs. Dozzle authenticates its own visitors (simple auth, prod only)
 # — the edge only gets them here, and deliberately does not add a second gate in
 # front of the login page.

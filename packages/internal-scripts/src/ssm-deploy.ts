@@ -18,6 +18,7 @@ const onBoxEnv: Record<string, string> = {
   API_IMAGE_URI: requiredEnv('API_IMAGE_URI'),
   API_HOSTNAME: requiredEnv('API_HOSTNAME'),
   DOZZLE_HOSTNAME: requiredEnv('DOZZLE_HOSTNAME'),
+  INTERNAL_PORT: requiredEnv('INTERNAL_PORT'),
   API_GITHUB_CLIENT_ID: requiredEnv('API_GITHUB_CLIENT_ID'),
   ARTIFACTS_BUCKET: requiredEnv('ARTIFACTS_BUCKET'),
   API_S3_ENDPOINT: requiredEnv('API_S3_ENDPOINT'),
