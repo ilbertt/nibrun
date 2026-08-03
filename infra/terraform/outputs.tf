@@ -6,10 +6,6 @@ output "public_ip" {
   value       = aws_eip.app.public_ip
 }
 
-output "public_ipv6" {
-  value = one(aws_instance.app.ipv6_addresses)
-}
-
 output "api_hostname" {
   value = var.api_hostname
 }

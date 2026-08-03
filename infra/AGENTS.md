@@ -26,10 +26,11 @@ DNS, every record **proxied** (orange cloud):
 - one A record per control-plane hostname (`api_hostname`, `dozzle_hostname`) → `terraform output
   public_ip`
 - `*.<app_domain>` A → `app_host_public_ips`. One record covers the whole fleet, so there is
-  nothing per app in DNS, and no AAAA: Cloudflare is the origin's only client and serves
-  visitors over IPv6 from its own edge.
+  nothing per app in DNS.
 
-The address outlives a replacement, so the record is written once.
+A records only, for both. Cloudflare is the only client either origin has, and it serves
+visitors over IPv6 from its own edge — an AAAA here would publish an address nothing needs to
+reach. Both addresses outlive a replacement, so the records are written once.
 
 Then, **in both zones**: SSL/TLS **Full (strict)**; an **Origin Certificate** (ECC — Cloudflare's
 edge is its only client), whose two halves are a proxy's TLS inputs; and **Authenticated Origin
