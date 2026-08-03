@@ -27,7 +27,10 @@ async function probeTcp({ guestIpv4, guestPort, healthCheck }: ProbeTarget): Pro
   let socket: { end(): void } | undefined;
   try {
     const connection = await Promise.race([
-      Bun.connect({ hostname: guestIpv4, port: guestPort, socket: {} }),
+      // `Bun.connect` rejects handlers carrying neither `data` nor `drain`, and the rejection
+      // is indistinguishable here from a tenant that is down. The probe never reads what the
+      // tenant sends: that the connection opened at all is the whole question.
+      Bun.connect({ hostname: guestIpv4, port: guestPort, socket: { data: () => undefined } }),
       Bun.sleep(healthCheck.timeoutMs).then(() => undefined),
     ]);
     socket = connection;

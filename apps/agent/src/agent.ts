@@ -117,6 +117,7 @@ export class Agent {
         artifactCacheDir: config.artifactCacheDir,
         guestImageDir: config.guestImageDir,
         vmDir: config.vmDir,
+        guestDnsServers: config.guestDnsServers,
       }),
       volumes: new VolumeManager({ runner, topology, allocator }),
     });
