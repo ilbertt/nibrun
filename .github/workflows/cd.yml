@@ -20,12 +20,24 @@ permissions:
   packages: write
 
 env:
-  # Authoritative: passed to Terraform as TF_VAR_region, so the two cannot drift.
+  # Authoritative: every job's credentials and TF_VAR_region come from here.
   AWS_REGION: eu-central-1
 
 jobs:
-  cd:
+  images:
     runs-on: ubuntu-latest
+    outputs:
+      # Same in every leg, so them racing to write it changes nothing.
+      repository: ${{ steps.registry.outputs.repo }}
+    strategy:
+      matrix:
+        include:
+          - name: api
+            context: .
+            dockerfile: apps/api/Dockerfile
+          - name: pg-backup
+            context: infra/pg-backup
+            dockerfile: infra/pg-backup/Dockerfile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -42,44 +54,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push api
-        id: api_image
+      - name: Build and push ${{ matrix.name }}
+        id: image
         uses: ./.github/actions/build-and-push-docker
         with:
-          image-repository: ${{ steps.registry.outputs.repo }}/api
+          image-repository: ${{ steps.registry.outputs.repo }}/${{ matrix.name }}
           image-tag: ${{ github.sha }}
-          context: .
-          dockerfile: apps/api/Dockerfile
-          cache-scope: api
+          context: ${{ matrix.context }}
+          dockerfile: ${{ matrix.dockerfile }}
+          cache-scope: ${{ matrix.name }}
 
-      - name: Build and push pg-backup
-        id: pg_backup_image
-        uses: ./.github/actions/build-and-push-docker
-        with:
-          image-repository: ${{ steps.registry.outputs.repo }}/pg-backup
-          image-tag: ${{ github.sha }}
-          context: infra/pg-backup
-          dockerfile: infra/pg-backup/Dockerfile
-          cache-scope: pg-backup
+      - name: Verify the image is public
+        run: bun run --filter @repo/internal-scripts verify-public-images ${{ steps.image.outputs.image-uri }}
 
-      - name: Verify images are public
-        env:
-          API_IMAGE_URI: ${{ steps.api_image.outputs.image-uri }}
-          PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
-        run: bun run --filter @repo/internal-scripts verify-public-images
+  terraform:
+    runs-on: ubuntu-latest
+    outputs:
+      values: ${{ steps.tf.outputs.json }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Both are plain compiled binaries rather than images: nothing on an app
-      # host is containerised. Built before any credential is assumed, because
-      # neither needs one — and the guest image's version is a digest of its
-      # inputs including the runtime binary, so that has to exist first.
-      - name: Build the guest runtime
-        run: bun run --filter @repo/runtime build
+      - uses: ./.github/actions/prepare
 
-      - name: Build the agent
-        run: bun run --filter @repo/agent build
-
-      - name: Configure AWS credentials (Terraform apply role)
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+      - uses: ./.github/actions/aws-credentials
         with:
           role-to-assume: ${{ vars.AWS_TERRAFORM_APPLY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -106,69 +103,101 @@ jobs:
           ALLOW_DESTROY: ${{ inputs.allow_destroy }}
         run: bun run --filter @repo/internal-scripts terraform-apply
 
-      # Drops from admin to the scoped role for everything that touches the app.
-      - name: Configure AWS credentials (deploy role)
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+  control-plane:
+    needs: [images, terraform]
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).deploy_bucket }}
+      DEPLOY_GROUP: ${{ fromJSON(needs.terraform.outputs.values).deploy_group }}
+      SSM_SECRET_PREFIX: ${{ fromJSON(needs.terraform.outputs.values).ssm_secret_prefix }}
+      DATA_VOLUME_ID: ${{ fromJSON(needs.terraform.outputs.values).data_volume_id }}
+      API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
+      DOZZLE_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).dozzle_hostname }}
+      API_GITHUB_CLIENT_ID: ${{ fromJSON(needs.terraform.outputs.values).api_github_client_id }}
+      ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
+      API_S3_ENDPOINT: ${{ fromJSON(needs.terraform.outputs.values).api_s3_endpoint }}
+      PG_BACKUP_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).pg_backup_bucket }}
+      API_IMAGE_URI: ${{ needs.images.outputs.repository }}/api:${{ github.sha }}
+      PG_BACKUP_IMAGE_URI: ${{ needs.images.outputs.repository }}/pg-backup:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/prepare
+
+      - uses: ./.github/actions/aws-credentials
         with:
-          role-to-assume: ${{ steps.tf.outputs.github_deploy_role_arn }}
+          role-to-assume: ${{ fromJSON(needs.terraform.outputs.values).github_deploy_role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Publish runtime bundle
         id: bundle
-        env:
-          DEPLOY_BUCKET: ${{ steps.tf.outputs.deploy_bucket }}
         run: bun run --filter @repo/internal-scripts publish-runtime-bundle
-
-      - name: Publish the agent binary
-        id: agent_binary
-        env:
-          DEPLOY_BUCKET: ${{ steps.tf.outputs.deploy_bucket }}
-        run: bun run --filter @repo/internal-scripts publish-agent-binary
-
-      # Skipped entirely unless the image's inputs changed — its version is a
-      # digest of them, so "already published" and "unchanged" are one question.
-      # When it does build, it compiles a kernel, hence the timeout.
-      - name: Publish the guest image
-        id: guest_image
-        timeout-minutes: 45
-        env:
-          GUEST_IMAGES_BUCKET: ${{ steps.tf.outputs.guest_images_bucket }}
-        run: bun run --filter @repo/internal-scripts publish-guest-image
-
-      - name: Publish the app host bundle
-        id: app_host_bundle
-        env:
-          DEPLOY_BUCKET: ${{ steps.tf.outputs.deploy_bucket }}
-        run: bun run --filter @repo/internal-scripts publish-app-host-bundle
 
       - name: Deploy via SSM
         env:
           BUNDLE_URL: ${{ steps.bundle.outputs.url }}
-          DEPLOY_GROUP: ${{ steps.tf.outputs.deploy_group }}
-          SSM_SECRET_PREFIX: ${{ steps.tf.outputs.ssm_secret_prefix }}
-          DATA_VOLUME_ID: ${{ steps.tf.outputs.data_volume_id }}
-          API_IMAGE_URI: ${{ steps.api_image.outputs.image-uri }}
-          API_HOSTNAME: ${{ steps.tf.outputs.api_hostname }}
-          DOZZLE_HOSTNAME: ${{ steps.tf.outputs.dozzle_hostname }}
-          API_GITHUB_CLIENT_ID: ${{ steps.tf.outputs.api_github_client_id }}
-          ARTIFACTS_BUCKET: ${{ steps.tf.outputs.artifacts_bucket }}
-          API_S3_ENDPOINT: ${{ steps.tf.outputs.api_s3_endpoint }}
-          PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
-          PG_BACKUP_BUCKET: ${{ steps.tf.outputs.pg_backup_bucket }}
         run: bun run --filter @repo/internal-scripts ssm-deploy
 
-      # Separate from the control plane's deploy: a different bundle, a different
-      # DeployGroup, and a different machine class. The versions it installs come
-      # from infra/app-host/versions.json — never from asking S3 what is newest.
+  app-hosts:
+    needs: terraform
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).deploy_bucket }}
+      APP_HOST_DEPLOY_GROUP: ${{ fromJSON(needs.terraform.outputs.values).app_host_deploy_group }}
+      APP_HOST_DATA_VOLUME_IDS: ${{ fromJSON(needs.terraform.outputs.values).app_host_data_volume_ids }}
+      SSM_SECRET_PREFIX: ${{ fromJSON(needs.terraform.outputs.values).ssm_secret_prefix }}
+      GUEST_IMAGES_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).guest_images_bucket }}
+      FILESYSTEMS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).filesystems_bucket }}
+      ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
+      API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/prepare
+
+      - uses: ./.github/actions/aws-credentials
+        with:
+          role-to-assume: ${{ fromJSON(needs.terraform.outputs.values).github_deploy_role_arn }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build the agent
+        run: bun run --filter @repo/agent build
+
+      - name: Publish the agent binary
+        id: agent_binary
+        run: bun run --filter @repo/internal-scripts publish-agent-binary
+
+      - name: Publish the app host bundle
+        id: bundle
+        run: bun run --filter @repo/internal-scripts publish-app-host-bundle
+
       - name: Deploy the app hosts via SSM
         env:
-          BUNDLE_URL: ${{ steps.app_host_bundle.outputs.url }}
-          APP_HOST_DEPLOY_GROUP: ${{ steps.tf.outputs.app_host_deploy_group }}
-          APP_HOST_DATA_VOLUME_IDS: ${{ steps.tf.outputs.app_host_data_volume_ids }}
-          SSM_SECRET_PREFIX: ${{ steps.tf.outputs.ssm_secret_prefix }}
+          BUNDLE_URL: ${{ steps.bundle.outputs.url }}
           AGENT_URL: ${{ steps.agent_binary.outputs.url }}
-          GUEST_IMAGES_BUCKET: ${{ steps.tf.outputs.guest_images_bucket }}
-          FILESYSTEMS_BUCKET: ${{ steps.tf.outputs.filesystems_bucket }}
-          ARTIFACTS_BUCKET: ${{ steps.tf.outputs.artifacts_bucket }}
-          API_HOSTNAME: ${{ steps.tf.outputs.api_hostname }}
         run: bun run --filter @repo/internal-scripts ssm-deploy-app-hosts
+
+  # Nothing may depend on this job. Publishing is not adopting, so no deploy
+  # consumes what it produces, and a kernel rebuild takes three quarters of an
+  # hour — waiting on it would hold up shipping an agent for no gain.
+  guest-image:
+    needs: terraform
+    runs-on: ubuntu-latest
+    env:
+      GUEST_IMAGES_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).guest_images_bucket }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/prepare
+
+      - uses: ./.github/actions/aws-credentials
+        with:
+          role-to-assume: ${{ fromJSON(needs.terraform.outputs.values).github_deploy_role_arn }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build the guest runtime
+        run: bun run --filter @repo/runtime build
+
+      - name: Publish the guest image
+        timeout-minutes: 45
+        run: bun run --filter @repo/internal-scripts publish-guest-image

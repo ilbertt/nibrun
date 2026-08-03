@@ -1,0 +1,18 @@
+name: AWS credentials
+description: Assume a role via OIDC.
+
+inputs:
+  role-to-assume:
+    description: ARN of the role to assume.
+    required: true
+  aws-region:
+    description: Region to assume the role in.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        aws-region: ${{ inputs.aws-region }}
