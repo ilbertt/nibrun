@@ -1,20 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { HealthStatus } from '#components/health-status.tsx';
+import { AccountCard } from '#components/overview/account-card.tsx';
+import { ApiCard } from '#components/overview/api-card.tsx';
+import { DeploymentCard } from '#components/overview/deployment-card.tsx';
+import { UptimeCard } from '#components/overview/uptime-card.tsx';
 
 export const Route = createFileRoute('/')({ component: RouteComponent });
 
 function RouteComponent() {
-  const { session } = Route.useRouteContext();
-
   return (
-    <div className="p-8">
-      <h1 className="font-bold text-4xl">Welcome back, {session?.user.name}</h1>
-      <p className="mt-4 text-lg">
-        Edit <code>src/routes/index.tsx</code> to get started.
-      </p>
-      <div className="mt-6">
-        <HealthStatus />
+    <div className="@container/main flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
+      <div className="grid @5xl/main:grid-cols-3 @xl/main:grid-cols-2 grid-cols-1 gap-4">
+        <ApiCard />
+        <UptimeCard />
+        <AccountCard />
       </div>
+      <DeploymentCard />
     </div>
   );
 }

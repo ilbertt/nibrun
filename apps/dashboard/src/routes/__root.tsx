@@ -3,7 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, Outlet, redirect } from '@tanstack/react-router';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
-import { AppHeader } from '#components/app-header.tsx';
+import { AppShell } from '#components/app-shell.tsx';
 import { sessionQueryOptions } from '#queries/session.ts';
 import { Route as IndexRoute } from '#routes/index.tsx';
 import { Route as LoginRoute } from '#routes/login.tsx';
@@ -35,8 +35,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RouteComponent() {
   return (
     <>
-      <AppHeader />
-      <Outlet />
+      <AppShell>
+        <Outlet />
+      </AppShell>
       <TanStackDevtools
         config={{
           position: 'bottom-right',

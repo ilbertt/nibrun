@@ -1,21 +1,24 @@
+import { GithubIcon } from '#components/github-icon.tsx';
+import { Button } from '#components/ui/button.tsx';
+import { Field, FieldError } from '#components/ui/field.tsx';
 import { useSignIn } from '#lib/hooks/use-sign-in.ts';
 
 export function GithubSignInButton({ callbackURL }: { callbackURL: string }) {
   const signIn = useSignIn(callbackURL);
 
   return (
-    <>
-      <button
-        type="button"
+    <Field data-invalid={signIn.isError || undefined}>
+      <Button
+        variant="outline"
+        size="lg"
+        className="w-full"
         onClick={() => signIn.mutate()}
         disabled={signIn.isPending}
-        className="rounded-md bg-gray-900 px-4 py-2.5 font-medium text-sm text-white hover:bg-gray-700 disabled:opacity-50"
       >
+        <GithubIcon />
         {signIn.isPending ? 'Redirecting…' : 'Continue with GitHub'}
-      </button>
-      {signIn.isError && (
-        <p className="text-red-600 text-sm">Could not start sign-in. Please try again.</p>
-      )}
-    </>
+      </Button>
+      {signIn.isError && <FieldError>Could not start sign-in. Please try again.</FieldError>}
+    </Field>
   );
 }
