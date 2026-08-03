@@ -125,9 +125,10 @@ Each of these has a deferred feature behind it that becomes a migration if the s
 - **The agent reports the host-side port.** Routing is local to the host, so the control plane
   does not strictly need it — but it is required to debug a host nothing can connect to, and
   it is what a second app host would route on.
-- **Cutting a filesystem checkpoint is expressible as desired state**, because export reads a
-  tenant's filesystem while a host still has it open and only that host can produce a view
-  that is not moving underneath the reader.
+- **Cutting a filesystem checkpoint is expressible as desired state.** Export itself does not
+  need it — a second process can open a live read-write prefix read-only and gets the writer's
+  last flushed state, crash-consistent and never partial. Checkpoints are for a view that must
+  stay still across a long operation, and only the owning host can cut one.
 
 `DesiredInstance` carries its app's hostnames so the agent can render its local proxy config
 from the same state it boots VMs with. That proxy is not built yet; the bookkeeping is shaped

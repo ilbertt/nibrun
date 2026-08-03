@@ -12,15 +12,22 @@ export const CheckpointStateSchema = stringEnum(CHECKPOINT_STATES);
 export type CheckpointState = typeof CheckpointStateSchema.static;
 
 /**
- * A point-in-time view of a volume, cut by the host that currently has it open.
+ * A pinned, non-advancing view of a volume, cut by the host that currently has it open.
  *
- * Export reads a tenant's filesystem from S3 while a host still has it open read-write, so it
- * needs a view that is not moving underneath it. The host is the only party that can produce
- * one, which is why cutting a checkpoint is expressed as desired state rather than as
- * something the exporter does for itself.
+ * Export does **not** need one. A second process can open a live read-write prefix read-only
+ * and gets exactly the writer's last flushed state — a crash-consistent whole-manifest view,
+ * never a partial one — with staleness bounded by the flush interval plus the reader's poll.
+ * So the ordinary path is a read-only open with no cooperation from the owning host at all.
  *
- * `reference` is whatever the storage layer hands back to address the checkpoint afterwards,
- * kept opaque here so that its shape stays the storage layer's business.
+ * A checkpoint is for the case a live view cannot serve: an image that must stay still across
+ * a long operation, such as a migration. That is the only reason this is expressible as
+ * desired state — the owning host is the only party that can cut one.
+ *
+ * Checkpoints never expire, and pin the storage they reference against garbage collection
+ * until deleted. Removing one is the point of `absent`, not an afterthought.
+ *
+ * `reference` is whatever the storage layer hands back to address it afterwards, kept opaque
+ * so its shape stays the storage layer's business.
  */
 export const CheckpointSchema = Type.Object({
   id: CheckpointIdSchema,
