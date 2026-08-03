@@ -31,7 +31,7 @@ ExecStartPost=/bin/sh -c 'for _ in $(seq 100); do mountpoint -q /mnt/zerofs && e
 ExecStopPost=-/usr/bin/fusermount3 -u /mnt/zerofs
 
 Restart=always
-RestartSec=5s
+RestartSec=2s
 
 [Install]
 WantedBy=multi-user.target
