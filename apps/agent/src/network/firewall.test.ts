@@ -85,6 +85,16 @@ describe('forwarding', () => {
     expect(renderRuleset(state())).toContain('ip saddr 10.201.0.0/16 oifname != "nbr*" masquerade');
   });
 
+  // nft accepts `dstnat` only on prerouting and rejects the whole ruleset otherwise, which
+  // leaves the host with no isolation rules at all rather than with one bad chain.
+  test('the output chain uses a priority nft accepts on that hook', () => {
+    const ruleset = renderRuleset(state({ instances: [instance] }));
+    const output = ruleset.split('\n').find((line) => line.includes('hook output'));
+
+    expect(output).toContain('priority -100');
+    expect(ruleset).not.toContain('hook output priority dstnat');
+  });
+
   test('host-local traffic to a forwarded port is re-sourced so the guest can reply', () => {
     const ruleset = renderRuleset(state({ instances: [instance] }));
     expect(ruleset).toContain('ip saddr 127.0.0.0/8 ip daddr 10.201.0.2 snat to 10.201.0.1');

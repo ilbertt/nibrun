@@ -8,6 +8,9 @@ export const INSTANCE_METADATA_ADDRESS = '169.254.169.254';
 
 const DNS_PORT = 53;
 
+// NF_IP_PRI_NAT_DST — what `dstnat` resolves to where the name is allowed.
+const OUTPUT_NAT_PRIORITY = -100;
+
 // The blanket rule that makes the three isolation guarantees hold even for a destination
 // nobody thought to enumerate. Every one of these is somewhere a tenant has no business
 // reaching from inside a microVM.
@@ -123,7 +126,9 @@ function natChains({ instances }: FirewallState): string[] {
     ...chain({
       header: 'output {',
       rules: [
-        'type nat hook output priority dstnat; policy accept;',
+        // The numeric value of dstnat, because the name is only accepted on prerouting: nft
+        // rejects `priority dstnat` on the output hook outright, and the whole ruleset with it.
+        `type nat hook output priority ${OUTPUT_NAT_PRIORITY}; policy accept;`,
         ...instances.map(
           (instance) =>
             `ip daddr 127.0.0.1 tcp dport ${instance.hostPort} dnat to ${instance.guestIpv4}:${instance.guestPort}`,

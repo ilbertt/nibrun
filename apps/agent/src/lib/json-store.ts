@@ -5,6 +5,10 @@ const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
 const JSON_INDENT = 2;
 
+function temporaryPathFor(path: string): string {
+  return `${path}.${crypto.randomUUID()}.tmp`;
+}
+
 export async function readJsonFile({ path }: { path: string }): Promise<unknown> {
   const file = Bun.file(path);
   if (!(await file.exists())) {
@@ -16,6 +20,11 @@ export async function readJsonFile({ path }: { path: string }): Promise<unknown>
 /**
  * Writes through a sibling temporary file and renames, so a torn write can never leave the
  * agent with a state file it cannot parse. Rename within a directory is atomic on ext4.
+ *
+ * The temporary name is unique per write rather than `<path>.tmp`: two writes of the same file
+ * in flight together — a reconcile and a status refresh both persisting slots — would otherwise
+ * share it, and whichever renamed second would find the first had already moved it away and
+ * fail with ENOENT.
  */
 export async function writeJsonFile({
   path,
@@ -25,7 +34,7 @@ export async function writeJsonFile({
   value: unknown;
 }): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: PRIVATE_DIR_MODE });
-  const temporaryPath = `${path}.tmp`;
+  const temporaryPath = temporaryPathFor(path);
   await writeFile(temporaryPath, `${JSON.stringify(value, null, JSON_INDENT)}\n`, {
     mode: PRIVATE_FILE_MODE,
   });
@@ -51,7 +60,7 @@ export async function writeTextFile({
   mode?: number;
 }): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: PRIVATE_DIR_MODE });
-  const temporaryPath = `${path}.tmp`;
+  const temporaryPath = temporaryPathFor(path);
   await writeFile(temporaryPath, value, { mode });
   await rename(temporaryPath, path);
 }
