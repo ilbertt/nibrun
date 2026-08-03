@@ -73,6 +73,7 @@ const desiredState = (): HostDesiredState => ({
     },
   ],
   checkpoints: [],
+  exports: [],
 });
 
 // Branding a schema means overriding a type-level property on it. If that ever started

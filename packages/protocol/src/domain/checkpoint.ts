@@ -14,10 +14,8 @@ export type CheckpointState = typeof CheckpointStateSchema.static;
 /**
  * A pinned, non-advancing view of a volume, cut by the host that currently has it open.
  *
- * Export does **not** need one. A second process can open a live read-write prefix read-only
- * and gets exactly the writer's last flushed state — a crash-consistent whole-manifest view,
- * never a partial one — with staleness bounded by the flush interval plus the reader's poll.
- * So the ordinary path is a read-only open with no cooperation from the owning host at all.
+ * Export does **not** need one: the owning host writes the export itself, from the device it
+ * already has attached, so there is no second reader to give a consistent view to.
  *
  * A checkpoint is for the case a live view cannot serve: an image that must stay still across
  * a long operation, such as a migration. That is the only reason this is expressible as

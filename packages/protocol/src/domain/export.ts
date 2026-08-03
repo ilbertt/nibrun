@@ -16,6 +16,11 @@ export type ExportState = typeof ExportStateSchema.static;
  * nothing produces one of these on a schedule. The bundle carries the tenant's environment
  * variables and their entire dataset, so `expiresAt` is a security property rather than
  * housekeeping, and the bytes are only ever reachable through a short-lived presigned URL.
+ *
+ * **The host that owns the volume writes it, not the control plane.** It already has the
+ * device attached, so it reads one tenant's filesystem and no other, in userspace and without
+ * mounting it. The control plane then needs no access at all to tenant filesystems — only read
+ * on the export bucket, which is what lets it sign a download URL.
  */
 export const ExportSchema = Type.Object({
   id: ExportIdSchema,

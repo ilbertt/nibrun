@@ -4,6 +4,7 @@ import {
   AppIdSchema,
   CheckpointIdSchema,
   DeploymentIdSchema,
+  ExportIdSchema,
   HostIdSchema,
   InstanceIdSchema,
   VolumeIdSchema,
@@ -71,6 +72,28 @@ export const DesiredCheckpointSchema = Type.Object({
 export type DesiredCheckpoint = typeof DesiredCheckpointSchema.static;
 
 /**
+ * A bundle the owning host should write, because it is the only party that can.
+ *
+ * The host has the tenant's device attached already, so it reads that one filesystem and no
+ * other, in userspace and without mounting it. Asking the control plane to do it would mean
+ * giving it access to tenant filesystems, and under a per-host storage layout that means access
+ * to *every* tenant's, to serve one.
+ *
+ * `objectKey` is chosen by the control plane rather than the host: it is what the download URL
+ * is signed against, and a key the control plane did not choose is one it would have to be told
+ * before it could sign anything.
+ */
+export const DesiredExportSchema = Type.Object({
+  exportId: ExportIdSchema,
+  appId: AppIdSchema,
+  volumeId: VolumeIdSchema,
+  objectKey: ObjectKeySchema,
+  desiredState: DesiredPresenceSchema,
+});
+
+export type DesiredExport = typeof DesiredExportSchema.static;
+
+/**
  * The whole of what one host should be doing.
  *
  * `instances` is authoritative: a microVM running on the host and absent from this list is one
@@ -87,6 +110,7 @@ export const HostDesiredStateSchema = Type.Object({
   volumes: Type.Array(DesiredVolumeSchema),
   instances: Type.Array(DesiredInstanceSchema),
   checkpoints: Type.Array(DesiredCheckpointSchema),
+  exports: Type.Array(DesiredExportSchema),
 });
 
 export type HostDesiredState = typeof HostDesiredStateSchema.static;

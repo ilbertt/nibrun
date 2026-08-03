@@ -1,9 +1,11 @@
 import { Type } from '@sinclair/typebox';
 import { CheckpointStateSchema } from '#domain/checkpoint.ts';
+import { ExportStateSchema } from '#domain/export.ts';
 import { HostCapacitySchema, HostStateSchema, HostVersionsSchema } from '#domain/host.ts';
 import {
   CheckpointIdSchema,
   DeploymentIdSchema,
+  ExportIdSchema,
   HostIdSchema,
   InstanceIdSchema,
   VolumeIdSchema,
@@ -65,6 +67,18 @@ export const ReportedCheckpointSchema = Type.Object({
 
 export type ReportedCheckpoint = typeof ReportedCheckpointSchema.static;
 
+// The host reports the size it wrote but not where it put it: the key came down in desired
+// state, so echoing it back would be a second place for it to be wrong.
+export const ReportedExportSchema = Type.Object({
+  exportId: ExportIdSchema,
+  state: ExportStateSchema,
+  sizeBytes: Type.Optional(ByteSizeSchema),
+  readyAt: Type.Optional(TimestampSchema),
+  message: Type.Optional(MessageSchema),
+});
+
+export type ReportedExport = typeof ReportedExportSchema.static;
+
 /**
  * What a host is actually doing, as observed by the agent — not as the agent remembers having
  * arranged. On startup the agent enumerates what is really running before it reports, so a
@@ -84,6 +98,7 @@ export const HostReportedStateSchema = Type.Object({
   volumes: Type.Array(ReportedVolumeSchema),
   instances: Type.Array(ReportedInstanceSchema),
   checkpoints: Type.Array(ReportedCheckpointSchema),
+  exports: Type.Array(ReportedExportSchema),
 });
 
 export type HostReportedState = typeof HostReportedStateSchema.static;
