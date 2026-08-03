@@ -6,8 +6,12 @@ to the api in development, so it is same-origin either way.
 ## Components
 
 `src/components/` holds one component per file, named after the component it
-exports — `sign-out-button.tsx` exports `SignOutButton`. Components belonging to
-the same group live together in a subfolder of it.
+exports — `github-sign-in-button.tsx` exports `GithubSignInButton`. Components
+belonging to the same group live together in a subfolder of it.
+
+`src/components/ui/` is the shadcn registry's output, kept as the CLI writes it
+so `shadcn add` can overwrite a component without a merge. Biome skips it for
+the same reason. Restyle from `src/styles.css`, not by editing these files.
 
 `src/routes/` is the TanStack Router route tree, so its files are named for the
 URL they serve rather than for what they export. Each holds the one component its
@@ -21,6 +25,16 @@ Reach for a hook before a prop: state a component can read for itself does not
 belong in its signature, and nothing should be threaded through a component that
 does not use it. Keep a prop for what the parent genuinely decides about the
 child.
+
+## Icons
+
+`src/icons/` holds hand-written SVG icons, one per file, named after the
+component it exports — `github-icon.tsx` exports `GithubIcon`. They sit outside
+`src/components/` because they are artwork behind a React signature rather than
+UI of their own.
+
+Reach for `lucide-react` first and only add a file here for a glyph it does not
+ship, such as a brand mark.
 
 ## Hooks
 

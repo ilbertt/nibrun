@@ -1,6 +1,6 @@
-import { GithubIcon } from '#components/github-icon.tsx';
 import { Button } from '#components/ui/button.tsx';
 import { Field, FieldError } from '#components/ui/field.tsx';
+import { GithubIcon } from '#icons/github-icon.tsx';
 import { useSignIn } from '#lib/hooks/use-sign-in.ts';
 
 export function GithubSignInButton({ callbackURL }: { callbackURL: string }) {
