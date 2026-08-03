@@ -53,8 +53,15 @@ variable "export_retention_days" {
 
 variable "internal_port" {
   type        = number
-  default     = 8080
+  default     = 19080
   description = "Port the control plane serves /internal on, reachable from app hosts over the VPC and from nowhere else. Plain HTTP: the security group is the boundary, and an origin certificate names hostnames rather than the private address an agent dials."
+
+  # Not 8080, which Dozzle already publishes in the same compose stack — the
+  # edge could not bind it and the deploy died on `compose up`. Chosen against
+  # the collision recurring rather than for the number: unregistered in
+  # /etc/services, outside the 3000/8000/9000 band anything added to the stack
+  # reaches for by default, and below the 32768 ephemeral floor so no outbound
+  # socket can be holding it when the edge starts.
 }
 
 variable "vpc_cidr_block" {

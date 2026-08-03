@@ -11,7 +11,7 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 : "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_GITHUB_CLIENT_ID:?}" \
   "${ARTIFACTS_BUCKET:?}" "${API_S3_ENDPOINT:?}" "${PG_BACKUP_IMAGE_URI:?}" \
   "${PG_BACKUP_BUCKET:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" \
-  "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}"
+  "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}" "${INTERNAL_PORT:?}"
 
 # Per-deployment values no infrastructure resource feeds, still overridable from
 # the deploy so they never have to be edited here. The host port bindings are
@@ -92,9 +92,25 @@ PG_BACKUP_BUCKET=${PG_BACKUP_BUCKET}
 
 DOZZLE_HOSTNAME=${DOZZLE_HOSTNAME}
 DOZZLE_PORT=${DOZZLE_PORT}
+
+INTERNAL_PORT=${INTERNAL_PORT}
 EOF
 
 compose="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+
+# `compose up` reports a taken port as a docker-proxy bind failure minutes in,
+# costing a CI round trip to learn what the box knew before it started. The edge
+# binds every interface, so any listener on the port collides whatever address it
+# holds — including a loopback-only one, which is how Dozzle's 8080 broke this.
+# The edge is the expected holder on a redeploy, since nothing recreates it.
+log "Checking port ${INTERNAL_PORT} is free"
+port_holder=$(ss -lntpH "sport = :${INTERNAL_PORT}")
+if [ -n "$port_holder" ] &&
+  [ "$(docker ps --filter "publish=${INTERNAL_PORT}" --format '{{.Names}}')" != caddy ]; then
+  log "INTERNAL_PORT ${INTERNAL_PORT} is already held:"
+  printf '%s\n' "$port_holder"
+  exit 1
+fi
 
 log "Pulling images"
 $compose pull

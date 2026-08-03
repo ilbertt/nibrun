@@ -44,6 +44,8 @@ services:
     ports:
       - "443:443"
       # Admitted from the app hosts' security group only; see infra/caddy/Caddyfile.
+      # On every interface like 443 above: the security group is the boundary, and
+      # AWS enforces it before a packet reaches the instance.
       - "${INTERNAL_PORT}:${INTERNAL_PORT}"
     healthcheck:
       test:
