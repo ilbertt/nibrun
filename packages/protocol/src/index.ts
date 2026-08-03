@@ -1,0 +1,178 @@
+/** biome-ignore-all lint/performance/noBarrelFile: index is the only allowed file where we can export other files */
+
+export {
+  DESIRED_INSTANCE_STATES,
+  DESIRED_PRESENCE,
+  type DesiredArtifact,
+  DesiredArtifactSchema,
+  type DesiredCheckpoint,
+  DesiredCheckpointSchema,
+  type DesiredInstance,
+  DesiredInstanceSchema,
+  type DesiredInstanceState,
+  DesiredInstanceStateSchema,
+  type DesiredPresence,
+  DesiredPresenceSchema,
+  type DesiredVolume,
+  DesiredVolumeSchema,
+  type HostDesiredState,
+  HostDesiredStateSchema,
+} from '#control/desired-state.ts';
+export {
+  type HostReportedState,
+  HostReportedStateSchema,
+  type ReportedCheckpoint,
+  ReportedCheckpointSchema,
+  type ReportedInstance,
+  ReportedInstanceSchema,
+  type ReportedVolume,
+  ReportedVolumeSchema,
+} from '#control/reported-state.ts';
+export {
+  type AgentPollSettings,
+  AgentPollSettingsSchema,
+  type AgentSession,
+  type AgentSessionRequest,
+  AgentSessionRequestSchema,
+  AgentSessionSchema,
+  DEFAULT_AGENT_POLL_SETTINGS,
+} from '#control/session.ts';
+export {
+  AGENT_API_PREFIX,
+  AGENT_ROUTES,
+  type DesiredStateRequest,
+  DesiredStateRequestSchema,
+  type DesiredStateResponse,
+  DesiredStateResponseSchema,
+  PROTOCOL_VERSION,
+  PROTOCOL_VERSION_HEADER,
+  type ReportedStateResponse,
+  ReportedStateResponseSchema,
+} from '#control/transport.ts';
+export {
+  APP_HOSTNAME_KINDS,
+  APP_STATES,
+  type App,
+  type AppConfig,
+  AppConfigSchema,
+  type AppHostname,
+  type AppHostnameKind,
+  AppHostnameKindSchema,
+  AppHostnameSchema,
+  AppSchema,
+  type AppState,
+  AppStateSchema,
+  defaultHostname,
+  type TenantEnvironment,
+  TenantEnvironmentSchema,
+} from '#domain/app.ts';
+export {
+  ARTIFACT_STATES,
+  type Artifact,
+  ArtifactSchema,
+  type ArtifactState,
+  ArtifactStateSchema,
+} from '#domain/artifact.ts';
+export {
+  CHECKPOINT_STATES,
+  type Checkpoint,
+  CheckpointSchema,
+  type CheckpointState,
+  CheckpointStateSchema,
+} from '#domain/checkpoint.ts';
+export {
+  DEPLOYMENT_STATES,
+  type Deployment,
+  DeploymentSchema,
+  type DeploymentState,
+  DeploymentStateSchema,
+} from '#domain/deployment.ts';
+export {
+  EXPORT_STATES,
+  type Export,
+  ExportSchema,
+  type ExportState,
+  ExportStateSchema,
+} from '#domain/export.ts';
+export {
+  HOST_STATES,
+  type Host,
+  type HostCapacity,
+  HostCapacitySchema,
+  HostSchema,
+  type HostState,
+  HostStateSchema,
+  type HostVersions,
+  HostVersionsSchema,
+} from '#domain/host.ts';
+export {
+  type AppId,
+  AppIdSchema,
+  type ArtifactId,
+  ArtifactIdSchema,
+  type CheckpointId,
+  CheckpointIdSchema,
+  type DeploymentId,
+  DeploymentIdSchema,
+  type ExportId,
+  ExportIdSchema,
+  type HostId,
+  HostIdSchema,
+  type InstanceId,
+  InstanceIdSchema,
+  type OwnerId,
+  OwnerIdSchema,
+  type VolumeId,
+  VolumeIdSchema,
+} from '#domain/identifiers.ts';
+export {
+  DEFAULT_HEALTH_CHECK,
+  DEFAULT_INSTANCE_RESOURCES,
+  DEFAULT_RESTART_POLICY,
+  type HealthCheck,
+  HealthCheckSchema,
+  INSTANCE_STATES,
+  type Instance,
+  type InstanceResources,
+  InstanceResourcesSchema,
+  InstanceSchema,
+  type InstanceState,
+  InstanceStateSchema,
+  type RestartPolicy,
+  RestartPolicySchema,
+} from '#domain/instance.ts';
+export {
+  VOLUME_STATES,
+  type Volume,
+  VolumeSchema,
+  type VolumeState,
+  VolumeStateSchema,
+} from '#domain/volume.ts';
+export type { Brand } from '#lib/brand.ts';
+export { REDACTED, redactSecrets, type SecretString, SecretStringSchema } from '#lib/secret.ts';
+export {
+  isValidMessage,
+  type ProtocolIssue,
+  ProtocolValidationError,
+  parseMessage,
+} from '#lib/validate.ts';
+export {
+  ByteSizeSchema,
+  DEFAULT_GUEST_PORT,
+  type DnsLabel,
+  DnsLabelSchema,
+  type GuestPort,
+  GuestPortSchema,
+  type Hostname,
+  HostnameSchema,
+  type HostPort,
+  HostPortSchema,
+  type Ipv4Address,
+  Ipv4AddressSchema,
+  type ObjectKey,
+  ObjectKeySchema,
+  type Sha256Digest,
+  Sha256DigestSchema,
+  type Timestamp,
+  TimestampSchema,
+} from '#lib/wire.ts';

@@ -91,6 +91,16 @@
         "typescript": "catalog:",
       },
     },
+    "packages/protocol": {
+      "name": "@repo/protocol",
+      "dependencies": {
+        "@sinclair/typebox": "^0.34.52",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "packages/typescript-config": {
       "name": "@repo/typescript-config",
     },
@@ -359,6 +369,8 @@
     "@repo/internal-scripts": ["@repo/internal-scripts@workspace:packages/internal-scripts"],
 
     "@repo/pack-utils": ["@repo/pack-utils@workspace:packages/pack-utils"],
+
+    "@repo/protocol": ["@repo/protocol@workspace:packages/protocol"],
 
     "@repo/typescript-config": ["@repo/typescript-config@workspace:packages/typescript-config"],
 

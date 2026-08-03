@@ -5,8 +5,9 @@
   "scripts": {
     "build": "bun run --bun turbo build",
     "check:types": "bun run --bun turbo check:types",
+    "test": "bun run --bun turbo test",
     "check:codestyle": "bun run --bun biome check",
-    "check:all": "bun check:types && bun check:codestyle",
+    "check:all": "bun check:types && bun check:codestyle && bun run test",
     "check:commit-message": "bun run --bun commitlint",
     "fix:codestyle": "bun run --bun biome check --write"
   },

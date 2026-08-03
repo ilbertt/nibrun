@@ -29,10 +29,21 @@ jobs:
       - name: Check JS Codestyle
         run: bun check:codestyle
 
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/prepare
+
+      - name: Run Tests
+        run: bun run test
+
   checks-passed:
     if: always()
     name: checks:required
-    needs: [types, codestyle]
+    needs: [types, codestyle, tests]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed
