@@ -64,6 +64,15 @@ data "aws_iam_policy_document" "app_host" {
     resources = [aws_s3_bucket.deploy.arn, "${aws_s3_bucket.deploy.arn}/*"]
   }
 
+  # The host writes the export itself, because it is the only party with the
+  # tenant's device attached. Write-only: a host has no reason to read back a
+  # bundle it produced, and the api is what serves them.
+  statement {
+    sid       = "ExportsWrite"
+    actions   = ["s3:PutObject", "s3:AbortMultipartUpload"]
+    resources = ["${aws_s3_bucket.exports.arn}/*"]
+  }
+
   # Read deployment secrets.
   statement {
     sid       = "SsmRead"

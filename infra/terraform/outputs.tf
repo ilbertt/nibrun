@@ -76,6 +76,11 @@ output "app_host_data_volume_ids" {
   value       = { for index, host in aws_instance.app_host : host.id => aws_ebs_volume.app_host_data[index].id }
 }
 
+output "exports_bucket" {
+  description = "Downloadable app exports. Written by app hosts, read by the api only to sign a download URL."
+  value       = aws_s3_bucket.exports.bucket
+}
+
 output "filesystems_bucket" {
   description = "ZeroFS's backing store. Read-write from app hosts, read-only from the control plane."
   value       = aws_s3_bucket.filesystems.bucket

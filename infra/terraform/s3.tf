@@ -211,3 +211,61 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "guest_images" {
     }
   }
 }
+
+# --- Exports ---
+#
+# The downloadable copies of an app, written by the host that owns the volume and
+# read only through a presigned URL the api signs.
+#
+# The expiry is a security requirement rather than housekeeping: a bundle carries
+# the tenant's environment variables and their entire dataset, so it must stop
+# existing rather than sit here indefinitely. It is a bucket rule and not a
+# per-object one on purpose — a rule cannot be forgotten on the one object that
+# mattered.
+#
+# No versioning, for the same reason. A version of an expired export is an
+# expired export that still exists.
+resource "aws_s3_bucket" "exports" {
+  bucket = "${local.resource_name_prefix}-exports-${var.region}"
+
+  tags = {
+    Name = "${local.resource_name_prefix}-exports"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "exports" {
+  bucket                  = aws_s3_bucket.exports.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "exports" {
+  bucket = aws_s3_bucket.exports.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "exports" {
+  bucket = aws_s3_bucket.exports.id
+
+  rule {
+    id     = "expire-exports"
+    status = "Enabled"
+    filter {}
+    expiration {
+      days = var.export_retention_days
+    }
+
+    # A bundle abandoned part-way through still holds tenant data, and an
+    # incomplete upload is invisible to the expiry rule above.
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+}

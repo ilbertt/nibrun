@@ -45,6 +45,12 @@ variable "app_host_data_volume_size" {
   description = "Per-host data EBS volume size in GB, mounted at /data. Sized for ZeroFS's working set, not for the fleet's data — S3 holds that."
 }
 
+variable "export_retention_days" {
+  type        = number
+  default     = 1
+  description = "How long a downloadable export survives. A security bound rather than a retention policy: the bundle carries the tenant's environment variables and their whole dataset. S3 lifecycle expiry runs daily, so 1 is the smallest meaningful value."
+}
+
 variable "vpc_cidr_block" {
   type        = string
   default     = "10.43.0.0/16"

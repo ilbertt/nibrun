@@ -30,31 +30,18 @@ data "aws_iam_policy_document" "api_s3" {
     resources = [aws_s3_bucket.artifacts.arn]
   }
 
-  # Read-only on tenant filesystems, for export: it runs in the control plane and
-  # pulls a copy of the app's data out of the disk image ZeroFS wrote.
+  # No access to tenant filesystems at all, deliberately. The host that owns a
+  # volume writes the export itself — it has the device attached already, so it
+  # reads one tenant's filesystem and no other, in userspace and without mounting
+  # it. Anything here would be access to tenant data that nothing needs.
   #
-  # This is the tightest grant that works today, and today nothing reads it. It
-  # will not be enough when export is built: a ZeroFS reader registers and renews
-  # its own ephemeral checkpoint so the writer's GC cannot delete what it is
-  # reading, so a strictly read-only grant fails at startup. Do not widen this to
-  # a blanket write when that happens — either add an explicit Deny on the keys
-  # holding tenant data, which keeps the guarantee structural, or copy the prefix
-  # elsewhere and read the copy, which keeps this grant at nothing.
-  #
-  # On this user rather than on the instance role because export runs inside the
-  # api, and the api reaches S3 with these static keys — which is the whole
-  # reason the user exists. When the api falls back to the default credential
-  # chain and this file goes away, the grant moves to aws_iam_role.instance.
+  # Read on the exports bucket is what lets the api sign a download URL: a
+  # presigned URL carries the signer's own permissions, so it cannot grant a read
+  # this policy does not.
   statement {
-    sid       = "FilesystemsObjects"
+    sid       = "ExportsRead"
     actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.filesystems.arn}/*"]
-  }
-
-  statement {
-    sid       = "FilesystemsList"
-    actions   = ["s3:ListBucket"]
-    resources = [aws_s3_bucket.filesystems.arn]
+    resources = ["${aws_s3_bucket.exports.arn}/*"]
   }
 }
 
