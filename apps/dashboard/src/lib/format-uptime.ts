@@ -1,6 +1,6 @@
 const SECONDS_PER_MINUTE = 60;
-const SECONDS_PER_HOUR = 3_600;
-const SECONDS_PER_DAY = 86_400;
+const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
+const SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR;
 
 export function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / SECONDS_PER_DAY);
