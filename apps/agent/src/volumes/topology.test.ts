@@ -15,6 +15,7 @@ const topology = () =>
     storagePrefix: HOST_PREFIX,
     mountPath: '/mnt/zerofs',
     nbdSocketPath: '/run/zerofs/nbd.sock',
+    binary: '/opt/nibrun/bin/zerofs/zerofs',
     configFile: '/etc/zerofs/config.toml',
   });
 

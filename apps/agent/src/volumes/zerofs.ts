@@ -1,8 +1,6 @@
 import type { CheckpointId } from '@repo/protocol';
 import { type CommandRunner, runCommandOrThrow } from '#lib/exec.ts';
 
-const ZEROFS_COMMAND = 'zerofs';
-
 /**
  * ZeroFS is a long-running service this agent does not own.
  *
@@ -14,10 +12,20 @@ const ZEROFS_COMMAND = 'zerofs';
  */
 export class ZerofsAdmin {
   readonly #runner: CommandRunner;
+  readonly #binary: string;
   readonly #configFile: string;
 
-  constructor({ runner, configFile }: { runner: CommandRunner; configFile: string }) {
+  constructor({
+    runner,
+    binary,
+    configFile,
+  }: {
+    runner: CommandRunner;
+    binary: string;
+    configFile: string;
+  }) {
     this.#runner = runner;
+    this.#binary = binary;
     this.#configFile = configFile;
   }
 
@@ -26,7 +34,7 @@ export class ZerofsAdmin {
   async flush(): Promise<void> {
     await runCommandOrThrow({
       runner: this.#runner,
-      request: { command: [ZEROFS_COMMAND, 'flush', '-c', this.#configFile] },
+      request: { command: [this.#binary, 'flush', '-c', this.#configFile] },
     });
   }
 
@@ -34,7 +42,7 @@ export class ZerofsAdmin {
     await runCommandOrThrow({
       runner: this.#runner,
       request: {
-        command: [ZEROFS_COMMAND, 'checkpoint', 'create', '-c', this.#configFile, checkpointId],
+        command: [this.#binary, 'checkpoint', 'create', '-c', this.#configFile, checkpointId],
       },
     });
   }
@@ -43,7 +51,7 @@ export class ZerofsAdmin {
     await runCommandOrThrow({
       runner: this.#runner,
       request: {
-        command: [ZEROFS_COMMAND, 'checkpoint', 'delete', '-c', this.#configFile, checkpointId],
+        command: [this.#binary, 'checkpoint', 'delete', '-c', this.#configFile, checkpointId],
       },
     });
   }
@@ -51,7 +59,7 @@ export class ZerofsAdmin {
   async listCheckpoints(): Promise<string[]> {
     const output = await runCommandOrThrow({
       runner: this.#runner,
-      request: { command: [ZEROFS_COMMAND, 'checkpoint', 'list', '-c', this.#configFile] },
+      request: { command: [this.#binary, 'checkpoint', 'list', '-c', this.#configFile] },
     });
     return parseCheckpointNames(output);
   }

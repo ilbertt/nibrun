@@ -93,6 +93,7 @@ export class Agent {
       storagePrefix: config.zerofsStoragePrefix as ObjectKey,
       mountPath: config.zerofsMount,
       nbdSocketPath: config.zerofsNbdSocket,
+      binary: config.zerofsBinary,
       configFile: config.zerofsConfigFile,
     });
     const units = new SystemdVmUnits({ runner });
