@@ -67,11 +67,13 @@ export class ZerofsTopology {
     storagePrefix,
     mountPath,
     nbdSocketPath,
+    binary,
     configFile,
   }: {
     runner: CommandRunner;
     storagePrefix: ObjectKey;
     mountPath: string;
+    binary: string;
     nbdSocketPath: string;
     configFile: string;
   }): ZerofsTopology {
@@ -81,7 +83,7 @@ export class ZerofsTopology {
         mountPath,
         nbdSocketPath,
         configFile,
-        admin: new ZerofsAdmin({ runner, configFile }),
+        admin: new ZerofsAdmin({ runner, binary, configFile }),
       },
     ]);
   }
