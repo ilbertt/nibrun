@@ -16,6 +16,7 @@ import {
   ByteSizeSchema,
   HostPortSchema,
   Ipv4AddressSchema,
+  ObjectKeySchema,
   Sha256DigestSchema,
   TimestampSchema,
 } from '#lib/wire.ts';
@@ -50,6 +51,8 @@ export const ReportedVolumeSchema = Type.Object({
   volumeId: VolumeIdSchema,
   state: VolumeStateSchema,
   sizeBytes: ByteSizeSchema,
+  // Which ZeroFS filesystem the host put it in.
+  storagePrefix: Type.Optional(ObjectKeySchema),
   devicePath: Type.Optional(Type.String({ maxLength: MAX_DEVICE_PATH_LENGTH })),
   message: Type.Optional(MessageSchema),
 });

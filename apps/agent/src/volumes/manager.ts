@@ -42,7 +42,7 @@ export class VolumeManager {
   }
 
   async provision({ desired }: { desired: DesiredVolume }): Promise<ReportedVolume> {
-    const filesystem = this.#options.topology.resolve({ storagePrefix: desired.storagePrefix });
+    const filesystem = this.#options.topology.place();
     const slot = this.#options.allocator.allocate(desired.appId);
     const path = devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId });
     const sizeBytes = await ensureDeviceFile({ path, sizeBytes: desired.sizeBytes });
@@ -73,6 +73,7 @@ export class VolumeManager {
       state: 'ready',
       sizeBytes,
       devicePath: slot.nbdDevicePath,
+      storagePrefix: filesystem.storagePrefix,
     };
   }
 
@@ -83,7 +84,7 @@ export class VolumeManager {
    * the guest's own barriers were never a durability point at all.
    */
   async teardown({ desired }: { desired: DesiredVolume }): Promise<ReportedVolume> {
-    const filesystem = this.#options.topology.resolve({ storagePrefix: desired.storagePrefix });
+    const filesystem = this.#options.topology.place();
     const slot = this.#options.allocator.lookup(desired.appId);
     await filesystem.admin.flush();
     if (slot) {

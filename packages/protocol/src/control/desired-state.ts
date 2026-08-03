@@ -57,7 +57,6 @@ export const DesiredVolumeSchema = Type.Object({
   volumeId: VolumeIdSchema,
   appId: AppIdSchema,
   sizeBytes: ByteSizeSchema,
-  storagePrefix: ObjectKeySchema,
   desiredState: DesiredPresenceSchema,
 });
 

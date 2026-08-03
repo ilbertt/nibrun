@@ -28,14 +28,6 @@ import { Repository } from '#repositories/repository.ts';
 // kind that tests the contract instead of agreeing with it.
 const APP_ID = 'app-pocketbase' as AppId;
 
-// Every volume on a host repeats the one prefix that host's ZeroFS serves, and the
-// agent refuses a prefix it does not serve. The host composes its own from IMDS, so
-// this value is the instance id of the machine as it stands and does not survive a
-// replacement — see the note in the pull request. A host reporting the prefixes it
-// serves is what removes the need to know this here.
-const STORAGE_PREFIX =
-  's3://nibrun-filesystems-eu-central-1/hosts/i-04d1d0f91bd5e41e5' as ObjectKey;
-
 const VOLUME_SIZE_BYTES = 8_589_934_592;
 
 const POCKETBASE_PORT = 8090 as GuestPort;
@@ -47,7 +39,6 @@ const DESIRED_APP = {
       volumeId: 'vol-pocketbase' as VolumeId,
       appId: APP_ID,
       sizeBytes: VOLUME_SIZE_BYTES,
-      storagePrefix: STORAGE_PREFIX,
       desiredState: 'present',
     },
   ],

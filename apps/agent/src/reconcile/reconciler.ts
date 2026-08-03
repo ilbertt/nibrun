@@ -45,16 +45,6 @@ const MAX_MESSAGE_LENGTH = 512;
 
 const UNKNOWN_UNIT: UnitStatus = { loaded: false, active: false, failed: false };
 
-// A checkpoint names a volume, and which ZeroFS serves it is decided by that volume's storage
-// prefix — which only desired state carries. A checkpoint for a volume the host has never been
-// told about is refused rather than guessed at.
-class UnknownVolumeError extends Error {
-  constructor(volumeId: VolumeId) {
-    super(`No storage prefix is known for volume ${volumeId}`);
-    this.name = 'UnknownVolumeError';
-  }
-}
-
 export type ReconcilerOptions = {
   config: AgentConfig;
   runner: CommandRunner;
@@ -78,7 +68,6 @@ export class Reconciler {
   readonly #records = new Map<InstanceId, InstanceRecord>();
   readonly #unitStatus = new Map<InstanceId, UnitStatus>();
   readonly #nextProbeAtMs = new Map<InstanceId, number>();
-  readonly #storagePrefixByVolume = new Map<VolumeId, ObjectKey>();
   readonly #allocator: SlotAllocator;
   #volumeReports: ReportedVolume[] = [];
   #checkpointReports: ReportedCheckpoint[] = [];
@@ -245,9 +234,6 @@ export class Reconciler {
   // artifact changing. Folding them into the record here is what keeps the route renderer and
   // the probe reading current configuration rather than whatever was true at boot.
   #syncDesired(desired: HostDesiredState): void {
-    for (const volume of desired.volumes) {
-      this.#storagePrefixByVolume.set(volume.volumeId, volume.storagePrefix);
-    }
     for (const wanted of desired.instances) {
       const record = this.#records.get(wanted.instanceId);
       if (!record) {
@@ -297,7 +283,7 @@ export class Reconciler {
     // Under `ignore_fsync` the guest's own flushes are a no-op, so this is the only thing
     // standing between a stop and the loss of everything since the last periodic flush. Worst
     // case is the flush interval *plus* the seal and upload, not exactly the interval.
-    await this.#tryFlush({ volumeId: record?.volumeId });
+    await this.#tryFlush();
     try {
       await this.#options.vms.stop({ instanceId });
       logger.info({ message: 'instance stopped', instanceId, reason });
@@ -478,7 +464,7 @@ export class Reconciler {
   ): Promise<ReportedCheckpoint> {
     const { checkpointId, volumeId } = action.desired;
     try {
-      const admin = this.#adminFor({ volumeId });
+      const admin = this.#adminFor();
       const existing = new Set(await admin.listCheckpoints());
       if (action.action === 'create' && !existing.has(checkpointId)) {
         await admin.createCheckpoint({ checkpointId });
@@ -505,20 +491,12 @@ export class Reconciler {
     }
   }
 
-  #adminFor({ volumeId }: { volumeId: VolumeId }): ZerofsAdmin {
-    const storagePrefix = this.#storagePrefixByVolume.get(volumeId);
-    if (storagePrefix === undefined) {
-      throw new UnknownVolumeError(volumeId);
-    }
-    return this.#options.topology.resolve({ storagePrefix }).admin;
+  #adminFor(): ZerofsAdmin {
+    return this.#options.topology.place().admin;
   }
 
-  async #tryFlush({ volumeId }: { volumeId?: VolumeId }): Promise<void> {
-    const prefix = volumeId === undefined ? undefined : this.#storagePrefixByVolume.get(volumeId);
+  async #tryFlush(): Promise<void> {
     for (const filesystem of this.#options.topology.all()) {
-      if (prefix !== undefined && filesystem.storagePrefix !== prefix) {
-        continue;
-      }
       try {
         await filesystem.admin.flush();
       } catch (error) {

@@ -23,15 +23,10 @@ export type ZerofsFilesystem = {
   admin: ZerofsAdmin;
 };
 
-export class UnservedStoragePrefixError extends Error {
-  readonly storagePrefix: ObjectKey;
-
-  constructor({ storagePrefix, served }: { storagePrefix: ObjectKey; served: readonly string[] }) {
-    super(
-      `No ZeroFS on this host serves ${storagePrefix}; it serves ${served.join(', ') || 'nothing'}`,
-    );
-    this.name = 'UnservedStoragePrefixError';
-    this.storagePrefix = storagePrefix;
+export class NoFilesystemError extends Error {
+  constructor() {
+    super('This host serves no ZeroFS filesystem, so it can hold no volume');
+    this.name = 'NoFilesystemError';
   }
 }
 
@@ -48,11 +43,11 @@ export class UnservedStoragePrefixError extends Error {
  * two filesystems, not repointing at a prefix. A ZeroFS restart is also a fleet-wide event on
  * this host rather than one tenant's.
  *
- * The protocol already accommodates either shape, because `storagePrefix` is on the volume: a
- * per-host prefix simply means every volume on the host repeats it. Nothing below assumes one
- * filesystem — the volume path, the NBD socket and the admin RPC are all resolved *per volume*
- * from the prefix it names, so moving to one ZeroFS per app is a second factory here plus a
- * supervisor for the extra processes, not a rewrite of the volume manager.
+ * The protocol accommodates either shape, because where a volume went is reported rather than
+ * instructed: a per-host filesystem simply means every volume on it reports the same prefix.
+ * Nothing below assumes one filesystem — the volume path, the NBD socket and the admin RPC are
+ * all resolved from the filesystem a volume was placed in, so moving to one ZeroFS per app is a
+ * second factory here plus a supervisor for the extra processes, not a rewrite of the manager.
  *
  * The invariant that holds under both: **exactly one read-write `zerofs run` per storage prefix,
  * fleet-wide.** ZeroFS does not reject a second writer — SlateDB's epoch fences the older one,
@@ -92,19 +87,13 @@ export class ZerofsTopology {
   }
 
   /**
-   * A volume naming a prefix this host does not serve is refused rather than written somewhere
-   * else. Silently creating the device file in the wrong filesystem would put a tenant's data
-   * under a prefix nothing will ever look for it under, which no later reconcile can undo.
+   * Which filesystem a volume belongs in. One per host in v1, so nothing is being chosen — but
+   * choosing here is what makes a second shape a policy rather than a protocol change.
    */
-  resolve({ storagePrefix }: { storagePrefix: ObjectKey }): ZerofsFilesystem {
-    const filesystem = this.#filesystems.find(
-      (candidate) => candidate.storagePrefix === storagePrefix,
-    );
+  place(): ZerofsFilesystem {
+    const [filesystem] = this.#filesystems;
     if (!filesystem) {
-      throw new UnservedStoragePrefixError({
-        storagePrefix,
-        served: this.#filesystems.map((candidate) => candidate.storagePrefix),
-      });
+      throw new NoFilesystemError();
     }
     return filesystem;
   }

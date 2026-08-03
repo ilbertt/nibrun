@@ -46,7 +46,6 @@ const desiredState = (): HostDesiredState => ({
       volumeId: 'vol_1' as VolumeId,
       appId: 'app_1' as AppId,
       sizeBytes: 1024,
-      storagePrefix: 'filesystems/app_1' as ObjectKey,
       desiredState: 'present',
     },
   ],

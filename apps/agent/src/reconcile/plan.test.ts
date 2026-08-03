@@ -57,7 +57,6 @@ const desiredVolume = (overrides: Partial<DesiredVolume> = {}): DesiredVolume =>
   volumeId: VOLUME,
   appId: APP,
   sizeBytes: VOLUME_SIZE_BYTES,
-  storagePrefix: 'apps/app-1' as ObjectKey,
   desiredState: 'present',
   ...overrides,
 });
