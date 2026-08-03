@@ -44,8 +44,13 @@ resource "aws_instance" "app_host" {
 
   depends_on = [aws_route_table_association.app]
 
+  # cloud-init runs user_data once per instance and records it in sem/, so a
+  # stop/start never re-runs it. Editing the bootstrap therefore reaches an
+  # existing host only by replacing it — and a host whose bootstrap failed can
+  # be fixed no other way, because the marker it never wrote is the thing the
+  # deploy waits for.
   user_data                   = templatefile("${path.module}/app_host_user_data.sh.tftpl", {})
-  user_data_replace_on_change = false
+  user_data_replace_on_change = true
 
   root_block_device {
     volume_size = var.app_host_root_volume_size

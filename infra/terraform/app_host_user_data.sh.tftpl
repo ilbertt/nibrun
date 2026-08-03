@@ -36,6 +36,9 @@ printf 'kvm_intel\nnbd\n' > /etc/modules-load.d/nibrun.conf
 modprobe kvm_intel
 modprobe nbd
 
+# The agent needs the device, not the module, and the two are not the same claim.
+test -e /dev/kvm
+
 mkdir -p /opt/nibrun /var/lib/nibrun
 
 # Completion marker — the deploy workflow waits for this, so it never lands on a
