@@ -68,6 +68,18 @@ output "app_host_instance_ids" {
   value = aws_instance.app_host[*].id
 }
 
+# No elastic IP, unlike the control plane, so these move if a host is stopped
+# and started — point the wildcard records at them and re-point after a replace.
+output "app_host_public_ips" {
+  description = "A record targets for the app domain's wildcard."
+  value       = aws_instance.app_host[*].public_ip
+}
+
+output "app_host_public_ipv6s" {
+  description = "AAAA record targets for the app domain's wildcard."
+  value       = [for host in aws_instance.app_host : one(host.ipv6_addresses)]
+}
+
 # Not a single DATA_VOLUME_ID like the control plane's, because each host has
 # its own: a deploy fanning out looks the instance it is targeting up here and
 # exports that one value under the usual name.

@@ -26,7 +26,13 @@ resource "aws_instance" "app_host" {
   # and fetches binaries the ordinary way instead of everything being mirrored
   # into S3 first. No NAT gateway: NAT is for tenant egress, and no tenant app
   # runs in this phase.
+  #
+  # Both families, so the wildcard record the user-app proxy needs can carry an
+  # AAAA as well as an A. The subnet assigns an IPv6 on creation anyway; stating
+  # it here is what stops a change to that default silently taking the address
+  # away from a host whose DNS points at it.
   associate_public_ip_address = true
+  ipv6_address_count          = 1
 
   depends_on = [aws_route_table_association.app]
 
