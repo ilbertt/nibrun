@@ -2,6 +2,9 @@ import { join } from 'node:path';
 
 const DEFAULT_STATE_DIR = '/var/lib/nibrun';
 const DEFAULT_RUNTIME_DIR = '/run/nibrun';
+// Laid down by the deploy under a versioned path with a symlink to the active one, like
+// every other binary on this host. Not on PATH, so it is named in full.
+const DEFAULT_ZEROFS_BINARY = '/opt/nibrun/bin/zerofs/zerofs';
 const DEFAULT_ZEROFS_MOUNT = '/mnt/zerofs';
 const DEFAULT_ZEROFS_CONFIG = '/etc/zerofs/config.toml';
 const DEFAULT_ZEROFS_NBD_SOCKET = '/run/zerofs/nbd.sock';
@@ -31,6 +34,7 @@ export type AgentConfig = {
   guestImageDir: string;
   firecrackerDir: string;
   zerofsMount: string;
+  zerofsBinary: string;
   zerofsConfigFile: string;
   zerofsNbdSocket: string;
   caddySitesFile: string;
@@ -110,6 +114,11 @@ export function loadAgentConfig({
       env,
       name: 'AGENT_FIRECRACKER_DIR',
       fallback: DEFAULT_FIRECRACKER_DIR,
+    }),
+    zerofsBinary: optional({
+      env,
+      name: 'AGENT_ZEROFS_BINARY',
+      fallback: DEFAULT_ZEROFS_BINARY,
     }),
     zerofsMount: optional({ env, name: 'AGENT_ZEROFS_MOUNT', fallback: DEFAULT_ZEROFS_MOUNT }),
     zerofsConfigFile: optional({
