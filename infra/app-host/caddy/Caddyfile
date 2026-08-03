@@ -41,7 +41,12 @@ import /etc/caddy/rendered/*.caddy
 # It exists so an unknown hostname is answered rather than handled by whatever
 # TLS policy Caddy falls back to — this way every connection the edge makes to
 # this host is one Authenticated Origin Pulls has already checked.
-https://{$APP_DOMAIN}, https://*.{$APP_DOMAIN} {
+#
+# The apex is deliberately absent: the origin certificate names *.<app_domain>
+# and not <app_domain>, and serving a redirect there would still mean
+# terminating TLS for a name the certificate does not cover. Cloudflare redirects
+# the apex at the edge, where no origin certificate is involved.
+https://*.{$APP_DOMAIN} {
 	import origin_tls
 	respond 404
 }

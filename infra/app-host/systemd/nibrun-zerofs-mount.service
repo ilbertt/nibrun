@@ -1,0 +1,37 @@
+[Unit]
+Description=The host's own view of the ZeroFS filesystem
+Documentation=https://www.zerofs.net
+# The 9P socket only exists once ZeroFS is serving, and the agent has nowhere to
+# create a tenant's disk until this mount is up, so it sits between the two.
+After=nibrun-zerofs.service
+Requires=nibrun-zerofs.service
+# The socket goes with ZeroFS, so this mount goes with it too — a restart of the
+# server leaves a mount pointing at a socket that no longer exists.
+PartOf=nibrun-zerofs.service
+Before=nibrun-agent.service
+
+[Service]
+# Not notify: the binary does not sd_notify, so systemd would wait for a message
+# that never arrives. The readiness check below is what ordering actually rests
+# on — without it `Before=` only promises the process was spawned, and the agent
+# would race an empty directory.
+Type=exec
+ExecStartPre=/usr/bin/mkdir -p /mnt/zerofs
+
+# The agent runs as root and creates .nbd/<volume-id> under here. FUSE's default
+# access mode admits only the mounting user, so both are root rather than adding
+# user_allow_other to widen it.
+#
+# --writeback false: the NBD server is a second client of the same filesystem, so
+# a write buffered in this client's page cache is a device the server cannot see
+# yet. Throughput is irrelevant — one file is created per app, once — and
+# coherence between the two clients is the whole point.
+ExecStart=/opt/nibrun/bin/zerofs/zerofs mount --writeback false unix:/run/zerofs/9p.sock /mnt/zerofs
+ExecStartPost=/bin/sh -c 'for _ in $(seq 100); do mountpoint -q /mnt/zerofs && exit 0; sleep 0.1; done; exit 1'
+ExecStopPost=-/usr/bin/fusermount3 -u /mnt/zerofs
+
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

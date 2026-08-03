@@ -292,7 +292,8 @@ if [ "$units_changed" = "1" ]; then
   systemctl daemon-reload
 fi
 
-systemctl enable nibrun-zerofs.service nibrun-caddy.service nibrun-agent.service >/dev/null
+systemctl enable nibrun-zerofs.service nibrun-zerofs-mount.service \
+  nibrun-caddy.service nibrun-agent.service >/dev/null
 
 # --- Restarting --------------------------------------------------------------
 #
@@ -314,6 +315,10 @@ if needs_restart zerofs; then
 else
   systemctl start nibrun-zerofs.service
 fi
+
+# Where the agent creates a tenant's disk. Bound to ZeroFS above, so a restart of
+# the server takes it with it and this brings both back in order.
+systemctl restart nibrun-zerofs-mount.service
 
 # A restart drops every connection this host is serving, so it happens only when
 # the binary or the unit's environment moved. Everything else — a new Caddyfile,
