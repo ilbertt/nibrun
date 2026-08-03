@@ -1,0 +1,47 @@
+# The user-app edge, and the only thing on an app host listening off-loopback.
+# It runs here rather than centrally on purpose: if it dies, every app it served
+# was on this host anyway, where a shared proxy would be a second failure domain
+# able to take down apps that are otherwise healthy.
+#
+# This half is static. The site blocks for the apps this host is running are
+# rendered by the agent from the instances it booted and imported at the bottom.
+{
+	# No ACME: the certificate is a Cloudflare Origin Certificate covering
+	# *.{$APP_DOMAIN}, which the deploy fetches from SSM and writes into tls/
+	# next to this file. Hostnames are handed out per app, so there is no moment
+	# at which issuing a certificate would be a step in creating one.
+	auto_https off
+}
+
+# Authenticated Origin Pulls. The origin IP is discoverable, so the edge has to
+# prove it is the edge: without a client certificate signed by Cloudflare's
+# origin-pull CA the handshake is refused before any request is read. Turning
+# this on also makes Caddy enforce SNI == Host, which closes Host-header
+# spoofing along with it.
+#
+# A snippet because every site needs it identically — including the ones the
+# agent renders, which import this by name.
+(origin_tls) {
+	tls /etc/caddy/tls/origin.crt /etc/caddy/tls/origin.key {
+		client_auth {
+			mode require_and_verify
+			trust_pool file /etc/caddy/cloudflare-origin-pull-ca.pem
+		}
+	}
+}
+
+# One file, replaced whole on every routing change, and a glob so a host with no
+# app on it — or one whose agent has not converged yet — still starts.
+import /etc/caddy/rendered/*.caddy
+
+# Everything else under the app domain: a hostname whose app is not running
+# here, or not running at all. Caddy orders site blocks most-specific first, so
+# the rendered ones above win and this is what is left.
+#
+# It exists so an unknown hostname is answered rather than handled by whatever
+# TLS policy Caddy falls back to — this way every connection the edge makes to
+# this host is one Authenticated Origin Pulls has already checked.
+https://{$APP_DOMAIN}, https://*.{$APP_DOMAIN} {
+	import origin_tls
+	respond 404
+}

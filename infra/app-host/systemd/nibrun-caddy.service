@@ -1,0 +1,47 @@
+[Unit]
+Description=nibrun user-app proxy
+Documentation=https://caddyserver.com/docs/
+After=network-online.target
+Wants=network-online.target
+
+# Deliberately unrelated to nibrun-agent.service. The agent renders this
+# proxy's site file and asks for a reload; it does not own the process, so an
+# agent restart is not an interruption to anything already being served.
+[Service]
+Type=notify
+User=caddy
+Group=caddy
+ExecStart=/opt/nibrun/bin/caddy/caddy run --config /etc/caddy/Caddyfile
+# A reload swaps the config in place with no dropped connections. A restart here
+# would interrupt every app on the host, so one app's route appearing must never
+# be able to do it — and a config that does not load leaves the running one
+# alone and fails loudly instead.
+ExecReload=/opt/nibrun/bin/caddy/caddy reload --config /etc/caddy/Caddyfile --force
+EnvironmentFile=/etc/caddy/caddy.env
+
+Restart=always
+RestartSec=5s
+
+# Binding 443 is the only privilege it needs, and this is the process on the
+# host most exposed to the internet.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+StateDirectory=caddy
+Environment=XDG_DATA_HOME=/var/lib
+
+LimitNOFILE=1048576
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

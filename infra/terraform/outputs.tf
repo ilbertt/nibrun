@@ -18,6 +18,11 @@ output "dozzle_hostname" {
   value = var.dozzle_hostname
 }
 
+output "app_domain" {
+  description = "User apps are served under this. One wildcard record covers the fleet, so there is nothing per-app in DNS."
+  value       = var.app_domain
+}
+
 output "api_github_client_id" {
   description = "Public half of the GitHub OAuth App credentials; the secret half is read from SSM on the box."
   value       = var.api_github_client_id

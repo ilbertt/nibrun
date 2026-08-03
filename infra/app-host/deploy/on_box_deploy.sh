@@ -18,8 +18,9 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${ZEROFS_VERSION:?}" "${ZEROFS_URL:?}" "${ZEROFS_SHA256:?}" "${ZEROFS_MEMBER:?}" \
   "${FIRECRACKER_VERSION:?}" "${FIRECRACKER_URL:?}" "${FIRECRACKER_SHA256:?}" \
   "${FIRECRACKER_DIRECTORY:?}" \
-  "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${GUEST_IMAGES_BUCKET:?}" \
-  "${ARTIFACTS_BUCKET:?}"
+  "${CADDY_VERSION:?}" "${CADDY_URL:?}" "${CADDY_SHA256:?}" \
+  "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${APP_DOMAIN:?}" \
+  "${GUEST_IMAGES_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
 
 # Empty until a guest image is adopted in infra/app-host/versions.json. A host
 # with none deploys fine; it simply has no image to boot microVMs from, which is
@@ -43,7 +44,10 @@ CURRENT_DIR="$NIBRUN_DIR/bin"
 WORK_DIR=$(mktemp -d)
 trap 'rm -rf "$WORK_DIR"' EXIT
 
-mkdir -p "$VERSIONS_DIR" "$CURRENT_DIR" "$NIBRUN_DIR/bundle" /var/lib/nibrun /etc/nibrun /etc/zerofs
+# /etc/caddy/rendered is the agent's to write and Caddy's to read, so it is
+# created here — the agent only replaces the file inside it.
+mkdir -p "$VERSIONS_DIR" "$CURRENT_DIR" "$NIBRUN_DIR/bundle" /var/lib/nibrun \
+  /etc/nibrun /etc/zerofs /etc/caddy/tls /etc/caddy/rendered
 
 secret() {
   aws ssm get-parameter --name "${SSM_SECRET_PREFIX}/$1" --with-decryption \
@@ -55,6 +59,13 @@ bash ensure_data_volume.sh zerofs
 
 id -u zerofs >/dev/null 2>&1 || useradd --system --no-create-home --shell /sbin/nologin zerofs
 chown -R zerofs:zerofs /data/zerofs
+
+# The public edge runs unprivileged; systemd grants it CAP_NET_BIND_SERVICE and
+# nothing else. Only the private key is its own, which is why tls/ is the one
+# directory here nobody else can traverse.
+id -u caddy >/dev/null 2>&1 || useradd --system --no-create-home --shell /sbin/nologin caddy
+chown caddy:caddy /etc/caddy/tls
+chmod 0700 /etc/caddy/tls
 
 # --- Fetching versions -------------------------------------------------------
 #
@@ -95,6 +106,16 @@ install_firecracker() {
   mark_installed firecracker "$FIRECRACKER_VERSION"
 }
 
+install_caddy() {
+  local dir="$VERSIONS_DIR/caddy/$CADDY_VERSION"
+  mkdir -p "$dir"
+  curl -fsSL "$CADDY_URL" -o "$WORK_DIR/caddy.tar.gz"
+  verify_sha256 "$WORK_DIR/caddy.tar.gz" "$CADDY_SHA256"
+  tar xzf "$WORK_DIR/caddy.tar.gz" -C "$WORK_DIR" caddy
+  install -m 0755 "$WORK_DIR/caddy" "$dir/caddy"
+  mark_installed caddy "$CADDY_VERSION"
+}
+
 install_agent() {
   local dir="$VERSIONS_DIR/agent/$AGENT_VERSION"
   mkdir -p "$dir"
@@ -128,6 +149,11 @@ activate() {
 }
 
 NEEDS_RESTART=()
+# Caddy is the one component whose configuration is swapped without stopping it,
+# because a change meant for one app must not interrupt traffic to the others on
+# the host. Its *binary* still cannot move under a running process, so a version
+# bump lands in NEEDS_RESTART like everything else.
+NEEDS_RELOAD=()
 
 ensure() {
   local component=$1 version=$2 installer=$3
@@ -147,6 +173,7 @@ ensure() {
 
 ensure zerofs "$ZEROFS_VERSION" install_zerofs
 ensure firecracker "$FIRECRACKER_VERSION" install_firecracker
+ensure caddy "$CADDY_VERSION" install_caddy
 ensure agent "$AGENT_VERSION" install_agent
 
 if [ -n "$GUEST_IMAGE_VERSION" ]; then
@@ -200,6 +227,40 @@ EOF
 chmod 0600 /etc/nibrun/agent.env.new
 changed_file /etc/nibrun/agent.env && NEEDS_RESTART+=(agent) || true
 
+# The origin certificate Caddy serves. Held base64-encoded in SSM because a PEM
+# is multi-line and `--output text` mangles that, with no jq here to read the
+# JSON form instead; Terraform does the encoding (ssm.tf).
+write_pem() {
+  secret "$1" | base64 -d > "$2"
+}
+
+log "Writing the origin TLS material"
+write_pem app_host_caddy_tls_cert /etc/caddy/tls/origin.crt.new
+write_pem app_host_caddy_tls_key /etc/caddy/tls/origin.key.new
+changed_file /etc/caddy/tls/origin.crt && NEEDS_RELOAD+=(caddy) || true
+changed_file /etc/caddy/tls/origin.key && NEEDS_RELOAD+=(caddy) || true
+chown caddy:caddy /etc/caddy/tls/origin.crt /etc/caddy/tls/origin.key
+
+cp caddy/Caddyfile /etc/caddy/Caddyfile.new
+changed_file /etc/caddy/Caddyfile && NEEDS_RELOAD+=(caddy) || true
+
+cp cloudflare-origin-pull-ca.pem /etc/caddy/cloudflare-origin-pull-ca.pem.new
+changed_file /etc/caddy/cloudflare-origin-pull-ca.pem && NEEDS_RELOAD+=(caddy) || true
+
+# `caddy reload` re-adapts the Caddyfile, and the substitutions in it are read
+# from the unit's environment — so this is a restart rather than a reload: only
+# a fresh ExecStart is guaranteed to re-read the file.
+cat > /etc/caddy/caddy.env.new <<EOF
+APP_DOMAIN=${APP_DOMAIN}
+EOF
+changed_file /etc/caddy/caddy.env && NEEDS_RESTART+=(caddy) || true
+
+# Modes are set rather than inherited: none of this is secret, all of it is read
+# by a user that is not the one writing it, and the umask this script runs under
+# is whatever RunCommand hands it.
+chmod 0644 /etc/caddy/Caddyfile /etc/caddy/cloudflare-origin-pull-ca.pem /etc/caddy/caddy.env
+chmod 0755 /etc/caddy /etc/caddy/rendered
+
 log "Installing systemd units"
 units_changed=0
 for unit in systemd/*.service; do
@@ -210,7 +271,7 @@ if [ "$units_changed" = "1" ]; then
   systemctl daemon-reload
 fi
 
-systemctl enable nibrun-zerofs.service nibrun-agent.service >/dev/null
+systemctl enable nibrun-zerofs.service nibrun-caddy.service nibrun-agent.service >/dev/null
 
 # --- Restarting --------------------------------------------------------------
 #
@@ -219,6 +280,8 @@ systemctl enable nibrun-zerofs.service nibrun-agent.service >/dev/null
 # the agent, so it comes back and reconciles against what it finds.
 
 needs_restart() { printf '%s\n' "${NEEDS_RESTART[@]+"${NEEDS_RESTART[@]}"}" | grep -qx "$1"; }
+
+needs_reload() { printf '%s\n' "${NEEDS_RELOAD[@]+"${NEEDS_RELOAD[@]}"}" | grep -qx "$1"; }
 
 if needs_restart zerofs; then
   # Disruptive: ZeroFS serves the NBD device behind every guest disk on this
@@ -229,6 +292,18 @@ if needs_restart zerofs; then
   systemctl restart nibrun-zerofs.service
 else
   systemctl start nibrun-zerofs.service
+fi
+
+# A restart drops every connection this host is serving, so it happens only when
+# the binary or the unit's environment moved. Everything else — a new Caddyfile,
+# a re-issued certificate — is swapped in place, and a config that fails to load
+# fails the deploy while the running one keeps serving.
+if needs_restart caddy || ! systemctl is-active --quiet nibrun-caddy.service; then
+  log "Starting the user-app proxy"
+  systemctl restart nibrun-caddy.service
+elif needs_reload caddy; then
+  log "Proxy configuration changed — reloading it, leaving connections up"
+  systemctl reload nibrun-caddy.service
 fi
 
 if needs_restart agent; then
@@ -242,7 +317,7 @@ fi
 # bump reaches an app when it is next redeployed and restarts nothing now.
 
 log "Waiting for the services to settle"
-for unit in nibrun-zerofs nibrun-agent; do
+for unit in nibrun-zerofs nibrun-caddy nibrun-agent; do
   for _ in $(seq 1 30); do
     state=$(systemctl is-active "$unit.service" || true)
     [ "$state" = "active" ] && break
@@ -257,7 +332,7 @@ for unit in nibrun-zerofs nibrun-agent; do
 done
 
 log "Active versions"
-for component in zerofs firecracker agent guest-image; do
+for component in zerofs firecracker caddy agent guest-image; do
   if [ -L "$CURRENT_DIR/$component" ]; then
     echo "  $component -> $(basename "$(readlink "$CURRENT_DIR/$component")")"
   fi

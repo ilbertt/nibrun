@@ -43,12 +43,15 @@ export async function readTextFile({ path }: { path: string }): Promise<string |
 export async function writeTextFile({
   path,
   value,
+  mode = PRIVATE_FILE_MODE,
 }: {
   path: string;
   value: string;
+  // Private unless the file is meant for another process on the host to read.
+  mode?: number;
 }): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: PRIVATE_DIR_MODE });
   const temporaryPath = `${path}.tmp`;
-  await writeFile(temporaryPath, value, { mode: PRIVATE_FILE_MODE });
+  await writeFile(temporaryPath, value, { mode });
   await rename(temporaryPath, path);
 }

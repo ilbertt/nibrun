@@ -9,6 +9,7 @@ import { repoRoot } from '#shared/paths.ts';
 export type AppHostVersions = {
   zerofs: { version: string; url: string; sha256: string; member: string };
   firecracker: { version: string; url: string; sha256: string; directory: string };
+  caddy: { version: string; url: string; sha256: string };
   // Null until a guest image is adopted. Publishing one and adopting it are
   // separate commits; the adopting commit is the reviewable artifact.
   guestImage: string | null;

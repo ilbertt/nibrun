@@ -38,27 +38,65 @@ resource "aws_security_group" "instance" {
   }
 }
 
-# No ingress at all, and that is the design rather than an omission: nothing
-# needs to reach an app host. The agent dials out for control, so the control
+# Cloudflare's published edge ranges, from https://www.cloudflare.com/ips-v4
+# and /ips-v6. Pinned in git rather than fetched by a data source: a plan that
+# asks the internet what to allow can widen the only inbound rule on the fleet
+# with nothing for a reviewer to look at. Refresh it deliberately, in its own
+# commit.
+locals {
+  cloudflare_ipv4_cidrs = [
+    "173.245.48.0/20",
+    "103.21.244.0/22",
+    "103.22.200.0/22",
+    "103.31.4.0/22",
+    "141.101.64.0/18",
+    "108.162.192.0/18",
+    "190.93.240.0/20",
+    "188.114.96.0/20",
+    "197.234.240.0/22",
+    "198.41.128.0/17",
+    "162.158.0.0/15",
+    "104.16.0.0/13",
+    "104.24.0.0/14",
+    "172.64.0.0/13",
+    "131.0.72.0/22",
+  ]
+
+  cloudflare_ipv6_cidrs = [
+    "2400:cb00::/32",
+    "2606:4700::/32",
+    "2803:f800::/32",
+    "2405:b500::/32",
+    "2405:8100::/32",
+    "2a06:98c0::/29",
+    "2c0f:f248::/32",
+  ]
+}
+
+# One inbound rule, and it is the whole list: the user-app proxy. Nothing else
+# needs to reach an app host — the agent dials out for control, so the control
 # channel is never inbound and the control plane never initiates a connection
 # here; export reads a tenant's data from S3 rather than from the host; and
 # shell access is SSM Session Manager, whose agent connects outbound too.
-#
-# Exactly one rule is ever added, when the user-app proxy lands: 443 from
-# Cloudflare's published ranges, with Authenticated Origin Pulls. Pinned to the
-# ranges rather than opened to the world as the control plane's 443 is, because
-# what answers there is a proxy in front of tenant applications — the cost of a
-# directly-reachable origin is somebody else's app, not ours, so it is worth
-# carrying a list that changes underneath us.
-#
-# Written as an explicit empty set rather than an omitted block so a rule added
-# out of band is a diff Terraform removes, not drift it adopts.
 resource "aws_security_group" "app_host" {
   name        = "${local.resource_name_prefix}-app-host"
   description = "nibrun app host"
   vpc_id      = aws_vpc.app.id
 
-  ingress = []
+  # Pinned to Cloudflare's ranges rather than opened to the world as the control
+  # plane's 443 is. Authenticated Origin Pulls is what actually refuses a
+  # connection that did not come through the edge, and it holds on its own; this
+  # sits in front of it because what answers here is a proxy for third-party
+  # code, so the cost of a reachable origin is somebody else's app rather than
+  # ours — worth carrying a list that changes underneath us.
+  ingress {
+    description      = "HTTPS from Cloudflare"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = local.cloudflare_ipv4_cidrs
+    ipv6_cidr_blocks = local.cloudflare_ipv6_cidrs
+  }
 
   egress {
     description      = "All outbound"

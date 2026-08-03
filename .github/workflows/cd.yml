@@ -96,10 +96,13 @@ jobs:
           TF_VAR_region: ${{ env.AWS_REGION }}
           TF_VAR_api_hostname: ${{ vars.API_HOSTNAME }}
           TF_VAR_dozzle_hostname: ${{ vars.DOZZLE_HOSTNAME }}
+          TF_VAR_app_domain: ${{ vars.APP_DOMAIN }}
           TF_VAR_api_github_client_id: ${{ vars.API_GITHUB_CLIENT_ID }}
           TF_VAR_api_github_client_secret: ${{ secrets.API_GITHUB_CLIENT_SECRET }}
           TF_VAR_caddy_tls_cert: ${{ vars.CADDY_TLS_CERT }}
           TF_VAR_caddy_tls_key: ${{ secrets.CADDY_TLS_KEY }}
+          TF_VAR_app_host_caddy_tls_cert: ${{ vars.APP_HOST_CADDY_TLS_CERT }}
+          TF_VAR_app_host_caddy_tls_key: ${{ secrets.APP_HOST_CADDY_TLS_KEY }}
           ALLOW_DESTROY: ${{ inputs.allow_destroy }}
         run: bun run --filter @repo/internal-scripts terraform-apply
 
@@ -150,6 +153,7 @@ jobs:
       FILESYSTEMS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).filesystems_bucket }}
       ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
       API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
+      APP_DOMAIN: ${{ fromJSON(needs.terraform.outputs.values).app_domain }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
