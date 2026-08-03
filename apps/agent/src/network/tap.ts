@@ -3,6 +3,7 @@ import { type CommandRunner, runCommandOrThrow } from '#lib/exec.ts';
 import { TAP_NAME_PREFIX } from '#network/allocator.ts';
 
 const IP_COMMAND = 'ip';
+const SYSCTL_COMMAND = 'sysctl';
 
 export function parseLinkNames(output: string): string[] {
   const parsed: unknown = JSON.parse(output);
@@ -63,6 +64,16 @@ export async function ensureTap({
   await runCommandOrThrow({
     runner,
     request: { command: [IP_COMMAND, 'link', 'set', 'dev', tap.tapName, 'up'] },
+  });
+  // The kernel treats 127.0.0.0/8 as martian on any interface but loopback, so without this it
+  // drops the reply to a connection opened against the forwarded 127.0.0.1 port before the
+  // nftables SNAT can rewrite it. The local proxy reaches every app that way, so a tap without
+  // it is a tap nothing can route to.
+  await runCommandOrThrow({
+    runner,
+    request: {
+      command: [SYSCTL_COMMAND, '-w', `net.ipv4.conf.${tap.tapName}.route_localnet=1`],
+    },
   });
 }
 

@@ -10,9 +10,11 @@ dnf install -y "kernel-modules-extra-$(uname -r)" || true
 
 dnf update -y
 
-# Only what the deploy itself needs to run. No Docker: everything this host runs
+# Only what the deploy itself needs to run, plus fuse3: ZeroFS exposes the
+# host's view of the filesystem over 9P and the agent reaches it through a FUSE
+# client, which needs the userspace helper. No Docker: everything this host runs
 # is a versioned binary the deploy fetches from S3 and starts under systemd.
-dnf install -y unzip
+dnf install -y unzip fuse3
 
 # Not guaranteed on minimal AL2023, and the deploy script needs it.
 if ! command -v aws >/dev/null 2>&1; then
