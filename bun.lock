@@ -63,6 +63,9 @@
         "vite": "^8.2.0",
       },
     },
+    "apps/runtime": {
+      "name": "@repo/runtime",
+    },
     "packages/api-client": {
       "name": "@repo/api-client",
       "dependencies": {
@@ -371,6 +374,8 @@
     "@repo/pack-utils": ["@repo/pack-utils@workspace:packages/pack-utils"],
 
     "@repo/protocol": ["@repo/protocol@workspace:packages/protocol"],
+
+    "@repo/runtime": ["@repo/runtime@workspace:apps/runtime"],
 
     "@repo/typescript-config": ["@repo/typescript-config@workspace:packages/typescript-config"],
 

@@ -1,0 +1,9 @@
+{
+  "name": "@repo/runtime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bash build.sh",
+    "test": "bash test.sh"
+  }
+}
