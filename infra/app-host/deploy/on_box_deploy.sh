@@ -323,7 +323,18 @@ fi
 
 # Where the agent creates a tenant's disk. Bound to ZeroFS above, so a restart of
 # the server takes it with it and this brings both back in order.
-systemctl restart nibrun-zerofs-mount.service
+#
+# ZeroFS is Type=exec, so systemd calls it started once the process execs — well
+# before it is answering on the 9P socket. Ordering after it therefore buys
+# nothing, and the first mount attempt loses the race and exits. The unit retries
+# and wins within seconds, so what the deploy asserts is that it converged, not
+# that it started first time.
+systemctl restart nibrun-zerofs-mount.service || true
+if ! timeout 60 bash -c 'until systemctl is-active --quiet nibrun-zerofs-mount.service; do sleep 1; done'; then
+  log "The ZeroFS mount never came up; the agent would have nowhere to put a disk"
+  systemctl status nibrun-zerofs-mount.service --no-pager || true
+  exit 1
+fi
 
 # A restart drops every connection this host is serving, so it happens only when
 # the binary or the unit's environment moved. Everything else — a new Caddyfile,
