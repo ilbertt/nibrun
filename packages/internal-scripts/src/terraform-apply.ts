@@ -9,7 +9,7 @@ const DEPLOY_OUTPUTS = [
   'api_hostname',
   'dozzle_hostname',
   'api_github_client_id',
-  'api_s3_bucket',
+  'artifacts_bucket',
   'api_s3_endpoint',
   'pg_backup_bucket',
   'deploy_bucket',

@@ -19,7 +19,7 @@ const onBoxEnv: Record<string, string> = {
   API_HOSTNAME: requiredEnv('API_HOSTNAME'),
   DOZZLE_HOSTNAME: requiredEnv('DOZZLE_HOSTNAME'),
   API_GITHUB_CLIENT_ID: requiredEnv('API_GITHUB_CLIENT_ID'),
-  API_S3_BUCKET: requiredEnv('API_S3_BUCKET'),
+  ARTIFACTS_BUCKET: requiredEnv('ARTIFACTS_BUCKET'),
   API_S3_ENDPOINT: requiredEnv('API_S3_ENDPOINT'),
   PG_BACKUP_IMAGE_URI: requiredEnv('PG_BACKUP_IMAGE_URI'),
   PG_BACKUP_BUCKET: requiredEnv('PG_BACKUP_BUCKET'),

@@ -23,7 +23,7 @@ output "api_github_client_id" {
   value       = var.api_github_client_id
 }
 
-output "api_s3_bucket" {
+output "artifacts_bucket" {
   value = aws_s3_bucket.artifacts.bucket
 }
 

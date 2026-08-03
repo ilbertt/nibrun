@@ -61,11 +61,11 @@ services:
       - |
         set -e
         mc alias set nibrun http://minio:9000 "$$API_S3_ACCESS_KEY_ID" "$$API_S3_SECRET_ACCESS_KEY"
-        mc mb --ignore-existing "nibrun/$$API_S3_BUCKET"
+        mc mb --ignore-existing "nibrun/$$ARTIFACTS_BUCKET"
     environment:
       - API_S3_ACCESS_KEY_ID
       - API_S3_SECRET_ACCESS_KEY
-      - API_S3_BUCKET
+      - ARTIFACTS_BUCKET
     depends_on:
       minio:
         condition: service_healthy
@@ -87,7 +87,7 @@ services:
       - GITHUB_CLIENT_ID=${API_GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
       - S3_ENDPOINT=http://minio:9000
-      - S3_BUCKET=${API_S3_BUCKET}
+      - ARTIFACTS_BUCKET=${ARTIFACTS_BUCKET}
       - S3_ACCESS_KEY_ID=${API_S3_ACCESS_KEY_ID}
       - S3_SECRET_ACCESS_KEY=${API_S3_SECRET_ACCESS_KEY}
     ports:
