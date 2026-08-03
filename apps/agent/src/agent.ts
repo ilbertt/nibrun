@@ -1,0 +1,314 @@
+import { join } from 'node:path';
+import {
+  type AgentSession,
+  DEFAULT_AGENT_POLL_SETTINGS,
+  type HostDesiredState,
+  HostDesiredStateSchema,
+  type HostState,
+  type HostVersions,
+  type ObjectKey,
+  ProtocolValidationError,
+  parseMessage,
+  type SecretString,
+} from '@repo/protocol';
+import { InstanceCredentialProvider } from '#aws/instance-credentials.ts';
+import { type AgentConfig, loadAgentConfig } from '#config.ts';
+import { ControlPlaneClient, ControlPlaneError } from '#control/client.ts';
+import { HostIdentity, isSessionExpiring, openSession } from '#control/session.ts';
+import { backoffDelayMs } from '#lib/backoff.ts';
+import { nowTimestamp } from '#lib/clock.ts';
+import { runCommand } from '#lib/exec.ts';
+import { readJsonFile, readTextFile, writeJsonFile } from '#lib/json-store.ts';
+import { describeError, logger } from '#lib/logger.ts';
+import { readSlotRecords, SlotAllocator } from '#network/allocator.ts';
+import { Reconciler } from '#reconcile/reconciler.ts';
+import { buildReportedState } from '#report/build-report.ts';
+import {
+  allocatableCapacity,
+  readAvailableCacheBytes,
+  readHostCapacity,
+} from '#report/capacity.ts';
+import { readHostVersions } from '#report/versions.ts';
+import { s3ArtifactBytes } from '#vm/artifacts.ts';
+import { VmManager } from '#vm/manager.ts';
+import { SystemdVmUnits } from '#vm/systemd.ts';
+import { VolumeManager } from '#volumes/manager.ts';
+import { ZerofsTopology } from '#volumes/topology.ts';
+
+const STATUS_TICK_MS = 1_000;
+const FIRST_GENERATION = 0;
+
+const CONTROL_PLANE_BACKOFF = {
+  initialBackoffMs: 1_000,
+  maxBackoffMs: 60_000,
+  backoffFactor: 2,
+};
+const FIRST_FAILURE = 1;
+const NO_FAILURES = 0;
+
+const DESIRED_STATE_FILENAME = 'desired-state.json';
+
+export class MissingBootstrapTokenError extends Error {
+  constructor(path: string) {
+    super(`${path} is missing: the bootstrap credential arrives with the instance's user-data`);
+    this.name = 'MissingBootstrapTokenError';
+  }
+}
+
+export class Agent {
+  readonly #config: AgentConfig;
+  readonly #client: ControlPlaneClient;
+  readonly #identity: HostIdentity;
+  readonly #reconciler: Reconciler;
+  readonly #versions: HostVersions;
+  #session: AgentSession | undefined;
+  #knownGeneration = FIRST_GENERATION;
+  #running = true;
+
+  private constructor({
+    config,
+    versions,
+    reconciler,
+  }: {
+    config: AgentConfig;
+    versions: HostVersions;
+    reconciler: Reconciler;
+  }) {
+    this.#config = config;
+    this.#versions = versions;
+    this.#reconciler = reconciler;
+    this.#client = new ControlPlaneClient({ baseUrl: config.controlPlaneUrl });
+    this.#identity = new HostIdentity({ path: config.hostIdFile });
+  }
+
+  static async create({ config = loadAgentConfig() }: { config?: AgentConfig } = {}) {
+    const runner = runCommand;
+    const versions = await readHostVersions({ path: config.versionsFile });
+    // v1 runs one ZeroFS per host, so every volume placed here shares one storage prefix. The
+    // reasoning and what it costs are in `volumes/topology.ts`; everything downstream resolves
+    // per volume, so a per-app shape is a second factory rather than a rewrite.
+    const topology = ZerofsTopology.sharedHostFilesystem({
+      runner,
+      storagePrefix: config.zerofsStoragePrefix as ObjectKey,
+      mountPath: config.zerofsMount,
+      nbdSocketPath: config.zerofsNbdSocket,
+      configFile: config.zerofsConfigFile,
+    });
+    const units = new SystemdVmUnits({ runner });
+    // One allocator, shared: the host port, the tap, the guest address and the NBD minor are
+    // four views of the same slot, and two owners of it would eventually disagree.
+    const allocator = SlotAllocator.fromRecords(
+      readSlotRecords(await readJsonFile({ path: config.slotsFile })),
+    );
+    const reconciler = new Reconciler({
+      config,
+      runner,
+      units,
+      topology,
+      allocator,
+      vms: new VmManager({
+        runner,
+        units,
+        artifacts: s3ArtifactBytes({
+          bucket: config.artifactBucket,
+          region: config.awsRegion,
+          credentials: new InstanceCredentialProvider(),
+        }),
+        artifactCacheDir: config.artifactCacheDir,
+        guestImageDir: config.guestImageDir,
+        vmDir: config.vmDir,
+      }),
+      volumes: new VolumeManager({ runner, topology, allocator }),
+    });
+    return new Agent({ config, versions, reconciler });
+  }
+
+  stop() {
+    this.#running = false;
+  }
+
+  /**
+   * Converges against the last desired state this host was given before it has even reached
+   * the control plane, then joins the poll.
+   *
+   * The cached copy is what makes an agent restart during a control-plane outage a non-event:
+   * the host still knows what it is supposed to be running, and the poll that follows only
+   * ever corrects it.
+   */
+  async run(): Promise<void> {
+    await this.#reconciler.load();
+    const cached = await this.#readCachedDesiredState();
+    if (cached) {
+      this.#knownGeneration = cached.generation;
+      await this.#reconcileSafely(cached);
+    }
+
+    await this.#ensureSession();
+    const statusLoop = this.#runStatusLoop();
+    const reportLoop = this.#runReportLoop();
+    await this.#runPollLoop();
+    await Promise.all([statusLoop, reportLoop]);
+  }
+
+  async #runPollLoop(): Promise<void> {
+    let failures = NO_FAILURES;
+    while (this.#running) {
+      try {
+        const session = await this.#ensureSession();
+        const response = await this.#client.fetchDesiredState({
+          sessionToken: session.sessionToken,
+          request: {
+            knownGeneration: this.#knownGeneration,
+            waitSeconds: session.poll.maxWaitSeconds,
+          },
+        });
+        failures = NO_FAILURES;
+        if (response.result === 'changed') {
+          await writeJsonFile({ path: this.#desiredStatePath(), value: response.state });
+          this.#knownGeneration = response.state.generation;
+          await this.#reconcileSafely(response.state);
+        }
+        await Bun.sleep(session.poll.minIntervalMs);
+      } catch (error) {
+        failures += FIRST_FAILURE;
+        this.#handlePollError(error);
+        await Bun.sleep(backoffDelayMs({ attempt: failures, policy: CONTROL_PLANE_BACKOFF }));
+      }
+    }
+  }
+
+  #handlePollError(error: unknown): void {
+    if (error instanceof ControlPlaneError && error.isSessionExpired) {
+      this.#session = undefined;
+    }
+    if (error instanceof ProtocolValidationError) {
+      logger.error({ message: 'desired state rejected by validation', issues: error.issues });
+      return;
+    }
+    logger.warn({ message: 'desired state poll failed', ...describeError(error) });
+  }
+
+  async #runStatusLoop(): Promise<void> {
+    while (this.#running) {
+      try {
+        await this.#reconciler.refreshStates();
+      } catch (error) {
+        logger.warn({ message: 'status refresh failed', ...describeError(error) });
+      }
+      await Bun.sleep(STATUS_TICK_MS);
+    }
+  }
+
+  async #runReportLoop(): Promise<void> {
+    while (this.#running) {
+      const interval =
+        this.#session?.poll.reportIntervalMs ?? DEFAULT_AGENT_POLL_SETTINGS.reportIntervalMs;
+      try {
+        await this.#report();
+      } catch (error) {
+        logger.warn({ message: 'report failed', ...describeError(error) });
+      }
+      await Bun.sleep(interval);
+    }
+  }
+
+  async #report(): Promise<void> {
+    const session = await this.#ensureSession();
+    const records = this.#reconciler.records();
+    const capacity = await readHostCapacity({ cacheDir: this.#config.stateDir });
+    const report = buildReportedState({
+      hostId: session.hostId,
+      observedGeneration: this.#reconciler.observedGeneration,
+      reportedAt: nowTimestamp(),
+      state: this.#hostState(),
+      capacity,
+      allocatable: allocatableCapacity({
+        capacity,
+        committed: records
+          .filter((record) => record.state !== 'stopped' && record.state !== 'failed')
+          .map((record) => record.resources),
+        availableCacheBytes: await readAvailableCacheBytes({ cacheDir: this.#config.stateDir }),
+      }),
+      versions: this.#versions,
+      records,
+      volumes: this.#reconciler.volumeReports(),
+      checkpoints: this.#reconciler.checkpointReports(),
+    });
+    const response = await this.#client.sendReportedState({
+      sessionToken: session.sessionToken,
+      report,
+    });
+    if (response.generation !== this.#knownGeneration) {
+      logger.debug({
+        message: 'control plane has newer desired state',
+        generation: response.generation,
+      });
+    }
+  }
+
+  #hostState(): HostState {
+    return this.#reconciler.converged ? 'ready' : 'registering';
+  }
+
+  async #ensureSession(): Promise<AgentSession> {
+    if (this.#session && !isSessionExpiring({ session: this.#session, nowMs: Date.now() })) {
+      return this.#session;
+    }
+    const capacity = await readHostCapacity({ cacheDir: this.#config.stateDir });
+    this.#session = await openSession({
+      client: this.#client,
+      identity: this.#identity,
+      inputs: {
+        bootstrapToken: await this.#readBootstrapToken(),
+        versions: this.#versions,
+        capacity,
+      },
+    });
+    logger.info({
+      message: 'session opened',
+      hostId: this.#session.hostId,
+      expiresAt: this.#session.expiresAt,
+    });
+    return this.#session;
+  }
+
+  // The credential identifies the machine, not a user, and buys exactly one thing: a session.
+  // It is read from disk on every renewal rather than held in memory, so rotating the file is
+  // enough to rotate the credential.
+  async #readBootstrapToken(): Promise<SecretString> {
+    const token = await readTextFile({ path: this.#config.bootstrapTokenFile });
+    if (!token) {
+      throw new MissingBootstrapTokenError(this.#config.bootstrapTokenFile);
+    }
+    return token as SecretString;
+  }
+
+  #desiredStatePath() {
+    return join(this.#config.stateDir, DESIRED_STATE_FILENAME);
+  }
+
+  async #readCachedDesiredState(): Promise<HostDesiredState | undefined> {
+    const value = await readJsonFile({ path: this.#desiredStatePath() });
+    if (value === undefined) {
+      return undefined;
+    }
+    try {
+      return parseMessage({ schema: HostDesiredStateSchema, value });
+    } catch (error) {
+      logger.warn({ message: 'cached desired state discarded', ...describeError(error) });
+      return undefined;
+    }
+  }
+
+  async #reconcileSafely(desired: HostDesiredState): Promise<void> {
+    try {
+      await this.#reconciler.reconcile({ desired });
+    } catch (error) {
+      logger.error({
+        message: 'reconcile failed',
+        generation: desired.generation,
+        ...describeError(error),
+      });
+    }
+  }
+}

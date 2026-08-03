@@ -1,0 +1,20 @@
+{
+  "name": "@repo/agent",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "test": "bun test",
+    "check:types": "bun run --bun tsc"
+  },
+  "dependencies": {
+    "@repo/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

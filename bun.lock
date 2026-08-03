@@ -15,6 +15,16 @@
         "typescript": "catalog:",
       },
     },
+    "apps/agent": {
+      "name": "@repo/agent",
+      "dependencies": {
+        "@repo/protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "apps/api": {
       "name": "@repo/api",
       "dependencies": {
@@ -362,6 +372,8 @@
     "@oxc-parser/binding-win32-x64-msvc": ["@oxc-parser/binding-win32-x64-msvc@0.120.0", "", { "os": "win32", "cpu": "x64" }, "sha512-ys+upfqNtSu58huAhJMBKl3XCkGzyVFBlMlGPzHeFKgpFF/OdgNs1MMf8oaJIbgMH8ZxgGF7qfue39eJohmKIg=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.142.0", "", {}, "sha512-7W+2q5AKQVU36fkaryontrHn3YDt1RyUYXatw9i5H8ocYe2sPKSFB6eS8WNPeRKiN1qAWWZUPm7gwFzJGrccqQ=="],
+
+    "@repo/agent": ["@repo/agent@workspace:apps/agent"],
 
     "@repo/api": ["@repo/api@workspace:apps/api"],
 
