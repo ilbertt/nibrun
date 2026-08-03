@@ -4,25 +4,6 @@ import { failOnUnexpectedDestroys, terraform } from '#shared/terraform.ts';
 
 const PLAN_FILE = 'tfplan';
 
-// Consumed by the deploy steps that follow, under these exact names.
-const DEPLOY_OUTPUTS = [
-  'api_hostname',
-  'dozzle_hostname',
-  'api_github_client_id',
-  'artifacts_bucket',
-  'api_s3_endpoint',
-  'pg_backup_bucket',
-  'deploy_bucket',
-  'data_volume_id',
-  'deploy_group',
-  'ssm_secret_prefix',
-  'github_deploy_role_arn',
-  'app_host_deploy_group',
-  'app_host_data_volume_ids',
-  'filesystems_bucket',
-  'guest_images_bucket',
-];
-
 const inActions = optionalEnv('GITHUB_ACTIONS') === 'true';
 // Actions renders ANSI but is not a TTY, so Bun's own detection says no.
 const useColor = Bun.enableANSIColors || inActions;
@@ -73,23 +54,31 @@ await group({
   run: () => terraform(['apply', '-input=false', PLAN_FILE]),
 });
 
-// Not every output is a string — the per-host volume map is an object, and
-// setOutput serialises it as JSON for the step that parses it back.
 const outputs = (await terraform(['output', '-json']).quiet().json()) as Record<
   string,
-  { value: unknown }
+  { value: unknown; sensitive: boolean }
 >;
 
+// Not every output is a string — the per-host volume map is an object, and the
+// step that reads it parses it back — so everything is rendered to a string here
+// and the published object is flat.
 const render = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
 
 console.log(green(bold('\n✓ applied')));
 
-for (const name of DEPLOY_OUTPUTS) {
-  const value = outputs[name]?.value;
-  if (value === undefined) {
-    core.setFailed(`Missing terraform output: ${name}`);
-    process.exit(1);
+// Published as one object rather than one Actions output per name: the names
+// belong to outputs.tf, and a second list of them here is a list that drifts.
+// Terraform already knows which values are secret, so that is what filters them
+// rather than an allowlist.
+const published: Record<string, string> = {};
+
+for (const [name, output] of Object.entries(outputs)) {
+  if (output.sensitive) {
+    console.log(`  ${name}=<sensitive, not published>`);
+    continue;
   }
-  core.setOutput(name, value);
-  console.log(`  ${name}=${render(value)}`);
+  published[name] = render(output.value);
+  console.log(`  ${name}=${published[name]}`);
 }
+
+core.setOutput('json', JSON.stringify(published));
