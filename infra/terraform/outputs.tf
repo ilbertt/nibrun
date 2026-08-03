@@ -91,11 +91,9 @@ output "app_host_instance_ids" {
   value = aws_instance.app_host[*].id
 }
 
-# No elastic IP, unlike the control plane, so these move if a host is stopped
-# and started — point the wildcard records at them and re-point after a replace.
 output "app_host_public_ips" {
   description = "A record targets for the app domain's wildcard."
-  value       = aws_instance.app_host[*].public_ip
+  value       = aws_eip.app_host[*].public_ip
 }
 
 output "app_host_public_ipv6s" {

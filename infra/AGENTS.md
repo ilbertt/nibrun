@@ -28,7 +28,7 @@ DNS, every record **proxied** (orange cloud):
 - `*.<app_domain>` A → `app_host_public_ips`, plus AAAA → `app_host_public_ipv6s`. One pair covers
   the whole fleet, so there is nothing per app in DNS.
 
-Neither address is elastic, so a stop/start means re-pointing.
+Both addresses outlive a replacement, so the records are written once.
 
 Then, **in both zones**: SSL/TLS **Full (strict)**; an **Origin Certificate** (ECC — Cloudflare's
 edge is its only client), whose two halves are a proxy's TLS inputs; and **Authenticated Origin

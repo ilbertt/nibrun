@@ -27,12 +27,14 @@ resource "aws_instance" "app_host" {
   # into S3 first. No NAT gateway: NAT is for tenant egress, and no tenant app
   # runs in this phase.
   #
-  # Both families, so the wildcard record the user-app proxy needs can carry an
-  # AAAA as well as an A. The subnet assigns an IPv6 on creation anyway; stating
-  # it here is what stops a change to that default silently taking the address
-  # away from a host whose DNS points at it.
+  # Both families, because the wildcard record the user-app proxy needs carries an
+  # A and an AAAA — and both have to survive a replacement, which happens whenever
+  # the bootstrap changes. A specific address rather than a count: an auto-assigned
+  # one is drawn fresh each time and would leave the AAAA pointing at a host that
+  # no longer exists. The elastic IP below does the same job for v4, which has no
+  # equivalent because an elastic address is IPv4-only.
   associate_public_ip_address = true
-  ipv6_address_count          = 1
+  ipv6_addresses              = [cidrhost(aws_subnet.app.ipv6_cidr_block, count.index + 1)]
 
   # Without this the CPU exposes no VMX, kvm_intel refuses to load, and the
   # bootstrap deliberately dies before writing its marker. It is a launch-time
@@ -80,6 +82,20 @@ resource "aws_instance" "app_host" {
   tags = {
     Name        = "${local.resource_name_prefix}-app-host-${count.index}"
     DeployGroup = local.app_host_deploy_group
+  }
+}
+
+# What the app domain's wildcard A record points at. Unlike the instance's own
+# public address it outlives a replacement, so the record is written once rather
+# than chased every time the bootstrap changes.
+resource "aws_eip" "app_host" {
+  count = var.app_host_count
+
+  instance = aws_instance.app_host[count.index].id
+  domain   = "vpc"
+
+  tags = {
+    Name = "${local.resource_name_prefix}-app-host-${count.index}-public-ip"
   }
 }
 
