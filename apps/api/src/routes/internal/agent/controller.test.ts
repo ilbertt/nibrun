@@ -1,0 +1,227 @@
+import { beforeAll, describe, expect, test } from 'bun:test';
+import {
+  AGENT_API_PREFIX,
+  AGENT_ROUTES,
+  type AgentSessionRequest,
+  AgentSessionSchema,
+  DesiredStateResponseSchema,
+  type HostCapacity,
+  type HostReportedState,
+  type HostVersions,
+  PROTOCOL_VERSION,
+  PROTOCOL_VERSION_HEADER,
+  parseMessage,
+  ReportedStateResponseSchema,
+} from '@repo/protocol';
+import { StatusMap } from 'elysia';
+
+const BOOTSTRAP_TOKEN = 'bootstrap-token-for-this-test';
+
+// What an agent that has never polled reports knowing, so this is the case that
+// has to yield state rather than `unchanged`.
+const FIRST_POLL_GENERATION = 0;
+
+const BETTER_AUTH_SECRET_LENGTH = 32;
+const PROTOCOL_VERSION_SKEW = 1;
+
+// The api reads its configuration when the service graph is constructed, so the
+// environment has to exist before the app module is imported.
+const REQUIRED_ENV = {
+  DATABASE_URL: 'postgres://nobody@127.0.0.1:1/none',
+  BETTER_AUTH_SECRET: 'x'.repeat(BETTER_AUTH_SECRET_LENGTH),
+  GITHUB_CLIENT_ID: 'test',
+  GITHUB_CLIENT_SECRET: 'test',
+  S3_ENDPOINT: 'http://127.0.0.1:1',
+  ARTIFACTS_BUCKET: 'test',
+  S3_ACCESS_KEY_ID: 'test',
+  S3_SECRET_ACCESS_KEY: 'test',
+  AGENT_BOOTSTRAP_TOKEN: BOOTSTRAP_TOKEN,
+};
+
+let app: { handle: (request: Request) => Promise<Response> };
+
+beforeAll(async () => {
+  Object.assign(process.env, REQUIRED_ENV);
+  const { createApp } = await import('#app.ts');
+  app = createApp();
+});
+
+const versions: HostVersions = {
+  agent: 'abc123',
+  guestImage: '6.1.180-436861c7d163',
+  zerofs: 'v2.2.1',
+  firecracker: 'v1.16.1',
+} as HostVersions;
+
+const capacity: HostCapacity = { vcpuCount: 2, memoryMib: 8192, cacheBytes: 100_000_000_000 };
+
+function post({
+  route,
+  body,
+  sessionToken,
+}: {
+  route: string;
+  body: unknown;
+  sessionToken?: string;
+}) {
+  return app.handle(
+    new Request(`http://control-plane${AGENT_API_PREFIX}${route}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [PROTOCOL_VERSION_HEADER]: String(PROTOCOL_VERSION),
+        ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
+      },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+// Every response is read back through the protocol's own schema, so the test
+// fails if the api answers something the agent could not have parsed — the same
+// check the agent performs, run from the other side.
+const readSession = async (response: Response) =>
+  parseMessage({ schema: AgentSessionSchema, value: await response.json() });
+
+const readDesired = async (response: Response) =>
+  parseMessage({ schema: DesiredStateResponseSchema, value: await response.json() });
+
+const readAck = async (response: Response) =>
+  parseMessage({ schema: ReportedStateResponseSchema, value: await response.json() });
+
+const openSession = async (overrides: Partial<AgentSessionRequest> = {}) =>
+  await post({
+    route: AGENT_ROUTES.session,
+    body: { bootstrapToken: BOOTSTRAP_TOKEN, versions, capacity, ...overrides },
+  });
+
+describe('an agent can register and be told what to run', () => {
+  test('a session names the host and how often to come back', async () => {
+    const session = await readSession(await openSession());
+
+    expect(session.hostId).toBeTruthy();
+    expect(session.sessionToken).toBeTruthy();
+    expect(session.poll.maxWaitSeconds).toBeGreaterThan(0);
+    // Issued rather than echoed: a session the bootstrap credential could stand in for would
+    // make expiring one meaningless.
+    expect(session.sessionToken).not.toBe(BOOTSTRAP_TOKEN);
+  });
+
+  test('a host that has never polled is told its state, not that nothing changed', async () => {
+    const session = await readSession(await openSession());
+    const response = await post({
+      route: AGENT_ROUTES.desiredState,
+      body: { knownGeneration: FIRST_POLL_GENERATION, waitSeconds: 0 },
+      sessionToken: session.sessionToken,
+    });
+
+    const body = await readDesired(response);
+    expect(body.result).toBe('changed');
+    // Desired state carries no host id, so a host can only ever be told about itself.
+    expect(body.result === 'changed' && body.state.hostId).toBe(session.hostId);
+  });
+
+  test('and told nothing when it is already current', async () => {
+    const session = await readSession(await openSession());
+    const first = await readDesired(
+      await post({
+        route: AGENT_ROUTES.desiredState,
+        body: { knownGeneration: FIRST_POLL_GENERATION, waitSeconds: 0 },
+        sessionToken: session.sessionToken,
+      }),
+    );
+    if (first.result !== 'changed') {
+      throw new Error('A host that has never polled must be given state to converge to.');
+    }
+
+    const second = await readDesired(
+      await post({
+        route: AGENT_ROUTES.desiredState,
+        body: { knownGeneration: first.state.generation, waitSeconds: 0 },
+        sessionToken: session.sessionToken,
+      }),
+    );
+
+    expect(second).toEqual({ result: 'unchanged', generation: first.state.generation });
+  });
+
+  test('a report is answered with the generation current at the time', async () => {
+    const session = await readSession(await openSession());
+    const desired = await readDesired(
+      await post({
+        route: AGENT_ROUTES.desiredState,
+        body: { knownGeneration: FIRST_POLL_GENERATION, waitSeconds: 0 },
+        sessionToken: session.sessionToken,
+      }),
+    );
+    const report = {
+      hostId: session.hostId,
+      observedGeneration: 0,
+      reportedAt: new Date().toISOString(),
+      state: 'ready',
+      capacity,
+      allocatable: capacity,
+      versions,
+      volumes: [],
+      instances: [],
+      checkpoints: [],
+      exports: [],
+    } as unknown as HostReportedState;
+
+    const response = await post({
+      route: AGENT_ROUTES.reportedState,
+      body: report,
+      sessionToken: session.sessionToken,
+    });
+
+    // The reply carries the generation, so an agent that has fallen behind learns it from the
+    // report it was already making rather than from its next poll.
+    expect(await readAck(response)).toEqual({
+      generation: desired.result === 'changed' ? desired.state.generation : desired.generation,
+    });
+  });
+});
+
+describe('nothing reaches desired state without proving what it is', () => {
+  test('a wrong bootstrap credential opens no session', async () => {
+    expect((await openSession({ bootstrapToken: 'wrong' as never })).status).toBe(
+      StatusMap.Unauthorized,
+    );
+  });
+
+  test('an unknown session is refused rather than served a default host', async () => {
+    const response = await post({
+      route: AGENT_ROUTES.desiredState,
+      body: { knownGeneration: 0, waitSeconds: 0 },
+      sessionToken: 'not-a-session',
+    });
+
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  });
+
+  test('a missing session is refused too', async () => {
+    const response = await post({
+      route: AGENT_ROUTES.desiredState,
+      body: { knownGeneration: 0, waitSeconds: 0 },
+    });
+
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  });
+
+  // The two sides ship in different pipelines, so version skew is the normal state during
+  // every rollout. It has to be a rejected message rather than one read as something else.
+  test('an agent speaking a different protocol is turned away', async () => {
+    const response = await app.handle(
+      new Request(`http://control-plane${AGENT_API_PREFIX}${AGENT_ROUTES.session}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          [PROTOCOL_VERSION_HEADER]: String(PROTOCOL_VERSION + PROTOCOL_VERSION_SKEW),
+        },
+        body: JSON.stringify({ bootstrapToken: BOOTSTRAP_TOKEN, versions, capacity }),
+      }),
+    );
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+});

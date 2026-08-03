@@ -28,8 +28,13 @@ function createRootController() {
   return controller;
 }
 
+// Every prefix the server answers. A path missing from here falls through to the
+// dashboard's index, so an agent calling a route that does not exist would be
+// handed HTML and a 200 instead of the 404 that would tell it what is wrong.
+const SERVED_PREFIXES = [RoutePrefix.Api, RoutePrefix.Internal];
+
 function isClientRoutePath(pathname: string): boolean {
-  return !pathname.startsWith(RoutePrefix.Api);
+  return !SERVED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 export const RootController = createRootController();

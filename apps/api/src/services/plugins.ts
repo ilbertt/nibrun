@@ -1,14 +1,22 @@
 import { Elysia } from 'elysia';
 import { sql } from '#db/client.ts';
+import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
+import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
+import { AgentService } from '#services/agent.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
 import { HealthService } from '#services/health.service.ts';
 
+const agentRepository = new AgentRepository(sql);
 const assetsRepository = new AssetsRepository(sql);
 const healthRepository = new HealthRepository(sql);
 
+const agentService = new AgentService({
+  agentRepo: agentRepository,
+  bootstrapToken: env.AGENT_BOOTSTRAP_TOKEN,
+});
 const assetsService = new AssetsService(assetsRepository);
 const healthService = new HealthService(healthRepository);
 
@@ -25,4 +33,9 @@ export const AssetsServicePlugin = new Elysia({ name: 'service.assets' }).decora
 export const HealthServicePlugin = new Elysia({ name: 'service.health' }).decorate(
   'healthService',
   healthService,
+);
+
+export const AgentServicePlugin = new Elysia({ name: 'service.agent' }).decorate(
+  'agentService',
+  agentService,
 );

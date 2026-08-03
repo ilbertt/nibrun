@@ -43,6 +43,9 @@ API_BETTER_AUTH_SECRET="$(secret api_better_auth_secret)"
 API_GITHUB_CLIENT_SECRET="$(secret api_github_client_secret)"
 API_S3_ACCESS_KEY_ID="$(secret api_s3_access_key_id)"
 API_S3_SECRET_ACCESS_KEY="$(secret api_s3_secret_access_key)"
+# The same parameter every app host reads, so the api can recognise the
+# credential a host presents rather than trusting whatever arrives.
+AGENT_BOOTSTRAP_TOKEN="$(secret agent_bootstrap_token)"
 
 # Everything written from here on carries a secret: the PEMs below, then .env.
 umask 077
@@ -74,6 +77,7 @@ API_BASE_URL=https://${API_HOSTNAME}
 API_BETTER_AUTH_SECRET=${API_BETTER_AUTH_SECRET}
 API_GITHUB_CLIENT_ID=${API_GITHUB_CLIENT_ID}
 API_GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
+AGENT_BOOTSTRAP_TOKEN=${AGENT_BOOTSTRAP_TOKEN}
 
 API_DB_USER=${API_DB_USER}
 API_DB_PASSWORD=${API_DB_PASSWORD}
