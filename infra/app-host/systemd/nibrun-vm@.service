@@ -1,0 +1,36 @@
+[Unit]
+Description=nibrun microVM %i
+# Its disk is an NBD device ZeroFS serves, so it cannot meaningfully outlive it.
+BindsTo=nibrun-zerofs.service
+After=nibrun-zerofs.service
+
+# Deliberately unrelated to nibrun-agent.service. The agent stages this VM's
+# files and asks init to start the unit, then stops caring — it is the component
+# that updates most often, and if these were its children every agent restart
+# would kill every tenant app on the host.
+[Service]
+Type=exec
+WorkingDirectory=/var/lib/nibrun/vm/%i
+ExecStart=/opt/nibrun/bin/firecracker/firecracker \
+  --api-sock /run/nibrun/vm-%i.sock \
+  --config-file /var/lib/nibrun/vm/%i/firecracker.json
+
+# No restart here on purpose. The guest's own init supervises the tenant process
+# with backoff and powers the VM off once that budget is exhausted, and the agent
+# reconciles a VM that should be running and is not. Restarting here as well
+# would race that loop and hide a broken deploy behind an infinite retry.
+Restart=no
+
+# The tenant's own output arrives on the guest console, which Firecracker writes
+# to its stdout and systemd captures — so `journalctl -u nibrun-vm@<id>` is the
+# app's log with no shipping built for it.
+StandardOutput=journal
+StandardError=journal
+
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# A stop is abrupt from the guest's point of view: nothing here asks it to shut
+# down cleanly first. That is survivable only because the agent flushes ZeroFS
+# before stopping a VM, which is the step that turns acknowledged writes durable
+# when `ignore_fsync` has made the guest's own fsync a no-op.

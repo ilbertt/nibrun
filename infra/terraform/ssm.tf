@@ -102,6 +102,53 @@ resource "aws_ssm_parameter" "dozzle_password" {
   }
 }
 
+# --- App hosts ---
+
+# ZeroFS encrypts everything it writes to the filesystems bucket under this. It
+# is generated once and never rotated in place: changing it does not re-encrypt
+# anything, it makes every existing tenant filesystem unreadable. Treat it as
+# permanent for the life of the bucket.
+resource "random_password" "filesystems_encryption_password" {
+  length  = 48
+  special = false
+}
+
+resource "aws_ssm_parameter" "filesystems_encryption_password" {
+  name  = "${var.ssm_secret_prefix}/filesystems_encryption_password"
+  type  = "SecureString"
+  value = random_password.filesystems_encryption_password.result
+
+  tags = {
+    Name = "${local.resource_name_prefix}-filesystems-encryption-password"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# What an agent presents once, to exchange for a session. It identifies the
+# machine class rather than a user, and buys nothing else — so revoking a host is
+# expiring its session rather than rotating this.
+#
+# Read by the instance with its own role rather than baked into user_data, which
+# is the repo's established path for every other secret and, unlike user_data,
+# can be rotated without replacing the instance.
+resource "random_password" "agent_bootstrap_token" {
+  length  = 48
+  special = false
+}
+
+resource "aws_ssm_parameter" "agent_bootstrap_token" {
+  name  = "${var.ssm_secret_prefix}/agent_bootstrap_token"
+  type  = "SecureString"
+  value = random_password.agent_bootstrap_token.result
+
+  tags = {
+    Name = "${local.resource_name_prefix}-agent-bootstrap-token"
+  }
+}
+
 # Credentials of the api's own IAM user (iam_api.tf), not generated here.
 resource "aws_ssm_parameter" "api_s3_access_key_id" {
   name  = "${var.ssm_secret_prefix}/api_s3_access_key_id"

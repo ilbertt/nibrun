@@ -1,0 +1,28 @@
+[Unit]
+Description=nibrun host agent
+After=network-online.target nibrun-zerofs.service
+Wants=network-online.target
+
+# Deliberately not BindsTo or Requires: the agent must be restartable, and
+# stoppable, without that being an event for anything it manages. Tenant microVMs
+# are systemd units in their own right rather than children of this process, so
+# restarting the agent leaves every running app alone — it comes back and
+# reconciles against what it finds.
+[Service]
+Type=exec
+ExecStart=/opt/nibrun/bin/agent/nibrun-agent
+EnvironmentFile=/etc/nibrun/agent.env
+
+Restart=always
+RestartSec=5s
+
+StateDirectory=nibrun
+RuntimeDirectory=nibrun
+
+# It creates tap devices, writes firewall rules and starts microVM units, so it
+# runs as root. Containerising it would hand back every privilege the container
+# removed, which is why nothing on this host is containerised.
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,65 @@
+# ZeroFS on an app host. Read by `zerofs run --config`, which has no default path
+# and no search behaviour — the unit passes this one explicitly.
+#
+# Every ${VAR} is expanded by ZeroFS itself from the process environment, which
+# the unit loads from /etc/zerofs/zerofs.env. Numbers are literal because the
+# substitution is a string one.
+
+[cache]
+# The EBS data volume, and the only thing on it. Sized well under the volume so a
+# full cache cannot fill the disk out from under the segments being written.
+dir = "/data/zerofs"
+disk_size_gb = 70.0
+memory_size_gb = 2.0
+warm_metadata = "filters_index"
+
+[storage]
+url = "${NIBRUN_FILESYSTEMS_URL}"
+encryption_password = "${NIBRUN_FILESYSTEMS_PASSWORD}"
+
+# Region only. Credentials resolve through the default chain, so the instance
+# role suffices and no static keys exist for this host.
+[aws]
+region = "${AWS_REGION}"
+
+[filesystem]
+# The setting the whole design rests on. Honouring fsync costs ~244 ms a call —
+# about 1.3 SQLite commits a second — which is unusable. With this, ~1.24 ms and
+# ~619 commits/s, roughly 1.9x faster than local EBS.
+#
+# It makes the guest's fsync a no-op all the way down: NBD FLUSH and FUA stop
+# meaning anything, and [lsm] flush_interval_secs below becomes the entire
+# durability guarantee.
+ignore_fsync = true
+compression = "zstd-3"
+
+[lsm]
+# The accepted RPO. Worst-case loss is this interval *plus* the time the seal and
+# upload take, so it is 5-15 s in practice rather than exactly 5. Five is the
+# enforced minimum and a lower value is silently clamped rather than rejected.
+#
+# sync_writes is deliberately absent: with ignore_fsync it is a hard config error.
+flush_interval_secs = 5
+
+# Unix sockets rather than TCP: everything that talks to ZeroFS is on this host.
+# Under /run rather than /tmp because the unit sets PrivateTmp, which would put a
+# /tmp socket in a namespace the agent cannot see.
+[servers.nbd]
+unix_socket = "/run/zerofs/nbd.sock"
+
+# How the agent creates and sizes an app's disk: the device files live in a .nbd
+# directory inside the ZeroFS filesystem itself, so managing them is a filesystem
+# operation rather than an RPC one.
+[servers.ninep]
+unix_socket = "/run/zerofs/9p.sock"
+
+# The admin RPC the `zerofs` CLI drives — flush, checkpoints, stats. Without this
+# section every one of those subcommands exits with "RPC server not configured".
+[servers.rpc]
+unix_socket = "/run/zerofs/rpc.sock"
+
+[prometheus]
+addresses = ["127.0.0.1:9091"]
+
+[telemetry]
+enabled = false

@@ -17,6 +17,10 @@ const DEPLOY_OUTPUTS = [
   'deploy_group',
   'ssm_secret_prefix',
   'github_deploy_role_arn',
+  'app_host_deploy_group',
+  'app_host_data_volume_ids',
+  'filesystems_bucket',
+  'guest_images_bucket',
 ];
 
 const inActions = optionalEnv('GITHUB_ACTIONS') === 'true';
@@ -69,10 +73,14 @@ await group({
   run: () => terraform(['apply', '-input=false', PLAN_FILE]),
 });
 
+// Not every output is a string — the per-host volume map is an object, and
+// setOutput serialises it as JSON for the step that parses it back.
 const outputs = (await terraform(['output', '-json']).quiet().json()) as Record<
   string,
-  { value: string }
+  { value: unknown }
 >;
+
+const render = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
 
 console.log(green(bold('\n✓ applied')));
 
@@ -83,5 +91,5 @@ for (const name of DEPLOY_OUTPUTS) {
     process.exit(1);
   }
   core.setOutput(name, value);
-  console.log(`  ${name}=${value}`);
+  console.log(`  ${name}=${render(value)}`);
 }

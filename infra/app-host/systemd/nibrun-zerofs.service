@@ -1,0 +1,48 @@
+[Unit]
+Description=ZeroFS, backing every tenant disk on this host
+Documentation=https://www.zerofs.net
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=zerofs
+Group=zerofs
+ExecStart=/opt/nibrun/bin/zerofs/zerofs run --config /etc/zerofs/config.toml
+EnvironmentFile=/etc/zerofs/zerofs.env
+
+# Any failed write to the object store terminates the process by design, and a
+# process fenced by another writer exits cleanly — `always` covers both, where
+# `on-failure` would leave a fenced host quietly serving nothing.
+Restart=always
+RestartSec=5s
+
+# Shutdown seals and uploads the open segment and flushes metadata. A SIGKILL
+# part-way through that loses the unflushed tail, which is exactly the data
+# ignore_fsync already put at risk. Do not shorten this.
+TimeoutStopSec=120
+
+CacheDirectory=zerofs
+StateDirectory=zerofs
+RuntimeDirectory=zerofs
+# The agent and nbd-client reach the sockets in here.
+RuntimeDirectoryMode=0750
+
+LimitNOFILE=1048576
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# ProtectSystem=strict makes everything else read-only, and the cache lives on
+# the data volume rather than under CacheDirectory.
+ReadWritePaths=/data/zerofs
+
+[Install]
+WantedBy=multi-user.target

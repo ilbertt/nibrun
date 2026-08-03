@@ -1,9 +1,10 @@
 #!/bin/bash
-# Runs ON the instance before the compose stack is touched. Mounts the
-# persistent EBS data volume at /data and prepares the directories the prod
-# compose file binds the data-bearing named volumes to, so that data survives
-# instance replacement. Docker's own state (images, containers, derived volumes)
-# stays on the root disk — every deploy rebuilds it.
+# Runs ON an instance, before anything that reads /data. Mounts the persistent
+# EBS data volume there and creates the directories named as arguments, relative
+# to /data, so their contents survive instance replacement.
+#
+# Shipped in both bundles because both machine classes have a data volume; what
+# they keep on it is the caller's business and arrives as those arguments.
 # Idempotent: a no-op once the volume is mounted and the directories exist.
 set -euo pipefail
 
@@ -36,8 +37,6 @@ mkdir -p /data
 grep -qF "$dev" /etc/fstab || echo "$dev /data xfs defaults,nofail 0 2" >> /etc/fstab
 mountpoint -q /data || mount /data
 
-# Docker does not create missing host directories for local volumes with
-# `o: bind` driver_opts (unlike container bind mounts) — volume creation fails.
-# Only Postgres: production talks to real S3, so MinIO does not run here and
-# has no volume to back.
-mkdir -p /data/volumes/postgres-data
+for directory in "$@"; do
+  mkdir -p "/data/${directory}"
+done

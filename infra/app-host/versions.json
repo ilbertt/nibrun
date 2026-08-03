@@ -1,0 +1,15 @@
+{
+  "zerofs": {
+    "version": "v2.2.1",
+    "url": "https://github.com/Barre/ZeroFS/releases/download/v2.2.1/zerofs-pgo-multiplatform.tar.gz",
+    "sha256": "d4ae4e4e9bc0a6f4cc4253b6a9fc6c9b57feda6dc0f0cb7443f9264b2eeec621",
+    "member": "zerofs-linux-amd64-pgo"
+  },
+  "firecracker": {
+    "version": "v1.16.1",
+    "url": "https://github.com/firecracker-microvm/firecracker/releases/download/v1.16.1/firecracker-v1.16.1-x86_64.tgz",
+    "sha256": "382a02a869e4d6d5cb14c40577f9545e8458021ea8b0b2d3fc10ec14d9c242e6",
+    "directory": "release-v1.16.1-x86_64"
+  },
+  "guestImage": null
+}

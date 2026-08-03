@@ -68,6 +68,16 @@ jobs:
           PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
         run: bun run --filter @repo/internal-scripts verify-public-images
 
+      # Both are plain compiled binaries rather than images: nothing on an app
+      # host is containerised. Built before any credential is assumed, because
+      # neither needs one — and the guest image's version is a digest of its
+      # inputs including the runtime binary, so that has to exist first.
+      - name: Build the guest runtime
+        run: bun run --filter @repo/runtime build
+
+      - name: Build the agent
+        run: bun run --filter @repo/agent build
+
       - name: Configure AWS credentials (Terraform apply role)
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
@@ -109,6 +119,28 @@ jobs:
           DEPLOY_BUCKET: ${{ steps.tf.outputs.deploy_bucket }}
         run: bun run --filter @repo/internal-scripts publish-runtime-bundle
 
+      - name: Publish the agent binary
+        id: agent_binary
+        env:
+          DEPLOY_BUCKET: ${{ steps.tf.outputs.deploy_bucket }}
+        run: bun run --filter @repo/internal-scripts publish-agent-binary
+
+      # Skipped entirely unless the image's inputs changed — its version is a
+      # digest of them, so "already published" and "unchanged" are one question.
+      # When it does build, it compiles a kernel, hence the timeout.
+      - name: Publish the guest image
+        id: guest_image
+        timeout-minutes: 45
+        env:
+          GUEST_IMAGES_BUCKET: ${{ steps.tf.outputs.guest_images_bucket }}
+        run: bun run --filter @repo/internal-scripts publish-guest-image
+
+      - name: Publish the app host bundle
+        id: app_host_bundle
+        env:
+          DEPLOY_BUCKET: ${{ steps.tf.outputs.deploy_bucket }}
+        run: bun run --filter @repo/internal-scripts publish-app-host-bundle
+
       - name: Deploy via SSM
         env:
           BUNDLE_URL: ${{ steps.bundle.outputs.url }}
@@ -124,3 +156,19 @@ jobs:
           PG_BACKUP_IMAGE_URI: ${{ steps.pg_backup_image.outputs.image-uri }}
           PG_BACKUP_BUCKET: ${{ steps.tf.outputs.pg_backup_bucket }}
         run: bun run --filter @repo/internal-scripts ssm-deploy
+
+      # Separate from the control plane's deploy: a different bundle, a different
+      # DeployGroup, and a different machine class. The versions it installs come
+      # from infra/app-host/versions.json — never from asking S3 what is newest.
+      - name: Deploy the app hosts via SSM
+        env:
+          BUNDLE_URL: ${{ steps.app_host_bundle.outputs.url }}
+          APP_HOST_DEPLOY_GROUP: ${{ steps.tf.outputs.app_host_deploy_group }}
+          APP_HOST_DATA_VOLUME_IDS: ${{ steps.tf.outputs.app_host_data_volume_ids }}
+          SSM_SECRET_PREFIX: ${{ steps.tf.outputs.ssm_secret_prefix }}
+          AGENT_URL: ${{ steps.agent_binary.outputs.url }}
+          GUEST_IMAGES_BUCKET: ${{ steps.tf.outputs.guest_images_bucket }}
+          FILESYSTEMS_BUCKET: ${{ steps.tf.outputs.filesystems_bucket }}
+          ARTIFACTS_BUCKET: ${{ steps.tf.outputs.artifacts_bucket }}
+          API_HOSTNAME: ${{ steps.tf.outputs.api_hostname }}
+        run: bun run --filter @repo/internal-scripts ssm-deploy-app-hosts

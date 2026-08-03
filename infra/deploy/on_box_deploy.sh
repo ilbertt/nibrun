@@ -26,8 +26,12 @@ API_S3_PORT="${API_S3_PORT:-9000}"
 API_S3_CONSOLE_PORT="${API_S3_CONSOLE_PORT:-9001}"
 DOZZLE_PORT="${DOZZLE_PORT:-8080}"
 
+# Docker does not create missing host directories for local volumes with
+# `o: bind` driver_opts (unlike container bind mounts) — volume creation fails.
+# Only Postgres: production talks to real S3, so MinIO does not run here and has
+# no volume to back.
 log "Ensuring the persistent data volume is mounted and holds the data-bearing volumes"
-bash ensure_data_volume.sh
+bash ensure_data_volume.sh volumes/postgres-data
 
 secret() {
   aws ssm get-parameter --name "${SSM_SECRET_PREFIX}/$1" --with-decryption \
