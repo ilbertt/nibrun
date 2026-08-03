@@ -27,10 +27,10 @@ resource "aws_instance" "app_host" {
   # into S3 first. No NAT gateway: NAT is for tenant egress, and no tenant app
   # runs in this phase.
   #
-  # Both families, so the wildcard record the user-app proxy needs can carry an
-  # AAAA as well as an A. The subnet assigns an IPv6 on creation anyway; stating
-  # it here is what stops a change to that default silently taking the address
-  # away from a host whose DNS points at it.
+  # An address in each family, but only the elastic one below is ever published:
+  # Cloudflare is the origin's only client and serves visitors over IPv6 from its
+  # own edge, so nothing here needs a stable IPv6. This one is for egress, and it
+  # is drawn fresh on every launch, which is fine because nothing points at it.
   associate_public_ip_address = true
   ipv6_address_count          = 1
 
@@ -80,6 +80,20 @@ resource "aws_instance" "app_host" {
   tags = {
     Name        = "${local.resource_name_prefix}-app-host-${count.index}"
     DeployGroup = local.app_host_deploy_group
+  }
+}
+
+# What the app domain's wildcard A record points at. Unlike the instance's own
+# public address it outlives a replacement, so the record is written once rather
+# than chased every time the bootstrap changes.
+resource "aws_eip" "app_host" {
+  count = var.app_host_count
+
+  instance = aws_instance.app_host[count.index].id
+  domain   = "vpc"
+
+  tags = {
+    Name = "${local.resource_name_prefix}-app-host-${count.index}-public-ip"
   }
 }
 
