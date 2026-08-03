@@ -27,14 +27,12 @@ resource "aws_instance" "app_host" {
   # into S3 first. No NAT gateway: NAT is for tenant egress, and no tenant app
   # runs in this phase.
   #
-  # Both families, because the wildcard record the user-app proxy needs carries an
-  # A and an AAAA — and both have to survive a replacement, which happens whenever
-  # the bootstrap changes. A specific address rather than a count: an auto-assigned
-  # one is drawn fresh each time and would leave the AAAA pointing at a host that
-  # no longer exists. The elastic IP below does the same job for v4, which has no
-  # equivalent because an elastic address is IPv4-only.
+  # An address in each family, but only the elastic one below is ever published:
+  # Cloudflare is the origin's only client and serves visitors over IPv6 from its
+  # own edge, so nothing here needs a stable IPv6. This one is for egress, and it
+  # is drawn fresh on every launch, which is fine because nothing points at it.
   associate_public_ip_address = true
-  ipv6_addresses              = [cidrhost(aws_subnet.app.ipv6_cidr_block, count.index + 1)]
+  ipv6_address_count          = 1
 
   # Without this the CPU exposes no VMX, kvm_intel refuses to load, and the
   # bootstrap deliberately dies before writing its marker. It is a launch-time

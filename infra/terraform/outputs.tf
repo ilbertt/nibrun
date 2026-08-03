@@ -96,11 +96,6 @@ output "app_host_public_ips" {
   value       = aws_eip.app_host[*].public_ip
 }
 
-output "app_host_public_ipv6s" {
-  description = "AAAA record targets for the app domain's wildcard."
-  value       = [for host in aws_instance.app_host : one(host.ipv6_addresses)]
-}
-
 # Not a single DATA_VOLUME_ID like the control plane's, because each host has
 # its own: a deploy fanning out looks the instance it is targeting up here and
 # exports that one value under the usual name.
