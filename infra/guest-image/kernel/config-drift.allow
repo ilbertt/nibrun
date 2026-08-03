@@ -1,0 +1,36 @@
+# Symbols where Firecracker's base config and a vanilla kernel.org tree are
+# allowed to disagree. Firecracker publishes those configs for the Amazon Linux
+# microVM kernel and does not guarantee them against kernel.org sources, so this
+# file is the price of using them off-label: every difference is named once, with
+# a reason, and anything not listed here fails the build.
+#
+# Symbols nibrun.config sets are exempt automatically — overriding is the point.
+
+# Regenerated from the toolchain, never carried from a config.
+CONFIG_CC_VERSION_TEXT
+CONFIG_GCC_VERSION
+CONFIG_AS_VERSION
+CONFIG_LD_VERSION
+CONFIG_PAHOLE_VERSION
+
+# Amazon Linux-only symbols that vanilla has never had. Both are `is not set`
+# upstream, so nothing is lost by their absence.
+CONFIG_AMAZON_DRIVER_UPDATES
+CONFIG_DMA_PAGE_TOUCHING
+
+# Amazon Linux carries this =y; vanilla 6.1 has no such driver. It is a second
+# wall-clock source for snapshot resume. Ours is kvmclock, which nibrun.config
+# asserts.
+CONFIG_PTP_1588_CLOCK_VMCLOCK
+
+# Amazon Linux out-of-tree driver: /dev/sysgenid tells userspace to reseed its
+# RNG after a snapshot restore, because a restored VM replays entropy the
+# original already used. nibrun takes no Firecracker snapshots, so nothing reads
+# it. **If snapshots are ever adopted, this is the missing symbol and the reason
+# to move the build onto the Amazon Linux source tree.**
+CONFIG_SYSGENID
+
+# Oversampling rate for the jitter entropy RNG; the symbol does not exist in
+# vanilla 6.1. Not load-bearing here — CONFIG_RANDOM_TRUST_CPU and virtio-rng
+# are what seed the CRNG, and both are asserted.
+CONFIG_CRYPTO_JITTERENTROPY_OSR

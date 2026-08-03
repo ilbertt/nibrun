@@ -1,0 +1,6 @@
+dist/
+
+# Docs cannot change a single byte of the artifacts, so keeping them out of the
+# context means editing them does not invalidate the kernel build cache.
+# version.sh still hashes them — it errs the other way on purpose.
+AGENTS.md
