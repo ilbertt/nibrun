@@ -23,6 +23,9 @@ export type VmManagerOptions = {
   artifactCacheDir: string;
   guestImageDir: string;
   vmDir: string;
+  // Written into the guest's config drive, which is the only way it gets a resolver: the root
+  // is read-only and there is no DHCP client to learn one from.
+  guestDnsServers: readonly string[];
 };
 
 export class VmManager {
@@ -75,6 +78,8 @@ export class VmManager {
       workingDir,
       guestPort: desired.config.guestPort,
       environment: desired.config.environment,
+      restartPolicy: desired.config.restartPolicy,
+      dnsServers: this.#options.guestDnsServers,
     });
 
     await writeJsonFile({
