@@ -1,6 +1,6 @@
 import { chmod, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { GuestPort, RestartPolicy, TenantEnvironment } from '@repo/protocol';
+import type { GuestPort, RestartPolicy, TenantArguments, TenantEnvironment } from '@repo/protocol';
 import { type CommandRunner, runCommandOrThrow } from '#lib/exec.ts';
 
 // Line-oriented `KEY=VALUE`, so the guest's init needs no parser. The file is generated and
@@ -44,11 +44,13 @@ export class UnrepresentableEnvironmentError extends Error {
  */
 export function renderInstanceEnv({
   guestPort,
+  args,
   environment,
   restartPolicy,
   dnsServers,
 }: {
   guestPort: GuestPort;
+  args: TenantArguments;
   environment: TenantEnvironment;
   restartPolicy: RestartPolicy;
   dnsServers: readonly string[];
@@ -63,6 +65,15 @@ export function renderInstanceEnv({
   ];
   if (dnsServers.length > 0) {
     lines.push(`${RUNTIME_PREFIX}DNS=${dnsServers.join(',')}`);
+  }
+  // Numbered rather than delimited: a format with no quoting cannot carry a separator that an
+  // argument might itself contain, and the guest refuses a gap rather than shifting the rest
+  // down one and running a command line nobody wrote.
+  for (const [index, argument] of args.entries()) {
+    if (FORBIDDEN_VALUE_CHARACTERS.test(argument)) {
+      throw new UnrepresentableEnvironmentError(`${RUNTIME_PREFIX}ARG_${index}`);
+    }
+    lines.push(`${RUNTIME_PREFIX}ARG_${index}=${argument}`);
   }
   for (const key of Object.keys(environment).sort()) {
     const value = environment[key] ?? '';
@@ -82,6 +93,7 @@ export async function buildInstanceConfigImage({
   runner,
   workingDir,
   guestPort,
+  args,
   environment,
   restartPolicy,
   dnsServers,
@@ -89,6 +101,7 @@ export async function buildInstanceConfigImage({
   runner: CommandRunner;
   workingDir: string;
   guestPort: GuestPort;
+  args: TenantArguments;
   environment: TenantEnvironment;
   restartPolicy: RestartPolicy;
   dnsServers: readonly string[];
@@ -100,7 +113,7 @@ export async function buildInstanceConfigImage({
   try {
     await writeFile(
       join(stagingDir, INSTANCE_ENV_FILENAME),
-      renderInstanceEnv({ guestPort, environment, restartPolicy, dnsServers }),
+      renderInstanceEnv({ guestPort, args, environment, restartPolicy, dnsServers }),
       {
         mode: PRIVATE_MODE,
       },

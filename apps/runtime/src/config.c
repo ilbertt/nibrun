@@ -13,6 +13,7 @@
 #include "paths.h"
 
 #define RUNTIME_PREFIX "NIBRUN_"
+#define ARGUMENT_KEY_PREFIX "ARG_"
 #define TENANT_PREFIX "ENV_"
 
 #define MIN_PORT 1
@@ -151,6 +152,34 @@ static bool assign(struct instance_config *config, const struct field *field, ch
   return false;
 }
 
+/* NIBRUN_ARG_<n>. Slotted by index rather than appended, so the writer's order is
+ * irrelevant and a gap is caught after the whole file is read rather than silently
+ * shifting every later argument down one. */
+static bool parse_argument(struct instance_config *config, const char *key, char *value, size_t line_number) {
+  const char *digits = key + strlen(ARGUMENT_KEY_PREFIX);
+  if (*digits == '\0') {
+    log_line("instance.env line %zu sets %s%s with no index", line_number, RUNTIME_PREFIX, key);
+    return false;
+  }
+
+  char *unparsed = NULL;
+  errno = 0;
+  unsigned long index = strtoul(digits, &unparsed, 10);
+  if (errno != 0 || *unparsed != '\0' || index >= CONFIG_MAX_ARGUMENTS) {
+    log_line("instance.env line %zu sets %s%s, which is not an index below %d", line_number, RUNTIME_PREFIX,
+             key, CONFIG_MAX_ARGUMENTS);
+    return false;
+  }
+  if (config->arguments[index] != NULL) {
+    log_line("instance.env sets %s%s twice (line %zu)", RUNTIME_PREFIX, key, line_number);
+    return false;
+  }
+
+  config->arguments[index] = value;
+  config->argument_count++;
+  return true;
+}
+
 static bool parse_runtime_key(struct instance_config *config, bool *seen, char *line, size_t line_number) {
   char *equals = strchr(line, '=');
   if (equals == NULL) {
@@ -159,6 +188,10 @@ static bool parse_runtime_key(struct instance_config *config, bool *seen, char *
   }
   *equals = '\0';
   const char *key = line + strlen(RUNTIME_PREFIX);
+
+  if (starts_with(key, ARGUMENT_KEY_PREFIX)) {
+    return parse_argument(config, key, equals + 1, line_number);
+  }
 
   for (size_t index = 0; index < FIELD_COUNT; index++) {
     if (strcmp(key, FIELDS[index].key) != 0) {
@@ -288,6 +321,16 @@ bool config_parse(struct instance_config *config, char *text, size_t length) {
       return false;
     }
   }
+
+  /* Every index below the count must be filled, or an argument the user wrote is
+   * missing and the tenant would be exec'd with a subtly different command line
+   * rather than not at all. */
+  for (size_t index = 0; index < config->argument_count; index++) {
+    if (config->arguments[index] == NULL) {
+      log_line("instance.env skips %sARG_%zu", RUNTIME_PREFIX, index);
+      return false;
+    }
+  }
   return true;
 }
 
@@ -303,6 +346,18 @@ static bool defines(char *const *entries, size_t count, const char *name) {
     }
   }
   return false;
+}
+
+char *const *config_build_argv(const struct instance_config *config, const char *executable) {
+  static char *argv[CONFIG_MAX_ARGUMENTS + 2];
+
+  size_t count = 0;
+  argv[count++] = (char *)executable;
+  for (size_t index = 0; index < config->argument_count; index++) {
+    argv[count++] = config->arguments[index];
+  }
+  argv[count] = NULL;
+  return argv;
 }
 
 char *const *config_build_environment(const struct instance_config *config) {

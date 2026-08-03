@@ -157,6 +157,58 @@ static void builds_the_tenant_environment(void) {
   EXPECT(count == 4); /* PORT, HOME, TOKEN, TMPDIR — the tenant's own PORT dropped */
 }
 
+/* A binary that needs a subcommand cannot be started without these, and an argv
+ * that is subtly wrong is worse than one that fails: it runs the wrong thing. */
+static void passes_arguments_through_in_order(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED
+                "NIBRUN_ARG_0=serve\n"
+                "NIBRUN_ARG_1=--http=0.0.0.0:8090\n"
+                "NIBRUN_ARG_2=--dir=/app/data/pb_data\n"));
+
+  EXPECT(config.argument_count == 3);
+  char *const *argv = config_build_argv(&config, "/mnt/artifact/server");
+  EXPECT(strcmp(argv[0], "/mnt/artifact/server") == 0);
+  EXPECT(strcmp(argv[1], "serve") == 0);
+  /* An argument containing '=' survives: the line splits on the first one only. */
+  EXPECT(strcmp(argv[2], "--http=0.0.0.0:8090") == 0);
+  EXPECT(strcmp(argv[3], "--dir=/app/data/pb_data") == 0);
+  EXPECT(argv[4] == NULL);
+}
+
+static void accepts_arguments_in_any_order(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED
+                "NIBRUN_ARG_1=second\n"
+                "NIBRUN_ARG_0=first\n"));
+
+  char *const *argv = config_build_argv(&config, "/bin/x");
+  EXPECT(strcmp(argv[1], "first") == 0);
+  EXPECT(strcmp(argv[2], "second") == 0);
+}
+
+static void a_binary_with_no_arguments_is_exec_d_bare(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED));
+
+  EXPECT(config.argument_count == 0);
+  char *const *argv = config_build_argv(&config, "/mnt/artifact/server");
+  EXPECT(strcmp(argv[0], "/mnt/artifact/server") == 0);
+  EXPECT(argv[1] == NULL);
+}
+
+static void rejects_a_gap_in_the_arguments(void) {
+  /* Accepting this would shift every later argument down one and exec a command
+   * line nobody wrote. */
+  EXPECT(rejects(REQUIRED "NIBRUN_ARG_0=serve\n" "NIBRUN_ARG_2=--verbose\n"));
+}
+
+static void rejects_an_unusable_argument_index(void) {
+  EXPECT(rejects(REQUIRED "NIBRUN_ARG_=serve\n"));
+  EXPECT(rejects(REQUIRED "NIBRUN_ARG_x=serve\n"));
+  EXPECT(rejects(REQUIRED "NIBRUN_ARG_0=one\n" "NIBRUN_ARG_0=two\n"));
+}
+
 int main(void) {
   accepts_a_generated_file();
   accepts_a_file_without_a_trailing_newline();
@@ -168,5 +220,10 @@ int main(void) {
   rejects_a_nul_byte();
   rejects_too_many_tenant_variables();
   builds_the_tenant_environment();
+  passes_arguments_through_in_order();
+  accepts_arguments_in_any_order();
+  a_binary_with_no_arguments_is_exec_d_bare();
+  rejects_a_gap_in_the_arguments();
+  rejects_an_unusable_argument_index();
   return EXPECT_REPORT("config");
 }

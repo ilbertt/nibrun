@@ -43,6 +43,7 @@ const desiredInstance = (overrides: Partial<DesiredInstance> = {}): DesiredInsta
   },
   config: {
     guestPort: DEFAULT_GUEST_PORT,
+    args: [],
     environment: {},
     resources: DEFAULT_INSTANCE_RESOURCES,
     healthCheck: DEFAULT_HEALTH_CHECK,

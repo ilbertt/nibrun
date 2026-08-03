@@ -21,6 +21,8 @@
 
 #define CONFIG_MAX_BYTES (128 * 1024)
 #define CONFIG_MAX_TENANT_VARIABLES 256
+/* Mirrors MAX_ARGUMENTS in packages/protocol, which refuses to write more. */
+#define CONFIG_MAX_ARGUMENTS 64
 /* glibc's resolver reads at most MAXNS entries and silently drops the rest. */
 #define CONFIG_MAX_NAMESERVERS 3
 
@@ -37,6 +39,11 @@ struct instance_config {
   struct restart_policy restart_policy;
   char *nameservers[CONFIG_MAX_NAMESERVERS];
   size_t nameserver_count;
+  /* argv[1..]; argv[0] is the binary itself, which the runtime owns. Arrives as
+   * NIBRUN_ARG_<n> from 0 upwards, numbered rather than delimited because a
+   * format with no quoting cannot carry a separator an argument might contain. */
+  char *arguments[CONFIG_MAX_ARGUMENTS];
+  size_t argument_count;
   /* "NAME=value" strings, ready for execve. */
   char *tenant_environment[CONFIG_MAX_TENANT_VARIABLES];
   size_t tenant_variable_count;
@@ -48,6 +55,9 @@ struct instance_config {
 bool config_parse(struct instance_config *config, char *text, size_t length);
 
 bool config_read_file(struct instance_config *config, const char *path, char *buffer, size_t buffer_size);
+
+/* argv for execve: the binary, then the parsed arguments, then NULL. */
+char *const *config_build_argv(const struct instance_config *config, const char *executable);
 
 /* The environment the tenant is exec'd with: PORT, which the platform owns because
  * it is the port the agent probes and routes to, then the tenant's own variables,

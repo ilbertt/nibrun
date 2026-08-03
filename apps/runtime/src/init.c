@@ -163,6 +163,7 @@ int main(void) {
           {
               .executable = TENANT_BINARY,
               .working_directory = APP_DIR,
+              .argv = config_build_argv(&config, TENANT_BINARY),
               .environment = config_build_environment(&config),
               .uid = TENANT_UID,
               .gid = TENANT_GID,

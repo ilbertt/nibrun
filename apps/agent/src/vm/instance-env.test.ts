@@ -14,6 +14,7 @@ const render = (
 ): ReturnType<typeof renderInstanceEnv> =>
   renderInstanceEnv({
     guestPort: DEFAULT_GUEST_PORT,
+    args: [],
     environment: {},
     restartPolicy: DEFAULT_RESTART_POLICY,
     dnsServers: [],
@@ -89,5 +90,23 @@ describe('what has no representation fails the instance', () => {
     })();
     expect(error?.message).toContain('API_KEY');
     expect(error?.message).not.toContain('secret-value');
+  });
+});
+
+describe('arguments reach the guest as the user wrote them', () => {
+  test('they are numbered from zero, in order', () => {
+    const rendered = render({ args: ['serve', '--http=0.0.0.0:8090'] });
+
+    expect(rendered).toContain('NIBRUN_ARG_0=serve');
+    // Splitting on the first `=` only is what lets a flag carry its own value.
+    expect(rendered).toContain('NIBRUN_ARG_1=--http=0.0.0.0:8090');
+  });
+
+  test('a binary that needs none is given none', () => {
+    expect(render({ args: [] })).not.toContain('NIBRUN_ARG_');
+  });
+
+  test('an argument with no representation fails the instance rather than truncating', () => {
+    expect(() => render({ args: ['--flag=one\ntwo'] })).toThrow(UnrepresentableEnvironmentError);
   });
 });

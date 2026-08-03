@@ -77,6 +77,7 @@ export class VmManager {
       runner: this.#options.runner,
       workingDir,
       guestPort: desired.config.guestPort,
+      args: desired.config.args,
       environment: desired.config.environment,
       restartPolicy: desired.config.restartPolicy,
       dnsServers: this.#options.guestDnsServers,

@@ -64,6 +64,7 @@ const desiredState = (): HostDesiredState => ({
       },
       config: {
         guestPort: DEFAULT_GUEST_PORT,
+        args: ['serve', '--http=0.0.0.0:8090'],
         environment: { DATABASE_URL: TENANT_SECRET },
         resources: DEFAULT_INSTANCE_RESOURCES,
         healthCheck: DEFAULT_HEALTH_CHECK,

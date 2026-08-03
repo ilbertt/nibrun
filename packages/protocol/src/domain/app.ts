@@ -12,6 +12,10 @@ import { DnsLabelSchema, GuestPortSchema, HostnameSchema, TimestampSchema } from
 const ENVIRONMENT_NAME_PATTERN = '^[A-Za-z_][A-Za-z0-9_]*$';
 const MIN_HOSTNAMES = 1;
 
+// Mirrored by CONFIG_MAX_ARGUMENTS in apps/runtime, which refuses a file exceeding it.
+const MAX_ARGUMENTS = 64;
+const MAX_ARGUMENT_LENGTH = 4096;
+
 // `platform` is the subdomain nibrun issues; `custom` is a domain the user brought. Modelling
 // hostnames as a set from the start is what keeps custom domains a new entry rather than a
 // schema change and a rewrite of every routing path.
@@ -41,8 +45,21 @@ export type TenantEnvironment = typeof TenantEnvironmentSchema.static;
 
 // What the user configured, snapshotted into every deployment so a rollback replays exactly
 // what ran rather than whatever the app happens to be configured with now.
+// argv[1..] for the tenant binary; argv[0] is always the binary itself. Empty for anything
+// built to run bare, which is what `bun build --compile` produces — but a released binary is
+// usually a multi-command tool, and one that needs `serve` cannot be started without this.
+//
+// A list rather than one string: splitting a command line means quoting rules, and the value
+// the user typed reaching exec unchanged is worth more than the convenience.
+export const TenantArgumentsSchema = Type.Array(Type.String({ maxLength: MAX_ARGUMENT_LENGTH }), {
+  maxItems: MAX_ARGUMENTS,
+});
+
+export type TenantArguments = typeof TenantArgumentsSchema.static;
+
 export const AppConfigSchema = Type.Object({
   guestPort: GuestPortSchema,
+  args: TenantArgumentsSchema,
   environment: TenantEnvironmentSchema,
   resources: InstanceResourcesSchema,
   healthCheck: HealthCheckSchema,

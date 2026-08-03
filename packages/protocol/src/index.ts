@@ -67,6 +67,8 @@ export {
   type AppState,
   AppStateSchema,
   defaultHostname,
+  type TenantArguments,
+  TenantArgumentsSchema,
   type TenantEnvironment,
   TenantEnvironmentSchema,
 } from '#domain/app.ts';

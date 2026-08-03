@@ -107,8 +107,7 @@ static _Noreturn void become_tenant(const struct tenant_process *tenant) {
   OR_GIVE_UP(setgid(tenant->gid), "drop to its gid");
   OR_GIVE_UP(setuid(tenant->uid), "drop to its uid");
 
-  char *const argv[] = {(char *)tenant->executable, NULL};
-  execve(tenant->executable, argv, tenant->environment);
+  execve(tenant->executable, tenant->argv, tenant->environment);
   log_errno("could not run %s", tenant->executable);
   _exit(TENANT_SPAWN_EXIT_CODE);
 }
