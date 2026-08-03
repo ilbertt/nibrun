@@ -22,6 +22,18 @@ resource "aws_security_group" "instance" {
     ipv6_cidr_blocks = ["::/0"]
   }
 
+  # The agents' channel. Scoped to the app hosts' security group rather than a
+  # CIDR, so it admits the fleet and widens by itself as the fleet grows, while
+  # admitting nothing else in the subnet. The paths behind it are the ones the
+  # public listener answers 404 for.
+  ingress {
+    description     = "Agent control channel from app hosts"
+    from_port       = var.internal_port
+    to_port         = var.internal_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app_host.id]
+  }
+
   # No inbound SSH: shell access is via SSM Session Manager.
 
   egress {

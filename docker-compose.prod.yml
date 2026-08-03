@@ -43,6 +43,8 @@ services:
     restart: always
     ports:
       - "443:443"
+      # Admitted from the app hosts' security group only; see infra/caddy/Caddyfile.
+      - "${INTERNAL_PORT}:${INTERNAL_PORT}"
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
@@ -53,6 +55,7 @@ services:
     environment:
       - API_HOSTNAME
       - DOZZLE_HOSTNAME
+      - INTERNAL_PORT
     volumes:
       - ./caddy:/etc/caddy:ro
     networks:

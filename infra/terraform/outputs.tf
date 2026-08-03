@@ -64,6 +64,24 @@ output "instance_id" {
   value = aws_instance.app.id
 }
 
+# Private, not the elastic IP: agents reach the api inside the VPC, and control
+# traffic never leaves it.
+output "control_plane_internal_url" {
+  description = "What an agent dials to reach the api."
+  value       = "http://${aws_instance.app.private_ip}:${var.internal_port}"
+}
+
+output "internal_port" {
+  value = var.internal_port
+}
+
+# The agent drops guest traffic to this by name, rather than leaving the control
+# plane to the blanket private-address rule that happens to contain it.
+output "vpc_cidr_block" {
+  description = "Denied to tenant microVMs."
+  value       = aws_vpc.app.cidr_block
+}
+
 output "app_host_deploy_group" {
   description = "SSM targeting tag for app hosts. Distinct from deploy_group so a deploy reaches one machine class without touching the other."
   value       = local.app_host_deploy_group

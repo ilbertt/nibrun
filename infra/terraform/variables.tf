@@ -51,6 +51,12 @@ variable "export_retention_days" {
   description = "How long a downloadable export survives. A security bound rather than a retention policy: the bundle carries the tenant's environment variables and their whole dataset. S3 lifecycle expiry runs daily, so 1 is the smallest meaningful value."
 }
 
+variable "internal_port" {
+  type        = number
+  default     = 8080
+  description = "Port the control plane serves /internal on, reachable from app hosts over the VPC and from nowhere else. Plain HTTP: the security group is the boundary, and an origin certificate names hostnames rather than the private address an agent dials."
+}
+
 variable "vpc_cidr_block" {
   type        = string
   default     = "10.43.0.0/16"
