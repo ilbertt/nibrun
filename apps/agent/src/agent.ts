@@ -21,6 +21,7 @@ import { runCommand } from '#lib/exec.ts';
 import { readJsonFile, readTextFile, writeJsonFile } from '#lib/json-store.ts';
 import { describeError, logger } from '#lib/logger.ts';
 import { readSlotRecords, SlotAllocator } from '#network/allocator.ts';
+import { CaddyProxy } from '#proxy/caddy.ts';
 import { Reconciler } from '#reconcile/reconciler.ts';
 import { buildReportedState } from '#report/build-report.ts';
 import {
@@ -106,6 +107,7 @@ export class Agent {
       units,
       topology,
       allocator,
+      proxy: new CaddyProxy({ runner, sitesFile: config.caddySitesFile }),
       vms: new VmManager({
         runner,
         units,

@@ -87,6 +87,29 @@ variable "dozzle_hostname" {
   }
 }
 
+# No default for the same reason api_hostname has none, and read the validation
+# below before choosing a value: user apps must not share a registrable domain
+# with the dashboard.
+variable "app_domain" {
+  type        = string
+  description = "Registrable domain user apps are served under, as <slug>.<app_domain>. Point a wildcard A record at an app host."
+
+  validation {
+    condition     = trimspace(var.app_domain) != ""
+    error_message = "app_domain must not be empty."
+  }
+
+  # A user app is somebody else's code on a hostname we hand out. On a subdomain
+  # of the dashboard's own domain it could set a cookie the browser then sends
+  # to the api, which is a session-fixation primitive handed to every tenant.
+  # A separate registrable domain is what puts them either side of the public
+  # suffix boundary, so this is a security bound rather than a preference.
+  validation {
+    condition     = var.api_hostname != var.app_domain && !endswith(var.api_hostname, ".${var.app_domain}")
+    error_message = "app_domain must be a different registrable domain from api_hostname."
+  }
+}
+
 # The GitHub OAuth App users sign in with. Its callback URL is tied to
 # api_hostname, so an app is per-deployment — GitHub allows one callback URL per
 # OAuth App. Both halves are created by hand, so unlike every other credential
@@ -142,6 +165,32 @@ variable "caddy_tls_key" {
   validation {
     condition     = strcontains(var.caddy_tls_key, "PRIVATE KEY")
     error_message = "caddy_tls_key must be a PEM private key."
+  }
+}
+
+# The app hosts' own pair, issued for app_domain. Separate from the control
+# plane's because a Cloudflare Origin Certificate is issued per zone and
+# app_domain is a different zone by design — the same split the two proxies
+# already are. It has to be a wildcard: hostnames are handed out per app, and
+# reissuing a certificate every time somebody creates one is not a deploy step.
+variable "app_host_caddy_tls_cert" {
+  type        = string
+  description = "PEM of the Cloudflare Origin Certificate for *.app_domain. CI passes the APP_HOST_CADDY_TLS_CERT repository variable through."
+
+  validation {
+    condition     = strcontains(var.app_host_caddy_tls_cert, "BEGIN CERTIFICATE")
+    error_message = "app_host_caddy_tls_cert must be a PEM certificate."
+  }
+}
+
+variable "app_host_caddy_tls_key" {
+  type        = string
+  sensitive   = true
+  description = "PEM of the private key for app_host_caddy_tls_cert. CI passes the APP_HOST_CADDY_TLS_KEY repository secret through."
+
+  validation {
+    condition     = strcontains(var.app_host_caddy_tls_key, "PRIVATE KEY")
+    error_message = "app_host_caddy_tls_key must be a PEM private key."
   }
 }
 

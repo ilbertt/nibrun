@@ -104,6 +104,30 @@ resource "aws_ssm_parameter" "dozzle_password" {
 
 # --- App hosts ---
 
+# The user-app proxy's TLS material, carried exactly like the control plane
+# proxy's above — base64 for the same reason, and both halves through SSM so
+# neither reaches the deploy's own environment. A different certificate, because
+# it is issued for a different zone.
+resource "aws_ssm_parameter" "app_host_caddy_tls_cert" {
+  name  = "${var.ssm_secret_prefix}/app_host_caddy_tls_cert"
+  type  = "SecureString"
+  value = base64encode(var.app_host_caddy_tls_cert)
+
+  tags = {
+    Name = "${local.resource_name_prefix}-app-host-caddy-tls-cert"
+  }
+}
+
+resource "aws_ssm_parameter" "app_host_caddy_tls_key" {
+  name  = "${var.ssm_secret_prefix}/app_host_caddy_tls_key"
+  type  = "SecureString"
+  value = base64encode(var.app_host_caddy_tls_key)
+
+  tags = {
+    Name = "${local.resource_name_prefix}-app-host-caddy-tls-key"
+  }
+}
+
 # ZeroFS encrypts everything it writes to the filesystems bucket under this. It
 # is generated once and never rotated in place: changing it does not re-encrypt
 # anything, it makes every existing tenant filesystem unreadable. Treat it as

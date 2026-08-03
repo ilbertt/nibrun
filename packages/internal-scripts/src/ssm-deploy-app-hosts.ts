@@ -27,6 +27,7 @@ const sharedEnv: Record<string, string> = {
   AWS_REGION: requiredEnv('AWS_REGION'),
   SSM_SECRET_PREFIX: requiredEnv('SSM_SECRET_PREFIX'),
   API_HOSTNAME: requiredEnv('API_HOSTNAME'),
+  APP_DOMAIN: requiredEnv('APP_DOMAIN'),
   FILESYSTEMS_BUCKET: requiredEnv('FILESYSTEMS_BUCKET'),
   GUEST_IMAGES_BUCKET: requiredEnv('GUEST_IMAGES_BUCKET'),
   ARTIFACTS_BUCKET: requiredEnv('ARTIFACTS_BUCKET'),
@@ -40,6 +41,9 @@ const sharedEnv: Record<string, string> = {
   FIRECRACKER_URL: versions.firecracker.url,
   FIRECRACKER_SHA256: versions.firecracker.sha256,
   FIRECRACKER_DIRECTORY: versions.firecracker.directory,
+  CADDY_VERSION: versions.caddy.version,
+  CADDY_URL: versions.caddy.url,
+  CADDY_SHA256: versions.caddy.sha256,
   GUEST_IMAGE_VERSION: versions.guestImage ?? '',
 };
 

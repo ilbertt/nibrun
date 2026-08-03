@@ -8,12 +8,9 @@ export type RouteTarget = {
 };
 
 /**
- * Everything the local user-app proxy would need, derived from the same records the boot path
- * writes.
- *
- * The proxy is not being built now. This exists so that when it is, its config is a projection
- * of what the host is running rather than a second copy of it — which is what leaves no room
- * for the two to drift.
+ * Everything the local user-app proxy needs, derived from the same records the boot path writes,
+ * so its config is a projection of what the host is running rather than a second copy of it —
+ * which is what leaves no room for the two to drift.
  *
  * Only instances whose tenant has actually answered are routable: sending traffic to a booted
  * but dead VM is the failure the `starting`/`running` distinction exists to prevent.

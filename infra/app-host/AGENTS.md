@@ -3,6 +3,12 @@
 Everything an app host runs. The machine itself is `infra/terraform/app_host.tf`; this is what
 lands on it.
 
+The user-app proxy is co-located here rather than central on purpose: if it dies, every app it
+served was on this host anyway, where a shared proxy would be a second failure domain able to
+take down apps that are otherwise healthy. It is also why there is no routing table in the
+control plane — the agent renders the site blocks from the instances it booted, so the process
+that knows what is running is the one that writes the routing config.
+
 Nothing here is containerised and Docker is not installed — the agent manipulates host
 networking and spawns microVMs, so a container would hand back every privilege it removed.
 
@@ -12,6 +18,8 @@ networking and spawns microVMs, so a container would hand back every privilege i
   bin/<component> -> versions/…      the active one; what the units resolve
   bundle/                            what CI ships: units, versions.json, the ZeroFS config, the deploy script
 /var/lib/nibrun/                     agent state, artifact cache, per-VM directories
+/etc/caddy/                          the proxy's static config, its origin certificate, and
+                                     rendered/, which belongs to the agent
 /data/                               the EBS volume — ZeroFS's local cache, and nothing else
 ```
 
@@ -37,6 +45,13 @@ Only the units whose resolved version — or whose configuration — actually mo
   are systemd units in their own right, so it comes back and reconciles against what it finds.
 - **Guest image or Firecracker bumped**: nothing restarts. Running VMs keep what they booted
   with; the new one reaches an app when it is next redeployed.
+- **Caddy's config or certificate changed**: reloaded, never restarted, because a change meant
+  for one app must not interrupt traffic to the others. The same holds for the routing config
+  the agent renders. A config that fails to load fails the deploy with the running one still
+  serving.
+- **Caddy bumped** — a new binary cannot be reloaded into a running process, so this restarts
+  it and every connection the host is serving is reset. Brief, and the edge retries, but it is
+  still a deliberate bump rather than a side effect.
 - **ZeroFS bumped — disruptive.** It serves the NBD device behind every guest disk on the host,
   so restarting it stalls every app at once and an attached guest may remount read-only. Bump
   it in its own commit, deliberately, expecting impact — never riding along with a feature push.

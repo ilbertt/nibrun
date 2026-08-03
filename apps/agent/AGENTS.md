@@ -22,6 +22,7 @@ subprocess: `systemctl`, `ip`, `nft`, `nbd-client`, `mkfs.ext4`, `mksquashfs`, `
 | `network/` | the slot allocator, tap devices, the whole nftables ruleset |
 | `health/` | the probe, and the reducer that decides `starting` vs `running` vs `failed` |
 | `report/` | instance records, capacity, versions, the report, and the route projection |
+| `proxy/` | the local Caddy site file, rendered from those routes, and the reload that swaps it in |
 | `aws/` | IMDSv2 credentials, because Bun's S3 client resolves static ones only |
 
 ## The decisions worth knowing before reading the code
@@ -31,6 +32,14 @@ subprocess: `systemctl`, `ip`, `nft`, `nbd-client`, `mkfs.ext4`, `mksquashfs`, `
 component that updates most often; if the VMs were its children, every agent restart would kill
 every tenant app on the host. Restarting the agent is a non-event, and an operator inspects one
 app with `systemctl status` and `journalctl -u nibrun-vm@<id>`.
+
+**The agent writes the routing config, and there is no other copy of it.** The local proxy's
+site blocks are rendered from the same records the boot path writes, filtered to instances whose
+tenant has answered a probe — a booted but dead VM is not routable. Rendered whole and compared
+before writing, like the nftables ruleset, so a reconcile that changes nothing reloads nothing;
+and reloaded rather than restarted, so one app's route appearing cannot interrupt another's
+traffic. A health transition is what makes an app routable, so the render happens on the status
+sweep as well as on reconcile.
 
 **Restart policy lives in two layers and they do not overlap.** The *tenant process* is
 restarted by the guest's init, with the budget in `RestartPolicy`; when it exhausts that budget
@@ -160,6 +169,7 @@ cannot create files, so there is no way to do this over the socket the agent alr
 | `/opt/nibrun/bin/guest-image/` | deploy | `vmlinux`, `rootfs.ext4` |
 | `/opt/nibrun/bin/firecracker/` | deploy | `firecracker` |
 | `/etc/nibrun/agent.env` | deploy, mode 0600 | the agent unit's `EnvironmentFile` |
+| `/etc/caddy/rendered/apps.caddy` | agent, mode 0644 | the site blocks, glob-imported by the deploy's Caddyfile and read by `nibrun-caddy.service` as its own user |
 | `/opt/nibrun/bundle/versions.json` | CI | `{ agent, guestImage, zerofs, firecracker }`, four version **strings** — validated against `HostVersionsSchema`; a missing or differently-shaped file is a hard startup failure. `infra/app-host/versions.json` is a richer object (urls, digests) and is **not** this file |
 | `/mnt/zerofs/` | a ZeroFS FUSE or NFS mount unit | the agent creates `.nbd/<volume-id>` in here |
 | `/run/zerofs/nbd.sock` | zerofs.service | NBD |
@@ -189,12 +199,14 @@ the value the control plane must put on every volume it places here. It has to m
 Optional, with the defaults in `src/config.ts`: `AGENT_STATE_DIR`, `AGENT_RUNTIME_DIR`,
 `AGENT_BOOTSTRAP_TOKEN_FILE`, `AGENT_VERSIONS_FILE`, `AGENT_GUEST_IMAGE_DIR`,
 `AGENT_FIRECRACKER_DIR`, `AGENT_ZEROFS_MOUNT`, `AGENT_ZEROFS_CONFIG_FILE`,
-`AGENT_ZEROFS_NBD_SOCKET`, `AGENT_LOG_LEVEL`, `AGENT_CONTROL_PLANE_CIDRS`,
-`AGENT_GUEST_DNS_SERVERS`.
+`AGENT_ZEROFS_NBD_SOCKET`, `AGENT_CADDY_SITES_FILE`, `AGENT_LOG_LEVEL`,
+`AGENT_CONTROL_PLANE_CIDRS`, `AGENT_GUEST_DNS_SERVERS`.
 
 The agent's own unit needs `CAP_NET_ADMIN` (tap devices, nftables) and root or equivalent for
 `nbd-client` and `mkfs.ext4`. It must **not** be `Restart=no`: an agent that dies should come
-back, and coming back is safe by construction.
+back, and coming back is safe by construction. It reaches the proxy with
+`systemctl reload nibrun-caddy.service` and nothing else — it never starts, stops or configures
+that unit.
 
 ### One thing `apps/runtime` should know
 

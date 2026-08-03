@@ -20,6 +20,7 @@ import { describeError, logger } from '#lib/logger.ts';
 import type { SlotAllocator } from '#network/allocator.ts';
 import type { ForwardedInstance } from '#network/firewall.ts';
 import { applyRuleset } from '#network/nftables.ts';
+import type { CaddyProxy } from '#proxy/caddy.ts';
 import {
   type CheckpointPlan,
   type ObservedState,
@@ -62,6 +63,7 @@ export type ReconcilerOptions = {
   volumes: VolumeManager;
   topology: ZerofsTopology;
   allocator: SlotAllocator;
+  proxy: CaddyProxy;
 };
 
 /**
@@ -108,9 +110,8 @@ export class Reconciler {
     return this.#checkpointReports;
   }
 
-  // What the local user-app proxy will render its config from when it exists. Nothing consumes
-  // it yet; it is here so that when something does, it reads the state that boots the VMs
-  // rather than a second copy of it.
+  // What the local user-app proxy renders its config from — the same records the boot path
+  // writes, rather than a second copy of them.
   routes(): RouteTarget[] {
     return renderableRoutes(this.records());
   }
@@ -178,6 +179,7 @@ export class Reconciler {
     await this.#applyCheckpoints({ plan, desired });
     await this.#applyTeardowns(plan);
     await this.#applyNetwork();
+    await this.#applyRoutes();
     await this.#persist();
 
     this.#observedGeneration = desired.generation;
@@ -232,6 +234,10 @@ export class Reconciler {
         }
       }
     }
+    // An instance becomes routable here rather than in reconcile: the probe is what tells a
+    // booted VM from one whose tenant has answered, and that is the whole distinction routing
+    // rests on.
+    await this.#applyRoutes();
     await this.#persist();
   }
 
@@ -550,6 +556,14 @@ export class Reconciler {
       });
     } catch (error) {
       logger.error({ message: 'firewall apply failed', ...describeError(error) });
+    }
+  }
+
+  async #applyRoutes(): Promise<void> {
+    try {
+      await this.#options.proxy.apply({ routes: this.routes() });
+    } catch (error) {
+      logger.error({ message: 'proxy reload failed', ...describeError(error) });
     }
   }
 

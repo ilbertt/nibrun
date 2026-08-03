@@ -8,6 +8,8 @@ const DEFAULT_ZEROFS_NBD_SOCKET = '/run/zerofs/nbd.sock';
 const DEFAULT_GUEST_IMAGE_DIR = '/opt/nibrun/bin/guest-image';
 const DEFAULT_FIRECRACKER_DIR = '/opt/nibrun/bin/firecracker';
 const DEFAULT_VERSIONS_FILE = '/opt/nibrun/bundle/versions.json';
+// Glob-imported by the Caddyfile the deploy installs, into a directory the deploy owns.
+const DEFAULT_CADDY_SITES_FILE = '/etc/caddy/rendered/apps.caddy';
 
 export const NBD_CONNECTIONS = 4;
 export const NBD_BLOCK_SIZE_BYTES = 4096;
@@ -31,6 +33,7 @@ export type AgentConfig = {
   zerofsMount: string;
   zerofsConfigFile: string;
   zerofsNbdSocket: string;
+  caddySitesFile: string;
   // The `[storage] url` prefix this host's ZeroFS is pointed at. A volume naming a different
   // one is refused rather than created here, because a device file written into the wrong
   // filesystem puts a tenant's data somewhere nothing will look for it.
@@ -118,6 +121,11 @@ export function loadAgentConfig({
       env,
       name: 'AGENT_ZEROFS_NBD_SOCKET',
       fallback: DEFAULT_ZEROFS_NBD_SOCKET,
+    }),
+    caddySitesFile: optional({
+      env,
+      name: 'AGENT_CADDY_SITES_FILE',
+      fallback: DEFAULT_CADDY_SITES_FILE,
     }),
     zerofsStoragePrefix: required({ env, name: 'AGENT_ZEROFS_STORAGE_PREFIX' }),
     artifactBucket: required({ env, name: 'AGENT_ARTIFACT_BUCKET' }),
