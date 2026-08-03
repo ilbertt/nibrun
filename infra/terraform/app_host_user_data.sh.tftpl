@@ -10,11 +10,20 @@ dnf install -y "kernel-modules-extra-$(uname -r)" || true
 
 dnf update -y
 
-# Only what the deploy itself needs to run, plus fuse3: ZeroFS exposes the
-# host's view of the filesystem over 9P and the agent reaches it through a FUSE
-# client, which needs the userspace helper. No Docker: everything this host runs
-# is a versioned binary the deploy fetches from S3 and starts under systemd.
-dnf install -y unzip fuse3
+# What the deploy needs to run, and what the agent shells out to once it does.
+# No Docker: everything this host runs is a versioned binary the deploy fetches
+# from S3 and starts under systemd.
+#
+#   unzip           the deploy installs the AWS CLI with it
+#   fuse3           ZeroFS serves the host's own view over 9P through a FUSE client
+#   nftables        guest isolation and the forward to a tenant's port
+#   nbd             attaches a tenant's disk, which ZeroFS serves over NBD
+#   squashfs-tools  builds the read-only config drive handed to a microVM
+#
+# The agent runs none of these until it has work, so a missing one surfaces when
+# an app is placed here rather than at boot — hence installing them together, up
+# front, rather than discovering them one replaced instance at a time.
+dnf install -y unzip fuse3 nftables nbd squashfs-tools
 
 # Not guaranteed on minimal AL2023, and the deploy script needs it.
 if ! command -v aws >/dev/null 2>&1; then
