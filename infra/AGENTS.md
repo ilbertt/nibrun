@@ -1,23 +1,21 @@
 # infra
 
-AWS, one stack, one box. `bootstrap/` is one-time CloudFormation, `terraform/`
-owns the resources, `pg-backup/` is the nightly dump sidecar, `caddy/` is the
-proxy's static config. `deploy/` holds only the two scripts that run *on* the
-box, which is why they are shell — the instance has no Bun. Everything CI runs
-lives in `@repo/internal-scripts`. The EC2 instance runs the compose stack — api, Postgres and Dozzle — behind an
-elastic IP, with a persistent EBS volume at `/data` and three S3 buckets:
-artifacts for user uploads, backups for Postgres dumps, deploy for runtime
-bundles. MinIO stands in for S3 locally only — `docker-compose.prod.yml` parks
-it on an inactive profile and points the api at the real bucket.
+AWS, one stack, two machine classes: the control plane runs the compose stack,
+app hosts run tenant microVMs. `bootstrap/` is one-time CloudFormation,
+`terraform/` owns the resources, `pg-backup/` is the nightly dump sidecar,
+`caddy/` is the proxy's static config. `deploy/` holds only the scripts that run
+*on* a box, which is why they are shell — an instance has no Bun. Everything CI
+runs lives in `@repo/internal-scripts`.
 
-Caddy terminates TLS on 443 and is the whole public surface; the api stays on
-loopback and on the compose network, which is the path fleet-host agents take
-later. Compute hosts and the CDN still come later.
+The Terraform explains itself; read it rather than a description of it here.
+
+MinIO stands in for S3 locally only — `docker-compose.prod.yml` parks it on an
+inactive profile and points the api at the real bucket.
 
 Config carries its component's prefix — `API_`, `POSTGRES_`, `PG_BACKUP_`,
-`CADDY_`, `DOZZLE_` — and keeps one name from the Terraform output through the
-SSM command to the `.env` the box writes. Nothing is aliased in transit, so
-nothing can drift.
+`CADDY_`, `DOZZLE_` — unless more than one component reads it, and keeps one
+name from the Terraform output through the SSM command to the `.env` the box
+writes. Nothing is aliased in transit, so nothing can drift.
 
 ## First run
 

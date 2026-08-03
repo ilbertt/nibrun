@@ -21,6 +21,30 @@ variable "data_volume_size" {
   description = "Persistent data EBS volume size in GB. Backs Postgres. Survives instance replacement."
 }
 
+variable "app_host_instance_type" {
+  type        = string
+  default     = "m7i-flex.large"
+  description = "Runs Firecracker microVMs and ZeroFS. Nested virtualisation works on ordinary Intel instances — verified on this one — so this is not a metal type and does not need to be."
+}
+
+variable "app_host_count" {
+  type        = number
+  default     = 1
+  description = "Size of the app host fleet. Terraform does not provision hosts dynamically, so scaling is changing this — but scaling down is not a plain decrement, see app_host.tf."
+}
+
+variable "app_host_root_volume_size" {
+  type        = number
+  default     = 50
+  description = "Root EBS volume size in GB for an app host. Holds the OS, the versioned binaries under /opt/nibrun and the artifact cache under /var/lib/nibrun."
+}
+
+variable "app_host_data_volume_size" {
+  type        = number
+  default     = 100
+  description = "Per-host data EBS volume size in GB, mounted at /data. Sized for ZeroFS's working set, not for the fleet's data — S3 holds that."
+}
+
 variable "vpc_cidr_block" {
   type        = string
   default     = "10.43.0.0/16"

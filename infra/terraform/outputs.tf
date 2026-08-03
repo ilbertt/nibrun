@@ -59,6 +59,33 @@ output "instance_id" {
   value = aws_instance.app.id
 }
 
+output "app_host_deploy_group" {
+  description = "SSM targeting tag for app hosts. Distinct from deploy_group so a deploy reaches one machine class without touching the other."
+  value       = local.app_host_deploy_group
+}
+
+output "app_host_instance_ids" {
+  value = aws_instance.app_host[*].id
+}
+
+# Not a single DATA_VOLUME_ID like the control plane's, because each host has
+# its own: a deploy fanning out looks the instance it is targeting up here and
+# exports that one value under the usual name.
+output "app_host_data_volume_ids" {
+  description = "Instance id to the id of the volume mounted at /data on it."
+  value       = { for index, host in aws_instance.app_host : host.id => aws_ebs_volume.app_host_data[index].id }
+}
+
+output "filesystems_bucket" {
+  description = "ZeroFS's backing store. Read-write from app hosts, read-only from the control plane."
+  value       = aws_s3_bucket.filesystems.bucket
+}
+
+output "guest_images_bucket" {
+  description = "Where CI publishes the pinned guest image and app hosts fetch it from."
+  value       = aws_s3_bucket.guest_images.bucket
+}
+
 output "github_deploy_role_arn" {
   description = "Assumed by the deploy steps, after Terraform has run."
   value       = var.enable_github_deploy ? aws_iam_role.github_deploy[0].arn : null

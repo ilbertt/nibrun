@@ -52,3 +52,22 @@ resource "aws_route_table_association" "app" {
   subnet_id      = aws_subnet.app.id
   route_table_id = aws_route_table.app.id
 }
+
+# Free, and it keeps the highest-volume traffic in the system — ZeroFS reading
+# and writing segments — off any metered path if egress ever stops going
+# straight out of the internet gateway. Nothing has to be reconfigured to use
+# it: the endpoint routes the region's S3 prefix list, so the existing endpoint
+# hostname keeps working and the control plane's S3 traffic moves onto it too.
+#
+# It adds a route to the table above, but a prefix-list one, which the route
+# table resource leaves alone rather than planning away on the next refresh.
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.app.id
+  service_name      = "com.amazonaws.${var.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.app.id]
+
+  tags = {
+    Name = "${local.resource_name_prefix}-s3"
+  }
+}

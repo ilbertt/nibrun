@@ -1,0 +1,46 @@
+#!/bin/bash
+set -euxo pipefail
+
+# nbd is not in the base kernel package on AL2023 and ZeroFS serves every app
+# disk over it. Pinned to the running kernel, because the update below can stage
+# a newer one that is not booted yet, and done before that update so the pair
+# moves forward together. Best-effort: on a kernel that already carries nbd this
+# package is redundant, and the modprobe further down is the real gate.
+dnf install -y "kernel-modules-extra-$(uname -r)" || true
+
+dnf update -y
+
+# Only what the deploy itself needs to run. No Docker: everything this host runs
+# is a versioned binary the deploy fetches from S3 and starts under systemd.
+dnf install -y unzip
+
+# Not guaranteed on minimal AL2023, and the deploy script needs it.
+if ! command -v aws >/dev/null 2>&1; then
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+  unzip -q /tmp/awscliv2.zip -d /tmp
+  /tmp/aws/install
+fi
+
+# nbds_max is read only when the module loads and caps how many app disks one
+# host can serve, so it is set before the modprobe rather than discovered later;
+# raising it means reloading the module. Nothing auto-loads nbd, because there
+# is no device present to trigger it — ZeroFS creates the devices afterwards.
+#
+# kvm_intel is loaded explicitly rather than left to the CPU-feature autoload so
+# that an instance type without nested virtualisation fails the bootstrap
+# outright: the marker below is never written, and the deploy times out waiting
+# for it instead of installing an agent onto a host that can never boot a
+# microVM.
+echo "options nbd nbds_max=64" > /etc/modprobe.d/nibrun.conf
+printf 'kvm_intel\nnbd\n' > /etc/modules-load.d/nibrun.conf
+modprobe kvm_intel
+modprobe nbd
+
+mkdir -p /opt/nibrun /var/lib/nibrun
+
+# Completion marker — the deploy workflow waits for this, so it never lands on a
+# host without the AWS CLI, KVM or nbd. Kept outside /opt/nibrun because the
+# deploy command writes into that directory, and named for this machine class
+# rather than sharing the control plane's: the two bootstrap differently, and a
+# deploy waiting on the wrong marker would be waiting on a promise nobody made.
+touch /opt/nibrun-app-host-bootstrap.done

@@ -57,7 +57,16 @@ data "aws_iam_policy_document" "github_deploy" {
     resources = [aws_s3_bucket.deploy.arn, "${aws_s3_bucket.deploy.arn}/*"]
   }
 
-  # Find the target instance behind the deploy tag.
+  # Publish the pinned guest image. The only other bucket CI writes, and
+  # deliberately not artifacts: the deploy role must never be able to overwrite
+  # a user's binary.
+  statement {
+    sid       = "GuestImageWrite"
+    actions   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket"]
+    resources = [aws_s3_bucket.guest_images.arn, "${aws_s3_bucket.guest_images.arn}/*"]
+  }
+
+  # Find the target instances behind the deploy tag.
   statement {
     sid       = "Ec2Describe"
     actions   = ["ec2:DescribeInstances"]
