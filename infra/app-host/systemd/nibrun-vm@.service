@@ -11,6 +11,11 @@ After=nibrun-zerofs.service
 [Service]
 Type=exec
 WorkingDirectory=/var/lib/nibrun/vm/%i
+# Firecracker refuses to bind a socket path that already exists, and it does not
+# clean its own up on exit — so without this the second boot of any instance dies
+# with FailedToBindSocket and never runs again. systemd guarantees one instance of
+# a unit at a time, so nothing can be listening on it when this runs.
+ExecStartPre=-/bin/rm -f /run/nibrun/vm-%i.sock
 ExecStart=/opt/nibrun/bin/firecracker/firecracker \
   --api-sock /run/nibrun/vm-%i.sock \
   --config-file /var/lib/nibrun/vm/%i/firecracker.json

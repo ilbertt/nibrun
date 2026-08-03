@@ -19,10 +19,6 @@ const BUNDLE_DIRECTORIES = ['systemd', 'zerofs', 'caddy'];
 // everything relative to itself.
 const ON_BOX_SCRIPTS = ['on_box_deploy.sh'];
 
-// The agent reads this to report what the host is running, so it ships with the
-// config rather than only being resolved by CI.
-const BUNDLE_FILES = ['versions.json'];
-
 // Shared with the control plane's bundle — both machine classes have a data
 // volume, and what they keep on it arrives as arguments.
 const SHARED_ON_BOX_SCRIPTS = ['ensure_data_volume.sh'];
@@ -37,7 +33,7 @@ const revision = requiredEnv('GITHUB_SHA');
 const appHostDir = join(repoRoot, 'infra/app-host');
 const bundlePath = join(tmpdir(), 'nibrun-app-host-bundle.tar.gz');
 
-await $`tar czf ${bundlePath} -C ${appHostDir} ${BUNDLE_DIRECTORIES} ${BUNDLE_FILES} -C ${join(appHostDir, 'deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/deploy')} ${SHARED_ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/caddy')} ${SHARED_CADDY_FILES}`;
+await $`tar czf ${bundlePath} -C ${appHostDir} ${BUNDLE_DIRECTORIES} -C ${join(appHostDir, 'deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/deploy')} ${SHARED_ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/caddy')} ${SHARED_CADDY_FILES}`;
 
 const bundleBytes = Bun.file(bundlePath).size;
 const url = `s3://${deployBucket}/app-host-bundles/${revision}.tar.gz`;

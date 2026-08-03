@@ -208,9 +208,26 @@ EOF
 chmod 0600 /etc/zerofs/zerofs.env.new
 changed_file /etc/zerofs/zerofs.env && NEEDS_RESTART+=(zerofs) || true
 
-cp versions.json "$NIBRUN_DIR/bundle/versions.json"
+# What the agent reports this host as running, validated against the protocol's
+# HostVersions — four version strings, and nothing like the pin file CI resolved
+# them from. A host with no adopted guest image is a legitimate state, but the
+# schema has no way to say so, so it says `none` rather than omitting the field.
+cat > "$NIBRUN_DIR/bundle/versions.json.new" <<EOF
+{
+  "agent": "${AGENT_VERSION}",
+  "guestImage": "${GUEST_IMAGE_VERSION:-none}",
+  "zerofs": "${ZEROFS_VERSION}",
+  "firecracker": "${FIRECRACKER_VERSION}"
+}
+EOF
+chmod 0644 "$NIBRUN_DIR/bundle/versions.json.new"
+changed_file "$NIBRUN_DIR/bundle/versions.json" && NEEDS_RESTART+=(agent) || true
 
 cp zerofs/config.toml /etc/zerofs/config.toml.new
+# Read by ZeroFS itself, which runs as its own user, so it cannot inherit the
+# 0600 the umask above gives the secrets around it. It holds no secret: every
+# value that is one arrives through zerofs.env.
+chmod 0644 /etc/zerofs/config.toml.new
 changed_file /etc/zerofs/config.toml && NEEDS_RESTART+=(zerofs) || true
 
 secret agent_bootstrap_token > /var/lib/nibrun/bootstrap-token.new
@@ -222,6 +239,10 @@ AGENT_CONTROL_PLANE_URL=https://${API_HOSTNAME}
 AGENT_BOOTSTRAP_TOKEN_FILE=/var/lib/nibrun/bootstrap-token
 AGENT_ARTIFACT_BUCKET=${ARTIFACTS_BUCKET}
 AGENT_AWS_REGION=${AWS_REGION}
+# The same prefix ZeroFS is pointed at, from the one variable both are rendered
+# from: a volume naming a prefix this host does not serve is refused, so the two
+# drifting apart would fail every volume placed here.
+AGENT_ZEROFS_STORAGE_PREFIX=${NIBRUN_FILESYSTEMS_URL}
 AWS_REGION=${AWS_REGION}
 EOF
 chmod 0600 /etc/nibrun/agent.env.new

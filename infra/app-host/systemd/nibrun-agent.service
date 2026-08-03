@@ -12,6 +12,11 @@ Wants=network-online.target
 Type=exec
 ExecStart=/opt/nibrun/bin/agent/nibrun-agent
 EnvironmentFile=/etc/nibrun/agent.env
+# The agent drives `zerofs flush` and the checkpoint subcommands against ZeroFS's
+# own config file, and ZeroFS expands that file's ${VAR} references from whatever
+# environment it is handed. Without these the flush before every VM stop fails,
+# which under ignore_fsync is the one step that makes the stop a durability point.
+EnvironmentFile=/etc/zerofs/zerofs.env
 
 Restart=always
 RestartSec=5s
