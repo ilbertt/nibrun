@@ -17,5 +17,5 @@ locals {
   github_owner         = split("/", var.github_repo)[0]
   github_name          = split("/", var.github_repo)[1]
 
-  ssm_param_arn_prefix = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${var.ssm_secret_prefix}"
+  ssm_param_arn_prefix = "arn:aws:ssm:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:parameter${var.ssm_secret_prefix}"
 }

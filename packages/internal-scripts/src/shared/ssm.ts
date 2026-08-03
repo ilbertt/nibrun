@@ -5,6 +5,7 @@ import { aws } from '#shared/aws.ts';
 const SSM_REGISTRATION_ATTEMPTS = 60;
 const DEPLOY_ATTEMPTS = 90;
 const POLL_MS = 10_000;
+const MS_PER_SECOND = 1000;
 const TERMINAL_STATUSES = new Set(['Success', 'Failed', 'Cancelled', 'TimedOut']);
 
 export type SsmInvocation = {
@@ -134,6 +135,12 @@ export async function waitForInvocation({
     if (invocation && TERMINAL_STATUSES.has(invocation.Status)) {
       break;
     }
+    // RunCommand withholds the box's output until the command ends, so without
+    // this the log is blank for as long as the deploy runs and a wedged host is
+    // indistinguishable from a busy one.
+    console.log(
+      `  [${instanceId}] ${invocation?.Status ?? 'Pending'} after ${(attempt * POLL_MS) / MS_PER_SECOND}s`,
+    );
     await Bun.sleep(POLL_MS);
     invocation = await readInvocation({ commandId, instanceId });
   }

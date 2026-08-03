@@ -57,9 +57,20 @@ if (instanceIds.length === 0) {
 }
 console.log(`Targeting ${instanceIds.length} app host(s): ${instanceIds.join(', ')}`);
 
+// A bootstrap that has already failed never writes its marker, so waiting for one
+// is waiting for something that cannot arrive. cloud-init knows, and says so in a
+// word — ask it, and turn a quarter of an hour of silence into an answer.
+const awaitBootstrap = `
+if [ "$(cloud-init status | awk '{print $2}')" = "error" ]; then
+  echo "instance bootstrap failed — it will never write its marker:"
+  tail -30 /var/log/cloud-init-output.log
+  exit 1
+fi
+timeout 900 bash -c 'until [ -f /opt/nibrun-app-host-bootstrap.done ]; do echo waiting for instance bootstrap; sleep 5; done'`;
+
 const remoteScript = ({ dataVolumeId }: { dataVolumeId: string }) => `
 set -euo pipefail
-timeout 900 bash -c 'until [ -f /opt/nibrun-app-host-bootstrap.done ]; do echo waiting for instance bootstrap; sleep 5; done'
+${awaitBootstrap}
 mkdir -p /opt/nibrun/bundle
 aws s3 cp ${quote(bundleUrl)} /tmp/app-host-bundle.tar.gz
 tar xzf /tmp/app-host-bundle.tar.gz --overwrite -C /opt/nibrun/bundle

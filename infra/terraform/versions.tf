@@ -13,8 +13,10 @@ terraform {
 
   required_providers {
     aws = {
+      # 6.x for cpu_options.nested_virtualization, which 5.x cannot express and
+      # without which an app host boots no microVM.
       source  = "hashicorp/aws"
-      version = "~> 5.60"
+      version = "~> 6.0"
     }
     random = {
       source  = "hashicorp/random"

@@ -137,6 +137,9 @@ jobs:
         run: bun run --filter @repo/internal-scripts publish-runtime-bundle
 
       - name: Deploy via SSM
+        # RunCommand outlives a cancelled job, so an unbounded step lets a wedged
+        # box hold a runner for the six-hour default.
+        timeout-minutes: 20
         env:
           BUNDLE_URL: ${{ steps.bundle.outputs.url }}
         run: bun run --filter @repo/internal-scripts ssm-deploy
@@ -176,6 +179,7 @@ jobs:
         run: bun run --filter @repo/internal-scripts publish-app-host-bundle
 
       - name: Deploy the app hosts via SSM
+        timeout-minutes: 20
         env:
           BUNDLE_URL: ${{ steps.bundle.outputs.url }}
           AGENT_URL: ${{ steps.agent_binary.outputs.url }}
