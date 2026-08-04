@@ -29,6 +29,7 @@ const onBoxEnv: Record<string, string> = {
   SSM_SECRET_PREFIX: requiredEnv('SSM_SECRET_PREFIX'),
   DATA_VOLUME_ID: requiredEnv('DATA_VOLUME_ID'),
   AWS_REGION: requiredEnv('AWS_REGION'),
+  APP_HOST_DOMAIN: requiredEnv('APP_HOST_DOMAIN'),
 };
 
 const [instanceId] = await findInstanceIds({ deployGroup });

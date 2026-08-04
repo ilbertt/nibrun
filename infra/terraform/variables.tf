@@ -126,13 +126,13 @@ variable "victorialogs_hostname" {
 # No default for the same reason api_hostname has none, and read the validation
 # below before choosing a value: user apps must not share a registrable domain
 # with the dashboard.
-variable "app_domain" {
+variable "app_host_domain" {
   type        = string
-  description = "Registrable domain user apps are served under, as <slug>.<app_domain>. Point a wildcard A record at an app host."
+  description = "Registrable domain user apps are served under, as <slug>.<app_host_domain>. Point a wildcard A record at an app host."
 
   validation {
-    condition     = trimspace(var.app_domain) != ""
-    error_message = "app_domain must not be empty."
+    condition     = trimspace(var.app_host_domain) != ""
+    error_message = "app_host_domain must not be empty."
   }
 
   # A user app is somebody else's code on a hostname we hand out. On a subdomain
@@ -141,8 +141,8 @@ variable "app_domain" {
   # A separate registrable domain is what puts them either side of the public
   # suffix boundary, so this is a security bound rather than a preference.
   validation {
-    condition     = var.api_hostname != var.app_domain && !endswith(var.api_hostname, ".${var.app_domain}")
-    error_message = "app_domain must be a different registrable domain from api_hostname."
+    condition     = var.api_hostname != var.app_host_domain && !endswith(var.api_hostname, ".${var.app_host_domain}")
+    error_message = "app_host_domain must be a different registrable domain from api_hostname."
   }
 }
 
@@ -204,14 +204,14 @@ variable "caddy_tls_key" {
   }
 }
 
-# The app hosts' own pair, issued for app_domain. Separate from the control
+# The app hosts' own pair, issued for app_host_domain. Separate from the control
 # plane's because a Cloudflare Origin Certificate is issued per zone and
-# app_domain is a different zone by design — the same split the two proxies
+# app_host_domain is a different zone by design — the same split the two proxies
 # already are. It has to be a wildcard: hostnames are handed out per app, and
 # reissuing a certificate every time somebody creates one is not a deploy step.
 variable "app_host_caddy_tls_cert" {
   type        = string
-  description = "PEM of the Cloudflare Origin Certificate for *.app_domain. CI passes the APP_HOST_CADDY_TLS_CERT repository variable through."
+  description = "PEM of the Cloudflare Origin Certificate for *.app_host_domain. CI passes the APP_HOST_CADDY_TLS_CERT repository variable through."
 
   validation {
     condition     = strcontains(var.app_host_caddy_tls_cert, "BEGIN CERTIFICATE")

@@ -68,7 +68,9 @@ jobs:
           TF_VAR_api_hostname: ${{ vars.API_HOSTNAME }}
           TF_VAR_dozzle_hostname: ${{ vars.DOZZLE_HOSTNAME }}
           TF_VAR_victorialogs_hostname: ${{ vars.VICTORIALOGS_HOSTNAME }}
-          TF_VAR_app_domain: ${{ vars.APP_DOMAIN }}
+          # Still APP_DOMAIN on purpose: the repository variable is read outside this repo
+          # too, so it is not ours alone to rename.
+          TF_VAR_app_host_domain: ${{ vars.APP_DOMAIN }}
           TF_VAR_api_github_client_id: ${{ vars.API_GITHUB_CLIENT_ID }}
           TF_VAR_api_github_client_secret: ${{ secrets.API_GITHUB_CLIENT_SECRET }}
           TF_VAR_caddy_tls_cert: ${{ vars.CADDY_TLS_CERT }}

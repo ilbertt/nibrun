@@ -77,7 +77,7 @@ const desiredState = (): HostDesiredState => ({
         healthCheck: DEFAULT_HEALTH_CHECK,
         restartPolicy: DEFAULT_RESTART_POLICY,
       },
-      hostnames: [{ hostname: 'app-1.nibrun.app' as Hostname, kind: 'platform', isDefault: true }],
+      hostnames: [{ hostname: 'app-1.nibrun.app' as Hostname, kind: 'platform' }],
     },
   ],
   checkpoints: [],

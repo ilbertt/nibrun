@@ -12,7 +12,7 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${ARTIFACTS_BUCKET:?}" "${API_S3_ENDPOINT:?}" "${PG_BACKUP_IMAGE_URI:?}" \
   "${PG_BACKUP_BUCKET:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" \
   "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}" "${VICTORIALOGS_HOSTNAME:?}" \
-  "${INTERNAL_PORT:?}" "${LOG_INGEST_PORT:?}"
+  "${INTERNAL_PORT:?}" "${LOG_INGEST_PORT:?}" "${APP_HOST_DOMAIN:?}"
 
 # Per-deployment values no infrastructure resource feeds, still overridable from
 # the deploy so they never have to be edited here. The host port bindings are
@@ -77,6 +77,7 @@ API_BASE_URL=https://${API_HOSTNAME}
 API_BETTER_AUTH_SECRET=${API_BETTER_AUTH_SECRET}
 API_GITHUB_CLIENT_ID=${API_GITHUB_CLIENT_ID}
 API_GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
+APP_HOST_DOMAIN=${APP_HOST_DOMAIN}
 
 API_DB_USER=${API_DB_USER}
 API_DB_PASSWORD=${API_DB_PASSWORD}

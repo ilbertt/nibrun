@@ -74,7 +74,6 @@ export {
   AppSchema,
   type AppState,
   AppStateSchema,
-  defaultHostname,
   type TenantArguments,
   TenantArgumentsSchema,
   type TenantEnvironment,
