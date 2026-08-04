@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import type { AppId, DeploymentId, InstanceId, TenantLogEvent, Timestamp } from '@repo/protocol';
 import { TenantLogQueue } from '#logs/queue.ts';
 
+const AFTER_THE_STREAM_ENDED = 7;
+
 function event(sequence = 0): TenantLogEvent {
   return {
     kind: 'data',
@@ -61,9 +63,11 @@ describe('the bounded upload queue', () => {
     queue.endStream();
     expect((await ending.read()).done).toBe(true);
 
-    expect(queue.push(event(7))).toBe(true);
+    expect(queue.push(event(AFTER_THE_STREAM_ENDED))).toBe(true);
     const replacement = queue.readable().getReader();
-    expect(JSON.parse(new TextDecoder().decode((await replacement.read()).value)).sequence).toBe(7);
+    expect(JSON.parse(new TextDecoder().decode((await replacement.read()).value)).sequence).toBe(
+      AFTER_THE_STREAM_ENDED,
+    );
     await replacement.cancel();
   });
 
