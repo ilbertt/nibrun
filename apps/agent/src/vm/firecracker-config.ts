@@ -13,8 +13,15 @@ const NO_BITS = 0;
 // not among them: it breaks SendCtrlAltDel on an ACPI-enabled guest, which ours is, so a
 // graceful stop would silently become a kill — the API answers 204 either way. The static `ip=`
 // form is why the guest ships no DHCP client: the kernel configures eth0 before /init runs.
+//
+// `quiet` is what makes this console the tenant's rather than the kernel's: without it a boot
+// puts ~788 printk lines on the same serial port the tenant writes to, so the first page of any
+// app's log is `BIOS-e820` rather than anything the app said. It raises the printk threshold and
+// nothing else — panics and oopses still print, and userspace writes to /dev/console are not
+// filtered at all, so both the guest init's `[nibrun] ` lines and the tenant's own output are
+// untouched.
 const BASE_KERNEL_ARGS =
-  'console=ttyS0 reboot=k panic=1 pci=off i8042.noaux i8042.nomux i8042.dumbkbd root=/dev/vda ro init=/init';
+  'console=ttyS0 quiet reboot=k panic=1 pci=off i8042.noaux i8042.nomux i8042.dumbkbd root=/dev/vda ro init=/init';
 
 export function netmaskFor(prefixLength: number): string {
   const octets: number[] = [];

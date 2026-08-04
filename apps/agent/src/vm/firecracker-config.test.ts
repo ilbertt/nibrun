@@ -71,6 +71,10 @@ describe('the setting that fails silently', () => {
 });
 
 describe('the kernel command line', () => {
+  test('the tenant console is not flooded by informational kernel messages', () => {
+    expect(renderKernelArgs(network)).toContain('console=ttyS0 quiet');
+  });
+
   test('it carries the three i8042 flags that halve boot time', () => {
     const args = renderKernelArgs(network);
     for (const flag of ['i8042.noaux', 'i8042.nomux', 'i8042.dumbkbd']) {
