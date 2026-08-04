@@ -4,14 +4,7 @@ import { AppIdSchema, ArtifactIdSchema, DeploymentIdSchema } from '#domain/ident
 import { stringEnum } from '#lib/string-enum.ts';
 import { TimestampSchema } from '#lib/wire.ts';
 
-export const DEPLOYMENT_STATES = [
-  'pending',
-  'starting',
-  'active',
-  'superseded',
-  'failed',
-  'cancelled',
-] as const;
+export const DEPLOYMENT_STATES = ['pending', 'starting', 'active', 'superseded', 'failed'] as const;
 
 export const DeploymentStateSchema = stringEnum(DEPLOYMENT_STATES);
 

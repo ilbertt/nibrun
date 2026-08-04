@@ -2,6 +2,7 @@ import type { OwnerId } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import { AppArtifactsController } from '#routes/api/apps/[id]/artifacts/controller.ts';
+import { AppDeploymentsController } from '#routes/api/apps/[id]/deployments/controller.ts';
 import { AppParamsSchema } from '#routes/api/apps/[id]/model.ts';
 import { AppConfigPatchSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
 import { AppsServicePlugin, loggerPlugin } from '#services/plugins.ts';
@@ -51,4 +52,5 @@ export const AppByIdController = new Elysia({ prefix: '/:id' })
       response: { [StatusMap.Accepted]: AppResponseSchema },
     },
   )
-  .use(AppArtifactsController);
+  .use(AppArtifactsController)
+  .use(AppDeploymentsController);
