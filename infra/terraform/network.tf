@@ -1,5 +1,5 @@
 resource "aws_vpc" "app" {
-  cidr_block                       = var.vpc_cidr_block
+  cidr_block                       = var.vpc_ipv4_cidr_block
   assign_generated_ipv6_cidr_block = true
   enable_dns_hostnames             = true
   enable_dns_support               = true
@@ -12,7 +12,7 @@ resource "aws_vpc" "app" {
 resource "aws_subnet" "app" {
   vpc_id                          = aws_vpc.app.id
   availability_zone               = local.availability_zone
-  cidr_block                      = cidrsubnet(var.vpc_cidr_block, 8, 0)
+  cidr_block                      = cidrsubnet(var.vpc_ipv4_cidr_block, 8, 0)
   ipv6_cidr_block                 = cidrsubnet(aws_vpc.app.ipv6_cidr_block, 8, 0)
   map_public_ip_on_launch         = true
   assign_ipv6_address_on_creation = true

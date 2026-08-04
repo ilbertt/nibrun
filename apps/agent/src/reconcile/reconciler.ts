@@ -667,7 +667,8 @@ export class Reconciler {
         runner: this.#options.runner,
         state: {
           instances,
-          controlPlaneCidrs: this.#options.config.controlPlaneCidrs,
+          controlPlaneCidrsV4: this.#options.config.controlPlaneCidrsV4,
+          controlPlaneCidrsV6: this.#options.config.controlPlaneCidrsV6,
           guestDnsServers: this.#options.config.guestDnsServers,
         },
       });

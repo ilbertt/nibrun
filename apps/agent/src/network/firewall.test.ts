@@ -2,13 +2,16 @@ import { describe, expect, test } from 'bun:test';
 import type { GuestPort, HostPort, Ipv4Address } from '@repo/protocol';
 import {
   type FirewallState,
-  INSTANCE_METADATA_ADDRESS,
+  INSTANCE_METADATA_ADDRESS_V4,
   INSTANCE_METADATA_ADDRESS_V6,
   NFTABLES_TABLE,
   renderRuleset,
 } from '#network/firewall.ts';
 
 const DNS_PORT = 53;
+
+// The ranges the blanket v6 rule covers, to assert that a VPC's range is not among them.
+const PRIVATE_DESTINATIONS_V6_SAMPLE = ['::1', 'fe80:', 'fc', 'fd'];
 
 const instance = {
   hostPort: 21_000 as HostPort,
@@ -17,12 +20,15 @@ const instance = {
   guestIpv4: '10.201.0.2' as Ipv4Address,
 };
 
-const state = (overrides: Partial<FirewallState> = {}): FirewallState => ({
-  instances: [],
-  controlPlaneCidrs: [],
-  guestDnsServers: [],
-  ...overrides,
-});
+function state(overrides: Partial<FirewallState> = {}): FirewallState {
+  return {
+    instances: [],
+    controlPlaneCidrsV4: [],
+    controlPlaneCidrsV6: [],
+    guestDnsServers: [],
+    ...overrides,
+  };
+}
 
 const dropsFrom = (ruleset: string) =>
   ruleset
@@ -33,7 +39,7 @@ const dropsFrom = (ruleset: string) =>
 describe('the three isolation rules are never optional', () => {
   test('guests cannot reach the instance metadata endpoint, with no instances configured', () => {
     const drops = dropsFrom(renderRuleset(state()));
-    expect(drops.some((line) => line.includes(INSTANCE_METADATA_ADDRESS))).toBe(true);
+    expect(drops.some((line) => line.includes(INSTANCE_METADATA_ADDRESS_V4))).toBe(true);
   });
 
   test('guests cannot reach each other', () => {
@@ -43,7 +49,7 @@ describe('the three isolation rules are never optional', () => {
   });
 
   test('guests cannot reach the control plane', () => {
-    const ruleset = renderRuleset(state({ controlPlaneCidrs: ['203.0.113.10/32'] }));
+    const ruleset = renderRuleset(state({ controlPlaneCidrsV4: ['203.0.113.10/32'] }));
     expect(dropsFrom(ruleset).some((line) => line.includes('203.0.113.10/32'))).toBe(true);
   });
 
@@ -52,7 +58,7 @@ describe('the three isolation rules are never optional', () => {
   // forwarding rule that gives guests the internet, or the accept would win.
   test('a guest cannot reach the control plane before it is allowed out', () => {
     const vpc = '10.43.0.0/16';
-    const lines = renderRuleset(state({ controlPlaneCidrs: [vpc] })).split('\n');
+    const lines = renderRuleset(state({ controlPlaneCidrsV4: [vpc] })).split('\n');
     const denied = lines.findIndex((line) => line.includes(vpc) && line.includes('drop'));
     const allowedOut = lines.findIndex((line) => line.includes('masquerade'));
 
@@ -116,6 +122,33 @@ describe('the same isolation holds over ipv6', () => {
     const ruleset = renderRuleset(state());
     expect(ruleset).toContain(`table ip6 ${NFTABLES_TABLE}\ndelete table ip6 ${NFTABLES_TABLE}\n`);
   });
+
+  // AWS allocates a VPC's IPv6 from global unicast, so `fc00::/7` does not contain it. Where the
+  // v4 control-plane rule is belt-and-braces over the blanket private drop, this one is the only
+  // thing denying the control plane — a v6 ruleset without it reads it as ordinary internet.
+  test('the vpc v6 range is denied by name, since no blanket rule contains it', () => {
+    const vpcV6 = '2600:1f18:abcd::/56';
+    const v6 = renderRuleset(state({ controlPlaneCidrsV6: [vpcV6] })).split(
+      `table ip6 ${NFTABLES_TABLE} {`,
+    )[1];
+
+    expect(v6).toContain(`ip6 daddr ${vpcV6} drop`);
+    // Named, rather than swept up by a private-range rule that does not cover it.
+    expect(PRIVATE_DESTINATIONS_V6_SAMPLE.some((range) => vpcV6.startsWith(range))).toBe(false);
+  });
+
+  test('the v6 control-plane denial lands before anything lets a guest out', () => {
+    const vpcV6 = '2600:1f18:abcd::/56';
+    const lines = renderRuleset(state({ controlPlaneCidrsV6: [vpcV6] }))
+      .split(`table ip6 ${NFTABLES_TABLE} {`)[1]
+      ?.split('\n')
+      .map((line) => line.trim());
+    const denied = lines?.findIndex((line) => line.includes(vpcV6));
+    const blanket = lines?.findIndex((line) => line.includes('private destinations'));
+
+    expect(denied).toBeGreaterThan(-1);
+    expect(blanket).toBeGreaterThan(denied ?? -1);
+  });
 });
 
 describe('forwarding', () => {
@@ -157,7 +190,7 @@ describe('the ruleset is a function of state, not a history of edits', () => {
   });
 
   test('rendering twice from the same state is byte-identical', () => {
-    const input = state({ instances: [instance], controlPlaneCidrs: ['203.0.113.0/24'] });
+    const input = state({ instances: [instance], controlPlaneCidrsV4: ['203.0.113.0/24'] });
     expect(renderRuleset(input)).toBe(renderRuleset(input));
   });
 

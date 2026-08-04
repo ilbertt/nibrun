@@ -64,7 +64,7 @@ variable "internal_port" {
   # socket can be holding it when the edge starts.
 }
 
-variable "vpc_cidr_block" {
+variable "vpc_ipv4_cidr_block" {
   type        = string
   default     = "10.43.0.0/16"
   description = "IPv4 CIDR block for the VPC."
