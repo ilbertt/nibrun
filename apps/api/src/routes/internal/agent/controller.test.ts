@@ -263,6 +263,38 @@ describe('an agent streams tenant output on a request of its own', () => {
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
 
+  // A host stops sending by going away far more often than by closing politely — an agent
+  // restart, a deploy, a timeout in between. Answering that with a fault makes the agent log a
+  // failure for its own reconnect, and makes a 500 the ordinary outcome of this route.
+  test('a host that goes away mid-stream ends it rather than failing it', async () => {
+    const session = await readSession(await openSession());
+    let send!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        send = controller;
+      },
+    });
+
+    const response = postTenantLogs({ body, sessionToken: session.sessionToken });
+    send.enqueue(new TextEncoder().encode(tenantLogLine()));
+    await Bun.sleep(SETTLE_MS);
+    send.error(new DOMException('The connection was closed.', 'AbortError'));
+
+    expect((await response).status).toBe(StatusMap['No Content']);
+  });
+
+  // What the agent sends to stop the connection reading as idle. It has to survive the decoder
+  // without becoming an event or an error, or the keepalive would break the stream it protects.
+  test('an empty line is a keepalive, not an event and not a fault', async () => {
+    const session = await readSession(await openSession());
+    const response = await postTenantLogs({
+      body: `\n${tenantLogLine()}\n\n`,
+      sessionToken: session.sessionToken,
+    });
+
+    expect(response.status).toBe(StatusMap['No Content']);
+  });
+
   test('a stream arriving without a session is refused', async () => {
     expect((await postTenantLogs({ body: tenantLogLine() })).status).toBe(StatusMap.Unauthorized);
   });

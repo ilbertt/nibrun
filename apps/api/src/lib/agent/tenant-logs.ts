@@ -1,5 +1,8 @@
 import { parseMessage, type TenantLogEvent, TenantLogEventSchema } from '@repo/protocol';
 import { BadRequestError } from '#lib/errors.ts';
+import { createLogger } from '#lib/logger.ts';
+
+const streamLogger = createLogger('agentTenantLogs');
 
 // The protocol caps one chunk's text far below this, so a line that outgrows it is a body with
 // no newlines in it rather than a large event. This request stays open for the life of a host,
@@ -27,11 +30,24 @@ export async function* tenantLogEvents({
   let pending = '';
   try {
     for (;;) {
-      const { done, value } = await reader.read();
-      if (done) {
+      let chunk: Awaited<ReturnType<typeof reader.read>>;
+      try {
+        chunk = await reader.read();
+      } catch (error) {
+        // Nothing but the connection can fail this read, and a host going away is how this
+        // request ends far more often than the host politely stopping — an agent restart, a
+        // deploy, a timeout anywhere in between. Everything it sent before this was delivered,
+        // so the stream is over, not broken, and answering with a fault would only make the
+        // agent treat its own reconnect as an error.
+        streamLogger.info('tenant log stream disconnected', {
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+      if (chunk.done) {
         break;
       }
-      pending += decoder.decode(value, { stream: true });
+      pending += decoder.decode(chunk.value, { stream: true });
       for (
         let newline = pending.indexOf(NEWLINE);
         newline >= 0;

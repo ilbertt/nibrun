@@ -58,6 +58,10 @@ const LOG_RECONNECT_FLOOR_MS = 250;
 // upload that worked. Counting it as a failure is what keeps a misconfigured edge from becoming
 // a silent reconnect loop that never backs off and never says anything.
 const MIN_HEALTHY_LOG_STREAM_MS = 5_000;
+// Comfortably inside both the control plane's own idle timeout and the 60s an AWS load balancer
+// defaults to, because the cost of being wrong in one direction is a byte and in the other is
+// every quiet host reconnecting on a timer.
+const LOG_KEEPALIVE_INTERVAL_MS = 20_000;
 
 export class Agent {
   readonly #config: AgentConfig;
@@ -234,6 +238,10 @@ export class Agent {
       this.#logUploadAbort = abort;
       const body = this.#logQueue.readable();
       const startedAtMs = performance.now();
+      const keepalive = setInterval(() => {
+        this.#logQueue.keepalive();
+      }, LOG_KEEPALIVE_INTERVAL_MS);
+      keepalive.unref();
       try {
         const session = await this.#ensureSession();
         await this.#client.streamTenantLogs({
@@ -258,6 +266,7 @@ export class Agent {
         }
         logger.warn({ message: 'tenant log stream failed', ...describeError(error) });
       } finally {
+        clearInterval(keepalive);
         abort.abort();
         if (this.#logUploadAbort === abort) {
           this.#logUploadAbort = undefined;
