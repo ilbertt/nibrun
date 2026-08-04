@@ -24,6 +24,8 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
 - Only re-export from index files - Biome enforces that
+- Declare functions with `function`, never a `const` bound to an arrow. Applies
+  to test fixtures and one-line helpers too
 
 ## Validation
 

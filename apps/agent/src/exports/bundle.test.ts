@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DesiredArtifact, ObjectKey, Sha256Digest } from '@repo/protocol';
 import { EmptyDumpError, writeBundle } from '#exports/bundle.ts';
-import type { CommandRequest, CommandResult } from '#lib/exec.ts';
+import type { CommandRequest, CommandResult, CommandRunner } from '#lib/exec.ts';
 import type { ArtifactBytes } from '#vm/artifacts.ts';
 
 const DEVICE_PATH = '/dev/nbd7';
@@ -23,11 +23,13 @@ const artifacts: ArtifactBytes = {
     ),
 };
 
-const artifact = (): DesiredArtifact => ({
-  digest: new Bun.CryptoHasher('sha256').update(BINARY_BYTES).digest('hex') as Sha256Digest,
-  sizeBytes: BINARY_BYTES.byteLength,
-  objectKey: 'artifacts/app-1/server' as ObjectKey,
-});
+function artifact(): DesiredArtifact {
+  return {
+    digest: new Bun.CryptoHasher('sha256').update(BINARY_BYTES).digest('hex') as Sha256Digest,
+    sizeBytes: BINARY_BYTES.byteLength,
+    objectKey: 'artifacts/app-1/server' as ObjectKey,
+  };
+}
 
 let stagingDir: string;
 
@@ -41,19 +43,21 @@ afterEach(async () => {
 
 // The dump is what a real `debugfs` would leave behind, so the tar step downstream has
 // something to archive.
-const runnerWritingDump = (calls: CommandRequest[]) => async (request: CommandRequest) => {
-  calls.push(request);
-  const [command] = request.command;
-  if (command === 'debugfs') {
-    const destination = join(stagingDir, 'data');
-    await mkdir(join(destination, 'pb_data'), { recursive: true });
-    await writeFile(join(destination, 'pb_data', 'data.db'), 'tenant');
-  }
-  if (command === 'tar') {
-    await writeFile(join(stagingDir, 'bundle.tar.gz'), 'archive');
-  }
-  return OK;
-};
+function runnerWritingDump(calls: CommandRequest[]): CommandRunner {
+  return async (request: CommandRequest) => {
+    calls.push(request);
+    const [command] = request.command;
+    if (command === 'debugfs') {
+      const destination = join(stagingDir, 'data');
+      await mkdir(join(destination, 'pb_data'), { recursive: true });
+      await writeFile(join(destination, 'pb_data', 'data.db'), 'tenant');
+    }
+    if (command === 'tar') {
+      await writeFile(join(stagingDir, 'bundle.tar.gz'), 'archive');
+    }
+    return OK;
+  };
+}
 
 test('reads the device with debugfs and never mounts it', async () => {
   const calls: CommandRequest[] = [];
