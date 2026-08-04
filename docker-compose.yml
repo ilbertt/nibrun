@@ -115,6 +115,35 @@ services:
     networks:
       - nibrun
 
+  # Where the fleet's logs land: tenant output and each app host's own journal,
+  # pushed in over Caddy's log ingest listener. Nothing writes to it yet — the
+  # shippers are a later change; this gives them somewhere to write.
+  #
+  # Chosen over Loki because the fields worth filtering on here are app, instance
+  # and deployment ids. Loki indexes labels and punishes their cardinality, so
+  # instance and deployment would have to become structured metadata; this treats
+  # every field as indexed and high cardinality as the ordinary case.
+  #
+  # No healthcheck: the image is scratch, so there is no shell and no HTTP client
+  # in the container to run one with. `/health` answers, but only from outside, so
+  # the deploy gates on the container staying up instead.
+  victorialogs:
+    image: victoriametrics/victoria-logs:v1.52.0
+    container_name: victorialogs
+    command:
+      - -retentionPeriod=${VICTORIALOGS_RETENTION_PERIOD}
+      - -storageDataPath=/victoria-logs-data
+    volumes:
+      - victorialogs-data:/victoria-logs-data
+    # Loopback only, for the built-in UI at /select/vmui — same reasoning as
+    # Dozzle below. Ingest arrives through Caddy, and the api queries over the
+    # compose network; neither goes through here.
+    ports:
+      - "127.0.0.1:${VICTORIALOGS_PORT}:9428"
+    restart: always
+    networks:
+      - nibrun
+
   # Every container's logs, read off the Docker socket, in local and prod alike.
   # Loopback-only and unauthenticated on purpose: reaching it on the box takes an
   # SSM port-forward, which already costs AWS credentials. The change that gives
@@ -146,4 +175,6 @@ volumes:
   postgres-data:
     driver: local
   minio-data:
+    driver: local
+  victorialogs-data:
     driver: local

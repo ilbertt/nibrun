@@ -64,6 +64,17 @@ variable "internal_port" {
   # socket can be holding it when the edge starts.
 }
 
+variable "log_ingest_port" {
+  type        = number
+  default     = 19081
+  description = "Port the control plane accepts log writes on, reachable from app hosts over the VPC and from nowhere else. Separate from internal_port so the fleet's write path and its control channel widen independently."
+
+  # Adjacent to internal_port and chosen on the same grounds: unregistered in
+  # /etc/services, outside the 3000/8000/9000 band anything added to the stack
+  # reaches for by default, and below the 32768 ephemeral floor so no outbound
+  # socket can be holding it when the edge starts.
+}
+
 variable "vpc_ipv4_cidr_block" {
   type        = string
   default     = "10.43.0.0/16"

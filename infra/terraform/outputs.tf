@@ -71,6 +71,17 @@ output "internal_port" {
   value = var.internal_port
 }
 
+output "log_ingest_port" {
+  value = var.log_ingest_port
+}
+
+# Private for the same reason control_plane_internal_url is: a shipper on an app
+# host writes across the VPC, and log traffic never leaves it.
+output "log_ingest_url" {
+  description = "What a log shipper on an app host writes to."
+  value       = "http://${aws_instance.app.private_ip}:${var.log_ingest_port}"
+}
+
 # The agent drops guest traffic to this by name, rather than leaving the control
 # plane to the blanket private-address rule that happens to contain it.
 output "vpc_ipv4_cidr_block" {

@@ -11,7 +11,8 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 : "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_GITHUB_CLIENT_ID:?}" \
   "${ARTIFACTS_BUCKET:?}" "${API_S3_ENDPOINT:?}" "${PG_BACKUP_IMAGE_URI:?}" \
   "${PG_BACKUP_BUCKET:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" \
-  "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}" "${INTERNAL_PORT:?}"
+  "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}" "${INTERNAL_PORT:?}" \
+  "${LOG_INGEST_PORT:?}"
 
 # Per-deployment values no infrastructure resource feeds, still overridable from
 # the deploy so they never have to be edited here. The host port bindings are
@@ -25,13 +26,15 @@ API_DB_PORT="${API_DB_PORT:-5432}"
 API_S3_PORT="${API_S3_PORT:-9000}"
 API_S3_CONSOLE_PORT="${API_S3_CONSOLE_PORT:-9001}"
 DOZZLE_PORT="${DOZZLE_PORT:-8080}"
+VICTORIALOGS_PORT="${VICTORIALOGS_PORT:-9428}"
+VICTORIALOGS_RETENTION_PERIOD="${VICTORIALOGS_RETENTION_PERIOD:-30d}"
 
 # Docker does not create missing host directories for local volumes with
 # `o: bind` driver_opts (unlike container bind mounts) — volume creation fails.
-# Only Postgres: production talks to real S3, so MinIO does not run here and has
-# no volume to back.
+# Postgres and the log store: production talks to real S3, so MinIO does not run
+# here and has no volume to back.
 log "Ensuring the persistent data volume is mounted and holds the data-bearing volumes"
-bash ensure_data_volume.sh volumes/postgres-data
+bash ensure_data_volume.sh volumes/postgres-data volumes/victorialogs-data
 
 secret() {
   aws ssm get-parameter --name "${SSM_SECRET_PREFIX}/$1" --with-decryption \
@@ -94,6 +97,10 @@ DOZZLE_HOSTNAME=${DOZZLE_HOSTNAME}
 DOZZLE_PORT=${DOZZLE_PORT}
 
 INTERNAL_PORT=${INTERNAL_PORT}
+LOG_INGEST_PORT=${LOG_INGEST_PORT}
+
+VICTORIALOGS_PORT=${VICTORIALOGS_PORT}
+VICTORIALOGS_RETENTION_PERIOD=${VICTORIALOGS_RETENTION_PERIOD}
 EOF
 
 compose="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
@@ -103,14 +110,20 @@ compose="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 # binds every interface, so any listener on the port collides whatever address it
 # holds — including a loopback-only one, which is how Dozzle's 8080 broke this.
 # The edge is the expected holder on a redeploy, since nothing recreates it.
-log "Checking port ${INTERNAL_PORT} is free"
-port_holder=$(ss -lntpH "sport = :${INTERNAL_PORT}")
-if [ -n "$port_holder" ] &&
-  [ "$(docker ps --filter "publish=${INTERNAL_PORT}" --format '{{.Names}}')" != caddy ]; then
-  log "INTERNAL_PORT ${INTERNAL_PORT} is already held:"
-  printf '%s\n' "$port_holder"
-  exit 1
-fi
+require_free_port() {
+  local name=$1 port=$2 holder
+  log "Checking port ${port} is free"
+  holder=$(ss -lntpH "sport = :${port}")
+  if [ -n "$holder" ] &&
+    [ "$(docker ps --filter "publish=${port}" --format '{{.Names}}')" != caddy ]; then
+    log "${name} ${port} is already held:"
+    printf '%s\n' "$holder"
+    exit 1
+  fi
+}
+
+require_free_port INTERNAL_PORT "${INTERNAL_PORT}"
+require_free_port LOG_INGEST_PORT "${LOG_INGEST_PORT}"
 
 log "Pulling images"
 $compose pull

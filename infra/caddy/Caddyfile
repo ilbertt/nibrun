@@ -72,6 +72,28 @@ https://{$API_HOSTNAME} {
 	}
 }
 
+# Log ingest from the fleet. Admitted from the app hosts' security group only,
+# exactly as the control channel above, and plain HTTP for the same reason.
+#
+# A listener of its own rather than another matcher on the internal port: the two
+# carry different traffic — one long poll per host against a continuous stream of
+# writes — and a mistake in a shared matcher would put one of them on whichever
+# port was meant to answer for the other.
+#
+# Only /insert. Reads go through the api, which is what decides whether a caller
+# may see the app it is asking about; nothing on an app host reads logs back, so
+# exposing /select here would only widen what a compromised host can do.
+:{$LOG_INGEST_PORT} {
+	@insert path /insert/*
+	handle @insert {
+		reverse_proxy victorialogs:9428
+	}
+
+	handle {
+		respond 404
+	}
+}
+
 # Container logs. Dozzle authenticates its own visitors (simple auth, prod only)
 # — the edge only gets them here, and deliberately does not add a second gate in
 # front of the login page.

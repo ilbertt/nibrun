@@ -113,3 +113,13 @@ volumes:
       type: none
       o: bind
       device: /data/volumes/postgres-data
+
+  # On the persistent volume rather than in a container-local one, so a retention
+  # period outlives instance replacement. It rides the DLM snapshots the volume
+  # already carries (dlm.tf) and stays out of pg-backup's nightly dump, which
+  # dumps the whole cluster and would otherwise grow with log volume.
+  victorialogs-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/volumes/victorialogs-data

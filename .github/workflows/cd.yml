@@ -120,6 +120,7 @@ jobs:
       API_S3_ENDPOINT: ${{ fromJSON(needs.terraform.outputs.values).api_s3_endpoint }}
       PG_BACKUP_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).pg_backup_bucket }}
       INTERNAL_PORT: ${{ fromJSON(needs.terraform.outputs.values).internal_port }}
+      LOG_INGEST_PORT: ${{ fromJSON(needs.terraform.outputs.values).log_ingest_port }}
       API_IMAGE_URI: ${{ needs.images.outputs.repository }}/api:${{ github.sha }}
       PG_BACKUP_IMAGE_URI: ${{ needs.images.outputs.repository }}/pg-backup:${{ github.sha }}
     steps:

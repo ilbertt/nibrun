@@ -34,6 +34,17 @@ resource "aws_security_group" "instance" {
     security_groups = [aws_security_group.app_host.id]
   }
 
+  # The fleet's log writes. Scoped to the app hosts' group like the control
+  # channel above, and a rule of its own so that widening one path does not
+  # silently widen the other. What answers here proxies /insert and nothing else.
+  ingress {
+    description     = "Log ingest from app hosts"
+    from_port       = var.log_ingest_port
+    to_port         = var.log_ingest_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app_host.id]
+  }
+
   # No inbound SSH: shell access is via SSM Session Manager.
 
   egress {
