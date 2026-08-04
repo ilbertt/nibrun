@@ -52,6 +52,12 @@ const NO_FAILURES = 0;
 
 const DESIRED_STATE_FILENAME = 'desired-state.json';
 const TENANT_LOG_BUFFER_BYTES = 8_388_608;
+// How much one upload may carry before it ends and asks to be confirmed.
+//
+// What a request has taken is held here until the control plane answers, so this is the memory a
+// failure is allowed to be worth — small beside the buffer above, and large beside anything a
+// tenant produces between two answers. A quiet host never reaches it and cycles on time instead.
+const TENANT_LOG_IN_FLIGHT_BYTES = 1_048_576;
 const LOG_RECONNECT_FLOOR_MS = 250;
 // The agent ends each upload itself rather than letting one run until something kills it, so a
 // stream that ended well inside its own window ended for a reason nobody chose. Counting that as
@@ -136,7 +142,10 @@ export class Agent {
     const allocator = SlotAllocator.fromRecords(
       readSlotRecords(await readJsonFile({ path: config.slotsFile })),
     );
-    const logQueue = new TenantLogQueue({ maxBytes: TENANT_LOG_BUFFER_BYTES });
+    const logQueue = new TenantLogQueue({
+      maxBytes: TENANT_LOG_BUFFER_BYTES,
+      maxInFlightBytes: TENANT_LOG_IN_FLIGHT_BYTES,
+    });
     let droppedLogEvents = 0;
     const logs = new TenantLogReceiver({
       publish: (event) => {
@@ -265,6 +274,7 @@ export class Agent {
           failures += FIRST_FAILURE;
           logger.warn({ message: 'tenant log stream ended without carrying anything', elapsedMs });
         } else {
+          this.#logQueue.acknowledge();
           failures = NO_FAILURES;
         }
       } catch (error) {

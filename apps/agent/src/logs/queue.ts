@@ -9,16 +9,20 @@ type WaitingReader = {
 
 export class TenantLogQueue {
   readonly #maxBytes: number;
+  readonly #maxInFlightBytes: number;
   readonly #encoder = new TextEncoder();
-  readonly #chunks: Uint8Array[] = [];
-  #queuedBytes = 0;
+  #chunks: Uint8Array[] = [];
+  #inFlight: Uint8Array[] = [];
+  #inFlightBytes = 0;
+  #retainedBytes = 0;
   #waiting: WaitingReader | undefined;
   #activeToken: symbol | undefined;
   #endingStream = false;
   #closed = false;
 
-  constructor({ maxBytes }: { maxBytes: number }) {
+  constructor({ maxBytes, maxInFlightBytes }: { maxBytes: number; maxInFlightBytes: number }) {
     this.#maxBytes = maxBytes;
+    this.#maxInFlightBytes = maxInFlightBytes;
   }
 
   push(event: TenantLogEvent): boolean {
@@ -65,23 +69,49 @@ export class TenantLogQueue {
     this.#endingStream = true;
   }
 
+  /**
+   * The control plane answered, so what this request carried is somewhere other than here and the
+   * copies held for it can go.
+   *
+   * Only ever called for a request that ran long enough to have been read. A reply that arrives
+   * too quickly to have consumed a body is the one success that proves nothing, and keeping the
+   * copies through it costs a duplicate where believing it would cost the events.
+   */
+  acknowledge(): void {
+    this.#retainedBytes -= this.#inFlightBytes;
+    this.#inFlight = [];
+    this.#inFlightBytes = 0;
+  }
+
   #offer(chunk: Uint8Array): boolean {
+    // In-flight bytes are counted here too. They are copies this host is holding until they are
+    // confirmed, which is the same memory as a queued event and has to answer to the same limit —
+    // a budget that only counted what had not been sent yet would be a budget for half the bytes.
+    if (this.#retainedBytes + chunk.byteLength > this.#maxBytes) {
+      return false;
+    }
+    this.#retainedBytes += chunk.byteLength;
     if (this.#waiting) {
       const waiting = this.#waiting;
       this.#waiting = undefined;
+      if (this.#inFlightBytes >= this.#maxInFlightBytes) {
+        this.#chunks.push(chunk);
+        waiting.resolve(undefined);
+        return true;
+      }
+      this.#holdInFlight(chunk);
       waiting.resolve(chunk);
       return true;
     }
-    if (this.#queuedBytes + chunk.byteLength > this.#maxBytes) {
-      return false;
-    }
     this.#chunks.push(chunk);
-    this.#queuedBytes += chunk.byteLength;
     return true;
   }
 
   readable(): ReadableStream<Uint8Array> {
     const token = Symbol('tenant log reader');
+    // Whatever the request this replaces had taken was never confirmed, so it is still owed. A
+    // new stream superseding an old one is exactly the case where those bytes have to go back.
+    this.#recover();
     // A control plane that answers before the body ends completes the fetch without cancelling
     // the stream it was reading, so the request this one replaces can still be holding a pending
     // read. Handing the next event to that reader would deliver it nowhere.
@@ -114,15 +144,35 @@ export class TenantLogQueue {
     this.#waiting = undefined;
   }
 
+  #holdInFlight(chunk: Uint8Array): void {
+    this.#inFlight.push(chunk);
+    this.#inFlightBytes += chunk.byteLength;
+  }
+
+  #recover(): void {
+    if (this.#inFlightBytes === 0) {
+      return;
+    }
+    this.#chunks = this.#inFlight.concat(this.#chunks);
+    this.#inFlight = [];
+    this.#inFlightBytes = 0;
+  }
+
   #take(token: symbol): Promise<Uint8Array | undefined> {
     // Checked before the queue is touched: a superseded reader whose pull lands late would
     // otherwise take a chunk into a request nothing is sending any more.
     if (token !== this.#activeToken) {
       return Promise.resolve(undefined);
     }
+    // A window ends on what it is carrying as well as on how long it has been open. Held copies
+    // are only released by an answer, so how much one request may take is how much this host is
+    // willing to hold — and a talkative tenant reaches that long before thirty seconds.
+    if (this.#inFlightBytes >= this.#maxInFlightBytes) {
+      return Promise.resolve(undefined);
+    }
     const chunk = this.#chunks.shift();
     if (chunk) {
-      this.#queuedBytes -= chunk.byteLength;
+      this.#holdInFlight(chunk);
       return Promise.resolve(chunk);
     }
     if (this.#closed || this.#endingStream) {
