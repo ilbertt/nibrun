@@ -1,18 +1,12 @@
 const FIRST_ATTEMPT = 0;
+const ONE_ATTEMPT = 1;
 
 export type BackoffPolicy = {
-  initialBackoffMs: number;
-  maxBackoffMs: number;
-  backoffFactor: number;
+  readonly initialBackoffMs: number;
+  readonly maxBackoffMs: number;
+  readonly backoffFactor: number;
 };
 
-/**
- * Delay before attempt `attempt`, counted from zero — so the first attempt never waits.
- *
- * The shape is deliberately the same as the guest's restart policy and reads its numbers from
- * the same object: the agent retrying a boot and the guest retrying a process are the same
- * question asked one layer apart, and two sets of tuning constants for it would drift.
- */
 export function backoffDelayMs({
   attempt,
   policy,
@@ -23,19 +17,16 @@ export function backoffDelayMs({
   if (attempt <= FIRST_ATTEMPT) {
     return 0;
   }
-  const grown = policy.initialBackoffMs * policy.backoffFactor ** (attempt - 1);
+  const grown = policy.initialBackoffMs * policy.backoffFactor ** (attempt - ONE_ATTEMPT);
   return Math.min(Math.round(grown), policy.maxBackoffMs);
 }
 
 export type AttemptWindow = {
-  attempts: number;
-  lastAttemptAtMs?: number;
+  readonly attempts: number;
+  readonly lastAttemptAtMs?: number;
 };
 
-/**
- * A component that stayed up longer than `resetAfterMs` is treated as healthy and starts its
- * budget over, so something that fails once a month never eventually exhausts a lifetime one.
- */
+/** Staying up longer than `resetAfterMs` restarts the budget, so a monthly failure never exhausts it. */
 export function nextAttemptWindow({
   window,
   nowMs,
@@ -46,8 +37,10 @@ export function nextAttemptWindow({
   resetAfterMs: number;
 }): AttemptWindow {
   const elapsed = window.lastAttemptAtMs === undefined ? 0 : nowMs - window.lastAttemptAtMs;
-  const attempts = elapsed >= resetAfterMs ? 1 : window.attempts + 1;
-  return { attempts, lastAttemptAtMs: nowMs };
+  return {
+    attempts: elapsed >= resetAfterMs ? ONE_ATTEMPT : window.attempts + ONE_ATTEMPT,
+    lastAttemptAtMs: nowMs,
+  };
 }
 
 export function isReadyToRetry({

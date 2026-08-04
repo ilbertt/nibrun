@@ -1,13 +1,11 @@
-import { mkdir, open, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { FileSystem, Path } from '@effect/platform';
 import type { VolumeId } from '@repo/protocol';
+import { Data, Effect, Option } from 'effect';
 
-// ZeroFS resolves every NBD export by looking this directory up on each negotiation, so a
-// device file appears the moment it is created — no restart, no registration step.
+/** ZeroFS resolves every NBD export by looking this directory up on each negotiation. */
 export const NBD_DIRECTORY = '.nbd';
 
-// Firecracker sizes a block device with lseek and computes sectors as `size >> 9`. A size that
-// is not a multiple of 512 leaves the tail invisible to the guest, with a warning and no error.
+/** Firecracker computes sectors as `size >> 9`, and leaves an unaligned tail invisible to the guest. */
 const SECTOR_SIZE_BYTES = 512;
 
 export const isSectorAligned = (sizeBytes: number) => sizeBytes % SECTOR_SIZE_BYTES === 0;
@@ -15,53 +13,59 @@ export const isSectorAligned = (sizeBytes: number) => sizeBytes % SECTOR_SIZE_BY
 export const alignToSector = (sizeBytes: number) =>
   Math.ceil(sizeBytes / SECTOR_SIZE_BYTES) * SECTOR_SIZE_BYTES;
 
-export const devicePathFor = ({ mount, volumeId }: { mount: string; volumeId: VolumeId }) =>
-  join(mount, NBD_DIRECTORY, volumeId);
+export const devicePathFor = ({
+  mount,
+  volumeId,
+  path,
+}: {
+  mount: string;
+  volumeId: VolumeId;
+  path: Path.Path;
+}) => path.join(mount, NBD_DIRECTORY, volumeId);
 
-export class VolumeShrinkError extends Error {
-  constructor({ current, requested }: { current: number; requested: number }) {
-    super(`Refusing to shrink a volume from ${current} to ${requested} bytes`);
-    this.name = 'VolumeShrinkError';
-  }
-}
+export class VolumeShrinkRefused extends Data.TaggedError('VolumeShrinkRefused')<{
+  readonly current: number;
+  readonly requested: number;
+}> {}
 
-export async function readDeviceFileSize({ path }: { path: string }): Promise<number | undefined> {
-  try {
-    return (await stat(path)).size;
-  } catch {
-    return undefined;
-  }
-}
+export const readDeviceFileSize = (path: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    return yield* fs.stat(path).pipe(
+      Effect.map((info) => Option.some(Number(info.size))),
+      Effect.orElseSucceed(() => Option.none<number>()),
+    );
+  });
 
 /**
- * Creates or grows the sparse file ZeroFS exports as this volume's block device.
- *
- * Growing preserves the data; shrinking discards everything past the new size, which is why a
- * smaller desired size is refused rather than obeyed. Desired state that has gone backwards is
- * a control-plane bug, and truncating a tenant's filesystem is not a recoverable way to
- * discover it.
+ * Growing preserves the data and shrinking discards everything past the new size, so a smaller
+ * desired size is refused: truncating a tenant's filesystem is not a way to discover a bug.
  */
-export async function ensureDeviceFile({
+export const ensureDeviceFile = ({
   path,
   sizeBytes,
 }: {
   path: string;
   sizeBytes: number;
-}): Promise<number> {
-  const target = alignToSector(sizeBytes);
-  const current = await readDeviceFileSize({ path });
-  if (current !== undefined && current > target) {
-    throw new VolumeShrinkError({ current, requested: target });
-  }
-  if (current === target) {
+}) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const pathService = yield* Path.Path;
+    const target = alignToSector(sizeBytes);
+    const current = yield* readDeviceFileSize(path);
+
+    if (Option.isSome(current)) {
+      if (current.value > target) {
+        return yield* new VolumeShrinkRefused({ current: current.value, requested: target });
+      }
+      if (current.value === target) {
+        return target;
+      }
+    }
+
+    yield* fs.makeDirectory(pathService.dirname(path), { recursive: true });
+    yield* Effect.scoped(
+      Effect.flatMap(fs.open(path, { flag: 'a' }), (file) => file.truncate(target)),
+    );
     return target;
-  }
-  await mkdir(join(path, '..'), { recursive: true });
-  const handle = await open(path, 'a');
-  try {
-    await handle.truncate(target);
-  } finally {
-    await handle.close();
-  }
-  return target;
-}
+  });

@@ -1,25 +1,21 @@
-import { type HostVersions, HostVersionsSchema, parseMessage } from '@repo/protocol';
+import { HostVersionsSchema, parseMessage } from '@repo/protocol';
+import { Data, Effect, Option } from 'effect';
 import { readJsonFile } from '#lib/json-store.ts';
+import { decode } from '#lib/protocol.ts';
 
-export class MissingVersionsError extends Error {
-  constructor(path: string) {
-    super(`${path} is missing: a host that cannot say what it is running has been misdeployed`);
-    this.name = 'MissingVersionsError';
-  }
-}
+export class MissingVersionsError extends Data.TaggedError('MissingVersionsError')<{
+  readonly path: string;
+}> {}
 
 /**
- * The pins CI writes into the bundle, read rather than compiled in.
- *
- * The agent's own version is the git SHA of the commit that built it; the other three name the
- * versions installed under `/opt/nibrun/bin`. Reading them from the same file the deploy
- * script installs from is what keeps a report from claiming a version a symlink no longer
- * points at.
+ * The pins CI writes into the bundle, read rather than compiled in, so a report cannot claim a
+ * version the active symlink no longer points at.
  */
-export async function readHostVersions({ path }: { path: string }): Promise<HostVersions> {
-  const value = await readJsonFile({ path });
-  if (value === undefined) {
-    throw new MissingVersionsError(path);
-  }
-  return parseMessage({ schema: HostVersionsSchema, value });
-}
+export const readHostVersions = (path: string) =>
+  Effect.gen(function* () {
+    const value = yield* readJsonFile(path);
+    if (Option.isNone(value)) {
+      return yield* new MissingVersionsError({ path });
+    }
+    return yield* decode(() => parseMessage({ schema: HostVersionsSchema, value: value.value }));
+  });

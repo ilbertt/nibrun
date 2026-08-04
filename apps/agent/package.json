@@ -11,8 +11,11 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
+    "@effect/platform": "0.97.1",
+    "@effect/platform-bun": "0.91.2",
     "@repo/api-client": "workspace:*",
-    "@repo/protocol": "workspace:*"
+    "@repo/protocol": "workspace:*",
+    "effect": "3.22.1"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

@@ -1,143 +1,61 @@
 import type { TenantLogEvent } from '@repo/protocol';
+import { Deferred, Effect, Option, Queue, Ref, Stream } from 'effect';
 
-const NEWLINE = new TextEncoder().encode('\n');
+const MAX_BUFFERED_BYTES = 8_388_608;
+const ENCODER = new TextEncoder();
+const NEWLINE = ENCODER.encode('\n');
 
-type WaitingReader = {
-  token: symbol;
-  resolve: (chunk: Uint8Array | undefined) => void;
-};
+export class TenantLogQueue extends Effect.Service<TenantLogQueue>()('TenantLogQueue', {
+  effect: Effect.gen(function* () {
+    const chunks = yield* Queue.unbounded<Uint8Array>();
+    const bufferedBytes = yield* Ref.make(0);
 
-export class TenantLogQueue {
-  readonly #maxBytes: number;
-  readonly #encoder = new TextEncoder();
-  readonly #chunks: Uint8Array[] = [];
-  #queuedBytes = 0;
-  #waiting: WaitingReader | undefined;
-  #activeToken: symbol | undefined;
-  #endingStream = false;
-  #closed = false;
-
-  constructor({ maxBytes }: { maxBytes: number }) {
-    this.#maxBytes = maxBytes;
-  }
-
-  push(event: TenantLogEvent): boolean {
-    if (this.#closed) {
-      return false;
-    }
-    const json = this.#encoder.encode(JSON.stringify(event));
-    const chunk = new Uint8Array(json.byteLength + NEWLINE.byteLength);
-    chunk.set(json);
-    chunk.set(NEWLINE, json.byteLength);
-    return this.#offer(chunk);
-  }
-
-  /**
-   * An empty line: NDJSON framing carrying no event, which the control plane skips.
-   *
-   * A host whose apps are quiet sends nothing for as long as they stay quiet, and every timeout
-   * between here and the control plane reads that silence as a dead connection. This is what
-   * makes the request outlive the tenant's own talkativeness.
-   */
-  keepalive(): boolean {
-    if (this.#closed) {
-      return false;
-    }
-    return this.#offer(NEWLINE);
-  }
-
-  /**
-   * End the current request's body once it has taken everything queued, leaving the queue itself
-   * open for the request that replaces it.
-   *
-   * An upload cannot be cut without losing whatever the request had already taken, and HTTP has
-   * no per-chunk acknowledgement to work out how much that was. A drained queue is the one
-   * boundary where the agent knows exactly what the control plane received, so it is the only
-   * place a stream can end for free.
-   */
-  endStream(): void {
-    if (this.#waiting) {
-      const waiting = this.#waiting;
-      this.#waiting = undefined;
-      waiting.resolve(undefined);
-      return;
-    }
-    this.#endingStream = true;
-  }
-
-  #offer(chunk: Uint8Array): boolean {
-    if (this.#waiting) {
-      const waiting = this.#waiting;
-      this.#waiting = undefined;
-      waiting.resolve(chunk);
-      return true;
-    }
-    if (this.#queuedBytes + chunk.byteLength > this.#maxBytes) {
-      return false;
-    }
-    this.#chunks.push(chunk);
-    this.#queuedBytes += chunk.byteLength;
-    return true;
-  }
-
-  readable(): ReadableStream<Uint8Array> {
-    const token = Symbol('tenant log reader');
-    // A control plane that answers before the body ends completes the fetch without cancelling
-    // the stream it was reading, so the request this one replaces can still be holding a pending
-    // read. Handing the next event to that reader would deliver it nowhere.
-    this.#waiting = undefined;
-    this.#activeToken = token;
-    this.#endingStream = false;
-    let active = true;
-    return new ReadableStream<Uint8Array>({
-      pull: async (controller) => {
-        const chunk = await this.#take(token);
-        if (!active) {
-          return;
+    const offer = (chunk: Uint8Array) =>
+      Effect.gen(function* () {
+        const accepted = yield* Ref.modify(bufferedBytes, (bytes) =>
+          bytes + chunk.byteLength > MAX_BUFFERED_BYTES
+            ? ([false, bytes] as const)
+            : ([true, bytes + chunk.byteLength] as const),
+        );
+        if (accepted) {
+          yield* Queue.offer(chunks, chunk);
         }
-        if (chunk) {
-          controller.enqueue(chunk);
-        } else {
-          controller.close();
-        }
-      },
-      cancel: () => {
-        active = false;
-        this.#cancel(token);
-      },
-    });
-  }
+        return accepted;
+      });
 
-  close(): void {
-    this.#closed = true;
-    this.#waiting?.resolve(undefined);
-    this.#waiting = undefined;
-  }
+    const taken = (chunk: Uint8Array) =>
+      Ref.update(bufferedBytes, (bytes) => bytes - chunk.byteLength);
 
-  #take(token: symbol): Promise<Uint8Array | undefined> {
-    // Checked before the queue is touched: a superseded reader whose pull lands late would
-    // otherwise take a chunk into a request nothing is sending any more.
-    if (token !== this.#activeToken) {
-      return Promise.resolve(undefined);
-    }
-    const chunk = this.#chunks.shift();
-    if (chunk) {
-      this.#queuedBytes -= chunk.byteLength;
-      return Promise.resolve(chunk);
-    }
-    if (this.#closed || this.#endingStream) {
-      return Promise.resolve(undefined);
-    }
-    return new Promise((resolve) => {
-      this.#waiting = { token, resolve };
-    });
-  }
+    /**
+     * The body of one upload, which ends at a drained queue and nowhere else: an upload cut
+     * mid-flight loses whatever the request had already taken, and HTTP cannot say how much.
+     */
+    const body = (ending: Deferred.Deferred<void>) =>
+      Stream.repeatEffectOption(
+        Effect.gen(function* () {
+          const ready = yield* Queue.poll(chunks);
+          if (Option.isSome(ready)) {
+            yield* taken(ready.value);
+            return ready.value;
+          }
+          if (yield* Deferred.isDone(ending)) {
+            return yield* Effect.fail(Option.none<never>());
+          }
+          return yield* Effect.raceFirst(
+            // Interruptible only while waiting: losing the race must not drop an accounted chunk.
+            Effect.uninterruptibleMask((restore) =>
+              Effect.tap(restore(Queue.take(chunks)), taken),
+            ),
+            Effect.andThen(Deferred.await(ending), Effect.fail(Option.none<never>())),
+          );
+        }),
+      );
 
-  #cancel(token: symbol): void {
-    if (this.#waiting?.token !== token) {
-      return;
-    }
-    this.#waiting.resolve(undefined);
-    this.#waiting = undefined;
-  }
-}
+    return {
+      publish: (event: TenantLogEvent) => offer(ENCODER.encode(`${JSON.stringify(event)}\n`)),
+      /** An empty NDJSON line: what keeps a quiet host's request from reading as a dead one. */
+      keepalive: offer(NEWLINE),
+      body,
+    };
+  }),
+}) {}

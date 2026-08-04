@@ -1,7 +1,6 @@
 import type { InstanceResources, Ipv4Address } from '@repo/protocol';
 
-// Firecracker assigns virtio-blk devices in the order this array declares them, so the order
-// is the boot contract: vda rootfs, vdb artifact, vdc instance config, vdd tenant data.
+/** Firecracker assigns virtio-blk devices in declaration order, so this order is the boot contract. */
 export const DRIVE_IDS = ['rootfs', 'artifact', 'config', 'data'] as const;
 
 const OCTET_BITS = 8;
@@ -9,15 +8,11 @@ const FULL_OCTET = 255;
 const OCTET_COUNT = 4;
 const NO_BITS = 0;
 
-// Three i8042 flags, and a measured 1.02 s to 0.60 s boot win. `i8042.nopnp` is deliberately
-// not among them: it breaks SendCtrlAltDel on an ACPI-enabled guest, which ours is, so a
-// graceful stop would silently become a kill — the API answers 204 either way. The static `ip=`
-// form is why the guest ships no DHCP client: the kernel configures eth0 before /init runs.
-//
-// `quiet` keeps the guest's operator console useful: without it a boot puts ~788 printk lines
-// ahead of the runtime diagnostics. It raises the printk threshold and nothing else — panics,
-// oopses and the guest init's own `[nibrun] ` writes are untouched. Tenant output does not share
-// this console; it travels over the dedicated vsock below.
+/**
+ * `i8042.nopnp` is deliberately absent: it breaks SendCtrlAltDel on an ACPI-enabled guest, so a
+ * graceful stop would silently become a kill. The static `ip=` form is why the guest ships no
+ * DHCP client, and `quiet` only raises the printk threshold — panics and init writes are untouched.
+ */
 const BASE_KERNEL_ARGS =
   'console=ttyS0 quiet reboot=k panic=1 pci=off i8042.noaux i8042.nomux i8042.dumbkbd root=/dev/vda ro init=/init';
 
@@ -39,8 +34,7 @@ export function renderKernelArgs({
   hostIpv4: Ipv4Address;
   subnetPrefixLength: number;
 }): string {
-  const netmask = netmaskFor(subnetPrefixLength);
-  return `${BASE_KERNEL_ARGS} ip=${guestIpv4}::${hostIpv4}:${netmask}::eth0:off`;
+  return `${BASE_KERNEL_ARGS} ip=${guestIpv4}::${hostIpv4}:${netmaskFor(subnetPrefixLength)}::eth0:off`;
 }
 
 export type FirecrackerDrive = {
@@ -63,10 +57,9 @@ export type FirecrackerConfig = {
 const READ_ONLY_DRIVE = {
   is_root_device: false,
   is_read_only: true,
-  // Meaningless on a read-only drive: there is nothing to flush.
   cache_type: 'Unsafe',
-  // io_uring is still a developer preview upstream, adds device-creation latency to every cold
-  // start, and its workers escape the cgroup the VM is confined to.
+  // io_uring is an upstream developer preview, adds device-creation latency to every cold start,
+  // and its workers escape the cgroup the VM is confined to.
   io_engine: 'Sync',
 } as const satisfies Omit<FirecrackerDrive, 'drive_id' | 'path_on_host'>;
 
@@ -86,20 +79,14 @@ export type VmNetwork = {
   subnetPrefixLength: number;
 };
 
-export type VmVsock = {
-  guestCid: number;
-  path: string;
-};
+export type VmVsock = { guestCid: number; path: string };
 
 const NETWORK_INTERFACE_ID = 'eth0';
 
 /**
- * The whole VM, as one file Firecracker both configures and boots from.
- *
- * `cache_type` on the data drive is the one setting here that fails silently. Firecracker
- * defaults a drive to `Unsafe`, which discards flush requests: the guest's fsync returns
- * success, ZeroFS is never asked to flush, and the loss window stops being the flush interval
- * and becomes unbounded. Nothing observable goes wrong until a host dies.
+ * `cache_type` on the data drive is the one setting here that fails silently: Firecracker
+ * defaults to `Unsafe`, which discards flushes, so the guest's fsync returns success, ZeroFS is
+ * never asked to flush, and the loss window becomes unbounded until a host dies.
  */
 export function renderFirecrackerConfig({
   resources,
@@ -147,9 +134,6 @@ export function renderFirecrackerConfig({
         guest_mac: network.guestMac,
       },
     ],
-    vsock: {
-      guest_cid: vsock.guestCid,
-      uds_path: vsock.path,
-    },
+    vsock: { guest_cid: vsock.guestCid, uds_path: vsock.path },
   };
 }

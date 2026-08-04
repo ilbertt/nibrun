@@ -1,66 +1,61 @@
-import { mkdir, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { FileSystem, Path } from '@effect/platform';
+import { Data, Effect, Option } from 'effect';
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
 const JSON_INDENT = 2;
 
-function temporaryPathFor(path: string): string {
-  return `${path}.${crypto.randomUUID()}.tmp`;
-}
+export class MalformedJsonError extends Data.TaggedError('MalformedJsonError')<{
+  readonly path: string;
+  readonly cause: unknown;
+}> {}
 
-export async function readJsonFile({ path }: { path: string }): Promise<unknown> {
-  const file = Bun.file(path);
-  if (!(await file.exists())) {
-    return undefined;
-  }
-  return file.json();
-}
+export const readJsonFile = (path: string) =>
+  Effect.gen(function* () {
+    const text = yield* readTextFile(path);
+    return yield* Option.match(text, {
+      onNone: () => Effect.succeedNone,
+      onSome: (value) =>
+        Effect.try({
+          try: () => Option.some(JSON.parse(value) as unknown),
+          catch: (cause) => new MalformedJsonError({ path, cause }),
+        }),
+    });
+  });
+
+export const readTextFile = (path: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    if (!(yield* fs.exists(path))) {
+      return Option.none<string>();
+    }
+    return Option.some((yield* fs.readFileString(path)).trim());
+  });
+
+export const writeJsonFile = ({ path, value }: { path: string; value: unknown }) =>
+  writeTextFile({ path, value: `${JSON.stringify(value, null, JSON_INDENT)}\n` });
 
 /**
- * Writes through a sibling temporary file and renames, so a torn write can never leave the
- * agent with a state file it cannot parse. Rename within a directory is atomic on ext4.
- *
- * The temporary name is unique per write rather than `<path>.tmp`: two writes of the same file
- * in flight together — a reconcile and a status refresh both persisting slots — would otherwise
- * share it, and whichever renamed second would find the first had already moved it away and
- * fail with ENOENT.
+ * Through a uniquely named sibling and a rename, which is atomic within a directory on ext4: a
+ * torn write cannot leave an unparsable state file, and two writes in flight cannot collide.
  */
-export async function writeJsonFile({
-  path,
-  value,
-}: {
-  path: string;
-  value: unknown;
-}): Promise<void> {
-  await mkdir(dirname(path), { recursive: true, mode: PRIVATE_DIR_MODE });
-  const temporaryPath = temporaryPathFor(path);
-  await writeFile(temporaryPath, `${JSON.stringify(value, null, JSON_INDENT)}\n`, {
-    mode: PRIVATE_FILE_MODE,
-  });
-  await rename(temporaryPath, path);
-}
-
-export async function readTextFile({ path }: { path: string }): Promise<string | undefined> {
-  const file = Bun.file(path);
-  if (!(await file.exists())) {
-    return undefined;
-  }
-  return (await file.text()).trim();
-}
-
-export async function writeTextFile({
+export const writeTextFile = ({
   path,
   value,
   mode = PRIVATE_FILE_MODE,
 }: {
   path: string;
   value: string;
-  // Private unless the file is meant for another process on the host to read.
   mode?: number;
-}): Promise<void> {
-  await mkdir(dirname(path), { recursive: true, mode: PRIVATE_DIR_MODE });
-  const temporaryPath = temporaryPathFor(path);
-  await writeFile(temporaryPath, value, { mode });
-  await rename(temporaryPath, path);
-}
+}) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const pathService = yield* Path.Path;
+    yield* fs.makeDirectory(pathService.dirname(path), {
+      recursive: true,
+      mode: PRIVATE_DIR_MODE,
+    });
+    const temporary = yield* Effect.sync(() => `${path}.${crypto.randomUUID()}.tmp`);
+    yield* fs.writeFileString(temporary, value, { mode });
+    yield* fs.rename(temporary, path);
+  });

@@ -12,11 +12,7 @@ import type {
 } from '@repo/protocol';
 import type { InstanceRecord } from '#report/instance-record.ts';
 
-/**
- * Every optional field is omitted rather than sent empty. Absent means unknown or not
- * applicable, and there is one convention for that so nothing downstream has to decide what
- * the difference between absent and null would have meant.
- */
+/** Optional fields are omitted rather than sent empty: absent is the one convention for unknown. */
 export function toReportedInstance(record: InstanceRecord): ReportedInstance {
   return {
     instanceId: record.instanceId,

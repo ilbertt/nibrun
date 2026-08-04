@@ -1,53 +1,64 @@
 import { Buffer } from 'node:buffer';
 import type { TenantLogStream } from '@repo/protocol';
+import { Data, Either } from 'effect';
 
 const FRAME_MAGIC = Buffer.from('NBL1');
 const FRAME_HEADER_BYTES = 9;
+const KIND_OFFSET = FRAME_MAGIC.byteLength;
+const LENGTH_OFFSET = KIND_OFFSET + 1;
 const MAX_FRAME_PAYLOAD_BYTES = 65_536;
 const GAP_PAYLOAD_BYTES = 8;
 
-const FRAME_KINDS = {
-  stdout: 1,
-  stderr: 2,
-  gap: 3,
-} as const;
+const FRAME_KINDS = { stdout: 1, stderr: 2, gap: 3 } as const;
 
-type GuestLogFrame =
-  | { kind: 'data'; stream: TenantLogStream; bytes: Uint8Array }
-  | { kind: 'gap'; droppedBytes: number };
+export type GuestLogFrame =
+  | { readonly kind: 'data'; readonly stream: TenantLogStream; readonly bytes: Uint8Array }
+  | { readonly kind: 'gap'; readonly droppedBytes: number };
 
-export class InvalidGuestLogFrameError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'InvalidGuestLogFrameError';
-  }
-}
+export class InvalidGuestLogFrame extends Data.TaggedError('InvalidGuestLogFrame')<{
+  readonly reason: string;
+}> {}
 
-export class GuestLogFrameDecoder {
-  #buffer = Buffer.alloc(0);
+export const EMPTY_BUFFER: Buffer = Buffer.alloc(0);
 
-  push(chunk: Uint8Array): GuestLogFrame[] {
-    this.#buffer = Buffer.concat([this.#buffer, chunk]);
-    const frames: GuestLogFrame[] = [];
-    while (this.#buffer.byteLength >= FRAME_HEADER_BYTES) {
-      if (!this.#buffer.subarray(0, FRAME_MAGIC.byteLength).equals(FRAME_MAGIC)) {
-        throw new InvalidGuestLogFrameError('guest log frame has an invalid magic value');
-      }
-      const kind = this.#buffer[FRAME_MAGIC.byteLength];
-      const payloadLength = this.#buffer.readUInt32BE(FRAME_MAGIC.byteLength + 1);
-      if (payloadLength > MAX_FRAME_PAYLOAD_BYTES) {
-        throw new InvalidGuestLogFrameError('guest log frame exceeds the payload limit');
-      }
-      const frameLength = FRAME_HEADER_BYTES + payloadLength;
-      if (this.#buffer.byteLength < frameLength) {
-        break;
-      }
-      const payload = this.#buffer.subarray(FRAME_HEADER_BYTES, frameLength);
-      frames.push(frameFrom({ kind, payload }));
-      this.#buffer = this.#buffer.subarray(frameLength);
+export type DecodedFrames = {
+  readonly frames: readonly GuestLogFrame[];
+  readonly rest: Buffer;
+};
+
+/** Frames survive arbitrary transport chunking, so `rest` carries the partial frame forward. */
+export function decodeFrames({
+  buffered,
+  chunk,
+}: {
+  buffered: Buffer;
+  chunk: Uint8Array;
+}): Either.Either<DecodedFrames, InvalidGuestLogFrame> {
+  let rest = Buffer.concat([buffered, chunk]);
+  const frames: GuestLogFrame[] = [];
+  while (rest.byteLength >= FRAME_HEADER_BYTES) {
+    if (!rest.subarray(0, FRAME_MAGIC.byteLength).equals(FRAME_MAGIC)) {
+      return Either.left(new InvalidGuestLogFrame({ reason: 'invalid magic value' }));
     }
-    return frames;
+    const payloadLength = rest.readUInt32BE(LENGTH_OFFSET);
+    if (payloadLength > MAX_FRAME_PAYLOAD_BYTES) {
+      return Either.left(new InvalidGuestLogFrame({ reason: 'payload exceeds the limit' }));
+    }
+    const frameLength = FRAME_HEADER_BYTES + payloadLength;
+    if (rest.byteLength < frameLength) {
+      break;
+    }
+    const frame = frameFrom({
+      kind: rest[KIND_OFFSET],
+      payload: rest.subarray(FRAME_HEADER_BYTES, frameLength),
+    });
+    if (Either.isLeft(frame)) {
+      return Either.left(frame.left);
+    }
+    frames.push(frame.right);
+    rest = rest.subarray(frameLength);
   }
+  return Either.right({ frames, rest });
 }
 
 function frameFrom({
@@ -56,27 +67,27 @@ function frameFrom({
 }: {
   kind: number | undefined;
   payload: Buffer;
-}): GuestLogFrame {
+}): Either.Either<GuestLogFrame, InvalidGuestLogFrame> {
   if (kind === FRAME_KINDS.stdout || kind === FRAME_KINDS.stderr) {
-    return {
+    return Either.right({
       kind: 'data',
       stream: kind === FRAME_KINDS.stdout ? 'stdout' : 'stderr',
       bytes: Uint8Array.from(payload),
-    };
+    });
   }
-  if (kind === FRAME_KINDS.gap) {
-    if (payload.byteLength !== GAP_PAYLOAD_BYTES) {
-      throw new InvalidGuestLogFrameError('guest log gap has an invalid payload length');
-    }
-    const encoded = payload.readBigUInt64BE();
-    return {
-      kind: 'gap',
-      droppedBytes: Number(
-        encoded > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : encoded,
-      ),
-    };
+  if (kind !== FRAME_KINDS.gap) {
+    return Either.left(new InvalidGuestLogFrame({ reason: 'unknown frame kind' }));
   }
-  throw new InvalidGuestLogFrameError('guest log frame has an unknown kind');
+  if (payload.byteLength !== GAP_PAYLOAD_BYTES) {
+    return Either.left(new InvalidGuestLogFrame({ reason: 'invalid gap payload length' }));
+  }
+  const encoded = payload.readBigUInt64BE();
+  return Either.right({
+    kind: 'gap',
+    droppedBytes: Number(
+      encoded > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : encoded,
+    ),
+  });
 }
 
 export function encodeGuestLogFrameForTest({
@@ -88,7 +99,7 @@ export function encodeGuestLogFrameForTest({
 }): Uint8Array {
   const header = Buffer.alloc(FRAME_HEADER_BYTES);
   FRAME_MAGIC.copy(header);
-  header[FRAME_MAGIC.byteLength] = FRAME_KINDS[kind];
-  header.writeUInt32BE(payload.byteLength, FRAME_MAGIC.byteLength + 1);
+  header[KIND_OFFSET] = FRAME_KINDS[kind];
+  header.writeUInt32BE(payload.byteLength, LENGTH_OFFSET);
   return Buffer.concat([header, payload]);
 }

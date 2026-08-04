@@ -5,14 +5,15 @@ import {
   HostIdSchema,
   type HostVersions,
   isValidMessage,
-  type SecretString,
 } from '@repo/protocol';
-import type { ControlPlaneClient } from '#control/client.ts';
+import { Effect, Option } from 'effect';
+import { AgentConfig } from '#config.ts';
+import { ControlPlane } from '#control/client.ts';
 import { toEpochMs } from '#lib/clock.ts';
 import { readTextFile, writeTextFile } from '#lib/json-store.ts';
 
-// Renewed well before it lapses: a session that expires mid-poll costs a round trip, and the
-// clock the control plane stamped it with is not the one the agent reads it against.
+/** Renewed early: a session that expires mid-poll costs a round trip, and the clock that stamped
+ * it is not the one the agent reads it against. */
 const RENEWAL_SKEW_MS = 60_000;
 
 export function isSessionExpiring({
@@ -27,53 +28,28 @@ export function isSessionExpiring({
   return toEpochMs(session.expiresAt) - skewMs <= nowMs;
 }
 
-/**
- * The host id the control plane assigned, kept on disk so a reinstalled agent rejoins as the
- * same host rather than as a new one. A file that has been corrupted is discarded rather than
- * sent, because registering twice is recoverable and claiming a malformed identity is not.
- */
-export class HostIdentity {
-  readonly #path: string;
+/** A corrupted file is discarded rather than sent: registering twice is recoverable, claiming a
+ * malformed identity is not. */
+const readHostId = Effect.gen(function* () {
+  const config = yield* AgentConfig;
+  const value = yield* readTextFile(config.hostIdFile);
+  return Option.filter(value, (hostId) =>
+    isValidMessage({ schema: HostIdSchema, value: hostId }),
+  ) as Option.Option<HostId>;
+});
 
-  constructor({ path }: { path: string }) {
-    this.#path = path;
-  }
-
-  async read(): Promise<HostId | undefined> {
-    const value = await readTextFile({ path: this.#path });
-    if (value === undefined || !isValidMessage({ schema: HostIdSchema, value })) {
-      return undefined;
+export const openSession = (inputs: { versions: HostVersions; capacity: HostCapacity }) =>
+  Effect.gen(function* () {
+    const config = yield* AgentConfig;
+    const control = yield* ControlPlane;
+    const hostId = yield* readHostId;
+    const session = yield* control.openSession({
+      ...Option.match(hostId, { onNone: () => ({}), onSome: (value) => ({ hostId: value }) }),
+      versions: inputs.versions,
+      capacity: inputs.capacity,
+    });
+    if (!Option.contains(hostId, session.hostId)) {
+      yield* writeTextFile({ path: config.hostIdFile, value: `${session.hostId}\n` });
     }
-    return value as HostId;
-  }
-
-  async write(hostId: HostId): Promise<void> {
-    await writeTextFile({ path: this.#path, value: `${hostId}\n` });
-  }
-}
-
-export type SessionInputs = {
-  versions: HostVersions;
-  capacity: HostCapacity;
-};
-
-export async function openSession({
-  client,
-  identity,
-  inputs,
-}: {
-  client: ControlPlaneClient;
-  identity: HostIdentity;
-  inputs: SessionInputs;
-}): Promise<AgentSession> {
-  const hostId = await identity.read();
-  const session = await client.openSession({
-    ...(hostId ? { hostId } : {}),
-    versions: inputs.versions,
-    capacity: inputs.capacity,
+    return session;
   });
-  if (session.hostId !== hostId) {
-    await identity.write(session.hostId);
-  }
-  return session;
-}

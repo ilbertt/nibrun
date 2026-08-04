@@ -1,170 +1,164 @@
-import { chmod, mkdir, rename, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact, Sha256Digest } from '@repo/protocol';
-import type { InstanceCredentialProvider } from '#aws/instance-credentials.ts';
-import { type CommandRunner, runCommandOrThrow } from '#lib/exec.ts';
+import { Context, Data, Effect, Layer, Ref, Stream } from 'effect';
+import { AwsCredentialProvider } from '#aws/provider.ts';
+import { AgentConfig } from '#config.ts';
+import { stdoutOf } from '#lib/exec.ts';
 
 const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
 const SQUASHFS_FILENAME = 'artifact.squashfs';
-// The path the guest's init execs. Fixed by the boot contract, not configurable.
+/** The path the guest's init execs, fixed by the boot contract. */
 const GUEST_BINARY_NAME = 'server';
 const BINARY_MODE = 0o755;
 const CACHE_DIR_MODE = 0o755;
 
-export class DigestMismatchError extends Error {
+export class DigestMismatch extends Data.TaggedError('DigestMismatch')<{
   readonly expected: Sha256Digest;
   readonly actual: string;
+}> {}
 
-  constructor({ expected, actual }: { expected: Sha256Digest; actual: string }) {
-    super(`Artifact digest mismatch: expected ${expected}, got ${actual}`);
-    this.name = 'DigestMismatchError';
-    this.expected = expected;
-    this.actual = actual;
+export class ArtifactSizeMismatch extends Data.TaggedError('ArtifactSizeMismatch')<{
+  readonly expected: number;
+  readonly actual: number;
+}> {}
+
+export class ArtifactTransferError extends Data.TaggedError('ArtifactTransferError')<{
+  readonly cause: unknown;
+}> {}
+
+export class ArtifactStore extends Context.Tag('ArtifactStore')<
+  ArtifactStore,
+  {
+    readonly open: (
+      objectKey: string,
+    ) => Effect.Effect<ReadableStream<Uint8Array>, ArtifactTransferError>;
   }
-}
+>() {}
 
-export class ArtifactSizeError extends Error {
-  constructor({ expected, actual }: { expected: number; actual: number }) {
-    super(`Artifact is ${actual} bytes, expected ${expected}`);
-    this.name = 'ArtifactSizeError';
-  }
-}
+export const layer = Layer.effect(
+  ArtifactStore,
+  Effect.gen(function* () {
+    const config = yield* AgentConfig;
+    const credentials = yield* AwsCredentialProvider;
+    return {
+      open: (objectKey: string) =>
+        credentials.resolve.pipe(
+          Effect.flatMap((resolved) =>
+            Effect.try(() =>
+              new Bun.S3Client({
+                bucket: config.artifactBucket,
+                region: config.awsRegion,
+                accessKeyId: resolved.accessKeyId,
+                secretAccessKey: resolved.secretAccessKey,
+                ...(resolved.sessionToken ? { sessionToken: resolved.sessionToken } : {}),
+              })
+                .file(objectKey)
+                .stream() as ReadableStream<Uint8Array>,
+            ),
+          ),
+          Effect.mapError((cause) => new ArtifactTransferError({ cause })),
+        ),
+    };
+  }),
+);
 
-// Content-addressed, so a redeploy of an artifact this host has already seen costs nothing and
-// two apps on the same binary share one squashfs.
-export const artifactDirectory = ({
+/** Content-addressed, so a redeploy of a known digest costs nothing and two apps share one image. */
+export const artifactImagePath = ({
   cacheDir,
   digest,
+  path,
 }: {
   cacheDir: string;
   digest: Sha256Digest;
-}) => join(cacheDir, digest);
-
-export const artifactImagePath = (options: { cacheDir: string; digest: Sha256Digest }) =>
-  join(artifactDirectory(options), SQUASHFS_FILENAME);
-
-export type ArtifactBytes = {
-  open(objectKey: string): Promise<ReadableStream<Uint8Array>>;
-};
-
-export function s3ArtifactBytes({
-  bucket,
-  region,
-  credentials,
-}: {
-  bucket: string;
-  region: string;
-  credentials: InstanceCredentialProvider;
-}): ArtifactBytes {
-  return {
-    async open(objectKey: string) {
-      const resolved = await credentials.resolve();
-      const client = new Bun.S3Client({
-        bucket,
-        region,
-        accessKeyId: resolved.accessKeyId,
-        secretAccessKey: resolved.secretAccessKey,
-        ...(resolved.sessionToken ? { sessionToken: resolved.sessionToken } : {}),
-      });
-      return client.file(objectKey).stream();
-    },
-  };
-}
+  path: Path.Path;
+}) => path.join(cacheDir, digest, SQUASHFS_FILENAME);
 
 /**
- * Streams the artifact to disk while hashing it, and verifies before anything can execute it.
- *
- * The digest is the artifact's identity as far as a host is concerned; the object key is only
- * where the bytes happened to be. Hashing during the transfer rather than after it means the
- * bytes are never read twice, and the file is only ever moved into the content-addressed cache
- * once it has been proven to be what it claims.
+ * Hashed during the transfer rather than after it, so the bytes are never read twice and the
+ * file is only moved into the content-addressed cache once it is proven to be what it claims.
  */
-export async function downloadAndVerify({
-  source,
+export const downloadAndVerify = ({
   artifact,
   destination,
 }: {
-  source: ArtifactBytes;
   artifact: DesiredArtifact;
   destination: string;
-}): Promise<void> {
-  const hasher = new Bun.CryptoHasher(DIGEST_ALGORITHM);
-  const writer = Bun.file(destination).writer();
-  let written = 0;
-  try {
-    for await (const chunk of await source.open(artifact.objectKey)) {
-      hasher.update(chunk);
-      writer.write(chunk);
-      written += chunk.byteLength;
+}) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const store = yield* ArtifactStore;
+    const hasher = yield* Effect.sync(() => new Bun.CryptoHasher(DIGEST_ALGORITHM));
+    const written = yield* Ref.make(0);
+
+    yield* Stream.unwrap(
+      Effect.map(store.open(artifact.objectKey), (readable) =>
+        Stream.fromReadableStream({
+          evaluate: () => readable,
+          onError: (cause) => new ArtifactTransferError({ cause }),
+        }),
+      ),
+    ).pipe(
+      Stream.tap((chunk) =>
+        Effect.zipRight(
+          Effect.sync(() => hasher.update(chunk)),
+          Ref.update(written, (total) => total + chunk.byteLength),
+        ),
+      ),
+      Stream.run(fs.sink(destination)),
+      Effect.onError(() => fs.remove(destination, { force: true }).pipe(Effect.ignore)),
+    );
+
+    const actual = yield* Effect.sync(() => hasher.digest(HEX_ENCODING));
+    const size = yield* Ref.get(written);
+    const mismatch =
+      actual !== artifact.digest
+        ? new DigestMismatch({ expected: artifact.digest, actual })
+        : size !== artifact.sizeBytes
+          ? new ArtifactSizeMismatch({ expected: artifact.sizeBytes, actual: size })
+          : undefined;
+    if (mismatch) {
+      yield* fs.remove(destination, { force: true }).pipe(Effect.ignore);
+      return yield* mismatch;
     }
-    await writer.end();
-  } catch (error) {
-    await writer.end();
-    await rm(destination, { force: true });
-    throw error;
-  }
+  });
 
-  const actual = hasher.digest(HEX_ENCODING);
-  if (actual !== artifact.digest) {
-    await rm(destination, { force: true });
-    throw new DigestMismatchError({ expected: artifact.digest, actual });
-  }
-  if (written !== artifact.sizeBytes) {
-    await rm(destination, { force: true });
-    throw new ArtifactSizeError({ expected: artifact.sizeBytes, actual: written });
-  }
-}
+/** The read-only squashfs the guest attaches as `vdb`, built if this host has not seen the digest. */
+export const ensureArtifactImage = (artifact: DesiredArtifact) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const config = yield* AgentConfig;
+    const cacheDir = config.artifactCacheDir;
+    const imagePath = artifactImagePath({ cacheDir, digest: artifact.digest, path });
+    if (yield* fs.exists(imagePath)) {
+      return imagePath;
+    }
 
-export async function digestOfFile({ path }: { path: string }): Promise<string> {
-  const hasher = new Bun.CryptoHasher(DIGEST_ALGORITHM);
-  for await (const chunk of Bun.file(path).stream()) {
-    hasher.update(chunk);
-  }
-  return hasher.digest(HEX_ENCODING);
-}
-
-/**
- * Returns the path of the read-only squashfs the guest attaches as `vdb`, building it if this
- * host has not seen the digest before.
- */
-export async function ensureArtifactImage({
-  source,
-  runner,
-  cacheDir,
-  artifact,
-}: {
-  source: ArtifactBytes;
-  runner: CommandRunner;
-  cacheDir: string;
-  artifact: DesiredArtifact;
-}): Promise<string> {
-  const imagePath = artifactImagePath({ cacheDir, digest: artifact.digest });
-  if (await Bun.file(imagePath).exists()) {
-    return imagePath;
-  }
-
-  const stagingDir = join(cacheDir, `.staging-${artifact.digest}`);
-  await rm(stagingDir, { recursive: true, force: true });
-  await mkdir(stagingDir, { recursive: true, mode: CACHE_DIR_MODE });
-  try {
-    const binaryPath = join(stagingDir, GUEST_BINARY_NAME);
-    await downloadAndVerify({ source, artifact, destination: binaryPath });
-    await chmod(binaryPath, BINARY_MODE);
-
+    const stagingDir = path.join(cacheDir, `.staging-${artifact.digest}`);
     const stagedImage = `${stagingDir}.squashfs`;
-    await rm(stagedImage, { force: true });
-    await runCommandOrThrow({
-      runner,
-      request: { command: ['mksquashfs', stagingDir, stagedImage, '-no-progress', '-noappend'] },
-    });
-    await mkdir(artifactDirectory({ cacheDir, digest: artifact.digest }), {
-      recursive: true,
-      mode: CACHE_DIR_MODE,
-    });
-    await rename(stagedImage, imagePath);
-    return imagePath;
-  } finally {
-    await rm(stagingDir, { recursive: true, force: true });
-  }
-}
+    return yield* Effect.acquireUseRelease(
+      fs
+        .remove(stagingDir, { recursive: true, force: true })
+        .pipe(
+          Effect.andThen(fs.makeDirectory(stagingDir, { recursive: true, mode: CACHE_DIR_MODE })),
+        ),
+      () =>
+        Effect.gen(function* () {
+          const binaryPath = path.join(stagingDir, GUEST_BINARY_NAME);
+          yield* downloadAndVerify({ artifact, destination: binaryPath });
+          yield* fs.chmod(binaryPath, BINARY_MODE);
+          yield* fs.remove(stagedImage, { force: true });
+          yield* stdoutOf({
+            command: ['mksquashfs', stagingDir, stagedImage, '-no-progress', '-noappend'],
+          });
+          yield* fs.makeDirectory(path.dirname(imagePath), {
+            recursive: true,
+            mode: CACHE_DIR_MODE,
+          });
+          yield* fs.rename(stagedImage, imagePath);
+          return imagePath;
+        }),
+      () => fs.remove(stagingDir, { recursive: true, force: true }).pipe(Effect.ignore),
+    );
+  });

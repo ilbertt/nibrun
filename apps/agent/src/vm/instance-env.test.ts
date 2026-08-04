@@ -5,13 +5,14 @@ import {
   type GuestPort,
   type SecretString,
 } from '@repo/protocol';
-import { renderInstanceEnv, UnrepresentableEnvironmentError } from '#vm/instance-env.ts';
+import { Either } from 'effect';
+import { renderInstanceEnv } from '#vm/instance-env.ts';
 
 const secret = (value: string) => value as SecretString;
 
-const render = (
-  overrides: Partial<Parameters<typeof renderInstanceEnv>[0]> = {},
-): ReturnType<typeof renderInstanceEnv> =>
+type Overrides = Partial<Parameters<typeof renderInstanceEnv>[0]>;
+
+const attempt = (overrides: Overrides = {}) =>
   renderInstanceEnv({
     guestPort: DEFAULT_GUEST_PORT,
     args: [],
@@ -20,6 +21,13 @@ const render = (
     dnsServers: [],
     ...overrides,
   });
+
+const render = (overrides: Overrides = {}) => Either.getOrThrow(attempt(overrides));
+
+const refusedVariable = (overrides: Overrides) => {
+  const result = attempt(overrides);
+  return Either.isLeft(result) ? result.left : undefined;
+};
 
 // apps/runtime/src/config.c accepts NIBRUN_ and ENV_ and rejects every other line, so these
 // assertions are the boot contract rather than a formatting preference.
@@ -73,23 +81,18 @@ describe('what has no representation fails the instance', () => {
   test.each([['\n'], ['\r'], ['\0']])(
     'a value containing %j is refused rather than truncated',
     (character) => {
-      expect(() => render({ environment: { BAD: secret(`a${character}INJECTED=1`) } })).toThrow(
-        UnrepresentableEnvironmentError,
-      );
+      expect(
+        refusedVariable({ environment: { BAD: secret(`a${character}INJECTED=1`) } })?.variableName,
+      ).toBe('BAD');
     },
   );
 
-  test('the error names the variable but never carries its value', () => {
-    const error = (() => {
-      try {
-        render({ environment: { API_KEY: secret('secret-value\nmore') } });
-      } catch (caught) {
-        return caught as Error;
-      }
-      return undefined;
-    })();
-    expect(error?.message).toContain('API_KEY');
-    expect(error?.message).not.toContain('secret-value');
+  test('the failure names the variable but never carries its value', () => {
+    const refused = refusedVariable({
+      environment: { API_KEY: secret('secret-value\nmore') },
+    });
+    expect(refused?.variableName).toBe('API_KEY');
+    expect(JSON.stringify(refused)).not.toContain('secret-value');
   });
 });
 
@@ -107,6 +110,6 @@ describe('arguments reach the guest as the user wrote them', () => {
   });
 
   test('an argument with no representation fails the instance rather than truncating', () => {
-    expect(() => render({ args: ['--flag=one\ntwo'] })).toThrow(UnrepresentableEnvironmentError);
+    expect(refusedVariable({ args: ['--flag=one\ntwo'] })?.variableName).toBe('NIBRUN_ARG_0');
   });
 });

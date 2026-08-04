@@ -1,13 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { InstanceId } from '@repo/protocol';
-import {
-  instanceIdFromUnit,
-  parseProperties,
-  parsePropertyBlocks,
-  parseUnitNames,
-  unitStatusFrom,
-  vmUnitName,
-} from '#vm/systemd.ts';
+import { instanceIdFromUnit, parseUnitNames, vmUnitName } from '#vm/systemd.ts';
+import { parseProperties, parsePropertyBlocks, unitStatusFrom } from '#vm/unit-status.ts';
 
 describe('unit naming round-trips', () => {
   test('an instance id becomes a template instance and back', () => {

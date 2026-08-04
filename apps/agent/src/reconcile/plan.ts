@@ -14,62 +14,44 @@ import type {
 } from '@repo/protocol';
 
 export type ObservedInstance = {
-  instanceId: InstanceId;
-  // Absent for a unit systemd knows about that this agent has no record of — which is what a
-  // host looks like after its state file is lost. The identity is unrecoverable from the unit
-  // alone, and every path below then treats it as a mismatch, which is the safe reading.
-  appId?: AppId;
-  volumeId?: VolumeId;
-  deploymentId?: DeploymentId;
-  // A unit systemd still knows about, whether or not it is currently active.
-  present: boolean;
-  running: boolean;
-  // The VM stopped without this agent asking it to: the guest exhausted the tenant process's
-  // restart budget and powered itself off, or Firecracker died. Booting it again here would
-  // hide a broken deploy behind a host that retries forever, so it is left alone until the
-  // reconciler says something new.
-  exited: boolean;
+  readonly instanceId: InstanceId;
+  /** Absent for a unit this agent has no record of — a host that lost its state file. */
+  readonly appId?: AppId;
+  readonly volumeId?: VolumeId;
+  readonly deploymentId?: DeploymentId;
+  readonly present: boolean;
+  readonly running: boolean;
+  /** Stopped without being asked to: left alone, because rebooting would hide a broken deploy. */
+  readonly exited: boolean;
 };
 
-/**
- * A device file found in a ZeroFS filesystem, and where it was found.
- *
- * `storagePrefix` and `devicePath` are carried here rather than looked up again by whoever
- * reports: this is the only point that knows which filesystem the file was enumerated from, and
- * a second derivation of it is a second thing that can disagree.
- */
 export type ObservedVolume = {
-  volumeId: VolumeId;
-  attached: boolean;
-  sizeBytes: number;
-  storagePrefix: ObjectKey;
-  devicePath?: string;
+  readonly volumeId: VolumeId;
+  readonly attached: boolean;
+  readonly sizeBytes: number;
+  readonly storagePrefix: ObjectKey;
+  readonly devicePath?: string;
 };
 
 export type ObservedCheckpoint = {
-  checkpointId: CheckpointId;
-  volumeId: VolumeId;
+  readonly checkpointId: CheckpointId;
+  readonly volumeId: VolumeId;
 };
 
 /**
- * An export this host has already written, as it remembers it.
- *
- * The one thing here that is remembered rather than observed. Every other observation is a
- * question asked of the host — systemd, the ZeroFS mount, the admin RPC — but a host holds
- * write-only credentials on the export bucket, so it cannot read back whether the object it
- * produced is there. Re-writing on doubt is not the safe default it usually is: it would
- * re-upload a tenant's entire dataset on every agent restart.
+ * Remembered rather than observed: the host holds write-only credentials on the export bucket,
+ * so re-writing on doubt would re-upload a tenant's whole dataset on every agent restart.
  */
 export type ObservedExport = {
-  exportId: ExportId;
-  written: boolean;
+  readonly exportId: ExportId;
+  readonly written: boolean;
 };
 
 export type ObservedState = {
-  instances: ObservedInstance[];
-  volumes: ObservedVolume[];
-  checkpoints: ObservedCheckpoint[];
-  exports: ObservedExport[];
+  readonly instances: readonly ObservedInstance[];
+  readonly volumes: readonly ObservedVolume[];
+  readonly checkpoints: readonly ObservedCheckpoint[];
+  readonly exports: readonly ObservedExport[];
 };
 
 export const INSTANCE_STOP_REASONS = ['desired-stopped', 'not-desired', 'superseded'] as const;
@@ -77,48 +59,47 @@ export const INSTANCE_STOP_REASONS = ['desired-stopped', 'not-desired', 'superse
 export type InstanceStopReason = (typeof INSTANCE_STOP_REASONS)[number];
 
 export type InstancePlan =
-  | { action: 'start'; desired: DesiredInstance }
-  | { action: 'replace'; desired: DesiredInstance }
-  | { action: 'stop'; instanceId: InstanceId; reason: InstanceStopReason }
-  | { action: 'forget'; instanceId: InstanceId }
-  | { action: 'none'; instanceId: InstanceId };
+  | { readonly action: 'start'; readonly desired: DesiredInstance }
+  | { readonly action: 'replace'; readonly desired: DesiredInstance }
+  | {
+      readonly action: 'stop';
+      readonly instanceId: InstanceId;
+      readonly reason: InstanceStopReason;
+    }
+  | { readonly action: 'forget'; readonly instanceId: InstanceId }
+  | { readonly action: 'none'; readonly instanceId: InstanceId };
 
 export type VolumePlan =
-  | { action: 'provision'; desired: DesiredVolume }
-  | { action: 'teardown'; desired: DesiredVolume }
-  | { action: 'blocked'; desired: DesiredVolume; blockedBy: InstanceId[] }
-  | { action: 'none'; volumeId: VolumeId };
+  | { readonly action: 'provision'; readonly desired: DesiredVolume }
+  | { readonly action: 'teardown'; readonly desired: DesiredVolume }
+  | {
+      readonly action: 'blocked';
+      readonly desired: DesiredVolume;
+      readonly blockedBy: readonly InstanceId[];
+    }
+  | { readonly action: 'none'; readonly volumeId: VolumeId };
 
 export type CheckpointPlan =
-  | { action: 'create'; desired: DesiredCheckpoint }
-  | { action: 'delete'; desired: DesiredCheckpoint }
-  | { action: 'none'; checkpointId: CheckpointId };
+  | { readonly action: 'create'; readonly desired: DesiredCheckpoint }
+  | { readonly action: 'delete'; readonly desired: DesiredCheckpoint }
+  | { readonly action: 'none'; readonly checkpointId: CheckpointId };
 
-/**
- * `forget` rather than `delete`: the host cannot remove an object it has no delete permission
- * for, and does not need to. Expiry is the bucket's lifecycle rule, which is what makes it
- * unforgettable — so `absent` here means this host stops carrying the record, nothing more.
- */
+/** `forget`, not `delete`: expiry is the bucket's lifecycle rule, which is what makes it unforgettable. */
 export type ExportPlan =
-  | { action: 'write'; desired: DesiredExport }
-  | { action: 'forget'; exportId: ExportId }
-  | { action: 'none'; exportId: ExportId };
+  | { readonly action: 'write'; readonly desired: DesiredExport }
+  | { readonly action: 'forget'; readonly exportId: ExportId }
+  | { readonly action: 'none'; readonly exportId: ExportId };
 
 export type ReconcilePlan = {
-  instances: InstancePlan[];
-  volumes: VolumePlan[];
-  checkpoints: CheckpointPlan[];
-  exports: ExportPlan[];
+  readonly instances: readonly InstancePlan[];
+  readonly volumes: readonly VolumePlan[];
+  readonly checkpoints: readonly CheckpointPlan[];
+  readonly exports: readonly ExportPlan[];
 };
 
 /**
- * Whether this plan left work it could not finish on this pass.
- *
- * A blocked teardown is the case that matters: the volume is still held by an instance this
- * reconcile is only now stopping, so it converges on a later pass. Nothing would otherwise run
- * one — the agent reconciles when the poll reports a new generation, and a volume it deferred
- * does not change the generation — so the deletion would wait for an unrelated change to come
- * along and carry it.
+ * A blocked teardown converges on a later pass, and nothing else would run one: only a new
+ * generation triggers a reconcile, and deferred work does not change the generation.
  */
 export function hasDeferredWork(plan: ReconcilePlan): boolean {
   return plan.volumes.some((action) => action.action === 'blocked');
@@ -133,13 +114,9 @@ const byId = <Item, Key extends string>({
 }) => new Map(items.map((item) => [key(item), item] as const));
 
 /**
- * Diffs desired state against what the host is observed to be doing.
- *
- * The asymmetry between the two lists is the point. `instances` is authoritative, so a microVM
- * the control plane does not mention is one this host stops — that is what makes an orphaned
- * VM converge away without anybody sending a command. `volumes` is not: removal is only ever
- * an explicit `absent`, because a truncated or partially-written response must not be able to
- * destroy a tenant's filesystem. A volume missing from desired state is left exactly as it is.
+ * The asymmetry is the point. `instances` is authoritative, so a microVM the control plane does
+ * not mention is stopped. `volumes` is not: removal is only ever an explicit `absent`, because a
+ * truncated response must not be able to destroy a tenant's filesystem.
  */
 export function planReconcile({
   desired,
@@ -226,10 +203,9 @@ function planVolumes({
     usedBy.set(instance.volumeId, [...(usedBy.get(instance.volumeId) ?? []), instance.instanceId]);
   }
   for (const instance of desired.instances) {
-    if (usedBy.has(instance.volumeId)) {
-      continue;
+    if (!usedBy.has(instance.volumeId)) {
+      usedBy.set(instance.volumeId, []);
     }
-    usedBy.set(instance.volumeId, []);
   }
 
   return desired.volumes.map((wanted): VolumePlan => {
@@ -251,12 +227,8 @@ function planVolumes({
 }
 
 /**
- * An export is written once and never rewritten.
- *
- * Unlike every other plan here this one is not a diff against reality, because the host cannot
- * see the bucket it writes to. A bundle already written is left alone even if the object has
- * since been deleted or expired underneath it — re-reading a tenant's whole filesystem on the
- * strength of a guess is worse than an export the control plane has to ask for again.
+ * Not a diff against reality: the host cannot see the bucket it writes to, so a bundle already
+ * written is left alone even if the object has since expired underneath it.
  */
 function planExports({
   desired,

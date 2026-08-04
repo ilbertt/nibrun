@@ -1,35 +1,49 @@
 import { describe, expect, test } from 'bun:test';
 import type { AppId, HostPort, Ipv4Address } from '@repo/protocol';
+import { Effect, Either, Layer, Option } from 'effect';
+import { AgentConfig } from '#config.ts';
 import {
-  describeSlot,
-  HOST_PORT_BASE,
+  assignmentsFrom,
   readSlotRecords,
   SlotAllocator,
-  SlotExhaustedError,
+  type SlotRecords,
 } from '#network/allocator.ts';
+import { describeSlot, HOST_PORT_BASE, SLOT_COUNT } from '#network/slot.ts';
+import { platform } from '#testing.ts';
 
 const app = (name: string | number) => `app-${name}` as AppId;
 
-const SLOT_COUNT = 200;
 const SUBNET_PREFIX_LENGTH = 30;
 const BOUNDARY_SLOT = 64;
 const SOME_SLOT = 3;
 const DISTINCT_APPS = ['alpha', 'beta', 'gamma'];
 const BEYOND_THE_LAST_SLOT = 1_000;
 
+// A directory nothing writes to: the allocator starts empty and never persists during a test.
+const config = Layer.succeed(AgentConfig, {
+  slotsFile: '/nonexistent/nibrun-test/slots.json',
+} as AgentConfig);
+
+const withAllocator = <A>(use: (allocator: SlotAllocator) => Effect.Effect<A, never, never>) =>
+  Effect.runPromise(
+    Effect.flatMap(SlotAllocator, use).pipe(
+      Effect.provide(SlotAllocator.Default.pipe(Layer.provide(Layer.merge(config, platform)))),
+    ),
+  );
+
 describe('slot derivation', () => {
   test('every per-app resource comes from the one number', () => {
     expect(describeSlot({ slot: 0, appId: app(0) })).toEqual({
       slot: 0,
       appId: app(0),
-      hostPort: HOST_PORT_BASE,
-      hostIpv4: '10.201.0.1',
-      guestIpv4: '10.201.0.2',
+      hostPort: HOST_PORT_BASE as HostPort,
+      hostIpv4: '10.201.0.1' as Ipv4Address,
+      guestIpv4: '10.201.0.2' as Ipv4Address,
       guestMac: '02:00:0a:c9:00:02',
       tapName: 'nbr0',
       nbdDevicePath: '/dev/nbd0',
       subnetPrefixLength: SUBNET_PREFIX_LENGTH,
-    } as ReturnType<typeof describeSlot>);
+    });
   });
 
   test('slots do not overlap', () => {
@@ -48,44 +62,56 @@ describe('slot derivation', () => {
 });
 
 describe('allocation is stable for the lifetime of an app', () => {
-  test('a second allocation for the same app returns the same slot', () => {
-    const allocator = new SlotAllocator();
-    const first = allocator.allocate(app(1));
-    const second = allocator.allocate(app(1));
-    expect(second).toEqual(first);
+  test('a redeploy keeps the host port, which is what makes it invisible to routing', async () => {
+    const ports = await withAllocator((allocator) =>
+      Effect.gen(function* () {
+        const first = yield* allocator.allocate(app(1));
+        const second = yield* allocator.allocate(app(1));
+        return [first.hostPort, second.hostPort];
+      }).pipe(Effect.orDie),
+    );
+    expect(ports[0]).toBe(ports[1] as HostPort);
   });
 
-  test('a redeploy keeps the host port, which is what makes it invisible to routing', () => {
-    const allocator = new SlotAllocator();
-    const before = allocator.allocate(app(1)).hostPort;
-    // A redeploy is a new instance of the same app; nothing about the app's slot changes.
-    expect(allocator.allocate(app(1)).hostPort).toBe(before);
+  test('distinct apps never share a slot', async () => {
+    const ports = await withAllocator((allocator) =>
+      Effect.forEach(DISTINCT_APPS, (name) =>
+        Effect.map(allocator.allocate(app(name)), (slot) => slot.hostPort),
+      ).pipe(Effect.orDie),
+    );
+    expect(new Set(ports).size).toBe(DISTINCT_APPS.length);
   });
 
-  test('distinct apps never share a slot', () => {
-    const allocator = new SlotAllocator();
-    const ports = new Set(DISTINCT_APPS.map((name) => allocator.allocate(app(name)).hostPort));
-    expect(ports.size).toBe(DISTINCT_APPS.length);
+  test('a released slot becomes available again', async () => {
+    const [released, reused] = await withAllocator((allocator) =>
+      Effect.gen(function* () {
+        const first = yield* allocator.allocate(app(1));
+        yield* allocator.release(app(1));
+        const gone = yield* allocator.lookup(app(1));
+        const next = yield* allocator.allocate(app(2));
+        return [Option.isNone(gone) ? first.slot : -1, next.slot];
+      }).pipe(Effect.orDie),
+    );
+    expect(reused).toBe(released as number);
+  });
+
+  test('running out of slots is a typed failure, not a silent reuse', async () => {
+    const exhausted = await withAllocator((allocator) =>
+      Effect.gen(function* () {
+        yield* Effect.forEach(
+          Array.from({ length: SLOT_COUNT }, (_, index) => index),
+          (index) => allocator.allocate(app(index)),
+          { discard: true },
+        ).pipe(Effect.orDie);
+        return yield* Effect.either(allocator.allocate(app(BEYOND_THE_LAST_SLOT)));
+      }),
+    );
+    expect(Either.isLeft(exhausted) && exhausted.left._tag).toBe('SlotExhausted');
   });
 });
 
 describe('allocation survives an agent restart', () => {
-  test('records round-trip through the persisted shape', () => {
-    const allocator = new SlotAllocator();
-    allocator.allocate(app(1));
-    allocator.allocate(app(2));
-    const revived = SlotAllocator.fromRecords(
-      readSlotRecords(JSON.parse(JSON.stringify(allocator.toRecords()))),
-    );
-    expect(revived.lookup(app(2))).toEqual(allocator.lookup(app(2)));
-  });
-
-  test('a revived allocator does not hand a live slot to a new app', () => {
-    const allocator = new SlotAllocator();
-    allocator.allocate(app(1));
-    const revived = SlotAllocator.fromRecords(allocator.toRecords());
-    expect(revived.allocate(app(BEYOND_THE_LAST_SLOT)).slot).not.toBe(revived.lookup(app(1))?.slot);
-  });
+  const slotOf = (records: SlotRecords, appId: AppId) => assignmentsFrom(records).get(appId);
 
   test('a corrupted record file degrades to an empty allocator rather than throwing', () => {
     expect(readSlotRecords('nonsense')).toEqual({});
@@ -95,28 +121,12 @@ describe('allocation survives an agent restart', () => {
   });
 
   test('duplicate slots in a persisted file are not both honoured', () => {
-    const revived = SlotAllocator.fromRecords({ 'app-1': SOME_SLOT, 'app-2': SOME_SLOT });
-    expect(revived.lookup(app(1))?.slot).toBe(SOME_SLOT);
-    expect(revived.lookup(app(2))).toBeUndefined();
+    const records = { 'app-1': SOME_SLOT, 'app-2': SOME_SLOT };
+    expect(slotOf(records, app(1))).toBe(SOME_SLOT);
+    expect(slotOf(records, app(2))).toBeUndefined();
   });
-});
 
-describe('release', () => {
-  test('a released slot becomes available again', () => {
-    const allocator = new SlotAllocator();
-    const slot = allocator.allocate(app(1)).slot;
-    allocator.release(app(1));
-    expect(allocator.lookup(app(1))).toBeUndefined();
-    expect(allocator.allocate(app(2)).slot).toBe(slot);
-  });
-});
-
-describe('exhaustion', () => {
-  test('running out of slots is an error, not a silent reuse', () => {
-    const allocator = new SlotAllocator();
-    for (let index = 0; index < SLOT_COUNT; index += 1) {
-      allocator.allocate(app(index));
-    }
-    expect(() => allocator.allocate(app(BEYOND_THE_LAST_SLOT))).toThrow(SlotExhaustedError);
+  test('a slot outside the host limit is dropped', () => {
+    expect(slotOf({ 'app-1': SLOT_COUNT }, app(1))).toBeUndefined();
   });
 });

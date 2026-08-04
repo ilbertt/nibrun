@@ -1,5 +1,6 @@
-import { open } from 'node:fs/promises';
-import { type CommandRunner, runCommandOrThrow } from '#lib/exec.ts';
+import { FileSystem } from '@effect/platform';
+import { Effect } from 'effect';
+import { stdoutOf } from '#lib/exec.ts';
 
 const SUPERBLOCK_MAGIC_OFFSET = 1080;
 const MAGIC_BYTE_COUNT = 2;
@@ -14,50 +15,33 @@ export function hasExtMagic(bytes: Uint8Array): boolean {
   if (bytes.length < MAGIC_BYTE_COUNT) {
     return false;
   }
-  const low = bytes[FIRST_BYTE] ?? 0;
-  const high = bytes[SECOND_BYTE] ?? 0;
-  return (low | (high << HIGH_BYTE_SHIFT)) === EXT_MAGIC;
+  return ((bytes[FIRST_BYTE] ?? 0) | ((bytes[SECOND_BYTE] ?? 0) << HIGH_BYTE_SHIFT)) === EXT_MAGIC;
 }
 
 /**
- * Reads the two magic bytes of the ext superblock.
- *
- * This is comparing a constant, not parsing a filesystem: the host must never let its kernel
- * interpret tenant-controlled metadata, which is the rule the export design depends on, and
- * the only thing that distinguishes a blank device from one already provisioned.
+ * Comparing a constant, not parsing a filesystem: the host must never let its kernel interpret
+ * tenant-controlled metadata, and this is the only thing distinguishing a blank device.
  */
-export async function isFormatted({ devicePath }: { devicePath: string }): Promise<boolean> {
-  const handle = await open(devicePath, 'r');
-  try {
-    const buffer = new Uint8Array(MAGIC_BYTE_COUNT);
-    await handle.read(buffer, FIRST_BYTE, MAGIC_BYTE_COUNT, SUPERBLOCK_MAGIC_OFFSET);
-    return hasExtMagic(buffer);
-  } finally {
-    await handle.close();
-  }
-}
-
-/**
- * Writes the filesystem exactly once, when the volume is provisioned.
- *
- * Writing a filesystem is not parsing one, so this stays on the host rather than in the guest,
- * and it keeps the guest runtime to mounting a device that is already valid.
- */
-export async function formatOnce({
-  runner,
-  devicePath,
-}: {
-  runner: CommandRunner;
-  devicePath: string;
-}): Promise<boolean> {
-  if (await isFormatted({ devicePath })) {
-    return false;
-  }
-  await runCommandOrThrow({
-    runner,
-    request: {
-      command: ['mkfs.ext4', '-q', '-L', FILESYSTEM_LABEL, devicePath],
-    },
+export const isFormatted = (devicePath: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    return yield* Effect.scoped(
+      Effect.gen(function* () {
+        const file = yield* fs.open(devicePath, { flag: 'r' });
+        yield* file.seek(SUPERBLOCK_MAGIC_OFFSET, 'start');
+        const buffer = new Uint8Array(MAGIC_BYTE_COUNT);
+        yield* file.read(buffer);
+        return hasExtMagic(buffer);
+      }),
+    );
   });
-  return true;
-}
+
+/** Writing a filesystem is not parsing one, so this stays on the host and the guest only mounts. */
+export const formatOnce = (devicePath: string) =>
+  Effect.gen(function* () {
+    if (yield* isFormatted(devicePath)) {
+      return false;
+    }
+    yield* stdoutOf({ command: ['mkfs.ext4', '-q', '-L', FILESYSTEM_LABEL, devicePath] });
+    return true;
+  });

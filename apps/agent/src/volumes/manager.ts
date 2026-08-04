@@ -1,31 +1,20 @@
-import { readdir, rm, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { FileSystem, Path } from '@effect/platform';
 import type { AppId, DesiredVolume, ReportedVolume, VolumeId } from '@repo/protocol';
-import type { CommandRunner } from '#lib/exec.ts';
-import { describeError, logger } from '#lib/logger.ts';
-import type { SlotAllocator } from '#network/allocator.ts';
+import { Array as Arr, Effect, Option } from 'effect';
+import { SlotAllocator } from '#network/allocator.ts';
+import type { AppSlot } from '#network/slot.ts';
 import type { ObservedVolume } from '#reconcile/plan.ts';
 import { devicePathFor, ensureDeviceFile, NBD_DIRECTORY } from '#volumes/device-file.ts';
 import { formatOnce } from '#volumes/ext4.ts';
 import { attach, detach, isAttached } from '#volumes/nbd.ts';
-import type { ZerofsFilesystem, ZerofsTopology } from '#volumes/topology.ts';
+import { type ZerofsFilesystem, ZerofsTopology } from '#volumes/topology.ts';
+import { flush } from '#volumes/zerofs.ts';
 
 const EMPTY_SIZE = 0;
 
-export type VolumeManagerOptions = {
-  runner: CommandRunner;
-  topology: ZerofsTopology;
-  allocator: SlotAllocator;
-};
-
 /**
- * What the host can say about a volume purely from having found it.
- *
- * The report is derived from the observation rather than accumulated from provisioning, so a
- * volume that is simply healthy still reports itself. Building it the other way round meant a
- * volume was described in the one reconcile that created it and never again — and since these
- * reports do not survive a restart, an agent that came back reported no volumes at all while
- * serving one.
+ * Derived from the observation rather than accumulated from provisioning, so a volume nobody
+ * touched still reports itself — and a restarted agent does not report none while serving one.
  */
 export function toReportedVolume(observed: ObservedVolume): ReportedVolume {
   return {
@@ -37,143 +26,142 @@ export function toReportedVolume(observed: ObservedVolume): ReportedVolume {
   };
 }
 
-export class VolumeManager {
-  readonly #options: VolumeManagerOptions;
+export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManager', {
+  effect: Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const topology = yield* ZerofsTopology;
+    const allocator = yield* SlotAllocator;
 
-  constructor(options: VolumeManagerOptions) {
-    this.#options = options;
-  }
+    const sizeOf = (filePath: string) =>
+      fs.stat(filePath).pipe(
+        Effect.map((info) =>
+          info.type === 'File' ? Option.some(Number(info.size)) : Option.none<number>(),
+        ),
+        Effect.orElseSucceed(() => Option.none<number>()),
+      );
 
-  /**
-   * Enumerates the device files ZeroFS is exporting, which is the truth a restarted agent
-   * converges against — not what it remembers having created.
-   */
-  async observe({
-    appIdByVolume,
-  }: {
-    appIdByVolume: ReadonlyMap<VolumeId, AppId>;
-  }): Promise<ObservedVolume[]> {
-    const observed: ObservedVolume[] = [];
-    for (const filesystem of this.#options.topology.all()) {
-      observed.push(...(await this.#observeFilesystem({ filesystem, appIdByVolume })));
-    }
-    return observed;
-  }
-
-  async provision({ desired }: { desired: DesiredVolume }): Promise<ReportedVolume> {
-    const filesystem = this.#options.topology.place();
-    const slot = this.#options.allocator.allocate(desired.appId);
-    const path = devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId });
-    const sizeBytes = await ensureDeviceFile({ path, sizeBytes: desired.sizeBytes });
-
-    if (!(await isAttached({ runner: this.#options.runner, devicePath: slot.nbdDevicePath }))) {
-      await attach({
-        runner: this.#options.runner,
-        socketPath: filesystem.nbdSocketPath,
-        devicePath: slot.nbdDevicePath,
-        volumeId: desired.volumeId,
+    const slotFor = ({
+      volumeId,
+      appIdByVolume,
+    }: {
+      volumeId: VolumeId;
+      appIdByVolume: ReadonlyMap<VolumeId, AppId>;
+    }) =>
+      Option.match(Option.fromNullable(appIdByVolume.get(volumeId)), {
+        onNone: () => Effect.succeedNone,
+        onSome: allocator.lookup,
       });
-    }
 
-    const formatted = await formatOnce({
-      runner: this.#options.runner,
-      devicePath: slot.nbdDevicePath,
-    });
-    if (formatted) {
-      logger.info({
-        message: 'volume formatted',
-        volumeId: desired.volumeId,
-        device: slot.nbdDevicePath,
+    const observeFile = ({
+      filesystem,
+      volumeId,
+      slot,
+    }: {
+      filesystem: ZerofsFilesystem;
+      volumeId: VolumeId;
+      slot: Option.Option<AppSlot>;
+    }) =>
+      Effect.gen(function* () {
+        const sizeBytes = yield* sizeOf(
+          path.join(filesystem.mountPath, NBD_DIRECTORY, volumeId),
+        );
+        if (Option.isNone(sizeBytes)) {
+          return Option.none<ObservedVolume>();
+        }
+        const attached = Option.isSome(slot) ? yield* isAttached(slot.value.nbdDevicePath) : false;
+        return Option.some<ObservedVolume>({
+          volumeId,
+          sizeBytes: sizeBytes.value,
+          storagePrefix: filesystem.storagePrefix,
+          attached,
+          ...Option.match(slot, {
+            onNone: () => ({}),
+            onSome: (value) => ({ devicePath: value.nbdDevicePath }),
+          }),
+        });
       });
-    }
 
-    return {
-      volumeId: desired.volumeId,
-      state: 'ready',
-      sizeBytes,
-      devicePath: slot.nbdDevicePath,
-      storagePrefix: filesystem.storagePrefix,
-    };
-  }
+    /** The truth a restarted agent converges against: what ZeroFS is exporting, not what it remembers. */
+    const observe = (appIdByVolume: ReadonlyMap<VolumeId, AppId>) =>
+      Effect.forEach(topology.all, (filesystem) =>
+        Effect.gen(function* () {
+          const directory = path.join(filesystem.mountPath, NBD_DIRECTORY);
+          const names = yield* fs.readDirectory(directory).pipe(
+            Effect.tapError((error) =>
+              Effect.logWarning('zerofs nbd directory unreadable', error).pipe(
+                Effect.annotateLogs({ directory }),
+              ),
+            ),
+            Effect.orElseSucceed(() => [] as string[]),
+          );
+          const observed = yield* Effect.forEach(names, (name) =>
+            Effect.flatMap(
+              slotFor({ volumeId: name as VolumeId, appIdByVolume }),
+              (slot) => observeFile({ filesystem, volumeId: name as VolumeId, slot }),
+            ),
+          );
+          return Arr.getSomes(observed);
+        }),
+      ).pipe(Effect.map((byFilesystem) => byFilesystem.flat()));
 
-  /**
-   * The only path that destroys tenant data, and it runs only for a volume the control plane
-   * has explicitly marked `absent`. A flush first, so the detach happens at a durability point
-   * rather than dropping whatever the periodic flush had not yet uploaded — with `ignore_fsync`
-   * the guest's own barriers were never a durability point at all.
-   */
-  async teardown({ desired }: { desired: DesiredVolume }): Promise<ReportedVolume> {
-    const filesystem = this.#options.topology.place();
-    const slot = this.#options.allocator.lookup(desired.appId);
-    await filesystem.admin.flush();
-    if (slot) {
-      await detach({ runner: this.#options.runner, devicePath: slot.nbdDevicePath });
-    }
-    await rm(devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId }), {
-      force: true,
-    });
-    this.#options.allocator.release(desired.appId);
-    return { volumeId: desired.volumeId, state: 'deleting', sizeBytes: EMPTY_SIZE };
-  }
+    const provision = (desired: DesiredVolume) =>
+      Effect.gen(function* () {
+        const filesystem = topology.place();
+        const slot = yield* allocator.allocate(desired.appId);
+        const sizeBytes = yield* ensureDeviceFile({
+          path: devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId, path }),
+          sizeBytes: desired.sizeBytes,
+        });
 
-  async #observeFilesystem({
-    filesystem,
-    appIdByVolume,
-  }: {
-    filesystem: ZerofsFilesystem;
-    appIdByVolume: ReadonlyMap<VolumeId, AppId>;
-  }): Promise<ObservedVolume[]> {
-    const directory = join(filesystem.mountPath, NBD_DIRECTORY);
-    let names: string[];
-    try {
-      names = await readdir(directory);
-    } catch (error) {
-      logger.warn({
-        message: 'zerofs nbd directory unreadable',
-        directory,
-        ...describeError(error),
+        if (!(yield* isAttached(slot.nbdDevicePath))) {
+          yield* attach({
+            socketPath: filesystem.nbdSocketPath,
+            devicePath: slot.nbdDevicePath,
+            volumeId: desired.volumeId,
+          });
+        }
+
+        if (yield* formatOnce(slot.nbdDevicePath)) {
+          yield* Effect.logInfo('volume formatted').pipe(
+            Effect.annotateLogs({ volumeId: desired.volumeId, device: slot.nbdDevicePath }),
+          );
+        }
+
+        return {
+          volumeId: desired.volumeId,
+          state: 'ready',
+          sizeBytes,
+          devicePath: slot.nbdDevicePath,
+          storagePrefix: filesystem.storagePrefix,
+        } satisfies ReportedVolume;
       });
-      return [];
-    }
 
-    const observed: ObservedVolume[] = [];
-    for (const name of names) {
-      const volumeId = name as VolumeId;
-      const sizeBytes = await this.#sizeOf(join(directory, name));
-      if (sizeBytes === undefined) {
-        continue;
-      }
-      const slot = this.#slotFor({ volumeId, appIdByVolume });
-      observed.push({
-        volumeId,
-        sizeBytes,
-        storagePrefix: filesystem.storagePrefix,
-        attached: slot
-          ? await isAttached({ runner: this.#options.runner, devicePath: slot.nbdDevicePath })
-          : false,
-        ...(slot ? { devicePath: slot.nbdDevicePath } : {}),
+    /**
+     * The only path that destroys tenant data, and it runs only for an explicit `absent`. The
+     * flush first, so the detach happens at a durability point rather than dropping whatever the
+     * periodic flush had not yet uploaded.
+     */
+    const teardown = (desired: DesiredVolume) =>
+      Effect.gen(function* () {
+        const filesystem = topology.place();
+        const slot = yield* allocator.lookup(desired.appId);
+        yield* flush(filesystem.admin);
+        if (Option.isSome(slot)) {
+          yield* detach(slot.value.nbdDevicePath);
+        }
+        yield* fs.remove(
+          devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId, path }),
+          { force: true },
+        );
+        yield* allocator.release(desired.appId);
+        return {
+          volumeId: desired.volumeId,
+          state: 'deleting',
+          sizeBytes: EMPTY_SIZE,
+        } satisfies ReportedVolume;
       });
-    }
-    return observed;
-  }
 
-  async #sizeOf(path: string): Promise<number | undefined> {
-    try {
-      const entry = await stat(path);
-      return entry.isFile() ? entry.size : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  #slotFor({
-    volumeId,
-    appIdByVolume,
-  }: {
-    volumeId: VolumeId;
-    appIdByVolume: ReadonlyMap<VolumeId, AppId>;
-  }) {
-    const appId = appIdByVolume.get(volumeId);
-    return appId === undefined ? undefined : this.#options.allocator.lookup(appId);
-  }
-}
+    return { observe, provision, teardown };
+  }),
+}) {}

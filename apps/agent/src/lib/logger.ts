@@ -1,44 +1,35 @@
-import { nowTimestamp } from '#lib/clock.ts';
+import { Cause, Config, ConfigError, Effect, Either, Layer, Logger, LogLevel } from 'effect';
 
-const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
+const LEVELS = new Map<string, LogLevel.LogLevel>(
+  LogLevel.allLevels.map((level) => [level.label, level]),
+);
 
-type LogLevel = (typeof LOG_LEVELS)[number];
+const configuredLevel = Config.string('AGENT_LOG_LEVEL').pipe(
+  Config.mapOrFail((value) =>
+    Either.fromNullable(LEVELS.get(value.toUpperCase()), () =>
+      ConfigError.InvalidData(['AGENT_LOG_LEVEL'], `${value} is not a log level`),
+    ),
+  ),
+  Config.withDefault(LogLevel.Info),
+);
 
-const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
+// systemd captures this into the journal, separately from the tenant stream this process forwards.
+const stderrJson = Logger.make<unknown, void>(({ annotations, cause, date, logLevel, message }) => {
+  const line = JSON.stringify({
+    ts: date.toISOString(),
+    level: logLevel.label.toLowerCase(),
+    message,
+    ...Object.fromEntries(annotations),
+    ...(Cause.isEmpty(cause) ? {} : { error: Cause.pretty(cause) }),
+  });
+  process.stderr.write(`${line}\n`);
+});
 
-const isLogLevel = (value: string): value is LogLevel =>
-  (LOG_LEVELS as readonly string[]).includes(value);
-
-const configuredLevel = (): LogLevel => {
-  const value = Bun.env.AGENT_LOG_LEVEL?.toLowerCase() ?? '';
-  return isLogLevel(value) ? value : 'info';
-};
-
-let threshold = LEVEL_ORDER[configuredLevel()];
-
-export const setLogLevel = ({ level }: { level: LogLevel }) => {
-  threshold = LEVEL_ORDER[level];
-};
-
-export type LogEvent = { message: string } & Record<string, unknown>;
-
-// One JSON object per line on stderr. systemd captures the agent's own operational messages
-// into the journal, separately from the tenant stream this process forwards.
-const emit = ({ level, event }: { level: LogLevel; event: LogEvent }) => {
-  if (LEVEL_ORDER[level] < threshold) {
-    return;
-  }
-  process.stderr.write(`${JSON.stringify({ ts: nowTimestamp(), level, ...event })}\n`);
-};
-
-export const describeError = (error: unknown) =>
-  error instanceof Error
-    ? { error: error.message, errorName: error.name }
-    : { error: String(error) };
-
-export const logger = {
-  debug: (event: LogEvent) => emit({ level: 'debug', event }),
-  info: (event: LogEvent) => emit({ level: 'info', event }),
-  warn: (event: LogEvent) => emit({ level: 'warn', event }),
-  error: (event: LogEvent) => emit({ level: 'error', event }),
-};
+export const AgentLogger = Layer.unwrapEffect(
+  Effect.map(configuredLevel, (level) =>
+    Layer.merge(
+      Logger.replace(Logger.defaultLogger, stderrJson),
+      Logger.minimumLogLevel(level),
+    ),
+  ),
+);

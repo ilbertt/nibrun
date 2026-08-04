@@ -1,214 +1,191 @@
-import { Buffer } from 'node:buffer';
-import { chmod, mkdir, rm } from 'node:fs/promises';
-import { createServer, type Server, type Socket } from 'node:net';
-import { dirname, join } from 'node:path';
-import type {
-  AppId,
-  DeploymentId,
-  InstanceId,
-  TenantLogEvent,
-  TenantLogStream,
-} from '@repo/protocol';
+import { join } from 'node:path';
+import { FileSystem, Path, type Socket } from '@effect/platform';
+import { BunSocketServer } from '@effect/platform-bun';
+import type { AppId, DeploymentId, InstanceId, TenantLogStream } from '@repo/protocol';
+import { Effect, Either, Ref, Scope } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
-import { logger } from '#lib/logger.ts';
-import { GuestLogFrameDecoder } from '#logs/guest-protocol.ts';
+import { decodeFrames, EMPTY_BUFFER } from '#logs/guest-protocol.ts';
+import { TenantLogQueue } from '#logs/queue.ts';
 
 export const TENANT_LOG_VSOCK_PORT = 51000;
 export const TENANT_LOG_VSOCK_FILENAME = 'logs.vsock';
 
 const PRIVATE_SOCKET_MODE = 0o600;
-// The guest runtime keeps one connection and reconnects on a delay, so the only overlap is a
-// replacement arriving before the host has reaped the socket it replaces. Past that, the peer is
-// a kernel the tenant controls, and every accepted socket costs the host a decoder it did not ask
-// for.
+/** The peer is a kernel the tenant controls, and every accepted socket costs the host a decoder. */
 const MAX_GUEST_CONNECTIONS = 4;
 
 export type TenantLogSource = {
-  appId: AppId;
-  deploymentId: DeploymentId;
-  instanceId: InstanceId;
+  readonly appId: AppId;
+  readonly deploymentId: DeploymentId;
+  readonly instanceId: InstanceId;
 };
+
+type LogEventBody =
+  | { readonly kind: 'data'; readonly stream: TenantLogStream; readonly text: string }
+  | { readonly kind: 'gap'; readonly droppedBytes: number };
 
 type Attachment = {
-  source: TenantLogSource;
-  sourceId: string;
-  socketPath: string;
-  server: Server;
-  sockets: Set<Socket>;
-  nextSequence: number;
+  readonly sourceId: string;
+  readonly socketPath: string;
+  readonly source: Ref.Ref<TenantLogSource>;
+  readonly sequence: Ref.Ref<number>;
+  readonly scope: Scope.CloseableScope;
 };
 
-export function tenantLogSocketPath({ workingDir }: { workingDir: string }): string {
-  return join(workingDir, `${TENANT_LOG_VSOCK_FILENAME}_${TENANT_LOG_VSOCK_PORT}`);
-}
+export const tenantLogSocketPath = ({ workingDir }: { workingDir: string }): string =>
+  join(workingDir, `${TENANT_LOG_VSOCK_FILENAME}_${TENANT_LOG_VSOCK_PORT}`);
 
-export class TenantLogReceiver {
-  readonly #publish: (event: TenantLogEvent) => void;
-  readonly #attachments = new Map<InstanceId, Attachment>();
+export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('TenantLogReceiver', {
+  scoped: Effect.gen(function* () {
+    const logs = yield* TenantLogQueue;
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const attachments = yield* Ref.make(new Map<InstanceId, Attachment>());
+    const dropped = yield* Ref.make(0);
 
-  constructor({ publish }: { publish: (event: TenantLogEvent) => void }) {
-    this.#publish = publish;
-  }
-
-  async attach({
-    source,
-    socketPath,
-  }: {
-    source: TenantLogSource;
-    socketPath: string;
-  }): Promise<void> {
-    const existing = this.#attachments.get(source.instanceId);
-    if (existing?.socketPath === socketPath) {
-      existing.source = source;
-      return;
-    }
-    if (existing) {
-      await this.detach({ instanceId: source.instanceId });
-    }
-    for (const attached of this.#attachments.values()) {
-      if (attached.socketPath === socketPath) {
-        await this.detach({ instanceId: attached.source.instanceId });
-        break;
+    const countDrop = Effect.gen(function* () {
+      const total = yield* Ref.updateAndGet(dropped, (count) => count + 1);
+      // Powers of two only: a full buffer would otherwise log once per dropped event.
+      if ((total & (total - 1)) === 0) {
+        yield* Effect.logWarning('tenant log upload buffer full').pipe(
+          Effect.annotateLogs({ droppedEvents: total }),
+        );
       }
-    }
+    });
 
-    await mkdir(dirname(socketPath), { recursive: true });
-    await rm(socketPath, { force: true });
-    const sockets = new Set<Socket>();
-    let attachment: Attachment;
-    const server = createServer((socket) => this.#accept({ attachment, socket }));
-    attachment = {
+    const emit = ({ attachment, event }: { attachment: Attachment; event: LogEventBody }) =>
+      Effect.gen(function* () {
+        const accepted = yield* logs.publish({
+          ...(yield* Ref.get(attachment.source)),
+          sourceId: attachment.sourceId,
+          sequence: yield* Ref.getAndUpdate(attachment.sequence, (value) => value + 1),
+          observedAt: yield* nowTimestamp,
+          ...event,
+        });
+        if (!accepted) {
+          yield* countDrop;
+        }
+      });
+
+    const pump = ({ attachment, socket }: { attachment: Attachment; socket: Socket.Socket }) =>
+      Effect.gen(function* () {
+        const buffered = yield* Ref.make(EMPTY_BUFFER);
+        const text: Record<TenantLogStream, TextDecoder> = {
+          stdout: new TextDecoder(),
+          stderr: new TextDecoder(),
+        };
+
+        yield* socket.run((chunk) =>
+          Effect.gen(function* () {
+            const decoded = decodeFrames({ buffered: yield* Ref.get(buffered), chunk });
+            if (Either.isLeft(decoded)) {
+              return yield* decoded.left;
+            }
+            yield* Ref.set(buffered, decoded.right.rest);
+            for (const frame of decoded.right.frames) {
+              if (frame.kind === 'gap') {
+                yield* emit({ attachment, event: frame });
+                continue;
+              }
+              const decodedText = text[frame.stream].decode(frame.bytes, { stream: true });
+              if (decodedText.length > 0) {
+                yield* emit({
+                  attachment,
+                  event: { kind: 'data', stream: frame.stream, text: decodedText },
+                });
+              }
+            }
+          }),
+        );
+
+        for (const stream of ['stdout', 'stderr'] as const) {
+          const remainder = text[stream].decode();
+          if (remainder.length > 0) {
+            yield* emit({ attachment, event: { kind: 'data', stream, text: remainder } });
+          }
+        }
+      });
+
+    const serve = ({ attachment }: { attachment: Attachment }) =>
+      Effect.gen(function* () {
+        const connections = yield* Ref.make(0);
+        const server = yield* BunSocketServer.make({ path: attachment.socketPath });
+        yield* fs.chmod(attachment.socketPath, PRIVATE_SOCKET_MODE);
+        yield* Effect.forkScoped(
+          server.run((socket) =>
+            Effect.acquireUseRelease(
+              Ref.updateAndGet(connections, (count) => count + 1),
+              (count) =>
+                count > MAX_GUEST_CONNECTIONS
+                  ? Effect.void
+                  : pump({ attachment, socket }).pipe(
+                      Effect.catchAll((error) =>
+                        Effect.logWarning('tenant log connection failed', error),
+                      ),
+                    ),
+              () => Ref.update(connections, (count) => count - 1),
+            ),
+          ),
+        );
+      });
+
+    const detach = (instanceId: InstanceId) =>
+      Effect.gen(function* () {
+        const attachment = (yield* Ref.get(attachments)).get(instanceId);
+        if (!attachment) {
+          return;
+        }
+        yield* Ref.update(attachments, (current) => {
+          const next = new Map(current);
+          next.delete(instanceId);
+          return next;
+        });
+        yield* Scope.close(attachment.scope, Effect.void as never);
+        yield* fs.remove(attachment.socketPath, { force: true });
+      });
+
+    const attach = ({
       source,
-      sourceId: crypto.randomUUID(),
       socketPath,
-      server,
-      sockets,
-      nextSequence: 0,
-    };
-    await listen({ server, socketPath });
-    try {
-      await chmod(socketPath, PRIVATE_SOCKET_MODE);
-    } catch (error) {
-      server.close();
-      await rm(socketPath, { force: true });
-      throw error;
-    }
-    this.#attachments.set(source.instanceId, attachment);
-  }
-
-  async detach({ instanceId }: { instanceId: InstanceId }): Promise<void> {
-    const attachment = this.#attachments.get(instanceId);
-    if (!attachment) {
-      return;
-    }
-    this.#attachments.delete(instanceId);
-    for (const socket of attachment.sockets) {
-      socket.destroy();
-    }
-    await close(attachment.server);
-    await rm(attachment.socketPath, { force: true });
-  }
-
-  async close(): Promise<void> {
-    for (const instanceId of [...this.#attachments.keys()]) {
-      await this.detach({ instanceId });
-    }
-  }
-
-  #accept({ attachment, socket }: { attachment: Attachment; socket: Socket }): void {
-    if (attachment.sockets.size >= MAX_GUEST_CONNECTIONS) {
-      socket.destroy();
-      return;
-    }
-    attachment.sockets.add(socket);
-    const frames = new GuestLogFrameDecoder();
-    const text = {
-      stdout: new TextDecoder(),
-      stderr: new TextDecoder(),
-    } satisfies Record<TenantLogStream, TextDecoder>;
-
-    socket.on('data', (chunk) => {
-      try {
-        for (const frame of frames.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)) {
-          if (frame.kind === 'gap') {
-            this.#emit({ attachment, event: { kind: 'gap', droppedBytes: frame.droppedBytes } });
-            continue;
-          }
-          const decoded = text[frame.stream].decode(frame.bytes, { stream: true });
-          if (decoded.length > 0) {
-            this.#emit({
-              attachment,
-              event: { kind: 'data', stream: frame.stream, text: decoded },
-            });
+    }: {
+      source: TenantLogSource;
+      socketPath: string;
+    }) =>
+      Effect.gen(function* () {
+        const current = yield* Ref.get(attachments);
+        const existing = current.get(source.instanceId);
+        if (existing?.socketPath === socketPath) {
+          return yield* Ref.set(existing.source, source);
+        }
+        for (const [instanceId, attached] of current) {
+          if (instanceId === source.instanceId || attached.socketPath === socketPath) {
+            yield* detach(instanceId);
           }
         }
-      } catch {
-        socket.destroy();
-      }
-    });
-    socket.on('close', () => {
-      attachment.sockets.delete(socket);
-      for (const stream of ['stdout', 'stderr'] as const) {
-        const remainder = text[stream].decode();
-        if (remainder.length > 0) {
-          this.#emit({
-            attachment,
-            event: { kind: 'data', stream, text: remainder },
-          });
-        }
-      }
-    });
-    socket.on('error', () => {});
-  }
 
-  #emit({
-    attachment,
-    event,
-  }: {
-    attachment: Attachment;
-    event:
-      | { kind: 'data'; stream: TenantLogStream; text: string }
-      | { kind: 'gap'; droppedBytes: number };
-  }): void {
-    this.#publish({
-      ...attachment.source,
-      sourceId: attachment.sourceId,
-      sequence: attachment.nextSequence,
-      observedAt: nowTimestamp(),
-      ...event,
-    });
-    attachment.nextSequence += 1;
-  }
-}
+        yield* fs.makeDirectory(path.dirname(socketPath), { recursive: true });
+        yield* fs.remove(socketPath, { force: true });
 
-async function listen({
-  server,
-  socketPath,
-}: {
-  server: Server;
-  socketPath: string;
-}): Promise<void> {
-  const listening = Promise.withResolvers<void>();
-  const onError = (error: Error) => {
-    server.off('listening', onListening);
-    listening.reject(error);
-  };
-  const onListening = () => {
-    server.off('error', onError);
-    listening.resolve();
-  };
-  server.once('error', onError);
-  server.once('listening', onListening);
-  server.listen(socketPath);
-  await listening.promise;
-  server.on('error', (error) => {
-    logger.warn({ message: 'tenant log socket failed', socketPath, error: error.message });
-  });
-}
+        const scope = yield* Scope.make();
+        const attachment: Attachment = {
+          sourceId: yield* Effect.sync(() => crypto.randomUUID()),
+          socketPath,
+          source: yield* Ref.make(source),
+          sequence: yield* Ref.make(0),
+          scope,
+        };
+        yield* Scope.extend(serve({ attachment }), scope).pipe(
+          Effect.onError(() => Scope.close(scope, Effect.void as never)),
+        );
+        yield* Ref.update(attachments, (all) => new Map(all).set(source.instanceId, attachment));
+      });
 
-async function close(server: Server): Promise<void> {
-  if (!server.listening) {
-    return;
-  }
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-}
+    yield* Effect.addFinalizer(() =>
+      Effect.flatMap(Ref.get(attachments), (all) =>
+        Effect.forEach([...all.keys()], detach, { discard: true }),
+      ).pipe(Effect.ignore),
+    );
+
+    return { attach, detach };
+  }),
+}) {}

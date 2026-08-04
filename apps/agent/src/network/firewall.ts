@@ -1,5 +1,5 @@
 import type { GuestPort, HostPort, Ipv4Address } from '@repo/protocol';
-import { GUEST_NETWORK_CIDR, TAP_NAME_PREFIX } from '#network/allocator.ts';
+import { GUEST_NETWORK_CIDR, TAP_NAME_PREFIX } from '#network/slot.ts';
 
 export const NFTABLES_TABLE = 'nibrun';
 const TAP_MATCH = `"${TAP_NAME_PREFIX}*"`;
@@ -9,12 +9,9 @@ export const INSTANCE_METADATA_ADDRESS_V6 = 'fd00:ec2::254';
 
 const DNS_PORT = 53;
 
-// NF_IP_PRI_NAT_DST — what `dstnat` resolves to where the name is allowed.
+/** nft rejects the name `dstnat` on the output hook, and the whole ruleset with it. */
 const OUTPUT_NAT_PRIORITY = -100;
 
-// The blanket rule that makes the three isolation guarantees hold even for a destination
-// nobody thought to enumerate. Every one of these is somewhere a tenant has no business
-// reaching from inside a microVM.
 const PRIVATE_DESTINATIONS_V4 = [
   '10.0.0.0/8',
   '172.16.0.0/12',
@@ -24,27 +21,24 @@ const PRIVATE_DESTINATIONS_V4 = [
   '100.64.0.0/10',
 ] as const;
 
-// The same blanket, in the family `table ip` cannot see. A tap is assigned a link-local v6
-// address the moment it exists, so without these every service on the host is reachable from
-// inside a microVM over `fe80::` with nothing in the way — whether or not v6 egress is
-// configured. Public v6 stays reachable, exactly as public v4 does.
+/** A tap carries a link-local v6 address from birth, and `table ip` cannot see it. */
 const PRIVATE_DESTINATIONS_V6 = ['::1/128', 'fe80::/10', 'fc00::/7'] as const;
 
 const CHAIN_INDENT = '  ';
 const RULE_INDENT = '    ';
 
 export type ForwardedInstance = {
-  hostPort: HostPort;
-  guestPort: GuestPort;
-  hostIpv4: Ipv4Address;
-  guestIpv4: Ipv4Address;
+  readonly hostPort: HostPort;
+  readonly guestPort: GuestPort;
+  readonly hostIpv4: Ipv4Address;
+  readonly guestIpv4: Ipv4Address;
 };
 
 export type FirewallState = {
-  instances: ForwardedInstance[];
-  controlPlaneCidrsV4: readonly string[];
-  controlPlaneCidrsV6: readonly string[];
-  guestDnsServers: readonly string[];
+  readonly instances: readonly ForwardedInstance[];
+  readonly controlPlaneCidrsV4: readonly string[];
+  readonly controlPlaneCidrsV6: readonly string[];
+  readonly guestDnsServers: readonly string[];
 };
 
 const set = (values: readonly string[]) => `{ ${values.join(', ')} }`;
@@ -55,20 +49,18 @@ const chain = ({ header, rules }: { header: string; rules: readonly string[] }) 
   `${CHAIN_INDENT}}`,
 ];
 
+const resolverRules = (guestDnsServers: readonly string[]) =>
+  guestDnsServers.flatMap((server) => [
+    `iifname ${TAP_MATCH} ip daddr ${server} udp dport ${DNS_PORT} accept`,
+    `iifname ${TAP_MATCH} ip daddr ${server} tcp dport ${DNS_PORT} accept`,
+  ]);
+
 /**
- * The whole ruleset, rendered as one file and applied with `nft -f`.
- *
- * Rendering everything and replacing the table in a single transaction is what keeps the rules
- * a function of state rather than a history of edits: there is no incremental add or delete
- * that can be missed, and a reconcile that runs twice produces the same kernel state.
- *
- * The metadata-endpoint rule is written explicitly even though the instance's IMDS hop limit
- * of 1 already defeats routed guest traffic. A guarantee that holds only while nobody changes
- * an instance attribute is not a guarantee, and the credentials it protects are the host's own
- * role — the most valuable thing on the machine.
+ * Rendered whole and applied with `nft -f`, so the rules are a function of state rather than a
+ * history of edits: no incremental add can be missed and a rerun converges.
  */
 export function renderRuleset(state: FirewallState): string {
-  const lines: string[] = [
+  return `${[
     `table ip ${NFTABLES_TABLE}`,
     `delete table ip ${NFTABLES_TABLE}`,
     '',
@@ -88,8 +80,7 @@ export function renderRuleset(state: FirewallState): string {
     '',
     ...inputChainV6(),
     '}',
-  ];
-  return `${lines.join('\n')}\n`;
+  ].join('\n')}\n`;
 }
 
 function forwardChainV4({ controlPlaneCidrsV4, guestDnsServers }: FirewallState): string[] {
@@ -98,10 +89,7 @@ function forwardChainV4({ controlPlaneCidrsV4, guestDnsServers }: FirewallState)
     rules: [
       'type filter hook forward priority filter; policy accept;',
       'ct state established,related accept',
-      ...guestDnsServers.flatMap((server) => [
-        `iifname ${TAP_MATCH} ip daddr ${server} udp dport ${DNS_PORT} accept`,
-        `iifname ${TAP_MATCH} ip daddr ${server} tcp dport ${DNS_PORT} accept`,
-      ]),
+      ...resolverRules(guestDnsServers),
       `iifname ${TAP_MATCH} ip daddr ${INSTANCE_METADATA_ADDRESS_V4} drop comment "instance metadata endpoint"`,
       `iifname ${TAP_MATCH} oifname ${TAP_MATCH} drop comment "guest to guest"`,
       `iifname ${TAP_MATCH} ip daddr ${GUEST_NETWORK_CIDR} drop comment "guest to guest"`,
@@ -113,32 +101,20 @@ function forwardChainV4({ controlPlaneCidrsV4, guestDnsServers }: FirewallState)
   });
 }
 
-// Traffic from a guest to the host's own tap address never reaches the forward hook, so the
-// three isolation rules would leave every service listening on the host exposed to tenants.
+/** Guest traffic to the host's own tap address never reaches the forward hook. */
 function inputChainV4({ guestDnsServers }: FirewallState): string[] {
   return chain({
     header: 'input {',
     rules: [
       'type filter hook input priority filter; policy accept;',
       `iifname ${TAP_MATCH} ct state established,related accept`,
-      // Port-matched like the forward chain rather than accepting the address outright: a
-      // resolver that happened to be one of the host's own addresses would otherwise open
-      // every port on the host to every tenant.
-      ...guestDnsServers.flatMap((server) => [
-        `iifname ${TAP_MATCH} ip daddr ${server} udp dport ${DNS_PORT} accept`,
-        `iifname ${TAP_MATCH} ip daddr ${server} tcp dport ${DNS_PORT} accept`,
-      ]),
+      ...resolverRules(guestDnsServers),
       `iifname ${TAP_MATCH} drop comment "guest to host"`,
     ],
   });
 }
 
-// No NAT counterpart: guests are given a v4 /30 and no v6 address, so nothing here forwards or
-// masquerades. These are the drops that hold whether or not that ever changes.
-//
-// The control-plane rule is not redundant here the way its v4 twin is. AWS allocates a VPC's
-// IPv6 from global unicast, so `PRIVATE_DESTINATIONS_V6` does not contain it and nothing else
-// would deny it — a ruleset without this reads the control plane as ordinary internet.
+/** AWS allocates VPC IPv6 from global unicast, so only the named rule denies the control plane. */
 function forwardChainV6({ controlPlaneCidrsV6 }: FirewallState): string[] {
   return chain({
     header: 'forward {',
@@ -182,8 +158,6 @@ function natChainsV4({ instances }: FirewallState): string[] {
     ...chain({
       header: 'output {',
       rules: [
-        // The numeric value of dstnat, because the name is only accepted on prerouting: nft
-        // rejects `priority dstnat` on the output hook outright, and the whole ruleset with it.
         `type nat hook output priority ${OUTPUT_NAT_PRIORITY}; policy accept;`,
         ...instances.map(
           (instance) =>
@@ -196,8 +170,7 @@ function natChainsV4({ instances }: FirewallState): string[] {
       header: 'postrouting {',
       rules: [
         'type nat hook postrouting priority srcnat; policy accept;',
-        // The host's own connections to a forwarded port leave with a loopback source address,
-        // which the guest cannot reply to. They are re-sourced onto the tap they leave by.
+        // A loopback source address is unreplyable from the guest, so it is re-sourced onto the tap.
         ...instances.map(
           (instance) =>
             `oifname ${TAP_MATCH} ip saddr 127.0.0.0/8 ip daddr ${instance.guestIpv4} snat to ${instance.hostIpv4}`,

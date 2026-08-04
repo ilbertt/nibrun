@@ -1,144 +1,115 @@
-import { mkdir, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { FileSystem, Path } from '@effect/platform';
 import type { DesiredInstance, InstanceId } from '@repo/protocol';
-import type { CommandRunner } from '#lib/exec.ts';
+import { Effect } from 'effect';
+import { AgentConfig } from '#config.ts';
 import { writeJsonFile } from '#lib/json-store.ts';
 import {
   TENANT_LOG_VSOCK_FILENAME,
-  type TenantLogReceiver,
+  TenantLogReceiver,
   tenantLogSocketPath,
 } from '#logs/receiver.ts';
-import type { AppSlot } from '#network/allocator.ts';
+import type { AppSlot } from '#network/slot.ts';
 import { ensureTap } from '#network/tap.ts';
-import { type ArtifactBytes, ensureArtifactImage } from '#vm/artifacts.ts';
+import { ensureArtifactImage } from '#vm/artifacts.ts';
 import { renderFirecrackerConfig } from '#vm/firecracker-config.ts';
 import { buildInstanceConfigImage } from '#vm/instance-env.ts';
-import type { SystemdVmUnits } from '#vm/systemd.ts';
+import * as Systemd from '#vm/systemd.ts';
 
 export const FIRECRACKER_CONFIG_FILENAME = 'firecracker.json';
 export const GUEST_KERNEL_FILENAME = 'vmlinux';
 export const GUEST_ROOTFS_FILENAME = 'rootfs.ext4';
 
 const VM_DIR_MODE = 0o700;
-
-export type VmManagerOptions = {
-  runner: CommandRunner;
-  units: SystemdVmUnits;
-  artifacts: ArtifactBytes;
-  artifactCacheDir: string;
-  guestImageDir: string;
-  vmDir: string;
-  // Written into the guest's config drive, which is the only way it gets a resolver: the root
-  // is read-only and there is no DHCP client to learn one from.
-  guestDnsServers: readonly string[];
-  logs: TenantLogReceiver;
-};
-
 const FIRST_GUEST_CID = 3;
 
-export class VmManager {
-  readonly #options: VmManagerOptions;
+export class VmManager extends Effect.Service<VmManager>()('VmManager', {
+  effect: Effect.gen(function* () {
+    const config = yield* AgentConfig;
+    const path = yield* Path.Path;
+    const fs = yield* FileSystem.FileSystem;
+    const logs = yield* TenantLogReceiver;
 
-  constructor(options: VmManagerOptions) {
-    this.#options = options;
-  }
+    const workingDir = (instanceId: InstanceId) => path.join(config.vmDir, instanceId);
 
-  workingDir(instanceId: InstanceId): string {
-    return join(this.#options.vmDir, instanceId);
-  }
-
-  /**
-   * Stages everything the VM needs and hands the boot to systemd.
-   *
-   * The agent never becomes the VM's parent: it writes the files, asks init to start the unit,
-   * and stops caring. Everything staged here is either content-addressed and shared, or lives
-   * under this instance's own directory, so two boots of the same app never race on a path.
-   */
-  async boot({
-    desired,
-    slot,
-    dataDevicePath,
-  }: {
-    desired: DesiredInstance;
-    slot: AppSlot;
-    dataDevicePath: string;
-  }): Promise<void> {
-    const artifactImagePath = await ensureArtifactImage({
-      source: this.#options.artifacts,
-      runner: this.#options.runner,
-      cacheDir: this.#options.artifactCacheDir,
-      artifact: desired.artifact,
-    });
-
-    await ensureTap({
-      runner: this.#options.runner,
-      tap: {
-        tapName: slot.tapName,
-        hostIpv4: slot.hostIpv4,
-        subnetPrefixLength: slot.subnetPrefixLength,
-      },
-    });
-
-    const workingDir = this.workingDir(desired.instanceId);
-    await mkdir(workingDir, { recursive: true, mode: VM_DIR_MODE });
-    const instanceConfigImagePath = await buildInstanceConfigImage({
-      runner: this.#options.runner,
-      workingDir,
-      guestPort: desired.config.guestPort,
-      args: desired.config.args,
-      environment: desired.config.environment,
-      restartPolicy: desired.config.restartPolicy,
-      dnsServers: this.#options.guestDnsServers,
-    });
-
-    await writeJsonFile({
-      path: join(workingDir, FIRECRACKER_CONFIG_FILENAME),
-      value: renderFirecrackerConfig({
-        resources: desired.config.resources,
-        paths: {
-          kernelPath: join(this.#options.guestImageDir, GUEST_KERNEL_FILENAME),
-          rootfsPath: join(this.#options.guestImageDir, GUEST_ROOTFS_FILENAME),
-          artifactImagePath,
-          instanceConfigImagePath,
-          dataDevicePath,
-        },
-        network: {
+    /**
+     * The agent never becomes the VM's parent: it stages the files, asks init to start the unit,
+     * and stops caring.
+     */
+    const boot = ({
+      desired,
+      slot,
+      dataDevicePath,
+    }: {
+      desired: DesiredInstance;
+      slot: AppSlot;
+      dataDevicePath: string;
+    }) =>
+      Effect.gen(function* () {
+        const artifactImagePath = yield* ensureArtifactImage(desired.artifact);
+        yield* ensureTap({
           tapName: slot.tapName,
-          guestMac: slot.guestMac,
-          guestIpv4: slot.guestIpv4,
           hostIpv4: slot.hostIpv4,
           subnetPrefixLength: slot.subnetPrefixLength,
-        },
-        vsock: {
-          guestCid: FIRST_GUEST_CID + slot.slot,
-          path: TENANT_LOG_VSOCK_FILENAME,
-        },
-      }),
-    });
+        });
 
-    await this.#options.logs.attach({
-      source: {
-        instanceId: desired.instanceId,
-        appId: desired.appId,
-        deploymentId: desired.deploymentId,
-      },
-      socketPath: tenantLogSocketPath({ workingDir }),
-    });
-    try {
-      await this.#options.units.start(desired.instanceId);
-    } catch (error) {
-      await this.#options.logs.detach({ instanceId: desired.instanceId });
-      throw error;
-    }
-  }
+        const directory = workingDir(desired.instanceId);
+        yield* fs.makeDirectory(directory, { recursive: true, mode: VM_DIR_MODE });
+        const instanceConfigImagePath = yield* buildInstanceConfigImage({
+          workingDir: directory,
+          guestPort: desired.config.guestPort,
+          args: desired.config.args,
+          environment: desired.config.environment,
+          restartPolicy: desired.config.restartPolicy,
+          dnsServers: config.guestDnsServers,
+        });
 
-  async stop({ instanceId }: { instanceId: InstanceId }): Promise<void> {
-    await this.#options.units.stop(instanceId);
-  }
+        yield* writeJsonFile({
+          path: path.join(directory, FIRECRACKER_CONFIG_FILENAME),
+          value: renderFirecrackerConfig({
+            resources: desired.config.resources,
+            paths: {
+              kernelPath: path.join(config.guestImageDir, GUEST_KERNEL_FILENAME),
+              rootfsPath: path.join(config.guestImageDir, GUEST_ROOTFS_FILENAME),
+              artifactImagePath,
+              instanceConfigImagePath,
+              dataDevicePath,
+            },
+            network: {
+              tapName: slot.tapName,
+              guestMac: slot.guestMac,
+              guestIpv4: slot.guestIpv4,
+              hostIpv4: slot.hostIpv4,
+              subnetPrefixLength: slot.subnetPrefixLength,
+            },
+            vsock: {
+              guestCid: FIRST_GUEST_CID + slot.slot,
+              path: TENANT_LOG_VSOCK_FILENAME,
+            },
+          }),
+        });
 
-  async discard({ instanceId }: { instanceId: InstanceId }): Promise<void> {
-    await this.#options.units.forget(instanceId);
-    await this.#options.logs.detach({ instanceId });
-    await rm(this.workingDir(instanceId), { recursive: true, force: true });
-  }
-}
+        yield* logs.attach({
+          source: {
+            instanceId: desired.instanceId,
+            appId: desired.appId,
+            deploymentId: desired.deploymentId,
+          },
+          socketPath: tenantLogSocketPath({ workingDir: directory }),
+        });
+        yield* Effect.onError(Systemd.start(desired.instanceId), () =>
+          Effect.ignore(logs.detach(desired.instanceId)),
+        );
+      });
+
+    return {
+      workingDir,
+      boot,
+      stop: Systemd.stop,
+      discard: (instanceId: InstanceId) =>
+        Systemd.forget(instanceId).pipe(
+          Effect.andThen(logs.detach(instanceId)),
+          Effect.andThen(fs.remove(workingDir(instanceId), { recursive: true, force: true })),
+        ),
+    };
+  }),
+}) {}

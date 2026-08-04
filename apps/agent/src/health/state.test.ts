@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { DEFAULT_HEALTH_CHECK, type HealthCheck, type Timestamp } from '@repo/protocol';
 import { applyProbe, evaluateInstanceState, initialTracker } from '#health/state.ts';
-import type { UnitStatus } from '#vm/systemd.ts';
+import type { UnitStatus } from '#vm/unit-status.ts';
 
 const AT = '2026-08-03T10:00:00.000Z' as Timestamp;
 const STARTED_AT_MS = 1_000_000;

@@ -1,46 +1,29 @@
-import { chmod, mkdir, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { FileSystem, Path } from '@effect/platform';
 import type { GuestPort, RestartPolicy, TenantArguments, TenantEnvironment } from '@repo/protocol';
-import { type CommandRunner, runCommandOrThrow } from '#lib/exec.ts';
+import { Data, Effect, Either } from 'effect';
+import { stdoutOf } from '#lib/exec.ts';
 
-// Line-oriented `KEY=VALUE`, so the guest's init needs no parser. The file is generated and
-// never hand-edited, which is what lets the format be this thin.
 export const INSTANCE_ENV_FILENAME = 'instance.env';
 export const INSTANCE_CONFIG_IMAGE = 'config.squashfs';
 
-// Carries the tenant's environment variables, which are secrets. Readable only by the user the
-// agent and Firecracker run as.
+/** Carries the tenant's environment variables, which are secrets. */
 const PRIVATE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
 
-// The two namespaces apps/runtime parses, and it accepts nothing outside them. They exist so
-// the two can never collide: a tenant variable actually called NIBRUN_PORT arrives as
-// ENV_NIBRUN_PORT and stays the tenant's.
+/** The two namespaces the runtime parses, so a tenant variable called NIBRUN_PORT stays the tenant's. */
 const RUNTIME_PREFIX = 'NIBRUN_';
 const TENANT_PREFIX = 'ENV_';
 
 const FORBIDDEN_VALUE_CHARACTERS = /[\n\r\0]/;
 
-export class UnrepresentableEnvironmentError extends Error {
-  readonly name_: string;
-
-  constructor(variableName: string) {
-    super(`Environment variable ${variableName} cannot be represented in instance.env`);
-    this.name = 'UnrepresentableEnvironmentError';
-    this.name_ = variableName;
-  }
-}
+export class UnrepresentableEnvironment extends Data.TaggedError('UnrepresentableEnvironment')<{
+  readonly variableName: string;
+}> {}
 
 /**
- * Renders what the guest's init reads off its config drive.
- *
- * The runtime carries no defaults for any `NIBRUN_` key and rejects a file missing one, so
- * every value it needs is resolved here — the restart policy included, which is the guest's
- * budget for the tenant process rather than anything this agent acts on.
- *
- * A value containing a newline has no representation in a format with no quoting, so it fails
- * the instance rather than silently truncating somebody's configuration into the next line —
- * and a second line could not carry a prefix, which is how the guest catches the same thing.
+ * Line-oriented `KEY=VALUE`, so the guest's init needs no parser. A value containing a newline
+ * has no representation in a format with no quoting, so it fails the instance rather than
+ * truncating somebody's configuration into the next line.
  */
 export function renderInstanceEnv({
   guestPort,
@@ -54,7 +37,7 @@ export function renderInstanceEnv({
   environment: TenantEnvironment;
   restartPolicy: RestartPolicy;
   dnsServers: readonly string[];
-}): string {
+}): Either.Either<string, UnrepresentableEnvironment> {
   const lines = [
     `${RUNTIME_PREFIX}PORT=${guestPort}`,
     `${RUNTIME_PREFIX}MAX_RESTARTS=${restartPolicy.maxRestarts}`,
@@ -66,68 +49,63 @@ export function renderInstanceEnv({
   if (dnsServers.length > 0) {
     lines.push(`${RUNTIME_PREFIX}DNS=${dnsServers.join(',')}`);
   }
-  // Numbered rather than delimited: a format with no quoting cannot carry a separator that an
-  // argument might itself contain, and the guest refuses a gap rather than shifting the rest
-  // down one and running a command line nobody wrote.
+  // Numbered rather than delimited: a format with no quoting cannot carry a separator an
+  // argument might itself contain, and the guest refuses a gap rather than shifting the rest down.
   for (const [index, argument] of args.entries()) {
     if (FORBIDDEN_VALUE_CHARACTERS.test(argument)) {
-      throw new UnrepresentableEnvironmentError(`${RUNTIME_PREFIX}ARG_${index}`);
+      return Either.left(
+        new UnrepresentableEnvironment({ variableName: `${RUNTIME_PREFIX}ARG_${index}` }),
+      );
     }
     lines.push(`${RUNTIME_PREFIX}ARG_${index}=${argument}`);
   }
   for (const key of Object.keys(environment).sort()) {
     const value = environment[key] ?? '';
     if (FORBIDDEN_VALUE_CHARACTERS.test(value)) {
-      throw new UnrepresentableEnvironmentError(key);
+      return Either.left(new UnrepresentableEnvironment({ variableName: key }));
     }
     lines.push(`${TENANT_PREFIX}${key}=${value}`);
   }
-  return `${lines.join('\n')}\n`;
+  return Either.right(`${lines.join('\n')}\n`);
 }
 
-/**
- * Builds the read-only squashfs the guest attaches as `vdc`, rebuilt on every boot because the
- * app's configuration can change without its artifact changing.
- */
-export async function buildInstanceConfigImage({
-  runner,
+/** Rebuilt on every boot, because configuration changes without the artifact changing. */
+export const buildInstanceConfigImage = ({
   workingDir,
-  guestPort,
-  args,
-  environment,
-  restartPolicy,
-  dnsServers,
+  ...content
 }: {
-  runner: CommandRunner;
   workingDir: string;
   guestPort: GuestPort;
   args: TenantArguments;
   environment: TenantEnvironment;
   restartPolicy: RestartPolicy;
   dnsServers: readonly string[];
-}): Promise<string> {
-  const stagingDir = join(workingDir, '.config-staging');
-  const imagePath = join(workingDir, INSTANCE_CONFIG_IMAGE);
-  await rm(stagingDir, { recursive: true, force: true });
-  await mkdir(stagingDir, { recursive: true, mode: PRIVATE_DIR_MODE });
-  try {
-    await writeFile(
-      join(stagingDir, INSTANCE_ENV_FILENAME),
-      renderInstanceEnv({ guestPort, args, environment, restartPolicy, dnsServers }),
-      {
-        mode: PRIVATE_MODE,
-      },
+}) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const stagingDir = path.join(workingDir, '.config-staging');
+    const imagePath = path.join(workingDir, INSTANCE_CONFIG_IMAGE);
+    const rendered = yield* renderInstanceEnv(content);
+
+    return yield* Effect.acquireUseRelease(
+      fs
+        .remove(stagingDir, { recursive: true, force: true })
+        .pipe(
+          Effect.andThen(fs.makeDirectory(stagingDir, { recursive: true, mode: PRIVATE_DIR_MODE })),
+        ),
+      () =>
+        Effect.gen(function* () {
+          yield* fs.writeFileString(path.join(stagingDir, INSTANCE_ENV_FILENAME), rendered, {
+            mode: PRIVATE_MODE,
+          });
+          yield* fs.remove(imagePath, { force: true });
+          yield* stdoutOf({
+            command: ['mksquashfs', stagingDir, imagePath, '-no-progress', '-noappend', '-all-root'],
+          });
+          yield* fs.chmod(imagePath, PRIVATE_MODE);
+          return imagePath;
+        }),
+      () => fs.remove(stagingDir, { recursive: true, force: true }).pipe(Effect.ignore),
     );
-    await rm(imagePath, { force: true });
-    await runCommandOrThrow({
-      runner,
-      request: {
-        command: ['mksquashfs', stagingDir, imagePath, '-no-progress', '-noappend', '-all-root'],
-      },
-    });
-    await chmod(imagePath, PRIVATE_MODE);
-    return imagePath;
-  } finally {
-    await rm(stagingDir, { recursive: true, force: true });
-  }
-}
+  });

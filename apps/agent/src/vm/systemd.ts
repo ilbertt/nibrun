@@ -1,16 +1,18 @@
 import { type InstanceId, InstanceIdSchema, isValidMessage } from '@repo/protocol';
-import { type CommandRunner, runCommandOrThrow } from '#lib/exec.ts';
+import { Effect } from 'effect';
+import { run, stdoutOf } from '#lib/exec.ts';
+import {
+  parsePropertyBlocks,
+  SHOWN_PROPERTIES,
+  type UnitStatus,
+  unitStatusFrom,
+} from '#vm/unit-status.ts';
 
 const SYSTEMCTL = 'systemctl';
 
 /**
- * One systemd template instance per microVM, so Firecracker is a child of init and not of this
- * agent.
- *
- * The agent is the component that updates most often. If the VMs were its children, every
- * agent restart would kill every tenant app on the host — which would make the one operation
- * that has to be routine the most dangerous one. Parented to init, an agent restart is a
- * non-event and an operator can inspect a single app with `systemctl status` and `journalctl`.
+ * One systemd template instance per microVM, so Firecracker is a child of init rather than of
+ * this agent — which is what makes redeploying the agent a non-event for running tenants.
  */
 export const VM_UNIT_TEMPLATE = 'nibrun-vm@';
 const UNIT_SUFFIX = '.service';
@@ -19,8 +21,6 @@ const UNIT_PATTERN = `${VM_UNIT_TEMPLATE}*${UNIT_SUFFIX}`;
 export const vmUnitName = (instanceId: InstanceId) =>
   `${VM_UNIT_TEMPLATE}${instanceId}${UNIT_SUFFIX}`;
 
-// Instance ids are alphanumerics, hyphens and underscores, none of which systemd escapes, so
-// the unit name carries the id verbatim in both directions.
 export function instanceIdFromUnit(unitName: string): InstanceId | undefined {
   if (!unitName.startsWith(VM_UNIT_TEMPLATE) || !unitName.endsWith(UNIT_SUFFIX)) {
     return undefined;
@@ -37,102 +37,31 @@ export function parseUnitNames(output: string): string[] {
     .filter((name) => name.endsWith(UNIT_SUFFIX));
 }
 
-export function parseProperties(output: string): Record<string, string> {
-  const properties: Record<string, string> = {};
-  for (const line of output.split('\n')) {
-    const separator = line.indexOf('=');
-    if (separator <= 0) {
-      continue;
-    }
-    properties[line.slice(0, separator)] = line.slice(separator + 1);
-  }
-  return properties;
-}
-
-// `systemctl show` answers for several units in one call, emitting one block per unit in the
-// order asked and separating them with a blank line. One subprocess per status sweep rather
-// than one per instance is the difference between a poll that scales to a full host and one
-// that does not.
-export function parsePropertyBlocks(output: string): Record<string, string>[] {
-  return output
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
-    .filter((block) => block.length > 0)
-    .map(parseProperties);
-}
-
-export type UnitStatus = {
-  loaded: boolean;
-  active: boolean;
-  failed: boolean;
-  // Whether the unit has run at any point since the host booted. A stopped VM and a VM that has
-  // never existed this boot are both `inactive`, and telling them apart is what stops a reboot
-  // being read as the guest having exited on its own.
-  startedThisBoot: boolean;
-  exitCode?: number;
-};
-
-const SHOWN_PROPERTIES = [
-  'LoadState',
-  'ActiveState',
-  'SubState',
-  'Result',
-  'ExecMainStatus',
-  'InactiveExitTimestampMonotonic',
-];
-
-const NEVER_LEFT_INACTIVE = 0;
-
-export function unitStatusFrom(properties: Record<string, string>): UnitStatus {
-  const loadState = properties.LoadState ?? 'not-found';
-  const activeState = properties.ActiveState ?? 'inactive';
-  const exitCode = Number.parseInt(properties.ExecMainStatus ?? '', 10);
-  // Monotonic rather than realtime because it is measured from boot and resets with it, which is
-  // the only property here that can distinguish this boot from any earlier one.
-  const inactiveExit = Number.parseInt(properties.InactiveExitTimestampMonotonic ?? '', 10);
-  return {
-    loaded: loadState === 'loaded',
-    active: activeState === 'active' || activeState === 'activating',
-    failed: activeState === 'failed',
-    startedThisBoot: Number.isFinite(inactiveExit) && inactiveExit > NEVER_LEFT_INACTIVE,
-    ...(Number.isFinite(exitCode) ? { exitCode } : {}),
-  };
-}
-
-export class SystemdVmUnits {
-  readonly #runner: CommandRunner;
-
-  constructor({ runner }: { runner: CommandRunner }) {
-    this.#runner = runner;
-  }
-
-  async listInstanceIds(): Promise<InstanceId[]> {
-    const output = await runCommandOrThrow({
-      runner: this.#runner,
-      request: {
-        command: [
-          SYSTEMCTL,
-          'list-units',
-          '--type=service',
-          '--all',
-          '--plain',
-          '--no-legend',
-          '--no-pager',
-          UNIT_PATTERN,
-        ],
-      },
-    });
-    return parseUnitNames(output)
+export const listInstanceIds = stdoutOf({
+  command: [
+    SYSTEMCTL,
+    'list-units',
+    '--type=service',
+    '--all',
+    '--plain',
+    '--no-legend',
+    '--no-pager',
+    UNIT_PATTERN,
+  ],
+}).pipe(
+  Effect.map((output) =>
+    parseUnitNames(output)
       .map(instanceIdFromUnit)
-      .filter((id): id is InstanceId => id !== undefined);
-  }
+      .filter((id): id is InstanceId => id !== undefined),
+  ),
+);
 
-  async statuses(instanceIds: readonly InstanceId[]): Promise<Map<InstanceId, UnitStatus>> {
-    const statuses = new Map<InstanceId, UnitStatus>();
+export const statuses = (instanceIds: readonly InstanceId[]) =>
+  Effect.gen(function* () {
     if (instanceIds.length === 0) {
-      return statuses;
+      return new Map<InstanceId, UnitStatus>();
     }
-    const result = await this.#runner({
+    const result = yield* run({
       command: [
         SYSTEMCTL,
         'show',
@@ -141,30 +70,20 @@ export class SystemdVmUnits {
       ],
     });
     const blocks = parsePropertyBlocks(result.stdout);
-    for (const [index, instanceId] of instanceIds.entries()) {
-      const block = blocks[index] ?? { LoadState: 'not-found', ActiveState: 'inactive' };
-      statuses.set(instanceId, unitStatusFrom(block));
-    }
-    return statuses;
-  }
+    return new Map(
+      instanceIds.map((instanceId, index) => [
+        instanceId,
+        unitStatusFrom(blocks[index] ?? { LoadState: 'not-found', ActiveState: 'inactive' }),
+      ]),
+    );
+  });
 
-  async start(instanceId: InstanceId): Promise<void> {
-    await runCommandOrThrow({
-      runner: this.#runner,
-      request: { command: [SYSTEMCTL, 'start', vmUnitName(instanceId)] },
-    });
-  }
+export const start = (instanceId: InstanceId) =>
+  stdoutOf({ command: [SYSTEMCTL, 'start', vmUnitName(instanceId)] });
 
-  async stop(instanceId: InstanceId): Promise<void> {
-    await runCommandOrThrow({
-      runner: this.#runner,
-      request: { command: [SYSTEMCTL, 'stop', vmUnitName(instanceId)] },
-    });
-  }
+export const stop = (instanceId: InstanceId) =>
+  stdoutOf({ command: [SYSTEMCTL, 'stop', vmUnitName(instanceId)] });
 
-  // A template instance that exited stays loaded and `failed` until it is reset, which would
-  // otherwise make an instance the control plane has forgotten linger in every enumeration.
-  async forget(instanceId: InstanceId): Promise<void> {
-    await this.#runner({ command: [SYSTEMCTL, 'reset-failed', vmUnitName(instanceId)] });
-  }
-}
+/** An exited template instance stays loaded and failed until reset, and would linger in every enumeration. */
+export const forget = (instanceId: InstanceId) =>
+  run({ command: [SYSTEMCTL, 'reset-failed', vmUnitName(instanceId)] });
