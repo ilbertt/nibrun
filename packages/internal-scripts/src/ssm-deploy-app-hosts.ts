@@ -27,7 +27,7 @@ const sharedEnv: Record<string, string> = {
   AWS_REGION: requiredEnv('AWS_REGION'),
   SSM_SECRET_PREFIX: requiredEnv('SSM_SECRET_PREFIX'),
   API_HOSTNAME: requiredEnv('API_HOSTNAME'),
-  APP_DOMAIN: requiredEnv('APP_DOMAIN'),
+  APP_HOST_DOMAIN: requiredEnv('APP_HOST_DOMAIN'),
   CONTROL_PLANE_INTERNAL_URL: requiredEnv('CONTROL_PLANE_INTERNAL_URL'),
   LOG_INGEST_URL: requiredEnv('LOG_INGEST_URL'),
   VPC_IPV4_CIDR_BLOCK: requiredEnv('VPC_IPV4_CIDR_BLOCK'),

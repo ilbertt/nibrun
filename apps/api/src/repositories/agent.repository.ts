@@ -71,9 +71,7 @@ const DESIRED_APP = {
         healthCheck: DEFAULT_HEALTH_CHECK,
         restartPolicy: DEFAULT_RESTART_POLICY,
       },
-      hostnames: [
-        { hostname: 'pocketbase.canister.site' as Hostname, kind: 'platform', isDefault: true },
-      ],
+      hostnames: [{ hostname: 'pocketbase.canister.site' as Hostname, kind: 'platform' }],
     },
   ],
   checkpoints: [],

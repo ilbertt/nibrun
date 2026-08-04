@@ -19,7 +19,7 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${FIRECRACKER_VERSION:?}" "${FIRECRACKER_URL:?}" "${FIRECRACKER_SHA256:?}" \
   "${FIRECRACKER_DIRECTORY:?}" \
   "${CADDY_VERSION:?}" "${CADDY_URL:?}" "${CADDY_SHA256:?}" \
-  "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${APP_DOMAIN:?}" \
+  "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${APP_HOST_DOMAIN:?}" \
   "${CONTROL_PLANE_INTERNAL_URL:?}" "${LOG_INGEST_URL:?}" \
   "${VPC_IPV4_CIDR_BLOCK:?}" "${VPC_IPV6_CIDR_BLOCK:?}" \
   "${GUEST_IMAGES_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
@@ -319,7 +319,7 @@ changed_file /etc/caddy/cloudflare-origin-pull-ca.pem && NEEDS_RELOAD+=(caddy) |
 # from the unit's environment — so this is a restart rather than a reload: only
 # a fresh ExecStart is guaranteed to re-read the file.
 cat > /etc/caddy/caddy.env.new <<EOF
-APP_DOMAIN=${APP_DOMAIN}
+APP_HOST_DOMAIN=${APP_HOST_DOMAIN}
 EOF
 changed_file /etc/caddy/caddy.env && NEEDS_RESTART+=(caddy) || true
 

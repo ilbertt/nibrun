@@ -96,7 +96,9 @@ jobs:
           TF_VAR_api_hostname: ${{ vars.API_HOSTNAME }}
           TF_VAR_dozzle_hostname: ${{ vars.DOZZLE_HOSTNAME }}
           TF_VAR_victorialogs_hostname: ${{ vars.VICTORIALOGS_HOSTNAME }}
-          TF_VAR_app_domain: ${{ vars.APP_DOMAIN }}
+          # Still APP_DOMAIN on purpose: the repository variable is read outside this repo
+          # too, so it is not ours alone to rename.
+          TF_VAR_app_host_domain: ${{ vars.APP_DOMAIN }}
           TF_VAR_api_github_client_id: ${{ vars.API_GITHUB_CLIENT_ID }}
           TF_VAR_api_github_client_secret: ${{ secrets.API_GITHUB_CLIENT_SECRET }}
           TF_VAR_caddy_tls_cert: ${{ vars.CADDY_TLS_CERT }}
@@ -115,6 +117,7 @@ jobs:
       SSM_SECRET_PREFIX: ${{ fromJSON(needs.terraform.outputs.values).ssm_secret_prefix }}
       DATA_VOLUME_ID: ${{ fromJSON(needs.terraform.outputs.values).data_volume_id }}
       API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
+      APP_HOST_DOMAIN: ${{ fromJSON(needs.terraform.outputs.values).app_host_domain }}
       DOZZLE_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).dozzle_hostname }}
       VICTORIALOGS_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).victorialogs_hostname }}
       API_GITHUB_CLIENT_ID: ${{ fromJSON(needs.terraform.outputs.values).api_github_client_id }}
@@ -160,7 +163,7 @@ jobs:
       ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
       EXPORTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).exports_bucket }}
       API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
-      APP_DOMAIN: ${{ fromJSON(needs.terraform.outputs.values).app_domain }}
+      APP_HOST_DOMAIN: ${{ fromJSON(needs.terraform.outputs.values).app_host_domain }}
       CONTROL_PLANE_INTERNAL_URL: ${{ fromJSON(needs.terraform.outputs.values).control_plane_internal_url }}
       LOG_INGEST_URL: ${{ fromJSON(needs.terraform.outputs.values).log_ingest_url }}
       VPC_IPV4_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv4_cidr_block }}

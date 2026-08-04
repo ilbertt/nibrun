@@ -1,5 +1,6 @@
 import { type ErrorHandler, StatusMap } from 'elysia';
 import { createLogger } from '#lib/logger.ts';
+import { isMalformedIdentifier } from '#lib/pg-errors.ts';
 
 const errorLogger = createLogger();
 
@@ -68,6 +69,9 @@ export function elysiaErrorHandler({
   }
   if (code === 'NOT_FOUND') {
     return status(StatusMap['Not Found'], { error: 'Not Found' });
+  }
+  if (isMalformedIdentifier(error)) {
+    return status(StatusMap['Bad Request'], { error: 'Malformed identifier' });
   }
   errorLogger.error(code, error);
   return status(StatusMap['Internal Server Error'], { error: 'Internal server error' });

@@ -18,9 +18,9 @@ output "victorialogs_hostname" {
   value = var.victorialogs_hostname
 }
 
-output "app_domain" {
+output "app_host_domain" {
   description = "User apps are served under this. One wildcard record covers the fleet, so there is nothing per-app in DNS."
-  value       = var.app_domain
+  value       = var.app_host_domain
 }
 
 output "api_github_client_id" {

@@ -3,10 +3,12 @@ import { sql } from '#db/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
+import { AppsRepository } from '#repositories/apps.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { FilesystemRepository } from '#repositories/filesystem.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
+import { AppsService } from '#services/apps.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
 import { HealthService } from '#services/health.service.ts';
@@ -15,11 +17,16 @@ const agentRepository = new AgentRepository(sql);
 const assetsRepository = new AssetsRepository(sql);
 const healthRepository = new HealthRepository(sql);
 const filesystemRepository = new FilesystemRepository(sql);
+const appsRepository = new AppsRepository(sql);
 
 const agentService = new AgentService({ agentRepo: agentRepository });
 const assetsService = new AssetsService(assetsRepository);
 const healthService = new HealthService(healthRepository);
 const filesystemService = new FilesystemService({ filesystemRepo: filesystemRepository });
+const appsService = new AppsService({
+  appsRepo: appsRepository,
+  appHostDomain: env.APP_HOST_DOMAIN,
+});
 
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);
@@ -44,4 +51,9 @@ export const AgentServicePlugin = new Elysia({ name: 'service.agent' }).decorate
 export const FilesystemServicePlugin = new Elysia({ name: 'service.filesystem' }).decorate(
   'filesystemService',
   filesystemService,
+);
+
+export const AppsServicePlugin = new Elysia({ name: 'service.apps' }).decorate(
+  'appsService',
+  appsService,
 );

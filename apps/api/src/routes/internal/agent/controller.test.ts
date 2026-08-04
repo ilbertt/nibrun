@@ -34,6 +34,8 @@ const REQUIRED_ENV = {
   ARTIFACTS_BUCKET: 'test',
   S3_ACCESS_KEY_ID: 'test',
   S3_SECRET_ACCESS_KEY: 'test',
+  S3_REGION: 'test',
+  APP_HOST_DOMAIN: 'apps.test',
 };
 
 let app: { handle: (request: Request) => Promise<Response> };

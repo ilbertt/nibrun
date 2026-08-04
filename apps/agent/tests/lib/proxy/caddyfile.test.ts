@@ -7,11 +7,11 @@ import { APP_ID, FIRST_HOST_PORT } from '#tests/support/fixtures.ts';
 const SECOND_HOST_PORT = (FIRST_HOST_PORT + 1) as HostPort;
 
 function platformHostname(hostname: string): AppHostname {
-  return { hostname: hostname as Hostname, kind: 'platform', isDefault: true };
+  return { hostname: hostname as Hostname, kind: 'platform' };
 }
 
 function customHostname(hostname: string): AppHostname {
-  return { hostname: hostname as Hostname, kind: 'custom', isDefault: false };
+  return { hostname: hostname as Hostname, kind: 'custom' };
 }
 
 function route(overrides: Partial<RouteTarget> = {}): RouteTarget {

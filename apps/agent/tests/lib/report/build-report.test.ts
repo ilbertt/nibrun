@@ -55,7 +55,7 @@ function record(overrides: Partial<InstanceRecord> = {}): InstanceRecord {
     appId: APP_ID,
     deploymentId: DEPLOYMENT_ID,
     volumeId: VOLUME_ID,
-    hostnames: [{ hostname: 'a.example.com' as Hostname, kind: 'platform', isDefault: true }],
+    hostnames: [{ hostname: 'a.example.com' as Hostname, kind: 'platform' }],
     hostPort: FIRST_HOST_PORT,
     guestPort: DEFAULT_GUEST_PORT,
     guestIpv4: '10.201.0.2' as Ipv4Address,

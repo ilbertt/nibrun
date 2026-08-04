@@ -28,13 +28,9 @@ export type AppHostnameKind = typeof AppHostnameKindSchema.static;
 export const AppHostnameSchema = Type.Object({
   hostname: HostnameSchema,
   kind: AppHostnameKindSchema,
-  isDefault: Type.Boolean(),
 });
 
 export type AppHostname = typeof AppHostnameSchema.static;
-
-export const defaultHostname = (hostnames: readonly AppHostname[]) =>
-  hostnames.find((entry) => entry.isDefault);
 
 export const TenantEnvironmentSchema = Type.Record(
   Type.String({ pattern: ENVIRONMENT_NAME_PATTERN }),

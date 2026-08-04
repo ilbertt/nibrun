@@ -6,7 +6,7 @@ import { RootController } from '#routes/controller.ts';
 import { InternalController } from '#routes/internal/controller.ts';
 
 export function createApp() {
-  return new Elysia()
+  return new Elysia({ normalize: false })
     .onError(elysiaErrorHandler)
     .use(requestResponsePlugin)
     .use(ApiController)
