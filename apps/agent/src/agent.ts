@@ -53,15 +53,22 @@ const NO_FAILURES = 0;
 const DESIRED_STATE_FILENAME = 'desired-state.json';
 const TENANT_LOG_BUFFER_BYTES = 8_388_608;
 const LOG_RECONNECT_FLOOR_MS = 250;
-// The control plane holds this request open until the agent stops sending, so a stream that
-// ended sooner than this carried nothing and is a route answering on headers rather than an
-// upload that worked. Counting it as a failure is what keeps a misconfigured edge from becoming
-// a silent reconnect loop that never backs off and never says anything.
+// The agent ends each upload itself rather than letting one run until something kills it, so a
+// stream that ended well inside its own window ended for a reason nobody chose. Counting that as
+// a failure is what keeps a misconfigured edge from becoming a silent reconnect loop.
 const MIN_HEALTHY_LOG_STREAM_MS = 5_000;
-// Comfortably inside both the control plane's own idle timeout and the 60s an AWS load balancer
-// defaults to, because the cost of being wrong in one direction is a byte and in the other is
-// every quiet host reconnecting on a timer.
-const LOG_KEEPALIVE_INTERVAL_MS = 20_000;
+// How long one upload lasts before the agent closes it and opens the next.
+//
+// The agent ends it rather than the control plane because this request carries its data in the
+// body: whoever ends it decides what was in flight at the time, and only the sender knows when
+// nothing is. Ended at a drained queue it costs nothing, which is what makes a window this short
+// affordable — and short is what keeps a stalled upload from holding a host's output hostage.
+const LOG_STREAM_WINDOW_MS = 30_000;
+// Silence, not the window, is what an idle timer measures, and a quiet app produces plenty of it
+// inside one window. Sending an empty line more often than anything between here and the control
+// plane is willing to wait is what lets the window above be chosen for delivery reasons instead
+// of to dodge somebody's timeout.
+const LOG_KEEPALIVE_INTERVAL_MS = 10_000;
 
 export class Agent {
   readonly #config: AgentConfig;
@@ -242,6 +249,10 @@ export class Agent {
         this.#logQueue.keepalive();
       }, LOG_KEEPALIVE_INTERVAL_MS);
       keepalive.unref();
+      const window = setTimeout(() => {
+        this.#logQueue.endStream();
+      }, LOG_STREAM_WINDOW_MS);
+      window.unref();
       try {
         const session = await this.#ensureSession();
         await this.#client.streamTenantLogs({
@@ -266,13 +277,16 @@ export class Agent {
         }
         logger.warn({ message: 'tenant log stream failed', ...describeError(error) });
       } finally {
+        clearTimeout(window);
         clearInterval(keepalive);
         abort.abort();
         if (this.#logUploadAbort === abort) {
           this.#logUploadAbort = undefined;
         }
       }
-      if (this.#running) {
+      // Reaching the end of a window is not a retry, so it does not wait: the next upload opens
+      // immediately and whatever the tenant wrote in between is already queued for it.
+      if (this.#running && failures > NO_FAILURES) {
         const retryMs = Math.max(
           LOG_RECONNECT_FLOOR_MS,
           backoffDelayMs({ attempt: failures, policy: CONTROL_PLANE_BACKOFF }),

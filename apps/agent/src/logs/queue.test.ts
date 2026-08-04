@@ -40,6 +40,44 @@ describe('the bounded upload queue', () => {
     await reader.cancel();
   });
 
+  // The point of ending a stream rather than cutting it: an upload cut mid-flight loses whatever
+  // the request had already taken, and HTTP cannot say how much that was.
+  test('ending a stream hands over everything queued before it stops', async () => {
+    const queue = new TenantLogQueue({ maxBytes: 4096 });
+    expect(queue.push(event(1))).toBe(true);
+    expect(queue.push(event(2))).toBe(true);
+
+    const reader = queue.readable().getReader();
+    queue.endStream();
+
+    expect(JSON.parse(new TextDecoder().decode((await reader.read()).value)).sequence).toBe(1);
+    expect(JSON.parse(new TextDecoder().decode((await reader.read()).value)).sequence).toBe(2);
+    expect((await reader.read()).done).toBe(true);
+  });
+
+  test('an event that arrives after a stream ended waits for the one that replaces it', async () => {
+    const queue = new TenantLogQueue({ maxBytes: 4096 });
+    const ending = queue.readable().getReader();
+    queue.endStream();
+    expect((await ending.read()).done).toBe(true);
+
+    expect(queue.push(event(7))).toBe(true);
+    const replacement = queue.readable().getReader();
+    expect(JSON.parse(new TextDecoder().decode((await replacement.read()).value)).sequence).toBe(7);
+    await replacement.cancel();
+  });
+
+  // The window fires whether or not the queue happens to be empty, and an idle host is the case
+  // where it always is.
+  test('a stream ended while nothing is queued closes rather than hanging', async () => {
+    const queue = new TenantLogQueue({ maxBytes: 4096 });
+    const reader = queue.readable().getReader();
+    const pending = reader.read();
+    queue.endStream();
+
+    expect((await pending).done).toBe(true);
+  });
+
   test('it refuses growth past its byte limit instead of blocking the producer', () => {
     const queue = new TenantLogQueue({ maxBytes: 1 });
     expect(queue.push(event())).toBe(false);
