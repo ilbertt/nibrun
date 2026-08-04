@@ -14,6 +14,7 @@ export class TenantLogQueue {
   #queuedBytes = 0;
   #waiting: WaitingReader | undefined;
   #activeToken: symbol | undefined;
+  #endingStream = false;
   #closed = false;
 
   constructor({ maxBytes }: { maxBytes: number }) {
@@ -45,6 +46,25 @@ export class TenantLogQueue {
     return this.#offer(NEWLINE);
   }
 
+  /**
+   * End the current request's body once it has taken everything queued, leaving the queue itself
+   * open for the request that replaces it.
+   *
+   * An upload cannot be cut without losing whatever the request had already taken, and HTTP has
+   * no per-chunk acknowledgement to work out how much that was. A drained queue is the one
+   * boundary where the agent knows exactly what the control plane received, so it is the only
+   * place a stream can end for free.
+   */
+  endStream(): void {
+    if (this.#waiting) {
+      const waiting = this.#waiting;
+      this.#waiting = undefined;
+      waiting.resolve(undefined);
+      return;
+    }
+    this.#endingStream = true;
+  }
+
   #offer(chunk: Uint8Array): boolean {
     if (this.#waiting) {
       const waiting = this.#waiting;
@@ -67,6 +87,7 @@ export class TenantLogQueue {
     // read. Handing the next event to that reader would deliver it nowhere.
     this.#waiting = undefined;
     this.#activeToken = token;
+    this.#endingStream = false;
     let active = true;
     return new ReadableStream<Uint8Array>({
       pull: async (controller) => {
@@ -104,7 +125,7 @@ export class TenantLogQueue {
       this.#queuedBytes -= chunk.byteLength;
       return Promise.resolve(chunk);
     }
-    if (this.#closed) {
+    if (this.#closed || this.#endingStream) {
       return Promise.resolve(undefined);
     }
     return new Promise((resolve) => {
