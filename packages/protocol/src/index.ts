@@ -167,6 +167,8 @@ export {
   DEFAULT_GUEST_PORT,
   type DnsLabel,
   DnsLabelSchema,
+  type Filename,
+  FilenameSchema,
   type GuestPort,
   GuestPortSchema,
   type Hostname,

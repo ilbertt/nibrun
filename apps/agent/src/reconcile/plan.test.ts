@@ -6,6 +6,7 @@ import type {
   DesiredInstance,
   DesiredVolume,
   ExportId,
+  Filename,
   HostDesiredState,
   HostId,
   InstanceId,
@@ -46,6 +47,7 @@ const desiredInstance = (overrides: Partial<DesiredInstance> = {}): DesiredInsta
     digest: DIGEST,
     sizeBytes: ARTIFACT_SIZE_BYTES,
     objectKey: 'artifacts/a' as ObjectKey,
+    filename: 'server' as Filename,
   },
   config: {
     guestPort: DEFAULT_GUEST_PORT,

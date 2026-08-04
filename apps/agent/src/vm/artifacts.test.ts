@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { DesiredArtifact, ObjectKey, Sha256Digest } from '@repo/protocol';
+import type { DesiredArtifact, Filename, ObjectKey, Sha256Digest } from '@repo/protocol';
 import {
   type ArtifactBytes,
   ArtifactSizeError,
@@ -31,12 +31,15 @@ const bytesOf = (chunks: Uint8Array[]): ArtifactBytes => ({
     ),
 });
 
-const artifact = (overrides: Partial<DesiredArtifact> = {}): DesiredArtifact => ({
-  digest: CONTENT_DIGEST,
-  sizeBytes: CONTENT.byteLength,
-  objectKey: 'artifacts/app-1/binary' as ObjectKey,
-  ...overrides,
-});
+function artifact(overrides: Partial<DesiredArtifact> = {}): DesiredArtifact {
+  return {
+    digest: CONTENT_DIGEST,
+    sizeBytes: CONTENT.byteLength,
+    objectKey: 'artifacts/app-1/binary' as ObjectKey,
+    filename: 'server' as Filename,
+    ...overrides,
+  };
+}
 
 let directory: string;
 

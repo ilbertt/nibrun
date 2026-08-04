@@ -1,12 +1,11 @@
 import { mkdir, readdir, rm, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { DesiredArtifact } from '@repo/protocol';
 import { type CommandRunner, runCommandOrThrow } from '#lib/exec.ts';
 import { type ArtifactBytes, downloadAndVerify } from '#vm/artifacts.ts';
 
 const STAGING_MODE = 0o700;
 const DATA_DIRECTORY = 'data';
-const BINARY_NAME = 'server';
 const BUNDLE_NAME = 'bundle.tar.gz';
 // A tenant filesystem is unbounded where every other subprocess here is not, and the default
 // would abort a large export part-way with nothing to distinguish it from a broken device.
@@ -16,6 +15,13 @@ export class EmptyDumpError extends Error {
   constructor(devicePath: string) {
     super(`debugfs produced nothing from ${devicePath}`);
     this.name = 'EmptyDumpError';
+  }
+}
+
+export class UnsafeFilenameError extends Error {
+  constructor(filename: string) {
+    super(`Refusing to write ${JSON.stringify(filename)} into a bundle: it is not a filename`);
+    this.name = 'UnsafeFilenameError';
   }
 }
 
@@ -53,6 +59,23 @@ async function dumpFilesystem({
 }
 
 /**
+ * The name the binary takes inside the bundle.
+ *
+ * Re-checked rather than trusted from the wire, and refused rather than corrected. The schema
+ * already constrains it to a single segment, so anything reaching here that is not one came
+ * from a peer that did not honour the contract — and this value becomes a path inside an
+ * archive somebody extracts on their own machine. Renaming it quietly would leave both the
+ * broken control plane and the attempt unnoticed.
+ */
+export function bundleBinaryName(artifact: DesiredArtifact): string {
+  const { filename } = artifact;
+  if (filename !== basename(filename) || filename.startsWith('.') || filename.startsWith('-')) {
+    throw new UnsafeFilenameError(filename);
+  }
+  return filename;
+}
+
+/**
  * Builds the downloadable copy of one app: the binary it runs and the filesystem it wrote.
  *
  * The binary is fetched from the artifact bucket rather than lifted out of the local squashfs
@@ -75,11 +98,12 @@ export async function writeBundle({
   await rm(stagingDir, { recursive: true, force: true });
   await mkdir(stagingDir, { recursive: true, mode: STAGING_MODE });
 
+  const binaryName = bundleBinaryName(artifact);
   await dumpFilesystem({ runner, devicePath, destination: join(stagingDir, DATA_DIRECTORY) });
   await downloadAndVerify({
     source: artifacts,
     artifact,
-    destination: join(stagingDir, BINARY_NAME),
+    destination: join(stagingDir, binaryName),
   });
 
   const bundlePath = join(stagingDir, BUNDLE_NAME);
@@ -87,7 +111,7 @@ export async function writeBundle({
     runner,
     request: {
       // Named entries rather than `.`, which would sweep the archive into itself.
-      command: ['tar', 'czf', bundlePath, '-C', stagingDir, DATA_DIRECTORY, BINARY_NAME],
+      command: ['tar', 'czf', bundlePath, '-C', stagingDir, DATA_DIRECTORY, binaryName],
       timeoutMs: DUMP_TIMEOUT_MS,
     },
   });

@@ -31,6 +31,14 @@ const MAX_IPV4_LENGTH = 15;
 
 const MAX_OBJECT_KEY_LENGTH = 1024;
 
+// A single path segment and nothing else. The value originates with whoever uploaded the
+// binary and its only use is as a name inside an archive someone later extracts, so a
+// separator or a `..` is the difference between a filename and a path traversal. Requiring
+// the first character to be alphanumeric is what excludes both `.` and `..` outright, along
+// with a leading dash that would read as a flag to whatever unpacks it.
+const FILENAME_PATTERN = '^[0-9A-Za-z][0-9A-Za-z._-]{0,126}$';
+const MAX_FILENAME_LENGTH = 127;
+
 const MIN_PORT = 1;
 const MAX_PORT = 65_535;
 
@@ -92,6 +100,15 @@ export const ObjectKeySchema = Type.String({
   minLength: 1,
   maxLength: MAX_OBJECT_KEY_LENGTH,
 }) as BrandedSchema<TString, ObjectKey>;
+
+export type Filename = Brand<string, 'Filename'>;
+
+export const FilenameSchema = Type.String({
+  description: 'One path segment, safe to use as a name inside an archive.',
+  pattern: FILENAME_PATTERN,
+  minLength: 1,
+  maxLength: MAX_FILENAME_LENGTH,
+}) as BrandedSchema<TString, Filename>;
 
 // The port the tenant's binary listens on inside its guest, and the port the agent forwards
 // to it on the host, are different numbers that mean different things. They are branded

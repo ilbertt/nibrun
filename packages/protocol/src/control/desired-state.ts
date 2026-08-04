@@ -10,7 +10,7 @@ import {
   VolumeIdSchema,
 } from '#domain/identifiers.ts';
 import { stringEnum } from '#lib/string-enum.ts';
-import { ByteSizeSchema, ObjectKeySchema, Sha256DigestSchema } from '#lib/wire.ts';
+import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } from '#lib/wire.ts';
 
 // What a host should be running. There is deliberately nothing here shaped like `start(x)` or
 // `stop(x)`: the control plane describes a world and the agent converges on it, so a missed
@@ -29,10 +29,20 @@ export const DesiredPresenceSchema = stringEnum(DESIRED_PRESENCE);
 
 export type DesiredPresence = typeof DesiredPresenceSchema.static;
 
+/**
+ * `filename` is what the uploader called the binary, and it exists because `objectKey` cannot
+ * answer that: keys are assigned to avoid collisions, so they carry no name. Nothing on the
+ * host boots from it — the guest execs a fixed path by boot contract — and its only use is the
+ * name the binary takes inside an export, which is the one place a person sees it again.
+ *
+ * Required, because an upload nobody has completed is not deployable: by the time an artifact
+ * appears here it has been named, so there is no nameless case for a host to handle.
+ */
 export const DesiredArtifactSchema = Type.Object({
   digest: Sha256DigestSchema,
   sizeBytes: ByteSizeSchema,
   objectKey: ObjectKeySchema,
+  filename: FilenameSchema,
 });
 
 export type DesiredArtifact = typeof DesiredArtifactSchema.static;

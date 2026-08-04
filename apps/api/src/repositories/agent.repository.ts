@@ -5,6 +5,7 @@ import {
   DEFAULT_RESTART_POLICY,
   type DeploymentId,
   type ExportId,
+  type Filename,
   type GuestPort,
   type HostDesiredState,
   type HostId,
@@ -54,6 +55,7 @@ const DESIRED_APP = {
         // Uploaded by hand; the agent hashes the stream as it downloads and refuses
         // on either mismatch, so both values below are load-bearing.
         objectKey: 'artifacts/app-pocketbase/pb-0-39-10' as ObjectKey,
+        filename: 'pocketbase' as Filename,
         digest: 'f119018534e7a9e0db837c2811dda589d03bbdb78a03decc0664aac864e53814' as Sha256Digest,
         sizeBytes: 32_096_418,
       },

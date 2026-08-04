@@ -1,9 +1,14 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { DesiredArtifact, ObjectKey, Sha256Digest } from '@repo/protocol';
-import { EmptyDumpError, writeBundle } from '#exports/bundle.ts';
+import type { DesiredArtifact, Filename, ObjectKey, Sha256Digest } from '@repo/protocol';
+import {
+  bundleBinaryName,
+  EmptyDumpError,
+  UnsafeFilenameError,
+  writeBundle,
+} from '#exports/bundle.ts';
 import type { CommandRequest, CommandResult, CommandRunner } from '#lib/exec.ts';
 import type { ArtifactBytes } from '#vm/artifacts.ts';
 
@@ -23,11 +28,14 @@ const artifacts: ArtifactBytes = {
     ),
 };
 
-function artifact(): DesiredArtifact {
+function artifact(overrides: Partial<DesiredArtifact> = {}): DesiredArtifact {
   return {
     digest: new Bun.CryptoHasher('sha256').update(BINARY_BYTES).digest('hex') as Sha256Digest,
     sizeBytes: BINARY_BYTES.byteLength,
-    objectKey: 'artifacts/app-1/server' as ObjectKey,
+    // A uuid, as the api will assign: it carries no name, which is why `filename` exists.
+    objectKey: 'artifacts/9f1c2f0e-0d4e-4a1b-9c3a-1f8b6d2e7a45' as ObjectKey,
+    filename: 'pocketbase' as Filename,
+    ...overrides,
   };
 }
 
@@ -81,7 +89,7 @@ test('reads the device with debugfs and never mounts it', async () => {
   expect(dump?.command).not.toContain('-w');
 });
 
-test('archives the data tree and the binary, and not the archive itself', async () => {
+test('archives the data tree and the binary under its uploaded name', async () => {
   const calls: CommandRequest[] = [];
   const bundle = await writeBundle({
     runner: runnerWritingDump(calls),
@@ -99,10 +107,29 @@ test('archives the data tree and the binary, and not the archive itself', async 
     '-C',
     stagingDir,
     'data',
-    'server',
+    'pocketbase',
   ]);
+  // `.` would sweep the archive into itself.
   expect(tar?.command).not.toContain('.');
   expect(bundle.sizeBytes).toBeGreaterThan(0);
+});
+
+describe('the bundle keeps the name the binary was uploaded under', () => {
+  test('the uploaded name is what lands in the archive', () => {
+    expect(bundleBinaryName(artifact({ filename: 'pocketbase' as Filename }))).toBe('pocketbase');
+  });
+
+  // The schema rejects all of these, so reaching here means a peer that did not honour it.
+  // The bundle is extracted by a person on their own machine; a name that escapes the archive
+  // root writes wherever the traversal points, so it fails rather than being corrected.
+  test.each(['../escape', 'nested/path', '.hidden', '..', '-rf'])(
+    'a name that is a path rather than a filename is refused: %s',
+    (hostile) => {
+      expect(() => bundleBinaryName(artifact({ filename: hostile as Filename }))).toThrow(
+        UnsafeFilenameError,
+      );
+    },
+  );
 });
 
 test('a dump that produced nothing is an error rather than an empty bundle', () => {

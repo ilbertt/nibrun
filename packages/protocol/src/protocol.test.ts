@@ -9,6 +9,7 @@ import {
   DEFAULT_RESTART_POLICY,
   type DeploymentId,
   DesiredStateResponseSchema,
+  type Filename,
   type GuestPort,
   type HostDesiredState,
   HostDesiredStateSchema,
@@ -28,7 +29,7 @@ import {
   TimestampSchema,
   type VolumeId,
 } from '#index.ts';
-import { GuestPortSchema, HostPortSchema } from '#lib/wire.ts';
+import { FilenameSchema, GuestPortSchema, HostPortSchema } from '#lib/wire.ts';
 
 const TENANT_SECRET = 'sk-live-do-not-log-this' as SecretString;
 
@@ -60,6 +61,7 @@ const desiredState = (): HostDesiredState => ({
         digest: hexDigest() as never,
         sizeBytes: 2048,
         objectKey: 'artifacts/app_1/a' as ObjectKey,
+        filename: 'server' as Filename,
       },
       config: {
         guestPort: DEFAULT_GUEST_PORT,
@@ -105,6 +107,20 @@ describe('branding leaves runtime validation intact', () => {
     expect(isValidMessage({ schema: GuestPortSchema, value: 0 })).toBe(false);
     expect(isValidMessage({ schema: GuestPortSchema, value: 65_536 })).toBe(false);
     expect(isValidMessage({ schema: GuestPortSchema, value: 3000.5 })).toBe(false);
+  });
+
+  // A filename crosses the wire from whoever uploaded the binary and becomes a path inside an
+  // archive someone extracts, so anything that is not a single segment is refused here first.
+  test('a filename is one path segment and never a path', () => {
+    expect(isValidMessage({ schema: FilenameSchema, value: 'pocketbase' })).toBe(true);
+    expect(isValidMessage({ schema: FilenameSchema, value: 'pb-0.39.10_linux-amd64' })).toBe(true);
+    expect(isValidMessage({ schema: FilenameSchema, value: '../escape' })).toBe(false);
+    expect(isValidMessage({ schema: FilenameSchema, value: 'nested/path' })).toBe(false);
+    expect(isValidMessage({ schema: FilenameSchema, value: '..' })).toBe(false);
+    expect(isValidMessage({ schema: FilenameSchema, value: '.hidden' })).toBe(false);
+    expect(isValidMessage({ schema: FilenameSchema, value: '-rf' })).toBe(false);
+    expect(isValidMessage({ schema: FilenameSchema, value: 'nul\u0000byte' })).toBe(false);
+    expect(isValidMessage({ schema: FilenameSchema, value: '' })).toBe(false);
   });
 });
 
