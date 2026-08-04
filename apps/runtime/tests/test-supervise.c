@@ -335,6 +335,31 @@ static void stdout_and_stderr_are_separate_streams(void) {
   EXPECT(!file_contains(stderr_path, "from stdout\n"));
 }
 
+static void count_service(void *context) {
+  int descriptor = open((const char *)context, O_WRONLY | O_APPEND);
+  if (descriptor < 0 || write(descriptor, "x", 1) != 1) {
+    _exit(1);
+  }
+  close(descriptor);
+}
+
+/* A tenant that prints nothing is the whole problem: it is the one case where no write can
+ * discover that the sink's far end has gone, so the supervisor has to hand it a turn unasked. */
+static void a_quiet_tenant_still_gets_the_sink_serviced(void) {
+  char ticks_path[128];
+  snprintf(ticks_path, sizeof(ticks_path), "%s", scratch_file("service-ticks"));
+  char *environment[] = {"FAKE_MODE=stay", "FAKE_RECORD=/tmp/unused", "FAKE_DURATION_MS=3500",
+                         NULL};
+  struct restart_policy policy = {
+      .max_restarts = 0, .initial_backoff_ms = 0, .max_backoff_ms = 0, .backoff_factor = 1,
+      .reset_after_ms = 60000};
+  struct supervisor supervisor = supervisor_for(environment, &policy, 1000);
+  supervisor.output = (struct tenant_output){.service = count_service, .context = ticks_path};
+
+  EXPECT(wait_for_supervisor(start_supervisor(&supervisor)) == SUPERVISE_RESTART_BUDGET_EXHAUSTED);
+  EXPECT(file_contains(ticks_path, "xx"));
+}
+
 int main(void) {
   backoff_grows_then_stops_growing();
   a_crashing_tenant_exhausts_its_budget();
@@ -344,5 +369,6 @@ int main(void) {
   orphans_are_reaped();
   the_tenant_runs_unprivileged_in_its_own_directory();
   stdout_and_stderr_are_separate_streams();
+  a_quiet_tenant_still_gets_the_sink_serviced();
   return EXPECT_REPORT("supervise");
 }
