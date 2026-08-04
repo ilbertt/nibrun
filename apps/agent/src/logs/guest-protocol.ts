@@ -89,17 +89,3 @@ function frameFrom({
     ),
   });
 }
-
-export function encodeGuestLogFrameForTest({
-  kind,
-  payload,
-}: {
-  kind: keyof typeof FRAME_KINDS;
-  payload: Uint8Array;
-}): Uint8Array {
-  const header = Buffer.alloc(FRAME_HEADER_BYTES);
-  FRAME_MAGIC.copy(header);
-  header[KIND_OFFSET] = FRAME_KINDS[kind];
-  header.writeUInt32BE(payload.byteLength, LENGTH_OFFSET);
-  return Buffer.concat([header, payload]);
-}

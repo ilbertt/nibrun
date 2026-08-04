@@ -29,13 +29,14 @@ const paths = {
   dataDevicePath: '/dev/nbd3',
 };
 
-const config = () =>
-  renderFirecrackerConfig({
+function config() {
+  return renderFirecrackerConfig({
     resources: DEFAULT_INSTANCE_RESOURCES,
     paths,
     network,
     vsock: { guestCid: 6, path: 'logs.vsock' },
   });
+}
 
 describe('the drive order is the boot contract', () => {
   test('vda vdb vdc vdd are rootfs, artifact, instance config, tenant data', () => {

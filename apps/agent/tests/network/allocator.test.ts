@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { AppId, HostPort, Ipv4Address } from '@repo/protocol';
 import { Effect, Either, Layer, Option } from 'effect';
-import { AgentConfig } from '#config.ts';
 import {
   assignmentsFrom,
   readSlotRecords,
@@ -9,9 +8,8 @@ import {
   type SlotRecords,
 } from '#network/allocator.ts';
 import { describeSlot, HOST_PORT_BASE, SLOT_COUNT } from '#network/slot.ts';
-import { platform } from '#testing.ts';
-
-const app = (name: string | number) => `app-${name}` as AppId;
+import { agentConfig } from '#tests/support/config.ts';
+import { platform, provided } from '#tests/support/run.ts';
 
 const SUBNET_PREFIX_LENGTH = 30;
 const BOUNDARY_SLOT = 64;
@@ -20,17 +18,17 @@ const DISTINCT_APPS = ['alpha', 'beta', 'gamma'];
 const BEYOND_THE_LAST_SLOT = 1_000;
 const everySlot = [...Array(SLOT_COUNT).keys()];
 
-// A directory nothing writes to: the allocator starts empty and never persists during a test.
-const config = Layer.succeed(AgentConfig, {
-  slotsFile: '/nonexistent/nibrun-test/slots.json',
-} as AgentConfig);
+const run = provided(
+  SlotAllocator.Default.pipe(Layer.provide(Layer.merge(agentConfig(), platform))),
+);
 
-const withAllocator = <A>(use: (allocator: SlotAllocator) => Effect.Effect<A, never, never>) =>
-  Effect.runPromise(
-    Effect.flatMap(SlotAllocator, use).pipe(
-      Effect.provide(SlotAllocator.Default.pipe(Layer.provide(Layer.merge(config, platform)))),
-    ),
-  );
+function app(name: string | number) {
+  return `app-${name}` as AppId;
+}
+
+function withAllocator<A, E>(use: (allocator: SlotAllocator) => Effect.Effect<A, E>) {
+  return run(Effect.flatMap(SlotAllocator, use));
+}
 
 describe('slot derivation', () => {
   test('every per-app resource comes from the one number', () => {
@@ -110,8 +108,9 @@ describe('allocation is stable for the lifetime of an app', () => {
 });
 
 describe('allocation survives an agent restart', () => {
-  const slotOf = ({ records, appId }: { records: SlotRecords; appId: AppId }) =>
-    assignmentsFrom(records).get(appId);
+  function slotOf({ records, appId }: { records: SlotRecords; appId: AppId }) {
+    return assignmentsFrom(records).get(appId);
+  }
 
   test('a corrupted record file degrades to an empty allocator rather than throwing', () => {
     expect(readSlotRecords('nonsense')).toEqual({});

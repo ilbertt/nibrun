@@ -2,25 +2,26 @@ import { describe, expect, test } from 'bun:test';
 import type { AppHostname, AppId, Hostname, HostPort } from '@repo/protocol';
 import { renderAppSites } from '#proxy/caddyfile.ts';
 import type { RouteTarget } from '#report/routes.ts';
+import { APP_ID, FIRST_HOST_PORT } from '#tests/support/fixtures.ts';
 
-const platform = (hostname: string): AppHostname => ({
-  hostname: hostname as Hostname,
-  kind: 'platform',
-  isDefault: true,
-});
+const SECOND_HOST_PORT = (FIRST_HOST_PORT + 1) as HostPort;
 
-const custom = (hostname: string): AppHostname => ({
-  hostname: hostname as Hostname,
-  kind: 'custom',
-  isDefault: false,
-});
+function platformHostname(hostname: string): AppHostname {
+  return { hostname: hostname as Hostname, kind: 'platform', isDefault: true };
+}
 
-const route = (overrides: Partial<RouteTarget> = {}): RouteTarget => ({
-  appId: 'app-a' as AppId,
-  hostnames: [platform('a.apps.example.com')],
-  hostPort: 21_000 as HostPort,
-  ...overrides,
-});
+function customHostname(hostname: string): AppHostname {
+  return { hostname: hostname as Hostname, kind: 'custom', isDefault: false };
+}
+
+function route(overrides: Partial<RouteTarget> = {}): RouteTarget {
+  return {
+    appId: APP_ID,
+    hostnames: [platformHostname('a.apps.example.com')],
+    hostPort: FIRST_HOST_PORT,
+    ...overrides,
+  };
+}
 
 describe('the rendered config is a projection of what is running', () => {
   test('an app is reached on the loopback port the host forwards into its guest', () => {
@@ -42,14 +43,14 @@ describe('the rendered config is a projection of what is running', () => {
   test('an app answers on every hostname it has, not only the default one', () => {
     const sites = renderAppSites([
       route({
-        hostnames: [platform('a.apps.example.com'), custom('brought.example.dev')],
+        hostnames: [platformHostname('a.apps.example.com'), customHostname('brought.example.dev')],
       }),
     ]);
     expect(sites).toContain('https://a.apps.example.com, https://brought.example.dev {');
   });
 
   test('rendering twice from the same routes is byte-identical, whatever order they arrive in', () => {
-    const first = route({ appId: 'app-b' as AppId, hostPort: 21_001 as HostPort });
+    const first = route({ appId: 'app-b' as AppId, hostPort: SECOND_HOST_PORT });
     const second = route({ appId: 'app-a' as AppId });
     expect(renderAppSites([first, second])).toBe(renderAppSites([second, first]));
   });
@@ -59,7 +60,10 @@ describe('a record the agent cannot use cannot wedge the whole host', () => {
   test('an unusable hostname is dropped rather than written into the config', () => {
     const sites = renderAppSites([
       route({
-        hostnames: [platform('a.apps.example.com } respond 500 #'), platform('b.apps.example.com')],
+        hostnames: [
+          platformHostname('a.apps.example.com } respond 500 #'),
+          platformHostname('b.apps.example.com'),
+        ],
       }),
     ]);
     expect(sites).toContain('https://b.apps.example.com {');
@@ -67,7 +71,7 @@ describe('a record the agent cannot use cannot wedge the whole host', () => {
   });
 
   test('an app left with no usable hostname is left out entirely', () => {
-    const sites = renderAppSites([route({ hostnames: [platform('not a hostname')] })]);
+    const sites = renderAppSites([route({ hostnames: [platformHostname('not a hostname')] })]);
     expect(sites).not.toContain('reverse_proxy');
   });
 });

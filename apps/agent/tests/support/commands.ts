@@ -1,4 +1,3 @@
-import { BunContext } from '@effect/platform-bun';
 import { Effect, Layer } from 'effect';
 import {
   type CommandError,
@@ -9,10 +8,14 @@ import {
 
 const OK: CommandResult = { code: 0, stdout: '', stderr: '' };
 
+export function succeeding(result: Partial<CommandResult> = {}) {
+  return Effect.succeed({ ...OK, ...result });
+}
+
 /** Records every command and answers each one, so a call shape can be asserted without a host. */
 export function recordingCommands(
   answer: (request: CommandRequest) => Effect.Effect<CommandResult, CommandError> = () =>
-    Effect.succeed(OK),
+    succeeding(),
 ) {
   const commands: CommandRequest[] = [];
   const layer = Layer.succeed(CommandRunner, {
@@ -23,8 +26,3 @@ export function recordingCommands(
   });
   return { commands, layer, executables: () => commands.map(({ command }) => command[0]) };
 }
-
-export const platform = BunContext.layer;
-
-export const succeeding = (result: Partial<CommandResult> = {}) =>
-  Effect.succeed({ ...OK, ...result });

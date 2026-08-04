@@ -30,11 +30,12 @@ function state(overrides: Partial<FirewallState> = {}): FirewallState {
   };
 }
 
-const dropsFrom = (ruleset: string) =>
-  ruleset
+function dropsFrom(ruleset: string) {
+  return ruleset
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.endsWith('drop') || line.includes('drop comment'));
+}
 
 describe('the three isolation rules are never optional', () => {
   test('guests cannot reach the instance metadata endpoint, with no instances configured', () => {

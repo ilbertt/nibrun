@@ -16,6 +16,12 @@ close the log sockets. Nothing stops a tenant VM, which is what keeps redeployin
 `CommandRunner` service over `@effect/platform`'s `Command`. Bun's own S3 client and hasher are
 still used directly, because `@effect/platform` has no equivalent.
 
+**Tests live in `tests/`, mirroring `src/`**, and everything they share is in `tests/support/`:
+fixtures, the recording `CommandRunner`, the scoped `Bun.serve` harness, and `provided(layer)` —
+the one `Effect.runPromise` a test performs, and the scope its temp directories, servers and
+sockets are released by. `bun test` rules out `@effect/vitest`, so there is no `it.effect`;
+`TestClock` comes from `effect` core when a test needs virtual time.
+
 The control plane is reached through `@repo/api-client/internal`, and every call goes through it,
 so a route the api does not mount is a compile error. What it cannot describe is the bytes that
 come back, so `control/client.ts` still validates every response against `@repo/protocol` —

@@ -3,7 +3,7 @@ import type { Ipv4Address } from '@repo/protocol';
 import { Effect } from 'effect';
 import type { CommandRequest } from '#lib/exec.ts';
 import { ensureTap } from '#network/tap.ts';
-import { recordingCommands, succeeding } from '#testing.ts';
+import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 
 const tap = {
   tapName: 'nbr7',
@@ -12,14 +12,15 @@ const tap = {
 };
 
 // The only command whose output is read back; every tap looks absent so the create path is taken.
-const noTapsExist = ({ command }: CommandRequest) =>
-  succeeding({ stdout: command.includes('-json') ? '[]' : '' });
+function noTapsExist({ command }: CommandRequest) {
+  return succeeding({ stdout: command.includes('-json') ? '[]' : '' });
+}
 
-const issuedCommands = async () => {
+async function issuedCommands() {
   const { commands, layer } = recordingCommands(noTapsExist);
   await Effect.runPromise(Effect.provide(ensureTap(tap), layer));
   return commands.map(({ command }) => [...command]);
-};
+}
 
 describe('a tap is usable the moment it is up', () => {
   test('the proxy can route to it, because 127.0.0.0/8 is not martian on it', async () => {

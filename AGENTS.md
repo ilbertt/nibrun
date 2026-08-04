@@ -35,10 +35,11 @@ After finishing an implementation, always run:
 2. `bun check:all` — verify types, codestyle and tests pass
 3. `bun run build` — verify the build succeeds
 
-Tests are `bun test` files living beside the code they cover (`src/**/*.test.ts`), run through
-Turbo by `bun run test` — note `bun test` on its own is Bun's own runner and bypasses the
-workspace. Not every package needs them; a package whose correctness is only checkable at
-runtime does.
+Tests are `bun test` files, run through Turbo by `bun run test` — note `bun test` on its own is
+Bun's own runner and bypasses the workspace. They live beside the code they cover
+(`src/**/*.test.ts`), or in a sibling `tests/` mirroring `src/` once a package has shared
+fixtures worth a `tests/support/` (`apps/agent`). Not every package needs them; a package whose
+correctness is only checkable at runtime does.
 
 Check `package.json` scripts (root and per-app) for other available commands.
 

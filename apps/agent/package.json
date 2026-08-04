@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "imports": {
-    "#*": "./src/*"
+    "#*": "./src/*",
+    "#tests/*": "./tests/*"
   },
   "scripts": {
     "build": "bun run scripts/build.ts",

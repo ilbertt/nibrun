@@ -8,12 +8,14 @@ import {
 import { Either } from 'effect';
 import { renderInstanceEnv } from '#vm/instance-env.ts';
 
-const secret = (value: string) => value as SecretString;
+function secret(value: string) {
+  return value as SecretString;
+}
 
 type Overrides = Partial<Parameters<typeof renderInstanceEnv>[0]>;
 
-const attempt = (overrides: Overrides = {}) =>
-  renderInstanceEnv({
+function attempt(overrides: Overrides = {}) {
+  return renderInstanceEnv({
     guestPort: DEFAULT_GUEST_PORT,
     args: [],
     environment: {},
@@ -21,13 +23,16 @@ const attempt = (overrides: Overrides = {}) =>
     dnsServers: [],
     ...overrides,
   });
+}
 
-const render = (overrides: Overrides = {}) => Either.getOrThrow(attempt(overrides));
+function render(overrides: Overrides = {}) {
+  return Either.getOrThrow(attempt(overrides));
+}
 
-const refusedVariable = (overrides: Overrides) => {
+function refusedVariable(overrides: Overrides) {
   const result = attempt(overrides);
   return Either.isLeft(result) ? result.left : undefined;
-};
+}
 
 // apps/runtime/src/config.c accepts NIBRUN_ and ENV_ and rejects every other line, so these
 // assertions are the boot contract rather than a formatting preference.

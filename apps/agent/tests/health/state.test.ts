@@ -1,16 +1,19 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_HEALTH_CHECK, type HealthCheck, type Timestamp } from '@repo/protocol';
+import { DEFAULT_HEALTH_CHECK, type HealthCheck } from '@repo/protocol';
 import { applyProbe, evaluateInstanceState, initialTracker } from '#health/state.ts';
+import { OBSERVED_AT } from '#tests/support/fixtures.ts';
 import type { UnitStatus } from '#vm/unit-status.ts';
 
-const AT = '2026-08-03T10:00:00.000Z' as Timestamp;
 const STARTED_AT_MS = 1_000_000;
 const GRACE_MS = DEFAULT_HEALTH_CHECK.gracePeriodMs;
 const WITHIN_GRACE_MS = STARTED_AT_MS + GRACE_MS - 1;
 const PAST_GRACE_MS = STARTED_AT_MS + GRACE_MS + 1;
 
 const UNHEALTHY_RUN = DEFAULT_HEALTH_CHECK.unhealthyThreshold;
+const HEALTHY_THRESHOLD = DEFAULT_HEALTH_CHECK.healthyThreshold;
 const TWO_SUCCESSES = 2;
+
+type Tracker = ReturnType<typeof initialTracker>;
 
 const active: UnitStatus = { loaded: true, active: true, failed: false, startedThisBoot: true };
 const exited: UnitStatus = {
@@ -34,40 +37,39 @@ const absent: UnitStatus = {
   startedThisBoot: false,
 };
 
-const check = (overrides: Partial<HealthCheck> = {}): HealthCheck => ({
-  ...DEFAULT_HEALTH_CHECK,
-  ...overrides,
-});
+function check(overrides: Partial<HealthCheck> = {}): HealthCheck {
+  return { ...DEFAULT_HEALTH_CHECK, ...overrides };
+}
 
-const HEALTHY_THRESHOLD = DEFAULT_HEALTH_CHECK.healthyThreshold;
-
-const probe = ({
+function probe({
   tracker,
   healthy,
   healthyThreshold = HEALTHY_THRESHOLD,
 }: {
-  tracker: ReturnType<typeof initialTracker>;
+  tracker: Tracker;
   healthy: boolean;
   healthyThreshold?: number;
-}) => applyProbe({ tracker, healthy, at: AT, healthyThreshold });
+}) {
+  return applyProbe({ tracker, healthy, at: OBSERVED_AT, healthyThreshold });
+}
 
-const failing = (count: number) => {
+function failing(count: number) {
   let tracker = initialTracker();
   for (let index = 0; index < count; index += 1) {
     tracker = probe({ tracker, healthy: false });
   }
   return tracker;
-};
+}
 
-const healthyThen = (failures: number) => {
+function healthyThen(failures: number) {
   let tracker = probe({ tracker: initialTracker(), healthy: true });
   for (let index = 0; index < failures; index += 1) {
     tracker = probe({ tracker, healthy: false });
   }
   return tracker;
-};
+}
 
-const evaluate = ({
+function evaluate({
   unit,
   tracker,
   nowMs,
@@ -77,14 +79,14 @@ const evaluate = ({
   startedAtMs = STARTED_AT_MS as number | undefined,
 }: {
   unit: UnitStatus;
-  tracker: ReturnType<typeof initialTracker>;
+  tracker: Tracker;
   nowMs: number;
   healthCheck?: HealthCheck;
   stopRequested?: boolean;
   desiredRunning?: boolean;
   startedAtMs?: number | undefined;
-}) =>
-  evaluateInstanceState({
+}) {
+  return evaluateInstanceState({
     unit,
     tracker,
     healthCheck,
@@ -93,6 +95,7 @@ const evaluate = ({
     ...(startedAtMs === undefined ? {} : { startedAtMs }),
     nowMs,
   });
+}
 
 describe('probe accounting', () => {
   test('a success resets the failure run and records when it happened', () => {
@@ -101,7 +104,7 @@ describe('probe accounting', () => {
       consecutiveSuccesses: 1,
       consecutiveFailures: 0,
       everHealthy: true,
-      lastHealthyAt: AT,
+      lastHealthyAt: OBSERVED_AT,
     });
   });
 

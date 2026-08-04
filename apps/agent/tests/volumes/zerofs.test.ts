@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { CheckpointId } from '@repo/protocol';
 import { Effect } from 'effect';
-import { recordingCommands } from '#testing.ts';
+import { recordingCommands } from '#tests/support/commands.ts';
 import {
   createCheckpoint,
   deleteCheckpoint,
