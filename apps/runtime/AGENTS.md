@@ -5,7 +5,7 @@ other thing that ever executes there. `src/init.c` is the sequence in order, `sr
 boot contract shared with the host agent, and `src/config.h` is the `/instance.env` format.
 
 C, static, musl, because this is resident in every microVM and its cost is multiplied by how many
-a host packs: measured **1.3 MiB RSS, 62 KiB on disk**. Only the tenant's binary needs glibc,
+a host packs: measured **1.3 MiB RSS, 65 KiB on disk**. Only the tenant's binary needs glibc,
 which is why the rootfs carries it and this does not link against it.
 
 ## Building
@@ -26,3 +26,7 @@ Verified on Firecracker v1.16.1: the boot sequence, data persisting across boots
 budget ending the VM with Firecracker exiting 0, and a graceful stop over `SendCtrlAltDel` — which
 works only because the guest kernel enables the i8042 path, and that belongs to
 `infra/guest-image`.
+
+The stdout/stderr framing and non-blocking capture are exercised in Docker. The AF_VSOCK
+connection itself still needs a Firecracker integration test; a container has no Firecracker
+vsock backend to connect it to.

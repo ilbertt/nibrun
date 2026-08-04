@@ -24,9 +24,9 @@ order *is* the contract.
 console=ttyS0 quiet reboot=k panic=1 pci=off i8042.noaux i8042.nomux i8042.dumbkbd root=/dev/vda ro init=/init ip=<guest-ip>::<host-ip>:<netmask>::eth0:off
 ```
 
-`quiet` keeps informational kernel messages out of the serial console that carries the tenant's
-stdout and stderr. Kernel warnings and failures remain visible, and writes to `/dev/console` are
-unaffected.
+`quiet` keeps informational kernel messages out of the serial console that carries the runtime's
+diagnostics. Kernel warnings and failures remain visible, and writes to `/dev/console` are
+unaffected. Tenant stdout and stderr use a separate guest-initiated Firecracker vsock.
 
 `cache_type` on `vdd` is the one setting that fails silently: Firecracker defaults a drive to
 `Unsafe`, which **discards flush requests**, so the guest's `fsync` returns success, ZeroFS is

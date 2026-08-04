@@ -16,6 +16,7 @@ WorkingDirectory=/var/lib/nibrun/vm/%i
 # with FailedToBindSocket and never runs again. systemd guarantees one instance of
 # a unit at a time, so nothing can be listening on it when this runs.
 ExecStartPre=-/bin/rm -f /run/nibrun/vm-%i.sock
+ExecStartPre=-/bin/rm -f /var/lib/nibrun/vm/%i/logs.vsock
 ExecStart=/opt/nibrun/bin/firecracker/firecracker \
   --api-sock /run/nibrun/vm-%i.sock \
   --config-file /var/lib/nibrun/vm/%i/firecracker.json
@@ -26,9 +27,9 @@ ExecStart=/opt/nibrun/bin/firecracker/firecracker \
 # would race that loop and hide a broken deploy behind an infinite retry.
 Restart=no
 
-# The tenant's own output arrives on the guest console, which Firecracker writes
-# to its stdout and systemd captures — so `journalctl -u nibrun-vm@<id>` is the
-# app's log with no shipping built for it.
+# Only the guest runtime and kernel use the serial console. Tenant output travels
+# over the VM's dedicated vsock into the agent, so an app cannot flood the
+# Firecracker service's operator journal.
 StandardOutput=journal
 StandardError=journal
 

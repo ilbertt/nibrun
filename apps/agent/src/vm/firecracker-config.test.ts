@@ -30,7 +30,12 @@ const paths = {
 };
 
 const config = () =>
-  renderFirecrackerConfig({ resources: DEFAULT_INSTANCE_RESOURCES, paths, network });
+  renderFirecrackerConfig({
+    resources: DEFAULT_INSTANCE_RESOURCES,
+    paths,
+    network,
+    vsock: { guestCid: 6, path: 'logs.vsock' },
+  });
 
 describe('the drive order is the boot contract', () => {
   test('vda vdb vdc vdd are rootfs, artifact, instance config, tenant data', () => {
@@ -123,5 +128,9 @@ describe('machine and network', () => {
     expect(config()['network-interfaces']).toEqual([
       { iface_id: 'eth0', host_dev_name: 'nbr3', guest_mac: network.guestMac },
     ]);
+  });
+
+  test('tenant logs have a dedicated guest-to-host transport', () => {
+    expect(config().vsock).toEqual({ guest_cid: 6, uds_path: 'logs.vsock' });
   });
 });

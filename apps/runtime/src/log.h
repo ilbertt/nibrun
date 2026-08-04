@@ -1,9 +1,8 @@
 #ifndef NIBRUN_LOG_H
 #define NIBRUN_LOG_H
 
-/* The tenant's stdout and the runtime's own messages share one console, so every
- * line the runtime writes carries a prefix the tenant's output does not, and is
- * written whole rather than in pieces that could interleave. */
+/* Runtime diagnostics stay on the guest console and carry a prefix that keeps
+ * them distinct from the tenant output shipped over vsock. */
 
 void log_line(const char *format, ...) __attribute__((format(printf, 1, 2)));
 

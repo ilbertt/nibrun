@@ -21,7 +21,7 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources; \
 # multiplied by how many VMs a host packs. Only the tenant's own binary needs glibc,
 # and the rootfs carries glibc for exactly that reason.
 ENV CFLAGS="-std=c11 -D_GNU_SOURCE -Os -static -Wall -Wextra -Werror -Wshadow -Wvla -fno-common -Wl,--build-id=none"
-ENV RUNTIME_SOURCES="/build/src/config.c /build/src/log.c /build/src/mounts.c /build/src/supervise.c"
+ENV RUNTIME_SOURCES="/build/src/config.c /build/src/guest-logs.c /build/src/log.c /build/src/mounts.c /build/src/supervise.c"
 WORKDIR /build
 COPY src/ /build/src/
 

@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "guest-logs.h"
 #include "log.h"
 #include "mounts.h"
 #include "paths.h"
@@ -46,9 +47,8 @@ static _Noreturn void shutdown_guest(void) {
 
 /* The rootfs image carries no device nodes of its own, so whether init starts with
  * a stdin, stdout and stderr at all depends on the kernel having mounted devtmpfs
- * before executing it. Claiming the console here is what makes the tenant's output
- * reach the guest console either way — and if there is no console to claim, the
- * descriptors this process was given are left exactly as they are. */
+ * before executing it. Claiming the console here gives runtime diagnostics a
+ * reliable sink; tenant output gets its own descriptors when it is spawned. */
 static void adopt_console(void) {
   int console = open("/dev/console", O_RDWR | O_NOCTTY);
   if (console < 0) {
@@ -168,9 +168,14 @@ int main(void) {
               .uid = TENANT_UID,
               .gid = TENANT_GID,
           },
+      .output = {0},
       .policy = config.restart_policy,
       .shutdown_grace_ms = SHUTDOWN_GRACE_MS,
   };
+
+  struct guest_log_forwarder guest_logs;
+  guest_logs_init(&guest_logs);
+  supervisor.output = guest_logs_tenant_output(&guest_logs);
 
   log_line("starting the tenant as uid %u with data at %s", TENANT_UID, DATA_DIR);
   switch (supervise(&supervisor)) {
@@ -188,5 +193,6 @@ int main(void) {
       log_line("the tenant could not be started at all; shutting the guest down");
       break;
   }
+  guest_logs_close(&guest_logs);
   shutdown_guest();
 }

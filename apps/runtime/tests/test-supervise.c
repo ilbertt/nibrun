@@ -134,6 +134,22 @@ static struct supervisor supervisor_for(char *const *environment, const struct r
   };
 }
 
+struct captured_output {
+  const char *stdout_path;
+  const char *stderr_path;
+};
+
+static void capture_output(void *context, enum tenant_output_stream stream, const unsigned char *bytes,
+                           size_t length) {
+  const struct captured_output *captured = context;
+  const char *path = stream == TENANT_OUTPUT_STDOUT ? captured->stdout_path : captured->stderr_path;
+  int descriptor = open(path, O_WRONLY | O_APPEND);
+  if (descriptor < 0 || write(descriptor, bytes, length) != (ssize_t)length) {
+    _exit(1);
+  }
+  close(descriptor);
+}
+
 static void backoff_grows_then_stops_growing(void) {
   struct restart_policy policy = {
       .max_restarts = 5, .initial_backoff_ms = 500, .max_backoff_ms = 30000, .backoff_factor = 2,
@@ -299,6 +315,26 @@ static void the_tenant_runs_unprivileged_in_its_own_directory(void) {
   EXPECT(file_contains(record, "GID=65534"));
 }
 
+static void stdout_and_stderr_are_separate_streams(void) {
+  char stdout_path[128];
+  char stderr_path[128];
+  snprintf(stdout_path, sizeof(stdout_path), "%s", scratch_file("stdout-record"));
+  snprintf(stderr_path, sizeof(stderr_path), "%s", scratch_file("stderr-record"));
+  struct captured_output captured = {.stdout_path = stdout_path, .stderr_path = stderr_path};
+  char *environment[] = {"FAKE_MODE=write-output", "FAKE_RECORD=/tmp/unused", NULL};
+  struct restart_policy policy = {
+      .max_restarts = 0, .initial_backoff_ms = 0, .max_backoff_ms = 0, .backoff_factor = 1,
+      .reset_after_ms = 60000};
+  struct supervisor supervisor = supervisor_for(environment, &policy, 1000);
+  supervisor.output = (struct tenant_output){.write = capture_output, .context = &captured};
+
+  EXPECT(wait_for_supervisor(start_supervisor(&supervisor)) == SUPERVISE_RESTART_BUDGET_EXHAUSTED);
+  EXPECT(file_contains(stdout_path, "from stdout\n"));
+  EXPECT(!file_contains(stdout_path, "from stderr\n"));
+  EXPECT(file_contains(stderr_path, "from stderr\n"));
+  EXPECT(!file_contains(stderr_path, "from stdout\n"));
+}
+
 int main(void) {
   backoff_grows_then_stops_growing();
   a_crashing_tenant_exhausts_its_budget();
@@ -307,5 +343,6 @@ int main(void) {
   a_tenant_that_ignores_sigterm_is_killed();
   orphans_are_reaped();
   the_tenant_runs_unprivileged_in_its_own_directory();
+  stdout_and_stderr_are_separate_streams();
   return EXPECT_REPORT("supervise");
 }

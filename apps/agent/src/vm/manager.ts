@@ -3,6 +3,11 @@ import { join } from 'node:path';
 import type { DesiredInstance, InstanceId } from '@repo/protocol';
 import type { CommandRunner } from '#lib/exec.ts';
 import { writeJsonFile } from '#lib/json-store.ts';
+import {
+  TENANT_LOG_VSOCK_FILENAME,
+  type TenantLogReceiver,
+  tenantLogSocketPath,
+} from '#logs/receiver.ts';
 import type { AppSlot } from '#network/allocator.ts';
 import { ensureTap } from '#network/tap.ts';
 import { type ArtifactBytes, ensureArtifactImage } from '#vm/artifacts.ts';
@@ -26,7 +31,10 @@ export type VmManagerOptions = {
   // Written into the guest's config drive, which is the only way it gets a resolver: the root
   // is read-only and there is no DHCP client to learn one from.
   guestDnsServers: readonly string[];
+  logs: TenantLogReceiver;
 };
+
+const FIRST_GUEST_CID = 3;
 
 export class VmManager {
   readonly #options: VmManagerOptions;
@@ -101,10 +109,27 @@ export class VmManager {
           hostIpv4: slot.hostIpv4,
           subnetPrefixLength: slot.subnetPrefixLength,
         },
+        vsock: {
+          guestCid: FIRST_GUEST_CID + slot.slot,
+          path: TENANT_LOG_VSOCK_FILENAME,
+        },
       }),
     });
 
-    await this.#options.units.start(desired.instanceId);
+    await this.#options.logs.attach({
+      source: {
+        instanceId: desired.instanceId,
+        appId: desired.appId,
+        deploymentId: desired.deploymentId,
+      },
+      socketPath: tenantLogSocketPath({ workingDir }),
+    });
+    try {
+      await this.#options.units.start(desired.instanceId);
+    } catch (error) {
+      await this.#options.logs.detach({ instanceId: desired.instanceId });
+      throw error;
+    }
   }
 
   async stop({ instanceId }: { instanceId: InstanceId }): Promise<void> {
@@ -113,6 +138,7 @@ export class VmManager {
 
   async discard({ instanceId }: { instanceId: InstanceId }): Promise<void> {
     await this.#options.units.forget(instanceId);
+    await this.#options.logs.detach({ instanceId });
     await rm(this.workingDir(instanceId), { recursive: true, force: true });
   }
 }

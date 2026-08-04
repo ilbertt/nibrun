@@ -21,6 +21,8 @@ import { nowTimestamp } from '#lib/clock.ts';
 import { runCommand } from '#lib/exec.ts';
 import { readJsonFile, readTextFile, writeJsonFile } from '#lib/json-store.ts';
 import { describeError, logger } from '#lib/logger.ts';
+import { TenantLogQueue } from '#logs/queue.ts';
+import { TenantLogReceiver, tenantLogSocketPath } from '#logs/receiver.ts';
 import { readSlotRecords, SlotAllocator } from '#network/allocator.ts';
 import { CaddyProxy } from '#proxy/caddy.ts';
 import { Reconciler } from '#reconcile/reconciler.ts';
@@ -49,30 +51,45 @@ const FIRST_FAILURE = 1;
 const NO_FAILURES = 0;
 
 const DESIRED_STATE_FILENAME = 'desired-state.json';
+const TENANT_LOG_BUFFER_BYTES = 8_388_608;
+const LOG_RECONNECT_FLOOR_MS = 250;
 
 export class Agent {
   readonly #config: AgentConfig;
   readonly #client: ControlPlaneClient;
   readonly #identity: HostIdentity;
   readonly #reconciler: Reconciler;
+  readonly #vms: VmManager;
+  readonly #logs: TenantLogReceiver;
+  readonly #logQueue: TenantLogQueue;
   readonly #versions: HostVersions;
   #session: AgentSession | undefined;
   #lastDesired: HostDesiredState | undefined;
   #knownGeneration = FIRST_GENERATION;
   #running = true;
+  #logUploadAbort: AbortController | undefined;
 
   private constructor({
     config,
     versions,
     reconciler,
+    vms,
+    logs,
+    logQueue,
   }: {
     config: AgentConfig;
     versions: HostVersions;
     reconciler: Reconciler;
+    vms: VmManager;
+    logs: TenantLogReceiver;
+    logQueue: TenantLogQueue;
   }) {
     this.#config = config;
     this.#versions = versions;
     this.#reconciler = reconciler;
+    this.#vms = vms;
+    this.#logs = logs;
+    this.#logQueue = logQueue;
     this.#client = new ControlPlaneClient({ baseUrl: config.controlPlaneUrl });
     this.#identity = new HostIdentity({ path: config.hostIdFile });
   }
@@ -103,6 +120,32 @@ export class Agent {
     const allocator = SlotAllocator.fromRecords(
       readSlotRecords(await readJsonFile({ path: config.slotsFile })),
     );
+    const logQueue = new TenantLogQueue({ maxBytes: TENANT_LOG_BUFFER_BYTES });
+    let droppedLogEvents = 0;
+    const logs = new TenantLogReceiver({
+      publish: (event) => {
+        if (logQueue.push(event)) {
+          return;
+        }
+        droppedLogEvents += 1;
+        if ((droppedLogEvents & (droppedLogEvents - 1)) === 0) {
+          logger.warn({
+            message: 'tenant log upload buffer full',
+            droppedEvents: droppedLogEvents,
+          });
+        }
+      },
+    });
+    const vms = new VmManager({
+      runner,
+      units,
+      artifacts,
+      artifactCacheDir: config.artifactCacheDir,
+      guestImageDir: config.guestImageDir,
+      vmDir: config.vmDir,
+      guestDnsServers: config.guestDnsServers,
+      logs,
+    });
     const reconciler = new Reconciler({
       config,
       runner,
@@ -119,22 +162,16 @@ export class Agent {
         region: config.awsRegion,
         stagingDir: config.exportStagingDir,
       }),
-      vms: new VmManager({
-        runner,
-        units,
-        artifacts,
-        artifactCacheDir: config.artifactCacheDir,
-        guestImageDir: config.guestImageDir,
-        vmDir: config.vmDir,
-        guestDnsServers: config.guestDnsServers,
-      }),
+      vms,
       volumes: new VolumeManager({ runner, topology, allocator }),
     });
-    return new Agent({ config, versions, reconciler });
+    return new Agent({ config, versions, reconciler, vms, logs, logQueue });
   }
 
   stop() {
     this.#running = false;
+    this.#logUploadAbort?.abort();
+    this.#logQueue.close();
   }
 
   /**
@@ -147,6 +184,7 @@ export class Agent {
    */
   async run(): Promise<void> {
     await this.#reconciler.load();
+    await this.#restoreLogReceivers();
     const cached = await this.#readCachedDesiredState();
     if (cached) {
       this.#knownGeneration = cached.generation;
@@ -157,8 +195,71 @@ export class Agent {
     await this.#ensureSession();
     const statusLoop = this.#runStatusLoop();
     const reportLoop = this.#runReportLoop();
+    const logLoop = this.#runLogLoop();
     await this.#runPollLoop();
-    await Promise.all([statusLoop, reportLoop]);
+    await Promise.all([statusLoop, reportLoop, logLoop]);
+    await this.#logs.close();
+  }
+
+  async #restoreLogReceivers(): Promise<void> {
+    for (const record of this.#reconciler.records()) {
+      try {
+        await this.#logs.attach({
+          source: {
+            instanceId: record.instanceId,
+            appId: record.appId,
+            deploymentId: record.deploymentId,
+          },
+          socketPath: tenantLogSocketPath({ workingDir: this.#vms.workingDir(record.instanceId) }),
+        });
+      } catch (error) {
+        logger.warn({
+          message: 'tenant log receiver restore failed',
+          instanceId: record.instanceId,
+          ...describeError(error),
+        });
+      }
+    }
+  }
+
+  async #runLogLoop(): Promise<void> {
+    let failures = NO_FAILURES;
+    while (this.#running) {
+      const abort = new AbortController();
+      this.#logUploadAbort = abort;
+      const body = this.#logQueue.readable();
+      try {
+        const session = await this.#ensureSession();
+        await this.#client.streamTenantLogs({
+          sessionToken: session.sessionToken,
+          body,
+          signal: abort.signal,
+        });
+        failures = NO_FAILURES;
+      } catch (error) {
+        if (!this.#running) {
+          break;
+        }
+        failures += FIRST_FAILURE;
+        if (error instanceof ControlPlaneError && error.isSessionExpired) {
+          this.#session = undefined;
+        }
+        logger.warn({ message: 'tenant log stream failed', ...describeError(error) });
+      } finally {
+        abort.abort();
+        await body.cancel().catch(() => {});
+        if (this.#logUploadAbort === abort) {
+          this.#logUploadAbort = undefined;
+        }
+      }
+      if (this.#running) {
+        const retryMs = Math.max(
+          LOG_RECONNECT_FLOOR_MS,
+          backoffDelayMs({ attempt: failures, policy: CONTROL_PLANE_BACKOFF }),
+        );
+        await Bun.sleep(retryMs);
+      }
+    }
   }
 
   async #runPollLoop(): Promise<void> {

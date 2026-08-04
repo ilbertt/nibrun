@@ -62,6 +62,80 @@ describe('every request identifies the protocol it speaks', () => {
     const sessionHeaders = calls[0]?.init.headers as Record<string, string> | undefined;
     expect(sessionHeaders?.authorization).toBeUndefined();
   });
+
+  test('tenant logs use one streaming NDJSON request on their own route', async () => {
+    const { calls, fetchImpl } = respondWith({ body: {} });
+    const client = new ControlPlaneClient({ baseUrl: BASE_URL, fetchImpl });
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"kind":"data"}\n'));
+        controller.close();
+      },
+    });
+    await client.streamTenantLogs({
+      sessionToken: SESSION_TOKEN,
+      body,
+      signal: new AbortController().signal,
+    });
+
+    const call = calls[0];
+    expect(call?.url).toBe(`${BASE_URL}${AGENT_API_PREFIX}${AGENT_ROUTES.tenantLogs}`);
+    expect(call?.init.body).toBe(body);
+    const headers = call?.init.headers as Record<string, string>;
+    expect(headers['content-type']).toBe('application/x-ndjson');
+    expect(headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+  });
+});
+
+test('a log chunk reaches the API while the HTTP request is still open', async () => {
+  let bodyController!: ReadableStreamDefaultController<Uint8Array>;
+  let releaseResponse!: () => void;
+  const responseReleased = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  let observeChunk!: (value: string) => void;
+  const observedChunk = new Promise<string>((resolve) => {
+    observeChunk = resolve;
+  });
+  const server = Bun.serve({
+    port: 0,
+    async fetch(request) {
+      const first = await request.body?.getReader().read();
+      observeChunk(new TextDecoder().decode(first?.value));
+      await responseReleased;
+      return new Response(undefined, { status: HTTP_OK });
+    },
+  });
+
+  try {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        bodyController = controller;
+      },
+    });
+    const client = new ControlPlaneClient({ baseUrl: `http://127.0.0.1:${server.port}` });
+    let requestFinished = false;
+    const request = client
+      .streamTenantLogs({
+        sessionToken: SESSION_TOKEN,
+        body,
+        signal: new AbortController().signal,
+      })
+      .finally(() => {
+        requestFinished = true;
+      });
+
+    bodyController.enqueue(new TextEncoder().encode('{"text":"now"}\n'));
+    expect(await observedChunk).toBe('{"text":"now"}\n');
+    expect(requestFinished).toBe(false);
+
+    bodyController.close();
+    releaseResponse();
+    await request;
+  } finally {
+    releaseResponse();
+    server.stop(true);
+  }
 });
 
 describe('validation at the boundary', () => {

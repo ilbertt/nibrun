@@ -1,11 +1,15 @@
 #include "supervise.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <grp.h>
+#include <limits.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/signalfd.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -16,6 +20,7 @@
 #define NS_PER_MS 1000000L
 #define TENANT_SPAWN_EXIT_CODE 126
 #define SIGKILL_GRACE_MS 2000
+#define OUTPUT_CHUNK_BYTES 4096
 
 /* Blocked rather than handled, and waited on synchronously: there is no signal
  * handler, so there is no async-signal-safety to get wrong, and a signal that
@@ -62,6 +67,12 @@ static struct timespec remaining_until(uint64_t deadline_ms) {
   return (struct timespec){(time_t)(left / MS_PER_SECOND), (long)(left % MS_PER_SECOND) * NS_PER_MS};
 }
 
+static int remaining_ms(uint64_t deadline_ms) {
+  uint64_t now = monotonic_ms();
+  uint64_t left = deadline_ms > now ? deadline_ms - now : 0;
+  return left > INT_MAX ? INT_MAX : (int)left;
+}
+
 /* The tenant is a session leader, so its whole group can be signalled at once. The
  * fallback covers the window between fork and the child's setsid, where the group
  * does not exist yet. */
@@ -94,10 +105,16 @@ static struct wait_result reap_children(pid_t tenant) {
     }                                                       \
   } while (0)
 
-static _Noreturn void become_tenant(const struct tenant_process *tenant) {
+static _Noreturn void become_tenant(const struct tenant_process *tenant, int stdout_descriptor,
+                                    int stderr_descriptor) {
   sigset_t none;
   sigemptyset(&none);
   sigprocmask(SIG_SETMASK, &none, NULL);
+
+  OR_GIVE_UP(dup2(stdout_descriptor, STDOUT_FILENO), "attach stdout");
+  OR_GIVE_UP(dup2(stderr_descriptor, STDERR_FILENO), "attach stderr");
+  close(stdout_descriptor);
+  close(stderr_descriptor);
 
   /* Its own session: the tenant's own children can then be signalled as a group,
    * and sharing the console with PID 1 cannot make job control stop it. */
@@ -112,30 +129,98 @@ static _Noreturn void become_tenant(const struct tenant_process *tenant) {
   _exit(TENANT_SPAWN_EXIT_CODE);
 }
 
-static struct wait_result wait_for_tenant(pid_t tenant, uint32_t grace_ms) {
+static void close_descriptor(int *descriptor) {
+  if (*descriptor >= 0) {
+    close(*descriptor);
+    *descriptor = -1;
+  }
+}
+
+static void drain_output(int *descriptor, enum tenant_output_stream stream,
+                         const struct tenant_output *output) {
+  if (*descriptor < 0) {
+    return;
+  }
+  unsigned char buffer[OUTPUT_CHUNK_BYTES];
+  for (;;) {
+    ssize_t length = read(*descriptor, buffer, sizeof(buffer));
+    if (length > 0) {
+      if (output->write != NULL) {
+        output->write(output->context, stream, buffer, (size_t)length);
+      }
+      continue;
+    }
+    if (length == 0) {
+      close_descriptor(descriptor);
+      return;
+    }
+    if (errno == EINTR) {
+      continue;
+    }
+    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+      log_errno("could not read tenant output");
+      close_descriptor(descriptor);
+    }
+    return;
+  }
+}
+
+static bool open_output_pipe(int descriptors[2]) {
+  if (pipe2(descriptors, O_CLOEXEC) < 0) {
+    return false;
+  }
+  int flags = fcntl(descriptors[0], F_GETFL);
+  if (flags >= 0 && fcntl(descriptors[0], F_SETFL, flags | O_NONBLOCK) == 0) {
+    return true;
+  }
+  close(descriptors[0]);
+  close(descriptors[1]);
+  return false;
+}
+
+static void drain_ready_output(struct pollfd *polled, int *stdout_descriptor, int *stderr_descriptor,
+                               const struct tenant_output *output) {
+  if ((polled[1].revents & (POLLIN | POLLHUP)) != 0) {
+    drain_output(stdout_descriptor, TENANT_OUTPUT_STDOUT, output);
+  }
+  if ((polled[2].revents & (POLLIN | POLLHUP)) != 0) {
+    drain_output(stderr_descriptor, TENANT_OUTPUT_STDERR, output);
+  }
+}
+
+static struct wait_result wait_for_tenant(pid_t tenant, uint32_t grace_ms, int stdout_descriptor,
+                                          int stderr_descriptor, const struct tenant_output *output) {
   sigset_t signals = supervised_signals();
   enum shutdown_phase phase = PHASE_RUNNING;
   uint64_t deadline_ms = 0;
+  int signal_descriptor = signalfd(-1, &signals, SFD_CLOEXEC | SFD_NONBLOCK);
+  if (signal_descriptor < 0) {
+    log_errno("could not open the supervisor signal descriptor");
+    close_descriptor(&stdout_descriptor);
+    close_descriptor(&stderr_descriptor);
+    return (struct wait_result){.shutdown_requested = true};
+  }
 
   for (;;) {
-    struct timespec remaining;
-    const struct timespec *timeout = NULL;
-    if (phase != PHASE_RUNNING) {
-      remaining = remaining_until(deadline_ms);
-      timeout = &remaining;
-    }
-
-    siginfo_t received;
-    int signal_number = sigtimedwait(&signals, &received, timeout);
-
-    if (signal_number < 0 && errno == EINTR) {
+    struct pollfd polled[] = {
+        {.fd = signal_descriptor, .events = POLLIN},
+        {.fd = stdout_descriptor, .events = POLLIN},
+        {.fd = stderr_descriptor, .events = POLLIN},
+    };
+    int ready = poll(polled, sizeof(polled) / sizeof(polled[0]),
+                     phase == PHASE_RUNNING ? -1 : remaining_ms(deadline_ms));
+    if (ready < 0 && errno == EINTR) {
       continue;
     }
-    if (signal_number < 0 && errno != EAGAIN) {
-      log_errno("could not wait for a signal");
+    if (ready < 0) {
+      log_errno("could not wait for the tenant");
+      close(signal_descriptor);
+      close_descriptor(&stdout_descriptor);
+      close_descriptor(&stderr_descriptor);
       return (struct wait_result){.shutdown_requested = true};
     }
-    if (signal_number < 0) {
+
+    if (ready == 0) {
       if (phase == PHASE_TERM_SENT) {
         log_line("the tenant is still running %ums after SIGTERM; killing it", grace_ms);
         signal_tenant(tenant, SIGKILL);
@@ -144,23 +229,54 @@ static struct wait_result wait_for_tenant(pid_t tenant, uint32_t grace_ms) {
         continue;
       }
       log_line("the tenant survived SIGKILL; shutting the guest down without it");
+      close(signal_descriptor);
+      close_descriptor(&stdout_descriptor);
+      close_descriptor(&stderr_descriptor);
       return (struct wait_result){.shutdown_requested = true};
     }
 
-    if (signal_number == SIGCHLD) {
-      struct wait_result reaped = reap_children(tenant);
-      if (reaped.exited) {
-        reaped.shutdown_requested = phase != PHASE_RUNNING;
-        return reaped;
-      }
+    drain_ready_output(polled, &stdout_descriptor, &stderr_descriptor, output);
+
+    if ((polled[0].revents & POLLIN) == 0) {
       continue;
     }
+    for (;;) {
+      struct signalfd_siginfo received;
+      ssize_t length = read(signal_descriptor, &received, sizeof(received));
+      if (length < 0 && errno == EINTR) {
+        continue;
+      }
+      if (length < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        break;
+      }
+      if (length != sizeof(received)) {
+        log_errno("could not read the supervisor signal descriptor");
+        close(signal_descriptor);
+        close_descriptor(&stdout_descriptor);
+        close_descriptor(&stderr_descriptor);
+        return (struct wait_result){.shutdown_requested = true};
+      }
 
-    if (phase == PHASE_RUNNING) {
-      log_line("shutdown requested; asking the tenant to stop");
-      signal_tenant(tenant, SIGTERM);
-      phase = PHASE_TERM_SENT;
-      deadline_ms = monotonic_ms() + grace_ms;
+      if (received.ssi_signo == SIGCHLD) {
+        struct wait_result reaped = reap_children(tenant);
+        if (reaped.exited) {
+          drain_output(&stdout_descriptor, TENANT_OUTPUT_STDOUT, output);
+          drain_output(&stderr_descriptor, TENANT_OUTPUT_STDERR, output);
+          close(signal_descriptor);
+          close_descriptor(&stdout_descriptor);
+          close_descriptor(&stderr_descriptor);
+          reaped.shutdown_requested = phase != PHASE_RUNNING;
+          return reaped;
+        }
+        continue;
+      }
+
+      if (phase == PHASE_RUNNING) {
+        log_line("shutdown requested; asking the tenant to stop");
+        signal_tenant(tenant, SIGTERM);
+        phase = PHASE_TERM_SENT;
+        deadline_ms = monotonic_ms() + grace_ms;
+      }
     }
   }
 }
@@ -215,16 +331,37 @@ enum supervise_outcome supervise(const struct supervisor *supervisor) {
 
   for (;;) {
     uint64_t started_ms = monotonic_ms();
+    int stdout_pipe[2];
+    int stderr_pipe[2];
+    if (!open_output_pipe(stdout_pipe)) {
+      log_errno("could not open the tenant stdout pipe");
+      return SUPERVISE_SPAWN_FAILED;
+    }
+    if (!open_output_pipe(stderr_pipe)) {
+      log_errno("could not open the tenant stderr pipe");
+      close(stdout_pipe[0]);
+      close(stdout_pipe[1]);
+      return SUPERVISE_SPAWN_FAILED;
+    }
     pid_t tenant = fork();
     if (tenant < 0) {
       log_errno("could not fork");
+      close(stdout_pipe[0]);
+      close(stdout_pipe[1]);
+      close(stderr_pipe[0]);
+      close(stderr_pipe[1]);
       return SUPERVISE_SPAWN_FAILED;
     }
     if (tenant == 0) {
-      become_tenant(&supervisor->tenant);
+      close(stdout_pipe[0]);
+      close(stderr_pipe[0]);
+      become_tenant(&supervisor->tenant, stdout_pipe[1], stderr_pipe[1]);
     }
+    close(stdout_pipe[1]);
+    close(stderr_pipe[1]);
 
-    struct wait_result result = wait_for_tenant(tenant, supervisor->shutdown_grace_ms);
+    struct wait_result result = wait_for_tenant(tenant, supervisor->shutdown_grace_ms, stdout_pipe[0],
+                                                stderr_pipe[0], &supervisor->output);
     /* Anything the tenant left behind goes with it. A survivor still holding the
      * listening socket would make every restart fail to bind. */
     signal_tenant(tenant, SIGKILL);

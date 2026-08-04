@@ -124,5 +124,10 @@ int main(void) {
     report(record);
     return 0;
   }
+  if (strcmp(mode, "write-output") == 0) {
+    fputs("from stdout\n", stdout);
+    fputs("from stderr\n", stderr);
+    return 0;
+  }
   return USAGE_EXIT_CODE;
 }

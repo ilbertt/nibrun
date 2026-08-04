@@ -1,6 +1,7 @@
 #ifndef NIBRUN_SUPERVISE_H
 #define NIBRUN_SUPERVISE_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -16,8 +17,20 @@ struct tenant_process {
   gid_t gid;
 };
 
+enum tenant_output_stream {
+  TENANT_OUTPUT_STDOUT,
+  TENANT_OUTPUT_STDERR,
+};
+
+struct tenant_output {
+  void (*write)(void *context, enum tenant_output_stream stream, const unsigned char *bytes,
+                size_t length);
+  void *context;
+};
+
 struct supervisor {
   struct tenant_process tenant;
+  struct tenant_output output;
   struct restart_policy policy;
   /* How long the tenant gets between SIGTERM and SIGKILL. The agent's own wait for
    * the microVM to exit has to be longer than this or it will never observe the

@@ -14,12 +14,10 @@ const NO_BITS = 0;
 // graceful stop would silently become a kill — the API answers 204 either way. The static `ip=`
 // form is why the guest ships no DHCP client: the kernel configures eth0 before /init runs.
 //
-// `quiet` is what makes this console the tenant's rather than the kernel's: without it a boot
-// puts ~788 printk lines on the same serial port the tenant writes to, so the first page of any
-// app's log is `BIOS-e820` rather than anything the app said. It raises the printk threshold and
-// nothing else — panics and oopses still print, and userspace writes to /dev/console are not
-// filtered at all, so both the guest init's `[nibrun] ` lines and the tenant's own output are
-// untouched.
+// `quiet` keeps the guest's operator console useful: without it a boot puts ~788 printk lines
+// ahead of the runtime diagnostics. It raises the printk threshold and nothing else — panics,
+// oopses and the guest init's own `[nibrun] ` writes are untouched. Tenant output does not share
+// this console; it travels over the dedicated vsock below.
 const BASE_KERNEL_ARGS =
   'console=ttyS0 quiet reboot=k panic=1 pci=off i8042.noaux i8042.nomux i8042.dumbkbd root=/dev/vda ro init=/init';
 
@@ -59,6 +57,7 @@ export type FirecrackerConfig = {
   drives: FirecrackerDrive[];
   'machine-config': { vcpu_count: number; mem_size_mib: number; smt: boolean };
   'network-interfaces': { iface_id: string; host_dev_name: string; guest_mac: string }[];
+  vsock: { guest_cid: number; uds_path: string };
 };
 
 const READ_ONLY_DRIVE = {
@@ -87,6 +86,11 @@ export type VmNetwork = {
   subnetPrefixLength: number;
 };
 
+export type VmVsock = {
+  guestCid: number;
+  path: string;
+};
+
 const NETWORK_INTERFACE_ID = 'eth0';
 
 /**
@@ -101,10 +105,12 @@ export function renderFirecrackerConfig({
   resources,
   paths,
   network,
+  vsock,
 }: {
   resources: InstanceResources;
   paths: VmPaths;
   network: VmNetwork;
+  vsock: VmVsock;
 }): FirecrackerConfig {
   return {
     'boot-source': {
@@ -141,5 +147,9 @@ export function renderFirecrackerConfig({
         guest_mac: network.guestMac,
       },
     ],
+    vsock: {
+      guest_cid: vsock.guestCid,
+      uds_path: vsock.path,
+    },
   };
 }

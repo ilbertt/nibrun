@@ -25,8 +25,7 @@ const MAX_MESSAGE_LENGTH = 512;
 const MAX_DEVICE_PATH_LENGTH = 256;
 
 // Operator-facing detail about why something is in the state it is in. Never the tenant's own
-// output: that goes to the guest console, which systemd captures into the host's journal, and
-// it must not arrive here where it would end up in the control plane's database.
+// output: that has a dedicated streaming path and must not arrive in a state report.
 const MessageSchema = Type.String({ maxLength: MAX_MESSAGE_LENGTH });
 
 export const ReportedInstanceSchema = Type.Object({

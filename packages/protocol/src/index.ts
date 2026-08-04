@@ -21,6 +21,14 @@ export {
   HostDesiredStateSchema,
 } from '#control/desired-state.ts';
 export {
+  TENANT_LOG_CONTENT_TYPE,
+  TENANT_LOG_STREAMS,
+  type TenantLogEvent,
+  TenantLogEventSchema,
+  type TenantLogStream,
+  TenantLogStreamSchema,
+} from '#control/logs.ts';
+export {
   type HostReportedState,
   HostReportedStateSchema,
   type ReportedCheckpoint,

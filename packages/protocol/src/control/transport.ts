@@ -21,13 +21,13 @@ export const PROTOCOL_VERSION_HEADER = 'x-nibrun-protocol-version';
 // over the private network instead.
 export const AGENT_API_PREFIX = '/internal/agent';
 
-// Every route is a POST carrying JSON, including the two that read. A long poll is not a
-// cacheable GET, and a request body keeps the protocol to exactly one wire format and one
-// validation path rather than adding query-string coercion at the only edge that would need it.
+// Every route is an outbound POST. Control messages carry one JSON document; tenantLogs carries
+// an NDJSON stream on its own request so output backpressure can never delay desired state.
 export const AGENT_ROUTES = {
   session: '/session',
   desiredState: '/desired-state',
   reportedState: '/reported-state',
+  tenantLogs: '/tenant-logs',
 } as const;
 
 export const DesiredStateRequestSchema = Type.Object({

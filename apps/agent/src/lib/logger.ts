@@ -22,8 +22,8 @@ export const setLogLevel = ({ level }: { level: LogLevel }) => {
 
 export type LogEvent = { message: string } & Record<string, unknown>;
 
-// One JSON object per line on stderr. systemd captures it into the journal, where the fields
-// stay queryable — which is the only log transport this agent has until log shipping exists.
+// One JSON object per line on stderr. systemd captures the agent's own operational messages
+// into the journal, separately from the tenant stream this process forwards.
 const emit = ({ level, event }: { level: LogLevel; event: LogEvent }) => {
   if (LEVEL_ORDER[level] < threshold) {
     return;
