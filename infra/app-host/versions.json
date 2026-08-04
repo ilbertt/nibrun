@@ -16,5 +16,5 @@
     "url": "https://github.com/caddyserver/caddy/releases/download/v2.11.4/caddy_2.11.4_linux_amd64.tar.gz",
     "sha256": "527fbf917c39189a1e3b31d34fa955601680b2d5c8055d2a87b8b9588dec7bb9"
   },
-  "guestImage": "6.1.180-ba5084da9128"
+  "guestImage": "6.1.180-6d6c45cc1031"
 }
