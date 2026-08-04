@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    "./public": "./src/public.ts",
+    "./internal": "./src/internal.ts"
   },
   "imports": {
     "#*": "./src/*"
