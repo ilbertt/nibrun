@@ -10,6 +10,9 @@ import {
 
 const DNS_PORT = 53;
 
+// The ranges the blanket v6 rule covers, to assert that a VPC's range is not among them.
+const PRIVATE_DESTINATIONS_V6_SAMPLE = ['::1', 'fe80:', 'fc', 'fd'];
+
 const instance = {
   hostPort: 21_000 as HostPort,
   guestPort: 3000 as GuestPort,
@@ -17,12 +20,15 @@ const instance = {
   guestIpv4: '10.201.0.2' as Ipv4Address,
 };
 
-const state = (overrides: Partial<FirewallState> = {}): FirewallState => ({
-  instances: [],
-  controlPlaneCidrs: [],
-  guestDnsServers: [],
-  ...overrides,
-});
+function state(overrides: Partial<FirewallState> = {}): FirewallState {
+  return {
+    instances: [],
+    controlPlaneCidrs: [],
+    controlPlaneCidrsV6: [],
+    guestDnsServers: [],
+    ...overrides,
+  };
+}
 
 const dropsFrom = (ruleset: string) =>
   ruleset
@@ -115,6 +121,33 @@ describe('the same isolation holds over ipv6', () => {
   test('the v6 table is rebuilt from state like the v4 one', () => {
     const ruleset = renderRuleset(state());
     expect(ruleset).toContain(`table ip6 ${NFTABLES_TABLE}\ndelete table ip6 ${NFTABLES_TABLE}\n`);
+  });
+
+  // AWS allocates a VPC's IPv6 from global unicast, so `fc00::/7` does not contain it. Where the
+  // v4 control-plane rule is belt-and-braces over the blanket private drop, this one is the only
+  // thing denying the control plane — a v6 ruleset without it reads it as ordinary internet.
+  test('the vpc v6 range is denied by name, since no blanket rule contains it', () => {
+    const vpcV6 = '2600:1f18:abcd::/56';
+    const v6 = renderRuleset(state({ controlPlaneCidrsV6: [vpcV6] })).split(
+      `table ip6 ${NFTABLES_TABLE} {`,
+    )[1];
+
+    expect(v6).toContain(`ip6 daddr ${vpcV6} drop`);
+    // Named, rather than swept up by a private-range rule that does not cover it.
+    expect(PRIVATE_DESTINATIONS_V6_SAMPLE.some((range) => vpcV6.startsWith(range))).toBe(false);
+  });
+
+  test('the v6 control-plane denial lands before anything lets a guest out', () => {
+    const vpcV6 = '2600:1f18:abcd::/56';
+    const lines = renderRuleset(state({ controlPlaneCidrsV6: [vpcV6] }))
+      .split(`table ip6 ${NFTABLES_TABLE} {`)[1]
+      ?.split('\n')
+      .map((line) => line.trim());
+    const denied = lines?.findIndex((line) => line.includes(vpcV6));
+    const blanket = lines?.findIndex((line) => line.includes('private destinations'));
+
+    expect(denied).toBeGreaterThan(-1);
+    expect(blanket).toBeGreaterThan(denied ?? -1);
   });
 });
 

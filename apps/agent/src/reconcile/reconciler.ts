@@ -668,6 +668,7 @@ export class Reconciler {
         state: {
           instances,
           controlPlaneCidrs: this.#options.config.controlPlaneCidrs,
+          controlPlaneCidrsV6: this.#options.config.controlPlaneCidrsV6,
           guestDnsServers: this.#options.config.guestDnsServers,
         },
       });

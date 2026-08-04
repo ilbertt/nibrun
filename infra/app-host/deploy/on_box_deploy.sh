@@ -20,7 +20,7 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${FIRECRACKER_DIRECTORY:?}" \
   "${CADDY_VERSION:?}" "${CADDY_URL:?}" "${CADDY_SHA256:?}" \
   "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${APP_DOMAIN:?}" \
-  "${CONTROL_PLANE_INTERNAL_URL:?}" "${VPC_CIDR_BLOCK:?}" \
+  "${CONTROL_PLANE_INTERNAL_URL:?}" "${VPC_CIDR_BLOCK:?}" "${VPC_IPV6_CIDR_BLOCK:?}" \
   "${GUEST_IMAGES_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
 
 # Empty until a guest image is adopted in infra/app-host/versions.json. A host
@@ -238,7 +238,13 @@ AGENT_EXPORT_BUCKET=${EXPORTS_BUCKET}
 # A tenant microVM reaching the api's internal port would be reaching it as the
 # host, with the host's standing. Named here rather than left to the blanket
 # private-address rule, so the ruleset on the box says why.
+#
+# The v6 block has no blanket rule behind it at all — AWS allocates it from
+# global unicast, which the agent's private-destination list does not and should
+# not contain. Both come straight from the Terraform outputs under the same
+# names, so neither can drift from the network they describe.
 AGENT_CONTROL_PLANE_CIDRS=${VPC_CIDR_BLOCK}
+AGENT_CONTROL_PLANE_CIDRS_V6=${VPC_IPV6_CIDR_BLOCK}
 AGENT_AWS_REGION=${AWS_REGION}
 # The same prefix ZeroFS is pointed at, from the one variable both are rendered
 # from: a volume naming a prefix this host does not serve is refused, so the two

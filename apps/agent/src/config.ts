@@ -49,9 +49,13 @@ export type AgentConfig = {
   // one place the agent cannot converge against reality.
   exportBucket: string;
   awsRegion: string;
-  // Guests are denied every private destination by default, so this is only needed when the
-  // control plane answers on a public address the blanket rule would not cover.
+  // The VPC, named rather than left to the blanket private-destination rule that happens to
+  // contain it. Required, because an empty list renders no rule and the redundancy that makes
+  // its absence survivable is also what would hide it.
   controlPlaneCidrs: string[];
+  // The same VPC in the family with no blanket rule behind it: AWS allocates VPC IPv6 from
+  // global unicast, so nothing but this denies it.
+  controlPlaneCidrsV6: string[];
   // Empty by default, which leaves guests reaching a public resolver over the ordinary egress
   // path. The VPC resolver sits inside RFC1918 and is therefore blocked with everything else,
   // so naming it here is the only way to allow it without weakening the blanket rule.
@@ -65,15 +69,15 @@ class MissingConfigurationError extends Error {
   }
 }
 
-const required = ({ env, name }: { env: Record<string, string | undefined>; name: string }) => {
+function required({ env, name }: { env: Record<string, string | undefined>; name: string }) {
   const value = env[name]?.trim();
   if (!value) {
     throw new MissingConfigurationError(name);
   }
   return value;
-};
+}
 
-const optional = ({
+function optional({
   env,
   name,
   fallback,
@@ -81,13 +85,31 @@ const optional = ({
   env: Record<string, string | undefined>;
   name: string;
   fallback: string;
-}) => env[name]?.trim() || fallback;
+}) {
+  return env[name]?.trim() || fallback;
+}
 
-const list = ({ env, name }: { env: Record<string, string | undefined>; name: string }) =>
-  (env[name] ?? '')
+function list({ env, name }: { env: Record<string, string | undefined>; name: string }) {
+  return (env[name] ?? '')
     .split(',')
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
+}
+
+/**
+ * A list whose absence is a failure to start rather than an empty one.
+ *
+ * The difference matters only for values a firewall rule is rendered from: an empty list drops
+ * the rule, so a variable that never arrived would leave the agent running with a ruleset one
+ * denial short and nothing anywhere saying so.
+ */
+function requiredList({ env, name }: { env: Record<string, string | undefined>; name: string }) {
+  const values = list({ env, name });
+  if (values.length === 0) {
+    throw new MissingConfigurationError(name);
+  }
+  return values;
+}
 
 export function loadAgentConfig({
   env = Bun.env,
@@ -142,7 +164,8 @@ export function loadAgentConfig({
     artifactBucket: required({ env, name: 'AGENT_ARTIFACT_BUCKET' }),
     exportBucket: required({ env, name: 'AGENT_EXPORT_BUCKET' }),
     awsRegion: required({ env, name: 'AGENT_AWS_REGION' }),
-    controlPlaneCidrs: list({ env, name: 'AGENT_CONTROL_PLANE_CIDRS' }),
+    controlPlaneCidrs: requiredList({ env, name: 'AGENT_CONTROL_PLANE_CIDRS' }),
+    controlPlaneCidrsV6: requiredList({ env, name: 'AGENT_CONTROL_PLANE_CIDRS_V6' }),
     guestDnsServers: list({ env, name: 'AGENT_GUEST_DNS_SERVERS' }),
   };
 }

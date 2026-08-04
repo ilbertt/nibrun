@@ -78,6 +78,15 @@ output "vpc_cidr_block" {
   value       = aws_vpc.app.cidr_block
 }
 
+# The v6 half has no blanket rule behind it: AWS allocates VPC IPv6 from global
+# unicast space, so `fc00::/7` does not contain it and a ruleset that only knows
+# the documented private ranges reads the control plane as ordinary internet.
+# Naming it here is the only thing that denies it.
+output "vpc_ipv6_cidr_block" {
+  description = "Denied to tenant microVMs. Unlike the v4 block, nothing else covers it."
+  value       = aws_vpc.app.ipv6_cidr_block
+}
+
 output "app_host_deploy_group" {
   description = "SSM targeting tag for app hosts. Distinct from deploy_group so a deploy reaches one machine class without touching the other."
   value       = local.app_host_deploy_group

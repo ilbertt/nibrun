@@ -43,6 +43,7 @@ export type ForwardedInstance = {
 export type FirewallState = {
   instances: ForwardedInstance[];
   controlPlaneCidrs: readonly string[];
+  controlPlaneCidrsV6: readonly string[];
   guestDnsServers: readonly string[];
 };
 
@@ -83,7 +84,7 @@ export function renderRuleset(state: FirewallState): string {
     `delete table ip6 ${NFTABLES_TABLE}`,
     '',
     `table ip6 ${NFTABLES_TABLE} {`,
-    ...forwardChainV6(),
+    ...forwardChainV6(state),
     '',
     ...inputChainV6(),
     '}',
@@ -134,7 +135,11 @@ function inputChain({ guestDnsServers }: FirewallState): string[] {
 
 // No NAT counterpart: guests are given a v4 /30 and no v6 address, so nothing here forwards or
 // masquerades. These are the drops that hold whether or not that ever changes.
-function forwardChainV6(): string[] {
+//
+// The control-plane rule is not redundant here the way its v4 twin is. AWS allocates a VPC's
+// IPv6 from global unicast, so `PRIVATE_DESTINATIONS_V6` does not contain it and nothing else
+// would deny it — a ruleset without this reads the control plane as ordinary internet.
+function forwardChainV6({ controlPlaneCidrsV6 }: FirewallState): string[] {
   return chain({
     header: 'forward {',
     rules: [
@@ -142,6 +147,9 @@ function forwardChainV6(): string[] {
       'ct state established,related accept',
       `iifname ${TAP_MATCH} ip6 daddr ${INSTANCE_METADATA_ADDRESS_V6} drop comment "instance metadata endpoint"`,
       `iifname ${TAP_MATCH} oifname ${TAP_MATCH} drop comment "guest to guest"`,
+      ...controlPlaneCidrsV6.map(
+        (cidr) => `iifname ${TAP_MATCH} ip6 daddr ${cidr} drop comment "control plane"`,
+      ),
       `iifname ${TAP_MATCH} ip6 daddr ${set(PRIVATE_DESTINATIONS_V6)} drop comment "private destinations"`,
     ],
   });
