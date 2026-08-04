@@ -19,7 +19,7 @@ const TIMESTAMP_PATTERN =
 const MAX_TIMESTAMP_LENGTH = 35;
 
 const DNS_LABEL_PATTERN = '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$';
-const MAX_DNS_LABEL_LENGTH = 63;
+export const MAX_DNS_LABEL_LENGTH = 63;
 
 const HOSTNAME_PATTERN =
   '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$';

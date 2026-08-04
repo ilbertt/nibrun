@@ -212,6 +212,7 @@ export {
   HostPortSchema,
   type Ipv4Address,
   Ipv4AddressSchema,
+  MAX_DNS_LABEL_LENGTH,
   type ObjectKey,
   ObjectKeySchema,
   type Sha256Digest,
