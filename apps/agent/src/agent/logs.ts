@@ -1,5 +1,6 @@
-import { Clock, Data, Deferred, type Duration, Effect, Schedule, Stream } from 'effect';
+import { Cause, Clock, Data, Deferred, type Duration, Effect, Schedule, Stream } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#agent/backoff.ts';
+import { supervised } from '#agent/loop.ts';
 import { AgentSessionHolder } from '#agent/session.ts';
 import { ControlPlane } from '#control/client.ts';
 import { TenantLogQueue } from '#logs/queue.ts';
@@ -58,14 +59,13 @@ const uploadWindow = Effect.gen(function* () {
 
 export const logLoop = Effect.gen(function* () {
   const sessions = yield* AgentSessionHolder;
-  yield* uploadWindow.pipe(
-    Effect.tapError((error) =>
+  // Reaching the end of a window is not a failure, so the next upload opens immediately.
+  yield* supervised({
+    once: uploadWindow,
+    onFailure: (cause) =>
       sessions
-        .forgetIfExpired(error)
-        .pipe(Effect.andThen(Effect.logWarning('tenant log stream failed', error))),
-    ),
-    Effect.retry(CONTROL_PLANE_BACKOFF),
-    // Reaching the end of a window is not a retry, so the next upload opens immediately.
-    Effect.forever,
-  );
+        .forgetIfExpired(Cause.squash(cause))
+        .pipe(Effect.andThen(Effect.logWarning('tenant log stream failed', cause))),
+    schedule: CONTROL_PLANE_BACKOFF,
+  });
 });

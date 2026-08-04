@@ -1,6 +1,7 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact, Sha256Digest } from '@repo/protocol';
 import { Context, Data, Effect, Layer, Ref, Stream } from 'effect';
+import { s3Credentials } from '#aws/credentials.ts';
 import { AwsCredentialProvider } from '#aws/provider.ts';
 import { AgentConfig } from '#config.ts';
 import { stdoutOf } from '#lib/exec.ts';
@@ -50,9 +51,7 @@ export const layer = Layer.effect(
                 new Bun.S3Client({
                   bucket: config.artifactBucket,
                   region: config.awsRegion,
-                  accessKeyId: resolved.accessKeyId,
-                  secretAccessKey: resolved.secretAccessKey,
-                  ...(resolved.sessionToken ? { sessionToken: resolved.sessionToken } : {}),
+                  ...s3Credentials(resolved),
                 })
                   .file(objectKey)
                   .stream() as ReadableStream<Uint8Array>,

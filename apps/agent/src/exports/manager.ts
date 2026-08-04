@@ -1,6 +1,7 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact, DesiredExport, ReportedExport } from '@repo/protocol';
 import { Effect } from 'effect';
+import { s3Credentials } from '#aws/credentials.ts';
 import { AwsCredentialProvider } from '#aws/provider.ts';
 import { AgentConfig } from '#config.ts';
 import { writeBundle } from '#exports/bundle.ts';
@@ -43,9 +44,7 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
         const client = new Bun.S3Client({
           bucket: config.exportBucket,
           region: config.awsRegion,
-          accessKeyId: resolved.accessKeyId,
-          secretAccessKey: resolved.secretAccessKey,
-          ...(resolved.sessionToken ? { sessionToken: resolved.sessionToken } : {}),
+          ...s3Credentials(resolved),
         });
         yield* Effect.tryPromise(async () => {
           const writer = client.file(objectKey).writer({

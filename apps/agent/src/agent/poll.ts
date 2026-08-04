@@ -1,7 +1,8 @@
 import { type HostDesiredState, ProtocolValidationError } from '@repo/protocol';
-import { Duration, Effect, Option } from 'effect';
+import { Cause, Duration, Effect, Option } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#agent/backoff.ts';
 import { DesiredStateCache } from '#agent/desired-state.ts';
+import { supervised } from '#agent/loop.ts';
 import { AgentSessionHolder } from '#agent/session.ts';
 import { ControlPlane } from '#control/client.ts';
 import { Reconciler } from '#reconcile/reconciler.ts';
@@ -54,11 +55,12 @@ export const pollLoop = Effect.gen(function* () {
     yield* Effect.sleep(Duration.millis(session.poll.minIntervalMs));
   });
 
-  yield* once.pipe(
-    Effect.tapError((error) =>
-      sessions.forgetIfExpired(error).pipe(Effect.andThen(logPollFailure(error))),
-    ),
-    Effect.retry(CONTROL_PLANE_BACKOFF),
-    Effect.forever,
-  );
+  yield* supervised({
+    once,
+    onFailure: (cause) =>
+      sessions
+        .forgetIfExpired(Cause.squash(cause))
+        .pipe(Effect.andThen(logPollFailure(Cause.squash(cause)))),
+    schedule: CONTROL_PLANE_BACKOFF,
+  });
 });
