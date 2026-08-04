@@ -19,7 +19,7 @@ import {
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
 } from '@repo/protocol';
-import { type ObservedState, planReconcile } from '#reconcile/plan.ts';
+import { type ObservedState, type ObservedVolume, planReconcile } from '#reconcile/plan.ts';
 
 const APP = 'app-1' as AppId;
 const VOLUME = 'vol-1' as VolumeId;
@@ -71,6 +71,17 @@ const desiredState = (overrides: Partial<HostDesiredState> = {}): HostDesiredSta
   exports: [],
   ...overrides,
 });
+
+function observedVolume(overrides: Partial<ObservedVolume> = {}): ObservedVolume {
+  return {
+    volumeId: VOLUME,
+    attached: true,
+    sizeBytes: VOLUME_SIZE_BYTES,
+    storagePrefix: 's3://filesystems/host-1' as ObjectKey,
+    devicePath: '/dev/nbd0',
+    ...overrides,
+  };
+}
 
 const observedState = (overrides: Partial<ObservedState> = {}): ObservedState => ({
   instances: [],
@@ -248,7 +259,7 @@ describe('volumes are not authoritative', () => {
     const plan = planReconcile({
       desired: desiredState(),
       observed: observedState({
-        volumes: [{ volumeId: VOLUME, attached: true, sizeBytes: VOLUME_SIZE_BYTES }],
+        volumes: [observedVolume()],
       }),
     });
     expect(plan.volumes).toEqual([]);
@@ -258,7 +269,7 @@ describe('volumes are not authoritative', () => {
     const plan = planReconcile({
       desired: desiredState({ volumes: [desiredVolume({ desiredState: 'absent' })] }),
       observed: observedState({
-        volumes: [{ volumeId: VOLUME, attached: true, sizeBytes: VOLUME_SIZE_BYTES }],
+        volumes: [observedVolume()],
       }),
     });
     expect(plan.volumes[0]?.action).toBe('teardown');
@@ -268,7 +279,7 @@ describe('volumes are not authoritative', () => {
     const plan = planReconcile({
       desired: desiredState({ volumes: [desiredVolume({ desiredState: 'absent' })] }),
       observed: observedState({
-        volumes: [{ volumeId: VOLUME, attached: true, sizeBytes: VOLUME_SIZE_BYTES }],
+        volumes: [observedVolume()],
         instances: [
           {
             instanceId: INSTANCE,
@@ -299,7 +310,7 @@ describe('volumes are not authoritative', () => {
     const small = planReconcile({
       desired: desiredState({ volumes: [desiredVolume({ sizeBytes: GROWN_VOLUME_SIZE_BYTES })] }),
       observed: observedState({
-        volumes: [{ volumeId: VOLUME, attached: true, sizeBytes: VOLUME_SIZE_BYTES }],
+        volumes: [observedVolume()],
       }),
     });
     expect(small.volumes[0]?.action).toBe('provision');
@@ -307,7 +318,7 @@ describe('volumes are not authoritative', () => {
     const converged = planReconcile({
       desired: desiredState({ volumes: [desiredVolume()] }),
       observed: observedState({
-        volumes: [{ volumeId: VOLUME, attached: true, sizeBytes: VOLUME_SIZE_BYTES }],
+        volumes: [observedVolume()],
       }),
     });
     expect(converged.volumes).toEqual([{ action: 'none', volumeId: VOLUME }]);
@@ -346,14 +357,16 @@ describe('checkpoints', () => {
 
 describe('exports', () => {
   const exportId = 'exp-1' as ExportId;
-  const desiredExport = (overrides = {}) => ({
-    exportId,
-    appId: APP,
-    volumeId: VOLUME,
-    objectKey: 'exports/app-1/exp-1.tar.gz' as ObjectKey,
-    desiredState: 'present' as const,
-    ...overrides,
-  });
+  function desiredExport(overrides = {}) {
+    return {
+      exportId,
+      appId: APP,
+      volumeId: VOLUME,
+      objectKey: 'exports/app-1/exp-1.tar.gz' as ObjectKey,
+      desiredState: 'present' as const,
+      ...overrides,
+    };
+  }
 
   test('a bundle this host has not written is written', () => {
     const plan = planReconcile({

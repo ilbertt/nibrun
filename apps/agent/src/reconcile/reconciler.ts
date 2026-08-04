@@ -39,7 +39,7 @@ import {
 import { type RouteTarget, renderableRoutes } from '#report/routes.ts';
 import type { VmManager } from '#vm/manager.ts';
 import type { SystemdVmUnits, UnitStatus } from '#vm/systemd.ts';
-import type { VolumeManager } from '#volumes/manager.ts';
+import { toReportedVolume, type VolumeManager } from '#volumes/manager.ts';
 import type { ZerofsTopology } from '#volumes/topology.ts';
 import type { ZerofsAdmin } from '#volumes/zerofs.ts';
 
@@ -196,7 +196,7 @@ export class Reconciler {
     this.#syncDesired(desired);
 
     await this.#applyStops(plan);
-    await this.#applyVolumes(plan);
+    await this.#applyVolumes({ plan, observed });
     await this.#applyStarts(plan);
     await this.#applyCheckpoints({ plan, desired });
     // After starts, so an export never competes with a boot for the device it reads, and before
@@ -336,7 +336,13 @@ export class Reconciler {
     }
   }
 
-  async #applyVolumes(plan: ReconcilePlan): Promise<void> {
+  async #applyVolumes({
+    plan,
+    observed,
+  }: {
+    plan: ReconcilePlan;
+    observed: ObservedState;
+  }): Promise<void> {
     const reports: ReportedVolume[] = [];
     for (const action of plan.volumes) {
       if (action.action === 'provision') {
@@ -350,7 +356,13 @@ export class Reconciler {
         });
       }
     }
-    this.#volumeReports = mergeVolumeReports({ existing: this.#volumeReports, updates: reports });
+    // Rebuilt from what this reconcile found rather than added to what the last one left, so a
+    // volume nobody touched still reports itself. What just happened to a volume wins over what
+    // it looked like beforehand — a provision that failed says so.
+    this.#volumeReports = mergeVolumeReports({
+      existing: observed.volumes.map(toReportedVolume),
+      updates: reports,
+    });
   }
 
   async #provision(desired: DesiredVolume): Promise<ReportedVolume> {

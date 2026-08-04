@@ -18,6 +18,25 @@ export type VolumeManagerOptions = {
   allocator: SlotAllocator;
 };
 
+/**
+ * What the host can say about a volume purely from having found it.
+ *
+ * The report is derived from the observation rather than accumulated from provisioning, so a
+ * volume that is simply healthy still reports itself. Building it the other way round meant a
+ * volume was described in the one reconcile that created it and never again — and since these
+ * reports do not survive a restart, an agent that came back reported no volumes at all while
+ * serving one.
+ */
+export function toReportedVolume(observed: ObservedVolume): ReportedVolume {
+  return {
+    volumeId: observed.volumeId,
+    state: observed.attached ? 'ready' : 'detached',
+    sizeBytes: observed.sizeBytes,
+    storagePrefix: observed.storagePrefix,
+    ...(observed.devicePath ? { devicePath: observed.devicePath } : {}),
+  };
+}
+
 export class VolumeManager {
   readonly #options: VolumeManagerOptions;
 
@@ -124,10 +143,15 @@ export class VolumeManager {
       if (sizeBytes === undefined) {
         continue;
       }
+      const slot = this.#slotFor({ volumeId, appIdByVolume });
       observed.push({
         volumeId,
         sizeBytes,
-        attached: await this.#isAttachedFor({ volumeId, appIdByVolume }),
+        storagePrefix: filesystem.storagePrefix,
+        attached: slot
+          ? await isAttached({ runner: this.#options.runner, devicePath: slot.nbdDevicePath })
+          : false,
+        ...(slot ? { devicePath: slot.nbdDevicePath } : {}),
       });
     }
     return observed;
@@ -142,21 +166,14 @@ export class VolumeManager {
     }
   }
 
-  async #isAttachedFor({
+  #slotFor({
     volumeId,
     appIdByVolume,
   }: {
     volumeId: VolumeId;
     appIdByVolume: ReadonlyMap<VolumeId, AppId>;
-  }): Promise<boolean> {
+  }) {
     const appId = appIdByVolume.get(volumeId);
-    if (appId === undefined) {
-      return false;
-    }
-    const slot = this.#options.allocator.lookup(appId);
-    if (!slot) {
-      return false;
-    }
-    return await isAttached({ runner: this.#options.runner, devicePath: slot.nbdDevicePath });
+    return appId === undefined ? undefined : this.#options.allocator.lookup(appId);
   }
 }

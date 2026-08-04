@@ -9,6 +9,7 @@ import type {
   ExportId,
   HostDesiredState,
   InstanceId,
+  ObjectKey,
   VolumeId,
 } from '@repo/protocol';
 
@@ -30,10 +31,19 @@ export type ObservedInstance = {
   exited: boolean;
 };
 
+/**
+ * A device file found in a ZeroFS filesystem, and where it was found.
+ *
+ * `storagePrefix` and `devicePath` are carried here rather than looked up again by whoever
+ * reports: this is the only point that knows which filesystem the file was enumerated from, and
+ * a second derivation of it is a second thing that can disagree.
+ */
 export type ObservedVolume = {
   volumeId: VolumeId;
   attached: boolean;
   sizeBytes: number;
+  storagePrefix: ObjectKey;
+  devicePath?: string;
 };
 
 export type ObservedCheckpoint = {
