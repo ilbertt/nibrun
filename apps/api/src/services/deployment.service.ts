@@ -1,19 +1,21 @@
-import type { DeploymentId, HostReportedState } from '@repo/protocol';
+import type { DeploymentId } from '@repo/protocol';
 import * as Duration from 'effect/Duration';
 import * as Effect from 'effect/Effect';
 import * as Fiber from 'effect/Fiber';
 import * as Layer from 'effect/Layer';
 import * as ManagedRuntime from 'effect/ManagedRuntime';
 import * as Schedule from 'effect/Schedule';
-import type { DeploymentRepository } from '#repositories/deployment.repository.ts';
-import { deploymentStateStoreLayer } from '#repositories/deployment.repository.ts';
+import type {
+  DeploymentEvent,
+  DeploymentStateMachineError,
+  DeploymentTransitionResult,
+} from '#lib/deployments/model.ts';
 import {
-  type DeploymentEvent,
   DeploymentStateMachine,
-  type DeploymentStateMachineError,
   DeploymentStateMachineLive,
-  type DeploymentTransitionResult,
-} from '#services/deployment-state-machine.ts';
+} from '#lib/deployments/state-machine.ts';
+import { deploymentStateStoreLayer } from '#lib/deployments/store.ts';
+import type { DeploymentRepository } from '#repositories/deployment.repository.ts';
 import { Service } from '#services/service.ts';
 
 const DEADLINE_SWEEP_BATCH_SIZE = 100;
@@ -43,14 +45,6 @@ export class DeploymentService extends Service {
     event: DeploymentEvent;
   }): Promise<DeploymentTransitionResult> {
     return this.#runtime.runPromise(DeploymentStateMachine.transition({ deploymentId, event }));
-  }
-
-  observeReport({
-    reported,
-  }: {
-    reported: HostReportedState;
-  }): Promise<readonly DeploymentTransitionResult[]> {
-    return this.#runtime.runPromise(DeploymentStateMachine.observeReport(reported));
   }
 
   startDeadlineSweep(): void {

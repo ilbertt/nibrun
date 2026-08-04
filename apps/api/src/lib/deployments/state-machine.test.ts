@@ -1,25 +1,23 @@
 import { describe, expect, test } from 'bun:test';
-import type { DeploymentId, HostReportedState } from '@repo/protocol';
+import type { DeploymentId } from '@repo/protocol';
 import * as Effect from 'effect/Effect';
 import * as Either from 'effect/Either';
 import * as Layer from 'effect/Layer';
 import * as Option from 'effect/Option';
 import * as TestClock from 'effect/TestClock';
 import * as TestContext from 'effect/TestContext';
+import { DeploymentEvent } from '#lib/deployments/model.ts';
 import {
-  DeploymentPersistenceError,
-  type DeploymentStateSnapshot,
-  DeploymentStateStore,
-  type DeploymentTransition,
-} from '#repositories/deployment.repository.ts';
-import {
-  DeploymentEvent,
   DeploymentStateMachine,
   DeploymentStateMachineLive,
-} from '#services/deployment-state-machine.ts';
+} from '#lib/deployments/state-machine.ts';
+import { DeploymentPersistenceError, DeploymentStateStore } from '#lib/deployments/store.ts';
+import type {
+  DeploymentStateSnapshot,
+  DeploymentTransition,
+} from '#repositories/deployment.repository.ts';
 
 const DEPLOYMENT_ID = '019cc8ab-b8a0-7000-8000-000000000001' as DeploymentId;
-const UNKNOWN_DEPLOYMENT_ID = '019cc8ab-b8a0-7000-8000-000000000002' as DeploymentId;
 const DEADLINE = new Date('2026-08-04T12:05:00.000Z');
 const ACTIVATED_AT = new Date('2026-08-04T12:01:00.000Z');
 
@@ -379,50 +377,5 @@ describe('DeploymentStateMachine', () => {
 
     expect(results).toHaveLength(1);
     expect(store.states.get(DEPLOYMENT_ID)?.state).toBe('failed');
-  });
-
-  test('uses reports as level-triggered observations and ignores unknown deployments', async () => {
-    const store = makeMemoryStateStore({
-      initial: [snapshot({ state: 'starting', targetGeneration: 7, deadlineAt: DEADLINE })],
-    });
-    const report = {
-      hostId: '019cc8ab-b8a0-7000-8000-000000000003',
-      observedGeneration: 7,
-      reportedAt: ACTIVATED_AT.toISOString(),
-      state: 'ready',
-      capacity: { vcpuCount: 2, memoryMib: 2048, cacheBytes: 1024 },
-      allocatable: { vcpuCount: 1, memoryMib: 1024, cacheBytes: 512 },
-      versions: {
-        agent: 'test',
-        guestImage: 'test',
-        zerofs: 'test',
-        firecracker: 'test',
-      },
-      volumes: [],
-      instances: [
-        {
-          instanceId: '019cc8ab-b8a0-7000-8000-000000000004',
-          deploymentId: DEPLOYMENT_ID,
-          state: 'running',
-          restartCount: 0,
-        },
-        {
-          instanceId: '019cc8ab-b8a0-7000-8000-000000000005',
-          deploymentId: UNKNOWN_DEPLOYMENT_ID,
-          state: 'running',
-          restartCount: 0,
-        },
-      ],
-      checkpoints: [],
-      exports: [],
-    } as unknown as HostReportedState;
-
-    const results = await runStateMachine({
-      store,
-      program: DeploymentStateMachine.observeReport(report),
-    });
-
-    expect(results).toHaveLength(1);
-    expect(store.states.get(DEPLOYMENT_ID)?.state).toBe('active');
   });
 });

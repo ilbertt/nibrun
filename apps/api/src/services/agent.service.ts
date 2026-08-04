@@ -10,7 +10,6 @@ import {
 } from '@repo/protocol';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepository } from '#repositories/agent.repository.ts';
-import type { DeploymentService } from '#services/deployment.service.ts';
 import { Service } from '#services/service.ts';
 
 const MS_PER_SECOND = 1000;
@@ -19,18 +18,10 @@ const SESSION_LIFETIME_MS = SECONDS_PER_HOUR * MS_PER_SECOND;
 
 export class AgentService extends Service {
   private readonly agentRepo: AgentRepository;
-  private readonly deploymentService: DeploymentService;
 
-  constructor({
-    agentRepo,
-    deploymentService,
-  }: {
-    agentRepo: AgentRepository;
-    deploymentService: DeploymentService;
-  }) {
+  constructor({ agentRepo }: { agentRepo: AgentRepository }) {
     super();
     this.agentRepo = agentRepo;
-    this.deploymentService = deploymentService;
   }
 
   /**
@@ -87,7 +78,6 @@ export class AgentService extends Service {
       volumes: reported.volumes.length,
     });
     await this.agentRepo.saveReportedState({ reported });
-    await this.deploymentService.observeReport({ reported });
 
     const desired = await this.agentRepo.desiredState({ hostId: reported.hostId });
     return desired.generation;

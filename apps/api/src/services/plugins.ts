@@ -15,9 +15,9 @@ const assetsRepository = new AssetsRepository(sql);
 const deploymentRepository = new DeploymentRepository(sql);
 const healthRepository = new HealthRepository(sql);
 
+const agentService = new AgentService({ agentRepo: agentRepository });
 const assetsService = new AssetsService(assetsRepository);
 const deploymentService = new DeploymentService({ deploymentRepository });
-const agentService = new AgentService({ agentRepo: agentRepository, deploymentService });
 const healthService = new HealthService(healthRepository);
 
 export function loggerPlugin(name: string) {
