@@ -3,9 +3,12 @@ import type { GuestPort, HostPort, Ipv4Address } from '@repo/protocol';
 import {
   type FirewallState,
   INSTANCE_METADATA_ADDRESS,
+  INSTANCE_METADATA_ADDRESS_V6,
   NFTABLES_TABLE,
   renderRuleset,
 } from '#network/firewall.ts';
+
+const DNS_PORT = 53;
 
 const instance = {
   hostPort: 21_000 as HostPort,
@@ -68,6 +71,50 @@ describe('the three isolation rules are never optional', () => {
     expect(dropsFrom(renderRuleset(state())).some((line) => line.includes('guest to host'))).toBe(
       true,
     );
+  });
+
+  // A resolver accepted by address alone opens every port on it. Harmless for a VPC resolver,
+  // and a hole in the guest-to-host drop the moment the address given is one of the host's own.
+  test('a named resolver is reachable on port 53 and not on everything else', () => {
+    const input = renderRuleset(state({ guestDnsServers: ['10.0.0.2'] }))
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.includes('10.0.0.2') && line.endsWith('accept'));
+
+    expect(input.length).toBeGreaterThan(0);
+    for (const rule of input) {
+      expect(rule).toContain(`dport ${DNS_PORT}`);
+    }
+  });
+});
+
+// `table ip` cannot see v6 at all, and a tap carries a link-local v6 address from the moment it
+// is created — so without a second table every isolation rule above is one family wide.
+describe('the same isolation holds over ipv6', () => {
+  test('guests cannot reach the host over its link-local address', () => {
+    const v6 = renderRuleset(state()).split(`table ip6 ${NFTABLES_TABLE} {`)[1] ?? '';
+    expect(v6).toContain('guest to host');
+    expect(v6).toContain('fe80::/10');
+  });
+
+  test('guests cannot reach each other or the metadata endpoint over v6', () => {
+    const v6 = renderRuleset(state()).split(`table ip6 ${NFTABLES_TABLE} {`)[1] ?? '';
+    expect(v6).toContain('guest to guest');
+    expect(v6).toContain(INSTANCE_METADATA_ADDRESS_V6);
+  });
+
+  // Blocking v6 outright would have been the smaller change and the wrong one: public v6 is
+  // egress a tenant is entitled to, exactly as public v4 is.
+  test('public v6 is not blocked, only the internal ranges', () => {
+    const v6 = renderRuleset(state()).split(`table ip6 ${NFTABLES_TABLE} {`)[1] ?? '';
+    expect(v6).toContain('::1/128');
+    expect(v6).toContain('fc00::/7');
+    expect(v6).not.toContain('::/0');
+  });
+
+  test('the v6 table is rebuilt from state like the v4 one', () => {
+    const ruleset = renderRuleset(state());
+    expect(ruleset).toContain(`table ip6 ${NFTABLES_TABLE}\ndelete table ip6 ${NFTABLES_TABLE}\n`);
   });
 });
 

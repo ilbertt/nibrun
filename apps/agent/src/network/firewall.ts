@@ -5,6 +5,7 @@ export const NFTABLES_TABLE = 'nibrun';
 const TAP_MATCH = `"${TAP_NAME_PREFIX}*"`;
 
 export const INSTANCE_METADATA_ADDRESS = '169.254.169.254';
+export const INSTANCE_METADATA_ADDRESS_V6 = 'fd00:ec2::254';
 
 const DNS_PORT = 53;
 
@@ -22,6 +23,12 @@ const PRIVATE_DESTINATIONS = [
   '127.0.0.0/8',
   '100.64.0.0/10',
 ] as const;
+
+// The same blanket, in the family `table ip` cannot see. A tap is assigned a link-local v6
+// address the moment it exists, so without these every service on the host is reachable from
+// inside a microVM over `fe80::` with nothing in the way — whether or not v6 egress is
+// configured. Public v6 stays reachable, exactly as public v4 does.
+const PRIVATE_DESTINATIONS_V6 = ['::1/128', 'fe80::/10', 'fc00::/7'] as const;
 
 const CHAIN_INDENT = '  ';
 const RULE_INDENT = '    ';
@@ -71,6 +78,15 @@ export function renderRuleset(state: FirewallState): string {
     '',
     ...natChains(state),
     '}',
+    '',
+    `table ip6 ${NFTABLES_TABLE}`,
+    `delete table ip6 ${NFTABLES_TABLE}`,
+    '',
+    `table ip6 ${NFTABLES_TABLE} {`,
+    ...forwardChainV6(),
+    '',
+    ...inputChainV6(),
+    '}',
   ];
   return `${lines.join('\n')}\n`;
 }
@@ -104,7 +120,39 @@ function inputChain({ guestDnsServers }: FirewallState): string[] {
     rules: [
       'type filter hook input priority filter; policy accept;',
       `iifname ${TAP_MATCH} ct state established,related accept`,
-      ...guestDnsServers.map((server) => `iifname ${TAP_MATCH} ip daddr ${server} accept`),
+      // Port-matched like the forward chain rather than accepting the address outright: a
+      // resolver that happened to be one of the host's own addresses would otherwise open
+      // every port on the host to every tenant.
+      ...guestDnsServers.flatMap((server) => [
+        `iifname ${TAP_MATCH} ip daddr ${server} udp dport ${DNS_PORT} accept`,
+        `iifname ${TAP_MATCH} ip daddr ${server} tcp dport ${DNS_PORT} accept`,
+      ]),
+      `iifname ${TAP_MATCH} drop comment "guest to host"`,
+    ],
+  });
+}
+
+// No NAT counterpart: guests are given a v4 /30 and no v6 address, so nothing here forwards or
+// masquerades. These are the drops that hold whether or not that ever changes.
+function forwardChainV6(): string[] {
+  return chain({
+    header: 'forward {',
+    rules: [
+      'type filter hook forward priority filter; policy accept;',
+      'ct state established,related accept',
+      `iifname ${TAP_MATCH} ip6 daddr ${INSTANCE_METADATA_ADDRESS_V6} drop comment "instance metadata endpoint"`,
+      `iifname ${TAP_MATCH} oifname ${TAP_MATCH} drop comment "guest to guest"`,
+      `iifname ${TAP_MATCH} ip6 daddr ${set(PRIVATE_DESTINATIONS_V6)} drop comment "private destinations"`,
+    ],
+  });
+}
+
+function inputChainV6(): string[] {
+  return chain({
+    header: 'input {',
+    rules: [
+      'type filter hook input priority filter; policy accept;',
+      `iifname ${TAP_MATCH} ct state established,related accept`,
       `iifname ${TAP_MATCH} drop comment "guest to host"`,
     ],
   });

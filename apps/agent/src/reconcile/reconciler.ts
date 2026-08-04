@@ -28,6 +28,7 @@ import {
   type CheckpointPlan,
   type ExportPlan,
   hasDeferredWork,
+  type InstancePlan,
   type ObservedState,
   planReconcile,
   type ReconcilePlan,
@@ -86,6 +87,8 @@ export class Reconciler {
   #observedGeneration = NO_GENERATION;
   #converged = false;
   #deferredWork = false;
+  // Whether this host's isolation ruleset is in the kernel. A tenant is not started without it.
+  #isolated = false;
 
   constructor(options: ReconcilerOptions) {
     this.#options = options;
@@ -206,12 +209,17 @@ export class Reconciler {
 
     await this.#applyStops(plan);
     await this.#applyVolumes({ plan, observed });
+    // Before anything boots. The isolation rules do not depend on which instances exist, and
+    // nothing persists the ruleset across a reboot — so a host that came back and started its
+    // VMs first would serve tenants through a kernel with no `nibrun` table in it at all.
+    await this.#applyNetwork();
     await this.#applyStarts(plan);
     await this.#applyCheckpoints({ plan, desired });
     // After starts, so an export never competes with a boot for the device it reads, and before
     // teardowns, so a volume marked absent in the same generation is still there to read from.
     await this.#applyExports({ plan, desired });
     await this.#applyTeardowns(plan);
+    // Again, because the instances started above are the ones whose forwards this renders.
     await this.#applyNetwork();
     await this.#applyRoutes();
     await this.#persist();
@@ -413,11 +421,30 @@ export class Reconciler {
     }
   }
 
+  /**
+   * A tenant only ever boots onto a host whose isolation ruleset is in the kernel.
+   *
+   * The guest is an arbitrary binary on a tap in the guest network, one routing decision away
+   * from the control plane, this host's own services and every neighbouring tenant. Nothing but
+   * that ruleset stands between them, so its absence is a reason not to run rather than
+   * something to log and continue past.
+   */
   async #applyStarts(plan: ReconcilePlan): Promise<void> {
-    for (const action of plan.instances) {
-      if (action.action !== 'start' && action.action !== 'replace') {
-        continue;
-      }
+    const starts = plan.instances.filter(
+      (action): action is Extract<InstancePlan, { action: 'start' | 'replace' }> =>
+        action.action === 'start' || action.action === 'replace',
+    );
+    if (starts.length === 0) {
+      return;
+    }
+    if (!this.#isolated) {
+      logger.error({
+        message: 'instance starts refused: isolation ruleset is not applied',
+        refused: starts.length,
+      });
+      return;
+    }
+    for (const action of starts) {
       await this.#start({ desired: action.desired });
     }
   }
@@ -644,7 +671,13 @@ export class Reconciler {
           guestDnsServers: this.#options.config.guestDnsServers,
         },
       });
+      this.#isolated = true;
     } catch (error) {
+      // Left false rather than thrown: `nft -f` replaces the table in one transaction, so a
+      // failed apply leaves whatever was already in the kernel. Tearing down running tenants
+      // over a transient failure would be the bigger outage — refusing to add new ones is the
+      // part that has to hold.
+      this.#isolated = false;
       logger.error({ message: 'firewall apply failed', ...describeError(error) });
     }
   }
