@@ -6,8 +6,8 @@ import {
   assignmentsFrom,
   readSlotRecords,
   SlotExhausted,
-} from '#network/allocator.ts';
-import { type AppSlot, describeSlot, FIRST_SLOT, SLOT_COUNT } from '#network/slot.ts';
+} from '#lib/network/allocator.ts';
+import { type AppSlot, describeSlot, FIRST_SLOT, SLOT_COUNT } from '#lib/network/slot.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
 const firstFree = (assignments: Assignments) => {

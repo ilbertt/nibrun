@@ -1,15 +1,15 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { AppId, DesiredVolume, ReportedVolume, VolumeId } from '@repo/protocol';
 import { Array as Arr, Effect, Option } from 'effect';
-import type { AppSlot } from '#network/slot.ts';
-import type { ObservedVolume } from '#reconcile/plan.ts';
+import type { AppSlot } from '#lib/network/slot.ts';
+import type { ObservedVolume } from '#lib/reconcile/plan.ts';
+import { devicePathFor, ensureDeviceFile, NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
+import { formatOnce } from '#lib/volumes/ext4.ts';
+import { attach, detach, isAttached } from '#lib/volumes/nbd.ts';
+import type { ZerofsFilesystem } from '#lib/volumes/topology.ts';
+import { flush } from '#lib/volumes/zerofs.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
-import { devicePathFor, ensureDeviceFile, NBD_DIRECTORY } from '#volumes/device-file.ts';
-import { formatOnce } from '#volumes/ext4.ts';
-import { attach, detach, isAttached } from '#volumes/nbd.ts';
-import type { ZerofsFilesystem } from '#volumes/topology.ts';
-import { flush } from '#volumes/zerofs.ts';
 
 const EMPTY_SIZE = 0;
 

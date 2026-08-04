@@ -3,8 +3,8 @@ import { BunSocketServer } from '@effect/platform-bun';
 import type { InstanceId, TenantLogStream } from '@repo/protocol';
 import { Deferred, Effect, Either, Exit, Ref, Scope } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
-import { decodeFrames, EMPTY_BUFFER } from '#logs/guest-protocol.ts';
-import type { TenantLogSource } from '#logs/vsock.ts';
+import { decodeFrames, EMPTY_BUFFER } from '#lib/logs/guest-protocol.ts';
+import type { TenantLogSource } from '#lib/logs/vsock.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 
 const PRIVATE_SOCKET_MODE = 0o600;

@@ -1,7 +1,7 @@
 import { Effect, Option, Ref } from 'effect';
 import { writeTextFile } from '#lib/json-store.ts';
-import { renderAppSites } from '#proxy/caddyfile.ts';
-import type { RouteTarget } from '#report/routes.ts';
+import { renderAppSites } from '#lib/proxy/caddyfile.ts';
+import type { RouteTarget } from '#lib/report/routes.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { stdoutOf } from '#services/command-runner.service.ts';
 

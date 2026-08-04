@@ -6,7 +6,7 @@ import type {
   ReportedVolume,
 } from '@repo/protocol';
 import { Context, Layer, Ref } from 'effect';
-import type { InstanceRecord } from '#report/instance-record.ts';
+import type { InstanceRecord } from '#lib/report/instance-record.ts';
 
 const NO_GENERATION = 0;
 

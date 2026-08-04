@@ -1,19 +1,19 @@
 import { describe, expect, test } from 'bun:test';
 import type { Sha256Digest } from '@repo/protocol';
-import { InstanceCredentialsError } from '#aws/credentials.ts';
-import { ControlPlaneError } from '#control/client.ts';
-import { EmptyDump, UnsafeFilename } from '#exports/bundle.ts';
+import { InstanceCredentialsError } from '#lib/aws/credentials.ts';
+import { ControlPlaneError } from '#lib/control/client.ts';
 import { CommandFailed, CommandTimedOut } from '#lib/exec.ts';
+import { EmptyDump, UnsafeFilename } from '#lib/exports/bundle.ts';
 import { reportedMessage } from '#lib/failure.ts';
 import { MalformedJsonError } from '#lib/json-store.ts';
+import { InvalidGuestLogFrame } from '#lib/logs/guest-protocol.ts';
+import { SlotExhausted } from '#lib/network/allocator.ts';
 import { ProtocolMismatch } from '#lib/protocol.ts';
-import { InvalidGuestLogFrame } from '#logs/guest-protocol.ts';
-import { SlotExhausted } from '#network/allocator.ts';
-import { MissingVersionsError } from '#report/versions.ts';
+import { MissingVersionsError } from '#lib/report/versions.ts';
+import { ArtifactSizeMismatch, DigestMismatch } from '#lib/vm/artifacts.ts';
+import { UnrepresentableEnvironment } from '#lib/vm/instance-env.ts';
+import { VolumeShrinkRefused } from '#lib/volumes/device-file.ts';
 import { ArtifactTransferError } from '#services/artifact-store.service.ts';
-import { ArtifactSizeMismatch, DigestMismatch } from '#vm/artifacts.ts';
-import { UnrepresentableEnvironment } from '#vm/instance-env.ts';
-import { VolumeShrinkRefused } from '#volumes/device-file.ts';
 
 const DIGEST_HEX_LENGTH = 64;
 const HTTP_UNAUTHORIZED = 401;

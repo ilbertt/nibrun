@@ -1,13 +1,13 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact, DesiredExport, ReportedExport } from '@repo/protocol';
 import { Effect } from 'effect';
-import { s3Credentials } from '#aws/credentials.ts';
-import { writeBundle } from '#exports/bundle.ts';
+import { s3Credentials } from '#lib/aws/credentials.ts';
 import { nowTimestamp } from '#lib/clock.ts';
+import { writeBundle } from '#lib/exports/bundle.ts';
+import { flush } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AwsCredentialProvider } from '#services/aws-credential-provider.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
-import { flush } from '#volumes/zerofs.ts';
 
 const UPLOAD_PART_SIZE_BYTES = 8_388_608;
 const UPLOAD_QUEUE_SIZE = 4;

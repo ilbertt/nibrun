@@ -1,5 +1,5 @@
 import { Context, Data, Effect, Layer } from 'effect';
-import { s3Credentials } from '#aws/credentials.ts';
+import { s3Credentials } from '#lib/aws/credentials.ts';
 import { describe } from '#lib/failure.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AwsCredentialProvider } from '#services/aws-credential-provider.service.ts';

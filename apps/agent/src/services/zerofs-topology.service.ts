@@ -1,7 +1,7 @@
 import type { ObjectKey } from '@repo/protocol';
 import { Effect } from 'effect';
+import type { ZerofsFilesystem } from '#lib/volumes/topology.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
-import type { ZerofsFilesystem } from '#volumes/topology.ts';
 
 /**
  * **v1 runs one ZeroFS per host**, so every volume placed here shares one prefix — one process,

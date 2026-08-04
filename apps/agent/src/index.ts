@@ -1,7 +1,7 @@
 import { FetchHttpClient } from '@effect/platform';
 import { BunContext, BunRuntime } from '@effect/platform-bun';
 import { Effect, Layer } from 'effect';
-import { run } from '#agent/run.ts';
+import { run } from '#lib/agent/run.ts';
 import { AgentLogger } from '#lib/logger.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';

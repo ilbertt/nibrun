@@ -1,7 +1,7 @@
 import { HttpClient } from '@effect/platform';
 import { Clock, Effect, Option, SynchronizedRef } from 'effect';
-import { type AwsCredentials, needsRefresh, staticCredentials } from '#aws/credentials.ts';
-import { fetchInstanceCredentials } from '#aws/imds.ts';
+import { type AwsCredentials, needsRefresh, staticCredentials } from '#lib/aws/credentials.ts';
+import { fetchInstanceCredentials } from '#lib/aws/imds.ts';
 
 export class AwsCredentialProvider extends Effect.Service<AwsCredentialProvider>()(
   'AwsCredentialProvider',

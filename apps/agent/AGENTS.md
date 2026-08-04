@@ -2,11 +2,12 @@
 
 The nibrun host agent. One compiled binary per app host: it opens a session with the control
 plane, long-polls for desired state, converges the host onto it, and reports what it observes. It
-is never sent a command. Read `reconcile/`, `volumes/topology.ts` and `network/slot.ts` first.
+is never sent a command. Read `lib/reconcile/`, `lib/volumes/topology.ts` and
+`lib/network/slot.ts` first.
 
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
 test needs to substitute is a service (`Context.Tag` or `Effect.Service`). State that used to be
-mutable class fields lives in a `Ref`. The four loops in `agent/` are fibers, and their retry
+mutable class fields lives in a `Ref`. The four loops in `lib/agent/` are fibers, and their retry
 cadence is a `Schedule` rather than a failure counter. Interruption is the shutdown path:
 `BunRuntime.runMain` cancels the fibers and scoped finalizers close the log sockets. Nothing stops
 a tenant VM, which is what keeps redeploying the agent free.
@@ -16,6 +17,10 @@ kebab-case of the identifier plus `.service.ts`, so `VolumeManager` is
 `volume-manager.service.ts`. A `.service.ts` module holds the service and its layer and nothing
 else; pure functions, error classes and host mechanics stay in the domain folder they belong to.
 `apps/api/src/services/` is the same shape, so the two apps read the same way.
+
+**`src` is three things**: `index.ts` composes the layer graph, `services/` holds the services,
+and `lib/` holds everything else grouped by domain — `lib/reconcile/`, `lib/volumes/`,
+`lib/network/` and the rest, alongside the loose modules every domain uses. `tests/` mirrors it.
 
 **Every service names its own requirements** in `dependencies`, so `index.ts` is a flat merge whose
 order carries nothing. A test that hands one of them a stub config takes
@@ -43,7 +48,7 @@ sockets are released by. `bun test` rules out `@effect/vitest`, so there is no `
 
 The control plane is reached through `@repo/api-client/internal`, and every call goes through it,
 so a route the api does not mount is a compile error. What it cannot describe is the bytes that
-come back, so `control/client.ts` still validates every response against `@repo/protocol` —
+come back, so `lib/control/client.ts` still validates every response against `@repo/protocol` —
 TypeBox, not `effect/Schema`, because the schemas are shared with the api.
 
 ## What the host must provide, and does not yet

@@ -22,8 +22,8 @@ import {
   type Timestamp,
   type VolumeId,
 } from '@repo/protocol';
-import { HOST_PORT_BASE } from '#network/slot.ts';
-import type { ObservedInstance, ObservedState, ObservedVolume } from '#reconcile/plan.ts';
+import { HOST_PORT_BASE } from '#lib/network/slot.ts';
+import type { ObservedInstance, ObservedState, ObservedVolume } from '#lib/reconcile/plan.ts';
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST } from '#tests/support/artifacts.ts';
 import { HOST_STORAGE_PREFIX } from '#tests/support/config.ts';
 

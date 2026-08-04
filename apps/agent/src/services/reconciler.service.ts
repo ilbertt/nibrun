@@ -1,21 +1,21 @@
 import type { HostDesiredState } from '@repo/protocol';
 import { Effect, Option } from 'effect';
-import { readExportReports } from '#exports/manager.ts';
+import { readExportReports } from '#lib/exports/manager.ts';
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
-import { applyCheckpoints } from '#reconcile/checkpoints.ts';
-import { applyExports } from '#reconcile/exports.ts';
-import { refreshStates, startInstance, stopInstance } from '#reconcile/instances.ts';
-import { applyNetwork, applyRoutes } from '#reconcile/network.ts';
-import { hasDeferredWork, type ObservedState, planReconcile } from '#reconcile/plan.ts';
-import * as State from '#reconcile/state.ts';
-import { applyTeardowns, applyVolumes } from '#reconcile/volumes.ts';
-import { readInstanceRecords } from '#report/instance-record.ts';
+import { applyCheckpoints } from '#lib/reconcile/checkpoints.ts';
+import { applyExports } from '#lib/reconcile/exports.ts';
+import { refreshStates, startInstance, stopInstance } from '#lib/reconcile/instances.ts';
+import { applyNetwork, applyRoutes } from '#lib/reconcile/network.ts';
+import { hasDeferredWork, type ObservedState, planReconcile } from '#lib/reconcile/plan.ts';
+import * as State from '#lib/reconcile/state.ts';
+import { applyTeardowns, applyVolumes } from '#lib/reconcile/volumes.ts';
+import { readInstanceRecords } from '#lib/report/instance-record.ts';
+import * as Systemd from '#lib/vm/systemd.ts';
+import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
-import * as Systemd from '#vm/systemd.ts';
-import { UNKNOWN_UNIT } from '#vm/unit-status.ts';
 
 /**
  * Pull, converge, report. Nothing here is driven by a command: desired state describes a world,
