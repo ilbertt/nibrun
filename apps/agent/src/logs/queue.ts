@@ -13,6 +13,7 @@ export class TenantLogQueue {
   readonly #chunks: Uint8Array[] = [];
   #queuedBytes = 0;
   #waiting: WaitingReader | undefined;
+  #activeToken: symbol | undefined;
   #closed = false;
 
   constructor({ maxBytes }: { maxBytes: number }) {
@@ -44,6 +45,11 @@ export class TenantLogQueue {
 
   readable(): ReadableStream<Uint8Array> {
     const token = Symbol('tenant log reader');
+    // A control plane that answers before the body ends completes the fetch without cancelling
+    // the stream it was reading, so the request this one replaces can still be holding a pending
+    // read. Handing the next event to that reader would deliver it nowhere.
+    this.#waiting = undefined;
+    this.#activeToken = token;
     let active = true;
     return new ReadableStream<Uint8Array>({
       pull: async (controller) => {
@@ -71,6 +77,11 @@ export class TenantLogQueue {
   }
 
   #take(token: symbol): Promise<Uint8Array | undefined> {
+    // Checked before the queue is touched: a superseded reader whose pull lands late would
+    // otherwise take a chunk into a request nothing is sending any more.
+    if (token !== this.#activeToken) {
+      return Promise.resolve(undefined);
+    }
     const chunk = this.#chunks.shift();
     if (chunk) {
       this.#queuedBytes -= chunk.byteLength;

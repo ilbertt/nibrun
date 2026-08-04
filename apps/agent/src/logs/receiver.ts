@@ -17,6 +17,11 @@ export const TENANT_LOG_VSOCK_PORT = 51000;
 export const TENANT_LOG_VSOCK_FILENAME = 'logs.vsock';
 
 const PRIVATE_SOCKET_MODE = 0o600;
+// The guest runtime keeps one connection and reconnects on a delay, so the only overlap is a
+// replacement arriving before the host has reaped the socket it replaces. Past that, the peer is
+// a kernel the tenant controls, and every accepted socket costs the host a decoder it did not ask
+// for.
+const MAX_GUEST_CONNECTIONS = 4;
 
 export type TenantLogSource = {
   appId: AppId;
@@ -33,8 +38,9 @@ type Attachment = {
   nextSequence: number;
 };
 
-export const tenantLogSocketPath = ({ workingDir }: { workingDir: string }) =>
-  join(workingDir, `${TENANT_LOG_VSOCK_FILENAME}_${TENANT_LOG_VSOCK_PORT}`);
+export function tenantLogSocketPath({ workingDir }: { workingDir: string }): string {
+  return join(workingDir, `${TENANT_LOG_VSOCK_FILENAME}_${TENANT_LOG_VSOCK_PORT}`);
+}
 
 export class TenantLogReceiver {
   readonly #publish: (event: TenantLogEvent) => void;
@@ -110,6 +116,10 @@ export class TenantLogReceiver {
   }
 
   #accept({ attachment, socket }: { attachment: Attachment; socket: Socket }): void {
+    if (attachment.sockets.size >= MAX_GUEST_CONNECTIONS) {
+      socket.destroy();
+      return;
+    }
     attachment.sockets.add(socket);
     const frames = new GuestLogFrameDecoder();
     const text = {

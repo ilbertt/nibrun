@@ -53,6 +53,11 @@ const NO_FAILURES = 0;
 const DESIRED_STATE_FILENAME = 'desired-state.json';
 const TENANT_LOG_BUFFER_BYTES = 8_388_608;
 const LOG_RECONNECT_FLOOR_MS = 250;
+// The control plane holds this request open until the agent stops sending, so a stream that
+// ended sooner than this carried nothing and is a route answering on headers rather than an
+// upload that worked. Counting it as a failure is what keeps a misconfigured edge from becoming
+// a silent reconnect loop that never backs off and never says anything.
+const MIN_HEALTHY_LOG_STREAM_MS = 5_000;
 
 export class Agent {
   readonly #config: AgentConfig;
@@ -228,6 +233,7 @@ export class Agent {
       const abort = new AbortController();
       this.#logUploadAbort = abort;
       const body = this.#logQueue.readable();
+      const startedAtMs = performance.now();
       try {
         const session = await this.#ensureSession();
         await this.#client.streamTenantLogs({
@@ -235,7 +241,13 @@ export class Agent {
           body,
           signal: abort.signal,
         });
-        failures = NO_FAILURES;
+        const elapsedMs = performance.now() - startedAtMs;
+        if (elapsedMs < MIN_HEALTHY_LOG_STREAM_MS) {
+          failures += FIRST_FAILURE;
+          logger.warn({ message: 'tenant log stream ended without carrying anything', elapsedMs });
+        } else {
+          failures = NO_FAILURES;
+        }
       } catch (error) {
         if (!this.#running) {
           break;
@@ -247,7 +259,6 @@ export class Agent {
         logger.warn({ message: 'tenant log stream failed', ...describeError(error) });
       } finally {
         abort.abort();
-        await body.cancel().catch(() => {});
         if (this.#logUploadAbort === abort) {
           this.#logUploadAbort = undefined;
         }

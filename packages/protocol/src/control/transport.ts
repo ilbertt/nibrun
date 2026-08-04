@@ -23,6 +23,11 @@ export const AGENT_API_PREFIX = '/internal/agent';
 
 // Every route is an outbound POST. Control messages carry one JSON document; tenantLogs carries
 // an NDJSON stream on its own request so output backpressure can never delay desired state.
+//
+// tenantLogs is the one route whose response must not begin until the request body ends. The
+// agent holds it open for as long as it has a host to report for, and answering on headers
+// instead ends a stream the agent believes succeeded — which it would reconnect at the retry
+// floor, forever, without ever calling it a failure.
 export const AGENT_ROUTES = {
   session: '/session',
   desiredState: '/desired-state',
