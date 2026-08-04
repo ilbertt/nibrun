@@ -1,7 +1,7 @@
 import type { ExportId, HostDesiredState, ReportedExport } from '@repo/protocol';
 import { Effect, Option } from 'effect';
 import { ExportManager } from '#exports/manager.ts';
-import { shortMessage } from '#lib/errors.ts';
+import { reportedMessage } from '#lib/failure.ts';
 import { SlotAllocator } from '#network/allocator.ts';
 import type { ExportPlan, ReconcilePlan } from '#reconcile/plan.ts';
 import * as State from '#reconcile/state.ts';
@@ -56,7 +56,7 @@ const write = ({
             Effect.as({
               exportId,
               state: 'failed',
-              message: shortMessage(error),
+              message: reportedMessage(error),
             } satisfies ReportedExport),
           ),
         ),

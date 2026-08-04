@@ -1,10 +1,11 @@
-import { type HostDesiredState, ProtocolValidationError } from '@repo/protocol';
-import { Cause, Duration, Effect, Option } from 'effect';
+import type { HostDesiredState } from '@repo/protocol';
+import { Duration, Effect, Option } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#agent/backoff.ts';
 import { DesiredStateCache } from '#agent/desired-state.ts';
 import { supervised } from '#agent/loop.ts';
 import { AgentSessionHolder } from '#agent/session.ts';
 import { ControlPlane } from '#control/client.ts';
+import type { ProtocolMismatch } from '#lib/protocol.ts';
 import { Reconciler } from '#reconcile/reconciler.ts';
 import * as State from '#reconcile/state.ts';
 
@@ -22,12 +23,11 @@ export const reconcileSafely = (desired: HostDesiredState) =>
       );
   });
 
-const logPollFailure = (error: unknown) =>
-  error instanceof ProtocolValidationError
-    ? Effect.logError('desired state rejected by validation').pipe(
-        Effect.annotateLogs({ issues: error.issues }),
-      )
-    : Effect.logWarning('desired state poll failed', error);
+/** A rejected message is the control plane's bug, not a flaky link, so it is not a warning. */
+const logRejectedState = (error: ProtocolMismatch) =>
+  Effect.logError('desired state rejected by validation').pipe(
+    Effect.annotateLogs({ issues: error.issues }),
+  );
 
 export const pollLoop = Effect.gen(function* () {
   const control = yield* ControlPlane;
@@ -56,11 +56,11 @@ export const pollLoop = Effect.gen(function* () {
   });
 
   yield* supervised({
-    once,
-    onFailure: (cause) =>
-      sessions
-        .forgetIfExpired(Cause.squash(cause))
-        .pipe(Effect.andThen(logPollFailure(Cause.squash(cause)))),
+    once: once.pipe(
+      Effect.tapErrorTag('ControlPlaneError', sessions.onExpired),
+      Effect.tapErrorTag('ProtocolMismatch', logRejectedState),
+    ),
+    onFailure: (cause) => Effect.logWarning('desired state poll failed', cause),
     schedule: CONTROL_PLANE_BACKOFF,
   });
 });

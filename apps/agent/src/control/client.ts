@@ -29,6 +29,12 @@ export class ControlPlaneError extends Data.TaggedError('ControlPlaneError')<{
   get isSessionExpired() {
     return this.status === HTTP_UNAUTHORIZED;
   }
+
+  override get message() {
+    return this.status === NOT_DELIVERED
+      ? `${this.route} was not reached: ${this.body}`
+      : `${this.route} answered ${this.status}: ${this.body}`;
+  }
 }
 
 type Reply = { data: unknown; error: { value: unknown } | null; status: number };

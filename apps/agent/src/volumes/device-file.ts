@@ -26,7 +26,11 @@ export const devicePathFor = ({
 export class VolumeShrinkRefused extends Data.TaggedError('VolumeShrinkRefused')<{
   readonly current: number;
   readonly requested: number;
-}> {}
+}> {
+  override get message() {
+    return `a volume of ${this.current} bytes cannot be resized down to ${this.requested}`;
+  }
+}
 
 export const readDeviceFileSize = (path: string) =>
   Effect.gen(function* () {

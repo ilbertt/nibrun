@@ -13,11 +13,19 @@ const DUMP_TIMEOUT = Duration.hours(1);
 
 export class EmptyDump extends Data.TaggedError('EmptyDump')<{
   readonly devicePath: string;
-}> {}
+}> {
+  override get message() {
+    return `reading ${this.devicePath} produced no files`;
+  }
+}
 
 export class UnsafeFilename extends Data.TaggedError('UnsafeFilename')<{
   readonly filename: string;
-}> {}
+}> {
+  override get message() {
+    return `${this.filename} is a path rather than a filename`;
+  }
+}
 
 /**
  * Read with `debugfs`, which walks inodes in userspace: the bundle is built from a filesystem the

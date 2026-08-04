@@ -16,7 +16,11 @@ export type AwsCredentials = {
 
 export class InstanceCredentialsError extends Data.TaggedError('InstanceCredentialsError')<{
   readonly detail: string;
-}> {}
+}> {
+  override get message() {
+    return `this instance has no usable AWS credentials: ${this.detail}`;
+  }
+}
 
 /** Absent unless both halves of the pair are set, since half a pair is not credentials. */
 export const staticCredentials = Config.all({

@@ -17,7 +17,11 @@ export type GuestLogFrame =
 
 export class InvalidGuestLogFrame extends Data.TaggedError('InvalidGuestLogFrame')<{
   readonly reason: string;
-}> {}
+}> {
+  override get message() {
+    return `the guest sent a log frame this host cannot read: ${this.reason}`;
+  }
+}
 
 export const EMPTY_BUFFER: Buffer = Buffer.alloc(0);
 

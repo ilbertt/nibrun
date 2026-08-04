@@ -18,7 +18,12 @@ const FORBIDDEN_VALUE_CHARACTERS = /[\n\r\0]/;
 
 export class UnrepresentableEnvironment extends Data.TaggedError('UnrepresentableEnvironment')<{
   readonly variableName: string;
-}> {}
+}> {
+  /** Names the variable and never its value, which is the tenant's secret. */
+  override get message() {
+    return `${this.variableName} has no representation on the config drive`;
+  }
+}
 
 /**
  * Line-oriented `KEY=VALUE`, so the guest's init needs no parser. A value containing a newline

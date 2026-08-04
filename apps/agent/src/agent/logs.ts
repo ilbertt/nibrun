@@ -1,4 +1,4 @@
-import { Cause, Clock, Data, Deferred, type Duration, Effect, Schedule, Stream } from 'effect';
+import { Clock, Data, Deferred, type Duration, Effect, Schedule, Stream } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#agent/backoff.ts';
 import { supervised } from '#agent/loop.ts';
 import { AgentSessionHolder } from '#agent/session.ts';
@@ -25,7 +25,11 @@ const MIN_HEALTHY_MS = 5_000;
 
 class LogStreamEndedEarly extends Data.TaggedError('LogStreamEndedEarly')<{
   readonly elapsedMs: number;
-}> {}
+}> {
+  override get message() {
+    return `the tenant log upload ended after ${this.elapsedMs}ms, well inside its own window`;
+  }
+}
 
 const uploadWindow = Effect.gen(function* () {
   const control = yield* ControlPlane;
@@ -61,11 +65,8 @@ export const logLoop = Effect.gen(function* () {
   const sessions = yield* AgentSessionHolder;
   // Reaching the end of a window is not a failure, so the next upload opens immediately.
   yield* supervised({
-    once: uploadWindow,
-    onFailure: (cause) =>
-      sessions
-        .forgetIfExpired(Cause.squash(cause))
-        .pipe(Effect.andThen(Effect.logWarning('tenant log stream failed', cause))),
+    once: Effect.tapErrorTag(uploadWindow, 'ControlPlaneError', sessions.onExpired),
+    onFailure: (cause) => Effect.logWarning('tenant log stream failed', cause),
     schedule: CONTROL_PLANE_BACKOFF,
   });
 });

@@ -8,7 +8,11 @@ export type SlotRecords = Record<string, number>;
 
 export class SlotExhausted extends Data.TaggedError('SlotExhausted')<{
   readonly limit: number;
-}> {}
+}> {
+  override get message() {
+    return `all ${this.limit} host slots are allocated`;
+  }
+}
 
 type Assignments = ReadonlyMap<AppId, number>;
 

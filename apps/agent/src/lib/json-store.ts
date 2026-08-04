@@ -1,5 +1,6 @@
 import { FileSystem, Path } from '@effect/platform';
 import { Data, Effect, Option } from 'effect';
+import { describe } from '#lib/failure.ts';
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
@@ -8,7 +9,11 @@ const JSON_INDENT = 2;
 export class MalformedJsonError extends Data.TaggedError('MalformedJsonError')<{
   readonly path: string;
   readonly cause: unknown;
-}> {}
+}> {
+  override get message() {
+    return `${this.path} does not hold JSON: ${describe(this.cause)}`;
+  }
+}
 
 export const readJsonFile = (path: string) =>
   Effect.gen(function* () {

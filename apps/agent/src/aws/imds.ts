@@ -1,6 +1,12 @@
-import { HttpClient, HttpClientRequest, type HttpClientResponse } from '@effect/platform';
+import {
+  HttpClient,
+  type HttpClientError,
+  HttpClientRequest,
+  type HttpClientResponse,
+} from '@effect/platform';
 import { type Duration, Effect } from 'effect';
 import { InstanceCredentialsError, parseCredentialsDocument } from '#aws/credentials.ts';
+import { describe } from '#lib/failure.ts';
 
 export const IMDS_BASE_URL = 'http://169.254.169.254';
 const TOKEN_PATH = '/latest/api/token';
@@ -22,7 +28,9 @@ export const fetchInstanceCredentials = Effect.gen(function* () {
     read,
   }: {
     request: HttpClientRequest.HttpClientRequest;
-    read: (response: HttpClientResponse.HttpClientResponse) => Effect.Effect<A, unknown>;
+    read: (
+      response: HttpClientResponse.HttpClientResponse,
+    ) => Effect.Effect<A, HttpClientError.ResponseError>;
   }) =>
     Effect.scoped(Effect.flatMap(http.execute(request), read)).pipe(
       Effect.timeout(REQUEST_TIMEOUT),
@@ -50,9 +58,12 @@ export const fetchInstanceCredentials = Effect.gen(function* () {
   });
   return yield* parseCredentialsDocument(document);
 }).pipe(
-  Effect.mapError((cause) =>
-    cause instanceof InstanceCredentialsError
-      ? cause
-      : new InstanceCredentialsError({ detail: String(cause) }),
-  ),
+  // Named rather than caught by class, so a new way for the request to fail is a compile error
+  // here instead of a `String(cause)` nobody chose.
+  Effect.catchTags({
+    RequestError: (cause) => new InstanceCredentialsError({ detail: describe(cause) }),
+    ResponseError: (cause) => new InstanceCredentialsError({ detail: describe(cause) }),
+    TimeoutException: () =>
+      new InstanceCredentialsError({ detail: 'the metadata endpoint did not answer in time' }),
+  }),
 );

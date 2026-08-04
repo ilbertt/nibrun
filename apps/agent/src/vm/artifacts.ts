@@ -5,6 +5,7 @@ import { s3Credentials } from '#aws/credentials.ts';
 import { AwsCredentialProvider } from '#aws/provider.ts';
 import { AgentConfig } from '#config.ts';
 import { stdoutOf } from '#lib/exec.ts';
+import { describe } from '#lib/failure.ts';
 
 const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
@@ -17,16 +18,28 @@ const CACHE_DIR_MODE = 0o755;
 export class DigestMismatch extends Data.TaggedError('DigestMismatch')<{
   readonly expected: Sha256Digest;
   readonly actual: string;
-}> {}
+}> {
+  override get message() {
+    return `the artifact hashes to ${this.actual}, not to the ${this.expected} it claims`;
+  }
+}
 
 export class ArtifactSizeMismatch extends Data.TaggedError('ArtifactSizeMismatch')<{
   readonly expected: number;
   readonly actual: number;
-}> {}
+}> {
+  override get message() {
+    return `the artifact is ${this.actual} bytes, not the ${this.expected} its manifest declares`;
+  }
+}
 
 export class ArtifactTransferError extends Data.TaggedError('ArtifactTransferError')<{
   readonly cause: unknown;
-}> {}
+}> {
+  override get message() {
+    return `the artifact could not be fetched: ${describe(this.cause)}`;
+  }
+}
 
 export class ArtifactStore extends Context.Tag('ArtifactStore')<
   ArtifactStore,

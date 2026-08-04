@@ -16,6 +16,13 @@ close the log sockets. Nothing stops a tenant VM, which is what keeps redeployin
 `CommandRunner` service over `@effect/platform`'s `Command`. Bun's own S3 client and hasher are
 still used directly, because `@effect/platform` has no equivalent.
 
+**Every failure is a `Data.TaggedError` that renders itself.** Its `get message()` is what a
+report carries to the control plane and from there to whoever is looking at a failed instance, so
+it reads as a sentence and names no value a tenant owns. Callers match on `_tag` — `catchTag`,
+`catchTags`, `tapErrorTag` — never `instanceof`; `describe`/`reportedMessage` in `lib/failure.ts`
+are the only formatters. A plain `Error` crossing in from `@repo/protocol` is tagged at the
+boundary in `lib/protocol.ts` so it can be matched like the rest.
+
 **Tests live in `tests/`, mirroring `src/`**, and everything they share is in `tests/support/`:
 fixtures, the recording `CommandRunner`, the scoped `Bun.serve` harness, and `provided(layer)` —
 the one `Effect.runPromise` a test performs, and the scope its temp directories, servers and

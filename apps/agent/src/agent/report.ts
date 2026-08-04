@@ -1,4 +1,4 @@
-import { Cause, Duration, Effect } from 'effect';
+import { Duration, Effect } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#agent/backoff.ts';
 import { supervised } from '#agent/loop.ts';
 import { AgentSessionHolder } from '#agent/session.ts';
@@ -55,11 +55,8 @@ export const reportLoop = Effect.gen(function* () {
       Effect.flatMap(sessions.pollSettings, (poll) =>
         Effect.sleep(Duration.millis(poll.reportIntervalMs)),
       ),
-    ),
-    onFailure: (cause) =>
-      sessions
-        .forgetIfExpired(Cause.squash(cause))
-        .pipe(Effect.andThen(Effect.logWarning('report failed', cause))),
+    ).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired)),
+    onFailure: (cause) => Effect.logWarning('report failed', cause),
     schedule: CONTROL_PLANE_BACKOFF,
   });
 });

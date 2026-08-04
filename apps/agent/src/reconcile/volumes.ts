@@ -1,6 +1,6 @@
 import type { DesiredVolume, ReportedVolume } from '@repo/protocol';
 import { Effect } from 'effect';
-import { shortMessage } from '#lib/errors.ts';
+import { reportedMessage } from '#lib/failure.ts';
 import type { ObservedState, ReconcilePlan } from '#reconcile/plan.ts';
 import * as State from '#reconcile/state.ts';
 import { toReportedVolume, VolumeManager } from '#volumes/manager.ts';
@@ -16,7 +16,7 @@ const provision = (desired: DesiredVolume) =>
             volumeId: desired.volumeId,
             state: 'failed',
             sizeBytes: desired.sizeBytes,
-            message: shortMessage(error),
+            message: reportedMessage(error),
           } satisfies ReportedVolume),
         ),
       ),

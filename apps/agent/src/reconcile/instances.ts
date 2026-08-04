@@ -4,7 +4,7 @@ import { probeInstance } from '#health/probe.ts';
 import { applyProbe, evaluateInstanceState, initialTracker } from '#health/state.ts';
 import { isReadyToRetry, nextAttemptWindow } from '#lib/backoff.ts';
 import { nowTimestamp } from '#lib/clock.ts';
-import { shortMessage } from '#lib/errors.ts';
+import { reportedMessage } from '#lib/failure.ts';
 import { SlotAllocator } from '#network/allocator.ts';
 import * as State from '#reconcile/state.ts';
 import { type InstanceRecord, newInstanceRecord } from '#report/instance-record.ts';
@@ -152,7 +152,7 @@ export const startInstance = (desired: DesiredInstance) =>
           yield* State.putRecord({
             ...attempted,
             state: 'failed',
-            message: shortMessage(error),
+            message: reportedMessage(error),
           });
           yield* Effect.logError('instance start failed', error).pipe(
             Effect.annotateLogs({

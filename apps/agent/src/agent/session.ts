@@ -1,7 +1,7 @@
 import { type AgentSession, DEFAULT_AGENT_POLL_SETTINGS } from '@repo/protocol';
 import { Clock, Effect, Option, SynchronizedRef } from 'effect';
 import { AgentConfig } from '#config.ts';
-import { ControlPlaneError } from '#control/client.ts';
+import type { ControlPlaneError } from '#control/client.ts';
 import { isSessionExpiring, openSession } from '#control/session.ts';
 import { readHostCapacity } from '#report/capacity.ts';
 import { readHostVersions } from '#report/versions.ts';
@@ -41,10 +41,12 @@ export class AgentSessionHolder extends Effect.Service<AgentSessionHolder>()('Ag
           onSome: (session: AgentSession) => session.poll,
         }),
       ),
-      forgetIfExpired: (error: unknown) =>
-        error instanceof ControlPlaneError && error.isSessionExpired
-          ? SynchronizedRef.set(cached, Option.none())
-          : Effect.void,
+      /**
+       * Attached with `tapErrorTag` where the error channel is concrete, rather than handed a
+       * caller's error as `unknown`: a 401 is in the type of the call that can produce one.
+       */
+      onExpired: (error: ControlPlaneError) =>
+        error.isSessionExpired ? SynchronizedRef.set(cached, Option.none()) : Effect.void,
     };
   }),
 }) {}

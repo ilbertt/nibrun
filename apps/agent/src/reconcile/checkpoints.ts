@@ -1,7 +1,7 @@
 import type { HostDesiredState, ReportedCheckpoint } from '@repo/protocol';
 import { Effect } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
-import { shortMessage } from '#lib/errors.ts';
+import { reportedMessage } from '#lib/failure.ts';
 import type { CheckpointPlan, ReconcilePlan } from '#reconcile/plan.ts';
 import * as State from '#reconcile/state.ts';
 import { ZerofsTopology } from '#volumes/topology.ts';
@@ -41,7 +41,7 @@ const applyOne = (action: Applicable) =>
           checkpointId,
           volumeId,
           state: 'failed',
-          message: shortMessage(error),
+          message: reportedMessage(error),
         } satisfies ReportedCheckpoint),
       ),
     );

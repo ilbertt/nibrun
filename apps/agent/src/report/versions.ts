@@ -5,7 +5,11 @@ import { decode } from '#lib/protocol.ts';
 
 export class MissingVersionsError extends Data.TaggedError('MissingVersionsError')<{
   readonly path: string;
-}> {}
+}> {
+  override get message() {
+    return `the bundle names no versions at ${this.path}`;
+  }
+}
 
 /**
  * The pins CI writes into the bundle, read rather than compiled in, so a report cannot claim a
