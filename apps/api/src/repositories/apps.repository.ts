@@ -24,11 +24,21 @@ export abstract class AppsRepositoryContract {
   abstract listHostnamesByApp(input: OwnedApp): Promise<AppHostnameRow[]>;
   abstract updateConfig(input: OwnedApp & { patch: AppConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: OwnedApp & { state: AppState }): Promise<AppRow | null>;
+  abstract isOwnedBy(input: OwnedApp): Promise<boolean>;
 }
 
 export const PLATFORM_KIND: AppHostnameKind = 'platform';
 
 export class AppsRepository extends Repository implements AppsRepositoryContract {
+  async isOwnedBy({ appId, ownerId }: OwnedApp): Promise<boolean> {
+    const [row] = await this.sql.SelectAppOwnership`
+      SELECT a.id
+      FROM nibrun.apps a
+      WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+    `;
+    return row !== undefined;
+  }
+
   create({
     ownerId,
     slug,
