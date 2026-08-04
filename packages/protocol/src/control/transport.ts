@@ -8,11 +8,12 @@ import { HostDesiredStateSchema } from '#control/desired-state.ts';
  * during every rollout. This is what lets the older side say so, instead of failing somewhere
  * further in where the cause is no longer visible.
  *
- * 2 dropped `waitSeconds`, `maxWaitSeconds` and the report's reply. A v1 agent requires the two
- * it no longer receives and reads a body that is no longer sent, so the skew has to be refused
- * here rather than surface as a validation error against a response that is merely newer.
+ * Still 1 while the first version is being shaped. Both sides ship from this repo and nothing
+ * outside it speaks this protocol, so a break is a deploy rather than a migration, and bumping
+ * on each one would only turn this into a changelog of churn. It starts moving when something
+ * we do not deploy depends on the shape.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 1;
 
 export const PROTOCOL_VERSION_HEADER = 'x-nibrun-protocol-version';
 
@@ -34,10 +35,12 @@ export const AGENT_ROUTES = {
 /**
  * What the host already has, so the control plane can answer `unchanged` rather than resend it.
  *
- * There is deliberately no `waitSeconds`. A long poll needs something able to wake it, and
- * desired state is not yet read from anywhere that can change — a held request would register a
- * waiter nothing could ever notify, which is a slower answer bought with a sleeping connection.
- * It belongs here alongside the `LISTEN`/`NOTIFY` that makes a change observable, and not before.
+ * No `waitSeconds` yet, which is a deferral rather than a decision against long-polling. Holding
+ * the request is what stops notice-latency and request rate being the same dial — `minIntervalMs`
+ * is currently both, so buying a faster deploy means paying for it in polls from every host. What
+ * it needs is something able to wake a held request, so it arrives with the `NOTIFY` beside the
+ * write that changes desired state, and not before: until then it would register a waiter nothing
+ * exists to notify.
  */
 export const DesiredStateRequestSchema = Type.Object({
   knownGeneration: Type.Integer({ minimum: 0 }),
