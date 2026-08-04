@@ -18,6 +18,7 @@
     "apps/agent": {
       "name": "@repo/agent",
       "dependencies": {
+        "@repo/api-client": "workspace:*",
         "@repo/protocol": "workspace:*",
       },
       "devDependencies": {

@@ -5,11 +5,14 @@ plane, long-polls for desired state, converges the host onto it, and reports wha
 is never sent a command. Every decision behind that is commented at the definition it applies to —
 read `reconcile/`, `volumes/topology.ts` and `network/allocator.ts` first.
 
-**No third-party dependencies, deliberately.** Bun's built-ins cover HTTP, S3, hashing, process
-spawning and file I/O, and `@repo/protocol` is the only import. That is what keeps the binary small
-and its supply chain trivial, and it is why everything the host does that Bun cannot do is a
-subprocess (`systemctl`, `ip`, `nft`, `nbd-client`, `mkfs.ext4`, `mksquashfs`, `zerofs`) rather
-than a library. Adding a dependency needs a reason that survives that trade.
+**Everything the host does that Bun cannot do is a subprocess** (`systemctl`, `ip`, `nft`,
+`nbd-client`, `mkfs.ext4`, `mksquashfs`, `zerofs`) rather than a library. Bun's built-ins cover S3,
+hashing, process spawning and file I/O, so the binary stays small.
+
+The control plane is reached through `@repo/api-client/internal`, and every call goes through it,
+so a route the api does not mount is a compile error. What it cannot describe is the bytes that
+come back, so `control/client.ts` still validates every response against `@repo/protocol` before
+believing it.
 
 ## What the host must provide, and does not yet
 
