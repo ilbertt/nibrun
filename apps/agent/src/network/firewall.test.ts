@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { GuestPort, HostPort, Ipv4Address } from '@repo/protocol';
 import {
   type FirewallState,
-  INSTANCE_METADATA_ADDRESS,
+  INSTANCE_METADATA_ADDRESS_V4,
   INSTANCE_METADATA_ADDRESS_V6,
   NFTABLES_TABLE,
   renderRuleset,
@@ -39,7 +39,7 @@ const dropsFrom = (ruleset: string) =>
 describe('the three isolation rules are never optional', () => {
   test('guests cannot reach the instance metadata endpoint, with no instances configured', () => {
     const drops = dropsFrom(renderRuleset(state()));
-    expect(drops.some((line) => line.includes(INSTANCE_METADATA_ADDRESS))).toBe(true);
+    expect(drops.some((line) => line.includes(INSTANCE_METADATA_ADDRESS_V4))).toBe(true);
   });
 
   test('guests cannot reach each other', () => {

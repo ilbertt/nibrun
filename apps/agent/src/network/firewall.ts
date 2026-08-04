@@ -4,7 +4,7 @@ import { GUEST_NETWORK_CIDR, TAP_NAME_PREFIX } from '#network/allocator.ts';
 export const NFTABLES_TABLE = 'nibrun';
 const TAP_MATCH = `"${TAP_NAME_PREFIX}*"`;
 
-export const INSTANCE_METADATA_ADDRESS = '169.254.169.254';
+export const INSTANCE_METADATA_ADDRESS_V4 = '169.254.169.254';
 export const INSTANCE_METADATA_ADDRESS_V6 = 'fd00:ec2::254';
 
 const DNS_PORT = 53;
@@ -15,7 +15,7 @@ const OUTPUT_NAT_PRIORITY = -100;
 // The blanket rule that makes the three isolation guarantees hold even for a destination
 // nobody thought to enumerate. Every one of these is somewhere a tenant has no business
 // reaching from inside a microVM.
-const PRIVATE_DESTINATIONS = [
+const PRIVATE_DESTINATIONS_V4 = [
   '10.0.0.0/8',
   '172.16.0.0/12',
   '192.168.0.0/16',
@@ -73,11 +73,11 @@ export function renderRuleset(state: FirewallState): string {
     `delete table ip ${NFTABLES_TABLE}`,
     '',
     `table ip ${NFTABLES_TABLE} {`,
-    ...forwardChain(state),
+    ...forwardChainV4(state),
     '',
-    ...inputChain(state),
+    ...inputChainV4(state),
     '',
-    ...natChains(state),
+    ...natChainsV4(state),
     '}',
     '',
     `table ip6 ${NFTABLES_TABLE}`,
@@ -92,7 +92,7 @@ export function renderRuleset(state: FirewallState): string {
   return `${lines.join('\n')}\n`;
 }
 
-function forwardChain({ controlPlaneCidrsV4, guestDnsServers }: FirewallState): string[] {
+function forwardChainV4({ controlPlaneCidrsV4, guestDnsServers }: FirewallState): string[] {
   return chain({
     header: 'forward {',
     rules: [
@@ -102,20 +102,20 @@ function forwardChain({ controlPlaneCidrsV4, guestDnsServers }: FirewallState): 
         `iifname ${TAP_MATCH} ip daddr ${server} udp dport ${DNS_PORT} accept`,
         `iifname ${TAP_MATCH} ip daddr ${server} tcp dport ${DNS_PORT} accept`,
       ]),
-      `iifname ${TAP_MATCH} ip daddr ${INSTANCE_METADATA_ADDRESS} drop comment "instance metadata endpoint"`,
+      `iifname ${TAP_MATCH} ip daddr ${INSTANCE_METADATA_ADDRESS_V4} drop comment "instance metadata endpoint"`,
       `iifname ${TAP_MATCH} oifname ${TAP_MATCH} drop comment "guest to guest"`,
       `iifname ${TAP_MATCH} ip daddr ${GUEST_NETWORK_CIDR} drop comment "guest to guest"`,
       ...controlPlaneCidrsV4.map(
         (cidr) => `iifname ${TAP_MATCH} ip daddr ${cidr} drop comment "control plane"`,
       ),
-      `iifname ${TAP_MATCH} ip daddr ${set(PRIVATE_DESTINATIONS)} drop comment "private destinations"`,
+      `iifname ${TAP_MATCH} ip daddr ${set(PRIVATE_DESTINATIONS_V4)} drop comment "private destinations"`,
     ],
   });
 }
 
 // Traffic from a guest to the host's own tap address never reaches the forward hook, so the
 // three isolation rules would leave every service listening on the host exposed to tenants.
-function inputChain({ guestDnsServers }: FirewallState): string[] {
+function inputChainV4({ guestDnsServers }: FirewallState): string[] {
   return chain({
     header: 'input {',
     rules: [
@@ -166,7 +166,7 @@ function inputChainV6(): string[] {
   });
 }
 
-function natChains({ instances }: FirewallState): string[] {
+function natChainsV4({ instances }: FirewallState): string[] {
   return [
     ...chain({
       header: 'prerouting {',
