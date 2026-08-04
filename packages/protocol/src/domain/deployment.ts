@@ -4,14 +4,7 @@ import { AppIdSchema, ArtifactIdSchema, DeploymentIdSchema } from '#domain/ident
 import { stringEnum } from '#lib/string-enum.ts';
 import { TimestampSchema } from '#lib/wire.ts';
 
-export const DEPLOYMENT_STATES = [
-  'pending',
-  'starting',
-  'active',
-  'superseded',
-  'failed',
-  'cancelled',
-] as const;
+export const DEPLOYMENT_STATES = ['pending', 'starting', 'active', 'superseded', 'failed'] as const;
 
 export const DeploymentStateSchema = stringEnum(DEPLOYMENT_STATES);
 
@@ -25,6 +18,10 @@ export const DeploymentSchema = Type.Object({
   state: DeploymentStateSchema,
   createdAt: TimestampSchema,
   activatedAt: Type.Optional(TimestampSchema),
+  // Present when this deployment was made by going back to an older one, naming the one it
+  // replays. A rollback is a new deployment rather than an old one revived, so this is what
+  // says a release happened twice.
+  rollbackOf: Type.Optional(DeploymentIdSchema),
 });
 
 export type Deployment = typeof DeploymentSchema.static;

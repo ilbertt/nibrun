@@ -235,6 +235,111 @@ export interface ISelectArtifactByIdResult {
     created_at: Date;
 }
 
+/** Result of query `SelectDeployableArtifact`. */
+export interface ISelectDeployableArtifactResult {
+    id: import("@repo/protocol").ArtifactId;
+}
+
+/** Result of query `InsertDeployment`. */
+export interface IInsertDeploymentResult {
+    id: import("@repo/protocol").DeploymentId;
+}
+
+/** Result of query `SelectDeploymentToReplay`. */
+export interface ISelectDeploymentToReplayResult {
+    id: import("@repo/protocol").DeploymentId;
+}
+
+/** Result of query `InsertReplayedDeployment`. */
+export interface IInsertReplayedDeploymentResult {
+    id: import("@repo/protocol").DeploymentId;
+}
+
+/** Result of query `SelectDeploymentsByApp`. */
+export interface ISelectDeploymentsByAppResult {
+    id: import("@repo/protocol").DeploymentId;
+    app_id: import("@repo/protocol").AppId;
+    artifact_id: import("@repo/protocol").ArtifactId;
+    state: import("@repo/protocol").DeploymentState;
+    activated_at: Date | null;
+    /** The deployment this one replays, when it was made to go back to one. */
+    rollback_of_deployment_id: import("@repo/protocol").DeploymentId | null;
+    created_at: Date;
+    guest_port: import("@repo/protocol").GuestPort;
+    args: string[];
+    vcpu_count: number;
+    memory_mib: number;
+    health_check_path: string | null;
+    health_check_interval_ms: number;
+    health_check_timeout_ms: number;
+    health_check_grace_period_ms: number;
+    health_check_healthy_threshold: number;
+    health_check_unhealthy_threshold: number;
+    restart_max_restarts: number;
+    restart_initial_backoff_ms: number;
+    restart_max_backoff_ms: number;
+    restart_backoff_factor: number;
+    restart_reset_after_ms: number;
+}
+
+/** Result of query `SelectDeploymentById`. */
+export interface ISelectDeploymentByIdResult {
+    id: import("@repo/protocol").DeploymentId;
+    app_id: import("@repo/protocol").AppId;
+    artifact_id: import("@repo/protocol").ArtifactId;
+    state: import("@repo/protocol").DeploymentState;
+    activated_at: Date | null;
+    /** The deployment this one replays, when it was made to go back to one. */
+    rollback_of_deployment_id: import("@repo/protocol").DeploymentId | null;
+    created_at: Date;
+    guest_port: import("@repo/protocol").GuestPort;
+    args: string[];
+    vcpu_count: number;
+    memory_mib: number;
+    health_check_path: string | null;
+    health_check_interval_ms: number;
+    health_check_timeout_ms: number;
+    health_check_grace_period_ms: number;
+    health_check_healthy_threshold: number;
+    health_check_unhealthy_threshold: number;
+    restart_max_restarts: number;
+    restart_initial_backoff_ms: number;
+    restart_max_backoff_ms: number;
+    restart_backoff_factor: number;
+    restart_reset_after_ms: number;
+}
+
+/** Result of query `SupersedeLiveDeployment`. */
+export interface ISupersedeLiveDeploymentResult {
+}
+
+/** Result of query `SelectInsertedDeployment`. */
+export interface ISelectInsertedDeploymentResult {
+    id: import("@repo/protocol").DeploymentId;
+    app_id: import("@repo/protocol").AppId;
+    artifact_id: import("@repo/protocol").ArtifactId;
+    state: import("@repo/protocol").DeploymentState;
+    activated_at: Date | null;
+    /** The deployment this one replays, when it was made to go back to one. */
+    rollback_of_deployment_id: import("@repo/protocol").DeploymentId | null;
+    created_at: Date;
+    guest_port: import("@repo/protocol").GuestPort;
+    args: string[];
+    vcpu_count: number;
+    memory_mib: number;
+    health_check_path: string | null;
+    health_check_interval_ms: number;
+    health_check_timeout_ms: number;
+    health_check_grace_period_ms: number;
+    health_check_healthy_threshold: number;
+    health_check_unhealthy_threshold: number;
+    restart_max_restarts: number;
+    restart_initial_backoff_ms: number;
+    restart_max_backoff_ms: number;
+    restart_backoff_factor: number;
+    restart_reset_after_ms: number;
+}
+
 /** Result of query `SelectHealthPing`. */
 export interface ISelectHealthPingResult {
     ok: number | null;
@@ -259,6 +364,14 @@ export interface Queries {
     InsertArtifact: IInsertArtifactResult;
     SelectArtifactsByApp: ISelectArtifactsByAppResult;
     SelectArtifactById: ISelectArtifactByIdResult;
+    SelectDeployableArtifact: ISelectDeployableArtifactResult;
+    InsertDeployment: IInsertDeploymentResult;
+    SelectDeploymentToReplay: ISelectDeploymentToReplayResult;
+    InsertReplayedDeployment: IInsertReplayedDeploymentResult;
+    SelectDeploymentsByApp: ISelectDeploymentsByAppResult;
+    SelectDeploymentById: ISelectDeploymentByIdResult;
+    SupersedeLiveDeployment: ISupersedeLiveDeploymentResult;
+    SelectInsertedDeployment: ISelectInsertedDeploymentResult;
     SelectHealthPing: ISelectHealthPingResult;
 }
 
