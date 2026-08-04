@@ -44,5 +44,11 @@ LockPersonality=true
 # the data volume rather than under CacheDirectory.
 ReadWritePaths=/data/zerofs
 
+# What this unit is called in the log store. journald attaches this to every
+# entry the unit writes, and systemd requires the field name to be uppercase —
+# which is why the agent spells it the same way on tenant output. One `SOURCE`
+# then answers "which service wrote this" for everything on the fleet.
+LogExtraFields=SOURCE=zerofs
+
 [Install]
 WantedBy=multi-user.target

@@ -40,3 +40,9 @@ TimeoutStopSec=30
 # down cleanly first. That is survivable only because the agent flushes ZeroFS
 # before stopping a VM, which is the step that turns acknowledged writes durable
 # when `ignore_fsync` has made the guest's own fsync a no-op.
+
+# What this unit is called in the log store. journald attaches this to every
+# entry the unit writes, and systemd requires the field name to be uppercase —
+# which is why the agent spells it the same way on tenant output. One `SOURCE`
+# then answers "which service wrote this" for everything on the fleet.
+LogExtraFields=SOURCE=firecracker

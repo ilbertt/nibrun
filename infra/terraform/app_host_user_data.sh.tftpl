@@ -14,16 +14,21 @@ dnf update -y
 # No Docker: everything this host runs is a versioned binary the deploy fetches
 # from S3 and starts under systemd.
 #
-#   unzip           the deploy installs the AWS CLI with it
-#   fuse3           ZeroFS serves the host's own view over 9P through a FUSE client
-#   nftables        guest isolation and the forward to a tenant's port
-#   nbd             attaches a tenant's disk, which ZeroFS serves over NBD
-#   squashfs-tools  builds the read-only config drive handed to a microVM
+#   unzip                   the deploy installs the AWS CLI with it
+#   fuse3                   ZeroFS serves the host's own view over 9P through a FUSE client
+#   nftables                guest isolation and the forward to a tenant's port
+#   nbd                     attaches a tenant's disk, which ZeroFS serves over NBD
+#   squashfs-tools          builds the read-only config drive handed to a microVM
+#   systemd-journal-remote  ships this host's journal to the log store
 #
 # The agent runs none of these until it has work, so a missing one surfaces when
 # an app is placed here rather than at boot — hence installing them together, up
 # front, rather than discovering them one replaced instance at a time.
-dnf install -y unzip fuse3 nftables nbd squashfs-tools
+#
+# systemd-journal-remote is the exception: it carries systemd-journal-upload,
+# which the deploy points at the log store. Part of systemd rather than a binary
+# of its own, so nothing here has to be pinned, fetched or kept current.
+dnf install -y unzip fuse3 nftables nbd squashfs-tools systemd-journal-remote
 
 # Not guaranteed on minimal AL2023, and the deploy script needs it.
 if ! command -v aws >/dev/null 2>&1; then
