@@ -47,8 +47,8 @@ variable "app_host_data_volume_size" {
 
 variable "export_retention_days" {
   type        = number
-  default     = 1
-  description = "How long a downloadable export survives. A security bound rather than a retention policy: the bundle carries the tenant's environment variables and their whole dataset. S3 lifecycle expiry runs daily, so 1 is the smallest meaningful value."
+  default     = 7
+  description = "How long a downloadable export survives before S3 deletes it. A security bound rather than a retention policy: the bundle carries the tenant's environment variables and their whole dataset. Expiry is evaluated in a daily batch, so this is a floor and not a timer — an object lives at least this long and is removed some hours after. 1 is the smallest meaningful value."
 }
 
 variable "internal_port" {
