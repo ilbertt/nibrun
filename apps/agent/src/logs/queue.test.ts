@@ -28,6 +28,18 @@ describe('the bounded upload queue', () => {
     await reader.cancel();
   });
 
+  // A host whose apps are quiet still has to hold the request open, and every timeout between
+  // here and the control plane counts silence as a dead connection.
+  test('a keepalive is an empty line, so it carries no event', async () => {
+    const queue = new TenantLogQueue({ maxBytes: 4096 });
+    expect(queue.keepalive()).toBe(true);
+
+    const reader = queue.readable().getReader();
+    const result = await reader.read();
+    expect(new TextDecoder().decode(result.value)).toBe('\n');
+    await reader.cancel();
+  });
+
   test('it refuses growth past its byte limit instead of blocking the producer', () => {
     const queue = new TenantLogQueue({ maxBytes: 1 });
     expect(queue.push(event())).toBe(false);

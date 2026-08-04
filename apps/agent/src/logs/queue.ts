@@ -28,7 +28,24 @@ export class TenantLogQueue {
     const chunk = new Uint8Array(json.byteLength + NEWLINE.byteLength);
     chunk.set(json);
     chunk.set(NEWLINE, json.byteLength);
+    return this.#offer(chunk);
+  }
 
+  /**
+   * An empty line: NDJSON framing carrying no event, which the control plane skips.
+   *
+   * A host whose apps are quiet sends nothing for as long as they stay quiet, and every timeout
+   * between here and the control plane reads that silence as a dead connection. This is what
+   * makes the request outlive the tenant's own talkativeness.
+   */
+  keepalive(): boolean {
+    if (this.#closed) {
+      return false;
+    }
+    return this.#offer(NEWLINE);
+  }
+
+  #offer(chunk: Uint8Array): boolean {
     if (this.#waiting) {
       const waiting = this.#waiting;
       this.#waiting = undefined;
