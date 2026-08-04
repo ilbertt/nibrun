@@ -239,7 +239,7 @@ test('a fully populated desired state round-trips through JSON', () => {
 });
 
 test('the poll settings the control plane hands out are themselves valid', () => {
-  expect(DEFAULT_AGENT_POLL_SETTINGS.maxWaitSeconds).toBeGreaterThan(0);
+  expect(DEFAULT_AGENT_POLL_SETTINGS.minIntervalMs).toBeGreaterThan(0);
   expect(DEFAULT_AGENT_POLL_SETTINGS.minIntervalMs).toBeLessThan(
     DEFAULT_AGENT_POLL_SETTINGS.reportIntervalMs,
   );

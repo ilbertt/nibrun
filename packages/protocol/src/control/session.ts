@@ -4,21 +4,14 @@ import { HostIdSchema } from '#domain/identifiers.ts';
 import { SecretStringSchema } from '#lib/secret.ts';
 import { TimestampSchema } from '#lib/wire.ts';
 
-const MIN_POLL_WAIT_SECONDS = 1;
-const MAX_POLL_WAIT_SECONDS = 300;
 const MIN_POLL_INTERVAL_MS = 100;
 
 /**
  * How often the agent should come back. The control plane sets these rather than the agent, so
- * a fleet can be backed off without redeploying it.
+ * a fleet can be backed off without redeploying it — which is the whole of the rate control
+ * while desired state is answered immediately.
  */
 export const AgentPollSettingsSchema = Type.Object({
-  // How long the control plane will hold a desired-state request open before answering
-  // `unchanged`.
-  maxWaitSeconds: Type.Integer({
-    minimum: MIN_POLL_WAIT_SECONDS,
-    maximum: MAX_POLL_WAIT_SECONDS,
-  }),
   // Floor between two desired-state requests, so a control plane answering instantly cannot be
   // hammered by its own fleet.
   minIntervalMs: Type.Integer({ minimum: MIN_POLL_INTERVAL_MS }),
@@ -27,12 +20,10 @@ export const AgentPollSettingsSchema = Type.Object({
 
 export type AgentPollSettings = typeof AgentPollSettingsSchema.static;
 
-const DEFAULT_MAX_WAIT_SECONDS = 30;
 const DEFAULT_MIN_INTERVAL_MS = 1_000;
 const DEFAULT_REPORT_INTERVAL_MS = 15_000;
 
 export const DEFAULT_AGENT_POLL_SETTINGS: AgentPollSettings = {
-  maxWaitSeconds: DEFAULT_MAX_WAIT_SECONDS,
   minIntervalMs: DEFAULT_MIN_INTERVAL_MS,
   reportIntervalMs: DEFAULT_REPORT_INTERVAL_MS,
 };

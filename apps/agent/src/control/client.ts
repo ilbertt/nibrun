@@ -11,13 +11,9 @@ import {
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
   parseMessage,
-  type ReportedStateResponse,
-  ReportedStateResponseSchema,
   type SecretString,
 } from '@repo/protocol';
 
-const POLL_TIMEOUT_MARGIN_MS = 10_000;
-const MS_PER_SECOND = 1_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const HTTP_UNAUTHORIZED = 401;
 
@@ -54,12 +50,11 @@ export class ControlPlaneClient {
   }
 
   async openSession(request: AgentSessionRequest): Promise<AgentSession> {
-    const body = await this.#post({
+    const response = await this.#post({
       route: AGENT_ROUTES.session,
       body: request,
-      timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     });
-    return parseMessage({ schema: AgentSessionSchema, value: body });
+    return parseMessage({ schema: AgentSessionSchema, value: await response.json() });
   }
 
   async fetchDesiredState({
@@ -69,13 +64,12 @@ export class ControlPlaneClient {
     sessionToken: SecretString;
     request: DesiredStateRequest;
   }): Promise<DesiredStateResponse> {
-    const body = await this.#post({
+    const response = await this.#post({
       route: AGENT_ROUTES.desiredState,
       body: request,
       sessionToken,
-      timeoutMs: request.waitSeconds * MS_PER_SECOND + POLL_TIMEOUT_MARGIN_MS,
     });
-    return parseMessage({ schema: DesiredStateResponseSchema, value: body });
+    return parseMessage({ schema: DesiredStateResponseSchema, value: await response.json() });
   }
 
   async sendReportedState({
@@ -84,27 +78,23 @@ export class ControlPlaneClient {
   }: {
     sessionToken: SecretString;
     report: HostReportedState;
-  }): Promise<ReportedStateResponse> {
-    const body = await this.#post({
+  }): Promise<void> {
+    await this.#post({
       route: AGENT_ROUTES.reportedState,
       body: report,
       sessionToken,
-      timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
     });
-    return parseMessage({ schema: ReportedStateResponseSchema, value: body });
   }
 
   async #post({
     route,
     body,
     sessionToken,
-    timeoutMs,
   }: {
     route: string;
     body: unknown;
     sessionToken?: SecretString;
-    timeoutMs: number;
-  }): Promise<unknown> {
+  }): Promise<Response> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       [PROTOCOL_VERSION_HEADER]: String(PROTOCOL_VERSION),
@@ -116,7 +106,7 @@ export class ControlPlaneClient {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: AbortSignal.timeout(DEFAULT_REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) {
       throw new ControlPlaneError({
@@ -125,6 +115,6 @@ export class ControlPlaneClient {
         body: await response.text(),
       });
     }
-    return response.json();
+    return response;
   }
 }

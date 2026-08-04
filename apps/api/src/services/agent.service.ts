@@ -69,7 +69,7 @@ export class AgentService extends Service {
     return this.agentRepo.desiredState({ hostId });
   }
 
-  async acceptReport({ reported }: { reported: HostReportedState }): Promise<number> {
+  async acceptReport({ reported }: { reported: HostReportedState }): Promise<void> {
     this.logger.info('host reported', {
       hostId: reported.hostId,
       state: reported.state,
@@ -78,8 +78,5 @@ export class AgentService extends Service {
       volumes: reported.volumes.length,
     });
     await this.agentRepo.saveReportedState({ reported });
-
-    const desired = await this.agentRepo.desiredState({ hostId: reported.hostId });
-    return desired.generation;
   }
 }

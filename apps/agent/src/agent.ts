@@ -168,10 +168,7 @@ export class Agent {
         const session = await this.#ensureSession();
         const response = await this.#client.fetchDesiredState({
           sessionToken: session.sessionToken,
-          request: {
-            knownGeneration: this.#knownGeneration,
-            waitSeconds: session.poll.maxWaitSeconds,
-          },
+          request: { knownGeneration: this.#knownGeneration },
         });
         failures = NO_FAILURES;
         if (response.result === 'changed') {
@@ -252,16 +249,7 @@ export class Agent {
       checkpoints: this.#reconciler.checkpointReports(),
       exports: this.#reconciler.exportReports(),
     });
-    const response = await this.#client.sendReportedState({
-      sessionToken: session.sessionToken,
-      report,
-    });
-    if (response.generation !== this.#knownGeneration) {
-      logger.debug({
-        message: 'control plane has newer desired state',
-        generation: response.generation,
-      });
-    }
+    await this.#client.sendReportedState({ sessionToken: session.sessionToken, report });
   }
 
   #hostState(): HostState {

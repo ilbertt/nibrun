@@ -3,6 +3,7 @@ import {
   AGENT_API_PREFIX,
   AGENT_ROUTES,
   type HostId,
+  type HostReportedState,
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
   ProtocolValidationError,
@@ -12,6 +13,7 @@ import { ControlPlaneClient, ControlPlaneError } from '#control/client.ts';
 
 const BASE_URL = 'https://control.example';
 const HTTP_OK = 200;
+const HTTP_NO_CONTENT = 204;
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_UNAVAILABLE = 503;
 const SOME_GENERATION = 4;
@@ -21,17 +23,17 @@ const VALID_SESSION = {
   hostId: 'host-1',
   sessionToken: 'granted',
   expiresAt: '2026-08-03T11:00:00Z',
-  poll: { maxWaitSeconds: 30, minIntervalMs: 1_000, reportIntervalMs: 15_000 },
+  poll: { minIntervalMs: 1_000, reportIntervalMs: 15_000 },
 };
 
-const respondWith = ({ body, status = HTTP_OK }: { body: unknown; status?: number }) => {
+function respondWith({ body, status = HTTP_OK }: { body: unknown; status?: number }) {
   const calls: { url: string; init: RequestInit }[] = [];
   const fetchImpl = ((...args: [string, RequestInit]) => {
     calls.push({ url: args[0], init: args[1] });
     return Promise.resolve(new Response(JSON.stringify(body), { status }));
   }) as unknown as typeof fetch;
   return { calls, fetchImpl };
-};
+}
 
 describe('every request identifies the protocol it speaks', () => {
   test('the version header and the session are sent', async () => {
@@ -41,7 +43,7 @@ describe('every request identifies the protocol it speaks', () => {
     const client = new ControlPlaneClient({ baseUrl: `${BASE_URL}/`, fetchImpl });
     await client.fetchDesiredState({
       sessionToken: SESSION_TOKEN,
-      request: { knownGeneration: SOME_GENERATION, waitSeconds: 1 },
+      request: { knownGeneration: SOME_GENERATION },
     });
     const call = calls[0];
     expect(call?.url).toBe(`${BASE_URL}${AGENT_API_PREFIX}${AGENT_ROUTES.desiredState}`);
@@ -61,6 +63,21 @@ describe('every request identifies the protocol it speaks', () => {
     expect(session.hostId).toBe('host-1' as HostId);
     const sessionHeaders = calls[0]?.init.headers as Record<string, string> | undefined;
     expect(sessionHeaders?.authorization).toBeUndefined();
+  });
+
+  // The report is the one route that answers with nothing, so it is the one route where reaching
+  // for a body would throw on the success path rather than on a malformed one.
+  test('a report expects no reply and does not read for one', async () => {
+    const fetchImpl = (() =>
+      Promise.resolve(new Response(null, { status: HTTP_NO_CONTENT }))) as unknown as typeof fetch;
+    const client = new ControlPlaneClient({ baseUrl: BASE_URL, fetchImpl });
+
+    expect(
+      await client.sendReportedState({
+        sessionToken: SESSION_TOKEN,
+        report: {} as unknown as HostReportedState,
+      }),
+    ).toBeUndefined();
   });
 });
 
@@ -82,7 +99,7 @@ describe('validation at the boundary', () => {
     await expect(
       client.fetchDesiredState({
         sessionToken: SESSION_TOKEN,
-        request: { knownGeneration: 0, waitSeconds: 0 },
+        request: { knownGeneration: 0 },
       }),
     ).rejects.toThrow(ProtocolValidationError);
   });
@@ -120,7 +137,7 @@ describe('errors', () => {
     const error = await client
       .fetchDesiredState({
         sessionToken: SESSION_TOKEN,
-        request: { knownGeneration: 0, waitSeconds: 0 },
+        request: { knownGeneration: 0 },
       })
       .catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ControlPlaneError);
@@ -133,7 +150,7 @@ describe('errors', () => {
     const error = await client
       .fetchDesiredState({
         sessionToken: SESSION_TOKEN,
-        request: { knownGeneration: 0, waitSeconds: 0 },
+        request: { knownGeneration: 0 },
       })
       .catch((caught: unknown) => caught);
     expect((error as ControlPlaneError).isSessionExpired).toBe(false);

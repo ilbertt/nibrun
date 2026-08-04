@@ -50,8 +50,6 @@ export {
   DesiredStateResponseSchema,
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
-  type ReportedStateResponse,
-  ReportedStateResponseSchema,
 } from '#control/transport.ts';
 export {
   APP_HOSTNAME_KINDS,
