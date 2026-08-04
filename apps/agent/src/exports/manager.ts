@@ -13,17 +13,20 @@ const UPLOAD_PART_SIZE_BYTES = 8_388_608;
 const UPLOAD_QUEUE_SIZE = 4;
 const UPLOAD_RETRIES = 3;
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
+function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
 
 // Structural rather than schema-driven, for the same reason as `readInstanceRecords`: this is
 // the agent's own note of what it wrote, not a message from another program. A record that
 // cannot be read back is dropped, which costs one re-written bundle rather than a failed start.
-const isReportedExport = (value: unknown): value is ReportedExport =>
-  isObject(value) && typeof value.exportId === 'string' && typeof value.state === 'string';
+function isReportedExport(value: unknown): value is ReportedExport {
+  return isObject(value) && typeof value.exportId === 'string' && typeof value.state === 'string';
+}
 
-export const readExportReports = (value: unknown): ReportedExport[] =>
-  Array.isArray(value) ? value.filter(isReportedExport) : [];
+export function readExportReports(value: unknown): ReportedExport[] {
+  return Array.isArray(value) ? value.filter(isReportedExport) : [];
+}
 
 export type ExportManagerOptions = {
   runner: CommandRunner;
