@@ -43,7 +43,12 @@ const NO_GENERATION = 0;
 const ONE_RESTART = 1;
 const MAX_MESSAGE_LENGTH = 512;
 
-const UNKNOWN_UNIT: UnitStatus = { loaded: false, active: false, failed: false };
+const UNKNOWN_UNIT: UnitStatus = {
+  loaded: false,
+  active: false,
+  failed: false,
+  startedThisBoot: false,
+};
 
 export type ReconcilerOptions = {
   config: AgentConfig;
@@ -144,7 +149,15 @@ export class Reconciler {
         ...(record ? { deploymentId: record.deploymentId } : {}),
         present: status.loaded || record !== undefined,
         running: status.active,
-        exited: !status.active && record?.startedAt !== undefined && !record.stopRequested,
+        // `startedThisBoot` is what keeps a reboot out of this. The record survives on disk, so
+        // after a reboot every instance still looks like one this agent started and nobody asked
+        // to stop — which read as `exited`, and an exited instance is deliberately left alone.
+        // The host would come back with its VMs down and nothing to bring them up.
+        exited:
+          !status.active &&
+          status.startedThisBoot &&
+          record?.startedAt !== undefined &&
+          !record.stopRequested,
       };
     });
 

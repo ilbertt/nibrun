@@ -70,8 +70,19 @@ describe('unit status', () => {
 
   test('a failed unit is loaded, not active, and failed', () => {
     expect(
-      unitStatusFrom({ LoadState: 'loaded', ActiveState: 'failed', ExecMainStatus: '1' }),
-    ).toEqual({ loaded: true, active: false, failed: true, exitCode: 1 });
+      unitStatusFrom({
+        LoadState: 'loaded',
+        ActiveState: 'failed',
+        ExecMainStatus: '1',
+        InactiveExitTimestampMonotonic: '6648500594',
+      }),
+    ).toEqual({
+      loaded: true,
+      active: false,
+      failed: true,
+      startedThisBoot: true,
+      exitCode: 1,
+    });
   });
 
   test('a unit systemd has never heard of is neither loaded nor active', () => {
@@ -79,7 +90,36 @@ describe('unit status', () => {
       loaded: false,
       active: false,
       failed: false,
+      startedThisBoot: false,
     });
+  });
+
+  // systemd answers `inactive` both for a VM that ran and stopped and for one that has not
+  // existed since the host booted. Only the monotonic clock separates them, and reading the
+  // second as the first is what would leave every VM down after a reboot.
+  test('a unit that has not run since boot is told apart from one that ran and stopped', () => {
+    const neverRan = unitStatusFrom({
+      LoadState: 'loaded',
+      ActiveState: 'inactive',
+      SubState: 'dead',
+      InactiveExitTimestampMonotonic: '0',
+    });
+    const ranAndStopped = unitStatusFrom({
+      LoadState: 'loaded',
+      ActiveState: 'inactive',
+      SubState: 'dead',
+      InactiveExitTimestampMonotonic: '6648500594',
+    });
+
+    expect(neverRan.active).toBe(ranAndStopped.active);
+    expect(neverRan.startedThisBoot).toBe(false);
+    expect(ranAndStopped.startedThisBoot).toBe(true);
+  });
+
+  test('a unit systemd reports no start timestamp for has not run this boot', () => {
+    expect(unitStatusFrom({ LoadState: 'loaded', ActiveState: 'inactive' }).startedThisBoot).toBe(
+      false,
+    );
   });
 
   test('a missing exit code is absent rather than zero', () => {

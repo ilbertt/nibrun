@@ -12,10 +12,27 @@ const PAST_GRACE_MS = STARTED_AT_MS + GRACE_MS + 1;
 const UNHEALTHY_RUN = DEFAULT_HEALTH_CHECK.unhealthyThreshold;
 const TWO_SUCCESSES = 2;
 
-const active: UnitStatus = { loaded: true, active: true, failed: false };
-const exited: UnitStatus = { loaded: true, active: false, failed: false, exitCode: 0 };
-const crashed: UnitStatus = { loaded: true, active: false, failed: true, exitCode: 1 };
-const absent: UnitStatus = { loaded: false, active: false, failed: false };
+const active: UnitStatus = { loaded: true, active: true, failed: false, startedThisBoot: true };
+const exited: UnitStatus = {
+  loaded: true,
+  active: false,
+  failed: false,
+  startedThisBoot: true,
+  exitCode: 0,
+};
+const crashed: UnitStatus = {
+  loaded: true,
+  active: false,
+  failed: true,
+  startedThisBoot: true,
+  exitCode: 1,
+};
+const absent: UnitStatus = {
+  loaded: false,
+  active: false,
+  failed: false,
+  startedThisBoot: false,
+};
 
 const check = (overrides: Partial<HealthCheck> = {}): HealthCheck => ({
   ...DEFAULT_HEALTH_CHECK,

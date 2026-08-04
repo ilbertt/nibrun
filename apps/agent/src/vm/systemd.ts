@@ -65,19 +65,36 @@ export type UnitStatus = {
   loaded: boolean;
   active: boolean;
   failed: boolean;
+  // Whether the unit has run at any point since the host booted. A stopped VM and a VM that has
+  // never existed this boot are both `inactive`, and telling them apart is what stops a reboot
+  // being read as the guest having exited on its own.
+  startedThisBoot: boolean;
   exitCode?: number;
 };
 
-const SHOWN_PROPERTIES = ['LoadState', 'ActiveState', 'SubState', 'Result', 'ExecMainStatus'];
+const SHOWN_PROPERTIES = [
+  'LoadState',
+  'ActiveState',
+  'SubState',
+  'Result',
+  'ExecMainStatus',
+  'InactiveExitTimestampMonotonic',
+];
+
+const NEVER_LEFT_INACTIVE = 0;
 
 export function unitStatusFrom(properties: Record<string, string>): UnitStatus {
   const loadState = properties.LoadState ?? 'not-found';
   const activeState = properties.ActiveState ?? 'inactive';
   const exitCode = Number.parseInt(properties.ExecMainStatus ?? '', 10);
+  // Monotonic rather than realtime because it is measured from boot and resets with it, which is
+  // the only property here that can distinguish this boot from any earlier one.
+  const inactiveExit = Number.parseInt(properties.InactiveExitTimestampMonotonic ?? '', 10);
   return {
     loaded: loadState === 'loaded',
     active: activeState === 'active' || activeState === 'activating',
     failed: activeState === 'failed',
+    startedThisBoot: Number.isFinite(inactiveExit) && inactiveExit > NEVER_LEFT_INACTIVE,
     ...(Number.isFinite(exitCode) ? { exitCode } : {}),
   };
 }

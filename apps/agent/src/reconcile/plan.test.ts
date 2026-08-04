@@ -176,6 +176,29 @@ describe('instances are authoritative', () => {
     expect(plan.instances).toEqual([{ action: 'none', instanceId: INSTANCE }]);
   });
 
+  // The shape a reboot produces: the agent's records survive on disk, so the instance is still
+  // present and still wanted, but nothing has run since the host came up. Reading that as an
+  // exit leaves the host serving nothing until somebody logs in.
+  test('a VM that has not run since the host booted is started', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [desiredInstance()] }),
+      observed: observedState({
+        instances: [
+          {
+            instanceId: INSTANCE,
+            appId: APP,
+            volumeId: VOLUME,
+            deploymentId: DEPLOYMENT,
+            present: true,
+            running: false,
+            exited: false,
+          },
+        ],
+      }),
+    });
+    expect(plan.instances).toEqual([{ action: 'start', desired: desiredInstance() }]);
+  });
+
   test('a staging failure that never reached systemd is retried', () => {
     const plan = planReconcile({
       desired: desiredState({ instances: [desiredInstance()] }),
