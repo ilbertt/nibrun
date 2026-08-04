@@ -23,7 +23,7 @@ const instance = {
 function state(overrides: Partial<FirewallState> = {}): FirewallState {
   return {
     instances: [],
-    controlPlaneCidrs: [],
+    controlPlaneCidrsV4: [],
     controlPlaneCidrsV6: [],
     guestDnsServers: [],
     ...overrides,
@@ -49,7 +49,7 @@ describe('the three isolation rules are never optional', () => {
   });
 
   test('guests cannot reach the control plane', () => {
-    const ruleset = renderRuleset(state({ controlPlaneCidrs: ['203.0.113.10/32'] }));
+    const ruleset = renderRuleset(state({ controlPlaneCidrsV4: ['203.0.113.10/32'] }));
     expect(dropsFrom(ruleset).some((line) => line.includes('203.0.113.10/32'))).toBe(true);
   });
 
@@ -58,7 +58,7 @@ describe('the three isolation rules are never optional', () => {
   // forwarding rule that gives guests the internet, or the accept would win.
   test('a guest cannot reach the control plane before it is allowed out', () => {
     const vpc = '10.43.0.0/16';
-    const lines = renderRuleset(state({ controlPlaneCidrs: [vpc] })).split('\n');
+    const lines = renderRuleset(state({ controlPlaneCidrsV4: [vpc] })).split('\n');
     const denied = lines.findIndex((line) => line.includes(vpc) && line.includes('drop'));
     const allowedOut = lines.findIndex((line) => line.includes('masquerade'));
 
@@ -190,7 +190,7 @@ describe('the ruleset is a function of state, not a history of edits', () => {
   });
 
   test('rendering twice from the same state is byte-identical', () => {
-    const input = state({ instances: [instance], controlPlaneCidrs: ['203.0.113.0/24'] });
+    const input = state({ instances: [instance], controlPlaneCidrsV4: ['203.0.113.0/24'] });
     expect(renderRuleset(input)).toBe(renderRuleset(input));
   });
 

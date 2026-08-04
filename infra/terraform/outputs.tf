@@ -73,7 +73,7 @@ output "internal_port" {
 
 # The agent drops guest traffic to this by name, rather than leaving the control
 # plane to the blanket private-address rule that happens to contain it.
-output "vpc_cidr_block" {
+output "vpc_ipv4_cidr_block" {
   description = "Denied to tenant microVMs."
   value       = aws_vpc.app.cidr_block
 }

@@ -52,7 +52,7 @@ export type AgentConfig = {
   // The VPC, named rather than left to the blanket private-destination rule that happens to
   // contain it. Required, because an empty list renders no rule and the redundancy that makes
   // its absence survivable is also what would hide it.
-  controlPlaneCidrs: string[];
+  controlPlaneCidrsV4: string[];
   // The same VPC in the family with no blanket rule behind it: AWS allocates VPC IPv6 from
   // global unicast, so nothing but this denies it.
   controlPlaneCidrsV6: string[];
@@ -164,7 +164,7 @@ export function loadAgentConfig({
     artifactBucket: required({ env, name: 'AGENT_ARTIFACT_BUCKET' }),
     exportBucket: required({ env, name: 'AGENT_EXPORT_BUCKET' }),
     awsRegion: required({ env, name: 'AGENT_AWS_REGION' }),
-    controlPlaneCidrs: requiredList({ env, name: 'AGENT_CONTROL_PLANE_CIDRS' }),
+    controlPlaneCidrsV4: requiredList({ env, name: 'AGENT_CONTROL_PLANE_CIDRS_V4' }),
     controlPlaneCidrsV6: requiredList({ env, name: 'AGENT_CONTROL_PLANE_CIDRS_V6' }),
     guestDnsServers: list({ env, name: 'AGENT_GUEST_DNS_SERVERS' }),
   };

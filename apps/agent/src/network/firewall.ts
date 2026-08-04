@@ -42,7 +42,7 @@ export type ForwardedInstance = {
 
 export type FirewallState = {
   instances: ForwardedInstance[];
-  controlPlaneCidrs: readonly string[];
+  controlPlaneCidrsV4: readonly string[];
   controlPlaneCidrsV6: readonly string[];
   guestDnsServers: readonly string[];
 };
@@ -92,7 +92,7 @@ export function renderRuleset(state: FirewallState): string {
   return `${lines.join('\n')}\n`;
 }
 
-function forwardChain({ controlPlaneCidrs, guestDnsServers }: FirewallState): string[] {
+function forwardChain({ controlPlaneCidrsV4, guestDnsServers }: FirewallState): string[] {
   return chain({
     header: 'forward {',
     rules: [
@@ -105,7 +105,7 @@ function forwardChain({ controlPlaneCidrs, guestDnsServers }: FirewallState): st
       `iifname ${TAP_MATCH} ip daddr ${INSTANCE_METADATA_ADDRESS} drop comment "instance metadata endpoint"`,
       `iifname ${TAP_MATCH} oifname ${TAP_MATCH} drop comment "guest to guest"`,
       `iifname ${TAP_MATCH} ip daddr ${GUEST_NETWORK_CIDR} drop comment "guest to guest"`,
-      ...controlPlaneCidrs.map(
+      ...controlPlaneCidrsV4.map(
         (cidr) => `iifname ${TAP_MATCH} ip daddr ${cidr} drop comment "control plane"`,
       ),
       `iifname ${TAP_MATCH} ip daddr ${set(PRIVATE_DESTINATIONS)} drop comment "private destinations"`,
