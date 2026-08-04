@@ -1,6 +1,6 @@
 import type { ObjectKey } from '@repo/protocol';
 import { Layer } from 'effect';
-import { AgentConfig } from '#config.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
 
 export const HOST_STORAGE_PREFIX = 'filesystems/host-1' as ObjectKey;
 

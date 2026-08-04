@@ -7,10 +7,10 @@ import {
   isValidMessage,
 } from '@repo/protocol';
 import { Effect, Option } from 'effect';
-import { AgentConfig } from '#config.ts';
-import { ControlPlane } from '#control/client.ts';
 import { toEpochMs } from '#lib/clock.ts';
 import { readTextFile, writeTextFile } from '#lib/json-store.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
+import { ControlPlane } from '#services/control-plane.service.ts';
 
 /** Renewed early: a session that expires mid-poll costs a round trip, and the clock that stamped
  * it is not the one the agent reads it against. */

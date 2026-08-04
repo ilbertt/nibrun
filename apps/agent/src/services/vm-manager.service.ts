@@ -1,15 +1,12 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredInstance, InstanceId } from '@repo/protocol';
 import { Effect } from 'effect';
-import { AgentConfig } from '#config.ts';
 import { writeJsonFile } from '#lib/json-store.ts';
-import {
-  TENANT_LOG_VSOCK_FILENAME,
-  TenantLogReceiver,
-  tenantLogSocketPath,
-} from '#logs/receiver.ts';
+import { TENANT_LOG_VSOCK_FILENAME, tenantLogSocketPath } from '#logs/vsock.ts';
 import type { AppSlot } from '#network/slot.ts';
 import { ensureTap } from '#network/tap.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
+import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import * as Artifacts from '#vm/artifacts.ts';
 import { renderFirecrackerConfig } from '#vm/firecracker-config.ts';
 import { buildInstanceConfigImage } from '#vm/instance-env.ts';

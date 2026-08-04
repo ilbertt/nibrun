@@ -1,9 +1,9 @@
 import { Clock, Data, Deferred, type Duration, Effect, Schedule, Stream } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#agent/backoff.ts';
 import { supervised } from '#agent/loop.ts';
-import { AgentSessionHolder } from '#agent/session.ts';
-import { ControlPlane } from '#control/client.ts';
-import { TenantLogQueue } from '#logs/queue.ts';
+import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
+import { ControlPlane } from '#services/control-plane.service.ts';
+import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 
 /**
  * How long one upload lasts before the agent closes it and opens the next. The agent ends it

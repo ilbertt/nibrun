@@ -1,14 +1,15 @@
 import { Effect, Option } from 'effect';
-import { DesiredStateCache } from '#agent/desired-state.ts';
 import { logLoop } from '#agent/logs.ts';
 import { pollLoop, reconcileSafely } from '#agent/poll.ts';
 import { reportLoop } from '#agent/report.ts';
-import { AgentSessionHolder } from '#agent/session.ts';
 import { statusLoop } from '#agent/status.ts';
-import { TenantLogReceiver, tenantLogSocketPath } from '#logs/receiver.ts';
-import { Reconciler } from '#reconcile/reconciler.ts';
+import { tenantLogSocketPath } from '#logs/vsock.ts';
 import * as State from '#reconcile/state.ts';
-import { VmManager } from '#vm/manager.ts';
+import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
+import { Reconciler } from '#services/reconciler.service.ts';
+import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
+import { VmManager } from '#services/vm-manager.service.ts';
 
 const restoreLogReceivers = Effect.gen(function* () {
   const vms = yield* VmManager;

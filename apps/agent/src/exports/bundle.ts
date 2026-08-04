@@ -2,7 +2,7 @@ import { basename } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact } from '@repo/protocol';
 import { Data, Duration, Effect, Either } from 'effect';
-import { stdoutOf } from '#lib/exec.ts';
+import { stdoutOf } from '#services/command-runner.service.ts';
 import { downloadAndVerify } from '#vm/artifacts.ts';
 
 const STAGING_MODE = 0o700;

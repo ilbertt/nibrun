@@ -1,11 +1,8 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact, Sha256Digest } from '@repo/protocol';
-import { Context, Data, Effect, Layer, Ref, Stream } from 'effect';
-import { s3Credentials } from '#aws/credentials.ts';
-import { AwsCredentialProvider } from '#aws/provider.ts';
-import { AgentConfig } from '#config.ts';
-import { stdoutOf } from '#lib/exec.ts';
-import { describe } from '#lib/failure.ts';
+import { Data, Effect, Ref, Stream } from 'effect';
+import { AgentConfig } from '#services/agent-config.service.ts';
+import { stdoutOf } from '#services/command-runner.service.ts';
 
 const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
@@ -33,48 +30,7 @@ export class ArtifactSizeMismatch extends Data.TaggedError('ArtifactSizeMismatch
   }
 }
 
-export class ArtifactTransferError extends Data.TaggedError('ArtifactTransferError')<{
-  readonly cause: unknown;
-}> {
-  override get message() {
-    return `the artifact could not be fetched: ${describe(this.cause)}`;
-  }
-}
-
-export class ArtifactStore extends Context.Tag('ArtifactStore')<
-  ArtifactStore,
-  {
-    readonly open: (
-      objectKey: string,
-    ) => Effect.Effect<ReadableStream<Uint8Array>, ArtifactTransferError>;
-  }
->() {}
-
-export const layer = Layer.effect(
-  ArtifactStore,
-  Effect.gen(function* () {
-    const config = yield* AgentConfig;
-    const credentials = yield* AwsCredentialProvider;
-    return {
-      open: (objectKey: string) =>
-        credentials.resolve.pipe(
-          Effect.flatMap((resolved) =>
-            Effect.try(
-              () =>
-                new Bun.S3Client({
-                  bucket: config.artifactBucket,
-                  region: config.awsRegion,
-                  ...s3Credentials(resolved),
-                })
-                  .file(objectKey)
-                  .stream() as ReadableStream<Uint8Array>,
-            ),
-          ),
-          Effect.mapError((cause) => new ArtifactTransferError({ cause })),
-        ),
-    };
-  }),
-).pipe(Layer.provide([AgentConfig.Default, AwsCredentialProvider.Default]));
+import { ArtifactStore, ArtifactTransferError } from '#services/artifact-store.service.ts';
 
 /** Content-addressed, so a redeploy of a known digest costs nothing and two apps share one image. */
 export const artifactImagePath = ({

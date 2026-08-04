@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { HttpClient, HttpClientResponse } from '@effect/platform';
 import { ConfigProvider, Effect, Layer, Redacted } from 'effect';
-import { AwsCredentialProvider } from '#aws/provider.ts';
+import { AwsCredentialProvider } from '#services/aws-credential-provider.service.ts';
 
 const CONCURRENT_CALLERS = 4;
 const TOKEN_PATH = '/latest/api/token';

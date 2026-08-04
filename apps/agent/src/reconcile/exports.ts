@@ -1,10 +1,10 @@
 import type { ExportId, HostDesiredState, ReportedExport } from '@repo/protocol';
 import { Effect, Option } from 'effect';
-import { ExportManager } from '#exports/manager.ts';
 import { reportedMessage } from '#lib/failure.ts';
-import { SlotAllocator } from '#network/allocator.ts';
 import type { ExportPlan, ReconcilePlan } from '#reconcile/plan.ts';
 import * as State from '#reconcile/state.ts';
+import { ExportManager } from '#services/export-manager.service.ts';
+import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
 const setReport = (report: ReportedExport) =>
   State.modify((current) => ({

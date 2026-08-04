@@ -1,6 +1,6 @@
 import type { Sha256Digest } from '@repo/protocol';
 import { Effect, Layer } from 'effect';
-import { ArtifactStore } from '#vm/artifacts.ts';
+import { ArtifactStore } from '#services/artifact-store.service.ts';
 
 export const ARTIFACT_BYTES = new TextEncoder().encode('#!/usr/bin/env fake-binary\n');
 export const ARTIFACT_DIGEST = new Bun.CryptoHasher('sha256')

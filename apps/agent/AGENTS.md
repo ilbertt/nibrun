@@ -11,6 +11,12 @@ cadence is a `Schedule` rather than a failure counter. Interruption is the shutd
 `BunRuntime.runMain` cancels the fibers and scoped finalizers close the log sockets. Nothing stops
 a tenant VM, which is what keeps redeploying the agent free.
 
+**Every service lives in `services/`, one per file**, named for the service it exports — the
+kebab-case of the identifier plus `.service.ts`, so `VolumeManager` is
+`volume-manager.service.ts`. A `.service.ts` module holds the service and its layer and nothing
+else; pure functions, error classes and host mechanics stay in the domain folder they belong to.
+`apps/api/src/services/` is the same shape, so the two apps read the same way.
+
 **Every service names its own requirements** in `dependencies`, so `index.ts` is a flat merge whose
 order carries nothing. A test that hands one of them a stub config takes
 `DefaultWithoutDependencies`: `Default` has already been given `AgentConfig.Default`, so a config

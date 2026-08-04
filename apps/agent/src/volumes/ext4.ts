@@ -1,6 +1,6 @@
 import { FileSystem } from '@effect/platform';
 import { Effect } from 'effect';
-import { stdoutOf } from '#lib/exec.ts';
+import { stdoutOf } from '#services/command-runner.service.ts';
 
 const SUPERBLOCK_MAGIC_OFFSET = 1080;
 const MAGIC_BYTE_COUNT = 2;

@@ -1,8 +1,8 @@
 import { type HostDesiredState, HostDesiredStateSchema, parseMessage } from '@repo/protocol';
 import { Effect, Option, Ref } from 'effect';
-import { AgentConfig } from '#config.ts';
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
 import { decode } from '#lib/protocol.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
 
 const FIRST_GENERATION = 0;
 

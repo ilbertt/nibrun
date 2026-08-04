@@ -4,7 +4,7 @@ import { nowTimestamp } from '#lib/clock.ts';
 import { reportedMessage } from '#lib/failure.ts';
 import type { CheckpointPlan, ReconcilePlan } from '#reconcile/plan.ts';
 import * as State from '#reconcile/state.ts';
-import { ZerofsTopology } from '#volumes/topology.ts';
+import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { createCheckpoint, deleteCheckpoint, listCheckpoints } from '#volumes/zerofs.ts';
 
 type Applicable = Extract<CheckpointPlan, { action: 'create' | 'delete' }>;

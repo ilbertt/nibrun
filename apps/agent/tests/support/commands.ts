@@ -1,10 +1,6 @@
 import { Effect, Layer } from 'effect';
-import {
-  type CommandError,
-  type CommandRequest,
-  type CommandResult,
-  CommandRunner,
-} from '#lib/exec.ts';
+import type { CommandError, CommandRequest, CommandResult } from '#lib/exec.ts';
+import { CommandRunner } from '#services/command-runner.service.ts';
 
 const OK: CommandResult = { code: 0, stdout: '', stderr: '' };
 

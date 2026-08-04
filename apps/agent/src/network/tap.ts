@@ -1,7 +1,7 @@
 import type { Ipv4Address } from '@repo/protocol';
 import { Effect } from 'effect';
-import { stdoutOf } from '#lib/exec.ts';
 import { TAP_NAME_PREFIX } from '#network/slot.ts';
+import { stdoutOf } from '#services/command-runner.service.ts';
 
 const IP = 'ip';
 const SYSCTL = 'sysctl';

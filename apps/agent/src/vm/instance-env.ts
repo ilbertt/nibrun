@@ -1,7 +1,7 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { GuestPort, RestartPolicy, TenantArguments, TenantEnvironment } from '@repo/protocol';
 import { Data, Effect, Either } from 'effect';
-import { stdoutOf } from '#lib/exec.ts';
+import { stdoutOf } from '#services/command-runner.service.ts';
 
 export const INSTANCE_ENV_FILENAME = 'instance.env';
 export const INSTANCE_CONFIG_IMAGE = 'config.squashfs';

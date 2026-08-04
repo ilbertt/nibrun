@@ -5,13 +5,13 @@ import { applyProbe, evaluateInstanceState, initialTracker } from '#health/state
 import { isReadyToRetry, nextAttemptWindow } from '#lib/backoff.ts';
 import { nowTimestamp } from '#lib/clock.ts';
 import { reportedMessage } from '#lib/failure.ts';
-import { SlotAllocator } from '#network/allocator.ts';
 import * as State from '#reconcile/state.ts';
 import { type InstanceRecord, newInstanceRecord } from '#report/instance-record.ts';
-import { VmManager } from '#vm/manager.ts';
+import { SlotAllocator } from '#services/slot-allocator.service.ts';
+import { VmManager } from '#services/vm-manager.service.ts';
+import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import * as Systemd from '#vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#vm/unit-status.ts';
-import { ZerofsTopology } from '#volumes/topology.ts';
 import { flush } from '#volumes/zerofs.ts';
 
 const ONE_RESTART = 1;

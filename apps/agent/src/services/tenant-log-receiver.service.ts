@@ -1,24 +1,15 @@
-import { join } from 'node:path';
 import { FileSystem, Path, type Socket } from '@effect/platform';
 import { BunSocketServer } from '@effect/platform-bun';
-import type { AppId, DeploymentId, InstanceId, TenantLogStream } from '@repo/protocol';
+import type { InstanceId, TenantLogStream } from '@repo/protocol';
 import { Deferred, Effect, Either, Exit, Ref, Scope } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { decodeFrames, EMPTY_BUFFER } from '#logs/guest-protocol.ts';
-import { TenantLogQueue } from '#logs/queue.ts';
-
-export const TENANT_LOG_VSOCK_PORT = 51000;
-export const TENANT_LOG_VSOCK_FILENAME = 'logs.vsock';
+import type { TenantLogSource } from '#logs/vsock.ts';
+import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 
 const PRIVATE_SOCKET_MODE = 0o600;
 /** The peer is a kernel the tenant controls, and every accepted socket costs the host a decoder. */
 const MAX_GUEST_CONNECTIONS = 4;
-
-export type TenantLogSource = {
-  readonly appId: AppId;
-  readonly deploymentId: DeploymentId;
-  readonly instanceId: InstanceId;
-};
 
 type LogEventBody =
   | { readonly kind: 'data'; readonly stream: TenantLogStream; readonly text: string }
@@ -31,9 +22,6 @@ type Attachment = {
   readonly sequence: Ref.Ref<number>;
   readonly scope: Scope.CloseableScope;
 };
-
-export const tenantLogSocketPath = ({ workingDir }: { workingDir: string }): string =>
-  join(workingDir, `${TENANT_LOG_VSOCK_FILENAME}_${TENANT_LOG_VSOCK_PORT}`);
 
 export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('TenantLogReceiver', {
   scoped: Effect.gen(function* () {

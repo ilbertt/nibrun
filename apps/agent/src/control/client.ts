@@ -12,8 +12,7 @@ import {
   type SecretString,
   TENANT_LOG_CONTENT_TYPE,
 } from '@repo/protocol';
-import { Context, Data, Effect, Layer } from 'effect';
-import { AgentConfig } from '#config.ts';
+import { Data, Effect } from 'effect';
 import { decode } from '#lib/protocol.ts';
 
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -169,10 +168,3 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
 };
 
 export type ControlPlaneClient = ReturnType<typeof makeControlPlaneClient>;
-
-export class ControlPlane extends Context.Tag('ControlPlane')<ControlPlane, ControlPlaneClient>() {}
-
-export const layer = Layer.effect(
-  ControlPlane,
-  Effect.map(AgentConfig, (config) => makeControlPlaneClient({ baseUrl: config.controlPlaneUrl })),
-).pipe(Layer.provide(AgentConfig.Default));

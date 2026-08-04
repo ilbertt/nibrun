@@ -1,6 +1,6 @@
 import { type InstanceId, InstanceIdSchema, isValidMessage } from '@repo/protocol';
 import { Effect } from 'effect';
-import { run, stdoutOf } from '#lib/exec.ts';
+import { run, stdoutOf } from '#services/command-runner.service.ts';
 import {
   parsePropertyBlocks,
   SHOWN_PROPERTIES,

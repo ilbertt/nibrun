@@ -1,9 +1,9 @@
 import { Effect, Option, Ref } from 'effect';
-import { AgentConfig } from '#config.ts';
-import { stdoutOf } from '#lib/exec.ts';
 import { writeTextFile } from '#lib/json-store.ts';
 import { renderAppSites } from '#proxy/caddyfile.ts';
 import type { RouteTarget } from '#report/routes.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
+import { stdoutOf } from '#services/command-runner.service.ts';
 
 const SYSTEMCTL = 'systemctl';
 const CADDY_UNIT = 'nibrun-caddy.service';

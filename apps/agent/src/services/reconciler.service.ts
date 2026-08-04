@@ -1,9 +1,7 @@
 import type { HostDesiredState } from '@repo/protocol';
 import { Effect, Option } from 'effect';
-import { AgentConfig } from '#config.ts';
 import { readExportReports } from '#exports/manager.ts';
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
-import { SlotAllocator } from '#network/allocator.ts';
 import { applyCheckpoints } from '#reconcile/checkpoints.ts';
 import { applyExports } from '#reconcile/exports.ts';
 import { refreshStates, startInstance, stopInstance } from '#reconcile/instances.ts';
@@ -12,10 +10,12 @@ import { hasDeferredWork, type ObservedState, planReconcile } from '#reconcile/p
 import * as State from '#reconcile/state.ts';
 import { applyTeardowns, applyVolumes } from '#reconcile/volumes.ts';
 import { readInstanceRecords } from '#report/instance-record.ts';
-import { VmManager } from '#vm/manager.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
+import { SlotAllocator } from '#services/slot-allocator.service.ts';
+import { VmManager } from '#services/vm-manager.service.ts';
+import { VolumeManager } from '#services/volume-manager.service.ts';
 import * as Systemd from '#vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#vm/unit-status.ts';
-import { VolumeManager } from '#volumes/manager.ts';
 
 /**
  * Pull, converge, report. Nothing here is driven by a command: desired state describes a world,

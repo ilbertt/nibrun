@@ -10,7 +10,8 @@ import { ProtocolMismatch } from '#lib/protocol.ts';
 import { InvalidGuestLogFrame } from '#logs/guest-protocol.ts';
 import { SlotExhausted } from '#network/allocator.ts';
 import { MissingVersionsError } from '#report/versions.ts';
-import { ArtifactSizeMismatch, ArtifactTransferError, DigestMismatch } from '#vm/artifacts.ts';
+import { ArtifactTransferError } from '#services/artifact-store.service.ts';
+import { ArtifactSizeMismatch, DigestMismatch } from '#vm/artifacts.ts';
 import { UnrepresentableEnvironment } from '#vm/instance-env.ts';
 import { VolumeShrinkRefused } from '#volumes/device-file.ts';
 

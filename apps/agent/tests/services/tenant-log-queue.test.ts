@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { Effect } from 'effect';
-import { MAX_BUFFERED_BYTES, MAX_IN_FLIGHT_BYTES, TenantLogQueue } from '#logs/queue.ts';
+import {
+  MAX_BUFFERED_BYTES,
+  MAX_IN_FLIGHT_BYTES,
+  TenantLogQueue,
+} from '#services/tenant-log-queue.service.ts';
 import { tenantLogEvent } from '#tests/support/fixtures.ts';
 import { drainedLines } from '#tests/support/logs.ts';
 import { provided } from '#tests/support/run.ts';

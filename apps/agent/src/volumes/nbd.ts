@@ -1,6 +1,6 @@
 import type { VolumeId } from '@repo/protocol';
 import { Effect } from 'effect';
-import { run, stdoutOf } from '#lib/exec.ts';
+import { run, stdoutOf } from '#services/command-runner.service.ts';
 
 const NBD_CLIENT = 'nbd-client';
 const CONNECTED_EXIT_CODE = 0;

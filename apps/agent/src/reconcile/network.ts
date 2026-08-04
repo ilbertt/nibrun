@@ -1,11 +1,11 @@
 import { Effect, Option } from 'effect';
-import { AgentConfig } from '#config.ts';
-import { SlotAllocator } from '#network/allocator.ts';
 import type { ForwardedInstance } from '#network/firewall.ts';
 import { applyRuleset } from '#network/nftables.ts';
-import { CaddyProxy } from '#proxy/caddy.ts';
 import * as State from '#reconcile/state.ts';
 import { renderableRoutes } from '#report/routes.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
+import { CaddyProxy } from '#services/caddy-proxy.service.ts';
+import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
 export const routes = Effect.map(State.records, renderableRoutes);
 

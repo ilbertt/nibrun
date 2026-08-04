@@ -1,13 +1,13 @@
 import type { HostDesiredState } from '@repo/protocol';
 import { Duration, Effect, Option } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#agent/backoff.ts';
-import { DesiredStateCache } from '#agent/desired-state.ts';
 import { supervised } from '#agent/loop.ts';
-import { AgentSessionHolder } from '#agent/session.ts';
-import { ControlPlane } from '#control/client.ts';
 import type { ProtocolMismatch } from '#lib/protocol.ts';
-import { Reconciler } from '#reconcile/reconciler.ts';
 import * as State from '#reconcile/state.ts';
+import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
+import { ControlPlane } from '#services/control-plane.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
+import { Reconciler } from '#services/reconciler.service.ts';
 
 export const reconcileSafely = (desired: HostDesiredState) =>
   Effect.gen(function* () {

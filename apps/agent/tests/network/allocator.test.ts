@@ -1,13 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import type { AppId, HostPort, Ipv4Address } from '@repo/protocol';
 import { Effect, Either, Layer, Option } from 'effect';
-import {
-  assignmentsFrom,
-  readSlotRecords,
-  SlotAllocator,
-  type SlotRecords,
-} from '#network/allocator.ts';
+import { assignmentsFrom, readSlotRecords, type SlotRecords } from '#network/allocator.ts';
 import { describeSlot, HOST_PORT_BASE, SLOT_COUNT } from '#network/slot.ts';
+import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { platform, provided } from '#tests/support/run.ts';
 

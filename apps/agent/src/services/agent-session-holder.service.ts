@@ -1,10 +1,10 @@
 import { type AgentSession, DEFAULT_AGENT_POLL_SETTINGS } from '@repo/protocol';
 import { Clock, Effect, Option, SynchronizedRef } from 'effect';
-import { AgentConfig } from '#config.ts';
 import type { ControlPlaneError } from '#control/client.ts';
 import { isSessionExpiring, openSession } from '#control/session.ts';
 import { readHostCapacity } from '#report/capacity.ts';
 import { readHostVersions } from '#report/versions.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
 
 export class AgentSessionHolder extends Effect.Service<AgentSessionHolder>()('AgentSessionHolder', {
   effect: Effect.gen(function* () {

@@ -1,6 +1,6 @@
 import { Duration, Effect, Schedule } from 'effect';
 import { supervised } from '#agent/loop.ts';
-import { Reconciler } from '#reconcile/reconciler.ts';
+import { Reconciler } from '#services/reconciler.service.ts';
 
 const TICK = Duration.seconds(1);
 

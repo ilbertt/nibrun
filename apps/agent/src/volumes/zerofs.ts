@@ -1,6 +1,6 @@
 import type { CheckpointId } from '@repo/protocol';
 import { Effect } from 'effect';
-import { stdoutOf } from '#lib/exec.ts';
+import { stdoutOf } from '#services/command-runner.service.ts';
 
 /**
  * ZeroFS is a long-running service this agent does not own. Restarting it stalls every attached

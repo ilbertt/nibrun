@@ -3,7 +3,8 @@ import { Effect } from 'effect';
 import { reportedMessage } from '#lib/failure.ts';
 import type { ObservedState, ReconcilePlan } from '#reconcile/plan.ts';
 import * as State from '#reconcile/state.ts';
-import { toReportedVolume, VolumeManager } from '#volumes/manager.ts';
+import { VolumeManager } from '#services/volume-manager.service.ts';
+import { toReportedVolume } from '#volumes/manager.ts';
 
 const provision = (desired: DesiredVolume) =>
   Effect.gen(function* () {

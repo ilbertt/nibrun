@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Effect, Layer } from 'effect';
+import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { AGENT_CONFIG, agentConfig } from '#tests/support/config.ts';
-import { ZerofsTopology } from '#volumes/topology.ts';
 
 function topology() {
   return Effect.runSync(

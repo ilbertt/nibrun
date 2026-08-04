@@ -1,6 +1,6 @@
 import type { TenantLogEvent } from '@repo/protocol';
 import { Chunk, Deferred, Effect, Stream } from 'effect';
-import type { TenantLogQueue } from '#logs/queue.ts';
+import type { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 
 const DECODER = new TextDecoder();
 
