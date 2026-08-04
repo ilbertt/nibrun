@@ -10,7 +10,6 @@ import {
   PROTOCOL_VERSION_HEADER,
   parseMessage,
   type SecretString,
-  TENANT_LOG_CONTENT_TYPE,
 } from '@repo/protocol';
 import { Data, Effect } from 'effect';
 import { decode } from '#lib/protocol.ts';
@@ -50,16 +49,9 @@ const describeFailure = (value: unknown) => {
  * signature for that, so headers are assembled here rather than at a call site where the
  * excess-property check would reject the ones the schema allows.
  */
-const protocolHeaders = ({
-  sessionToken,
-  contentType,
-}: {
-  sessionToken?: SecretString;
-  contentType?: string;
-} = {}) => ({
+const protocolHeaders = ({ sessionToken }: { sessionToken?: SecretString } = {}) => ({
   [PROTOCOL_VERSION_HEADER]: String(PROTOCOL_VERSION),
   ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
-  ...(contentType ? { 'content-type': contentType } : {}),
 });
 
 /**
@@ -139,29 +131,6 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
         call({
           route: AGENT_ROUTES.reportedState,
           send: () => api.internal.agent['reported-state'].post(report, options(sessionToken)),
-        }),
-      ),
-
-    /**
-     * The body travels as a `RequestInit` rather than as the call's argument, which is
-     * `JSON.stringify`d and would not survive it. Interrupting this effect aborts the request,
-     * which is how an upload the agent no longer wants is ended.
-     */
-    streamTenantLogs: ({
-      sessionToken,
-      body,
-    }: {
-      sessionToken: SecretString;
-      body: ReadableStream<Uint8Array>;
-    }) =>
-      Effect.asVoid(
-        call({
-          route: AGENT_ROUTES.tenantLogs,
-          send: (signal) =>
-            api.internal.agent['tenant-logs'].post(undefined, {
-              headers: protocolHeaders({ sessionToken, contentType: TENANT_LOG_CONTENT_TYPE }),
-              fetch: { body, signal },
-            }),
         }),
       ),
   };

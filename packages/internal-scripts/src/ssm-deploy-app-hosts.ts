@@ -29,6 +29,7 @@ const sharedEnv: Record<string, string> = {
   API_HOSTNAME: requiredEnv('API_HOSTNAME'),
   APP_DOMAIN: requiredEnv('APP_DOMAIN'),
   CONTROL_PLANE_INTERNAL_URL: requiredEnv('CONTROL_PLANE_INTERNAL_URL'),
+  LOG_INGEST_URL: requiredEnv('LOG_INGEST_URL'),
   VPC_IPV4_CIDR_BLOCK: requiredEnv('VPC_IPV4_CIDR_BLOCK'),
   VPC_IPV6_CIDR_BLOCK: requiredEnv('VPC_IPV6_CIDR_BLOCK'),
   FILESYSTEMS_BUCKET: requiredEnv('FILESYSTEMS_BUCKET'),

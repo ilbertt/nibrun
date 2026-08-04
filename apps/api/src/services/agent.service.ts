@@ -6,7 +6,6 @@ import {
   type HostId,
   type HostReportedState,
   type SecretString,
-  type TenantLogEvent,
   type Timestamp,
 } from '@repo/protocol';
 import { UnauthorizedError } from '#lib/errors.ts';
@@ -68,38 +67,6 @@ export class AgentService extends Service {
 
   desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
     return this.agentRepo.desiredState({ hostId });
-  }
-
-  /**
-   * Written to this service's own log rather than to Postgres, which is where it is going. What
-   * is on the wire is worth seeing before deciding what a row looks like — in particular how much
-   * of it is `gap`, since a stream that is mostly gaps is a buffer that needs sizing rather than
-   * a schema that needs designing.
-   */
-  async ingestTenantLogs({
-    hostId,
-    events,
-  }: {
-    hostId: HostId;
-    events: AsyncIterable<TenantLogEvent>;
-  }): Promise<void> {
-    let accepted = 0;
-    for await (const event of events) {
-      accepted += 1;
-      const source = {
-        hostId,
-        appId: event.appId,
-        instanceId: event.instanceId,
-        sourceId: event.sourceId,
-        sequence: event.sequence,
-      };
-      if (event.kind === 'gap') {
-        this.logger.warn('tenant log gap', { ...source, droppedBytes: event.droppedBytes });
-        continue;
-      }
-      this.logger.info('tenant log', { ...source, stream: event.stream, text: event.text });
-    }
-    this.logger.info('tenant log stream ended', { hostId, accepted });
   }
 
   async acceptReport({ reported }: { reported: HostReportedState }): Promise<void> {

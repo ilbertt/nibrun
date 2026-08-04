@@ -160,6 +160,7 @@ jobs:
       API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
       APP_DOMAIN: ${{ fromJSON(needs.terraform.outputs.values).app_domain }}
       CONTROL_PLANE_INTERNAL_URL: ${{ fromJSON(needs.terraform.outputs.values).control_plane_internal_url }}
+      LOG_INGEST_URL: ${{ fromJSON(needs.terraform.outputs.values).log_ingest_url }}
       VPC_IPV4_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv4_cidr_block }}
       VPC_IPV6_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv6_cidr_block }}
     steps:

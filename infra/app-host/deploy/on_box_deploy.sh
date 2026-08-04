@@ -20,7 +20,8 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${FIRECRACKER_DIRECTORY:?}" \
   "${CADDY_VERSION:?}" "${CADDY_URL:?}" "${CADDY_SHA256:?}" \
   "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${APP_DOMAIN:?}" \
-  "${CONTROL_PLANE_INTERNAL_URL:?}" "${VPC_IPV4_CIDR_BLOCK:?}" "${VPC_IPV6_CIDR_BLOCK:?}" \
+  "${CONTROL_PLANE_INTERNAL_URL:?}" "${LOG_INGEST_URL:?}" \
+  "${VPC_IPV4_CIDR_BLOCK:?}" "${VPC_IPV6_CIDR_BLOCK:?}" \
   "${GUEST_IMAGES_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
 
 # Empty until a guest image is adopted in infra/app-host/versions.json. A host
@@ -233,6 +234,10 @@ changed_file /etc/zerofs/config.toml && NEEDS_RESTART+=(zerofs) || true
 
 cat > /etc/nibrun/agent.env.new <<EOF
 AGENT_CONTROL_PLANE_URL=${CONTROL_PLANE_INTERNAL_URL}
+# The log store, on a port of its own beside the control channel. Both are the
+# same private address; what separates them is which security group rule admits
+# them, so widening one cannot widen the other.
+AGENT_LOG_INGEST_URL=${LOG_INGEST_URL}
 AGENT_ARTIFACT_BUCKET=${ARTIFACTS_BUCKET}
 AGENT_EXPORT_BUCKET=${EXPORTS_BUCKET}
 # A tenant microVM reaching the api's internal port would be reaching it as the

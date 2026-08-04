@@ -11,7 +11,6 @@ import {
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
   parseMessage,
-  TENANT_LOG_CONTENT_TYPE,
 } from '@repo/protocol';
 import { StatusMap } from 'elysia';
 
@@ -21,8 +20,6 @@ const FIRST_POLL_GENERATION = 0;
 
 const BETTER_AUTH_SECRET_LENGTH = 32;
 const PROTOCOL_VERSION_SKEW = 1;
-// Long enough for a reply to have been written if the route were going to write one early.
-const SETTLE_MS = 50;
 
 // The api reads its configuration when the service graph is constructed, so the
 // environment has to exist before the app module is imported.
@@ -85,42 +82,6 @@ async function readSession(response: Response) {
 
 async function readDesired(response: Response) {
   return parseMessage({ schema: DesiredStateResponseSchema, value: await response.json() });
-}
-
-function postTenantLogs({
-  body,
-  sessionToken,
-}: {
-  body: string | ReadableStream<Uint8Array>;
-  sessionToken?: string;
-}) {
-  return app.handle(
-    new Request(`http://control-plane${AGENT_API_PREFIX}${AGENT_ROUTES.tenantLogs}`, {
-      method: 'POST',
-      headers: {
-        'content-type': TENANT_LOG_CONTENT_TYPE,
-        [PROTOCOL_VERSION_HEADER]: String(PROTOCOL_VERSION),
-        ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
-      },
-      body,
-      duplex: 'half',
-    } as RequestInit),
-  );
-}
-
-function tenantLogLine(overrides: Record<string, unknown> = {}): string {
-  return `${JSON.stringify({
-    kind: 'data',
-    sourceId: 'source-1',
-    sequence: 0,
-    observedAt: new Date().toISOString(),
-    appId: 'app-pocketbase',
-    deploymentId: 'dep-pocketbase-2',
-    instanceId: 'inst-pocketbase-1',
-    stream: 'stdout',
-    text: 'listening on 0.0.0.0:8090\n',
-    ...overrides,
-  })}\n`;
 }
 
 function openSession(overrides: Partial<AgentSessionRequest> = {}) {
@@ -210,93 +171,6 @@ describe('an agent can register and be told what to run', () => {
     // nothing here for an agent to read and nothing to keep in step with it.
     expect(response.status).toBe(StatusMap['No Content']);
     expect(await response.text()).toBe('');
-  });
-});
-
-describe('an agent streams tenant output on a request of its own', () => {
-  test('a stream of events is accepted once the host stops sending', async () => {
-    const session = await readSession(await openSession());
-    const response = await postTenantLogs({
-      body: `${tenantLogLine()}${tenantLogLine({ sequence: 1, stream: 'stderr' })}`,
-      sessionToken: session.sessionToken,
-    });
-
-    expect(response.status).toBe(StatusMap['No Content']);
-  });
-
-  // The agent reads a response as the end of its upload and opens the next one, so answering
-  // while the body is still open is what turns a working stream into a reconnect loop. This is
-  // the same contract its own client test pins, asserted from the side that has to honour it.
-  test('nothing is answered while the host is still sending', async () => {
-    const session = await readSession(await openSession());
-    let send!: ReadableStreamDefaultController<Uint8Array>;
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        send = controller;
-      },
-    });
-
-    let answered = false;
-    const response = postTenantLogs({ body, sessionToken: session.sessionToken }).then((value) => {
-      answered = true;
-      return value;
-    });
-
-    send.enqueue(new TextEncoder().encode(tenantLogLine()));
-    await Bun.sleep(SETTLE_MS);
-    expect(answered).toBe(false);
-
-    send.close();
-    expect((await response).status).toBe(StatusMap['No Content']);
-  });
-
-  // Every event on this stream was built by the agent out of pieces it had already validated, so
-  // one that does not parse is skew or a bug rather than a tenant writing something odd. Refusing
-  // is what makes either visible; skipping would leave a stream that looks like it works.
-  test('a line that is not an event is refused rather than skipped', async () => {
-    const session = await readSession(await openSession());
-    const response = await postTenantLogs({
-      body: `${tenantLogLine()}{"kind":"data"}\n`,
-      sessionToken: session.sessionToken,
-    });
-
-    expect(response.status).toBe(StatusMap['Bad Request']);
-  });
-
-  // A host stops sending by going away far more often than by closing politely — an agent
-  // restart, a deploy, a timeout in between. Answering that with a fault makes the agent log a
-  // failure for its own reconnect, and makes a 500 the ordinary outcome of this route.
-  test('a host that goes away mid-stream ends it rather than failing it', async () => {
-    const session = await readSession(await openSession());
-    let send!: ReadableStreamDefaultController<Uint8Array>;
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        send = controller;
-      },
-    });
-
-    const response = postTenantLogs({ body, sessionToken: session.sessionToken });
-    send.enqueue(new TextEncoder().encode(tenantLogLine()));
-    await Bun.sleep(SETTLE_MS);
-    send.error(new DOMException('The connection was closed.', 'AbortError'));
-
-    expect((await response).status).toBe(StatusMap['No Content']);
-  });
-
-  // What the agent sends to stop the connection reading as idle. It has to survive the decoder
-  // without becoming an event or an error, or the keepalive would break the stream it protects.
-  test('an empty line is a keepalive, not an event and not a fault', async () => {
-    const session = await readSession(await openSession());
-    const response = await postTenantLogs({
-      body: `\n${tenantLogLine()}\n\n`,
-      sessionToken: session.sessionToken,
-    });
-
-    expect(response.status).toBe(StatusMap['No Content']);
-  });
-
-  test('a stream arriving without a session is refused', async () => {
-    expect((await postTenantLogs({ body: tenantLogLine() })).status).toBe(StatusMap.Unauthorized);
   });
 });
 
