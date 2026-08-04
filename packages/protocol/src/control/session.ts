@@ -38,14 +38,20 @@ export const DEFAULT_AGENT_POLL_SETTINGS: AgentPollSettings = {
 };
 
 /**
- * Opens a session from a bootstrap credential delivered with the machine.
+ * Opens a session.
  *
- * The credential identifies the machine, not a user, and buys exactly one thing: a session
- * token. Everything afterwards presents the session, so revoking a host is expiring a session
- * rather than rotating a credential baked into an instance.
+ * There is deliberately no credential here. The internal port is reachable from inside the VPC
+ * and nowhere else, and a tenant microVM is denied it by the host's own ruleset before it can
+ * route anywhere — so a caller that reaches this endpoint has already crossed the boundary that
+ * matters. The fleet-wide secret this used to carry was not a second boundary: it sat readable
+ * on every host, so anything positioned to abuse the endpoint could read it, and rotating it
+ * meant redeploying the fleet and the control plane together.
+ *
+ * What nothing here does yet is tell one host from another — `hostId` is honoured as presented.
+ * That wants a claim a file cannot be copied into, such as an instance identity document, and
+ * a shared secret every host already holds was never going to be it.
  */
 export const AgentSessionRequestSchema = Type.Object({
-  bootstrapToken: SecretStringSchema,
   // Absent on a host's very first registration; the control plane assigns one and the agent
   // persists it, so a reinstalled agent rejoins as the same host rather than as a new one.
   hostId: Type.Optional(HostIdSchema),

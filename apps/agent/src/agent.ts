@@ -50,13 +50,6 @@ const NO_FAILURES = 0;
 
 const DESIRED_STATE_FILENAME = 'desired-state.json';
 
-export class MissingBootstrapTokenError extends Error {
-  constructor(path: string) {
-    super(`${path} is missing: the bootstrap credential arrives with the instance's user-data`);
-    this.name = 'MissingBootstrapTokenError';
-  }
-}
-
 export class Agent {
   readonly #config: AgentConfig;
   readonly #client: ControlPlaneClient;
@@ -283,11 +276,7 @@ export class Agent {
     this.#session = await openSession({
       client: this.#client,
       identity: this.#identity,
-      inputs: {
-        bootstrapToken: await this.#readBootstrapToken(),
-        versions: this.#versions,
-        capacity,
-      },
+      inputs: { versions: this.#versions, capacity },
     });
     logger.info({
       message: 'session opened',
@@ -295,17 +284,6 @@ export class Agent {
       expiresAt: this.#session.expiresAt,
     });
     return this.#session;
-  }
-
-  // The credential identifies the machine, not a user, and buys exactly one thing: a session.
-  // It is read from disk on every renewal rather than held in memory, so rotating the file is
-  // enough to rotate the credential.
-  async #readBootstrapToken(): Promise<SecretString> {
-    const token = await readTextFile({ path: this.#config.bootstrapTokenFile });
-    if (!token) {
-      throw new MissingBootstrapTokenError(this.#config.bootstrapTokenFile);
-    }
-    return token as SecretString;
   }
 
   #desiredStatePath() {

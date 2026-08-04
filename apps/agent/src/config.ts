@@ -22,7 +22,6 @@ export const NBD_TIMEOUT_SECONDS = 600;
 
 export type AgentConfig = {
   controlPlaneUrl: string;
-  bootstrapTokenFile: string;
   stateDir: string;
   runtimeDir: string;
   hostIdFile: string;
@@ -98,11 +97,6 @@ export function loadAgentConfig({
   const stateDir = optional({ env, name: 'AGENT_STATE_DIR', fallback: DEFAULT_STATE_DIR });
   return {
     controlPlaneUrl: required({ env, name: 'AGENT_CONTROL_PLANE_URL' }),
-    bootstrapTokenFile: optional({
-      env,
-      name: 'AGENT_BOOTSTRAP_TOKEN_FILE',
-      fallback: join(stateDir, 'bootstrap-token'),
-    }),
     stateDir,
     runtimeDir: optional({ env, name: 'AGENT_RUNTIME_DIR', fallback: DEFAULT_RUNTIME_DIR }),
     hostIdFile: join(stateDir, 'host-id'),

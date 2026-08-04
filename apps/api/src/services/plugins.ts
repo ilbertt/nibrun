@@ -13,10 +13,7 @@ const agentRepository = new AgentRepository(sql);
 const assetsRepository = new AssetsRepository(sql);
 const healthRepository = new HealthRepository(sql);
 
-const agentService = new AgentService({
-  agentRepo: agentRepository,
-  bootstrapToken: env.AGENT_BOOTSTRAP_TOKEN,
-});
+const agentService = new AgentService({ agentRepo: agentRepository });
 const assetsService = new AssetsService(assetsRepository);
 const healthService = new HealthService(healthRepository);
 

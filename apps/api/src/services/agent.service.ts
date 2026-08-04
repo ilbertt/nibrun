@@ -18,30 +18,21 @@ const SESSION_LIFETIME_MS = SECONDS_PER_HOUR * MS_PER_SECOND;
 
 export class AgentService extends Service {
   private readonly agentRepo: AgentRepository;
-  private readonly bootstrapToken: string;
 
-  constructor({
-    agentRepo,
-    bootstrapToken,
-  }: {
-    agentRepo: AgentRepository;
-    bootstrapToken: string;
-  }) {
+  constructor({ agentRepo }: { agentRepo: AgentRepository }) {
     super();
     this.agentRepo = agentRepo;
-    this.bootstrapToken = bootstrapToken;
   }
 
   /**
-   * One credential for the fleet, because Terraform generates one and every host reads it from
-   * the same SSM path. It buys exactly one thing — a session — so revoking a host becomes
-   * expiring that session rather than rotating a secret baked into an instance.
+   * Anything that reaches this endpoint gets a session.
+   *
+   * The reachability is the control: the internal port answers inside the VPC only, and a
+   * tenant is dropped by its host's ruleset before it can route to it. The shared secret this
+   * used to check was readable on every host, so it could not distinguish the callers it was
+   * defending against from the ones it was admitting.
    */
   async openSession(request: AgentSessionRequest): Promise<AgentSession> {
-    if (!timingSafeEquals({ presented: request.bootstrapToken, expected: this.bootstrapToken })) {
-      throw new UnauthorizedError('Bootstrap token rejected.');
-    }
-
     // The agent persists what it is given and presents it next time, so a host keeps its
     // identity across a reinstall. Nothing allocates one yet, so its own is honoured.
     const hostId = request.hostId ?? (crypto.randomUUID() as HostId);
@@ -91,10 +82,4 @@ export class AgentService extends Service {
     const desired = await this.agentRepo.desiredState({ hostId: reported.hostId });
     return desired.generation;
   }
-}
-
-function timingSafeEquals({ presented, expected }: { presented: string; expected: string }) {
-  const left = Buffer.from(presented);
-  const right = Buffer.from(expected);
-  return left.length === right.length && crypto.timingSafeEqual(left, right);
 }

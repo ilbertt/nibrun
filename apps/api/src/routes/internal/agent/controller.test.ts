@@ -15,8 +15,6 @@ import {
 } from '@repo/protocol';
 import { StatusMap } from 'elysia';
 
-const BOOTSTRAP_TOKEN = 'bootstrap-token-for-this-test';
-
 // What an agent that has never polled reports knowing, so this is the case that
 // has to yield state rather than `unchanged`.
 const FIRST_POLL_GENERATION = 0;
@@ -35,7 +33,6 @@ const REQUIRED_ENV = {
   ARTIFACTS_BUCKET: 'test',
   S3_ACCESS_KEY_ID: 'test',
   S3_SECRET_ACCESS_KEY: 'test',
-  AGENT_BOOTSTRAP_TOKEN: BOOTSTRAP_TOKEN,
 };
 
 let app: { handle: (request: Request) => Promise<Response> };
@@ -92,7 +89,7 @@ const readAck = async (response: Response) =>
 const openSession = async (overrides: Partial<AgentSessionRequest> = {}) =>
   await post({
     route: AGENT_ROUTES.session,
-    body: { bootstrapToken: BOOTSTRAP_TOKEN, versions, capacity, ...overrides },
+    body: { versions, capacity, ...overrides },
   });
 
 describe('an agent can register and be told what to run', () => {
@@ -102,9 +99,13 @@ describe('an agent can register and be told what to run', () => {
     expect(session.hostId).toBeTruthy();
     expect(session.sessionToken).toBeTruthy();
     expect(session.poll.maxWaitSeconds).toBeGreaterThan(0);
-    // Issued rather than echoed: a session the bootstrap credential could stand in for would
-    // make expiring one meaningless.
-    expect(session.sessionToken).not.toBe(BOOTSTRAP_TOKEN);
+  });
+
+  // The endpoint carries no credential. What keeps it closed is that nothing outside the VPC
+  // can address it and no tenant can route to it, so a test asserting a rejection here would
+  // be asserting a defence this design deliberately does not have.
+  test('a session is granted on reachability alone', async () => {
+    expect((await openSession()).status).toBe(StatusMap.OK);
   });
 
   test('a host that has never polled is told its state, not that nothing changed', async () => {
@@ -183,12 +184,6 @@ describe('an agent can register and be told what to run', () => {
 });
 
 describe('nothing reaches desired state without proving what it is', () => {
-  test('a wrong bootstrap credential opens no session', async () => {
-    expect((await openSession({ bootstrapToken: 'wrong' as never })).status).toBe(
-      StatusMap.Unauthorized,
-    );
-  });
-
   test('an unknown session is refused rather than served a default host', async () => {
     const response = await post({
       route: AGENT_ROUTES.desiredState,
@@ -218,7 +213,7 @@ describe('nothing reaches desired state without proving what it is', () => {
           'content-type': 'application/json',
           [PROTOCOL_VERSION_HEADER]: String(PROTOCOL_VERSION + PROTOCOL_VERSION_SKEW),
         },
-        body: JSON.stringify({ bootstrapToken: BOOTSTRAP_TOKEN, versions, capacity }),
+        body: JSON.stringify({ versions, capacity }),
       }),
     );
 

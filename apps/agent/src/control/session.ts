@@ -53,7 +53,6 @@ export class HostIdentity {
 }
 
 export type SessionInputs = {
-  bootstrapToken: SecretString;
   versions: HostVersions;
   capacity: HostCapacity;
 };
@@ -69,7 +68,6 @@ export async function openSession({
 }): Promise<AgentSession> {
   const hostId = await identity.read();
   const session = await client.openSession({
-    bootstrapToken: inputs.bootstrapToken,
     ...(hostId ? { hostId } : {}),
     versions: inputs.versions,
     capacity: inputs.capacity,

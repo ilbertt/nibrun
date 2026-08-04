@@ -55,7 +55,6 @@ describe('every request identifies the protocol it speaks', () => {
     const { calls, fetchImpl } = respondWith({ body: VALID_SESSION });
     const client = new ControlPlaneClient({ baseUrl: BASE_URL, fetchImpl });
     const session = await client.openSession({
-      bootstrapToken: 'boot' as SecretString,
       versions: { agent: 'a', guestImage: 'b', zerofs: 'c', firecracker: 'd' },
       capacity: { vcpuCount: 2, memoryMib: 4096, cacheBytes: 100 },
     });
@@ -71,7 +70,6 @@ describe('validation at the boundary', () => {
     const client = new ControlPlaneClient({ baseUrl: BASE_URL, fetchImpl });
     await expect(
       client.openSession({
-        bootstrapToken: 'boot' as SecretString,
         versions: { agent: 'a', guestImage: 'b', zerofs: 'c', firecracker: 'd' },
         capacity: { vcpuCount: 2, memoryMib: 4096, cacheBytes: 100 },
       }),
@@ -95,7 +93,6 @@ describe('validation at the boundary', () => {
     });
     const client = new ControlPlaneClient({ baseUrl: BASE_URL, fetchImpl });
     const session = await client.openSession({
-      bootstrapToken: 'boot' as SecretString,
       versions: { agent: 'a', guestImage: 'b', zerofs: 'c', firecracker: 'd' },
       capacity: { vcpuCount: 2, memoryMib: 4096, cacheBytes: 100 },
     });
@@ -109,7 +106,6 @@ describe('validation at the boundary', () => {
     const client = new ControlPlaneClient({ baseUrl: BASE_URL, fetchImpl });
     await expect(
       client.openSession({
-        bootstrapToken: 'boot' as SecretString,
         versions: { agent: 'a', guestImage: 'b', zerofs: 'c', firecracker: 'd' },
         capacity: { vcpuCount: 2, memoryMib: 4096, cacheBytes: 100 },
       }),

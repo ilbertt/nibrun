@@ -231,13 +231,8 @@ cp zerofs/config.toml /etc/zerofs/config.toml.new
 chmod 0644 /etc/zerofs/config.toml.new
 changed_file /etc/zerofs/config.toml && NEEDS_RESTART+=(zerofs) || true
 
-secret agent_bootstrap_token > /var/lib/nibrun/bootstrap-token.new
-chmod 0600 /var/lib/nibrun/bootstrap-token.new
-changed_file /var/lib/nibrun/bootstrap-token && NEEDS_RESTART+=(agent) || true
-
 cat > /etc/nibrun/agent.env.new <<EOF
 AGENT_CONTROL_PLANE_URL=${CONTROL_PLANE_INTERNAL_URL}
-AGENT_BOOTSTRAP_TOKEN_FILE=/var/lib/nibrun/bootstrap-token
 AGENT_ARTIFACT_BUCKET=${ARTIFACTS_BUCKET}
 AGENT_EXPORT_BUCKET=${EXPORTS_BUCKET}
 # A tenant microVM reaching the api's internal port would be reaching it as the

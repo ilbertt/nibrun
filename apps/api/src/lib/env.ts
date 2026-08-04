@@ -10,7 +10,6 @@ interface CustomProcessEnv {
   readonly ARTIFACTS_BUCKET: string;
   readonly S3_ACCESS_KEY_ID: string;
   readonly S3_SECRET_ACCESS_KEY: string;
-  readonly AGENT_BOOTSTRAP_TOKEN: string;
 }
 
 const DEFAULT_PORT = '3000';
@@ -43,7 +42,6 @@ type Env = {
   GITHUB_CLIENT_SECRET: string;
   S3_ENDPOINT: URL;
   ARTIFACTS_BUCKET: string;
-  AGENT_BOOTSTRAP_TOKEN: string;
   S3_ACCESS_KEY_ID: string;
   S3_SECRET_ACCESS_KEY: string;
 };
@@ -58,7 +56,6 @@ function loadEnv(): Env {
     GITHUB_CLIENT_SECRET: required('GITHUB_CLIENT_SECRET'),
     S3_ENDPOINT: new URL(required('S3_ENDPOINT')),
     ARTIFACTS_BUCKET: required('ARTIFACTS_BUCKET'),
-    AGENT_BOOTSTRAP_TOKEN: required('AGENT_BOOTSTRAP_TOKEN'),
     S3_ACCESS_KEY_ID: required('S3_ACCESS_KEY_ID'),
     S3_SECRET_ACCESS_KEY: required('S3_SECRET_ACCESS_KEY'),
   };
