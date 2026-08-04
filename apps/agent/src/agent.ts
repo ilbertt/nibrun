@@ -15,6 +15,7 @@ import { InstanceCredentialProvider } from '#aws/instance-credentials.ts';
 import { type AgentConfig, loadAgentConfig } from '#config.ts';
 import { ControlPlaneClient, ControlPlaneError } from '#control/client.ts';
 import { HostIdentity, isSessionExpiring, openSession } from '#control/session.ts';
+import { ExportManager } from '#exports/manager.ts';
 import { backoffDelayMs } from '#lib/backoff.ts';
 import { nowTimestamp } from '#lib/clock.ts';
 import { runCommand } from '#lib/exec.ts';
@@ -97,6 +98,12 @@ export class Agent {
       configFile: config.zerofsConfigFile,
     });
     const units = new SystemdVmUnits({ runner });
+    const credentials = new InstanceCredentialProvider();
+    const artifacts = s3ArtifactBytes({
+      bucket: config.artifactBucket,
+      region: config.awsRegion,
+      credentials,
+    });
     // One allocator, shared: the host port, the tap, the guest address and the NBD minor are
     // four views of the same slot, and two owners of it would eventually disagree.
     const allocator = SlotAllocator.fromRecords(
@@ -109,14 +116,19 @@ export class Agent {
       topology,
       allocator,
       proxy: new CaddyProxy({ runner, sitesFile: config.caddySitesFile }),
+      exports: new ExportManager({
+        runner,
+        topology,
+        artifacts,
+        credentials,
+        bucket: config.exportBucket,
+        region: config.awsRegion,
+        stagingDir: config.exportStagingDir,
+      }),
       vms: new VmManager({
         runner,
         units,
-        artifacts: s3ArtifactBytes({
-          bucket: config.artifactBucket,
-          region: config.awsRegion,
-          credentials: new InstanceCredentialProvider(),
-        }),
+        artifacts,
         artifactCacheDir: config.artifactCacheDir,
         guestImageDir: config.guestImageDir,
         vmDir: config.vmDir,
@@ -237,6 +249,7 @@ export class Agent {
       records,
       volumes: this.#reconciler.volumeReports(),
       checkpoints: this.#reconciler.checkpointReports(),
+      exports: this.#reconciler.exportReports(),
     });
     const response = await this.#client.sendReportedState({
       sessionToken: session.sessionToken,

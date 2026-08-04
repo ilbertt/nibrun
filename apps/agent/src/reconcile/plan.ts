@@ -3,8 +3,10 @@ import type {
   CheckpointId,
   DeploymentId,
   DesiredCheckpoint,
+  DesiredExport,
   DesiredInstance,
   DesiredVolume,
+  ExportId,
   HostDesiredState,
   InstanceId,
   VolumeId,
@@ -39,10 +41,25 @@ export type ObservedCheckpoint = {
   volumeId: VolumeId;
 };
 
+/**
+ * An export this host has already written, as it remembers it.
+ *
+ * The one thing here that is remembered rather than observed. Every other observation is a
+ * question asked of the host — systemd, the ZeroFS mount, the admin RPC — but a host holds
+ * write-only credentials on the export bucket, so it cannot read back whether the object it
+ * produced is there. Re-writing on doubt is not the safe default it usually is: it would
+ * re-upload a tenant's entire dataset on every agent restart.
+ */
+export type ObservedExport = {
+  exportId: ExportId;
+  written: boolean;
+};
+
 export type ObservedState = {
   instances: ObservedInstance[];
   volumes: ObservedVolume[];
   checkpoints: ObservedCheckpoint[];
+  exports: ObservedExport[];
 };
 
 export const INSTANCE_STOP_REASONS = ['desired-stopped', 'not-desired', 'superseded'] as const;
@@ -67,10 +84,21 @@ export type CheckpointPlan =
   | { action: 'delete'; desired: DesiredCheckpoint }
   | { action: 'none'; checkpointId: CheckpointId };
 
+/**
+ * `forget` rather than `delete`: the host cannot remove an object it has no delete permission
+ * for, and does not need to. Expiry is the bucket's lifecycle rule, which is what makes it
+ * unforgettable — so `absent` here means this host stops carrying the record, nothing more.
+ */
+export type ExportPlan =
+  | { action: 'write'; desired: DesiredExport }
+  | { action: 'forget'; exportId: ExportId }
+  | { action: 'none'; exportId: ExportId };
+
 export type ReconcilePlan = {
   instances: InstancePlan[];
   volumes: VolumePlan[];
   checkpoints: CheckpointPlan[];
+  exports: ExportPlan[];
 };
 
 const byId = <Item, Key extends string>({
@@ -101,6 +129,7 @@ export function planReconcile({
     instances: planInstances({ desired, observed }),
     volumes: planVolumes({ desired, observed }),
     checkpoints: planCheckpoints({ desired, observed }),
+    exports: planExports({ desired, observed }),
   };
 }
 
@@ -195,6 +224,34 @@ function planVolumes({
       return { action: 'provision', desired: wanted };
     }
     return { action: 'none', volumeId: wanted.volumeId };
+  });
+}
+
+/**
+ * An export is written once and never rewritten.
+ *
+ * Unlike every other plan here this one is not a diff against reality, because the host cannot
+ * see the bucket it writes to. A bundle already written is left alone even if the object has
+ * since been deleted or expired underneath it — re-reading a tenant's whole filesystem on the
+ * strength of a guess is worse than an export the control plane has to ask for again.
+ */
+function planExports({
+  desired,
+  observed,
+}: {
+  desired: HostDesiredState;
+  observed: ObservedState;
+}): ExportPlan[] {
+  const writtenIds = new Set(
+    observed.exports.filter((current) => current.written).map((current) => current.exportId),
+  );
+  return desired.exports.map((wanted): ExportPlan => {
+    if (wanted.desiredState === 'absent') {
+      return { action: 'forget', exportId: wanted.exportId };
+    }
+    return writtenIds.has(wanted.exportId)
+      ? { action: 'none', exportId: wanted.exportId }
+      : { action: 'write', desired: wanted };
   });
 }
 

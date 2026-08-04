@@ -239,6 +239,7 @@ cat > /etc/nibrun/agent.env.new <<EOF
 AGENT_CONTROL_PLANE_URL=${CONTROL_PLANE_INTERNAL_URL}
 AGENT_BOOTSTRAP_TOKEN_FILE=/var/lib/nibrun/bootstrap-token
 AGENT_ARTIFACT_BUCKET=${ARTIFACTS_BUCKET}
+AGENT_EXPORT_BUCKET=${EXPORTS_BUCKET}
 # A tenant microVM reaching the api's internal port would be reaching it as the
 # host, with the host's standing. Named here rather than left to the blanket
 # private-address rule, so the ruleset on the box says why.

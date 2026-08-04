@@ -28,6 +28,8 @@ export type AgentConfig = {
   hostIdFile: string;
   slotsFile: string;
   instancesFile: string;
+  exportsFile: string;
+  exportStagingDir: string;
   artifactCacheDir: string;
   vmDir: string;
   versionsFile: string;
@@ -43,6 +45,10 @@ export type AgentConfig = {
   // filesystem puts a tenant's data somewhere nothing will look for it.
   zerofsStoragePrefix: string;
   artifactBucket: string;
+  // Write-only for this host by IAM, so a bundle it has already produced is unreadable to it.
+  // What was written is therefore remembered in `exportsFile` rather than observed, which is the
+  // one place the agent cannot converge against reality.
+  exportBucket: string;
   awsRegion: string;
   // Guests are denied every private destination by default, so this is only needed when the
   // control plane answers on a public address the blanket rule would not cover.
@@ -102,6 +108,8 @@ export function loadAgentConfig({
     hostIdFile: join(stateDir, 'host-id'),
     slotsFile: join(stateDir, 'slots.json'),
     instancesFile: join(stateDir, 'instances.json'),
+    exportsFile: join(stateDir, 'exports.json'),
+    exportStagingDir: join(stateDir, 'exports'),
     artifactCacheDir: join(stateDir, 'artifacts'),
     vmDir: join(stateDir, 'vm'),
     versionsFile: optional({ env, name: 'AGENT_VERSIONS_FILE', fallback: DEFAULT_VERSIONS_FILE }),
@@ -138,6 +146,7 @@ export function loadAgentConfig({
     }),
     zerofsStoragePrefix: required({ env, name: 'AGENT_ZEROFS_STORAGE_PREFIX' }),
     artifactBucket: required({ env, name: 'AGENT_ARTIFACT_BUCKET' }),
+    exportBucket: required({ env, name: 'AGENT_EXPORT_BUCKET' }),
     awsRegion: required({ env, name: 'AGENT_AWS_REGION' }),
     controlPlaneCidrs: list({ env, name: 'AGENT_CONTROL_PLANE_CIDRS' }),
     guestDnsServers: list({ env, name: 'AGENT_GUEST_DNS_SERVERS' }),

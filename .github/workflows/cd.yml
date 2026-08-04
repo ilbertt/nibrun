@@ -156,6 +156,7 @@ jobs:
       GUEST_IMAGES_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).guest_images_bucket }}
       FILESYSTEMS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).filesystems_bucket }}
       ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
+      EXPORTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).exports_bucket }}
       API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
       APP_DOMAIN: ${{ fromJSON(needs.terraform.outputs.values).app_domain }}
       CONTROL_PLANE_INTERNAL_URL: ${{ fromJSON(needs.terraform.outputs.values).control_plane_internal_url }}

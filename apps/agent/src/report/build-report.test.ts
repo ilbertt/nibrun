@@ -5,6 +5,7 @@ import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   type DeploymentId,
+  type ExportId,
   type GuestPort,
   type HostId,
   type Hostname,
@@ -28,6 +29,7 @@ const AT = '2026-08-03T10:00:00.000Z' as Timestamp;
 const DIGEST_HEX_LENGTH = 64;
 const FIRST_HOST_PORT = 21_000 as HostPort;
 const OBSERVED_GENERATION = 7;
+const BUNDLE_SIZE_BYTES = 1_782_579;
 const HOST_VCPUS = 4;
 const HOST_MEMORY_MIB = 8_192;
 const HOST_CACHE_BYTES = 1_000;
@@ -90,6 +92,14 @@ describe('the assembled report satisfies the protocol', () => {
       records: [record({ startedAt: AT })],
       volumes: [{ volumeId: 'vol-1' as VolumeId, state: 'ready', sizeBytes: VOLUME_SIZE_BYTES }],
       checkpoints: [],
+      exports: [
+        {
+          exportId: 'exp-1' as ExportId,
+          state: 'ready',
+          sizeBytes: BUNDLE_SIZE_BYTES,
+          readyAt: AT,
+        },
+      ],
     });
     expect(isValidMessage({ schema: HostReportedStateSchema, value: report })).toBe(true);
   });

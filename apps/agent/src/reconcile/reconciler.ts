@@ -2,14 +2,17 @@ import type {
   AppId,
   DesiredInstance,
   DesiredVolume,
+  ExportId,
   HostDesiredState,
   InstanceId,
   ObjectKey,
   ReportedCheckpoint,
+  ReportedExport,
   ReportedVolume,
   VolumeId,
 } from '@repo/protocol';
 import type { AgentConfig } from '#config.ts';
+import { type ExportManager, readExportReports } from '#exports/manager.ts';
 import { probeInstance } from '#health/probe.ts';
 import { applyProbe, evaluateInstanceState, initialTracker } from '#health/state.ts';
 import { isReadyToRetry, nextAttemptWindow } from '#lib/backoff.ts';
@@ -23,6 +26,7 @@ import { applyRuleset } from '#network/nftables.ts';
 import type { CaddyProxy } from '#proxy/caddy.ts';
 import {
   type CheckpointPlan,
+  type ExportPlan,
   type ObservedState,
   planReconcile,
   type ReconcilePlan,
@@ -56,6 +60,7 @@ export type ReconcilerOptions = {
   units: SystemdVmUnits;
   vms: VmManager;
   volumes: VolumeManager;
+  exports: ExportManager;
   topology: ZerofsTopology;
   allocator: SlotAllocator;
   proxy: CaddyProxy;
@@ -76,6 +81,7 @@ export class Reconciler {
   readonly #allocator: SlotAllocator;
   #volumeReports: ReportedVolume[] = [];
   #checkpointReports: ReportedCheckpoint[] = [];
+  readonly #exportReports = new Map<ExportId, ReportedExport>();
   #observedGeneration = NO_GENERATION;
   #converged = false;
 
@@ -104,6 +110,10 @@ export class Reconciler {
     return this.#checkpointReports;
   }
 
+  exportReports(): ReportedExport[] {
+    return [...this.#exportReports.values()];
+  }
+
   // What the local user-app proxy renders its config from — the same records the boot path
   // writes, rather than a second copy of them.
   routes(): RouteTarget[] {
@@ -116,10 +126,16 @@ export class Reconciler {
     )) {
       this.#records.set(record.instanceId, record);
     }
+    for (const report of readExportReports(
+      await readJsonFile({ path: this.#options.config.exportsFile }),
+    )) {
+      this.#exportReports.set(report.exportId, report);
+    }
     logger.info({
       message: 'agent state loaded',
       instances: this.#records.size,
       slots: this.#allocator.slots().length,
+      exports: this.#exportReports.size,
     });
   }
 
@@ -167,6 +183,10 @@ export class Reconciler {
       // Listing checkpoints costs an RPC round trip on every reconcile, and almost every
       // reconcile has none to converge. The list is read once, inside the branch that needs it.
       checkpoints: [],
+      exports: [...this.#exportReports.values()].map((report) => ({
+        exportId: report.exportId,
+        written: report.state === 'ready',
+      })),
     };
   }
 
@@ -179,6 +199,9 @@ export class Reconciler {
     await this.#applyVolumes(plan);
     await this.#applyStarts(plan);
     await this.#applyCheckpoints({ plan, desired });
+    // After starts, so an export never competes with a boot for the device it reads, and before
+    // teardowns, so a volume marked absent in the same generation is still there to read from.
+    await this.#applyExports({ plan, desired });
     await this.#applyTeardowns(plan);
     await this.#applyNetwork();
     await this.#applyRoutes();
@@ -504,6 +527,61 @@ export class Reconciler {
     }
   }
 
+  async #applyExports({
+    plan,
+    desired,
+  }: {
+    plan: ReconcilePlan;
+    desired: HostDesiredState;
+  }): Promise<void> {
+    for (const action of plan.exports) {
+      if (action.action === 'none') {
+        continue;
+      }
+      if (action.action === 'forget') {
+        this.#exportReports.delete(action.exportId);
+        continue;
+      }
+      this.#exportReports.set(
+        action.desired.exportId,
+        await this.#writeExport({ action, desired }),
+      );
+    }
+  }
+
+  /**
+   * The artifact is joined from the instance desired state rather than carried on the export,
+   * so a bundle can only ever pair a filesystem with the binary this host was told to run
+   * against it. An app with no instance here has no such pairing, and reporting that is more
+   * use than shipping half a bundle.
+   */
+  async #writeExport({
+    action,
+    desired,
+  }: {
+    action: Extract<ExportPlan, { action: 'write' }>;
+    desired: HostDesiredState;
+  }): Promise<ReportedExport> {
+    const { exportId, appId } = action.desired;
+    const artifact = desired.instances.find((instance) => instance.appId === appId)?.artifact;
+    const devicePath = this.#allocator.lookup(appId)?.nbdDevicePath;
+
+    if (!artifact || !devicePath) {
+      const reason = artifact
+        ? 'no device attached for this app'
+        : 'no instance to take a binary from';
+      logger.error({ message: 'export not writable here', exportId, appId, reason });
+      return { exportId, state: 'failed', message: truncate(reason) };
+    }
+
+    try {
+      return await this.#options.exports.write({ desired: action.desired, artifact, devicePath });
+    } catch (error) {
+      logger.error({ message: 'export failed', exportId, appId, ...describeError(error) });
+      return { exportId, state: 'failed', message: truncate(describeError(error).error) };
+    }
+  }
+
   #adminFor(): ZerofsAdmin {
     return this.#options.topology.place().admin;
   }
@@ -564,6 +642,7 @@ export class Reconciler {
       value: this.#allocator.toRecords(),
     });
     await writeJsonFile({ path: this.#options.config.instancesFile, value: this.records() });
+    await writeJsonFile({ path: this.#options.config.exportsFile, value: this.exportReports() });
   }
 }
 

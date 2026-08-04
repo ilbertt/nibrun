@@ -4,6 +4,7 @@ import {
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
   type DeploymentId,
+  type ExportId,
   type GuestPort,
   type HostDesiredState,
   type HostId,
@@ -33,7 +34,7 @@ const VOLUME_SIZE_BYTES = 8_589_934_592;
 const POCKETBASE_PORT = 8090 as GuestPort;
 
 const DESIRED_APP = {
-  generation: 3,
+  generation: 4,
   volumes: [
     {
       volumeId: 'vol-pocketbase' as VolumeId,
@@ -74,7 +75,18 @@ const DESIRED_APP = {
     },
   ],
   checkpoints: [],
-  exports: [],
+  // Written once by the host that owns the volume, then never rewritten — so bumping
+  // `generation` alone will not produce a second bundle. Asking for another means a new
+  // `exportId` and a new key, which is what the table behind this will hand out per request.
+  exports: [
+    {
+      exportId: 'exp-pocketbase-1' as ExportId,
+      appId: APP_ID,
+      volumeId: 'vol-pocketbase' as VolumeId,
+      objectKey: `exports/${APP_ID}/exp-pocketbase-1.tar.gz` as ObjectKey,
+      desiredState: 'present',
+    },
+  ],
 } satisfies Omit<HostDesiredState, 'hostId'>;
 
 export class AgentRepository extends Repository {

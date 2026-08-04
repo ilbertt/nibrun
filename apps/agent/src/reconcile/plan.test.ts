@@ -5,6 +5,7 @@ import type {
   DeploymentId,
   DesiredInstance,
   DesiredVolume,
+  ExportId,
   HostDesiredState,
   HostId,
   InstanceId,
@@ -75,6 +76,7 @@ const observedState = (overrides: Partial<ObservedState> = {}): ObservedState =>
   instances: [],
   volumes: [],
   checkpoints: [],
+  exports: [],
   ...overrides,
 });
 
@@ -339,5 +341,51 @@ describe('checkpoints', () => {
       observed: observedState({ checkpoints: [{ checkpointId, volumeId: VOLUME }] }),
     });
     expect(remove.checkpoints[0]?.action).toBe('delete');
+  });
+});
+
+describe('exports', () => {
+  const exportId = 'exp-1' as ExportId;
+  const desiredExport = (overrides = {}) => ({
+    exportId,
+    appId: APP,
+    volumeId: VOLUME,
+    objectKey: 'exports/app-1/exp-1.tar.gz' as ObjectKey,
+    desiredState: 'present' as const,
+    ...overrides,
+  });
+
+  test('a bundle this host has not written is written', () => {
+    const plan = planReconcile({
+      desired: desiredState({ exports: [desiredExport()] }),
+      observed: observedState(),
+    });
+    expect(plan.exports).toEqual([{ action: 'write', desired: desiredExport() }]);
+  });
+
+  test('a bundle already written is never written twice', () => {
+    const plan = planReconcile({
+      desired: desiredState({ exports: [desiredExport()] }),
+      observed: observedState({ exports: [{ exportId, written: true }] }),
+    });
+    expect(plan.exports[0]?.action).toBe('none');
+  });
+
+  // A failed export is remembered as a record but not as a bundle, so the next reconcile is
+  // what retries it — the one case where re-reading the whole filesystem is the right answer.
+  test('a bundle that failed is retried', () => {
+    const plan = planReconcile({
+      desired: desiredState({ exports: [desiredExport()] }),
+      observed: observedState({ exports: [{ exportId, written: false }] }),
+    });
+    expect(plan.exports[0]?.action).toBe('write');
+  });
+
+  test('absent forgets the record rather than deleting an object it cannot reach', () => {
+    const plan = planReconcile({
+      desired: desiredState({ exports: [desiredExport({ desiredState: 'absent' })] }),
+      observed: observedState({ exports: [{ exportId, written: true }] }),
+    });
+    expect(plan.exports).toEqual([{ action: 'forget', exportId }]);
   });
 });

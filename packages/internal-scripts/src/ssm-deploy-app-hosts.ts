@@ -33,6 +33,7 @@ const sharedEnv: Record<string, string> = {
   FILESYSTEMS_BUCKET: requiredEnv('FILESYSTEMS_BUCKET'),
   GUEST_IMAGES_BUCKET: requiredEnv('GUEST_IMAGES_BUCKET'),
   ARTIFACTS_BUCKET: requiredEnv('ARTIFACTS_BUCKET'),
+  EXPORTS_BUCKET: requiredEnv('EXPORTS_BUCKET'),
   AGENT_VERSION: revision,
   AGENT_URL: requiredEnv('AGENT_URL'),
   ZEROFS_VERSION: versions.zerofs.version,

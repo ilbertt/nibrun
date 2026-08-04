@@ -5,6 +5,7 @@ import type {
   HostState,
   HostVersions,
   ReportedCheckpoint,
+  ReportedExport,
   ReportedInstance,
   ReportedVolume,
   Timestamp,
@@ -43,6 +44,7 @@ export function buildReportedState({
   records,
   volumes,
   checkpoints,
+  exports,
 }: {
   hostId: HostId;
   observedGeneration: number;
@@ -54,6 +56,7 @@ export function buildReportedState({
   records: readonly InstanceRecord[];
   volumes: readonly ReportedVolume[];
   checkpoints: readonly ReportedCheckpoint[];
+  exports: readonly ReportedExport[];
 }): HostReportedState {
   return {
     hostId,
@@ -66,7 +69,6 @@ export function buildReportedState({
     volumes: [...volumes],
     instances: records.map(toReportedInstance),
     checkpoints: [...checkpoints],
-    // Writing exports is not implemented yet, so this host has none to report.
-    exports: [],
+    exports: [...exports],
   };
 }
