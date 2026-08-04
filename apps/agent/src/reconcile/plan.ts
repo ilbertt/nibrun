@@ -111,6 +111,19 @@ export type ReconcilePlan = {
   exports: ExportPlan[];
 };
 
+/**
+ * Whether this plan left work it could not finish on this pass.
+ *
+ * A blocked teardown is the case that matters: the volume is still held by an instance this
+ * reconcile is only now stopping, so it converges on a later pass. Nothing would otherwise run
+ * one — the agent reconciles when the poll reports a new generation, and a volume it deferred
+ * does not change the generation — so the deletion would wait for an unrelated change to come
+ * along and carry it.
+ */
+export function hasDeferredWork(plan: ReconcilePlan): boolean {
+  return plan.volumes.some((action) => action.action === 'blocked');
+}
+
 const byId = <Item, Key extends string>({
   items,
   key,

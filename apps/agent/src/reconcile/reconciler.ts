@@ -27,6 +27,7 @@ import type { CaddyProxy } from '#proxy/caddy.ts';
 import {
   type CheckpointPlan,
   type ExportPlan,
+  hasDeferredWork,
   type ObservedState,
   planReconcile,
   type ReconcilePlan,
@@ -84,6 +85,7 @@ export class Reconciler {
   readonly #exportReports = new Map<ExportId, ReportedExport>();
   #observedGeneration = NO_GENERATION;
   #converged = false;
+  #deferredWork = false;
 
   constructor(options: ReconcilerOptions) {
     this.#options = options;
@@ -96,6 +98,12 @@ export class Reconciler {
 
   get converged() {
     return this.#converged;
+  }
+
+  // Whether the last reconcile deferred something, and therefore whether running it again
+  // against the same desired state would do anything.
+  get deferredWork() {
+    return this.#deferredWork;
   }
 
   records(): InstanceRecord[] {
@@ -193,6 +201,7 @@ export class Reconciler {
   async reconcile({ desired }: { desired: HostDesiredState }): Promise<void> {
     const observed = await this.observe();
     const plan = planReconcile({ desired, observed });
+    this.#deferredWork = hasDeferredWork(plan);
     this.#syncDesired(desired);
 
     await this.#applyStops(plan);

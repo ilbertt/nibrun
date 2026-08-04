@@ -19,7 +19,12 @@ import {
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
 } from '@repo/protocol';
-import { type ObservedState, type ObservedVolume, planReconcile } from '#reconcile/plan.ts';
+import {
+  hasDeferredWork,
+  type ObservedState,
+  type ObservedVolume,
+  planReconcile,
+} from '#reconcile/plan.ts';
 
 const APP = 'app-1' as AppId;
 const VOLUME = 'vol-1' as VolumeId;
@@ -298,6 +303,20 @@ describe('volumes are not authoritative', () => {
       desired: desiredVolume({ desiredState: 'absent' }),
       blockedBy: [INSTANCE],
     });
+    // Deleting an app takes two passes — stop the instance, then tear the volume down — and
+    // only a generation change runs a pass. Without this the second one never comes.
+    expect(hasDeferredWork(plan)).toBe(true);
+  });
+
+  test('a plan that finished everything leaves nothing to re-run for', () => {
+    const plan = planReconcile({
+      desired: desiredState({ volumes: [desiredVolume()] }),
+      observed: observedState({
+        volumes: [observedVolume()],
+      }),
+    });
+    expect(plan.volumes[0]?.action).toBe('none');
+    expect(hasDeferredWork(plan)).toBe(false);
   });
 
   test('an unattached volume is provisioned and a grown one re-provisioned', () => {

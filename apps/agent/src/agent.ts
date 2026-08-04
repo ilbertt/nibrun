@@ -64,6 +64,7 @@ export class Agent {
   readonly #reconciler: Reconciler;
   readonly #versions: HostVersions;
   #session: AgentSession | undefined;
+  #lastDesired: HostDesiredState | undefined;
   #knownGeneration = FIRST_GENERATION;
   #running = true;
 
@@ -156,6 +157,7 @@ export class Agent {
     const cached = await this.#readCachedDesiredState();
     if (cached) {
       this.#knownGeneration = cached.generation;
+      this.#lastDesired = cached;
       await this.#reconcileSafely(cached);
     }
 
@@ -182,7 +184,13 @@ export class Agent {
         if (response.result === 'changed') {
           await writeJsonFile({ path: this.#desiredStatePath(), value: response.state });
           this.#knownGeneration = response.state.generation;
+          this.#lastDesired = response.state;
           await this.#reconcileSafely(response.state);
+        } else if (this.#reconciler.deferredWork && this.#lastDesired) {
+          // The only thing that re-runs a reconcile is the generation changing, and work the
+          // last one deferred does not change it. A volume waiting on an instance to stop would
+          // otherwise sit until some unrelated edit came along to carry it.
+          await this.#reconcileSafely(this.#lastDesired);
         }
         await Bun.sleep(session.poll.minIntervalMs);
       } catch (error) {

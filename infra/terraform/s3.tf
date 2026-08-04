@@ -132,15 +132,19 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
 
 # --- Tenant filesystems ---
 #
-# ZeroFS's backing store: one prefix per app, holding the segments that make up
-# that app's disk. Deliberately not a prefix inside artifacts.
+# ZeroFS's backing store. Deliberately not a prefix inside artifacts.
 #
-# Versioning is why it cannot share: artifacts has it enabled, and ZeroFS's GC
-# deletes dead segments continuously, so on a versioned bucket every delete
-# would become a delete marker with the object retained — storage growing
-# without bound while the GC reports reclaiming space. Never enable versioning
-# here. The access patterns are opposite too, and deleting an app means
-# bulk-deleting a prefix, which should happen nowhere near users' binaries.
+# **A prefix here is one host, not one app.** v1 runs a single ZeroFS per app
+# host, so every tenant placed on that host shares its prefix — see the topology
+# note in `apps/agent/src/volumes/topology.ts`. Deleting one app is removing its
+# device file from inside that filesystem, which is what the agent's volume
+# teardown does. Deleting the prefix destroys every tenant on the host.
+#
+# Versioning is why it cannot share with artifacts: artifacts has it enabled,
+# and ZeroFS's GC deletes dead segments continuously, so on a versioned bucket
+# every delete would become a delete marker with the object retained — storage
+# growing without bound while the GC reports reclaiming space. Never enable
+# versioning here.
 #
 # Never put a lifecycle expiry on this bucket either. It holds live data: the
 # host's local disk is the cache, and this is what it is a cache of.
