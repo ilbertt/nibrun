@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { FileSystem, Path, type Socket } from '@effect/platform';
 import { BunSocketServer } from '@effect/platform-bun';
 import type { AppId, DeploymentId, InstanceId, TenantLogStream } from '@repo/protocol';
-import { Deferred, Effect, Either, Ref, Scope } from 'effect';
+import { Deferred, Effect, Either, Exit, Ref, Scope } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { decodeFrames, EMPTY_BUFFER } from '#logs/guest-protocol.ts';
 import { TenantLogQueue } from '#logs/queue.ts';
@@ -152,7 +152,7 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
           next.delete(instanceId);
           return next;
         });
-        yield* Scope.close(attachment.scope, Effect.void as never);
+        yield* Scope.close(attachment.scope, Exit.void);
         yield* fs.remove(attachment.socketPath, { force: true });
       });
 
@@ -181,7 +181,7 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
           scope,
         };
         yield* Scope.extend(serve({ attachment }), scope).pipe(
-          Effect.onError(() => Scope.close(scope, Effect.void as never)),
+          Effect.onError(() => Scope.close(scope, Exit.void)),
         );
         yield* Ref.update(attachments, (all) => new Map(all).set(source.instanceId, attachment));
       });

@@ -44,9 +44,11 @@ const uploadWindow = Effect.gen(function* () {
       );
       yield* control.streamTenantLogs({ sessionToken: session.sessionToken, body });
     }),
+  ).pipe(
     // A control plane that answers before the body ends leaves this stream still pulling, and a
     // chunk handed to it would be delivered nowhere.
-  ).pipe(Effect.ensuring(Effect.ignore(Effect.tryPromise(() => body.cancel()))));
+    Effect.ensuring(Effect.ignore(Effect.tryPromise(() => body.cancel()))),
+  );
 
   const elapsedMs = (yield* Clock.currentTimeMillis) - startedAtMs;
   if (elapsedMs < MIN_HEALTHY_MS) {
