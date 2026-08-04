@@ -11,7 +11,6 @@ import {
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
   parseMessage,
-  ReportedStateResponseSchema,
 } from '@repo/protocol';
 import { StatusMap } from 'elysia';
 
@@ -77,20 +76,20 @@ function post({
 // Every response is read back through the protocol's own schema, so the test
 // fails if the api answers something the agent could not have parsed — the same
 // check the agent performs, run from the other side.
-const readSession = async (response: Response) =>
-  parseMessage({ schema: AgentSessionSchema, value: await response.json() });
+async function readSession(response: Response) {
+  return parseMessage({ schema: AgentSessionSchema, value: await response.json() });
+}
 
-const readDesired = async (response: Response) =>
-  parseMessage({ schema: DesiredStateResponseSchema, value: await response.json() });
+async function readDesired(response: Response) {
+  return parseMessage({ schema: DesiredStateResponseSchema, value: await response.json() });
+}
 
-const readAck = async (response: Response) =>
-  parseMessage({ schema: ReportedStateResponseSchema, value: await response.json() });
-
-const openSession = async (overrides: Partial<AgentSessionRequest> = {}) =>
-  await post({
+function openSession(overrides: Partial<AgentSessionRequest> = {}) {
+  return post({
     route: AGENT_ROUTES.session,
     body: { versions, capacity, ...overrides },
   });
+}
 
 describe('an agent can register and be told what to run', () => {
   test('a session names the host and how often to come back', async () => {
@@ -98,7 +97,7 @@ describe('an agent can register and be told what to run', () => {
 
     expect(session.hostId).toBeTruthy();
     expect(session.sessionToken).toBeTruthy();
-    expect(session.poll.maxWaitSeconds).toBeGreaterThan(0);
+    expect(session.poll.minIntervalMs).toBeGreaterThan(0);
   });
 
   // The endpoint carries no credential. What keeps it closed is that nothing outside the VPC
@@ -112,7 +111,7 @@ describe('an agent can register and be told what to run', () => {
     const session = await readSession(await openSession());
     const response = await post({
       route: AGENT_ROUTES.desiredState,
-      body: { knownGeneration: FIRST_POLL_GENERATION, waitSeconds: 0 },
+      body: { knownGeneration: FIRST_POLL_GENERATION },
       sessionToken: session.sessionToken,
     });
 
@@ -127,7 +126,7 @@ describe('an agent can register and be told what to run', () => {
     const first = await readDesired(
       await post({
         route: AGENT_ROUTES.desiredState,
-        body: { knownGeneration: FIRST_POLL_GENERATION, waitSeconds: 0 },
+        body: { knownGeneration: FIRST_POLL_GENERATION },
         sessionToken: session.sessionToken,
       }),
     );
@@ -138,7 +137,7 @@ describe('an agent can register and be told what to run', () => {
     const second = await readDesired(
       await post({
         route: AGENT_ROUTES.desiredState,
-        body: { knownGeneration: first.state.generation, waitSeconds: 0 },
+        body: { knownGeneration: first.state.generation },
         sessionToken: session.sessionToken,
       }),
     );
@@ -146,15 +145,8 @@ describe('an agent can register and be told what to run', () => {
     expect(second).toEqual({ result: 'unchanged', generation: first.state.generation });
   });
 
-  test('a report is answered with the generation current at the time', async () => {
+  test('a report is accepted without being answered', async () => {
     const session = await readSession(await openSession());
-    const desired = await readDesired(
-      await post({
-        route: AGENT_ROUTES.desiredState,
-        body: { knownGeneration: FIRST_POLL_GENERATION, waitSeconds: 0 },
-        sessionToken: session.sessionToken,
-      }),
-    );
     const report = {
       hostId: session.hostId,
       observedGeneration: 0,
@@ -175,11 +167,10 @@ describe('an agent can register and be told what to run', () => {
       sessionToken: session.sessionToken,
     });
 
-    // The reply carries the generation, so an agent that has fallen behind learns it from the
-    // report it was already making rather than from its next poll.
-    expect(await readAck(response)).toEqual({
-      generation: desired.result === 'changed' ? desired.state.generation : desired.generation,
-    });
+    // No body at all: the desired-state poll is the only place a generation travels, so there is
+    // nothing here for an agent to read and nothing to keep in step with it.
+    expect(response.status).toBe(StatusMap['No Content']);
+    expect(await response.text()).toBe('');
   });
 });
 
@@ -187,7 +178,7 @@ describe('nothing reaches desired state without proving what it is', () => {
   test('an unknown session is refused rather than served a default host', async () => {
     const response = await post({
       route: AGENT_ROUTES.desiredState,
-      body: { knownGeneration: 0, waitSeconds: 0 },
+      body: { knownGeneration: 0 },
       sessionToken: 'not-a-session',
     });
 
@@ -197,7 +188,7 @@ describe('nothing reaches desired state without proving what it is', () => {
   test('a missing session is refused too', async () => {
     const response = await post({
       route: AGENT_ROUTES.desiredState,
-      body: { knownGeneration: 0, waitSeconds: 0 },
+      body: { knownGeneration: 0 },
     });
 
     expect(response.status).toBe(StatusMap.Unauthorized);
