@@ -102,4 +102,5 @@ export class SlotAllocator extends Effect.Service<SlotAllocator>()('SlotAllocato
       ),
     };
   }),
+  dependencies: [AgentConfig.Default],
 }) {}

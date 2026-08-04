@@ -141,50 +141,56 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
         );
       });
 
-    const detach = (instanceId: InstanceId) =>
-      Effect.gen(function* () {
-        const attachment = (yield* Ref.get(attachments)).get(instanceId);
-        if (!attachment) {
-          return;
-        }
-        yield* Ref.update(attachments, (current) => {
-          const next = new Map(current);
-          next.delete(instanceId);
-          return next;
-        });
-        yield* Scope.close(attachment.scope, Exit.void);
-        yield* fs.remove(attachment.socketPath, { force: true });
+    const detach = Effect.fn('TenantLogReceiver.detach')(function* (instanceId: InstanceId) {
+      yield* Effect.annotateCurrentSpan({ instanceId });
+      const attachment = (yield* Ref.get(attachments)).get(instanceId);
+      if (!attachment) {
+        return;
+      }
+      yield* Ref.update(attachments, (current) => {
+        const next = new Map(current);
+        next.delete(instanceId);
+        return next;
       });
+      yield* Scope.close(attachment.scope, Exit.void);
+      yield* fs.remove(attachment.socketPath, { force: true });
+    });
 
-    const attach = ({ source, socketPath }: { source: TenantLogSource; socketPath: string }) =>
-      Effect.gen(function* () {
-        const current = yield* Ref.get(attachments);
-        const existing = current.get(source.instanceId);
-        if (existing?.socketPath === socketPath) {
-          return yield* Ref.set(existing.source, source);
+    const attach = Effect.fn('TenantLogReceiver.attach')(function* ({
+      source,
+      socketPath,
+    }: {
+      source: TenantLogSource;
+      socketPath: string;
+    }) {
+      yield* Effect.annotateCurrentSpan({ instanceId: source.instanceId, appId: source.appId });
+      const current = yield* Ref.get(attachments);
+      const existing = current.get(source.instanceId);
+      if (existing?.socketPath === socketPath) {
+        return yield* Ref.set(existing.source, source);
+      }
+      for (const [instanceId, attached] of current) {
+        if (instanceId === source.instanceId || attached.socketPath === socketPath) {
+          yield* detach(instanceId);
         }
-        for (const [instanceId, attached] of current) {
-          if (instanceId === source.instanceId || attached.socketPath === socketPath) {
-            yield* detach(instanceId);
-          }
-        }
+      }
 
-        yield* fs.makeDirectory(path.dirname(socketPath), { recursive: true });
-        yield* fs.remove(socketPath, { force: true });
+      yield* fs.makeDirectory(path.dirname(socketPath), { recursive: true });
+      yield* fs.remove(socketPath, { force: true });
 
-        const scope = yield* Scope.make();
-        const attachment: Attachment = {
-          sourceId: yield* Effect.sync(() => crypto.randomUUID()),
-          socketPath,
-          source: yield* Ref.make(source),
-          sequence: yield* Ref.make(0),
-          scope,
-        };
-        yield* Scope.extend(serve({ attachment }), scope).pipe(
-          Effect.onError(() => Scope.close(scope, Exit.void)),
-        );
-        yield* Ref.update(attachments, (all) => new Map(all).set(source.instanceId, attachment));
-      });
+      const scope = yield* Scope.make();
+      const attachment: Attachment = {
+        sourceId: yield* Effect.sync(() => crypto.randomUUID()),
+        socketPath,
+        source: yield* Ref.make(source),
+        sequence: yield* Ref.make(0),
+        scope,
+      };
+      yield* Scope.extend(serve({ attachment }), scope).pipe(
+        Effect.onError(() => Scope.close(scope, Exit.void)),
+      );
+      yield* Ref.update(attachments, (all) => new Map(all).set(source.instanceId, attachment));
+    });
 
     yield* Effect.addFinalizer(() =>
       Effect.flatMap(Ref.get(attachments), (all) =>
@@ -194,4 +200,5 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
 
     return { attach, detach };
   }),
+  dependencies: [TenantLogQueue.Default],
 }) {}

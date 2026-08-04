@@ -49,4 +49,5 @@ export class AgentSessionHolder extends Effect.Service<AgentSessionHolder>()('Ag
         error.isSessionExpired ? SynchronizedRef.set(cached, Option.none()) : Effect.void,
     };
   }),
+  dependencies: [AgentConfig.Default],
 }) {}

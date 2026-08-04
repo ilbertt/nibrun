@@ -54,36 +54,41 @@ export const listInstanceIds = stdoutOf({
       .map(instanceIdFromUnit)
       .filter((id): id is InstanceId => id !== undefined),
   ),
+  Effect.withSpan('systemd.listInstanceIds'),
 );
 
-export const statuses = (instanceIds: readonly InstanceId[]) =>
-  Effect.gen(function* () {
-    if (instanceIds.length === 0) {
-      return new Map<InstanceId, UnitStatus>();
-    }
-    const result = yield* run({
-      command: [
-        SYSTEMCTL,
-        'show',
-        ...instanceIds.map(vmUnitName),
-        `--property=${SHOWN_PROPERTIES.join(',')}`,
-      ],
-    });
-    const blocks = parsePropertyBlocks(result.stdout);
-    return new Map(
-      [...instanceIds.entries()].map(([index, instanceId]) => [
-        instanceId,
-        unitStatusFrom(blocks[index] ?? { LoadState: 'not-found', ActiveState: 'inactive' }),
-      ]),
-    );
+export const statuses = Effect.fn('systemd.statuses')(function* (
+  instanceIds: readonly InstanceId[],
+) {
+  if (instanceIds.length === 0) {
+    return new Map<InstanceId, UnitStatus>();
+  }
+  const result = yield* run({
+    command: [
+      SYSTEMCTL,
+      'show',
+      ...instanceIds.map(vmUnitName),
+      `--property=${SHOWN_PROPERTIES.join(',')}`,
+    ],
   });
+  const blocks = parsePropertyBlocks(result.stdout);
+  return new Map(
+    [...instanceIds.entries()].map(([index, instanceId]) => [
+      instanceId,
+      unitStatusFrom(blocks[index] ?? { LoadState: 'not-found', ActiveState: 'inactive' }),
+    ]),
+  );
+});
 
-export const start = (instanceId: InstanceId) =>
-  stdoutOf({ command: [SYSTEMCTL, 'start', vmUnitName(instanceId)] });
+export const start = Effect.fn('systemd.start')((instanceId: InstanceId) =>
+  stdoutOf({ command: [SYSTEMCTL, 'start', vmUnitName(instanceId)] }),
+);
 
-export const stop = (instanceId: InstanceId) =>
-  stdoutOf({ command: [SYSTEMCTL, 'stop', vmUnitName(instanceId)] });
+export const stop = Effect.fn('systemd.stop')((instanceId: InstanceId) =>
+  stdoutOf({ command: [SYSTEMCTL, 'stop', vmUnitName(instanceId)] }),
+);
 
 /** An exited template instance stays loaded and failed until reset, and would linger in every enumeration. */
-export const forget = (instanceId: InstanceId) =>
-  run({ command: [SYSTEMCTL, 'reset-failed', vmUnitName(instanceId)] });
+export const forget = Effect.fn('systemd.forget')((instanceId: InstanceId) =>
+  run({ command: [SYSTEMCTL, 'reset-failed', vmUnitName(instanceId)] }),
+);

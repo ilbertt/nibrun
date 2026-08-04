@@ -37,11 +37,11 @@ export const isFormatted = (devicePath: string) =>
   });
 
 /** Writing a filesystem is not parsing one, so this stays on the host and the guest only mounts. */
-export const formatOnce = (devicePath: string) =>
-  Effect.gen(function* () {
-    if (yield* isFormatted(devicePath)) {
-      return false;
-    }
-    yield* stdoutOf({ command: ['mkfs.ext4', '-q', '-L', FILESYSTEM_LABEL, devicePath] });
-    return true;
-  });
+export const formatOnce = Effect.fn('formatOnce')(function* (devicePath: string) {
+  yield* Effect.annotateCurrentSpan({ devicePath });
+  if (yield* isFormatted(devicePath)) {
+    return false;
+  }
+  yield* stdoutOf({ command: ['mkfs.ext4', '-q', '-L', FILESYSTEM_LABEL, devicePath] });
+  return true;
+});

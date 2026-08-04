@@ -19,7 +19,9 @@ const BEYOND_THE_LAST_SLOT = 1_000;
 const everySlot = [...Array(SLOT_COUNT).keys()];
 
 const run = provided(
-  SlotAllocator.Default.pipe(Layer.provide(Layer.merge(agentConfig(), platform))),
+  SlotAllocator.DefaultWithoutDependencies.pipe(
+    Layer.provide(Layer.merge(agentConfig(), platform)),
+  ),
 );
 
 function app(name: string | number) {

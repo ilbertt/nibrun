@@ -15,8 +15,11 @@ const DROPPED_BYTES = 17n;
 const MAX_GUEST_CONNECTIONS = 4;
 const SETTLE_MS = 50;
 
+// The receiver publishes to the queue this drains: naming one layer twice still builds it once.
 const run = provided(
-  TenantLogReceiver.Default.pipe(Layer.provideMerge(Layer.merge(TenantLogQueue.Default, platform))),
+  Layer.mergeAll(TenantLogReceiver.Default, TenantLogQueue.Default).pipe(
+    Layer.provideMerge(platform),
+  ),
 );
 
 async function connect(socketPath: string): Promise<Socket> {

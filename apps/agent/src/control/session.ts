@@ -38,18 +38,20 @@ const readHostId = Effect.gen(function* () {
   ) as Option.Option<HostId>;
 });
 
-export const openSession = (inputs: { versions: HostVersions; capacity: HostCapacity }) =>
-  Effect.gen(function* () {
-    const config = yield* AgentConfig;
-    const control = yield* ControlPlane;
-    const hostId = yield* readHostId;
-    const session = yield* control.openSession({
-      ...Option.match(hostId, { onNone: () => ({}), onSome: (value) => ({ hostId: value }) }),
-      versions: inputs.versions,
-      capacity: inputs.capacity,
-    });
-    if (!Option.contains(hostId, session.hostId)) {
-      yield* writeTextFile({ path: config.hostIdFile, value: `${session.hostId}\n` });
-    }
-    return session;
+export const openSession = Effect.fn('openSession')(function* (inputs: {
+  versions: HostVersions;
+  capacity: HostCapacity;
+}) {
+  const config = yield* AgentConfig;
+  const control = yield* ControlPlane;
+  const hostId = yield* readHostId;
+  const session = yield* control.openSession({
+    ...Option.match(hostId, { onNone: () => ({}), onSome: (value) => ({ hostId: value }) }),
+    versions: inputs.versions,
+    capacity: inputs.capacity,
   });
+  if (!Option.contains(hostId, session.hostId)) {
+    yield* writeTextFile({ path: config.hostIdFile, value: `${session.hostId}\n` });
+  }
+  return session;
+});

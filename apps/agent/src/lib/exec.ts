@@ -77,6 +77,7 @@ const execute = (request: CommandRequest) =>
       duration: request.timeout ?? DEFAULT_TIMEOUT,
       onTimeout: () => new CommandTimedOut({ command: request.command }),
     }),
+    Effect.withSpan('exec', { attributes: { command: request.command[0] } }),
   );
 
 export const layer = Layer.effect(

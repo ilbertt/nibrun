@@ -25,10 +25,11 @@ export class DesiredStateCache extends Effect.Service<DesiredStateCache>()('Desi
       knownGeneration: Ref.get(generation),
       latest: Ref.get(latest),
 
-      accept: (state: HostDesiredState) =>
-        writeJsonFile({ path: config.desiredStateFile, value: state }).pipe(
-          Effect.andThen(remember(state)),
-        ),
+      accept: Effect.fn('DesiredStateCache.accept')(function* (state: HostDesiredState) {
+        yield* Effect.annotateCurrentSpan({ generation: state.generation });
+        yield* writeJsonFile({ path: config.desiredStateFile, value: state });
+        yield* remember(state);
+      }),
 
       restore: Effect.gen(function* () {
         const value = yield* readJsonFile(config.desiredStateFile).pipe(
@@ -54,4 +55,5 @@ export class DesiredStateCache extends Effect.Service<DesiredStateCache>()('Desi
       }),
     };
   }),
+  dependencies: [AgentConfig.Default],
 }) {}

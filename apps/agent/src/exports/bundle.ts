@@ -63,7 +63,7 @@ export function bundleBinaryName(artifact: DesiredArtifact): Either.Either<strin
  * The binary is fetched from the artifact bucket rather than lifted out of the local squashfs
  * cache, because the download proves the digest on the way past.
  */
-export const writeBundle = ({
+export const writeBundle = Effect.fn('writeBundle')(function* ({
   artifact,
   devicePath,
   stagingDir,
@@ -71,24 +71,24 @@ export const writeBundle = ({
   artifact: DesiredArtifact;
   devicePath: string;
   stagingDir: string;
-}) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const binaryName = yield* bundleBinaryName(artifact);
+}) {
+  yield* Effect.annotateCurrentSpan({ devicePath });
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const binaryName = yield* bundleBinaryName(artifact);
 
-    yield* fs.remove(stagingDir, { recursive: true, force: true });
-    yield* fs.makeDirectory(stagingDir, { recursive: true, mode: STAGING_MODE });
+  yield* fs.remove(stagingDir, { recursive: true, force: true });
+  yield* fs.makeDirectory(stagingDir, { recursive: true, mode: STAGING_MODE });
 
-    yield* dumpFilesystem({ devicePath, destination: path.join(stagingDir, DATA_DIRECTORY) });
-    yield* downloadAndVerify({ artifact, destination: path.join(stagingDir, binaryName) });
+  yield* dumpFilesystem({ devicePath, destination: path.join(stagingDir, DATA_DIRECTORY) });
+  yield* downloadAndVerify({ artifact, destination: path.join(stagingDir, binaryName) });
 
-    const bundlePath = path.join(stagingDir, BUNDLE_NAME);
-    yield* stdoutOf({
-      // Named entries rather than `.`, which would sweep the archive into itself.
-      command: ['tar', 'czf', bundlePath, '-C', stagingDir, DATA_DIRECTORY, binaryName],
-      timeout: DUMP_TIMEOUT,
-    });
-
-    return { path: bundlePath, sizeBytes: Number((yield* fs.stat(bundlePath)).size) };
+  const bundlePath = path.join(stagingDir, BUNDLE_NAME);
+  yield* stdoutOf({
+    // Named entries rather than `.`, which would sweep the archive into itself.
+    command: ['tar', 'czf', bundlePath, '-C', stagingDir, DATA_DIRECTORY, binaryName],
+    timeout: DUMP_TIMEOUT,
   });
+
+  return { path: bundlePath, sizeBytes: Number((yield* fs.stat(bundlePath)).size) };
+});

@@ -40,4 +40,5 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
     ];
     return { place: () => filesystems[0], all: filesystems };
   }),
+  dependencies: [AgentConfig.Default],
 }) {}

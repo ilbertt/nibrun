@@ -94,6 +94,7 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
             })
           : Effect.succeed(reply.data),
       ),
+      Effect.withSpan('controlPlane', { attributes: { route } }),
     );
 
   const options = (sessionToken?: SecretString) => ({
@@ -174,4 +175,4 @@ export class ControlPlane extends Context.Tag('ControlPlane')<ControlPlane, Cont
 export const layer = Layer.effect(
   ControlPlane,
   Effect.map(AgentConfig, (config) => makeControlPlaneClient({ baseUrl: config.controlPlaneUrl })),
-);
+).pipe(Layer.provide(AgentConfig.Default));

@@ -47,7 +47,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
           exports: exports.length,
         }),
       );
-    });
+    }).pipe(Effect.withSpan('Reconciler.load'));
 
     /**
      * The union of what systemd knows and what this agent has notes on: a unit with no note is an
@@ -94,7 +94,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
           written: report.state === 'ready',
         })),
       } satisfies ObservedState;
-    });
+    }).pipe(Effect.withSpan('Reconciler.observe'));
 
     const persist = Effect.gen(function* () {
       const current = yield* State.snapshot;
@@ -184,38 +184,38 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
         );
       });
 
-    const reconcile = (desired: HostDesiredState) =>
-      Effect.gen(function* () {
-        const observed = yield* observe;
-        const plan = planReconcile({ desired, observed });
-        yield* State.modify((current) => ({
-          ...current,
-          deferredWork: hasDeferredWork(plan),
-        }));
-        yield* syncDesired(desired);
+    const reconcile = Effect.fn('Reconciler.reconcile')(function* (desired: HostDesiredState) {
+      yield* Effect.annotateCurrentSpan({ generation: desired.generation });
+      const observed = yield* observe;
+      const plan = planReconcile({ desired, observed });
+      yield* State.modify((current) => ({
+        ...current,
+        deferredWork: hasDeferredWork(plan),
+      }));
+      yield* syncDesired(desired);
 
-        yield* applyStops(plan);
-        yield* applyVolumes({ plan, observed });
-        // Before anything boots: nothing persists the ruleset across a reboot, so a host that
-        // started its VMs first would serve tenants through a kernel with no `nibrun` table.
-        yield* applyNetwork;
-        yield* applyStarts(plan);
-        yield* applyCheckpoints({ plan, desired });
-        // After starts, so an export never competes with a boot for the device it reads, and
-        // before teardowns, so a volume marked absent this generation is still there to read.
-        yield* applyExports({ plan, desired });
-        yield* applyTeardowns(plan);
-        // Again, because the instances started above are the ones whose forwards this renders.
-        yield* applyNetwork;
-        yield* applyRoutes;
-        yield* persist;
+      yield* applyStops(plan).pipe(Effect.withSpan('reconcile.stops'));
+      yield* applyVolumes({ plan, observed }).pipe(Effect.withSpan('reconcile.volumes'));
+      // Before anything boots: nothing persists the ruleset across a reboot, so a host that
+      // started its VMs first would serve tenants through a kernel with no `nibrun` table.
+      yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
+      yield* applyStarts(plan).pipe(Effect.withSpan('reconcile.starts'));
+      yield* applyCheckpoints({ plan, desired }).pipe(Effect.withSpan('reconcile.checkpoints'));
+      // After starts, so an export never competes with a boot for the device it reads, and
+      // before teardowns, so a volume marked absent this generation is still there to read.
+      yield* applyExports({ plan, desired }).pipe(Effect.withSpan('reconcile.exports'));
+      yield* applyTeardowns(plan).pipe(Effect.withSpan('reconcile.teardowns'));
+      // Again, because the instances started above are the ones whose forwards this renders.
+      yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
+      yield* applyRoutes.pipe(Effect.withSpan('reconcile.routes'));
+      yield* persist.pipe(Effect.withSpan('reconcile.persist'));
 
-        yield* State.modify((current) => ({
-          ...current,
-          observedGeneration: desired.generation,
-          converged: true,
-        }));
-      });
+      yield* State.modify((current) => ({
+        ...current,
+        observedGeneration: desired.generation,
+        converged: true,
+      }));
+    });
 
     return {
       load,
@@ -223,7 +223,17 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       reconcile,
       // An instance becomes routable here rather than in reconcile: the probe is what tells a
       // booted VM from one whose tenant has answered.
-      refresh: refreshStates.pipe(Effect.andThen(applyRoutes), Effect.andThen(persist)),
+      refresh: refreshStates.pipe(
+        Effect.andThen(applyRoutes),
+        Effect.andThen(persist),
+        Effect.withSpan('Reconciler.refresh'),
+      ),
     };
   }),
+  dependencies: [
+    AgentConfig.Default,
+    SlotAllocator.Default,
+    VolumeManager.Default,
+    VmManager.Default,
+  ],
 }) {}

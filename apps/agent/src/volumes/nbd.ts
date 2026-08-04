@@ -18,31 +18,35 @@ export const isAttached = (devicePath: string) =>
   );
 
 /** `-persist` reconnects on its own, which keeps a ZeroFS restart a stall rather than an I/O error. */
-export const attach = ({
-  socketPath,
-  devicePath,
-  volumeId,
-}: {
-  socketPath: string;
-  devicePath: string;
-  volumeId: VolumeId;
-}) =>
-  stdoutOf({
-    command: [
-      NBD_CLIENT,
-      '-unix',
-      socketPath,
-      devicePath,
-      '-N',
-      volumeId,
-      '-persist',
-      '-timeout',
-      String(NBD_TIMEOUT_SECONDS),
-      '-connections',
-      String(NBD_CONNECTIONS),
-      '-block-size',
-      String(NBD_BLOCK_SIZE_BYTES),
-    ],
-  });
+export const attach = Effect.fn('nbd.attach')(
+  ({
+    socketPath,
+    devicePath,
+    volumeId,
+  }: {
+    socketPath: string;
+    devicePath: string;
+    volumeId: VolumeId;
+  }) =>
+    stdoutOf({
+      command: [
+        NBD_CLIENT,
+        '-unix',
+        socketPath,
+        devicePath,
+        '-N',
+        volumeId,
+        '-persist',
+        '-timeout',
+        String(NBD_TIMEOUT_SECONDS),
+        '-connections',
+        String(NBD_CONNECTIONS),
+        '-block-size',
+        String(NBD_BLOCK_SIZE_BYTES),
+      ],
+    }),
+);
 
-export const detach = (devicePath: string) => run({ command: [NBD_CLIENT, '-d', devicePath] });
+export const detach = Effect.fn('nbd.detach')((devicePath: string) =>
+  run({ command: [NBD_CLIENT, '-d', devicePath] }),
+);

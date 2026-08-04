@@ -38,32 +38,38 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
      * truncated bundle, and the bucket's abort rule reaps it — which is why exports need no
      * delete permission.
      */
-    const upload = ({ bundlePath, objectKey }: { bundlePath: string; objectKey: string }) =>
-      Effect.gen(function* () {
-        const resolved = yield* credentials.resolve;
-        const client = new Bun.S3Client({
-          bucket: config.exportBucket,
-          region: config.awsRegion,
-          ...s3Credentials(resolved),
-        });
-        yield* Effect.tryPromise(async () => {
-          const writer = client.file(objectKey).writer({
-            partSize: UPLOAD_PART_SIZE_BYTES,
-            queueSize: UPLOAD_QUEUE_SIZE,
-            retry: UPLOAD_RETRIES,
-          });
-          for await (const chunk of Bun.file(bundlePath).stream()) {
-            writer.write(chunk);
-          }
-          await writer.end();
-        });
+    const upload = Effect.fn('ExportManager.upload')(function* ({
+      bundlePath,
+      objectKey,
+    }: {
+      bundlePath: string;
+      objectKey: string;
+    }) {
+      yield* Effect.annotateCurrentSpan({ objectKey });
+      const resolved = yield* credentials.resolve;
+      const client = new Bun.S3Client({
+        bucket: config.exportBucket,
+        region: config.awsRegion,
+        ...s3Credentials(resolved),
       });
+      yield* Effect.tryPromise(async () => {
+        const writer = client.file(objectKey).writer({
+          partSize: UPLOAD_PART_SIZE_BYTES,
+          queueSize: UPLOAD_QUEUE_SIZE,
+          retry: UPLOAD_RETRIES,
+        });
+        for await (const chunk of Bun.file(bundlePath).stream()) {
+          writer.write(chunk);
+        }
+        await writer.end();
+      });
+    });
 
     /**
      * The staging tree is a second copy of a tenant's dataset in the clear on a shared host, so
      * it is removed whether or not the upload worked.
      */
-    const write = ({
+    const write = Effect.fn('ExportManager.write')(function* ({
       desired,
       artifact,
       devicePath,
@@ -71,34 +77,35 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
       desired: DesiredExport;
       artifact: DesiredArtifact;
       devicePath: string;
-    }) =>
-      Effect.gen(function* () {
-        const stagingDir = path.join(config.exportStagingDir, desired.exportId);
-        return yield* Effect.ensuring(
-          Effect.gen(function* () {
-            // Under `ignore_fsync` the guest's barriers are not durability points, so this is what
-            // turns its acknowledged writes into bytes the device will hand back.
-            yield* flush(topology.place().admin);
-            const bundle = yield* writeBundle({ artifact, devicePath, stagingDir });
-            yield* upload({ bundlePath: bundle.path, objectKey: desired.objectKey });
-            yield* Effect.logInfo('export written').pipe(
-              Effect.annotateLogs({
-                exportId: desired.exportId,
-                objectKey: desired.objectKey,
-                sizeBytes: bundle.sizeBytes,
-              }),
-            );
-            return {
+    }) {
+      yield* Effect.annotateCurrentSpan({ exportId: desired.exportId });
+      const stagingDir = path.join(config.exportStagingDir, desired.exportId);
+      return yield* Effect.ensuring(
+        Effect.gen(function* () {
+          // Under `ignore_fsync` the guest's barriers are not durability points, so this is what
+          // turns its acknowledged writes into bytes the device will hand back.
+          yield* flush(topology.place().admin);
+          const bundle = yield* writeBundle({ artifact, devicePath, stagingDir });
+          yield* upload({ bundlePath: bundle.path, objectKey: desired.objectKey });
+          yield* Effect.logInfo('export written').pipe(
+            Effect.annotateLogs({
               exportId: desired.exportId,
-              state: 'ready',
+              objectKey: desired.objectKey,
               sizeBytes: bundle.sizeBytes,
-              readyAt: yield* nowTimestamp,
-            } satisfies ReportedExport;
-          }),
-          fs.remove(stagingDir, { recursive: true, force: true }).pipe(Effect.ignore),
-        );
-      });
+            }),
+          );
+          return {
+            exportId: desired.exportId,
+            state: 'ready',
+            sizeBytes: bundle.sizeBytes,
+            readyAt: yield* nowTimestamp,
+          } satisfies ReportedExport;
+        }),
+        fs.remove(stagingDir, { recursive: true, force: true }).pipe(Effect.ignore),
+      );
+    });
 
     return { write };
   }),
+  dependencies: [AgentConfig.Default, ZerofsTopology.Default, AwsCredentialProvider.Default],
 }) {}

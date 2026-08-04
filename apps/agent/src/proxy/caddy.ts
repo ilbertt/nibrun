@@ -23,21 +23,21 @@ export class CaddyProxy extends Effect.Service<CaddyProxy>()('CaddyProxy', {
     const applied = yield* Ref.make(Option.none<string>());
 
     return {
-      apply: (routes: readonly RouteTarget[]) =>
-        Effect.gen(function* () {
-          const sites = renderAppSites(routes);
-          if (Option.getOrUndefined(yield* Ref.get(applied)) === sites) {
-            return;
-          }
-          yield* writeTextFile({
-            path: config.caddySitesFile,
-            value: sites,
-            mode: SITE_FILE_MODE,
-          });
-          // Reloaded, not restarted: one app's route must not interrupt the others.
-          yield* stdoutOf({ command: [SYSTEMCTL, 'reload', CADDY_UNIT] });
-          yield* Ref.set(applied, Option.some(sites));
-        }),
+      apply: Effect.fn('CaddyProxy.apply')(function* (routes: readonly RouteTarget[]) {
+        const sites = renderAppSites(routes);
+        if (Option.getOrUndefined(yield* Ref.get(applied)) === sites) {
+          return;
+        }
+        yield* writeTextFile({
+          path: config.caddySitesFile,
+          value: sites,
+          mode: SITE_FILE_MODE,
+        });
+        // Reloaded, not restarted: one app's route must not interrupt the others.
+        yield* stdoutOf({ command: [SYSTEMCTL, 'reload', CADDY_UNIT] });
+        yield* Ref.set(applied, Option.some(sites));
+      }),
     };
   }),
+  dependencies: [AgentConfig.Default],
 }) {}

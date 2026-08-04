@@ -5,7 +5,10 @@ import { ZerofsTopology } from '#volumes/topology.ts';
 
 function topology() {
   return Effect.runSync(
-    Effect.provide(ZerofsTopology, ZerofsTopology.Default.pipe(Layer.provide(agentConfig()))),
+    Effect.provide(
+      ZerofsTopology,
+      ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provide(agentConfig())),
+    ),
   );
 }
 

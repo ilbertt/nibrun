@@ -81,84 +81,87 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
       });
 
     /** The truth a restarted agent converges against: what ZeroFS is exporting, not what it remembers. */
-    const observe = (appIdByVolume: ReadonlyMap<VolumeId, AppId>) =>
-      Effect.forEach(topology.all, (filesystem) =>
-        Effect.gen(function* () {
-          const directory = path.join(filesystem.mountPath, NBD_DIRECTORY);
-          const names = yield* fs.readDirectory(directory).pipe(
-            Effect.tapError((error) =>
-              Effect.logWarning('zerofs nbd directory unreadable', error).pipe(
-                Effect.annotateLogs({ directory }),
+    const observe = Effect.fn('VolumeManager.observe')(
+      (appIdByVolume: ReadonlyMap<VolumeId, AppId>) =>
+        Effect.forEach(topology.all, (filesystem) =>
+          Effect.gen(function* () {
+            const directory = path.join(filesystem.mountPath, NBD_DIRECTORY);
+            const names = yield* fs.readDirectory(directory).pipe(
+              Effect.tapError((error) =>
+                Effect.logWarning('zerofs nbd directory unreadable', error).pipe(
+                  Effect.annotateLogs({ directory }),
+                ),
               ),
-            ),
-            Effect.orElseSucceed(() => [] as string[]),
-          );
-          const observed = yield* Effect.forEach(names, (name) =>
-            Effect.flatMap(slotFor({ volumeId: name as VolumeId, appIdByVolume }), (slot) =>
-              observeFile({ filesystem, volumeId: name as VolumeId, slot }),
-            ),
-          );
-          return Arr.getSomes(observed);
-        }),
-      ).pipe(Effect.map((byFilesystem) => byFilesystem.flat()));
+              Effect.orElseSucceed(() => [] as string[]),
+            );
+            const observed = yield* Effect.forEach(names, (name) =>
+              Effect.flatMap(slotFor({ volumeId: name as VolumeId, appIdByVolume }), (slot) =>
+                observeFile({ filesystem, volumeId: name as VolumeId, slot }),
+              ),
+            );
+            return Arr.getSomes(observed);
+          }),
+        ).pipe(Effect.map((byFilesystem) => byFilesystem.flat())),
+    );
 
-    const provision = (desired: DesiredVolume) =>
-      Effect.gen(function* () {
-        const filesystem = topology.place();
-        const slot = yield* allocator.allocate(desired.appId);
-        const sizeBytes = yield* ensureDeviceFile({
-          path: devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId, path }),
-          sizeBytes: desired.sizeBytes,
-        });
-
-        if (!(yield* isAttached(slot.nbdDevicePath))) {
-          yield* attach({
-            socketPath: filesystem.nbdSocketPath,
-            devicePath: slot.nbdDevicePath,
-            volumeId: desired.volumeId,
-          });
-        }
-
-        if (yield* formatOnce(slot.nbdDevicePath)) {
-          yield* Effect.logInfo('volume formatted').pipe(
-            Effect.annotateLogs({ volumeId: desired.volumeId, device: slot.nbdDevicePath }),
-          );
-        }
-
-        return {
-          volumeId: desired.volumeId,
-          state: 'ready',
-          sizeBytes,
-          devicePath: slot.nbdDevicePath,
-          storagePrefix: filesystem.storagePrefix,
-        } satisfies ReportedVolume;
+    const provision = Effect.fn('VolumeManager.provision')(function* (desired: DesiredVolume) {
+      yield* Effect.annotateCurrentSpan({ volumeId: desired.volumeId, appId: desired.appId });
+      const filesystem = topology.place();
+      const slot = yield* allocator.allocate(desired.appId);
+      const sizeBytes = yield* ensureDeviceFile({
+        path: devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId, path }),
+        sizeBytes: desired.sizeBytes,
       });
+
+      if (!(yield* isAttached(slot.nbdDevicePath))) {
+        yield* attach({
+          socketPath: filesystem.nbdSocketPath,
+          devicePath: slot.nbdDevicePath,
+          volumeId: desired.volumeId,
+        });
+      }
+
+      if (yield* formatOnce(slot.nbdDevicePath)) {
+        yield* Effect.logInfo('volume formatted').pipe(
+          Effect.annotateLogs({ volumeId: desired.volumeId, device: slot.nbdDevicePath }),
+        );
+      }
+
+      return {
+        volumeId: desired.volumeId,
+        state: 'ready',
+        sizeBytes,
+        devicePath: slot.nbdDevicePath,
+        storagePrefix: filesystem.storagePrefix,
+      } satisfies ReportedVolume;
+    });
 
     /**
      * The only path that destroys tenant data, and it runs only for an explicit `absent`. The
      * flush first, so the detach happens at a durability point rather than dropping whatever the
      * periodic flush had not yet uploaded.
      */
-    const teardown = (desired: DesiredVolume) =>
-      Effect.gen(function* () {
-        const filesystem = topology.place();
-        const slot = yield* allocator.lookup(desired.appId);
-        yield* flush(filesystem.admin);
-        if (Option.isSome(slot)) {
-          yield* detach(slot.value.nbdDevicePath);
-        }
-        yield* fs.remove(
-          devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId, path }),
-          { force: true },
-        );
-        yield* allocator.release(desired.appId);
-        return {
-          volumeId: desired.volumeId,
-          state: 'deleting',
-          sizeBytes: EMPTY_SIZE,
-        } satisfies ReportedVolume;
-      });
+    const teardown = Effect.fn('VolumeManager.teardown')(function* (desired: DesiredVolume) {
+      yield* Effect.annotateCurrentSpan({ volumeId: desired.volumeId, appId: desired.appId });
+      const filesystem = topology.place();
+      const slot = yield* allocator.lookup(desired.appId);
+      yield* flush(filesystem.admin);
+      if (Option.isSome(slot)) {
+        yield* detach(slot.value.nbdDevicePath);
+      }
+      yield* fs.remove(
+        devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId, path }),
+        { force: true },
+      );
+      yield* allocator.release(desired.appId);
+      return {
+        volumeId: desired.volumeId,
+        state: 'deleting',
+        sizeBytes: EMPTY_SIZE,
+      } satisfies ReportedVolume;
+    });
 
     return { observe, provision, teardown };
   }),
+  dependencies: [ZerofsTopology.Default, SlotAllocator.Default],
 }) {}
