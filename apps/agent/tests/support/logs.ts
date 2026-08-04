@@ -9,7 +9,8 @@ export function drainedLines(queue: TenantLogQueue) {
   return Effect.gen(function* () {
     const ending = yield* Deferred.make<void>();
     yield* Deferred.succeed(ending, undefined);
-    const chunks = Chunk.toReadonlyArray(yield* Stream.runCollect(queue.body(ending)));
+    const upload = yield* queue.body(ending);
+    const chunks = Chunk.toReadonlyArray(yield* Stream.runCollect(upload));
     return chunks.map((chunk) => DECODER.decode(chunk));
   });
 }

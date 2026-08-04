@@ -23,6 +23,11 @@ RestartSec=5s
 
 StateDirectory=nibrun
 RuntimeDirectory=nibrun
+# systemd removes a RuntimeDirectory when its unit stops, and what lives in this one belongs to
+# the microVMs rather than to the agent: each Firecracker holds its API socket there and keeps
+# running across an agent restart. Removing it takes away the only handle on a VM that outlived
+# the agent, which is precisely the case the VMs are parented to init to survive.
+RuntimeDirectoryPreserve=yes
 
 # It creates tap devices, writes firewall rules and starts microVM units, so it
 # runs as root. Containerising it would hand back every privilege the container

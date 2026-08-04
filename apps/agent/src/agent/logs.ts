@@ -37,7 +37,8 @@ const uploadWindow = Effect.gen(function* () {
   const logs = yield* TenantLogQueue;
 
   const ending = yield* Deferred.make<void>();
-  const body = yield* Stream.toReadableStreamEffect(logs.body(ending));
+  const upload = yield* logs.body(ending);
+  const body = yield* Stream.toReadableStreamEffect(upload);
   const session = yield* sessions.current;
   const startedAtMs = yield* Clock.currentTimeMillis;
 
@@ -59,6 +60,7 @@ const uploadWindow = Effect.gen(function* () {
   if (elapsedMs < MIN_HEALTHY_MS) {
     return yield* new LogStreamEndedEarly({ elapsedMs });
   }
+  yield* logs.acknowledge;
 });
 
 export const logLoop = Effect.gen(function* () {

@@ -1,12 +1,16 @@
 import { describe, expect, test } from 'bun:test';
 import { Effect } from 'effect';
-import { TenantLogQueue } from '#logs/queue.ts';
+import { MAX_BUFFERED_BYTES, MAX_IN_FLIGHT_BYTES, TenantLogQueue } from '#logs/queue.ts';
 import { tenantLogEvent } from '#tests/support/fixtures.ts';
 import { drainedLines } from '#tests/support/logs.ts';
 import { provided } from '#tests/support/run.ts';
 
 const AFTER_THE_STREAM_ENDED = 7;
-const MAX_BUFFERED_BYTES = 8_388_608;
+const ENCODER = new TextEncoder();
+
+// Sized from the encoding rather than guessed, so a field added to the event does not silently
+// turn "more than the buffer holds" into less than it holds.
+const EVENT_BYTES = ENCODER.encode(`${JSON.stringify(tenantLogEvent())}\n`).byteLength;
 
 const run = provided(TenantLogQueue.Default);
 
@@ -14,8 +18,23 @@ function withQueue<A, E>(use: (queue: TenantLogQueue) => Effect.Effect<A, E>) {
   return run(Effect.flatMap(TenantLogQueue, use));
 }
 
+/** More than the buffer holds, sequenced so what one window carried can be told from the rest. */
+function pastTheBufferLimit() {
+  return Array.from(Array(Math.ceil(MAX_BUFFERED_BYTES / EVENT_BYTES) + 1).keys()).map((sequence) =>
+    tenantLogEvent(sequence),
+  );
+}
+
+function publishUntilRefused(queue: TenantLogQueue) {
+  return Effect.forEach(pastTheBufferLimit(), queue.publish);
+}
+
 function sequences(lines: readonly string[]) {
   return lines.map((line) => JSON.parse(line).sequence as number);
+}
+
+function carriedBytes(lines: readonly string[]) {
+  return ENCODER.encode(lines.join('')).byteLength;
 }
 
 describe('the bounded upload queue', () => {
@@ -68,15 +87,71 @@ describe('the bounded upload queue', () => {
     expect(await withQueue(drainedLines)).toEqual([]);
   });
 
-  test('it refuses growth past its byte limit instead of blocking the producer', async () => {
-    const eventBytes = new TextEncoder().encode(`${JSON.stringify(tenantLogEvent())}\n`).byteLength;
-    const pastTheLimit = Math.ceil(MAX_BUFFERED_BYTES / eventBytes) + 1;
-    const accepted = await withQueue((queue) =>
-      Effect.forEach(
-        Array.from({ length: pastTheLimit }, () => tenantLogEvent()),
-        queue.publish,
-      ),
+  // The whole point of holding copies: a request that dies takes nothing with it.
+  test('an upload that is never confirmed hands its events to the next one', async () => {
+    const { failed, replacement } = await withQueue((queue) =>
+      Effect.gen(function* () {
+        yield* queue.publish(tenantLogEvent(1));
+        yield* queue.publish(tenantLogEvent(2));
+        const failed = yield* drainedLines(queue);
+        return { failed, replacement: yield* drainedLines(queue) };
+      }),
     );
+
+    expect(sequences(failed)).toEqual([1, 2]);
+    expect(sequences(replacement)).toEqual([1, 2]);
+  });
+
+  test('a confirmed upload does not hand them over again', async () => {
+    const { delivered, replacement } = await withQueue((queue) =>
+      Effect.gen(function* () {
+        yield* queue.publish(tenantLogEvent(1));
+        const delivered = yield* drainedLines(queue);
+        yield* queue.acknowledge;
+        return { delivered, replacement: yield* drainedLines(queue) };
+      }),
+    );
+
+    expect(sequences(delivered)).toEqual([1]);
+    expect(replacement).toEqual([]);
+  });
+
+  // Copies are held until they are confirmed, so a request that is never confirmed must not be
+  // able to hold more of this host's memory than the buffer it was drawn from.
+  test('what is held for an unconfirmed upload answers to the same byte limit', async () => {
+    const { whileHeld, onceConfirmed } = await withQueue((queue) =>
+      Effect.gen(function* () {
+        yield* publishUntilRefused(queue);
+        yield* drainedLines(queue);
+        // What that window took is in flight rather than queued, and the budget has not reopened
+        // because of it.
+        const whileHeld = yield* queue.publish(tenantLogEvent());
+        yield* queue.acknowledge;
+        return { whileHeld, onceConfirmed: yield* queue.publish(tenantLogEvent()) };
+      }),
+    );
+
+    expect(whileHeld).toBe(false);
+    expect(onceConfirmed).toBe(true);
+  });
+
+  test('an upload ends once it is carrying its limit, leaving the rest queued', async () => {
+    const { carried, next } = await withQueue((queue) =>
+      Effect.gen(function* () {
+        yield* publishUntilRefused(queue);
+        const carried = yield* drainedLines(queue);
+        yield* queue.acknowledge;
+        return { carried, next: yield* drainedLines(queue) };
+      }),
+    );
+
+    expect(carriedBytes(carried)).toBeGreaterThanOrEqual(MAX_IN_FLIGHT_BYTES);
+    expect(carriedBytes(carried)).toBeLessThan(MAX_BUFFERED_BYTES);
+    expect(sequences(next).at(0)).toBe(carried.length);
+  });
+
+  test('it refuses growth past its byte limit instead of blocking the producer', async () => {
+    const accepted = await withQueue(publishUntilRefused);
 
     expect(accepted.at(0)).toBe(true);
     expect(accepted.at(-1)).toBe(false);

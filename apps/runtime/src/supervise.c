@@ -21,6 +21,10 @@
 #define TENANT_SPAWN_EXIT_CODE 126
 #define SIGKILL_GRACE_MS 2000
 #define OUTPUT_CHUNK_BYTES 4096
+/* How long the supervisor may sit in poll before giving the output sink a turn. A tenant that
+ * prints nothing for hours is ordinary, and it is exactly the tenant whose sink can lose its far
+ * end without anything here noticing. One wakeup a second buys that back for a syscall. */
+#define OUTPUT_SERVICE_INTERVAL_MS 1000
 
 /* Blocked rather than handled, and waited on synchronously: there is no signal
  * handler, so there is no async-signal-safety to get wrong, and a signal that
@@ -208,7 +212,7 @@ static struct wait_result wait_for_tenant(pid_t tenant, uint32_t grace_ms, int s
         {.fd = stderr_descriptor, .events = POLLIN},
     };
     int ready = poll(polled, sizeof(polled) / sizeof(polled[0]),
-                     phase == PHASE_RUNNING ? -1 : remaining_ms(deadline_ms));
+                     phase == PHASE_RUNNING ? OUTPUT_SERVICE_INTERVAL_MS : remaining_ms(deadline_ms));
     if (ready < 0 && errno == EINTR) {
       continue;
     }
@@ -221,6 +225,14 @@ static struct wait_result wait_for_tenant(pid_t tenant, uint32_t grace_ms, int s
     }
 
     if (ready == 0) {
+      /* Nothing happened, which while the tenant is running is not a deadline but the quiet the
+       * sink needs a turn in. */
+      if (phase == PHASE_RUNNING) {
+        if (output->service != NULL) {
+          output->service(output->context);
+        }
+        continue;
+      }
       if (phase == PHASE_TERM_SENT) {
         log_line("the tenant is still running %ums after SIGTERM; killing it", grace_ms);
         signal_tenant(tenant, SIGKILL);

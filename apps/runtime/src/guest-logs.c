@@ -183,6 +183,22 @@ static void forward_output(void *context, enum tenant_output_stream stream, cons
   }
 }
 
+/* A host that goes away leaves this side looking connected: nothing fails until something is
+ * written, and a tenant that is not printing never writes. So the connection is asked about
+ * rather than waited on — a peek costs one syscall and turns the agent restarting into something
+ * the guest notices before it has anything to say, instead of a first line lost proving it. */
+static void service_connection(void *context) {
+  struct guest_log_forwarder *forwarder = context;
+  if (forwarder->connection_state == CONNECTION_CONNECTED) {
+    unsigned char probe;
+    ssize_t seen = recv(forwarder->descriptor, &probe, sizeof(probe), MSG_DONTWAIT | MSG_PEEK);
+    if (seen == 0 || (seen < 0 && errno != EAGAIN && errno != EWOULDBLOCK)) {
+      disconnect(forwarder);
+    }
+  }
+  connection_ready(forwarder);
+}
+
 void guest_logs_init(struct guest_log_forwarder *forwarder) {
   *forwarder = (struct guest_log_forwarder){
       .descriptor = -1,
@@ -200,5 +216,6 @@ void guest_logs_close(struct guest_log_forwarder *forwarder) {
 }
 
 struct tenant_output guest_logs_tenant_output(struct guest_log_forwarder *forwarder) {
-  return (struct tenant_output){.write = forward_output, .context = forwarder};
+  return (struct tenant_output){
+      .write = forward_output, .service = service_connection, .context = forwarder};
 }

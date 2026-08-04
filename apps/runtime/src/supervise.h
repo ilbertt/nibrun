@@ -25,6 +25,9 @@ enum tenant_output_stream {
 struct tenant_output {
   void (*write)(void *context, enum tenant_output_stream stream, const unsigned char *bytes,
                 size_t length);
+  /* Called while the tenant is quiet. Nothing else runs then, and a sink whose far end has gone
+   * away has no way to find that out from a tenant that is not printing. */
+  void (*service)(void *context);
   void *context;
 };
 
