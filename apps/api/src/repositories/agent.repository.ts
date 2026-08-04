@@ -35,7 +35,7 @@ const VOLUME_SIZE_BYTES = 8_589_934_592;
 const POCKETBASE_PORT = 8090 as GuestPort;
 
 const DESIRED_APP = {
-  generation: 4,
+  generation: 5,
   volumes: [
     {
       volumeId: 'vol-pocketbase' as VolumeId,
@@ -48,7 +48,7 @@ const DESIRED_APP = {
     {
       instanceId: 'inst-pocketbase-1' as InstanceId,
       appId: APP_ID,
-      deploymentId: 'dep-pocketbase-2' as DeploymentId,
+      deploymentId: 'dep-pocketbase-3' as DeploymentId,
       volumeId: 'vol-pocketbase' as VolumeId,
       desiredState: 'running',
       artifact: {
