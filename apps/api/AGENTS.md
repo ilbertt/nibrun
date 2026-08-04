@@ -12,12 +12,17 @@ Bun + Elysia service.
 
 Every feature is a repository, a service, and a controller. Do not collapse them.
 
-- `src/repositories/` — all SQL, one repository per concern, extends `Repository`
-  (holds the `Bun.sql` client). No business logic.
+- `src/repositories/` — every system outside this process, one repository per
+  concern, each behind an abstract `Contract` a test can implement. SQL ones
+  extend `Repository` (holds the `Bun.sql` client); an object store or an HTTP
+  API is a repository too, and holds its own client. No business logic.
 - `src/services/` — business logic, one service per concern, extends `Service`
   (gives `this.logger`). No SQL.
 - `src/routes/` — one folder per endpoint holding `controller.ts` (a single
   Elysia route) + `model.ts` (TypeBox schemas). No business logic, no SQL.
+
+Every statement touching a tenant row takes an `ownerId` and scopes on it in the
+`WHERE` clause. Never filter by owner after the row comes back.
 
 Controllers call services; services call repositories. Never skip a layer — a
 controller must not touch a repository. Wire the graph once in

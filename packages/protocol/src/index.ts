@@ -80,11 +80,8 @@ export {
   TenantEnvironmentSchema,
 } from '#domain/app.ts';
 export {
-  ARTIFACT_STATES,
   type Artifact,
   ArtifactSchema,
-  type ArtifactState,
-  ArtifactStateSchema,
 } from '#domain/artifact.ts';
 export {
   CHECKPOINT_STATES,

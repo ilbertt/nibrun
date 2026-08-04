@@ -119,6 +119,10 @@ class StubAppsRepository implements AppsRepositoryContract {
     });
   }
 
+  isOwnedBy(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
   listByOwner(): Promise<AppRow[]> {
     return Promise.resolve([]);
   }
