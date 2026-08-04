@@ -1,10 +1,10 @@
 import { BunContext } from '@effect/platform-bun';
 import { Effect, Layer } from 'effect';
 import {
+  type CommandError,
   type CommandRequest,
   type CommandResult,
   CommandRunner,
-  type CommandError,
 } from '#lib/exec.ts';
 
 const OK: CommandResult = { code: 0, stdout: '', stderr: '' };

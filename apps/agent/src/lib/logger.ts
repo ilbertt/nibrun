@@ -27,9 +27,6 @@ const stderrJson = Logger.make<unknown, void>(({ annotations, cause, date, logLe
 
 export const AgentLogger = Layer.unwrapEffect(
   Effect.map(configuredLevel, (level) =>
-    Layer.merge(
-      Logger.replace(Logger.defaultLogger, stderrJson),
-      Logger.minimumLogLevel(level),
-    ),
+    Layer.merge(Logger.replace(Logger.defaultLogger, stderrJson), Logger.minimumLogLevel(level)),
   ),
 );

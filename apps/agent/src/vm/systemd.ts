@@ -71,7 +71,7 @@ export const statuses = (instanceIds: readonly InstanceId[]) =>
     });
     const blocks = parsePropertyBlocks(result.stdout);
     return new Map(
-      instanceIds.map((instanceId, index) => [
+      [...instanceIds.entries()].map(([index, instanceId]) => [
         instanceId,
         unitStatusFrom(blocks[index] ?? { LoadState: 'not-found', ActiveState: 'inactive' }),
       ]),

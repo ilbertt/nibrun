@@ -63,9 +63,7 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
       slot: Option.Option<AppSlot>;
     }) =>
       Effect.gen(function* () {
-        const sizeBytes = yield* sizeOf(
-          path.join(filesystem.mountPath, NBD_DIRECTORY, volumeId),
-        );
+        const sizeBytes = yield* sizeOf(path.join(filesystem.mountPath, NBD_DIRECTORY, volumeId));
         if (Option.isNone(sizeBytes)) {
           return Option.none<ObservedVolume>();
         }
@@ -96,9 +94,8 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
             Effect.orElseSucceed(() => [] as string[]),
           );
           const observed = yield* Effect.forEach(names, (name) =>
-            Effect.flatMap(
-              slotFor({ volumeId: name as VolumeId, appIdByVolume }),
-              (slot) => observeFile({ filesystem, volumeId: name as VolumeId, slot }),
+            Effect.flatMap(slotFor({ volumeId: name as VolumeId, appIdByVolume }), (slot) =>
+              observeFile({ filesystem, volumeId: name as VolumeId, slot }),
             ),
           );
           return Arr.getSomes(observed);

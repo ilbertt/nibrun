@@ -45,16 +45,17 @@ export const layer = Layer.effect(
       open: (objectKey: string) =>
         credentials.resolve.pipe(
           Effect.flatMap((resolved) =>
-            Effect.try(() =>
-              new Bun.S3Client({
-                bucket: config.artifactBucket,
-                region: config.awsRegion,
-                accessKeyId: resolved.accessKeyId,
-                secretAccessKey: resolved.secretAccessKey,
-                ...(resolved.sessionToken ? { sessionToken: resolved.sessionToken } : {}),
-              })
-                .file(objectKey)
-                .stream() as ReadableStream<Uint8Array>,
+            Effect.try(
+              () =>
+                new Bun.S3Client({
+                  bucket: config.artifactBucket,
+                  region: config.awsRegion,
+                  accessKeyId: resolved.accessKeyId,
+                  secretAccessKey: resolved.secretAccessKey,
+                  ...(resolved.sessionToken ? { sessionToken: resolved.sessionToken } : {}),
+                })
+                  .file(objectKey)
+                  .stream() as ReadableStream<Uint8Array>,
             ),
           ),
           Effect.mapError((cause) => new ArtifactTransferError({ cause })),

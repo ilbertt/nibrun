@@ -101,7 +101,14 @@ export const buildInstanceConfigImage = ({
           });
           yield* fs.remove(imagePath, { force: true });
           yield* stdoutOf({
-            command: ['mksquashfs', stagingDir, imagePath, '-no-progress', '-noappend', '-all-root'],
+            command: [
+              'mksquashfs',
+              stagingDir,
+              imagePath,
+              '-no-progress',
+              '-noappend',
+              '-all-root',
+            ],
           });
           yield* fs.chmod(imagePath, PRIVATE_MODE);
           return imagePath;

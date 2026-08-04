@@ -35,13 +35,7 @@ const flushEverything = Effect.gen(function* () {
   );
 });
 
-export const stopInstance = ({
-  instanceId,
-  reason,
-}: {
-  instanceId: InstanceId;
-  reason: string;
-}) =>
+export const stopInstance = ({ instanceId, reason }: { instanceId: InstanceId; reason: string }) =>
   Effect.gen(function* () {
     const vms = yield* VmManager;
     yield* setState({ instanceId, state: 'stopping', stopRequested: true });
@@ -204,8 +198,7 @@ export const refreshStates = Effect.gen(function* () {
       Effect.gen(function* () {
         const status = statuses.get(record.instanceId) ?? UNKNOWN_UNIT;
         const due = nowMs >= (current.nextProbeAtMs.get(record.instanceId) ?? 0);
-        const health =
-          status.active && due ? yield* probed({ record, nowMs }) : record.health;
+        const health = status.active && due ? yield* probed({ record, nowMs }) : record.health;
 
         const state = evaluateInstanceState({
           unit: status,

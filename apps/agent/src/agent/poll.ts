@@ -10,13 +10,15 @@ import * as State from '#reconcile/state.ts';
 export const reconcileSafely = (desired: HostDesiredState) =>
   Effect.gen(function* () {
     const reconciler = yield* Reconciler;
-    yield* reconciler.reconcile(desired).pipe(
-      Effect.catchAllCause((cause) =>
-        Effect.logError('reconcile failed', cause).pipe(
-          Effect.annotateLogs({ generation: desired.generation }),
+    yield* reconciler
+      .reconcile(desired)
+      .pipe(
+        Effect.catchAllCause((cause) =>
+          Effect.logError('reconcile failed', cause).pipe(
+            Effect.annotateLogs({ generation: desired.generation }),
+          ),
         ),
-      ),
-    );
+      );
   });
 
 const logPollFailure = (error: unknown) =>

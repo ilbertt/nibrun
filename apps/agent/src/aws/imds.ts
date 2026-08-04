@@ -1,5 +1,5 @@
 import { HttpClient, HttpClientRequest, type HttpClientResponse } from '@effect/platform';
-import { Duration, Effect } from 'effect';
+import { type Duration, Effect } from 'effect';
 import { InstanceCredentialsError, parseCredentialsDocument } from '#aws/credentials.ts';
 
 export const IMDS_BASE_URL = 'http://169.254.169.254';
@@ -8,7 +8,7 @@ const ROLE_PATH = '/latest/meta-data/iam/security-credentials/';
 const TOKEN_TTL_HEADER = 'x-aws-ec2-metadata-token-ttl-seconds';
 const TOKEN_HEADER = 'x-aws-ec2-metadata-token';
 const TOKEN_TTL_SECONDS = 21_600;
-const REQUEST_TIMEOUT = Duration.seconds(5);
+const REQUEST_TIMEOUT: Duration.DurationInput = '5 seconds';
 
 /**
  * IMDSv2 by hand, because Bun's S3 client resolves static credentials only. v2 rather than v1:
@@ -24,7 +24,9 @@ export const fetchInstanceCredentials = Effect.gen(function* () {
     request: HttpClientRequest.HttpClientRequest;
     read: (response: HttpClientResponse.HttpClientResponse) => Effect.Effect<A, unknown>;
   }) =>
-    Effect.scoped(Effect.flatMap(http.execute(request), read)).pipe(Effect.timeout(REQUEST_TIMEOUT));
+    Effect.scoped(Effect.flatMap(http.execute(request), read)).pipe(
+      Effect.timeout(REQUEST_TIMEOUT),
+    );
 
   const token = yield* send({
     request: HttpClientRequest.put(`${IMDS_BASE_URL}${TOKEN_PATH}`, {

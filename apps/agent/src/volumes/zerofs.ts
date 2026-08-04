@@ -12,11 +12,11 @@ export type ZerofsAdmin = {
   readonly configFile: string;
 };
 
-const admin = ({ binary, configFile }: ZerofsAdmin, ...args: string[]) =>
-  stdoutOf({ command: [binary, ...args, '-c', configFile] });
+const admin = ({ target, args }: { target: ZerofsAdmin; args: readonly string[] }) =>
+  stdoutOf({ command: [target.binary, ...args, '-c', target.configFile] });
 
 /** With `ignore_fsync` the guest's own flushes are a no-op, so this is what makes writes durable. */
-export const flush = (target: ZerofsAdmin) => admin(target, 'flush');
+export const flush = (target: ZerofsAdmin) => admin({ target, args: ['flush'] });
 
 export const createCheckpoint = ({
   target,
@@ -24,7 +24,10 @@ export const createCheckpoint = ({
 }: {
   target: ZerofsAdmin;
   checkpointId: CheckpointId;
-}) => stdoutOf({ command: [target.binary, 'checkpoint', 'create', '-c', target.configFile, checkpointId] });
+}) =>
+  stdoutOf({
+    command: [target.binary, 'checkpoint', 'create', '-c', target.configFile, checkpointId],
+  });
 
 export const deleteCheckpoint = ({
   target,
@@ -32,10 +35,13 @@ export const deleteCheckpoint = ({
 }: {
   target: ZerofsAdmin;
   checkpointId: CheckpointId;
-}) => stdoutOf({ command: [target.binary, 'checkpoint', 'delete', '-c', target.configFile, checkpointId] });
+}) =>
+  stdoutOf({
+    command: [target.binary, 'checkpoint', 'delete', '-c', target.configFile, checkpointId],
+  });
 
 export const listCheckpoints = (target: ZerofsAdmin) =>
-  Effect.map(admin(target, 'checkpoint', 'list'), parseCheckpointNames);
+  Effect.map(admin({ target, args: ['checkpoint', 'list'] }), parseCheckpointNames);
 
 export function parseCheckpointNames(output: string): string[] {
   return output

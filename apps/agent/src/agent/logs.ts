@@ -1,4 +1,4 @@
-import { Clock, Data, Deferred, Duration, Effect, Schedule, Stream } from 'effect';
+import { Clock, Data, Deferred, type Duration, Effect, Schedule, Stream } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#agent/backoff.ts';
 import { AgentSessionHolder } from '#agent/session.ts';
 import { ControlPlane } from '#control/client.ts';
@@ -10,10 +10,10 @@ import { TenantLogQueue } from '#logs/queue.ts';
  * a drained queue it costs nothing, and short is what keeps a stalled upload from holding a
  * host's output hostage.
  */
-const WINDOW = Duration.seconds(30);
+const WINDOW: Duration.DurationInput = '30 seconds';
 
 /** Silence, not the window, is what an idle timer measures, and a quiet app produces plenty. */
-const KEEPALIVE_INTERVAL = Duration.seconds(10);
+const KEEPALIVE_INTERVAL: Duration.DurationInput = '10 seconds';
 
 /**
  * The agent ends each upload itself, so a stream that ended well inside its own window ended for
@@ -58,9 +58,9 @@ export const logLoop = Effect.gen(function* () {
   const sessions = yield* AgentSessionHolder;
   yield* uploadWindow.pipe(
     Effect.tapError((error) =>
-      sessions.forgetIfExpired(error).pipe(
-        Effect.andThen(Effect.logWarning('tenant log stream failed', error)),
-      ),
+      sessions
+        .forgetIfExpired(error)
+        .pipe(Effect.andThen(Effect.logWarning('tenant log stream failed', error))),
     ),
     Effect.retry(CONTROL_PLANE_BACKOFF),
     // Reaching the end of a window is not a retry, so the next upload opens immediately.

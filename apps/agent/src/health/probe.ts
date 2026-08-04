@@ -16,14 +16,21 @@ export type ProbeTarget = {
  * the tenant is down and never that a NAT rule is missing.
  */
 export const probeInstance = (target: ProbeTarget) =>
-  unhealthyUnless(
-    target.healthCheck.path === undefined
-      ? probeTcp(target)
-      : probeHttp({ target, path: target.healthCheck.path }),
-    target.healthCheck.timeoutMs,
-  );
+  unhealthyUnless({
+    probe:
+      target.healthCheck.path === undefined
+        ? probeTcp(target)
+        : probeHttp({ target, path: target.healthCheck.path }),
+    timeoutMs: target.healthCheck.timeoutMs,
+  });
 
-const unhealthyUnless = (probe: Effect.Effect<boolean, unknown, HttpClient.HttpClient>, timeoutMs: number) =>
+const unhealthyUnless = ({
+  probe,
+  timeoutMs,
+}: {
+  probe: Effect.Effect<boolean, unknown, HttpClient.HttpClient>;
+  timeoutMs: number;
+}) =>
   probe.pipe(
     Effect.timeoutTo({
       duration: Duration.millis(timeoutMs),

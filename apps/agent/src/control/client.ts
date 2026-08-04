@@ -48,7 +48,10 @@ const describeFailure = (value: unknown) => {
 const protocolHeaders = ({
   sessionToken,
   contentType,
-}: { sessionToken?: SecretString; contentType?: string } = {}) => ({
+}: {
+  sessionToken?: SecretString;
+  contentType?: string;
+} = {}) => ({
   [PROTOCOL_VERSION_HEADER]: String(PROTOCOL_VERSION),
   ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
   ...(contentType ? { 'content-type': contentType } : {}),
@@ -64,7 +67,13 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
 
   // Eden hands back a failure rather than rejecting, and reports one it never sent as a 503 of
   // its own, so a refusal and an unreachable VPC arrive the same way.
-  const call = ({ route, send }: { route: string; send: (signal: AbortSignal) => Promise<Reply> }) =>
+  const call = ({
+    route,
+    send,
+  }: {
+    route: string;
+    send: (signal: AbortSignal) => Promise<Reply>;
+  }) =>
     Effect.tryPromise({
       try: send,
       catch: (cause) =>
@@ -92,7 +101,9 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
         route: AGENT_ROUTES.session,
         send: () => api.internal.agent.session.post(request, options()),
       }).pipe(
-        Effect.flatMap((value) => decode(() => parseMessage({ schema: AgentSessionSchema, value }))),
+        Effect.flatMap((value) =>
+          decode(() => parseMessage({ schema: AgentSessionSchema, value })),
+        ),
       ),
 
     fetchDesiredState: ({

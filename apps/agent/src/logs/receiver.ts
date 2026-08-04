@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { FileSystem, Path, type Socket } from '@effect/platform';
 import { BunSocketServer } from '@effect/platform-bun';
 import type { AppId, DeploymentId, InstanceId, TenantLogStream } from '@repo/protocol';
-import { Effect, Either, Ref, Scope } from 'effect';
+import { Deferred, Effect, Either, Ref, Scope } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { decodeFrames, EMPTY_BUFFER } from '#logs/guest-protocol.ts';
 import { TenantLogQueue } from '#logs/queue.ts';
@@ -106,6 +106,18 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
         }
       });
 
+    /** The duplex is only opened by `run`, so a connection over the cap is opened to be closed. */
+    const refuse = (socket: Socket.Socket) =>
+      Effect.gen(function* () {
+        const opened = yield* Deferred.make<void>();
+        yield* Effect.raceFirst(
+          socket.run(() => Effect.void, {
+            onOpen: Effect.asVoid(Deferred.succeed(opened, undefined)),
+          }),
+          Deferred.await(opened),
+        ).pipe(Effect.ignore);
+      });
+
     const serve = ({ attachment }: { attachment: Attachment }) =>
       Effect.gen(function* () {
         const connections = yield* Ref.make(0);
@@ -117,7 +129,7 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
               Ref.updateAndGet(connections, (count) => count + 1),
               (count) =>
                 count > MAX_GUEST_CONNECTIONS
-                  ? Effect.void
+                  ? refuse(socket)
                   : pump({ attachment, socket }).pipe(
                       Effect.catchAll((error) =>
                         Effect.logWarning('tenant log connection failed', error),
@@ -144,13 +156,7 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
         yield* fs.remove(attachment.socketPath, { force: true });
       });
 
-    const attach = ({
-      source,
-      socketPath,
-    }: {
-      source: TenantLogSource;
-      socketPath: string;
-    }) =>
+    const attach = ({ source, socketPath }: { source: TenantLogSource; socketPath: string }) =>
       Effect.gen(function* () {
         const current = yield* Ref.get(attachments);
         const existing = current.get(source.instanceId);

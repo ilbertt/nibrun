@@ -41,13 +41,7 @@ export const readDeviceFileSize = (path: string) =>
  * Growing preserves the data and shrinking discards everything past the new size, so a smaller
  * desired size is refused: truncating a tenant's filesystem is not a way to discover a bug.
  */
-export const ensureDeviceFile = ({
-  path,
-  sizeBytes,
-}: {
-  path: string;
-  sizeBytes: number;
-}) =>
+export const ensureDeviceFile = ({ path, sizeBytes }: { path: string; sizeBytes: number }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const pathService = yield* Path.Path;

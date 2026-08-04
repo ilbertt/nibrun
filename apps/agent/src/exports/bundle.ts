@@ -26,13 +26,7 @@ export class UnsafeFilename extends Data.TaggedError('UnsafeFilename')<{
  * `debugfs` reports a failed `rdump` on stderr and still exits 0, so an empty destination is the
  * only reliable signal that nothing came out.
  */
-const dumpFilesystem = ({
-  devicePath,
-  destination,
-}: {
-  devicePath: string;
-  destination: string;
-}) =>
+const dumpFilesystem = ({ devicePath, destination }: { devicePath: string; destination: string }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     yield* fs.makeDirectory(destination, { recursive: true, mode: STAGING_MODE });
@@ -50,9 +44,7 @@ const dumpFilesystem = ({
  * path inside an archive somebody extracts on their own machine, and the schema already
  * constrains it, so anything else came from a peer that did not honour the contract.
  */
-export function bundleBinaryName(
-  artifact: DesiredArtifact,
-): Either.Either<string, UnsafeFilename> {
+export function bundleBinaryName(artifact: DesiredArtifact): Either.Either<string, UnsafeFilename> {
   const { filename } = artifact;
   return filename !== basename(filename) || filename.startsWith('.') || filename.startsWith('-')
     ? Either.left(new UnsafeFilename({ filename }))

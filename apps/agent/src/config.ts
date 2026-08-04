@@ -27,14 +27,22 @@ const optional = ({ name, fallback }: { name: string; fallback: string }) =>
 
 const list = (name: string) =>
   trimmed(name).pipe(
-    Config.map((value) => value.split(',').map((entry) => entry.trim()).filter(Boolean)),
+    Config.map((value) =>
+      value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
     Config.withDefault<string[]>([]),
   );
 
 /** An empty list renders no firewall rule at all, so its absence has to stop the agent starting. */
 const requiredList = (name: string) =>
   list(name).pipe(
-    Config.validate({ message: `${name} is required`, validation: (entries) => entries.length > 0 }),
+    Config.validate({
+      message: `${name} is required`,
+      validation: (entries) => entries.length > 0,
+    }),
   );
 
 export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {

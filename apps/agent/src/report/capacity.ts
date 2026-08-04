@@ -31,6 +31,14 @@ export const readHostCapacity = (cacheDir: string): Effect.Effect<HostCapacity> 
     }),
   );
 
+const sum = (values: readonly number[]) => {
+  let total = NONE;
+  for (const value of values) {
+    total += value;
+  }
+  return total;
+};
+
 /** Floored at zero: an oversubscribed host is a fact to report, not a number to do arithmetic with. */
 export function allocatableCapacity({
   capacity,
@@ -41,16 +49,11 @@ export function allocatableCapacity({
   committed: readonly InstanceResources[];
   availableCacheBytes: number;
 }): HostCapacity {
-  const used = committed.reduce(
-    (total, entry) => ({
-      vcpuCount: total.vcpuCount + entry.vcpuCount,
-      memoryMib: total.memoryMib + entry.memoryMib,
-    }),
-    { vcpuCount: NONE, memoryMib: NONE },
-  );
+  const usedVcpu = sum(committed.map((entry) => entry.vcpuCount));
+  const usedMemory = sum(committed.map((entry) => entry.memoryMib));
   return {
-    vcpuCount: Math.max(capacity.vcpuCount - used.vcpuCount, NONE),
-    memoryMib: Math.max(capacity.memoryMib - used.memoryMib, NONE),
+    vcpuCount: Math.max(capacity.vcpuCount - usedVcpu, NONE),
+    memoryMib: Math.max(capacity.memoryMib - usedMemory, NONE),
     cacheBytes: Math.max(Math.min(availableCacheBytes, capacity.cacheBytes), NONE),
   };
 }

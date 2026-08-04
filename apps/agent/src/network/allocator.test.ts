@@ -18,6 +18,7 @@ const BOUNDARY_SLOT = 64;
 const SOME_SLOT = 3;
 const DISTINCT_APPS = ['alpha', 'beta', 'gamma'];
 const BEYOND_THE_LAST_SLOT = 1_000;
+const everySlot = [...Array(SLOT_COUNT).keys()];
 
 // A directory nothing writes to: the allocator starts empty and never persists during a test.
 const config = Layer.succeed(AgentConfig, {
@@ -98,11 +99,9 @@ describe('allocation is stable for the lifetime of an app', () => {
   test('running out of slots is a typed failure, not a silent reuse', async () => {
     const exhausted = await withAllocator((allocator) =>
       Effect.gen(function* () {
-        yield* Effect.forEach(
-          Array.from({ length: SLOT_COUNT }, (_, index) => index),
-          (index) => allocator.allocate(app(index)),
-          { discard: true },
-        ).pipe(Effect.orDie);
+        yield* Effect.forEach(everySlot, (index) => allocator.allocate(app(index)), {
+          discard: true,
+        }).pipe(Effect.orDie);
         return yield* Effect.either(allocator.allocate(app(BEYOND_THE_LAST_SLOT)));
       }),
     );
@@ -111,7 +110,8 @@ describe('allocation is stable for the lifetime of an app', () => {
 });
 
 describe('allocation survives an agent restart', () => {
-  const slotOf = (records: SlotRecords, appId: AppId) => assignmentsFrom(records).get(appId);
+  const slotOf = ({ records, appId }: { records: SlotRecords; appId: AppId }) =>
+    assignmentsFrom(records).get(appId);
 
   test('a corrupted record file degrades to an empty allocator rather than throwing', () => {
     expect(readSlotRecords('nonsense')).toEqual({});
@@ -122,11 +122,11 @@ describe('allocation survives an agent restart', () => {
 
   test('duplicate slots in a persisted file are not both honoured', () => {
     const records = { 'app-1': SOME_SLOT, 'app-2': SOME_SLOT };
-    expect(slotOf(records, app(1))).toBe(SOME_SLOT);
-    expect(slotOf(records, app(2))).toBeUndefined();
+    expect(slotOf({ records, appId: app(1) })).toBe(SOME_SLOT);
+    expect(slotOf({ records, appId: app(2) })).toBeUndefined();
   });
 
   test('a slot outside the host limit is dropped', () => {
-    expect(slotOf({ 'app-1': SLOT_COUNT }, app(1))).toBeUndefined();
+    expect(slotOf({ records: { 'app-1': SLOT_COUNT }, appId: app(1) })).toBeUndefined();
   });
 });

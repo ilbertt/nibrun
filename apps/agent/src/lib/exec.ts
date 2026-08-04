@@ -1,4 +1,4 @@
-import { Command, CommandExecutor } from '@effect/platform';
+import { Command, type CommandExecutor } from '@effect/platform';
 import type { PlatformError } from '@effect/platform/Error';
 import { Context, Data, Duration, Effect, Layer, Stream } from 'effect';
 
@@ -51,10 +51,7 @@ const build = ({ command: [executable, ...args], stdin }: CommandRequest) => {
 };
 
 const collect = (stream: Stream.Stream<Uint8Array, PlatformError>) =>
-  stream.pipe(
-    Stream.decodeText(),
-    Stream.runFold('', (all, chunk) => all + chunk),
-  );
+  stream.pipe(Stream.decodeText(), Stream.mkString);
 
 const execute = (request: CommandRequest) =>
   Effect.gen(function* () {

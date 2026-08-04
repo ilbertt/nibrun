@@ -49,9 +49,9 @@ export const reportLoop = Effect.gen(function* () {
   const sessions = yield* AgentSessionHolder;
   yield* report.pipe(
     Effect.tapError((error) =>
-      sessions.forgetIfExpired(error).pipe(
-        Effect.andThen(Effect.logWarning('report failed', error)),
-      ),
+      sessions
+        .forgetIfExpired(error)
+        .pipe(Effect.andThen(Effect.logWarning('report failed', error))),
     ),
     Effect.ignore,
     Effect.andThen(

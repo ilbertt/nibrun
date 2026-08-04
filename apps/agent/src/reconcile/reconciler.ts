@@ -170,9 +170,9 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
           return;
         }
         if (!(yield* State.snapshot).isolated) {
-          return yield* Effect.logError('instance starts refused: isolation ruleset not applied').pipe(
-            Effect.annotateLogs({ refused: starts.length }),
-          );
+          return yield* Effect.logError(
+            'instance starts refused: isolation ruleset not applied',
+          ).pipe(Effect.annotateLogs({ refused: starts.length }));
         }
         yield* Effect.forEach(
           starts,

@@ -17,7 +17,9 @@ export class DesiredStateCache extends Effect.Service<DesiredStateCache>()('Desi
     const latest = yield* Ref.make(Option.none<HostDesiredState>());
 
     const remember = (state: HostDesiredState) =>
-      Ref.set(generation, state.generation).pipe(Effect.andThen(Ref.set(latest, Option.some(state))));
+      Ref.set(generation, state.generation).pipe(
+        Effect.andThen(Ref.set(latest, Option.some(state))),
+      );
 
     return {
       knownGeneration: Ref.get(generation),

@@ -43,9 +43,7 @@ export class TenantLogQueue extends Effect.Service<TenantLogQueue>()('TenantLogQ
           }
           return yield* Effect.raceFirst(
             // Interruptible only while waiting: losing the race must not drop an accounted chunk.
-            Effect.uninterruptibleMask((restore) =>
-              Effect.tap(restore(Queue.take(chunks)), taken),
-            ),
+            Effect.uninterruptibleMask((restore) => Effect.tap(restore(Queue.take(chunks)), taken)),
             Effect.andThen(Deferred.await(ending), Effect.fail(Option.none<never>())),
           );
         }),

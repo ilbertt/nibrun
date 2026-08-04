@@ -50,10 +50,7 @@ export function unitStatusFrom(properties: Record<string, string>): UnitStatus {
   const activeState = properties.ActiveState ?? 'inactive';
   const exitCode = Number.parseInt(properties.ExecMainStatus ?? '', DECIMAL);
   // Monotonic, so it resets with the host: the only property that can date a start to this boot.
-  const inactiveExit = Number.parseInt(
-    properties.InactiveExitTimestampMonotonic ?? '',
-    DECIMAL,
-  );
+  const inactiveExit = Number.parseInt(properties.InactiveExitTimestampMonotonic ?? '', DECIMAL);
   return {
     loaded: (properties.LoadState ?? 'not-found') === 'loaded',
     active: activeState === 'active' || activeState === 'activating',
