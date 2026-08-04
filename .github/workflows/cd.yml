@@ -62,7 +62,6 @@ jobs:
           image-tag: ${{ github.sha }}
           context: ${{ matrix.context }}
           dockerfile: ${{ matrix.dockerfile }}
-          cache-scope: ${{ matrix.name }}
 
       - name: Verify the image is public
         run: bun run --filter @repo/internal-scripts verify-public-images ${{ steps.image.outputs.image-uri }}

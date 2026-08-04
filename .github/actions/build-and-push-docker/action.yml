@@ -14,9 +14,6 @@ inputs:
   dockerfile:
     description: Path to the Dockerfile.
     required: true
-  cache-scope:
-    description: GitHub Actions cache scope; keep distinct per image to avoid collisions.
-    required: true
 
 outputs:
   image-uri:
@@ -36,7 +33,12 @@ runs:
         IMAGE_TAG: ${{ inputs.image-tag }}
         BUILD_CONTEXT: ${{ inputs.context }}
         DOCKERFILE: ${{ inputs.dockerfile }}
-        CACHE_FROM: type=gha,scope=${{ inputs.cache-scope }}
-        CACHE_TO: type=gha,mode=max,scope=${{ inputs.cache-scope }}
+        # The registry cache rides on the login this build already holds.
+        # type=gha would need Actions credentials that GitHub hands to JS
+        # actions only, and buildx drops a cache it cannot authenticate
+        # silently — no warning, exit 0, every layer rebuilt. GHCR rejects
+        # buildkit's default cache manifest list, hence image-manifest.
+        CACHE_FROM: type=registry,ref=${{ inputs.image-repository }}:buildcache
+        CACHE_TO: type=registry,ref=${{ inputs.image-repository }}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
         SOURCE_LABEL: https://github.com/${{ github.repository }}
       run: bun run --filter @repo/internal-scripts build-and-push-image
