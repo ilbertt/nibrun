@@ -235,6 +235,119 @@ export interface ISelectArtifactByIdResult {
     created_at: Date;
 }
 
+/** Result of query `InsertDeployment`. */
+export interface IInsertDeploymentResult {
+    id: import("@repo/protocol").DeploymentId;
+}
+
+/** Result of query `SelectInsertedDeployment`. */
+export interface ISelectInsertedDeploymentResult {
+    id: import("@repo/protocol").DeploymentId;
+    app_id: import("@repo/protocol").AppId;
+    artifact_id: import("@repo/protocol").ArtifactId;
+    /** What the host last reported, not what was asked for. */
+    state: import("@repo/protocol").DeploymentState;
+    activated_at: Date | null;
+    created_at: Date;
+    guest_port: import("@repo/protocol").GuestPort;
+    args: string[];
+    vcpu_count: number;
+    memory_mib: number;
+    health_check_path: string | null;
+    health_check_interval_ms: number;
+    health_check_timeout_ms: number;
+    health_check_grace_period_ms: number;
+    health_check_healthy_threshold: number;
+    health_check_unhealthy_threshold: number;
+    restart_max_restarts: number;
+    restart_initial_backoff_ms: number;
+    restart_max_backoff_ms: number;
+    restart_backoff_factor: number;
+    restart_reset_after_ms: number;
+}
+
+/** Result of query `SelectDeploymentsByApp`. */
+export interface ISelectDeploymentsByAppResult {
+    id: import("@repo/protocol").DeploymentId;
+    app_id: import("@repo/protocol").AppId;
+    artifact_id: import("@repo/protocol").ArtifactId;
+    /** What the host last reported, not what was asked for. */
+    state: import("@repo/protocol").DeploymentState;
+    activated_at: Date | null;
+    created_at: Date;
+    guest_port: import("@repo/protocol").GuestPort;
+    args: string[];
+    vcpu_count: number;
+    memory_mib: number;
+    health_check_path: string | null;
+    health_check_interval_ms: number;
+    health_check_timeout_ms: number;
+    health_check_grace_period_ms: number;
+    health_check_healthy_threshold: number;
+    health_check_unhealthy_threshold: number;
+    restart_max_restarts: number;
+    restart_initial_backoff_ms: number;
+    restart_max_backoff_ms: number;
+    restart_backoff_factor: number;
+    restart_reset_after_ms: number;
+}
+
+/** Result of query `SelectDeploymentById`. */
+export interface ISelectDeploymentByIdResult {
+    id: import("@repo/protocol").DeploymentId;
+    app_id: import("@repo/protocol").AppId;
+    artifact_id: import("@repo/protocol").ArtifactId;
+    /** What the host last reported, not what was asked for. */
+    state: import("@repo/protocol").DeploymentState;
+    activated_at: Date | null;
+    created_at: Date;
+    guest_port: import("@repo/protocol").GuestPort;
+    args: string[];
+    vcpu_count: number;
+    memory_mib: number;
+    health_check_path: string | null;
+    health_check_interval_ms: number;
+    health_check_timeout_ms: number;
+    health_check_grace_period_ms: number;
+    health_check_healthy_threshold: number;
+    health_check_unhealthy_threshold: number;
+    restart_max_restarts: number;
+    restart_initial_backoff_ms: number;
+    restart_max_backoff_ms: number;
+    restart_backoff_factor: number;
+    restart_reset_after_ms: number;
+}
+
+/** Result of query `StopReplacedDeployment`. */
+export interface IStopReplacedDeploymentResult {
+}
+
+/** Result of query `RunDeployment`. */
+export interface IRunDeploymentResult {
+    id: import("@repo/protocol").DeploymentId;
+    app_id: import("@repo/protocol").AppId;
+    artifact_id: import("@repo/protocol").ArtifactId;
+    /** What the host last reported, not what was asked for. */
+    state: import("@repo/protocol").DeploymentState;
+    activated_at: Date | null;
+    created_at: Date;
+    guest_port: import("@repo/protocol").GuestPort;
+    args: string[];
+    vcpu_count: number;
+    memory_mib: number;
+    health_check_path: string | null;
+    health_check_interval_ms: number;
+    health_check_timeout_ms: number;
+    health_check_grace_period_ms: number;
+    health_check_healthy_threshold: number;
+    health_check_unhealthy_threshold: number;
+    restart_max_restarts: number;
+    restart_initial_backoff_ms: number;
+    restart_max_backoff_ms: number;
+    restart_backoff_factor: number;
+    restart_reset_after_ms: number;
+}
+
 /** Result of query `SelectHealthPing`. */
 export interface ISelectHealthPingResult {
     ok: number | null;
@@ -259,6 +372,12 @@ export interface Queries {
     InsertArtifact: IInsertArtifactResult;
     SelectArtifactsByApp: ISelectArtifactsByAppResult;
     SelectArtifactById: ISelectArtifactByIdResult;
+    InsertDeployment: IInsertDeploymentResult;
+    SelectInsertedDeployment: ISelectInsertedDeploymentResult;
+    SelectDeploymentsByApp: ISelectDeploymentsByAppResult;
+    SelectDeploymentById: ISelectDeploymentByIdResult;
+    StopReplacedDeployment: IStopReplacedDeploymentResult;
+    RunDeployment: IRunDeploymentResult;
     SelectHealthPing: ISelectHealthPingResult;
 }
 
