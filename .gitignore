@@ -10,10 +10,13 @@ dist
 coverage
 *.lcov
 
-# logs
-logs
-_.log
-report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+# logs. Anchored and suffixed, because an unanchored `logs` matches a directory of
+# that name at any depth — including a source module — and git reports nothing when
+# it does. The two patterns below had their asterisks replaced by underscores at
+# some point, which left them matching nothing at all.
+/logs/
+*.log
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Dozzle's user list — rendered on the box from SSM, holds a password hash.
 dozzle/data/
