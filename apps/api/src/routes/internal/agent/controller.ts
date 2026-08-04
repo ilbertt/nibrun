@@ -4,6 +4,7 @@ import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { AgentDesiredStateController } from '#routes/internal/agent/desired-state/controller.ts';
 import { AgentReportedStateController } from '#routes/internal/agent/reported-state/controller.ts';
 import { AgentSessionController } from '#routes/internal/agent/session/controller.ts';
+import { AgentTenantLogsController } from '#routes/internal/agent/tenant-logs/controller.ts';
 
 // The protocol owns the whole path. This controller applies only the segment below
 // the prefix its parent applies, derived from that one constant so the two cannot
@@ -13,4 +14,5 @@ const AGENT_PREFIX = AGENT_API_PREFIX.slice(RoutePrefix.Internal.length);
 export const AgentController = new Elysia({ prefix: AGENT_PREFIX })
   .use(AgentSessionController)
   .use(AgentDesiredStateController)
-  .use(AgentReportedStateController);
+  .use(AgentReportedStateController)
+  .use(AgentTenantLogsController);
