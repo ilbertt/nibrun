@@ -5,11 +5,17 @@ plane, long-polls for desired state, converges the host onto it, and reports wha
 is never sent a command. Read `reconcile/`, `volumes/topology.ts` and `network/slot.ts` first.
 
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
-test needs to substitute is a service (`Context.Tag` or `Effect.Service`) wired in `index.ts` and
-nowhere else. State that used to be mutable class fields lives in a `Ref`. The four loops in
-`agent/` are fibers, and their retry cadence is a `Schedule` rather than a failure counter.
-Interruption is the shutdown path: `BunRuntime.runMain` cancels the fibers and scoped finalizers
-close the log sockets. Nothing stops a tenant VM, which is what keeps redeploying the agent free.
+test needs to substitute is a service (`Context.Tag` or `Effect.Service`). State that used to be
+mutable class fields lives in a `Ref`. The four loops in `agent/` are fibers, and their retry
+cadence is a `Schedule` rather than a failure counter. Interruption is the shutdown path:
+`BunRuntime.runMain` cancels the fibers and scoped finalizers close the log sockets. Nothing stops
+a tenant VM, which is what keeps redeploying the agent free.
+
+**Every service names its own requirements** in `dependencies`, so `index.ts` is a flat merge whose
+order carries nothing. A test that hands one of them a stub config takes
+`DefaultWithoutDependencies`: `Default` has already been given `AgentConfig.Default`, so a config
+provided from outside is ignored without a word, and the real one then fails at runtime on an
+environment the test never set.
 
 **Everything the host does that Bun cannot do is a subprocess** (`systemctl`, `ip`, `nft`,
 `nbd-client`, `mkfs.ext4`, `mksquashfs`, `zerofs`) rather than a library, through the
@@ -47,6 +53,9 @@ Owned by `infra/app-host/`, not fixable here.
   `table ip nibrun` and expresses isolation as `drop` rules, which are final wherever they appear;
   its `accept` rules only end its own chain, so it composes with a coexisting ruleset but cannot
   open one that is closed.
+- **A tracer.** The agent names its spans — every reconcile phase, subprocess and control-plane
+  request — and nothing collects them, so they go nowhere. Where they are exported to is a
+  deployment decision, not one the binary should hold.
 
 ## What is not tested
 
