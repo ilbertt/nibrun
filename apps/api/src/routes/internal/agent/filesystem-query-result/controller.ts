@@ -1,6 +1,7 @@
 import { AGENT_ROUTES, FilesystemQueryResultSchema } from '@repo/protocol';
 import { Elysia, StatusMap, t } from 'elysia';
 import { assertProtocolVersion } from '#lib/agent/protocol-version.ts';
+import { agentRoutePath } from '#lib/agent/routes.ts';
 import { sessionTokenFrom } from '#lib/agent/session-token.ts';
 import { ProtocolHeadersSchema } from '#routes/internal/agent/model.ts';
 import { AgentServicePlugin, FilesystemServicePlugin, loggerPlugin } from '#services/plugins.ts';
@@ -14,7 +15,7 @@ export const AgentFilesystemQueryResultController = new Elysia()
   .use(AgentServicePlugin)
   .use(FilesystemServicePlugin)
   .post(
-    AGENT_ROUTES.filesystemQueryResult,
+    agentRoutePath(AGENT_ROUTES.filesystemQueryResult),
     async ({ agentService, filesystemService, body, headers, status }) => {
       assertProtocolVersion(headers);
       await agentService.hostForSession({ sessionToken: sessionTokenFrom(headers) });

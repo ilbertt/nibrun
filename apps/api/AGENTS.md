@@ -33,11 +33,16 @@ plugin.
 
 The `src/routes/` tree must mirror the served URL path, so the layout reads as
 the API surface: `GET /api/health` → `src/routes/api/health/`. Dynamic segments
-use `[id]` as the folder name (`:` is not portable across filesystems; the
-literal `:id` route string stays in `controller.ts`). Children are aggregated by
-their parent's `controller.ts`, which applies the shared prefix once, so each
-child keeps a bare path string. A schema shared by sibling routes lives in the
+are folders named for what they identify — `[appId]`, never `[id]` (`:` is not
+portable across filesystems). A schema shared by sibling routes lives in the
 parent folder's `model.ts`.
+
+`RoutePrefix` is the only prefix an Elysia instance may be constructed with, and
+`ApiController` / `InternalController` are the only two that do. Every other
+controller mounts flat on one of them and writes its whole path below that
+prefix on each handler — `.get('/apps/:appId/artifacts', …)` — which is what
+lets Elysia name and type `params`. That path also names the controller:
+`AppsAppIdArtifactsController`, unique where the folder name alone would not be.
 
 ## Tests
 

@@ -1,6 +1,7 @@
 import { AGENT_ROUTES, AgentSessionRequestSchema, AgentSessionSchema } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { assertProtocolVersion } from '#lib/agent/protocol-version.ts';
+import { agentRoutePath } from '#lib/agent/routes.ts';
 import { ProtocolHeadersSchema } from '#routes/internal/agent/model.ts';
 import { AgentServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -9,7 +10,7 @@ export const AgentSessionController = new Elysia()
   .use(loggerPlugin('agentSessionController'))
   .use(AgentServicePlugin)
   .post(
-    AGENT_ROUTES.session,
+    agentRoutePath(AGENT_ROUTES.session),
     async ({ agentService, body, headers, status }) => {
       assertProtocolVersion(headers);
       return status(StatusMap.OK, await agentService.openSession(body));

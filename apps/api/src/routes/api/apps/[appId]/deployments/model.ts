@@ -5,7 +5,7 @@ import {
   type DeploymentState,
 } from '@repo/protocol';
 import { t } from 'elysia';
-import { AppParamsSchema } from '#routes/api/apps/[id]/model.ts';
+import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 import { PublicAppConfigSchema } from '#routes/api/apps/model.ts';
 
 const ACTIVE = 'active' satisfies DeploymentState;
