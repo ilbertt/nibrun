@@ -9,7 +9,11 @@ import {
   DEFAULT_RESTART_POLICY,
   type DeploymentId,
   DesiredStateResponseSchema,
+  DIRECTORY_ENTRY_LIMIT,
+  DirectoryListingSchema,
   type Filename,
+  FilesystemEntryNameSchema,
+  GuestPathSchema,
   type GuestPort,
   type HostDesiredState,
   HostDesiredStateSchema,
@@ -36,6 +40,8 @@ const TENANT_SECRET = 'sk-live-do-not-log-this' as SecretString;
 const SHA256_HEX_LENGTH = 64;
 const TRUNCATED_DIGEST_LENGTH = SHA256_HEX_LENGTH - 1;
 const OVERLONG_SECRET_LENGTH = 40_000;
+/** One past what ext4 itself stores, so the schema and the filesystem agree on the boundary. */
+const OVERLONG_ENTRY_NAME_LENGTH = 256;
 
 const hexDigest = (length: number = SHA256_HEX_LENGTH) => 'a'.repeat(length);
 
@@ -122,6 +128,93 @@ describe('branding leaves runtime validation intact', () => {
     expect(isValidMessage({ schema: FilenameSchema, value: 'nul\u0000byte' })).toBe(false);
     expect(isValidMessage({ schema: FilenameSchema, value: '' })).toBe(false);
   });
+});
+
+// A name is reported and a path is accepted, so they are validated in opposite directions. The
+// pair of suites below exist to keep that asymmetry deliberate: loosening the path or tightening
+// the name would each look like a small consistency fix in isolation.
+describe('a directory entry name describes what the tenant created', () => {
+  const accepts = (value: string) => isValidMessage({ schema: FilesystemEntryNameSchema, value });
+
+  test('anything ext4 stores survives being described', () => {
+    expect(accepts('pb_data')).toBe(true);
+    expect(accepts('.env')).toBe(true);
+    expect(accepts('-rf')).toBe(true);
+    expect(accepts("it's")).toBe(true);
+    expect(accepts('a b c.txt')).toBe(true);
+    expect(accepts('données.txt')).toBe(true);
+    expect(accepts('..')).toBe(true);
+  });
+
+  test('only what ext4 itself cannot hold is refused', () => {
+    expect(accepts('nested/path')).toBe(false);
+    expect(accepts('nul\u0000byte')).toBe(false);
+    expect(accepts('')).toBe(false);
+    expect(accepts('n'.repeat(OVERLONG_ENTRY_NAME_LENGTH))).toBe(false);
+  });
+});
+
+describe('a guest path is accepted rather than described', () => {
+  const accepts = (value: string) => isValidMessage({ schema: GuestPathSchema, value });
+
+  test('an absolute path inside the volume is addressable', () => {
+    expect(accepts('/')).toBe(true);
+    expect(accepts('/pb_data')).toBe(true);
+    expect(accepts('/pb_data/backups')).toBe(true);
+    expect(accepts('/.env')).toBe(true);
+    expect(accepts('/a b c')).toBe(true);
+  });
+
+  test('nothing that resolves out of the volume is', () => {
+    expect(accepts('/..')).toBe(false);
+    expect(accepts('/pb_data/../../etc')).toBe(false);
+    expect(accepts('/.')).toBe(false);
+    expect(accepts('/pb_data/.')).toBe(false);
+    expect(accepts('pb_data')).toBe(false);
+  });
+
+  // The value reaches `debugfs -R`, which tokenises its argument the way a shell would, so a
+  // second command must not be expressible in it.
+  test('nothing that could carry a second command is', () => {
+    expect(accepts('/pb_data" -R "rm /pb_data')).toBe(false);
+    expect(accepts("/pb_data' -R 'rm /pb_data")).toBe(false);
+    expect(accepts('/pb_data\\backups')).toBe(false);
+    expect(accepts('/pb_data\nrm /')).toBe(false);
+    expect(accepts('/nul\u0000byte')).toBe(false);
+  });
+
+  // A trailing slash and a doubled separator both name the same directory as the canonical form,
+  // so admitting them would make one directory two cache keys and two audit-log lines.
+  test('only the canonical spelling of a directory is', () => {
+    expect(accepts('/pb_data/')).toBe(false);
+    expect(accepts('//pb_data')).toBe(false);
+    expect(accepts('/pb_data//backups')).toBe(false);
+  });
+});
+
+test('a listing carries one flat directory and says when it held back', () => {
+  const entry = {
+    name: 'data.db',
+    kind: 'file',
+    sizeBytes: 4096,
+    modifiedAt: '2026-08-03T09:41:00Z',
+  };
+  expect(
+    isValidMessage({
+      schema: DirectoryListingSchema,
+      value: { path: '/pb_data', entries: [entry], truncated: false },
+    }),
+  ).toBe(true);
+  expect(
+    isValidMessage({
+      schema: DirectoryListingSchema,
+      value: {
+        path: '/pb_data',
+        entries: Array.from({ length: DIRECTORY_ENTRY_LIMIT + 1 }, () => entry),
+        truncated: true,
+      },
+    }),
+  ).toBe(false);
 });
 
 test('a guest port cannot be used where a host port belongs', () => {

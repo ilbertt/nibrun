@@ -99,6 +99,20 @@ export {
   ExportStateSchema,
 } from '#domain/export.ts';
 export {
+  DIRECTORY_ENTRY_LIMIT,
+  type DirectoryListing,
+  DirectoryListingSchema,
+  FILESYSTEM_ENTRY_KINDS,
+  type FilesystemEntry,
+  type FilesystemEntryKind,
+  FilesystemEntryKindSchema,
+  FilesystemEntryNameSchema,
+  FilesystemEntrySchema,
+  GUEST_PATH_ROOT,
+  type GuestPath,
+  GuestPathSchema,
+} from '#domain/filesystem.ts';
+export {
   HOST_STATES,
   type Host,
   type HostCapacity,
