@@ -401,11 +401,6 @@ fi
 # Restarted rather than reloaded: it reads its URL once, at start.
 if needs_restart journal-upload || ! systemctl is-active --quiet systemd-journal-upload.service; then
   log "Journal uploader config changed — restarting it"
-  # A unit that exhausted its start limit refuses to restart until the failure is
-  # cleared, so without this a host that gave up while the store was unreachable
-  # stays down through every deploy that follows. The drop-in above stops it
-  # latching in the first place; this recovers the hosts that already have.
-  systemctl reset-failed systemd-journal-upload.service || true
   # Tolerated rather than fatal, for the same reason it is not in the health gate
   # below: this ships logs, and a host that cannot must still finish deploying
   # the things that serve tenants. `set -e` would otherwise make an unreachable
