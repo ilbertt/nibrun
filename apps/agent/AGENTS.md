@@ -5,9 +5,13 @@ plane, long-polls for desired state, converges the host onto it, and reports wha
 is never sent a command. Read `lib/reconcile/`, `lib/volumes/topology.ts` and
 `lib/network/slot.ts` first.
 
+It answers one kind of question besides converging: `lib/agent/filesystem.ts` polls for a
+directory read and answers it, on routes of its own. A read is not a state anything converges on,
+so it carries no generation and cannot delay a stop.
+
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
 test needs to substitute is a service. State that used to be
-mutable class fields lives in a `Ref`. The four loops in `lib/agent/` are fibers, and their retry
+mutable class fields lives in a `Ref`. The loops in `lib/agent/` are fibers, and their retry
 cadence is a `Schedule` rather than a failure counter. Interruption is the shutdown path:
 `BunRuntime.runMain` cancels the fibers and scoped finalizers close the log sockets. Nothing stops
 a tenant VM, which is what keeps redeploying the agent free.

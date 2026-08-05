@@ -13,7 +13,7 @@ export class AgentSessionHolder extends Effect.Service<AgentSessionHolder>()('Ag
     const cached = yield* SynchronizedRef.make(Option.none<AgentSession>());
 
     /**
-     * Synchronized because four loops ask for the session, and a plain `Ref` would have every one
+     * Synchronized because every loop asks for the session, and a plain `Ref` would have each one
      * of them see the same expired value and open a session of its own.
      */
     const current = SynchronizedRef.modifyEffect(cached, (existing) =>

@@ -5,6 +5,9 @@ import {
   AgentSessionSchema,
   type DesiredStateRequest,
   DesiredStateResponseSchema,
+  type FilesystemQueryRequest,
+  FilesystemQueryResponseSchema,
+  type FilesystemQueryResult,
   type HostReportedState,
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
@@ -131,6 +134,37 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
         call({
           route: AGENT_ROUTES.reportedState,
           send: () => api.internal.agent['reported-state'].post(report, options(sessionToken)),
+        }),
+      ),
+
+    fetchFilesystemQuery: ({
+      sessionToken,
+      request,
+    }: {
+      sessionToken: SecretString;
+      request: FilesystemQueryRequest;
+    }) =>
+      call({
+        route: AGENT_ROUTES.filesystemQuery,
+        send: () => api.internal.agent['filesystem-query'].post(request, options(sessionToken)),
+      }).pipe(
+        Effect.flatMap((value) =>
+          decode(() => parseMessage({ schema: FilesystemQueryResponseSchema, value })),
+        ),
+      ),
+
+    sendFilesystemQueryResult: ({
+      sessionToken,
+      result,
+    }: {
+      sessionToken: SecretString;
+      result: FilesystemQueryResult;
+    }) =>
+      Effect.asVoid(
+        call({
+          route: AGENT_ROUTES.filesystemQueryResult,
+          send: () =>
+            api.internal.agent['filesystem-query-result'].post(result, options(sessionToken)),
         }),
       ),
   };

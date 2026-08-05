@@ -112,6 +112,60 @@ describe('every request identifies the protocol it speaks', () => {
   });
 });
 
+// The read channel is separate from desired state all the way down to the wire, and these are
+// what say so: a different route, and a reply carrying no generation for anything to act on.
+describe('a filesystem read travels on its own routes', () => {
+  test('a poll for a read reaches the query route', async () => {
+    const { call, baseUrl } = await runScoped(
+      Effect.gen(function* () {
+        const { client, received, baseUrl } = yield* controlPlane({ body: { result: 'none' } });
+        yield* client.fetchFilesystemQuery({
+          sessionToken: SESSION_TOKEN,
+          request: { servedAppIds: [] },
+        });
+        return { call: received[0], baseUrl };
+      }),
+    );
+
+    expect(call?.url).toBe(`${baseUrl}${AGENT_API_PREFIX}${AGENT_ROUTES.filesystemQuery}`);
+    expect(call?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+  });
+
+  test('an answer is posted to the result route and expects no reply', async () => {
+    const { result, call, baseUrl } = await runScoped(
+      Effect.gen(function* () {
+        const { client, received, baseUrl } = yield* controlPlane(NO_REPLY);
+        const result = yield* client.sendFilesystemQueryResult({
+          sessionToken: SESSION_TOKEN,
+          result: {
+            queryId: 'query-1' as never,
+            outcome: { status: 'failed', message: 'no device is attached on this host' },
+          },
+        });
+        return { result, call: received[0], baseUrl };
+      }),
+    );
+
+    expect(result).toBeUndefined();
+    expect(call?.url).toBe(`${baseUrl}${AGENT_API_PREFIX}${AGENT_ROUTES.filesystemQueryResult}`);
+  });
+
+  test('a malformed query is rejected rather than read as a directory', async () => {
+    const error = await runScoped(
+      Effect.flatMap(controlPlane({ body: { result: 'query' } }), ({ client }) =>
+        Effect.flip(
+          client.fetchFilesystemQuery({
+            sessionToken: SESSION_TOKEN,
+            request: { servedAppIds: [] },
+          }),
+        ),
+      ),
+    );
+
+    expect(String(error)).toContain('does not match the protocol');
+  });
+});
+
 describe('validation at the boundary', () => {
   test('a response missing a required field is rejected rather than believed', async () => {
     const error = await sessionFailure({ body: { hostId: 'host-1', sessionToken: 'granted' } });
