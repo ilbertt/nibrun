@@ -6,6 +6,7 @@ const LOGGED_ENTRY_NAMES = 10;
 
 export class FilesystemService extends Service {
   private readonly filesystemRepo: FilesystemRepository;
+  #handedOut = 0;
 
   constructor({ filesystemRepo }: { filesystemRepo: FilesystemRepository }) {
     super();
@@ -13,6 +14,10 @@ export class FilesystemService extends Service {
   }
 
   /**
+   * One per poll, taken in turn, so every standing query is read as often as the others rather
+   * than the first one starving the rest. A poll carries one answer back, and widening it to a
+   * batch would make a slow directory delay every other directory's answer.
+   *
    * Offered only to a host that says it serves the app. The claim is the host's, restated on each
    * poll: it is the only party that knows what it has attached, and a control plane deciding this
    * from its own records would keep sending reads to a host that no longer holds the volume.
@@ -22,8 +27,15 @@ export class FilesystemService extends Service {
   }: {
     servedAppIds: readonly AppId[];
   }): Promise<FilesystemQuery | undefined> {
-    const query = await this.filesystemRepo.pendingQuery();
-    return servedAppIds.includes(query.appId) ? query : undefined;
+    const queries = (await this.filesystemRepo.pendingQueries()).filter((query) =>
+      servedAppIds.includes(query.appId),
+    );
+    if (queries.length === 0) {
+      return undefined;
+    }
+    const query = queries[this.#handedOut % queries.length];
+    this.#handedOut += 1;
+    return query;
   }
 
   /**
