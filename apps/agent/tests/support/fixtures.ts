@@ -96,6 +96,7 @@ export function desiredExport(overrides: Partial<DesiredExport> = {}): DesiredEx
     appId: APP_ID,
     volumeId: VOLUME_ID,
     objectKey: 'exports/app-1/exp-1.tar.gz' as ObjectKey,
+    artifact: artifact(),
     desiredState: 'present',
     ...overrides,
   };

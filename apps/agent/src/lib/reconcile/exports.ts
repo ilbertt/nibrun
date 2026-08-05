@@ -20,27 +20,18 @@ const forget = (exportId: ExportId) =>
   });
 
 /**
- * The artifact is joined from the instance desired state rather than carried on the export, so a
- * bundle can only pair a filesystem with the binary this host was told to run against it.
+ * The device is the only thing an export needs this host to still have: the volume is provisioned
+ * from its own desired state, so it stays attached whether or not anything is running against it.
  */
-const write = ({
-  action,
-  desired,
-}: {
-  action: Extract<ExportPlan, { action: 'write' }>;
-  desired: HostDesiredState;
-}) =>
+const write = ({ action }: { action: Extract<ExportPlan, { action: 'write' }> }) =>
   Effect.gen(function* () {
     const exports = yield* ExportManager;
     const allocator = yield* SlotAllocator;
-    const { exportId, appId } = action.desired;
-    const artifact = desired.instances.find((instance) => instance.appId === appId)?.artifact;
+    const { exportId, appId, artifact } = action.desired;
     const slot = yield* allocator.lookup(appId);
 
-    if (!artifact || Option.isNone(slot)) {
-      const reason = artifact
-        ? 'no device attached for this app'
-        : 'no instance to take a binary from';
+    if (Option.isNone(slot)) {
+      const reason = 'no device attached for this app';
       yield* Effect.logError('export not writable here').pipe(
         Effect.annotateLogs({ exportId, appId, reason }),
       );
@@ -63,13 +54,7 @@ const write = ({
       );
   });
 
-export const applyExports = ({
-  plan,
-  desired,
-}: {
-  plan: ReconcilePlan;
-  desired: HostDesiredState;
-}) =>
+export const applyExports = ({ plan }: { plan: ReconcilePlan }) =>
   Effect.forEach(
     plan.exports,
     (action) => {
@@ -78,7 +63,7 @@ export const applyExports = ({
       }
       return action.action === 'forget'
         ? forget(action.exportId)
-        : Effect.flatMap(write({ action, desired }), setReport);
+        : Effect.flatMap(write({ action }), setReport);
     },
     { discard: true },
   );

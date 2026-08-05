@@ -91,12 +91,18 @@ export type DesiredCheckpoint = typeof DesiredCheckpointSchema.static;
  * `objectKey` is chosen by the control plane rather than the host: it is what the download URL
  * is signed against, and a key the control plane did not choose is one it would have to be told
  * before it could sign anything.
+ *
+ * `artifact` is carried here rather than joined from `instances`, because the moment an owner
+ * most wants their data out is after they have stopped the app — and a stopped app has no
+ * instance to take a binary from. Which binary belongs in the bundle is a fact the control
+ * plane holds either way, so asking the host to infer it only made it inferrable less often.
  */
 export const DesiredExportSchema = Type.Object({
   exportId: ExportIdSchema,
   appId: AppIdSchema,
   volumeId: VolumeIdSchema,
   objectKey: ObjectKeySchema,
+  artifact: DesiredArtifactSchema,
   desiredState: DesiredPresenceSchema,
 });
 

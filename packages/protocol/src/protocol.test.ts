@@ -11,6 +11,7 @@ import {
   DesiredStateResponseSchema,
   DIRECTORY_ENTRY_LIMIT,
   DirectoryListingSchema,
+  type ExportId,
   type Filename,
   FilesystemEntryNameSchema,
   GuestPathSchema,
@@ -82,6 +83,42 @@ const desiredState = (): HostDesiredState => ({
   ],
   checkpoints: [],
   exports: [],
+});
+
+const desiredExport = () => ({
+  exportId: 'exp_1' as ExportId,
+  appId: 'app_1' as AppId,
+  volumeId: 'vol_1' as VolumeId,
+  objectKey: 'exports/app_1/exp_1.tar.gz' as ObjectKey,
+  artifact: {
+    digest: hexDigest(),
+    sizeBytes: 2048,
+    objectKey: 'artifacts/app_1/a' as ObjectKey,
+    filename: 'server' as Filename,
+  },
+  desiredState: 'present',
+});
+
+// The moment an owner most wants their data out is after they have stopped the app, and a
+// stopped app puts no instance in desired state. The export naming its own binary is what
+// keeps the bundle writable then.
+describe('an export names the binary it packages', () => {
+  test('a host running nothing is still told how to write one', () => {
+    const stopped = { ...desiredState(), instances: [], exports: [desiredExport()] };
+
+    expect(isValidMessage({ schema: HostDesiredStateSchema, value: stopped })).toBe(true);
+  });
+
+  test('an export that names no binary is not one', () => {
+    const { artifact: _artifact, ...unnamed } = desiredExport();
+
+    expect(
+      isValidMessage({
+        schema: HostDesiredStateSchema,
+        value: { ...desiredState(), exports: [unnamed] },
+      }),
+    ).toBe(false);
+  });
 });
 
 // Branding a schema means overriding a type-level property on it. If that ever started

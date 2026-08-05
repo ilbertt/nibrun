@@ -203,7 +203,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       yield* applyCheckpoints({ plan, desired }).pipe(Effect.withSpan('reconcile.checkpoints'));
       // After starts, so an export never competes with a boot for the device it reads, and
       // before teardowns, so a volume marked absent this generation is still there to read.
-      yield* applyExports({ plan, desired }).pipe(Effect.withSpan('reconcile.exports'));
+      yield* applyExports({ plan }).pipe(Effect.withSpan('reconcile.exports'));
       yield* applyTeardowns(plan).pipe(Effect.withSpan('reconcile.teardowns'));
       // Again, because the instances started above are the ones whose forwards this renders.
       yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));

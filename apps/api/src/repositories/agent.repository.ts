@@ -4,6 +4,7 @@ import {
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
   type DeploymentId,
+  type DesiredArtifact,
   type ExportId,
   type Filename,
   type GuestPort,
@@ -34,6 +35,17 @@ const VOLUME_SIZE_BYTES = 8_589_934_592;
 
 const POCKETBASE_PORT = 8090 as GuestPort;
 
+// Named once and pointed at twice: the binary an export packages is the binary the instance
+// runs, so two copies of it here would be two chances for a bundle to hold the wrong one.
+const POCKETBASE_ARTIFACT = {
+  // Uploaded by hand; the agent hashes the stream as it downloads and refuses
+  // on either mismatch, so both values below are load-bearing.
+  objectKey: 'artifacts/app-pocketbase/pb-0-39-10' as ObjectKey,
+  filename: 'pocketbase' as Filename,
+  digest: 'f119018534e7a9e0db837c2811dda589d03bbdb78a03decc0664aac864e53814' as Sha256Digest,
+  sizeBytes: 32_096_418,
+} satisfies DesiredArtifact;
+
 const DESIRED_APP = {
   generation: 5,
   volumes: [
@@ -51,14 +63,7 @@ const DESIRED_APP = {
       deploymentId: 'dep-pocketbase-3' as DeploymentId,
       volumeId: 'vol-pocketbase' as VolumeId,
       desiredState: 'running',
-      artifact: {
-        // Uploaded by hand; the agent hashes the stream as it downloads and refuses
-        // on either mismatch, so both values below are load-bearing.
-        objectKey: 'artifacts/app-pocketbase/pb-0-39-10' as ObjectKey,
-        filename: 'pocketbase' as Filename,
-        digest: 'f119018534e7a9e0db837c2811dda589d03bbdb78a03decc0664aac864e53814' as Sha256Digest,
-        sizeBytes: 32_096_418,
-      },
+      artifact: POCKETBASE_ARTIFACT,
       config: {
         guestPort: POCKETBASE_PORT,
         // `serve` because the binary is a multi-command tool; 0.0.0.0 because the
@@ -84,6 +89,7 @@ const DESIRED_APP = {
       appId: APP_ID,
       volumeId: 'vol-pocketbase' as VolumeId,
       objectKey: `exports/${APP_ID}/exp-pocketbase-1.tar.gz` as ObjectKey,
+      artifact: POCKETBASE_ARTIFACT,
       desiredState: 'present',
     },
   ],
