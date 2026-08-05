@@ -87,6 +87,15 @@ services:
       - GITHUB_CLIENT_ID=${API_GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
       - S3_ENDPOINT=http://minio:9000
+      # Reads only. Writes arrive from the fleet through Caddy's ingest listener,
+      # and the api is what decides who may see an app — so this is the one thing
+      # on the compose network that queries the store, and nothing queries it
+      # from outside.
+      #
+      # Not in .env: unlike S3, the log store runs in this stack in production
+      # too, at the same name and port, so there is no deployment for this to
+      # vary by.
+      - VICTORIALOGS_ENDPOINT=http://victorialogs:9428
       - ARTIFACTS_BUCKET=${ARTIFACTS_BUCKET}
       - AGENT_BOOTSTRAP_TOKEN=${AGENT_BOOTSTRAP_TOKEN}
       - S3_ACCESS_KEY_ID=${API_S3_ACCESS_KEY_ID}

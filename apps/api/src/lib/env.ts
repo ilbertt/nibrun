@@ -7,6 +7,7 @@ interface CustomProcessEnv {
   readonly GITHUB_CLIENT_ID: string;
   readonly GITHUB_CLIENT_SECRET: string;
   readonly S3_ENDPOINT: string;
+  readonly VICTORIALOGS_ENDPOINT: string;
   readonly ARTIFACTS_BUCKET: string;
   readonly S3_ACCESS_KEY_ID: string;
   readonly S3_SECRET_ACCESS_KEY: string;
@@ -41,6 +42,7 @@ type Env = {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   S3_ENDPOINT: URL;
+  VICTORIALOGS_ENDPOINT: URL;
   ARTIFACTS_BUCKET: string;
   S3_ACCESS_KEY_ID: string;
   S3_SECRET_ACCESS_KEY: string;
@@ -55,6 +57,7 @@ function loadEnv(): Env {
     GITHUB_CLIENT_ID: required('GITHUB_CLIENT_ID'),
     GITHUB_CLIENT_SECRET: required('GITHUB_CLIENT_SECRET'),
     S3_ENDPOINT: new URL(required('S3_ENDPOINT')),
+    VICTORIALOGS_ENDPOINT: new URL(required('VICTORIALOGS_ENDPOINT')),
     ARTIFACTS_BUCKET: required('ARTIFACTS_BUCKET'),
     S3_ACCESS_KEY_ID: required('S3_ACCESS_KEY_ID'),
     S3_SECRET_ACCESS_KEY: required('S3_SECRET_ACCESS_KEY'),

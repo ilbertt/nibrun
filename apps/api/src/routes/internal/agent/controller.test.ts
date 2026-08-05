@@ -29,6 +29,7 @@ const REQUIRED_ENV = {
   GITHUB_CLIENT_ID: 'test',
   GITHUB_CLIENT_SECRET: 'test',
   S3_ENDPOINT: 'http://127.0.0.1:1',
+  VICTORIALOGS_ENDPOINT: 'http://127.0.0.1:1',
   ARTIFACTS_BUCKET: 'test',
   S3_ACCESS_KEY_ID: 'test',
   S3_SECRET_ACCESS_KEY: 'test',
