@@ -24,8 +24,8 @@ terraform apply # prompts for every variable without a default
 
 DNS, every record **proxied** (orange cloud):
 
-- one A record per control-plane hostname (`api_hostname`, `dozzle_hostname`) → `terraform output
-  public_ip`
+- one A record per control-plane hostname (`api_hostname`, `dozzle_hostname`,
+  `victorialogs_hostname`) → `terraform output public_ip`
 - `*.<app_domain>` A → `app_host_public_ips`. One record covers the whole fleet, so there is
   nothing per app in DNS.
 

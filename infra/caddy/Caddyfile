@@ -1,10 +1,11 @@
 # The public edge, and the only thing on the box listening off-loopback.
 # Cloudflare terminates the visitor's TLS; this terminates the edge-to-origin
-# leg. Two hostnames, two upstreams — routing for user apps is a later phase.
+# leg. Routing for user apps is a later phase.
 {
 	# No ACME: the certificate is a Cloudflare Origin Certificate, which the
 	# deploy fetches from SSM and writes into tls/ next to this file. It names
-	# every hostname below, so both sites serve the same pair.
+	# every hostname below, so every site serves the same pair — which is why
+	# adding one here means reissuing that certificate.
 	auto_https off
 }
 
@@ -105,4 +106,32 @@ https://{$DOZZLE_HOSTNAME} {
 	# gap to ride out, and holding a request open would only delay the 502 that
 	# says Dozzle is actually down.
 	reverse_proxy dozzle:8080
+}
+
+# The fleet's logs. Unlike Dozzle, VictoriaLogs has no login of its own and no
+# way to expose a subset of itself: one -httpAuth credential covers every
+# endpoint including /insert, and -select.disable is all-or-nothing. So both the
+# gate and the endpoint allowlist are here.
+https://{$VICTORIALOGS_HOSTNAME} {
+	import origin_tls
+
+	# The hash is written by on_box_deploy.sh from the SSM password, the way
+	# Dozzle's user list is. bcrypt is what basic_auth reads; nothing on the box
+	# holds the password itself.
+	basic_auth {
+		admin {$VICTORIALOGS_PASSWORD_HASH}
+	}
+
+	# vmui is served from /select/vmui/ and loads every asset relative to it, and
+	# its queries are /select/logsql/*. So this is the whole dashboard and nothing
+	# else: /insert stays reachable only on the ingest listener above, and the
+	# version page, /metrics and /flags are not published at all.
+	@select path /select/*
+	handle @select {
+		reverse_proxy victorialogs:9428
+	}
+
+	handle {
+		respond 404
+	}
 }

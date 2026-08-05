@@ -57,6 +57,11 @@ services:
     environment:
       - API_HOSTNAME
       - DOZZLE_HOSTNAME
+      - VICTORIALOGS_HOSTNAME
+      # A bcrypt hash is full of `$`, and compose reads `$name` in .env as a
+      # variable — so the deploy escapes them and compose unescapes here. Passed
+      # in rather than mounted because basic_auth takes the hash inline.
+      - VICTORIALOGS_PASSWORD_HASH
       - INTERNAL_PORT
     volumes:
       - ./caddy:/etc/caddy:ro

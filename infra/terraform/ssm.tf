@@ -102,6 +102,25 @@ resource "aws_ssm_parameter" "dozzle_password" {
   }
 }
 
+# The password for the log dashboard, read back the same way as Dozzle's above
+# and held here for the same reason: VictoriaLogs has no login of its own, so
+# the proxy gates it, and Caddy wants a bcrypt hash. Salted, so the box hashes
+# it once per deploy rather than Terraform rewriting the parameter every apply.
+resource "random_password" "victorialogs_password" {
+  length  = 32
+  special = false
+}
+
+resource "aws_ssm_parameter" "victorialogs_password" {
+  name  = "${var.ssm_secret_prefix}/victorialogs_password"
+  type  = "SecureString"
+  value = random_password.victorialogs_password.result
+
+  tags = {
+    Name = "${local.resource_name_prefix}-victorialogs-password"
+  }
+}
+
 # --- App hosts ---
 
 # The user-app proxy's TLS material, carried exactly like the control plane

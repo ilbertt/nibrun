@@ -14,6 +14,10 @@ output "dozzle_hostname" {
   value = var.dozzle_hostname
 }
 
+output "victorialogs_hostname" {
+  value = var.victorialogs_hostname
+}
+
 output "app_domain" {
   description = "User apps are served under this. One wildcard record covers the fleet, so there is nothing per-app in DNS."
   value       = var.app_domain

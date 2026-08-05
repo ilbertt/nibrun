@@ -11,8 +11,8 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 : "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_GITHUB_CLIENT_ID:?}" \
   "${ARTIFACTS_BUCKET:?}" "${API_S3_ENDPOINT:?}" "${PG_BACKUP_IMAGE_URI:?}" \
   "${PG_BACKUP_BUCKET:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" \
-  "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}" "${INTERNAL_PORT:?}" \
-  "${LOG_INGEST_PORT:?}"
+  "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}" "${VICTORIALOGS_HOSTNAME:?}" \
+  "${INTERNAL_PORT:?}" "${LOG_INGEST_PORT:?}"
 
 # Per-deployment values no infrastructure resource feeds, still overridable from
 # the deploy so they never have to be edited here. The host port bindings are
@@ -99,6 +99,7 @@ DOZZLE_PORT=${DOZZLE_PORT}
 INTERNAL_PORT=${INTERNAL_PORT}
 LOG_INGEST_PORT=${LOG_INGEST_PORT}
 
+VICTORIALOGS_HOSTNAME=${VICTORIALOGS_HOSTNAME}
 VICTORIALOGS_PORT=${VICTORIALOGS_PORT}
 VICTORIALOGS_RETENTION_PERIOD=${VICTORIALOGS_RETENTION_PERIOD}
 EOF
@@ -141,6 +142,20 @@ $compose run --rm --no-deps -T --entrypoint /dozzle dozzle generate \
   --name Admin --email "admin@${API_HOSTNAME}" \
   --password "$(secret dozzle_password)" admin > dozzle/data/users.yml.new
 mv dozzle/data/users.yml.new dozzle/data/users.yml
+
+# VictoriaLogs has no login, so Caddy holds the one for its dashboard — and
+# basic_auth takes the hash inline, which is why this lands in .env rather than
+# in a file beside the Caddyfile. Appended rather than written with the rest
+# because producing it needs compose, and compose needs the .env that was
+# written above. Over stdin so the password is never in a container's argv.
+#
+# Every `$` is doubled: compose reads `$name` in .env as a variable, and a
+# bcrypt hash is `$2a$14$<salt><digest>` — the salt is arbitrary and starts with
+# a letter often enough that leaving this alone truncates the hash silently.
+log "Hashing the log dashboard password"
+victorialogs_hash=$(printf '%s\n' "$(secret victorialogs_password)" |
+  $compose run --rm --no-deps -T --entrypoint caddy caddy hash-password)
+printf 'VICTORIALOGS_PASSWORD_HASH=%s\n' "${victorialogs_hash//\$/\$\$}" >> .env
 
 log "Starting services (up -d --remove-orphans)"
 $compose up -d --remove-orphans

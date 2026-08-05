@@ -111,6 +111,18 @@ variable "dozzle_hostname" {
   }
 }
 
+# The third name on the origin certificate. Same reasoning as dozzle_hostname,
+# and the same consequence for leaving it empty.
+variable "victorialogs_hostname" {
+  type        = string
+  description = "Public hostname the fleet's logs are queried on. Point an A record at the elastic IP."
+
+  validation {
+    condition     = trimspace(var.victorialogs_hostname) != ""
+    error_message = "victorialogs_hostname must not be empty."
+  }
+}
+
 # No default for the same reason api_hostname has none, and read the validation
 # below before choosing a value: user apps must not share a registrable domain
 # with the dashboard.
