@@ -1,6 +1,6 @@
 import { Command, type CommandExecutor } from '@effect/platform';
 import type { PlatformError } from '@effect/platform/Error';
-import { Duration, Effect, Stream } from 'effect';
+import { Duration, Effect, identity, Stream } from 'effect';
 import {
   type CommandError,
   CommandFailed,
@@ -22,8 +22,8 @@ export const stdoutOf = (request: CommandRequest) =>
       : new CommandFailed({ command: request.command, result }),
   );
 
-const build = ({ command: [executable, ...args], stdin }: CommandRequest) => {
-  const command = Command.make(executable, ...args);
+const build = ({ command: [executable, ...args], stdin, env }: CommandRequest) => {
+  const command = Command.make(executable, ...args).pipe(env ? Command.env(env) : identity);
   return stdin === undefined ? command : Command.feed(command, stdin);
 };
 

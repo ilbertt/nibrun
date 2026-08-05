@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import type { Sha256Digest } from '@repo/protocol';
+import type { AppId, Sha256Digest } from '@repo/protocol';
 import { InstanceCredentialsError } from '#lib/aws/credentials.ts';
 import { ControlPlaneError } from '#lib/control/client.ts';
 import { CommandFailed, CommandTimedOut } from '#lib/exec.ts';
 import { EmptyDump, UnsafeFilename } from '#lib/exports/bundle.ts';
 import { reportedMessage } from '#lib/failure.ts';
+import { UnreadableDirectory, UnsafeGuestPath } from '#lib/filesystem/debugfs.ts';
 import { MalformedJsonError } from '#lib/json-store.ts';
 import { InvalidGuestLogFrame } from '#lib/logs/guest-protocol.ts';
 import { SlotExhausted } from '#lib/network/allocator.ts';
@@ -14,6 +15,7 @@ import { ArtifactSizeMismatch, DigestMismatch } from '#lib/vm/artifacts.ts';
 import { UnrepresentableEnvironment } from '#lib/vm/instance-env.ts';
 import { VolumeShrinkRefused } from '#lib/volumes/device-file.ts';
 import { ArtifactTransferError } from '#services/artifact-store.service.ts';
+import { NoDeviceForApp } from '#services/filesystem-reader.service.ts';
 
 const DIGEST_HEX_LENGTH = 64;
 const HTTP_UNAUTHORIZED = 401;
@@ -42,6 +44,9 @@ const everyFailure = [
   new VolumeShrinkRefused({ current: OTHER_SIZE, requested: SOME_SIZE }),
   new ControlPlaneError({ status: HTTP_UNAUTHORIZED, route: '/desired-state', body: 'expired' }),
   new ProtocolMismatch({ issues: [] }),
+  new UnsafeGuestPath({ reason: 'it is not an absolute in-volume path' }),
+  new UnreadableDirectory({ devicePath: '/dev/nbd7' }),
+  new NoDeviceForApp({ appId: 'app-pocketbase' as AppId }),
 ];
 
 // The message is what a report carries to the control plane, and from there to whoever is

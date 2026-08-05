@@ -7,6 +7,8 @@ export type CommandRequest = {
   readonly command: CommandLine;
   readonly stdin?: string;
   readonly timeout?: Duration.DurationInput;
+  /** Merged over the agent's own environment, so a caller pins a variable without dropping PATH. */
+  readonly env?: Readonly<Record<string, string>>;
 };
 
 export type CommandResult = {
