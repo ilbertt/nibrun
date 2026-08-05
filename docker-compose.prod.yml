@@ -43,10 +43,12 @@ services:
     restart: always
     ports:
       - "443:443"
-      # Admitted from the app hosts' security group only; see infra/caddy/Caddyfile.
-      # On every interface like 443 above: the security group is the boundary, and
-      # AWS enforces it before a packet reaches the instance.
+      # Both admitted from the app hosts' security group only; see
+      # infra/caddy/Caddyfile. On every interface like 443 above: the security
+      # group is the boundary, and AWS enforces it before a packet reaches the
+      # instance.
       - "${INTERNAL_PORT}:${INTERNAL_PORT}"
+      - "${LOG_INGEST_PORT}:${LOG_INGEST_PORT}"
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
@@ -63,6 +65,11 @@ services:
       # in rather than mounted because basic_auth takes the hash inline.
       - VICTORIALOGS_PASSWORD_HASH
       - INTERNAL_PORT
+      # Without this the Caddyfile's `:{$LOG_INGEST_PORT}` site address expands
+      # to a bare `:`, which Caddy drops silently rather than refusing — the
+      # listener simply does not exist and every shipper on the fleet gets a
+      # connection refused.
+      - LOG_INGEST_PORT
     volumes:
       - ./caddy:/etc/caddy:ro
     networks:

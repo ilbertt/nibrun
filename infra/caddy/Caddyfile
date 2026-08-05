@@ -122,6 +122,15 @@ https://{$VICTORIALOGS_HOSTNAME} {
 		admin {$VICTORIALOGS_PASSWORD_HASH}
 	}
 
+	# Nothing is served at the bare hostname — the allowlist below starts at
+	# /select — so this is what makes typing the hostname land on the dashboard
+	# rather than a 404. A redirect, not a proxy: it publishes no new path.
+	# Temporary, so the destination can move without browsers having cached it.
+	@root path /
+	handle @root {
+		redir * /select/vmui/
+	}
+
 	# vmui is served from /select/vmui/ and loads every asset relative to it, and
 	# its queries are /select/logsql/*. So this is the whole dashboard and nothing
 	# else: /insert stays reachable only on the ingest listener above, and the
