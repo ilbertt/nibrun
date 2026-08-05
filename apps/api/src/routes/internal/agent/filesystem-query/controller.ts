@@ -5,6 +5,7 @@ import {
 } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { assertProtocolVersion } from '#lib/agent/protocol-version.ts';
+import { agentRoutePath } from '#lib/agent/routes.ts';
 import { sessionTokenFrom } from '#lib/agent/session-token.ts';
 import { ProtocolHeadersSchema } from '#routes/internal/agent/model.ts';
 import { AgentServicePlugin, FilesystemServicePlugin, loggerPlugin } from '#services/plugins.ts';
@@ -21,7 +22,7 @@ export const AgentFilesystemQueryController = new Elysia()
   .use(AgentServicePlugin)
   .use(FilesystemServicePlugin)
   .post(
-    AGENT_ROUTES.filesystemQuery,
+    agentRoutePath(AGENT_ROUTES.filesystemQuery),
     async ({ agentService, filesystemService, body, headers }) => {
       assertProtocolVersion(headers);
       // Resolved and discarded: nothing below needs the host id, but an expired session must not

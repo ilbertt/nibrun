@@ -1,24 +1,23 @@
 import { ArtifactSchema, type OwnerId } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
-import { AppArtifactByIdController } from '#routes/api/apps/[id]/artifacts/[artifactId]/controller.ts';
 import {
   CreateArtifactBodySchema,
   ListArtifactsResponseSchema,
-} from '#routes/api/apps/[id]/artifacts/model.ts';
-import { AppParamsSchema } from '#routes/api/apps/[id]/model.ts';
+} from '#routes/api/apps/[appId]/artifacts/model.ts';
+import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 import { ArtifactsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
-export const AppArtifactsController = new Elysia({ prefix: '/artifacts' })
-  .use(loggerPlugin('appArtifactsController'))
+export const AppsAppIdArtifactsController = new Elysia()
+  .use(loggerPlugin('appsAppIdArtifactsController'))
   .use(authPlugin)
   .use(ArtifactsServicePlugin)
   .guard({ auth: true })
   .get(
-    '/',
+    '/apps/:appId/artifacts',
     async ({ artifactsService, params, user, status }) => {
       const artifacts = await artifactsService.list({
-        appId: params.id,
+        appId: params.appId,
         ownerId: user.id as OwnerId,
       });
       return status(StatusMap.OK, { artifacts });
@@ -29,10 +28,10 @@ export const AppArtifactsController = new Elysia({ prefix: '/artifacts' })
     },
   )
   .post(
-    '/',
+    '/apps/:appId/artifacts',
     async ({ artifactsService, params, body, user, status }) => {
       const artifact = await artifactsService.create({
-        appId: params.id,
+        appId: params.appId,
         ownerId: user.id as OwnerId,
         binary: body.binary,
       });
@@ -43,5 +42,4 @@ export const AppArtifactsController = new Elysia({ prefix: '/artifacts' })
       body: CreateArtifactBodySchema,
       response: { [StatusMap.Created]: ArtifactSchema },
     },
-  )
-  .use(AppArtifactByIdController);
+  );

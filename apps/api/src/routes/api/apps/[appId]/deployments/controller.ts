@@ -1,25 +1,24 @@
 import type { OwnerId } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
-import { AppDeploymentByIdController } from '#routes/api/apps/[id]/deployments/[deploymentId]/controller.ts';
 import {
   CreateDeploymentBodySchema,
   DeploymentResponseSchema,
   ListDeploymentsResponseSchema,
-} from '#routes/api/apps/[id]/deployments/model.ts';
-import { AppParamsSchema } from '#routes/api/apps/[id]/model.ts';
+} from '#routes/api/apps/[appId]/deployments/model.ts';
+import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 import { DeploymentsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
-export const AppDeploymentsController = new Elysia({ prefix: '/deployments' })
-  .use(loggerPlugin('appDeploymentsController'))
+export const AppsAppIdDeploymentsController = new Elysia()
+  .use(loggerPlugin('appsAppIdDeploymentsController'))
   .use(authPlugin)
   .use(DeploymentsServicePlugin)
   .guard({ auth: true })
   .get(
-    '/',
+    '/apps/:appId/deployments',
     async ({ deploymentsService, params, user, status }) => {
       const deployments = await deploymentsService.list({
-        appId: params.id,
+        appId: params.appId,
         ownerId: user.id as OwnerId,
       });
       return status(StatusMap.OK, { deployments });
@@ -30,10 +29,10 @@ export const AppDeploymentsController = new Elysia({ prefix: '/deployments' })
     },
   )
   .post(
-    '/',
+    '/apps/:appId/deployments',
     async ({ deploymentsService, params, body, user, status }) => {
       const deployment = await deploymentsService.createOrRollback({
-        appId: params.id,
+        appId: params.appId,
         ownerId: user.id as OwnerId,
         source: body,
       });
@@ -44,5 +43,4 @@ export const AppDeploymentsController = new Elysia({ prefix: '/deployments' })
       body: CreateDeploymentBodySchema,
       response: { [StatusMap.Created]: DeploymentResponseSchema },
     },
-  )
-  .use(AppDeploymentByIdController);
+  );
