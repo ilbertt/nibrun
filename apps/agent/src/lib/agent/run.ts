@@ -1,4 +1,5 @@
 import { Effect, Option } from 'effect';
+import { heartbeatLoop } from '#lib/agent/heartbeat.ts';
 import { logLoop } from '#lib/agent/logs.ts';
 import { pollLoop, reconcileSafely } from '#lib/agent/poll.ts';
 import { reportLoop } from '#lib/agent/report.ts';
@@ -55,5 +56,7 @@ export const run = Effect.gen(function* () {
   }
 
   yield* sessions.current;
-  yield* Effect.all([pollLoop, statusLoop, reportLoop, logLoop], { concurrency: 'unbounded' });
+  yield* Effect.all([pollLoop, statusLoop, reportLoop, logLoop, heartbeatLoop], {
+    concurrency: 'unbounded',
+  });
 });
