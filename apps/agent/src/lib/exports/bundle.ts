@@ -3,6 +3,7 @@ import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact } from '@repo/protocol';
 import { Data, Duration, Effect, Either } from 'effect';
 import { downloadAndVerify } from '#lib/vm/artifacts.ts';
+import { MKFS_ROOT_ENTRIES } from '#lib/volumes/ext4.ts';
 import { stdoutOf } from '#services/command-runner.service.ts';
 
 const STAGING_MODE = 0o700;
@@ -37,6 +38,7 @@ export class UnsafeFilename extends Data.TaggedError('UnsafeFilename')<{
 const dumpFilesystem = ({ devicePath, destination }: { devicePath: string; destination: string }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
     yield* fs.makeDirectory(destination, { recursive: true, mode: STAGING_MODE });
     yield* stdoutOf({
       command: ['debugfs', '-R', `rdump / ${destination}`, devicePath],
@@ -45,6 +47,14 @@ const dumpFilesystem = ({ devicePath, destination }: { devicePath: string; desti
     if ((yield* fs.readDirectory(destination)).length === 0) {
       return yield* new EmptyDump({ devicePath });
     }
+    // Dropped after the emptiness check and never before it: a filesystem holding nothing but
+    // `lost+found` is a tenant who has written no data, and removing it first would report that
+    // as a dump that failed.
+    yield* Effect.forEach(
+      MKFS_ROOT_ENTRIES,
+      (entry) => fs.remove(path.join(destination, entry), { recursive: true, force: true }),
+      { discard: true },
+    );
   });
 
 /**

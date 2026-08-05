@@ -11,6 +11,16 @@ const SECOND_BYTE = 1;
 
 export const FILESYSTEM_LABEL = 'nibrun-data';
 
+/**
+ * What `mkfs.ext4` below puts at the root of every filesystem it writes. A tenant did not create
+ * these and has no use for them, so neither a listing nor an export shows them.
+ *
+ * **At the root only.** `lost+found` is reserved by the filesystem in exactly one directory; the
+ * same name deeper in the tree is a directory a tenant made, and hiding it would be hiding their
+ * own data from them.
+ */
+export const MKFS_ROOT_ENTRIES: ReadonlySet<string> = new Set(['lost+found']);
+
 export function hasExtMagic(bytes: Uint8Array): boolean {
   if (bytes.length < MAGIC_BYTE_COUNT) {
     return false;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Filename } from '@repo/protocol';
 import { Effect, Either, Layer } from 'effect';
@@ -13,17 +13,32 @@ const DEVICE_PATH = '/dev/nbd7';
 
 const run = provided(Layer.merge(artifactStore(), platform));
 
-/** What a real `debugfs` and `tar` would leave behind, so each step downstream has its input. */
-function bundling({ dump = true }: { dump?: boolean } = {}) {
+/** `lost+found` is written by `mkfs.ext4`, so a real `rdump` of any root always produces it. */
+const DUMPS = {
+  tenant: async (dataDir: string) => {
+    await mkdir(join(dataDir, 'pb_data'), { recursive: true });
+    await writeFile(join(dataDir, 'pb_data', 'data.db'), 'tenant');
+    await mkdir(join(dataDir, 'lost+found'), { recursive: true });
+  },
+  'mkfs-only': async (dataDir: string) => {
+    await mkdir(join(dataDir, 'lost+found'), { recursive: true });
+  },
+  none: () => Promise.resolve(),
+} as const;
+
+/**
+ * What a real `debugfs` and `tar` would leave behind, so each step downstream has its input. The
+ * staging tree is read inside the scope that owns it, because it is gone by the time the test
+ * body resumes.
+ */
+function bundling({ dumps = 'tenant' }: { dumps?: keyof typeof DUMPS } = {}) {
   return Effect.gen(function* () {
     const stagingDir = yield* temporaryDirectory;
+    const dataDir = join(stagingDir, 'data');
     const { commands, layer } = recordingCommands(({ command }) =>
       Effect.gen(function* () {
-        if (command[0] === 'debugfs' && dump) {
-          yield* Effect.promise(async () => {
-            await mkdir(join(stagingDir, 'data', 'pb_data'), { recursive: true });
-            await writeFile(join(stagingDir, 'data', 'pb_data', 'data.db'), 'tenant');
-          });
+        if (command[0] === 'debugfs') {
+          yield* Effect.promise(() => DUMPS[dumps](dataDir));
         }
         if (command[0] === 'tar') {
           yield* Effect.promise(() => writeFile(join(stagingDir, 'bundle.tar.gz'), 'archive'));
@@ -38,7 +53,8 @@ function bundling({ dump = true }: { dump?: boolean } = {}) {
         layer,
       ),
     );
-    return { commands, result, stagingDir };
+    const archived = yield* Effect.promise(() => readdir(dataDir).catch(() => [] as string[]));
+    return { commands, result, stagingDir, archived };
   });
 }
 
@@ -76,9 +92,26 @@ test('archives the data tree and the binary under its uploaded name', async () =
 });
 
 test('a dump that produced nothing is a failure rather than an empty bundle', async () => {
-  const { result } = await run(bundling({ dump: false }));
+  const { result } = await run(bundling({ dumps: 'none' }));
 
   expect(Either.isLeft(result) && result.left._tag).toBe('EmptyDump');
+});
+
+// Somebody extracting this on their own machine gets what they put in the volume, not the
+// bookkeeping the filesystem needed to hold it.
+test('what mkfs left at the root does not reach the archive', async () => {
+  const { archived } = await run(bundling());
+
+  expect(archived).toEqual(['pb_data']);
+});
+
+// The emptiness check has to see the raw dump: a volume holding only `lost+found` is a tenant who
+// has written nothing, and reporting that as a failed read would fail their export forever.
+test('a volume holding only that is an empty export rather than a failed one', async () => {
+  const { result, archived } = await run(bundling({ dumps: 'mkfs-only' }));
+
+  expect(Either.isRight(result)).toBe(true);
+  expect(archived).toEqual([]);
 });
 
 describe('the bundle keeps the name the binary was uploaded under', () => {

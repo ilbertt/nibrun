@@ -80,6 +80,29 @@ describe('a directory is read off the columns debugfs prints', () => {
   });
 });
 
+describe('what mkfs left at the root is not the tenant data', () => {
+  const withLostAndFound = [
+    '      2  40755 (2)      0      0    4096 15-Jan-2026 10:23 .',
+    '      2  40755 (2)      0      0    4096 15-Jan-2026 10:23 ..',
+    '     11  40700 (2)      0      0   16384 15-Jan-2026 10:23 lost+found',
+    '     12  40755 (2)      0      0    4096 15-Jan-2026 10:24 pb_data',
+  ].join('\n');
+
+  test('it is left out of the root', () => {
+    expect(entriesOf(withLostAndFound).entries.map((entry) => entry.name)).toEqual(['pb_data']);
+  });
+
+  // The name is reserved in one directory only. Anywhere else it is a directory the tenant made,
+  // and hiding it would be hiding their own data from them.
+  test('but the same name below the root is the tenant own directory', () => {
+    const listing = parseListing({ output: withLostAndFound, path: '/pb_data' as GuestPath });
+    if (Either.isLeft(listing)) {
+      throw new Error('expected a readable directory');
+    }
+    expect(listing.right.entries.map((entry) => entry.name)).toEqual(['lost+found', 'pb_data']);
+  });
+});
+
 // `debugfs` writes its failures to stderr and exits 0 regardless, so the output is the only
 // evidence. Every ext4 directory holds `.`, which separates "unreadable" from "empty" — and the
 // export path's emptiness check cannot, because both look identical to it.

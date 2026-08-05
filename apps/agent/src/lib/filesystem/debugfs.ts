@@ -3,6 +3,7 @@ import {
   type DirectoryListing,
   type FilesystemEntry,
   type FilesystemEntryKind,
+  GUEST_PATH_ROOT,
   type GuestPath,
   GuestPathSchema,
   isValidMessage,
@@ -10,6 +11,7 @@ import {
 } from '@repo/protocol';
 import { Data, Either } from 'effect';
 import type { CommandLine } from '#lib/exec.ts';
+import { MKFS_ROOT_ENTRIES } from '#lib/volumes/ext4.ts';
 
 /**
  * Reading a tenant filesystem with `debugfs`, which walks inodes in userspace — the same reason
@@ -164,6 +166,7 @@ export function parseListing({
   path: GuestPath;
 }): Either.Either<DirectoryListing, 'no-directory'> {
   const entries: FilesystemEntry[] = [];
+  const atRoot = path === GUEST_PATH_ROOT;
   let sawSelf = false;
   let truncated = false;
 
@@ -174,6 +177,9 @@ export function parseListing({
     }
     if (SELF_AND_PARENT.has(parsed.name)) {
       sawSelf ||= parsed.name === '.';
+      continue;
+    }
+    if (atRoot && MKFS_ROOT_ENTRIES.has(parsed.name)) {
       continue;
     }
     if (entries.length === DIRECTORY_ENTRY_LIMIT) {
