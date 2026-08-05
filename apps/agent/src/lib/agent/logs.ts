@@ -1,74 +1,52 @@
-import { Clock, Data, Deferred, type Duration, Effect, Schedule, Stream } from 'effect';
+import { type Duration, Effect, Exit } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#lib/agent/backoff.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
-import { ControlPlane } from '#services/control-plane.service.ts';
-import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
+import { LogStore } from '#services/log-store.service.ts';
+import { MAX_BATCH_BYTES, TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 
 /**
- * How long one upload lasts before the agent closes it and opens the next. The agent ends it
- * rather than the control plane because only the sender knows when nothing is in flight; ended at
- * a drained queue it costs nothing, and short is what keeps a stalled upload from holding a
- * host's output hostage.
+ * How long the loop waits when there is nothing to send. Tenant output is read by someone
+ * watching a deploy, so this is the floor on how stale what they see can be.
  */
-const WINDOW: Duration.DurationInput = '30 seconds';
-
-/** Silence, not the window, is what an idle timer measures, and a quiet app produces plenty. */
-const KEEPALIVE_INTERVAL: Duration.DurationInput = '10 seconds';
+const IDLE_POLL: Duration.DurationInput = '500 millis';
 
 /**
- * The agent ends each upload itself, so a stream that ended well inside its own window ended for
- * a reason nobody chose. Counting that as a failure keeps a misconfigured edge from becoming a
- * silent reconnect loop.
+ * One acknowledged batch.
+ *
+ * A batch is either released or put back, never dropped: `onExit` covers the failure that
+ * retries, the defect that does not, and the interruption a shutdown raises — the three ways out
+ * of a request that has already taken events out of the queue.
  */
-const MIN_HEALTHY_MS = 5_000;
-
-class LogStreamEndedEarly extends Data.TaggedError('LogStreamEndedEarly')<{
-  readonly elapsedMs: number;
-}> {
-  override get message() {
-    return `the tenant log upload ended after ${this.elapsedMs}ms, well inside its own window`;
-  }
-}
-
-const uploadWindow = Effect.gen(function* () {
-  const control = yield* ControlPlane;
-  const sessions = yield* AgentSessionHolder;
+const sendBatch = Effect.gen(function* () {
   const logs = yield* TenantLogQueue;
+  const store = yield* LogStore;
+  const sessions = yield* AgentSessionHolder;
 
-  const ending = yield* Deferred.make<void>();
-  const upload = yield* logs.body(ending);
-  const body = yield* Stream.toReadableStreamEffect(upload);
-  const session = yield* sessions.current;
-  const startedAtMs = yield* Clock.currentTimeMillis;
-
-  yield* Effect.scoped(
-    Effect.gen(function* () {
-      yield* Effect.forkScoped(Effect.repeat(logs.keepalive, Schedule.spaced(KEEPALIVE_INTERVAL)));
-      yield* Effect.forkScoped(
-        Effect.andThen(Effect.sleep(WINDOW), Deferred.succeed(ending, undefined)),
-      );
-      yield* control.streamTenantLogs({ sessionToken: session.sessionToken, body });
-    }),
-  ).pipe(
-    // A control plane that answers before the body ends leaves this stream still pulling, and a
-    // chunk handed to it would be delivered nowhere.
-    Effect.ensuring(Effect.ignore(Effect.tryPromise(() => body.cancel()))),
-  );
-
-  const elapsedMs = (yield* Clock.currentTimeMillis) - startedAtMs;
-  if (elapsedMs < MIN_HEALTHY_MS) {
-    return yield* new LogStreamEndedEarly({ elapsedMs });
+  if (yield* logs.isEmpty) {
+    return yield* Effect.sleep(IDLE_POLL);
   }
-  yield* logs.acknowledge;
+
+  const session = yield* sessions.current;
+  const batch = yield* logs.take({ maxBytes: MAX_BATCH_BYTES });
+
+  yield* store.publish({ events: batch, hostId: session.hostId }).pipe(
+    Effect.onExit((exit) => (Exit.isSuccess(exit) ? logs.release(batch) : logs.restore(batch))),
+    Effect.tapError((error) =>
+      Effect.logWarning('tenant log batch failed', error).pipe(
+        Effect.annotateLogs({ events: batch.length }),
+      ),
+    ),
+  );
 });
 
 export const logLoop = Effect.gen(function* () {
   const sessions = yield* AgentSessionHolder;
-  // Reaching the end of a window is not a failure, so the next upload opens immediately.
+  // An idle tick is not a failure, so a quiet host never backs off: the schedule only advances
+  // when a batch could not be delivered.
   yield* supervised({
-    once: Effect.tapErrorTag(uploadWindow, 'ControlPlaneError', sessions.onExpired),
-    onFailure: (cause) => Effect.logWarning('tenant log stream failed', cause),
+    once: Effect.tapErrorTag(sendBatch, 'ControlPlaneError', sessions.onExpired),
+    onFailure: (cause) => Effect.logWarning('tenant log loop failed', cause),
     schedule: CONTROL_PLANE_BACKOFF,
   });
 });

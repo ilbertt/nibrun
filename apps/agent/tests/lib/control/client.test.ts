@@ -8,16 +8,14 @@ import {
   PROTOCOL_VERSION_HEADER,
   type SecretString,
 } from '@repo/protocol';
-import { Effect, Exit, Fiber, Option } from 'effect';
+import { Effect } from 'effect';
 import { ControlPlaneError, makeControlPlaneClient } from '#lib/control/client.ts';
 import { runScoped } from '#tests/support/run.ts';
 import {
   HTTP_NO_CONTENT,
-  HTTP_OK,
   HTTP_UNAUTHORIZED,
   HTTP_UNAVAILABLE,
   recordingServer,
-  serving,
 } from '#tests/support/server.ts';
 
 const SOME_GENERATION = 4;
@@ -112,96 +110,6 @@ describe('every request identifies the protocol it speaks', () => {
       ),
     ).toBeUndefined();
   });
-
-  test('tenant logs use one streaming NDJSON request on their own route', async () => {
-    const { call, baseUrl } = await runScoped(
-      Effect.gen(function* () {
-        const { client, received, baseUrl } = yield* controlPlane(NO_REPLY);
-        const body = new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.enqueue(new TextEncoder().encode('{"kind":"data"}\n'));
-            controller.close();
-          },
-        });
-        yield* client.streamTenantLogs({ sessionToken: SESSION_TOKEN, body });
-        return { call: received[0], baseUrl };
-      }),
-    );
-
-    expect(call?.url).toBe(`${baseUrl}${AGENT_API_PREFIX}${AGENT_ROUTES.tenantLogs}`);
-    // The stream reached the wire as itself. Handed to the client as a call argument instead, it
-    // would arrive as the `{}` that `JSON.stringify` makes of a ReadableStream.
-    expect(call?.body).toBe('{"kind":"data"}\n');
-    expect(call?.headers['content-type']).toBe('application/x-ndjson');
-    expect(call?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
-  });
-});
-
-test('a log chunk reaches the API while the HTTP request is still open', async () => {
-  let releaseResponse!: () => void;
-  const responseReleased = new Promise<void>((resolve) => {
-    releaseResponse = resolve;
-  });
-  let observeChunk!: (value: string) => void;
-  const observedChunk = new Promise<string>((resolve) => {
-    observeChunk = resolve;
-  });
-  let bodyController!: ReadableStreamDefaultController<Uint8Array>;
-
-  const { chunk, stillOpen } = await runScoped(
-    Effect.gen(function* () {
-      const server = yield* serving(async (request) => {
-        const first = await request.body?.getReader().read();
-        observeChunk(new TextDecoder().decode(first?.value));
-        await responseReleased;
-        return new Response(undefined, { status: HTTP_OK });
-      });
-      const client = makeControlPlaneClient({ baseUrl: server.baseUrl });
-      const body = new ReadableStream<Uint8Array>({
-        start(controller) {
-          bodyController = controller;
-        },
-      });
-
-      const upload = yield* Effect.fork(
-        client.streamTenantLogs({ sessionToken: SESSION_TOKEN, body }),
-      );
-      yield* Effect.sync(() =>
-        bodyController.enqueue(new TextEncoder().encode('{"text":"now"}\n')),
-      );
-      const chunk = yield* Effect.promise(() => observedChunk);
-      // The server is still holding its response, so an upload that had finished finished early.
-      const stillOpen = Option.isNone(yield* Fiber.poll(upload));
-
-      yield* Effect.sync(() => bodyController.close());
-      yield* Effect.sync(releaseResponse);
-      yield* Fiber.join(upload);
-      return { chunk, stillOpen };
-    }).pipe(Effect.ensuring(Effect.sync(() => releaseResponse()))),
-  );
-
-  expect(chunk).toBe('{"text":"now"}\n');
-  expect(stillOpen).toBe(true);
-});
-
-// Interrupting the effect is what ends an upload the agent no longer wants — the one case where
-// nothing else is coming to end the request.
-test('interrupting the upload ends it', async () => {
-  const exit = await runScoped(
-    Effect.gen(function* () {
-      const server = yield* serving(() => new Promise<Response>(() => {}));
-      return yield* Effect.exit(
-        makeControlPlaneClient({ baseUrl: server.baseUrl })
-          .streamTenantLogs({
-            sessionToken: SESSION_TOKEN,
-            body: new ReadableStream<Uint8Array>({ start: () => {} }),
-          })
-          .pipe(Effect.timeout('100 millis')),
-      );
-    }),
-  );
-
-  expect(Exit.isFailure(exit)).toBe(true);
 });
 
 describe('validation at the boundary', () => {

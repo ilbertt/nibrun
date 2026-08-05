@@ -53,6 +53,10 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
     return {
       stateDir,
       controlPlaneUrl: yield* required('AGENT_CONTROL_PLANE_URL'),
+      // The log store, on a port of its own beside the control channel. Required: an agent that
+      // started without it would run correctly and discard every tenant's output, which is the
+      // kind of missing config nothing notices until someone asks where the logs went.
+      logIngestUrl: yield* required('AGENT_LOG_INGEST_URL'),
       runtimeDir: yield* optional({ name: 'AGENT_RUNTIME_DIR', fallback: DEFAULT_RUNTIME_DIR }),
       hostIdFile: inStateDir('host-id'),
       slotsFile: inStateDir('slots.json'),

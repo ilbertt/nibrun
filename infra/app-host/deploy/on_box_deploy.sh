@@ -20,7 +20,8 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${FIRECRACKER_DIRECTORY:?}" \
   "${CADDY_VERSION:?}" "${CADDY_URL:?}" "${CADDY_SHA256:?}" \
   "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${APP_DOMAIN:?}" \
-  "${CONTROL_PLANE_INTERNAL_URL:?}" "${VPC_IPV4_CIDR_BLOCK:?}" "${VPC_IPV6_CIDR_BLOCK:?}" \
+  "${CONTROL_PLANE_INTERNAL_URL:?}" "${LOG_INGEST_URL:?}" \
+  "${VPC_IPV4_CIDR_BLOCK:?}" "${VPC_IPV6_CIDR_BLOCK:?}" \
   "${GUEST_IMAGES_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
 
 # Empty until a guest image is adopted in infra/app-host/versions.json. A host
@@ -224,6 +225,19 @@ EOF
 chmod 0644 "$NIBRUN_DIR/bundle/versions.json.new"
 changed_file "$NIBRUN_DIR/bundle/versions.json" && NEEDS_RESTART+=(agent) || true
 
+# Ships this host's journal to the log store. systemd-journal-upload appends
+# `/upload` to this URL, which is exactly the path VictoriaLogs serves its
+# journald endpoint on — so the URL names the endpoint and the tool completes it.
+#
+# Holds no secret: the port admits app hosts by security group and nothing else,
+# so 0644 rather than the 0600 the umask above would otherwise give it.
+cat > /etc/systemd/journal-upload.conf.new <<EOF
+[Upload]
+URL=${LOG_INGEST_URL}/insert/journald
+EOF
+chmod 0644 /etc/systemd/journal-upload.conf.new
+changed_file /etc/systemd/journal-upload.conf && NEEDS_RESTART+=(journal-upload) || true
+
 cp zerofs/config.toml /etc/zerofs/config.toml.new
 # Read by ZeroFS itself, which runs as its own user, so it cannot inherit the
 # 0600 the umask above gives the secrets around it. It holds no secret: every
@@ -233,6 +247,10 @@ changed_file /etc/zerofs/config.toml && NEEDS_RESTART+=(zerofs) || true
 
 cat > /etc/nibrun/agent.env.new <<EOF
 AGENT_CONTROL_PLANE_URL=${CONTROL_PLANE_INTERNAL_URL}
+# The log store, on a port of its own beside the control channel. Both are the
+# same private address; what separates them is which security group rule admits
+# them, so widening one cannot widen the other.
+AGENT_LOG_INGEST_URL=${LOG_INGEST_URL}
 AGENT_ARTIFACT_BUCKET=${ARTIFACTS_BUCKET}
 AGENT_EXPORT_BUCKET=${EXPORTS_BUCKET}
 # A tenant microVM reaching the api's internal port would be reaching it as the
@@ -300,7 +318,7 @@ if [ "$units_changed" = "1" ]; then
 fi
 
 systemctl enable nibrun-zerofs.service nibrun-zerofs-mount.service \
-  nibrun-caddy.service nibrun-agent.service >/dev/null
+  nibrun-caddy.service nibrun-agent.service systemd-journal-upload.service >/dev/null
 
 # --- Restarting --------------------------------------------------------------
 #
@@ -350,6 +368,12 @@ elif needs_reload caddy; then
   systemctl reload nibrun-caddy.service
 fi
 
+# Restarted rather than reloaded: it reads its URL once, at start.
+if needs_restart journal-upload || ! systemctl is-active --quiet systemd-journal-upload.service; then
+  log "Journal uploader config changed — restarting it"
+  systemctl restart systemd-journal-upload.service
+fi
+
 if needs_restart agent; then
   log "Agent changed — restarting it, leaving tenant microVMs running"
   systemctl restart nibrun-agent.service
@@ -361,7 +385,7 @@ fi
 # bump reaches an app when it is next redeployed and restarts nothing now.
 
 log "Waiting for the services to settle"
-for unit in nibrun-zerofs nibrun-caddy nibrun-agent; do
+for unit in nibrun-zerofs nibrun-caddy nibrun-agent systemd-journal-upload; do
   for _ in $(seq 1 30); do
     state=$(systemctl is-active "$unit.service" || true)
     [ "$state" = "active" ] && break

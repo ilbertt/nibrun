@@ -12,6 +12,7 @@ import * as Exec from '#services/command-runner.service.ts';
 import * as ControlPlane from '#services/control-plane.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
+import * as LogStore from '#services/log-store.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
@@ -32,6 +33,7 @@ const agent = Layer.mergeAll(
   AgentState.layer,
   Exec.layer,
   ControlPlane.layer,
+  LogStore.layer,
   Artifacts.layer,
   SlotAllocator.Default,
   ZerofsTopology.Default,

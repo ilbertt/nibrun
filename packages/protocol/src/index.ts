@@ -21,14 +21,6 @@ export {
   HostDesiredStateSchema,
 } from '#control/desired-state.ts';
 export {
-  TENANT_LOG_CONTENT_TYPE,
-  TENANT_LOG_STREAMS,
-  type TenantLogEvent,
-  TenantLogEventSchema,
-  type TenantLogStream,
-  TenantLogStreamSchema,
-} from '#control/logs.ts';
-export {
   type HostReportedState,
   HostReportedStateSchema,
   type ReportedCheckpoint,
@@ -153,6 +145,17 @@ export {
   type RestartPolicy,
   RestartPolicySchema,
 } from '#domain/instance.ts';
+export {
+  LOG_SOURCES,
+  LOG_STREAM_FIELDS,
+  type LogSource,
+  LogSourceSchema,
+  TENANT_LOG_STREAMS,
+  type TenantLogRecord,
+  TenantLogRecordSchema,
+  type TenantLogStream,
+  TenantLogStreamSchema,
+} from '#domain/log.ts';
 export {
   VOLUME_STATES,
   type Volume,

@@ -1,22 +1,9 @@
-import type { TenantLogEvent } from '@repo/protocol';
-import { Chunk, Deferred, Effect, Stream } from 'effect';
-import type { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
+import { MAX_BUFFERED_BYTES, type TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 
-const DECODER = new TextDecoder();
-
-/** Everything one upload window carries, taken after the window has been ended. */
-export function drainedLines(queue: TenantLogQueue) {
-  return Effect.gen(function* () {
-    const ending = yield* Deferred.make<void>();
-    yield* Deferred.succeed(ending, undefined);
-    const upload = yield* queue.body(ending);
-    const chunks = Chunk.toReadonlyArray(yield* Stream.runCollect(upload));
-    return chunks.map((chunk) => DECODER.decode(chunk));
-  });
-}
-
+/**
+ * Everything the queue is holding, as one batch — the buffer's own cap is the bound, so nothing
+ * it accepted can be left behind by the batch limit.
+ */
 export function drainedEvents(queue: TenantLogQueue) {
-  return Effect.map(drainedLines(queue), (lines) =>
-    lines.map((line) => JSON.parse(line) as TenantLogEvent),
-  );
+  return queue.take({ maxBytes: MAX_BUFFERED_BYTES });
 }

@@ -18,10 +18,10 @@ import {
   type HostPort,
   type InstanceId,
   type ObjectKey,
-  type TenantLogEvent,
   type Timestamp,
   type VolumeId,
 } from '@repo/protocol';
+import type { TenantLogEvent } from '#lib/logs/event.ts';
 import { HOST_PORT_BASE } from '#lib/network/slot.ts';
 import type { ObservedInstance, ObservedState, ObservedVolume } from '#lib/reconcile/plan.ts';
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST } from '#tests/support/artifacts.ts';
