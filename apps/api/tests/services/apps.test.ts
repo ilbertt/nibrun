@@ -1,17 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  type AppId,
-  type AppState,
-  DEFAULT_GUEST_PORT,
-  DEFAULT_HEALTH_CHECK,
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_RESTART_POLICY,
-  type DnsLabel,
-  type Hostname,
-  type OwnerId,
-} from '@repo/protocol';
+import type { AppId, AppState, DnsLabel, Hostname, OwnerId } from '@repo/protocol';
 import { SQL } from 'bun';
-import { type AppConfigPatch, type PublicAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
+import type { AppConfigPatch, PublicAppConfig } from '#lib/app-config.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
   AppHostnameRow,
@@ -21,10 +11,15 @@ import type {
   OwnedAppHostnameRow,
 } from '#repositories/apps.repository.ts';
 import { AppsService } from '#services/apps.service.ts';
+import {
+  APP_HOST_DOMAIN,
+  APP_ID,
+  configColumns,
+  DEFAULT_CONFIG,
+  OWNER_ID,
+} from '#tests/services/support/fixtures.ts';
+import { uniqueViolation } from '#tests/support/postgres.ts';
 
-const APP_HOST_DOMAIN = 'apps.test';
-const OWNER_ID = 'owner-1' as OwnerId;
-const APP_ID = 'app-1' as AppId;
 const APP_NAME = 'pocketbase';
 
 // Restated rather than imported from the implementation: that the bound exists and how many
@@ -37,24 +32,6 @@ function distinct(slugs: readonly DnsLabel[]): number {
   return new Set(slugs).size;
 }
 
-const CONFIG: PublicAppConfig = {
-  volumeSizeBytes: VOLUME_SIZE_BYTES,
-  guestPort: DEFAULT_GUEST_PORT,
-  args: [],
-  resources: DEFAULT_INSTANCE_RESOURCES,
-  healthCheck: DEFAULT_HEALTH_CHECK,
-  restartPolicy: DEFAULT_RESTART_POLICY,
-};
-
-// What Postgres raises when two labels land on the same six characters of entropy.
-function uniqueViolation(constraint: string): SQL.PostgresError {
-  return new SQL.PostgresError('duplicate key value violates unique constraint', {
-    code: 'ERR_POSTGRES_SERVER_ERROR',
-    errno: '23505',
-    constraint,
-  });
-}
-
 function appRow(slug: DnsLabel): AppRow {
   return {
     id: APP_ID,
@@ -63,21 +40,7 @@ function appRow(slug: DnsLabel): AppRow {
     state: 'active',
     created_at: new Date(),
     updated_at: new Date(),
-    guest_port: CONFIG.guestPort,
-    args: [...CONFIG.args],
-    vcpu_count: CONFIG.resources.vcpuCount,
-    memory_mib: CONFIG.resources.memoryMib,
-    health_check_path: CONFIG.healthCheck.path ?? null,
-    health_check_interval_ms: CONFIG.healthCheck.intervalMs,
-    health_check_timeout_ms: CONFIG.healthCheck.timeoutMs,
-    health_check_grace_period_ms: CONFIG.healthCheck.gracePeriodMs,
-    health_check_healthy_threshold: CONFIG.healthCheck.healthyThreshold,
-    health_check_unhealthy_threshold: CONFIG.healthCheck.unhealthyThreshold,
-    restart_max_restarts: CONFIG.restartPolicy.maxRestarts,
-    restart_initial_backoff_ms: CONFIG.restartPolicy.initialBackoffMs,
-    restart_max_backoff_ms: CONFIG.restartPolicy.maxBackoffMs,
-    restart_backoff_factor: CONFIG.restartPolicy.backoffFactor,
-    restart_reset_after_ms: CONFIG.restartPolicy.resetAfterMs,
+    ...configColumns(DEFAULT_CONFIG),
   };
 }
 
@@ -152,6 +115,10 @@ class StubAppsRepository implements AppsRepositoryContract {
   }
 }
 
+function serviceWith(appsRepo: AppsRepositoryContract) {
+  return new AppsService({ appsRepo, appHostDomain: APP_HOST_DOMAIN });
+}
+
 function createApp({
   appsRepo,
   config,
@@ -159,11 +126,7 @@ function createApp({
   appsRepo: AppsRepositoryContract;
   config?: AppConfigPatch;
 }) {
-  return new AppsService({ appsRepo, appHostDomain: APP_HOST_DOMAIN }).create({
-    ownerId: OWNER_ID,
-    name: APP_NAME,
-    config,
-  });
+  return serviceWith(appsRepo).create({ ownerId: OWNER_ID, name: APP_NAME, config });
 }
 
 describe('a taken hostname is a re-roll, not something the owner sees', () => {
@@ -241,7 +204,7 @@ describe('an app is created with no environment and never reports one', () => {
 
     await createApp({ appsRepo, config: { args: ['serve'] } });
 
-    expect(appsRepo.offeredConfigs).toEqual([{ ...CONFIG, args: ['serve'] }]);
+    expect(appsRepo.offeredConfigs).toEqual([{ ...DEFAULT_CONFIG, args: ['serve'] }]);
   });
 
   test('the config the api persists has no environment to store', async () => {
@@ -257,7 +220,7 @@ describe('an app is created with no environment and never reports one', () => {
 
     await createApp({ appsRepo });
 
-    expect(appsRepo.offeredConfigs).toEqual([CONFIG]);
+    expect(appsRepo.offeredConfigs).toEqual([DEFAULT_CONFIG]);
   });
 
   test('the config on the wire has no environment to leak', async () => {
@@ -270,10 +233,7 @@ describe('an app is created with no environment and never reports one', () => {
 // A 403 would confirm the app exists to someone with no right to know it does.
 describe('an app the caller does not own is one that does not exist', () => {
   test('a statement that matches no row is a 404', async () => {
-    const service = new AppsService({
-      appsRepo: new StubAppsRepository({ failures: 0 }),
-      appHostDomain: APP_HOST_DOMAIN,
-    });
+    const service = serviceWith(new StubAppsRepository({ failures: 0 }));
     const owned = { appId: APP_ID, ownerId: OWNER_ID };
 
     await expect(service.get(owned)).rejects.toBeInstanceOf(NotFoundError);

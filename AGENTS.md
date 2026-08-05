@@ -37,8 +37,9 @@ After finishing an implementation, always run:
 
 Tests are `bun test` files, run through Turbo by `bun run test` — note `bun test` on its own is
 Bun's own runner and bypasses the workspace. They live beside the code they cover
-(`src/**/*.test.ts`), or in a sibling `tests/` mirroring `src/` once a package has shared
-fixtures worth a `tests/support/` (`apps/agent`). Not every package needs them; a package whose
+(`src/**/*.test.ts`), or in a sibling `tests/` once a package has shared fixtures worth a
+`tests/support/` — mirroring `src/` (`apps/agent`) or the package's own layering (`apps/api`).
+Not every package needs them; a package whose
 correctness is only checkable at runtime does.
 
 Check `package.json` scripts (root and per-app) for other available commands.

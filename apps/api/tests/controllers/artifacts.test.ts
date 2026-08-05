@@ -1,40 +1,13 @@
-import { beforeAll, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { StatusMap } from 'elysia';
+import { ORIGIN, send } from '#tests/controllers/support/api.ts';
 
-const BETTER_AUTH_SECRET_LENGTH = 32;
-
-// The api reads its configuration when the service graph is constructed, so the
-// environment has to exist before the app module is imported.
-const REQUIRED_ENV = {
-  DATABASE_URL: 'postgres://nobody@127.0.0.1:1/none',
-  BETTER_AUTH_SECRET: 'x'.repeat(BETTER_AUTH_SECRET_LENGTH),
-  GITHUB_CLIENT_ID: 'test',
-  GITHUB_CLIENT_SECRET: 'test',
-  S3_ENDPOINT: 'http://127.0.0.1:1',
-  VICTORIALOGS_ENDPOINT: 'http://127.0.0.1:1',
-  ARTIFACTS_BUCKET: 'test',
-  S3_ACCESS_KEY_ID: 'test',
-  S3_SECRET_ACCESS_KEY: 'test',
-  S3_REGION: 'test',
-  APP_HOST_DOMAIN: 'apps.test',
-};
-
-// A single-label host breaks path matching in Elysia 1.4.29, so every route resolves to 404.
-const ORIGIN = 'http://localhost';
 const APP_ID = '0199c0de-0000-7000-8000-000000000001';
 const ARTIFACT_ID = '0199c0de-0000-7000-8000-000000000002';
-const artifactsPath = `${ORIGIN}/api/apps/${APP_ID}/artifacts`;
-
-let app: { handle: (request: Request) => Promise<Response> };
-
-beforeAll(async () => {
-  Object.assign(process.env, REQUIRED_ENV);
-  const { createApp } = await import('#app.ts');
-  app = createApp();
-});
+const ARTIFACTS_URL = `${ORIGIN}/api/apps/${APP_ID}/artifacts`;
 
 function upload(body: FormData) {
-  return app.handle(new Request(artifactsPath, { method: 'POST', body }));
+  return send({ method: 'POST', url: ARTIFACTS_URL, body });
 }
 
 // Nothing here presents a session: better-auth needs a database and this suite has none. What
@@ -42,11 +15,11 @@ function upload(body: FormData) {
 // that not one of them answers anything to a caller who has not proven who they are.
 describe('an app is not somewhere strangers can read from or write to', () => {
   test('listing artifacts requires a session', async () => {
-    expect((await app.handle(new Request(artifactsPath))).status).toBe(StatusMap.Unauthorized);
+    expect((await send({ url: ARTIFACTS_URL })).status).toBe(StatusMap.Unauthorized);
   });
 
   test('fetching one artifact requires a session', async () => {
-    const response = await app.handle(new Request(`${artifactsPath}/${ARTIFACT_ID}`));
+    const response = await send({ url: `${ARTIFACTS_URL}/${ARTIFACT_ID}` });
 
     expect(response.status).toBe(StatusMap.Unauthorized);
   });

@@ -39,6 +39,17 @@ their parent's `controller.ts`, which applies the shared prefix once, so each
 child keeps a bare path string. A schema shared by sibling routes lives in the
 parent folder's `model.ts`.
 
+## Tests
+
+`tests/` mirrors the layering rather than the source tree —
+`tests/{controllers,services,lib}/<name>.test.ts`, reached through the `#tests/*`
+mapping. Fixtures shared across groups live in `tests/support/`, those shared
+within one group in `tests/<group>/support/`.
+
+A controller test takes its app from `tests/controllers/support/api.ts`, the only
+place `#app.ts` may be imported: the api reads its configuration when the service
+graph is constructed, so an earlier import would pin the wrong environment.
+
 ## Database
 
 Raw SQL via `Bun.sql` (`src/db/client.ts`), no ORM. Always schema-qualify
