@@ -1,6 +1,6 @@
 import { Command, type CommandExecutor } from '@effect/platform';
 import type { PlatformError } from '@effect/platform/Error';
-import { Context, Duration, Effect, Layer, Stream } from 'effect';
+import { Duration, Effect, Stream } from 'effect';
 import {
   type CommandError,
   CommandFailed,
@@ -11,11 +11,6 @@ import {
 
 const DEFAULT_TIMEOUT = Duration.minutes(2);
 const SUCCESS = 0;
-
-export class CommandRunner extends Context.Tag('CommandRunner')<
-  CommandRunner,
-  { readonly run: (request: CommandRequest) => Effect.Effect<CommandResult, CommandError> }
->() {}
 
 export const run = (request: CommandRequest) =>
   Effect.flatMap(CommandRunner, (runner) => runner.run(request));
@@ -52,9 +47,9 @@ const execute = (request: CommandRequest) =>
     Effect.withSpan('exec', { attributes: { command: request.command[0] } }),
   );
 
-export const layer = Layer.effect(
-  CommandRunner,
-  Effect.map(Effect.context<CommandExecutor.CommandExecutor>(), (context) => ({
-    run: (request: CommandRequest) => Effect.provide(execute(request), context),
+export class CommandRunner extends Effect.Service<CommandRunner>()('CommandRunner', {
+  effect: Effect.map(Effect.context<CommandExecutor.CommandExecutor>(), (context) => ({
+    run: (request: CommandRequest): Effect.Effect<CommandResult, CommandError> =>
+      Effect.provide(execute(request), context),
   })),
-);
+}) {}

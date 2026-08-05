@@ -1,13 +1,13 @@
 import { Effect, Option } from 'effect';
 import type { ForwardedInstance } from '#lib/network/firewall.ts';
 import { applyRuleset } from '#lib/network/nftables.ts';
-import * as State from '#lib/reconcile/state.ts';
 import { renderableRoutes } from '#lib/report/routes.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { CaddyProxy } from '#services/caddy-proxy.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
-export const routes = Effect.map(State.records, renderableRoutes);
+export const routes = Effect.map(AgentState.records, renderableRoutes);
 
 export const applyRoutes = Effect.gen(function* () {
   const proxy = yield* CaddyProxy;
@@ -18,7 +18,7 @@ export const applyRoutes = Effect.gen(function* () {
 
 const forwards = Effect.gen(function* () {
   const allocator = yield* SlotAllocator;
-  const all = yield* State.records;
+  const all = yield* AgentState.records;
   const forwarded: ForwardedInstance[] = [];
   for (const record of all) {
     const slot = yield* allocator.lookup(record.appId);
@@ -47,9 +47,9 @@ export const applyNetwork = Effect.gen(function* () {
     controlPlaneCidrsV6: config.controlPlaneCidrsV6,
     guestDnsServers: config.guestDnsServers,
   }).pipe(
-    Effect.andThen(State.modify((current) => ({ ...current, isolated: true }))),
+    Effect.andThen(AgentState.modify((current) => ({ ...current, isolated: true }))),
     Effect.catchAll((error) =>
-      State.modify((current) => ({ ...current, isolated: false })).pipe(
+      AgentState.modify((current) => ({ ...current, isolated: false })).pipe(
         Effect.andThen(Effect.logError('firewall apply failed', error)),
       ),
     ),

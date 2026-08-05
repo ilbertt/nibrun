@@ -5,11 +5,11 @@ import { nowTimestamp } from '#lib/clock.ts';
 import { reportedMessage } from '#lib/failure.ts';
 import { probeInstance } from '#lib/health/probe.ts';
 import { applyProbe, evaluateInstanceState, initialTracker } from '#lib/health/state.ts';
-import * as State from '#lib/reconcile/state.ts';
 import { type InstanceRecord, newInstanceRecord } from '#lib/report/instance-record.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -63,7 +63,7 @@ const setState = ({
   state: InstanceState;
   stopRequested?: boolean;
 }) =>
-  State.updateRecord({
+  AgentState.updateRecord({
     instanceId,
     change: (record) => ({
       ...record,
@@ -96,7 +96,7 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
   const allocator = yield* SlotAllocator;
   const vms = yield* VmManager;
   const nowMs = yield* Clock.currentTimeMillis;
-  const existing = (yield* State.snapshot).records.get(desired.instanceId);
+  const existing = (yield* AgentState.snapshot).records.get(desired.instanceId);
   if (!isStartable({ existing, nowMs, desired })) {
     return;
   }
@@ -126,12 +126,12 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
       resetAfterMs: desired.config.restartPolicy.resetAfterMs,
     }),
   };
-  yield* State.putRecord(attempted);
+  yield* AgentState.putRecord(attempted);
 
   yield* Effect.matchEffect(vms.boot({ desired, slot, dataDevicePath: slot.nbdDevicePath }), {
     onSuccess: () =>
       Effect.gen(function* () {
-        yield* State.putRecord({
+        yield* AgentState.putRecord({
           ...attempted,
           startedAt: yield* nowTimestamp,
           state: 'starting',
@@ -140,7 +140,7 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
           restartCount: attempted.restartCount + (existing ? ONE_RESTART : NO_RESTART),
           message: undefined,
         });
-        yield* State.modify((current) => {
+        yield* AgentState.modify((current) => {
           const nextProbeAtMs = new Map(current.nextProbeAtMs);
           nextProbeAtMs.delete(desired.instanceId);
           return { ...current, nextProbeAtMs };
@@ -155,7 +155,7 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
       }),
     onFailure: (error) =>
       Effect.gen(function* () {
-        yield* State.putRecord({
+        yield* AgentState.putRecord({
           ...attempted,
           state: 'failed',
           message: reportedMessage(error),
@@ -177,7 +177,7 @@ const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
       guestPort: record.guestPort,
       healthCheck: record.healthCheck,
     });
-    yield* State.modify((current) => ({
+    yield* AgentState.modify((current) => ({
       ...current,
       nextProbeAtMs: new Map(current.nextProbeAtMs).set(
         record.instanceId,
@@ -194,7 +194,7 @@ const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
 
 /** Probes the tenants that are due, then settles each state from systemd and the probe together. */
 export const refreshStates = Effect.gen(function* () {
-  const current = yield* State.snapshot;
+  const current = yield* AgentState.snapshot;
   const statuses = yield* Systemd.statuses([...current.records.keys()]);
   const nowMs = yield* Clock.currentTimeMillis;
 
@@ -217,7 +217,7 @@ export const refreshStates = Effect.gen(function* () {
         });
 
         const changed = state !== record.state;
-        yield* State.putRecord({
+        yield* AgentState.putRecord({
           ...record,
           health,
           state,

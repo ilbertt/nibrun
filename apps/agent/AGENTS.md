@@ -6,15 +6,23 @@ is never sent a command. Read `lib/reconcile/`, `lib/volumes/topology.ts` and
 `lib/network/slot.ts` first.
 
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
-test needs to substitute is a service (`Context.Tag` or `Effect.Service`). State that used to be
+test needs to substitute is a service. State that used to be
 mutable class fields lives in a `Ref`. The four loops in `lib/agent/` are fibers, and their retry
 cadence is a `Schedule` rather than a failure counter. Interruption is the shutdown path:
 `BunRuntime.runMain` cancels the fibers and scoped finalizers close the log sockets. Nothing stops
 a tenant VM, which is what keeps redeploying the agent free.
 
+**A service is an `Effect.Service`, and there is no second way to define one.** `Context.Tag` with
+a hand-written `Layer` is the primitive underneath it, not an alternative style: reaching for it
+gives a service that is provided as `layer` while its neighbours are provided as `Default`, and
+that inconsistency spreads to whatever is written next to it. A test substitutes a service through
+the generated `make` — `Layer.succeed(CommandRunner, CommandRunner.make({ run }))`. If something
+does not deserve a service, it is plain functions taking what they need from context, as
+`lib/vm/systemd.ts` is.
+
 **Every service lives in `services/`, one per file**, named for the service it exports — the
 kebab-case of the identifier plus `.service.ts`, so `VolumeManager` is
-`volume-manager.service.ts`. A `.service.ts` module holds the service and its layer and nothing
+`volume-manager.service.ts`. A `.service.ts` module holds the service and nothing
 else; pure functions, error classes and host mechanics stay in the domain folder they belong to.
 `apps/api/src/services/` is the same shape, so the two apps read the same way.
 

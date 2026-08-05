@@ -3,8 +3,8 @@ import { Effect } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { reportedMessage } from '#lib/failure.ts';
 import type { CheckpointPlan, ReconcilePlan } from '#lib/reconcile/plan.ts';
-import * as State from '#lib/reconcile/state.ts';
 import { createCheckpoint, deleteCheckpoint, listCheckpoints } from '#lib/volumes/zerofs.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
 type Applicable = Extract<CheckpointPlan, { action: 'create' | 'delete' }>;
@@ -61,5 +61,5 @@ export const applyCheckpoints = ({
         ? []
         : plan.checkpoints.filter((action): action is Applicable => action.action !== 'none');
     const checkpointReports = yield* Effect.forEach(applicable, applyOne);
-    yield* State.modify((current) => ({ ...current, checkpointReports }));
+    yield* AgentState.modify((current) => ({ ...current, checkpointReports }));
   });

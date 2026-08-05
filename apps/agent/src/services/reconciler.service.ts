@@ -7,12 +7,12 @@ import { applyExports } from '#lib/reconcile/exports.ts';
 import { refreshStates, startInstance, stopInstance } from '#lib/reconcile/instances.ts';
 import { applyNetwork, applyRoutes } from '#lib/reconcile/network.ts';
 import { hasDeferredWork, type ObservedState, planReconcile } from '#lib/reconcile/plan.ts';
-import * as State from '#lib/reconcile/state.ts';
 import { applyTeardowns, applyVolumes } from '#lib/reconcile/volumes.ts';
 import { readInstanceRecords } from '#lib/report/instance-record.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
@@ -35,7 +35,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       const exports = readExportReports(
         Option.getOrUndefined(yield* readJsonFile(config.exportsFile)),
       );
-      yield* State.modify((current) => ({
+      yield* AgentState.modify((current) => ({
         ...current,
         records: new Map(instances.map((record) => [record.instanceId, record])),
         exportReports: new Map(exports.map((report) => [report.exportId, report])),
@@ -54,7 +54,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
      * orphan to stop, and a note with no unit is an instance that is gone.
      */
     const observe = Effect.gen(function* () {
-      const current = yield* State.snapshot;
+      const current = yield* AgentState.snapshot;
       const unitIds = yield* Systemd.listInstanceIds.pipe(Effect.orElseSucceed(() => []));
       const ids = [...new Set([...unitIds, ...current.records.keys()])];
       const statuses = yield* Systemd.statuses(ids).pipe(
@@ -86,7 +86,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
           };
         }),
         volumes: yield* volumes
-          .observe(yield* State.appIdByVolume)
+          .observe(yield* AgentState.appIdByVolume)
           .pipe(Effect.orElseSucceed(() => [])),
         checkpoints: [],
         exports: [...current.exportReports.values()].map((report) => ({
@@ -97,7 +97,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
     }).pipe(Effect.withSpan('Reconciler.observe'));
 
     const persist = Effect.gen(function* () {
-      const current = yield* State.snapshot;
+      const current = yield* AgentState.snapshot;
       yield* allocator.persist;
       yield* writeJsonFile({
         path: config.instancesFile,
@@ -117,7 +117,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       Effect.forEach(
         desired.instances,
         (wanted) =>
-          State.updateRecord({
+          AgentState.updateRecord({
             instanceId: wanted.instanceId,
             change: (record) => ({
               ...record,
@@ -144,13 +144,13 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
               reason: 'superseded',
             }).pipe(
               Effect.andThen(vms.discard(action.desired.instanceId)),
-              Effect.andThen(State.dropRecord(action.desired.instanceId)),
+              Effect.andThen(AgentState.dropRecord(action.desired.instanceId)),
             );
           }
           if (action.action === 'forget') {
             return vms
               .discard(action.instanceId)
-              .pipe(Effect.andThen(State.dropRecord(action.instanceId)));
+              .pipe(Effect.andThen(AgentState.dropRecord(action.instanceId)));
           }
           return Effect.void;
         },
@@ -169,7 +169,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
         if (starts.length === 0) {
           return;
         }
-        if (!(yield* State.snapshot).isolated) {
+        if (!(yield* AgentState.snapshot).isolated) {
           return yield* Effect.logError(
             'instance starts refused: isolation ruleset not applied',
           ).pipe(Effect.annotateLogs({ refused: starts.length }));
@@ -188,7 +188,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       yield* Effect.annotateCurrentSpan({ generation: desired.generation });
       const observed = yield* observe;
       const plan = planReconcile({ desired, observed });
-      yield* State.modify((current) => ({
+      yield* AgentState.modify((current) => ({
         ...current,
         deferredWork: hasDeferredWork(plan),
       }));
@@ -210,7 +210,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       yield* applyRoutes.pipe(Effect.withSpan('reconcile.routes'));
       yield* persist.pipe(Effect.withSpan('reconcile.persist'));
 
-      yield* State.modify((current) => ({
+      yield* AgentState.modify((current) => ({
         ...current,
         observedGeneration: desired.generation,
         converged: true,

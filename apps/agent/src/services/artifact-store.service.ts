@@ -1,4 +1,4 @@
-import { Context, Data, Effect, Layer } from 'effect';
+import { Data, Effect } from 'effect';
 import { s3Credentials } from '#lib/aws/credentials.ts';
 import { describe } from '#lib/failure.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
@@ -12,22 +12,12 @@ export class ArtifactTransferError extends Data.TaggedError('ArtifactTransferErr
   }
 }
 
-export class ArtifactStore extends Context.Tag('ArtifactStore')<
-  ArtifactStore,
-  {
-    readonly open: (
-      objectKey: string,
-    ) => Effect.Effect<ReadableStream<Uint8Array>, ArtifactTransferError>;
-  }
->() {}
-
-export const layer = Layer.effect(
-  ArtifactStore,
-  Effect.gen(function* () {
+export class ArtifactStore extends Effect.Service<ArtifactStore>()('ArtifactStore', {
+  effect: Effect.gen(function* () {
     const config = yield* AgentConfig;
     const credentials = yield* AwsCredentialProvider;
     return {
-      open: (objectKey: string) =>
+      open: (objectKey: string): Effect.Effect<ReadableStream<Uint8Array>, ArtifactTransferError> =>
         credentials.resolve.pipe(
           Effect.flatMap((resolved) =>
             Effect.try(
@@ -45,4 +35,5 @@ export const layer = Layer.effect(
         ),
     };
   }),
-).pipe(Layer.provide([AgentConfig.Default, AwsCredentialProvider.Default]));
+  dependencies: [AgentConfig.Default, AwsCredentialProvider.Default],
+}) {}

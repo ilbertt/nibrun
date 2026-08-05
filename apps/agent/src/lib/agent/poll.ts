@@ -3,8 +3,8 @@ import { Duration, Effect, Option } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#lib/agent/backoff.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import type { ProtocolMismatch } from '#lib/protocol.ts';
-import * as State from '#lib/reconcile/state.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
@@ -48,7 +48,7 @@ export const pollLoop = Effect.gen(function* () {
       // Only a new generation re-runs a reconcile, and work the last one deferred does not change
       // it — so a volume waiting on an instance to stop would otherwise never be carried.
       const latest = yield* cache.latest;
-      if ((yield* State.snapshot).deferredWork && Option.isSome(latest)) {
+      if ((yield* AgentState.snapshot).deferredWork && Option.isSome(latest)) {
         yield* reconcileSafely(latest.value);
       }
     }

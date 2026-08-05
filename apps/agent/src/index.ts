@@ -5,14 +5,14 @@ import { run } from '#lib/agent/run.ts';
 import { AgentLogger } from '#lib/logger.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
-import * as AgentState from '#services/agent-state.service.ts';
-import * as Artifacts from '#services/artifact-store.service.ts';
+import { AgentState } from '#services/agent-state.service.ts';
+import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { CaddyProxy } from '#services/caddy-proxy.service.ts';
-import * as Exec from '#services/command-runner.service.ts';
-import * as ControlPlane from '#services/control-plane.service.ts';
+import { CommandRunner } from '#services/command-runner.service.ts';
+import { ControlPlane } from '#services/control-plane.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
-import * as LogStore from '#services/log-store.service.ts';
+import { LogStore } from '#services/log-store.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
@@ -30,11 +30,11 @@ const platform = Layer.mergeAll(BunContext.layer, FetchHttpClient.layer);
  */
 const agent = Layer.mergeAll(
   AgentConfig.Default,
-  AgentState.layer,
-  Exec.layer,
-  ControlPlane.layer,
-  LogStore.layer,
-  Artifacts.layer,
+  AgentState.Default,
+  CommandRunner.Default,
+  ControlPlane.Default,
+  LogStore.Default,
+  ArtifactStore.Default,
   SlotAllocator.Default,
   ZerofsTopology.Default,
   CaddyProxy.Default,

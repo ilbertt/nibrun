@@ -2,8 +2,9 @@ import type { DesiredVolume, ReportedVolume } from '@repo/protocol';
 import { Effect } from 'effect';
 import { reportedMessage } from '#lib/failure.ts';
 import type { ObservedState, ReconcilePlan } from '#lib/reconcile/plan.ts';
-import * as State from '#lib/reconcile/state.ts';
+import { mergeVolumeReports } from '#lib/reconcile/state.ts';
 import { toReportedVolume } from '#lib/volumes/manager.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
 
 const provision = (desired: DesiredVolume) =>
@@ -46,9 +47,9 @@ export const applyVolumes = ({
         );
       }
     }
-    yield* State.modify((current) => ({
+    yield* AgentState.modify((current) => ({
       ...current,
-      volumeReports: State.mergeVolumeReports({
+      volumeReports: mergeVolumeReports({
         existing: observed.volumes.map(toReportedVolume),
         updates,
       }),
@@ -64,9 +65,9 @@ export const applyTeardowns = (plan: ReconcilePlan) =>
       }
       yield* volumes.teardown(action.desired).pipe(
         Effect.flatMap((report) =>
-          State.modify((current) => ({
+          AgentState.modify((current) => ({
             ...current,
-            volumeReports: State.mergeVolumeReports({
+            volumeReports: mergeVolumeReports({
               existing: current.volumeReports,
               updates: [report],
             }),

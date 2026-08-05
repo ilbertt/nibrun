@@ -2,7 +2,6 @@ import { Duration, Effect } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#lib/agent/backoff.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import { nowTimestamp } from '#lib/clock.ts';
-import * as State from '#lib/reconcile/state.ts';
 import { buildReportedState } from '#lib/report/build-report.ts';
 import {
   allocatableCapacity,
@@ -11,6 +10,7 @@ import {
 } from '#lib/report/capacity.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
 
 const report = Effect.gen(function* () {
@@ -19,7 +19,7 @@ const report = Effect.gen(function* () {
   const sessions = yield* AgentSessionHolder;
 
   const session = yield* sessions.current;
-  const current = yield* State.snapshot;
+  const current = yield* AgentState.snapshot;
   const records = [...current.records.values()];
   const capacity = yield* readHostCapacity(config.stateDir);
 

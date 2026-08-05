@@ -14,11 +14,14 @@ export function recordingCommands(
     succeeding(),
 ) {
   const commands: CommandRequest[] = [];
-  const layer = Layer.succeed(CommandRunner, {
-    run: (request) => {
-      commands.push(request);
-      return answer(request);
-    },
-  });
+  const layer = Layer.succeed(
+    CommandRunner,
+    CommandRunner.make({
+      run: (request) => {
+        commands.push(request);
+        return answer(request);
+      },
+    }),
+  );
   return { commands, layer, executables: () => commands.map(({ command }) => command[0]) };
 }

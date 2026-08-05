@@ -9,18 +9,21 @@ export const ARTIFACT_DIGEST = new Bun.CryptoHasher('sha256')
 
 /** The artifact bucket as the chunks the transfer is meant to see, in the order it sees them. */
 export function artifactStore(chunks: readonly Uint8Array[] = [ARTIFACT_BYTES]) {
-  return Layer.succeed(ArtifactStore, {
-    open: () =>
-      Effect.sync(
-        () =>
-          new ReadableStream<Uint8Array>({
-            start(controller) {
-              for (const chunk of chunks) {
-                controller.enqueue(chunk);
-              }
-              controller.close();
-            },
-          }),
-      ),
-  });
+  return Layer.succeed(
+    ArtifactStore,
+    ArtifactStore.make({
+      open: () =>
+        Effect.sync(
+          () =>
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                for (const chunk of chunks) {
+                  controller.enqueue(chunk);
+                }
+                controller.close();
+              },
+            }),
+        ),
+    }),
+  );
 }

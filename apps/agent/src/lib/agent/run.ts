@@ -4,8 +4,8 @@ import { pollLoop, reconcileSafely } from '#lib/agent/poll.ts';
 import { reportLoop } from '#lib/agent/report.ts';
 import { statusLoop } from '#lib/agent/status.ts';
 import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
-import * as State from '#lib/reconcile/state.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
@@ -15,7 +15,7 @@ const restoreLogReceivers = Effect.gen(function* () {
   const vms = yield* VmManager;
   const receiver = yield* TenantLogReceiver;
   yield* Effect.forEach(
-    yield* State.records,
+    yield* AgentState.records,
     (record) =>
       receiver
         .attach({

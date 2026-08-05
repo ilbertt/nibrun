@@ -2,18 +2,18 @@ import type { ExportId, HostDesiredState, ReportedExport } from '@repo/protocol'
 import { Effect, Option } from 'effect';
 import { reportedMessage } from '#lib/failure.ts';
 import type { ExportPlan, ReconcilePlan } from '#lib/reconcile/plan.ts';
-import * as State from '#lib/reconcile/state.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
 const setReport = (report: ReportedExport) =>
-  State.modify((current) => ({
+  AgentState.modify((current) => ({
     ...current,
     exportReports: new Map(current.exportReports).set(report.exportId, report),
   }));
 
 const forget = (exportId: ExportId) =>
-  State.modify((current) => {
+  AgentState.modify((current) => {
     const exportReports = new Map(current.exportReports);
     exportReports.delete(exportId);
     return { ...current, exportReports };
