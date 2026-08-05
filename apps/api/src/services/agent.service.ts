@@ -8,20 +8,42 @@ import {
   type SecretString,
   type Timestamp,
 } from '@repo/protocol';
+import {
+  hostnamesByApp,
+  THE_APP_HOST,
+  toDesiredInstance,
+  toDesiredVolume,
+} from '#lib/desired-state.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
-import type { AgentRepository } from '#repositories/agent.repository.ts';
+import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
+import type { DeploymentsRepositoryContract } from '#repositories/deployments.repository.ts';
+import type { DesiredStateRepositoryContract } from '#repositories/desired-state.repository.ts';
 import { Service } from '#services/service.ts';
 
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_HOUR = 60 * 60;
 const SESSION_LIFETIME_MS = SECONDS_PER_HOUR * MS_PER_SECOND;
 
-export class AgentService extends Service {
-  private readonly agentRepo: AgentRepository;
+export type DeploymentObservation = Pick<DeploymentsRepositoryContract, 'applyReport'>;
 
-  constructor({ agentRepo }: { agentRepo: AgentRepository }) {
+export class AgentService extends Service {
+  private readonly agentRepo: AgentRepositoryContract;
+  private readonly desiredStateRepo: DesiredStateRepositoryContract;
+  private readonly deploymentsRepo: DeploymentObservation;
+
+  constructor({
+    agentRepo,
+    desiredStateRepo,
+    deploymentsRepo,
+  }: {
+    agentRepo: AgentRepositoryContract;
+    desiredStateRepo: DesiredStateRepositoryContract;
+    deploymentsRepo: DeploymentObservation;
+  }) {
     super();
     this.agentRepo = agentRepo;
+    this.desiredStateRepo = desiredStateRepo;
+    this.deploymentsRepo = deploymentsRepo;
   }
 
   /**
@@ -33,9 +55,9 @@ export class AgentService extends Service {
    * defending against from the ones it was admitting.
    */
   async openSession(request: AgentSessionRequest): Promise<AgentSession> {
-    // The agent persists what it is given and presents it next time, so a host keeps its
-    // identity across a reinstall. Nothing allocates one yet, so its own is honoured.
-    const hostId = request.hostId ?? (crypto.randomUUID() as HostId);
+    // Whatever the agent presents, there is one host and this is it. The agent persists what
+    // it is given and comes back with it, so a reinstalled host rejoins as the same one.
+    const hostId = THE_APP_HOST;
     const sessionToken = crypto.randomUUID() as SecretString;
     await this.agentRepo.saveSession({ sessionToken, hostId });
 
@@ -65,8 +87,34 @@ export class AgentService extends Service {
     return hostId;
   }
 
-  desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
-    return this.agentRepo.desiredState({ hostId });
+  /**
+   * The generation is read before the rows, not after.
+   *
+   * A change landing between the two reads then labels newer rows with an older generation,
+   * which costs one redundant poll. Reading it afterwards would label older rows with a newer
+   * generation, and the host would sit on stale state believing it had converged.
+   */
+  async desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+    const generation = await this.desiredStateRepo.generation();
+    const [deployments, volumes, hostnameRows] = await Promise.all([
+      this.desiredStateRepo.runningDeployments(),
+      this.desiredStateRepo.appVolumes(),
+      this.desiredStateRepo.deployedHostnames(),
+    ]);
+
+    const hostnames = hostnamesByApp(hostnameRows);
+
+    return {
+      hostId,
+      generation,
+      volumes: volumes.map(toDesiredVolume),
+      instances: deployments.map((row) =>
+        toDesiredInstance({ row, hostnames: hostnames.get(row.app_id) ?? [] }),
+      ),
+      // Neither has a table yet, so a host is told there are none rather than told nothing.
+      checkpoints: [],
+      exports: [],
+    };
   }
 
   async acceptReport({ reported }: { reported: HostReportedState }): Promise<void> {
@@ -77,6 +125,6 @@ export class AgentService extends Service {
       instances: reported.instances.length,
       volumes: reported.volumes.length,
     });
-    await this.agentRepo.saveReportedState({ reported });
+    await this.deploymentsRepo.applyReport({ instances: reported.instances });
   }
 }
