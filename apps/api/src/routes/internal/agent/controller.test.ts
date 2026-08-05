@@ -5,6 +5,7 @@ import {
   type AgentSessionRequest,
   AgentSessionSchema,
   DesiredStateResponseSchema,
+  FilesystemQueryResponseSchema,
   type HostCapacity,
   type HostReportedState,
   type HostVersions,
@@ -175,7 +176,121 @@ describe('an agent can register and be told what to run', () => {
   });
 });
 
+describe('a host polls for filesystem reads on a channel of its own', () => {
+  test('a host with nothing to answer is told so, and told no generation', async () => {
+    const session = await readSession(await openSession());
+    const response = await post({
+      route: AGENT_ROUTES.filesystemQuery,
+      body: { servedAppIds: [] },
+      sessionToken: session.sessionToken,
+    });
+
+    const body = parseMessage({
+      schema: FilesystemQueryResponseSchema,
+      value: await response.json(),
+    });
+    expect(body).toEqual({ result: 'none' });
+  });
+
+  // A read that could bump a generation would make one person opening a folder cost every host
+  // in the fleet a re-read. The two channels stay disjoint, and this is what says so.
+  test('polling for a read leaves desired state where it was', async () => {
+    const session = await readSession(await openSession());
+    const before = await readDesired(
+      await post({
+        route: AGENT_ROUTES.desiredState,
+        body: { knownGeneration: FIRST_POLL_GENERATION },
+        sessionToken: session.sessionToken,
+      }),
+    );
+    if (before.result !== 'changed') {
+      throw new Error('A host that has never polled must be given state to converge to.');
+    }
+
+    await post({
+      route: AGENT_ROUTES.filesystemQuery,
+      body: { servedAppIds: [] },
+      sessionToken: session.sessionToken,
+    });
+
+    const after = await readDesired(
+      await post({
+        route: AGENT_ROUTES.desiredState,
+        body: { knownGeneration: before.state.generation },
+        sessionToken: session.sessionToken,
+      }),
+    );
+    expect(after).toEqual({ result: 'unchanged', generation: before.state.generation });
+  });
+
+  test('a host serving the app is given something to read', async () => {
+    const session = await readSession(await openSession());
+    const desired = await readDesired(
+      await post({
+        route: AGENT_ROUTES.desiredState,
+        body: { knownGeneration: FIRST_POLL_GENERATION },
+        sessionToken: session.sessionToken,
+      }),
+    );
+    if (desired.result !== 'changed') {
+      throw new Error('A host that has never polled must be given state to converge to.');
+    }
+
+    const response = await post({
+      route: AGENT_ROUTES.filesystemQuery,
+      body: { servedAppIds: desired.state.volumes.map((volume) => volume.appId) },
+      sessionToken: session.sessionToken,
+    });
+
+    const body = parseMessage({
+      schema: FilesystemQueryResponseSchema,
+      value: await response.json(),
+    });
+    expect(body.result).toBe('query');
+  });
+
+  // Nothing comes back, for the same reason nothing comes back from a report: a generation
+  // travels on one channel only, and a second copy here would be a second thing to keep true.
+  test('an answer is taken and not replied to', async () => {
+    const session = await readSession(await openSession());
+    const response = await post({
+      route: AGENT_ROUTES.filesystemQueryResult,
+      body: {
+        queryId: 'query-pocketbase-root',
+        outcome: { status: 'failed', message: 'no device is attached on this host' },
+      },
+      sessionToken: session.sessionToken,
+    });
+
+    expect(response.status).toBe(StatusMap['No Content']);
+    expect(await response.text()).toBe('');
+  });
+});
+
 describe('nothing reaches desired state without proving what it is', () => {
+  test('an unknown session cannot collect another tenant read', async () => {
+    const response = await post({
+      route: AGENT_ROUTES.filesystemQuery,
+      body: { servedAppIds: [] },
+      sessionToken: 'not-a-session',
+    });
+
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  });
+
+  test('nor answer one', async () => {
+    const response = await post({
+      route: AGENT_ROUTES.filesystemQueryResult,
+      body: {
+        queryId: 'query-1',
+        outcome: { status: 'failed', message: 'not mine to answer' },
+      },
+      sessionToken: 'not-a-session',
+    });
+
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  });
+
   test('an unknown session is refused rather than served a default host', async () => {
     const response = await post({
       route: AGENT_ROUTES.desiredState,

@@ -33,6 +33,10 @@ export const AGENT_ROUTES = {
   session: '/session',
   desiredState: '/desired-state',
   reportedState: '/reported-state',
+  // A question and its answer, on a channel of their own. Neither carries a generation: a read
+  // is not a state anything converges on, so it must not be able to disturb one.
+  filesystemQuery: '/filesystem-query',
+  filesystemQueryResult: '/filesystem-query-result',
 } as const;
 
 /**

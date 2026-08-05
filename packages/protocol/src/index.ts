@@ -21,6 +21,16 @@ export {
   HostDesiredStateSchema,
 } from '#control/desired-state.ts';
 export {
+  type FilesystemQuery,
+  type FilesystemQueryRequest,
+  FilesystemQueryRequestSchema,
+  type FilesystemQueryResponse,
+  FilesystemQueryResponseSchema,
+  type FilesystemQueryResult,
+  FilesystemQueryResultSchema,
+  FilesystemQuerySchema,
+} from '#control/filesystem-query.ts';
+export {
   type HostReportedState,
   HostReportedStateSchema,
   type ReportedCheckpoint,
@@ -134,6 +144,8 @@ export {
   DeploymentIdSchema,
   type ExportId,
   ExportIdSchema,
+  type FilesystemQueryId,
+  FilesystemQueryIdSchema,
   type HostId,
   HostIdSchema,
   type InstanceId,

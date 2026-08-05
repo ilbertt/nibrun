@@ -35,3 +35,8 @@ export type ExportId = Identifier<'ExportId'>;
 export const ExportIdSchema = identifierSchema<ExportId>(
   'One request for a downloadable copy of an app.',
 );
+
+export type FilesystemQueryId = Identifier<'FilesystemQueryId'>;
+export const FilesystemQueryIdSchema = identifierSchema<FilesystemQueryId>(
+  'One read of one directory, alive only while its answer is still awaited.',
+);
