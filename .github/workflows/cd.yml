@@ -24,7 +24,8 @@ env:
   AWS_REGION: eu-central-1
 
 jobs:
-  images:
+  api-images:
+    name: api-images (${{ matrix.name }})
     runs-on: ubuntu-latest
     outputs:
       # Same in every leg, so them racing to write it changes nothing.
@@ -108,8 +109,8 @@ jobs:
           ALLOW_DESTROY: ${{ inputs.allow_destroy }}
         run: bun run --filter @repo/internal-scripts terraform-apply
 
-  control-plane:
-    needs: [images, terraform]
+  deploy-api:
+    needs: [api-images, terraform]
     runs-on: ubuntu-latest
     env:
       DEPLOY_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).deploy_bucket }}
@@ -126,8 +127,8 @@ jobs:
       PG_BACKUP_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).pg_backup_bucket }}
       INTERNAL_PORT: ${{ fromJSON(needs.terraform.outputs.values).internal_port }}
       LOG_INGEST_PORT: ${{ fromJSON(needs.terraform.outputs.values).log_ingest_port }}
-      API_IMAGE_URI: ${{ needs.images.outputs.repository }}/api:${{ github.sha }}
-      PG_BACKUP_IMAGE_URI: ${{ needs.images.outputs.repository }}/pg-backup:${{ github.sha }}
+      API_IMAGE_URI: ${{ needs.api-images.outputs.repository }}/api:${{ github.sha }}
+      PG_BACKUP_IMAGE_URI: ${{ needs.api-images.outputs.repository }}/pg-backup:${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -150,7 +151,7 @@ jobs:
           BUNDLE_URL: ${{ steps.bundle.outputs.url }}
         run: bun run --filter @repo/internal-scripts ssm-deploy
 
-  app-hosts:
+  deploy-app-hosts:
     needs: terraform
     runs-on: ubuntu-latest
     env:
@@ -199,7 +200,7 @@ jobs:
   # Nothing may depend on this job. Publishing is not adopting, so no deploy
   # consumes what it produces, and a kernel rebuild takes three quarters of an
   # hour — waiting on it would hold up shipping an agent for no gain.
-  guest-image:
+  build-guest-image:
     needs: terraform
     runs-on: ubuntu-latest
     env:
