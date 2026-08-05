@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "imports": {
-    "#*": "./src/*"
+    "#*": "./src/*",
+    "#tests/*": "./tests/*"
   },
   "exports": {
     "./types": "./src/types.ts"
