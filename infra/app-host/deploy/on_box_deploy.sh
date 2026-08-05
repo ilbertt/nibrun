@@ -335,6 +335,14 @@ for unit in systemd/*.service; do
   cp "$unit" "/etc/systemd/system/$(basename "$unit").new"
   changed_file "/etc/systemd/system/$(basename "$unit")" && units_changed=1 || true
 done
+
+# The uploader's unit belongs to systemd rather than to us, so what we have to
+# say about it goes in a drop-in beside it instead of replacing it.
+journal_upload_dropin=/etc/systemd/system/systemd-journal-upload.service.d
+mkdir -p "$journal_upload_dropin"
+cp systemd/systemd-journal-upload.service.d/nibrun.conf "$journal_upload_dropin/nibrun.conf.new"
+changed_file "$journal_upload_dropin/nibrun.conf" && units_changed=1 || true
+
 if [ "$units_changed" = "1" ]; then
   systemctl daemon-reload
 fi
@@ -393,6 +401,11 @@ fi
 # Restarted rather than reloaded: it reads its URL once, at start.
 if needs_restart journal-upload || ! systemctl is-active --quiet systemd-journal-upload.service; then
   log "Journal uploader config changed — restarting it"
+  # A unit that exhausted its start limit refuses to restart until the failure is
+  # cleared, so without this a host that gave up while the store was unreachable
+  # stays down through every deploy that follows. The drop-in above stops it
+  # latching in the first place; this recovers the hosts that already have.
+  systemctl reset-failed systemd-journal-upload.service || true
   # Tolerated rather than fatal, for the same reason it is not in the health gate
   # below: this ships logs, and a host that cannot must still finish deploying
   # the things that serve tenants. `set -e` would otherwise make an unreachable
