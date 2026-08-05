@@ -1,16 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  type AppId,
-  type ArtifactId,
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
-  type DeploymentId,
   type GuestPort,
-  type OwnerId,
   type Timestamp,
 } from '@repo/protocol';
-import { SQL } from 'bun';
 import { type PublicAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
@@ -22,11 +17,15 @@ import type {
   RollbackDeploymentInput,
 } from '#repositories/deployments.repository.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
-
-const OWNER_ID = 'owner-1' as OwnerId;
-const APP_ID = 'app-1' as AppId;
-const ARTIFACT_ID = 'artifact-1' as ArtifactId;
-const DEPLOYMENT_ID = 'deployment-1' as DeploymentId;
+import {
+  APP_ID,
+  ARTIFACT_ID,
+  configColumns,
+  DEFAULT_CONFIG,
+  DEPLOYMENT_ID,
+  OWNER_ID,
+} from '#tests/services/support/fixtures.ts';
+import { uniqueViolation } from '#tests/support/postgres.ts';
 
 const GUEST_PORT = 8090 as GuestPort;
 const OWNER_SCOPED_METHODS = 4;
@@ -36,22 +35,24 @@ const ACTIVATED_AT = new Date('2026-08-04T11:30:00.000Z');
 // The config version this deployment pins. `app_configs` never changes a row, so this is what
 // the deployment was launched with however the app has since been reconfigured.
 const PINNED_CONFIG: PublicAppConfig = {
-  volumeSizeBytes: VOLUME_SIZE_BYTES,
+  ...DEFAULT_CONFIG,
   guestPort: GUEST_PORT,
   args: ['serve'],
-  resources: DEFAULT_INSTANCE_RESOURCES,
-  healthCheck: DEFAULT_HEALTH_CHECK,
-  restartPolicy: DEFAULT_RESTART_POLICY,
 };
 
-// What Postgres raises when a second deployment reaches `deployments_live_idx` first.
-function liveIndexViolation(): SQL.PostgresError {
-  return new SQL.PostgresError('duplicate key value violates unique constraint', {
-    code: 'ERR_POSTGRES_SERVER_ERROR',
-    errno: '23505',
-    constraint: 'deployments_live_idx',
-  });
-}
+// Going back to `DEPLOYMENT_ID`, which is the same route and the same verb as deploying an
+// artifact — only the body says which of the two it is.
+const ROLLBACK_REQUEST = {
+  appId: APP_ID,
+  ownerId: OWNER_ID,
+  source: { rollbackOf: DEPLOYMENT_ID },
+};
+
+const OWNED_DEPLOYMENT: DeploymentByIdInput = {
+  appId: APP_ID,
+  deploymentId: DEPLOYMENT_ID,
+  ownerId: OWNER_ID,
+};
 
 function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
   return {
@@ -62,21 +63,7 @@ function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
     activated_at: null,
     rollback_of_deployment_id: null,
     created_at: CREATED_AT,
-    guest_port: PINNED_CONFIG.guestPort,
-    args: [...PINNED_CONFIG.args],
-    vcpu_count: PINNED_CONFIG.resources.vcpuCount,
-    memory_mib: PINNED_CONFIG.resources.memoryMib,
-    health_check_path: PINNED_CONFIG.healthCheck.path ?? null,
-    health_check_interval_ms: PINNED_CONFIG.healthCheck.intervalMs,
-    health_check_timeout_ms: PINNED_CONFIG.healthCheck.timeoutMs,
-    health_check_grace_period_ms: PINNED_CONFIG.healthCheck.gracePeriodMs,
-    health_check_healthy_threshold: PINNED_CONFIG.healthCheck.healthyThreshold,
-    health_check_unhealthy_threshold: PINNED_CONFIG.healthCheck.unhealthyThreshold,
-    restart_max_restarts: PINNED_CONFIG.restartPolicy.maxRestarts,
-    restart_initial_backoff_ms: PINNED_CONFIG.restartPolicy.initialBackoffMs,
-    restart_max_backoff_ms: PINNED_CONFIG.restartPolicy.maxBackoffMs,
-    restart_backoff_factor: PINNED_CONFIG.restartPolicy.backoffFactor,
-    restart_reset_after_ms: PINNED_CONFIG.restartPolicy.resetAfterMs,
+    ...configColumns(PINNED_CONFIG),
     ...overrides,
   };
 }
@@ -151,9 +138,7 @@ describe('a deployment publishes the config version it pins', () => {
   test('columns become the wire shape the protocol describes', async () => {
     const { service } = serviceWith({ row: deploymentRow() });
 
-    expect(
-      await service.get({ appId: APP_ID, deploymentId: DEPLOYMENT_ID, ownerId: OWNER_ID }),
-    ).toMatchObject({
+    expect(await service.get(OWNED_DEPLOYMENT)).toMatchObject({
       id: DEPLOYMENT_ID,
       appId: APP_ID,
       artifactId: ARTIFACT_ID,
@@ -167,13 +152,7 @@ describe('a deployment publishes the config version it pins', () => {
   test('a deployment that has never run carries no activation instant', async () => {
     const { service } = serviceWith({ row: deploymentRow() });
 
-    const deployment = await service.get({
-      appId: APP_ID,
-      deploymentId: DEPLOYMENT_ID,
-      ownerId: OWNER_ID,
-    });
-
-    expect('activatedAt' in deployment).toBe(false);
+    expect('activatedAt' in (await service.get(OWNED_DEPLOYMENT))).toBe(false);
   });
 
   test('and one that has carries it as an ISO instant', async () => {
@@ -181,11 +160,7 @@ describe('a deployment publishes the config version it pins', () => {
       row: deploymentRow({ state: 'active', activated_at: ACTIVATED_AT }),
     });
 
-    const deployment = await service.get({
-      appId: APP_ID,
-      deploymentId: DEPLOYMENT_ID,
-      ownerId: OWNER_ID,
-    });
+    const deployment = await service.get(OWNED_DEPLOYMENT);
 
     expect(deployment.activatedAt).toBe(ACTIVATED_AT.toISOString() as Timestamp);
   });
@@ -207,21 +182,13 @@ describe('an app the caller does not own is indistinguishable from one that does
   test('fetching one is too', async () => {
     const { service } = serviceWith({ row: null });
 
-    await expect(
-      service.get({ appId: APP_ID, deploymentId: DEPLOYMENT_ID, ownerId: OWNER_ID }),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.get(OWNED_DEPLOYMENT)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   test('going back to one belonging to another app is too', async () => {
     const { service } = serviceWith({ row: null });
 
-    await expect(
-      service.createOrRollback({
-        appId: APP_ID,
-        ownerId: OWNER_ID,
-        source: { rollbackOf: DEPLOYMENT_ID },
-      }),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.createOrRollback(ROLLBACK_REQUEST)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   test("listing yields nothing rather than another owner's rows", async () => {
@@ -241,12 +208,8 @@ describe('an app the caller does not own is indistinguishable from one that does
       source: { artifactId: ARTIFACT_ID },
     });
     await service.list({ appId: APP_ID, ownerId: OWNER_ID });
-    await service.get({ appId: APP_ID, deploymentId: DEPLOYMENT_ID, ownerId: OWNER_ID });
-    await service.createOrRollback({
-      appId: APP_ID,
-      ownerId: OWNER_ID,
-      source: { rollbackOf: DEPLOYMENT_ID },
-    });
+    await service.get(OWNED_DEPLOYMENT);
+    await service.createOrRollback(ROLLBACK_REQUEST);
 
     expect(deploymentsRepo.calls).toHaveLength(OWNER_SCOPED_METHODS);
     for (const call of deploymentsRepo.calls) {
@@ -272,7 +235,7 @@ describe('creating a deployment is asking for it to run', () => {
 
   // Same index, same race, whichever call is asking: creating now claims the running slot too.
   test('losing the race while creating is a conflict, not a 500', async () => {
-    const { service } = serviceWith({ runError: liveIndexViolation() });
+    const { service } = serviceWith({ runError: uniqueViolation('deployments_live_idx') });
 
     await expect(
       service.createOrRollback({
@@ -290,11 +253,7 @@ describe('going back to a release is a new deployment, not an old one revived', 
   test('naming a deployment replays it rather than deploying an artifact', async () => {
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
 
-    await service.createOrRollback({
-      appId: APP_ID,
-      ownerId: OWNER_ID,
-      source: { rollbackOf: DEPLOYMENT_ID },
-    });
+    await service.createOrRollback(ROLLBACK_REQUEST);
 
     expect(deploymentsRepo.calls).toEqual([
       { appId: APP_ID, ownerId: OWNER_ID, rollbackOf: DEPLOYMENT_ID },
@@ -308,41 +267,21 @@ describe('going back to a release is a new deployment, not an old one revived', 
       row: deploymentRow({ rollback_of_deployment_id: DEPLOYMENT_ID }),
     });
 
-    expect(
-      (
-        await service.createOrRollback({
-          appId: APP_ID,
-          ownerId: OWNER_ID,
-          source: { rollbackOf: DEPLOYMENT_ID },
-        })
-      ).rollbackOf,
-    ).toBe(DEPLOYMENT_ID);
+    expect((await service.createOrRollback(ROLLBACK_REQUEST)).rollbackOf).toBe(DEPLOYMENT_ID);
   });
 
   // Two callers racing meet the partial unique index, not each other. The loser is told to
   // retry rather than left believing it won.
   test('losing the race to the live index is a conflict, not a 500', async () => {
-    const { service } = serviceWith({ runError: liveIndexViolation() });
+    const { service } = serviceWith({ runError: uniqueViolation('deployments_live_idx') });
 
-    await expect(
-      service.createOrRollback({
-        appId: APP_ID,
-        ownerId: OWNER_ID,
-        source: { rollbackOf: DEPLOYMENT_ID },
-      }),
-    ).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.createOrRollback(ROLLBACK_REQUEST)).rejects.toBeInstanceOf(ConflictError);
   });
 
   test('any other database failure is not disguised as one', async () => {
     const boom = new Error('connection reset');
     const { service } = serviceWith({ runError: boom });
 
-    await expect(
-      service.createOrRollback({
-        appId: APP_ID,
-        ownerId: OWNER_ID,
-        source: { rollbackOf: DEPLOYMENT_ID },
-      }),
-    ).rejects.toBe(boom);
+    await expect(service.createOrRollback(ROLLBACK_REQUEST)).rejects.toBe(boom);
   });
 });

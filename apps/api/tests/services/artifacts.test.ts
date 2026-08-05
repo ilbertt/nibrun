@@ -18,10 +18,7 @@ import type {
   InsertArtifactInput,
 } from '#repositories/artifacts.repository.ts';
 import { type AppOwnership, ArtifactsService } from '#services/artifacts.service.ts';
-
-const OWNER = 'owner-1' as OwnerId;
-const OTHER_OWNER = 'owner-2' as OwnerId;
-const APP = 'app-1' as AppId;
+import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 
 // The api refuses anything that is not a Linux executable, so the fixture opens with the ELF
 // magic the way a real upload does.
@@ -96,7 +93,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
 
   seed(): ArtifactRow {
     return this.remember({
-      app_id: APP,
+      app_id: APP_ID,
       digest: SEEDED_DIGEST,
       size_bytes: String(SEEDED_SIZE_BYTES),
       object_key: SEEDED_DIGEST as string as ObjectKey,
@@ -146,11 +143,11 @@ class RefusingStorage implements ArtifactStorageRepositoryContract {
 }
 
 const appsRepo: AppOwnership = {
-  isOwnedBy: ({ ownerId }) => Promise.resolve(ownerId === OWNER),
+  isOwnedBy: ({ ownerId }) => Promise.resolve(ownerId === OWNER_ID),
 };
 
 function build(storageRepo: ArtifactStorageRepositoryContract = new FakeStorage()) {
-  const artifactsRepo = new FakeArtifactsRepository(OWNER);
+  const artifactsRepo = new FakeArtifactsRepository(OWNER_ID);
   return {
     artifactsRepo,
     service: new ArtifactsService({ artifactsRepo, storageRepo, appsRepo }),
@@ -162,7 +159,7 @@ describe('the api records the digest of what it stored', () => {
     const storage = new FakeStorage();
     const { artifactsRepo, service } = build(storage);
 
-    const artifact = await service.create({ appId: APP, ownerId: OWNER, binary: binary() });
+    const artifact = await service.create({ appId: APP_ID, ownerId: OWNER_ID, binary: binary() });
 
     const [written] = storage.written;
     expect(artifact.digest).toBe(BINARY_DIGEST as Sha256Digest);
@@ -175,8 +172,8 @@ describe('the api records the digest of what it stored', () => {
   test('the key is derived, so two uploads of one binary share the bytes but not the row', async () => {
     const { service } = build();
 
-    const first = await service.create({ appId: APP, ownerId: OWNER, binary: binary() });
-    const second = await service.create({ appId: APP, ownerId: OWNER, binary: binary() });
+    const first = await service.create({ appId: APP_ID, ownerId: OWNER_ID, binary: binary() });
+    const second = await service.create({ appId: APP_ID, ownerId: OWNER_ID, binary: binary() });
 
     expect(second.objectKey).toBe(first.objectKey);
     expect(second.id).not.toBe(first.id);
@@ -190,8 +187,8 @@ describe('the api records the digest of what it stored', () => {
 
     await expect(
       service.create({
-        appId: APP,
-        ownerId: OWNER,
+        appId: APP_ID,
+        ownerId: OWNER_ID,
         binary: new File(['#!/bin/true'], UPLOADED_NAME),
       }),
     ).rejects.toBeInstanceOf(BadRequestError);
@@ -207,7 +204,7 @@ describe('the api records the digest of what it stored', () => {
     const { artifactsRepo, service } = build(storage);
 
     await expect(
-      service.create({ appId: APP, ownerId: OWNER, binary: binary('../../etc/passwd') }),
+      service.create({ appId: APP_ID, ownerId: OWNER_ID, binary: binary('../../etc/passwd') }),
     ).rejects.toBeInstanceOf(BadRequestError);
 
     expect(artifactsRepo.inserted).toHaveLength(0);
@@ -219,7 +216,7 @@ describe('the api records the digest of what it stored', () => {
     const storage = new FakeStorage({ alreadyStored: true });
     const { service } = build(storage);
 
-    await service.create({ appId: APP, ownerId: OWNER, binary: binary() });
+    await service.create({ appId: APP_ID, ownerId: OWNER_ID, binary: binary() });
 
     expect(storage.written).toHaveLength(0);
   });
@@ -228,9 +225,9 @@ describe('the api records the digest of what it stored', () => {
   test('one that never reached the bucket leaves no row behind', async () => {
     const { artifactsRepo, service } = build(new RefusingStorage());
 
-    await expect(service.create({ appId: APP, ownerId: OWNER, binary: binary() })).rejects.toThrow(
-      BUCKET_REFUSED,
-    );
+    await expect(
+      service.create({ appId: APP_ID, ownerId: OWNER_ID, binary: binary() }),
+    ).rejects.toThrow(BUCKET_REFUSED);
 
     expect(artifactsRepo.inserted).toHaveLength(0);
   });
@@ -242,7 +239,7 @@ describe('an artifact is reachable only through an app its owner owns', () => {
     const { service } = build(storage);
 
     await expect(
-      service.create({ appId: APP, ownerId: OTHER_OWNER, binary: binary() }),
+      service.create({ appId: APP_ID, ownerId: OTHER_OWNER_ID, binary: binary() }),
     ).rejects.toBeInstanceOf(NotFoundError);
 
     expect(storage.written).toEqual([]);
@@ -253,7 +250,7 @@ describe('an artifact is reachable only through an app its owner owns', () => {
     const seeded = artifactsRepo.seed();
 
     await expect(
-      service.get({ appId: APP, artifactId: seeded.id, ownerId: OTHER_OWNER }),
+      service.get({ appId: APP_ID, artifactId: seeded.id, ownerId: OTHER_OWNER_ID }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -261,8 +258,8 @@ describe('an artifact is reachable only through an app its owner owns', () => {
     const { artifactsRepo, service } = build();
     artifactsRepo.seed();
 
-    expect(await service.list({ appId: APP, ownerId: OTHER_OWNER })).toEqual([]);
-    expect(await service.list({ appId: APP, ownerId: OWNER })).toHaveLength(1);
+    expect(await service.list({ appId: APP_ID, ownerId: OTHER_OWNER_ID })).toEqual([]);
+    expect(await service.list({ appId: APP_ID, ownerId: OWNER_ID })).toHaveLength(1);
   });
 });
 
@@ -271,7 +268,11 @@ describe('a row becomes the wire shape the dashboard and the agent both read', (
     const { artifactsRepo, service } = build();
     const seeded = artifactsRepo.seed();
 
-    const artifact = await service.get({ appId: APP, artifactId: seeded.id, ownerId: OWNER });
+    const artifact = await service.get({
+      appId: APP_ID,
+      artifactId: seeded.id,
+      ownerId: OWNER_ID,
+    });
 
     expect(artifact.sizeBytes).toBe(SEEDED_SIZE_BYTES);
     expect(artifact.createdAt).toBe(SEEDED_CREATED_AT.toISOString() as Timestamp);
