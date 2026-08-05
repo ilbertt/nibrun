@@ -7,7 +7,7 @@
 # rendered by the agent from the instances it booted and imported at the bottom.
 {
 	# No ACME: the certificate is a Cloudflare Origin Certificate covering
-	# *.{$APP_DOMAIN}, which the deploy fetches from SSM and writes into tls/
+	# *.{$APP_HOST_DOMAIN}, which the deploy fetches from SSM and writes into tls/
 	# next to this file. Hostnames are handed out per app, so there is no moment
 	# at which issuing a certificate would be a step in creating one.
 	auto_https off
@@ -46,7 +46,7 @@ import /etc/caddy/rendered/*.caddy
 # and not <app_domain>, and serving a redirect there would still mean
 # terminating TLS for a name the certificate does not cover. Cloudflare redirects
 # the apex at the edge, where no origin certificate is involved.
-https://*.{$APP_DOMAIN} {
+https://*.{$APP_HOST_DOMAIN} {
 	import origin_tls
 	respond 404
 }
