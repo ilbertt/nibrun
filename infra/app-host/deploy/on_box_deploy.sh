@@ -56,6 +56,25 @@ secret() {
     --query Parameter.Value --output text
 }
 
+# systemd-journal-upload ships this host's journal, and arrives with
+# systemd-journal-remote. user_data installs it, but user_data only ever runs on
+# a host being created — so a package added after the fleet exists reaches the
+# hosts already running it here or not at all, and enabling its unit later is
+# what fails when it has not.
+#
+# Before anything writes configuration, because the package carries its own
+# /etc/systemd/journal-upload.conf: installing it after this deploy had written
+# that file would put the two in a race decided by rpm's config handling rather
+# than by this script.
+#
+# Guarded on the unit file rather than the package, because that is the thing
+# the enable actually needs, and it makes a re-run on a healthy host a test
+# rather than a `dnf` call.
+if [ ! -f /usr/lib/systemd/system/systemd-journal-upload.service ]; then
+  log "Installing systemd-journal-remote"
+  dnf install -y systemd-journal-remote
+fi
+
 log "Ensuring the data volume is mounted"
 bash ensure_data_volume.sh zerofs
 
@@ -121,7 +140,10 @@ install_caddy() {
 install_agent() {
   local dir="$VERSIONS_DIR/agent/$AGENT_VERSION"
   mkdir -p "$dir"
-  aws s3 cp "$AGENT_URL" "$dir/nibrun-agent"
+  # `--no-progress`: SSM RunCommand truncates a command's output, and the agent is
+  # ~90 MiB, so the transfer meter alone buries everything that follows it — which
+  # is how a failure after this step comes back with no visible cause.
+  aws s3 cp --no-progress "$AGENT_URL" "$dir/nibrun-agent"
   chmod 0755 "$dir/nibrun-agent"
   mark_installed agent "$AGENT_VERSION"
 }
@@ -129,7 +151,7 @@ install_agent() {
 install_guest_image() {
   local dir="$VERSIONS_DIR/guest-image/$GUEST_IMAGE_VERSION"
   mkdir -p "$dir"
-  aws s3 cp --recursive "s3://${GUEST_IMAGES_BUCKET}/${GUEST_IMAGE_VERSION}/" "$dir/"
+  aws s3 cp --no-progress --recursive "s3://${GUEST_IMAGES_BUCKET}/${GUEST_IMAGE_VERSION}/" "$dir/"
   # Written by the publish step from the manifest's own digests, because this box
   # has no jq to read the manifest with.
   ( cd "$dir" && sha256sum -c SHA256SUMS )
@@ -371,7 +393,12 @@ fi
 # Restarted rather than reloaded: it reads its URL once, at start.
 if needs_restart journal-upload || ! systemctl is-active --quiet systemd-journal-upload.service; then
   log "Journal uploader config changed — restarting it"
-  systemctl restart systemd-journal-upload.service
+  # Tolerated rather than fatal, for the same reason it is not in the health gate
+  # below: this ships logs, and a host that cannot must still finish deploying
+  # the things that serve tenants. `set -e` would otherwise make an unreachable
+  # log store end the deploy here.
+  systemctl restart systemd-journal-upload.service ||
+    log "WARNING: the journal uploader would not start"
 fi
 
 if needs_restart agent; then
@@ -385,7 +412,7 @@ fi
 # bump reaches an app when it is next redeployed and restarts nothing now.
 
 log "Waiting for the services to settle"
-for unit in nibrun-zerofs nibrun-caddy nibrun-agent systemd-journal-upload; do
+for unit in nibrun-zerofs nibrun-caddy nibrun-agent; do
   for _ in $(seq 1 30); do
     state=$(systemctl is-active "$unit.service" || true)
     [ "$state" = "active" ] && break
@@ -398,6 +425,15 @@ for unit in nibrun-zerofs nibrun-caddy nibrun-agent systemd-journal-upload; do
     exit 1
   fi
 done
+
+# Reported, not gated. The units above serve tenants; this one only describes
+# what they did, and it reaches the log store over a port whose availability the
+# fleet's deploys should not depend on — gating here would let the log store
+# being down stop every app host from deploying.
+if [ "$(systemctl is-active systemd-journal-upload.service || true)" != "active" ]; then
+  log "WARNING: systemd-journal-upload is not active — this host is not shipping its journal"
+  systemctl status systemd-journal-upload.service --no-pager --lines 20 || true
+fi
 
 log "Active versions"
 for component in zerofs firecracker caddy agent guest-image; do
