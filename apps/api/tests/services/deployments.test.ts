@@ -90,6 +90,10 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
     return Promise.resolve(this.#behaviour.row ?? null);
   }
 
+  applyReport(): Promise<void> {
+    return Promise.resolve();
+  }
+
   activate(input: DeploymentByIdInput): Promise<DeploymentRow | null> {
     this.calls.push(input);
     if (this.#behaviour.runError) {

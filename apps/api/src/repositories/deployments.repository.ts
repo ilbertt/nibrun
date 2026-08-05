@@ -1,4 +1,12 @@
-import type { AppId, ArtifactId, DeploymentId, OwnerId } from '@repo/protocol';
+import type {
+  AppId,
+  ArtifactId,
+  DeploymentId,
+  DeploymentState,
+  InstanceState,
+  OwnerId,
+  ReportedInstance,
+} from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.d.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -26,6 +34,7 @@ export abstract class DeploymentsRepositoryContract {
   abstract listByApp(input: DeploymentsByAppInput): Promise<DeploymentRow[]>;
   abstract findById(input: DeploymentByIdInput): Promise<DeploymentRow | null>;
   abstract activate(input: DeploymentByIdInput): Promise<DeploymentRow | null>;
+  abstract applyReport(input: { instances: ReportedInstance[] }): Promise<void>;
 }
 
 export class DeploymentsRepository extends Repository implements DeploymentsRepositoryContract {
@@ -190,5 +199,64 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       `;
       return row ?? null;
     });
+  }
+
+  /**
+   * Takes what a host says it is running.
+   *
+   * One deployment is one microVM, so the reported instance id is the deployment id and there
+   * is nothing to match up. Nothing is inserted: an instance the control plane never asked for
+   * is one the host is about to be told to stop, and giving it a row would make it real.
+   *
+   * A deployment that has already reached a terminal state is left alone: it was superseded
+   * when a newer one was asked for, and a host still reporting the microVM it is on its way to
+   * stopping would otherwise put it back among the live.
+   */
+  async applyReport({ instances }: { instances: ReportedInstance[] }): Promise<void> {
+    if (instances.length === 0) {
+      return;
+    }
+    await this.sql.begin(async (tx) => {
+      for (const instance of instances) {
+        await tx.UpdateDeploymentFromReport`
+          UPDATE nibrun.deployments SET
+            state = ${observedState(instance.state)},
+            host_port = ${instance.hostPort ?? null},
+            guest_ipv4 = ${instance.guestIpv4 ?? null},
+            restart_count = ${instance.restartCount},
+            message = ${instance.message ?? null},
+            started_at = ${instance.startedAt ?? null},
+            last_healthy_at = ${instance.lastHealthyAt ?? null},
+            activated_at = CASE
+              WHEN ${instance.state} = 'running' AND activated_at IS NULL THEN now()
+              ELSE activated_at
+            END
+          WHERE id = ${instance.instanceId} AND state NOT IN ('superseded', 'failed')
+        `;
+      }
+    });
+  }
+}
+
+/**
+ * What a microVM is doing, said in the vocabulary a deployment has.
+ *
+ * `unhealthy` reads as `starting` rather than `failed`: the restart policy is still working on
+ * it, and a deployment marked failed while its guest is being restarted is one an owner would
+ * roll back for no reason.
+ */
+function observedState(state: InstanceState): DeploymentState {
+  switch (state) {
+    case 'pending':
+      return 'pending';
+    case 'running':
+      return 'active';
+    case 'failed':
+      return 'failed';
+    case 'stopping':
+    case 'stopped':
+      return 'superseded';
+    default:
+      return 'starting';
   }
 }

@@ -9,6 +9,7 @@ import { ArtifactStorageRepository } from '#repositories/artifact-storage.reposi
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { DesiredStateRepository } from '#repositories/desired-state.repository.ts';
 import { FilesystemRepository } from '#repositories/filesystem.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
@@ -26,9 +27,14 @@ const filesystemRepository = new FilesystemRepository(sql);
 const appsRepository = new AppsRepository(sql);
 const artifactsRepository = new ArtifactsRepository(sql);
 const deploymentsRepository = new DeploymentsRepository(sql);
+const desiredStateRepository = new DesiredStateRepository(sql);
 const artifactStorageRepository = new ArtifactStorageRepository(s3);
 
-const agentService = new AgentService({ agentRepo: agentRepository });
+const agentService = new AgentService({
+  agentRepo: agentRepository,
+  desiredStateRepo: desiredStateRepository,
+  deploymentsRepo: deploymentsRepository,
+});
 const assetsService = new AssetsService(assetsRepository);
 const healthService = new HealthService(healthRepository);
 const filesystemService = new FilesystemService({ filesystemRepo: filesystemRepository });

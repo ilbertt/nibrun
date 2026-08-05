@@ -353,6 +353,57 @@ export interface IRunDeploymentResult {
     restart_reset_after_ms: number;
 }
 
+/** Result of query `UpdateDeploymentFromReport`. */
+export interface IUpdateDeploymentFromReportResult {
+}
+
+/** Result of query `SelectDesiredStateGeneration`. */
+export interface ISelectDesiredStateGenerationResult {
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    generation: string;
+}
+
+/** Result of query `SelectRunningDeployments`. */
+export interface ISelectRunningDeploymentsResult {
+    id: import("@repo/protocol").DeploymentId;
+    app_id: import("@repo/protocol").AppId;
+    digest: import("@repo/protocol").Sha256Digest;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    size_bytes: string;
+    /** Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    object_key: import("@repo/protocol").ObjectKey;
+    /** The name the binary was uploaded under; a content-addressed key carries none. */
+    original_file_name: import("@repo/protocol").Filename;
+    guest_port: import("@repo/protocol").GuestPort;
+    args: string[];
+    vcpu_count: number;
+    memory_mib: number;
+    health_check_path: string | null;
+    health_check_interval_ms: number;
+    health_check_timeout_ms: number;
+    health_check_grace_period_ms: number;
+    health_check_healthy_threshold: number;
+    health_check_unhealthy_threshold: number;
+    restart_max_restarts: number;
+    restart_initial_backoff_ms: number;
+    restart_max_backoff_ms: number;
+    restart_backoff_factor: number;
+    restart_reset_after_ms: number;
+}
+
+/** Result of query `SelectAppVolumes`. */
+export interface ISelectAppVolumesResult {
+    id: import("@repo/protocol").AppId;
+    state: import("@repo/protocol").AppState;
+}
+
+/** Result of query `SelectDeployedHostnames`. */
+export interface ISelectDeployedHostnamesResult {
+    app_id: import("@repo/protocol").AppId;
+    hostname: import("@repo/protocol").Hostname;
+    kind: import("@repo/protocol").AppHostnameKind;
+}
+
 /** Result of query `SelectHealthPing`. */
 export interface ISelectHealthPingResult {
     ok: number | null;
@@ -385,6 +436,11 @@ export interface Queries {
     SelectDeploymentById: ISelectDeploymentByIdResult;
     SupersedeReplacedDeployment: ISupersedeReplacedDeploymentResult;
     RunDeployment: IRunDeploymentResult;
+    UpdateDeploymentFromReport: IUpdateDeploymentFromReportResult;
+    SelectDesiredStateGeneration: ISelectDesiredStateGenerationResult;
+    SelectRunningDeployments: ISelectRunningDeploymentsResult;
+    SelectAppVolumes: ISelectAppVolumesResult;
+    SelectDeployedHostnames: ISelectDeployedHostnamesResult;
     SelectHealthPing: ISelectHealthPingResult;
 }
 
