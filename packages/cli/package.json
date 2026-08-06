@@ -18,6 +18,7 @@
     "@parshjs/files": "^0.0.4",
     "@repo/api-client": "workspace:*",
     "@repo/protocol": "workspace:*",
+    "better-auth": "^1.6.26",
     "zod": "^4.4.3"
   },
   "devDependencies": {

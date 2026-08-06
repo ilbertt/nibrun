@@ -1,8 +1,6 @@
-import { z } from 'zod';
+import { createAuthClient } from 'better-auth/client';
+import { deviceAuthorizationClient } from 'better-auth/client/plugins';
 import { ApiError, UsageError } from '#lib/errors.ts';
-
-const DEVICE_CODE_PATH = '/api/auth/device/code';
-const DEVICE_TOKEN_PATH = '/api/auth/device/token';
 
 // Sent so the record of a pending login says what asked for it. Not a secret and not a
 // credential: a public client has nothing to prove, which is the whole reason this flow exists.
@@ -14,44 +12,43 @@ const MS_PER_SECOND = 1_000;
 // to the client and this is the interval it suggests starting from.
 const SLOW_DOWN_SECONDS = 5;
 
-const StartedSchema = z.object({
-  user_code: z.string(),
-  device_code: z.string(),
-  verification_uri_complete: z.url(),
-  expires_in: z.number(),
-  interval: z.number(),
-});
+const EXPIRED = 'That code expired. Run `nib login` again.';
 
-export type StartedLogin = z.infer<typeof StartedSchema>;
+type DeviceClient = ReturnType<typeof createDeviceClient>;
+type StartedLogin = NonNullable<Awaited<ReturnType<DeviceClient['device']['code']>>['data']>;
 
-const GrantedSchema = z.object({ access_token: z.string().min(1) });
+function createDeviceClient(apiUrl: string) {
+  return createAuthClient({ baseURL: apiUrl, plugins: [deviceAuthorizationClient()] });
+}
 
-const RefusedSchema = z.object({
-  error: z.string(),
-  error_description: z.string().optional(),
-});
-
-/** Asks for a code to show, and for the address the owner approves it at. */
-export async function startLogin({ apiUrl }: { apiUrl: string }): Promise<StartedLogin> {
-  const response = await post({
-    url: `${apiUrl}${DEVICE_CODE_PATH}`,
-    body: { client_id: CLIENT_ID },
-  });
-  if (!response.ok) {
-    throw new ApiError(`Could not start a login at ${apiUrl}: ${refusal(response.body)}`);
+/**
+ * Asks for a code to show and the address it is approved at, and hands back the wait for that
+ * approval rather than what it would take to reconstruct it — the client and the code the poll
+ * needs are already here, and nothing outside has any use for either.
+ */
+export async function startLogin({ apiUrl }: { apiUrl: string }) {
+  const client = createDeviceClient(apiUrl);
+  const { data, error } = await client.device.code({ client_id: CLIENT_ID });
+  if (!data) {
+    throw new ApiError(`Could not start a login at ${apiUrl}: ${error.error_description}`);
   }
-  return StartedSchema.parse(response.body);
+
+  return {
+    userCode: data.user_code,
+    verificationUrl: data.verification_uri_complete,
+    awaitApproval: () => awaitApproval({ client, started: data }),
+  };
 }
 
 /**
  * Polls until the owner answers, which is the only thing that ends this — the endpoint says
  * `authorization_pending` for as long as nobody has, and each of the other answers is final.
  */
-export async function awaitApproval({
-  apiUrl,
+async function awaitApproval({
+  client,
   started,
 }: {
-  apiUrl: string;
+  client: DeviceClient;
   started: StartedLogin;
 }): Promise<string> {
   const deadline = Date.now() + started.expires_in * MS_PER_SECOND;
@@ -59,16 +56,16 @@ export async function awaitApproval({
 
   while (Date.now() < deadline) {
     await Bun.sleep(waitMs);
-    const response = await post({
-      url: `${apiUrl}${DEVICE_TOKEN_PATH}`,
-      body: { grant_type: GRANT_TYPE, device_code: started.device_code, client_id: CLIENT_ID },
+    const { data, error } = await client.device.token({
+      grant_type: GRANT_TYPE,
+      device_code: started.device_code,
+      client_id: CLIENT_ID,
     });
-    if (response.ok) {
-      return GrantedSchema.parse(response.body).access_token;
+    if (data) {
+      return data.access_token;
     }
 
-    const refused = RefusedSchema.safeParse(response.body);
-    switch (refused.data?.error) {
+    switch (error.error) {
       case 'authorization_pending':
         break;
       case 'slow_down':
@@ -77,13 +74,13 @@ export async function awaitApproval({
       case 'access_denied':
         throw new UsageError('That request was refused.');
       case 'expired_token':
-        throw new UsageError('That code expired. Run `nib login` again.');
+        throw new UsageError(EXPIRED);
       default:
-        throw new ApiError(refusal(response.body));
+        throw new ApiError(error.error_description);
     }
   }
 
-  throw new UsageError('That code expired. Run `nib login` again.');
+  throw new UsageError(EXPIRED);
 }
 
 /**
@@ -99,29 +96,4 @@ export function openInBrowser(url: string): void {
   } catch {
     // Nothing to fall back to, and nothing lost — the URL is on screen.
   }
-}
-
-async function post({
-  url,
-  body,
-}: {
-  url: string;
-  body: Record<string, string>;
-}): Promise<{ ok: boolean; body: unknown }> {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  }).catch((cause: unknown) => {
-    throw new ApiError(`Could not reach ${url}: ${String(cause)}`);
-  });
-  return { ok: response.ok, body: await response.json().catch(() => null) };
-}
-
-function refusal(body: unknown): string {
-  const refused = RefusedSchema.safeParse(body);
-  if (!refused.success) {
-    return 'the api gave no reason.';
-  }
-  return refused.data.error_description ?? refused.data.error;
 }

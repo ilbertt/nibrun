@@ -1,5 +1,5 @@
 import { defineCommand } from '@parshjs/core';
-import { awaitApproval, openInBrowser, startLogin } from '#lib/device-login.ts';
+import { openInBrowser, startLogin } from '#lib/device-login.ts';
 import { createUi, isInteractive } from '#lib/ui.ts';
 
 export const command = defineCommand('login', {
@@ -9,15 +9,15 @@ export const command = defineCommand('login', {
     const ui = createUi({ print, interactive: isInteractive() });
     const { apiUrl } = context;
 
-    const started = await startLogin({ apiUrl });
+    const login = await startLogin({ apiUrl });
     ui.open('nib login');
-    ui.step(`code ${started.user_code}`);
-    ui.step(started.verification_uri_complete);
-    openInBrowser(started.verification_uri_complete);
+    ui.step(`code ${login.userCode}`);
+    ui.step(login.verificationUrl);
+    openInBrowser(login.verificationUrl);
 
     const accessToken = await ui.waitingFor({
       message: 'waiting for you to approve it',
-      task: () => awaitApproval({ apiUrl, started }),
+      task: login.awaitApproval,
     });
 
     await context.files.credentials.write({ apiUrl, accessToken });
