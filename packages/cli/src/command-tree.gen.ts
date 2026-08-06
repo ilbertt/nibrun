@@ -4,6 +4,8 @@ import type { InferForwardedOptions, InferParams, RuntimeNode } from '@parshjs/c
 import type { command as appsCmd } from './commands/apps.ts';
 import type { command as appsExportDestinationCmd } from './commands/apps/export/[destination].ts';
 import type { command as appsLogsCmd } from './commands/apps/logs.ts';
+import type { command as appsLsCmd } from './commands/apps/ls.ts';
+import type { command as appsLsPathCmd } from './commands/apps/ls/[path].ts';
 import type { command as loginCmd } from './commands/login.ts';
 import type { command as runCommandCmd } from './commands/run/[command].ts';
 
@@ -22,6 +24,19 @@ declare module '@parshjs/core' {
     'apps logs': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: {};
+    };
+    'apps ls': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: {};
+    };
+    'apps ls [path]': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+        'apps ls': { options: InferForwardedOptions<typeof appsLsCmd.options>; params: InferParams<typeof appsLsCmd.params> };
       };
       rootOptions: {};
     };
@@ -60,6 +75,17 @@ export const commandTree: RuntimeNode = {
           command: { path: 'apps logs', load: () => import('./commands/apps/logs.ts').then((m) => m.command) },
           literalChildren: {},
           paramChild: null,
+        },
+        'ls': {
+          segment: { kind: 'literal', value: 'ls' },
+          command: { path: 'apps ls', load: () => import('./commands/apps/ls.ts').then((m) => m.command) },
+          literalChildren: {},
+          paramChild: {
+            segment: { kind: 'param', name: 'path' },
+            command: { path: 'apps ls [path]', load: () => import('./commands/apps/ls/[path].ts').then((m) => m.command) },
+            literalChildren: {},
+            paramChild: null,
+          },
         },
       },
       paramChild: null,

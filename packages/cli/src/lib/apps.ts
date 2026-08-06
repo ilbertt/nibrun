@@ -1,7 +1,9 @@
+import type { Print } from '@parshjs/core';
 import { type Api, unwrap } from '#lib/api.ts';
 import { ApiError, UsageError } from '#lib/errors.ts';
 
 const NO_APP_NAMED = 'Which app? Name one with --app-slug.';
+const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
 /**
  * `--app-slug` is optional on `apps` so that asking for nothing is answered with a listing rather
@@ -24,4 +26,42 @@ export async function appBySlug({ api, slug }: { api: Api; slug: string }) {
     throw new ApiError(`No app with slug ${slug}.`);
   }
   return found;
+}
+
+/**
+ * The deployment a reader means by not naming one. The api lists them newest first, so this is
+ * the head of the list rather than a search through it.
+ */
+async function latestDeployment({ api, appId }: { api: Api; appId: string }): Promise<string> {
+  const { deployments } = unwrap(await api.api.apps({ appId }).deployments.get());
+  const newest = deployments[0];
+  if (!newest) {
+    throw new ApiError(NO_DEPLOYMENTS);
+  }
+  return newest.id;
+}
+
+/**
+ * The deployment a command was pointed at, and a line saying which one it turned out to be.
+ *
+ * The app is looked up either way — a deployment is addressed under the app that owns it — so
+ * what naming one skips is only the question of which deployment is current. Which makes the line
+ * worth printing: the answer to that question is the difference between reading the release
+ * someone just made and reading the one before it.
+ */
+export async function addressedDeployment({
+  api,
+  slug,
+  deploymentId,
+  print,
+}: {
+  api: Api;
+  slug: string;
+  deploymentId: string | undefined;
+  print: Print;
+}): Promise<{ appId: string; deploymentId: string }> {
+  const app = await appBySlug({ api, slug });
+  const addressed = deploymentId ?? (await latestDeployment({ api, appId: app.id }));
+  print.dim(`${app.slug} · deployment ${addressed}`);
+  return { appId: app.id, deploymentId: addressed };
 }

@@ -27,6 +27,12 @@ the layout under `src/commands/` is the command tree.
   prints the parent's usage rather than a missing-argument error, because the
   walk stops at the node above the param — that listing is the only place the
   command's description is read, so it has to say what the value is for.
+- An **optional** positional is that node given a command of its own:
+  `commands/apps/ls.ts` beside `commands/apps/ls/[path].ts` makes `nib apps ls`
+  and `nib apps ls <path>` two commands, and the walk picks whichever the
+  positional it was handed reaches. There is no other spelling — a param is how
+  routing gets there, so a command reached without one is a different command.
+  Flags they share go on the `ls` node with `forwardToChildren: true`.
 - **`options` is required by `defineCommand` even when a command has none.**
   Omitting it matches the alias overload instead, whose errors talk about
   `undefined` and never mention options. `options: {}` is the fix.

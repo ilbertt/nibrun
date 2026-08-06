@@ -1,9 +1,6 @@
 import type { Print } from '@parshjs/core';
 import type { TenantLogRecord } from '@repo/protocol';
 import { type Api, unwrap } from '#lib/api.ts';
-import { ApiError } from '#lib/errors.ts';
-
-const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
 /**
  * How much of the gap a reconnect asks to be told about.
@@ -16,25 +13,6 @@ const RECONNECT_TIMERANGE = '30s';
 
 /** What a closed stream costs before we open another, so a refusing api is not hammered. */
 const RECONNECT_PAUSE_MS = 1_000;
-
-/**
- * The deployment a reader means by not naming one. The api lists them newest first, so this is
- * the head of the list rather than a search through it.
- */
-export async function latestDeployment({
-  api,
-  appId,
-}: {
-  api: Api;
-  appId: string;
-}): Promise<string> {
-  const { deployments } = unwrap(await api.api.apps({ appId }).deployments.get());
-  const newest = deployments[0];
-  if (!newest) {
-    throw new ApiError(NO_DEPLOYMENTS);
-  }
-  return newest.id;
-}
 
 /**
  * Ctrl-C, as something a loop can read rather than something that kills it mid-line.
