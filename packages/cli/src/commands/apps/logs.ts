@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { appBySlug } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { UsageError } from '#lib/errors.ts';
-import { follow, latestDeployment } from '#lib/logs.ts';
+import { follow, latestDeployment, untilInterrupted } from '#lib/logs.ts';
 
 const NO_APP_NAMED = 'Which app? Name one with --app-slug.';
 
@@ -46,7 +46,8 @@ export const command = defineCommand('apps logs', {
       appId: app.id,
       deploymentId,
       timerange: options.timerange,
-      write: (line) => process.stdout.write(`${line}\n`),
+      print,
+      signal: untilInterrupted(),
     });
   },
 });

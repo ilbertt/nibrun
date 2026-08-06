@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import type { Print } from '@parshjs/core';
 import type { TenantLogRecord } from '@repo/protocol';
-import { Printed, render } from '#lib/logs.ts';
+import { Printed, render, show } from '#lib/logs.ts';
 
 const DROPPED_BYTES = 4096;
 
@@ -17,6 +18,19 @@ function record(overrides: Partial<TenantLogRecord> = {}): TenantLogRecord {
     sequence: 0,
     ...overrides,
   } as TenantLogRecord;
+}
+
+/** Which level a record went out at is the whole of what `show` decides. */
+function printer(): Print & { at: string[] } {
+  const at: string[] = [];
+  return {
+    at,
+    info: () => at.push('info'),
+    success: () => at.push('success'),
+    warn: () => at.push('warn'),
+    error: () => at.push('error'),
+    dim: () => at.push('dim'),
+  };
 }
 
 describe('a page that overlaps the one before it prints only what is new', () => {
@@ -45,21 +59,44 @@ describe('a page that overlaps the one before it prints only what is new', () =>
 
 describe('a record is one line of what the app wrote', () => {
   test('the line carries the time of day, the stream and the message', () => {
-    const line = render(record());
-
-    expect(line).toContain('09:41:00.123');
-    expect(line).toContain('out');
-    expect(line).toContain('listening on 0.0.0.0:8090');
+    expect(render(record())).toBe('09:41:00.123 out listening on 0.0.0.0:8090');
   });
 
   test('what the app wrote to its error stream is labelled as such', () => {
-    expect(render(record({ stream: 'stderr' }))).toContain('err');
+    expect(render(record({ stream: 'stderr' }))).toStartWith('09:41:00.123 err');
   });
 
   // A gap stands for output the host had to drop, and how much is the whole of what it says.
   test('a gap says how much went missing', () => {
     const line = render(record({ stream: 'stderr', droppedBytes: DROPPED_BYTES }));
 
-    expect(line).toContain(String(DROPPED_BYTES));
+    expect(line).toEndWith(`(${DROPPED_BYTES} bytes)`);
+  });
+});
+
+describe('the stream a record came out of is the stream it goes back into', () => {
+  test('ordinary output is written plainly to ours', () => {
+    const print = printer();
+
+    show({ record: record(), print });
+
+    expect(print.at).toEqual(['info']);
+  });
+
+  test('what the app wrote to its error stream goes to ours', () => {
+    const print = printer();
+
+    show({ record: record({ stream: 'stderr' }), print });
+
+    expect(print.at).toEqual(['error']);
+  });
+
+  // A gap is the host speaking, not the app, so it is not dressed as the app's own error output.
+  test('a gap is a warning rather than the app error output', () => {
+    const print = printer();
+
+    show({ record: record({ stream: 'stderr', droppedBytes: DROPPED_BYTES }), print });
+
+    expect(print.at).toEqual(['warn']);
   });
 });
