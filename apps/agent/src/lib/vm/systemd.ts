@@ -1,4 +1,4 @@
-import { type AppId, AppIdSchema, isValidMessage } from '@repo/protocol';
+import { type AppId, AppIdSchema, Value } from '@repo/protocol';
 import { Effect } from 'effect';
 import {
   parsePropertyBlocks,
@@ -25,7 +25,11 @@ export function appIdFromUnit(unitName: string): AppId | undefined {
     return undefined;
   }
   const value = unitName.slice(VM_UNIT_TEMPLATE.length, -UNIT_SUFFIX.length);
-  return isValidMessage({ schema: AppIdSchema, value }) ? (value as AppId) : undefined;
+  try {
+    return Value.Parse(AppIdSchema, value);
+  } catch {
+    return undefined;
+  }
 }
 
 export function parseUnitNames(output: string): string[] {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { GuestPort, HostPort, Ipv4Address } from '@repo/protocol';
+import { GuestPortSchema, HostPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
 import {
   type FirewallState,
   INSTANCE_METADATA_ADDRESS_V4,
@@ -13,11 +13,14 @@ const DNS_PORT = 53;
 // The ranges the blanket v6 rule covers, to assert that a VPC's range is not among them.
 const PRIVATE_DESTINATIONS_V6_SAMPLE = ['::1', 'fe80:', 'fc', 'fd'];
 
+const HOST_PORT_NUMBER = 21_000;
+const GUEST_PORT_NUMBER = 3000;
+
 const instance = {
-  hostPort: 21_000 as HostPort,
-  guestPort: 3000 as GuestPort,
-  hostIpv4: '10.201.0.1' as Ipv4Address,
-  guestIpv4: '10.201.0.2' as Ipv4Address,
+  hostPort: Value.Parse(HostPortSchema, HOST_PORT_NUMBER),
+  guestPort: Value.Parse(GuestPortSchema, GUEST_PORT_NUMBER),
+  hostIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.1'),
+  guestIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.2'),
 };
 
 function state(overrides: Partial<FirewallState> = {}): FirewallState {

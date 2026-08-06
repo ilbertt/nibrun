@@ -1,7 +1,8 @@
-import type { Timestamp } from '@repo/protocol';
+import { type Timestamp, TimestampSchema, Value } from '@repo/protocol';
 import { Clock, Effect } from 'effect';
 
-export const fromEpochMs = (value: number): Timestamp => new Date(value).toISOString() as Timestamp;
+export const fromEpochMs = (value: number): Timestamp =>
+  Value.Parse(TimestampSchema, new Date(value).toISOString());
 
 export const toEpochMs = (value: Timestamp): number => Date.parse(value);
 

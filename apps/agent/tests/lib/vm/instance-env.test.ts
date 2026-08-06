@@ -2,14 +2,17 @@ import { describe, expect, test } from 'bun:test';
 import {
   DEFAULT_GUEST_PORT,
   DEFAULT_RESTART_POLICY,
-  type GuestPort,
-  type SecretString,
+  GuestPortSchema,
+  SecretStringSchema,
+  Value,
 } from '@repo/protocol';
 import { Either } from 'effect';
 import { renderInstanceEnv } from '#lib/vm/instance-env.ts';
 
+const NON_DEFAULT_PORT = 8080;
+
 function secret(value: string) {
-  return value as SecretString;
+  return Value.Parse(SecretStringSchema, value);
 }
 
 type Overrides = Partial<Parameters<typeof renderInstanceEnv>[0]>;
@@ -78,7 +81,9 @@ describe('what apps/runtime parses off the config drive', () => {
   });
 
   test('a non-default port is the one written', () => {
-    expect(render({ guestPort: 8080 as GuestPort })).toContain('NIBRUN_PORT=8080\n');
+    expect(render({ guestPort: Value.Parse(GuestPortSchema, NON_DEFAULT_PORT) })).toContain(
+      `NIBRUN_PORT=${NON_DEFAULT_PORT}\n`,
+    );
   });
 });
 

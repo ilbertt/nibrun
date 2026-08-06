@@ -4,8 +4,8 @@ import {
   type ArtifactId,
   type Filename,
   FilenameSchema,
-  isValidMessage,
   type OwnerId,
+  Value,
 } from '@repo/protocol';
 import { identifyArtifact } from '#lib/artifact-digest.ts';
 import { isElfExecutable } from '#lib/elf.ts';
@@ -31,10 +31,11 @@ export type AppOwnership = Pick<AppsRepositoryContract, 'isOwnedBy'>;
 // A host writes this name into an export archive, so a browser-supplied one that is not a
 // single path segment has to be refused here rather than sanitised into something else.
 function asFilename(name: string): Filename {
-  if (!isValidMessage({ schema: FilenameSchema, value: name })) {
+  try {
+    return Value.Parse(FilenameSchema, name);
+  } catch {
     throw new BadRequestError(NOT_A_FILENAME);
   }
-  return name as Filename;
 }
 
 function toArtifact(row: ArtifactRow): Artifact {

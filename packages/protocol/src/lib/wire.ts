@@ -1,4 +1,5 @@
 import { type TInteger, type TString, Type } from '@sinclair/typebox';
+import { Value } from '@sinclair/typebox/value';
 import type { Brand, BrandedSchema } from '#lib/brand.ts';
 
 // Every schema in this package resolves to one of these. The wire format is JSON and only
@@ -129,4 +130,6 @@ export const HostPortSchema = Type.Integer({
   maximum: MAX_PORT,
 }) as BrandedSchema<TInteger, HostPort>;
 
-export const DEFAULT_GUEST_PORT = 3000 as GuestPort;
+const DEFAULT_GUEST_PORT_NUMBER = 3000;
+
+export const DEFAULT_GUEST_PORT = Value.Parse(GuestPortSchema, DEFAULT_GUEST_PORT_NUMBER);

@@ -1,8 +1,8 @@
-import type { ObjectKey } from '@repo/protocol';
+import { ObjectKeySchema, Value } from '@repo/protocol';
 import { Layer } from 'effect';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
-export const HOST_STORAGE_PREFIX = 'filesystems/host-1' as ObjectKey;
+export const HOST_STORAGE_PREFIX = Value.Parse(ObjectKeySchema, 'filesystems/host-1');
 
 /** `slotsFile` names a directory nothing creates: what a test persists never reaches a host. */
 export const AGENT_CONFIG = {

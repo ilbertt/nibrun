@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import type { AppId } from '@repo/protocol';
+import { AppIdSchema, Value } from '@repo/protocol';
 import { appIdFromUnit, parseUnitNames, vmUnitName } from '#lib/vm/systemd.ts';
 import { parseProperties, parsePropertyBlocks, unitStatusFrom } from '#lib/vm/unit-status.ts';
 
 describe('unit naming round-trips', () => {
   test('an instance id becomes a template instance and back', () => {
-    const appId = 'inst-A_1' as AppId;
+    const appId = Value.Parse(AppIdSchema, 'inst-A_1');
     expect(vmUnitName(appId)).toBe('nibrun-vm@inst-A_1.service');
     expect(appIdFromUnit(vmUnitName(appId))).toBe(appId);
   });

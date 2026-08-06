@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import type {
-  AgentSessionRequest,
-  HostDesiredState,
-  HostId,
-  HostReportedState,
-  ReportedVolume,
-  SecretString,
+import {
+  type AgentSessionRequest,
+  type HostDesiredState,
+  type HostId,
+  HostIdSchema,
+  type HostReportedState,
+  type ReportedVolume,
+  type SecretString,
+  Value,
 } from '@repo/protocol';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
@@ -95,7 +97,7 @@ function build() {
 describe('a session is the identity a host is answered as', () => {
   test('a host presenting its own id keeps it across a reinstall', async () => {
     const { service } = build();
-    const hostId = 'host-of-record' as HostId;
+    const hostId = Value.Parse(HostIdSchema, 'host-of-record');
 
     expect((await service.openSession({ ...SESSION_REQUEST, hostId })).hostId).toBe(hostId);
   });
@@ -120,7 +122,7 @@ describe('a host is told the whole of what it should be running', () => {
   // Desired state carries no host id of its own, so a host can only ever be told about itself.
   test('and told it about itself', async () => {
     const { service } = build();
-    const hostId = 'host-1' as HostId;
+    const hostId = Value.Parse(HostIdSchema, 'host-1');
 
     expect(await service.desiredState({ hostId })).toEqual({
       hostId,
@@ -136,7 +138,7 @@ describe('a report is read by whatever owns what it talks about', () => {
   test('and by each of them, so no part of it is dropped on the way in', async () => {
     const { deployments, exports, service } = build();
     const reported = {
-      hostId: 'host-1' as HostId,
+      hostId: Value.Parse(HostIdSchema, 'host-1'),
       instances: [],
       volumes: [],
       exports: [],

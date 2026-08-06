@@ -1,4 +1,4 @@
-import { ArtifactSchema, type OwnerId } from '@repo/protocol';
+import { ArtifactSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import { ArtifactParamsSchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
@@ -15,7 +15,7 @@ export const AppsAppIdArtifactsArtifactIdController = new Elysia()
       const artifact = await artifactsService.get({
         appId: params.appId,
         artifactId: params.artifactId,
-        ownerId: user.id as OwnerId,
+        ownerId: Value.Parse(OwnerIdSchema, user.id),
       });
       return status(StatusMap.OK, artifact);
     },

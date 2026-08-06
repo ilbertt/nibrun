@@ -1,5 +1,8 @@
 /** biome-ignore-all lint/performance/noBarrelFile: index is the only allowed file where we can export other files */
 
+// Re-exported so a consumer can `Value.Parse` a branded schema without taking its own
+// dependency on the validator this package already owns.
+export { Value } from '@sinclair/typebox/value';
 export {
   DESIRED_INSTANCE_STATES,
   DESIRED_PRESENCE,

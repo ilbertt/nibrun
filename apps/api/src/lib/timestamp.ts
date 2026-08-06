@@ -1,5 +1,5 @@
-import type { Timestamp } from '@repo/protocol';
+import { type Timestamp, TimestampSchema, Value } from '@repo/protocol';
 
 export function toTimestamp(value: Date): Timestamp {
-  return value.toISOString() as Timestamp;
+  return Value.Parse(TimestampSchema, value.toISOString());
 }

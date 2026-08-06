@@ -5,13 +5,14 @@ import {
   DEFAULT_RESTART_POLICY,
   type DeploymentId,
   type DeploymentState,
-  type GuestPort,
-  type HostPort,
+  GuestPortSchema,
+  HostPortSchema,
   type HostReportedState,
   type InstanceState,
-  type Ipv4Address,
+  Ipv4AddressSchema,
   type ReportedInstance,
-  type Timestamp,
+  TimestampSchema,
+  Value,
 } from '@repo/protocol';
 import { type PublicAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
 import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
@@ -37,14 +38,17 @@ import {
 } from '#tests/services/support/fixtures.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
 
-const GUEST_PORT = 8090 as GuestPort;
+const GUEST_PORT_NUMBER = 8090;
+const HOST_PORT_NUMBER = 30_001;
+
+const GUEST_PORT = Value.Parse(GuestPortSchema, GUEST_PORT_NUMBER);
 const OWNER_SCOPED_METHODS = 4;
 const CREATED_AT = new Date('2026-08-04T10:00:00.000Z');
 const ACTIVATED_AT = new Date('2026-08-04T11:30:00.000Z');
 const HEALTHY_AT = new Date('2026-08-04T11:31:00.000Z');
 const REPORTED_AT = new Date('2026-08-04T11:32:00.000Z');
-const HOST_PORT = 30_001 as HostPort;
-const GUEST_IPV4 = '10.0.0.2' as Ipv4Address;
+const HOST_PORT = Value.Parse(HostPortSchema, HOST_PORT_NUMBER);
+const GUEST_IPV4 = Value.Parse(Ipv4AddressSchema, '10.0.0.2');
 const RESTART_COUNT = 2;
 
 // The config version this deployment pins. `app_configs` never changes a row, so this is what
@@ -227,7 +231,7 @@ describe('a deployment publishes the config version it pins', () => {
 
     const deployment = await service.get(OWNED_DEPLOYMENT);
 
-    expect(deployment.activatedAt).toBe(ACTIVATED_AT.toISOString() as Timestamp);
+    expect(deployment.activatedAt).toBe(Value.Parse(TimestampSchema, ACTIVATED_AT.toISOString()));
   });
 });
 
@@ -330,7 +334,10 @@ describe('a host reporting is what moves a release through its states', () => {
 
     await service.applyHostReport({
       reported: report([
-        instance({ state: 'running', lastHealthyAt: HEALTHY_AT.toISOString() as Timestamp }),
+        instance({
+          state: 'running',
+          lastHealthyAt: Value.Parse(TimestampSchema, HEALTHY_AT.toISOString()),
+        }),
       ]),
     });
 
@@ -378,7 +385,7 @@ describe('a host reporting is what moves a release through its states', () => {
           hostPort: HOST_PORT,
           guestIpv4: GUEST_IPV4,
           restartCount: RESTART_COUNT,
-          lastHealthyAt: HEALTHY_AT.toISOString() as Timestamp,
+          lastHealthyAt: Value.Parse(TimestampSchema, HEALTHY_AT.toISOString()),
         }),
       ]),
     });

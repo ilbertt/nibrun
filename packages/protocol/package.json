@@ -13,7 +13,7 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.52"
+    "@sinclair/typebox": "catalog:"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

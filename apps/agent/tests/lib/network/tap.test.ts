@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Ipv4Address } from '@repo/protocol';
+import { Ipv4AddressSchema, Value } from '@repo/protocol';
 import { Effect } from 'effect';
 import type { CommandRequest } from '#lib/exec.ts';
 import { ensureTap } from '#lib/network/tap.ts';
@@ -7,7 +7,7 @@ import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 
 const tap = {
   tapName: 'nbr7',
-  hostIpv4: '10.201.0.29' as Ipv4Address,
+  hostIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.29'),
   subnetPrefixLength: 30,
 };
 

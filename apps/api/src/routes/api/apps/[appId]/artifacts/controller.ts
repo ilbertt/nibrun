@@ -1,4 +1,4 @@
-import { ArtifactSchema, type OwnerId } from '@repo/protocol';
+import { ArtifactSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import {
@@ -18,7 +18,7 @@ export const AppsAppIdArtifactsController = new Elysia()
     async ({ artifactsService, params, user, status }) => {
       const artifacts = await artifactsService.list({
         appId: params.appId,
-        ownerId: user.id as OwnerId,
+        ownerId: Value.Parse(OwnerIdSchema, user.id),
       });
       return status(StatusMap.OK, { artifacts });
     },
@@ -32,7 +32,7 @@ export const AppsAppIdArtifactsController = new Elysia()
     async ({ artifactsService, params, body, user, status }) => {
       const artifact = await artifactsService.create({
         appId: params.appId,
-        ownerId: user.id as OwnerId,
+        ownerId: Value.Parse(OwnerIdSchema, user.id),
         binary: body.binary,
       });
       return status(StatusMap.Created, artifact);

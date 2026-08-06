@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  type AppId,
+  AppIdSchema,
   type DirectoryListing,
   type FilesystemQuery,
   GUEST_PATH_ROOT,
   type GuestPath,
-  type Timestamp,
+  GuestPathSchema,
+  TimestampSchema,
+  Value,
 } from '@repo/protocol';
 import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import type { DeploymentRow } from '#repositories/deployments.repository.ts';
@@ -19,8 +21,8 @@ import {
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
 
-const OTHER_APP = 'app-somebody-else' as AppId;
-const DATA = '/pb_data' as GuestPath;
+const OTHER_APP = Value.Parse(AppIdSchema, 'app-somebody-else');
+const DATA = Value.Parse(GuestPathSchema, '/pb_data');
 
 const UNREADABLE_DEVICE = 'no directory could be read from /dev/nbd7';
 
@@ -31,7 +33,7 @@ const LISTING: DirectoryListing = {
       name: 'data.db',
       kind: 'file',
       sizeBytes: 4096,
-      modifiedAt: '2026-08-03T09:41:00Z' as Timestamp,
+      modifiedAt: Value.Parse(TimestampSchema, '2026-08-03T09:41:00Z'),
     },
   ],
   truncated: false,

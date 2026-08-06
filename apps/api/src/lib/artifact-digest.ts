@@ -1,4 +1,10 @@
-import type { ObjectKey, Sha256Digest } from '@repo/protocol';
+import {
+  type ObjectKey,
+  ObjectKeySchema,
+  type Sha256Digest,
+  Sha256DigestSchema,
+  Value,
+} from '@repo/protocol';
 
 const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
@@ -16,13 +22,14 @@ export type ArtifactIdentity = {
  * that never converges rather than a rejected upload.
  */
 export function identifyArtifact(bytes: Uint8Array): ArtifactIdentity {
-  const digest = new Bun.CryptoHasher(DIGEST_ALGORITHM)
-    .update(bytes)
-    .digest(HEX_ENCODING) as Sha256Digest;
+  const digest = Value.Parse(
+    Sha256DigestSchema,
+    new Bun.CryptoHasher(DIGEST_ALGORITHM).update(bytes).digest(HEX_ENCODING),
+  );
 
   return {
     digest,
     sizeBytes: bytes.byteLength,
-    objectKey: digest as string as ObjectKey,
+    objectKey: Value.Parse(ObjectKeySchema, digest),
   };
 }

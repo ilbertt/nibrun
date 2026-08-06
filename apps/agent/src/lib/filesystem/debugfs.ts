@@ -8,6 +8,8 @@ import {
   GuestPathSchema,
   isValidMessage,
   type Timestamp,
+  TimestampSchema,
+  Value,
 } from '@repo/protocol';
 import { Data, Either } from 'effect';
 import type { CommandLine } from '#lib/exec.ts';
@@ -110,7 +112,10 @@ function timestampFrom({ date, time }: { date: string; time: string }): Timestam
   }
   const paddedDay = day.padStart(TWO_DIGITS, '0');
   const paddedHour = hour.padStart(TWO_DIGITS, '0');
-  return `${year}-${monthNumber}-${paddedDay}T${paddedHour}:${minute}:00Z` as Timestamp;
+  return Value.Parse(
+    TimestampSchema,
+    `${year}-${monthNumber}-${paddedDay}T${paddedHour}:${minute}:00Z`,
+  );
 }
 
 /**

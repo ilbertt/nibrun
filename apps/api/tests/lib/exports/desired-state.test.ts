@@ -1,14 +1,23 @@
 import { describe, expect, test } from 'bun:test';
-import type { ExportId, ExportState, Filename, ObjectKey, Sha256Digest } from '@repo/protocol';
+import {
+  ExportIdSchema,
+  type ExportState,
+  FilenameSchema,
+  ObjectKeySchema,
+  Sha256DigestSchema,
+  Value,
+} from '@repo/protocol';
 import { type DesiredExportRow, toDesiredExport } from '#lib/exports/desired-state.ts';
 import { APP_ID } from '#tests/services/support/fixtures.ts';
 
-const EXPORT_ID = 'export-1' as ExportId;
-const OBJECT_KEY = `exports/${APP_ID}/${EXPORT_ID}.tar.gz` as ObjectKey;
-const ARTIFACT_OBJECT_KEY = 'artifacts/abc' as ObjectKey;
-const ARTIFACT_FILENAME = 'pocketbase' as Filename;
-const ARTIFACT_DIGEST =
-  'd9403d88cdf0684fbb9d8e97cf3508e9fb4506cf309a34e42653a1c2bc04a298' as Sha256Digest;
+const EXPORT_ID = Value.Parse(ExportIdSchema, 'export-1');
+const OBJECT_KEY = Value.Parse(ObjectKeySchema, `exports/${APP_ID}/${EXPORT_ID}.tar.gz`);
+const ARTIFACT_OBJECT_KEY = Value.Parse(ObjectKeySchema, 'artifacts/abc');
+const ARTIFACT_FILENAME = Value.Parse(FilenameSchema, 'pocketbase');
+const ARTIFACT_DIGEST = Value.Parse(
+  Sha256DigestSchema,
+  'd9403d88cdf0684fbb9d8e97cf3508e9fb4506cf309a34e42653a1c2bc04a298',
+);
 const ARTIFACT_SIZE_BYTES = 4096;
 
 function desiredExportRow(state: ExportState): DesiredExportRow {

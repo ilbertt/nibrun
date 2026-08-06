@@ -2,18 +2,19 @@ import { describe, expect, test } from 'bun:test';
 import { FetchHttpClient } from '@effect/platform';
 import {
   DEFAULT_HEALTH_CHECK,
-  type GuestPort,
+  GuestPortSchema,
   type HealthCheck,
-  type Ipv4Address,
+  Ipv4AddressSchema,
+  Value,
 } from '@repo/protocol';
 import { Effect } from 'effect';
 import { probeInstance } from '#lib/health/probe.ts';
 import { provided } from '#tests/support/run.ts';
 import { HTTP_SERVER_ERROR, serving } from '#tests/support/server.ts';
 
-const LOOPBACK = '127.0.0.1' as Ipv4Address;
+const LOOPBACK = Value.Parse(Ipv4AddressSchema, '127.0.0.1');
 // Nothing listens here, so a probe against it must fail rather than hang.
-const CLOSED_PORT = 1 as GuestPort;
+const CLOSED_PORT = Value.Parse(GuestPortSchema, 1);
 const WITH_PATH: HealthCheck = { ...DEFAULT_HEALTH_CHECK, path: '/health' };
 
 const run = provided(FetchHttpClient.layer);
@@ -29,7 +30,7 @@ function probing({
     const server = yield* serving(answer);
     return yield* probeInstance({
       guestIpv4: LOOPBACK,
-      guestPort: server.port as GuestPort,
+      guestPort: Value.Parse(GuestPortSchema, server.port),
       healthCheck,
     });
   });

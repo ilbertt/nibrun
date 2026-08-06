@@ -1,4 +1,4 @@
-import type { DnsLabel, Hostname } from '@repo/protocol';
+import { type DnsLabel, type Hostname, HostnameSchema, Value } from '@repo/protocol';
 
 /**
  * The app domain is a different registrable domain from the one the dashboard is served on, so
@@ -11,5 +11,5 @@ export function platformHostname({
   slug: DnsLabel;
   appHostDomain: string;
 }): Hostname {
-  return `${slug}.${appHostDomain}` as Hostname;
+  return Value.Parse(HostnameSchema, `${slug}.${appHostDomain}`);
 }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Filename } from '@repo/protocol';
+import { type Filename, FilenameSchema, Value } from '@repo/protocol';
 import { Effect, Either, Layer } from 'effect';
 import { bundleBinaryName, writeBundle } from '#lib/exports/bundle.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
@@ -116,9 +116,9 @@ test('a volume holding only that is an empty export rather than a failed one', a
 
 describe('the bundle keeps the name the binary was uploaded under', () => {
   test('the uploaded name is what lands in the archive', () => {
-    expect(bundleBinaryName(artifact({ filename: 'pocketbase' as Filename }))).toEqual(
-      Either.right('pocketbase'),
-    );
+    expect(
+      bundleBinaryName(artifact({ filename: Value.Parse(FilenameSchema, 'pocketbase') })),
+    ).toEqual(Either.right('pocketbase'));
   });
 
   // The schema rejects all of these, so reaching here means a peer that did not honour it. The

@@ -4,9 +4,11 @@ import {
   DEFAULT_AGENT_POLL_SETTINGS,
   type HostDesiredState,
   type HostId,
+  HostIdSchema,
   type HostReportedState,
-  type SecretString,
-  type Timestamp,
+  SecretStringSchema,
+  TimestampSchema,
+  Value,
 } from '@repo/protocol';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
@@ -54,8 +56,8 @@ export class AgentService extends Service {
   async openSession(request: AgentSessionRequest): Promise<AgentSession> {
     // The agent persists what it is given and presents it next time, so a host keeps its
     // identity across a reinstall. Nothing allocates one yet, so its own is honoured.
-    const hostId = request.hostId ?? (crypto.randomUUID() as HostId);
-    const sessionToken = crypto.randomUUID() as SecretString;
+    const hostId = request.hostId ?? Value.Parse(HostIdSchema, crypto.randomUUID());
+    const sessionToken = Value.Parse(SecretStringSchema, crypto.randomUUID());
     await this.agentRepo.saveSession({ sessionToken, hostId });
 
     this.logger.info('agent session opened', {
@@ -67,7 +69,10 @@ export class AgentService extends Service {
     return {
       hostId,
       sessionToken,
-      expiresAt: new Date(Date.now() + SESSION_LIFETIME_MS).toISOString() as Timestamp,
+      expiresAt: Value.Parse(
+        TimestampSchema,
+        new Date(Date.now() + SESSION_LIFETIME_MS).toISOString(),
+      ),
       poll: DEFAULT_AGENT_POLL_SETTINGS,
     };
   }

@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import type {
-  AppId,
-  DirectoryListing,
-  FilesystemQuery,
-  FilesystemQueryId,
-  GuestPath,
-  Timestamp,
+import {
+  AppIdSchema,
+  type DirectoryListing,
+  type FilesystemQuery,
+  FilesystemQueryIdSchema,
+  GuestPathSchema,
+  TimestampSchema,
+  Value,
 } from '@repo/protocol';
 import { Effect, Layer } from 'effect';
 import { answer } from '#lib/agent/filesystem.ts';
@@ -13,21 +14,21 @@ import { UnreadableDirectory } from '#lib/filesystem/debugfs.ts';
 import { FilesystemReader, NoDeviceForApp } from '#services/filesystem-reader.service.ts';
 import { recordingCommands } from '#tests/support/commands.ts';
 
-const APP = 'app-pocketbase' as AppId;
+const APP = Value.Parse(AppIdSchema, 'app-pocketbase');
 const QUERY: FilesystemQuery = {
-  queryId: 'query-1' as FilesystemQueryId,
+  queryId: Value.Parse(FilesystemQueryIdSchema, 'query-1'),
   appId: APP,
-  path: '/' as GuestPath,
+  path: Value.Parse(GuestPathSchema, '/'),
 };
 
 const LISTING: DirectoryListing = {
-  path: '/' as GuestPath,
+  path: Value.Parse(GuestPathSchema, '/'),
   entries: [
     {
       name: 'pb_data',
       kind: 'directory',
       sizeBytes: 4096,
-      modifiedAt: '2026-08-03T09:41:00Z' as Timestamp,
+      modifiedAt: Value.Parse(TimestampSchema, '2026-08-03T09:41:00Z'),
     },
   ],
   truncated: false,

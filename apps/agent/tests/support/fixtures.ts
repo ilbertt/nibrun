@@ -1,24 +1,25 @@
 import {
-  type AppId,
-  type CheckpointId,
+  AppIdSchema,
+  CheckpointIdSchema,
   DEFAULT_GUEST_PORT,
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
-  type DeploymentId,
+  DeploymentIdSchema,
   type DesiredArtifact,
   type DesiredCheckpoint,
   type DesiredExport,
   type DesiredInstance,
   type DesiredVolume,
-  type ExportId,
-  type Filename,
+  ExportIdSchema,
+  FilenameSchema,
   type HostDesiredState,
-  type HostId,
-  type HostPort,
-  type ObjectKey,
-  type Timestamp,
-  type VolumeId,
+  HostIdSchema,
+  HostPortSchema,
+  ObjectKeySchema,
+  TimestampSchema,
+  Value,
+  VolumeIdSchema,
 } from '@repo/protocol';
 import type { TenantLogEvent } from '#lib/logs/event.ts';
 import { HOST_PORT_BASE } from '#lib/network/slot.ts';
@@ -26,24 +27,24 @@ import type { ObservedInstance, ObservedState, ObservedVolume } from '#lib/recon
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST } from '#tests/support/artifacts.ts';
 import { HOST_STORAGE_PREFIX } from '#tests/support/config.ts';
 
-export const APP_ID = 'app-1' as AppId;
-export const VOLUME_ID = 'vol-1' as VolumeId;
-export const DEPLOYMENT_ID = 'dep-1' as DeploymentId;
-export const HOST_ID = 'host-1' as HostId;
-export const CHECKPOINT_ID = 'chk-1' as CheckpointId;
-export const EXPORT_ID = 'exp-1' as ExportId;
-export const OBSERVED_AT = '2026-08-03T10:00:00.000Z' as Timestamp;
+export const APP_ID = Value.Parse(AppIdSchema, 'app-1');
+export const VOLUME_ID = Value.Parse(VolumeIdSchema, 'vol-1');
+export const DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'dep-1');
+export const HOST_ID = Value.Parse(HostIdSchema, 'host-1');
+export const CHECKPOINT_ID = Value.Parse(CheckpointIdSchema, 'chk-1');
+export const EXPORT_ID = Value.Parse(ExportIdSchema, 'exp-1');
+export const OBSERVED_AT = Value.Parse(TimestampSchema, '2026-08-03T10:00:00.000Z');
 
 export const VOLUME_SIZE_BYTES = 4_096;
-export const FIRST_HOST_PORT = HOST_PORT_BASE as HostPort;
+export const FIRST_HOST_PORT = Value.Parse(HostPortSchema, HOST_PORT_BASE);
 
 export function artifact(overrides: Partial<DesiredArtifact> = {}): DesiredArtifact {
   return {
     digest: ARTIFACT_DIGEST,
     sizeBytes: ARTIFACT_BYTES.byteLength,
     // A uuid, as the api will assign: it carries no name, which is why `filename` exists.
-    objectKey: 'artifacts/9f1c2f0e-0d4e-4a1b-9c3a-1f8b6d2e7a45' as ObjectKey,
-    filename: 'pocketbase' as Filename,
+    objectKey: Value.Parse(ObjectKeySchema, 'artifacts/9f1c2f0e-0d4e-4a1b-9c3a-1f8b6d2e7a45'),
+    filename: Value.Parse(FilenameSchema, 'pocketbase'),
     ...overrides,
   };
 }
@@ -92,7 +93,7 @@ export function desiredExport(overrides: Partial<DesiredExport> = {}): DesiredEx
     exportId: EXPORT_ID,
     appId: APP_ID,
     volumeId: VOLUME_ID,
-    objectKey: 'exports/app-1/exp-1.tar.gz' as ObjectKey,
+    objectKey: Value.Parse(ObjectKeySchema, 'exports/app-1/exp-1.tar.gz'),
     artifact: artifact(),
     desiredState: 'present',
     ...overrides,

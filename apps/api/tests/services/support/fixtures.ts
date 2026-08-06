@@ -1,12 +1,13 @@
 import {
-  type AppId,
-  type ArtifactId,
+  AppIdSchema,
+  ArtifactIdSchema,
   DEFAULT_GUEST_PORT,
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
-  type DeploymentId,
-  type OwnerId,
+  DeploymentIdSchema,
+  OwnerIdSchema,
+  Value,
 } from '@repo/protocol';
 import { type AppConfigColumns, type PublicAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
 import type {
@@ -15,11 +16,11 @@ import type {
   DeploymentRow,
 } from '#repositories/deployments.repository.ts';
 
-export const OWNER_ID = 'owner-1' as OwnerId;
-export const OTHER_OWNER_ID = 'owner-2' as OwnerId;
-export const APP_ID = 'app-1' as AppId;
-export const ARTIFACT_ID = 'artifact-1' as ArtifactId;
-export const DEPLOYMENT_ID = 'deployment-1' as DeploymentId;
+export const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-1');
+export const OTHER_OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-2');
+export const APP_ID = Value.Parse(AppIdSchema, 'app-1');
+export const ARTIFACT_ID = Value.Parse(ArtifactIdSchema, 'artifact-1');
+export const DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'deployment-1');
 
 export const APP_HOST_DOMAIN = 'apps.test';
 

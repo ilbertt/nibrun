@@ -1,12 +1,15 @@
 import { describe, expect, test } from 'bun:test';
-import type {
-  AppId,
-  AppState,
-  DnsLabel,
-  Hostname,
-  OwnerId,
-  ReportedVolume,
-  VolumeId,
+import {
+  type AppId,
+  type AppState,
+  type DnsLabel,
+  DnsLabelSchema,
+  type Hostname,
+  HostnameSchema,
+  type OwnerId,
+  type ReportedVolume,
+  Value,
+  VolumeIdSchema,
 } from '@repo/protocol';
 import { SQL } from 'bun';
 import type { AppConfigPatch, PublicAppConfig } from '#lib/app-config.ts';
@@ -137,11 +140,13 @@ class StubAppsRepository implements AppsRepositoryContract {
     ownerId: OwnerId;
     state: AppState;
   }): Promise<AppRow | null> {
-    return Promise.resolve(this.owns ? { ...appRow(APP_NAME as DnsLabel), state } : null);
+    return Promise.resolve(
+      this.owns ? { ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state } : null,
+    );
   }
 }
 
-const VOLUME_ID = APP_ID as string as VolumeId;
+const VOLUME_ID = Value.Parse(VolumeIdSchema, APP_ID);
 const NO_BYTES = 0;
 
 function serviceWith(appsRepo: AppsRepositoryContract) {
@@ -172,7 +177,7 @@ describe('a taken hostname is a re-roll, not something the owner sees', () => {
     expect(appsRepo.offeredSlugs.every((slug) => slug.startsWith(`${APP_NAME}-`))).toBe(true);
     expect(distinct(appsRepo.offeredSlugs)).toBe(2);
     // The app answers to the label that was accepted, not to the one that was refused.
-    expect(app.slug).toBe(appsRepo.offeredSlugs[1] as DnsLabel);
+    expect(app.slug).toBe(Value.Parse(DnsLabelSchema, appsRepo.offeredSlugs[1]));
   });
 
   // The hostname is unique platform-wide, so a collision on either constraint means the same
@@ -188,7 +193,7 @@ describe('a taken hostname is a re-roll, not something the owner sees', () => {
     expect(appsRepo.offeredSlugs).toHaveLength(COLLISIONS_BEFORE_SUCCESS + 1);
     expect(distinct(appsRepo.offeredSlugs)).toBe(appsRepo.offeredSlugs.length);
     expect(app.hostnames).toEqual([
-      { hostname: `${app.slug}.${APP_HOST_DOMAIN}` as Hostname, kind: 'platform' },
+      { hostname: Value.Parse(HostnameSchema, `${app.slug}.${APP_HOST_DOMAIN}`), kind: 'platform' },
     ]);
   });
 });

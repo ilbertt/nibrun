@@ -1,4 +1,11 @@
-import type { AppId, HostPort, Ipv4Address } from '@repo/protocol';
+import {
+  type AppId,
+  type HostPort,
+  HostPortSchema,
+  type Ipv4Address,
+  Ipv4AddressSchema,
+  Value,
+} from '@repo/protocol';
 
 /**
  * A host port, a tap, a /30 and an NBD minor all derive from one small integer, so there is one
@@ -39,7 +46,10 @@ export type AppSlot = {
 };
 
 const addressAt = (index: number): Ipv4Address =>
-  `${GUEST_NETWORK_FIRST_OCTET}.${GUEST_NETWORK_SECOND_OCTET}.${Math.floor(index / OCTET_SIZE)}.${index % OCTET_SIZE}` as Ipv4Address;
+  Value.Parse(
+    Ipv4AddressSchema,
+    `${GUEST_NETWORK_FIRST_OCTET}.${GUEST_NETWORK_SECOND_OCTET}.${Math.floor(index / OCTET_SIZE)}.${index % OCTET_SIZE}`,
+  );
 
 const macFor = (address: Ipv4Address) =>
   [
@@ -55,7 +65,7 @@ export function describeSlot({ slot, appId }: { slot: number; appId: AppId }): A
   return {
     slot,
     appId,
-    hostPort: (HOST_PORT_BASE + slot) as HostPort,
+    hostPort: Value.Parse(HostPortSchema, HOST_PORT_BASE + slot),
     hostIpv4: addressAt(base + HOST_ADDRESS_OFFSET),
     guestIpv4,
     guestMac: macFor(guestIpv4),
