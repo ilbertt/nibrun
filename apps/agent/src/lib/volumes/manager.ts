@@ -8,6 +8,7 @@ import type { ObservedVolume } from '#lib/reconcile/plan.ts';
 export function toReportedVolume(observed: ObservedVolume): ReportedVolume {
   return {
     volumeId: observed.volumeId,
+    appId: observed.appId,
     state: observed.attached ? 'ready' : 'detached',
     sizeBytes: observed.sizeBytes,
     storagePrefix: observed.storagePrefix,

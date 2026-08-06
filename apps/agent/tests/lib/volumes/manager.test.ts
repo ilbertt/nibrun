@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { toReportedVolume } from '#lib/volumes/manager.ts';
 import { HOST_STORAGE_PREFIX } from '#tests/support/config.ts';
-import { observedVolume, VOLUME_ID, VOLUME_SIZE_BYTES } from '#tests/support/fixtures.ts';
+import { APP_ID, observedVolume, VOLUME_ID, VOLUME_SIZE_BYTES } from '#tests/support/fixtures.ts';
 
 describe('a volume reports itself from having been found', () => {
   // The regression: reports used to accumulate from provisioning, so a volume nobody touched
@@ -9,6 +9,7 @@ describe('a volume reports itself from having been found', () => {
   test('a healthy volume is reportable without anything having provisioned it', () => {
     expect(toReportedVolume(observedVolume())).toEqual({
       volumeId: VOLUME_ID,
+      appId: APP_ID,
       state: 'ready',
       sizeBytes: VOLUME_SIZE_BYTES,
       storagePrefix: HOST_STORAGE_PREFIX,

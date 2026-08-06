@@ -29,14 +29,18 @@ const deploymentsRepository = new DeploymentsRepository(sql);
 const artifactStorageRepository = new ArtifactStorageRepository(s3);
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
-const agentService = new AgentService({ agentRepo: agentRepository, deploymentsService });
-const assetsService = new AssetsService(assetsRepository);
-const healthService = new HealthService(healthRepository);
-const filesystemService = new FilesystemService({ filesystemRepo: filesystemRepository });
 const appsService = new AppsService({
   appsRepo: appsRepository,
   appHostDomain: env.APP_HOST_DOMAIN,
 });
+const agentService = new AgentService({
+  agentRepo: agentRepository,
+  deploymentsService,
+  appsService,
+});
+const assetsService = new AssetsService(assetsRepository);
+const healthService = new HealthService(healthRepository);
+const filesystemService = new FilesystemService({ filesystemRepo: filesystemRepository });
 const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,

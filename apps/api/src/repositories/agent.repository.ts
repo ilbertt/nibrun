@@ -50,6 +50,9 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
              restart_backoff_factor, restart_reset_after_ms
       FROM nibrun.desired_deployments
     `;
+    const volumes = await this.sql.SelectDesiredVolumes`
+      SELECT app_id, state FROM nibrun.desired_volumes
+    `;
     const hostnames = hostnamesByApp(
       await this.sql.SelectDesiredHostnames`
         SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
@@ -58,7 +61,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
 
     return {
       hostId,
-      volumes: deployments.map(toDesiredVolume),
+      volumes: volumes.map(toDesiredVolume),
       instances: deployments.map((row) => toDesiredInstance({ row, hostnames })),
       checkpoints: [],
       exports: [],

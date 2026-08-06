@@ -4,11 +4,13 @@ import type {
   HostDesiredState,
   HostId,
   HostReportedState,
+  ReportedVolume,
   SecretString,
 } from '@repo/protocol';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
+import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 
 const SESSION_REQUEST = {
@@ -45,6 +47,15 @@ class FakeAgentRepository implements AgentRepositoryContract {
   }
 }
 
+class FakeAppsService {
+  readonly volumes: ReportedVolume[][] = [];
+
+  completeDeletions({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
+    this.volumes.push([...volumes]);
+    return Promise.resolve();
+  }
+}
+
 class FakeDeploymentsService {
   readonly reports: HostReportedState[] = [];
 
@@ -56,11 +67,14 @@ class FakeDeploymentsService {
 
 function build() {
   const deployments = new FakeDeploymentsService();
+  const apps = new FakeAppsService();
   return {
+    apps,
     deployments,
     service: new AgentService({
       agentRepo: new FakeAgentRepository(),
       deploymentsService: deployments as unknown as DeploymentsService,
+      appsService: apps as unknown as AppsService,
     }),
   };
 }

@@ -24,6 +24,7 @@ export abstract class AppsRepositoryContract {
   abstract listHostnamesByApp(input: OwnedApp): Promise<AppHostnameRow[]>;
   abstract updateConfig(input: OwnedApp & { patch: AppConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: OwnedApp & { state: AppState }): Promise<AppRow | null>;
+  abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
   abstract isOwnedBy(input: OwnedApp): Promise<boolean>;
 }
 
@@ -250,6 +251,23 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       `;
       return app ?? null;
     });
+  }
+
+  /**
+   * The fleet's view rather than an owner's, so there is no `ownerId` to scope on: an app is
+   * deleted once the host holding its filesystem says the filesystem is gone.
+   *
+   * `state = 'deleting'` in the predicate rather than around it. A host reports the same volume
+   * every heartbeat until desired state stops mentioning it, so this is asked many times for one
+   * deletion, and what comes back says which of them was the one that finished it.
+   */
+  async finishDeleting({ appId }: { appId: AppId }): Promise<boolean> {
+    const rows = await this.sql.FinishDeletingApp`
+      UPDATE nibrun.apps SET state = 'deleted'
+      WHERE id = ${appId} AND state = 'deleting'
+      RETURNING id
+    `;
+    return rows.length > 0;
   }
 
   updateState({ appId, ownerId, state }: OwnedApp & { state: AppState }) {

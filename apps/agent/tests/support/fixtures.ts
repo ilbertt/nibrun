@@ -125,6 +125,7 @@ export function observedInstance(overrides: Partial<ObservedInstance> = {}): Obs
 export function observedVolume(overrides: Partial<ObservedVolume> = {}): ObservedVolume {
   return {
     volumeId: VOLUME_ID,
+    appId: APP_ID,
     attached: true,
     sizeBytes: VOLUME_SIZE_BYTES,
     storagePrefix: HOST_STORAGE_PREFIX,

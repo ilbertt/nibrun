@@ -13,6 +13,8 @@ export type DesiredDeploymentRow = Queries['SelectDesiredDeployments'];
 
 export type DesiredHostnameRow = Queries['SelectDesiredHostnames'];
 
+export type DesiredVolumeRow = Queries['SelectDesiredVolumes'];
+
 /**
  * The app's own id, because an app has one filesystem and the two never differ. Kept a type apart
  * so an app holding a second one later is a schema change rather than a wire change.
@@ -22,16 +24,16 @@ function volumeIdOf(appId: AppId): VolumeId {
 }
 
 /**
- * Always `present`. A suspended app keeps its filesystem — that is what suspending it means —
- * and removing one is the business of deleting the app, which says `absent` deliberately rather
- * than by leaving a volume out of a list.
+ * A suspended app keeps its filesystem — that is what suspending it means — so deleting the app
+ * is the only thing that asks for one to go, and it asks by saying so. A volume is never removed
+ * by falling out of a list.
  */
-export function toDesiredVolume(row: DesiredDeploymentRow): DesiredVolume {
+export function toDesiredVolume(row: DesiredVolumeRow): DesiredVolume {
   return {
     volumeId: volumeIdOf(row.app_id),
     appId: row.app_id,
     sizeBytes: VOLUME_SIZE_BYTES,
-    desiredState: 'present',
+    desiredState: row.state === 'deleting' ? 'absent' : 'present',
   };
 }
 
