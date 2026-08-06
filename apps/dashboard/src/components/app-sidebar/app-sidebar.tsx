@@ -14,7 +14,7 @@ import {
 } from '#components/ui/sidebar.tsx';
 import { useActiveNavItem } from '#lib/hooks/use-active-nav-item.ts';
 import { NAV_ITEMS } from '#lib/navigation.ts';
-import { Route as IndexRoute } from '#routes/index.tsx';
+import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 export function AppSidebar() {
   const activeItem = useActiveNavItem();

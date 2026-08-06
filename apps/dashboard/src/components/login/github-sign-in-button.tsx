@@ -1,12 +1,12 @@
-import { useSearch } from '@tanstack/react-router';
 import { Button } from '#components/ui/button.tsx';
 import { Field, FieldError } from '#components/ui/field.tsx';
 import { GithubIcon } from '#icons/github-icon.tsx';
 import { useSignIn } from '#lib/hooks/use-sign-in.ts';
-import { Route as IndexRoute } from '#routes/index.tsx';
+import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
+import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 export function GithubSignInButton() {
-  const { redirect } = useSearch({ from: '/login' });
+  const { redirect } = LoginRoute.useSearch();
   const signIn = useSignIn(redirect ?? IndexRoute.to);
 
   return (

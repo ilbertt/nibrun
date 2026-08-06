@@ -1,10 +1,9 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet, redirect } from '@tanstack/react-router';
 import { AppDevtools } from '#components/app-devtools.tsx';
-import { AppShell } from '#components/app-shell.tsx';
 import { sessionQueryOptions } from '#queries/session.ts';
-import { Route as IndexRoute } from '#routes/index.tsx';
-import { Route as LoginRoute } from '#routes/login.tsx';
+import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
+import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 import '../styles.css';
 
@@ -33,9 +32,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RouteComponent() {
   return (
     <>
-      <AppShell>
-        <Outlet />
-      </AppShell>
+      <Outlet />
       <AppDevtools />
     </>
   );

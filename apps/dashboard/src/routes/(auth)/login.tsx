@@ -1,13 +1,12 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { BrandMark } from '#components/brand-mark.tsx';
 import { LoginForm } from '#components/login/login-form.tsx';
-import { Route as IndexRoute } from '#routes/index.tsx';
+import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 type LoginSearch = {
   redirect?: string;
 };
 
-export const Route = createFileRoute('/login')({
+export const Route = createFileRoute('/(auth)/login')({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
     redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
   }),
@@ -20,12 +19,5 @@ export const Route = createFileRoute('/login')({
 });
 
 function RouteComponent() {
-  return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <BrandMark />
-        <LoginForm />
-      </div>
-    </div>
-  );
+  return <LoginForm />;
 }
