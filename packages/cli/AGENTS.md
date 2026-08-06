@@ -8,7 +8,7 @@ the layout under `src/commands/` is the command tree.
   is committed. Editing an existing command's body does not need it.
 - Keep top-level imports light — `--help` loads every command it lists, so pull
   the api client and anything else heavy in from inside the handler.
-- `NIB_API_URL` and `NIB_API_KEY` are read through `@parshjs/env` as
+- `NIBRUN_API_URL` and `NIBRUN_API_KEY` are read through `@parshjs/env` as
   `ctx.context.env`, never `process.env`.
 - Arguments meant for a tenant binary are split off `process.argv` at the first
   `--` in `src/main.ts` and reach handlers as `ctx.context.tenantArgs`.
@@ -16,6 +16,6 @@ the layout under `src/commands/` is the command tree.
   and on `--yes` being absent. A command must work with neither: whatever the
   flags left open still needs a default. `ctx.print` stays the plain-output path,
   clack the interactive one — see `src/lib/ui.ts`.
-- Run it with `bun nib …`. Bun runs package scripts from the repo root, so
-  relative paths are resolved against the root rather than the caller's shell —
-  pass absolute paths until the CLI ships as a real `bin`.
+- Run it with `bun run --filter @repo/cli nib …`. A package script runs from the
+  package directory, so relative paths resolve against `packages/cli` rather than
+  the caller's shell — pass absolute ones until the CLI ships as a real `bin`.

@@ -25,8 +25,8 @@ const cli = createCli({
   context: {
     env: createEnvContext({
       vars: {
-        NIB_API_URL: { schema: z.url(), default: 'http://localhost:3000' },
-        NIB_API_KEY: { schema: z.string().min(1) },
+        NIBRUN_API_URL: { schema: z.url(), default: 'http://localhost:3000' },
+        NIBRUN_API_KEY: { schema: z.string().min(1) },
       },
     }),
     tenantArgs,

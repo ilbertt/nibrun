@@ -42,7 +42,10 @@ export const command = defineCommand('run [binary]', {
     const { createUi, isInteractive } = await import('#lib/ui.ts');
 
     const { yes, detach, ...given } = options;
-    const api = createApi({ baseUrl: context.env.NIB_API_URL, apiKey: context.env.NIB_API_KEY });
+    const api = createApi({
+      baseUrl: context.env.NIBRUN_API_URL,
+      apiKey: context.env.NIBRUN_API_KEY,
+    });
 
     // A terminal decides how this looks; `--yes` only decides whether it asks. Someone who wants
     // the defaults taken has not thereby asked for the output of a log file.
