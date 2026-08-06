@@ -17,7 +17,6 @@
       "packages/*"
     ],
     "catalog": {
-      "@sinclair/typebox": "^0.34.52",
       "@types/react": "^19.2.18",
       "@types/react-dom": "^19.2.4",
       "react": "^19.2.8",
