@@ -185,7 +185,6 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       });
 
     const reconcile = Effect.fn('Reconciler.reconcile')(function* (desired: HostDesiredState) {
-      yield* Effect.annotateCurrentSpan({ generation: desired.generation });
       const observed = yield* observe;
       const plan = planReconcile({ desired, observed });
       yield* AgentState.modify((current) => ({
@@ -210,11 +209,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       yield* applyRoutes.pipe(Effect.withSpan('reconcile.routes'));
       yield* persist.pipe(Effect.withSpan('reconcile.persist'));
 
-      yield* AgentState.modify((current) => ({
-        ...current,
-        observedGeneration: desired.generation,
-        converged: true,
-      }));
+      yield* AgentState.modify((current) => ({ ...current, converged: true }));
     });
 
     return {

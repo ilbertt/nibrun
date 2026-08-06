@@ -33,14 +33,21 @@ export const AGENT_ROUTES = {
   session: '/session',
   desiredState: '/desired-state',
   reportedState: '/reported-state',
-  // A question and its answer, on a channel of their own. Neither carries a generation: a read
-  // is not a state anything converges on, so it must not be able to disturb one.
+  // A question and its answer, on a channel of their own: a read is not a state anything
+  // converges on, so it must not be able to disturb one.
   filesystemQuery: '/filesystem-query',
   filesystemQueryResult: '/filesystem-query-result',
 } as const;
 
 /**
- * What the host already has, so the control plane can answer `unchanged` rather than resend it.
+ * Nothing, and deliberately: a host asking what it should be running has nothing to tell the
+ * control plane to get an answer.
+ *
+ * It used to carry what the host already had, so the reply could be `unchanged` instead of the
+ * state. Deciding that costs the control plane a read of everything the state is made of, which
+ * is what it was trying not to send — and the host holds the last state anyway, so it can see
+ * for itself whether the one that arrived differs. The comparison belongs to the only party that
+ * knows what it converged on.
  *
  * No `waitSeconds` yet, which is a deferral rather than a decision against long-polling. Holding
  * the request is what stops notice-latency and request rate being the same dial — `minIntervalMs`
@@ -49,21 +56,10 @@ export const AGENT_ROUTES = {
  * write that changes desired state, and not before: until then it would register a waiter nothing
  * exists to notify.
  */
-export const DesiredStateRequestSchema = Type.Object({
-  knownGeneration: Type.Integer({ minimum: 0 }),
-});
+export const DesiredStateRequestSchema = Type.Object({});
 
 export type DesiredStateRequest = typeof DesiredStateRequestSchema.static;
 
-export const DesiredStateResponseSchema = Type.Union([
-  Type.Object({
-    result: Type.Literal('changed'),
-    state: HostDesiredStateSchema,
-  }),
-  Type.Object({
-    result: Type.Literal('unchanged'),
-    generation: Type.Integer({ minimum: 0 }),
-  }),
-]);
+export const DesiredStateResponseSchema = HostDesiredStateSchema;
 
 export type DesiredStateResponse = typeof DesiredStateResponseSchema.static;

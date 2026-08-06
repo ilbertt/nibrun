@@ -11,9 +11,6 @@ import type { AgentRepositoryContract } from '#repositories/agent.repository.ts'
 import { AgentService } from '#services/agent.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 
-const GENERATION = 7;
-const STALE_GENERATION = 6;
-
 const SESSION_REQUEST = {
   versions: { agent: 'abc123', guestImage: 'linux-6.1', zerofs: 'v2', firecracker: 'v1' },
   capacity: { vcpuCount: 2, memoryMib: 8192, cacheBytes: 100_000_000_000 },
@@ -40,7 +37,6 @@ class FakeAgentRepository implements AgentRepositoryContract {
   desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
     return Promise.resolve({
       hostId,
-      generation: GENERATION,
       volumes: [],
       instances: [],
       checkpoints: [],
@@ -93,34 +89,19 @@ describe('a session is the identity a host is answered as', () => {
   });
 });
 
-describe('a host is told its state, or told it already has it', () => {
-  test('a generation it does not have brings the state down with it', async () => {
+describe('a host is told the whole of what it should be running', () => {
+  // Desired state carries no host id of its own, so a host can only ever be told about itself.
+  test('and told it about itself', async () => {
     const { service } = build();
     const hostId = 'host-1' as HostId;
 
-    const response = await service.desiredState({ hostId, knownGeneration: STALE_GENERATION });
-
-    expect(response).toEqual({
-      result: 'changed',
-      state: {
-        hostId,
-        generation: GENERATION,
-        volumes: [],
-        instances: [],
-        checkpoints: [],
-        exports: [],
-      },
+    expect(await service.desiredState({ hostId })).toEqual({
+      hostId,
+      volumes: [],
+      instances: [],
+      checkpoints: [],
+      exports: [],
     });
-  });
-
-  // The common answer, and the one that has to stay cheap: a host polls far more often than the
-  // fleet changes.
-  test('the generation it already has brings nothing but the number back', async () => {
-    const { service } = build();
-
-    expect(
-      await service.desiredState({ hostId: 'host-1' as HostId, knownGeneration: GENERATION }),
-    ).toEqual({ result: 'unchanged', generation: GENERATION });
   });
 });
 
@@ -129,7 +110,6 @@ describe('a report is read for what it says about deployments', () => {
     const { deployments, service } = build();
     const reported = {
       hostId: 'host-1' as HostId,
-      observedGeneration: GENERATION,
       instances: [],
       volumes: [],
     } as unknown as HostReportedState;

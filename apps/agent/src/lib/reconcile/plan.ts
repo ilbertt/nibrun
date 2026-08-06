@@ -98,8 +98,8 @@ export type ReconcilePlan = {
 };
 
 /**
- * A blocked teardown converges on a later pass, and nothing else would run one: only a new
- * generation triggers a reconcile, and deferred work does not change the generation.
+ * A blocked teardown converges on a later pass, and nothing else would run one: only desired
+ * state moving triggers a reconcile, and deferred work does not move it.
  */
 export function hasDeferredWork(plan: ReconcilePlan): boolean {
   return plan.volumes.some((action) => action.action === 'blocked');

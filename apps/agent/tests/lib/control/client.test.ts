@@ -18,8 +18,15 @@ import {
   recordingServer,
 } from '#tests/support/server.ts';
 
-const SOME_GENERATION = 4;
 const SESSION_TOKEN = 'session-token' as SecretString;
+
+const VALID_DESIRED_STATE = {
+  hostId: 'host-1',
+  volumes: [],
+  instances: [],
+  checkpoints: [],
+  exports: [],
+};
 const NO_REPLY = { body: undefined, status: HTTP_NO_CONTENT };
 
 const VALID_SESSION = {
@@ -47,7 +54,7 @@ function controlPlane(reply: Reply) {
 function desiredState(client: ReturnType<typeof makeControlPlaneClient>) {
   return client.fetchDesiredState({
     sessionToken: SESSION_TOKEN,
-    request: { knownGeneration: SOME_GENERATION },
+    request: {},
   });
 }
 
@@ -70,7 +77,7 @@ describe('every request identifies the protocol it speaks', () => {
     const { call, baseUrl } = await runScoped(
       Effect.gen(function* () {
         const { received, baseUrl } = yield* controlPlane({
-          body: { result: 'unchanged', generation: SOME_GENERATION },
+          body: VALID_DESIRED_STATE,
         });
         // A trailing slash is stripped, or every route would be reached one slash too deep.
         yield* desiredState(makeControlPlaneClient({ baseUrl: `${baseUrl}/` }));
@@ -113,7 +120,7 @@ describe('every request identifies the protocol it speaks', () => {
 });
 
 // The read channel is separate from desired state all the way down to the wire, and these are
-// what say so: a different route, and a reply carrying no generation for anything to act on.
+// what say so: a different route, and a reply that is not a state anything converges on.
 describe('a filesystem read travels on its own routes', () => {
   test('a poll for a read reaches the query route', async () => {
     const { call, baseUrl } = await runScoped(
@@ -173,7 +180,9 @@ describe('validation at the boundary', () => {
   });
 
   test('a mistyped field is rejected', async () => {
-    const error = await desiredStateFailure({ body: { result: 'unchanged', generation: 'four' } });
+    const error = await desiredStateFailure({
+      body: { ...VALID_DESIRED_STATE, instances: 'not a list' },
+    });
     expect(String(error)).toContain('does not match the protocol');
   });
 

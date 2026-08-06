@@ -15,10 +15,6 @@ import {
 import { StatusMap } from 'elysia';
 import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
 
-// What an agent that has never polled reports knowing. Nothing below reads the state it comes
-// back with — desired state is a database read, and how it is composed is a service's test.
-const FIRST_POLL_GENERATION = 0;
-
 // The app the standing filesystem queries are written against, until there is a table of them.
 const STANDING_QUERY_APP_ID = 'app-pocketbase' as AppId;
 
@@ -170,7 +166,7 @@ describe('nothing reaches desired state without proving what it is', () => {
   test('an unknown session is refused rather than served a default host', async () => {
     const response = await post({
       route: AGENT_ROUTES.desiredState,
-      body: { knownGeneration: FIRST_POLL_GENERATION },
+      body: {},
       sessionToken: 'not-a-session',
     });
 
@@ -180,7 +176,7 @@ describe('nothing reaches desired state without proving what it is', () => {
   test('a missing session is refused too', async () => {
     const response = await post({
       route: AGENT_ROUTES.desiredState,
-      body: { knownGeneration: FIRST_POLL_GENERATION },
+      body: {},
     });
 
     expect(response.status).toBe(StatusMap.Unauthorized);

@@ -10,15 +10,12 @@ import type {
 import { Effect, Ref } from 'effect';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
 
-const NO_GENERATION = 0;
-
 export type AgentSnapshot = {
   readonly records: ReadonlyMap<InstanceId, InstanceRecord>;
   readonly exportReports: ReadonlyMap<ExportId, ReportedExport>;
   readonly nextProbeAtMs: ReadonlyMap<InstanceId, number>;
   readonly volumeReports: readonly ReportedVolume[];
   readonly checkpointReports: readonly ReportedCheckpoint[];
-  readonly observedGeneration: number;
   readonly converged: boolean;
   /** Whether the last reconcile deferred something, and so whether re-running it would do anything. */
   readonly deferredWork: boolean;
@@ -32,7 +29,6 @@ const EMPTY: AgentSnapshot = {
   nextProbeAtMs: new Map(),
   volumeReports: [],
   checkpointReports: [],
-  observedGeneration: NO_GENERATION,
   converged: false,
   deferredWork: false,
   isolated: false,

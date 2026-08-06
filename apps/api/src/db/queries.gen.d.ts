@@ -37,11 +37,6 @@ export interface ISelectDesiredHostnamesResult {
     kind: import("@repo/protocol").AppHostnameKind;
 }
 
-/** Result of query `SelectDesiredStateGeneration`. */
-export interface ISelectDesiredStateGenerationResult {
-    generation: string | null;
-}
-
 /** Result of query `SelectAppOwnership`. */
 export interface ISelectAppOwnershipResult {
     id: import("@repo/protocol").AppId;
@@ -405,7 +400,6 @@ export interface ISelectHealthPingResult {
 export interface Queries {
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredHostnames: ISelectDesiredHostnamesResult;
-    SelectDesiredStateGeneration: ISelectDesiredStateGenerationResult;
     SelectAppOwnership: ISelectAppOwnershipResult;
     InsertApp: IInsertAppResult;
     InsertAppConfig: IInsertAppConfigResult;

@@ -31,7 +31,6 @@ export function toReportedInstance(record: InstanceRecord): ReportedInstance {
 
 export function buildReportedState({
   hostId,
-  observedGeneration,
   reportedAt,
   state,
   capacity,
@@ -43,7 +42,6 @@ export function buildReportedState({
   exports,
 }: {
   hostId: HostId;
-  observedGeneration: number;
   reportedAt: Timestamp;
   state: HostState;
   capacity: HostCapacity;
@@ -56,7 +54,6 @@ export function buildReportedState({
 }): HostReportedState {
   return {
     hostId,
-    observedGeneration,
     reportedAt,
     state,
     capacity,

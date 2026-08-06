@@ -37,10 +37,6 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
    * someone asked.
    */
   async desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
-    // Read before the rows below it. A change landing in between then costs one redundant poll,
-    // where the other order would hand a host old rows under a number saying it was current —
-    // and it would believe it had converged until something else changed.
-    const generation = await this.generation();
     const deployments = await this.sql.SelectDesiredDeployments`
       SELECT id, app_id, state,
              digest, size_bytes, object_key, original_file_name,
@@ -60,18 +56,10 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
 
     return {
       hostId,
-      generation,
       volumes: deployments.map(toDesiredVolume),
       instances: deployments.map((row) => toDesiredInstance({ row, hostnames })),
       checkpoints: [],
       exports: [],
     };
-  }
-
-  private async generation(): Promise<number> {
-    const [row] = await this.sql.SelectDesiredStateGeneration`
-      SELECT generation FROM nibrun.desired_state
-    `;
-    return Number(row?.generation ?? 0);
   }
 }

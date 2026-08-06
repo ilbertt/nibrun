@@ -4,31 +4,34 @@ import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
 import { decode } from '#lib/protocol.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
-const FIRST_GENERATION = 0;
-
 /**
  * The last desired state this host was given, kept on disk so an agent restart during a
  * control-plane outage is a non-event: the host still knows what it is supposed to be running.
+ *
+ * Holding it is also what decides whether a poll is news. The control plane sends the whole of
+ * it every time and says nothing about whether it moved — it would have to read all of it to
+ * know, which is the work it would be saving — so the comparison lives here, with the only party
+ * that knows what it converged on.
  */
 export class DesiredStateCache extends Effect.Service<DesiredStateCache>()('DesiredStateCache', {
   effect: Effect.gen(function* () {
     const config = yield* AgentConfig;
-    const generation = yield* Ref.make(FIRST_GENERATION);
     const latest = yield* Ref.make(Option.none<HostDesiredState>());
 
-    const remember = (state: HostDesiredState) =>
-      Ref.set(generation, state.generation).pipe(
-        Effect.andThen(Ref.set(latest, Option.some(state))),
-      );
+    const remember = (state: HostDesiredState) => Ref.set(latest, Option.some(state));
 
     return {
-      knownGeneration: Ref.get(generation),
       latest: Ref.get(latest),
 
+      /** Whether this differs from what the host holds, and so whether it is worth converging on. */
       accept: Effect.fn('DesiredStateCache.accept')(function* (state: HostDesiredState) {
-        yield* Effect.annotateCurrentSpan({ generation: state.generation });
+        const held = yield* Ref.get(latest);
+        if (Option.isSome(held) && Bun.deepEquals(held.value, state)) {
+          return false;
+        }
         yield* writeJsonFile({ path: config.desiredStateFile, value: state });
         yield* remember(state);
+        return true;
       }),
 
       restore: Effect.gen(function* () {

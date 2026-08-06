@@ -31,7 +31,6 @@ import {
 } from '#tests/support/fixtures.ts';
 
 const DIGEST_HEX_LENGTH = 64;
-const OBSERVED_GENERATION = 7;
 const BUNDLE_SIZE_BYTES = 1_782_579;
 const HOST_VCPUS = 4;
 const HOST_MEMORY_MIB = 8_192;
@@ -94,7 +93,6 @@ describe('the assembled report satisfies the protocol', () => {
   test('a full report validates against the schema it will be sent as', () => {
     const report = buildReportedState({
       hostId: HOST_ID,
-      observedGeneration: OBSERVED_GENERATION,
       reportedAt: OBSERVED_AT,
       state: 'ready',
       capacity: HOST_CAPACITY,

@@ -2,7 +2,7 @@ import {
   type AgentSession,
   type AgentSessionRequest,
   DEFAULT_AGENT_POLL_SETTINGS,
-  type DesiredStateResponse,
+  type HostDesiredState,
   type HostId,
   type HostReportedState,
   type SecretString,
@@ -74,21 +74,8 @@ export class AgentService extends Service {
     return hostId;
   }
 
-  /**
-   * A host is told its state or told it already has it. Which of the two is a question about
-   * desired state rather than about HTTP, so it is answered here and the route reports it.
-   */
-  async desiredState({
-    hostId,
-    knownGeneration,
-  }: {
-    hostId: HostId;
-    knownGeneration: number;
-  }): Promise<DesiredStateResponse> {
-    const state = await this.agentRepo.desiredState({ hostId });
-    return knownGeneration === state.generation
-      ? { result: 'unchanged', generation: state.generation }
-      : { result: 'changed', state };
+  desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+    return this.agentRepo.desiredState({ hostId });
   }
 
   /**
@@ -100,7 +87,6 @@ export class AgentService extends Service {
     this.logger.info('host reported', {
       hostId: reported.hostId,
       state: reported.state,
-      observedGeneration: reported.observedGeneration,
       instances: reported.instances.length,
       volumes: reported.volumes.length,
     });

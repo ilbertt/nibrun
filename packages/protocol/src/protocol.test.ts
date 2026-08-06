@@ -48,7 +48,6 @@ const hexDigest = (length: number = SHA256_HEX_LENGTH) => 'a'.repeat(length);
 
 const desiredState = (): HostDesiredState => ({
   hostId: 'host_1' as HostId,
-  generation: 7,
   volumes: [
     {
       volumeId: 'vol_1' as VolumeId,
@@ -296,31 +295,24 @@ describe('version skew', () => {
   });
 
   test('a missing required field is rejected', () => {
-    const { generation: _generation, ...withoutGeneration } = desiredState();
-    expect(() =>
-      parseMessage({ schema: HostDesiredStateSchema, value: withoutGeneration }),
-    ).toThrow(ProtocolValidationError);
+    const { hostId: _hostId, ...withoutHostId } = desiredState();
+    expect(() => parseMessage({ schema: HostDesiredStateSchema, value: withoutHostId })).toThrow(
+      ProtocolValidationError,
+    );
   });
 
-  test('the desired-state response discriminates on its result', () => {
+  // The whole of it, with nothing wrapped around it saying whether it moved: a host compares it
+  // with what it holds, so there is no second shape the reply can take.
+  test('the desired-state reply is the state itself', () => {
+    expect(isValidMessage({ schema: DesiredStateResponseSchema, value: desiredState() })).toBe(
+      true,
+    );
     expect(
       isValidMessage({
         schema: DesiredStateResponseSchema,
         value: { result: 'unchanged', generation: 7 },
       }),
-    ).toBe(true);
-    expect(
-      isValidMessage({
-        schema: DesiredStateResponseSchema,
-        value: { result: 'changed', generation: 7 },
-      }),
     ).toBe(false);
-    expect(
-      isValidMessage({
-        schema: DesiredStateResponseSchema,
-        value: { result: 'changed', state: desiredState() },
-      }),
-    ).toBe(true);
   });
 });
 
@@ -336,7 +328,7 @@ describe('secrets', () => {
       schema: HostDesiredStateSchema,
       value: desiredState(),
     }) as HostDesiredState;
-    expect(redacted.generation).toBe(desiredState().generation);
+    expect(redacted.hostId).toBe(desiredState().hostId);
     expect(redacted.instances[0]?.hostnames[0]?.hostname).toBe('app-1.nibrun.app' as Hostname);
   });
 

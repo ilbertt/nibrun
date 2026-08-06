@@ -105,7 +105,6 @@ export function desiredExport(overrides: Partial<DesiredExport> = {}): DesiredEx
 export function desiredState(overrides: Partial<HostDesiredState> = {}): HostDesiredState {
   return {
     hostId: HOST_ID,
-    generation: 1,
     volumes: [],
     instances: [],
     checkpoints: [],

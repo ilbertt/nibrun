@@ -17,7 +17,7 @@ export const reconcileSafely = (desired: HostDesiredState) =>
       .pipe(
         Effect.catchAllCause((cause) =>
           Effect.logError('reconcile failed', cause).pipe(
-            Effect.annotateLogs({ generation: desired.generation }),
+            Effect.annotateLogs({ hostId: desired.hostId }),
           ),
         ),
       );
@@ -36,17 +36,16 @@ export const pollLoop = Effect.gen(function* () {
 
   const once = Effect.gen(function* () {
     const session = yield* sessions.current;
-    const response = yield* control.fetchDesiredState({
+    const desired = yield* control.fetchDesiredState({
       sessionToken: session.sessionToken,
-      request: { knownGeneration: yield* cache.knownGeneration },
+      request: {},
     });
 
-    if (response.result === 'changed') {
-      yield* cache.accept(response.state);
-      yield* reconcileSafely(response.state);
+    if (yield* cache.accept(desired)) {
+      yield* reconcileSafely(desired);
     } else {
-      // Only a new generation re-runs a reconcile, and work the last one deferred does not change
-      // it — so a volume waiting on an instance to stop would otherwise never be carried.
+      // Only desired state moving re-runs a reconcile, and work the last one deferred does not
+      // move it — so a volume waiting on an instance to stop would otherwise never be carried.
       const latest = yield* cache.latest;
       if ((yield* AgentState.snapshot).deferredWork && Option.isSome(latest)) {
         yield* reconcileSafely(latest.value);

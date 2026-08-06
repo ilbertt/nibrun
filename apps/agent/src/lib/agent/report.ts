@@ -27,7 +27,6 @@ const report = Effect.gen(function* () {
     sessionToken: session.sessionToken,
     report: buildReportedState({
       hostId: session.hostId,
-      observedGeneration: current.observedGeneration,
       reportedAt: yield* nowTimestamp,
       state: current.converged ? 'ready' : 'registering',
       capacity,
