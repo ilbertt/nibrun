@@ -1,4 +1,4 @@
-import type { DesiredInstance, InstanceId, InstanceState } from '@repo/protocol';
+import type { AppId, DesiredInstance, InstanceState } from '@repo/protocol';
 import { Clock, Effect } from 'effect';
 import { isReadyToRetry, nextAttemptWindow } from '#lib/backoff.ts';
 import { nowTimestamp } from '#lib/clock.ts';
@@ -36,35 +36,35 @@ const flushEverything = Effect.gen(function* () {
 });
 
 export const stopInstance = Effect.fn('stopInstance')(function* ({
-  instanceId,
+  appId,
   reason,
 }: {
-  instanceId: InstanceId;
+  appId: AppId;
   reason: string;
 }) {
-  yield* Effect.annotateCurrentSpan({ instanceId, reason });
+  yield* Effect.annotateCurrentSpan({ appId, reason });
   const vms = yield* VmManager;
-  yield* setState({ instanceId, state: 'stopping', stopRequested: true });
+  yield* setState({ appId, state: 'stopping', stopRequested: true });
   yield* flushEverything;
-  yield* vms.stop(instanceId).pipe(
+  yield* vms.stop(appId).pipe(
     Effect.andThen(Effect.logInfo('instance stopped')),
     Effect.catchAll((error) => Effect.logError('instance stop failed', error)),
-    Effect.annotateLogs({ instanceId, reason }),
+    Effect.annotateLogs({ appId, reason }),
   );
-  yield* setState({ instanceId, state: 'stopped' });
+  yield* setState({ appId, state: 'stopped' });
 });
 
 const setState = ({
-  instanceId,
+  appId,
   state,
   stopRequested,
 }: {
-  instanceId: InstanceId;
+  appId: AppId;
   state: InstanceState;
   stopRequested?: boolean;
 }) =>
   AgentState.updateRecord({
-    instanceId,
+    appId,
     change: (record) => ({
       ...record,
       state,
@@ -92,11 +92,11 @@ const isStartable = ({
 };
 
 export const startInstance = Effect.fn('startInstance')(function* (desired: DesiredInstance) {
-  yield* Effect.annotateCurrentSpan({ instanceId: desired.instanceId, appId: desired.appId });
+  yield* Effect.annotateCurrentSpan({ appId: desired.appId });
   const allocator = yield* SlotAllocator;
   const vms = yield* VmManager;
   const nowMs = yield* Clock.currentTimeMillis;
-  const existing = (yield* AgentState.snapshot).records.get(desired.instanceId);
+  const existing = (yield* AgentState.snapshot).records.get(desired.appId);
   if (!isStartable({ existing, nowMs, desired })) {
     return;
   }
@@ -105,7 +105,6 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
   const attempted: InstanceRecord = {
     ...(existing ??
       newInstanceRecord({
-        instanceId: desired.instanceId,
         appId: desired.appId,
         deploymentId: desired.deploymentId,
         volumeId: desired.volumeId,
@@ -142,12 +141,12 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
         });
         yield* AgentState.modify((current) => {
           const nextProbeAtMs = new Map(current.nextProbeAtMs);
-          nextProbeAtMs.delete(desired.instanceId);
+          nextProbeAtMs.delete(desired.appId);
           return { ...current, nextProbeAtMs };
         });
         yield* Effect.logInfo('instance started').pipe(
           Effect.annotateLogs({
-            instanceId: desired.instanceId,
+            appId: desired.appId,
             hostPort: attempted.hostPort,
             guestIpv4: attempted.guestIpv4,
           }),
@@ -162,7 +161,7 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
         });
         yield* Effect.logError('instance start failed', error).pipe(
           Effect.annotateLogs({
-            instanceId: desired.instanceId,
+            appId: desired.appId,
             attempt: attempted.startAttempts.attempts,
           }),
         );
@@ -180,7 +179,7 @@ const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
     yield* AgentState.modify((current) => ({
       ...current,
       nextProbeAtMs: new Map(current.nextProbeAtMs).set(
-        record.instanceId,
+        record.appId,
         nowMs + record.healthCheck.intervalMs,
       ),
     }));
@@ -202,8 +201,8 @@ export const refreshStates = Effect.gen(function* () {
     [...current.records.values()],
     (record) =>
       Effect.gen(function* () {
-        const status = statuses.get(record.instanceId) ?? UNKNOWN_UNIT;
-        const due = nowMs >= (current.nextProbeAtMs.get(record.instanceId) ?? 0);
+        const status = statuses.get(record.appId) ?? UNKNOWN_UNIT;
+        const due = nowMs >= (current.nextProbeAtMs.get(record.appId) ?? 0);
         const health = status.active && due ? yield* probed({ record, nowMs }) : record.health;
 
         const state = evaluateInstanceState({
@@ -228,7 +227,7 @@ export const refreshStates = Effect.gen(function* () {
         if (changed) {
           yield* Effect.logInfo('instance state changed').pipe(
             Effect.annotateLogs({
-              instanceId: record.instanceId,
+              appId: record.appId,
               from: record.state,
               to: state,
             }),

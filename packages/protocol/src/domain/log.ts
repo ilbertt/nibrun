@@ -1,10 +1,5 @@
 import { Type } from '@sinclair/typebox';
-import {
-  AppIdSchema,
-  DeploymentIdSchema,
-  HostIdSchema,
-  InstanceIdSchema,
-} from '#domain/identifiers.ts';
+import { AppIdSchema, DeploymentIdSchema, HostIdSchema } from '#domain/identifiers.ts';
 import { stringEnum } from '#lib/string-enum.ts';
 import { TimestampSchema } from '#lib/wire.ts';
 
@@ -54,7 +49,6 @@ export const TenantLogRecordSchema = Type.Object({
   SOURCE: Type.Literal('tenant'),
   appId: AppIdSchema,
   deploymentId: DeploymentIdSchema,
-  instanceId: InstanceIdSchema,
   stream: TenantLogStreamSchema,
   // Recreated with the host receiver. A gap in `sequence` within one `sourceId` means bounded
   // buffering dropped records; a new `sourceId` means the receiver itself restarted.

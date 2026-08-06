@@ -8,14 +8,13 @@ import {
   type GuestPort,
   type HostPort,
   type HostReportedState,
-  type InstanceId,
   type InstanceState,
   type Ipv4Address,
   type ReportedInstance,
   type Timestamp,
 } from '@repo/protocol';
 import { type PublicAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
-import { STARTUP_DEADLINE_MS } from '#lib/deployment-lifecycle.ts';
+import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
   CreateDeploymentInput,
@@ -43,7 +42,6 @@ const OWNER_SCOPED_METHODS = 4;
 const CREATED_AT = new Date('2026-08-04T10:00:00.000Z');
 const ACTIVATED_AT = new Date('2026-08-04T11:30:00.000Z');
 const HEALTHY_AT = new Date('2026-08-04T11:31:00.000Z');
-const INSTANCE_ID = 'instance-1' as InstanceId;
 const HOST_PORT = 30_001 as HostPort;
 const GUEST_IPV4 = '10.0.0.2' as Ipv4Address;
 const RESTART_COUNT = 2;
@@ -157,7 +155,7 @@ function instance({
   ...overrides
 }: Partial<ReportedInstance> & { state: InstanceState }): ReportedInstance {
   return {
-    instanceId: INSTANCE_ID,
+    appId: APP_ID,
     deploymentId: DEPLOYMENT_ID,
     state,
     restartCount: 0,

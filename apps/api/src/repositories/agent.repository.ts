@@ -1,5 +1,9 @@
 import type { HostDesiredState, HostId, SecretString } from '@repo/protocol';
-import { hostnamesByApp, toDesiredInstance, toDesiredVolume } from '#lib/desired-state.ts';
+import {
+  hostnamesByApp,
+  toDesiredInstance,
+  toDesiredVolume,
+} from '#lib/deployments/desired-state.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export abstract class AgentRepositoryContract {

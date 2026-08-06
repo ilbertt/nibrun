@@ -3,11 +3,11 @@ import { CheckpointStateSchema } from '#domain/checkpoint.ts';
 import { ExportStateSchema } from '#domain/export.ts';
 import { HostCapacitySchema, HostStateSchema, HostVersionsSchema } from '#domain/host.ts';
 import {
+  AppIdSchema,
   CheckpointIdSchema,
   DeploymentIdSchema,
   ExportIdSchema,
   HostIdSchema,
-  InstanceIdSchema,
   VolumeIdSchema,
 } from '#domain/identifiers.ts';
 import { InstanceStateSchema } from '#domain/instance.ts';
@@ -29,7 +29,7 @@ const MAX_DEVICE_PATH_LENGTH = 256;
 const MessageSchema = Type.String({ maxLength: MAX_MESSAGE_LENGTH });
 
 export const ReportedInstanceSchema = Type.Object({
-  instanceId: InstanceIdSchema,
+  appId: AppIdSchema,
   deploymentId: DeploymentIdSchema,
   state: InstanceStateSchema,
   // Reported even though routing is local to the host: the control plane needs it to debug a

@@ -15,7 +15,7 @@ import type { InstanceRecord } from '#lib/report/instance-record.ts';
 /** Optional fields are omitted rather than sent empty: absent is the one convention for unknown. */
 export function toReportedInstance(record: InstanceRecord): ReportedInstance {
   return {
-    instanceId: record.instanceId,
+    appId: record.appId,
     deploymentId: record.deploymentId,
     state: record.state,
     hostPort: record.hostPort,

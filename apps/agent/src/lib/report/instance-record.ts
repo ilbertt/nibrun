@@ -5,7 +5,6 @@ import type {
   GuestPort,
   HealthCheck,
   HostPort,
-  InstanceId,
   InstanceResources,
   InstanceState,
   Ipv4Address,
@@ -24,7 +23,6 @@ const NO_ATTEMPTS = 0;
  * read back is discarded rather than trusted. Routing is rendered straight from these.
  */
 export type InstanceRecord = {
-  readonly instanceId: InstanceId;
   readonly appId: AppId;
   readonly deploymentId: DeploymentId;
   readonly volumeId: VolumeId;
@@ -59,7 +57,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const REQUIRED_STRING_FIELDS = [
-  'instanceId',
+  'appId',
   'appId',
   'deploymentId',
   'volumeId',

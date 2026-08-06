@@ -1,7 +1,6 @@
 import type {
   AppId,
   ExportId,
-  InstanceId,
   ReportedCheckpoint,
   ReportedExport,
   ReportedVolume,
@@ -11,9 +10,9 @@ import { Effect, Ref } from 'effect';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
 
 export type AgentSnapshot = {
-  readonly records: ReadonlyMap<InstanceId, InstanceRecord>;
+  readonly records: ReadonlyMap<AppId, InstanceRecord>;
   readonly exportReports: ReadonlyMap<ExportId, ReportedExport>;
-  readonly nextProbeAtMs: ReadonlyMap<InstanceId, number>;
+  readonly nextProbeAtMs: ReadonlyMap<AppId, number>;
   readonly volumeReports: readonly ReportedVolume[];
   readonly checkpointReports: readonly ReportedCheckpoint[];
   readonly converged: boolean;
@@ -52,27 +51,27 @@ export class AgentState extends Effect.Service<AgentState>()('AgentState', {
       putRecord: (record: InstanceRecord) =>
         modify((current) => ({
           ...current,
-          records: new Map(current.records).set(record.instanceId, record),
+          records: new Map(current.records).set(record.appId, record),
         })),
 
       updateRecord: ({
-        instanceId,
+        appId,
         change,
       }: {
-        instanceId: InstanceId;
+        appId: AppId;
         change: (record: InstanceRecord) => InstanceRecord;
       }) =>
         modify((current) => {
-          const record = current.records.get(instanceId);
+          const record = current.records.get(appId);
           return record
-            ? { ...current, records: new Map(current.records).set(instanceId, change(record)) }
+            ? { ...current, records: new Map(current.records).set(appId, change(record)) }
             : current;
         }),
 
-      dropRecord: (instanceId: InstanceId) =>
+      dropRecord: (appId: AppId) =>
         modify((current) => {
           const remaining = new Map(current.records);
-          remaining.delete(instanceId);
+          remaining.delete(appId);
           return { ...current, records: remaining };
         }),
 

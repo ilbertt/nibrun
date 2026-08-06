@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { DeploymentId } from '@repo/protocol';
 import { hasDeferredWork, planReconcile } from '#lib/reconcile/plan.ts';
 import {
+  APP_ID,
   CHECKPOINT_ID,
   desiredCheckpoint,
   desiredExport,
@@ -9,7 +10,6 @@ import {
   desiredState,
   desiredVolume,
   EXPORT_ID,
-  INSTANCE_ID,
   observedInstance,
   observedState,
   observedVolume,
@@ -33,9 +33,7 @@ describe('instances are authoritative', () => {
       desired: desiredState(),
       observed: observedState({ instances: [observedInstance()] }),
     });
-    expect(plan.instances).toEqual([
-      { action: 'stop', instanceId: INSTANCE_ID, reason: 'not-desired' },
-    ]);
+    expect(plan.instances).toEqual([{ action: 'stop', appId: APP_ID, reason: 'not-desired' }]);
   });
 
   test('a stopped instance the control plane does not mention is forgotten', () => {
@@ -44,7 +42,7 @@ describe('instances are authoritative', () => {
       observed: observedState({
         instances: [
           {
-            instanceId: INSTANCE_ID,
+            appId: APP_ID,
             present: true,
             running: false,
             exited: true,
@@ -52,7 +50,7 @@ describe('instances are authoritative', () => {
         ],
       }),
     });
-    expect(plan.instances).toEqual([{ action: 'forget', instanceId: INSTANCE_ID }]);
+    expect(plan.instances).toEqual([{ action: 'forget', appId: APP_ID }]);
   });
 
   test('a deployment change replaces rather than restarts', () => {
@@ -69,7 +67,7 @@ describe('instances are authoritative', () => {
     const plan = planReconcile({
       desired: desiredState({ instances: [desiredInstance()] }),
       observed: observedState({
-        instances: [{ instanceId: INSTANCE_ID, present: true, running: true, exited: false }],
+        instances: [{ appId: APP_ID, present: true, running: true, exited: false }],
       }),
     });
     expect(plan.instances[0]?.action).toBe('replace');
@@ -82,7 +80,7 @@ describe('instances are authoritative', () => {
         instances: [observedInstance({ running: false, exited: true })],
       }),
     });
-    expect(plan.instances).toEqual([{ action: 'none', instanceId: INSTANCE_ID }]);
+    expect(plan.instances).toEqual([{ action: 'none', appId: APP_ID }]);
   });
 
   // The shape a reboot produces: the agent's records survive on disk, so the instance is still
@@ -104,12 +102,12 @@ describe('instances are authoritative', () => {
     const running = planReconcile({
       desired: desiredState({ instances: [stopped] }),
       observed: observedState({
-        instances: [{ instanceId: INSTANCE_ID, present: true, running: true, exited: false }],
+        instances: [{ appId: APP_ID, present: true, running: true, exited: false }],
       }),
     });
     expect(running.instances[0]).toEqual({
       action: 'stop',
-      instanceId: INSTANCE_ID,
+      appId: APP_ID,
       reason: 'desired-stopped',
     });
 
@@ -117,7 +115,7 @@ describe('instances are authoritative', () => {
       desired: desiredState({ instances: [stopped] }),
       observed: observedState(),
     });
-    expect(already.instances).toEqual([{ action: 'none', instanceId: INSTANCE_ID }]);
+    expect(already.instances).toEqual([{ action: 'none', appId: APP_ID }]);
   });
 });
 
@@ -151,7 +149,7 @@ describe('volumes are not authoritative', () => {
     expect(plan.volumes[0]).toEqual({
       action: 'blocked',
       desired: absent,
-      blockedBy: [INSTANCE_ID],
+      blockedBy: [APP_ID],
     });
     // Deleting an app takes two passes — stop the instance, then tear the volume down — and
     // only a generation change runs a pass. Without this the second one never comes.

@@ -1,4 +1,4 @@
-import { type InstanceId, InstanceIdSchema, isValidMessage } from '@repo/protocol';
+import { type AppId, AppIdSchema, isValidMessage } from '@repo/protocol';
 import { Effect } from 'effect';
 import {
   parsePropertyBlocks,
@@ -18,15 +18,14 @@ export const VM_UNIT_TEMPLATE = 'nibrun-vm@';
 const UNIT_SUFFIX = '.service';
 const UNIT_PATTERN = `${VM_UNIT_TEMPLATE}*${UNIT_SUFFIX}`;
 
-export const vmUnitName = (instanceId: InstanceId) =>
-  `${VM_UNIT_TEMPLATE}${instanceId}${UNIT_SUFFIX}`;
+export const vmUnitName = (appId: AppId) => `${VM_UNIT_TEMPLATE}${appId}${UNIT_SUFFIX}`;
 
-export function instanceIdFromUnit(unitName: string): InstanceId | undefined {
+export function appIdFromUnit(unitName: string): AppId | undefined {
   if (!unitName.startsWith(VM_UNIT_TEMPLATE) || !unitName.endsWith(UNIT_SUFFIX)) {
     return undefined;
   }
   const value = unitName.slice(VM_UNIT_TEMPLATE.length, -UNIT_SUFFIX.length);
-  return isValidMessage({ schema: InstanceIdSchema, value }) ? (value as InstanceId) : undefined;
+  return isValidMessage({ schema: AppIdSchema, value }) ? (value as AppId) : undefined;
 }
 
 export function parseUnitNames(output: string): string[] {
@@ -37,7 +36,7 @@ export function parseUnitNames(output: string): string[] {
     .filter((name) => name.endsWith(UNIT_SUFFIX));
 }
 
-export const listInstanceIds = stdoutOf({
+export const listAppIds = stdoutOf({
   command: [
     SYSTEMCTL,
     'list-units',
@@ -51,44 +50,42 @@ export const listInstanceIds = stdoutOf({
 }).pipe(
   Effect.map((output) =>
     parseUnitNames(output)
-      .map(instanceIdFromUnit)
-      .filter((id): id is InstanceId => id !== undefined),
+      .map(appIdFromUnit)
+      .filter((id): id is AppId => id !== undefined),
   ),
-  Effect.withSpan('systemd.listInstanceIds'),
+  Effect.withSpan('systemd.listAppIds'),
 );
 
-export const statuses = Effect.fn('systemd.statuses')(function* (
-  instanceIds: readonly InstanceId[],
-) {
-  if (instanceIds.length === 0) {
-    return new Map<InstanceId, UnitStatus>();
+export const statuses = Effect.fn('systemd.statuses')(function* (appIds: readonly AppId[]) {
+  if (appIds.length === 0) {
+    return new Map<AppId, UnitStatus>();
   }
   const result = yield* run({
     command: [
       SYSTEMCTL,
       'show',
-      ...instanceIds.map(vmUnitName),
+      ...appIds.map(vmUnitName),
       `--property=${SHOWN_PROPERTIES.join(',')}`,
     ],
   });
   const blocks = parsePropertyBlocks(result.stdout);
   return new Map(
-    [...instanceIds.entries()].map(([index, instanceId]) => [
-      instanceId,
+    [...appIds.entries()].map(([index, appId]) => [
+      appId,
       unitStatusFrom(blocks[index] ?? { LoadState: 'not-found', ActiveState: 'inactive' }),
     ]),
   );
 });
 
-export const start = Effect.fn('systemd.start')((instanceId: InstanceId) =>
-  stdoutOf({ command: [SYSTEMCTL, 'start', vmUnitName(instanceId)] }),
+export const start = Effect.fn('systemd.start')((appId: AppId) =>
+  stdoutOf({ command: [SYSTEMCTL, 'start', vmUnitName(appId)] }),
 );
 
-export const stop = Effect.fn('systemd.stop')((instanceId: InstanceId) =>
-  stdoutOf({ command: [SYSTEMCTL, 'stop', vmUnitName(instanceId)] }),
+export const stop = Effect.fn('systemd.stop')((appId: AppId) =>
+  stdoutOf({ command: [SYSTEMCTL, 'stop', vmUnitName(appId)] }),
 );
 
 /** An exited template instance stays loaded and failed until reset, and would linger in every enumeration. */
-export const forget = Effect.fn('systemd.forget')((instanceId: InstanceId) =>
-  run({ command: [SYSTEMCTL, 'reset-failed', vmUnitName(instanceId)] }),
+export const forget = Effect.fn('systemd.forget')((appId: AppId) =>
+  run({ command: [SYSTEMCTL, 'reset-failed', vmUnitName(appId)] }),
 );

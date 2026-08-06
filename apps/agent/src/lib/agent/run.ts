@@ -22,16 +22,15 @@ const restoreLogReceivers = Effect.gen(function* () {
       receiver
         .attach({
           source: {
-            instanceId: record.instanceId,
             appId: record.appId,
             deploymentId: record.deploymentId,
           },
-          socketPath: tenantLogSocketPath({ workingDir: vms.workingDir(record.instanceId) }),
+          socketPath: tenantLogSocketPath({ workingDir: vms.workingDir(record.appId) }),
         })
         .pipe(
           Effect.catchAll((error) =>
             Effect.logWarning('tenant log receiver restore failed', error).pipe(
-              Effect.annotateLogs({ instanceId: record.instanceId }),
+              Effect.annotateLogs({ appId: record.appId }),
             ),
           ),
         ),

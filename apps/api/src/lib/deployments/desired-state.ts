@@ -4,7 +4,6 @@ import type {
   AppId,
   DesiredInstance,
   DesiredVolume,
-  InstanceId,
   VolumeId,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.d.ts';
@@ -15,18 +14,9 @@ export type DesiredDeploymentRow = Queries['SelectDesiredDeployments'];
 export type DesiredHostnameRow = Queries['SelectDesiredHostnames'];
 
 /**
- * An app runs one microVM over one filesystem, so both are the app rather than rows of their own.
- *
- * Naming the instance after the app is what makes a redeploy a `replace` on the host: the agent
- * plans one when `instanceId` holds still and `deploymentId` moves, and a replace stops the old
- * microVM before starting the new one. Named after the deployment instead, a redeploy would be a
- * start and a stop on two different ids, and the host would boot the second while the first
- * still held the volume and the port.
+ * The app's own id, because an app has one filesystem and the two never differ. Kept a type apart
+ * so an app holding a second one later is a schema change rather than a wire change.
  */
-function instanceIdOf(appId: AppId): InstanceId {
-  return appId as string as InstanceId;
-}
-
 function volumeIdOf(appId: AppId): VolumeId {
   return appId as string as VolumeId;
 }
@@ -45,6 +35,13 @@ export function toDesiredVolume(row: DesiredDeploymentRow): DesiredVolume {
   };
 }
 
+/**
+ * An app runs one microVM, so the instance is the app: the agent plans a `replace` when `appId`
+ * holds still and `deploymentId` moves, and a replace stops the old microVM before starting the
+ * new one. Were a microVM named after its deployment instead, a redeploy would be a start and a
+ * stop under two different names, and the host would boot the second while the first still held
+ * the volume and the port.
+ */
 export function toDesiredInstance({
   row,
   hostnames,
@@ -53,7 +50,6 @@ export function toDesiredInstance({
   hostnames: Map<AppId, AppHostname[]>;
 }): DesiredInstance {
   return {
-    instanceId: instanceIdOf(row.app_id),
     appId: row.app_id,
     deploymentId: row.id,
     volumeId: volumeIdOf(row.app_id),

@@ -6,7 +6,6 @@ import {
   DeploymentIdSchema,
   ExportIdSchema,
   HostIdSchema,
-  InstanceIdSchema,
   VolumeIdSchema,
 } from '#domain/identifiers.ts';
 import { stringEnum } from '#lib/string-enum.ts';
@@ -48,7 +47,6 @@ export const DesiredArtifactSchema = Type.Object({
 export type DesiredArtifact = typeof DesiredArtifactSchema.static;
 
 export const DesiredInstanceSchema = Type.Object({
-  instanceId: InstanceIdSchema,
   appId: AppIdSchema,
   deploymentId: DeploymentIdSchema,
   volumeId: VolumeIdSchema,

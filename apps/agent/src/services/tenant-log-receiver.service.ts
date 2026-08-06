@@ -1,6 +1,6 @@
 import { FileSystem, Path, type Socket } from '@effect/platform';
 import { BunSocketServer } from '@effect/platform-bun';
-import type { InstanceId, TenantLogStream } from '@repo/protocol';
+import type { AppId, TenantLogStream } from '@repo/protocol';
 import { Deferred, Effect, Either, Exit, Ref, Scope } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { decodeFrames, EMPTY_BUFFER } from '#lib/logs/guest-protocol.ts';
@@ -28,7 +28,7 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
     const logs = yield* TenantLogQueue;
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const attachments = yield* Ref.make(new Map<InstanceId, Attachment>());
+    const attachments = yield* Ref.make(new Map<AppId, Attachment>());
     const dropped = yield* Ref.make(0);
 
     const countDrop = Effect.gen(function* () {
@@ -129,15 +129,15 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
         );
       });
 
-    const detach = Effect.fn('TenantLogReceiver.detach')(function* (instanceId: InstanceId) {
-      yield* Effect.annotateCurrentSpan({ instanceId });
-      const attachment = (yield* Ref.get(attachments)).get(instanceId);
+    const detach = Effect.fn('TenantLogReceiver.detach')(function* (appId: AppId) {
+      yield* Effect.annotateCurrentSpan({ appId });
+      const attachment = (yield* Ref.get(attachments)).get(appId);
       if (!attachment) {
         return;
       }
       yield* Ref.update(attachments, (current) => {
         const next = new Map(current);
-        next.delete(instanceId);
+        next.delete(appId);
         return next;
       });
       yield* Scope.close(attachment.scope, Exit.void);
@@ -151,15 +151,15 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
       source: TenantLogSource;
       socketPath: string;
     }) {
-      yield* Effect.annotateCurrentSpan({ instanceId: source.instanceId, appId: source.appId });
+      yield* Effect.annotateCurrentSpan({ appId: source.appId });
       const current = yield* Ref.get(attachments);
-      const existing = current.get(source.instanceId);
+      const existing = current.get(source.appId);
       if (existing?.socketPath === socketPath) {
         return yield* Ref.set(existing.source, source);
       }
-      for (const [instanceId, attached] of current) {
-        if (instanceId === source.instanceId || attached.socketPath === socketPath) {
-          yield* detach(instanceId);
+      for (const [appId, attached] of current) {
+        if (appId === source.appId || attached.socketPath === socketPath) {
+          yield* detach(appId);
         }
       }
 
@@ -177,7 +177,7 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
       yield* Scope.extend(serve({ attachment }), scope).pipe(
         Effect.onError(() => Scope.close(scope, Exit.void)),
       );
-      yield* Ref.update(attachments, (all) => new Map(all).set(source.instanceId, attachment));
+      yield* Ref.update(attachments, (all) => new Map(all).set(source.appId, attachment));
     });
 
     yield* Effect.addFinalizer(() =>

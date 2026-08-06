@@ -67,7 +67,7 @@ test('a guest connection becomes identified, ordered API events', async () => {
     kind: 'data',
     stream: 'stdout',
     text: '€',
-    instanceId: LOG_SOURCE.instanceId,
+    appId: LOG_SOURCE.appId,
   });
   expect(events[1]).toMatchObject({ kind: 'data', stream: 'stderr', text: 'failed\n' });
   expect(events[2]).toMatchObject({ kind: 'gap', droppedBytes: Number(DROPPED_BYTES) });

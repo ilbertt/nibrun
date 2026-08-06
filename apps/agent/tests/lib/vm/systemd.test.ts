@@ -1,23 +1,23 @@
 import { describe, expect, test } from 'bun:test';
-import type { InstanceId } from '@repo/protocol';
-import { instanceIdFromUnit, parseUnitNames, vmUnitName } from '#lib/vm/systemd.ts';
+import type { AppId } from '@repo/protocol';
+import { appIdFromUnit, parseUnitNames, vmUnitName } from '#lib/vm/systemd.ts';
 import { parseProperties, parsePropertyBlocks, unitStatusFrom } from '#lib/vm/unit-status.ts';
 
 describe('unit naming round-trips', () => {
   test('an instance id becomes a template instance and back', () => {
-    const instanceId = 'inst-A_1' as InstanceId;
-    expect(vmUnitName(instanceId)).toBe('nibrun-vm@inst-A_1.service');
-    expect(instanceIdFromUnit(vmUnitName(instanceId))).toBe(instanceId);
+    const appId = 'inst-A_1' as AppId;
+    expect(vmUnitName(appId)).toBe('nibrun-vm@inst-A_1.service');
+    expect(appIdFromUnit(vmUnitName(appId))).toBe(appId);
   });
 
   test('a unit that is not ours is ignored', () => {
-    expect(instanceIdFromUnit('sshd.service')).toBeUndefined();
-    expect(instanceIdFromUnit('nibrun-vm@inst-1.socket')).toBeUndefined();
+    expect(appIdFromUnit('sshd.service')).toBeUndefined();
+    expect(appIdFromUnit('nibrun-vm@inst-1.socket')).toBeUndefined();
   });
 
   test('an instance name that is not a valid identifier is refused', () => {
-    expect(instanceIdFromUnit('nibrun-vm@..\\x2fetc.service')).toBeUndefined();
-    expect(instanceIdFromUnit('nibrun-vm@.service')).toBeUndefined();
+    expect(appIdFromUnit('nibrun-vm@..\\x2fetc.service')).toBeUndefined();
+    expect(appIdFromUnit('nibrun-vm@.service')).toBeUndefined();
   });
 });
 

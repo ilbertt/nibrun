@@ -1,20 +1,20 @@
 import { describe, expect, test } from 'bun:test';
 import type {
+  AppId,
   DeploymentId,
   DeploymentState,
-  InstanceId,
   InstanceState,
   ReportedInstance,
 } from '@repo/protocol';
-import { DeploymentLifecycle, STARTUP_DEADLINE_MS } from '#lib/deployment-lifecycle.ts';
+import { DeploymentLifecycle, STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 
-const INSTANCE_ID = 'instance-1' as InstanceId;
+const APP_ID = 'app-1' as AppId;
 const DEPLOYMENT_ID = 'deployment-1' as DeploymentId;
 const CREATED_AT = new Date('2026-08-04T10:00:00.000Z');
 const JUST_DEPLOYED_MS = 1000;
 
 function reported(state: InstanceState): ReportedInstance {
-  return { instanceId: INSTANCE_ID, deploymentId: DEPLOYMENT_ID, state, restartCount: 0 };
+  return { appId: APP_ID, deploymentId: DEPLOYMENT_ID, state, restartCount: 0 };
 }
 
 function advance({

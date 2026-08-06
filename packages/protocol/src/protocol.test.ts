@@ -21,7 +21,6 @@ import {
   type HostId,
   type Hostname,
   type HostPort,
-  type InstanceId,
   isValidMessage,
   type ObjectKey,
   ProtocolValidationError,
@@ -58,7 +57,6 @@ const desiredState = (): HostDesiredState => ({
   ],
   instances: [
     {
-      instanceId: 'inst_1' as InstanceId,
       appId: 'app_1' as AppId,
       deploymentId: 'dep_1' as DeploymentId,
       volumeId: 'vol_1' as VolumeId,

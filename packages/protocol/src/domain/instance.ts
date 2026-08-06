@@ -1,18 +1,5 @@
 import { Type } from '@sinclair/typebox';
-import {
-  AppIdSchema,
-  DeploymentIdSchema,
-  HostIdSchema,
-  InstanceIdSchema,
-  VolumeIdSchema,
-} from '#domain/identifiers.ts';
 import { stringEnum } from '#lib/string-enum.ts';
-import {
-  HostPortSchema,
-  Ipv4AddressSchema,
-  Sha256DigestSchema,
-  TimestampSchema,
-} from '#lib/wire.ts';
 
 const MIN_VCPU_COUNT = 1;
 const MAX_VCPU_COUNT = 32;
@@ -113,23 +100,3 @@ export const INSTANCE_STATES = [
 export const InstanceStateSchema = stringEnum(INSTANCE_STATES);
 
 export type InstanceState = typeof InstanceStateSchema.static;
-
-export const InstanceSchema = Type.Object({
-  id: InstanceIdSchema,
-  appId: AppIdSchema,
-  deploymentId: DeploymentIdSchema,
-  volumeId: VolumeIdSchema,
-  hostId: HostIdSchema,
-  state: InstanceStateSchema,
-  artifactDigest: Sha256DigestSchema,
-  // Allocated by the agent and stable for the lifetime of the app, so a redeploy is invisible
-  // to the routing layer: same host, same port, new process behind it.
-  hostPort: Type.Optional(HostPortSchema),
-  guestIpv4: Type.Optional(Ipv4AddressSchema),
-  restartCount: Type.Integer({ minimum: 0 }),
-  createdAt: TimestampSchema,
-  startedAt: Type.Optional(TimestampSchema),
-  lastHealthyAt: Type.Optional(TimestampSchema),
-});
-
-export type Instance = typeof InstanceSchema.static;

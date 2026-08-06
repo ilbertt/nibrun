@@ -7,7 +7,7 @@ import type {
   ReportedInstance,
 } from '@repo/protocol';
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
-import { DeploymentLifecycle } from '#lib/deployment-lifecycle.ts';
+import { DeploymentLifecycle } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';

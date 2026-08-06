@@ -37,7 +37,6 @@ export function tenantLogRecord({
     SOURCE: 'tenant',
     appId: event.appId,
     deploymentId: event.deploymentId,
-    instanceId: event.instanceId,
     sourceId: event.sourceId,
     sequence: event.sequence,
   } as const;

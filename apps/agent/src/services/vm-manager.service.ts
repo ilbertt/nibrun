@@ -1,5 +1,5 @@
 import { FileSystem, Path } from '@effect/platform';
-import type { DesiredInstance, InstanceId } from '@repo/protocol';
+import type { AppId, DesiredInstance } from '@repo/protocol';
 import { Effect } from 'effect';
 import { writeJsonFile } from '#lib/json-store.ts';
 import { TENANT_LOG_VSOCK_FILENAME, tenantLogSocketPath } from '#lib/logs/vsock.ts';
@@ -26,7 +26,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     const fs = yield* FileSystem.FileSystem;
     const logs = yield* TenantLogReceiver;
 
-    const workingDir = (instanceId: InstanceId) => path.join(config.vmDir, instanceId);
+    const workingDir = (appId: AppId) => path.join(config.vmDir, appId);
 
     /**
      * The agent never becomes the VM's parent: it stages the files, asks init to start the unit,
@@ -42,7 +42,6 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       dataDevicePath: string;
     }) {
       yield* Effect.annotateCurrentSpan({
-        instanceId: desired.instanceId,
         appId: desired.appId,
       });
       const artifactImagePath = yield* Artifacts.ensureArtifactImage(desired.artifact);
@@ -52,7 +51,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
         subnetPrefixLength: slot.subnetPrefixLength,
       });
 
-      const directory = workingDir(desired.instanceId);
+      const directory = workingDir(desired.appId);
       yield* fs.makeDirectory(directory, { recursive: true, mode: VM_DIR_MODE });
       const instanceConfigImagePath = yield* buildInstanceConfigImage({
         workingDir: directory,
@@ -90,14 +89,13 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
 
       yield* logs.attach({
         source: {
-          instanceId: desired.instanceId,
           appId: desired.appId,
           deploymentId: desired.deploymentId,
         },
         socketPath: tenantLogSocketPath({ workingDir: directory }),
       });
-      yield* Effect.onError(Systemd.start(desired.instanceId), () =>
-        Effect.ignore(logs.detach(desired.instanceId)),
+      yield* Effect.onError(Systemd.start(desired.appId), () =>
+        Effect.ignore(logs.detach(desired.appId)),
       );
     });
 
@@ -105,11 +103,11 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       workingDir,
       boot,
       stop: Systemd.stop,
-      discard: Effect.fn('VmManager.discard')(function* (instanceId: InstanceId) {
-        yield* Effect.annotateCurrentSpan({ instanceId });
-        yield* Systemd.forget(instanceId);
-        yield* logs.detach(instanceId);
-        yield* fs.remove(workingDir(instanceId), { recursive: true, force: true });
+      discard: Effect.fn('VmManager.discard')(function* (appId: AppId) {
+        yield* Effect.annotateCurrentSpan({ appId });
+        yield* Systemd.forget(appId);
+        yield* logs.detach(appId);
+        yield* fs.remove(workingDir(appId), { recursive: true, force: true });
       }),
     };
   }),

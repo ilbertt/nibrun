@@ -16,7 +16,6 @@ import {
   type HostDesiredState,
   type HostId,
   type HostPort,
-  type InstanceId,
   type ObjectKey,
   type Timestamp,
   type VolumeId,
@@ -29,7 +28,6 @@ import { HOST_STORAGE_PREFIX } from '#tests/support/config.ts';
 
 export const APP_ID = 'app-1' as AppId;
 export const VOLUME_ID = 'vol-1' as VolumeId;
-export const INSTANCE_ID = 'inst-1' as InstanceId;
 export const DEPLOYMENT_ID = 'dep-1' as DeploymentId;
 export const HOST_ID = 'host-1' as HostId;
 export const CHECKPOINT_ID = 'chk-1' as CheckpointId;
@@ -52,7 +50,6 @@ export function artifact(overrides: Partial<DesiredArtifact> = {}): DesiredArtif
 
 export function desiredInstance(overrides: Partial<DesiredInstance> = {}): DesiredInstance {
   return {
-    instanceId: INSTANCE_ID,
     appId: APP_ID,
     deploymentId: DEPLOYMENT_ID,
     volumeId: VOLUME_ID,
@@ -115,7 +112,6 @@ export function desiredState(overrides: Partial<HostDesiredState> = {}): HostDes
 
 export function observedInstance(overrides: Partial<ObservedInstance> = {}): ObservedInstance {
   return {
-    instanceId: INSTANCE_ID,
     appId: APP_ID,
     volumeId: VOLUME_ID,
     deploymentId: DEPLOYMENT_ID,
@@ -144,7 +140,6 @@ export function observedState(overrides: Partial<ObservedState> = {}): ObservedS
 export const LOG_SOURCE = {
   appId: APP_ID,
   deploymentId: DEPLOYMENT_ID,
-  instanceId: INSTANCE_ID,
 };
 
 export function tenantLogEvent(sequence = 0): TenantLogEvent {

@@ -8,15 +8,13 @@ import type {
   DesiredVolume,
   ExportId,
   HostDesiredState,
-  InstanceId,
   ObjectKey,
   VolumeId,
 } from '@repo/protocol';
 
 export type ObservedInstance = {
-  readonly instanceId: InstanceId;
+  readonly appId: AppId;
   /** Absent for a unit this agent has no record of — a host that lost its state file. */
-  readonly appId?: AppId;
   readonly volumeId?: VolumeId;
   readonly deploymentId?: DeploymentId;
   readonly present: boolean;
@@ -63,11 +61,11 @@ export type InstancePlan =
   | { readonly action: 'replace'; readonly desired: DesiredInstance }
   | {
       readonly action: 'stop';
-      readonly instanceId: InstanceId;
+      readonly appId: AppId;
       readonly reason: InstanceStopReason;
     }
-  | { readonly action: 'forget'; readonly instanceId: InstanceId }
-  | { readonly action: 'none'; readonly instanceId: InstanceId };
+  | { readonly action: 'forget'; readonly appId: AppId }
+  | { readonly action: 'none'; readonly appId: AppId };
 
 export type VolumePlan =
   | { readonly action: 'provision'; readonly desired: DesiredVolume }
@@ -75,7 +73,7 @@ export type VolumePlan =
   | {
       readonly action: 'blocked';
       readonly desired: DesiredVolume;
-      readonly blockedBy: readonly InstanceId[];
+      readonly blockedBy: readonly AppId[];
     }
   | { readonly action: 'none'; readonly volumeId: VolumeId };
 
@@ -140,16 +138,16 @@ function planInstances({
   desired: HostDesiredState;
   observed: ObservedState;
 }): InstancePlan[] {
-  const observedById = byId({ items: observed.instances, key: (instance) => instance.instanceId });
+  const observedById = byId({ items: observed.instances, key: (instance) => instance.appId });
   const plans: InstancePlan[] = [];
 
   for (const wanted of desired.instances) {
-    const current = observedById.get(wanted.instanceId);
+    const current = observedById.get(wanted.appId);
     if (wanted.desiredState === 'stopped') {
       plans.push(
         current?.running
-          ? { action: 'stop', instanceId: wanted.instanceId, reason: 'desired-stopped' }
-          : { action: 'none', instanceId: wanted.instanceId },
+          ? { action: 'stop', appId: wanted.appId, reason: 'desired-stopped' }
+          : { action: 'none', appId: wanted.appId },
       );
       continue;
     }
@@ -162,25 +160,25 @@ function planInstances({
       continue;
     }
     if (current.running) {
-      plans.push({ action: 'none', instanceId: wanted.instanceId });
+      plans.push({ action: 'none', appId: wanted.appId });
       continue;
     }
     plans.push(
       current.exited
-        ? { action: 'none', instanceId: wanted.instanceId }
+        ? { action: 'none', appId: wanted.appId }
         : { action: 'start', desired: wanted },
     );
   }
 
-  const desiredIds = new Set(desired.instances.map((instance) => instance.instanceId));
+  const desiredIds = new Set(desired.instances.map((instance) => instance.appId));
   for (const current of observed.instances) {
-    if (desiredIds.has(current.instanceId)) {
+    if (desiredIds.has(current.appId)) {
       continue;
     }
     plans.push(
       current.running
-        ? { action: 'stop', instanceId: current.instanceId, reason: 'not-desired' }
-        : { action: 'forget', instanceId: current.instanceId },
+        ? { action: 'stop', appId: current.appId, reason: 'not-desired' }
+        : { action: 'forget', appId: current.appId },
     );
   }
 
@@ -195,12 +193,12 @@ function planVolumes({
   observed: ObservedState;
 }): VolumePlan[] {
   const observedById = byId({ items: observed.volumes, key: (volume) => volume.volumeId });
-  const usedBy = new Map<VolumeId, InstanceId[]>();
+  const usedBy = new Map<VolumeId, AppId[]>();
   for (const instance of observed.instances) {
     if (!instance.present || instance.volumeId === undefined) {
       continue;
     }
-    usedBy.set(instance.volumeId, [...(usedBy.get(instance.volumeId) ?? []), instance.instanceId]);
+    usedBy.set(instance.volumeId, [...(usedBy.get(instance.volumeId) ?? []), instance.appId]);
   }
   for (const instance of desired.instances) {
     if (!usedBy.has(instance.volumeId)) {
