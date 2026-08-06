@@ -1,11 +1,13 @@
 #!/usr/bin/env bun
+import { join } from 'node:path';
 import { createCli } from '@parshjs/core';
 import { createEnvContext } from '@parshjs/env';
+import { createFilesContext, osHomeConfigDir } from '@parshjs/files';
 import { z } from 'zod';
 import { commandTree } from '#command-tree.gen.ts';
 import { DEFAULT_API_URL, PROGRAM_NAME } from '#config.ts';
 import { createApi } from '#lib/api.ts';
-import { createCredentialsStore } from '#lib/credentials.ts';
+import { CREDENTIALS_FILE } from '#lib/credentials.ts';
 import { CancelledError } from '#lib/errors.ts';
 
 const cli = createCli({
@@ -17,7 +19,10 @@ const cli = createCli({
       vars: { NIBRUN_API_URL: { schema: z.url(), default: DEFAULT_API_URL } },
     });
     const apiUrl = env.NIBRUN_API_URL;
-    const files = createCredentialsStore();
+    const files = createFilesContext({
+      basePath: join(osHomeConfigDir(), PROGRAM_NAME),
+      files: { credentials: CREDENTIALS_FILE },
+    });
     const credentials = await files.credentials.maybeRead();
     const api = createApi({ baseUrl: apiUrl, credentials });
 

@@ -1,10 +1,5 @@
-import { join } from 'node:path';
-import { createFilesContext, osHomeConfigDir } from '@parshjs/files';
 import { z } from 'zod';
-import { PROGRAM_NAME } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
-
-const CREDENTIALS_FILE = 'credentials.json';
 
 /**
  * The api that issued a token is stored beside it. A session is only a credential for the
@@ -18,14 +13,10 @@ const CredentialsSchema = z.object({
 
 export type Credentials = z.infer<typeof CredentialsSchema>;
 
-export function createCredentialsStore() {
-  return createFilesContext({
-    basePath: join(osHomeConfigDir(), PROGRAM_NAME),
-    files: {
-      credentials: { filename: CREDENTIALS_FILE, schema: CredentialsSchema },
-    },
-  });
-}
+export const CREDENTIALS_FILE = {
+  filename: 'credentials.json',
+  schema: CredentialsSchema,
+};
 
 /**
  * The gate a command that talks to the api runs before its handler, so being signed out costs one
