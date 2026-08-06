@@ -5,11 +5,9 @@ import { volumeIdOf } from '#lib/deployments/desired-state.ts';
 export type DesiredExportRow = Queries['SelectDesiredExports'];
 
 /**
- * A bundle still wanted is `present`; one that has been written, or failed trying, is `absent`.
- *
- * `absent` rather than dropped, because the agent plans only over the exports it is sent: one
- * that simply stopped appearing would be remembered — and reported — for as long as the host ran.
- * Saying so is what lets it forget.
+ * A finished export is `absent` rather than dropped, because the agent plans only over the exports
+ * it is sent: one that simply stopped appearing would be remembered — and reported — for as long
+ * as the host ran. Saying so is what lets it forget.
  */
 export function toDesiredExport(row: DesiredExportRow): DesiredExport {
   return {
