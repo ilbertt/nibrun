@@ -93,6 +93,7 @@ type FakeBehaviour = {
 class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
   readonly calls: Array<Record<string, unknown>> = [];
   readonly applied: ReportedDeployment[] = [];
+  readonly activations: { deploymentId: DeploymentId; at: Date }[] = [];
   readonly failed: DeploymentId[] = [];
   readonly #behaviour: FakeBehaviour;
 
@@ -106,6 +107,11 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
 
   applyReport({ reported }: { reported: ReportedDeployment[] }): Promise<void> {
     this.applied.push(...reported);
+    return Promise.resolve();
+  }
+
+  stampActivation(input: { deploymentId: DeploymentId; at: Date }): Promise<void> {
+    this.activations.push(input);
     return Promise.resolve();
   }
 
@@ -319,7 +325,7 @@ describe('a host reporting is what moves a release through its states', () => {
 
   // The probe the host answered, not the moment this end got round to reading about it: a report
   // arrives up to an interval late, and the api's clock is not the one that saw it happen.
-  test("and the instant it became active is the host's, not this end's", async () => {
+  test("the instant it began serving is the host's, not this end's", async () => {
     const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
 
     await service.applyHostReport({
@@ -328,7 +334,7 @@ describe('a host reporting is what moves a release through its states', () => {
       ]),
     });
 
-    expect(deploymentsRepo.applied[0]?.activatedAt).toEqual(HEALTHY_AT);
+    expect(deploymentsRepo.activations).toEqual([{ deploymentId: DEPLOYMENT_ID, at: HEALTHY_AT }]);
   });
 
   // Unreachable while a host only reports `running` for an instance that answered a probe, so
@@ -338,15 +344,26 @@ describe('a host reporting is what moves a release through its states', () => {
 
     await service.applyHostReport({ reported: report([instance({ state: 'running' })]) });
 
-    expect(deploymentsRepo.applied[0]?.activatedAt).toEqual(REPORTED_AT);
+    expect(deploymentsRepo.activations[0]?.at).toEqual(REPORTED_AT);
   });
 
-  test('one that has not served carries no activation instant at all', async () => {
+  test('one that has not served is not stamped as having done so', async () => {
     const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
 
     await service.applyHostReport({ reported: report([instance({ state: 'starting' })]) });
 
-    expect(deploymentsRepo.applied[0]?.activatedAt).toBeNull();
+    expect(deploymentsRepo.activations).toEqual([]);
+  });
+
+  // The reported columns are written on every heartbeat; this one is not, or it would creep
+  // forward with each probe and end up saying when the app was last healthy.
+  test('one already active is not stamped a second time', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow({ state: 'active' })] });
+
+    await service.applyHostReport({ reported: report([instance({ state: 'running' })]) });
+
+    expect(deploymentsRepo.activations).toEqual([]);
+    expect(deploymentsRepo.applied).toHaveLength(1);
   });
 
   // They move without the state moving — a running instance reports a restart count and a health

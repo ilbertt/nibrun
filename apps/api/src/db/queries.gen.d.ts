@@ -357,6 +357,10 @@ export interface ISelectLiveDeploymentsResult {
 export interface IApplyReportedDeploymentResult {
 }
 
+/** Result of query `StampDeploymentActivation`. */
+export interface IStampDeploymentActivationResult {
+}
+
 /** Result of query `FailDeployment`. */
 export interface IFailDeploymentResult {
 }
@@ -426,6 +430,7 @@ export interface Queries {
     SelectDeploymentById: ISelectDeploymentByIdResult;
     SelectLiveDeployments: ISelectLiveDeploymentsResult;
     ApplyReportedDeployment: IApplyReportedDeploymentResult;
+    StampDeploymentActivation: IStampDeploymentActivationResult;
     FailDeployment: IFailDeploymentResult;
     SupersedeLiveDeployment: ISupersedeLiveDeploymentResult;
     SelectInsertedDeployment: ISelectInsertedDeploymentResult;

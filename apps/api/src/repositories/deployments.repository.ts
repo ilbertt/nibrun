@@ -42,7 +42,6 @@ export type LiveDeploymentRow = Queries['SelectLiveDeployments'];
 export type ReportedDeployment = {
   deploymentId: DeploymentId;
   state: DeploymentState;
-  activatedAt: Date | null;
   hostPort: HostPort | null;
   guestIpv4: Ipv4Address | null;
   restartCount: number;
@@ -58,6 +57,7 @@ export abstract class DeploymentsRepositoryContract {
   abstract findById(input: DeploymentByIdInput): Promise<DeploymentRow | null>;
   abstract listLive(): Promise<LiveDeploymentRow[]>;
   abstract applyReport(input: { reported: ReportedDeployment[] }): Promise<void>;
+  abstract stampActivation(input: { deploymentId: DeploymentId; at: Date }): Promise<void>;
   abstract fail(input: { deploymentId: DeploymentId; message: string }): Promise<void>;
 }
 
@@ -208,6 +208,9 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
    * `state` is written back even when it has not moved, so the reported columns beside it are a
    * single write. Rows that have gone terminal since the report was assembled are left alone,
    * which is what stops a report in flight from resurrecting a superseded deployment.
+   *
+   * Every column here is whatever the host last said. The one that is not — when the release
+   * began serving — is written by `stampActivation` instead.
    */
   applyReport({ reported }: { reported: ReportedDeployment[] }): Promise<void> {
     return this.sql.begin(async (tx) => {
@@ -220,12 +223,32 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
             restart_count = ${instance.restartCount},
             message = ${instance.message},
             started_at = ${instance.startedAt},
-            last_healthy_at = ${instance.lastHealthyAt},
-            activated_at = COALESCE(activated_at, ${instance.activatedAt})
+            last_healthy_at = ${instance.lastHealthyAt}
           WHERE id = ${instance.deploymentId} AND state NOT IN ('superseded', 'failed')
         `;
       }
     });
+  }
+
+  /**
+   * When the release began serving, which is a thing that happens once. Every later report says
+   * it is still serving and carries a newer healthy instant, so a column that took each of them
+   * would end up meaning `last_healthy_at` a second time.
+   *
+   * `IS NULL` rather than a check around the call: two reports arriving together would both find
+   * it empty, and only one of them can be the moment it started.
+   */
+  async stampActivation({
+    deploymentId,
+    at,
+  }: {
+    deploymentId: DeploymentId;
+    at: Date;
+  }): Promise<void> {
+    await this.sql.StampDeploymentActivation`
+      UPDATE nibrun.deployments SET activated_at = ${at}
+      WHERE id = ${deploymentId} AND activated_at IS NULL
+    `;
   }
 
   async fail({

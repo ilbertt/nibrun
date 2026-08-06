@@ -92,6 +92,7 @@ export class DeploymentsService extends Service {
     const live = await this.deploymentsRepo.listLive();
 
     const observed: ReportedDeployment[] = [];
+    const activated: DeploymentId[] = [];
     const overdue: DeploymentId[] = [];
 
     for (const row of live) {
@@ -108,15 +109,24 @@ export class DeploymentsService extends Service {
           from: row.state,
           to: state,
         });
+        if (state === 'active') {
+          activated.push(row.id);
+        }
       }
       if (instance) {
-        observed.push(toReportedDeployment({ instance, state, reportedAt: reported.reportedAt }));
+        observed.push(toReportedDeployment({ instance, state }));
       } else if (state === 'failed') {
         overdue.push(row.id);
       }
     }
 
     await this.deploymentsRepo.applyReport({ reported: observed });
+    for (const deploymentId of activated) {
+      await this.deploymentsRepo.stampActivation({
+        deploymentId,
+        at: servedFrom({ instance: instances.get(deploymentId), reportedAt: reported.reportedAt }),
+      });
+    }
     for (const deploymentId of overdue) {
       await this.deploymentsRepo.fail({ deploymentId, message: NEVER_STARTED });
     }
@@ -143,24 +153,30 @@ export class DeploymentsService extends Service {
 }
 
 /**
- * The instant a release began serving is the probe that first answered, which the host observed
- * and this end learns of a report later — so it is read off the report rather than taken from
- * this clock. An instance only reaches `running` by passing that probe, so a state of `active`
- * always has one; `reportedAt` stands in for a host that somehow sent none.
+ * The probe the tenant first answered, which the host saw and this end hears about a report
+ * later — so it is taken off the report rather than from this clock. An instance only reaches
+ * `running` by answering one, so `reportedAt` stands in for a host that sends none anyway.
  */
+function servedFrom({
+  instance,
+  reportedAt,
+}: {
+  instance: ReportedInstance | undefined;
+  reportedAt: Timestamp;
+}): Date {
+  return new Date(instance?.lastHealthyAt ?? reportedAt);
+}
+
 function toReportedDeployment({
   instance,
   state,
-  reportedAt,
 }: {
   instance: ReportedInstance;
   state: DeploymentState;
-  reportedAt: Timestamp;
 }): ReportedDeployment {
   return {
     deploymentId: instance.deploymentId,
     state,
-    activatedAt: state === 'active' ? new Date(instance.lastHealthyAt ?? reportedAt) : null,
     hostPort: instance.hostPort ?? null,
     guestIpv4: instance.guestIpv4 ?? null,
     restartCount: instance.restartCount,
