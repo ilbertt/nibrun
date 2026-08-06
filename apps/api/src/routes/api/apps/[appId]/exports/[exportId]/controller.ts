@@ -1,10 +1,7 @@
 import { AppIdSchema, ExportIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
-import {
-  ExportParamsSchema,
-  ExportResponseSchema,
-} from '#routes/api/apps/[appId]/exports/model.ts';
+import { ExportResponseSchema } from '#routes/api/apps/[appId]/exports/model.ts';
 import { ExportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 /**
@@ -28,7 +25,6 @@ export const AppsAppIdExportsExportIdController = new Elysia()
       return status(StatusMap.OK, found);
     },
     {
-      params: ExportParamsSchema,
       response: { [StatusMap.OK]: ExportResponseSchema },
     },
   );

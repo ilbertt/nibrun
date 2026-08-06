@@ -11,7 +11,6 @@ import {
   DEFAULT_START_OFFSET,
   TailLogsQuerySchema,
 } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';
-import { DeploymentParamsSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
 import { LogsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 /**
@@ -43,7 +42,6 @@ export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
       return events({ records, signal });
     },
     {
-      params: DeploymentParamsSchema,
       query: TailLogsQuerySchema,
     },
   );

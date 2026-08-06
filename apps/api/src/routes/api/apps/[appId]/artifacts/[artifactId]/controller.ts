@@ -7,7 +7,6 @@ import {
 } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
-import { ArtifactParamsSchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { ArtifactsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdArtifactsArtifactIdController = new Elysia()
@@ -26,7 +25,6 @@ export const AppsAppIdArtifactsArtifactIdController = new Elysia()
       return status(StatusMap.OK, artifact);
     },
     {
-      params: ArtifactParamsSchema,
       response: { [StatusMap.OK]: ArtifactSchema },
     },
   );

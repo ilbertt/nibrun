@@ -1,12 +1,6 @@
 import { ArtifactIdSchema, DeploymentIdSchema, DeploymentSchema } from '@repo/protocol';
 import { t } from 'elysia';
-import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 import { PublicAppConfigSchema } from '#routes/api/apps/model.ts';
-
-export const DeploymentParamsSchema = t.Composite([
-  AppParamsSchema,
-  t.Object({ deploymentId: t.String() }),
-]);
 
 /**
  * An artifact to run, or a release to go back to — never both and never neither. A union rather

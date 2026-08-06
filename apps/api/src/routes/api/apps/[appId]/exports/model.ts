@@ -1,11 +1,5 @@
 import { ExportSchema } from '@repo/protocol';
 import { t } from 'elysia';
-import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
-
-export const ExportParamsSchema = t.Composite([
-  AppParamsSchema,
-  t.Object({ exportId: t.String() }),
-]);
 
 /**
  * `objectKey` is dropped and a signed URL put in its place: where the bundle sits is this end's

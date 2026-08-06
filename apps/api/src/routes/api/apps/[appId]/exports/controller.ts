@@ -5,7 +5,6 @@ import {
   ExportResponseSchema,
   ListExportsResponseSchema,
 } from '#routes/api/apps/[appId]/exports/model.ts';
-import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 import { ExportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdExportsController = new Elysia()
@@ -23,7 +22,6 @@ export const AppsAppIdExportsController = new Elysia()
       return status(StatusMap.OK, { exports });
     },
     {
-      params: AppParamsSchema,
       response: { [StatusMap.OK]: ListExportsResponseSchema },
     },
   )
@@ -41,7 +39,6 @@ export const AppsAppIdExportsController = new Elysia()
       return status(StatusMap.Accepted, requested);
     },
     {
-      params: AppParamsSchema,
       response: { [StatusMap.Accepted]: ExportResponseSchema },
     },
   );

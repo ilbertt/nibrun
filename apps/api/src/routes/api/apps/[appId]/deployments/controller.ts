@@ -6,7 +6,6 @@ import {
   DeploymentResponseSchema,
   ListDeploymentsResponseSchema,
 } from '#routes/api/apps/[appId]/deployments/model.ts';
-import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 import { DeploymentsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdDeploymentsController = new Elysia()
@@ -24,7 +23,6 @@ export const AppsAppIdDeploymentsController = new Elysia()
       return status(StatusMap.OK, { deployments });
     },
     {
-      params: AppParamsSchema,
       response: { [StatusMap.OK]: ListDeploymentsResponseSchema },
     },
   )
@@ -39,7 +37,6 @@ export const AppsAppIdDeploymentsController = new Elysia()
       return status(StatusMap.Created, deployment);
     },
     {
-      params: AppParamsSchema,
       body: CreateDeploymentBodySchema,
       response: { [StatusMap.Created]: DeploymentResponseSchema },
     },

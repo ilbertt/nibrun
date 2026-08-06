@@ -5,7 +5,6 @@ import {
   CreateArtifactBodySchema,
   ListArtifactsResponseSchema,
 } from '#routes/api/apps/[appId]/artifacts/model.ts';
-import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 import { ArtifactsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdArtifactsController = new Elysia()
@@ -23,7 +22,6 @@ export const AppsAppIdArtifactsController = new Elysia()
       return status(StatusMap.OK, { artifacts });
     },
     {
-      params: AppParamsSchema,
       response: { [StatusMap.OK]: ListArtifactsResponseSchema },
     },
   )
@@ -38,7 +36,6 @@ export const AppsAppIdArtifactsController = new Elysia()
       return status(StatusMap.Created, artifact);
     },
     {
-      params: AppParamsSchema,
       body: CreateArtifactBodySchema,
       response: { [StatusMap.Created]: ArtifactSchema },
     },
