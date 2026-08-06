@@ -1,4 +1,4 @@
-import { ArtifactIdSchema, ArtifactSchema } from '@repo/protocol';
+import { ArtifactSchema } from '@repo/protocol';
 import { t } from 'elysia';
 import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 
@@ -8,7 +8,7 @@ const MAX_ARTIFACT_SIZE = '256m';
 
 export const ArtifactParamsSchema = t.Composite([
   AppParamsSchema,
-  t.Object({ artifactId: ArtifactIdSchema }),
+  t.Object({ artifactId: t.String() }),
 ]);
 
 export const CreateArtifactBodySchema = t.Object({

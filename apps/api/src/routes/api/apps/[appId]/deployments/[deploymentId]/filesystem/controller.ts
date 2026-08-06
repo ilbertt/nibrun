@@ -1,4 +1,11 @@
-import { DirectoryListingSchema, GUEST_PATH_ROOT, OwnerIdSchema, Value } from '@repo/protocol';
+import {
+  AppIdSchema,
+  DeploymentIdSchema,
+  DirectoryListingSchema,
+  GUEST_PATH_ROOT,
+  OwnerIdSchema,
+  Value,
+} from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import { ReadDirectoryQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/model.ts';
@@ -24,8 +31,8 @@ export const AppsAppIdDeploymentsDeploymentIdFilesystemController = new Elysia()
     '/apps/:appId/deployments/:deploymentId/filesystem',
     async ({ filesystemService, params, query, user, request, status }) => {
       const listing = await filesystemService.readDirectory({
-        appId: params.appId,
-        deploymentId: params.deploymentId,
+        appId: Value.Parse(AppIdSchema, params.appId),
+        deploymentId: Value.Parse(DeploymentIdSchema, params.deploymentId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         path: query.path ?? GUEST_PATH_ROOT,
         signal: AbortSignal.any([request.signal, AbortSignal.timeout(MAX_WAIT_MS)]),

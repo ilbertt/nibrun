@@ -1,10 +1,10 @@
-import { ExportIdSchema, ExportSchema } from '@repo/protocol';
+import { ExportSchema } from '@repo/protocol';
 import { t } from 'elysia';
 import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 
 export const ExportParamsSchema = t.Composite([
   AppParamsSchema,
-  t.Object({ exportId: ExportIdSchema }),
+  t.Object({ exportId: t.String() }),
 ]);
 
 /**

@@ -5,7 +5,7 @@ import { PublicAppConfigSchema } from '#routes/api/apps/model.ts';
 
 export const DeploymentParamsSchema = t.Composite([
   AppParamsSchema,
-  t.Object({ deploymentId: DeploymentIdSchema }),
+  t.Object({ deploymentId: t.String() }),
 ]);
 
 /**

@@ -18,6 +18,15 @@ describe('nothing under /api/apps answers a caller with no session', () => {
     // Unauthorized rather than Not Found: every route is mounted, each one refuses to serve.
     expect((await sendJson(route)).status).toBe(StatusMap.Unauthorized);
   });
+
+  // A path segment is a plain string until a handler parses it, so a malformed one is refused
+  // for the session it lacks rather than for its shape — which is the order a stranger should
+  // meet: whether the id was well-formed is not something an unauthenticated caller learns.
+  test('an appId the schema would refuse is still refused for the session first', async () => {
+    const response = await sendJson({ method: 'GET', url: `${APPS_URL}/-not-an-app-id` });
+
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  });
 });
 
 // Elysia raises its own 422 for a schema violation; `elysiaErrorHandler` rewrites it, and a

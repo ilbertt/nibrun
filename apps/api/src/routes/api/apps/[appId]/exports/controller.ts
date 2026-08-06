@@ -1,4 +1,4 @@
-import { OwnerIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import {
@@ -17,7 +17,7 @@ export const AppsAppIdExportsController = new Elysia()
     '/apps/:appId/exports',
     async ({ exportsService, params, user, status }) => {
       const exports = await exportsService.list({
-        appId: params.appId,
+        appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
       });
       return status(StatusMap.OK, { exports });
@@ -35,7 +35,7 @@ export const AppsAppIdExportsController = new Elysia()
     '/apps/:appId/exports',
     async ({ exportsService, params, user, status }) => {
       const requested = await exportsService.request({
-        appId: params.appId,
+        appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
       });
       return status(StatusMap.Accepted, requested);

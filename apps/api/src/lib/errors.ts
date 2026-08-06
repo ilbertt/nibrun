@@ -1,3 +1,4 @@
+import { AssertError } from '@repo/protocol';
 import { type ErrorHandler, StatusMap } from 'elysia';
 import { createLogger } from '#lib/logger.ts';
 import { isMalformedIdentifier } from '#lib/pg-errors.ts';
@@ -81,6 +82,11 @@ export function elysiaErrorHandler({
     return status(error.statusCode, { error: error.message });
   }
   if (code === 'VALIDATION') {
+    return status(StatusMap['Bad Request'], { error: 'Validation error', details: error.message });
+  }
+  // A path segment is only a branded identifier once a handler has parsed it, so the schema that
+  // rejects a malformed one throws here rather than at the edge, and would otherwise be a 500.
+  if (error instanceof AssertError) {
     return status(StatusMap['Bad Request'], { error: 'Validation error', details: error.message });
   }
   if (code === 'NOT_FOUND') {
