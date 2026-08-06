@@ -19,8 +19,9 @@ const cli = createCli({
     const apiUrl = env.NIBRUN_API_URL;
     const files = createCredentialsStore();
     const credentials = await files.credentials.maybeRead();
+    const api = createApi({ baseUrl: apiUrl, credentials });
 
-    return { apiUrl, files, credentials, api: createApi({ baseUrl: apiUrl, credentials }) };
+    return { apiUrl, files, credentials, api };
   },
   errors: { CANCELLED: CancelledError },
   onError: ({ code, exit }) => (code === 'CANCELLED' ? exit(1) : undefined),
