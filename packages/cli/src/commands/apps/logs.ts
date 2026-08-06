@@ -1,12 +1,9 @@
 import { defineCommand } from '@parshjs/core';
 import { DEFAULT_LOG_TIMERANGE, LOG_TIMERANGE_PATTERN } from '@repo/protocol';
 import { z } from 'zod';
-import { appBySlug } from '#lib/apps.ts';
+import { appBySlug, requireAppSlug } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { UsageError } from '#lib/errors.ts';
 import { follow, latestDeployment, untilInterrupted } from '#lib/logs.ts';
-
-const NO_APP_NAMED = 'Which app? Name one with --app-slug.';
 
 export const command = defineCommand('apps logs', {
   description: 'Print an app output and keep printing it. Ends when you do.',
@@ -28,10 +25,7 @@ export const command = defineCommand('apps logs', {
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ options, parents, context, print }) => {
-    const slug = parents.apps.options['app-slug'];
-    if (slug === undefined) {
-      throw new UsageError(NO_APP_NAMED);
-    }
+    const slug = requireAppSlug(parents.apps.options['app-slug']);
     const { api } = context;
 
     // The app is looked up either way — a deployment is addressed under the app that owns it — so

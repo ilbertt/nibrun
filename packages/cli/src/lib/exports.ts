@@ -1,0 +1,173 @@
+import { rename, rm, stat } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import type { ExportState } from '@repo/protocol';
+import { type Api, unwrap } from '#lib/api.ts';
+import { appBySlug } from '#lib/apps.ts';
+import { ApiError, UsageError } from '#lib/errors.ts';
+import type { Ui } from '#lib/ui.ts';
+
+/** What the host writes, so what the file is called when the caller left the naming to us. */
+const BUNDLE_SUFFIX = '.tar.gz';
+
+/**
+ * Written under a name of its own and renamed into place: a transfer that stops part-way would
+ * otherwise leave something that looks like the export and is not one.
+ */
+const PARTIAL_SUFFIX = '.partial';
+
+const MS_PER_MINUTE = 60_000;
+
+/**
+ * Longer between polls than a deployment takes, because the wait is a different kind: a
+ * deployment is a guest starting, an export is a filesystem being read with no bound on how much
+ * is in it.
+ */
+const POLL_INTERVAL_MS = 5_000;
+
+/**
+ * The host allows itself an hour to read one tenant's filesystem, so giving up sooner would be
+ * giving up on an export that is still coming. Giving up costs little either way: the request
+ * stays in flight, and asking again is answered with it rather than with a second read.
+ */
+const READY_TIMEOUT_MINUTES = 60;
+
+const STILL_COMING: ReadonlySet<ExportState> = new Set<ExportState>(['pending', 'preparing']);
+
+const BYTES_PER_MIB = 1_048_576;
+const MIB_DECIMALS = 1;
+
+export type ExportInput = {
+  api: Api;
+  slug: string;
+  destination: string;
+  ui: Ui;
+};
+
+/**
+ * Ask for a copy of an app — its data and the binary that ran against it — and write it where the
+ * caller said.
+ *
+ * Where it goes is settled before anything is asked for, because reading a tenant's whole
+ * filesystem is the most expensive thing the platform does on an owner's behalf: a path that
+ * cannot be written is worth one line now rather than one line several minutes from now.
+ */
+export async function exportApp({ api, slug, destination, ui }: ExportInput): Promise<void> {
+  const path = await bundlePath({ destination, slug });
+  const app = await appBySlug({ api, slug });
+
+  const requested = unwrap(await api.api.apps({ appId: app.id }).exports.post());
+  ui.step(`export ${requested.id}`);
+
+  const bundle = await ui.waitingFor({
+    message: 'preparing the bundle',
+    task: () => awaitBundle({ api, appId: app.id, exportId: requested.id }),
+  });
+  await ui.waitingFor({
+    message: describeDownload(bundle.sizeBytes),
+    task: () => download({ url: bundle.downloadUrl, path }),
+  });
+
+  ui.done(path);
+}
+
+/**
+ * A directory is somewhere to put the bundle rather than a name for it, so the app names it
+ * there. Anything else is the name itself, suffix or no suffix — someone who typed a filename has
+ * said what they want it called.
+ */
+export async function bundlePath({
+  destination,
+  slug,
+}: {
+  destination: string;
+  slug: string;
+}): Promise<string> {
+  const path = (await isDirectory(destination))
+    ? join(destination, `${slug}${BUNDLE_SUFFIX}`)
+    : destination;
+
+  const parent = dirname(path);
+  if (!(await isDirectory(parent))) {
+    throw new UsageError(`No such directory: ${parent}.`);
+  }
+  // An export is a moment rather than a running copy, so replacing one with another loses the
+  // moment. Refusing is what leaves that decision with whoever typed the path.
+  if (await Bun.file(path).exists()) {
+    throw new UsageError(`${path} already exists.`);
+  }
+  return path;
+}
+
+/**
+ * Poll until the host has written the bundle.
+ *
+ * A download URL rather than a state is what says it is there: the URL is signed for the response
+ * it arrives in and outlives it by minutes, so the one that is read is the one the download uses.
+ */
+async function awaitBundle({
+  api,
+  appId,
+  exportId,
+}: {
+  api: Api;
+  appId: string;
+  exportId: string;
+}): Promise<{ downloadUrl: string; sizeBytes: number | undefined }> {
+  const deadline = Date.now() + READY_TIMEOUT_MINUTES * MS_PER_MINUTE;
+  while (Date.now() < deadline) {
+    const found = unwrap(await api.api.apps({ appId }).exports({ exportId }).get());
+    if (found.downloadUrl !== undefined) {
+      return { downloadUrl: found.downloadUrl, sizeBytes: found.sizeBytes };
+    }
+    if (!STILL_COMING.has(found.state)) {
+      throw new ApiError(`Export ${exportId} is ${found.state}.`);
+    }
+    await Bun.sleep(POLL_INTERVAL_MS);
+  }
+  throw new ApiError(
+    `Export ${exportId} was still being prepared after ${READY_TIMEOUT_MINUTES} minutes. Asking again is answered with this one until it is ready.`,
+  );
+}
+
+/**
+ * Streamed to disk rather than read first: a bundle is the whole of what the app has written, and
+ * this process has no reason to hold any of it.
+ */
+async function download({ url, path }: { url: string; path: string }): Promise<void> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new ApiError(`The bundle could not be downloaded: ${response.status}.`);
+  }
+
+  const partial = `${path}${PARTIAL_SUFFIX}`;
+  try {
+    await Bun.write(partial, response);
+    await rename(partial, path);
+  } catch (failure) {
+    await rm(partial, { force: true });
+    throw failure;
+  }
+}
+
+/**
+ * Said before the transfer rather than after it, because what a reader wants from it is how long
+ * they are about to wait. MiB is the unit a bundle is usually in, and a rounded `0.0` would be
+ * worse than no size at all for the one that is not.
+ */
+function describeDownload(sizeBytes: number | undefined): string {
+  if (sizeBytes === undefined) {
+    return 'downloading the bundle';
+  }
+  if (sizeBytes < BYTES_PER_MIB) {
+    return `downloading ${sizeBytes} bytes`;
+  }
+  return `downloading ${(sizeBytes / BYTES_PER_MIB).toFixed(MIB_DECIMALS)} MiB`;
+}
+
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}

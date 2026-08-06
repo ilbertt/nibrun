@@ -22,6 +22,14 @@ the layout under `src/commands/` is the command tree.
   lists what is under it, and the flag stays optional — a required one would make
   that listing an error. parsh spells a flag exactly as its key, so `--app-slug`
   is the key `'app-slug'`.
+- A positional is a path segment, so a command taking one lives at
+  `commands/<…>/[name].ts` and its path string ends in `[name]`. Leaving it out
+  prints the parent's usage rather than a missing-argument error, because the
+  walk stops at the node above the param — that listing is the only place the
+  command's description is read, so it has to say what the value is for.
+- **`options` is required by `defineCommand` even when a command has none.**
+  Omitting it matches the alias overload instead, whose errors talk about
+  `undefined` and never mention options. `options: {}` is the fix.
 - **The client is built even when there is no token**, so `nib login` — a
   command like any other — can run at all. What stops an unauthenticated
   request is `requireSignedIn` in a `beforeHandler`. A new command that talks to
