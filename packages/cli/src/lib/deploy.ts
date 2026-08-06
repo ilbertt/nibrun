@@ -2,12 +2,13 @@ import { basename } from 'node:path';
 import {
   DEFAULT_INSTANCE_RESOURCES,
   type DeploymentState,
-  type GuestPort,
+  GuestPortSchema,
   type InstanceResources,
   type TenantArguments,
+  Value,
 } from '@repo/protocol';
 import { type Api, unwrap } from '#lib/api.ts';
-import { ApiError } from '#lib/errors.ts';
+import { ApiError, UsageError } from '#lib/errors.ts';
 import type { RunOptions } from '#lib/plan.ts';
 import type { Ui } from '#lib/ui.ts';
 
@@ -81,7 +82,7 @@ export async function deploy({
 export async function readBinary(path: string): Promise<File> {
   const handle = Bun.file(path);
   if (!(await handle.exists())) {
-    throw new ApiError(`No such file: ${path}`);
+    throw new UsageError(`No such file: ${path}`);
   }
   return new File([await handle.arrayBuffer()], basename(path));
 }
@@ -111,7 +112,7 @@ function configPatch({
 }: RunOptions & { args: TenantArguments; current: InstanceResources }) {
   return {
     args,
-    ...(port !== undefined && { guestPort: port as GuestPort }),
+    ...(port !== undefined && { guestPort: Value.Parse(GuestPortSchema, port) }),
     ...((vcpu !== undefined || memory !== undefined) && {
       resources: {
         vcpuCount: vcpu ?? current.vcpuCount,

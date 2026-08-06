@@ -1,22 +1,9 @@
 #!/usr/bin/env bun
 import { createCli } from '@parshjs/core';
 import { createEnvContext } from '@parshjs/env';
-import type { TenantArguments } from '@repo/protocol';
 import { z } from 'zod';
 import { commandTree } from '#command-tree.gen.ts';
 import { CancelledError } from '#lib/errors.ts';
-
-/**
- * Everything past the first `--` belongs to the deployed binary, not to us. The split happens
- * here because the router reads every positional as a command, so a tenant's `serve --port 8080`
- * would otherwise be read as a `nib` command that does not exist.
- */
-const TENANT_ARGS_SEPARATOR = '--';
-
-const argv = process.argv.slice(2);
-const separator = argv.indexOf(TENANT_ARGS_SEPARATOR);
-const ownArgv = separator === -1 ? argv : argv.slice(0, separator);
-const tenantArgs: TenantArguments = separator === -1 ? [] : argv.slice(separator + 1);
 
 const cli = createCli({
   programName: 'nib',
@@ -29,7 +16,6 @@ const cli = createCli({
         NIBRUN_API_KEY: { schema: z.string().min(1) },
       },
     }),
-    tenantArgs,
   },
   errors: { CANCELLED: CancelledError },
   // Walking away from a prompt is an ordinary ending, and clack has already written the line
@@ -43,4 +29,4 @@ declare module '@parshjs/core' {
   }
 }
 
-process.exit(await cli.run(ownArgv));
+await cli.main();

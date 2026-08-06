@@ -10,8 +10,10 @@ the layout under `src/commands/` is the command tree.
   the api client and anything else heavy in from inside the handler.
 - `NIBRUN_API_URL` and `NIBRUN_API_KEY` are read through `@parshjs/env` as
   `ctx.context.env`, never `process.env`.
-- Arguments meant for a tenant binary are split off `process.argv` at the first
-  `--` in `src/main.ts` and reach handlers as `ctx.context.tenantArgs`.
+- A tenant binary and its arguments arrive as one quoted positional, split by
+  `src/lib/command-line.ts`. parsh cannot tell a trailing `--verbose` meant for
+  the tenant from one meant for us, so quoting is what says which — never add a
+  bare variadic and never reintroduce a `--` separator.
 - Prompting is gated on both ends of the pipe being a terminal (`isInteractive()`)
   and on `--yes` being absent. A command must work with neither: whatever the
   flags left open still needs a default. `ctx.print` stays the plain-output path,

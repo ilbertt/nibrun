@@ -1,10 +1,11 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
 
-export const command = defineCommand('run [binary]', {
-  description: 'Deploy a compiled binary and run it. Arguments after `--` are passed to it.',
+export const command = defineCommand('run [command]', {
+  description:
+    'Deploy a compiled binary and run it. Quote the binary with its arguments to pass them on: nib run "./my-server serve --port 8080".',
   params: {
-    binary: { schema: z.string().min(1) },
+    command: { schema: z.string().min(1) },
   },
   options: {
     app: {
@@ -37,11 +38,13 @@ export const command = defineCommand('run [binary]', {
   },
   handler: async ({ params, options, context, print }) => {
     const { createApi } = await import('#lib/api.ts');
+    const { parseCommandLine } = await import('#lib/command-line.ts');
     const { deploy, readBinary } = await import('#lib/deploy.ts');
     const { completeOptions } = await import('#lib/plan.ts');
     const { createUi, isInteractive } = await import('#lib/ui.ts');
 
     const { yes, detach, ...given } = options;
+    const { binaryPath, args } = parseCommandLine(params.command);
     const api = createApi({
       baseUrl: context.env.NIBRUN_API_URL,
       apiKey: context.env.NIBRUN_API_KEY,
@@ -54,13 +57,12 @@ export const command = defineCommand('run [binary]', {
 
     // Before anything is asked, so a path nobody can read costs one line rather than a
     // questionnaire whose answers are then thrown away.
-    const binary = await readBinary(params.binary);
+    const binary = await readBinary(binaryPath);
     ui.open('nib run');
 
-    const args = context.tenantArgs;
     const resolved =
       interactive && yes !== true
-        ? await completeOptions({ api, options: given, binaryPath: params.binary, args })
+        ? await completeOptions({ api, options: given, binaryPath, args })
         : given;
 
     await deploy({ ...resolved, api, ui, binary, args, detach });
