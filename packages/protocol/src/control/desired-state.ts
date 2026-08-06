@@ -116,8 +116,10 @@ export type DesiredExport = typeof DesiredExportSchema.static;
  * removing one is only ever expressed by an explicit `absent`, never implied by a list
  * shrinking. A truncated response must not be able to delete a filesystem.
  *
- * `generation` increases whenever anything below it changes, and is what the agent long-polls
- * against and echoes back as `observedGeneration`.
+ * `generation` identifies everything below it, and is what the agent polls against and echoes
+ * back as `observedGeneration`. Only ever compared for equality: a host asks whether the number
+ * it holds is still the one, so it carries no ordering and a state returned to is a number
+ * returned to.
  */
 export const HostDesiredStateSchema = Type.Object({
   hostId: HostIdSchema,

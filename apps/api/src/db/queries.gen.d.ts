@@ -39,8 +39,7 @@ export interface ISelectDesiredHostnamesResult {
 
 /** Result of query `SelectDesiredStateGeneration`. */
 export interface ISelectDesiredStateGenerationResult {
-    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    generation: string;
+    generation: string | null;
 }
 
 /** Result of query `SelectAppOwnership`. */

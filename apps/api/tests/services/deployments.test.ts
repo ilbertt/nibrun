@@ -15,7 +15,7 @@ import {
   type Timestamp,
 } from '@repo/protocol';
 import { type PublicAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
-import { STARTUP_DEADLINE_MS } from '#lib/deployment-transition.ts';
+import { STARTUP_DEADLINE_MS } from '#lib/deployment-lifecycle.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
   CreateDeploymentInput,

@@ -42,27 +42,19 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     // and it would believe it had converged until something else changed.
     const generation = await this.generation();
     const deployments = await this.sql.SelectDesiredDeployments`
-      SELECT d.id, d.app_id, a.state,
-             ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
-             c.guest_port, c.args, c.vcpu_count, c.memory_mib,
-             c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
-             c.health_check_grace_period_ms, c.health_check_healthy_threshold,
-             c.health_check_unhealthy_threshold,
-             c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms
-      FROM nibrun.deployments d
-      JOIN nibrun.apps a ON a.id = d.app_id
-      JOIN nibrun.artifacts ar ON ar.id = d.artifact_id
-      JOIN nibrun.app_configs c ON c.id = d.config_id
-      WHERE d.state NOT IN ('superseded', 'failed') AND a.state IN ('active', 'suspended')
+      SELECT id, app_id, state,
+             digest, size_bytes, object_key, original_file_name,
+             guest_port, args, vcpu_count, memory_mib,
+             health_check_path, health_check_interval_ms, health_check_timeout_ms,
+             health_check_grace_period_ms, health_check_healthy_threshold,
+             health_check_unhealthy_threshold,
+             restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
+             restart_backoff_factor, restart_reset_after_ms
+      FROM nibrun.desired_deployments
     `;
     const hostnames = hostnamesByApp(
       await this.sql.SelectDesiredHostnames`
-        SELECT h.app_id, h.hostname, h.kind
-        FROM nibrun.app_hostnames h
-        JOIN nibrun.deployments d ON d.app_id = h.app_id
-        JOIN nibrun.apps a ON a.id = h.app_id
-        WHERE d.state NOT IN ('superseded', 'failed') AND a.state IN ('active', 'suspended')
+        SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
       `,
     );
 

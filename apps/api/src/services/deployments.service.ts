@@ -7,7 +7,7 @@ import type {
   ReportedInstance,
 } from '@repo/protocol';
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
-import { nextDeploymentState } from '#lib/deployment-transition.ts';
+import { DeploymentLifecycle } from '#lib/deployment-lifecycle.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -87,7 +87,7 @@ export class DeploymentsService extends Service {
     const instances = new Map(
       reported.instances.map((instance) => [instance.deploymentId, instance]),
     );
-    const nowMs = Date.now();
+    const now = new Date();
     const live = await this.deploymentsRepo.listLive();
 
     const observed: ReportedDeployment[] = [];
@@ -95,13 +95,11 @@ export class DeploymentsService extends Service {
 
     for (const row of live) {
       const instance = instances.get(row.id);
-      const state =
-        nextDeploymentState({
-          current: row.state,
-          reported: instance,
-          desiredRunning: row.desired_running,
-          ageMs: nowMs - row.created_at.getTime(),
-        }) ?? row.state;
+      const state = new DeploymentLifecycle({
+        state: row.state,
+        desiredRunning: row.desired_running,
+        createdAt: row.created_at,
+      }).advanceState({ reported: instance, now });
 
       if (state !== row.state) {
         this.logger.info('deployment state changed', {
