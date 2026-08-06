@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { commandTree } from '#command-tree.gen.ts';
 import { DEFAULT_API_URL, PROGRAM_NAME } from '#config.ts';
 import { createApi } from '#lib/api.ts';
-import { CREDENTIALS_FILE } from '#lib/credentials.ts';
+import { CredentialsSchema } from '#lib/credentials.ts';
 import { CancelledError } from '#lib/errors.ts';
 
 const cli = createCli({
@@ -21,13 +21,14 @@ const cli = createCli({
     const apiUrl = env.NIBRUN_API_URL;
     const files = createFilesContext({
       basePath: join(osHomeConfigDir(), PROGRAM_NAME),
-      files: { credentials: CREDENTIALS_FILE },
+      files: {
+        credentials: { filename: 'credentials.json', schema: CredentialsSchema },
+      },
     });
     const credentials = await files.credentials.maybeRead();
     const api = createApi({ baseUrl: apiUrl, credentials });
-    const signIn = (accessToken: string) => files.credentials.write({ apiUrl, accessToken });
 
-    return { apiUrl, credentials, api, signIn };
+    return { apiUrl, files, credentials, api };
   },
   errors: { CANCELLED: CancelledError },
   onError: ({ code, exit }) => (code === 'CANCELLED' ? exit(1) : undefined),

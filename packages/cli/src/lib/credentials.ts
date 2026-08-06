@@ -6,17 +6,12 @@ import { UsageError } from '#lib/errors.ts';
  * control plane that minted it, so signing in to staging and then running against production
  * has to be answerable as such rather than arriving as an unexplained 401.
  */
-const CredentialsSchema = z.object({
+export const CredentialsSchema = z.object({
   apiUrl: z.url(),
   accessToken: z.string().min(1),
 });
 
 export type Credentials = z.infer<typeof CredentialsSchema>;
-
-export const CREDENTIALS_FILE = {
-  filename: 'credentials.json',
-  schema: CredentialsSchema,
-};
 
 /**
  * The gate a command that talks to the api runs before its handler, so being signed out costs one

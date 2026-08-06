@@ -20,7 +20,7 @@ export const command = defineCommand('login', {
       task: () => awaitApproval({ apiUrl, started }),
     });
 
-    await context.signIn(accessToken);
+    await context.files.credentials.write({ apiUrl, accessToken });
     ui.done(`Signed in to ${apiUrl}.`);
   },
 });
