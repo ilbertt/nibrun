@@ -1,11 +1,16 @@
-import { OwnerIdSchema, type TenantLogRecord, Value } from '@repo/protocol';
+import {
+  AppIdSchema,
+  DeploymentIdSchema,
+  OwnerIdSchema,
+  type TenantLogRecord,
+  Value,
+} from '@repo/protocol';
 import { Elysia, sse } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import {
   DEFAULT_START_OFFSET,
   TailLogsQuerySchema,
 } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';
-import { DeploymentParamsSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
 import { LogsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 /**
@@ -28,8 +33,8 @@ export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
     async ({ logsService, params, query, user, request }) => {
       const signal = AbortSignal.any([request.signal, AbortSignal.timeout(MAX_TAIL_MS)]);
       const records = await logsService.openTail({
-        appId: params.appId,
-        deploymentId: params.deploymentId,
+        appId: Value.Parse(AppIdSchema, params.appId),
+        deploymentId: Value.Parse(DeploymentIdSchema, params.deploymentId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         startOffset: query.startOffset ?? DEFAULT_START_OFFSET,
         signal,
@@ -37,7 +42,6 @@ export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
       return events({ records, signal });
     },
     {
-      params: DeploymentParamsSchema,
       query: TailLogsQuerySchema,
     },
   );

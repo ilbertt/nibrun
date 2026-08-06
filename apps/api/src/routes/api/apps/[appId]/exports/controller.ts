@@ -1,11 +1,10 @@
-import { OwnerIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import {
   ExportResponseSchema,
   ListExportsResponseSchema,
 } from '#routes/api/apps/[appId]/exports/model.ts';
-import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 import { ExportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdExportsController = new Elysia()
@@ -17,13 +16,12 @@ export const AppsAppIdExportsController = new Elysia()
     '/apps/:appId/exports',
     async ({ exportsService, params, user, status }) => {
       const exports = await exportsService.list({
-        appId: params.appId,
+        appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
       });
       return status(StatusMap.OK, { exports });
     },
     {
-      params: AppParamsSchema,
       response: { [StatusMap.OK]: ListExportsResponseSchema },
     },
   )
@@ -35,13 +33,12 @@ export const AppsAppIdExportsController = new Elysia()
     '/apps/:appId/exports',
     async ({ exportsService, params, user, status }) => {
       const requested = await exportsService.request({
-        appId: params.appId,
+        appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
       });
       return status(StatusMap.Accepted, requested);
     },
     {
-      params: AppParamsSchema,
       response: { [StatusMap.Accepted]: ExportResponseSchema },
     },
   );

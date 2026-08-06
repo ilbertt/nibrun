@@ -1,4 +1,4 @@
-import { OwnerIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import {
@@ -6,7 +6,6 @@ import {
   DeploymentResponseSchema,
   ListDeploymentsResponseSchema,
 } from '#routes/api/apps/[appId]/deployments/model.ts';
-import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
 import { DeploymentsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdDeploymentsController = new Elysia()
@@ -18,13 +17,12 @@ export const AppsAppIdDeploymentsController = new Elysia()
     '/apps/:appId/deployments',
     async ({ deploymentsService, params, user, status }) => {
       const deployments = await deploymentsService.list({
-        appId: params.appId,
+        appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
       });
       return status(StatusMap.OK, { deployments });
     },
     {
-      params: AppParamsSchema,
       response: { [StatusMap.OK]: ListDeploymentsResponseSchema },
     },
   )
@@ -32,14 +30,13 @@ export const AppsAppIdDeploymentsController = new Elysia()
     '/apps/:appId/deployments',
     async ({ deploymentsService, params, body, user, status }) => {
       const deployment = await deploymentsService.createOrRollback({
-        appId: params.appId,
+        appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         source: body,
       });
       return status(StatusMap.Created, deployment);
     },
     {
-      params: AppParamsSchema,
       body: CreateDeploymentBodySchema,
       response: { [StatusMap.Created]: DeploymentResponseSchema },
     },
