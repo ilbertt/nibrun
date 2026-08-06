@@ -19,7 +19,7 @@
     "@tanstack/react-query-devtools": "^5.101.4",
     "@tanstack/react-router": "^1.170.18",
     "@tanstack/react-router-devtools": "^1.167.0",
-    "better-auth": "^1.6.25",
+    "better-auth": "catalog:",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.28.0",

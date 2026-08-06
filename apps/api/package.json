@@ -20,7 +20,7 @@
     "@ilbertt/better-auth-bun-sql": "^0.2.0",
     "@ilbertt/bun-sqlgen": "^0.4.0",
     "@repo/protocol": "workspace:*",
-    "better-auth": "^1.6.25",
+    "better-auth": "catalog:",
     "elysia": "^1.4.29"
   },
   "devDependencies": {
