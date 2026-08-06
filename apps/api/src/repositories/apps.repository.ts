@@ -1,7 +1,15 @@
 import type { AppHostnameKind, AppId, AppState, DnsLabel, Hostname, OwnerId } from '@repo/protocol';
+import type { ArrayType } from 'bun';
 import type { Queries } from '#db/queries.gen.d.ts';
 import { type AppConfigPatch, type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { Repository } from '#repositories/repository.ts';
+
+/**
+ * `sql.array` encodes as JSON when the element type is left out, and `text[]` reads that JSON
+ * back element by element — so the arguments would arrive quoted rather than rejected. Naming
+ * the type is what makes the column and the parameter agree.
+ */
+const TENANT_ARGS_TYPE: ArrayType = 'TEXT';
 
 export type AppRow = Queries['SelectAppById'];
 export type AppHostnameRow = Queries['SelectAppHostnamesByApp'];
@@ -71,7 +79,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           restart_backoff_factor, restart_reset_after_ms
         )
         VALUES (
-          ${inserted.id}, ${config.guestPort}, ${config.args},
+          ${inserted.id}, ${config.guestPort}, ${tx.array(config.args, TENANT_ARGS_TYPE)},
           ${config.resources.vcpuCount}, ${config.resources.memoryMib},
           ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
           ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
@@ -218,7 +226,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           restart_backoff_factor, restart_reset_after_ms
         )
         VALUES (
-          ${appId}, ${config.guestPort}, ${config.args},
+          ${appId}, ${config.guestPort}, ${tx.array(config.args, TENANT_ARGS_TYPE)},
           ${config.resources.vcpuCount}, ${config.resources.memoryMib},
           ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
           ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},

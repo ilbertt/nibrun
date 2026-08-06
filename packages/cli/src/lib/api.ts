@@ -42,13 +42,29 @@ export function unwrap<R extends Reply>(reply: R): NonNullable<R['data']> {
   return reply.data as NonNullable<R['data']>;
 }
 
-// Eden wraps the body it was given in an `Error` whose message is that body stringified, which
-// for the api's `{ error }` shape reads as `[object Object]`. The body itself is the message.
-function describeFailure(failure: unknown): string {
+/**
+ * Eden wraps the body it was given in an `Error` whose message is that body stringified, which
+ * for the api's `{ error }` shape reads as `[object Object]`.
+ *
+ * The status is said as well as the body, because the body alone reads as this program's own
+ * verdict: `Not Found` sounds like a binary that could not be opened rather than a route that
+ * does not exist.
+ */
+export function describeFailure(failure: unknown): string {
   if (typeof failure !== 'object' || failure === null || !('value' in failure)) {
     return String(failure);
   }
   const { value } = failure;
+  // Eden reports a request it never managed to send as a 503 of its own, so a thrown value is
+  // this end failing to reach the api rather than the api answering.
+  if (value instanceof Error) {
+    return value.message;
+  }
+  const status = 'status' in failure ? String(failure.status) : 'no status';
+  return `The api answered ${status}: ${bodyMessage(value)}`;
+}
+
+function bodyMessage(value: unknown): string {
   if (typeof value === 'object' && value !== null && 'error' in value) {
     return String(value.error);
   }

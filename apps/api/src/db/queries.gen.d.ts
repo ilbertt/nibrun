@@ -193,7 +193,7 @@ export interface ISelectCurrentAppConfigResult {
 
 /** Result of query `InsertPatchedAppConfig`. */
 export interface IInsertPatchedAppConfigResult {
-    id: string | null;
+    id: string;
 }
 
 /** Result of query `TouchAppAfterConfigPatch`. */
