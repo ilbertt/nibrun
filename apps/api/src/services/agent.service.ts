@@ -12,6 +12,7 @@ import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
+import type { ExportsService } from '#services/exports.service.ts';
 import { Service } from '#services/service.ts';
 
 const MS_PER_SECOND = 1000;
@@ -22,20 +23,24 @@ export class AgentService extends Service {
   private readonly agentRepo: AgentRepositoryContract;
   private readonly deploymentsService: DeploymentsService;
   private readonly appsService: AppsService;
+  private readonly exportsService: ExportsService;
 
   constructor({
     agentRepo,
     deploymentsService,
     appsService,
+    exportsService,
   }: {
     agentRepo: AgentRepositoryContract;
     deploymentsService: DeploymentsService;
     appsService: AppsService;
+    exportsService: ExportsService;
   }) {
     super();
     this.agentRepo = agentRepo;
     this.deploymentsService = deploymentsService;
     this.appsService = appsService;
+    this.exportsService = exportsService;
   }
 
   /**
@@ -84,8 +89,8 @@ export class AgentService extends Service {
   }
 
   /**
-   * Read by the two things that own what it talks about: the releases running on the host, and
-   * the apps whose filesystems it is holding or has just let go of.
+   * Read by the things that own what it talks about: the releases running on the host, the apps
+   * whose filesystems it is holding or has just let go of, and the bundles it was told to write.
    *
    * The rest is dropped. Capacity, versions and the host's own state have no table to land in
    * while hosts are not modelled, and holding them in this process would be a second source of
@@ -100,5 +105,6 @@ export class AgentService extends Service {
     });
     await this.deploymentsService.applyHostReport({ reported });
     await this.appsService.completeDeletions({ volumes: reported.volumes });
+    await this.exportsService.applyHostReport({ reported });
   }
 }

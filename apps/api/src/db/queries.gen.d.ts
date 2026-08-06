@@ -43,6 +43,22 @@ export interface ISelectDesiredHostnamesResult {
     kind: import("@repo/protocol").AppHostnameKind;
 }
 
+/** Result of query `SelectDesiredExports`. */
+export interface ISelectDesiredExportsResult {
+    id: import("@repo/protocol").ExportId;
+    app_id: import("@repo/protocol").AppId;
+    /** Where the host writes the bundle and the api signs its download URL. */
+    object_key: import("@repo/protocol").ObjectKey;
+    state: import("@repo/protocol").ExportState;
+    digest: import("@repo/protocol").Sha256Digest;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    size_bytes: string;
+    /** Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    artifact_object_key: import("@repo/protocol").ObjectKey;
+    /** The name the binary was uploaded under; a content-addressed key carries none. */
+    original_file_name: import("@repo/protocol").Filename;
+}
+
 /** Result of query `SelectAppOwnership`. */
 export interface ISelectAppOwnershipResult {
     id: import("@repo/protocol").AppId;
@@ -407,6 +423,63 @@ export interface ISelectInsertedDeploymentResult {
     restart_reset_after_ms: number;
 }
 
+/** Result of query `InsertExport`. */
+export interface IInsertExportResult {
+    id: import("@repo/protocol").ExportId;
+}
+
+/** Result of query `SelectExportsByApp`. */
+export interface ISelectExportsByAppResult {
+    id: import("@repo/protocol").ExportId;
+    app_id: import("@repo/protocol").AppId;
+    state: import("@repo/protocol").ExportState;
+    /** Where the host writes the bundle and the api signs its download URL. */
+    object_key: import("@repo/protocol").ObjectKey;
+    size_bytes: string | null;
+    /** Why the export is in the state it is in, as the host put it. Never the tenant's own output. */
+    message: string | null;
+    ready_at: Date | null;
+    /** When the bucket's lifecycle rule removes the bundle. The api refuses to sign past it. */
+    expires_at: Date;
+    created_at: Date;
+}
+
+/** Result of query `SelectExportById`. */
+export interface ISelectExportByIdResult {
+    id: import("@repo/protocol").ExportId;
+    app_id: import("@repo/protocol").AppId;
+    state: import("@repo/protocol").ExportState;
+    /** Where the host writes the bundle and the api signs its download URL. */
+    object_key: import("@repo/protocol").ObjectKey;
+    size_bytes: string | null;
+    /** Why the export is in the state it is in, as the host put it. Never the tenant's own output. */
+    message: string | null;
+    ready_at: Date | null;
+    /** When the bucket's lifecycle rule removes the bundle. The api refuses to sign past it. */
+    expires_at: Date;
+    created_at: Date;
+}
+
+/** Result of query `ApplyReportedExport`. */
+export interface IApplyReportedExportResult {
+}
+
+/** Result of query `SelectInFlightExport`. */
+export interface ISelectInFlightExportResult {
+    id: import("@repo/protocol").ExportId;
+    app_id: import("@repo/protocol").AppId;
+    state: import("@repo/protocol").ExportState;
+    /** Where the host writes the bundle and the api signs its download URL. */
+    object_key: import("@repo/protocol").ObjectKey;
+    size_bytes: string | null;
+    /** Why the export is in the state it is in, as the host put it. Never the tenant's own output. */
+    message: string | null;
+    ready_at: Date | null;
+    /** When the bucket's lifecycle rule removes the bundle. The api refuses to sign past it. */
+    expires_at: Date;
+    created_at: Date;
+}
+
 /** Result of query `SelectHealthPing`. */
 export interface ISelectHealthPingResult {
     ok: number | null;
@@ -416,6 +489,7 @@ export interface Queries {
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
     SelectDesiredHostnames: ISelectDesiredHostnamesResult;
+    SelectDesiredExports: ISelectDesiredExportsResult;
     SelectAppOwnership: ISelectAppOwnershipResult;
     InsertApp: IInsertAppResult;
     InsertAppConfig: IInsertAppConfigResult;
@@ -447,6 +521,11 @@ export interface Queries {
     FailDeployment: IFailDeploymentResult;
     SupersedeLiveDeployment: ISupersedeLiveDeploymentResult;
     SelectInsertedDeployment: ISelectInsertedDeploymentResult;
+    InsertExport: IInsertExportResult;
+    SelectExportsByApp: ISelectExportsByAppResult;
+    SelectExportById: ISelectExportByIdResult;
+    ApplyReportedExport: IApplyReportedExportResult;
+    SelectInFlightExport: ISelectInFlightExportResult;
     SelectHealthPing: ISelectHealthPingResult;
 }
 

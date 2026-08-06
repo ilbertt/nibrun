@@ -9,6 +9,8 @@ interface CustomProcessEnv {
   readonly S3_ENDPOINT: string;
   readonly VICTORIALOGS_ENDPOINT: string;
   readonly ARTIFACTS_BUCKET: string;
+  readonly EXPORTS_BUCKET: string;
+  readonly EXPORT_RETENTION_DAYS?: string;
   readonly S3_ACCESS_KEY_ID: string;
   readonly S3_SECRET_ACCESS_KEY: string;
   readonly S3_REGION: string;
@@ -17,6 +19,11 @@ interface CustomProcessEnv {
 
 const DEFAULT_PORT = '3000';
 const DEFAULT_BASE_URL = `http://localhost:${DEFAULT_PORT}`;
+
+// Matches the exports bucket's own lifecycle rule, which is what actually removes the object;
+// this end only decides how long it is willing to promise. Deployed from the same terraform
+// variable, so the two move together rather than this one drifting past the rule.
+const DEFAULT_EXPORT_RETENTION_DAYS = '1';
 
 function required(name: keyof CustomProcessEnv): string {
   const value = process.env[name];
@@ -46,6 +53,8 @@ type Env = {
   S3_ENDPOINT: URL;
   VICTORIALOGS_ENDPOINT: URL;
   ARTIFACTS_BUCKET: string;
+  EXPORTS_BUCKET: string;
+  EXPORT_RETENTION_DAYS: number;
   S3_ACCESS_KEY_ID: string;
   S3_SECRET_ACCESS_KEY: string;
   S3_REGION: string;
@@ -63,6 +72,10 @@ function loadEnv(): Env {
     S3_ENDPOINT: new URL(required('S3_ENDPOINT')),
     VICTORIALOGS_ENDPOINT: new URL(required('VICTORIALOGS_ENDPOINT')),
     ARTIFACTS_BUCKET: required('ARTIFACTS_BUCKET'),
+    EXPORTS_BUCKET: required('EXPORTS_BUCKET'),
+    EXPORT_RETENTION_DAYS: Number(
+      optional({ name: 'EXPORT_RETENTION_DAYS', defaultValue: DEFAULT_EXPORT_RETENTION_DAYS }),
+    ),
     S3_ACCESS_KEY_ID: required('S3_ACCESS_KEY_ID'),
     S3_SECRET_ACCESS_KEY: required('S3_SECRET_ACCESS_KEY'),
     S3_REGION: required('S3_REGION'),

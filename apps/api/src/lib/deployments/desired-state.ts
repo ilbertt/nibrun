@@ -19,7 +19,7 @@ export type DesiredVolumeRow = Queries['SelectDesiredVolumes'];
  * The app's own id, because an app has one filesystem and the two never differ. Kept a type apart
  * so an app holding a second one later is a schema change rather than a wire change.
  */
-function volumeIdOf(appId: AppId): VolumeId {
+export function volumeIdOf(appId: AppId): VolumeId {
   return appId as string as VolumeId;
 }
 

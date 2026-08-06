@@ -12,6 +12,7 @@ import type { AgentRepositoryContract } from '#repositories/agent.repository.ts'
 import { AgentService } from '#services/agent.service.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
+import type { ExportsService } from '#services/exports.service.ts';
 
 const SESSION_REQUEST = {
   versions: { agent: 'abc123', guestImage: 'linux-6.1', zerofs: 'v2', firecracker: 'v1' },
@@ -65,16 +66,28 @@ class FakeDeploymentsService {
   }
 }
 
+class FakeExportsService {
+  readonly reports: HostReportedState[] = [];
+
+  applyHostReport({ reported }: { reported: HostReportedState }): Promise<void> {
+    this.reports.push(reported);
+    return Promise.resolve();
+  }
+}
+
 function build() {
   const deployments = new FakeDeploymentsService();
   const apps = new FakeAppsService();
+  const exports = new FakeExportsService();
   return {
     apps,
     deployments,
+    exports,
     service: new AgentService({
       agentRepo: new FakeAgentRepository(),
       deploymentsService: deployments as unknown as DeploymentsService,
       appsService: apps as unknown as AppsService,
+      exportsService: exports as unknown as ExportsService,
     }),
   };
 }
@@ -119,17 +132,19 @@ describe('a host is told the whole of what it should be running', () => {
   });
 });
 
-describe('a report is read for what it says about deployments', () => {
-  test('and nothing else, because nothing else has a table to land in', async () => {
-    const { deployments, service } = build();
+describe('a report is read by whatever owns what it talks about', () => {
+  test('and by each of them, so no part of it is dropped on the way in', async () => {
+    const { deployments, exports, service } = build();
     const reported = {
       hostId: 'host-1' as HostId,
       instances: [],
       volumes: [],
+      exports: [],
     } as unknown as HostReportedState;
 
     await service.acceptReport({ reported });
 
     expect(deployments.reports).toEqual([reported]);
+    expect(exports.reports).toEqual([reported]);
   });
 });

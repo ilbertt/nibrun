@@ -123,6 +123,8 @@ jobs:
       VICTORIALOGS_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).victorialogs_hostname }}
       API_GITHUB_CLIENT_ID: ${{ fromJSON(needs.terraform.outputs.values).api_github_client_id }}
       ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
+      EXPORTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).exports_bucket }}
+      EXPORT_RETENTION_DAYS: ${{ fromJSON(needs.terraform.outputs.values).export_retention_days }}
       API_S3_ENDPOINT: ${{ fromJSON(needs.terraform.outputs.values).api_s3_endpoint }}
       PG_BACKUP_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).pg_backup_bucket }}
       INTERNAL_PORT: ${{ fromJSON(needs.terraform.outputs.values).internal_port }}

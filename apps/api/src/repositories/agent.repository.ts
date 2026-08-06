@@ -4,6 +4,7 @@ import {
   toDesiredInstance,
   toDesiredVolume,
 } from '#lib/deployments/desired-state.ts';
+import { toDesiredExport } from '#lib/exports/desired-state.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export abstract class AgentRepositoryContract {
@@ -34,9 +35,8 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
    * The same state for whichever host asks. Hosts are not modelled and there is one, so the id
    * here is the one the agent registered under rather than one this end assigned.
    *
-   * `checkpoints` and `exports` are empty until each has a table to be requested through: both
-   * are per-request work, so a host can only be told to do one once something has recorded that
-   * someone asked.
+   * `checkpoints` is empty until it has a table to be requested through: it is per-request work,
+   * so a host can only be told to do one once something has recorded that someone asked.
    */
   async desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
     const deployments = await this.sql.SelectDesiredDeployments`
@@ -58,13 +58,20 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
         SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
       `,
     );
+    const exports = await this.sql.SelectDesiredExports`
+      /* @notNull object_key */
+      /* @notNull artifact_object_key */
+      SELECT id, app_id, object_key, state,
+             digest, size_bytes, artifact_object_key, original_file_name
+      FROM nibrun.desired_exports
+    `;
 
     return {
       hostId,
       volumes: volumes.map(toDesiredVolume),
       instances: deployments.map((row) => toDesiredInstance({ row, hostnames })),
       checkpoints: [],
-      exports: [],
+      exports: exports.map(toDesiredExport),
     };
   }
 }

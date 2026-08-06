@@ -1,0 +1,34 @@
+import type { OwnerId } from '@repo/protocol';
+import { Elysia, StatusMap } from 'elysia';
+import { authPlugin } from '#lib/auth/plugin.ts';
+import {
+  ExportParamsSchema,
+  ExportResponseSchema,
+} from '#routes/api/apps/[appId]/exports/model.ts';
+import { ExportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
+
+/**
+ * What a client polls. The download URL appears here once the host has written the bundle, and
+ * it is signed for this response rather than stored, so it is short-lived however long the
+ * caller waited before asking.
+ */
+export const AppsAppIdExportsExportIdController = new Elysia()
+  .use(loggerPlugin('appsAppIdExportsExportIdController'))
+  .use(authPlugin)
+  .use(ExportsServicePlugin)
+  .guard({ auth: true })
+  .get(
+    '/apps/:appId/exports/:exportId',
+    async ({ exportsService, params, user, status }) => {
+      const found = await exportsService.get({
+        appId: params.appId,
+        exportId: params.exportId,
+        ownerId: user.id as OwnerId,
+      });
+      return status(StatusMap.OK, found);
+    },
+    {
+      params: ExportParamsSchema,
+      response: { [StatusMap.OK]: ExportResponseSchema },
+    },
+  );

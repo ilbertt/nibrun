@@ -129,6 +129,14 @@ output "exports_bucket" {
   value       = aws_s3_bucket.exports.bucket
 }
 
+# The api has to say when an export stops being downloadable, and the bucket rule
+# above is what makes that true. Read from the same variable rather than repeated
+# in the api's configuration, so the promise cannot outlive the expiry.
+output "export_retention_days" {
+  description = "How long a downloadable export survives, as enforced by the exports bucket's lifecycle rule."
+  value       = var.export_retention_days
+}
+
 output "filesystems_bucket" {
   description = "ZeroFS's backing store. Read-write from app hosts, read-only from the control plane."
   value       = aws_s3_bucket.filesystems.bucket

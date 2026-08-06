@@ -7,6 +7,8 @@ import { AppsAppIdDeploymentsDeploymentIdController } from '#routes/api/apps/[ap
 import { AppsAppIdDeploymentsDeploymentIdFilesystemController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/controller.ts';
 import { AppsAppIdDeploymentsDeploymentIdLogsController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/controller.ts';
 import { AppsAppIdDeploymentsController } from '#routes/api/apps/[appId]/deployments/controller.ts';
+import { AppsAppIdExportsExportIdController } from '#routes/api/apps/[appId]/exports/[exportId]/controller.ts';
+import { AppsAppIdExportsController } from '#routes/api/apps/[appId]/exports/controller.ts';
 import { AppsController } from '#routes/api/apps/controller.ts';
 import { AuthController } from '#routes/api/auth/controller.ts';
 import { HealthController } from '#routes/api/health/controller.ts';
@@ -21,4 +23,6 @@ export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(AppsAppIdDeploymentsController)
   .use(AppsAppIdDeploymentsDeploymentIdController)
   .use(AppsAppIdDeploymentsDeploymentIdFilesystemController)
-  .use(AppsAppIdDeploymentsDeploymentIdLogsController);
+  .use(AppsAppIdDeploymentsDeploymentIdLogsController)
+  .use(AppsAppIdExportsController)
+  .use(AppsAppIdExportsExportIdController);

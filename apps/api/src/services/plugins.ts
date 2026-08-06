@@ -2,7 +2,7 @@ import { Elysia } from 'elysia';
 import { sql } from '#db/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
-import { s3 } from '#lib/s3/client.ts';
+import { exportsS3, s3 } from '#lib/s3/client.ts';
 import { VictoriaLogsClient } from '#lib/victorialogs/client.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -10,6 +10,8 @@ import { ArtifactStorageRepository } from '#repositories/artifact-storage.reposi
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { ExportStorageRepository } from '#repositories/export-storage.repository.ts';
+import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
@@ -17,6 +19,7 @@ import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
+import { ExportsService } from '#services/exports.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
 import { HealthService } from '#services/health.service.ts';
 import { LogsService } from '#services/logs.service.ts';
@@ -28,6 +31,8 @@ const appsRepository = new AppsRepository(sql);
 const artifactsRepository = new ArtifactsRepository(sql);
 const deploymentsRepository = new DeploymentsRepository(sql);
 const artifactStorageRepository = new ArtifactStorageRepository(s3);
+const exportsRepository = new ExportsRepository(sql);
+const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const logsRepository = new LogsRepository(new VictoriaLogsClient(env.VICTORIALOGS_ENDPOINT));
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
@@ -35,10 +40,17 @@ const appsService = new AppsService({
   appsRepo: appsRepository,
   appHostDomain: env.APP_HOST_DOMAIN,
 });
+const exportsService = new ExportsService({
+  exportsRepo: exportsRepository,
+  storageRepo: exportStorageRepository,
+  appsRepo: appsRepository,
+  retentionDays: env.EXPORT_RETENTION_DAYS,
+});
 const agentService = new AgentService({
   agentRepo: agentRepository,
   deploymentsService,
   appsService,
+  exportsService,
 });
 const assetsService = new AssetsService(assetsRepository);
 const healthService = new HealthService(healthRepository);
@@ -96,4 +108,9 @@ export const DeploymentsServicePlugin = new Elysia({ name: 'service.deployments'
 export const LogsServicePlugin = new Elysia({ name: 'service.logs' }).decorate(
   'logsService',
   logsService,
+);
+
+export const ExportsServicePlugin = new Elysia({ name: 'service.exports' }).decorate(
+  'exportsService',
+  exportsService,
 );

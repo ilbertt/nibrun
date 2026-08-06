@@ -62,10 +62,12 @@ services:
         set -e
         mc alias set nibrun http://minio:9000 "$$API_S3_ACCESS_KEY_ID" "$$API_S3_SECRET_ACCESS_KEY"
         mc mb --ignore-existing "nibrun/$$ARTIFACTS_BUCKET"
+        mc mb --ignore-existing "nibrun/$$EXPORTS_BUCKET"
     environment:
       - API_S3_ACCESS_KEY_ID
       - API_S3_SECRET_ACCESS_KEY
       - ARTIFACTS_BUCKET
+      - EXPORTS_BUCKET
     depends_on:
       minio:
         condition: service_healthy
@@ -97,6 +99,8 @@ services:
       # vary by.
       - VICTORIALOGS_ENDPOINT=http://victorialogs:9428
       - ARTIFACTS_BUCKET=${ARTIFACTS_BUCKET}
+      - EXPORTS_BUCKET=${EXPORTS_BUCKET}
+      - EXPORT_RETENTION_DAYS=${EXPORT_RETENTION_DAYS}
       - AGENT_BOOTSTRAP_TOKEN=${AGENT_BOOTSTRAP_TOKEN}
       - S3_ACCESS_KEY_ID=${API_S3_ACCESS_KEY_ID}
       - S3_SECRET_ACCESS_KEY=${API_S3_SECRET_ACCESS_KEY}
