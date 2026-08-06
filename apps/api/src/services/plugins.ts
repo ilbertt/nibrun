@@ -31,14 +31,18 @@ const artifactStorageRepository = new ArtifactStorageRepository(s3);
 const logsRepository = new LogsRepository(new VictoriaLogsClient(env.VICTORIALOGS_ENDPOINT));
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
-const agentService = new AgentService({ agentRepo: agentRepository, deploymentsService });
-const assetsService = new AssetsService(assetsRepository);
-const healthService = new HealthService(healthRepository);
-const filesystemService = new FilesystemService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
   appsRepo: appsRepository,
   appHostDomain: env.APP_HOST_DOMAIN,
 });
+const agentService = new AgentService({
+  agentRepo: agentRepository,
+  deploymentsService,
+  appsService,
+});
+const assetsService = new AssetsService(assetsRepository);
+const healthService = new HealthService(healthRepository);
+const filesystemService = new FilesystemService({ deploymentsRepo: deploymentsRepository });
 const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,

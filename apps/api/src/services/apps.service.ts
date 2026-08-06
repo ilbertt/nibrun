@@ -1,4 +1,4 @@
-import type { App, AppHostname, AppId, OwnerId } from '@repo/protocol';
+import type { App, AppHostname, AppId, OwnerId, ReportedVolume } from '@repo/protocol';
 import {
   type AppConfigPatch,
   configWithDefaults,
@@ -117,6 +117,25 @@ export class AppsService extends Service {
    * The row stays behind: tearing an app down is the agent's work, the owner follows it through
    * this same state, and the slug must never be handed to a second app whatever happens.
    */
+  /**
+   * Deleting an app finishes on the host that held its data. Until a host says the filesystem is
+   * gone the app stays `deleting`, because the alternative is calling it deleted while a tenant's
+   * bytes are still on a disk somewhere.
+   *
+   * Read off the volumes rather than their absence: a report that lost some would otherwise
+   * delete the apps it forgot to mention.
+   */
+  async completeDeletions({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
+    for (const volume of volumes) {
+      if (volume.state !== 'deleted') {
+        continue;
+      }
+      if (await this.appsRepo.finishDeleting({ appId: volume.appId })) {
+        this.logger.info('app deleted', { appId: volume.appId, volumeId: volume.volumeId });
+      }
+    }
+  }
+
   async delete({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
     const app = requireApp(await this.appsRepo.updateState({ appId, ownerId, state: 'deleting' }));
     const hostnames = await this.appsRepo.listHostnamesByApp({ appId, ownerId });

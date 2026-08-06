@@ -101,7 +101,9 @@ describe('the assembled report satisfies the protocol', () => {
       },
       versions: { agent: 'sha', guestImage: '6.1', zerofs: '2.2.1', firecracker: '1.16.1' },
       records: [record({ startedAt: OBSERVED_AT })],
-      volumes: [{ volumeId: VOLUME_ID, state: 'ready', sizeBytes: VOLUME_SIZE_BYTES }],
+      volumes: [
+        { volumeId: VOLUME_ID, appId: APP_ID, state: 'ready', sizeBytes: VOLUME_SIZE_BYTES },
+      ],
       checkpoints: [],
       exports: [
         {

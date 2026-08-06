@@ -10,6 +10,7 @@ import {
 } from '@repo/protocol';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
+import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import { Service } from '#services/service.ts';
 
@@ -20,17 +21,21 @@ const SESSION_LIFETIME_MS = SECONDS_PER_HOUR * MS_PER_SECOND;
 export class AgentService extends Service {
   private readonly agentRepo: AgentRepositoryContract;
   private readonly deploymentsService: DeploymentsService;
+  private readonly appsService: AppsService;
 
   constructor({
     agentRepo,
     deploymentsService,
+    appsService,
   }: {
     agentRepo: AgentRepositoryContract;
     deploymentsService: DeploymentsService;
+    appsService: AppsService;
   }) {
     super();
     this.agentRepo = agentRepo;
     this.deploymentsService = deploymentsService;
+    this.appsService = appsService;
   }
 
   /**
@@ -79,9 +84,12 @@ export class AgentService extends Service {
   }
 
   /**
-   * Only what the report says about deployments is kept. Capacity, versions and the host's own
-   * state have no table to land in while hosts are not modelled, and holding them in this process
-   * would be a second source of truth to unpick once they do.
+   * Read by the two things that own what it talks about: the releases running on the host, and
+   * the apps whose filesystems it is holding or has just let go of.
+   *
+   * The rest is dropped. Capacity, versions and the host's own state have no table to land in
+   * while hosts are not modelled, and holding them in this process would be a second source of
+   * truth to unpick once they do.
    */
   async acceptReport({ reported }: { reported: HostReportedState }): Promise<void> {
     this.logger.info('host reported', {
@@ -91,5 +99,6 @@ export class AgentService extends Service {
       volumes: reported.volumes.length,
     });
     await this.deploymentsService.applyHostReport({ reported });
+    await this.appsService.completeDeletions({ volumes: reported.volumes });
   }
 }

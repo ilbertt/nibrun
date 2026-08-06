@@ -16,6 +16,7 @@ const provision = (desired: DesiredVolume) =>
           Effect.annotateLogs({ volumeId: desired.volumeId }),
           Effect.as({
             volumeId: desired.volumeId,
+            appId: desired.appId,
             state: 'failed',
             sizeBytes: desired.sizeBytes,
             message: reportedMessage(error),

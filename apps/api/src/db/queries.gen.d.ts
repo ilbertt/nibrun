@@ -30,6 +30,12 @@ export interface ISelectDesiredDeploymentsResult {
     restart_reset_after_ms: number;
 }
 
+/** Result of query `SelectDesiredVolumes`. */
+export interface ISelectDesiredVolumesResult {
+    app_id: import("@repo/protocol").AppId;
+    state: import("@repo/protocol").AppState;
+}
+
 /** Result of query `SelectDesiredHostnames`. */
 export interface ISelectDesiredHostnamesResult {
     app_id: import("@repo/protocol").AppId;
@@ -197,6 +203,11 @@ export interface ITouchAppAfterConfigPatchResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+}
+
+/** Result of query `FinishDeletingApp`. */
+export interface IFinishDeletingAppResult {
+    id: import("@repo/protocol").AppId;
 }
 
 /** Result of query `UpdateAppState`. */
@@ -403,6 +414,7 @@ export interface ISelectHealthPingResult {
 
 export interface Queries {
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
+    SelectDesiredVolumes: ISelectDesiredVolumesResult;
     SelectDesiredHostnames: ISelectDesiredHostnamesResult;
     SelectAppOwnership: ISelectAppOwnershipResult;
     InsertApp: IInsertAppResult;
@@ -417,6 +429,7 @@ export interface Queries {
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
     TouchAppAfterConfigPatch: ITouchAppAfterConfigPatchResult;
+    FinishDeletingApp: IFinishDeletingAppResult;
     UpdateAppState: IUpdateAppStateResult;
     SelectAppAfterStateChange: ISelectAppAfterStateChangeResult;
     InsertArtifact: IInsertArtifactResult;

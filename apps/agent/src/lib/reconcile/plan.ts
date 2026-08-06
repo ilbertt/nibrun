@@ -25,6 +25,7 @@ export type ObservedInstance = {
 
 export type ObservedVolume = {
   readonly volumeId: VolumeId;
+  readonly appId: AppId;
   readonly attached: boolean;
   readonly sizeBytes: number;
   readonly storagePrefix: ObjectKey;

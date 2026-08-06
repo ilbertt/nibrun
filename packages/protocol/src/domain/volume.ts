@@ -3,7 +3,9 @@ import { AppIdSchema, VolumeIdSchema } from '#domain/identifiers.ts';
 import { stringEnum } from '#lib/string-enum.ts';
 import { ByteSizeSchema, ObjectKeySchema, TimestampSchema } from '#lib/wire.ts';
 
-export const VOLUME_STATES = ['pending', 'ready', 'detached', 'deleting', 'failed'] as const;
+// `deleted` is reported once the filesystem is actually gone, which is what lets the control
+// plane finish deleting an app rather than leave it saying `deleting` forever.
+export const VOLUME_STATES = ['pending', 'ready', 'detached', 'deleted', 'failed'] as const;
 
 export const VolumeStateSchema = stringEnum(VOLUME_STATES);
 

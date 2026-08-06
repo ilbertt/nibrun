@@ -48,6 +48,7 @@ export type ReportedInstance = typeof ReportedInstanceSchema.static;
 
 export const ReportedVolumeSchema = Type.Object({
   volumeId: VolumeIdSchema,
+  appId: AppIdSchema,
   state: VolumeStateSchema,
   sizeBytes: ByteSizeSchema,
   // Which ZeroFS filesystem the host put it in.

@@ -43,10 +43,12 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
     const observeFile = ({
       filesystem,
       volumeId,
+      appId,
       slot,
     }: {
       filesystem: ZerofsFilesystem;
       volumeId: VolumeId;
+      appId: AppId;
       slot: Option.Option<AppSlot>;
     }) =>
       Effect.gen(function* () {
@@ -57,6 +59,7 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
         const attached = Option.isSome(slot) ? yield* isAttached(slot.value.nbdDevicePath) : false;
         return Option.some<ObservedVolume>({
           volumeId,
+          appId,
           sizeBytes: sizeBytes.value,
           storagePrefix: filesystem.storagePrefix,
           attached,
@@ -81,10 +84,19 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
               ),
               Effect.orElseSucceed(() => [] as string[]),
             );
+            // A device file with no app is one this agent has lost its record of. Reporting it
+            // under a guessed app would be worse than leaving it out: the control plane reads
+            // these to decide a tenant's filesystem is gone.
             const observed = yield* Effect.forEach(names, (name) =>
-              Effect.flatMap(slotFor({ volumeId: name as VolumeId, appIdByVolume }), (slot) =>
-                observeFile({ filesystem, volumeId: name as VolumeId, slot }),
-              ),
+              Effect.gen(function* () {
+                const volumeId = name as VolumeId;
+                const appId = appIdByVolume.get(volumeId);
+                if (appId === undefined) {
+                  return Option.none<ObservedVolume>();
+                }
+                const slot = yield* slotFor({ volumeId, appIdByVolume });
+                return yield* observeFile({ filesystem, volumeId, appId, slot });
+              }),
             );
             return Arr.getSomes(observed);
           }),
@@ -116,6 +128,7 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
 
       return {
         volumeId: desired.volumeId,
+        appId: desired.appId,
         state: 'ready',
         sizeBytes,
         devicePath: slot.nbdDevicePath,
@@ -141,9 +154,12 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
         { force: true },
       );
       yield* allocator.release(desired.appId);
+      // `deleted` rather than `deleting`: everything above has already happened, and the control
+      // plane finishes deleting the app on the strength of this.
       return {
         volumeId: desired.volumeId,
-        state: 'deleting',
+        appId: desired.appId,
+        state: 'deleted',
         sizeBytes: EMPTY_SIZE,
       } satisfies ReportedVolume;
     });
