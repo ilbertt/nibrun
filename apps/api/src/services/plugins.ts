@@ -3,6 +3,7 @@ import { sql } from '#db/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
 import { s3 } from '#lib/s3/client.ts';
+import { VictoriaLogsClient } from '#lib/victorialogs/client.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
 import { ArtifactStorageRepository } from '#repositories/artifact-storage.repository.ts';
@@ -11,6 +12,7 @@ import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { FilesystemRepository } from '#repositories/filesystem.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
+import { LogsRepository } from '#repositories/logs.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
 import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
@@ -18,6 +20,7 @@ import { AssetsService } from '#services/assets.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
 import { HealthService } from '#services/health.service.ts';
+import { LogsService } from '#services/logs.service.ts';
 
 const agentRepository = new AgentRepository(sql);
 const assetsRepository = new AssetsRepository(sql);
@@ -27,6 +30,7 @@ const appsRepository = new AppsRepository(sql);
 const artifactsRepository = new ArtifactsRepository(sql);
 const deploymentsRepository = new DeploymentsRepository(sql);
 const artifactStorageRepository = new ArtifactStorageRepository(s3);
+const logsRepository = new LogsRepository(new VictoriaLogsClient(env.VICTORIALOGS_ENDPOINT));
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
@@ -46,6 +50,11 @@ const artifactsService = new ArtifactsService({
   storageRepo: artifactStorageRepository,
   appsRepo: appsRepository,
 });
+const logsService = new LogsService({
+  logsRepo: logsRepository,
+  deploymentsRepo: deploymentsRepository,
+});
+
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);
   return new Elysia({ name: `logger.${name}` }).derive({ as: 'scoped' }, () => ({ logger }));
@@ -84,4 +93,9 @@ export const ArtifactsServicePlugin = new Elysia({ name: 'service.artifacts' }).
 export const DeploymentsServicePlugin = new Elysia({ name: 'service.deployments' }).decorate(
   'deploymentsService',
   deploymentsService,
+);
+
+export const LogsServicePlugin = new Elysia({ name: 'service.logs' }).decorate(
+  'logsService',
+  logsService,
 );
