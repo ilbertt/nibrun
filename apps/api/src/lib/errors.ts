@@ -86,8 +86,12 @@ export function elysiaErrorHandler({
   }
   // A path segment is only a branded identifier once a handler has parsed it, so the schema that
   // rejects a malformed one throws here rather than at the edge, and would otherwise be a 500.
+  // Named apart from Elysia's own so the two are told apart: this one failed past the edge.
   if (error instanceof AssertError) {
-    return status(StatusMap['Bad Request'], { error: 'Validation error', details: error.message });
+    return status(StatusMap['Bad Request'], {
+      error: 'Protocol type validation error',
+      details: error.message,
+    });
   }
   if (code === 'NOT_FOUND') {
     return status(StatusMap['Not Found'], { error: 'Not Found' });
