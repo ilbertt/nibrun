@@ -12,6 +12,10 @@ the layout under `src/commands/` is the command tree.
   `ctx.context.env`, never `process.env`.
 - Arguments meant for a tenant binary are split off `process.argv` at the first
   `--` in `src/main.ts` and reach handlers as `ctx.context.tenantArgs`.
+- Prompting is gated on both ends of the pipe being a terminal (`isInteractive()`)
+  and on `--yes` being absent. A command must work with neither: whatever the
+  flags left open still needs a default. `ctx.print` stays the plain-output path,
+  clack the interactive one — see `src/lib/ui.ts`.
 - Run it with `bun nib …`. Bun runs package scripts from the repo root, so
   relative paths are resolved against the root rather than the caller's shell —
   pass absolute paths until the CLI ships as a real `bin`.

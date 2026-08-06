@@ -9,7 +9,7 @@ export const command = defineCommand('run [binary]', {
   options: {
     app: {
       schema: z.string().optional(),
-      description: 'Slug of an existing app to deploy onto. A new app is created when omitted.',
+      description: 'Slug of an existing app to deploy onto. Asked for when omitted.',
     },
     name: {
       schema: z.string().optional(),
@@ -29,17 +29,37 @@ export const command = defineCommand('run [binary]', {
       aliases: ['d'],
       description: 'Return once the deployment is created instead of waiting for it to serve.',
     },
+    yes: {
+      schema: z.boolean().optional(),
+      aliases: ['y'],
+      description: 'Take the defaults for anything not given instead of asking.',
+    },
   },
   handler: async ({ params, options, context, print }) => {
     const { createApi } = await import('#lib/api.ts');
-    const { deploy } = await import('#lib/deploy.ts');
+    const { deploy, readBinary } = await import('#lib/deploy.ts');
+    const { completeOptions } = await import('#lib/plan.ts');
+    const { createUi, isInteractive } = await import('#lib/ui.ts');
 
-    await deploy({
-      ...options,
-      api: createApi({ baseUrl: context.env.NIB_API_URL, apiKey: context.env.NIB_API_KEY }),
-      print,
-      binaryPath: params.binary,
-      args: context.tenantArgs,
-    });
+    const { yes, detach, ...given } = options;
+    const api = createApi({ baseUrl: context.env.NIB_API_URL, apiKey: context.env.NIB_API_KEY });
+
+    // A terminal decides how this looks; `--yes` only decides whether it asks. Someone who wants
+    // the defaults taken has not thereby asked for the output of a log file.
+    const interactive = isInteractive();
+    const ui = createUi({ print, interactive });
+
+    // Before anything is asked, so a path nobody can read costs one line rather than a
+    // questionnaire whose answers are then thrown away.
+    const binary = await readBinary(params.binary);
+    ui.open('nib run');
+
+    const args = context.tenantArgs;
+    const resolved =
+      interactive && yes !== true
+        ? await completeOptions({ api, options: given, binaryPath: params.binary, args })
+        : given;
+
+    await deploy({ ...resolved, api, ui, binary, args, detach });
   },
 });

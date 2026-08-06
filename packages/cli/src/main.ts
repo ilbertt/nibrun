@@ -4,6 +4,7 @@ import { createEnvContext } from '@parshjs/env';
 import type { TenantArguments } from '@repo/protocol';
 import { z } from 'zod';
 import { commandTree } from '#command-tree.gen.ts';
+import { CancelledError } from '#lib/errors.ts';
 
 /**
  * Everything past the first `--` belongs to the deployed binary, not to us. The split happens
@@ -30,6 +31,10 @@ const cli = createCli({
     }),
     tenantArgs,
   },
+  errors: { CANCELLED: CancelledError },
+  // Walking away from a prompt is an ordinary ending, and clack has already written the line
+  // saying so — the exit code is all that is left to say.
+  onError: ({ code, exit }) => (code === 'CANCELLED' ? exit(1) : undefined),
 });
 
 declare module '@parshjs/core' {

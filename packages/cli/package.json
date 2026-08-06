@@ -7,10 +7,12 @@
   },
   "scripts": {
     "nib": "bun run src/main.ts",
+    "test": "bun test",
     "generate": "parsh-codegen generate --commands src/commands --out src/command-tree.gen.ts",
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
+    "@clack/prompts": "^1.7.0",
     "@parshjs/core": "^0.0.10",
     "@parshjs/env": "^0.0.3",
     "@repo/api-client": "workspace:*",

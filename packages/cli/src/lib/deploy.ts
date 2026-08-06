@@ -1,5 +1,4 @@
 import { basename } from 'node:path';
-import type { Print } from '@parshjs/core';
 import {
   DEFAULT_INSTANCE_RESOURCES,
   type DeploymentState,
@@ -7,25 +6,20 @@ import {
   type InstanceResources,
   type TenantArguments,
 } from '@repo/protocol';
-import { type Api, ApiError, unwrap } from '#lib/api.ts';
+import { type Api, unwrap } from '#lib/api.ts';
+import { ApiError } from '#lib/errors.ts';
+import type { RunOptions } from '#lib/plan.ts';
+import type { Ui } from '#lib/ui.ts';
 
 const SETTLING_STATES = new Set<DeploymentState>(['pending', 'starting']);
 const POLL_INTERVAL_MS = 2_000;
 const SERVING_TIMEOUT_MS = 300_000;
 
-type ResourceOverrides = {
-  port?: number | undefined;
-  vcpu?: number | undefined;
-  memory?: number | undefined;
-};
-
-export type DeployInput = ResourceOverrides & {
+export type DeployInput = RunOptions & {
   api: Api;
-  print: Print;
-  binaryPath: string;
+  ui: Ui;
+  binary: File;
   args: TenantArguments;
-  app?: string | undefined;
-  name?: string | undefined;
   detach?: boolean | undefined;
 };
 
@@ -38,15 +32,14 @@ export type DeployInput = ResourceOverrides & {
  */
 export async function deploy({
   api,
-  print,
-  binaryPath,
+  ui,
+  binary,
   args,
   app: slug,
   name,
   detach,
   ...resources
 }: DeployInput): Promise<void> {
-  const binary = await readBinary(binaryPath);
   const target = slug === undefined ? null : await appBySlug({ api, slug });
   const config = configPatch({
     args,
@@ -58,32 +51,34 @@ export async function deploy({
     target === null
       ? unwrap(await api.api.apps.post({ name: name ?? binary.name, config }))
       : unwrap(await api.api.apps({ appId: target.id }).patch(config));
-  print.dim(`app ${app.slug}`);
+  ui.step(`app ${app.slug}`);
 
   const artifact = unwrap(await api.api.apps({ appId: app.id }).artifacts.post({ binary }));
-  print.dim(`artifact ${artifact.digest}`);
+  ui.step(`artifact ${artifact.digest}`);
 
   const deployment = unwrap(
     await api.api.apps({ appId: app.id }).deployments.post({ artifactId: artifact.id }),
   );
-  print.dim(`deployment ${deployment.id}`);
 
   const url = `https://${platformHostname(app.hostnames)}`;
   if (detach === true) {
-    print.success(url);
+    ui.done(`${url} — deployment ${deployment.id} is starting`);
     return;
   }
 
-  const state = await awaitSettled({ api, appId: app.id, deploymentId: deployment.id });
+  const state = await ui.waitingFor({
+    message: `starting deployment ${deployment.id}`,
+    task: () => awaitSettled({ api, appId: app.id, deploymentId: deployment.id }),
+  });
   if (state !== 'active') {
     throw new ApiError(`Deployment ${deployment.id} is ${state}.`);
   }
-  print.success(url);
+  ui.done(url);
 }
 
 // A `File` rather than the `Bun.file` handle it came from: the multipart filename is read off
 // `name`, and the api keeps it as what the binary is called again inside an export.
-async function readBinary(path: string): Promise<File> {
+export async function readBinary(path: string): Promise<File> {
   const handle = Bun.file(path);
   if (!(await handle.exists())) {
     throw new ApiError(`No such file: ${path}`);
@@ -103,8 +98,8 @@ async function appBySlug({ api, slug }: { api: Api; slug: string }) {
 }
 
 /**
- * `args` is always written, empty included: what was typed after `--` is what the binary is asked
- * to run with, and carrying over the last deploy's arguments because none were given this time
+ * `args` is always written, empty included: what the caller typed is what the binary is asked to
+ * run with, and carrying over the last deploy's arguments because none were given this time
  * would run something nobody asked for.
  */
 function configPatch({
@@ -113,7 +108,7 @@ function configPatch({
   port,
   vcpu,
   memory,
-}: ResourceOverrides & { args: TenantArguments; current: InstanceResources }) {
+}: RunOptions & { args: TenantArguments; current: InstanceResources }) {
   return {
     args,
     ...(port !== undefined && { guestPort: port as GuestPort }),

@@ -1,4 +1,5 @@
 import { createPublicApiClient } from '@repo/api-client/public';
+import { ApiError } from '#lib/errors.ts';
 
 // The header better-auth's api-key plugin reads. Named after it rather than after us so a key
 // minted by the api reaches this client unchanged the day that plugin is turned on.
@@ -8,13 +9,6 @@ export type Api = ReturnType<typeof createPublicApiClient>;
 
 export function createApi({ baseUrl, apiKey }: { baseUrl: string; apiKey: string }): Api {
   return createPublicApiClient({ baseUrl, headers: { [API_KEY_HEADER]: apiKey } });
-}
-
-export class ApiError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'ApiError';
-  }
 }
 
 type Reply = { data: unknown; error: unknown };
