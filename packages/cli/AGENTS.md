@@ -9,8 +9,16 @@ the layout under `src/commands/` is the command tree.
 - `--help` loads every command it lists, so a heavy top-level import is paid on
   every help invocation. Not worth avoiding at this size; move imports into the
   handler once the tree is big enough to feel it.
-- `NIBRUN_API_URL` and `NIBRUN_API_KEY` are read through `@parshjs/env` as
-  `ctx.context.env`, never `process.env`.
+- `NIBRUN_API_URL` and `NIBRUN_COOKIE_TOKEN` are read through `@parshjs/env`
+  inside `createCli`'s context factory, never `process.env`. Handlers ask for
+  the ready client as `ctx.context.api`.
+- The session cookie is a placeholder for a credential the CLI has not been
+  issued yet. It goes when better-auth's device-authorization and bearer
+  plugins land: `nib login` will hold an access token and `authHeaders` will
+  send `Authorization: Bearer` instead.
+- The factory is where a missing variable is noticed, and parsh resolves it
+  outside its own error handling — hence the `try` around `cli.main()`. Remove
+  it and an unset variable prints a stack trace instead of one line.
 - A tenant binary and its arguments arrive as one quoted positional, split by
   `src/lib/command-line.ts`. parsh cannot tell a trailing `--verbose` meant for
   the tenant from one meant for us, so quoting is what says which — never add a

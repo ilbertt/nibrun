@@ -1,14 +1,43 @@
 import { createPublicApiClient } from '@repo/api-client/public';
-import { ApiError } from '#lib/errors.ts';
+import { ApiError, UsageError } from '#lib/errors.ts';
 
-// The header better-auth's api-key plugin reads. Named after it rather than after us so a key
-// minted by the api reaches this client unchanged the day that plugin is turned on.
-const API_KEY_HEADER = 'x-api-key';
+const SESSION_COOKIE = 'better-auth.session_token';
+const SECURE_COOKIE_PREFIX = '__Secure-';
+
+const NO_CREDENTIAL =
+  'Set NIBRUN_COOKIE_TOKEN to the value of your better-auth.session_token cookie.';
 
 export type Api = ReturnType<typeof createPublicApiClient>;
 
-export function createApi({ baseUrl, apiKey }: { baseUrl: string; apiKey: string }): Api {
-  return createPublicApiClient({ baseUrl, headers: { [API_KEY_HEADER]: apiKey } });
+export type Credentials = {
+  baseUrl: string;
+  cookieToken?: string | undefined;
+};
+
+export function createApi(credentials: Credentials): Api {
+  return createPublicApiClient({
+    baseUrl: credentials.baseUrl,
+    headers: authHeaders(credentials),
+  });
+}
+
+/**
+ * A session cookie, because it is the only credential the api can verify: it authenticates every
+ * request through better-auth, and better-auth has been given no other way in. Borrowing a
+ * browser's session is the placeholder for a CLI that has not been issued one of its own yet.
+ */
+export function authHeaders({ baseUrl, cookieToken }: Credentials): Record<string, string> {
+  if (!cookieToken) {
+    throw new UsageError(NO_CREDENTIAL);
+  }
+  return { cookie: `${sessionCookieName(baseUrl)}=${cookieToken}` };
+}
+
+// better-auth prefixes the cookie it sets whenever its own base URL is https, so what to call it
+// follows the scheme of the api being addressed rather than being fixed here.
+function sessionCookieName(baseUrl: string): string {
+  const prefix = new URL(baseUrl).protocol === 'https:' ? SECURE_COOKIE_PREFIX : '';
+  return `${prefix}${SESSION_COOKIE}`;
 }
 
 type Reply = { data: unknown; error: unknown };

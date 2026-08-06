@@ -6,26 +6,24 @@ import { commandTree } from '#command-tree.gen.ts';
 import { createApi } from '#lib/api.ts';
 import { CancelledError } from '#lib/errors.ts';
 
-const env = createEnvContext({
-  vars: {
-    NIBRUN_API_URL: { schema: z.url(), default: 'http://localhost:3000' },
-    NIBRUN_API_KEY: { schema: z.string().min(1) },
-  },
-});
+const PROGRAM_NAME = 'nib';
 
 const cli = createCli({
-  programName: 'nib',
+  programName: PROGRAM_NAME,
   programDescription: 'Run a binary on nibrun.',
   tree: commandTree,
-  // A factory rather than an object: building the client reads the key, and parsh resolves a
-  // factory only once a handler is about to run. Asking someone for a credential before showing
-  // them `--help` is the one thing this must not do.
-  context: () => ({
-    api: createApi({ baseUrl: env.NIBRUN_API_URL, apiKey: env.NIBRUN_API_KEY }),
-  }),
+  context: () => {
+    const env = createEnvContext({
+      vars: {
+        NIBRUN_API_URL: { schema: z.url(), default: 'http://localhost:3000' },
+        NIBRUN_COOKIE_TOKEN: { schema: z.string(), default: '' },
+      },
+    });
+    return {
+      api: createApi({ baseUrl: env.NIBRUN_API_URL, cookieToken: env.NIBRUN_COOKIE_TOKEN }),
+    };
+  },
   errors: { CANCELLED: CancelledError },
-  // Walking away from a prompt is an ordinary ending, and clack has already written the line
-  // saying so — the exit code is all that is left to say.
   onError: ({ code, exit }) => (code === 'CANCELLED' ? exit(1) : undefined),
 });
 
@@ -35,4 +33,10 @@ declare module '@parshjs/core' {
   }
 }
 
-await cli.main();
+try {
+  await cli.main();
+} catch (failure) {
+  const message = failure instanceof Error ? failure.message : String(failure);
+  process.stderr.write(`${PROGRAM_NAME}: ${message}\n`);
+  process.exit(1);
+}
