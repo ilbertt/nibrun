@@ -1,24 +1,28 @@
 import { expect, test } from 'bun:test';
 import { authHeaders } from '#lib/api.ts';
 
-test('a session token is sent as the cookie better-auth issued', () => {
-  expect(authHeaders({ baseUrl: 'http://localhost:3000', cookieToken: 'abc' })).toEqual({
-    cookie: 'better-auth.session_token=abc',
-  });
+const API_URL = 'http://localhost:3000';
+
+test('a stored token authenticates as the bearer it is', () => {
+  expect(
+    authHeaders({
+      baseUrl: API_URL,
+      credentials: { apiUrl: API_URL, accessToken: 'abc' },
+    }),
+  ).toEqual({ authorization: 'Bearer abc' });
 });
 
-test('an api served over https is sent the prefixed name it set the cookie under', () => {
-  expect(authHeaders({ baseUrl: 'https://nibrun.test', cookieToken: 'abc' })).toEqual({
-    cookie: '__Secure-better-auth.session_token=abc',
-  });
+test('a token issued by another api is not sent to this one', () => {
+  expect(
+    authHeaders({
+      baseUrl: API_URL,
+      credentials: { apiUrl: 'https://nibrun.test', accessToken: 'abc' },
+    }),
+  ).toEqual({});
 });
 
-test('naming no credential is refused before anything is sent', () => {
-  expect(() => authHeaders({ baseUrl: 'http://localhost:3000' })).toThrow('NIBRUN_COOKIE_TOKEN');
-});
-
-test('a variable set to nothing is a variable not set', () => {
-  expect(() => authHeaders({ baseUrl: 'http://localhost:3000', cookieToken: '' })).toThrow(
-    'NIBRUN_COOKIE_TOKEN',
-  );
+// `nib login` is dispatched like any other command, so building the client must survive having
+// nothing to authenticate with.
+test('being signed out builds a client rather than refusing to', () => {
+  expect(authHeaders({ baseUrl: API_URL, credentials: null })).toEqual({});
 });

@@ -98,6 +98,7 @@
         "@clack/prompts": "^1.7.0",
         "@parshjs/core": "^0.0.10",
         "@parshjs/env": "^0.0.3",
+        "@parshjs/files": "^0.0.4",
         "@repo/api-client": "workspace:*",
         "@repo/protocol": "workspace:*",
         "zod": "^4.4.3",
@@ -457,6 +458,8 @@
     "@parshjs/core": ["@parshjs/core@0.0.10", "", {}, "sha512-tMjf7tx7snUMLWQch0SXJXFxHfiJZusbG3UXivqSQN9lTf+JTj6iaWIRkpw+1FKPoV7t9WPvCi9LsmeZ98/QnQ=="],
 
     "@parshjs/env": ["@parshjs/env@0.0.3", "", {}, "sha512-n0D9K7YLyLPxwJbyz3oKP3q0/t0V1vDZpnyNZ7kJZ8nGuB8oX2tMNYYgdhJDOXgHQl6IKZHeIi+RTa6OWSQPGg=="],
+
+    "@parshjs/files": ["@parshjs/files@0.0.4", "", {}, "sha512-u+JqZ1+yRn7hvDtXMCizqHe2k4cPQaKgGqI1y9P9NZbROTC/+rbMvaadK5+Ks2OoanzQmIIb/3/nO8aZOq8qhw=="],
 
     "@repo/agent": ["@repo/agent@workspace:apps/agent"],
 

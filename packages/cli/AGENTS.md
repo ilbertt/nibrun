@@ -9,16 +9,20 @@ the layout under `src/commands/` is the command tree.
 - `--help` loads every command it lists, so a heavy top-level import is paid on
   every help invocation. Not worth avoiding at this size; move imports into the
   handler once the tree is big enough to feel it.
-- `NIBRUN_API_URL` and `NIBRUN_COOKIE_TOKEN` are read through `@parshjs/env`
-  inside `createCli`'s context factory, never `process.env`. Handlers ask for
-  the ready client as `ctx.context.api`.
-- The session cookie is a placeholder for a credential the CLI has not been
-  issued yet. It goes when better-auth's device-authorization and bearer
-  plugins land: `nib login` will hold an access token and `authHeaders` will
-  send `Authorization: Bearer` instead.
-- The factory is where a missing variable is noticed, and parsh resolves it
-  outside its own error handling — hence the `try` around `cli.main()`. Remove
-  it and an unset variable prints a stack trace instead of one line.
+- `NIBRUN_API_URL` is read through `@parshjs/env` inside `createCli`'s context
+  factory, never `process.env`. Handlers ask for the ready client as
+  `ctx.context.api`.
+- `nib login` is the device-authorization flow: the CLI shows a code, the owner
+  approves it on the dashboard's `/device`, and the token that comes back is
+  written by `@parshjs/files` to `~/.config/nib/credentials.json`. It is stored
+  with the api that issued it, because it authenticates against no other.
+- **The client is built even when there is no token**, so `nib login` — a
+  command like any other — can run at all. What stops an unauthenticated
+  request is `requireSignedIn` in a `beforeHandler`. A new command that talks to
+  the api needs that line, or its failure is a bare 401.
+- The factory is where a missing variable or unreadable credential is noticed,
+  and parsh resolves it outside its own error handling — hence the `try` around
+  `cli.main()`. Remove it and those print a stack trace instead of one line.
 - A tenant binary and its arguments arrive as one quoted positional, split by
   `src/lib/command-line.ts`. parsh cannot tell a trailing `--verbose` meant for
   the tenant from one meant for us, so quoting is what says which — never add a

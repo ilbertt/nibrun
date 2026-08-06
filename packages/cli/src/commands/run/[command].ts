@@ -1,6 +1,7 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
 import { parseCommandLine } from '#lib/command-line.ts';
+import { requireSignedIn } from '#lib/credentials.ts';
 import { deploy, readBinary } from '#lib/deploy.ts';
 import { completeOptions } from '#lib/plan.ts';
 import { createUi, isInteractive } from '#lib/ui.ts';
@@ -40,6 +41,7 @@ export const command = defineCommand('run [command]', {
       description: 'Take the defaults for anything not given instead of asking.',
     },
   },
+  beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ params, options, context, print }) => {
     const { yes, detach, ...given } = options;
     const { binaryPath, args } = parseCommandLine(params.command);

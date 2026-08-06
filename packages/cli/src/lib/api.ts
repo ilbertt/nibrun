@@ -1,43 +1,31 @@
 import { createPublicApiClient } from '@repo/api-client/public';
-import { ApiError, UsageError } from '#lib/errors.ts';
-
-const SESSION_COOKIE = 'better-auth.session_token';
-const SECURE_COOKIE_PREFIX = '__Secure-';
-
-const NO_CREDENTIAL =
-  'Set NIBRUN_COOKIE_TOKEN to the value of your better-auth.session_token cookie.';
+import type { Credentials } from '#lib/credentials.ts';
+import { ApiError } from '#lib/errors.ts';
 
 export type Api = ReturnType<typeof createPublicApiClient>;
 
-export type Credentials = {
+export type ApiInput = {
   baseUrl: string;
-  cookieToken?: string | undefined;
+  credentials: Credentials | null;
 };
 
-export function createApi(credentials: Credentials): Api {
-  return createPublicApiClient({
-    baseUrl: credentials.baseUrl,
-    headers: authHeaders(credentials),
-  });
+export function createApi({ baseUrl, credentials }: ApiInput): Api {
+  return createPublicApiClient({ baseUrl, headers: authHeaders({ baseUrl, credentials }) });
 }
 
 /**
- * A session cookie, because it is the only credential the api can verify: it authenticates every
- * request through better-auth, and better-auth has been given no other way in. Borrowing a
- * browser's session is the placeholder for a CLI that has not been issued one of its own yet.
+ * Built even with nothing to put in it, because `nib login` is a command like any other and its
+ * whole job is to get a credential. What keeps an unauthenticated request from being sent at all
+ * is `requireSignedIn`, run before the handlers that need one.
+ *
+ * A token issued by a different api is no credential here, so it is left behind rather than sent
+ * somewhere it can only be refused.
  */
-export function authHeaders({ baseUrl, cookieToken }: Credentials): Record<string, string> {
-  if (!cookieToken) {
-    throw new UsageError(NO_CREDENTIAL);
+export function authHeaders({ baseUrl, credentials }: ApiInput): Record<string, string> {
+  if (!credentials || credentials.apiUrl !== baseUrl) {
+    return {};
   }
-  return { cookie: `${sessionCookieName(baseUrl)}=${cookieToken}` };
-}
-
-// better-auth prefixes the cookie it sets whenever its own base URL is https, so what to call it
-// follows the scheme of the api being addressed rather than being fixed here.
-function sessionCookieName(baseUrl: string): string {
-  const prefix = new URL(baseUrl).protocol === 'https:' ? SECURE_COOKIE_PREFIX : '';
-  return `${prefix}${SESSION_COOKIE}`;
+  return { authorization: `Bearer ${credentials.accessToken}` };
 }
 
 type Reply = { data: unknown; error: unknown };

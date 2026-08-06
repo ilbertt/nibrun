@@ -4,6 +4,7 @@ import { createEnvContext } from '@parshjs/env';
 import { z } from 'zod';
 import { commandTree } from '#command-tree.gen.ts';
 import { createApi } from '#lib/api.ts';
+import { createCredentialsStore } from '#lib/credentials.ts';
 import { CancelledError } from '#lib/errors.ts';
 
 const PROGRAM_NAME = 'nib';
@@ -12,16 +13,15 @@ const cli = createCli({
   programName: PROGRAM_NAME,
   programDescription: 'Run a binary on nibrun.',
   tree: commandTree,
-  context: () => {
+  context: async () => {
     const env = createEnvContext({
-      vars: {
-        NIBRUN_API_URL: { schema: z.url(), default: 'http://localhost:3000' },
-        NIBRUN_COOKIE_TOKEN: { schema: z.string(), default: '' },
-      },
+      vars: { NIBRUN_API_URL: { schema: z.url(), default: 'http://localhost:3000' } },
     });
-    return {
-      api: createApi({ baseUrl: env.NIBRUN_API_URL, cookieToken: env.NIBRUN_COOKIE_TOKEN }),
-    };
+    const apiUrl = env.NIBRUN_API_URL;
+    const files = createCredentialsStore();
+    const credentials = await files.credentials.maybeRead();
+
+    return { apiUrl, files, credentials, api: createApi({ baseUrl: apiUrl, credentials }) };
   },
   errors: { CANCELLED: CancelledError },
   onError: ({ code, exit }) => (code === 'CANCELLED' ? exit(1) : undefined),
