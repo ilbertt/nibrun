@@ -1,6 +1,5 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
-import { createApi } from '#lib/api.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { deploy, readBinary } from '#lib/deploy.ts';
 import { completeOptions } from '#lib/plan.ts';
@@ -44,10 +43,7 @@ export const command = defineCommand('run [command]', {
   handler: async ({ params, options, context, print }) => {
     const { yes, detach, ...given } = options;
     const { binaryPath, args } = parseCommandLine(params.command);
-    const api = createApi({
-      baseUrl: context.env.NIBRUN_API_URL,
-      apiKey: context.env.NIBRUN_API_KEY,
-    });
+    const { api } = context;
 
     // A terminal decides how this looks; `--yes` only decides whether it asks. Someone who wants
     // the defaults taken has not thereby asked for the output of a log file.
