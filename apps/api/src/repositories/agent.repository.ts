@@ -1,105 +1,16 @@
-import {
-  type AppId,
-  DEFAULT_HEALTH_CHECK,
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_RESTART_POLICY,
-  type DeploymentId,
-  type DesiredArtifact,
-  type ExportId,
-  type Filename,
-  type GuestPort,
-  type HostDesiredState,
-  type HostId,
-  type Hostname,
-  type HostReportedState,
-  type InstanceId,
-  type ObjectKey,
-  type SecretString,
-  type Sha256Digest,
-  type VolumeId,
-} from '@repo/protocol';
+import type { HostDesiredState, HostId, SecretString } from '@repo/protocol';
+import { hostnamesByApp, toDesiredInstance, toDesiredVolume } from '#lib/desired-state.ts';
 import { Repository } from '#repositories/repository.ts';
 
-// Where the schema goes when there is one. Until then one app, written out here,
-// which is what a control plane with no database can honestly offer: the shape is
-// exactly what a query will return, so replacing this is replacing the body of
-// `desiredState` and nothing above it.
-//
-// PocketBase rather than something of ours, deliberately — it is a released
-// third-party binary that needs a subcommand, writes to a directory it is told
-// about, and binds a port it is told about. A tenant we did not build is the only
-// kind that tests the contract instead of agreeing with it.
-const APP_ID = 'app-pocketbase' as AppId;
+export abstract class AgentRepositoryContract {
+  abstract saveSession(input: { sessionToken: SecretString; hostId: HostId }): Promise<void>;
+  abstract hostForSession(input: { sessionToken: string }): Promise<HostId | undefined>;
+  abstract desiredState(input: { hostId: HostId }): Promise<HostDesiredState>;
+}
 
-const VOLUME_SIZE_BYTES = 8_589_934_592;
-
-const POCKETBASE_PORT = 8090 as GuestPort;
-
-// Named once and pointed at twice: the binary an export packages is the binary the instance
-// runs, so two copies of it here would be two chances for a bundle to hold the wrong one.
-const POCKETBASE_ARTIFACT = {
-  // Uploaded by hand; the agent hashes the stream as it downloads and refuses
-  // on either mismatch, so both values below are load-bearing.
-  objectKey: 'artifacts/app-pocketbase/pb-0-39-10' as ObjectKey,
-  filename: 'pocketbase' as Filename,
-  digest: 'f119018534e7a9e0db837c2811dda589d03bbdb78a03decc0664aac864e53814' as Sha256Digest,
-  sizeBytes: 32_096_418,
-} satisfies DesiredArtifact;
-
-const DESIRED_APP = {
-  generation: 5,
-  volumes: [
-    {
-      volumeId: 'vol-pocketbase' as VolumeId,
-      appId: APP_ID,
-      sizeBytes: VOLUME_SIZE_BYTES,
-      desiredState: 'present',
-    },
-  ],
-  instances: [
-    {
-      instanceId: 'inst-pocketbase-1' as InstanceId,
-      appId: APP_ID,
-      deploymentId: 'dep-pocketbase-3' as DeploymentId,
-      volumeId: 'vol-pocketbase' as VolumeId,
-      desiredState: 'running',
-      artifact: POCKETBASE_ARTIFACT,
-      config: {
-        guestPort: POCKETBASE_PORT,
-        // `serve` because the binary is a multi-command tool; 0.0.0.0 because the
-        // host forwards into the guest and loopback would not be reachable; --dir
-        // because PocketBase writes beside its working directory by default, which
-        // is the tmpfs at /app rather than the volume that survives a restart.
-        args: ['serve', `--http=0.0.0.0:${POCKETBASE_PORT}`, '--dir=/app/data/pb_data'],
-        environment: {},
-        resources: DEFAULT_INSTANCE_RESOURCES,
-        healthCheck: DEFAULT_HEALTH_CHECK,
-        restartPolicy: DEFAULT_RESTART_POLICY,
-      },
-      hostnames: [{ hostname: 'pocketbase.canister.site' as Hostname, kind: 'platform' }],
-    },
-  ],
-  checkpoints: [],
-  // Written once by the host that owns the volume, then never rewritten — so bumping
-  // `generation` alone will not produce a second bundle. Asking for another means a new
-  // `exportId` and a new key, which is what the table behind this will hand out per request.
-  exports: [
-    {
-      exportId: 'exp-pocketbase-1' as ExportId,
-      appId: APP_ID,
-      volumeId: 'vol-pocketbase' as VolumeId,
-      objectKey: `exports/${APP_ID}/exp-pocketbase-1.tar.gz` as ObjectKey,
-      artifact: POCKETBASE_ARTIFACT,
-      desiredState: 'present',
-    },
-  ],
-} satisfies Omit<HostDesiredState, 'hostId'>;
-
-export class AgentRepository extends Repository {
-  // In this process rather than in Postgres, which is the one thing here that is
-  // not simply "a table is missing": a session is ephemeral, so losing the map
-  // when the api restarts costs a re-registration the agent already retries.
-  // Every other read below is a query waiting to be written.
+export class AgentRepository extends Repository implements AgentRepositoryContract {
+  // In this process rather than in Postgres: a session is ephemeral, so losing the map when the
+  // api restarts costs a re-registration the agent already retries.
   readonly #hostBySession = new Map<string, HostId>();
 
   saveSession({
@@ -117,14 +28,58 @@ export class AgentRepository extends Repository {
     return Promise.resolve(this.#hostBySession.get(sessionToken));
   }
 
-  desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
-    return Promise.resolve({ hostId, ...DESIRED_APP });
+  /**
+   * The same state for whichever host asks. Hosts are not modelled and there is one, so the id
+   * here is the one the agent registered under rather than one this end assigned.
+   *
+   * `checkpoints` and `exports` are empty until each has a table to be requested through: both
+   * are per-request work, so a host can only be told to do one once something has recorded that
+   * someone asked.
+   */
+  async desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+    // Read before the rows below it. A change landing in between then costs one redundant poll,
+    // where the other order would hand a host old rows under a number saying it was current —
+    // and it would believe it had converged until something else changed.
+    const generation = await this.generation();
+    const deployments = await this.sql.SelectDesiredDeployments`
+      SELECT d.id, d.app_id, a.state,
+             ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
+             c.guest_port, c.args, c.vcpu_count, c.memory_mib,
+             c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
+             c.health_check_grace_period_ms, c.health_check_healthy_threshold,
+             c.health_check_unhealthy_threshold,
+             c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
+             c.restart_backoff_factor, c.restart_reset_after_ms
+      FROM nibrun.deployments d
+      JOIN nibrun.apps a ON a.id = d.app_id
+      JOIN nibrun.artifacts ar ON ar.id = d.artifact_id
+      JOIN nibrun.app_configs c ON c.id = d.config_id
+      WHERE d.state NOT IN ('superseded', 'failed') AND a.state IN ('active', 'suspended')
+    `;
+    const hostnames = hostnamesByApp(
+      await this.sql.SelectDesiredHostnames`
+        SELECT h.app_id, h.hostname, h.kind
+        FROM nibrun.app_hostnames h
+        JOIN nibrun.deployments d ON d.app_id = h.app_id
+        JOIN nibrun.apps a ON a.id = h.app_id
+        WHERE d.state NOT IN ('superseded', 'failed') AND a.state IN ('active', 'suspended')
+      `,
+    );
+
+    return {
+      hostId,
+      generation,
+      volumes: deployments.map(toDesiredVolume),
+      instances: deployments.map((row) => toDesiredInstance({ row, hostnames })),
+      checkpoints: [],
+      exports: [],
+    };
   }
 
-  // Reported state is the fleet's view of itself and belongs beside the desired
-  // state it answers. Dropped rather than held in memory: an in-process copy
-  // would be a second source of truth to unpick later.
-  saveReportedState(_: { reported: HostReportedState }): Promise<void> {
-    return Promise.resolve();
+  private async generation(): Promise<number> {
+    const [row] = await this.sql.SelectDesiredStateGeneration`
+      SELECT generation FROM nibrun.desired_state
+    `;
+    return Number(row?.generation ?? 0);
   }
 }

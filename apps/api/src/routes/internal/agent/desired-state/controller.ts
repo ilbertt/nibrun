@@ -20,11 +20,8 @@ export const AgentDesiredStateController = new Elysia()
     async ({ agentService, body, headers }) => {
       assertProtocolVersion(headers);
       const hostId = await agentService.hostForSession({ sessionToken: sessionTokenFrom(headers) });
-      const state = await agentService.desiredState({ hostId });
 
-      return body.knownGeneration === state.generation
-        ? { result: 'unchanged' as const, generation: state.generation }
-        : { result: 'changed' as const, state };
+      return await agentService.desiredState({ hostId, knownGeneration: body.knownGeneration });
     },
     {
       body: DesiredStateRequestSchema,

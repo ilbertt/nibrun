@@ -28,7 +28,8 @@ const artifactsRepository = new ArtifactsRepository(sql);
 const deploymentsRepository = new DeploymentsRepository(sql);
 const artifactStorageRepository = new ArtifactStorageRepository(s3);
 
-const agentService = new AgentService({ agentRepo: agentRepository });
+const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
+const agentService = new AgentService({ agentRepo: agentRepository, deploymentsService });
 const assetsService = new AssetsService(assetsRepository);
 const healthService = new HealthService(healthRepository);
 const filesystemService = new FilesystemService({ filesystemRepo: filesystemRepository });
@@ -41,8 +42,6 @@ const artifactsService = new ArtifactsService({
   storageRepo: artifactStorageRepository,
   appsRepo: appsRepository,
 });
-const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
-
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);
   return new Elysia({ name: `logger.${name}` }).derive({ as: 'scoped' }, () => ({ logger }));

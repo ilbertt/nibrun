@@ -1,5 +1,13 @@
-import type { ArtifactId, Deployment } from '@repo/protocol';
+import type {
+  ArtifactId,
+  Deployment,
+  DeploymentId,
+  DeploymentState,
+  HostReportedState,
+  ReportedInstance,
+} from '@repo/protocol';
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
+import { nextDeploymentState } from '#lib/deployment-transition.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -9,11 +17,14 @@ import type {
   DeploymentsByAppInput,
   DeploymentsRepositoryContract,
   OwnedApp,
+  ReportedDeployment,
   RollbackDeploymentInput,
 } from '#repositories/deployments.repository.ts';
 import { Service } from '#services/service.ts';
 
 const LIVE_DEPLOYMENT_CONSTRAINT = 'deployments_live_idx';
+
+const NEVER_STARTED = 'No host started this deployment in time.';
 
 export type PublicDeployment = Omit<Deployment, 'config'> & { config: PublicAppConfig };
 
@@ -66,6 +77,53 @@ export class DeploymentsService extends Service {
   }
 
   /**
+   * A host's report, read as what it says about each release it is running.
+   *
+   * Every live deployment is considered rather than only the ones the report names: one no
+   * instance has appeared for is exactly the case a startup deadline exists for, and it is
+   * knowable only by looking at the deployments the report left out.
+   */
+  async applyHostReport({ reported }: { reported: HostReportedState }): Promise<void> {
+    const instances = new Map(
+      reported.instances.map((instance) => [instance.deploymentId, instance]),
+    );
+    const nowMs = Date.now();
+    const live = await this.deploymentsRepo.listLive();
+
+    const observed: ReportedDeployment[] = [];
+    const overdue: DeploymentId[] = [];
+
+    for (const row of live) {
+      const instance = instances.get(row.id);
+      const state =
+        nextDeploymentState({
+          current: row.state,
+          reported: instance,
+          desiredRunning: row.desired_running,
+          ageMs: nowMs - row.created_at.getTime(),
+        }) ?? row.state;
+
+      if (state !== row.state) {
+        this.logger.info('deployment state changed', {
+          deploymentId: row.id,
+          from: row.state,
+          to: state,
+        });
+      }
+      if (instance) {
+        observed.push(toReportedDeployment({ instance, state }));
+      } else if (state === 'failed') {
+        overdue.push(row.id);
+      }
+    }
+
+    await this.deploymentsRepo.applyReport({ reported: observed });
+    for (const deploymentId of overdue) {
+      await this.deploymentsRepo.fail({ deploymentId, message: NEVER_STARTED });
+    }
+  }
+
+  /**
    * Both ways of asking end here. A source the caller does not own wrote nothing, which is a
    * 404 rather than a 403 — a deployment they cannot see must not be confirmed to exist. Two
    * callers racing meet `deployments_live_idx` rather than each other, so the loser is told to
@@ -83,6 +141,26 @@ export class DeploymentsService extends Service {
     }
     return toPublicDeployment(row);
   }
+}
+
+function toReportedDeployment({
+  instance,
+  state,
+}: {
+  instance: ReportedInstance;
+  state: DeploymentState;
+}): ReportedDeployment {
+  return {
+    deploymentId: instance.deploymentId,
+    state,
+    activated: state === 'active',
+    hostPort: instance.hostPort ?? null,
+    guestIpv4: instance.guestIpv4 ?? null,
+    restartCount: instance.restartCount,
+    message: instance.message ?? null,
+    startedAt: instance.startedAt ? new Date(instance.startedAt) : null,
+    lastHealthyAt: instance.lastHealthyAt ? new Date(instance.lastHealthyAt) : null,
+  };
 }
 
 function toPublicDeployment(row: DeploymentRow): PublicDeployment {

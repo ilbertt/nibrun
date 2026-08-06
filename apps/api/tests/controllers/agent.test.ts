@@ -5,10 +5,8 @@ import {
   type AgentSessionRequest,
   AgentSessionSchema,
   type AppId,
-  DesiredStateResponseSchema,
   FilesystemQueryResponseSchema,
   type HostCapacity,
-  type HostReportedState,
   type HostVersions,
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
@@ -17,9 +15,12 @@ import {
 import { StatusMap } from 'elysia';
 import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
 
-// What an agent that has never polled reports knowing, so this is the case that
-// has to yield state rather than `unchanged`.
+// What an agent that has never polled reports knowing. Nothing below reads the state it comes
+// back with — desired state is a database read, and how it is composed is a service's test.
 const FIRST_POLL_GENERATION = 0;
+
+// The app the standing filesystem queries are written against, until there is a table of them.
+const STANDING_QUERY_APP_ID = 'app-pocketbase' as AppId;
 
 const PROTOCOL_VERSION_SKEW = 1;
 
@@ -61,15 +62,9 @@ async function readSession(response: Response) {
   return parseMessage({ schema: AgentSessionSchema, value: await response.json() });
 }
 
-async function readDesired(response: Response) {
-  return parseMessage({ schema: DesiredStateResponseSchema, value: await response.json() });
-}
-
 async function readFilesystemQuery(response: Response) {
   return parseMessage({ schema: FilesystemQueryResponseSchema, value: await response.json() });
 }
-
-type SessionToken = Awaited<ReturnType<typeof readSession>>['sessionToken'];
 
 function openSession(overrides: Partial<AgentSessionRequest> = {}) {
   return post({
@@ -80,26 +75,6 @@ function openSession(overrides: Partial<AgentSessionRequest> = {}) {
 
 async function startSession() {
   return readSession(await openSession());
-}
-
-async function pollDesired({
-  sessionToken,
-  knownGeneration,
-}: {
-  sessionToken?: string;
-  knownGeneration: number;
-}) {
-  return readDesired(
-    await post({ route: AGENT_ROUTES.desiredState, body: { knownGeneration }, sessionToken }),
-  );
-}
-
-async function firstDesiredState(sessionToken: SessionToken) {
-  const response = await pollDesired({ sessionToken, knownGeneration: FIRST_POLL_GENERATION });
-  if (response.result !== 'changed') {
-    throw new Error('A host that has never polled must be given state to converge to.');
-  }
-  return response.state;
 }
 
 function pollFilesystem({
@@ -135,53 +110,6 @@ describe('an agent can register and be told what to run', () => {
   test('a session is granted on reachability alone', async () => {
     expect((await openSession()).status).toBe(StatusMap.OK);
   });
-
-  test('a host that has never polled is told its state, not that nothing changed', async () => {
-    const session = await startSession();
-
-    // Desired state carries no host id, so a host can only ever be told about itself.
-    expect((await firstDesiredState(session.sessionToken)).hostId).toBe(session.hostId);
-  });
-
-  test('and told nothing when it is already current', async () => {
-    const session = await startSession();
-    const first = await firstDesiredState(session.sessionToken);
-
-    const second = await pollDesired({
-      sessionToken: session.sessionToken,
-      knownGeneration: first.generation,
-    });
-
-    expect(second).toEqual({ result: 'unchanged', generation: first.generation });
-  });
-
-  test('a report is accepted without being answered', async () => {
-    const session = await startSession();
-    const report = {
-      hostId: session.hostId,
-      observedGeneration: 0,
-      reportedAt: new Date().toISOString(),
-      state: 'ready',
-      capacity,
-      allocatable: capacity,
-      versions,
-      volumes: [],
-      instances: [],
-      checkpoints: [],
-      exports: [],
-    } as unknown as HostReportedState;
-
-    const response = await post({
-      route: AGENT_ROUTES.reportedState,
-      body: report,
-      sessionToken: session.sessionToken,
-    });
-
-    // No body at all: the desired-state poll is the only place a generation travels, so there is
-    // nothing here for an agent to read and nothing to keep in step with it.
-    expect(response.status).toBe(StatusMap['No Content']);
-    expect(await response.text()).toBe('');
-  });
 });
 
 describe('a host polls for filesystem reads on a channel of its own', () => {
@@ -195,29 +123,13 @@ describe('a host polls for filesystem reads on a channel of its own', () => {
     expect(body).toEqual({ result: 'none' });
   });
 
-  // A read that could bump a generation would make one person opening a folder cost every host
-  // in the fleet a re-read. The two channels stay disjoint, and this is what says so.
-  test('polling for a read leaves desired state where it was', async () => {
-    const session = await startSession();
-    const before = await firstDesiredState(session.sessionToken);
-
-    await pollFilesystem({ sessionToken: session.sessionToken });
-
-    const after = await pollDesired({
-      sessionToken: session.sessionToken,
-      knownGeneration: before.generation,
-    });
-    expect(after).toEqual({ result: 'unchanged', generation: before.generation });
-  });
-
   test('a host serving the app is given something to read', async () => {
     const session = await startSession();
-    const desired = await firstDesiredState(session.sessionToken);
 
     const body = await readFilesystemQuery(
       await pollFilesystem({
         sessionToken: session.sessionToken,
-        servedAppIds: desired.volumes.map((volume) => volume.appId),
+        servedAppIds: [STANDING_QUERY_APP_ID],
       }),
     );
 

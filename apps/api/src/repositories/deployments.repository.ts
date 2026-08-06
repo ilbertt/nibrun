@@ -1,5 +1,13 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
-import type { AppId, ArtifactId, DeploymentId, OwnerId } from '@repo/protocol';
+import type {
+  AppId,
+  ArtifactId,
+  DeploymentId,
+  DeploymentState,
+  HostPort,
+  Ipv4Address,
+  OwnerId,
+} from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.d.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -28,11 +36,29 @@ export type DeploymentsByAppInput = {
   ownerId: OwnerId;
 };
 
+export type LiveDeploymentRow = Queries['SelectLiveDeployments'];
+
+/** What a host said about the microVM, as the columns the deployment keeps it in. */
+export type ReportedDeployment = {
+  deploymentId: DeploymentId;
+  state: DeploymentState;
+  activated: boolean;
+  hostPort: HostPort | null;
+  guestIpv4: Ipv4Address | null;
+  restartCount: number;
+  message: string | null;
+  startedAt: Date | null;
+  lastHealthyAt: Date | null;
+};
+
 export abstract class DeploymentsRepositoryContract {
   abstract insert(input: CreateDeploymentInput): Promise<DeploymentRow | null>;
   abstract insertRollback(input: RollbackDeploymentInput): Promise<DeploymentRow | null>;
   abstract listByApp(input: DeploymentsByAppInput): Promise<DeploymentRow[]>;
   abstract findById(input: DeploymentByIdInput): Promise<DeploymentRow | null>;
+  abstract listLive(): Promise<LiveDeploymentRow[]>;
+  abstract applyReport(input: { reported: ReportedDeployment[] }): Promise<void>;
+  abstract fail(input: { deploymentId: DeploymentId; message: string }): Promise<void>;
 }
 
 export class DeploymentsRepository extends Repository implements DeploymentsRepositoryContract {
@@ -157,6 +183,62 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       WHERE d.app_id = ${appId} AND d.id = ${deploymentId} AND a.owner_id = ${ownerId}
     `;
     return row ?? null;
+  }
+
+  /**
+   * The fleet's view rather than an owner's, so there is no `ownerId` to scope on: a host is
+   * told about every app it runs. `desired_running` is the app's own state read as the question
+   * the deployment's clock asks — a suspended app's deployment is not late for anything.
+   */
+  listLive(): Promise<LiveDeploymentRow[]> {
+    return this.sql.SelectLiveDeployments`
+      /* @notNull created_at */
+      /* @notNull desired_running */
+      SELECT d.id, d.state, d.created_at, (a.state = 'active') AS desired_running
+      FROM nibrun.deployments d
+      JOIN nibrun.apps a ON a.id = d.app_id
+      WHERE d.state NOT IN ('superseded', 'failed')
+    `;
+  }
+
+  /**
+   * One statement per instance rather than one over all of them: a host runs a handful, and a
+   * batch would have to name the rows it skipped for the caller to learn anything from it.
+   *
+   * `state` is written back even when it has not moved, so the reported columns beside it are a
+   * single write. Rows that have gone terminal since the report was assembled are left alone,
+   * which is what stops a report in flight from resurrecting a superseded deployment.
+   */
+  applyReport({ reported }: { reported: ReportedDeployment[] }): Promise<void> {
+    return this.sql.begin(async (tx) => {
+      for (const instance of reported) {
+        await tx.ApplyReportedDeployment`
+          UPDATE nibrun.deployments SET
+            state = ${instance.state},
+            host_port = ${instance.hostPort},
+            guest_ipv4 = ${instance.guestIpv4},
+            restart_count = ${instance.restartCount},
+            message = ${instance.message},
+            started_at = ${instance.startedAt},
+            last_healthy_at = ${instance.lastHealthyAt},
+            activated_at = COALESCE(activated_at, ${instance.activated ? new Date() : null})
+          WHERE id = ${instance.deploymentId} AND state NOT IN ('superseded', 'failed')
+        `;
+      }
+    });
+  }
+
+  async fail({
+    deploymentId,
+    message,
+  }: {
+    deploymentId: DeploymentId;
+    message: string;
+  }): Promise<void> {
+    await this.sql.FailDeployment`
+      UPDATE nibrun.deployments SET state = 'failed', message = ${message}
+      WHERE id = ${deploymentId} AND state NOT IN ('superseded', 'failed')
+    `;
   }
 
   private async supersedeLive({

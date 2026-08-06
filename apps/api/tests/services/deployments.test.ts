@@ -3,10 +3,19 @@ import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
+  type DeploymentId,
+  type DeploymentState,
   type GuestPort,
+  type HostPort,
+  type HostReportedState,
+  type InstanceId,
+  type InstanceState,
+  type Ipv4Address,
+  type ReportedInstance,
   type Timestamp,
 } from '@repo/protocol';
 import { type PublicAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
+import { STARTUP_DEADLINE_MS } from '#lib/deployment-transition.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
   CreateDeploymentInput,
@@ -14,6 +23,8 @@ import type {
   DeploymentRow,
   DeploymentsByAppInput,
   DeploymentsRepositoryContract,
+  LiveDeploymentRow,
+  ReportedDeployment,
   RollbackDeploymentInput,
 } from '#repositories/deployments.repository.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
@@ -31,6 +42,11 @@ const GUEST_PORT = 8090 as GuestPort;
 const OWNER_SCOPED_METHODS = 4;
 const CREATED_AT = new Date('2026-08-04T10:00:00.000Z');
 const ACTIVATED_AT = new Date('2026-08-04T11:30:00.000Z');
+const HEALTHY_AT = new Date('2026-08-04T11:31:00.000Z');
+const INSTANCE_ID = 'instance-1' as InstanceId;
+const HOST_PORT = 30_001 as HostPort;
+const GUEST_IPV4 = '10.0.0.2' as Ipv4Address;
+const RESTART_COUNT = 2;
 
 // The config version this deployment pins. `app_configs` never changes a row, so this is what
 // the deployment was launched with however the app has since been reconfigured.
@@ -71,15 +87,32 @@ function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
 type FakeBehaviour = {
   rows?: DeploymentRow[];
   row?: DeploymentRow | null;
+  live?: LiveDeploymentRow[];
   runError?: unknown;
 };
 
 class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
   readonly calls: Array<Record<string, unknown>> = [];
+  readonly applied: ReportedDeployment[] = [];
+  readonly failed: DeploymentId[] = [];
   readonly #behaviour: FakeBehaviour;
 
   constructor(behaviour: FakeBehaviour = {}) {
     this.#behaviour = behaviour;
+  }
+
+  listLive(): Promise<LiveDeploymentRow[]> {
+    return Promise.resolve(this.#behaviour.live ?? []);
+  }
+
+  applyReport({ reported }: { reported: ReportedDeployment[] }): Promise<void> {
+    this.applied.push(...reported);
+    return Promise.resolve();
+  }
+
+  fail({ deploymentId }: { deploymentId: DeploymentId }): Promise<void> {
+    this.failed.push(deploymentId);
+    return Promise.resolve();
   }
 
   insert(input: CreateDeploymentInput): Promise<DeploymentRow | null> {
@@ -107,6 +140,33 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
     }
     return Promise.resolve(this.#behaviour.row ?? null);
   }
+}
+
+function liveRow(overrides: Partial<LiveDeploymentRow> = {}): LiveDeploymentRow {
+  return {
+    id: DEPLOYMENT_ID,
+    state: 'pending' as DeploymentState,
+    created_at: new Date(),
+    desired_running: true,
+    ...overrides,
+  };
+}
+
+function instance({
+  state,
+  ...overrides
+}: Partial<ReportedInstance> & { state: InstanceState }): ReportedInstance {
+  return {
+    instanceId: INSTANCE_ID,
+    deploymentId: DEPLOYMENT_ID,
+    state,
+    restartCount: 0,
+    ...overrides,
+  };
+}
+
+function report(instances: ReportedInstance[]): HostReportedState {
+  return { instances } as unknown as HostReportedState;
 }
 
 function serviceWith(behaviour: FakeBehaviour = {}) {
@@ -244,6 +304,77 @@ describe('creating a deployment is asking for it to run', () => {
         source: { artifactId: ARTIFACT_ID },
       }),
     ).rejects.toBeInstanceOf(ConflictError);
+  });
+});
+
+describe('a host reporting is what moves a release through its states', () => {
+  test('the first connection the tenant accepts is what makes the deployment active', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
+
+    await service.applyHostReport({ reported: report([instance({ state: 'running' })]) });
+
+    expect(deploymentsRepo.applied).toEqual([
+      expect.objectContaining({ deploymentId: DEPLOYMENT_ID, state: 'active', activated: true }),
+    ]);
+  });
+
+  // They move without the state moving — a running instance reports a restart count and a health
+  // instant on every heartbeat — so they cannot ride along only on a transition.
+  test('what the host observed lands even when the state does not move', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow({ state: 'active' })] });
+
+    await service.applyHostReport({
+      reported: report([
+        instance({
+          state: 'running',
+          hostPort: HOST_PORT,
+          guestIpv4: GUEST_IPV4,
+          restartCount: RESTART_COUNT,
+          lastHealthyAt: HEALTHY_AT.toISOString() as Timestamp,
+        }),
+      ]),
+    });
+
+    expect(deploymentsRepo.applied).toEqual([
+      expect.objectContaining({
+        state: 'active',
+        hostPort: HOST_PORT,
+        guestIpv4: GUEST_IPV4,
+        restartCount: RESTART_COUNT,
+        lastHealthyAt: HEALTHY_AT,
+      }),
+    ]);
+  });
+
+  // Knowable only from the deployments the report left out, which is why every live row is
+  // considered rather than only the ones a host mentioned.
+  test('one no instance ever appeared for is failed on its deadline', async () => {
+    const { deploymentsRepo, service } = serviceWith({
+      live: [liveRow({ created_at: new Date(Date.now() - STARTUP_DEADLINE_MS) })],
+    });
+
+    await service.applyHostReport({ reported: report([]) });
+
+    expect(deploymentsRepo.failed).toEqual([DEPLOYMENT_ID]);
+    expect(deploymentsRepo.applied).toEqual([]);
+  });
+
+  test('and left alone while it is still within it', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
+
+    await service.applyHostReport({ reported: report([]) });
+
+    expect(deploymentsRepo.failed).toEqual([]);
+  });
+
+  // A report assembled before a redeploy landed still names the row that redeploy superseded.
+  test('a report about a deployment no longer live writes nothing', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [] });
+
+    await service.applyHostReport({ reported: report([instance({ state: 'running' })]) });
+
+    expect(deploymentsRepo.applied).toEqual([]);
+    expect(deploymentsRepo.failed).toEqual([]);
   });
 });
 
