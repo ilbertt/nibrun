@@ -79,7 +79,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       const [deployable] = await tx.SelectDeployableArtifact`
         SELECT ar.id
         FROM nibrun.artifacts ar
-        JOIN nibrun.apps a ON a.id = ar.app_id
+        JOIN nibrun.live_apps a ON a.id = ar.app_id
         WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}
       `;
       if (!deployable) {
@@ -92,7 +92,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       const [inserted] = await tx.InsertDeployment`
         INSERT INTO nibrun.deployments (app_id, artifact_id, config_id)
         SELECT a.id, ar.id, c.id
-        FROM nibrun.apps a
+        FROM nibrun.live_apps a
         JOIN nibrun.artifacts ar ON ar.app_id = a.id
         JOIN LATERAL (
           SELECT id FROM nibrun.app_configs c
@@ -122,7 +122,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       const [replayable] = await tx.SelectDeploymentToReplay`
         SELECT d.id
         FROM nibrun.deployments d
-        JOIN nibrun.apps a ON a.id = d.app_id
+        JOIN nibrun.live_apps a ON a.id = d.app_id
         WHERE d.id = ${rollbackOf} AND d.app_id = ${appId} AND a.owner_id = ${ownerId}
       `;
       if (!replayable) {
@@ -135,7 +135,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
           (app_id, artifact_id, config_id, rollback_of_deployment_id)
         SELECT src.app_id, src.artifact_id, src.config_id, src.id
         FROM nibrun.deployments src
-        JOIN nibrun.apps a ON a.id = src.app_id
+        JOIN nibrun.live_apps a ON a.id = src.app_id
         WHERE src.id = ${rollbackOf} AND src.app_id = ${appId} AND a.owner_id = ${ownerId}
         RETURNING id
       `;
@@ -155,7 +155,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                c.restart_backoff_factor, c.restart_reset_after_ms
       FROM nibrun.deployments d
-      JOIN nibrun.apps a ON a.id = d.app_id
+      JOIN nibrun.live_apps a ON a.id = d.app_id
       JOIN nibrun.app_configs c ON c.id = d.config_id
       WHERE d.app_id = ${appId} AND a.owner_id = ${ownerId}
       ORDER BY d.id DESC
@@ -178,7 +178,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                c.restart_backoff_factor, c.restart_reset_after_ms
       FROM nibrun.deployments d
-      JOIN nibrun.apps a ON a.id = d.app_id
+      JOIN nibrun.live_apps a ON a.id = d.app_id
       JOIN nibrun.app_configs c ON c.id = d.config_id
       WHERE d.app_id = ${appId} AND d.id = ${deploymentId} AND a.owner_id = ${ownerId}
     `;
@@ -272,7 +272,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     await tx.SupersedeLiveDeployment`
       UPDATE nibrun.deployments d
       SET state = 'superseded'
-      FROM nibrun.apps a
+      FROM nibrun.live_apps a
       WHERE a.id = d.app_id
         AND d.app_id = ${appId}
         AND a.owner_id = ${ownerId}

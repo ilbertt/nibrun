@@ -36,7 +36,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       /* @notNull created_at */
       INSERT INTO nibrun.artifacts (app_id, digest, size_bytes, object_key, original_file_name)
       SELECT a.id, ${digest}, ${sizeBytes}, ${objectKey}, ${originalFileName}
-      FROM nibrun.apps a
+      FROM nibrun.live_apps a
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
       RETURNING id, app_id, digest, size_bytes, object_key, original_file_name, created_at
     `;
@@ -49,7 +49,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       SELECT ar.id, ar.app_id, ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
              ar.created_at
       FROM nibrun.artifacts ar
-      JOIN nibrun.apps a ON a.id = ar.app_id
+      JOIN nibrun.live_apps a ON a.id = ar.app_id
       WHERE ar.app_id = ${appId} AND a.owner_id = ${ownerId}
       ORDER BY ar.id DESC
     `;
@@ -69,7 +69,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       SELECT ar.id, ar.app_id, ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
              ar.created_at
       FROM nibrun.artifacts ar
-      JOIN nibrun.apps a ON a.id = ar.app_id
+      JOIN nibrun.live_apps a ON a.id = ar.app_id
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}
     `;
     return row ?? null;

@@ -34,7 +34,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   async isOwnedBy({ appId, ownerId }: OwnedApp): Promise<boolean> {
     const [row] = await this.sql.SelectAppOwnership`
       SELECT a.id
-      FROM nibrun.apps a
+      FROM nibrun.live_apps a
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
     `;
     return row !== undefined;
@@ -100,7 +100,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                c.restart_backoff_factor, c.restart_reset_after_ms
-        FROM nibrun.apps a
+        FROM nibrun.live_apps a
         JOIN LATERAL (
           SELECT * FROM nibrun.app_configs c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
@@ -125,7 +125,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms
-      FROM nibrun.apps a
+      FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
@@ -139,7 +139,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return this.sql.SelectAppHostnamesByOwner`
       SELECT h.app_id, h.hostname, h.kind
       FROM nibrun.app_hostnames h
-      JOIN nibrun.apps a ON a.id = h.app_id
+      JOIN nibrun.live_apps a ON a.id = h.app_id
       WHERE a.owner_id = ${ownerId}
       ORDER BY h.app_id, h.hostname
     `;
@@ -155,7 +155,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms
-      FROM nibrun.apps a
+      FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
@@ -169,7 +169,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return this.sql.SelectAppHostnamesByApp`
       SELECT h.hostname, h.kind
       FROM nibrun.app_hostnames h
-      JOIN nibrun.apps a ON a.id = h.app_id
+      JOIN nibrun.live_apps a ON a.id = h.app_id
       WHERE h.app_id = ${appId} AND a.owner_id = ${ownerId}
       ORDER BY h.hostname
     `;
@@ -182,7 +182,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return this.sql.begin(async (tx) => {
       const [locked] = await tx.SelectAppForConfigUpdate`
         SELECT a.id
-        FROM nibrun.apps a
+        FROM nibrun.live_apps a
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
         FOR UPDATE
       `;
@@ -275,7 +275,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       const [updated] = await tx.UpdateAppState`
         UPDATE nibrun.apps
         SET state = ${state}
-        WHERE id = ${appId} AND owner_id = ${ownerId}
+        WHERE id = ${appId} AND owner_id = ${ownerId} AND state <> 'deleted'
         RETURNING id
       `;
       if (!updated) {
@@ -291,7 +291,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                c.restart_backoff_factor, c.restart_reset_after_ms
-        FROM nibrun.apps a
+        FROM nibrun.live_apps a
         JOIN LATERAL (
           SELECT * FROM nibrun.app_configs c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
