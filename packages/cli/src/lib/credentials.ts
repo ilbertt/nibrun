@@ -1,3 +1,4 @@
+import type { FileHandle } from '@parshjs/files';
 import { z } from 'zod';
 import { UsageError } from '#lib/errors.ts';
 
@@ -13,17 +14,25 @@ export const CredentialsSchema = z.object({
 
 export type Credentials = z.infer<typeof CredentialsSchema>;
 
+// Only the one thing the gate does with the store, so what it asks for is what it uses.
+type CredentialsStore = { credentials: Pick<FileHandle<Credentials>, 'maybeRead'> };
+
 /**
  * The gate a command that talks to the api runs before its handler, so being signed out costs one
  * sentence rather than a request that comes back refused with nothing to do about it.
+ *
+ * Read here rather than taken from the context, so it is the credential on disk now being
+ * checked — a run that signs in first would otherwise be gated on what was there before it did.
  */
-export function requireSignedIn({
-  credentials,
+export async function requireSignedIn({
+  files,
   apiUrl,
 }: {
-  credentials: Credentials | null;
+  files: CredentialsStore;
   apiUrl: string;
-}): void {
+}): Promise<void> {
+  const credentials = await files.credentials.maybeRead();
+
   if (!credentials) {
     throw new UsageError('Not signed in. Run `nib login`.');
   }

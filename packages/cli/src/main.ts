@@ -28,7 +28,7 @@ const cli = createCli({
     const credentials = await files.credentials.maybeRead();
     const api = createApi({ baseUrl: apiUrl, credentials });
 
-    return { apiUrl, files, credentials, api };
+    return { apiUrl, files, api };
   },
   errors: { CANCELLED: CancelledError },
   onError: ({ code, exit }) => (code === 'CANCELLED' ? exit(1) : undefined),
