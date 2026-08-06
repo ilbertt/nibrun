@@ -50,6 +50,22 @@ export class ConflictError extends AppError {
   }
 }
 
+/** A host was asked something and said it could not answer it. */
+export class BadGatewayError extends AppError {
+  constructor(message = 'Bad Gateway') {
+    super(StatusMap['Bad Gateway'], message);
+    this.name = 'BadGatewayError';
+  }
+}
+
+/** No host said anything at all before this end stopped waiting. */
+export class GatewayTimeoutError extends AppError {
+  constructor(message = 'Gateway Timeout') {
+    super(StatusMap['Gateway Timeout'], message);
+    this.name = 'GatewayTimeoutError';
+  }
+}
+
 type ErrorHandlerOptions = Parameters<ErrorHandler>[0];
 type ErrorHandlerResult = ReturnType<ErrorHandler>;
 

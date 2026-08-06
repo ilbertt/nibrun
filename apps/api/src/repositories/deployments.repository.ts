@@ -61,6 +61,12 @@ export abstract class DeploymentsRepositoryContract {
   abstract fail(input: { deploymentId: DeploymentId; message: string }): Promise<void>;
 }
 
+/**
+ * What a service reading something held elsewhere — a log store, a host's filesystem — needs from
+ * here: the question of who may read it, and nothing beyond that.
+ */
+export type DeploymentLookup = Pick<DeploymentsRepositoryContract, 'findById'>;
+
 export class DeploymentsRepository extends Repository implements DeploymentsRepositoryContract {
   /**
    * The app's config id is pinned rather than its contents copied: `app_configs` never changes

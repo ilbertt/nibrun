@@ -4,6 +4,7 @@ import { AppsAppIdArtifactsArtifactIdController } from '#routes/api/apps/[appId]
 import { AppsAppIdArtifactsController } from '#routes/api/apps/[appId]/artifacts/controller.ts';
 import { AppsAppIdController } from '#routes/api/apps/[appId]/controller.ts';
 import { AppsAppIdDeploymentsDeploymentIdController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/controller.ts';
+import { AppsAppIdDeploymentsDeploymentIdFilesystemController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/controller.ts';
 import { AppsAppIdDeploymentsDeploymentIdLogsController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/controller.ts';
 import { AppsAppIdDeploymentsController } from '#routes/api/apps/[appId]/deployments/controller.ts';
 import { AppsController } from '#routes/api/apps/controller.ts';
@@ -19,4 +20,5 @@ export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(AppsAppIdArtifactsArtifactIdController)
   .use(AppsAppIdDeploymentsController)
   .use(AppsAppIdDeploymentsDeploymentIdController)
+  .use(AppsAppIdDeploymentsDeploymentIdFilesystemController)
   .use(AppsAppIdDeploymentsDeploymentIdLogsController);

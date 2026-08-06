@@ -9,6 +9,11 @@ import {
   type OwnerId,
 } from '@repo/protocol';
 import { type AppConfigColumns, type PublicAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
+import type {
+  DeploymentByIdInput,
+  DeploymentLookup,
+  DeploymentRow,
+} from '#repositories/deployments.repository.ts';
 
 export const OWNER_ID = 'owner-1' as OwnerId;
 export const OTHER_OWNER_ID = 'owner-2' as OwnerId;
@@ -17,6 +22,23 @@ export const ARTIFACT_ID = 'artifact-1' as ArtifactId;
 export const DEPLOYMENT_ID = 'deployment-1' as DeploymentId;
 
 export const APP_HOST_DOMAIN = 'apps.test';
+
+// A service reading a log store or a host's filesystem asks Postgres one question — may this
+// caller see this deployment — and never reads the row, so this is the whole of what it needs.
+export const A_DEPLOYMENT_ROW = {} as DeploymentRow;
+
+export function deploymentLookup(
+  row: DeploymentRow | null,
+): DeploymentLookup & { asked: DeploymentByIdInput[] } {
+  const asked: DeploymentByIdInput[] = [];
+  return {
+    asked,
+    findById(input) {
+      asked.push(input);
+      return Promise.resolve(row);
+    },
+  };
+}
 
 // Spelled out from the protocol's own defaults rather than built with `configWithDefaults`,
 // which is the thing under test wherever this is the expected value.

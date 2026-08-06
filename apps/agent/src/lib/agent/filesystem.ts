@@ -9,14 +9,14 @@ import { FilesystemReader } from '#services/filesystem-reader.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
 /**
- * Slept after every pass, not only after an idle one. The control plane hands out a standing
- * query that nothing retires, so a loop that only paused when it had nothing to do would read a
- * tenant device as fast as `debugfs` could return — this is what bounds that to a rate.
+ * Slept only when there was nothing to read, so this is how long an idle host waits rather than
+ * how long a browsing caller does: every query has somebody holding a request open for it, and
+ * pausing between two of them would charge that person for a host that had nothing else to do.
  *
- * It is also the floor on how stale a listing can be, which is why it is seconds rather than the
- * minute the read itself would tolerate.
+ * Reading back to back cannot run away, because a query exists only while its caller waits —
+ * demand is what bounds the rate, and demand stops when people stop asking.
  */
-const POLL_INTERVAL: Duration.DurationInput = '5 seconds';
+const IDLE_POLL_INTERVAL: Duration.DurationInput = '5 seconds';
 
 /**
  * A read this host can serve is one it has a device for, which is what the slot table records.
@@ -66,14 +66,14 @@ const once = Effect.gen(function* () {
     request: { servedAppIds: yield* servedAppIds },
   });
 
-  if (response.result === 'query') {
-    yield* control.sendFilesystemQueryResult({
-      sessionToken: session.sessionToken,
-      result: yield* answer(response.query),
-    });
+  if (response.result === 'none') {
+    return yield* Effect.sleep(IDLE_POLL_INTERVAL);
   }
 
-  yield* Effect.sleep(POLL_INTERVAL);
+  yield* control.sendFilesystemQueryResult({
+    sessionToken: session.sessionToken,
+    result: yield* answer(response.query),
+  });
 });
 
 /**

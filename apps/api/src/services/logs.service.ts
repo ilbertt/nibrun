@@ -1,13 +1,11 @@
 import type { AppId, DeploymentId, OwnerId, TenantLogRecord } from '@repo/protocol';
 import { NotFoundError } from '#lib/errors.ts';
-import type { DeploymentsRepositoryContract } from '#repositories/deployments.repository.ts';
+import type { DeploymentLookup } from '#repositories/deployments.repository.ts';
 import type { LogsRepositoryContract } from '#repositories/logs.repository.ts';
 import { Service } from '#services/service.ts';
 
 // A deployment the caller does not own has to be indistinguishable from one that does not exist.
 const NO_SUCH_DEPLOYMENT = 'Deployment not found.';
-
-export type DeploymentLookup = Pick<DeploymentsRepositoryContract, 'findById'>;
 
 export type TenantLogTailRequest = {
   appId: AppId;

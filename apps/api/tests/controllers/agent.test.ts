@@ -15,8 +15,7 @@ import {
 import { StatusMap } from 'elysia';
 import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
 
-// The app the standing filesystem queries are written against, until there is a table of them.
-const STANDING_QUERY_APP_ID = 'app-pocketbase' as AppId;
+const A_SERVED_APP_ID = 'app-pocketbase' as AppId;
 
 const PROTOCOL_VERSION_SKEW = 1;
 
@@ -119,27 +118,30 @@ describe('a host polls for filesystem reads on a channel of its own', () => {
     expect(body).toEqual({ result: 'none' });
   });
 
-  test('a host serving the app is given something to read', async () => {
+  // A read exists only while somebody is waiting on it, so serving an app is not by itself a
+  // reason to be sent to a device. Nothing standing means an idle fleet reads no tenant disks.
+  test('a host serving an app nobody is browsing is still told nothing', async () => {
     const session = await startSession();
 
     const body = await readFilesystemQuery(
       await pollFilesystem({
         sessionToken: session.sessionToken,
-        servedAppIds: [STANDING_QUERY_APP_ID],
+        servedAppIds: [A_SERVED_APP_ID],
       }),
     );
 
-    expect(body.result).toBe('query');
+    expect(body).toEqual({ result: 'none' });
   });
 
   // Nothing comes back, for the same reason nothing comes back from a report: a generation
   // travels on one channel only, and a second copy here would be a second thing to keep true.
+  // A host whose caller has already given up is taken at its word too, rather than errored at.
   test('an answer is taken and not replied to', async () => {
     const session = await startSession();
 
     const response = await answerFilesystem({
       sessionToken: session.sessionToken,
-      queryId: 'query-pocketbase-root',
+      queryId: 'query-nobody-is-waiting-for',
     });
 
     expect(response.status).toBe(StatusMap['No Content']);

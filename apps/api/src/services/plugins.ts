@@ -10,7 +10,6 @@ import { ArtifactStorageRepository } from '#repositories/artifact-storage.reposi
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
-import { FilesystemRepository } from '#repositories/filesystem.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
@@ -25,7 +24,6 @@ import { LogsService } from '#services/logs.service.ts';
 const agentRepository = new AgentRepository(sql);
 const assetsRepository = new AssetsRepository(sql);
 const healthRepository = new HealthRepository(sql);
-const filesystemRepository = new FilesystemRepository(sql);
 const appsRepository = new AppsRepository(sql);
 const artifactsRepository = new ArtifactsRepository(sql);
 const deploymentsRepository = new DeploymentsRepository(sql);
@@ -36,7 +34,7 @@ const deploymentsService = new DeploymentsService({ deploymentsRepo: deployments
 const agentService = new AgentService({ agentRepo: agentRepository, deploymentsService });
 const assetsService = new AssetsService(assetsRepository);
 const healthService = new HealthService(healthRepository);
-const filesystemService = new FilesystemService({ filesystemRepo: filesystemRepository });
+const filesystemService = new FilesystemService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
   appsRepo: appsRepository,
   appHostDomain: env.APP_HOST_DOMAIN,

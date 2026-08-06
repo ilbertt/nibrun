@@ -3,10 +3,12 @@ import type { TenantLogRecord } from '@repo/protocol';
 import { NotFoundError } from '#lib/errors.ts';
 import type { DeploymentByIdInput, DeploymentRow } from '#repositories/deployments.repository.ts';
 import type { LogsRepositoryContract, TenantLogTail } from '#repositories/logs.repository.ts';
-import { type DeploymentLookup, LogsService } from '#services/logs.service.ts';
+import { LogsService } from '#services/logs.service.ts';
 import {
+  A_DEPLOYMENT_ROW,
   APP_ID,
   DEPLOYMENT_ID,
+  deploymentLookup,
   OTHER_OWNER_ID,
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
@@ -27,23 +29,6 @@ const NO_RECORDS: AsyncIterable<TenantLogRecord> = {
   },
 };
 
-// The row's contents are never read — only whether there was one — so this is the whole of what
-// the service asks Postgres for.
-const A_ROW = {} as DeploymentRow;
-
-function deployments(
-  row: DeploymentRow | null,
-): DeploymentLookup & { asked: DeploymentByIdInput[] } {
-  const asked: DeploymentByIdInput[] = [];
-  return {
-    asked,
-    findById(input) {
-      asked.push(input);
-      return Promise.resolve(row);
-    },
-  };
-}
-
 function logs(): LogsRepositoryContract & { asked: TenantLogTail[] } {
   const asked: TenantLogTail[] = [];
   return {
@@ -56,7 +41,7 @@ function logs(): LogsRepositoryContract & { asked: TenantLogTail[] } {
 }
 
 function service({ row }: { row: DeploymentRow | null }) {
-  const deploymentsRepo = deployments(row);
+  const deploymentsRepo = deploymentLookup(row);
   const logsRepo = logs();
   return {
     logsRepo,
@@ -83,7 +68,7 @@ function open({
 
 describe('reading a deployment logs is asking whether you own it', () => {
   test('an owned deployment opens a tail filtered to itself', async () => {
-    const subject = service({ row: A_ROW });
+    const subject = service({ row: A_DEPLOYMENT_ROW });
 
     await open({ subject });
 
@@ -106,7 +91,7 @@ describe('reading a deployment logs is asking whether you own it', () => {
 
   // Scoped in the query rather than compared afterwards, like every other read of a tenant row.
   test('ownership travels into the lookup', async () => {
-    const subject = service({ row: A_ROW });
+    const subject = service({ row: A_DEPLOYMENT_ROW });
 
     await open({ subject });
 

@@ -29,7 +29,7 @@ export const AgentFilesystemQueryController = new Elysia()
       // be able to collect another tenant's query.
       await agentService.hostForSession({ sessionToken: sessionTokenFrom(headers) });
 
-      const query = await filesystemService.pendingQuery({ servedAppIds: body.servedAppIds });
+      const query = filesystemService.pendingQuery({ servedAppIds: body.servedAppIds });
       return query ? { result: 'query' as const, query } : { result: 'none' as const };
     },
     {
