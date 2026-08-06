@@ -1,0 +1,25 @@
+{
+  "name": "@repo/cli",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "nib": "bun run src/main.ts",
+    "generate": "parsh-codegen generate --commands src/commands --out src/command-tree.gen.ts",
+    "check:types": "bun run --bun tsc"
+  },
+  "dependencies": {
+    "@parshjs/core": "^0.0.10",
+    "@parshjs/env": "^0.0.3",
+    "@repo/api-client": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@parshjs/codegen": "^0.0.5",
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

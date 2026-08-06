@@ -4,6 +4,15 @@ import { type Treaty, treaty } from '@elysiajs/eden';
 // only as Eden's peer, so naming it here would be a dependency taken for one type.
 type AnyApp = Exclude<Parameters<typeof treaty>[0], string>;
 
+/**
+ * `headers` are sent on every request. A browser has a cookie and needs none; anything without
+ * one — a CLI, a script — carries its credential here rather than repeating it per call.
+ */
+export type ApiClientOptions = {
+  baseUrl: string;
+  headers?: Record<string, string>;
+};
+
 // Every surface is built here rather than each one calling Eden with the same options, so a
 // surface added later cannot be the one that forgets them.
 //
@@ -13,8 +22,7 @@ type AnyApp = Exclude<Parameters<typeof treaty>[0], string>;
 // revalidates one rejects it.
 export function createClient<App extends AnyApp>({
   baseUrl,
-}: {
-  baseUrl: string;
-}): Treaty.Create<App> {
-  return treaty<App>(baseUrl, { parseDate: false });
+  headers,
+}: ApiClientOptions): Treaty.Create<App> {
+  return treaty<App>(baseUrl, { parseDate: false, headers });
 }

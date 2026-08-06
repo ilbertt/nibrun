@@ -3,6 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "nib": "bun run packages/cli/src/main.ts",
     "build": "bun run --bun turbo build",
     "check:types": "bun run --bun turbo check:types",
     "test": "bun run --bun turbo test",

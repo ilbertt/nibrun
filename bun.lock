@@ -92,6 +92,21 @@
         "typescript": "catalog:",
       },
     },
+    "packages/cli": {
+      "name": "@repo/cli",
+      "dependencies": {
+        "@parshjs/core": "^0.0.10",
+        "@parshjs/env": "^0.0.3",
+        "@repo/api-client": "workspace:*",
+        "@repo/protocol": "workspace:*",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@parshjs/codegen": "^0.0.5",
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "packages/internal-scripts": {
       "name": "@repo/internal-scripts",
       "dependencies": {
@@ -432,11 +447,19 @@
 
     "@parcel/watcher-win32-x64": ["@parcel/watcher-win32-x64@2.6.0", "", { "os": "win32", "cpu": "x64" }, "sha512-cA+/pXV2YkfxlIcXOQ5fSWqAzzPyD78/x5qbK/I0vUkrlYHA8TIz+MXjAbGouguKVSI4bOmkTSJ1/poVSsgt+A=="],
 
+    "@parshjs/codegen": ["@parshjs/codegen@0.0.5", "", { "dependencies": { "typescript": "^5.9.3" }, "bin": { "parsh-codegen": "dist/cli/main.js" } }, "sha512-fJFVIa5A6OWiABD8kZqSm2A75SV+ZgDuakQ/XASmYpJyd/FN6E/2erkev2LdqiFD6WySnbux8O/Dh+ms4oNzlw=="],
+
+    "@parshjs/core": ["@parshjs/core@0.0.10", "", {}, "sha512-tMjf7tx7snUMLWQch0SXJXFxHfiJZusbG3UXivqSQN9lTf+JTj6iaWIRkpw+1FKPoV7t9WPvCi9LsmeZ98/QnQ=="],
+
+    "@parshjs/env": ["@parshjs/env@0.0.3", "", {}, "sha512-n0D9K7YLyLPxwJbyz3oKP3q0/t0V1vDZpnyNZ7kJZ8nGuB8oX2tMNYYgdhJDOXgHQl6IKZHeIi+RTa6OWSQPGg=="],
+
     "@repo/agent": ["@repo/agent@workspace:apps/agent"],
 
     "@repo/api": ["@repo/api@workspace:apps/api"],
 
     "@repo/api-client": ["@repo/api-client@workspace:packages/api-client"],
+
+    "@repo/cli": ["@repo/cli@workspace:packages/cli"],
 
     "@repo/dashboard": ["@repo/dashboard@workspace:apps/dashboard"],
 
@@ -1351,6 +1374,8 @@
     "@dotenvx/dotenvx/execa": ["execa@5.1.1", "", { "dependencies": { "cross-spawn": "^7.0.3", "get-stream": "^6.0.0", "human-signals": "^2.1.0", "is-stream": "^2.0.0", "merge-stream": "^2.0.0", "npm-run-path": "^4.0.1", "onetime": "^5.1.2", "signal-exit": "^3.0.3", "strip-final-newline": "^2.0.0" } }, "sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg=="],
 
     "@dotenvx/dotenvx/open": ["open@8.4.2", "", { "dependencies": { "define-lazy-prop": "^2.0.0", "is-docker": "^2.1.1", "is-wsl": "^2.2.0" } }, "sha512-7x81NCL719oNbsq/3mh+hVrAWmFuEYUqrq/Iw3kUzH8ReypT9QQ0BLoJS7/G9k6N81XjW4qHWtjWwe/9eLy1EQ=="],
+
+    "@parshjs/codegen/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@tailwindcss/node/lightningcss": ["lightningcss@1.32.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.32.0", "lightningcss-darwin-arm64": "1.32.0", "lightningcss-darwin-x64": "1.32.0", "lightningcss-freebsd-x64": "1.32.0", "lightningcss-linux-arm-gnueabihf": "1.32.0", "lightningcss-linux-arm64-gnu": "1.32.0", "lightningcss-linux-arm64-musl": "1.32.0", "lightningcss-linux-x64-gnu": "1.32.0", "lightningcss-linux-x64-musl": "1.32.0", "lightningcss-win32-arm64-msvc": "1.32.0", "lightningcss-win32-x64-msvc": "1.32.0" } }, "sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ=="],
 
