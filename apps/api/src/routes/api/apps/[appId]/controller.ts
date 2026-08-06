@@ -1,4 +1,4 @@
-import type { OwnerId } from '@repo/protocol';
+import { OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import { AppParamsSchema } from '#routes/api/apps/[appId]/model.ts';
@@ -13,7 +13,10 @@ export const AppsAppIdController = new Elysia()
   .get(
     '/apps/:appId',
     async ({ appsService, params, user, status }) => {
-      const app = await appsService.get({ appId: params.appId, ownerId: user.id as OwnerId });
+      const app = await appsService.get({
+        appId: params.appId,
+        ownerId: Value.Parse(OwnerIdSchema, user.id),
+      });
       return status(StatusMap.OK, app);
     },
     {
@@ -26,7 +29,7 @@ export const AppsAppIdController = new Elysia()
     async ({ appsService, params, body, user, status }) => {
       const app = await appsService.updateConfig({
         appId: params.appId,
-        ownerId: user.id as OwnerId,
+        ownerId: Value.Parse(OwnerIdSchema, user.id),
         patch: body,
       });
       return status(StatusMap.OK, app);
@@ -42,7 +45,10 @@ export const AppsAppIdController = new Elysia()
   .delete(
     '/apps/:appId',
     async ({ appsService, params, user, status }) => {
-      const app = await appsService.delete({ appId: params.appId, ownerId: user.id as OwnerId });
+      const app = await appsService.delete({
+        appId: params.appId,
+        ownerId: Value.Parse(OwnerIdSchema, user.id),
+      });
       return status(StatusMap.Accepted, app);
     },
     {

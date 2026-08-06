@@ -2,11 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import {
   AGENT_API_PREFIX,
   AGENT_ROUTES,
-  type HostId,
+  HostIdSchema,
   type HostReportedState,
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
-  type SecretString,
+  SecretStringSchema,
+  Value,
 } from '@repo/protocol';
 import { Effect } from 'effect';
 import { ControlPlaneError, makeControlPlaneClient } from '#lib/control/client.ts';
@@ -18,7 +19,7 @@ import {
   recordingServer,
 } from '#tests/support/server.ts';
 
-const SESSION_TOKEN = 'session-token' as SecretString;
+const SESSION_TOKEN = Value.Parse(SecretStringSchema, 'session-token');
 
 const VALID_DESIRED_STATE = {
   hostId: 'host-1',
@@ -99,7 +100,7 @@ describe('every request identifies the protocol it speaks', () => {
       }),
     );
 
-    expect(session.hostId).toBe('host-1' as HostId);
+    expect(session.hostId).toBe(Value.Parse(HostIdSchema, 'host-1'));
     expect(call?.headers.authorization).toBeUndefined();
   });
 

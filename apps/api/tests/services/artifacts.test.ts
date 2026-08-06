@@ -2,13 +2,16 @@ import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
   type ArtifactId,
+  ArtifactIdSchema,
   ArtifactSchema,
-  type Filename,
+  FilenameSchema,
   isValidMessage,
   type ObjectKey,
+  ObjectKeySchema,
   type OwnerId,
-  type Sha256Digest,
-  type Timestamp,
+  Sha256DigestSchema,
+  TimestampSchema,
+  Value,
 } from '@repo/protocol';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
@@ -34,7 +37,7 @@ function binary(name = UPLOADED_NAME): File {
   return new File([bytesOf(BINARY_TEXT)], name);
 }
 
-const SEEDED_DIGEST = 'a'.repeat(BINARY_DIGEST.length) as Sha256Digest;
+const SEEDED_DIGEST = Value.Parse(Sha256DigestSchema, 'a'.repeat(BINARY_DIGEST.length));
 const SEEDED_SIZE_BYTES = 4096;
 const SEEDED_CREATED_AT = new Date('2026-01-02T03:04:05.000Z');
 
@@ -96,15 +99,15 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
       app_id: APP_ID,
       digest: SEEDED_DIGEST,
       size_bytes: String(SEEDED_SIZE_BYTES),
-      object_key: SEEDED_DIGEST as string as ObjectKey,
-      original_file_name: UPLOADED_NAME as Filename,
+      object_key: Value.Parse(ObjectKeySchema, SEEDED_DIGEST),
+      original_file_name: Value.Parse(FilenameSchema, UPLOADED_NAME),
     });
   }
 
   private remember(row: Omit<ArtifactRow, 'id' | 'created_at'>): ArtifactRow {
     const stored: ArtifactRow = {
       ...row,
-      id: `artifact-${this.rows.size}` as ArtifactId,
+      id: Value.Parse(ArtifactIdSchema, `artifact-${this.rows.size}`),
       created_at: SEEDED_CREATED_AT,
     };
     this.rows.set(stored.id, stored);
@@ -162,7 +165,7 @@ describe('the api records the digest of what it stored', () => {
     const artifact = await service.create({ appId: APP_ID, ownerId: OWNER_ID, binary: binary() });
 
     const [written] = storage.written;
-    expect(artifact.digest).toBe(BINARY_DIGEST as Sha256Digest);
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
     expect(artifactsRepo.inserted[0]?.digest).toBe(artifact.digest);
     expect(written?.objectKey).toBe(artifact.objectKey);
     expect(written?.bytes).toEqual(bytesOf(BINARY_TEXT));
@@ -275,7 +278,7 @@ describe('a row becomes the wire shape the dashboard and the agent both read', (
     });
 
     expect(artifact.sizeBytes).toBe(SEEDED_SIZE_BYTES);
-    expect(artifact.createdAt).toBe(SEEDED_CREATED_AT.toISOString() as Timestamp);
+    expect(artifact.createdAt).toBe(Value.Parse(TimestampSchema, SEEDED_CREATED_AT.toISOString()));
     expect(isValidMessage({ schema: ArtifactSchema, value: artifact })).toBe(true);
   });
 });

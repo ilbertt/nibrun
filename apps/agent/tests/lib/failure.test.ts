@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { AppId, Sha256Digest } from '@repo/protocol';
+import { AppIdSchema, Sha256DigestSchema, Value } from '@repo/protocol';
 import { InstanceCredentialsError } from '#lib/aws/credentials.ts';
 import { ControlPlaneError } from '#lib/control/client.ts';
 import { CommandFailed, CommandTimedOut } from '#lib/exec.ts';
@@ -26,7 +26,10 @@ const SOME_LIMIT = 200;
 
 const everyFailure = [
   new SlotExhausted({ limit: SOME_LIMIT }),
-  new DigestMismatch({ expected: 'a'.repeat(DIGEST_HEX_LENGTH) as Sha256Digest, actual: 'b' }),
+  new DigestMismatch({
+    expected: Value.Parse(Sha256DigestSchema, 'a'.repeat(DIGEST_HEX_LENGTH)),
+    actual: 'b',
+  }),
   new ArtifactSizeMismatch({ expected: SOME_SIZE, actual: OTHER_SIZE }),
   new ArtifactTransferError({ cause: new Error('connection reset') }),
   new UnrepresentableEnvironment({ variableName: 'API_KEY' }),
@@ -46,7 +49,7 @@ const everyFailure = [
   new ProtocolMismatch({ issues: [] }),
   new UnsafeGuestPath({ reason: 'it is not an absolute in-volume path' }),
   new UnreadableDirectory({ devicePath: '/dev/nbd7' }),
-  new NoDeviceForApp({ appId: 'app-pocketbase' as AppId }),
+  new NoDeviceForApp({ appId: Value.Parse(AppIdSchema, 'app-pocketbase') }),
 ];
 
 // The message is what a report carries to the control plane, and from there to whoever is

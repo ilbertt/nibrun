@@ -1,18 +1,16 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  isValidMessage,
-  type ObjectKey,
-  ObjectKeySchema,
-  type Sha256Digest,
-  Sha256DigestSchema,
-} from '@repo/protocol';
+import { isValidMessage, ObjectKeySchema, Sha256DigestSchema, Value } from '@repo/protocol';
 import { identifyArtifact } from '#lib/artifact-digest.ts';
 
 // From the SHA-256 test vectors: the digest of the empty input and of "abc".
-const EMPTY_DIGEST =
-  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' as Sha256Digest;
-const ABC_DIGEST =
-  'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad' as Sha256Digest;
+const EMPTY_DIGEST = Value.Parse(
+  Sha256DigestSchema,
+  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+);
+const ABC_DIGEST = Value.Parse(
+  Sha256DigestSchema,
+  'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+);
 
 // One character, two bytes — which is the whole point of the size test below.
 const MULTI_BYTE_CHARACTER = 'é';
@@ -47,7 +45,9 @@ describe('an artifact is identified by what was stored, not by what was claimed'
   });
 
   test('the key names the digest algorithm, so a future one cannot alias this object', () => {
-    expect(identifyArtifact(bytesOf('abc')).objectKey).toBe(ABC_DIGEST as string as ObjectKey);
+    expect(identifyArtifact(bytesOf('abc')).objectKey).toBe(
+      Value.Parse(ObjectKeySchema, ABC_DIGEST),
+    );
   });
 
   test('the identity satisfies the schemas the agent will read it back through', () => {

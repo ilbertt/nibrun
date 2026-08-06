@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import type { AppId, DeploymentId, HostId } from '@repo/protocol';
+import { AppIdSchema, DeploymentIdSchema, HostIdSchema, Value } from '@repo/protocol';
 import type { TailRequest } from '#lib/victorialogs/client.ts';
 import type { LogRow } from '#lib/victorialogs/parse.ts';
 import { LogsRepository, type TenantLogStore } from '#repositories/logs.repository.ts';
 
-const APP_ID = 'app-1' as AppId;
-const DEPLOYMENT_ID = 'deployment-1' as DeploymentId;
-const HOST_ID = 'host-1' as HostId;
+const APP_ID = Value.Parse(AppIdSchema, 'app-1');
+const DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'deployment-1');
+const HOST_ID = Value.Parse(HostIdSchema, 'host-1');
 const START_OFFSET = '5m';
 const DROPPED_BYTES = 4096;
 const TAIL_TIMEOUT_MS = 1_000;

@@ -1,4 +1,4 @@
-import type { OwnerId, TenantLogRecord } from '@repo/protocol';
+import { OwnerIdSchema, type TenantLogRecord, Value } from '@repo/protocol';
 import { Elysia, sse } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import {
@@ -30,7 +30,7 @@ export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
       const records = await logsService.openTail({
         appId: params.appId,
         deploymentId: params.deploymentId,
-        ownerId: user.id as OwnerId,
+        ownerId: Value.Parse(OwnerIdSchema, user.id),
         startOffset: query.startOffset ?? DEFAULT_START_OFFSET,
         signal,
       });

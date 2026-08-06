@@ -1,9 +1,11 @@
-import type {
-  AppId,
-  FilesystemQuery,
-  FilesystemQueryId,
-  FilesystemQueryResult,
-  GuestPath,
+import {
+  type AppId,
+  type FilesystemQuery,
+  type FilesystemQueryId,
+  FilesystemQueryIdSchema,
+  type FilesystemQueryResult,
+  type GuestPath,
+  Value,
 } from '@repo/protocol';
 
 type Outcome = FilesystemQueryResult['outcome'];
@@ -118,7 +120,11 @@ export class PendingFilesystemQueries {
         return read;
       }
     }
-    const query = { queryId: crypto.randomUUID() as FilesystemQueryId, appId, path };
+    const query = {
+      queryId: Value.Parse(FilesystemQueryIdSchema, crypto.randomUUID()),
+      appId,
+      path,
+    };
     const read: Read = { query, waiting: new Set(), claimed: false };
     this.#reads.set(query.queryId, read);
     return read;

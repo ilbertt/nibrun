@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { AppId, HostPort, Ipv4Address } from '@repo/protocol';
+import { type AppId, AppIdSchema, HostPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
 import { Effect, Either, Layer, Option } from 'effect';
 import { assignmentsFrom, readSlotRecords, type SlotRecords } from '#lib/network/allocator.ts';
 import { describeSlot, HOST_PORT_BASE, SLOT_COUNT } from '#lib/network/slot.ts';
@@ -21,7 +21,7 @@ const run = provided(
 );
 
 function app(name: string | number) {
-  return `app-${name}` as AppId;
+  return Value.Parse(AppIdSchema, `app-${name}`);
 }
 
 function withAllocator<A, E>(use: (allocator: SlotAllocator) => Effect.Effect<A, E>) {
@@ -33,9 +33,9 @@ describe('slot derivation', () => {
     expect(describeSlot({ slot: 0, appId: app(0) })).toEqual({
       slot: 0,
       appId: app(0),
-      hostPort: HOST_PORT_BASE as HostPort,
-      hostIpv4: '10.201.0.1' as Ipv4Address,
-      guestIpv4: '10.201.0.2' as Ipv4Address,
+      hostPort: Value.Parse(HostPortSchema, HOST_PORT_BASE),
+      hostIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.1'),
+      guestIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.2'),
       guestMac: '02:00:0a:c9:00:02',
       tapName: 'nbr0',
       nbdDevicePath: '/dev/nbd0',
@@ -46,14 +46,14 @@ describe('slot derivation', () => {
   test('slots do not overlap', () => {
     const first = describeSlot({ slot: 0, appId: app(0) });
     const second = describeSlot({ slot: 1, appId: app(1) });
-    expect(second.hostIpv4).toBe('10.201.0.5' as Ipv4Address);
-    expect(second.guestIpv4).toBe('10.201.0.6' as Ipv4Address);
-    expect(second.hostPort).toBe((first.hostPort + 1) as HostPort);
+    expect(second.hostIpv4).toBe(Value.Parse(Ipv4AddressSchema, '10.201.0.5'));
+    expect(second.guestIpv4).toBe(Value.Parse(Ipv4AddressSchema, '10.201.0.6'));
+    expect(second.hostPort).toBe(Value.Parse(HostPortSchema, first.hostPort + 1));
   });
 
   test('addressing carries past an octet boundary', () => {
     expect(describeSlot({ slot: BOUNDARY_SLOT, appId: app(BOUNDARY_SLOT) }).guestIpv4).toBe(
-      '10.201.1.2' as Ipv4Address,
+      Value.Parse(Ipv4AddressSchema, '10.201.1.2'),
     );
   });
 });
@@ -67,7 +67,7 @@ describe('allocation is stable for the lifetime of an app', () => {
         return [first.hostPort, second.hostPort];
       }).pipe(Effect.orDie),
     );
-    expect(ports[0]).toBe(ports[1] as HostPort);
+    expect(ports[0]).toBe(Value.Parse(HostPortSchema, ports[1]));
   });
 
   test('distinct apps never share a slot', async () => {

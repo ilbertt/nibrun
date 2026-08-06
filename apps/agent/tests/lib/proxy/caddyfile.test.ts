@@ -1,11 +1,19 @@
 import { describe, expect, test } from 'bun:test';
-import type { AppHostname, AppId, Hostname, HostPort } from '@repo/protocol';
+import {
+  type AppHostname,
+  AppIdSchema,
+  type Hostname,
+  HostPortSchema,
+  Value,
+} from '@repo/protocol';
 import { renderAppSites } from '#lib/proxy/caddyfile.ts';
 import type { RouteTarget } from '#lib/report/routes.ts';
 import { APP_ID, FIRST_HOST_PORT } from '#tests/support/fixtures.ts';
 
-const SECOND_HOST_PORT = (FIRST_HOST_PORT + 1) as HostPort;
+const SECOND_HOST_PORT = Value.Parse(HostPortSchema, FIRST_HOST_PORT + 1);
 
+// Cast rather than parsed: these stand in for whatever a peer put on the wire, and the tests
+// below turn on hostnames the schema would have refused, which parsing here would never yield.
 function platformHostname(hostname: string): AppHostname {
   return { hostname: hostname as Hostname, kind: 'platform' };
 }
@@ -31,7 +39,7 @@ describe('the rendered config is a projection of what is running', () => {
   });
 
   test('every site authenticates the edge, so none can be reached from the origin address', () => {
-    const sites = renderAppSites([route(), route({ appId: 'app-b' as AppId })]);
+    const sites = renderAppSites([route(), route({ appId: Value.Parse(AppIdSchema, 'app-b') })]);
     const blocks = sites.split('{').length - 1;
     expect(sites.split('import origin_tls').length - 1).toBe(blocks);
   });
@@ -50,8 +58,8 @@ describe('the rendered config is a projection of what is running', () => {
   });
 
   test('rendering twice from the same routes is byte-identical, whatever order they arrive in', () => {
-    const first = route({ appId: 'app-b' as AppId, hostPort: SECOND_HOST_PORT });
-    const second = route({ appId: 'app-a' as AppId });
+    const first = route({ appId: Value.Parse(AppIdSchema, 'app-b'), hostPort: SECOND_HOST_PORT });
+    const second = route({ appId: Value.Parse(AppIdSchema, 'app-a') });
     expect(renderAppSites([first, second])).toBe(renderAppSites([second, first]));
   });
 });

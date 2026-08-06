@@ -1,17 +1,19 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  type AppId,
+  AppIdSchema,
   DEFAULT_GUEST_PORT,
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   type GuestPort,
-  type Hostname,
+  HostnameSchema,
   type HostPort,
+  HostPortSchema,
   HostReportedStateSchema,
   type InstanceState,
-  type Ipv4Address,
+  Ipv4AddressSchema,
   isValidMessage,
-  type Sha256Digest,
+  Sha256DigestSchema,
+  Value,
 } from '@repo/protocol';
 import { initialTracker } from '#lib/health/state.ts';
 import { buildReportedState, toReportedInstance } from '#lib/report/build-report.ts';
@@ -52,11 +54,11 @@ function record(overrides: Partial<InstanceRecord> = {}): InstanceRecord {
     appId: APP_ID,
     deploymentId: DEPLOYMENT_ID,
     volumeId: VOLUME_ID,
-    hostnames: [{ hostname: 'a.example.com' as Hostname, kind: 'platform' }],
+    hostnames: [{ hostname: Value.Parse(HostnameSchema, 'a.example.com'), kind: 'platform' }],
     hostPort: FIRST_HOST_PORT,
     guestPort: DEFAULT_GUEST_PORT,
-    guestIpv4: '10.201.0.2' as Ipv4Address,
-    artifactDigest: 'a'.repeat(DIGEST_HEX_LENGTH) as Sha256Digest,
+    guestIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.2'),
+    artifactDigest: Value.Parse(Sha256DigestSchema, 'a'.repeat(DIGEST_HEX_LENGTH)),
     state: 'running' as InstanceState,
     health: initialTracker(),
     healthCheck: DEFAULT_HEALTH_CHECK,
@@ -122,8 +124,8 @@ describe('the same records render the routing layer', () => {
   test('only instances whose tenant answered are routable', () => {
     const records = [
       record(),
-      record({ appId: 'inst-2' as AppId, state: 'starting' }),
-      record({ appId: 'inst-3' as AppId, state: 'unhealthy' }),
+      record({ appId: Value.Parse(AppIdSchema, 'inst-2'), state: 'starting' }),
+      record({ appId: Value.Parse(AppIdSchema, 'inst-3'), state: 'unhealthy' }),
     ];
     expect(renderableRoutes(records)).toEqual([
       {
@@ -168,6 +170,6 @@ describe('allocatable capacity', () => {
     const guestPort: GuestPort = DEFAULT_GUEST_PORT;
     // @ts-expect-error a GuestPort is not a HostPort, which is what stops a routing bug type-checking
     const hostPort: HostPort = guestPort;
-    expect(hostPort).toBe(guestPort as unknown as HostPort);
+    expect(hostPort).toBe(Value.Parse(HostPortSchema, guestPort as unknown));
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_INSTANCE_RESOURCES, type Ipv4Address } from '@repo/protocol';
+import { DEFAULT_INSTANCE_RESOURCES, Ipv4AddressSchema, Value } from '@repo/protocol';
 import {
   DRIVE_IDS,
   netmaskFor,
@@ -16,8 +16,8 @@ const SLASH_0 = 0;
 const network = {
   tapName: 'nbr3',
   guestMac: '02:00:0a:c9:00:0e',
-  guestIpv4: '10.201.0.14' as Ipv4Address,
-  hostIpv4: '10.201.0.13' as Ipv4Address,
+  guestIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.14'),
+  hostIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.13'),
   subnetPrefixLength: SUBNET_PREFIX_LENGTH,
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { DeploymentId } from '@repo/protocol';
+import { DeploymentIdSchema, Value } from '@repo/protocol';
 import { hasDeferredWork, planReconcile } from '#lib/reconcile/plan.ts';
 import {
   APP_ID,
@@ -57,7 +57,7 @@ describe('instances are authoritative', () => {
     const plan = planReconcile({
       desired: desiredState({ instances: [desiredInstance()] }),
       observed: observedState({
-        instances: [observedInstance({ deploymentId: 'dep-0' as DeploymentId })],
+        instances: [observedInstance({ deploymentId: Value.Parse(DeploymentIdSchema, 'dep-0') })],
       }),
     });
     expect(plan.instances[0]?.action).toBe('replace');

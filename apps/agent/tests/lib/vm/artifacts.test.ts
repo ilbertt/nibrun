@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Path } from '@effect/platform';
 import { BunPath } from '@effect/platform-bun';
-import type { DesiredArtifact, Sha256Digest } from '@repo/protocol';
+import { type DesiredArtifact, Sha256DigestSchema, Value } from '@repo/protocol';
 import { Effect, Either } from 'effect';
 import { artifactImagePath, downloadAndVerify } from '#lib/vm/artifacts.ts';
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST, artifactStore } from '#tests/support/artifacts.ts';
@@ -9,7 +9,7 @@ import { artifact } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const DIGEST_HEX_LENGTH = 64;
-const WRONG_DIGEST = 'b'.repeat(DIGEST_HEX_LENGTH) as Sha256Digest;
+const WRONG_DIGEST = Value.Parse(Sha256DigestSchema, 'b'.repeat(DIGEST_HEX_LENGTH));
 const CACHE_DIR = '/var/lib/nibrun/artifacts';
 const HALF = Math.floor(ARTIFACT_BYTES.byteLength / 2);
 const SPLIT_CHUNKS = [ARTIFACT_BYTES.slice(0, HALF), ARTIFACT_BYTES.slice(HALF)];

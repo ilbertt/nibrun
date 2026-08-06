@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { CheckpointId } from '@repo/protocol';
+import { CheckpointIdSchema, Value } from '@repo/protocol';
 import { Effect } from 'effect';
 import {
   createCheckpoint,
@@ -12,7 +12,7 @@ import { recordingCommands } from '#tests/support/commands.ts';
 
 const BINARY = '/opt/nibrun/bin/zerofs/zerofs';
 const target = { binary: BINARY, configFile: '/etc/z.toml' };
-const checkpointId = 'cp-1' as CheckpointId;
+const checkpointId = Value.Parse(CheckpointIdSchema, 'cp-1');
 
 // The deploy puts every binary under a versioned path and none on PATH, so a bare name resolves
 // to nothing — and the flush that fails is the one that makes a stop a durability point.

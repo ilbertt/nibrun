@@ -1,4 +1,4 @@
-import type { AppId } from '@repo/protocol';
+import { type AppId, AppIdSchema, Value } from '@repo/protocol';
 import { Data } from 'effect';
 import { FIRST_SLOT, SLOT_COUNT } from '#lib/network/slot.ts';
 
@@ -30,7 +30,7 @@ export function assignmentsFrom(records: SlotRecords): Assignments {
     if (slot < FIRST_SLOT || slot >= SLOT_COUNT || taken.has(slot)) {
       continue;
     }
-    assignments.set(appId as AppId, slot);
+    assignments.set(Value.Parse(AppIdSchema, appId), slot);
     taken.add(slot);
   }
   return assignments;

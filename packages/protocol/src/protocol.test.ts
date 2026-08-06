@@ -1,41 +1,40 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  type AppId,
   AppIdSchema,
   DEFAULT_AGENT_POLL_SETTINGS,
   DEFAULT_GUEST_PORT,
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
-  type DeploymentId,
+  DeploymentIdSchema,
   DesiredStateResponseSchema,
   DIRECTORY_ENTRY_LIMIT,
   DirectoryListingSchema,
-  type ExportId,
-  type Filename,
+  ExportIdSchema,
   FilesystemEntryNameSchema,
   GuestPathSchema,
   type GuestPort,
   type HostDesiredState,
   HostDesiredStateSchema,
-  type HostId,
-  type Hostname,
+  HostIdSchema,
+  HostnameSchema,
   type HostPort,
   isValidMessage,
-  type ObjectKey,
+  ObjectKeySchema,
   ProtocolValidationError,
   parseMessage,
   REDACTED,
   redactSecrets,
   type SecretString,
+  SecretStringSchema,
   Sha256DigestSchema,
-  type Timestamp,
   TimestampSchema,
-  type VolumeId,
+  Value,
+  VolumeIdSchema,
 } from '#index.ts';
 import { FilenameSchema, GuestPortSchema, HostPortSchema } from '#lib/wire.ts';
 
-const TENANT_SECRET = 'sk-live-do-not-log-this' as SecretString;
+const TENANT_SECRET = Value.Parse(SecretStringSchema, 'sk-live-do-not-log-this');
 
 const SHA256_HEX_LENGTH = 64;
 const TRUNCATED_DIGEST_LENGTH = SHA256_HEX_LENGTH - 1;
@@ -46,26 +45,26 @@ const OVERLONG_ENTRY_NAME_LENGTH = 256;
 const hexDigest = (length: number = SHA256_HEX_LENGTH) => 'a'.repeat(length);
 
 const desiredState = (): HostDesiredState => ({
-  hostId: 'host_1' as HostId,
+  hostId: Value.Parse(HostIdSchema, 'host_1'),
   volumes: [
     {
-      volumeId: 'vol_1' as VolumeId,
-      appId: 'app_1' as AppId,
+      volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
+      appId: Value.Parse(AppIdSchema, 'app_1'),
       sizeBytes: 1024,
       desiredState: 'present',
     },
   ],
   instances: [
     {
-      appId: 'app_1' as AppId,
-      deploymentId: 'dep_1' as DeploymentId,
-      volumeId: 'vol_1' as VolumeId,
+      appId: Value.Parse(AppIdSchema, 'app_1'),
+      deploymentId: Value.Parse(DeploymentIdSchema, 'dep_1'),
+      volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
       desiredState: 'running',
       artifact: {
         digest: hexDigest() as never,
         sizeBytes: 2048,
-        objectKey: 'artifacts/app_1/a' as ObjectKey,
-        filename: 'server' as Filename,
+        objectKey: Value.Parse(ObjectKeySchema, 'artifacts/app_1/a'),
+        filename: Value.Parse(FilenameSchema, 'server'),
       },
       config: {
         guestPort: DEFAULT_GUEST_PORT,
@@ -75,7 +74,7 @@ const desiredState = (): HostDesiredState => ({
         healthCheck: DEFAULT_HEALTH_CHECK,
         restartPolicy: DEFAULT_RESTART_POLICY,
       },
-      hostnames: [{ hostname: 'app-1.nibrun.app' as Hostname, kind: 'platform' }],
+      hostnames: [{ hostname: Value.Parse(HostnameSchema, 'app-1.nibrun.app'), kind: 'platform' }],
     },
   ],
   checkpoints: [],
@@ -83,15 +82,15 @@ const desiredState = (): HostDesiredState => ({
 });
 
 const desiredExport = () => ({
-  exportId: 'exp_1' as ExportId,
-  appId: 'app_1' as AppId,
-  volumeId: 'vol_1' as VolumeId,
-  objectKey: 'exports/app_1/exp_1.tar.gz' as ObjectKey,
+  exportId: Value.Parse(ExportIdSchema, 'exp_1'),
+  appId: Value.Parse(AppIdSchema, 'app_1'),
+  volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
+  objectKey: Value.Parse(ObjectKeySchema, 'exports/app_1/exp_1.tar.gz'),
   artifact: {
     digest: hexDigest(),
     sizeBytes: 2048,
-    objectKey: 'artifacts/app_1/a' as ObjectKey,
-    filename: 'server' as Filename,
+    objectKey: Value.Parse(ObjectKeySchema, 'artifacts/app_1/a'),
+    filename: Value.Parse(FilenameSchema, 'server'),
   },
   desiredState: 'present',
 });
@@ -327,11 +326,15 @@ describe('secrets', () => {
       value: desiredState(),
     }) as HostDesiredState;
     expect(redacted.hostId).toBe(desiredState().hostId);
-    expect(redacted.instances[0]?.hostnames[0]?.hostname).toBe('app-1.nibrun.app' as Hostname);
+    expect(redacted.instances[0]?.hostnames[0]?.hostname).toBe(
+      Value.Parse(HostnameSchema, 'app-1.nibrun.app'),
+    );
   });
 
   test('a validation failure never carries the offending value into its message', () => {
     const state = desiredState();
+    // Cast rather than parsed: the value has to violate the schema for the rejection this test
+    // is about to happen at all, so constructing it through the schema would defeat the test.
     const overlong = 'x'.repeat(OVERLONG_SECRET_LENGTH) as SecretString;
     const instance = state.instances[0];
     if (!instance) {
@@ -365,7 +368,7 @@ test('the poll settings the control plane hands out are themselves valid', () =>
   );
 });
 
-test('a timestamp brand still requires a cast from a plain string', () => {
-  const now = new Date().toISOString() as Timestamp;
+test('a timestamp brand is only obtained by parsing a plain string', () => {
+  const now = Value.Parse(TimestampSchema, new Date().toISOString());
   expect(isValidMessage({ schema: TimestampSchema, value: now })).toBe(true);
 });

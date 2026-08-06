@@ -1,15 +1,16 @@
 import { describe, expect, test } from 'bun:test';
-import type {
-  AppId,
-  DeploymentId,
-  DeploymentState,
-  InstanceState,
-  ReportedInstance,
+import {
+  AppIdSchema,
+  DeploymentIdSchema,
+  type DeploymentState,
+  type InstanceState,
+  type ReportedInstance,
+  Value,
 } from '@repo/protocol';
 import { DeploymentLifecycle, STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 
-const APP_ID = 'app-1' as AppId;
-const DEPLOYMENT_ID = 'deployment-1' as DeploymentId;
+const APP_ID = Value.Parse(AppIdSchema, 'app-1');
+const DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'deployment-1');
 const CREATED_AT = new Date('2026-08-04T10:00:00.000Z');
 const JUST_DEPLOYED_MS = 1000;
 

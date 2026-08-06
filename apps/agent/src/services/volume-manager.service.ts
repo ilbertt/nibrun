@@ -1,5 +1,12 @@
 import { FileSystem, Path } from '@effect/platform';
-import type { AppId, DesiredVolume, ReportedVolume, VolumeId } from '@repo/protocol';
+import {
+  type AppId,
+  type DesiredVolume,
+  type ReportedVolume,
+  Value,
+  type VolumeId,
+  VolumeIdSchema,
+} from '@repo/protocol';
 import { Array as Arr, Effect, Option } from 'effect';
 import type { AppSlot } from '#lib/network/slot.ts';
 import type { ObservedVolume } from '#lib/reconcile/plan.ts';
@@ -89,7 +96,7 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
             // these to decide a tenant's filesystem is gone.
             const observed = yield* Effect.forEach(names, (name) =>
               Effect.gen(function* () {
-                const volumeId = name as VolumeId;
+                const volumeId = Value.Parse(VolumeIdSchema, name);
                 const appId = appIdByVolume.get(volumeId);
                 if (appId === undefined) {
                   return Option.none<ObservedVolume>();

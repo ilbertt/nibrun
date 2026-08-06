@@ -1,4 +1,4 @@
-import type { ObjectKey } from '@repo/protocol';
+import { ObjectKeySchema, Value } from '@repo/protocol';
 import { Effect } from 'effect';
 import type { ZerofsFilesystem } from '#lib/volumes/topology.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
@@ -18,7 +18,7 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
     const config = yield* AgentConfig;
     const filesystems: readonly [ZerofsFilesystem, ...ZerofsFilesystem[]] = [
       {
-        storagePrefix: config.zerofsStoragePrefix as ObjectKey,
+        storagePrefix: Value.Parse(ObjectKeySchema, config.zerofsStoragePrefix),
         mountPath: config.zerofsMount,
         nbdSocketPath: config.zerofsNbdSocket,
         admin: { binary: config.zerofsBinary, configFile: config.zerofsConfigFile },

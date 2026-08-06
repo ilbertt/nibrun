@@ -1,10 +1,12 @@
-import type {
-  AppConfig,
-  AppHostname,
-  AppId,
-  DesiredInstance,
-  DesiredVolume,
-  VolumeId,
+import {
+  type AppConfig,
+  type AppHostname,
+  type AppId,
+  type DesiredInstance,
+  type DesiredVolume,
+  Value,
+  type VolumeId,
+  VolumeIdSchema,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.d.ts';
 import { toAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
@@ -20,7 +22,7 @@ export type DesiredVolumeRow = Queries['SelectDesiredVolumes'];
  * so an app holding a second one later is a schema change rather than a wire change.
  */
 export function volumeIdOf(appId: AppId): VolumeId {
-  return appId as string as VolumeId;
+  return Value.Parse(VolumeIdSchema, appId);
 }
 
 /**

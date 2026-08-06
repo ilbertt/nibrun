@@ -1,10 +1,17 @@
 import { describe, expect, test } from 'bun:test';
-import { DIRECTORY_ENTRY_LIMIT, type GuestPath, type Timestamp } from '@repo/protocol';
+import {
+  DIRECTORY_ENTRY_LIMIT,
+  type GuestPath,
+  GuestPathSchema,
+  type Timestamp,
+  TimestampSchema,
+  Value,
+} from '@repo/protocol';
 import { Either } from 'effect';
 import { listingCommand, parseListing } from '#lib/filesystem/debugfs.ts';
 
 const DEVICE = '/dev/nbd7';
-const ROOT = '/' as GuestPath;
+const ROOT = Value.Parse(GuestPathSchema, '/');
 
 // Captured from `debugfs -R "ls -l /" <device>`: inode, mode, an e2fsprogs-dependent file-type
 // column, owner, group, size, then the date, time and name.
@@ -30,7 +37,7 @@ function entriesOf(output: string) {
 }
 
 function at(value: string): Timestamp {
-  return value as Timestamp;
+  return Value.Parse(TimestampSchema, value);
 }
 
 describe('a directory is read off the columns debugfs prints', () => {
@@ -95,7 +102,10 @@ describe('what mkfs left at the root is not the tenant data', () => {
   // The name is reserved in one directory only. Anywhere else it is a directory the tenant made,
   // and hiding it would be hiding their own data from them.
   test('but the same name below the root is the tenant own directory', () => {
-    const listing = parseListing({ output: withLostAndFound, path: '/pb_data' as GuestPath });
+    const listing = parseListing({
+      output: withLostAndFound,
+      path: Value.Parse(GuestPathSchema, '/pb_data'),
+    });
     if (Either.isLeft(listing)) {
       throw new Error('expected a readable directory');
     }
@@ -155,7 +165,10 @@ test('a directory larger than the wire allows says so rather than being cut sile
 
 describe('the command is built so debugfs cannot be handed a second one', () => {
   test('a valid path is quoted into a read-only invocation', () => {
-    const command = listingCommand({ devicePath: DEVICE, path: '/pb_data' as GuestPath });
+    const command = listingCommand({
+      devicePath: DEVICE,
+      path: Value.Parse(GuestPathSchema, '/pb_data'),
+    });
     expect(Either.isRight(command) && command.right).toEqual([
       'debugfs',
       '-R',

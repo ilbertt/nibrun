@@ -5,17 +5,19 @@ import {
   type AgentSessionRequest,
   AgentSessionSchema,
   type AppId,
+  AppIdSchema,
   FilesystemQueryResponseSchema,
   type HostCapacity,
   type HostVersions,
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
   parseMessage,
+  Value,
 } from '@repo/protocol';
 import { StatusMap } from 'elysia';
 import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
 
-const A_SERVED_APP_ID = 'app-pocketbase' as AppId;
+const A_SERVED_APP_ID = Value.Parse(AppIdSchema, 'app-pocketbase');
 
 const PROTOCOL_VERSION_SKEW = 1;
 

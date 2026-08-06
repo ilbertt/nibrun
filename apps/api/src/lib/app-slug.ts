@@ -1,4 +1,4 @@
-import { type DnsLabel, MAX_DNS_LABEL_LENGTH } from '@repo/protocol';
+import { type DnsLabel, DnsLabelSchema, MAX_DNS_LABEL_LENGTH, Value } from '@repo/protocol';
 
 const SEPARATOR = '-';
 
@@ -32,7 +32,7 @@ const TRAILING_HYPHENS = /-+$/;
  * thing get two labels rather than a collision.
  */
 export function deriveAppSlug(name: string): DnsLabel {
-  return `${stemOf(name)}${SEPARATOR}${randomSuffix()}` as DnsLabel;
+  return Value.Parse(DnsLabelSchema, `${stemOf(name)}${SEPARATOR}${randomSuffix()}`);
 }
 
 function stemOf(name: string): string {

@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'bun:test';
-import type {
-  ExportId,
-  ExportState,
-  HostReportedState,
-  ObjectKey,
-  OwnerId,
-  Timestamp,
+import {
+  type ExportId,
+  ExportIdSchema,
+  type ExportState,
+  type HostReportedState,
+  type ObjectKey,
+  ObjectKeySchema,
+  type OwnerId,
+  TimestampSchema,
+  Value,
 } from '@repo/protocol';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type { ExportStorageRepositoryContract } from '#repositories/export-storage.repository.ts';
@@ -19,8 +22,8 @@ import type { AppOwnership } from '#services/artifacts.service.ts';
 import { ExportsService } from '#services/exports.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 
-const EXPORT_ID = 'export-1' as ExportId;
-const OBJECT_KEY = `exports/${APP_ID}/${EXPORT_ID}.tar.gz` as ObjectKey;
+const EXPORT_ID = Value.Parse(ExportIdSchema, 'export-1');
+const OBJECT_KEY = Value.Parse(ObjectKeySchema, `exports/${APP_ID}/${EXPORT_ID}.tar.gz`);
 const SIGNED_URL = 'https://exports.test/signed';
 const RETENTION_DAYS = 1;
 const MS_PER_DAY = 86_400_000;
@@ -63,7 +66,7 @@ class FakeExportsRepository implements ExportsRepositoryContract {
       return Promise.resolve(inFlight);
     }
     const row = exportRow({
-      id: `export-${this.rows.length + 1}` as ExportId,
+      id: Value.Parse(ExportIdSchema, `export-${this.rows.length + 1}`),
       expires_at: input.expiresAt,
     });
     this.rows.push(row);
@@ -227,7 +230,7 @@ describe('polling an export', () => {
 describe('what a host says about the bundles it was told to write', () => {
   test('moves the export it names', async () => {
     const { service, exportsRepo } = build();
-    const readyAt = '2026-01-02T03:04:05.000Z' as Timestamp;
+    const readyAt = Value.Parse(TimestampSchema, '2026-01-02T03:04:05.000Z');
 
     await service.applyHostReport({
       reported: {
