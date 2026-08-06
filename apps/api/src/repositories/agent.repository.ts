@@ -13,8 +13,6 @@ export abstract class AgentRepositoryContract {
 }
 
 export class AgentRepository extends Repository implements AgentRepositoryContract {
-  // In this process rather than in Postgres: a session is ephemeral, so losing the map when the
-  // api restarts costs a re-registration the agent already retries.
   readonly #hostBySession = new Map<string, HostId>();
 
   saveSession({
