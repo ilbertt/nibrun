@@ -42,7 +42,7 @@ export type LiveDeploymentRow = Queries['SelectLiveDeployments'];
 export type ReportedDeployment = {
   deploymentId: DeploymentId;
   state: DeploymentState;
-  activated: boolean;
+  activatedAt: Date | null;
   hostPort: HostPort | null;
   guestIpv4: Ipv4Address | null;
   restartCount: number;
@@ -221,7 +221,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
             message = ${instance.message},
             started_at = ${instance.startedAt},
             last_healthy_at = ${instance.lastHealthyAt},
-            activated_at = COALESCE(activated_at, ${instance.activated ? new Date() : null})
+            activated_at = COALESCE(activated_at, ${instance.activatedAt})
           WHERE id = ${instance.deploymentId} AND state NOT IN ('superseded', 'failed')
         `;
       }

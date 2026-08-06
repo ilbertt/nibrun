@@ -42,6 +42,7 @@ const OWNER_SCOPED_METHODS = 4;
 const CREATED_AT = new Date('2026-08-04T10:00:00.000Z');
 const ACTIVATED_AT = new Date('2026-08-04T11:30:00.000Z');
 const HEALTHY_AT = new Date('2026-08-04T11:31:00.000Z');
+const REPORTED_AT = new Date('2026-08-04T11:32:00.000Z');
 const HOST_PORT = 30_001 as HostPort;
 const GUEST_IPV4 = '10.0.0.2' as Ipv4Address;
 const RESTART_COUNT = 2;
@@ -164,7 +165,7 @@ function instance({
 }
 
 function report(instances: ReportedInstance[]): HostReportedState {
-  return { instances } as unknown as HostReportedState;
+  return { instances, reportedAt: REPORTED_AT.toISOString() } as unknown as HostReportedState;
 }
 
 function serviceWith(behaviour: FakeBehaviour = {}) {
@@ -312,8 +313,40 @@ describe('a host reporting is what moves a release through its states', () => {
     await service.applyHostReport({ reported: report([instance({ state: 'running' })]) });
 
     expect(deploymentsRepo.applied).toEqual([
-      expect.objectContaining({ deploymentId: DEPLOYMENT_ID, state: 'active', activated: true }),
+      expect.objectContaining({ deploymentId: DEPLOYMENT_ID, state: 'active' }),
     ]);
+  });
+
+  // The probe the host answered, not the moment this end got round to reading about it: a report
+  // arrives up to an interval late, and the api's clock is not the one that saw it happen.
+  test("and the instant it became active is the host's, not this end's", async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
+
+    await service.applyHostReport({
+      reported: report([
+        instance({ state: 'running', lastHealthyAt: HEALTHY_AT.toISOString() as Timestamp }),
+      ]),
+    });
+
+    expect(deploymentsRepo.applied[0]?.activatedAt).toEqual(HEALTHY_AT);
+  });
+
+  // Unreachable while a host only reports `running` for an instance that answered a probe, so
+  // this is what a host drifting from that contract lands on rather than a null hole.
+  test('a report with no healthy instant falls back to when the host sent it', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
+
+    await service.applyHostReport({ reported: report([instance({ state: 'running' })]) });
+
+    expect(deploymentsRepo.applied[0]?.activatedAt).toEqual(REPORTED_AT);
+  });
+
+  test('one that has not served carries no activation instant at all', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
+
+    await service.applyHostReport({ reported: report([instance({ state: 'starting' })]) });
+
+    expect(deploymentsRepo.applied[0]?.activatedAt).toBeNull();
   });
 
   // They move without the state moving — a running instance reports a restart count and a health

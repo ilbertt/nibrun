@@ -5,6 +5,7 @@ import type {
   DeploymentState,
   HostReportedState,
   ReportedInstance,
+  Timestamp,
 } from '@repo/protocol';
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { DeploymentLifecycle } from '#lib/deployments/lifecycle.ts';
@@ -109,7 +110,7 @@ export class DeploymentsService extends Service {
         });
       }
       if (instance) {
-        observed.push(toReportedDeployment({ instance, state }));
+        observed.push(toReportedDeployment({ instance, state, reportedAt: reported.reportedAt }));
       } else if (state === 'failed') {
         overdue.push(row.id);
       }
@@ -141,17 +142,25 @@ export class DeploymentsService extends Service {
   }
 }
 
+/**
+ * The instant a release began serving is the probe that first answered, which the host observed
+ * and this end learns of a report later — so it is read off the report rather than taken from
+ * this clock. An instance only reaches `running` by passing that probe, so a state of `active`
+ * always has one; `reportedAt` stands in for a host that somehow sent none.
+ */
 function toReportedDeployment({
   instance,
   state,
+  reportedAt,
 }: {
   instance: ReportedInstance;
   state: DeploymentState;
+  reportedAt: Timestamp;
 }): ReportedDeployment {
   return {
     deploymentId: instance.deploymentId,
     state,
-    activated: state === 'active',
+    activatedAt: state === 'active' ? new Date(instance.lastHealthyAt ?? reportedAt) : null,
     hostPort: instance.hostPort ?? null,
     guestIpv4: instance.guestIpv4 ?? null,
     restartCount: instance.restartCount,
