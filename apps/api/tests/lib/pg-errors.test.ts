@@ -1,10 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 import { isMalformedIdentifier, isUniqueViolation } from '#lib/pg-errors.ts';
-import { MALFORMED_IDENTIFIER, postgresError, uniqueViolation } from '#tests/support/postgres.ts';
+import { malformedArrayLiteral, malformedUuid, uniqueViolation } from '#tests/support/postgres.ts';
 
 describe('a malformed identifier is the request being wrong, not the server', () => {
   test('a uuid column refusing a wire-valid id is recognised', () => {
-    expect(isMalformedIdentifier(postgresError({ sqlstate: MALFORMED_IDENTIFIER }))).toBe(true);
+    expect(isMalformedIdentifier(malformedUuid())).toBe(true);
+  });
+
+  // Everything Postgres cannot parse answers to 22P02, a value this end failed to encode
+  // included. Calling one of those a bad request blames the caller for the server's mistake and
+  // hides it behind a 400 nobody will investigate.
+  test('a value this end encoded wrongly shares the sqlstate and is not one', () => {
+    expect(isMalformedIdentifier(malformedArrayLiteral())).toBe(false);
   });
 
   test('nothing else is', () => {
