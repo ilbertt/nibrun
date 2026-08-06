@@ -1,9 +1,9 @@
 import { join } from 'node:path';
 import { createFilesContext, osHomeConfigDir } from '@parshjs/files';
 import { z } from 'zod';
+import { PROGRAM_NAME } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
 
-const CONFIG_DIR = 'nib';
 const CREDENTIALS_FILE = 'credentials.json';
 
 /**
@@ -20,7 +20,7 @@ export type Credentials = z.infer<typeof CredentialsSchema>;
 
 export function createCredentialsStore() {
   return createFilesContext({
-    basePath: join(osHomeConfigDir(), CONFIG_DIR),
+    basePath: join(osHomeConfigDir(), PROGRAM_NAME),
     files: {
       credentials: { filename: CREDENTIALS_FILE, schema: CredentialsSchema },
     },

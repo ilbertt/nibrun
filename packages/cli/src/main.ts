@@ -3,11 +3,10 @@ import { createCli } from '@parshjs/core';
 import { createEnvContext } from '@parshjs/env';
 import { z } from 'zod';
 import { commandTree } from '#command-tree.gen.ts';
+import { DEFAULT_API_URL, PROGRAM_NAME } from '#config.ts';
 import { createApi } from '#lib/api.ts';
 import { createCredentialsStore } from '#lib/credentials.ts';
 import { CancelledError } from '#lib/errors.ts';
-
-const PROGRAM_NAME = 'nib';
 
 const cli = createCli({
   programName: PROGRAM_NAME,
@@ -15,7 +14,7 @@ const cli = createCli({
   tree: commandTree,
   context: async () => {
     const env = createEnvContext({
-      vars: { NIBRUN_API_URL: { schema: z.url(), default: 'http://localhost:3000' } },
+      vars: { NIBRUN_API_URL: { schema: z.url(), default: DEFAULT_API_URL } },
     });
     const apiUrl = env.NIBRUN_API_URL;
     const files = createCredentialsStore();
