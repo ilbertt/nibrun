@@ -6,8 +6,9 @@ the layout under `src/commands/` is the command tree.
 - **Adding, renaming or moving a command means running `bun run generate`.** The
   generated `src/command-tree.gen.ts` is what types every handler's `ctx`, and it
   is committed. Editing an existing command's body does not need it.
-- Keep top-level imports light — `--help` loads every command it lists, so pull
-  the api client and anything else heavy in from inside the handler.
+- `--help` loads every command it lists, so a heavy top-level import is paid on
+  every help invocation. Not worth avoiding at this size; move imports into the
+  handler once the tree is big enough to feel it.
 - `NIBRUN_API_URL` and `NIBRUN_API_KEY` are read through `@parshjs/env` as
   `ctx.context.env`, never `process.env`.
 - A tenant binary and its arguments arrive as one quoted positional, split by

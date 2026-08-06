@@ -1,5 +1,10 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
+import { createApi } from '#lib/api.ts';
+import { parseCommandLine } from '#lib/command-line.ts';
+import { deploy, readBinary } from '#lib/deploy.ts';
+import { completeOptions } from '#lib/plan.ts';
+import { createUi, isInteractive } from '#lib/ui.ts';
 
 export const command = defineCommand('run [command]', {
   description:
@@ -37,12 +42,6 @@ export const command = defineCommand('run [command]', {
     },
   },
   handler: async ({ params, options, context, print }) => {
-    const { createApi } = await import('#lib/api.ts');
-    const { parseCommandLine } = await import('#lib/command-line.ts');
-    const { deploy, readBinary } = await import('#lib/deploy.ts');
-    const { completeOptions } = await import('#lib/plan.ts');
-    const { createUi, isInteractive } = await import('#lib/ui.ts');
-
     const { yes, detach, ...given } = options;
     const { binaryPath, args } = parseCommandLine(params.command);
     const api = createApi({
