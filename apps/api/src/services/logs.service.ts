@@ -10,26 +10,20 @@ import { Service } from '#services/service.ts';
 // A deployment the caller does not own has to be indistinguishable from one that does not exist.
 const NO_SUCH_DEPLOYMENT = 'Deployment not found.';
 
-/** Most records one answer carries. A reader that fills it is handed the rest on its next ask. */
+/** Most records one read of the store may answer with. The rest are the next read's. */
 const PAGE_LIMIT = 500;
 
-/** How long an answer with nothing in it waits before looking again. */
+/** How long a read that found nothing waits before looking again. */
 const IDLE_INTERVAL_MS = 1_000;
 
 const ONE_MS = 1;
 
-export type TenantLogPollRequest = {
+export type TenantLogStreamRequest = {
   appId: AppId;
   deploymentId: DeploymentId;
   ownerId: OwnerId;
-  /** Where to resume. Absent on a first read, which starts `timerange` ago instead. */
-  since: Timestamp | undefined;
+  /** How much history precedes the follow. */
   timerange: string;
-};
-
-export type TenantLogPage = {
-  records: TenantLogRecord[];
-  cursor: Timestamp;
 };
 
 export class LogsService extends Service {
@@ -49,56 +43,85 @@ export class LogsService extends Service {
   }
 
   /**
-   * One page of a deployment's output, waited for rather than reported empty.
+   * Resolves who may read before it returns anything to read from, so a caller who owns nothing
+   * is answered rather than connected to. The check is Postgres' — the log store holds no owner
+   * — and it is made once, at the point the stream opens: a connection held open past a transfer
+   * keeps the access it was granted, which is what bounds how long the route lets one live.
    *
-   * A log that is quiet has nothing to answer with and everything to answer with in a moment, so
-   * the request is held rather than refused — which is what lets a reader follow an app by asking
-   * again and again without either spinning or missing what lands between two asks. What ends the
-   * wait is the caller's own signal: they left, or the ceiling above this reached.
-   *
-   * Ownership is resolved before anything is read, and resolved again on every page, because each
-   * page is its own request. The check is Postgres' — the log store holds no owner — and the
-   * deployment is what is looked up rather than the app, because a deployment belonging to another
+   * The deployment is looked up rather than the app, because a deployment belonging to another
    * owner's app must not be readable by naming this owner's app in the path.
    */
-  async poll({
+  async openStream({
     appId,
     deploymentId,
     ownerId,
-    since,
     timerange,
     signal,
-  }: TenantLogPollRequest & { signal: AbortSignal }): Promise<TenantLogPage> {
+  }: TenantLogStreamRequest & { signal: AbortSignal }): Promise<AsyncIterable<TenantLogRecord>> {
     const deployment = await this.deploymentsRepo.findById({ appId, deploymentId, ownerId });
     if (!deployment) {
       throw new NotFoundError(NO_SUCH_DEPLOYMENT);
     }
-    const from = since ?? startOf(timerange);
-    this.logger.info('tenant log page opened', { appId, deploymentId, from });
+    this.logger.info('tenant log stream opened', { appId, deploymentId, timerange });
+    return this.records({ appId, deploymentId, since: startOf(timerange), signal });
+  }
 
-    // An abort reaches the store as a failed fetch rather than an empty answer, and it is the
-    // ordinary ending here — every quiet follow reaches the ceiling. The signal decides that, not
-    // the error: a reader who left and an expired ceiling raise different exceptions.
-    try {
-      while (!signal.aborted) {
-        const records = await this.logsRepo.read({
-          appId,
-          deploymentId,
-          since: from,
-          limit: PAGE_LIMIT,
-          signal,
-        });
-        if (records.length > 0) {
-          return { records, cursor: resumeAt({ records, from }) };
-        }
+  /**
+   * The store is read in windows rather than followed, so what makes this a stream is the loop —
+   * ask, hand over what came back, wait, ask again from where that left off. A reader sees a live
+   * log; that it is assembled from windows is this service's business and reaches nobody else,
+   * which is why the overlap each window carries is dropped here rather than passed on.
+   */
+  private async *records({
+    appId,
+    deploymentId,
+    since,
+    signal,
+  }: Pick<TenantLogStreamRequest, 'appId' | 'deploymentId'> & {
+    since: Timestamp;
+    signal: AbortSignal;
+  }): AsyncGenerator<TenantLogRecord> {
+    const delivered = new Delivered();
+    let from = since;
+
+    while (!signal.aborted) {
+      const records = await this.logsRepo.read({
+        appId,
+        deploymentId,
+        since: from,
+        limit: PAGE_LIMIT,
+      });
+      const fresh = records.filter((record) => delivered.admit(record));
+      for (const record of fresh) {
+        yield record;
+      }
+      from = resumeAt({ records, from });
+
+      if (fresh.length === 0) {
         await wait({ ms: IDLE_INTERVAL_MS, signal });
       }
-    } catch (error) {
-      if (!signal.aborted) {
-        throw error;
-      }
     }
-    return { records: [], cursor: from };
+  }
+}
+
+/**
+ * What this stream has already handed over, so the overlap between two windows is handed over once.
+ *
+ * A window resumes on the instant the last one ended rather than after it — see `resumeAt` — so
+ * every window but the first begins with records its predecessor already carried. `sourceId` and
+ * `sequence` are what tell a second copy from a second record: sequence counts within one source
+ * and only rises, so the highest seen is the whole of what has to be kept.
+ */
+class Delivered {
+  readonly #highest = new Map<string, number>();
+
+  admit(record: TenantLogRecord): boolean {
+    const seen = this.#highest.get(record.sourceId);
+    if (seen !== undefined && record.sequence <= seen) {
+      return false;
+    }
+    this.#highest.set(record.sourceId, record.sequence);
+    return true;
   }
 }
 
@@ -107,17 +130,16 @@ function startOf(timerange: string): Timestamp {
 }
 
 /**
- * Where the next page resumes: inclusive of the record it names, or unmoved when there was none.
+ * Where the next window starts: inclusive of the record it names, or unmoved when there was none.
  *
  * The store stamps to the millisecond, so records sharing the last one's instant may not all have
- * been written when this page was read — resuming past it would lose them, and resuming on it
- * hands the reader a copy of what it already has. A copy is the recoverable half: `sourceId` and
- * `sequence` are on every record precisely so a reader can tell a second copy from a second
- * record.
+ * been written when this window was read — starting past it would lose them, and starting on it
+ * repeats what has already been handed over. A repeat is the recoverable half, and `Delivered` is
+ * what recovers it.
  *
- * A full page that begins and ends in the same instant is the one case that would resume on
- * itself forever, and it moves on instead. Reaching it means a guest wrote a page of output inside
- * one millisecond, and what is skipped is the remainder of that millisecond.
+ * A full window that begins and ends in the same instant is the one case that would start on
+ * itself forever, and it moves on instead. Reaching it means a guest wrote a window of output
+ * inside one millisecond, and what is skipped is the remainder of that millisecond.
  */
 function resumeAt({ records, from }: { records: TenantLogRecord[]; from: Timestamp }): Timestamp {
   const first = records[0];

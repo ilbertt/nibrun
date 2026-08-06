@@ -1,20 +1,21 @@
 import type { Print } from '@parshjs/core';
-import type { TenantLogRecord, Timestamp } from '@repo/protocol';
+import type { TenantLogRecord } from '@repo/protocol';
 import { type Api, unwrap } from '#lib/api.ts';
 import { ApiError } from '#lib/errors.ts';
 
 const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
 /**
- * What a page that told us nothing costs before we ask again.
+ * How much of the gap a reconnect asks to be told about.
  *
- * The api holds an ask open while the log is quiet, so following an app never reaches this: a page
- * that brought something is asked after at once, and one that brought nothing has already spent
- * its wait on the other end. It is here for when that stops being true — a proxy answering short,
- * an api that stops holding — where the difference is a poll a second rather than a hot loop
- * against someone else's server.
+ * Only the first stream wants the range the reader asked for; a later one is picking up after a
+ * close and wants the seconds it was away, not that history again. Generous, because overlap is
+ * cheap here — `Printed` drops what has already been shown — and a gap is not recoverable.
  */
-const QUIET_PAUSE_MS = 1_000;
+const RECONNECT_TIMERANGE = '30s';
+
+/** What a closed stream costs before we open another, so a refusing api is not hammered. */
+const RECONNECT_PAUSE_MS = 1_000;
 
 /**
  * The deployment a reader means by not naming one. The api lists them newest first, so this is
@@ -60,9 +61,10 @@ export type FollowInput = {
 /**
  * Print what a deployment has written, and keep printing what it writes until stopped.
  *
- * Every page comes back with the instant to resume from, and asking again with it is the whole of
- * what following is. The api holds an ask open while the log is quiet rather than answering it
- * empty, so this runs at the speed the app writes rather than at a poll interval of its own.
+ * The api closes a stream on its own clock so that who may read it is asked again rather than
+ * decided once, which makes reaching the end of one an instruction to open another rather than
+ * the end of the log. Opening another is why `Printed` outlives them all: a reconnect asks for
+ * the seconds it was away, and what it was not away for comes back a second time.
  */
 export async function follow({
   api,
@@ -74,30 +76,20 @@ export async function follow({
 }: FollowInput): Promise<void> {
   const logs = api.api.apps({ appId }).deployments({ deploymentId }).logs;
   const printed = new Printed();
-  let since: Timestamp | undefined;
+  let asked = timerange;
 
-  // Stopping part-way through an ask is the ordinary ending — the api holds one open for as long
-  // as it can, so that is where a reader almost always is when they stop. It arrives as a failed
-  // request rather than a last page, and the signal is what says so, not the error.
+  // Stopping part-way through a stream is the ordinary ending, and it arrives as a failed request
+  // rather than a last record. The signal is what says so, not the error.
   try {
     while (!signal.aborted) {
-      const page = unwrap(
-        await logs.get({
-          query: since === undefined ? { timerange } : { since },
-          fetch: { signal },
-        }),
-      );
-      const fresh = page.records.filter((record) => printed.admit(record));
-      for (const record of fresh) {
-        show({ record, print });
+      const stream = unwrap(await logs.get({ query: { timerange: asked }, fetch: { signal } }));
+      for await (const { data } of stream) {
+        if (printed.admit(data)) {
+          show({ record: data, print });
+        }
       }
-      since = page.cursor;
-
-      // Nothing to show is the only thing worth pausing on, and it is not the same as an empty
-      // page: one that repeated what the last ended on and added nothing is equally no progress.
-      if (fresh.length === 0) {
-        await Bun.sleep(QUIET_PAUSE_MS);
-      }
+      asked = RECONNECT_TIMERANGE;
+      await Bun.sleep(RECONNECT_PAUSE_MS);
     }
   } catch (failure) {
     if (!signal.aborted) {
@@ -107,13 +99,12 @@ export async function follow({
 }
 
 /**
- * What has already been printed, so a page overlapping the one before it is not printed twice.
+ * What has already been printed, so a reconnect does not print it again.
  *
- * A page resumes on the instant the last one ended rather than after it: the store stamps to the
- * millisecond, and a record sharing that instant may not have been written when the last page was
- * read. Dropping it would be worse than repeating it, so the api repeats — and `sourceId` and
- * `sequence` are what tell a second copy from a second record. Sequence counts within one source
- * and only rises, so the highest one seen is the whole of what has to be remembered.
+ * A stream cannot be resumed from where the last one stopped — there is no cursor on the wire —
+ * so a new one asks for the seconds around the gap and carries whatever else was in them.
+ * `sourceId` and `sequence` are what tell a second copy from a second record: sequence counts
+ * within one source and only rises, so the highest seen is the whole of what has to be remembered.
  */
 export class Printed {
   readonly #highest = new Map<string, number>();

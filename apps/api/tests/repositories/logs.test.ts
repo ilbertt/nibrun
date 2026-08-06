@@ -16,7 +16,6 @@ const HOST_ID = Value.Parse(HostIdSchema, 'host-1');
 const SINCE = Value.Parse(TimestampSchema, '2026-08-06T09:41:00.123Z');
 const LIMIT = 500;
 const DROPPED_BYTES = 4096;
-const READ_TIMEOUT_MS = 1_000;
 
 /**
  * A row as the store hands it over: every value a string, whatever the agent wrote. The client's
@@ -57,7 +56,6 @@ async function read(rows: LogRow[]) {
     deploymentId: DEPLOYMENT_ID,
     since: SINCE,
     limit: LIMIT,
-    signal: AbortSignal.timeout(READ_TIMEOUT_MS),
   });
   return { records, asked: client.asked };
 }

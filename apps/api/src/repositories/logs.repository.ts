@@ -19,7 +19,6 @@ export type TenantLogWindow = {
   since: Timestamp;
   /** Most records one read may answer with. Oldest first, so the rest are the next read's. */
   limit: number;
-  signal: AbortSignal;
 };
 
 export abstract class LogsRepositoryContract {
@@ -34,11 +33,10 @@ export class LogsRepository implements LogsRepositoryContract {
     this.store = store;
   }
 
-  async read({ appId, deploymentId, since, limit, signal }: TenantLogWindow) {
+  async read({ appId, deploymentId, since, limit }: TenantLogWindow) {
     const rows = await this.store.query.run({
       query: tenantQuery({ appId, deploymentId, limit }),
       start: since,
-      signal,
     });
     return rows.map(toRecord).filter((record) => record !== undefined);
   }

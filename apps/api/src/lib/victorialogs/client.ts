@@ -28,18 +28,11 @@ abstract class VictoriaLogsEndpoint {
     this.url = new URL(path, baseUrl).toString();
   }
 
-  protected async post({
-    params,
-    signal,
-  }: {
-    params: Record<string, string>;
-    signal: AbortSignal;
-  }): Promise<Response> {
+  protected async post({ params }: { params: Record<string, string> }): Promise<Response> {
     const response = await fetch(this.url, {
       method: 'POST',
       headers: { 'content-type': FORM_CONTENT_TYPE },
       body: new URLSearchParams(params),
-      signal,
     });
     if (!response.ok) {
       throw new VictoriaLogsError({
@@ -56,24 +49,23 @@ export type QueryRequest = {
   query: string;
   /** Inclusive lower bound of the window, as an ISO 8601 instant. */
   start: string;
-  signal: AbortSignal;
 };
 
 /**
  * One window of the store, read and finished with.
  *
- * The endpoint that follows a stream instead exists, and is not what a poll wants: following means
- * holding a connection open for as long as someone is reading, which is a decision about who may
- * still see the app made once and then never revisited. A window is asked for, answered, and asked
- * for again — so every answer is one the caller's authorization was checked for.
+ * An ordinary request, and nothing here can cancel one. The endpoint that follows a stream instead
+ * exists and would need that — it is held open for as long as someone is reading, so abandoning
+ * one without saying so leaks it. A window is bounded by its own `limit` and answers in the time a
+ * query takes, which is short enough that a reader who has left costs a reply nobody reads.
  */
 export class VictoriaLogsQuery extends VictoriaLogsEndpoint {
   constructor(baseUrl: URL) {
     super({ baseUrl, path: QUERY_PATH });
   }
 
-  async run({ query, start, signal }: QueryRequest): Promise<LogRow[]> {
-    const response = await this.post({ params: { query, start }, signal });
+  async run({ query, start }: QueryRequest): Promise<LogRow[]> {
+    const response = await this.post({ params: { query, start } });
     if (!response.body) {
       return [];
     }

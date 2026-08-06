@@ -4,7 +4,6 @@ import type { LogRow } from '#lib/victorialogs/parse.ts';
 
 const QUERY = 'SOURCE:="tenant"';
 const START = '2026-08-06T09:41:00.123Z';
-const QUERY_TIMEOUT_MS = 5_000;
 const HALF = 2;
 const BAD_REQUEST = 400;
 
@@ -48,11 +47,7 @@ const client = new VictoriaLogsClient(new URL(store.url.toString()));
 
 function collect(): Promise<LogRow[]> {
   asked.length = 0;
-  return client.query.run({
-    query: QUERY,
-    start: START,
-    signal: AbortSignal.timeout(QUERY_TIMEOUT_MS),
-  });
+  return client.query.run({ query: QUERY, start: START });
 }
 
 describe('the query endpoint answers with one window of the store', () => {
