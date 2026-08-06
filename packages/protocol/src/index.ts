@@ -167,10 +167,14 @@ export {
   RestartPolicySchema,
 } from '#domain/instance.ts';
 export {
+  DEFAULT_LOG_TIMERANGE,
   LOG_SOURCES,
   LOG_STREAM_FIELDS,
+  LOG_TIMERANGE_PATTERN,
   type LogSource,
   LogSourceSchema,
+  type LogTimerange,
+  LogTimerangeSchema,
   TENANT_LOG_STREAMS,
   type TenantLogRecord,
   TenantLogRecordSchema,

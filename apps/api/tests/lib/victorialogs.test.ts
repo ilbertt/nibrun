@@ -3,8 +3,8 @@ import { VictoriaLogsClient, VictoriaLogsError } from '#lib/victorialogs/client.
 import type { LogRow } from '#lib/victorialogs/parse.ts';
 
 const QUERY = 'SOURCE:="tenant"';
-const START_OFFSET = '5m';
-const TAIL_TIMEOUT_MS = 5_000;
+const START = '2026-08-06T09:41:00.123Z';
+const QUERY_TIMEOUT_MS = 5_000;
 const HALF = 2;
 const BAD_REQUEST = 400;
 
@@ -17,7 +17,8 @@ const asked: Asked[] = [];
 let answer: Answer = { body: '' };
 
 // A real socket rather than a stubbed fetch: what is under test is reading a response the store
-// holds open, and a stub handing back one whole string never splits a record across two reads.
+// writes as it finds matches, and a stub handing back one whole string never splits a record
+// across two reads.
 const store = Bun.serve({
   port: 0,
   async fetch(request) {
@@ -45,27 +46,23 @@ afterAll(() => store.stop(true));
 
 const client = new VictoriaLogsClient(new URL(store.url.toString()));
 
-async function collect(): Promise<LogRow[]> {
+function collect(): Promise<LogRow[]> {
   asked.length = 0;
-  const rows: LogRow[] = [];
-  for await (const row of client.tail.subscribe({
+  return client.query.run({
     query: QUERY,
-    startOffset: START_OFFSET,
-    signal: AbortSignal.timeout(TAIL_TIMEOUT_MS),
-  })) {
-    rows.push(row);
-  }
-  return rows;
+    start: START,
+    signal: AbortSignal.timeout(QUERY_TIMEOUT_MS),
+  });
 }
 
-describe('the tail endpoint follows a query the store holds open', () => {
+describe('the query endpoint answers with one window of the store', () => {
   test('it asks its own path, with the query in the body', async () => {
     answer = { body: '' };
     await collect();
 
-    expect(asked[0]?.path).toBe('/select/logsql/tail');
+    expect(asked[0]?.path).toBe('/select/logsql/query');
     expect(asked[0]?.form.get('query')).toBe(QUERY);
-    expect(asked[0]?.form.get('start_offset')).toBe(START_OFFSET);
+    expect(asked[0]?.form.get('start')).toBe(START);
   });
 
   test('each line is a row', async () => {
@@ -74,7 +71,7 @@ describe('the tail endpoint follows a query the store holds open', () => {
     expect((await collect()).map((row) => row._msg)).toEqual(['first', 'second']);
   });
 
-  // The store writes as records arrive, so a record straddling two reads is ordinary.
+  // The store writes as records are found, so a record straddling two reads is ordinary.
   test('a record split across two reads is still one row', async () => {
     const body = jsonLine({ _msg: 'listening on 0.0.0.0:8090' });
     answer = { body, chunkAt: Math.floor(body.length / HALF) };
@@ -82,9 +79,9 @@ describe('the tail endpoint follows a query the store holds open', () => {
     expect(await collect()).toHaveLength(1);
   });
 
-  // Ending the stream would take the whole log view down with it, and the reader is watching a
+  // Failing the window would take the whole log view down with it, and the reader is watching a
   // live app rather than auditing the store.
-  test('a line that is not a JSON object is skipped rather than ending the tail', async () => {
+  test('a line that is not a JSON object is skipped rather than failing the window', async () => {
     answer = { body: `not json\n${jsonLine({ _msg: 'kept' })}[1,2]\n` };
 
     expect((await collect()).map((row) => row._msg)).toEqual(['kept']);

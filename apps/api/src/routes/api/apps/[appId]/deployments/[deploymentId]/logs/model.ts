@@ -1,19 +1,22 @@
+import { LogTimerangeSchema, TenantLogRecordSchema, TimestampSchema } from '@repo/protocol';
 import { t } from 'elysia';
 
 /**
- * How much history precedes the follow. A LogsQL duration rather than a line count: the store's
- * tail cannot be limited by rows, so the only bound expressible here is one in time.
+ * Where to resume, or how far back to start when there is nothing to resume from — defaulted at
+ * the handler, like every other range this api takes. Naming both is allowed and `since` wins: a
+ * reader following an app sends back the cursor it was last given and has no reason to keep
+ * restating the range its first read used.
  */
-const START_OFFSET_PATTERN = '^[1-9][0-9]{0,3}[smh]$';
+export const PollLogsQuerySchema = t.Object({
+  since: t.Optional(TimestampSchema),
+  timerange: t.Optional(LogTimerangeSchema),
+});
 
-export const DEFAULT_START_OFFSET = '5m';
-
-export const TailLogsQuerySchema = t.Object({
-  startOffset: t.Optional(
-    t.String({
-      pattern: START_OFFSET_PATTERN,
-      default: DEFAULT_START_OFFSET,
-      description: 'How far back the tail starts, as a LogsQL duration such as 5m.',
-    }),
-  ),
+/**
+ * `cursor` is what the next read passes back as `since`, and it is returned whether or not
+ * anything was found — a reader that got nothing still has to know where its wait got to.
+ */
+export const TenantLogPageSchema = t.Object({
+  records: t.Array(TenantLogRecordSchema),
+  cursor: TimestampSchema,
 });

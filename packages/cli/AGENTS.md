@@ -16,6 +16,12 @@ the layout under `src/commands/` is the command tree.
   approves it on the dashboard's `/device`, and the token that comes back is
   written by `@parshjs/files` to `~/.config/nib/credentials.json`. It is stored
   with the api that issued it, because it authenticates against no other.
+- A flag several commands share is declared once on their parent with
+  `forwardToChildren: true` and read as `parents['<path>'].options`, never
+  redeclared per child. The parent is then a group: no handler, so `nib apps`
+  lists what is under it, and the flag stays optional — a required one would make
+  that listing an error. parsh spells a flag exactly as its key, so `--app-slug`
+  is the key `'app-slug'`.
 - **The client is built even when there is no token**, so `nib login` — a
   command like any other — can run at all. What stops an unauthenticated
   request is `requireSignedIn` in a `beforeHandler`. A new command that talks to

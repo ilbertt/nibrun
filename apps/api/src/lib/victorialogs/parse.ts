@@ -8,9 +8,9 @@
 export type LogRow = Record<string, string>;
 
 /**
- * Newline-delimited JSON off a response the store holds open, so a record straddling two reads is
- * the ordinary case rather than an edge one: what is left after the last newline is carried into
- * the next chunk instead of being parsed as a line of its own.
+ * Newline-delimited JSON off a response the store writes as it finds matches, so a record
+ * straddling two reads is the ordinary case rather than an edge one: what is left after the last
+ * newline is carried into the next chunk instead of being parsed as a line of its own.
  */
 export async function* lines(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
   const decoder = new TextDecoder();

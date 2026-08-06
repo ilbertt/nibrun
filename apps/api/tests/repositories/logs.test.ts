@@ -1,15 +1,22 @@
 import { describe, expect, test } from 'bun:test';
-import { AppIdSchema, DeploymentIdSchema, HostIdSchema, Value } from '@repo/protocol';
-import type { TailRequest } from '#lib/victorialogs/client.ts';
+import {
+  AppIdSchema,
+  DeploymentIdSchema,
+  HostIdSchema,
+  TimestampSchema,
+  Value,
+} from '@repo/protocol';
+import type { QueryRequest } from '#lib/victorialogs/client.ts';
 import type { LogRow } from '#lib/victorialogs/parse.ts';
 import { LogsRepository, type TenantLogStore } from '#repositories/logs.repository.ts';
 
 const APP_ID = Value.Parse(AppIdSchema, 'app-1');
 const DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'deployment-1');
 const HOST_ID = Value.Parse(HostIdSchema, 'host-1');
-const START_OFFSET = '5m';
+const SINCE = Value.Parse(TimestampSchema, '2026-08-06T09:41:00.123Z');
+const LIMIT = 500;
 const DROPPED_BYTES = 4096;
-const TAIL_TIMEOUT_MS = 1_000;
+const READ_TIMEOUT_MS = 1_000;
 
 /**
  * A row as the store hands it over: every value a string, whatever the agent wrote. The client's
@@ -30,48 +37,51 @@ function storedRow(overrides: Record<string, string> = {}): LogRow {
   };
 }
 
-function store(rows: LogRow[]): TenantLogStore & { asked: TailRequest[] } {
-  const asked: TailRequest[] = [];
+function store(rows: LogRow[]): TenantLogStore & { asked: QueryRequest[] } {
+  const asked: QueryRequest[] = [];
   return {
     asked,
-    tail: {
-      subscribe(request: TailRequest) {
+    query: {
+      run(request: QueryRequest) {
         asked.push(request);
-        return (async function* () {
-          yield* rows;
-        })();
+        return Promise.resolve(rows);
       },
     },
   };
 }
 
-async function collect(rows: LogRow[]) {
+async function read(rows: LogRow[]) {
   const client = store(rows);
-  const repository = new LogsRepository(client);
-  const records = [];
-  for await (const record of repository.tail({
+  const records = await new LogsRepository(client).read({
     appId: APP_ID,
     deploymentId: DEPLOYMENT_ID,
-    startOffset: START_OFFSET,
-    signal: AbortSignal.timeout(TAIL_TIMEOUT_MS),
-  })) {
-    records.push(record);
-  }
+    since: SINCE,
+    limit: LIMIT,
+    signal: AbortSignal.timeout(READ_TIMEOUT_MS),
+  });
   return { records, asked: client.asked };
 }
 
-describe('a tail reads one deployment out of the store', () => {
+describe('a read takes one window of one deployment out of the store', () => {
   test('the filter names the stream fields before the deployment', async () => {
-    const { asked } = await collect([]);
+    const { asked } = await read([]);
 
-    expect(asked[0]?.query).toBe(
+    expect(asked[0]?.query).toStartWith(
       `SOURCE:="tenant" appId:="${APP_ID}" deploymentId:="${DEPLOYMENT_ID}"`,
     );
-    expect(asked[0]?.startOffset).toBe(START_OFFSET);
+    expect(asked[0]?.start).toBe(SINCE);
+  });
+
+  // The store's own limit keeps the newest matches, which read forward from a cursor would skip
+  // everything between the window's start and the last page of it.
+  test('the window is cut at its far end, by sorting before the limit applies', async () => {
+    const { asked } = await read([]);
+
+    expect(asked[0]?.query).toEndWith(`| sort by (_time) limit ${LIMIT}`);
   });
 
   test('a stored row becomes a record the protocol accepts', async () => {
-    const { records } = await collect([storedRow()]);
+    const { records } = await read([storedRow()]);
 
     expect(records[0]?.sequence).toBe(0);
     expect(records[0]?.deploymentId).toBe(DEPLOYMENT_ID);
@@ -79,7 +89,7 @@ describe('a tail reads one deployment out of the store', () => {
   });
 
   test('a gap keeps the byte count it reports as a number', async () => {
-    const { records } = await collect([
+    const { records } = await read([
       storedRow({ droppedBytes: String(DROPPED_BYTES), stream: 'stderr' }),
     ]);
 
@@ -88,9 +98,9 @@ describe('a tail reads one deployment out of the store', () => {
 
   // The schema is what would catch a field renamed on the writing side, and the reader is
   // watching a live app rather than auditing the store — so it drops the row and carries on.
-  test('a row the protocol does not recognise is skipped rather than ending the tail', async () => {
+  test('a row the protocol does not recognise is skipped rather than failing the window', async () => {
     const { hostId: _hostId, ...missingAField } = storedRow();
-    const { records } = await collect([missingAField, storedRow()]);
+    const { records } = await read([missingAField, storedRow()]);
 
     expect(records).toHaveLength(1);
   });
