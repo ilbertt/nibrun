@@ -22,12 +22,15 @@ the layout under `src/commands/` is the command tree.
   lists what is under it, and the flag stays optional — a required one would make
   that listing an error. parsh spells a flag exactly as its key, so `--app` is
   the key `'app'` — and a flag two unrelated commands both take is a
-  `SharedOption` member in `src/config.ts`, so they cannot drift apart. When
-  those commands also mean the same thing by it, the whole declaration is shared
-  from there (`DEPLOYMENT_ID_OPTION`) and the site adds only
-  `forwardToChildren`. `defineCommand` infers its options `const`, so an enum
-  key and a spread both survive as literals — `parents['<path>'].options` stays
-  typed either way.
+  `SHARED_OPTIONS` entry in `src/config.ts`, holding that name and the
+  declaration it points at, so neither half can drift. A site writes
+  `[SHARED_OPTIONS.x.name]: { ...SHARED_OPTIONS.x.option, … }` and adds only
+  what differs there — whether it forwards, and a description where the same
+  value means a different thing per command. `defineCommand` infers its options
+  through a `const` type parameter, so the key and the spread both survive as
+  literals and `parents['<path>'].options` stays typed. The `satisfies` on
+  `SHARED_OPTIONS` is what makes a mistyped field an error where it is written
+  rather than an overload failure at every command taking it.
 - A positional is a path segment, so a command taking one lives at
   `commands/<…>/[name].ts` and its path string ends in `[name]`. Leaving it out
   prints the parent's usage rather than a missing-argument error, because the

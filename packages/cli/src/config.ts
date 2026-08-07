@@ -1,3 +1,4 @@
+import type { CommandOption } from '@parshjs/core';
 import { z } from 'zod';
 
 export const PROGRAM_NAME = 'nib';
@@ -5,20 +6,21 @@ export const PROGRAM_NAME = 'nib';
 export const DEFAULT_API_URL = 'https://app.nibrun.com';
 
 /**
- * Flags asked for by more than one command, spelled once so two commands cannot end up asking for
- * the same thing by different names.
+ * A flag more than one command takes, held as both the name parsh spells it by and the declaration
+ * that name points at, so neither half can drift between the commands taking it. A site adds only
+ * what genuinely differs there: whether it forwards, and a description where the same value means a
+ * different thing to each command.
  */
-export enum SharedOption {
-  App = 'app',
-  DeploymentId = 'deployment-id',
-}
-
-/**
- * Only the name of `--app` is shared, because what an app is to each command is not: `nib run`
- * deploys onto one, `nib apps` works with one. A deployment is the same deployment wherever it is
- * named, so this one is shared whole and a site adds nothing but whether it forwards.
- */
-export const DEPLOYMENT_ID_OPTION = {
-  schema: z.string().min(1).optional(),
-  description: 'Read this deployment instead of looking up the app latest.',
-};
+export const SHARED_OPTIONS = {
+  app: {
+    name: 'app',
+    option: { schema: z.string().min(1).optional() },
+  },
+  deploymentId: {
+    name: 'deployment-id',
+    option: {
+      schema: z.string().min(1).optional(),
+      description: 'Read this deployment instead of looking up the app latest.',
+    },
+  },
+} as const satisfies Record<string, { name: string; option: CommandOption }>;

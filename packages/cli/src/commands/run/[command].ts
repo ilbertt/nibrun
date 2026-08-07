@@ -1,6 +1,6 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
-import { SharedOption } from '#config.ts';
+import { SHARED_OPTIONS } from '#config.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { deploy, readBinary } from '#lib/deploy.ts';
@@ -14,8 +14,8 @@ export const command = defineCommand('run [command]', {
     command: { schema: z.string().min(1) },
   },
   options: {
-    [SharedOption.App]: {
-      schema: z.string().optional(),
+    [SHARED_OPTIONS.app.name]: {
+      ...SHARED_OPTIONS.app.option,
       description: 'Slug of an existing app to deploy onto. Asked for when omitted.',
     },
     name: {
