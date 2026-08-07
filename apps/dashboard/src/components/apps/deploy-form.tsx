@@ -1,5 +1,4 @@
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
-import { DeployTargetField } from '#components/apps/deploy-target-field.tsx';
 import { Button } from '#components/ui/button.tsx';
 import { Field, FieldDescription, FieldError, FieldLabel } from '#components/ui/field.tsx';
 import { Input } from '#components/ui/input.tsx';
@@ -8,8 +7,9 @@ import { formatBytes } from '#lib/format-bytes.ts';
 import { useDeployForm, validateBinary, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 export function DeployForm({ appId }: { appId: string | undefined }) {
-  const { api, locked, target, choices, replacing, targetResolved, defaultPort, defaultArgs } =
-    useDeployForm({ appId });
+  const { api, locked, replacing, targetResolved, defaultPort, defaultArgs } = useDeployForm({
+    appId,
+  });
 
   return (
     <form
@@ -40,9 +40,7 @@ export function DeployForm({ appId }: { appId: string | undefined }) {
         }}
       </api.Field>
 
-      {!locked && <DeployTargetField api={api} choices={choices} />}
-
-      {!locked && target === null && <DeployNameField api={api} />}
+      {!locked && <DeployNameField api={api} />}
 
       <api.Field name="port" validators={{ onChange: validatePort }}>
         {(field) => (
