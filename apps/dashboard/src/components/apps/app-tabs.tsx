@@ -1,4 +1,4 @@
-import { GUEST_PATH_ROOT } from '@repo/protocol';
+import { DEFAULT_LOG_TIMERANGE, GUEST_PATH_ROOT } from '@repo/protocol';
 import { Link } from '@tanstack/react-router';
 import { Tabs, TabsList, TabsTrigger } from '#components/ui/tabs.tsx';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
@@ -17,7 +17,16 @@ export function AppTabs() {
         <TabsTrigger value="overview" render={<Link to={AppRoute.to} params={{ appId }} />}>
           Overview
         </TabsTrigger>
-        <TabsTrigger value="logs" render={<Link to={LogsRoute.to} params={{ appId }} />}>
+        <TabsTrigger
+          value="logs"
+          render={
+            <Link
+              to={LogsRoute.to}
+              params={{ appId }}
+              search={{ timerange: DEFAULT_LOG_TIMERANGE }}
+            />
+          }
+        >
           Logs
         </TabsTrigger>
         <TabsTrigger

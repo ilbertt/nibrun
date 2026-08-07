@@ -1,5 +1,5 @@
 import { followLogs } from '@repo/app-operations';
-import { DEFAULT_LOG_TIMERANGE, type TenantLogRecord } from '@repo/protocol';
+import type { LogTimerange, TenantLogRecord } from '@repo/protocol';
 import {
   queryOptions,
   skipToken,
@@ -16,12 +16,14 @@ function keptTail(records: readonly TenantLogRecord[]): readonly TenantLogRecord
 export function deploymentLogsQueryOptions({
   appId,
   deploymentId,
+  timerange,
 }: {
   appId: string;
   deploymentId: string | undefined;
+  timerange: LogTimerange;
 }) {
   return queryOptions({
-    queryKey: ['deployments', appId, deploymentId, 'logs'],
+    queryKey: ['deployments', appId, deploymentId, 'logs', timerange],
     queryFn:
       deploymentId === undefined
         ? skipToken
@@ -31,7 +33,7 @@ export function deploymentLogsQueryOptions({
                 api,
                 appId,
                 deploymentId,
-                timerange: DEFAULT_LOG_TIMERANGE,
+                timerange,
                 signal,
               }),
             // biome-ignore lint/complexity/useMaxParams: a reducer folds a chunk into what it has
