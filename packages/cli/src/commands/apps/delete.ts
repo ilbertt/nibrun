@@ -7,7 +7,7 @@ import { createUi, isInteractive } from '#lib/ui.ts';
 
 export const command = defineCommand('apps delete', {
   description:
-    'Delete an app: every deployment of it and everything on its volume. There is no undo.',
+    'Delete an app: everything on its volume, every binary uploaded to it and every export taken of it. There is no undo.',
   options: {
     yes: {
       schema: z.boolean().optional(),
