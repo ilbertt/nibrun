@@ -51,4 +51,8 @@ command history, in the clear, for 30 days — so Terraform writes secrets into 
 instance decrypts with its own role. Both GHCR packages must be public for the same reason: the box
 pulls with no registry credentials.
 
-`workflow_dispatch` takes `allow_destroy` for the times a plan legitimately replaces something.
+`workflow_dispatch` takes `allow_destroy` for the times a plan legitimately replaces something, and
+`replace` for recreating a machine nothing in the configuration would otherwise touch — e.g.
+`aws_instance.app_host[0]`, with `allow_destroy` on, to rebuild a host from its bootstrap up. An app
+host's ZeroFS prefix is keyed on its instance id, so a replacement starts on an empty prefix and
+orphans the old one.
