@@ -46,6 +46,12 @@ const APP_DELETED = 'The app was deleted while this export was still being writt
  */
 const PURGE_BATCH = 8;
 
+/**
+ * How many stuck deletions one host report finishes. Only apps from before a deletion could
+ * finish itself ever land here, so this drains a backlog that never grows.
+ */
+const FINISH_BATCH = 8;
+
 export class AppsService extends Service {
   private readonly appsRepo: AppsRepositoryContract;
   private readonly exportsRepo: ExportCancellation;
@@ -228,17 +234,33 @@ export class AppsService extends Service {
 
   /**
    * `deleting` means waiting for a host to say the filesystem is gone, and an app that never had
-   * a filesystem is waiting for a sentence nobody will ever speak: a volume is desired only where
-   * the app has been deployed at least once, so an app deployed no times is named in no host's
-   * desired state and reported back by nobody.
-   *
-   * Asked of `desired_volumes` rather than of the deployments underneath it, because what decides
-   * this is whether a host will be told — which is exactly what that view is.
+   * a filesystem waits for a sentence nobody will ever speak. Answered here so the owner is told
+   * what became of their app rather than told to wait for it.
    */
   private async finishIfNothingToTearDown({ appId }: { appId: AppId }): Promise<boolean> {
-    if (await this.appsRepo.hasDesiredVolume({ appId })) {
+    if (!(await this.appsRepo.isDeletionFinishable({ appId }))) {
       return false;
     }
+    return this.finishWithoutVolume({ appId });
+  }
+
+  /**
+   * The same question asked of every app rather than of the one in hand, which is what reaches
+   * the ones left `deleting` from before a deletion could finish itself. They are found by the
+   * state they are in rather than remembered as owed, so this needs nothing written down and
+   * nothing run by hand.
+   *
+   * Before `purgeDeleted` in a report, so an app finished here has what it left behind removed by
+   * the same pass rather than by the next one.
+   */
+  async finishDeletions(): Promise<void> {
+    const appIds = await this.appsRepo.listFinishableDeletions({ limit: FINISH_BATCH });
+    for (const appId of appIds) {
+      await this.finishWithoutVolume({ appId });
+    }
+  }
+
+  private async finishWithoutVolume({ appId }: { appId: AppId }): Promise<boolean> {
     const finished = await this.appsRepo.finishDeleting({ appId });
     if (finished) {
       this.logger.info('app deleted without a filesystem to tear down', { appId });

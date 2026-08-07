@@ -71,6 +71,12 @@ Migrations are ordered `src/db/migrations/NNNN_*.sql`, applied on startup by
 `src/db/migrate.ts`. Add one by dropping in the next-numbered file. The runner's
 ledger lives in the `api_migrations` schema — never put app tables there.
 
+**Migrations carry schema and nothing else — never `INSERT`, `UPDATE` or
+`DELETE` on app tables.** Rows to repair are found by the state they are in and
+fixed by code that runs continuously, so the repair is retried, tested and
+reviewable as behaviour rather than fired once on the next boot with nothing
+watching it.
+
 Every table carries a `created_at timestamptz GENERATED ALWAYS AS
 (uuid_extract_timestamp(id)) VIRTUAL` and an `updated_at timestamptz NOT NULL
 DEFAULT now()`, with a `BEFORE UPDATE` trigger running `nibrun.set_updated_at()`

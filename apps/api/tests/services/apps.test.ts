@@ -84,9 +84,20 @@ class StubAppsRepository implements AppsRepositoryContract {
     this.#failure = failure;
   }
 
-  // An app is deployed at least once or it is not, and only the first has a volume anyone holds.
-  hasDesiredVolume({ appId }: { appId: AppId }): Promise<boolean> {
-    return Promise.resolve(this.deployedApps.includes(appId));
+  // A deletion is finishable when the app is going and no host holds a volume for it, which is
+  // to say it was never deployed. The view says both halves; this says them the same way.
+  #finishable(appId: AppId): boolean {
+    return this.deleting.includes(appId) && !this.deployedApps.includes(appId);
+  }
+
+  isDeletionFinishable({ appId }: { appId: AppId }): Promise<boolean> {
+    return Promise.resolve(this.#finishable(appId));
+  }
+
+  listFinishableDeletions({ limit }: { limit: number }): Promise<AppId[]> {
+    return Promise.resolve(
+      this.deleting.filter((appId) => this.#finishable(appId)).slice(0, limit),
+    );
   }
 
   finishDeleting({ appId }: { appId: AppId }): Promise<boolean> {
@@ -640,5 +651,36 @@ describe('an app with no filesystem to tear down is not left waiting for one', (
     await serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
 
     expect(exportsRepo.cancelled).toEqual([APP_ID]);
+  });
+});
+
+describe('a deletion left stuck before any of this existed is finished when one is found', () => {
+  // These predate a deletion being able to finish itself, so nothing wrote down that they were
+  // owed: they are found by the state they are still in.
+  test('an app stuck deleting with no filesystem is finished by a host report', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.deleting = [APP_ID];
+
+    await serviceWith({ appsRepo }).finishDeletions();
+
+    expect(appsRepo.deleted).toEqual([APP_ID]);
+  });
+
+  test('an app still waiting on the host holding its volume is left alone', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.deleting = [APP_ID];
+    appsRepo.deployedApps = [APP_ID];
+
+    await serviceWith({ appsRepo }).finishDeletions();
+
+    expect(appsRepo.deleted).toEqual([]);
+  });
+
+  test('an app nobody asked to delete is not deleted by the sweep', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).finishDeletions();
+
+    expect(appsRepo.deleted).toEqual([]);
   });
 });

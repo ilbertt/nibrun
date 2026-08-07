@@ -52,7 +52,8 @@ export abstract class AppsRepositoryContract {
   abstract updateConfig(input: OwnedApp & { patch: AppConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: OwnedApp & { state: AppState }): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
-  abstract hasDesiredVolume(input: { appId: AppId }): Promise<boolean>;
+  abstract isDeletionFinishable(input: { appId: AppId }): Promise<boolean>;
+  abstract listFinishableDeletions(input: { limit: number }): Promise<AppId[]>;
   abstract isOwnedBy(input: OwnedApp): Promise<boolean>;
   abstract listPurgeable(input: { limit: number }): Promise<AppId[]>;
   abstract listLeftovers(input: { appId: AppId }): Promise<Leftovers>;
@@ -292,15 +293,24 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * every heartbeat until desired state stops mentioning it, so this is asked many times for one
    * deletion, and what comes back says which of them was the one that finished it.
    */
-  /**
-   * Whether any host will be told to hold or to let go of this app's filesystem. Read off the
-   * view the hosts are served from, so it cannot answer one thing while they are told another.
-   */
-  async hasDesiredVolume({ appId }: { appId: AppId }): Promise<boolean> {
-    const rows = await this.sql.SelectDesiredVolumeForApp`
-      SELECT v.app_id FROM nibrun.desired_volumes v WHERE v.app_id = ${appId}
+  /** The app just asked for, so that an owner is told what became of it rather than to wait. */
+  async isDeletionFinishable({ appId }: { appId: AppId }): Promise<boolean> {
+    const rows = await this.sql.SelectFinishableDeletion`
+      SELECT f.app_id FROM nibrun.finishable_deletions f WHERE f.app_id = ${appId}
     `;
     return rows.length > 0;
+  }
+
+  /**
+   * The ones nobody is waiting on any more — apps left `deleting` from before a deletion could
+   * finish itself. Bounded: this is asked on the way through a host report, and what it usually
+   * finds is nothing.
+   */
+  async listFinishableDeletions({ limit }: { limit: number }): Promise<AppId[]> {
+    const rows = await this.sql.SelectFinishableDeletions`
+      SELECT f.app_id FROM nibrun.finishable_deletions f LIMIT ${limit}
+    `;
+    return rows.map((row) => row.app_id);
   }
 
   async finishDeleting({ appId }: { appId: AppId }): Promise<boolean> {

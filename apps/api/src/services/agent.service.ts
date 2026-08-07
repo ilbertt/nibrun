@@ -113,6 +113,7 @@ export class AgentService extends Service {
     await this.exportsService.applyHostReport({ reported });
     // Last, because what an app leaves behind is only safe to remove once a host has said its
     // filesystem is gone — and `completeDeletions` above is where this report says so.
+    await this.appsService.finishDeletions();
     await this.appsService.purgeDeleted();
   }
 }
