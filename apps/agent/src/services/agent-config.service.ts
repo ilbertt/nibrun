@@ -62,6 +62,7 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
       slotsFile: inStateDir('slots.json'),
       instancesFile: inStateDir('instances.json'),
       exportsFile: inStateDir('exports.json'),
+      deletedVolumesFile: inStateDir('deleted-volumes.json'),
       desiredStateFile: inStateDir('desired-state.json'),
       exportStagingDir: inStateDir('exports'),
       artifactCacheDir: inStateDir('artifacts'),

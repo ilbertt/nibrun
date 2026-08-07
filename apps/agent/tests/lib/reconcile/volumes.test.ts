@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import type { AppId, VolumeId } from '@repo/protocol';
+import type { AppId, ReportedVolume, VolumeId } from '@repo/protocol';
 import { volumeOwners } from '#lib/reconcile/volumes.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
+import { readDeletedVolumes } from '#lib/volumes/manager.ts';
 import { APP_ID, desiredState, desiredVolume, VOLUME_ID } from '#tests/support/fixtures.ts';
 
 /** Only the two fields an owner is read out of; the rest of a record is not what this decides. */
@@ -43,5 +44,36 @@ describe('a volume belongs to the app the control plane says it belongs to', () 
     const map = volumeOwners({ desired: desiredState(), records: records([]) });
 
     expect(owners(map)).toEqual([]);
+  });
+});
+
+describe('a removal this host carried out keeps being reported until it is taken in', () => {
+  const deleted = (): ReportedVolume => ({
+    volumeId: VOLUME_ID,
+    appId: APP_ID,
+    state: 'deleted',
+    sizeBytes: 0,
+  });
+
+  /**
+   * The window that left an app deleting forever: the device file is gone, so the next
+   * observation finds nothing — and nothing is also what an app whose filesystem lives on another
+   * host looks like. Only the host that removed it can say so, so it has to survive a restart.
+   */
+  test('a note of it is read back after a restart', () => {
+    const written = JSON.parse(JSON.stringify([deleted()]));
+
+    expect(readDeletedVolumes(written)).toEqual([deleted()]);
+  });
+
+  test('a report that is not a removal is not read back as one', () => {
+    const ready = { volumeId: VOLUME_ID, appId: APP_ID, state: 'ready', sizeBytes: 4096 };
+
+    expect(readDeletedVolumes([ready])).toEqual([]);
+  });
+
+  test('nothing written is nothing remembered', () => {
+    expect(readDeletedVolumes(undefined)).toEqual([]);
+    expect(readDeletedVolumes({ not: 'an array' })).toEqual([]);
   });
 });

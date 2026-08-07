@@ -64,9 +64,11 @@ const provision = (desired: DesiredVolume) =>
 export const applyVolumes = ({
   plan,
   observed,
+  desired,
 }: {
   plan: ReconcilePlan;
   observed: ObservedState;
+  desired: HostDesiredState;
 }) =>
   Effect.gen(function* () {
     const updates: ReportedVolume[] = [];
@@ -83,11 +85,18 @@ export const applyVolumes = ({
         );
       }
     }
+
+    // Anything still named is still being waited on; anything not is a removal the control plane
+    // has taken in, and holding it after that would report a volume nobody is asking about.
+    yield* AgentState.forgetDeletedVolumes(new Set(desired.volumes.map((one) => one.volumeId)));
+
     yield* AgentState.modify((current) => ({
       ...current,
       volumeReports: mergeVolumeReports({
         existing: observed.volumes.map(toReportedVolume),
-        updates,
+        // After the observation, because a removal this host carried out is not something the
+        // next observation can find: the device file it would have been read from is gone.
+        updates: [...current.deletedVolumes.values(), ...updates],
       }),
     }));
   });
@@ -101,13 +110,19 @@ export const applyTeardowns = (plan: ReconcilePlan) =>
       }
       yield* volumes.teardown(action.desired).pipe(
         Effect.flatMap((report) =>
-          AgentState.modify((current) => ({
-            ...current,
-            volumeReports: mergeVolumeReports({
-              existing: current.volumeReports,
-              updates: [report],
-            }),
-          })),
+          // Remembered as well as reported: the report reaches the control plane on the next poll,
+          // and a restart in between would otherwise leave nobody able to say the volume is gone.
+          AgentState.rememberDeletedVolume(report).pipe(
+            Effect.andThen(
+              AgentState.modify((current) => ({
+                ...current,
+                volumeReports: mergeVolumeReports({
+                  existing: current.volumeReports,
+                  updates: [report],
+                }),
+              })),
+            ),
+          ),
         ),
         Effect.catchAll((error) =>
           Effect.logError('volume teardown failed', error).pipe(

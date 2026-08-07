@@ -16,6 +16,7 @@ import { applyTeardowns, applyVolumes, volumeOwners } from '#lib/reconcile/volum
 import { readInstanceRecords } from '#lib/report/instance-record.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
+import { readDeletedVolumes } from '#lib/volumes/manager.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
@@ -41,10 +42,14 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       const exports = readExportReports(
         Option.getOrUndefined(yield* readJsonFile(config.exportsFile)),
       );
+      const deletedVolumes = readDeletedVolumes(
+        Option.getOrUndefined(yield* readJsonFile(config.deletedVolumesFile)),
+      );
       yield* AgentState.modify((current) => ({
         ...current,
         records: new Map(instances.map((record) => [record.appId, record])),
         exportReports: new Map(exports.map((report) => [report.exportId, report])),
+        deletedVolumes: new Map(deletedVolumes.map((report) => [report.volumeId, report])),
       }));
       yield* Effect.logInfo('agent state loaded').pipe(
         Effect.annotateLogs({
@@ -112,6 +117,10 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       yield* writeJsonFile({
         path: config.exportsFile,
         value: [...current.exportReports.values()],
+      });
+      yield* writeJsonFile({
+        path: config.deletedVolumesFile,
+        value: [...current.deletedVolumes.values()],
       });
     });
 
@@ -203,7 +212,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
         [prefetchArtifacts(plan), applyStops(plan).pipe(Effect.withSpan('reconcile.stops'))],
         { concurrency: 'unbounded', discard: true },
       );
-      yield* applyVolumes({ plan, observed }).pipe(Effect.withSpan('reconcile.volumes'));
+      yield* applyVolumes({ plan, observed, desired }).pipe(Effect.withSpan('reconcile.volumes'));
       // Before anything boots: nothing persists the ruleset across a reboot, so a host that
       // started its VMs first would serve tenants through a kernel with no `nibrun` table.
       yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
