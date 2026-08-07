@@ -17,6 +17,7 @@ import { Route as dashboardIndexRouteImport } from './routes/(dashboard)/index'
 import { Route as dashboardAppsIndexRouteImport } from './routes/(dashboard)/apps/index'
 import { Route as dashboardAppsAppIdRouteRouteImport } from './routes/(dashboard)/apps/$appId/route'
 import { Route as dashboardAppsAppIdIndexRouteImport } from './routes/(dashboard)/apps/$appId/index'
+import { Route as dashboardAppsAppIdLogsRouteImport } from './routes/(dashboard)/apps/$appId/logs'
 
 const authRouteRoute = authRouteRouteImport.update({
   id: '/(auth)',
@@ -56,6 +57,11 @@ const dashboardAppsAppIdIndexRoute = dashboardAppsAppIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => dashboardAppsAppIdRouteRoute,
 } as any)
+const dashboardAppsAppIdLogsRoute = dashboardAppsAppIdLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => dashboardAppsAppIdRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/device': typeof authDeviceRoute
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof dashboardIndexRoute
   '/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
   '/apps/': typeof dashboardAppsIndexRoute
+  '/apps/$appId/logs': typeof dashboardAppsAppIdLogsRoute
   '/apps/$appId/': typeof dashboardAppsAppIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
   '/apps': typeof dashboardAppsIndexRoute
+  '/apps/$appId/logs': typeof dashboardAppsAppIdLogsRoute
   '/apps/$appId': typeof dashboardAppsAppIdIndexRoute
 }
 export interface FileRoutesById {
@@ -81,14 +89,22 @@ export interface FileRoutesById {
   '/(dashboard)/': typeof dashboardIndexRoute
   '/(dashboard)/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
   '/(dashboard)/apps/': typeof dashboardAppsIndexRoute
+  '/(dashboard)/apps/$appId/logs': typeof dashboardAppsAppIdLogsRoute
   '/(dashboard)/apps/$appId/': typeof dashboardAppsAppIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/device' | '/login' | '/' | '/apps/$appId' | '/apps/' | '/apps/$appId/'
+    | '/device'
+    | '/login'
+    | '/'
+    | '/apps/$appId'
+    | '/apps/'
+    | '/apps/$appId/logs'
+    | '/apps/$appId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/device' | '/login' | '/' | '/apps' | '/apps/$appId'
+  to:
+    '/device' | '/login' | '/' | '/apps' | '/apps/$appId/logs' | '/apps/$appId'
   id:
     | '__root__'
     | '/(auth)'
@@ -98,6 +114,7 @@ export interface FileRouteTypes {
     | '/(dashboard)/'
     | '/(dashboard)/apps/$appId'
     | '/(dashboard)/apps/'
+    | '/(dashboard)/apps/$appId/logs'
     | '/(dashboard)/apps/$appId/'
   fileRoutesById: FileRoutesById
 }
@@ -164,6 +181,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof dashboardAppsAppIdIndexRouteImport
       parentRoute: typeof dashboardAppsAppIdRouteRoute
     }
+    '/(dashboard)/apps/$appId/logs': {
+      id: '/(dashboard)/apps/$appId/logs'
+      path: '/logs'
+      fullPath: '/apps/$appId/logs'
+      preLoaderRoute: typeof dashboardAppsAppIdLogsRouteImport
+      parentRoute: typeof dashboardAppsAppIdRouteRoute
+    }
   }
 }
 
@@ -182,11 +206,13 @@ const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
 )
 
 interface dashboardAppsAppIdRouteRouteChildren {
+  dashboardAppsAppIdLogsRoute: typeof dashboardAppsAppIdLogsRoute
   dashboardAppsAppIdIndexRoute: typeof dashboardAppsAppIdIndexRoute
 }
 
 const dashboardAppsAppIdRouteRouteChildren: dashboardAppsAppIdRouteRouteChildren =
   {
+    dashboardAppsAppIdLogsRoute: dashboardAppsAppIdLogsRoute,
     dashboardAppsAppIdIndexRoute: dashboardAppsAppIdIndexRoute,
   }
 

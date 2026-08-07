@@ -1,4 +1,5 @@
 import { unwrap } from '@repo/api-client/unwrap';
+import { latestDeployment } from '@repo/app-operations';
 import { queryOptions, skipToken } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 
@@ -12,5 +13,12 @@ export function deploymentsQueryOptions(appId: string | undefined) {
   return queryOptions({
     queryKey: ['deployments', appId],
     queryFn: appId === undefined ? skipToken : () => fetchDeployments(appId),
+  });
+}
+
+export function latestDeploymentQueryOptions(appId: string) {
+  return queryOptions({
+    queryKey: ['latest-deployment', appId],
+    queryFn: () => latestDeployment({ api, appId }),
   });
 }
