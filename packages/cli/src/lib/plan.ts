@@ -8,8 +8,6 @@ export type RunOptions = {
   app?: string | undefined;
   name?: string | undefined;
   port?: number | undefined;
-  vcpu?: number | undefined;
-  memory?: number | undefined;
 };
 
 type Plan = {
@@ -21,9 +19,8 @@ type Plan = {
 /**
  * Ask for what the flags left open, then show what it all adds up to.
  *
- * Only the two answers that decide where a first deploy lands are asked for. Resources are not:
- * they have defaults worth taking, and a question asked on every run is one that gets answered
- * without reading it.
+ * Only the answers that decide where a first deploy lands are asked for — a question asked on
+ * every run is one that gets answered without reading it.
  */
 export async function completeOptions({ api, options, binaryPath, args }: Plan & { api: Api }) {
   const completed = await fillGaps({ api, options, binaryPath });
@@ -106,8 +103,6 @@ function summary({ options, binaryPath, args }: Plan): string {
     ['binary', binaryPath],
     ['app', options.app ?? options.name],
     ['port', options.port],
-    ['vcpu', options.vcpu],
-    ['memory', options.memory],
     ['args', args.length === 0 ? undefined : args.join(' ')],
   ];
   return rows

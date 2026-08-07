@@ -1,5 +1,6 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
+import { APP_OPTION } from '#config.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { deploy, readBinary } from '#lib/deploy.ts';
@@ -13,7 +14,7 @@ export const command = defineCommand('run [command]', {
     command: { schema: z.string().min(1) },
   },
   options: {
-    app: {
+    [APP_OPTION]: {
       schema: z.string().optional(),
       description: 'Slug of an existing app to deploy onto. Asked for when omitted.',
     },
@@ -25,30 +26,18 @@ export const command = defineCommand('run [command]', {
       schema: z.number().int().optional(),
       description: 'Port the binary listens on inside the guest.',
     },
-    vcpu: { schema: z.number().int().optional(), description: 'vCPUs the guest is given.' },
-    memory: {
-      schema: z.number().int().optional(),
-      description: 'Memory the guest is given, in MiB.',
-    },
     detach: {
       schema: z.boolean().optional(),
       aliases: ['d'],
       description: 'Return once the deployment is created instead of waiting for it to serve.',
     },
-    yes: {
-      schema: z.boolean().optional(),
-      aliases: ['y'],
-      description: 'Take the defaults for anything not given instead of asking.',
-    },
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ params, options, context, print }) => {
-    const { yes, detach, ...given } = options;
+    const { detach, ...given } = options;
     const { binaryPath, args } = parseCommandLine(params.command);
     const { api } = context;
 
-    // A terminal decides how this looks; `--yes` only decides whether it asks. Someone who wants
-    // the defaults taken has not thereby asked for the output of a log file.
     const interactive = isInteractive();
     const ui = createUi({ print, interactive });
 
@@ -57,10 +46,9 @@ export const command = defineCommand('run [command]', {
     const binary = await readBinary(binaryPath);
     ui.open('nib run');
 
-    const resolved =
-      interactive && yes !== true
-        ? await completeOptions({ api, options: given, binaryPath, args })
-        : given;
+    const resolved = interactive
+      ? await completeOptions({ api, options: given, binaryPath, args })
+      : given;
 
     await deploy({ ...resolved, api, ui, binary, args, detach });
   },

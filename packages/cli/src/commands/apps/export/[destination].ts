@@ -24,7 +24,7 @@ export const command = defineCommand('apps export [destination]', {
     ui.open('nib apps export');
     await exportApp({
       api,
-      slug: requireAppSlug(parents.apps.options['app-slug']),
+      slug: requireAppSlug(parents.apps.options.app),
       destination: params.destination,
       ui,
     });

@@ -1,12 +1,13 @@
 import type { Print } from '@parshjs/core';
+import { APP_OPTION } from '#config.ts';
 import { type Api, unwrap } from '#lib/api.ts';
 import { ApiError, UsageError } from '#lib/errors.ts';
 
-const NO_APP_NAMED = 'Which app? Name one with --app-slug.';
+const NO_APP_NAMED = `Which app? Name one with --${APP_OPTION}.`;
 const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
 /**
- * `--app-slug` is optional on `apps` so that asking for nothing is answered with a listing rather
+ * `--app` is optional on `apps` so that asking for nothing is answered with a listing rather
  * than an error, which leaves every command underneath to say what going without one means. They
  * all mean the same thing, so they say it from here.
  */

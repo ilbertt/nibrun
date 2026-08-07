@@ -20,8 +20,9 @@ the layout under `src/commands/` is the command tree.
   `forwardToChildren: true` and read as `parents['<path>'].options`, never
   redeclared per child. The parent is then a group: no handler, so `nib apps`
   lists what is under it, and the flag stays optional — a required one would make
-  that listing an error. parsh spells a flag exactly as its key, so `--app-slug`
-  is the key `'app-slug'`.
+  that listing an error. parsh spells a flag exactly as its key, so `--app` is
+  the key `'app'` — and a flag two unrelated commands both take is that key held
+  in `src/config.ts` (`APP_OPTION`), so they cannot drift apart.
 - A positional is a path segment, so a command taking one lives at
   `commands/<…>/[name].ts` and its path string ends in `[name]`. Leaving it out
   prints the parent's usage rather than a missing-argument error, because the
@@ -47,10 +48,10 @@ the layout under `src/commands/` is the command tree.
   `src/lib/command-line.ts`. parsh cannot tell a trailing `--verbose` meant for
   the tenant from one meant for us, so quoting is what says which — never add a
   bare variadic and never reintroduce a `--` separator.
-- Prompting is gated on both ends of the pipe being a terminal (`isInteractive()`)
-  and on `--yes` being absent. A command must work with neither: whatever the
-  flags left open still needs a default. `ctx.print` stays the plain-output path,
-  clack the interactive one — see `src/lib/ui.ts`.
+- Prompting is gated on both ends of the pipe being a terminal
+  (`isInteractive()`). A command must work without one: whatever the flags left
+  open still needs a default. `ctx.print` stays the plain-output path, clack the
+  interactive one — see `src/lib/ui.ts`.
 - Run it with `bun run --filter @repo/cli nib …`. A package script runs from the
   package directory, so relative paths resolve against `packages/cli` rather than
   the caller's shell — pass absolute ones until the CLI ships as a real `bin`.

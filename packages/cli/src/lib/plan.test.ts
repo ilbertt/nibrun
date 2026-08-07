@@ -82,14 +82,14 @@ test('an app the owner cannot deploy onto is not offered', async () => {
 
 test('a flag already given is not asked about again', async () => {
   const resolved = await completeOptions({
-    api: apiListing([{ slug: 'demo-abc123', state: 'active' }]),
-    options: { app: 'demo-abc123', vcpu: 2 },
+    api: apiListing([]),
+    options: { name: 'my-app', port: 8080 },
     binaryPath: '/tmp/my-server',
     args: ['serve', '--verbose'],
   });
 
-  expect(resolved).toEqual({ app: 'demo-abc123', vcpu: 2 });
-  expect(asked).toEqual(['confirm:Deploy onto demo-abc123? This replaces what it is running.']);
+  expect(resolved).toEqual({ name: 'my-app', port: 8080 });
+  expect(asked).toEqual(['confirm:Create my-app and deploy?']);
 });
 
 test('what the binary will be run with is shown before anything is uploaded', async () => {

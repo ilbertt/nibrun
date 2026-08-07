@@ -28,7 +28,7 @@ export const command = defineCommand('apps logs', {
     const { api } = context;
     const { appId, deploymentId } = await addressedDeployment({
       api,
-      slug: requireAppSlug(parents.apps.options['app-slug']),
+      slug: requireAppSlug(parents.apps.options.app),
       deploymentId: options['deployment-id'],
       print,
     });

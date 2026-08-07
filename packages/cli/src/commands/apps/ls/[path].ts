@@ -20,7 +20,7 @@ export const command = defineCommand('apps ls [path]', {
 
     await listDirectory({
       api: context.api,
-      slug: requireAppSlug(parents.apps.options['app-slug']),
+      slug: requireAppSlug(parents.apps.options.app),
       deploymentId: parents['apps ls'].options['deployment-id'],
       path,
       print,

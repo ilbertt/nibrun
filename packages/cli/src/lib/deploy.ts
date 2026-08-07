@@ -1,12 +1,5 @@
 import { basename } from 'node:path';
-import {
-  DEFAULT_INSTANCE_RESOURCES,
-  type DeploymentState,
-  GuestPortSchema,
-  type InstanceResources,
-  type TenantArguments,
-  Value,
-} from '@repo/protocol';
+import { type DeploymentState, GuestPortSchema, type TenantArguments, Value } from '@repo/protocol';
 import { type Api, unwrap } from '#lib/api.ts';
 import { appBySlug } from '#lib/apps.ts';
 import { ApiError, UsageError } from '#lib/errors.ts';
@@ -39,15 +32,11 @@ export async function deploy({
   args,
   app: slug,
   name,
+  port,
   detach,
-  ...resources
 }: DeployInput): Promise<void> {
   const target = slug === undefined ? null : await appBySlug({ api, slug });
-  const config = configPatch({
-    args,
-    current: target?.config.resources ?? DEFAULT_INSTANCE_RESOURCES,
-    ...resources,
-  });
+  const config = configPatch({ args, port });
 
   const app =
     target === null
@@ -93,22 +82,10 @@ export async function readBinary(path: string): Promise<File> {
  * run with, and carrying over the last deploy's arguments because none were given this time
  * would run something nobody asked for.
  */
-function configPatch({
-  args,
-  current,
-  port,
-  vcpu,
-  memory,
-}: RunOptions & { args: TenantArguments; current: InstanceResources }) {
+function configPatch({ args, port }: Pick<RunOptions, 'port'> & { args: TenantArguments }) {
   return {
     args,
     ...(port !== undefined && { guestPort: Value.Parse(GuestPortSchema, port) }),
-    ...((vcpu !== undefined || memory !== undefined) && {
-      resources: {
-        vcpuCount: vcpu ?? current.vcpuCount,
-        memoryMib: memory ?? current.memoryMib,
-      },
-    }),
   };
 }
 
