@@ -131,6 +131,10 @@ class FakeStorage implements ArtifactStorageRepositoryContract {
   exists(): Promise<boolean> {
     return Promise.resolve(this.#alreadyStored);
   }
+
+  remove(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 const BUCKET_REFUSED = 'the bucket said no';
@@ -142,6 +146,10 @@ class RefusingStorage implements ArtifactStorageRepositoryContract {
 
   exists(): Promise<boolean> {
     return Promise.resolve(false);
+  }
+
+  remove(): Promise<void> {
+    return Promise.reject(new Error(BUCKET_REFUSED));
   }
 }
 

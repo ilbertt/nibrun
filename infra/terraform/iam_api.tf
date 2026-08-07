@@ -38,9 +38,15 @@ data "aws_iam_policy_document" "api_s3" {
   # Read on the exports bucket is what lets the api sign a download URL: a
   # presigned URL carries the signer's own permissions, so it cannot grant a read
   # this policy does not.
+  #
+  # Delete is how a bundle goes when the app it was taken from is deleted. The
+  # lifecycle rule would reach it eventually, and eventually is the whole
+  # retention window — a tenant's entire dataset outliving every way of asking
+  # for it. Signing needs read, so read is already here; this adds only the
+  # removal.
   statement {
-    sid       = "ExportsRead"
-    actions   = ["s3:GetObject"]
+    sid       = "ExportsReadDelete"
+    actions   = ["s3:GetObject", "s3:DeleteObject"]
     resources = ["${aws_s3_bucket.exports.arn}/*"]
   }
 }

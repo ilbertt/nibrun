@@ -52,9 +52,16 @@ class FakeAgentRepository implements AgentRepositoryContract {
 
 class FakeAppsService {
   readonly volumes: ReportedVolume[][] = [];
+  readonly trace: string[] = [];
 
   completeDeletions({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
     this.volumes.push([...volumes]);
+    this.trace.push('completeDeletions');
+    return Promise.resolve();
+  }
+
+  purgeDeleted(): Promise<void> {
+    this.trace.push('purgeDeleted');
     return Promise.resolve();
   }
 }
@@ -148,5 +155,21 @@ describe('a report is read by whatever owns what it talks about', () => {
 
     expect(deployments.reports).toEqual([reported]);
     expect(exports.reports).toEqual([reported]);
+  });
+
+  // What a deleted app left behind is only safe to remove once a host has said the filesystem is
+  // gone, and that is what taking the report in records.
+  test('and only then is what the deleted ones left behind cleaned up', async () => {
+    const { apps, service } = build();
+    const reported = {
+      hostId: Value.Parse(HostIdSchema, 'host-1'),
+      instances: [],
+      volumes: [],
+      exports: [],
+    } as unknown as HostReportedState;
+
+    await service.acceptReport({ reported });
+
+    expect(apps.trace).toEqual(['completeDeletions', 'purgeDeleted']);
   });
 });

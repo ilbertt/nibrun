@@ -1,4 +1,12 @@
-import type { AppHostnameKind, AppId, AppState, DnsLabel, Hostname, OwnerId } from '@repo/protocol';
+import type {
+  AppHostnameKind,
+  AppId,
+  AppState,
+  DnsLabel,
+  Hostname,
+  ObjectKey,
+  OwnerId,
+} from '@repo/protocol';
 import type { ArrayType } from 'bun';
 import type { Queries } from '#db/queries.gen.d.ts';
 import { type AppConfigPatch, type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
@@ -17,6 +25,17 @@ export type OwnedAppHostnameRow = Queries['SelectAppHostnamesByOwner'];
 
 export type CreatedApp = { app: AppRow; hostnames: AppHostnameRow[] };
 
+/**
+ * The objects a deleted app still has behind it, ready to be removed before the rows naming them
+ * are.
+ *
+ * `artifacts` is only the keys no surviving app still names. An artifact key is the digest of the
+ * bytes and nothing else, so two apps that were deployed from the same binary are two rows over
+ * one object — and deleting it for the app that is going would take the binary out from under the
+ * one that stays. The last of them to be deleted is the one that finds it unreferenced.
+ */
+export type Leftovers = { artifacts: ObjectKey[]; exports: ObjectKey[] };
+
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
 export abstract class AppsRepositoryContract {
@@ -34,6 +53,9 @@ export abstract class AppsRepositoryContract {
   abstract updateState(input: OwnedApp & { state: AppState }): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
   abstract isOwnedBy(input: OwnedApp): Promise<boolean>;
+  abstract listPurgeable(input: { limit: number }): Promise<AppId[]>;
+  abstract listLeftovers(input: { appId: AppId }): Promise<Leftovers>;
+  abstract purge(input: { appId: AppId }): Promise<void>;
 }
 
 export const PLATFORM_KIND: AppHostnameKind = 'platform';
@@ -276,6 +298,64 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       RETURNING id
     `;
     return rows.length > 0;
+  }
+
+  /**
+   * Apps whose filesystem is gone and whose binaries and bundles are not. Bounded, because this
+   * is asked on the way through a host report and the answer is almost always empty — a backlog
+   * is drained a batch per report rather than held open on one.
+   */
+  async listPurgeable({ limit }: { limit: number }): Promise<AppId[]> {
+    const rows = await this.sql.SelectPurgeableApps`
+      SELECT p.app_id FROM nibrun.purgeable_apps p LIMIT ${limit}
+    `;
+    return rows.map((row) => row.app_id);
+  }
+
+  /**
+   * Read while the rows still name them, so an object is only ever deleted on the strength of a
+   * row that says it should be — and read as one query per kind rather than one per row, because
+   * an app deployed a hundred times is a hundred rows over far fewer objects.
+   */
+  async listLeftovers({ appId }: { appId: AppId }): Promise<Leftovers> {
+    const [artifacts, exports] = await Promise.all([
+      this.sql.SelectUnsharedArtifactKeys`
+        SELECT DISTINCT ar.object_key
+        FROM nibrun.artifacts ar
+        WHERE ar.app_id = ${appId}
+          AND NOT EXISTS (
+            SELECT 1 FROM nibrun.artifacts other
+            WHERE other.object_key = ar.object_key AND other.app_id <> ${appId}
+          )
+      `,
+      this.sql.SelectExportKeysByApp`
+        SELECT e.object_key FROM nibrun.exports e WHERE e.app_id = ${appId}
+      `,
+    ]);
+    return {
+      artifacts: artifacts.map((row) => row.object_key),
+      exports: exports.map((row) => row.object_key),
+    };
+  }
+
+  /**
+   * Every row of the app's that names an object, in the order the foreign keys allow: exports and
+   * deployments both point at artifacts with `ON DELETE RESTRICT`, so the artifact rows are last.
+   * The app row itself stays — the slug must never be handed to a second app.
+   *
+   * A deployment made to replay an older one points at it, and one statement takes both: a
+   * rollback only ever names a deployment of the same app, so there is no row left behind to
+   * restrict the delete.
+   *
+   * One transaction, so an app is never half purged: what a second pass finds is either all of
+   * this still to do or none of it.
+   */
+  purge({ appId }: { appId: AppId }): Promise<void> {
+    return this.sql.begin(async (tx) => {
+      await tx.DeleteExportsByApp`DELETE FROM nibrun.exports WHERE app_id = ${appId}`;
+      await tx.DeleteDeploymentsByApp`DELETE FROM nibrun.deployments WHERE app_id = ${appId}`;
+      await tx.DeleteArtifactsByApp`DELETE FROM nibrun.artifacts WHERE app_id = ${appId}`;
+    });
   }
 
   updateState({ appId, ownerId, state }: OwnedApp & { state: AppState }) {

@@ -10,6 +10,7 @@ const DOWNLOAD_URL_TTL_SECONDS = 300;
 
 export abstract class ExportStorageRepositoryContract {
   abstract signDownload(input: { objectKey: ObjectKey }): string;
+  abstract remove(input: { objectKey: ObjectKey }): Promise<void>;
 }
 
 export class ExportStorageRepository implements ExportStorageRepositoryContract {
@@ -31,5 +32,14 @@ export class ExportStorageRepository implements ExportStorageRepositoryContract 
       method: 'GET',
       expiresIn: DOWNLOAD_URL_TTL_SECONDS,
     });
+  }
+
+  /**
+   * The lifecycle rule would reach this bundle eventually, and eventually is the whole retention
+   * window: the app it was taken from is gone, so what is left is a tenant's dataset outliving
+   * every way of asking for it. Removing it early is what closes that window.
+   */
+  async remove({ objectKey }: { objectKey: ObjectKey }): Promise<void> {
+    await this.client.delete(objectKey);
   }
 }
