@@ -29,11 +29,12 @@ the layout under `src/commands/` is the command tree.
   walk stops at the node above the param — that listing is the only place the
   command's description is read, so it has to say what the value is for.
 - An **optional** positional is that node given a command of its own:
-  `commands/apps/ls.ts` beside `commands/apps/ls/[path].ts` makes `nib apps ls`
-  and `nib apps ls <path>` two commands, and the walk picks whichever the
-  positional it was handed reaches. There is no other spelling — a param is how
-  routing gets there, so a command reached without one is a different command.
-  Flags they share go on the `ls` node with `forwardToChildren: true`.
+  `commands/apps/files/ls.ts` beside `commands/apps/files/ls/[path].ts` makes
+  `nib apps files ls` and `nib apps files ls <path>` two commands, and the walk
+  picks whichever the positional it was handed reaches. There is no other
+  spelling — a param is how routing gets there, so a command reached without one
+  is a different command. Flags they share go on the `ls` node with
+  `forwardToChildren: true`.
 - **`options` is required by `defineCommand` even when a command has none.**
   Omitting it matches the alias overload instead, whose errors talk about
   `undefined` and never mention options. `options: {}` is the fix.
@@ -57,9 +58,7 @@ the layout under `src/commands/` is the command tree.
   it is asked. An app is not something that can be defaulted to, so without a
   terminal to ask at that is where the flag is demanded instead. `apps list` is
   the exception and the reason the rule is not enforced anywhere central: it
-  lists the apps themselves, so asking which one would be circular. `apps ls`
-  lists inside one — the two are a letter apart and neither name is free to
-  change, so check which you mean before adding to either.
+  lists the apps themselves, so asking which one would be circular.
 - **A command that destroys something is the exception**, because the only
   default it could take is the destruction. Without a terminal it is refused
   rather than answered on the owner's behalf, so `--yes` is the one way to mean
