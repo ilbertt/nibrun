@@ -1,9 +1,8 @@
 import { rename, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { ApiError, unwrap } from '@repo/api-client/unwrap';
-import { appBySlug } from '@repo/app-operations';
-import type { ExportState } from '@repo/protocol';
+import { ApiError } from '@repo/api-client/unwrap';
+import { appBySlug, awaitExportBundle, requestExport } from '@repo/app-operations';
 import { UsageError } from '#lib/errors.ts';
 import type { Ui } from '#lib/ui.ts';
 
@@ -15,24 +14,6 @@ const BUNDLE_SUFFIX = '.tar.gz';
  * otherwise leave something that looks like the export and is not one.
  */
 const PARTIAL_SUFFIX = '.partial';
-
-const MS_PER_MINUTE = 60_000;
-
-/**
- * Longer between polls than a deployment takes, because the wait is a different kind: a
- * deployment is a guest starting, an export is a filesystem being read with no bound on how much
- * is in it.
- */
-const POLL_INTERVAL_MS = 5_000;
-
-/**
- * The host allows itself an hour to read one tenant's filesystem, so giving up sooner would be
- * giving up on an export that is still coming. Giving up costs little either way: the request
- * stays in flight, and asking again is answered with it rather than with a second read.
- */
-const READY_TIMEOUT_MINUTES = 60;
-
-const STILL_COMING: ReadonlySet<ExportState> = new Set<ExportState>(['pending', 'preparing']);
 
 const BYTES_PER_MIB = 1_048_576;
 const MIB_DECIMALS = 1;
@@ -56,12 +37,12 @@ export async function exportApp({ api, slug, destination, ui }: ExportInput): Pr
   const path = await bundlePath({ destination, slug });
   const app = await appBySlug({ api, slug });
 
-  const requested = unwrap(await api.api.apps({ appId: app.id }).exports.post());
+  const requested = await requestExport({ api, appId: app.id });
   ui.step(`export ${requested.id}`);
 
   const bundle = await ui.waitingFor({
     message: 'preparing the bundle',
-    task: () => awaitBundle({ api, appId: app.id, exportId: requested.id }),
+    task: () => awaitExportBundle({ api, appId: app.id, exportId: requested.id }),
   });
   await ui.waitingFor({
     message: describeDownload(bundle.sizeBytes),
@@ -97,37 +78,6 @@ export async function bundlePath({
     throw new UsageError(`${path} already exists.`);
   }
   return path;
-}
-
-/**
- * Poll until the host has written the bundle.
- *
- * A download URL rather than a state is what says it is there: the URL is signed for the response
- * it arrives in and outlives it by minutes, so the one that is read is the one the download uses.
- */
-async function awaitBundle({
-  api,
-  appId,
-  exportId,
-}: {
-  api: PublicApiClient;
-  appId: string;
-  exportId: string;
-}): Promise<{ downloadUrl: string; sizeBytes: number | undefined }> {
-  const deadline = Date.now() + READY_TIMEOUT_MINUTES * MS_PER_MINUTE;
-  while (Date.now() < deadline) {
-    const found = unwrap(await api.api.apps({ appId }).exports({ exportId }).get());
-    if (found.downloadUrl !== undefined) {
-      return { downloadUrl: found.downloadUrl, sizeBytes: found.sizeBytes };
-    }
-    if (!STILL_COMING.has(found.state)) {
-      throw new ApiError(`Export ${exportId} is ${found.state}.`);
-    }
-    await Bun.sleep(POLL_INTERVAL_MS);
-  }
-  throw new ApiError(
-    `Export ${exportId} was still being prepared after ${READY_TIMEOUT_MINUTES} minutes. Asking again is answered with this one until it is ready.`,
-  );
 }
 
 /**

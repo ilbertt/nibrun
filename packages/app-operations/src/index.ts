@@ -11,5 +11,6 @@ export {
   type UploadWait,
 } from '#deploy.ts';
 export { InvalidPathError } from '#errors.ts';
+export { awaitExportBundle, type ExportBundle, requestExport } from '#exports.ts';
 export { guestPath, readDirectory } from '#filesystem.ts';
 export { type FollowInput, followLogs } from '#logs.ts';
