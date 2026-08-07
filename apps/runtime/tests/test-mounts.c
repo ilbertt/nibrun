@@ -18,6 +18,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "../src/guest-control.h"
 #include "../src/mounts.h"
 #include "../src/paths.h"
 #include "expect.h"
@@ -151,6 +152,16 @@ int main(int argc, char **argv) {
   /* Its own directory and nothing above it: /run stands in for the tmpfs the guest
    * mounts at /app, which the tenant must not be able to write. */
   EXPECT(!can_write_as_tenant("/run"));
+
+  /* A frozen filesystem cannot be asked whether it is frozen, and a write that proved
+   * it would be a write that never returns. What answers instead is the pair of
+   * refusals: a second freeze is EBUSY only while one is held, and a second thaw is
+   * EINVAL only once none is. */
+  EXPECT(guest_control_freeze(DATA_MOUNT));
+  EXPECT(!guest_control_freeze(DATA_MOUNT) && errno == EBUSY);
+  EXPECT(guest_control_thaw(DATA_MOUNT));
+  EXPECT(!guest_control_thaw(DATA_MOUNT) && errno == EINVAL);
+  EXPECT(can_write_as_tenant(DATA_MOUNT));
 
   EXPECT(!mounts_artifact("/dev/does-not-exist", "/run/test-missing"));
   EXPECT(!mounts_tenant_data(&(struct tenant_data_mount){

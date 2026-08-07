@@ -3,7 +3,8 @@ import type { DesiredArtifact, DesiredExport, ReportedExport } from '@repo/proto
 import { Effect } from 'effect';
 import { s3Credentials } from '#lib/aws/credentials.ts';
 import { nowTimestamp } from '#lib/clock.ts';
-import { writeBundle } from '#lib/exports/bundle.ts';
+import { dumpVolume, writeBundle } from '#lib/exports/bundle.ts';
+import { frozen } from '#lib/exports/freeze.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AwsCredentialProvider } from '#services/aws-credential-provider.service.ts';
@@ -71,10 +72,24 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
       const stagingDir = path.join(config.exportStagingDir, desired.exportId);
       return yield* Effect.ensuring(
         Effect.gen(function* () {
-          // Under `ignore_fsync` the guest's barriers are not durability points, so this is what
-          // turns its acknowledged writes into bytes the device will hand back.
-          yield* flush(topology.place().admin);
-          const bundle = yield* writeBundle({ artifact, devicePath, stagingDir });
+          // Two layers of staleness sit between a tenant's last write and the device this reads,
+          // and each needs the side that owns it to act. The guest's kernel goes first: only it
+          // can checkpoint the ext4 journal that `debugfs` never replays, and staying frozen is
+          // also what stops the device changing mid-read. Then ZeroFS, where under
+          // `ignore_fsync` the guest's barriers are not durability points, so this is what turns
+          // acknowledged writes into bytes the device will hand back.
+          //
+          // The scope ends where the reading does. Archiving what was read needs the tenant no
+          // more than uploading it does, and both take longer.
+          yield* Effect.scoped(
+            Effect.gen(function* () {
+              const lease = yield* frozen({ appId: desired.appId, vmDir: config.vmDir });
+              yield* flush(topology.place().admin);
+              yield* dumpVolume({ devicePath, stagingDir });
+              yield* lease.assertHeld;
+            }),
+          );
+          const bundle = yield* writeBundle({ artifact, stagingDir });
           yield* upload({ bundlePath: bundle.path, objectKey: desired.objectKey });
           yield* Effect.logInfo('export written').pipe(
             Effect.annotateLogs({

@@ -3,7 +3,7 @@ import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type Filename, FilenameSchema, Value } from '@repo/protocol';
 import { Effect, Either, Layer } from 'effect';
-import { bundleBinaryName, writeBundle } from '#lib/exports/bundle.ts';
+import { bundleBinaryName, dumpVolume, writeBundle } from '#lib/exports/bundle.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { artifact } from '#tests/support/fixtures.ts';
@@ -52,7 +52,9 @@ function bundling({ dumps = 'tenant' }: { dumps?: keyof typeof DUMPS } = {}) {
 
     const result = yield* Effect.either(
       Effect.provide(
-        writeBundle({ artifact: artifact(), devicePath: DEVICE_PATH, stagingDir }),
+        Effect.flatMap(dumpVolume({ devicePath: DEVICE_PATH, stagingDir }), () =>
+          writeBundle({ artifact: artifact(), stagingDir }),
+        ),
         layer,
       ),
     );

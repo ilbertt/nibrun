@@ -70,27 +70,43 @@ export function bundleBinaryName(artifact: DesiredArtifact): Either.Either<strin
 }
 
 /**
- * The binary is fetched from the artifact bucket rather than lifted out of the local squashfs
- * cache, because the download proves the digest on the way past.
+ * Kept apart from the archive step because this is the only part of an export a frozen tenant
+ * pays for. Everything after it reads the staging tree rather than the device, so holding the
+ * guest still through a binary download and a `tar` of the whole dataset would block writes for
+ * several times as long as reading the device does.
  */
-export const writeBundle = Effect.fn('writeBundle')(function* ({
-  artifact,
+export const dumpVolume = Effect.fn('dumpVolume')(function* ({
   devicePath,
   stagingDir,
 }: {
-  artifact: DesiredArtifact;
   devicePath: string;
   stagingDir: string;
 }) {
   yield* Effect.annotateCurrentSpan({ devicePath });
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const binaryName = yield* bundleBinaryName(artifact);
 
   yield* fs.remove(stagingDir, { recursive: true, force: true });
   yield* fs.makeDirectory(stagingDir, { recursive: true, mode: STAGING_MODE });
 
   yield* dumpFilesystem({ devicePath, destination: path.join(stagingDir, DATA_DIRECTORY) });
+});
+
+/**
+ * The binary is fetched from the artifact bucket rather than lifted out of the local squashfs
+ * cache, because the download proves the digest on the way past.
+ */
+export const writeBundle = Effect.fn('writeBundle')(function* ({
+  artifact,
+  stagingDir,
+}: {
+  artifact: DesiredArtifact;
+  stagingDir: string;
+}) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const binaryName = yield* bundleBinaryName(artifact);
+
   const binaryPath = path.join(stagingDir, binaryName);
   yield* downloadAndVerify({ artifact, destination: binaryPath });
   // A transfer writes what a transfer writes, and `tar` records the mode it finds. Without this

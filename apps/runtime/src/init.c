@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "guest-control.h"
 #include "guest-logs.h"
 #include "log.h"
 #include "mounts.h"
@@ -28,7 +29,9 @@
 #define SHUTDOWN_GRACE_MS 10000
 #define TENANT_UMASK 0022
 
-static _Noreturn void shutdown_guest(void) {
+static _Noreturn void shutdown_guest(const struct guest_control *control) {
+  /* Before the unmount, which a filesystem left frozen would never return from. */
+  guest_control_stop(control);
   /* Unmounted rather than only synced, so the next boot finds a clean filesystem
    * instead of replaying a journal. */
   if (umount(DATA_DIR) < 0 && errno != EINVAL && errno != ENOENT) {
@@ -143,8 +146,10 @@ static bool read_instance_config(struct instance_config *config) {
 int main(void) {
   umask(TENANT_UMASK);
 
+  struct guest_control control = {.process = -1, .mount_point = DATA_DIR};
+
   if (!mounts_dev()) {
-    shutdown_guest(); /* there is no console to say so on */
+    shutdown_guest(&control); /* there is no console to say so on */
   }
   adopt_console();
   log_line("guest runtime starting");
@@ -155,8 +160,13 @@ int main(void) {
   struct instance_config config;
   if (!mounts_pseudo_filesystems() || !read_instance_config(&config) || !write_resolv_conf(&config) ||
       !prepare_tenant_filesystem()) {
-    shutdown_guest();
+    shutdown_guest(&control);
   }
+
+  /* After the data filesystem exists and before the tenant does: the channel's only
+   * job is that filesystem, and the host may ask for it while the tenant is still
+   * starting. */
+  guest_control_start(&control);
 
   struct supervisor supervisor = {
       .tenant =
@@ -194,5 +204,5 @@ int main(void) {
       break;
   }
   guest_logs_close(&guest_logs);
-  shutdown_guest();
+  shutdown_guest(&control);
 }

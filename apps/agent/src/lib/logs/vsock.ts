@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 import type { AppId, DeploymentId } from '@repo/protocol';
+import { GUEST_VSOCK_FILENAME } from '#lib/vm/vsock.ts';
 
 export const TENANT_LOG_VSOCK_PORT = 51000;
-export const TENANT_LOG_VSOCK_FILENAME = 'logs.vsock';
 
 export type TenantLogSource = {
   readonly appId: AppId;
@@ -10,4 +10,4 @@ export type TenantLogSource = {
 };
 
 export const tenantLogSocketPath = ({ workingDir }: { workingDir: string }): string =>
-  join(workingDir, `${TENANT_LOG_VSOCK_FILENAME}_${TENANT_LOG_VSOCK_PORT}`);
+  join(workingDir, `${GUEST_VSOCK_FILENAME}_${TENANT_LOG_VSOCK_PORT}`);

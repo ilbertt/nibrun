@@ -5,8 +5,6 @@
 
 #include "supervise.h"
 
-#define TENANT_LOG_VSOCK_PORT 51000
-
 struct guest_log_forwarder {
   int descriptor;
   int connection_state;

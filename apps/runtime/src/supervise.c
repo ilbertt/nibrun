@@ -3,7 +3,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
-#include <limits.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -14,6 +13,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "clock.h"
 #include "log.h"
 
 #define MS_PER_SECOND 1000
@@ -59,22 +59,10 @@ void supervise_block_signals(void) {
   }
 }
 
-static uint64_t monotonic_ms(void) {
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  return (uint64_t)now.tv_sec * MS_PER_SECOND + (uint64_t)now.tv_nsec / (uint64_t)NS_PER_MS;
-}
-
 static struct timespec remaining_until(uint64_t deadline_ms) {
-  uint64_t now = monotonic_ms();
+  uint64_t now = clock_monotonic_ms();
   uint64_t left = deadline_ms > now ? deadline_ms - now : 0;
   return (struct timespec){(time_t)(left / MS_PER_SECOND), (long)(left % MS_PER_SECOND) * NS_PER_MS};
-}
-
-static int remaining_ms(uint64_t deadline_ms) {
-  uint64_t now = monotonic_ms();
-  uint64_t left = deadline_ms > now ? deadline_ms - now : 0;
-  return left > INT_MAX ? INT_MAX : (int)left;
 }
 
 /* The tenant is a session leader, so its whole group can be signalled at once. The
@@ -211,8 +199,9 @@ static struct wait_result wait_for_tenant(pid_t tenant, uint32_t grace_ms, int s
         {.fd = stdout_descriptor, .events = POLLIN},
         {.fd = stderr_descriptor, .events = POLLIN},
     };
-    int ready = poll(polled, sizeof(polled) / sizeof(polled[0]),
-                     phase == PHASE_RUNNING ? OUTPUT_SERVICE_INTERVAL_MS : remaining_ms(deadline_ms));
+    int timeout_ms =
+        phase == PHASE_RUNNING ? OUTPUT_SERVICE_INTERVAL_MS : clock_remaining_ms(deadline_ms);
+    int ready = poll(polled, sizeof(polled) / sizeof(polled[0]), timeout_ms);
     if (ready < 0 && errno == EINTR) {
       continue;
     }
@@ -237,7 +226,7 @@ static struct wait_result wait_for_tenant(pid_t tenant, uint32_t grace_ms, int s
         log_line("the tenant is still running %ums after SIGTERM; killing it", grace_ms);
         signal_tenant(tenant, SIGKILL);
         phase = PHASE_KILL_SENT;
-        deadline_ms = monotonic_ms() + SIGKILL_GRACE_MS;
+        deadline_ms = clock_monotonic_ms() + SIGKILL_GRACE_MS;
         continue;
       }
       log_line("the tenant survived SIGKILL; shutting the guest down without it");
@@ -287,7 +276,7 @@ static struct wait_result wait_for_tenant(pid_t tenant, uint32_t grace_ms, int s
         log_line("shutdown requested; asking the tenant to stop");
         signal_tenant(tenant, SIGTERM);
         phase = PHASE_TERM_SENT;
-        deadline_ms = monotonic_ms() + grace_ms;
+        deadline_ms = clock_monotonic_ms() + grace_ms;
       }
     }
   }
@@ -295,7 +284,7 @@ static struct wait_result wait_for_tenant(pid_t tenant, uint32_t grace_ms, int s
 
 static bool sleep_or_shutdown(uint32_t duration_ms) {
   sigset_t signals = supervised_signals();
-  uint64_t deadline_ms = monotonic_ms() + duration_ms;
+  uint64_t deadline_ms = clock_monotonic_ms() + duration_ms;
 
   for (;;) {
     struct timespec remaining = remaining_until(deadline_ms);
@@ -342,7 +331,7 @@ enum supervise_outcome supervise(const struct supervisor *supervisor) {
   uint32_t restarts = 0;
 
   for (;;) {
-    uint64_t started_ms = monotonic_ms();
+    uint64_t started_ms = clock_monotonic_ms();
     int stdout_pipe[2];
     int stderr_pipe[2];
     if (!open_output_pipe(stdout_pipe)) {
@@ -381,7 +370,7 @@ enum supervise_outcome supervise(const struct supervisor *supervisor) {
       return SUPERVISE_SHUTDOWN_REQUESTED;
     }
 
-    uint64_t uptime_ms = monotonic_ms() - started_ms;
+    uint64_t uptime_ms = clock_monotonic_ms() - started_ms;
     log_tenant_exit(result.status, uptime_ms);
 
     if (uptime_ms >= supervisor->policy.reset_after_ms && restarts > 0) {

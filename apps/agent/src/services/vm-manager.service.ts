@@ -2,13 +2,14 @@ import { FileSystem, Path } from '@effect/platform';
 import type { AppId, DesiredInstance } from '@repo/protocol';
 import { Effect } from 'effect';
 import { writeJsonFile } from '#lib/json-store.ts';
-import { TENANT_LOG_VSOCK_FILENAME, tenantLogSocketPath } from '#lib/logs/vsock.ts';
+import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
 import type { AppSlot } from '#lib/network/slot.ts';
 import { ensureTap } from '#lib/network/tap.ts';
 import * as Artifacts from '#lib/vm/artifacts.ts';
 import { renderFirecrackerConfig } from '#lib/vm/firecracker-config.ts';
 import { buildInstanceConfigImage } from '#lib/vm/instance-env.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
+import { GUEST_VSOCK_FILENAME, vmWorkingDir } from '#lib/vm/vsock.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 
@@ -26,7 +27,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     const fs = yield* FileSystem.FileSystem;
     const logs = yield* TenantLogReceiver;
 
-    const workingDir = (appId: AppId) => path.join(config.vmDir, appId);
+    const workingDir = (appId: AppId) => vmWorkingDir({ vmDir: config.vmDir, appId });
 
     /**
      * The agent never becomes the VM's parent: it stages the files, asks init to start the unit,
@@ -82,7 +83,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
           },
           vsock: {
             guestCid: FIRST_GUEST_CID + slot.slot,
-            path: TENANT_LOG_VSOCK_FILENAME,
+            path: GUEST_VSOCK_FILENAME,
           },
         }),
       });

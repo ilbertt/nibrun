@@ -9,33 +9,14 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
-#include <time.h>
 #include <unistd.h>
 
-#define MS_PER_SECOND 1000
-#define NS_PER_MS 1000000L
+#include "clock.h"
+#include "vsock.h"
+
 #define RECONNECT_DELAY_MS 250
 #define FRAME_HEADER_BYTES 9
 #define GAP_PAYLOAD_BYTES 8
-
-#ifndef AF_VSOCK
-#define AF_VSOCK 40
-#endif
-#define VMADDR_CID_HOST 2U
-
-/* The static musl toolchain deliberately carries no Linux header bundle. This is
- * the stable 16-byte UAPI address, kept local so adding one socket family does not
- * add kernel headers to the guest runtime's build input. */
-struct vsock_address {
-  sa_family_t family;
-  unsigned short reserved;
-  uint32_t port;
-  uint32_t cid;
-  unsigned char zero[sizeof(struct sockaddr) - sizeof(sa_family_t) - sizeof(unsigned short) -
-                     sizeof(uint32_t) - sizeof(uint32_t)];
-};
-
-_Static_assert(sizeof(struct vsock_address) == sizeof(struct sockaddr), "vsock address has the wrong ABI");
 
 enum connection_state {
   CONNECTION_DISCONNECTED,
@@ -51,29 +32,23 @@ enum frame_kind {
 
 static const unsigned char FRAME_MAGIC[] = {'N', 'B', 'L', '1'};
 
-static uint64_t monotonic_ms(void) {
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  return (uint64_t)now.tv_sec * MS_PER_SECOND + (uint64_t)now.tv_nsec / (uint64_t)NS_PER_MS;
-}
-
 static void disconnect(struct guest_log_forwarder *forwarder) {
   if (forwarder->descriptor >= 0) {
     close(forwarder->descriptor);
   }
   forwarder->descriptor = -1;
   forwarder->connection_state = CONNECTION_DISCONNECTED;
-  forwarder->retry_after_ms = monotonic_ms() + RECONNECT_DELAY_MS;
+  forwarder->retry_after_ms = clock_monotonic_ms() + RECONNECT_DELAY_MS;
 }
 
 static void start_connection(struct guest_log_forwarder *forwarder) {
-  if (monotonic_ms() < forwarder->retry_after_ms) {
+  if (clock_monotonic_ms() < forwarder->retry_after_ms) {
     return;
   }
 
   int descriptor = socket(AF_VSOCK, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
   if (descriptor < 0) {
-    forwarder->retry_after_ms = monotonic_ms() + RECONNECT_DELAY_MS;
+    forwarder->retry_after_ms = clock_monotonic_ms() + RECONNECT_DELAY_MS;
     return;
   }
 
