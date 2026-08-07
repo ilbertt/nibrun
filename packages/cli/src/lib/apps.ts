@@ -1,11 +1,11 @@
 import { select } from '@clack/prompts';
 import type { Print } from '@parshjs/core';
-import { APP_OPTION } from '#config.ts';
+import { SHARED_OPTIONS } from '#config.ts';
 import { type Api, unwrap } from '#lib/api.ts';
 import { ApiError, UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
 
-const NO_APP_NAMED = `Which app? Name one with --${APP_OPTION}.`;
+const NO_APP_NAMED = `Which app? Name one with --${SHARED_OPTIONS.app.name}.`;
 export const NO_APPS = 'You have no apps. `nib run` is what makes one.';
 const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
