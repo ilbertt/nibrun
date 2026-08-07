@@ -199,6 +199,27 @@ describe('a stream is windows of the store, and reads as one log', () => {
     expect(seen.map((entry) => entry.sequence)).toEqual([0, 1, 2]);
   });
 
+  /**
+   * A guest writes several lines within one millisecond every time it announces itself, and only
+   * the overlap between windows is a repeat — sharing an instant with the record before it is not.
+   */
+  test('a burst written inside one millisecond is handed over whole', async () => {
+    const subject = service({
+      row: A_DEPLOYMENT_ROW,
+      windows: [
+        [
+          record({ at: AN_INSTANT, sequence: 0 }),
+          record({ at: AN_INSTANT, sequence: 1 }),
+          record({ at: AN_INSTANT, sequence: 2 }),
+        ],
+      ],
+    });
+
+    const seen = await drain(await open({ subject }));
+
+    expect(seen.map((entry) => entry.sequence)).toEqual([0, 1, 2]);
+  });
+
   test('the next window starts where the last one reached', async () => {
     const subject = service({
       row: A_DEPLOYMENT_ROW,

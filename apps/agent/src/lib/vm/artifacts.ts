@@ -9,7 +9,8 @@ const HEX_ENCODING = 'hex';
 const SQUASHFS_FILENAME = 'artifact.squashfs';
 /** The path the guest's init execs, fixed by the boot contract. */
 const GUEST_BINARY_NAME = 'server';
-const BINARY_MODE = 0o755;
+/** What a binary has to be to be one, wherever it lands — the guest's squashfs or an export. */
+export const BINARY_MODE = 0o755;
 const CACHE_DIR_MODE = 0o755;
 
 export class DigestMismatch extends Data.TaggedError('DigestMismatch')<{

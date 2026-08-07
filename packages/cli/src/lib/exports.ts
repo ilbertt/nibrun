@@ -135,17 +135,41 @@ async function awaitBundle({
  */
 async function download({ url, path }: { url: string; path: string }): Promise<void> {
   const response = await fetch(url);
-  if (!response.ok) {
+  if (!response.ok || response.body === null) {
     throw new ApiError(`The bundle could not be downloaded: ${response.status}.`);
   }
 
   const partial = `${path}${PARTIAL_SUFFIX}`;
   try {
-    await Bun.write(partial, response);
+    await writeStream({ stream: response.body, path: partial });
     await rename(partial, path);
   } catch (failure) {
     await rm(partial, { force: true });
     throw failure;
+  }
+}
+
+/**
+ * `Bun.write` takes a `Response` and would be the whole of this, but in Bun 1.4 it never settles
+ * when the body arrives in more than one piece: nothing is written, nothing throws, and the
+ * download waits for good. A body that arrives at once is fine, which is why a local server does
+ * not show it and every real transfer does. Reading the stream is the same thing said in a way
+ * that finishes.
+ */
+export async function writeStream({
+  stream,
+  path,
+}: {
+  stream: ReadableStream<Uint8Array>;
+  path: string;
+}): Promise<void> {
+  const sink = Bun.file(path).writer();
+  try {
+    for await (const chunk of stream) {
+      sink.write(chunk);
+    }
+  } finally {
+    await sink.end();
   }
 }
 

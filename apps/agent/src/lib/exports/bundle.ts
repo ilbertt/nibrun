@@ -2,7 +2,7 @@ import { basename } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact } from '@repo/protocol';
 import { Data, Duration, Effect, Either } from 'effect';
-import { downloadAndVerify } from '#lib/vm/artifacts.ts';
+import { BINARY_MODE, downloadAndVerify } from '#lib/vm/artifacts.ts';
 import { MKFS_ROOT_ENTRIES } from '#lib/volumes/ext4.ts';
 import { stdoutOf } from '#services/command-runner.service.ts';
 
@@ -91,7 +91,11 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
   yield* fs.makeDirectory(stagingDir, { recursive: true, mode: STAGING_MODE });
 
   yield* dumpFilesystem({ devicePath, destination: path.join(stagingDir, DATA_DIRECTORY) });
-  yield* downloadAndVerify({ artifact, destination: path.join(stagingDir, binaryName) });
+  const binaryPath = path.join(stagingDir, binaryName);
+  yield* downloadAndVerify({ artifact, destination: binaryPath });
+  // A transfer writes what a transfer writes, and `tar` records the mode it finds. Without this
+  // the bundle carries a binary the owner has to chmod before the copy they were handed will run.
+  yield* fs.chmod(binaryPath, BINARY_MODE);
 
   const bundlePath = path.join(stagingDir, BUNDLE_NAME);
   yield* stdoutOf({

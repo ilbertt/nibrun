@@ -2,9 +2,28 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { bundlePath } from '#lib/exports.ts';
+import { bundlePath, writeStream } from '#lib/exports.ts';
 
 const SLUG = 'quiet-otter';
+
+const CHUNK_COUNT = 4;
+const CHUNK_BYTES = 64;
+
+/**
+ * A body that arrives in pieces rather than at once, which is every transfer that crosses a
+ * network and the only kind `Bun.write` cannot be given a `Response` for.
+ */
+function trickling(): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      for (let sent = 0; sent < CHUNK_COUNT; sent += 1) {
+        controller.enqueue(new Uint8Array(CHUNK_BYTES).fill(sent));
+        await Bun.sleep(1);
+      }
+      controller.close();
+    },
+  });
+}
 
 let root = '';
 
@@ -42,6 +61,27 @@ describe('where the bundle lands', () => {
     await expect(bundlePath({ destination: missing, slug: SLUG })).rejects.toThrow(
       `No such directory: ${join(root, 'nowhere')}.`,
     );
+  });
+});
+
+// The bug this covers ends in a download that never finishes rather than one that fails, so what
+// it asserts is that the write settles at all — the bytes are the easy half.
+describe('a bundle arrives in pieces and still lands whole', () => {
+  test('every chunk is written', async () => {
+    const landed = join(root, 'trickled.bin');
+
+    await writeStream({ stream: trickling(), path: landed });
+
+    expect(Bun.file(landed).size).toBe(CHUNK_COUNT * CHUNK_BYTES);
+  });
+
+  test('the last chunk is there, not just the first', async () => {
+    const landed = join(root, 'trickled-tail.bin');
+
+    await writeStream({ stream: trickling(), path: landed });
+
+    const bytes = new Uint8Array(await Bun.file(landed).arrayBuffer());
+    expect(bytes.at(-1)).toBe(CHUNK_COUNT - 1);
   });
 });
 
