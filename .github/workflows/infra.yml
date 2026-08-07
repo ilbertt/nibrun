@@ -3,11 +3,7 @@ name: infra
 # No paths filter: infra-passed is a required check, and a check gated by a path
 # filter never reports on the PRs it skips, leaving them unmergeable. The plan
 # script decides for itself whether anything under infra/terraform changed.
-on:
-  push:
-    branches:
-      - main
-  pull_request:
+on: pull_request
 
 concurrency:
   group: infra-${{ github.ref }}
@@ -38,9 +34,6 @@ jobs:
         run: bun run --filter @repo/internal-scripts terraform-check
 
   terraform-plan:
-    # On main the deploy plans and applies for real; planning again here would
-    # only race it.
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
