@@ -9,10 +9,6 @@ on:
         description: "Apply even if the plan destroys or replaces resources"
         type: boolean
         default: false
-      replace:
-        description: "Terraform addresses to recreate, comma-separated (e.g. aws_instance.app_host[0]). Replacing is a destroy, so allow_destroy has to be on too."
-        type: string
-        default: ""
 
 concurrency:
   group: cd
@@ -111,7 +107,6 @@ jobs:
           TF_VAR_app_host_caddy_tls_cert: ${{ vars.APP_HOST_CADDY_TLS_CERT }}
           TF_VAR_app_host_caddy_tls_key: ${{ secrets.APP_HOST_CADDY_TLS_KEY }}
           ALLOW_DESTROY: ${{ inputs.allow_destroy }}
-          TERRAFORM_REPLACE: ${{ inputs.replace }}
         run: bun run --filter @repo/internal-scripts terraform-apply
 
   deploy-api:

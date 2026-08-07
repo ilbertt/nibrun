@@ -34,28 +34,9 @@ await group({
   run: () => terraform(['init', '-input=false']),
 });
 
-// The one operation a plan cannot express, because nothing in the configuration
-// changed: recreating a resource whose state is fine and whose *machine* is not
-// — a host to rebuild from scratch, a bootstrap to re-run.
-const replaced = (optionalEnv('TERRAFORM_REPLACE') ?? '')
-  .split(',')
-  .map((address) => address.trim())
-  .filter(Boolean);
-
-if (replaced.length > 0) {
-  console.log(bold(`\nRecreating: ${replaced.join(' ')}`));
-}
-
 await group({
   title: 'terraform plan',
-  run: () =>
-    terraform([
-      'plan',
-      '-input=false',
-      ...replaced.map((address) => `-replace=${address}`),
-      '-out',
-      PLAN_FILE,
-    ]),
+  run: () => terraform(['plan', '-input=false', '-out', PLAN_FILE]),
 });
 
 if (optionalEnv('ALLOW_DESTROY') !== 'true') {
