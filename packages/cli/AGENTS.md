@@ -55,7 +55,11 @@ the layout under `src/commands/` is the command tree.
 - **A command under `apps` reached without `--app` asks which one**, through
   `selectApp` in `src/lib/apps.ts` so that the question is one question wherever
   it is asked. An app is not something that can be defaulted to, so without a
-  terminal to ask at that is where the flag is demanded instead.
+  terminal to ask at that is where the flag is demanded instead. `apps list` is
+  the exception and the reason the rule is not enforced anywhere central: it
+  lists the apps themselves, so asking which one would be circular. `apps ls`
+  lists inside one — the two are a letter apart and neither name is free to
+  change, so check which you mean before adding to either.
 - **A command that destroys something is the exception**, because the only
   default it could take is the destruction. Without a terminal it is refused
   rather than answered on the owner's behalf, so `--yes` is the one way to mean
