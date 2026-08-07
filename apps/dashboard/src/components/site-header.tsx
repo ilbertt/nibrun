@@ -1,4 +1,4 @@
-import { ApiStatusBadge } from '#components/api-status-badge.tsx';
+import { SystemStatusBadge } from '#components/system-status-badge.tsx';
 import { Separator } from '#components/ui/separator.tsx';
 import { SidebarTrigger } from '#components/ui/sidebar.tsx';
 import { useActiveNavItem } from '#lib/hooks/use-active-nav-item.ts';
@@ -13,7 +13,7 @@ export function SiteHeader() {
         <Separator orientation="vertical" className="mx-2 h-4 data-vertical:self-auto" />
         <h1 className="font-medium text-base">{activeItem?.title}</h1>
         <div className="ml-auto">
-          <ApiStatusBadge />
+          <SystemStatusBadge />
         </div>
       </div>
     </header>
