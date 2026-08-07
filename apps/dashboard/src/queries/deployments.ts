@@ -18,7 +18,7 @@ export function deploymentsQueryOptions(appId: string | undefined) {
 
 export function latestDeploymentQueryOptions(appId: string) {
   return queryOptions({
-    queryKey: ['latest-deployment', appId],
+    queryKey: ['deployments', appId, 'latest'],
     queryFn: () => latestDeployment({ api, appId }),
   });
 }
