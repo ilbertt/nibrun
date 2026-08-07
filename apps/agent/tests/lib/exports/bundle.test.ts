@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type Filename, FilenameSchema, Value } from '@repo/protocol';
 import { Effect, Either, Layer } from 'effect';
@@ -10,6 +10,9 @@ import { artifact } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const DEVICE_PATH = '/dev/nbd7';
+const PERMISSION_BITS = 0o777;
+/** Spelled out rather than imported: what the archive has to carry, not what the source says it does. */
+const RUNNABLE_MODE = 0o755;
 
 const run = provided(Layer.merge(artifactStore(), platform));
 
@@ -54,7 +57,12 @@ function bundling({ dumps = 'tenant' }: { dumps?: keyof typeof DUMPS } = {}) {
       ),
     );
     const archived = yield* Effect.promise(() => readdir(dataDir).catch(() => [] as string[]));
-    return { commands, result, stagingDir, archived };
+    const binaryMode = yield* Effect.promise(() =>
+      stat(join(stagingDir, 'pocketbase'))
+        .then((stats) => stats.mode & PERMISSION_BITS)
+        .catch(() => null),
+    );
+    return { commands, result, stagingDir, archived, binaryMode };
   });
 }
 
@@ -89,6 +97,14 @@ test('archives the data tree and the binary under its uploaded name', async () =
   // `.` would sweep the archive into itself.
   expect(tar?.command).not.toContain('.');
   expect(Either.isRight(result)).toBe(true);
+});
+
+// The bundle exists so the copy can be run, and `tar` records the mode the staging tree has. A
+// transfer writes 0644, so without a chmod the binary arrives needing one.
+test('the binary is archived able to run', async () => {
+  const { binaryMode } = await run(bundling());
+
+  expect(binaryMode).toBe(RUNNABLE_MODE);
 });
 
 test('a dump that produced nothing is a failure rather than an empty bundle', async () => {
