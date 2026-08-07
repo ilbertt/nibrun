@@ -11,7 +11,11 @@ import {
   nextProbeDelayMs,
 } from '#lib/health/state.ts';
 import type { ReconcilePlan } from '#lib/reconcile/plan.ts';
-import { type InstanceRecord, newInstanceRecord } from '#lib/report/instance-record.ts';
+import {
+  graceInputs,
+  type InstanceRecord,
+  newInstanceRecord,
+} from '#lib/report/instance-record.ts';
 import { ensureArtifactImage } from '#lib/vm/artifacts.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
@@ -223,9 +227,7 @@ const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
     });
     const delayMs = nextProbeDelayMs({
       tracker: record.health,
-      healthCheck: record.healthCheck,
-      ...(record.startedAt ? { startedAtMs: Date.parse(record.startedAt) } : {}),
-      nowMs,
+      ...graceInputs({ record, nowMs }),
     });
     yield* AgentState.modify((current) => ({
       ...current,
@@ -256,11 +258,9 @@ export const refreshStates = Effect.gen(function* () {
         const state = evaluateInstanceState({
           unit: status,
           tracker: health,
-          healthCheck: record.healthCheck,
           desiredRunning: record.desiredRunning,
           stopRequested: record.stopRequested,
-          ...(record.startedAt ? { startedAtMs: Date.parse(record.startedAt) } : {}),
-          nowMs,
+          ...graceInputs({ record, nowMs }),
         });
 
         const changed = state !== record.state;

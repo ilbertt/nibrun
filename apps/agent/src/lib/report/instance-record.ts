@@ -13,7 +13,7 @@ import type {
   VolumeId,
 } from '@repo/protocol';
 import type { AttemptWindow } from '#lib/backoff.ts';
-import type { HealthTracker } from '#lib/health/state.ts';
+import type { GraceInputs, HealthTracker } from '#lib/health/state.ts';
 
 const NO_RESTARTS = 0;
 const NO_ATTEMPTS = 0;
@@ -52,6 +52,25 @@ export const newInstanceRecord = (
   startAttempts: { attempts: NO_ATTEMPTS },
   stopRequested: false,
 });
+
+/**
+ * What every health decision about a record needs, in the one place that knows `startedAt` is a
+ * wire timestamp here and a clock reading there — and that a record this agent never started has
+ * no start time at all.
+ */
+export function graceInputs({
+  record,
+  nowMs,
+}: {
+  record: InstanceRecord;
+  nowMs: number;
+}): GraceInputs {
+  return {
+    healthCheck: record.healthCheck,
+    ...(record.startedAt ? { startedAtMs: Date.parse(record.startedAt) } : {}),
+    nowMs,
+  };
+}
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);

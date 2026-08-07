@@ -59,11 +59,13 @@ export function applyProbe({
   };
 }
 
-type GraceInputs = {
+export type GraceInputs = {
   healthCheck: HealthCheck;
   startedAtMs?: number;
   nowMs: number;
 };
+
+type ProbeInputs = GraceInputs & { tracker: HealthTracker };
 
 /** An instance with no start time has not been booted by this agent, so nothing has run out yet. */
 export function isWithinGracePeriod({ healthCheck, startedAtMs, nowMs }: GraceInputs): boolean {
@@ -71,17 +73,24 @@ export function isWithinGracePeriod({ healthCheck, startedAtMs, nowMs }: GraceIn
 }
 
 /**
+ * Whether this tenant is still being given its first chance to answer.
+ *
+ * Bounded by the grace period rather than by the state alone, which is what keeps it — and the
+ * loop that ticks for it — from running for as long as an app that never settles is up.
+ */
+export function isOnStartupGrid({ tracker, ...grace }: ProbeInputs): boolean {
+  return !tracker.everHealthy && isWithinGracePeriod(grace);
+}
+
+/**
  * The fast grid applies only while a tenant is still owed its grace period, so a slow starter
  * is failed on exactly the schedule it was before: `unhealthyThreshold` probes at `intervalMs`
  * after the grace runs out.
  */
-export function nextProbeDelayMs({
-  tracker,
-  ...grace
-}: GraceInputs & { tracker: HealthTracker }): number {
-  return !tracker.everHealthy && isWithinGracePeriod(grace)
-    ? Math.min(STARTUP_PROBE_INTERVAL_MS, grace.healthCheck.intervalMs)
-    : grace.healthCheck.intervalMs;
+export function nextProbeDelayMs(inputs: ProbeInputs): number {
+  return isOnStartupGrid(inputs)
+    ? Math.min(STARTUP_PROBE_INTERVAL_MS, inputs.healthCheck.intervalMs)
+    : inputs.healthCheck.intervalMs;
 }
 
 export type LifecycleInputs = {
