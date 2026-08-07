@@ -52,6 +52,10 @@ the layout under `src/commands/` is the command tree.
   (`isInteractive()`). A command must work without one: whatever the flags left
   open still needs a default. `ctx.print` stays the plain-output path, clack the
   interactive one — see `src/lib/ui.ts`.
+- **A command under `apps` reached without `--app` asks which one**, through
+  `selectApp` in `src/lib/apps.ts` so that the question is one question wherever
+  it is asked. An app is not something that can be defaulted to, so without a
+  terminal to ask at that is where the flag is demanded instead.
 - **A command that destroys something is the exception**, because the only
   default it could take is the destruction. Without a terminal it is refused
   rather than answered on the owner's behalf, so `--yes` is the one way to mean

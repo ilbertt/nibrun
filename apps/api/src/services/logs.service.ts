@@ -1,4 +1,11 @@
-import type { AppId, DeploymentId, OwnerId, TenantLogRecord, Timestamp } from '@repo/protocol';
+import {
+  type AppId,
+  type DeploymentId,
+  type OwnerId,
+  SeenTenantLogs,
+  type TenantLogRecord,
+  type Timestamp,
+} from '@repo/protocol';
 import { durationToMs } from '#lib/duration.ts';
 import { NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -81,7 +88,7 @@ export class LogsService extends Service {
     since: Timestamp;
     signal: AbortSignal;
   }): AsyncGenerator<TenantLogRecord> {
-    const delivered = new Delivered();
+    const delivered = new SeenTenantLogs();
     let from = since;
 
     while (!signal.aborted) {
@@ -104,27 +111,6 @@ export class LogsService extends Service {
   }
 }
 
-/**
- * What this stream has already handed over, so the overlap between two windows is handed over once.
- *
- * A window resumes on the instant the last one ended rather than after it — see `resumeAt` — so
- * every window but the first begins with records its predecessor already carried. `sourceId` and
- * `sequence` are what tell a second copy from a second record: sequence counts within one source
- * and only rises, so the highest seen is the whole of what has to be kept.
- */
-class Delivered {
-  readonly #highest = new Map<string, number>();
-
-  admit(record: TenantLogRecord): boolean {
-    const seen = this.#highest.get(record.sourceId);
-    if (seen !== undefined && record.sequence <= seen) {
-      return false;
-    }
-    this.#highest.set(record.sourceId, record.sequence);
-    return true;
-  }
-}
-
 function startOf(timerange: string): Timestamp {
   return toTimestamp(new Date(Date.now() - durationToMs(timerange)));
 }
@@ -134,8 +120,8 @@ function startOf(timerange: string): Timestamp {
  *
  * The store stamps to the millisecond, so records sharing the last one's instant may not all have
  * been written when this window was read — starting past it would lose them, and starting on it
- * repeats what has already been handed over. A repeat is the recoverable half, and `Delivered` is
- * what recovers it.
+ * repeats what has already been handed over. A repeat is the recoverable half, and
+ * `SeenTenantLogs` is what recovers it.
  *
  * A full window that begins and ends in the same instant is the one case that would start on
  * itself forever, and it moves on instead. Reaching it means a guest wrote a window of output

@@ -1,6 +1,6 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
-import { requireAppSlug } from '#lib/apps.ts';
+import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { deleteApp } from '#lib/delete.ts';
 import { createUi, isInteractive } from '#lib/ui.ts';
@@ -17,18 +17,16 @@ export const command = defineCommand('apps delete', {
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ options, parents, context, print }) => {
-    // Elsewhere a terminal decides how the output looks. Here it also decides whether the question
-    // can be asked at all, which is why the handler keeps the answer rather than only the `ui`.
+    const { api } = context;
+    // A terminal decides more here than how the output looks — which app, when the flag named
+    // none, and whether the confirmation can be asked at all — so the handler keeps the answer
+    // rather than only the `ui` built from it.
     const interactive = isInteractive();
     const ui = createUi({ print, interactive });
 
     ui.open('nib apps delete');
-    await deleteApp({
-      api: context.api,
-      slug: requireAppSlug(parents.apps.options.app),
-      ui,
-      yes: options.yes === true,
-      interactive,
-    });
+    const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
+
+    await deleteApp({ api, slug, ui, yes: options.yes === true, interactive });
   },
 });

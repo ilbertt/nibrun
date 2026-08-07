@@ -175,6 +175,7 @@ export {
   LogSourceSchema,
   type LogTimerange,
   LogTimerangeSchema,
+  SeenTenantLogs,
   TENANT_LOG_STREAMS,
   type TenantLogRecord,
   TenantLogRecordSchema,

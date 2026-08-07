@@ -1,21 +1,62 @@
+import { select } from '@clack/prompts';
 import type { Print } from '@parshjs/core';
 import { APP_OPTION } from '#config.ts';
 import { type Api, unwrap } from '#lib/api.ts';
 import { ApiError, UsageError } from '#lib/errors.ts';
+import { answered } from '#lib/prompts.ts';
 
 const NO_APP_NAMED = `Which app? Name one with --${APP_OPTION}.`;
+const NO_APPS = 'You have no apps. `nib run` is what makes one.';
 const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
 /**
+ * The app a command was pointed at: the flag when it was given, and the question it stands for
+ * when it was not.
+ *
  * `--app` is optional on `apps` so that asking for nothing is answered with a listing rather
  * than an error, which leaves every command underneath to say what going without one means. They
  * all mean the same thing, so they say it from here.
  */
-export function requireAppSlug(slug: string | undefined): string {
-  if (slug === undefined) {
+export async function selectApp({
+  api,
+  slug,
+  interactive,
+}: {
+  api: Api;
+  slug: string | undefined;
+  interactive: boolean;
+}): Promise<string> {
+  if (slug !== undefined) {
+    return slug;
+  }
+  if (!interactive) {
     throw new UsageError(NO_APP_NAMED);
   }
-  return slug;
+  return await chooseApp({ api });
+}
+
+/**
+ * A slug rather than the app it was read from, even though whatever the answer is handed to reads
+ * the listing again: a slug is what an owner calls an app by and what every command under `apps`
+ * takes, and the second read falls only on somebody already sat at the prompt.
+ */
+async function chooseApp({ api }: { api: Api }): Promise<string> {
+  const { apps } = unwrap(await api.api.apps.get());
+  if (apps.length === 0) {
+    throw new UsageError(NO_APPS);
+  }
+  const chosen = await select({
+    message: 'Which app?',
+    options: apps.map((app) => ({
+      value: app.slug,
+      label: app.slug,
+      // Every app the api lists is offered — reading what a suspended one wrote is a reason to
+      // have kept it — so the state is said as well, an app being torn down answering differently
+      // and having chosen it being too late to find that out.
+      hint: app.state === 'active' ? undefined : app.state,
+    })),
+  });
+  return answered(chosen);
 }
 
 // Apps are addressed by id and listed by slug; the slug is the half a person sees, so it is the

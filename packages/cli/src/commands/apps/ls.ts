@@ -1,9 +1,10 @@
 import { defineCommand } from '@parshjs/core';
 import { GUEST_PATH_ROOT } from '@repo/protocol';
 import { z } from 'zod';
-import { requireAppSlug } from '#lib/apps.ts';
+import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { listDirectory } from '#lib/filesystem.ts';
+import { isInteractive } from '#lib/ui.ts';
 
 /**
  * A command and the parent of `apps ls [path]` at once, which is how an optional positional is
@@ -22,9 +23,16 @@ export const command = defineCommand('apps ls', {
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ options, parents, context, print }) => {
+    const { api } = context;
+    const slug = await selectApp({
+      api,
+      slug: parents.apps.options.app,
+      interactive: isInteractive(),
+    });
+
     await listDirectory({
-      api: context.api,
-      slug: requireAppSlug(parents.apps.options.app),
+      api,
+      slug,
       deploymentId: options['deployment-id'],
       path: GUEST_PATH_ROOT,
       print,

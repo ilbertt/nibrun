@@ -14,6 +14,8 @@ const APP_ID = Value.Parse(AppIdSchema, 'app-1');
 const DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'deployment-1');
 const HOST_ID = Value.Parse(HostIdSchema, 'host-1');
 const SINCE = Value.Parse(TimestampSchema, '2026-08-06T09:41:00.123Z');
+const AN_INSTANT = Value.Parse(TimestampSchema, '2026-08-06T09:41:00.687Z');
+const A_LATER_INSTANT = Value.Parse(TimestampSchema, '2026-08-06T09:41:00.756Z');
 const LIMIT = 500;
 const DROPPED_BYTES = 4096;
 
@@ -101,5 +103,49 @@ describe('a read takes one window of one deployment out of the store', () => {
     const { records } = await read([missingAField, storedRow()]);
 
     expect(records).toHaveLength(1);
+  });
+});
+
+describe('a window comes back in the order the app wrote it', () => {
+  /**
+   * `sort by (_time)` settles nothing within one millisecond, and a program announcing itself
+   * writes several lines in one. Here the store hands that instant back newest first, which is a
+   * log printed backwards until `sequence` puts it right.
+   */
+  test('records sharing an instant are ordered by what the source counted', async () => {
+    const { records } = await read([
+      storedRow({ sequence: '2', _msg: '└─ Dashboard: ...' }),
+      storedRow({ sequence: '1', _msg: '├─ REST API: ...' }),
+      storedRow({ sequence: '0', _msg: 'Server started at ...' }),
+    ]);
+
+    expect(records.map((record) => record.sequence)).toEqual([0, 1, 2]);
+  });
+
+  test('an instant still decides against a later one', async () => {
+    const { records } = await read([
+      storedRow({ _time: A_LATER_INSTANT, sequence: '0' }),
+      storedRow({ _time: AN_INSTANT, sequence: '9' }),
+    ]);
+
+    expect(records.map((record) => record._time)).toEqual([AN_INSTANT, A_LATER_INSTANT]);
+  });
+
+  // Two sources never share a counter, so the tie is arbitrary — but a window read twice has to
+  // come back the same way twice, which is the whole of what settling it buys.
+  test('two sources within one instant are separated rather than interleaved', async () => {
+    const { records } = await read([
+      storedRow({ sourceId: 'source-2', sequence: '0' }),
+      storedRow({ sourceId: 'source-1', sequence: '1' }),
+      storedRow({ sourceId: 'source-2', sequence: '1' }),
+      storedRow({ sourceId: 'source-1', sequence: '0' }),
+    ]);
+
+    expect(records.map((record) => `${record.sourceId}/${record.sequence}`)).toEqual([
+      'source-1/0',
+      'source-1/1',
+      'source-2/0',
+      'source-2/1',
+    ]);
   });
 });

@@ -1,6 +1,6 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
-import { requireAppSlug } from '#lib/apps.ts';
+import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { exportApp } from '#lib/exports.ts';
 import { createUi, isInteractive } from '#lib/ui.ts';
@@ -17,16 +17,12 @@ export const command = defineCommand('apps export [destination]', {
   beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ params, parents, context, print }) => {
     const { api } = context;
-    // Nothing to ask about — the destination is the one thing this needs and it was typed — so a
-    // terminal only decides how the waiting looks.
-    const ui = createUi({ print, interactive: isInteractive() });
+    const interactive = isInteractive();
+    const ui = createUi({ print, interactive });
 
     ui.open('nib apps export');
-    await exportApp({
-      api,
-      slug: requireAppSlug(parents.apps.options.app),
-      destination: params.destination,
-      ui,
-    });
+    const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
+
+    await exportApp({ api, slug, destination: params.destination, ui });
   },
 });

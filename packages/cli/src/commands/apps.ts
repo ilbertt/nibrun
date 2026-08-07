@@ -17,7 +17,7 @@ export const command = defineCommand('apps', {
     [APP_OPTION]: {
       schema: z.string().min(1).optional(),
       forwardToChildren: true,
-      description: 'Slug of the app to work with.',
+      description: 'Slug of the app to work with. Asked for when omitted.',
     },
   },
 });
