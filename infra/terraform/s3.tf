@@ -130,6 +130,26 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
   }
 }
 
+# The dashboard uploads a binary from the browser straight to the URL the api
+# signs, which is a cross-origin PUT — and a browser will not send one at all
+# unless the bucket says the origin may ask. The CLI needs none of this: it is
+# only a browser that asks permission before making a request.
+#
+# One origin and one method. The signed URL is already the permission to write,
+# so this decides who may be handed one, not what it is allowed to do.
+resource "aws_s3_bucket_cors_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  cors_rule {
+    allowed_methods = ["PUT"]
+    allowed_origins = ["https://${var.api_hostname}"]
+    # A browser sends headers on a PUT that nothing here chose — content-type
+    # among them — and one the rule does not name is the whole request refused.
+    allowed_headers = ["*"]
+    max_age_seconds = 3600
+  }
+}
+
 # A binary is uploaded straight here over a URL the api signs, landing under
 # uploads/ until the api has read it back, hashed it and copied it to the key its
 # digest names. The staging copy is deleted the moment that is done — this is for
