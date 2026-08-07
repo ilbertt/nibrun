@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '#components/ui/card.tsx';
+import { formatBytes } from '#lib/format-bytes.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export function AppConfigCard({ app }: { app: AppSummary }) {
@@ -16,7 +17,9 @@ export function AppConfigCard({ app }: { app: AppSummary }) {
         </div>
         <div className="flex items-center justify-between gap-4">
           <span className="text-muted-foreground">Volume size</span>
-          <span className="font-mono tabular-nums">{volumeSizeBytes} bytes</span>
+          <span className="font-mono tabular-nums" title={`${volumeSizeBytes} bytes`}>
+            {formatBytes(volumeSizeBytes)}
+          </span>
         </div>
         <div className="flex flex-col gap-2">
           <span className="text-muted-foreground">Arguments</span>
