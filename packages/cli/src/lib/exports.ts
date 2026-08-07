@@ -47,7 +47,7 @@ export type ExportInput = {
  * Ask for a copy of an app — its data and the binary that ran against it — and write it where the
  * caller said.
  *
- * Where it goes is settled before anything is asked for, because reading a tenant's whole
+ * Where it goes is settled before the export is asked for, because reading a tenant's whole
  * filesystem is the most expensive thing the platform does on an owner's behalf: a path that
  * cannot be written is worth one line now rather than one line several minutes from now.
  */
