@@ -4,7 +4,6 @@ import type {
   ReportedCheckpoint,
   ReportedExport,
   ReportedVolume,
-  VolumeId,
 } from '@repo/protocol';
 import { Effect, Ref } from 'effect';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
@@ -74,11 +73,6 @@ export class AgentState extends Effect.Service<AgentState>()('AgentState', {
           remaining.delete(appId);
           return { ...current, records: remaining };
         }),
-
-      appIdByVolume: Effect.map(
-        records,
-        (all) => new Map<VolumeId, AppId>(all.map((record) => [record.volumeId, record.appId])),
-      ),
     };
   }),
 }) {}

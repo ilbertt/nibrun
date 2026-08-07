@@ -12,7 +12,7 @@ import {
 } from '#lib/reconcile/instances.ts';
 import { applyNetwork, applyRoutes } from '#lib/reconcile/network.ts';
 import { hasDeferredWork, type ObservedState, planReconcile } from '#lib/reconcile/plan.ts';
-import { applyTeardowns, applyVolumes } from '#lib/reconcile/volumes.ts';
+import { applyTeardowns, applyVolumes, volumeOwners } from '#lib/reconcile/volumes.ts';
 import { readInstanceRecords } from '#lib/report/instance-record.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
@@ -59,7 +59,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
      * The union of what systemd knows and what this agent has notes on: a unit with no note is an
      * orphan to stop, and a note with no unit is an instance that is gone.
      */
-    const observe = Effect.gen(function* () {
+    const observe = Effect.fn('Reconciler.observe')(function* (desired: HostDesiredState) {
       const current = yield* AgentState.snapshot;
       const unitIds = yield* Systemd.listAppIds.pipe(Effect.orElseSucceed(() => []));
       const ids = [...new Set([...unitIds, ...current.records.keys()])];
@@ -92,7 +92,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
           };
         }),
         volumes: yield* volumes
-          .observe(yield* AgentState.appIdByVolume)
+          .observe(volumeOwners({ desired, records: current.records }))
           .pipe(Effect.orElseSucceed(() => [])),
         checkpoints: [],
         exports: [...current.exportReports.values()].map((report) => ({
@@ -100,7 +100,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
           written: report.state === 'ready',
         })),
       } satisfies ObservedState;
-    }).pipe(Effect.withSpan('Reconciler.observe'));
+    });
 
     const persist = Effect.gen(function* () {
       const current = yield* AgentState.snapshot;
@@ -191,7 +191,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       });
 
     const reconcile = Effect.fn('Reconciler.reconcile')(function* (desired: HostDesiredState) {
-      const observed = yield* observe;
+      const observed = yield* observe(desired);
       const plan = planReconcile({ desired, observed });
       yield* AgentState.modify((current) => ({
         ...current,
