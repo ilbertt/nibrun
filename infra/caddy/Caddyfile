@@ -87,7 +87,13 @@ https://{$API_HOSTNAME} {
 :{$LOG_INGEST_PORT} {
 	@insert path /insert/*
 	handle @insert {
-		reverse_proxy victorialogs:9428
+		# Held rather than refused while the store is away: a shipper that gets an
+		# error here drops the lines it was carrying, and they are the record of
+		# what the fleet was doing at the one moment worth reading back.
+		reverse_proxy victorialogs:9428 {
+			lb_try_duration 30s
+			lb_try_interval 250ms
+		}
 	}
 
 	handle {
@@ -101,11 +107,13 @@ https://{$API_HOSTNAME} {
 https://{$DOZZLE_HOSTNAME} {
 	import origin_tls
 
-	# Log streaming is a websocket; reverse_proxy upgrades it as-is. No
-	# lb_try_duration: nothing recreates this container on deploy, so there is no
-	# gap to ride out, and holding a request open would only delay the 502 that
-	# says Dozzle is actually down.
-	reverse_proxy dozzle:8080
+	# Log streaming is a websocket; reverse_proxy upgrades it as-is, and the
+	# retries below sit before the upgrade, where a dial that never connected is
+	# safe to repeat.
+	reverse_proxy dozzle:8080 {
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
 }
 
 # The fleet's logs. Unlike Dozzle, VictoriaLogs has no login of its own and no
@@ -115,12 +123,14 @@ https://{$DOZZLE_HOSTNAME} {
 https://{$VICTORIALOGS_HOSTNAME} {
 	import origin_tls
 
-	# The hash is written by on_box_deploy.sh from the SSM password, the way
-	# Dozzle's user list is. bcrypt is what basic_auth reads; nothing on the box
-	# holds the password itself.
-	basic_auth {
-		admin {$VICTORIALOGS_PASSWORD_HASH}
-	}
+	# Rendered by on_box_deploy.sh from the SSM password, the way Dozzle's user
+	# list is; bcrypt is what basic_auth reads, and nothing on the box holds the
+	# password itself. A file under the mounted directory rather than an
+	# environment variable because bcrypt re-salts on every run: the same
+	# password hashes differently each deploy, which through the environment
+	# would change the edge's compose config and recreate it every time. Here the
+	# new hash arrives through the reload and the container is never touched.
+	import /etc/caddy/auth/victorialogs.caddy
 
 	# Nothing is served at the bare hostname — the allowlist below starts at
 	# /select — so this is what makes typing the hostname land on the dashboard
@@ -137,7 +147,10 @@ https://{$VICTORIALOGS_HOSTNAME} {
 	# version page, /metrics and /flags are not published at all.
 	@select path /select/*
 	handle @select {
-		reverse_proxy victorialogs:9428
+		reverse_proxy victorialogs:9428 {
+			lb_try_duration 30s
+			lb_try_interval 250ms
+		}
 	}
 
 	handle {

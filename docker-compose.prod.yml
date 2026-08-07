@@ -30,13 +30,20 @@ services:
   # No depends_on: it makes compose restart Caddy whenever an upstream is
   # recreated, which every deploy does to the api, taking the edge down for the
   # upstream's health-gate window. The Caddyfile's lb_try_duration already rides
-  # out an api that is not accepting yet, on cold boot and during a recreate.
+  # out an upstream that is not accepting yet, on cold boot and during a
+  # recreate.
   #
   # Nothing here changes between deploys, so the container is left running and
-  # the edge never blinks; new config and re-issued certificates arrive through
-  # the reload in on_box_deploy.sh rather than a recreate. The whole directory
-  # is mounted, not the files in it, so replacing a file cannot leave the
-  # container holding the old inode.
+  # the edge never blinks; new config, re-issued certificates and the log
+  # dashboard's password hash all arrive through the mounted directory and the
+  # reload in on_box_deploy.sh rather than a recreate. The whole directory is
+  # mounted, not the files in it, so replacing a file cannot leave the container
+  # holding the old inode.
+  #
+  # Anything added below that varies per deploy takes the whole origin down for
+  # the length of a recreate, with no proxy left alive to hold the requests that
+  # land in it — the log dashboard's bcrypt hash sat here and did exactly that,
+  # since bcrypt re-salts on every run.
   caddy:
     image: caddy:2.11-alpine
     container_name: caddy
@@ -60,10 +67,6 @@ services:
       - API_HOSTNAME
       - DOZZLE_HOSTNAME
       - VICTORIALOGS_HOSTNAME
-      # A bcrypt hash is full of `$`, and compose reads `$name` in .env as a
-      # variable — so the deploy escapes them and compose unescapes here. Passed
-      # in rather than mounted because basic_auth takes the hash inline.
-      - VICTORIALOGS_PASSWORD_HASH
       - INTERNAL_PORT
       # Without this the Caddyfile's `:{$LOG_INGEST_PORT}` site address expands
       # to a bare `:`, which Caddy drops silently rather than refusing — the

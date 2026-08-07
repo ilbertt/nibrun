@@ -147,19 +147,19 @@ $compose run --rm --no-deps -T --entrypoint /dozzle dozzle generate \
   --password "$(secret dozzle_password)" admin > dozzle/data/users.yml.new
 mv dozzle/data/users.yml.new dozzle/data/users.yml
 
-# VictoriaLogs has no login, so Caddy holds the one for its dashboard — and
-# basic_auth takes the hash inline, which is why this lands in .env rather than
-# in a file beside the Caddyfile. Appended rather than written with the rest
-# because producing it needs compose, and compose needs the .env that was
-# written above. Over stdin so the password is never in a container's argv.
-#
-# Every `$` is doubled: compose reads `$name` in .env as a variable, and a
-# bcrypt hash is `$2a$14$<salt><digest>` — the salt is arbitrary and starts with
-# a letter often enough that leaving this alone truncates the hash silently.
-log "Hashing the log dashboard password"
+# VictoriaLogs has no login, so Caddy holds the one for its dashboard. Rendered
+# into the directory Caddy mounts rather than passed to the container, because
+# bcrypt re-salts on every run: as part of the edge's environment a hash that
+# differs on every deploy is a changed compose config, and compose answers that
+# by recreating the container — dropping the whole origin, every time. Produced
+# after the .env above because it takes compose, and before `up` because the
+# Caddyfile imports it and a missing file is a parse error on a cold box. Over
+# stdin so the password is never in a container's argv.
+log "Rendering the log dashboard login"
 victorialogs_hash=$(printf '%s\n' "$(secret victorialogs_password)" |
   $compose run --rm --no-deps -T --entrypoint caddy caddy hash-password)
-printf 'VICTORIALOGS_PASSWORD_HASH=%s\n' "${victorialogs_hash//\$/\$\$}" >> .env
+mkdir -p caddy/auth
+printf 'basic_auth {\n\tadmin %s\n}\n' "${victorialogs_hash}" > caddy/auth/victorialogs.caddy
 
 log "Starting services (up -d --remove-orphans)"
 $compose up -d --remove-orphans
