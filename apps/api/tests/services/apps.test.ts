@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
+  AppIdSchema,
   type AppState,
   type DnsLabel,
   DnsLabelSchema,
   type Hostname,
   HostnameSchema,
+  type ObjectKey,
+  ObjectKeySchema,
   type OwnerId,
   type ReportedVolume,
   Value,
@@ -19,8 +22,11 @@ import type {
   AppRow,
   AppsRepositoryContract,
   CreatedApp,
+  Leftovers,
   OwnedAppHostnameRow,
 } from '#repositories/apps.repository.ts';
+import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
+import type { ExportStorageRepositoryContract } from '#repositories/export-storage.repository.ts';
 import { AppsService, type ExportCancellation } from '#services/apps.service.ts';
 import {
   APP_HOST_DOMAIN,
@@ -64,7 +70,10 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly offeredSlugs: DnsLabel[] = [];
   readonly offeredConfigs: PublicAppConfig[] = [];
   readonly deleted: AppId[] = [];
+  readonly trace: string[] = [];
+  readonly leftovers = new Map<AppId, Leftovers>();
   deleting: AppId[] = [];
+  purgeable: AppId[] = [];
   owns = false;
   #remainingFailures: number;
   readonly #failure: unknown;
@@ -144,6 +153,69 @@ class StubAppsRepository implements AppsRepositoryContract {
       this.owns ? { ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state } : null,
     );
   }
+
+  listPurgeable({ limit }: { limit: number }): Promise<AppId[]> {
+    return Promise.resolve(this.purgeable.slice(0, limit));
+  }
+
+  listLeftovers({ appId }: { appId: AppId }): Promise<Leftovers> {
+    return Promise.resolve(this.leftovers.get(appId) ?? { artifacts: [], exports: [] });
+  }
+
+  // An app leaves the purgeable list by having nothing left, which is how the real view answers.
+  purge({ appId }: { appId: AppId }): Promise<void> {
+    this.trace.push(`rows:${appId}`);
+    this.purgeable = this.purgeable.filter((id) => id !== appId);
+    return Promise.resolve();
+  }
+}
+
+/**
+ * Both buckets write into one trace, because what this has to pin down is that no object is
+ * deleted after the row naming it: a bucket refusing a delete has to leave work a later pass can
+ * still find.
+ */
+class StubObjectStorage {
+  readonly removed: ObjectKey[] = [];
+  readonly #trace: string[];
+  readonly #refuse: ReadonlySet<ObjectKey>;
+
+  constructor({
+    trace,
+    refuse = new Set<ObjectKey>(),
+  }: { trace: string[]; refuse?: Set<ObjectKey> }) {
+    this.#trace = trace;
+    this.#refuse = refuse;
+  }
+
+  remove({ objectKey }: { objectKey: ObjectKey }): Promise<void> {
+    if (this.#refuse.has(objectKey)) {
+      return Promise.reject(new Error(`the bucket refused ${objectKey}`));
+    }
+    this.#trace.push(`object:${objectKey}`);
+    this.removed.push(objectKey);
+    return Promise.resolve();
+  }
+}
+
+class StubArtifactStorage extends StubObjectStorage implements ArtifactStorageRepositoryContract {
+  put(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  exists(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+}
+
+class StubExportStorage extends StubObjectStorage implements ExportStorageRepositoryContract {
+  signDownload(): string {
+    return '';
+  }
+}
+
+function objectKey(key: string): ObjectKey {
+  return Value.Parse(ObjectKeySchema, key);
 }
 
 const VOLUME_ID = Value.Parse(VolumeIdSchema, APP_ID);
@@ -161,11 +233,21 @@ class StubExportCancellation implements ExportCancellation {
 function serviceWith({
   appsRepo,
   exportsRepo = new StubExportCancellation(),
+  artifactStorageRepo = new StubArtifactStorage({ trace: [] }),
+  exportStorageRepo = new StubExportStorage({ trace: [] }),
 }: {
   appsRepo: AppsRepositoryContract;
   exportsRepo?: ExportCancellation;
+  artifactStorageRepo?: ArtifactStorageRepositoryContract;
+  exportStorageRepo?: ExportStorageRepositoryContract;
 }) {
-  return new AppsService({ appsRepo, exportsRepo, appHostDomain: APP_HOST_DOMAIN });
+  return new AppsService({
+    appsRepo,
+    exportsRepo,
+    artifactStorageRepo,
+    exportStorageRepo,
+    appHostDomain: APP_HOST_DOMAIN,
+  });
 }
 
 function createApp({
@@ -379,5 +461,131 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     await serviceWith({ appsRepo }).completeDeletions({ volumes: [reportedVolume('deleted')] });
 
     expect(appsRepo.deleted).toEqual([]);
+  });
+});
+
+const SECOND_APP_ID = Value.Parse(AppIdSchema, '01927e3a-0000-7000-8000-00000000beef');
+
+const SOLO_BINARY = objectKey('solo-binary-digest');
+const BUNDLE = objectKey('exports/app/bundle.tar.gz');
+
+function purgeableApp({
+  appsRepo,
+  appId,
+  leftovers,
+}: {
+  appsRepo: StubAppsRepository;
+  appId: AppId;
+  leftovers: Leftovers;
+}): void {
+  appsRepo.purgeable.push(appId);
+  appsRepo.leftovers.set(appId, leftovers);
+}
+
+describe('what a deleted app leaves behind is removed after it', () => {
+  test('the binaries and the bundles both go', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const artifacts = new StubArtifactStorage({ trace: appsRepo.trace });
+    const exports = new StubExportStorage({ trace: appsRepo.trace });
+    purgeableApp({
+      appsRepo,
+      appId: APP_ID,
+      leftovers: { artifacts: [SOLO_BINARY], exports: [BUNDLE] },
+    });
+
+    await serviceWith({
+      appsRepo,
+      artifactStorageRepo: artifacts,
+      exportStorageRepo: exports,
+    }).purgeDeleted();
+
+    expect(artifacts.removed).toEqual([SOLO_BINARY]);
+    expect(exports.removed).toEqual([BUNDLE]);
+  });
+
+  // A row deleted before its object is bytes nothing names; an object deleted before its row is
+  // work the next pass reads again. Only one of those two orders is recoverable.
+  test('every object goes before the rows naming it', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const artifacts = new StubArtifactStorage({ trace: appsRepo.trace });
+    const exports = new StubExportStorage({ trace: appsRepo.trace });
+    purgeableApp({
+      appsRepo,
+      appId: APP_ID,
+      leftovers: { artifacts: [SOLO_BINARY], exports: [BUNDLE] },
+    });
+
+    await serviceWith({
+      appsRepo,
+      artifactStorageRepo: artifacts,
+      exportStorageRepo: exports,
+    }).purgeDeleted();
+
+    expect(appsRepo.trace.at(-1)).toBe(`rows:${APP_ID}`);
+    expect(appsRepo.trace).toContain(`object:${SOLO_BINARY}`);
+  });
+
+  test('an app with nothing left is not asked about again', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    purgeableApp({ appsRepo, appId: APP_ID, leftovers: { artifacts: [], exports: [] } });
+    const apps = serviceWith({ appsRepo });
+
+    await apps.purgeDeleted();
+    await apps.purgeDeleted();
+
+    expect(appsRepo.trace).toEqual([`rows:${APP_ID}`]);
+  });
+
+  test('nothing to purge does nothing', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).purgeDeleted();
+
+    expect(appsRepo.trace).toEqual([]);
+  });
+});
+
+describe('a purge that cannot finish leaves the work to be found again', () => {
+  test('a bucket refusing one object keeps the rows that name it', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const artifacts = new StubArtifactStorage({
+      trace: appsRepo.trace,
+      refuse: new Set([SOLO_BINARY]),
+    });
+    purgeableApp({
+      appsRepo,
+      appId: APP_ID,
+      leftovers: { artifacts: [SOLO_BINARY], exports: [] },
+    });
+
+    await serviceWith({ appsRepo, artifactStorageRepo: artifacts }).purgeDeleted();
+
+    expect(appsRepo.trace).toEqual([]);
+    expect(appsRepo.purgeable).toEqual([APP_ID]);
+  });
+
+  // This runs on the way through a host report, so one bucket failure must not cost the report
+  // or the apps queued behind the app it failed on.
+  test('the app after the one that failed is still purged', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const artifacts = new StubArtifactStorage({
+      trace: appsRepo.trace,
+      refuse: new Set([SOLO_BINARY]),
+    });
+    purgeableApp({
+      appsRepo,
+      appId: APP_ID,
+      leftovers: { artifacts: [SOLO_BINARY], exports: [] },
+    });
+    purgeableApp({
+      appsRepo,
+      appId: SECOND_APP_ID,
+      leftovers: { artifacts: [], exports: [BUNDLE] },
+    });
+
+    await serviceWith({ appsRepo, artifactStorageRepo: artifacts }).purgeDeleted();
+
+    expect(appsRepo.trace).toContain(`rows:${SECOND_APP_ID}`);
+    expect(appsRepo.purgeable).toEqual([APP_ID]);
   });
 });

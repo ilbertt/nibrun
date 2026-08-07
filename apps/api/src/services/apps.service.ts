@@ -15,6 +15,8 @@ import type {
   AppRow,
   AppsRepositoryContract,
 } from '#repositories/apps.repository.ts';
+import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
+import type { ExportStorageRepositoryContract } from '#repositories/export-storage.repository.ts';
 import type { ExportsRepositoryContract } from '#repositories/exports.repository.ts';
 import { Service } from '#services/service.ts';
 
@@ -37,23 +39,38 @@ export type ExportCancellation = Pick<ExportsRepositoryContract, 'failInFlight'>
 
 const APP_DELETED = 'The app was deleted while this export was still being written.';
 
+/**
+ * How many deleted apps one host report cleans up after. Small, because it is work done on the
+ * way through a request that a host is waiting on, and a backlog only ever grows by one app per
+ * deletion — the next report takes the next batch.
+ */
+const PURGE_BATCH = 8;
+
 export class AppsService extends Service {
   private readonly appsRepo: AppsRepositoryContract;
   private readonly exportsRepo: ExportCancellation;
+  private readonly artifactStorageRepo: ArtifactStorageRepositoryContract;
+  private readonly exportStorageRepo: ExportStorageRepositoryContract;
   private readonly appHostDomain: string;
 
   constructor({
     appsRepo,
     exportsRepo,
+    artifactStorageRepo,
+    exportStorageRepo,
     appHostDomain,
   }: {
     appsRepo: AppsRepositoryContract;
     exportsRepo: ExportCancellation;
+    artifactStorageRepo: ArtifactStorageRepositoryContract;
+    exportStorageRepo: ExportStorageRepositoryContract;
     appHostDomain: string;
   }) {
     super();
     this.appsRepo = appsRepo;
     this.exportsRepo = exportsRepo;
+    this.artifactStorageRepo = artifactStorageRepo;
+    this.exportStorageRepo = exportStorageRepo;
     this.appHostDomain = appHostDomain;
   }
 
@@ -143,6 +160,49 @@ export class AppsService extends Service {
       if (await this.appsRepo.finishDeleting({ appId: volume.appId })) {
         this.logger.info('app deleted', { appId: volume.appId, volumeId: volume.volumeId });
       }
+    }
+  }
+
+  /**
+   * Remove what a deleted app left behind: the binaries it was deployed from, the bundles it was
+   * exported into, and the rows naming them. The filesystem went with the host; these did not,
+   * and between them they are the tenant's code and every byte of their data.
+   *
+   * Driven off what is still there rather than off the moment an app became `deleted`, so a pass
+   * that fails part way is retried by the next host report finding the same app still listed —
+   * and so apps deleted before any of this existed are cleaned up by the first report after it.
+   */
+  async purgeDeleted(): Promise<void> {
+    const appIds = await this.appsRepo.listPurgeable({ limit: PURGE_BATCH });
+    for (const appId of appIds) {
+      await this.purgeApp({ appId });
+    }
+  }
+
+  /**
+   * Objects first, rows last, because the rows are what makes the objects findable: a row deleted
+   * before its object leaves bytes nothing names, while an object deleted before its row leaves a
+   * row that the next pass reads again and acts on again. Both halves are safe to repeat.
+   *
+   * One app failing is logged rather than thrown: this runs on the way through a host report, and
+   * a bucket refusing one delete is no reason to fail the report or to skip the apps after it.
+   */
+  private async purgeApp({ appId }: { appId: AppId }): Promise<void> {
+    try {
+      const leftovers = await this.appsRepo.listLeftovers({ appId });
+      await Promise.all([
+        ...leftovers.exports.map((objectKey) => this.exportStorageRepo.remove({ objectKey })),
+        ...leftovers.artifacts.map((objectKey) => this.artifactStorageRepo.remove({ objectKey })),
+      ]);
+      await this.appsRepo.purge({ appId });
+
+      this.logger.info('deleted app purged', {
+        appId,
+        artifacts: leftovers.artifacts.length,
+        exports: leftovers.exports.length,
+      });
+    } catch (error) {
+      this.logger.error('purging a deleted app failed', { appId, error });
     }
   }
 

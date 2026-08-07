@@ -24,6 +24,13 @@ Every feature is a repository, a service, and a controller. Do not collapse them
 Every statement touching a tenant row takes an `ownerId` and scopes on it in the
 `WHERE` clause. Never filter by owner after the row comes back.
 
+Deleting an object from a bucket and deleting the row naming it cannot be one
+transaction, so the row goes **last**: a row removed first leaves bytes nothing
+names, while an object removed first leaves work the next pass finds and repeats.
+Work spanning the two is driven off a relation saying what is still outstanding
+— `nibrun.purgeable_apps` — rather than off the event that created it, which is
+what makes retrying the same code path as doing it the first time.
+
 Controllers call services; services call repositories. Never skip a layer — a
 controller must not touch a repository. Wire the graph once in
 `src/services/plugins.ts` and expose each service via an Elysia `.decorate`

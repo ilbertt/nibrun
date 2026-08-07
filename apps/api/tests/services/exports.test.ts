@@ -113,6 +113,10 @@ class FakeExportStorage implements ExportStorageRepositoryContract {
     this.signed.push(objectKey);
     return SIGNED_URL;
   }
+
+  remove(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 function build(exportsRepo = new FakeExportsRepository()) {

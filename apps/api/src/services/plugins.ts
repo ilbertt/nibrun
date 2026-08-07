@@ -39,6 +39,8 @@ const deploymentsService = new DeploymentsService({ deploymentsRepo: deployments
 const appsService = new AppsService({
   appsRepo: appsRepository,
   exportsRepo: exportsRepository,
+  artifactStorageRepo: artifactStorageRepository,
+  exportStorageRepo: exportStorageRepository,
   appHostDomain: env.APP_HOST_DOMAIN,
 });
 const exportsService = new ExportsService({

@@ -226,6 +226,35 @@ export interface IFinishDeletingAppResult {
     id: import("@repo/protocol").AppId;
 }
 
+/** Result of query `SelectPurgeableApps`. */
+export interface ISelectPurgeableAppsResult {
+    app_id: import("@repo/protocol").AppId;
+}
+
+/** Result of query `SelectUnsharedArtifactKeys`. */
+export interface ISelectUnsharedArtifactKeysResult {
+    /** Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    object_key: import("@repo/protocol").ObjectKey;
+}
+
+/** Result of query `SelectExportKeysByApp`. */
+export interface ISelectExportKeysByAppResult {
+    /** Where the host writes the bundle and the api signs its download URL. */
+    object_key: import("@repo/protocol").ObjectKey;
+}
+
+/** Result of query `DeleteExportsByApp`. */
+export interface IDeleteExportsByAppResult {
+}
+
+/** Result of query `DeleteDeploymentsByApp`. */
+export interface IDeleteDeploymentsByAppResult {
+}
+
+/** Result of query `DeleteArtifactsByApp`. */
+export interface IDeleteArtifactsByAppResult {
+}
+
 /** Result of query `UpdateAppState`. */
 export interface IUpdateAppStateResult {
     id: import("@repo/protocol").AppId;
@@ -508,6 +537,12 @@ export interface Queries {
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
     TouchAppAfterConfigPatch: ITouchAppAfterConfigPatchResult;
     FinishDeletingApp: IFinishDeletingAppResult;
+    SelectPurgeableApps: ISelectPurgeableAppsResult;
+    SelectUnsharedArtifactKeys: ISelectUnsharedArtifactKeysResult;
+    SelectExportKeysByApp: ISelectExportKeysByAppResult;
+    DeleteExportsByApp: IDeleteExportsByAppResult;
+    DeleteDeploymentsByApp: IDeleteDeploymentsByAppResult;
+    DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     UpdateAppState: IUpdateAppStateResult;
     SelectAppAfterStateChange: ISelectAppAfterStateChangeResult;
     InsertArtifact: IInsertArtifactResult;
