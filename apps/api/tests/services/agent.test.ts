@@ -11,7 +11,7 @@ import {
 } from '@repo/protocol';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
-import { AgentService } from '#services/agent.service.ts';
+import { AgentService, type UploadSweep } from '#services/agent.service.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { ExportsService } from '#services/exports.service.ts';
@@ -89,19 +89,32 @@ class FakeExportsService {
   }
 }
 
+/** A report is the only clock this process has, so the sweep rides along on one. */
+class FakeUploadSweep implements UploadSweep {
+  swept = 0;
+
+  sweepAbandoned(): Promise<void> {
+    this.swept += 1;
+    return Promise.resolve();
+  }
+}
+
 function build() {
   const deployments = new FakeDeploymentsService();
   const apps = new FakeAppsService();
   const exports = new FakeExportsService();
+  const artifacts = new FakeUploadSweep();
   return {
     apps,
     deployments,
     exports,
+    artifacts,
     service: new AgentService({
       agentRepo: new FakeAgentRepository(),
       deploymentsService: deployments as unknown as DeploymentsService,
       appsService: apps as unknown as AppsService,
       exportsService: exports as unknown as ExportsService,
+      artifactsService: artifacts,
     }),
   };
 }

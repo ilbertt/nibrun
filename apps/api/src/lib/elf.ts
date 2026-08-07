@@ -2,6 +2,8 @@
 // bytes themselves — and the first four settle it.
 const ELF_MAGIC = Uint8Array.from('\x7fELF', (character) => character.charCodeAt(0));
 
+export const ELF_MAGIC_LENGTH = ELF_MAGIC.length;
+
 /**
  * Whether the upload is a Linux executable at all.
  *

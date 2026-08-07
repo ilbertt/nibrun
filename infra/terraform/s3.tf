@@ -130,6 +130,48 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
   }
 }
 
+# A binary is uploaded straight here over a URL the api signs, landing under
+# uploads/ until the api has read it back, hashed it and copied it to the key its
+# digest names. The staging copy is deleted the moment that is done — this is for
+# the ones where it never happens: an upload nobody registers is bytes no row will
+# ever name, and without a rule they would sit here at full size forever.
+#
+# Scoped to the prefix, because everything outside it is what users deployed.
+#
+# Noncurrent versions too: the bucket is versioned, so deleting a staging object
+# leaves the object behind under a delete marker, and expiring only the current
+# version would keep exactly what this is meant to remove.
+resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  rule {
+    id     = "expire-staged-uploads"
+    status = "Enabled"
+    filter {
+      prefix = "uploads/"
+    }
+    expiration {
+      days = 1
+    }
+    noncurrent_version_expiration {
+      noncurrent_days = 1
+    }
+  }
+
+  # Every key, not just the staged ones: the api copies a verified binary to the key its digest
+  # names, in parts, and a copy that fails part way leaves those parts holding storage under a
+  # key that lists nothing. Unfiltered so that a prefix added later cannot be the one this was
+  # forgotten on.
+  rule {
+    id     = "abort-incomplete-uploads"
+    status = "Enabled"
+    filter {}
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+}
+
 # --- Tenant filesystems ---
 #
 # ZeroFS's backing store. Deliberately not a prefix inside artifacts.

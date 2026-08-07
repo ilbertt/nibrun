@@ -25,9 +25,11 @@ import type {
   Leftovers,
   OwnedAppHostnameRow,
 } from '#repositories/apps.repository.ts';
-import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
-import type { ExportStorageRepositoryContract } from '#repositories/export-storage.repository.ts';
-import { AppsService, type ExportCancellation } from '#services/apps.service.ts';
+import {
+  AppsService,
+  type ExportCancellation,
+  type ObjectRemoval,
+} from '#services/apps.service.ts';
 import {
   APP_HOST_DOMAIN,
   APP_ID,
@@ -222,22 +224,6 @@ class StubObjectStorage {
   }
 }
 
-class StubArtifactStorage extends StubObjectStorage implements ArtifactStorageRepositoryContract {
-  put(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  exists(): Promise<boolean> {
-    return Promise.resolve(true);
-  }
-}
-
-class StubExportStorage extends StubObjectStorage implements ExportStorageRepositoryContract {
-  signDownload(): string {
-    return '';
-  }
-}
-
 function objectKey(key: string): ObjectKey {
   return Value.Parse(ObjectKeySchema, key);
 }
@@ -257,13 +243,13 @@ class StubExportCancellation implements ExportCancellation {
 function serviceWith({
   appsRepo,
   exportsRepo = new StubExportCancellation(),
-  artifactStorageRepo = new StubArtifactStorage({ trace: [] }),
-  exportStorageRepo = new StubExportStorage({ trace: [] }),
+  artifactStorageRepo = new StubObjectStorage({ trace: [] }),
+  exportStorageRepo = new StubObjectStorage({ trace: [] }),
 }: {
   appsRepo: AppsRepositoryContract;
   exportsRepo?: ExportCancellation;
-  artifactStorageRepo?: ArtifactStorageRepositoryContract;
-  exportStorageRepo?: ExportStorageRepositoryContract;
+  artifactStorageRepo?: ObjectRemoval;
+  exportStorageRepo?: ObjectRemoval;
 }) {
   return new AppsService({
     appsRepo,
@@ -510,8 +496,8 @@ function purgeableApp({
 describe('what a deleted app leaves behind is removed after it', () => {
   test('the binaries and the bundles both go', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-    const artifacts = new StubArtifactStorage({ trace: appsRepo.trace });
-    const exports = new StubExportStorage({ trace: appsRepo.trace });
+    const artifacts = new StubObjectStorage({ trace: appsRepo.trace });
+    const exports = new StubObjectStorage({ trace: appsRepo.trace });
     purgeableApp({
       appsRepo,
       appId: APP_ID,
@@ -532,8 +518,8 @@ describe('what a deleted app leaves behind is removed after it', () => {
   // work the next pass reads again. Only one of those two orders is recoverable.
   test('every object goes before the rows naming it', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-    const artifacts = new StubArtifactStorage({ trace: appsRepo.trace });
-    const exports = new StubExportStorage({ trace: appsRepo.trace });
+    const artifacts = new StubObjectStorage({ trace: appsRepo.trace });
+    const exports = new StubObjectStorage({ trace: appsRepo.trace });
     purgeableApp({
       appsRepo,
       appId: APP_ID,
@@ -573,7 +559,7 @@ describe('what a deleted app leaves behind is removed after it', () => {
 describe('a purge that cannot finish leaves the work to be found again', () => {
   test('a bucket refusing one object keeps the rows that name it', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-    const artifacts = new StubArtifactStorage({
+    const artifacts = new StubObjectStorage({
       trace: appsRepo.trace,
       refuse: new Set([SOLO_BINARY]),
     });
@@ -593,7 +579,7 @@ describe('a purge that cannot finish leaves the work to be found again', () => {
   // or the apps queued behind the app it failed on.
   test('the app after the one that failed is still purged', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-    const artifacts = new StubArtifactStorage({
+    const artifacts = new StubObjectStorage({
       trace: appsRepo.trace,
       refuse: new Set([SOLO_BINARY]),
     });

@@ -342,9 +342,12 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   async listLeftovers({ appId }: { appId: AppId }): Promise<Leftovers> {
     const [artifacts, exports] = await Promise.all([
       this.sql.SelectUnsharedArtifactKeys`
+        /* @notNull object_key */
         SELECT DISTINCT ar.object_key
         FROM nibrun.artifacts ar
         WHERE ar.app_id = ${appId}
+          -- An upload that never completed named no object, so there is nothing of it to remove.
+          AND ar.object_key IS NOT NULL
           AND NOT EXISTS (
             SELECT 1 FROM nibrun.artifacts other
             WHERE other.object_key = ar.object_key AND other.app_id <> ${appId}

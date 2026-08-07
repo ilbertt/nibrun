@@ -1,8 +1,9 @@
-import { AppIdSchema, ArtifactSchema, OwnerIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import {
   CreateArtifactBodySchema,
+  CreateArtifactResponseSchema,
   ListArtifactsResponseSchema,
 } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { ArtifactsServicePlugin, loggerPlugin } from '#services/plugins.ts';
@@ -25,18 +26,21 @@ export const AppsAppIdArtifactsController = new Elysia()
       response: { [StatusMap.OK]: ListArtifactsResponseSchema },
     },
   )
+  // Created rather than OK: the artifact exists from here on, and the upload it is waiting for is
+  // what the response says where to send.
   .post(
     '/apps/:appId/artifacts',
     async ({ artifactsService, params, body, user, status }) => {
-      const artifact = await artifactsService.create({
+      const upload = await artifactsService.create({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
-        binary: body.binary,
+        filename: body.filename,
+        sizeBytes: body.sizeBytes,
       });
-      return status(StatusMap.Created, artifact);
+      return status(StatusMap.Created, upload);
     },
     {
       body: CreateArtifactBodySchema,
-      response: { [StatusMap.Created]: ArtifactSchema },
+      response: { [StatusMap.Created]: CreateArtifactResponseSchema },
     },
   );

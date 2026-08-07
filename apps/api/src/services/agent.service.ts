@@ -13,6 +13,7 @@ import {
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
 import type { AppsService } from '#services/apps.service.ts';
+import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { ExportsService } from '#services/exports.service.ts';
 import { Service } from '#services/service.ts';
@@ -21,28 +22,35 @@ const MS_PER_SECOND = 1000;
 const SECONDS_PER_HOUR = 60 * 60;
 const SESSION_LIFETIME_MS = SECONDS_PER_HOUR * MS_PER_SECOND;
 
+/** What a report is borrowed for, and nothing else artifacts can do. */
+export type UploadSweep = Pick<ArtifactsService, 'sweepAbandoned'>;
+
 export class AgentService extends Service {
   private readonly agentRepo: AgentRepositoryContract;
   private readonly deploymentsService: DeploymentsService;
   private readonly appsService: AppsService;
   private readonly exportsService: ExportsService;
+  private readonly artifactsService: UploadSweep;
 
   constructor({
     agentRepo,
     deploymentsService,
     appsService,
     exportsService,
+    artifactsService,
   }: {
     agentRepo: AgentRepositoryContract;
     deploymentsService: DeploymentsService;
     appsService: AppsService;
     exportsService: ExportsService;
+    artifactsService: UploadSweep;
   }) {
     super();
     this.agentRepo = agentRepo;
     this.deploymentsService = deploymentsService;
     this.appsService = appsService;
     this.exportsService = exportsService;
+    this.artifactsService = artifactsService;
   }
 
   /**
@@ -115,5 +123,8 @@ export class AgentService extends Service {
     // filesystem is gone — and `completeDeletions` above is where this report says so.
     await this.appsService.finishDeletions();
     await this.appsService.purgeDeleted();
+    // Nothing to do with this report. A report is simply the clock this process has, and an
+    // upload nobody ever came back about is work that needs one.
+    await this.artifactsService.sweepAbandoned();
   }
 }

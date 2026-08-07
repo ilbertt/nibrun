@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { SHARED_OPTIONS } from '#config.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { deploy, readBinary } from '#lib/deploy.ts';
+import { deploy, openBinary } from '#lib/deploy.ts';
 import { completeOptions } from '#lib/plan.ts';
 import { createUi, isInteractive } from '#lib/ui.ts';
 
@@ -43,7 +43,7 @@ export const command = defineCommand('run [command]', {
 
     // Before anything is asked, so a path nobody can read costs one line rather than a
     // questionnaire whose answers are then thrown away.
-    const binary = await readBinary(binaryPath);
+    const binary = await openBinary(binaryPath);
     ui.open('nib run');
 
     const resolved = interactive

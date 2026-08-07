@@ -6,10 +6,11 @@ export interface ISelectDesiredDeploymentsResult {
     id: import("@repo/protocol").DeploymentId;
     app_id: import("@repo/protocol").AppId;
     state: import("@repo/protocol").AppState;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: import("@repo/protocol").Sha256Digest;
-    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
     size_bytes: string;
-    /** Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     object_key: import("@repo/protocol").ObjectKey;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: import("@repo/protocol").Filename;
@@ -50,10 +51,11 @@ export interface ISelectDesiredExportsResult {
     /** Where the host writes the bundle and the api signs its download URL. */
     object_key: import("@repo/protocol").ObjectKey;
     state: import("@repo/protocol").ExportState;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: import("@repo/protocol").Sha256Digest;
-    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
     size_bytes: string;
-    /** Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     artifact_object_key: import("@repo/protocol").ObjectKey;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: import("@repo/protocol").Filename;
@@ -243,7 +245,7 @@ export interface ISelectPurgeableAppsResult {
 
 /** Result of query `SelectUnsharedArtifactKeys`. */
 export interface ISelectUnsharedArtifactKeysResult {
-    /** Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     object_key: import("@repo/protocol").ObjectKey;
 }
 
@@ -295,28 +297,62 @@ export interface ISelectAppAfterStateChangeResult {
     restart_reset_after_ms: number;
 }
 
-/** Result of query `InsertArtifact`. */
-export interface IInsertArtifactResult {
+/** Result of query `InsertPendingArtifact`. */
+export interface IInsertPendingArtifactResult {
     id: import("@repo/protocol").ArtifactId;
     app_id: import("@repo/protocol").AppId;
+    /** The name the binary was uploaded under; a content-addressed key carries none. */
+    original_file_name: import("@repo/protocol").Filename;
+    created_at: Date;
+}
+
+/** Result of query `CompleteArtifact`. */
+export interface ICompleteArtifactResult {
+    id: import("@repo/protocol").ArtifactId;
+    app_id: import("@repo/protocol").AppId;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: import("@repo/protocol").Sha256Digest;
-    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
     size_bytes: string;
-    /** Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     object_key: import("@repo/protocol").ObjectKey;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: import("@repo/protocol").Filename;
     created_at: Date;
 }
 
+/** Result of query `DeleteArtifact`. */
+export interface IDeleteArtifactResult {
+}
+
+/** Result of query `SelectPendingArtifact`. */
+export interface ISelectPendingArtifactResult {
+    id: import("@repo/protocol").ArtifactId;
+    app_id: import("@repo/protocol").AppId;
+    /** The name the binary was uploaded under; a content-addressed key carries none. */
+    original_file_name: import("@repo/protocol").Filename;
+    created_at: Date;
+}
+
+/** Result of query `SelectAbandonedArtifacts`. */
+export interface ISelectAbandonedArtifactsResult {
+    id: import("@repo/protocol").ArtifactId;
+    app_id: import("@repo/protocol").AppId;
+}
+
+/** Result of query `DeleteAbandonedArtifact`. */
+export interface IDeleteAbandonedArtifactResult {
+}
+
 /** Result of query `SelectArtifactsByApp`. */
 export interface ISelectArtifactsByAppResult {
     id: import("@repo/protocol").ArtifactId;
     app_id: import("@repo/protocol").AppId;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: import("@repo/protocol").Sha256Digest;
-    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
     size_bytes: string;
-    /** Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     object_key: import("@repo/protocol").ObjectKey;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: import("@repo/protocol").Filename;
@@ -327,10 +363,11 @@ export interface ISelectArtifactsByAppResult {
 export interface ISelectArtifactByIdResult {
     id: import("@repo/protocol").ArtifactId;
     app_id: import("@repo/protocol").AppId;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: import("@repo/protocol").Sha256Digest;
-    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
     size_bytes: string;
-    /** Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     object_key: import("@repo/protocol").ObjectKey;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: import("@repo/protocol").Filename;
@@ -560,7 +597,12 @@ export interface Queries {
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     UpdateAppState: IUpdateAppStateResult;
     SelectAppAfterStateChange: ISelectAppAfterStateChangeResult;
-    InsertArtifact: IInsertArtifactResult;
+    InsertPendingArtifact: IInsertPendingArtifactResult;
+    CompleteArtifact: ICompleteArtifactResult;
+    DeleteArtifact: IDeleteArtifactResult;
+    SelectPendingArtifact: ISelectPendingArtifactResult;
+    SelectAbandonedArtifacts: ISelectAbandonedArtifactsResult;
+    DeleteAbandonedArtifact: IDeleteAbandonedArtifactResult;
     SelectArtifactsByApp: ISelectArtifactsByAppResult;
     SelectArtifactById: ISelectArtifactByIdResult;
     SelectDeployableArtifact: ISelectDeployableArtifactResult;

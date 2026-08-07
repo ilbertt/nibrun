@@ -17,6 +17,8 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1105.0",
+    "@aws-sdk/s3-presigned-post": "^3.1105.0",
     "@ilbertt/better-auth-bun-sql": "^0.2.0",
     "@ilbertt/bun-sqlgen": "^0.4.0",
     "@repo/protocol": "workspace:*",

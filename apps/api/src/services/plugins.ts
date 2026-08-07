@@ -2,7 +2,7 @@ import { Elysia } from 'elysia';
 import { sql } from '#db/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
-import { artifactsS3, exportsS3 } from '#lib/s3/client.ts';
+import { artifactsPolicySigner, artifactsS3, exportsS3 } from '#lib/s3/client.ts';
 import { VictoriaLogsClient } from '#lib/victorialogs/client.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -30,7 +30,11 @@ const healthRepository = new HealthRepository(sql);
 const appsRepository = new AppsRepository(sql);
 const artifactsRepository = new ArtifactsRepository(sql);
 const deploymentsRepository = new DeploymentsRepository(sql);
-const artifactStorageRepository = new ArtifactStorageRepository(artifactsS3);
+const artifactStorageRepository = new ArtifactStorageRepository({
+  client: artifactsS3,
+  policySigner: artifactsPolicySigner,
+  bucket: env.ARTIFACTS_BUCKET,
+});
 const exportsRepository = new ExportsRepository(sql);
 const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const logsRepository = new LogsRepository(new VictoriaLogsClient(env.VICTORIALOGS_ENDPOINT));
@@ -49,12 +53,7 @@ const exportsService = new ExportsService({
   appsRepo: appsRepository,
   retentionDays: env.EXPORT_RETENTION_DAYS,
 });
-const agentService = new AgentService({
-  agentRepo: agentRepository,
-  deploymentsService,
-  appsService,
-  exportsService,
-});
+
 const assetsService = new AssetsService(assetsRepository);
 const healthService = new HealthService(healthRepository);
 const filesystemService = new FilesystemService({ deploymentsRepo: deploymentsRepository });
@@ -62,6 +61,13 @@ const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,
   appsRepo: appsRepository,
+});
+const agentService = new AgentService({
+  agentRepo: agentRepository,
+  deploymentsService,
+  appsService,
+  exportsService,
+  artifactsService,
 });
 const logsService = new LogsService({
   logsRepo: logsRepository,

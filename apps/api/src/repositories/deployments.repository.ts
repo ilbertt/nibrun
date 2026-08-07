@@ -82,11 +82,14 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       // Asked before anything is superseded: returning from this callback commits, so an
       // artifact this owner does not have must leave the running deployment alone rather than
       // stand it down on behalf of a request that goes on to write nothing.
+      // `digest IS NOT NULL` is what makes an artifact one: a row without it is an upload still
+      // in flight, and a host sent to fetch it would find a key that names nothing yet.
       const [deployable] = await tx.SelectDeployableArtifact`
         SELECT ar.id
         FROM nibrun.artifacts ar
         JOIN nibrun.live_apps a ON a.id = ar.app_id
         WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}
+          AND ar.digest IS NOT NULL
       `;
       if (!deployable) {
         return null;
@@ -105,6 +108,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND ar.id = ${artifactId}
+          AND ar.digest IS NOT NULL
         RETURNING id
       `;
       return inserted ? await this.selectDeployment({ tx, deploymentId: inserted.id }) : null;

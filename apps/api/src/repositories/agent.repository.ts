@@ -39,7 +39,12 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
    * so a host can only be told to do one once something has recorded that someone asked.
    */
   async desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+    // An artifact still awaiting its upload cannot be deployed or exported — the deployment
+    // that would name it is refused — so what reaches a host here always has its bytes.
     const deployments = await this.sql.SelectDesiredDeployments`
+      /* @notNull digest */
+      /* @notNull size_bytes */
+      /* @notNull object_key */
       SELECT id, app_id, state,
              digest, size_bytes, object_key, original_file_name,
              guest_port, args, vcpu_count, memory_mib,
@@ -61,6 +66,8 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     const exports = await this.sql.SelectDesiredExports`
       /* @notNull object_key */
       /* @notNull artifact_object_key */
+      /* @notNull digest */
+      /* @notNull size_bytes */
       SELECT id, app_id, object_key, state,
              digest, size_bytes, artifact_object_key, original_file_name
       FROM nibrun.desired_exports

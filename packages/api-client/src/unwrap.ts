@@ -45,5 +45,16 @@ function bodyMessage(value: unknown): string {
   if (typeof value === 'object' && value !== null && 'error' in value) {
     return String(value.error);
   }
+  // A body Eden hands back unread, because it arrived chunked and as text: an error page from
+  // something between here and the api rather than the api's own answer. Reading it would make
+  // every call site async to quote a page of HTML, so the status is left to say it — and it is
+  // the status that identifies the hop, since the api answers in JSON.
+  if (isAsyncIterable(value)) {
+    return 'a page, not this api — something between here and it refused the request';
+  }
   return String(value);
+}
+
+function isAsyncIterable(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && Symbol.asyncIterator in value;
 }

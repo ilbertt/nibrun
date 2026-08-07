@@ -16,7 +16,6 @@ import type {
   AppsRepositoryContract,
 } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
-import type { ExportStorageRepositoryContract } from '#repositories/export-storage.repository.ts';
 import type { ExportsRepositoryContract } from '#repositories/exports.repository.ts';
 import { Service } from '#services/service.ts';
 
@@ -37,6 +36,13 @@ const MAX_SLUG_ATTEMPTS = 5;
 /** What deleting an app needs from the exports it leaves behind, and nothing else. */
 export type ExportCancellation = Pick<ExportsRepositoryContract, 'failInFlight'>;
 
+/**
+ * Likewise for the buckets: purging only ever takes objects out of them. Narrowed so that a
+ * service holding the whole of one — able to sign an upload, or read a tenant's binary back —
+ * is not what a reader has to rule out here.
+ */
+export type ObjectRemoval = Pick<ArtifactStorageRepositoryContract, 'remove'>;
+
 const APP_DELETED = 'The app was deleted while this export was still being written.';
 
 /**
@@ -55,8 +61,8 @@ const FINISH_BATCH = 8;
 export class AppsService extends Service {
   private readonly appsRepo: AppsRepositoryContract;
   private readonly exportsRepo: ExportCancellation;
-  private readonly artifactStorageRepo: ArtifactStorageRepositoryContract;
-  private readonly exportStorageRepo: ExportStorageRepositoryContract;
+  private readonly artifactStorageRepo: ObjectRemoval;
+  private readonly exportStorageRepo: ObjectRemoval;
   private readonly appHostDomain: string;
 
   constructor({
@@ -68,8 +74,8 @@ export class AppsService extends Service {
   }: {
     appsRepo: AppsRepositoryContract;
     exportsRepo: ExportCancellation;
-    artifactStorageRepo: ArtifactStorageRepositoryContract;
-    exportStorageRepo: ExportStorageRepositoryContract;
+    artifactStorageRepo: ObjectRemoval;
+    exportStorageRepo: ObjectRemoval;
     appHostDomain: string;
   }) {
     super();
