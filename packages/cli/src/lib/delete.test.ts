@@ -42,7 +42,7 @@ function ui(): Ui & { said: string[] } {
     open: () => {},
     step: (message) => said.push(message),
     done: (message) => said.push(message),
-    waitingFor: ({ task }) => task(),
+    waitingFor: ({ task }) => task(() => {}),
   };
 }
 

@@ -4,10 +4,12 @@ import {
   type DeployStep,
   deploy,
   type UploadableBinary,
+  type UploadProgress,
 } from '@repo/app-operations';
 import type { TenantArguments } from '@repo/protocol';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
+import { browserUpload } from '#lib/browser-upload.ts';
 
 export type DeployRequest = {
   binary: UploadableBinary;
@@ -19,12 +21,24 @@ export type DeployRequest = {
 
 export type DeployMutation = UseMutationResult<Deployed, Error, DeployRequest>;
 
-export function useDeploy({ onStep }: { onStep: (step: DeployStep) => void }): DeployMutation {
+export function useDeploy({
+  onStep,
+  onProgress,
+}: {
+  onStep: (step: DeployStep) => void;
+  onProgress: (progress: UploadProgress) => void;
+}): DeployMutation {
   const queryClient = useQueryClient();
 
   return useMutation<Deployed, Error, DeployRequest>({
     mutationFn: async (request) => {
-      const deployed = await deploy({ api, ...request, onStep });
+      const deployed = await deploy({
+        api,
+        ...request,
+        onStep,
+        upload: browserUpload,
+        whileUploading: ({ task }) => task(onProgress),
+      });
       const state = await awaitDeploymentSettled({
         api,
         appId: deployed.appId,

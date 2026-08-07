@@ -1,5 +1,6 @@
 import type { DeployStep } from '@repo/app-operations';
 import { CheckIcon, TriangleAlertIcon } from 'lucide-react';
+import { UploadMeter } from '#components/apps/upload-meter.tsx';
 import { Button } from '#components/ui/button.tsx';
 import { DialogClose } from '#components/ui/dialog.tsx';
 import { Spinner } from '#components/ui/spinner.tsx';
@@ -20,9 +21,14 @@ export function DeployProgress() {
           </li>
         ))}
         {waiting !== undefined && (
-          <li className="flex items-center gap-2 text-muted-foreground">
-            <Spinner className="shrink-0" />
-            <span>{waiting}</span>
+          <li className="flex flex-col gap-2 text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Spinner className="shrink-0" />
+              <span>{waiting}</span>
+            </div>
+            {run.progress !== undefined && run.phase === 'uploading' && (
+              <UploadMeter progress={run.progress} />
+            )}
           </li>
         )}
       </ol>
