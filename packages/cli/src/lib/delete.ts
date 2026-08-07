@@ -1,0 +1,95 @@
+import { note, text } from '@clack/prompts';
+import { type Api, unwrap } from '#lib/api.ts';
+import { appBySlug } from '#lib/apps.ts';
+import { UsageError } from '#lib/errors.ts';
+import { answered } from '#lib/prompts.ts';
+import type { Ui } from '#lib/ui.ts';
+
+/**
+ * A phrase rather than a y/n, because a y/n is answered by the muscle that has answered every
+ * other one. There is nothing underneath this to undo it with: an export taken beforehand is the
+ * only copy anyone gets to keep.
+ */
+const CONFIRMATION_PHRASE = 'delete permanently';
+
+export type DeleteInput = {
+  api: Api;
+  slug: string;
+  ui: Ui;
+  yes: boolean;
+  interactive: boolean;
+};
+
+/**
+ * Delete an app: every deployment of it, the hostnames it answered on, and everything its binary
+ * ever wrote.
+ *
+ * The app is looked up before anything is asked, so a slug that names nothing costs one line
+ * rather than a phrase typed out for an app that was never there.
+ */
+export async function deleteApp({ api, slug, ui, yes, interactive }: DeleteInput): Promise<void> {
+  const app = await appBySlug({ api, slug });
+  // Asking twice is asking once: the teardown already running is the answer to the second.
+  if (app.state === 'deleting') {
+    ui.done(`${app.slug} is already being deleted.`);
+    return;
+  }
+
+  if (!yes) {
+    await confirmDeletion({
+      slug: app.slug,
+      hostnames: app.hostnames.map((each) => each.hostname),
+      interactive,
+    });
+  }
+
+  const deleting = unwrap(await api.api.apps({ appId: app.id }).delete());
+  ui.done(
+    `${deleting.slug} is ${deleting.state}. What is on the volume goes when the host holding it says so.`,
+  );
+}
+
+/**
+ * `run` takes the defaults when there is nobody to ask; there is no default here that is not the
+ * deletion itself, so a pipe without `--yes` is refused rather than answered on the owner's
+ * behalf. A prompt nobody can read is not a safeguard.
+ */
+async function confirmDeletion({
+  slug,
+  hostnames,
+  interactive,
+}: {
+  slug: string;
+  hostnames: readonly string[];
+  interactive: boolean;
+}): Promise<void> {
+  if (!interactive) {
+    throw new UsageError(
+      `Deleting ${slug} cannot be undone, and there is no terminal here to confirm it through. Pass --yes to mean it.`,
+    );
+  }
+
+  note(
+    [`app: ${slug}`, `hostnames: ${hostnames.join(' ')}`, 'data: everything on the volume'].join(
+      '\n',
+    ),
+    'Deleted for good',
+  );
+  answered(
+    await text({
+      message: `Type ${CONFIRMATION_PHRASE} to delete ${slug}`,
+      validate: (value) =>
+        saysDeletePermanently(value)
+          ? undefined
+          : `Type ${CONFIRMATION_PHRASE}, or press Ctrl-C to keep the app.`,
+    }),
+  );
+}
+
+/**
+ * Typing the words is what makes this deliberate, so a caps lock left on is not a second chance
+ * to think about it and neither is a space either side of them.
+ */
+export function saysDeletePermanently(typed: string | undefined): boolean {
+  return typed?.trim().toLowerCase() === CONFIRMATION_PHRASE;
+}

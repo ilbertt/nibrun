@@ -52,6 +52,12 @@ the layout under `src/commands/` is the command tree.
   (`isInteractive()`). A command must work without one: whatever the flags left
   open still needs a default. `ctx.print` stays the plain-output path, clack the
   interactive one — see `src/lib/ui.ts`.
+- **A command that destroys something is the exception**, because the only
+  default it could take is the destruction. Without a terminal it is refused
+  rather than answered on the owner's behalf, so `--yes` is the one way to mean
+  it from a script — and that is why `--yes` lives on such a command rather than
+  anywhere shared. The terminal question is a typed phrase, not a y/n, which is
+  answered by the muscle that answers every other one — see `src/lib/delete.ts`.
 - Run it with `bun run --filter @repo/cli nib …`. A package script runs from the
   package directory, so relative paths resolve against `packages/cli` rather than
   the caller's shell — pass absolute ones until the CLI ships as a real `bin`.

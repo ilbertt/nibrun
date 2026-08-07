@@ -1,8 +1,9 @@
 import { basename } from 'node:path';
-import { confirm, isCancel, note, select, text } from '@clack/prompts';
+import { confirm, note, select, text } from '@clack/prompts';
 import { DEFAULT_GUEST_PORT, type TenantArguments } from '@repo/protocol';
 import { type Api, unwrap } from '#lib/api.ts';
 import { CancelledError } from '#lib/errors.ts';
+import { answered } from '#lib/prompts.ts';
 
 export type RunOptions = {
   app?: string | undefined;
@@ -109,13 +110,4 @@ function summary({ options, binaryPath, args }: Plan): string {
     .filter(([, value]) => value !== undefined)
     .map(([label, value]) => `${label}: ${value}`)
     .join('\n');
-}
-
-// clack answers a cancelled prompt with a sentinel rather than rejecting, so every answer has to
-// be read through here or a Ctrl-C reaches the api as if it were an instruction.
-function answered<T>(value: T | symbol): T {
-  if (isCancel(value)) {
-    throw new CancelledError();
-  }
-  return value as T;
 }
