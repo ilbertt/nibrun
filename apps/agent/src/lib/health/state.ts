@@ -4,6 +4,16 @@ import type { UnitStatus } from '#lib/vm/unit-status.ts';
 const NO_PROBES = 0;
 const ONE_PROBE = 1;
 
+/**
+ * How often a tenant that has never answered is asked again.
+ *
+ * `intervalMs` is a liveness cadence for something already serving, and spending it on a boot
+ * means the gap between a binary starting to listen and a deploy being called done is most of
+ * that interval. This is the grid a first answer lands on instead, and it is why the status
+ * loop ticks at the same rate while anything is coming up.
+ */
+export const STARTUP_PROBE_INTERVAL_MS = 250;
+
 export type HealthTracker = {
   readonly consecutiveSuccesses: number;
   readonly consecutiveFailures: number;
@@ -49,6 +59,40 @@ export function applyProbe({
   };
 }
 
+export type GraceInputs = {
+  healthCheck: HealthCheck;
+  startedAtMs?: number;
+  nowMs: number;
+};
+
+type ProbeInputs = GraceInputs & { tracker: HealthTracker };
+
+/** An instance with no start time has not been booted by this agent, so nothing has run out yet. */
+export function isWithinGracePeriod({ healthCheck, startedAtMs, nowMs }: GraceInputs): boolean {
+  return startedAtMs === undefined || nowMs - startedAtMs < healthCheck.gracePeriodMs;
+}
+
+/**
+ * Whether this tenant is still being given its first chance to answer.
+ *
+ * Bounded by the grace period rather than by the state alone, which is what keeps it — and the
+ * loop that ticks for it — from running for as long as an app that never settles is up.
+ */
+export function isOnStartupGrid({ tracker, ...grace }: ProbeInputs): boolean {
+  return !tracker.everHealthy && isWithinGracePeriod(grace);
+}
+
+/**
+ * The fast grid applies only while a tenant is still owed its grace period, so a slow starter
+ * is failed on exactly the schedule it was before: `unhealthyThreshold` probes at `intervalMs`
+ * after the grace runs out.
+ */
+export function nextProbeDelayMs(inputs: ProbeInputs): number {
+  return isOnStartupGrid(inputs)
+    ? Math.min(STARTUP_PROBE_INTERVAL_MS, inputs.healthCheck.intervalMs)
+    : inputs.healthCheck.intervalMs;
+}
+
 export type LifecycleInputs = {
   unit: UnitStatus;
   tracker: HealthTracker;
@@ -90,7 +134,7 @@ export function evaluateInstanceState({
   if (tracker.consecutiveSuccesses >= healthCheck.healthyThreshold) {
     return 'running';
   }
-  const withinGrace = startedAtMs === undefined || nowMs - startedAtMs < healthCheck.gracePeriodMs;
+  const withinGrace = isWithinGracePeriod({ healthCheck, startedAtMs, nowMs });
   if (tracker.consecutiveFailures >= healthCheck.unhealthyThreshold && !withinGrace) {
     return tracker.everHealthy ? 'unhealthy' : 'failed';
   }

@@ -4,12 +4,24 @@ import { isReadyToRetry, nextAttemptWindow } from '#lib/backoff.ts';
 import { nowTimestamp } from '#lib/clock.ts';
 import { reportedMessage } from '#lib/failure.ts';
 import { probeInstance } from '#lib/health/probe.ts';
-import { applyProbe, evaluateInstanceState, initialTracker } from '#lib/health/state.ts';
-import { type InstanceRecord, newInstanceRecord } from '#lib/report/instance-record.ts';
+import {
+  applyProbe,
+  evaluateInstanceState,
+  initialTracker,
+  nextProbeDelayMs,
+} from '#lib/health/state.ts';
+import type { ReconcilePlan } from '#lib/reconcile/plan.ts';
+import {
+  graceInputs,
+  type InstanceRecord,
+  newInstanceRecord,
+} from '#lib/report/instance-record.ts';
+import { ensureArtifactImage } from '#lib/vm/artifacts.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -90,6 +102,43 @@ const isStartable = ({
     isReadyToRetry({ window: existing.startAttempts, nowMs, policy })
   );
 };
+
+/**
+ * One entry per digest: two apps deploying the same bytes share the image, and fetching it
+ * twice at once would have them race for the same staging directory.
+ */
+function artifactsToStart(plan: ReconcilePlan) {
+  return new Map(
+    plan.instances.flatMap((action) =>
+      action.action === 'start' || action.action === 'replace'
+        ? [[action.desired.artifact.digest, action.desired.artifact] as const]
+        : [],
+    ),
+  ).values();
+}
+
+/**
+ * Downloading the artifact and building its image is the longest step of a deploy, and it does
+ * not need the host to have stopped anything — so it runs while the outgoing microVM is still
+ * serving rather than after it is gone.
+ *
+ * Best-effort: `startInstance` asks for the same image and is the one that reports a fetch that
+ * could not be made, so a failure here is only a head start that was not taken.
+ */
+export const prefetchArtifacts = Effect.fn('prefetchArtifacts')((plan: ReconcilePlan) =>
+  Effect.forEach(
+    artifactsToStart(plan),
+    (artifact) =>
+      ensureArtifactImage(artifact).pipe(
+        Effect.catchAll((error) =>
+          Effect.logWarning('artifact prefetch failed', error).pipe(
+            Effect.annotateLogs({ digest: artifact.digest }),
+          ),
+        ),
+      ),
+    { discard: true, concurrency: 'unbounded' },
+  ),
+);
 
 export const startInstance = Effect.fn('startInstance')(function* (desired: DesiredInstance) {
   yield* Effect.annotateCurrentSpan({ appId: desired.appId });
@@ -176,12 +225,13 @@ const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
       guestPort: record.guestPort,
       healthCheck: record.healthCheck,
     });
+    const delayMs = nextProbeDelayMs({
+      tracker: record.health,
+      ...graceInputs({ record, nowMs }),
+    });
     yield* AgentState.modify((current) => ({
       ...current,
-      nextProbeAtMs: new Map(current.nextProbeAtMs).set(
-        record.appId,
-        nowMs + record.healthCheck.intervalMs,
-      ),
+      nextProbeAtMs: new Map(current.nextProbeAtMs).set(record.appId, nowMs + delayMs),
     }));
     return applyProbe({
       tracker: record.health,
@@ -208,11 +258,9 @@ export const refreshStates = Effect.gen(function* () {
         const state = evaluateInstanceState({
           unit: status,
           tracker: health,
-          healthCheck: record.healthCheck,
           desiredRunning: record.desiredRunning,
           stopRequested: record.stopRequested,
-          ...(record.startedAt ? { startedAtMs: Date.parse(record.startedAt) } : {}),
-          nowMs,
+          ...graceInputs({ record, nowMs }),
         });
 
         const changed = state !== record.state;
@@ -232,6 +280,7 @@ export const refreshStates = Effect.gen(function* () {
               to: state,
             }),
           );
+          yield* ReportSignal.raise;
         }
       }),
     { discard: true },

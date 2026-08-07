@@ -15,6 +15,7 @@ import { ExportManager } from '#services/export-manager.service.ts';
 import { FilesystemReader } from '#services/filesystem-reader.service.ts';
 import { LogStore } from '#services/log-store.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
+import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
@@ -32,6 +33,7 @@ const platform = Layer.mergeAll(BunContext.layer, FetchHttpClient.layer);
 const agent = Layer.mergeAll(
   AgentConfig.Default,
   AgentState.Default,
+  ReportSignal.Default,
   CommandRunner.Default,
   ControlPlane.Default,
   LogStore.Default,

@@ -7,6 +7,15 @@ import { stdoutOf } from '#services/command-runner.service.ts';
 const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
 const SQUASHFS_FILENAME = 'artifact.squashfs';
+/**
+ * The image is built once per digest on the path a deploy waits on, and read back off a local
+ * disk by one guest — so the compressor's job here is to finish, not to be small. On a 57 MiB
+ * release binary this measures 0.56s against 2.6s at the default level, for an image 8% larger.
+ *
+ * gzip rather than something faster because that is the choice: `squashfs-tools` on the host
+ * image is built with gzip, lzma and lzo only, and lzo measures slower than gzip at every level.
+ */
+const SQUASHFS_COMPRESSION_LEVEL = '1';
 /** The path the guest's init execs, fixed by the boot contract. */
 const GUEST_BINARY_NAME = 'server';
 /** What a binary has to be to be one, wherever it lands — the guest's squashfs or an export. */
@@ -125,7 +134,15 @@ export const ensureArtifactImage = Effect.fn('ensureArtifactImage')(function* (
         yield* fs.chmod(binaryPath, BINARY_MODE);
         yield* fs.remove(stagedImage, { force: true });
         yield* stdoutOf({
-          command: ['mksquashfs', stagingDir, stagedImage, '-no-progress', '-noappend'],
+          command: [
+            'mksquashfs',
+            stagingDir,
+            stagedImage,
+            '-no-progress',
+            '-noappend',
+            '-Xcompression-level',
+            SQUASHFS_COMPRESSION_LEVEL,
+          ],
         });
         yield* fs.makeDirectory(path.dirname(imagePath), {
           recursive: true,
