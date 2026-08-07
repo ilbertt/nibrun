@@ -1,6 +1,7 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
 import { SeenTenantLogs, type TenantLogRecord } from '@repo/protocol';
+import { pause } from '#wait.ts';
 
 /**
  * How much of the gap a reconnect asks to be told about.
@@ -59,10 +60,4 @@ export async function* followLogs({
       throw failure;
     }
   }
-}
-
-function pause(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }
