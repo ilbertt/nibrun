@@ -246,4 +246,14 @@ describe('exports', () => {
     });
     expect(plan.exports).toEqual([{ action: 'forget', exportId: EXPORT_ID }]);
   });
+
+  // `absent` only reaches a record the control plane still has. One it never had, or has lost,
+  // is a record nothing would ever withdraw — and the host reports it for as long as it runs.
+  test('a record desired state does not mention at all is forgotten too', () => {
+    const plan = planReconcile({
+      desired: desiredState({ exports: [] }),
+      observed: observedState({ exports: [{ exportId: EXPORT_ID, written: true }] }),
+    });
+    expect(plan.exports).toEqual([{ action: 'forget', exportId: EXPORT_ID }]);
+  });
 });

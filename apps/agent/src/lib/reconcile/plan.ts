@@ -228,6 +228,12 @@ function planVolumes({
 /**
  * Not a diff against reality: the host cannot see the bucket it writes to, so a bundle already
  * written is left alone even if the object has since expired underneath it.
+ *
+ * Authoritative, like `instances` and unlike `volumes`: an export this end remembers and desired
+ * state does not mention is dropped. `absent` can only be said about a row the control plane
+ * still has, so it cannot reach one it never had or has since lost — and a note nothing will ever
+ * withdraw is one the host reports for as long as it runs. Safe to be authoritative about because
+ * forgetting costs a re-upload at worst, where forgetting a volume would cost the tenant's data.
  */
 function planExports({
   desired,
@@ -239,14 +245,20 @@ function planExports({
   const writtenIds = new Set(
     observed.exports.filter((current) => current.written).map((current) => current.exportId),
   );
-  return desired.exports.map((wanted): ExportPlan => {
-    if (wanted.desiredState === 'absent') {
-      return { action: 'forget', exportId: wanted.exportId };
-    }
-    return writtenIds.has(wanted.exportId)
-      ? { action: 'none', exportId: wanted.exportId }
-      : { action: 'write', desired: wanted };
-  });
+  const desiredIds = new Set(desired.exports.map((wanted) => wanted.exportId));
+  return [
+    ...desired.exports.map((wanted): ExportPlan => {
+      if (wanted.desiredState === 'absent') {
+        return { action: 'forget', exportId: wanted.exportId };
+      }
+      return writtenIds.has(wanted.exportId)
+        ? { action: 'none', exportId: wanted.exportId }
+        : { action: 'write', desired: wanted };
+    }),
+    ...observed.exports
+      .filter((current) => !desiredIds.has(current.exportId))
+      .map((current): ExportPlan => ({ action: 'forget', exportId: current.exportId })),
+  ];
 }
 
 function planCheckpoints({
