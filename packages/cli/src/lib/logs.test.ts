@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Print } from '@parshjs/core';
 import type { TenantLogRecord } from '@repo/protocol';
-import { Printed, render, show } from '#lib/logs.ts';
+import { render, show } from '#lib/logs.ts';
 
 const DROPPED_BYTES = 4096;
 
@@ -32,30 +32,6 @@ function printer(): Print & { at: string[] } {
     dim: () => at.push('dim'),
   };
 }
-
-describe('a page that overlaps the one before it prints only what is new', () => {
-  test('a record is printed once', () => {
-    const printed = new Printed();
-
-    expect(printed.admit(record())).toBe(true);
-    expect(printed.admit(record())).toBe(false);
-  });
-
-  test('the next record from the same source is new', () => {
-    const printed = new Printed();
-    printed.admit(record());
-
-    expect(printed.admit(record({ sequence: 1 }))).toBe(true);
-  });
-
-  // Sequence counts within one source, so the same number from another one is another record.
-  test('a source that restarted is not the source that stopped', () => {
-    const printed = new Printed();
-    printed.admit(record());
-
-    expect(printed.admit(record({ sourceId: 'source-2' }))).toBe(true);
-  });
-});
 
 describe('a record is one line of what the app wrote', () => {
   test('the line carries the time of day, the stream and the message', () => {

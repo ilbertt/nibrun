@@ -38,8 +38,33 @@ export class LogsRepository implements LogsRepositoryContract {
       query: tenantQuery({ appId, deploymentId, limit }),
       start: since,
     });
-    return rows.map(toRecord).filter((record) => record !== undefined);
+    return rows
+      .map(toRecord)
+      .filter((record) => record !== undefined)
+      .sort(byWritingOrder);
   }
+}
+
+/**
+ * The order a guest wrote its output in, which is the order it is read back in.
+ *
+ * `sort by (_time)` settles the instant and nothing within it, and a guest writes many lines inside
+ * one millisecond — a program announcing itself at startup writes all of them there. How the store
+ * holds those is the store's own business, and the order it hands them back in is not the order
+ * they were written. `sequence` is: it counts what one source wrote, in order.
+ *
+ * Across sources it settles nothing, because two sources never share a counter — but a window read
+ * twice has to come back the same way twice, so `sourceId` breaks that tie rather than the store.
+ */
+// biome-ignore lint/complexity/useMaxParams: a comparator compares two records
+function byWritingOrder(left: TenantLogRecord, right: TenantLogRecord): number {
+  if (left._time !== right._time) {
+    return left._time < right._time ? -1 : 1;
+  }
+  if (left.sourceId !== right.sourceId) {
+    return left.sourceId < right.sourceId ? -1 : 1;
+  }
+  return left.sequence - right.sequence;
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { Print } from '@parshjs/core';
-import type { TenantLogRecord } from '@repo/protocol';
+import { SeenTenantLogs, type TenantLogRecord } from '@repo/protocol';
 import { type Api, unwrap } from '#lib/api.ts';
 
 /**
@@ -7,7 +7,7 @@ import { type Api, unwrap } from '#lib/api.ts';
  *
  * Only the first stream wants the range the reader asked for; a later one is picking up after a
  * close and wants the seconds it was away, not that history again. Generous, because overlap is
- * cheap here — `Printed` drops what has already been shown — and a gap is not recoverable.
+ * cheap here — `SeenTenantLogs` drops what has already been shown — and a gap is not recoverable.
  */
 const RECONNECT_TIMERANGE = '30s';
 
@@ -41,8 +41,8 @@ export type FollowInput = {
  *
  * The api closes a stream on its own clock so that who may read it is asked again rather than
  * decided once, which makes reaching the end of one an instruction to open another rather than
- * the end of the log. Opening another is why `Printed` outlives them all: a reconnect asks for
- * the seconds it was away, and what it was not away for comes back a second time.
+ * the end of the log. Opening another is why `SeenTenantLogs` outlives them all: a reconnect asks
+ * for the seconds it was away, and what it was not away for comes back a second time.
  */
 export async function follow({
   api,
@@ -53,7 +53,7 @@ export async function follow({
   signal,
 }: FollowInput): Promise<void> {
   const logs = api.api.apps({ appId }).deployments({ deploymentId }).logs;
-  const printed = new Printed();
+  const printed = new SeenTenantLogs();
   let asked = timerange;
 
   // Stopping part-way through a stream is the ordinary ending, and it arrives as a failed request
@@ -73,27 +73,6 @@ export async function follow({
     if (!signal.aborted) {
       throw failure;
     }
-  }
-}
-
-/**
- * What has already been printed, so a reconnect does not print it again.
- *
- * A stream cannot be resumed from where the last one stopped — there is no cursor on the wire —
- * so a new one asks for the seconds around the gap and carries whatever else was in them.
- * `sourceId` and `sequence` are what tell a second copy from a second record: sequence counts
- * within one source and only rises, so the highest seen is the whole of what has to be remembered.
- */
-export class Printed {
-  readonly #highest = new Map<string, number>();
-
-  admit(record: TenantLogRecord): boolean {
-    const seen = this.#highest.get(record.sourceId);
-    if (seen !== undefined && record.sequence <= seen) {
-      return false;
-    }
-    this.#highest.set(record.sourceId, record.sequence);
-    return true;
   }
 }
 
