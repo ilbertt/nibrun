@@ -1,7 +1,6 @@
 import { note, text } from '@clack/prompts';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { unwrap } from '@repo/api-client/unwrap';
-import { appBySlug } from '@repo/app-operations';
+import { appBySlug, deleteApp as requestDeletion } from '@repo/app-operations';
 import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
 import type { Ui } from '#lib/ui.ts';
@@ -45,7 +44,7 @@ export async function deleteApp({ api, slug, ui, yes, interactive }: DeleteInput
     });
   }
 
-  const deleting = unwrap(await api.api.apps({ appId: app.id }).delete());
+  const deleting = await requestDeletion({ api, appId: app.id });
   ui.done(
     `${deleting.slug} is ${deleting.state}. What is on the volume goes when the host holding it says so.`,
   );
