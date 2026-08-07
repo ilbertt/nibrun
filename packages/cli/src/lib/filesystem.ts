@@ -1,4 +1,6 @@
 import type { Print } from '@parshjs/core';
+import type { PublicApiClient } from '@repo/api-client/public';
+import { unwrap } from '@repo/api-client/unwrap';
 import {
   DIRECTORY_ENTRY_LIMIT,
   FILESYSTEM_ENTRY_KINDS,
@@ -7,7 +9,6 @@ import {
   GuestPathSchema,
   Value,
 } from '@repo/protocol';
-import { type Api, unwrap } from '#lib/api.ts';
 import { addressedDeployment } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';
 import { dayAndMinute } from '#lib/timestamp.ts';
@@ -34,7 +35,7 @@ export function guestPath(typed: string): GuestPath {
 }
 
 export type ListInput = {
-  api: Api;
+  api: PublicApiClient;
   slug: string;
   deploymentId: string | undefined;
   path: GuestPath;

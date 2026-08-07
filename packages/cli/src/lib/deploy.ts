@@ -1,8 +1,9 @@
 import { basename } from 'node:path';
+import type { PublicApiClient } from '@repo/api-client/public';
+import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import { type DeploymentState, GuestPortSchema, type TenantArguments, Value } from '@repo/protocol';
-import { type Api, unwrap } from '#lib/api.ts';
 import { appBySlug } from '#lib/apps.ts';
-import { ApiError, UsageError } from '#lib/errors.ts';
+import { UsageError } from '#lib/errors.ts';
 import type { RunOptions } from '#lib/plan.ts';
 import type { Ui } from '#lib/ui.ts';
 
@@ -15,7 +16,7 @@ const MS_PER_SECOND = 1_000;
 const ELAPSED_DECIMALS = 1;
 
 export type DeployInput = RunOptions & {
-  api: Api;
+  api: PublicApiClient;
   ui: Ui;
   binary: File;
   args: TenantArguments;
@@ -103,7 +104,7 @@ async function awaitSettled({
   appId,
   deploymentId,
 }: {
-  api: Api;
+  api: PublicApiClient;
   appId: string;
   deploymentId: string;
 }): Promise<DeploymentState> {

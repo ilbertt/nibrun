@@ -1,5 +1,5 @@
 import { beforeEach, expect, mock, test } from 'bun:test';
-import type { Api } from '#lib/api.ts';
+import type { PublicApiClient } from '@repo/api-client/public';
 
 type Asked = {
   message: string;
@@ -25,7 +25,7 @@ const { selectApp } = await import('#lib/apps.ts');
 
 let listings = 0;
 
-function apiListing(apps: Array<{ slug: string; state: string }>): Api {
+function apiListing(apps: Array<{ slug: string; state: string }>): PublicApiClient {
   return {
     api: {
       apps: {
@@ -35,7 +35,7 @@ function apiListing(apps: Array<{ slug: string; state: string }>): Api {
         },
       },
     },
-  } as unknown as Api;
+  } as unknown as PublicApiClient;
 }
 
 beforeEach(() => {

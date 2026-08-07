@@ -1,8 +1,9 @@
 import { select } from '@clack/prompts';
 import type { Print } from '@parshjs/core';
+import type { PublicApiClient } from '@repo/api-client/public';
+import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import { SHARED_OPTIONS } from '#config.ts';
-import { type Api, unwrap } from '#lib/api.ts';
-import { ApiError, UsageError } from '#lib/errors.ts';
+import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
 
 const NO_APP_NAMED = `Which app? Name one with --${SHARED_OPTIONS.app.name}.`;
@@ -22,7 +23,7 @@ export async function selectApp({
   slug,
   interactive,
 }: {
-  api: Api;
+  api: PublicApiClient;
   slug: string | undefined;
   interactive: boolean;
 }): Promise<string> {
@@ -40,7 +41,7 @@ export async function selectApp({
  * the listing again: a slug is what an owner calls an app by and what every command under `apps`
  * takes, and the second read falls only on somebody already sat at the prompt.
  */
-async function chooseApp({ api }: { api: Api }): Promise<string> {
+async function chooseApp({ api }: { api: PublicApiClient }): Promise<string> {
   const { apps } = unwrap(await api.api.apps.get());
   if (apps.length === 0) {
     throw new UsageError(NO_APPS);
@@ -61,7 +62,7 @@ async function chooseApp({ api }: { api: Api }): Promise<string> {
 
 // Apps are addressed by id and listed by slug; the slug is the half a person sees, so it is the
 // half the CLI takes and this is where the two meet.
-export async function appBySlug({ api, slug }: { api: Api; slug: string }) {
+export async function appBySlug({ api, slug }: { api: PublicApiClient; slug: string }) {
   const { apps } = unwrap(await api.api.apps.get());
   const found = apps.find((app) => app.slug === slug);
   if (!found) {
@@ -74,7 +75,13 @@ export async function appBySlug({ api, slug }: { api: Api; slug: string }) {
  * The deployment a reader means by not naming one. The api lists them newest first, so this is
  * the head of the list rather than a search through it.
  */
-async function latestDeployment({ api, appId }: { api: Api; appId: string }): Promise<string> {
+async function latestDeployment({
+  api,
+  appId,
+}: {
+  api: PublicApiClient;
+  appId: string;
+}): Promise<string> {
   const { deployments } = unwrap(await api.api.apps({ appId }).deployments.get());
   const newest = deployments[0];
   if (!newest) {
@@ -97,7 +104,7 @@ export async function addressedDeployment({
   deploymentId,
   print,
 }: {
-  api: Api;
+  api: PublicApiClient;
   slug: string;
   deploymentId: string | undefined;
   print: Print;

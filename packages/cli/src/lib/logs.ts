@@ -1,6 +1,7 @@
 import type { Print } from '@parshjs/core';
+import type { PublicApiClient } from '@repo/api-client/public';
+import { unwrap } from '@repo/api-client/unwrap';
 import { SeenTenantLogs, type TenantLogRecord, type TenantLogStream } from '@repo/protocol';
-import { type Api, unwrap } from '#lib/api.ts';
 
 /**
  * How much of the gap a reconnect asks to be told about.
@@ -28,7 +29,7 @@ export function untilInterrupted(): AbortSignal {
 }
 
 export type FollowInput = {
-  api: Api;
+  api: PublicApiClient;
   appId: string;
   deploymentId: string;
   timerange: string;

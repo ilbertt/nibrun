@@ -1,6 +1,7 @@
+import { ApiError } from '@repo/api-client/unwrap';
 import { createAuthClient } from 'better-auth/client';
 import { deviceAuthorizationClient } from 'better-auth/client/plugins';
-import { ApiError, UsageError } from '#lib/errors.ts';
+import { UsageError } from '#lib/errors.ts';
 
 // Sent so the record of a pending login says what asked for it. Not a secret and not a
 // credential: a public client has nothing to prove, which is the whole reason this flow exists.

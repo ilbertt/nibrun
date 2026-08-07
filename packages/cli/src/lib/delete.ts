@@ -1,5 +1,6 @@
 import { note, text } from '@clack/prompts';
-import { type Api, unwrap } from '#lib/api.ts';
+import type { PublicApiClient } from '@repo/api-client/public';
+import { unwrap } from '@repo/api-client/unwrap';
 import { appBySlug } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
@@ -13,7 +14,7 @@ import type { Ui } from '#lib/ui.ts';
 const CONFIRMATION_PHRASE = 'delete permanently';
 
 export type DeleteInput = {
-  api: Api;
+  api: PublicApiClient;
   slug: string;
   ui: Ui;
   yes: boolean;

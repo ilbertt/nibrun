@@ -1,7 +1,8 @@
 import { basename } from 'node:path';
 import { confirm, note, select, text } from '@clack/prompts';
+import type { PublicApiClient } from '@repo/api-client/public';
+import { unwrap } from '@repo/api-client/unwrap';
 import { DEFAULT_GUEST_PORT, type TenantArguments } from '@repo/protocol';
-import { type Api, unwrap } from '#lib/api.ts';
 import { CancelledError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
 
@@ -23,7 +24,12 @@ type Plan = {
  * Only the answers that decide where a first deploy lands are asked for — a question asked on
  * every run is one that gets answered without reading it.
  */
-export async function completeOptions({ api, options, binaryPath, args }: Plan & { api: Api }) {
+export async function completeOptions({
+  api,
+  options,
+  binaryPath,
+  args,
+}: Plan & { api: PublicApiClient }) {
   const completed = await fillGaps({ api, options, binaryPath });
   await confirmPlan({ options: completed, binaryPath, args });
   return completed;
@@ -33,7 +39,7 @@ async function fillGaps({
   api,
   options,
   binaryPath,
-}: Omit<Plan, 'args'> & { api: Api }): Promise<RunOptions> {
+}: Omit<Plan, 'args'> & { api: PublicApiClient }): Promise<RunOptions> {
   const app = options.app ?? (await chooseApp({ api }));
   if (app !== undefined) {
     return { ...options, app };
@@ -52,7 +58,7 @@ async function fillGaps({
  * the one case where guessing is expensive: taken literally they get a second app every run,
  * and taken generously they overwrite one they never named.
  */
-async function chooseApp({ api }: { api: Api }): Promise<string | undefined> {
+async function chooseApp({ api }: { api: PublicApiClient }): Promise<string | undefined> {
   const { apps } = unwrap(await api.api.apps.get());
   const deployable = apps.filter((app) => app.state === 'active');
   if (deployable.length === 0) {

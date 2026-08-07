@@ -1,6 +1,7 @@
 import type { Print } from '@parshjs/core';
+import type { PublicApiClient } from '@repo/api-client/public';
+import { unwrap } from '@repo/api-client/unwrap';
 import { APP_STATES, type App } from '@repo/protocol';
-import { type Api, unwrap } from '#lib/api.ts';
 import { NO_APPS } from '#lib/apps.ts';
 import { dayAndMinute } from '#lib/timestamp.ts';
 
@@ -17,7 +18,13 @@ const COLUMN_GAP = '  ';
 const STATE_WIDTH = Math.max(HEADINGS.state.length, ...APP_STATES.map((state) => state.length));
 
 /** Print what the owner has, one app to a line. */
-export async function listApps({ api, print }: { api: Api; print: Print }): Promise<void> {
+export async function listApps({
+  api,
+  print,
+}: {
+  api: PublicApiClient;
+  print: Print;
+}): Promise<void> {
   const { apps } = unwrap(await api.api.apps.get());
   if (apps.length === 0) {
     print.dim(NO_APPS);

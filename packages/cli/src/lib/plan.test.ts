@@ -1,5 +1,5 @@
 import { beforeEach, expect, mock, test } from 'bun:test';
-import type { Api } from '#lib/api.ts';
+import type { PublicApiClient } from '@repo/api-client/public';
 
 const asked: string[] = [];
 const notes: string[] = [];
@@ -38,10 +38,10 @@ beforeEach(() => {
   confirmed = true;
 });
 
-function apiListing(apps: Array<{ slug: string; state: string }>): Api {
+function apiListing(apps: Array<{ slug: string; state: string }>): PublicApiClient {
   return {
     api: { apps: { get: () => Promise.resolve({ data: { apps }, error: null }) } },
-  } as unknown as Api;
+  } as unknown as PublicApiClient;
 }
 
 test('an owner with no apps is asked what to call one, not which to use', async () => {

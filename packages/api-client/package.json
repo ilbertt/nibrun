@@ -4,12 +4,14 @@
   "type": "module",
   "exports": {
     "./public": "./src/public.ts",
-    "./internal": "./src/internal.ts"
+    "./internal": "./src/internal.ts",
+    "./unwrap": "./src/unwrap.ts"
   },
   "imports": {
     "#*": "./src/*"
   },
   "scripts": {
+    "test": "bun test",
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Api } from '#lib/api.ts';
+import type { PublicApiClient } from '@repo/api-client/public';
 import { deleteApp, saysDeletePermanently } from '#lib/delete.ts';
 import type { Ui } from '#lib/ui.ts';
 
@@ -18,7 +18,7 @@ function listed(overrides: Partial<Listed> = {}): Listed {
 }
 
 /** The apps an owner has, and the ids the run asked the api to delete. */
-function apiHolding({ apps, deleted }: { apps: Listed[]; deleted: string[] }): Api {
+function apiHolding({ apps, deleted }: { apps: Listed[]; deleted: string[] }): PublicApiClient {
   function addressed({ appId }: { appId: string }) {
     return {
       delete: () => {
@@ -32,7 +32,7 @@ function apiHolding({ apps, deleted }: { apps: Listed[]; deleted: string[] }): A
   const route = Object.assign(addressed, {
     get: () => Promise.resolve({ data: { apps }, error: null }),
   });
-  return { api: { apps: route } } as unknown as Api;
+  return { api: { apps: route } } as unknown as PublicApiClient;
 }
 
 function ui(): Ui & { said: string[] } {

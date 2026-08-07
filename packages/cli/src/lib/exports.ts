@@ -1,9 +1,10 @@
 import { rename, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import type { PublicApiClient } from '@repo/api-client/public';
+import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import type { ExportState } from '@repo/protocol';
-import { type Api, unwrap } from '#lib/api.ts';
 import { appBySlug } from '#lib/apps.ts';
-import { ApiError, UsageError } from '#lib/errors.ts';
+import { UsageError } from '#lib/errors.ts';
 import type { Ui } from '#lib/ui.ts';
 
 /** What the host writes, so what the file is called when the caller left the naming to us. */
@@ -37,7 +38,7 @@ const BYTES_PER_MIB = 1_048_576;
 const MIB_DECIMALS = 1;
 
 export type ExportInput = {
-  api: Api;
+  api: PublicApiClient;
   slug: string;
   destination: string;
   ui: Ui;
@@ -109,7 +110,7 @@ async function awaitBundle({
   appId,
   exportId,
 }: {
-  api: Api;
+  api: PublicApiClient;
   appId: string;
   exportId: string;
 }): Promise<{ downloadUrl: string; sizeBytes: number | undefined }> {
