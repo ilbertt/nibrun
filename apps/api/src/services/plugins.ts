@@ -2,7 +2,7 @@ import { Elysia } from 'elysia';
 import { sql } from '#db/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
-import { artifactsPolicySigner, artifactsS3, exportsS3 } from '#lib/s3/client.ts';
+import { artifactsS3, artifactsSigner, exportsS3 } from '#lib/s3/client.ts';
 import { VictoriaLogsClient } from '#lib/victorialogs/client.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -32,7 +32,7 @@ const artifactsRepository = new ArtifactsRepository(sql);
 const deploymentsRepository = new DeploymentsRepository(sql);
 const artifactStorageRepository = new ArtifactStorageRepository({
   client: artifactsS3,
-  policySigner: artifactsPolicySigner,
+  signer: artifactsSigner,
   bucket: env.ARTIFACTS_BUCKET,
 });
 const exportsRepository = new ExportsRepository(sql);

@@ -5,8 +5,8 @@ import { t } from 'elysia';
 // what a host writes into an export archive. Refused here as a shape rather than sanitised into
 // a different name — see FilenameSchema.
 //
-// The size is only a claim, answered before anything is signed. What holds the upload to it is
-// the policy in the response.
+// The size is answered before anything is signed, and then signed into the url: the store holds
+// the upload to exactly it.
 export const CreateArtifactBodySchema = t.Object({
   filename: FilenameSchema,
   sizeBytes: ByteSizeSchema,
@@ -14,10 +14,7 @@ export const CreateArtifactBodySchema = t.Object({
 
 export const CreateArtifactResponseSchema = t.Object({
   artifactId: ArtifactIdSchema,
-  url: t.String({ description: 'Where to post the binary.' }),
-  fields: t.Record(t.String(), t.String(), {
-    description: 'Form fields to send before the file, which must be the last part.',
-  }),
+  url: t.String({ description: 'Where to PUT the binary, as the whole request body.' }),
 });
 
 // Said by the only end that knows: the upload happened between the caller and the store, so the

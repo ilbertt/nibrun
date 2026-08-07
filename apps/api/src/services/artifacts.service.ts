@@ -12,10 +12,7 @@ import { inspectArtifact } from '#lib/artifact-digest.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
-import type {
-  ArtifactStorageRepositoryContract,
-  SignedUpload,
-} from '#repositories/artifact-storage.repository.ts';
+import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
   ArtifactRow,
   ArtifactsRepositoryContract,
@@ -36,10 +33,11 @@ const MAX_ARTIFACT_MEBIBYTES = 256;
 /**
  * What a host has to pull before a tenant can start, and what this api has to read back to hash.
  *
- * Said three times over, each catching what the one before it cannot: to the caller before a byte
- * moves, so an oversized binary costs a request; to the store in the upload policy, which is the
- * only one that can refuse the bytes as they arrive; and here again while hashing, because the
- * store is not this api and a bucket that let something through is not an argument for storing it.
+ * Refused here before a byte moves, which is also what bounds the signature: an upload is signed
+ * for exactly the size it declared, so a binary larger than this cannot be declared and a body
+ * larger than the declaration is not the request that was signed. Checked once more while hashing,
+ * because the store is not this api and a bucket that let something through is not an argument for
+ * storing it.
  */
 export const MAX_ARTIFACT_SIZE_BYTES = MAX_ARTIFACT_MEBIBYTES * BYTES_PER_MEBIBYTE;
 const TOO_LARGE = `A binary may be at most ${MAX_ARTIFACT_MEBIBYTES} MB.`;
@@ -58,8 +56,9 @@ const UPLOAD_PREFIX = 'uploads';
 
 export type AppOwnership = Pick<AppsRepositoryContract, 'isOwnedBy'>;
 
-export type ArtifactUpload = SignedUpload & {
+export type ArtifactUpload = {
   artifactId: ArtifactId;
+  url: string;
 };
 
 function toArtifact(row: ArtifactRow): Artifact {
@@ -132,12 +131,12 @@ export class ArtifactsService extends Service {
       throw new NotFoundError(NO_SUCH_APP);
     }
 
-    const upload = await this.storageRepo.signUpload({
+    const url = await this.storageRepo.signUpload({
       objectKey: stagingKey({ appId, artifactId: pending.id }),
-      maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES,
+      sizeBytes,
     });
 
-    return { artifactId: pending.id, ...upload };
+    return { artifactId: pending.id, url };
   }
 
   /**

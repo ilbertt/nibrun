@@ -109,7 +109,7 @@ async function uploadBinary({
   appId: string;
   binary: LocalBinary;
 }) {
-  const { artifactId, url, fields } = unwrap(
+  const { artifactId, url } = unwrap(
     await api.api.apps({ appId }).artifacts.post({
       filename: binary.name,
       sizeBytes: binary.sizeBytes,
@@ -120,7 +120,7 @@ async function uploadBinary({
   try {
     await ui.waitingFor({
       message: `uploading ${binary.name} (${mebibytes(binary.sizeBytes)})`,
-      task: () => postBinary({ url, fields, binary }),
+      task: () => putBinary({ url, binary }),
     });
   } catch (failure) {
     await artifact.patch({ upload: 'failed' });
@@ -137,31 +137,14 @@ async function uploadBinary({
 }
 
 /**
- * A form post rather than a plain PUT, because the store will only hold an upload to a size when
- * the size is part of what was signed, and that is a policy the form carries.
+ * The whole file as the body, streamed from disk: a process that has to hold a binary to send it
+ * is a process that cannot send a large one.
  *
- * The file goes last: the store reads the fields in order and applies the policy to what follows
- * them, so a file sent before them is a file sent under no policy at all.
- *
- * Streamed from disk rather than read into memory — a process that has to hold a binary to send
- * it is a process that cannot send a large one.
+ * The url was signed for this exact length, so the store refuses anything else — which is also
+ * why a file that changed since it was measured comes back as a signature that does not match.
  */
-async function postBinary({
-  url,
-  fields,
-  binary,
-}: {
-  url: string;
-  fields: Record<string, string>;
-  binary: LocalBinary;
-}): Promise<void> {
-  const form = new FormData();
-  for (const [name, value] of Object.entries(fields)) {
-    form.append(name, value);
-  }
-  form.append('file', Bun.file(binary.path), binary.name);
-
-  const response = await fetch(url, { method: 'POST', body: form });
+async function putBinary({ url, binary }: { url: string; binary: LocalBinary }): Promise<void> {
+  const response = await fetch(url, { method: 'PUT', body: Bun.file(binary.path) });
   if (!response.ok) {
     throw new ApiError(
       `The store refused the upload: ${response.status} ${await storeError(response)}`,

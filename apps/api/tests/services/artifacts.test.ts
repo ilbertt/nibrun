@@ -15,10 +15,7 @@ import {
   Value,
 } from '@repo/protocol';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
-import type {
-  ArtifactStorageRepositoryContract,
-  SignedUpload,
-} from '#repositories/artifact-storage.repository.ts';
+import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
   AbandonedArtifactRow,
   ArtifactRow,
@@ -231,15 +228,15 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
 
 const SIGNED_URL = 'https://store.test/nibrun';
 
-/** A bucket as a map, so what a signed policy wrote and what the api copied are both visible. */
+/** A bucket as a map, so what a signed upload wrote and what the api copied are both visible. */
 class FakeStorage implements ArtifactStorageRepositoryContract {
   readonly objects = new Map<ObjectKey, Uint8Array>();
-  readonly signed: { objectKey: ObjectKey; maxSizeBytes: number }[] = [];
+  readonly signed: { objectKey: ObjectKey; sizeBytes: number }[] = [];
   readonly copied: { from: ObjectKey; to: ObjectKey }[] = [];
 
-  signUpload(input: { objectKey: ObjectKey; maxSizeBytes: number }): Promise<SignedUpload> {
+  signUpload(input: { objectKey: ObjectKey; sizeBytes: number }): Promise<string> {
     this.signed.push(input);
-    return Promise.resolve({ url: SIGNED_URL, fields: { key: input.objectKey } });
+    return Promise.resolve(`${SIGNED_URL}/${input.objectKey}`);
   }
 
   read({ objectKey }: { objectKey: ObjectKey }): ReadableStream<Uint8Array> {
@@ -272,7 +269,7 @@ class FakeStorage implements ArtifactStorageRepositoryContract {
     return Promise.resolve();
   }
 
-  /** Stands in for the caller spending the signed policy. */
+  /** Stands in for the caller spending the signed url. */
   put({ objectKey, text }: { objectKey: ObjectKey; text: string }): void {
     this.objects.set(objectKey, bytesOf(text));
   }
@@ -324,7 +321,7 @@ async function upload({
 }
 
 describe('an artifact begins before its bytes do', () => {
-  test('the slot is inside the app it belongs to, so a policy cannot be spent anywhere else', async () => {
+  test('the slot is inside the app it belongs to, so a url cannot be spent anywhere else', async () => {
     const { service, storage } = build();
 
     const { artifactId } = await service.create({
@@ -340,8 +337,8 @@ describe('an artifact begins before its bytes do', () => {
   });
 
   // The store is the only thing positioned to refuse the bytes as they arrive, and it will only
-  // do it if the size was part of what was signed.
-  test('the policy the store is handed carries the limit', async () => {
+  // do it if the size is part of what was signed.
+  test('the url is signed for the size that was declared', async () => {
     const { service, storage } = build();
 
     await service.create({
@@ -351,7 +348,7 @@ describe('an artifact begins before its bytes do', () => {
       sizeBytes: BINARY_TEXT.length,
     });
 
-    expect(storage.signed.at(-1)?.maxSizeBytes).toBe(MAX_ARTIFACT_SIZE_BYTES);
+    expect(storage.signed.at(-1)?.sizeBytes).toBe(BINARY_TEXT.length);
   });
 
   test('two uploads of one app never share a slot', async () => {
@@ -370,7 +367,7 @@ describe('an artifact begins before its bytes do', () => {
     expect(new Set(storage.signed.map((entry) => entry.objectKey)).size).toBe(2);
   });
 
-  test('a binary declared over the limit is refused before a row or a policy exists', async () => {
+  test('a binary declared over the limit is refused before a row or a url exists', async () => {
     const { service, storage, artifactsRepo } = build();
 
     await expect(

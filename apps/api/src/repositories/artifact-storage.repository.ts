@@ -1,5 +1,5 @@
-import type { S3Client } from '@aws-sdk/client-s3';
-import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
+import { PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { ObjectKey } from '@repo/protocol';
 
 const ARTIFACT_CONTENT_TYPE = 'application/octet-stream';
@@ -18,17 +18,8 @@ const UPLOAD_RETRIES = 3;
  */
 const UPLOAD_URL_TTL_SECONDS = 900;
 
-/**
- * Everything the caller has to send for the store to accept the upload. `fields` carries the
- * policy and its signature, and goes in the form ahead of the file.
- */
-export type SignedUpload = {
-  url: string;
-  fields: Record<string, string>;
-};
-
 export abstract class ArtifactStorageRepositoryContract {
-  abstract signUpload(input: { objectKey: ObjectKey; maxSizeBytes: number }): Promise<SignedUpload>;
+  abstract signUpload(input: { objectKey: ObjectKey; sizeBytes: number }): Promise<string>;
   abstract read(input: { objectKey: ObjectKey }): ReadableStream<Uint8Array>;
   abstract copy(input: { from: ObjectKey; to: ObjectKey }): Promise<void>;
   abstract exists(input: { objectKey: ObjectKey }): Promise<boolean>;
@@ -37,20 +28,20 @@ export abstract class ArtifactStorageRepositoryContract {
 
 export class ArtifactStorageRepository implements ArtifactStorageRepositoryContract {
   private readonly client: Bun.S3Client;
-  private readonly policySigner: S3Client;
+  private readonly signer: S3Client;
   private readonly bucket: string;
 
   constructor({
     client,
-    policySigner,
+    signer,
     bucket,
   }: {
     client: Bun.S3Client;
-    policySigner: S3Client;
+    signer: S3Client;
     bucket: string;
   }) {
     this.client = client;
-    this.policySigner = policySigner;
+    this.signer = signer;
     this.bucket = bucket;
   }
 
@@ -59,27 +50,31 @@ export class ArtifactStorageRepository implements ArtifactStorageRepositoryContr
    * taking delivery of one would spend the control plane's memory and bandwidth on every deploy
    * — and put every upload under whatever body limit the edge in front of it enforces.
    *
-   * The signature carries this end's permissions, which are this bucket and nothing else.
+   * The signature carries this end's permissions, which are this bucket and nothing else, and it
+   * covers the length as well as the key: a signature holds whatever headers it names, so naming
+   * `content-length` is what makes the store refuse a body of any other size. Bun's `presign` has
+   * no way to name one — https://github.com/oven-sh/bun/issues/18240 — which is the whole reason
+   * the signing here is not its.
    *
-   * A POST policy rather than a presigned PUT, because only a policy can name a size the store
-   * itself will hold the upload to. SigV4 binds the headers it lists and no others, and Bun's
-   * `presign` offers no way to add one — https://github.com/oven-sh/bun/issues/18240, still open,
-   * with an attempt at it closed unmerged. Signing this with Bun would leave the limit to be
-   * discovered after the bytes were already stored, which is the upload it exists to refuse.
+   * Exactly the size that was declared rather than at most it: this end was told what it is being
+   * offered, and a body of any other length is not the upload it agreed to.
    */
   async signUpload({
     objectKey,
-    maxSizeBytes,
+    sizeBytes,
   }: {
     objectKey: ObjectKey;
-    maxSizeBytes: number;
-  }): Promise<SignedUpload> {
-    return await createPresignedPost(this.policySigner, {
-      Bucket: this.bucket,
-      Key: objectKey,
-      Conditions: [['content-length-range', 0, maxSizeBytes]],
-      Expires: UPLOAD_URL_TTL_SECONDS,
-    });
+    sizeBytes: number;
+  }): Promise<string> {
+    return await getSignedUrl(
+      this.signer,
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: objectKey,
+        ContentLength: sizeBytes,
+      }),
+      { expiresIn: UPLOAD_URL_TTL_SECONDS, signableHeaders: new Set(['content-length']) },
+    );
   }
 
   read({ objectKey }: { objectKey: ObjectKey }): ReadableStream<Uint8Array> {
