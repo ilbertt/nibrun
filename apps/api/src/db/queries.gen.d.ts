@@ -481,6 +481,7 @@ export interface ISelectExportsByAppResult {
     /** When the bucket's lifecycle rule removes the bundle. The api refuses to sign past it. */
     expires_at: Date;
     created_at: Date;
+    app_slug: import("@repo/protocol").DnsLabel;
 }
 
 /** Result of query `SelectExportById`. */
@@ -497,6 +498,7 @@ export interface ISelectExportByIdResult {
     /** When the bucket's lifecycle rule removes the bundle. The api refuses to sign past it. */
     expires_at: Date;
     created_at: Date;
+    app_slug: import("@repo/protocol").DnsLabel;
 }
 
 /** Result of query `ApplyReportedExport`. */
@@ -521,6 +523,7 @@ export interface ISelectInFlightExportResult {
     /** When the bucket's lifecycle rule removes the bundle. The api refuses to sign past it. */
     expires_at: Date;
     created_at: Date;
+    app_slug: import("@repo/protocol").DnsLabel;
 }
 
 /** Result of query `SelectHealthPing`. */

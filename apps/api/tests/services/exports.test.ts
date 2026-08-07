@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
+  DnsLabelSchema,
   type ExportId,
   ExportIdSchema,
   type ExportState,
@@ -12,7 +13,10 @@ import {
   Value,
 } from '@repo/protocol';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
-import type { ExportStorageRepositoryContract } from '#repositories/export-storage.repository.ts';
+import type {
+  ExportStorageRepositoryContract,
+  SignDownloadInput,
+} from '#repositories/export-storage.repository.ts';
 import type {
   ExportRow,
   ExportsRepositoryContract,
@@ -25,6 +29,7 @@ import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtur
 
 const EXPORT_ID = Value.Parse(ExportIdSchema, 'export-1');
 const OBJECT_KEY = Value.Parse(ObjectKeySchema, `exports/${APP_ID}/${EXPORT_ID}.tar.gz`);
+const APP_SLUG = Value.Parse(DnsLabelSchema, 'quiet-meadow');
 const SIGNED_URL = 'https://exports.test/signed';
 const RETENTION_DAYS = 1;
 const MS_PER_DAY = 86_400_000;
@@ -41,6 +46,7 @@ function exportRow(overrides: Partial<ExportRow> = {}): ExportRow {
     ready_at: null,
     expires_at: new Date(Date.now() + MS_PER_DAY),
     created_at: new Date('2026-01-02T03:04:05.000Z'),
+    app_slug: APP_SLUG,
     ...overrides,
   };
 }
@@ -108,9 +114,11 @@ class FakeExportsRepository implements ExportsRepositoryContract {
 
 class FakeExportStorage implements ExportStorageRepositoryContract {
   readonly signed: ObjectKey[] = [];
+  readonly filenames: string[] = [];
 
-  signDownload({ objectKey }: { objectKey: ObjectKey }): string {
+  signDownload({ objectKey, filename }: SignDownloadInput): string {
     this.signed.push(objectKey);
+    this.filenames.push(filename);
     return SIGNED_URL;
   }
 
@@ -202,6 +210,16 @@ describe('polling an export', () => {
     expect(found.downloadUrl).toBe(SIGNED_URL);
     expect(found.sizeBytes).toBe(BUNDLE_SIZE_BYTES);
     expect(storage.signed).toEqual([OBJECT_KEY]);
+  });
+
+  test('is signed for under the name of the app it was taken from', async () => {
+    const repo = new FakeExportsRepository();
+    repo.rows = [exportRow({ state: 'ready', ready_at: new Date() })];
+    const { service, storage } = build(repo);
+
+    await service.get({ appId: APP_ID, exportId: EXPORT_ID, ownerId: OWNER_ID });
+
+    expect(storage.filenames).toEqual([`${APP_SLUG}.tar.gz`]);
   });
 
   // The bucket's lifecycle rule is what removed the object; signing for it would hand over a URL

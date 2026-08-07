@@ -14,6 +14,8 @@ const NOTHING_TO_EXPORT = 'The app has never been deployed, so there is no binar
 
 const MS_PER_DAY = 86_400_000;
 
+const BUNDLE_SUFFIX = '.tar.gz';
+
 /** What the owner sees, plus the only way to actually reach the bytes. */
 export type OwnedExport = Omit<Export, 'objectKey'> & { downloadUrl?: string };
 
@@ -125,7 +127,10 @@ export class ExportsService extends Service {
       expiresAt: toTimestamp(expiresAt),
       downloadUrl:
         state === 'ready'
-          ? this.storageRepo.signDownload({ objectKey: row.object_key })
+          ? this.storageRepo.signDownload({
+              objectKey: row.object_key,
+              filename: `${row.app_slug}${BUNDLE_SUFFIX}`,
+            })
           : undefined,
     };
   }

@@ -73,8 +73,9 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
     return this.sql.SelectExportsByApp`
       /* @notNull created_at */
       /* @notNull object_key */
+      /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
-             e.ready_at, e.expires_at, e.created_at
+             e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
       FROM nibrun.exports e
       JOIN nibrun.live_apps a ON a.id = e.app_id
       WHERE e.app_id = ${appId} AND a.owner_id = ${ownerId}
@@ -86,8 +87,9 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
     const [row] = await this.sql.SelectExportById`
       /* @notNull created_at */
       /* @notNull object_key */
+      /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
-             e.ready_at, e.expires_at, e.created_at
+             e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
       FROM nibrun.exports e
       JOIN nibrun.live_apps a ON a.id = e.app_id
       WHERE e.app_id = ${appId} AND e.id = ${exportId} AND a.owner_id = ${ownerId}
@@ -132,8 +134,9 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
     const [row] = await this.sql.SelectInFlightExport`
       /* @notNull created_at */
       /* @notNull object_key */
+      /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
-             e.ready_at, e.expires_at, e.created_at
+             e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
       FROM nibrun.exports e
       JOIN nibrun.live_apps a ON a.id = e.app_id
       WHERE e.app_id = ${appId} AND a.owner_id = ${ownerId}

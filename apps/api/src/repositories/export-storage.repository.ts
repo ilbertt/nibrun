@@ -8,8 +8,10 @@ import type { ObjectKey } from '@repo/protocol';
  */
 const DOWNLOAD_URL_TTL_SECONDS = 300;
 
+export type SignDownloadInput = { objectKey: ObjectKey; filename: string };
+
 export abstract class ExportStorageRepositoryContract {
-  abstract signDownload(input: { objectKey: ObjectKey }): string;
+  abstract signDownload(input: SignDownloadInput): string;
   abstract remove(input: { objectKey: ObjectKey }): Promise<void>;
 }
 
@@ -27,10 +29,11 @@ export class ExportStorageRepository implements ExportStorageRepositoryContract 
    * The signature carries this end's permissions, which are read on the export bucket and
    * nothing else — so a leaked URL is a leaked bundle rather than a leaked bucket.
    */
-  signDownload({ objectKey }: { objectKey: ObjectKey }): string {
+  signDownload({ objectKey, filename }: SignDownloadInput): string {
     return this.client.presign(objectKey, {
       method: 'GET',
       expiresIn: DOWNLOAD_URL_TTL_SECONDS,
+      contentDisposition: `attachment; filename="${filename}"`,
     });
   }
 
