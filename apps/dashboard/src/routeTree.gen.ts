@@ -15,6 +15,8 @@ import { Route as authDeviceRouteImport } from './routes/(auth)/device'
 import { Route as authLoginRouteImport } from './routes/(auth)/login'
 import { Route as dashboardIndexRouteImport } from './routes/(dashboard)/index'
 import { Route as dashboardAppsIndexRouteImport } from './routes/(dashboard)/apps/index'
+import { Route as dashboardAppsAppIdRouteRouteImport } from './routes/(dashboard)/apps/$appId/route'
+import { Route as dashboardAppsAppIdIndexRouteImport } from './routes/(dashboard)/apps/$appId/index'
 
 const authRouteRoute = authRouteRouteImport.update({
   id: '/(auth)',
@@ -44,18 +46,31 @@ const dashboardAppsIndexRoute = dashboardAppsIndexRouteImport.update({
   path: '/apps/',
   getParentRoute: () => dashboardRouteRoute,
 } as any)
+const dashboardAppsAppIdRouteRoute = dashboardAppsAppIdRouteRouteImport.update({
+  id: '/apps/$appId',
+  path: '/apps/$appId',
+  getParentRoute: () => dashboardRouteRoute,
+} as any)
+const dashboardAppsAppIdIndexRoute = dashboardAppsAppIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => dashboardAppsAppIdRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/device': typeof authDeviceRoute
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
+  '/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
   '/apps/': typeof dashboardAppsIndexRoute
+  '/apps/$appId/': typeof dashboardAppsAppIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/device': typeof authDeviceRoute
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
   '/apps': typeof dashboardAppsIndexRoute
+  '/apps/$appId': typeof dashboardAppsAppIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -64,13 +79,16 @@ export interface FileRoutesById {
   '/(auth)/device': typeof authDeviceRoute
   '/(auth)/login': typeof authLoginRoute
   '/(dashboard)/': typeof dashboardIndexRoute
+  '/(dashboard)/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
   '/(dashboard)/apps/': typeof dashboardAppsIndexRoute
+  '/(dashboard)/apps/$appId/': typeof dashboardAppsAppIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/device' | '/login' | '/' | '/apps/'
+  fullPaths:
+    '/device' | '/login' | '/' | '/apps/$appId' | '/apps/' | '/apps/$appId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/device' | '/login' | '/' | '/apps'
+  to: '/device' | '/login' | '/' | '/apps' | '/apps/$appId'
   id:
     | '__root__'
     | '/(auth)'
@@ -78,7 +96,9 @@ export interface FileRouteTypes {
     | '/(auth)/device'
     | '/(auth)/login'
     | '/(dashboard)/'
+    | '/(dashboard)/apps/$appId'
     | '/(dashboard)/apps/'
+    | '/(dashboard)/apps/$appId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -130,6 +150,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof dashboardAppsIndexRouteImport
       parentRoute: typeof dashboardRouteRoute
     }
+    '/(dashboard)/apps/$appId': {
+      id: '/(dashboard)/apps/$appId'
+      path: '/apps/$appId'
+      fullPath: '/apps/$appId'
+      preLoaderRoute: typeof dashboardAppsAppIdRouteRouteImport
+      parentRoute: typeof dashboardRouteRoute
+    }
+    '/(dashboard)/apps/$appId/': {
+      id: '/(dashboard)/apps/$appId/'
+      path: '/'
+      fullPath: '/apps/$appId/'
+      preLoaderRoute: typeof dashboardAppsAppIdIndexRouteImport
+      parentRoute: typeof dashboardAppsAppIdRouteRoute
+    }
   }
 }
 
@@ -147,13 +181,29 @@ const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
   authRouteRouteChildren,
 )
 
+interface dashboardAppsAppIdRouteRouteChildren {
+  dashboardAppsAppIdIndexRoute: typeof dashboardAppsAppIdIndexRoute
+}
+
+const dashboardAppsAppIdRouteRouteChildren: dashboardAppsAppIdRouteRouteChildren =
+  {
+    dashboardAppsAppIdIndexRoute: dashboardAppsAppIdIndexRoute,
+  }
+
+const dashboardAppsAppIdRouteRouteWithChildren =
+  dashboardAppsAppIdRouteRoute._addFileChildren(
+    dashboardAppsAppIdRouteRouteChildren,
+  )
+
 interface dashboardRouteRouteChildren {
   dashboardIndexRoute: typeof dashboardIndexRoute
+  dashboardAppsAppIdRouteRoute: typeof dashboardAppsAppIdRouteRouteWithChildren
   dashboardAppsIndexRoute: typeof dashboardAppsIndexRoute
 }
 
 const dashboardRouteRouteChildren: dashboardRouteRouteChildren = {
   dashboardIndexRoute: dashboardIndexRoute,
+  dashboardAppsAppIdRouteRoute: dashboardAppsAppIdRouteRouteWithChildren,
   dashboardAppsIndexRoute: dashboardAppsIndexRoute,
 }
 
