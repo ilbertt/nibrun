@@ -10,10 +10,9 @@ import {
 import { type Api, unwrap } from '#lib/api.ts';
 import { addressedDeployment } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';
+import { dayAndMinute } from '#lib/timestamp.ts';
 
 const KIND_WIDTH = Math.max(...FILESYSTEM_ENTRY_KINDS.map((kind) => kind.length));
-
-const DAY_AND_MINUTE_END = 16;
 
 /**
  * What was typed, as a path the api will take.
@@ -87,7 +86,7 @@ export function render(entries: readonly FilesystemEntry[]): string[] {
     [
       entry.kind.padEnd(KIND_WIDTH),
       String(entry.sizeBytes).padStart(sizeWidth),
-      modifiedAt(entry.modifiedAt),
+      dayAndMinute(entry.modifiedAt),
       entry.name,
     ].join(' '),
   );
@@ -96,12 +95,4 @@ export function render(entries: readonly FilesystemEntry[]): string[] {
 function byName(entries: readonly FilesystemEntry[]): FilesystemEntry[] {
   // biome-ignore lint/complexity/useMaxParams: a comparator compares two entries
   return [...entries].sort((left, right) => (left.name < right.name ? -1 : 1));
-}
-
-/**
- * The date as well as the time, unlike a log line: what a log holds is what just happened, and
- * what a filesystem holds may have been written months ago. UTC, as logs are.
- */
-function modifiedAt(instant: string): string {
-  return new Date(instant).toISOString().slice(0, DAY_AND_MINUTE_END).replace('T', ' ');
 }

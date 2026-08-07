@@ -4,6 +4,7 @@ import type { InferForwardedOptions, InferParams, RuntimeNode } from '@parshjs/c
 import type { command as appsCmd } from './commands/apps.ts';
 import type { command as appsDeleteCmd } from './commands/apps/delete.ts';
 import type { command as appsExportDestinationCmd } from './commands/apps/export/[destination].ts';
+import type { command as appsListCmd } from './commands/apps/list.ts';
 import type { command as appsLogsCmd } from './commands/apps/logs.ts';
 import type { command as appsLsCmd } from './commands/apps/ls.ts';
 import type { command as appsLsPathCmd } from './commands/apps/ls/[path].ts';
@@ -23,6 +24,12 @@ declare module '@parshjs/core' {
       rootOptions: {};
     };
     'apps export [destination]': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: {};
+    };
+    'apps list': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
@@ -82,6 +89,12 @@ export const commandTree: RuntimeNode = {
             literalChildren: {},
             paramChild: null,
           },
+        },
+        'list': {
+          segment: { kind: 'literal', value: 'list' },
+          command: { path: 'apps list', load: () => import('./commands/apps/list.ts').then((m) => m.command) },
+          literalChildren: {},
+          paramChild: null,
         },
         'logs': {
           segment: { kind: 'literal', value: 'logs' },
