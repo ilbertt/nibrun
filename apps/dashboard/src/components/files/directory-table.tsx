@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '#components/ui/table.tsx';
+import { formatBytes } from '#lib/format-bytes.ts';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDirectoryPath } from '#lib/hooks/use-directory-path.ts';
@@ -31,7 +32,12 @@ export function DirectoryTable({ entries }: { entries: readonly FilesystemEntry[
         {byName(entries).map((entry) => (
           <TableRow key={entry.name}>
             <TableCell className="text-muted-foreground">{entry.kind}</TableCell>
-            <TableCell className="text-right font-mono tabular-nums">{entry.sizeBytes}</TableCell>
+            <TableCell
+              className="text-right font-mono tabular-nums"
+              title={`${entry.sizeBytes} bytes`}
+            >
+              {formatBytes(entry.sizeBytes)}
+            </TableCell>
             <TableCell className="text-muted-foreground tabular-nums">
               {dayAndMinute(entry.modifiedAt)}
             </TableCell>
