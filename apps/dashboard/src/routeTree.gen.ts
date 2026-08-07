@@ -9,86 +9,142 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as DeviceRouteImport } from './routes/device'
-import { Route as LoginRouteImport } from './routes/login'
+import { Route as authRouteRouteImport } from './routes/(auth)/route'
+import { Route as dashboardRouteRouteImport } from './routes/(dashboard)/route'
+import { Route as authDeviceRouteImport } from './routes/(auth)/device'
+import { Route as authLoginRouteImport } from './routes/(auth)/login'
+import { Route as dashboardIndexRouteImport } from './routes/(dashboard)/index'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const authRouteRoute = authRouteRouteImport.update({
+  id: '/(auth)',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DeviceRoute = DeviceRouteImport.update({
+const dashboardRouteRoute = dashboardRouteRouteImport.update({
+  id: '/(dashboard)',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const authDeviceRoute = authDeviceRouteImport.update({
   id: '/device',
   path: '/device',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => authRouteRoute,
 } as any)
-const LoginRoute = LoginRouteImport.update({
+const authLoginRoute = authLoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => authRouteRoute,
+} as any)
+const dashboardIndexRoute = dashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => dashboardRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/device': typeof DeviceRoute
-  '/login': typeof LoginRoute
+  '/device': typeof authDeviceRoute
+  '/login': typeof authLoginRoute
+  '/': typeof dashboardIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/device': typeof DeviceRoute
-  '/login': typeof LoginRoute
+  '/device': typeof authDeviceRoute
+  '/login': typeof authLoginRoute
+  '/': typeof dashboardIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/device': typeof DeviceRoute
-  '/login': typeof LoginRoute
+  '/(auth)': typeof authRouteRouteWithChildren
+  '/(dashboard)': typeof dashboardRouteRouteWithChildren
+  '/(auth)/device': typeof authDeviceRoute
+  '/(auth)/login': typeof authLoginRoute
+  '/(dashboard)/': typeof dashboardIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/device' | '/login'
+  fullPaths: '/device' | '/login' | '/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/device' | '/login'
-  id: '__root__' | '/' | '/device' | '/login'
+  to: '/device' | '/login' | '/'
+  id:
+    | '__root__'
+    | '/(auth)'
+    | '/(dashboard)'
+    | '/(auth)/device'
+    | '/(auth)/login'
+    | '/(dashboard)/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  DeviceRoute: typeof DeviceRoute
-  LoginRoute: typeof LoginRoute
+  authRouteRoute: typeof authRouteRouteWithChildren
+  dashboardRouteRoute: typeof dashboardRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/(auth)': {
+      id: '/(auth)'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof authRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/device': {
-      id: '/device'
+    '/(dashboard)': {
+      id: '/(dashboard)'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof dashboardRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/device': {
+      id: '/(auth)/device'
       path: '/device'
       fullPath: '/device'
-      preLoaderRoute: typeof DeviceRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof authDeviceRouteImport
+      parentRoute: typeof authRouteRoute
     }
-    '/login': {
-      id: '/login'
+    '/(auth)/login': {
+      id: '/(auth)/login'
       path: '/login'
       fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof authLoginRouteImport
+      parentRoute: typeof authRouteRoute
+    }
+    '/(dashboard)/': {
+      id: '/(dashboard)/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof dashboardIndexRouteImport
+      parentRoute: typeof dashboardRouteRoute
     }
   }
 }
 
+interface authRouteRouteChildren {
+  authDeviceRoute: typeof authDeviceRoute
+  authLoginRoute: typeof authLoginRoute
+}
+
+const authRouteRouteChildren: authRouteRouteChildren = {
+  authDeviceRoute: authDeviceRoute,
+  authLoginRoute: authLoginRoute,
+}
+
+const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
+  authRouteRouteChildren,
+)
+
+interface dashboardRouteRouteChildren {
+  dashboardIndexRoute: typeof dashboardIndexRoute
+}
+
+const dashboardRouteRouteChildren: dashboardRouteRouteChildren = {
+  dashboardIndexRoute: dashboardIndexRoute,
+}
+
+const dashboardRouteRouteWithChildren = dashboardRouteRoute._addFileChildren(
+  dashboardRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  DeviceRoute: DeviceRoute,
-  LoginRoute: LoginRoute,
+  authRouteRoute: authRouteRouteWithChildren,
+  dashboardRouteRoute: dashboardRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

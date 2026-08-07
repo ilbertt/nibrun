@@ -17,6 +17,11 @@ the same reason. Restyle from `src/styles.css`, not by editing these files.
 URL they serve rather than for what they export. Each holds the one component its
 route mounts, always named `RouteComponent`, so every route reads the same way.
 
+A `(group)/` directory contributes no URL segment; its `route.tsx` is the frame
+the pages inside it share. `(dashboard)` is the signed-in chrome and `(auth)` the
+standalone card, which is what decides that approving a terminal is not framed
+like a page of the dashboard.
+
 A component should read as markup. Push queries, mutations, derived state and
 effects into a hook, and split anything that owns state or behaviour of its own
 into its own component.

@@ -1,6 +1,6 @@
 import type { LinkProps } from '@tanstack/react-router';
 import { LayoutDashboardIcon, type LucideIcon } from 'lucide-react';
-import { Route as IndexRoute } from '#routes/index.tsx';
+import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 export type NavItem = {
   title: string;

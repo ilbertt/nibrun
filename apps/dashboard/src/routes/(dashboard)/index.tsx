@@ -4,7 +4,7 @@ import { ApiCard } from '#components/overview/api-card.tsx';
 import { DeploymentCard } from '#components/overview/deployment-card.tsx';
 import { UptimeCard } from '#components/overview/uptime-card.tsx';
 
-export const Route = createFileRoute('/')({ component: RouteComponent });
+export const Route = createFileRoute('/(dashboard)/')({ component: RouteComponent });
 
 function RouteComponent() {
   return (
