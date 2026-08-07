@@ -21,8 +21,13 @@ the layout under `src/commands/` is the command tree.
   redeclared per child. The parent is then a group: no handler, so `nib apps`
   lists what is under it, and the flag stays optional — a required one would make
   that listing an error. parsh spells a flag exactly as its key, so `--app` is
-  the key `'app'` — and a flag two unrelated commands both take is that key held
-  in `src/config.ts` (`APP_OPTION`), so they cannot drift apart.
+  the key `'app'` — and a flag two unrelated commands both take is a
+  `SharedOption` member in `src/config.ts`, so they cannot drift apart. When
+  those commands also mean the same thing by it, the whole declaration is shared
+  from there (`DEPLOYMENT_ID_OPTION`) and the site adds only
+  `forwardToChildren`. `defineCommand` infers its options `const`, so an enum
+  key and a spread both survive as literals — `parents['<path>'].options` stays
+  typed either way.
 - A positional is a path segment, so a command taking one lives at
   `commands/<…>/[name].ts` and its path string ends in `[name]`. Leaving it out
   prints the parent's usage rather than a missing-argument error, because the

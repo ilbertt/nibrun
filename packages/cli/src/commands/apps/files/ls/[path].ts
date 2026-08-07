@@ -1,5 +1,6 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
+import { SharedOption } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { guestPath, listDirectory } from '#lib/filesystem.ts';
@@ -29,7 +30,7 @@ export const command = defineCommand('apps files ls [path]', {
     await listDirectory({
       api,
       slug,
-      deploymentId: parents['apps files ls'].options['deployment-id'],
+      deploymentId: parents['apps files ls'].options[SharedOption.DeploymentId],
       path,
       print,
     });

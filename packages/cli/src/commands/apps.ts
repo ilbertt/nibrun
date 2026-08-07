@@ -1,6 +1,6 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
-import { APP_OPTION } from '#config.ts';
+import { SharedOption } from '#config.ts';
 
 /**
  * A group rather than a command. Naming an app is what everything under here has in common, so
@@ -14,7 +14,7 @@ import { APP_OPTION } from '#config.ts';
 export const command = defineCommand('apps', {
   description: 'Work with one of your apps.',
   options: {
-    [APP_OPTION]: {
+    [SharedOption.App]: {
       schema: z.string().min(1).optional(),
       forwardToChildren: true,
       description: 'Slug of the app to work with. Asked for when omitted.',

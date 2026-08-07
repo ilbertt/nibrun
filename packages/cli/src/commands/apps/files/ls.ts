@@ -1,6 +1,6 @@
 import { defineCommand } from '@parshjs/core';
 import { GUEST_PATH_ROOT } from '@repo/protocol';
-import { z } from 'zod';
+import { DEPLOYMENT_ID_OPTION, SharedOption } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { listDirectory } from '#lib/filesystem.ts';
@@ -15,11 +15,7 @@ import { isInteractive } from '#lib/ui.ts';
 export const command = defineCommand('apps files ls', {
   description: "List a directory of an app's filesystem. Without a path, the volume root.",
   options: {
-    'deployment-id': {
-      schema: z.string().min(1).optional(),
-      forwardToChildren: true,
-      description: 'Read this deployment instead of looking up the app latest.',
-    },
+    [SharedOption.DeploymentId]: { ...DEPLOYMENT_ID_OPTION, forwardToChildren: true },
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ options, parents, context, print }) => {
@@ -33,7 +29,7 @@ export const command = defineCommand('apps files ls', {
     await listDirectory({
       api,
       slug,
-      deploymentId: options['deployment-id'],
+      deploymentId: options[SharedOption.DeploymentId],
       path: GUEST_PATH_ROOT,
       print,
     });
