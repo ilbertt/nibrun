@@ -1,0 +1,23 @@
+{
+  "name": "@repo/app-operations",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "test": "bun test",
+    "check:types": "bun run --bun tsc"
+  },
+  "dependencies": {
+    "@repo/api-client": "workspace:*",
+    "@repo/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

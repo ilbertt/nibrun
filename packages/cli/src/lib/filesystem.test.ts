@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { FilesystemEntry } from '@repo/protocol';
-import { guestPath, render } from '#lib/filesystem.ts';
+import { UsageError } from '#lib/errors.ts';
+import { render, typedPath } from '#lib/filesystem.ts';
 
 function entry(overrides: Partial<FilesystemEntry> = {}): FilesystemEntry {
   return {
@@ -13,37 +14,19 @@ function entry(overrides: Partial<FilesystemEntry> = {}): FilesystemEntry {
 }
 
 function spelled(typed: string): string {
-  return guestPath(typed);
+  return typedPath(typed);
 }
 
-describe('a path is absolute because there is nowhere else it could start', () => {
-  test('one already spelled that way is left alone', () => {
-    expect(spelled('/uploads/2026')).toBe('/uploads/2026');
+describe('a path the filesystem cannot take is something that was typed wrong', () => {
+  test('one it can take is handed on as it stands', () => {
+    expect(spelled('uploads/')).toBe('/uploads');
   });
 
-  test('a leading slash left off is supplied', () => {
-    expect(spelled('uploads')).toBe('/uploads');
-  });
-
-  test('a trailing slash is spelling too', () => {
-    expect(spelled('/uploads/')).toBe('/uploads');
-  });
-
-  test('the root survives being trimmed', () => {
-    expect(spelled('/')).toBe('/');
-  });
-});
-
-describe('what is refused rather than repaired', () => {
-  // Resolving these is what would let a caller walk out of the filesystem they were scoped to.
-  test('a traversal is not resolved', () => {
-    expect(() => guestPath('/uploads/../../etc')).toThrow(
+  test('one it cannot is refused in the words `nib` refuses anything else in', () => {
+    expect(() => typedPath('/uploads/../../etc')).toThrow(UsageError);
+    expect(() => typedPath('/uploads/../../etc')).toThrow(
       '/uploads/../../etc is not a path inside an app filesystem.',
     );
-  });
-
-  test('a quote the reader tooling would tokenise is refused', () => {
-    expect(() => guestPath("/it's")).toThrow("/it's is not a path inside an app filesystem.");
   });
 });
 

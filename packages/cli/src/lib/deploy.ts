@@ -1,8 +1,8 @@
 import { basename } from 'node:path';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import { appBySlug } from '@repo/app-operations';
 import { type DeploymentState, GuestPortSchema, type TenantArguments, Value } from '@repo/protocol';
-import { appBySlug } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';
 import type { RunOptions } from '#lib/plan.ts';
 import type { Ui } from '#lib/ui.ts';

@@ -1,4 +1,5 @@
 import { beforeEach, expect, mock, test } from 'bun:test';
+import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
 
 type Asked = {
@@ -21,7 +22,7 @@ mock.module('@clack/prompts', () => ({
   },
 }));
 
-const { selectApp } = await import('#lib/apps.ts');
+const { announcedDeployment, selectApp } = await import('#lib/apps.ts');
 
 let listings = 0;
 
@@ -104,4 +105,37 @@ test('walking away from the question is not answering it', async () => {
   });
 
   await expect(attempt).rejects.toThrow('Cancelled.');
+});
+
+test('which deployment a command settled on is said before it is read from', async () => {
+  const dimmed: string[] = [];
+  const api = {
+    api: {
+      apps: Object.assign(
+        () => ({
+          deployments: {
+            get: () =>
+              Promise.resolve({ data: { deployments: [{ id: 'deployment-2' }] }, error: null }),
+          },
+        }),
+        {
+          get: () =>
+            Promise.resolve({
+              data: { apps: [{ id: 'app-1', slug: 'quiet-otter' }] },
+              error: null,
+            }),
+        },
+      ),
+    },
+  } as unknown as PublicApiClient;
+
+  const addressed = await announcedDeployment({
+    api,
+    slug: 'quiet-otter',
+    deploymentId: undefined,
+    print: { dim: (line: string) => dimmed.push(line) } as unknown as Print,
+  });
+
+  expect(addressed).toEqual({ appId: 'app-1', deploymentId: 'deployment-2', slug: 'quiet-otter' });
+  expect(dimmed).toEqual(['quiet-otter · deployment deployment-2']);
 });

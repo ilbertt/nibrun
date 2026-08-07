@@ -1,36 +1,26 @@
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { unwrap } from '@repo/api-client/unwrap';
+import { guestPath, InvalidPathError, readDirectory } from '@repo/app-operations';
 import {
   DIRECTORY_ENTRY_LIMIT,
   FILESYSTEM_ENTRY_KINDS,
   type FilesystemEntry,
   type GuestPath,
-  GuestPathSchema,
-  Value,
 } from '@repo/protocol';
-import { addressedDeployment } from '#lib/apps.ts';
+import { announcedDeployment } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';
 import { dayAndMinute } from '#lib/timestamp.ts';
 
 const KIND_WIDTH = Math.max(...FILESYSTEM_ENTRY_KINDS.map((kind) => kind.length));
 
-/**
- * What was typed, as a path the api will take.
- *
- * A path here is absolute because there is nothing for it to be relative to — the volume's root
- * is the only place it can start — so a leading slash is spelling rather than meaning, and one
- * left off is supplied rather than refused. A trailing one is the same. Nothing else is repaired:
- * `.` and `..` are refused by the schema on purpose, and resolving them here is exactly what
- * would put a caller outside the filesystem they were scoped to.
- */
-export function guestPath(typed: string): GuestPath {
-  const absolute = typed.startsWith('/') ? typed : `/${typed}`;
-  const spelled = absolute.length > 1 ? absolute.replace(/\/$/, '') : absolute;
+export function typedPath(typed: string): GuestPath {
   try {
-    return Value.Parse(GuestPathSchema, spelled);
-  } catch {
-    throw new UsageError(`${typed} is not a path inside an app filesystem.`);
+    return guestPath(typed);
+  } catch (failure) {
+    if (failure instanceof InvalidPathError) {
+      throw new UsageError(failure.message);
+    }
+    throw failure;
   }
 }
 
@@ -55,13 +45,13 @@ export async function listDirectory({
   path,
   print,
 }: ListInput): Promise<void> {
-  const addressed = await addressedDeployment({ api, slug, deploymentId, print });
-  const listing = unwrap(
-    await api.api
-      .apps({ appId: addressed.appId })
-      .deployments({ deploymentId: addressed.deploymentId })
-      .filesystem.get({ query: { path } }),
-  );
+  const addressed = await announcedDeployment({ api, slug, deploymentId, print });
+  const listing = await readDirectory({
+    api,
+    appId: addressed.appId,
+    deploymentId: addressed.deploymentId,
+    path,
+  });
 
   for (const line of render(listing.entries)) {
     print.info(line);

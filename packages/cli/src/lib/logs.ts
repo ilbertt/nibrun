@@ -1,19 +1,7 @@
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { unwrap } from '@repo/api-client/unwrap';
-import { SeenTenantLogs, type TenantLogRecord, type TenantLogStream } from '@repo/protocol';
-
-/**
- * How much of the gap a reconnect asks to be told about.
- *
- * Only the first stream wants the range the reader asked for; a later one is picking up after a
- * close and wants the seconds it was away, not that history again. Generous, because overlap is
- * cheap here — `SeenTenantLogs` drops what has already been shown — and a gap is not recoverable.
- */
-const RECONNECT_TIMERANGE = '30s';
-
-/** What a closed stream costs before we open another, so a refusing api is not hammered. */
-const RECONNECT_PAUSE_MS = 1_000;
+import { followLogs } from '@repo/app-operations';
+import type { TenantLogRecord, TenantLogStream } from '@repo/protocol';
 
 /**
  * Ctrl-C, as something a loop can read rather than something that kills it mid-line.
@@ -37,14 +25,7 @@ export type FollowInput = {
   signal: AbortSignal;
 };
 
-/**
- * Print what a deployment has written, and keep printing what it writes until stopped.
- *
- * The api closes a stream on its own clock so that who may read it is asked again rather than
- * decided once, which makes reaching the end of one an instruction to open another rather than
- * the end of the log. Opening another is why `SeenTenantLogs` outlives them all: a reconnect asks
- * for the seconds it was away, and what it was not away for comes back a second time.
- */
+/** Print what a deployment has written, and keep printing what it writes until stopped. */
 export async function follow({
   api,
   appId,
@@ -53,27 +34,8 @@ export async function follow({
   print,
   signal,
 }: FollowInput): Promise<void> {
-  const logs = api.api.apps({ appId }).deployments({ deploymentId }).logs;
-  const printed = new SeenTenantLogs();
-  let asked = timerange;
-
-  // Stopping part-way through a stream is the ordinary ending, and it arrives as a failed request
-  // rather than a last record. The signal is what says so, not the error.
-  try {
-    while (!signal.aborted) {
-      const stream = unwrap(await logs.get({ query: { timerange: asked }, fetch: { signal } }));
-      for await (const { data } of stream) {
-        if (printed.admit(data)) {
-          show({ record: data, print });
-        }
-      }
-      asked = RECONNECT_TIMERANGE;
-      await Bun.sleep(RECONNECT_PAUSE_MS);
-    }
-  } catch (failure) {
-    if (!signal.aborted) {
-      throw failure;
-    }
+  for await (const record of followLogs({ api, appId, deploymentId, timerange, signal })) {
+    show({ record, print });
   }
 }
 

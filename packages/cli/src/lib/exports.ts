@@ -2,8 +2,8 @@ import { rename, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import { appBySlug } from '@repo/app-operations';
 import type { ExportState } from '@repo/protocol';
-import { appBySlug } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';
 import type { Ui } from '#lib/ui.ts';
 

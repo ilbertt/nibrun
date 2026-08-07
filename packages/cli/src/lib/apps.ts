@@ -1,14 +1,14 @@
 import { select } from '@clack/prompts';
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import { unwrap } from '@repo/api-client/unwrap';
+import { addressedDeployment } from '@repo/app-operations';
 import { SHARED_OPTIONS } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
 
 const NO_APP_NAMED = `Which app? Name one with --${SHARED_OPTIONS.app.name}.`;
 export const NO_APPS = 'You have no apps. `nib run` is what makes one.';
-const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
 /**
  * The app a command was pointed at: the flag when it was given, and the question it stands for
@@ -60,45 +60,14 @@ async function chooseApp({ api }: { api: PublicApiClient }): Promise<string> {
   return answered(chosen);
 }
 
-// Apps are addressed by id and listed by slug; the slug is the half a person sees, so it is the
-// half the CLI takes and this is where the two meet.
-export async function appBySlug({ api, slug }: { api: PublicApiClient; slug: string }) {
-  const { apps } = unwrap(await api.api.apps.get());
-  const found = apps.find((app) => app.slug === slug);
-  if (!found) {
-    throw new ApiError(`No app with slug ${slug}.`);
-  }
-  return found;
-}
-
-/**
- * The deployment a reader means by not naming one. The api lists them newest first, so this is
- * the head of the list rather than a search through it.
- */
-async function latestDeployment({
-  api,
-  appId,
-}: {
-  api: PublicApiClient;
-  appId: string;
-}): Promise<string> {
-  const { deployments } = unwrap(await api.api.apps({ appId }).deployments.get());
-  const newest = deployments[0];
-  if (!newest) {
-    throw new ApiError(NO_DEPLOYMENTS);
-  }
-  return newest.id;
-}
-
 /**
  * The deployment a command was pointed at, and a line saying which one it turned out to be.
  *
- * The app is looked up either way — a deployment is addressed under the app that owns it — so
- * what naming one skips is only the question of which deployment is current. Which makes the line
+ * What naming one skips is only the question of which deployment is current. Which makes the line
  * worth printing: the answer to that question is the difference between reading the release
  * someone just made and reading the one before it.
  */
-export async function addressedDeployment({
+export async function announcedDeployment({
   api,
   slug,
   deploymentId,
@@ -108,9 +77,8 @@ export async function addressedDeployment({
   slug: string;
   deploymentId: string | undefined;
   print: Print;
-}): Promise<{ appId: string; deploymentId: string }> {
-  const app = await appBySlug({ api, slug });
-  const addressed = deploymentId ?? (await latestDeployment({ api, appId: app.id }));
-  print.dim(`${app.slug} · deployment ${addressed}`);
-  return { appId: app.id, deploymentId: addressed };
+}): Promise<{ appId: string; deploymentId: string; slug: string }> {
+  const addressed = await addressedDeployment({ api, slug, deploymentId });
+  print.dim(`${addressed.slug} · deployment ${addressed.deploymentId}`);
+  return addressed;
 }

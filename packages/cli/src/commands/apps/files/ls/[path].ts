@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { SHARED_OPTIONS } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { guestPath, listDirectory } from '#lib/filesystem.ts';
+import { listDirectory, typedPath } from '#lib/filesystem.ts';
 import { isInteractive } from '#lib/ui.ts';
 
 export const command = defineCommand('apps files ls [path]', {
@@ -18,7 +18,7 @@ export const command = defineCommand('apps files ls [path]', {
   handler: async ({ params, parents, context, print }) => {
     // Parsed before anything is asked for: the read is a wait on a host, and a path that could
     // never have been read is worth one line now rather than one line half a minute from now.
-    const path = guestPath(params.path);
+    const path = typedPath(params.path);
 
     const { api } = context;
     const slug = await selectApp({

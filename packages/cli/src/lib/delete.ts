@@ -1,7 +1,7 @@
 import { note, text } from '@clack/prompts';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import { appBySlug } from '#lib/apps.ts';
+import { appBySlug } from '@repo/app-operations';
 import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
 import type { Ui } from '#lib/ui.ts';
