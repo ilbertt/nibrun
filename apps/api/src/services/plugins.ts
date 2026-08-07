@@ -38,6 +38,7 @@ const logsRepository = new LogsRepository(new VictoriaLogsClient(env.VICTORIALOG
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
   appsRepo: appsRepository,
+  exportsRepo: exportsRepository,
   appHostDomain: env.APP_HOST_DOMAIN,
 });
 const exportsService = new ExportsService({

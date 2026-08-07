@@ -15,6 +15,7 @@ import type {
   AppRow,
   AppsRepositoryContract,
 } from '#repositories/apps.repository.ts';
+import type { ExportsRepositoryContract } from '#repositories/exports.repository.ts';
 import { Service } from '#services/service.ts';
 
 export type PublicApp = Omit<App, 'config'> & { config: PublicAppConfig };
@@ -31,19 +32,28 @@ const SLUG_CONSTRAINTS = ['apps_slug_key', 'app_hostnames_hostname_key'];
 // a signal that something other than luck is wrong.
 const MAX_SLUG_ATTEMPTS = 5;
 
+/** What deleting an app needs from the exports it leaves behind, and nothing else. */
+export type ExportCancellation = Pick<ExportsRepositoryContract, 'failInFlight'>;
+
+const APP_DELETED = 'The app was deleted while this export was still being written.';
+
 export class AppsService extends Service {
   private readonly appsRepo: AppsRepositoryContract;
+  private readonly exportsRepo: ExportCancellation;
   private readonly appHostDomain: string;
 
   constructor({
     appsRepo,
+    exportsRepo,
     appHostDomain,
   }: {
     appsRepo: AppsRepositoryContract;
+    exportsRepo: ExportCancellation;
     appHostDomain: string;
   }) {
     super();
     this.appsRepo = appsRepo;
+    this.exportsRepo = exportsRepo;
     this.appHostDomain = appHostDomain;
   }
 
@@ -136,8 +146,18 @@ export class AppsService extends Service {
     }
   }
 
+  /**
+   * An export still running is ended here rather than left to finish, because there is nothing
+   * left for it to finish into: the bundle would be reachable only through the app that is going,
+   * and the host would spend minutes reading a filesystem the same reconcile pass tears down.
+   *
+   * After the state change, so it is only ever reached by an owner the app answered to — and
+   * while the app is `deleting` rather than once it is `deleted`, which is the last generation of
+   * desired state the host is told about it in.
+   */
   async delete({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
     const app = requireApp(await this.appsRepo.updateState({ appId, ownerId, state: 'deleting' }));
+    await this.exportsRepo.failInFlight({ appId, message: APP_DELETED });
     const hostnames = await this.appsRepo.listHostnamesByApp({ appId, ownerId });
 
     return toPublicApp({ app, hostnames });

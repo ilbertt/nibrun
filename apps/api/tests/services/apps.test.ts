@@ -21,7 +21,7 @@ import type {
   CreatedApp,
   OwnedAppHostnameRow,
 } from '#repositories/apps.repository.ts';
-import { AppsService } from '#services/apps.service.ts';
+import { AppsService, type ExportCancellation } from '#services/apps.service.ts';
 import {
   APP_HOST_DOMAIN,
   APP_ID,
@@ -149,8 +149,23 @@ class StubAppsRepository implements AppsRepositoryContract {
 const VOLUME_ID = Value.Parse(VolumeIdSchema, APP_ID);
 const NO_BYTES = 0;
 
-function serviceWith(appsRepo: AppsRepositoryContract) {
-  return new AppsService({ appsRepo, appHostDomain: APP_HOST_DOMAIN });
+class StubExportCancellation implements ExportCancellation {
+  readonly cancelled: AppId[] = [];
+
+  failInFlight({ appId }: { appId: AppId; message: string }): Promise<void> {
+    this.cancelled.push(appId);
+    return Promise.resolve();
+  }
+}
+
+function serviceWith({
+  appsRepo,
+  exportsRepo = new StubExportCancellation(),
+}: {
+  appsRepo: AppsRepositoryContract;
+  exportsRepo?: ExportCancellation;
+}) {
+  return new AppsService({ appsRepo, exportsRepo, appHostDomain: APP_HOST_DOMAIN });
 }
 
 function createApp({
@@ -160,7 +175,7 @@ function createApp({
   appsRepo: AppsRepositoryContract;
   config?: AppConfigPatch;
 }) {
-  return serviceWith(appsRepo).create({ ownerId: OWNER_ID, name: APP_NAME, config });
+  return serviceWith({ appsRepo }).create({ ownerId: OWNER_ID, name: APP_NAME, config });
 }
 
 describe('a taken hostname is a re-roll, not something the owner sees', () => {
@@ -267,7 +282,7 @@ describe('an app is created with no environment and never reports one', () => {
 // A 403 would confirm the app exists to someone with no right to know it does.
 describe('an app the caller does not own is one that does not exist', () => {
   test('a statement that matches no row is a 404', async () => {
-    const service = serviceWith(new StubAppsRepository({ failures: 0 }));
+    const service = serviceWith({ appsRepo: new StubAppsRepository({ failures: 0 }) });
     const owned = { appId: APP_ID, ownerId: OWNER_ID };
 
     await expect(service.get(owned)).rejects.toBeInstanceOf(NotFoundError);
@@ -291,17 +306,40 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
 
-    const app = await serviceWith(appsRepo).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
 
     expect(app.state).toBe('deleting');
     expect(appsRepo.deleted).toEqual([]);
+  });
+
+  // The bundle would be reachable only through the app that is going, and the host would spend
+  // minutes reading a filesystem the same reconcile pass tears down.
+  test('an export still being written is ended rather than left to finish', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    const exportsRepo = new StubExportCancellation();
+
+    await serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+
+    expect(exportsRepo.cancelled).toEqual([APP_ID]);
+  });
+
+  // Reached only by an owner the app answered to: the state change is what says it is theirs.
+  test('and an app the caller does not own has none of its exports touched', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const exportsRepo = new StubExportCancellation();
+
+    await expect(
+      serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(exportsRepo.cancelled).toEqual([]);
   });
 
   test('a host saying the filesystem is gone is what finishes it', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.deleting = [APP_ID];
 
-    await serviceWith(appsRepo).completeDeletions({ volumes: [reportedVolume('deleted')] });
+    await serviceWith({ appsRepo }).completeDeletions({ volumes: [reportedVolume('deleted')] });
 
     expect(appsRepo.deleted).toEqual([APP_ID]);
   });
@@ -314,7 +352,7 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
       const appsRepo = new StubAppsRepository({ failures: 0 });
       appsRepo.deleting = [APP_ID];
 
-      await serviceWith(appsRepo).completeDeletions({ volumes: [reportedVolume(state)] });
+      await serviceWith({ appsRepo }).completeDeletions({ volumes: [reportedVolume(state)] });
 
       expect(appsRepo.deleted).toEqual([]);
     });
@@ -325,7 +363,7 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
   test('the same report arriving again deletes nothing a second time', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.deleting = [APP_ID];
-    const apps = serviceWith(appsRepo);
+    const apps = serviceWith({ appsRepo });
 
     await apps.completeDeletions({ volumes: [reportedVolume('deleted')] });
     await apps.completeDeletions({ volumes: [reportedVolume('deleted')] });
@@ -338,7 +376,7 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
   test('an app nobody asked to delete survives its volume going missing', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await serviceWith(appsRepo).completeDeletions({ volumes: [reportedVolume('deleted')] });
+    await serviceWith({ appsRepo }).completeDeletions({ volumes: [reportedVolume('deleted')] });
 
     expect(appsRepo.deleted).toEqual([]);
   });

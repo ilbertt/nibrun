@@ -464,6 +464,10 @@ export interface ISelectExportByIdResult {
 export interface IApplyReportedExportResult {
 }
 
+/** Result of query `FailInFlightExports`. */
+export interface IFailInFlightExportsResult {
+}
+
 /** Result of query `SelectInFlightExport`. */
 export interface ISelectInFlightExportResult {
     id: import("@repo/protocol").ExportId;
@@ -525,6 +529,7 @@ export interface Queries {
     SelectExportsByApp: ISelectExportsByAppResult;
     SelectExportById: ISelectExportByIdResult;
     ApplyReportedExport: IApplyReportedExportResult;
+    FailInFlightExports: IFailInFlightExportsResult;
     SelectInFlightExport: ISelectInFlightExportResult;
     SelectHealthPing: ISelectHealthPingResult;
 }

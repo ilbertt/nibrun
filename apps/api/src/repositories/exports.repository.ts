@@ -35,6 +35,7 @@ export abstract class ExportsRepositoryContract {
   abstract listByApp(input: ExportsByAppInput): Promise<ExportRow[]>;
   abstract findById(input: ExportByIdInput): Promise<ExportRow | null>;
   abstract applyReport(input: { reported: ReportedExportRow[] }): Promise<void>;
+  abstract failInFlight(input: { appId: AppId; message: string }): Promise<void>;
 }
 
 export class ExportsRepository extends Repository implements ExportsRepositoryContract {
@@ -114,6 +115,17 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
         `;
       }
     });
+  }
+
+  /**
+   * No owner in the predicate: the caller has already been answered on whether the app is theirs,
+   * and an export the owner cannot reach is one this end has to finish regardless of who asks.
+   */
+  async failInFlight({ appId, message }: { appId: AppId; message: string }): Promise<void> {
+    await this.sql.FailInFlightExports`
+      UPDATE nibrun.exports SET state = 'failed', message = ${message}
+      WHERE app_id = ${appId} AND state IN ('pending', 'preparing')
+    `;
   }
 
   private async findInFlight({ appId, ownerId }: ExportsByAppInput): Promise<ExportRow | null> {

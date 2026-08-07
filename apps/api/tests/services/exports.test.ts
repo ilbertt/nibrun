@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  type AppId,
   type ExportId,
   ExportIdSchema,
   type ExportState,
@@ -92,6 +93,15 @@ class FakeExportsRepository implements ExportsRepositoryContract {
 
   applyReport({ reported }: { reported: ReportedExportRow[] }): Promise<void> {
     this.reported.push(reported);
+    return Promise.resolve();
+  }
+
+  failInFlight({ appId, message }: { appId: AppId; message: string }): Promise<void> {
+    this.rows = this.rows.map((row) =>
+      row.app_id === appId && (row.state === 'pending' || row.state === 'preparing')
+        ? { ...row, state: 'failed', message }
+        : row,
+    );
     return Promise.resolve();
   }
 }
