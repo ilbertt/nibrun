@@ -218,9 +218,32 @@ export class AppsService extends Service {
   async delete({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
     const app = requireApp(await this.appsRepo.updateState({ appId, ownerId, state: 'deleting' }));
     await this.exportsRepo.failInFlight({ appId, message: APP_DELETED });
-    const hostnames = await this.appsRepo.listHostnamesByApp({ appId, ownerId });
+    const [torndown, hostnames] = await Promise.all([
+      this.finishIfNothingToTearDown({ appId }),
+      this.appsRepo.listHostnamesByApp({ appId, ownerId }),
+    ]);
 
-    return toPublicApp({ app, hostnames });
+    return toPublicApp({ app: torndown ? { ...app, state: 'deleted' } : app, hostnames });
+  }
+
+  /**
+   * `deleting` means waiting for a host to say the filesystem is gone, and an app that never had
+   * a filesystem is waiting for a sentence nobody will ever speak: a volume is desired only where
+   * the app has been deployed at least once, so an app deployed no times is named in no host's
+   * desired state and reported back by nobody.
+   *
+   * Asked of `desired_volumes` rather than of the deployments underneath it, because what decides
+   * this is whether a host will be told — which is exactly what that view is.
+   */
+  private async finishIfNothingToTearDown({ appId }: { appId: AppId }): Promise<boolean> {
+    if (await this.appsRepo.hasDesiredVolume({ appId })) {
+      return false;
+    }
+    const finished = await this.appsRepo.finishDeleting({ appId });
+    if (finished) {
+      this.logger.info('app deleted without a filesystem to tear down', { appId });
+    }
+    return finished;
   }
 }
 

@@ -221,6 +221,11 @@ export interface ITouchAppAfterConfigPatchResult {
     restart_reset_after_ms: number;
 }
 
+/** Result of query `SelectDesiredVolumeForApp`. */
+export interface ISelectDesiredVolumeForAppResult {
+    app_id: import("@repo/protocol").AppId;
+}
+
 /** Result of query `FinishDeletingApp`. */
 export interface IFinishDeletingAppResult {
     id: import("@repo/protocol").AppId;
@@ -536,6 +541,7 @@ export interface Queries {
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
     TouchAppAfterConfigPatch: ITouchAppAfterConfigPatchResult;
+    SelectDesiredVolumeForApp: ISelectDesiredVolumeForAppResult;
     FinishDeletingApp: IFinishDeletingAppResult;
     SelectPurgeableApps: ISelectPurgeableAppsResult;
     SelectUnsharedArtifactKeys: ISelectUnsharedArtifactKeysResult;

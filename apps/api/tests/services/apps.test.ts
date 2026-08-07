@@ -74,6 +74,7 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly leftovers = new Map<AppId, Leftovers>();
   deleting: AppId[] = [];
   purgeable: AppId[] = [];
+  deployedApps: AppId[] = [];
   owns = false;
   #remainingFailures: number;
   readonly #failure: unknown;
@@ -81,6 +82,11 @@ class StubAppsRepository implements AppsRepositoryContract {
   constructor({ failures, failure }: { failures: number; failure?: unknown }) {
     this.#remainingFailures = failures;
     this.#failure = failure;
+  }
+
+  // An app is deployed at least once or it is not, and only the first has a volume anyone holds.
+  hasDesiredVolume({ appId }: { appId: AppId }): Promise<boolean> {
+    return Promise.resolve(this.deployedApps.includes(appId));
   }
 
   finishDeleting({ appId }: { appId: AppId }): Promise<boolean> {
@@ -143,15 +149,22 @@ class StubAppsRepository implements AppsRepositoryContract {
   }
 
   updateState({
+    appId,
     state,
   }: {
     appId: AppId;
     ownerId: OwnerId;
     state: AppState;
   }): Promise<AppRow | null> {
-    return Promise.resolve(
-      this.owns ? { ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state } : null,
-    );
+    if (!this.owns) {
+      return Promise.resolve(null);
+    }
+    // The state the app is left in is what `finishDeleting` then has to find, so it is recorded
+    // rather than only returned.
+    if (state === 'deleting') {
+      this.deleting.push(appId);
+    }
+    return Promise.resolve({ ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state });
   }
 
   listPurgeable({ limit }: { limit: number }): Promise<AppId[]> {
@@ -384,9 +397,10 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     return { volumeId: VOLUME_ID, appId: APP_ID, state, sizeBytes: NO_BYTES };
   }
 
-  test('asking leaves the app deleting rather than deleted', async () => {
+  test('asking leaves an app with a filesystem deleting rather than deleted', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
+    appsRepo.deployedApps = [APP_ID];
 
     const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
 
@@ -587,5 +601,44 @@ describe('a purge that cannot finish leaves the work to be found again', () => {
 
     expect(appsRepo.trace).toContain(`rows:${SECOND_APP_ID}`);
     expect(appsRepo.purgeable).toEqual([APP_ID]);
+  });
+});
+
+describe('an app with no filesystem to tear down is not left waiting for one', () => {
+  // Reaching `deleted` takes a host saying the filesystem is gone, and no host is ever told
+  // about an app that was never deployed. Waiting for that is waiting forever.
+  test('an app deployed no times is deleted as it is asked for', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+
+    expect(app.state).toBe('deleted');
+    expect(appsRepo.deleted).toEqual([APP_ID]);
+  });
+
+  // The volume is the thing that has to be let go of, so an app that has one waits for the host
+  // holding it however the deletion was asked for.
+  test('an app that has been deployed still waits for the host holding it', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    appsRepo.deployedApps = [APP_ID];
+
+    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+
+    expect(app.state).toBe('deleting');
+    expect(appsRepo.deleted).toEqual([]);
+  });
+
+  // Deleting is what ends an export, and it ends one whether or not there is a filesystem left
+  // for the host to have been reading.
+  test('an export still being written is ended either way', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    const exportsRepo = new StubExportCancellation();
+
+    await serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+
+    expect(exportsRepo.cancelled).toEqual([APP_ID]);
   });
 });
