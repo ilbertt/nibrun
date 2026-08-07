@@ -46,12 +46,22 @@ export const isFormatted = (devicePath: string) =>
     );
   });
 
+/**
+ * Every byte `mkfs.ext4` writes here travels NBD → ZeroFS → S3, which makes its defaults the
+ * wrong trade: on a volume this size they are a whole-device discard plus a few hundred MiB of
+ * zeroed inode tables and journal before an app has deployed once. All three are work the guest
+ * kernel does lazily after it mounts, off the path an owner is waiting on.
+ */
+const MKFS_EXTENDED_OPTIONS = 'nodiscard,lazy_itable_init=1,lazy_journal_init=1';
+
 /** Writing a filesystem is not parsing one, so this stays on the host and the guest only mounts. */
 export const formatOnce = Effect.fn('formatOnce')(function* (devicePath: string) {
   yield* Effect.annotateCurrentSpan({ devicePath });
   if (yield* isFormatted(devicePath)) {
     return false;
   }
-  yield* stdoutOf({ command: ['mkfs.ext4', '-q', '-L', FILESYSTEM_LABEL, devicePath] });
+  yield* stdoutOf({
+    command: ['mkfs.ext4', '-q', '-E', MKFS_EXTENDED_OPTIONS, '-L', FILESYSTEM_LABEL, devicePath],
+  });
   return true;
 });

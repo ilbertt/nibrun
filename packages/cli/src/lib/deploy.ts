@@ -7,8 +7,12 @@ import type { RunOptions } from '#lib/plan.ts';
 import type { Ui } from '#lib/ui.ts';
 
 const SETTLING_STATES = new Set<DeploymentState>(['pending', 'starting']);
-const POLL_INTERVAL_MS = 2_000;
+// A host now tells the api the moment a tenant answers rather than on its next report, so this
+// is what stands between that and the owner being told — and the whole wait is a few seconds.
+const POLL_INTERVAL_MS = 500;
 const SERVING_TIMEOUT_MS = 300_000;
+const MS_PER_SECOND = 1_000;
+const ELAPSED_DECIMALS = 1;
 
 export type DeployInput = RunOptions & {
   api: Api;
@@ -57,6 +61,7 @@ export async function deploy({
     return;
   }
 
+  const startedAt = Date.now();
   const state = await ui.waitingFor({
     message: `starting deployment ${deployment.id}`,
     task: () => awaitSettled({ api, appId: app.id, deploymentId: deployment.id }),
@@ -64,7 +69,11 @@ export async function deploy({
   if (state !== 'active') {
     throw new ApiError(`Deployment ${deployment.id} is ${state}.`);
   }
-  ui.done(url);
+  ui.done(`${url} — ready in ${elapsed(Date.now() - startedAt)}`);
+}
+
+function elapsed(ms: number): string {
+  return `${(ms / MS_PER_SECOND).toFixed(ELAPSED_DECIMALS)}s`;
 }
 
 // A `File` rather than the `Bun.file` handle it came from: the multipart filename is read off

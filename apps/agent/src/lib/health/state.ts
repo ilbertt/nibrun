@@ -4,6 +4,16 @@ import type { UnitStatus } from '#lib/vm/unit-status.ts';
 const NO_PROBES = 0;
 const ONE_PROBE = 1;
 
+/**
+ * How often a tenant that has never answered is asked again.
+ *
+ * `intervalMs` is a liveness cadence for something already serving, and spending it on a boot
+ * means the gap between a binary starting to listen and a deploy being called done is most of
+ * that interval. This is the grid a first answer lands on instead, and it is why the status
+ * loop ticks at the same rate while anything is coming up.
+ */
+export const STARTUP_PROBE_INTERVAL_MS = 250;
+
 export type HealthTracker = {
   readonly consecutiveSuccesses: number;
   readonly consecutiveFailures: number;
@@ -49,6 +59,31 @@ export function applyProbe({
   };
 }
 
+type GraceInputs = {
+  healthCheck: HealthCheck;
+  startedAtMs?: number;
+  nowMs: number;
+};
+
+/** An instance with no start time has not been booted by this agent, so nothing has run out yet. */
+export function isWithinGracePeriod({ healthCheck, startedAtMs, nowMs }: GraceInputs): boolean {
+  return startedAtMs === undefined || nowMs - startedAtMs < healthCheck.gracePeriodMs;
+}
+
+/**
+ * The fast grid applies only while a tenant is still owed its grace period, so a slow starter
+ * is failed on exactly the schedule it was before: `unhealthyThreshold` probes at `intervalMs`
+ * after the grace runs out.
+ */
+export function nextProbeDelayMs({
+  tracker,
+  ...grace
+}: GraceInputs & { tracker: HealthTracker }): number {
+  return !tracker.everHealthy && isWithinGracePeriod(grace)
+    ? Math.min(STARTUP_PROBE_INTERVAL_MS, grace.healthCheck.intervalMs)
+    : grace.healthCheck.intervalMs;
+}
+
 export type LifecycleInputs = {
   unit: UnitStatus;
   tracker: HealthTracker;
@@ -90,7 +125,7 @@ export function evaluateInstanceState({
   if (tracker.consecutiveSuccesses >= healthCheck.healthyThreshold) {
     return 'running';
   }
-  const withinGrace = startedAtMs === undefined || nowMs - startedAtMs < healthCheck.gracePeriodMs;
+  const withinGrace = isWithinGracePeriod({ healthCheck, startedAtMs, nowMs });
   if (tracker.consecutiveFailures >= healthCheck.unhealthyThreshold && !withinGrace) {
     return tracker.everHealthy ? 'unhealthy' : 'failed';
   }

@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { DEFAULT_HEALTH_CHECK, type HealthCheck } from '@repo/protocol';
-import { applyProbe, evaluateInstanceState, initialTracker } from '#lib/health/state.ts';
+import {
+  applyProbe,
+  evaluateInstanceState,
+  initialTracker,
+  nextProbeDelayMs,
+  STARTUP_PROBE_INTERVAL_MS,
+} from '#lib/health/state.ts';
 import type { UnitStatus } from '#lib/vm/unit-status.ts';
 import { OBSERVED_AT } from '#tests/support/fixtures.ts';
 
@@ -96,6 +102,54 @@ function evaluate({
     nowMs,
   });
 }
+
+/**
+ * The interval is what stands between a binary starting to listen and the deploy that is waiting
+ * on it being called done, so the boot and the liveness cadence are deliberately not the same
+ * number — and the point of the grace bound is that a slow starter is still failed on the old one.
+ */
+describe('how soon a tenant is asked again', () => {
+  function delay({
+    tracker,
+    nowMs,
+    healthCheck = check(),
+  }: {
+    tracker: Tracker;
+    nowMs: number;
+    healthCheck?: HealthCheck;
+  }) {
+    return nextProbeDelayMs({ tracker, healthCheck, startedAtMs: STARTED_AT_MS, nowMs });
+  }
+
+  test('a tenant that has never answered is asked on the startup grid', () => {
+    expect(delay({ tracker: initialTracker(), nowMs: WITHIN_GRACE_MS })).toBe(
+      STARTUP_PROBE_INTERVAL_MS,
+    );
+  });
+
+  test('one that has answered falls back to the liveness interval', () => {
+    expect(delay({ tracker: healthyThen(0), nowMs: WITHIN_GRACE_MS })).toBe(
+      DEFAULT_HEALTH_CHECK.intervalMs,
+    );
+  });
+
+  test('past the grace period the startup grid is over, so a slow starter fails as it always did', () => {
+    expect(delay({ tracker: initialTracker(), nowMs: PAST_GRACE_MS })).toBe(
+      DEFAULT_HEALTH_CHECK.intervalMs,
+    );
+  });
+
+  test('an interval configured below the startup grid is not slowed to it', () => {
+    const intervalMs = STARTUP_PROBE_INTERVAL_MS - 1;
+    expect(
+      delay({
+        tracker: initialTracker(),
+        nowMs: WITHIN_GRACE_MS,
+        healthCheck: check({ intervalMs }),
+      }),
+    ).toBe(intervalMs);
+  });
+});
 
 describe('probe accounting', () => {
   test('a success resets the failure run and records when it happened', () => {

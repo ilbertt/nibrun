@@ -12,6 +12,13 @@ import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
+import { ReportSignal } from '#services/report-signal.service.ts';
+
+/**
+ * The floor a raise cannot get under. Without it an instance flapping between two states would
+ * turn every transition into a request, which is the thing `reportIntervalMs` exists to bound.
+ */
+const MIN_REPORT_GAP: Duration.DurationInput = '250 millis';
 
 const report = Effect.gen(function* () {
   const config = yield* AgentConfig;
@@ -46,15 +53,26 @@ const report = Effect.gen(function* () {
   });
 });
 
+/**
+ * `reportIntervalMs` is the longest a host stays quiet, not the rate it reports at: a tenant
+ * that has just answered its first probe is news the control plane is holding a deploy open
+ * waiting for, and telling it on the next tick instead adds that tick to every deploy.
+ */
+const untilNextReport = Effect.gen(function* () {
+  const sessions = yield* AgentSessionHolder;
+  const poll = yield* sessions.pollSettings;
+  yield* Effect.race(
+    Effect.sleep(Duration.millis(poll.reportIntervalMs)),
+    Effect.andThen(Effect.sleep(MIN_REPORT_GAP), ReportSignal.awaited),
+  );
+});
+
 export const reportLoop = Effect.gen(function* () {
   const sessions = yield* AgentSessionHolder;
   yield* supervised({
-    once: Effect.andThen(
-      report,
-      Effect.flatMap(sessions.pollSettings, (poll) =>
-        Effect.sleep(Duration.millis(poll.reportIntervalMs)),
-      ),
-    ).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired)),
+    once: Effect.andThen(report, untilNextReport).pipe(
+      Effect.tapErrorTag('ControlPlaneError', sessions.onExpired),
+    ),
     onFailure: (cause) => Effect.logWarning('report failed', cause),
     schedule: CONTROL_PLANE_BACKOFF,
   });

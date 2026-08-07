@@ -4,7 +4,12 @@ import { readExportReports } from '#lib/exports/manager.ts';
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
 import { applyCheckpoints } from '#lib/reconcile/checkpoints.ts';
 import { applyExports } from '#lib/reconcile/exports.ts';
-import { refreshStates, startInstance, stopInstance } from '#lib/reconcile/instances.ts';
+import {
+  prefetchArtifacts,
+  refreshStates,
+  startInstance,
+  stopInstance,
+} from '#lib/reconcile/instances.ts';
 import { applyNetwork, applyRoutes } from '#lib/reconcile/network.ts';
 import { hasDeferredWork, type ObservedState, planReconcile } from '#lib/reconcile/plan.ts';
 import { applyTeardowns, applyVolumes } from '#lib/reconcile/volumes.ts';
@@ -13,6 +18,7 @@ import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
@@ -193,7 +199,10 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       }));
       yield* syncDesired(desired);
 
-      yield* applyStops(plan).pipe(Effect.withSpan('reconcile.stops'));
+      yield* Effect.all(
+        [prefetchArtifacts(plan), applyStops(plan).pipe(Effect.withSpan('reconcile.stops'))],
+        { concurrency: 'unbounded', discard: true },
+      );
       yield* applyVolumes({ plan, observed }).pipe(Effect.withSpan('reconcile.volumes'));
       // Before anything boots: nothing persists the ruleset across a reboot, so a host that
       // started its VMs first would serve tenants through a kernel with no `nibrun` table.
@@ -210,6 +219,9 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       yield* persist.pipe(Effect.withSpan('reconcile.persist'));
 
       yield* AgentState.modify((current) => ({ ...current, converged: true }));
+      // Everything a reconcile touches is something the control plane is waiting to hear about:
+      // the instance it just asked for, a volume it may now delete, a bundle it can hand over.
+      yield* ReportSignal.raise;
     });
 
     return {
