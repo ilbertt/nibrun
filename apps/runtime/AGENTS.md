@@ -36,9 +36,15 @@ budget ending the VM with Firecracker exiting 0, and a graceful stop over `SendC
 works only because the guest kernel enables the i8042 path, and that belongs to
 `infra/guest-image`.
 
-The stdout/stderr framing and non-blocking capture are exercised in Docker, and so is freeze and
-thaw against a real ext4 loop device — a frozen filesystem cannot be asked whether it is frozen,
-so what the mount suite asserts is the pair of refusals, EBUSY on a second freeze and EINVAL on a
-second thaw. Neither AF_VSOCK leg is covered: a container has no Firecracker vsock backend, so
-the log connection and the control channel's handshake both still need a Firecracker integration
-test. The host's half of that handshake is covered in `apps/agent`, against a fake VMM.
+The stdout/stderr framing and non-blocking capture are exercised in Docker, and so is the control
+channel against a real ext4 loop device. A frozen filesystem cannot be asked whether it is
+frozen, and a write that proved it would be a write that never returns, so what the mount suite
+asserts is the pair of refusals: EBUSY on a second freeze, EINVAL on a second thaw. The lease
+loop is driven over a socketpair standing in for the vsock — a host that lets go, one that never
+does, and one that asks for something else — because the property worth proving is that the
+tenant gets its filesystem back however the connection ended.
+
+What that leaves uncovered is the AF_VSOCK transport itself, for both legs: a container has no
+Firecracker vsock backend, so the log connection and the control channel's `CONNECT` handshake
+still need a Firecracker integration test. The host's half of that handshake is covered in
+`apps/agent`, against a fake VMM.

@@ -2,6 +2,7 @@
 #define NIBRUN_GUEST_CONTROL_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 /* The host asks for the tenant's filesystem to be held still while it reads the
@@ -37,5 +38,31 @@ bool guest_control_freeze(const char *mount_point);
 /* False with errno set, so a caller can tell a filesystem that refused to thaw from
  * one that was never frozen (EINVAL). */
 bool guest_control_thaw(const char *mount_point);
+
+enum guest_control_outcome {
+  /* Nothing was asked, or something this side does not answer. Nothing was frozen. */
+  GUEST_CONTROL_IGNORED,
+  GUEST_CONTROL_REFUSED,
+  /* The host let go, or stopped being there — which this side cannot tell apart, and
+   * has no reason to. */
+  GUEST_CONTROL_RELEASED,
+  GUEST_CONTROL_TIMED_OUT,
+};
+
+struct guest_control_request {
+  int connection;
+  const char *mount_point;
+  /* How long a freeze may be held before this side takes it back. */
+  uint32_t max_hold_ms;
+};
+
+/* Answers one connection and returns with the filesystem thawed, however that
+ * connection ended.
+ *
+ * Exposed rather than left private so a test can drive it over a socketpair: a vsock
+ * and a unix socket are both SOCK_STREAM, and the property worth proving is that no
+ * path out of here leaves a tenant frozen — which is exactly the path a container
+ * cannot arrange over vsock, having no Firecracker to carry it. */
+enum guest_control_outcome guest_control_answer(const struct guest_control_request *request);
 
 #endif

@@ -134,8 +134,8 @@ static bool read_request(int connection, char *buffer, size_t capacity) {
  * and the filesystem thaws without anybody having to ask — which is what keeps a
  * dead agent from leaving a tenant wedged. The deadline covers the host that
  * neither finishes nor lets go. */
-static bool wait_until_released(int connection) {
-  uint64_t deadline_ms = clock_monotonic_ms() + MAX_FREEZE_HOLD_MS;
+static bool wait_until_released(int connection, uint32_t max_hold_ms) {
+  uint64_t deadline_ms = clock_monotonic_ms() + max_hold_ms;
   for (;;) {
     struct pollfd waiting = {.fd = connection, .events = POLLIN};
     int ready = poll(&waiting, 1, clock_remaining_ms(deadline_ms));
@@ -156,27 +156,39 @@ static bool wait_until_released(int connection) {
   }
 }
 
-static void answer(int connection, const char *mount_point) {
-  char request[REQUEST_MAX_BYTES];
-  if (!read_request(connection, request, sizeof(request))) {
-    return;
-  }
-  if (strcmp(request, FREEZE_REQUEST) != 0) {
-    reply(connection, UNKNOWN_REQUEST);
-    return;
-  }
-  if (!guest_control_freeze(mount_point)) {
-    log_errno("could not freeze %s", mount_point);
-    reply(connection, FREEZE_REFUSED);
-    return;
-  }
-  if (reply(connection, FREEZE_HELD) && !wait_until_released(connection)) {
-    log_line("the host held %s frozen for %ums without letting go; thawing it", mount_point,
-             MAX_FREEZE_HOLD_MS);
-  }
+/* The one way out of a freeze, so that every path that took one goes through here. */
+static enum guest_control_outcome thawing(const char *mount_point,
+                                          enum guest_control_outcome outcome) {
   if (!guest_control_thaw(mount_point)) {
     log_errno("could not thaw %s", mount_point);
   }
+  return outcome;
+}
+
+enum guest_control_outcome guest_control_answer(const struct guest_control_request *request) {
+  char asked[REQUEST_MAX_BYTES];
+  if (!read_request(request->connection, asked, sizeof(asked))) {
+    return GUEST_CONTROL_IGNORED;
+  }
+  if (strcmp(asked, FREEZE_REQUEST) != 0) {
+    reply(request->connection, UNKNOWN_REQUEST);
+    return GUEST_CONTROL_IGNORED;
+  }
+  if (!guest_control_freeze(request->mount_point)) {
+    log_errno("could not freeze %s", request->mount_point);
+    reply(request->connection, FREEZE_REFUSED);
+    return GUEST_CONTROL_REFUSED;
+  }
+  /* A host that is gone before it hears the answer has already let go. */
+  if (!reply(request->connection, FREEZE_HELD)) {
+    return thawing(request->mount_point, GUEST_CONTROL_RELEASED);
+  }
+  if (!wait_until_released(request->connection, request->max_hold_ms)) {
+    log_line("the host held %s frozen for %ums without letting go; thawing it",
+             request->mount_point, request->max_hold_ms);
+    return thawing(request->mount_point, GUEST_CONTROL_TIMED_OUT);
+  }
+  return thawing(request->mount_point, GUEST_CONTROL_RELEASED);
 }
 
 static void serve(const char *mount_point) {
@@ -194,10 +206,28 @@ static void serve(const char *mount_point) {
       log_errno("could not accept a control connection");
       break;
     }
-    answer(connection, mount_point);
+    guest_control_answer(&(struct guest_control_request){
+        .connection = connection, .mount_point = mount_point, .max_hold_ms = MAX_FREEZE_HOLD_MS});
     close(connection);
   }
   close(listener);
+}
+
+/* A freeze outlives the process that took it, so this one being reaped mid-lease
+ * would leave the tenant's filesystem frozen until the VM shut down — the deadline
+ * dies with the process waiting on it. The tenant is what should be killed under
+ * memory pressure instead: it is the only thing in this guest that allocates. */
+static void refuse_the_oom_killer(void) {
+  static const char NEVER[] = "-1000";
+  int descriptor = open("/proc/self/oom_score_adj", O_WRONLY | O_CLOEXEC);
+  if (descriptor < 0) {
+    log_errno("could not opt the control channel out of the oom killer");
+    return;
+  }
+  if (write(descriptor, NEVER, sizeof(NEVER) - 1) < 0) {
+    log_errno("could not opt the control channel out of the oom killer");
+  }
+  close(descriptor);
 }
 
 void guest_control_start(struct guest_control *control) {
@@ -208,6 +238,7 @@ void guest_control_start(struct guest_control *control) {
     return;
   }
   if (process == 0) {
+    refuse_the_oom_killer();
     serve(control->mount_point);
     _exit(0);
   }

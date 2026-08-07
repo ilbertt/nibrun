@@ -10,10 +10,12 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mount.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -25,6 +27,45 @@
 
 #define SQUASHFS_MOUNT "/run/test-artifact"
 #define DATA_MOUNT "/run/test-data"
+#define FREEZE_HOLD_TEST_MS 200
+#define GRANT_BYTES 8
+
+/**
+ * Drives the real control-channel loop over a socketpair, standing in for the vsock a
+ * container has no Firecracker to carry. Both are SOCK_STREAM, so the code deciding when
+ * a lease has ended is the same code either way.
+ *
+ * The host runs in a child because the loop blocks until the lease ends: `release` closes
+ * the connection once the freeze is granted, and its absence is a host that took the
+ * freeze and never came back.
+ */
+static enum guest_control_outcome answering(const char *request, bool release) {
+  int pair[2];
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair) < 0) {
+    return GUEST_CONTROL_REFUSED;
+  }
+  pid_t host = fork();
+  if (host == 0) {
+    close(pair[0]);
+    if (write(pair[1], request, strlen(request)) < 0) {
+      _exit(1);
+    }
+    if (release) {
+      char granted[GRANT_BYTES];
+      /* Exiting closes the connection, which is the only way a host lets go. */
+      _exit(read(pair[1], granted, sizeof(granted)) < 0 ? 1 : 0);
+    }
+    pause();
+    _exit(0);
+  }
+  close(pair[1]);
+  enum guest_control_outcome outcome = guest_control_answer(&(struct guest_control_request){
+      .connection = pair[0], .mount_point = DATA_MOUNT, .max_hold_ms = FREEZE_HOLD_TEST_MS});
+  close(pair[0]);
+  kill(host, SIGKILL);
+  waitpid(host, NULL, 0);
+  return outcome;
+}
 
 static bool mounted_with(const char *target, const char *option) {
   FILE *table = fopen("/proc/self/mounts", "r");
@@ -160,6 +201,24 @@ int main(int argc, char **argv) {
   EXPECT(guest_control_freeze(DATA_MOUNT));
   EXPECT(!guest_control_freeze(DATA_MOUNT) && errno == EBUSY);
   EXPECT(guest_control_thaw(DATA_MOUNT));
+  EXPECT(!guest_control_thaw(DATA_MOUNT) && errno == EINVAL);
+  EXPECT(can_write_as_tenant(DATA_MOUNT));
+
+  /* However the connection ends, the tenant gets its filesystem back. A freeze is a lease
+   * on something live and not a flag somebody has to remember to clear, so the EINVAL after
+   * each of these is the whole point: it is the filesystem saying it is no longer frozen. */
+  EXPECT(answering("FREEZE\n", true) == GUEST_CONTROL_RELEASED);
+  EXPECT(!guest_control_thaw(DATA_MOUNT) && errno == EINVAL);
+  EXPECT(can_write_as_tenant(DATA_MOUNT));
+
+  /* The host that takes a freeze and never lets go: an agent wedged rather than gone, which
+   * no closed connection will ever report. */
+  EXPECT(answering("FREEZE\n", false) == GUEST_CONTROL_TIMED_OUT);
+  EXPECT(!guest_control_thaw(DATA_MOUNT) && errno == EINVAL);
+  EXPECT(can_write_as_tenant(DATA_MOUNT));
+
+  /* Anything else is answered without touching the filesystem at all. */
+  EXPECT(answering("THAW\n", true) == GUEST_CONTROL_IGNORED);
   EXPECT(!guest_control_thaw(DATA_MOUNT) && errno == EINVAL);
   EXPECT(can_write_as_tenant(DATA_MOUNT));
 
