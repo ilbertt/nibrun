@@ -49,3 +49,15 @@ exports — `use-session.ts` exports `useSession`.
 - Declare a hook with `function`, never `const`.
 - Always annotate the return type. Left inferred, a hook leaks whichever library
   type it happens to wrap into every caller.
+
+## Contexts and providers
+
+`src/lib/contexts/` holds the context object alone and `src/lib/providers/` the
+component that fills it, each one per file named after what it exports. The hook
+that reads one lives in `src/lib/hooks/` like any other and is the only way a
+component should reach it — so a missing provider is one thrown error rather
+than an `undefined` that spreads.
+
+Reach for this only where a second call to the owning hook would be a second
+instance: state that has to be one thing across siblings, such as a run a form
+starts and a progress view watches.
