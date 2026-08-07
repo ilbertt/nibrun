@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { AppStateBadge } from '#components/apps/app-state-badge.tsx';
+import { AppStatusBadge } from '#components/apps/app-status-badge.tsx';
 import {
   Table,
   TableBody,
@@ -18,7 +18,7 @@ export function AppsTable({ apps }: { apps: readonly AppSummary[] }) {
       <TableHeader>
         <TableRow>
           <TableHead>Slug</TableHead>
-          <TableHead>State</TableHead>
+          <TableHead>Status</TableHead>
           <TableHead>Last change</TableHead>
         </TableRow>
       </TableHeader>
@@ -35,7 +35,7 @@ export function AppsTable({ apps }: { apps: readonly AppSummary[] }) {
               </Link>
             </TableCell>
             <TableCell>
-              <AppStateBadge state={app.state} />
+              <AppStatusBadge app={app} />
             </TableCell>
             <TableCell className="text-muted-foreground tabular-nums">
               {dayAndMinute(app.updatedAt)}
