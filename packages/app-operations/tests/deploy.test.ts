@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
 import type { Filename } from '@repo/protocol';
 import { type DeployStep, deploy } from '#deploy.ts';
+import type { UploadProgress } from '#upload.ts';
 
 const SLUG = 'quiet-otter';
 const APP_ID = 'app-1';
@@ -10,6 +11,7 @@ const DIGEST = 'sha256:abcd';
 const PUT_URL = 'https://store.example/artifact-1?signature=x';
 const PORT = 8080;
 const SIZE_BYTES = 1_048_576;
+const PART_BYTES = 262_144;
 const REFUSED = 403;
 
 type Sent = { what: string; body?: unknown };
@@ -74,7 +76,7 @@ function app(id: string) {
 }
 
 function binary() {
-  return { name: 'my-server' as Filename, sizeBytes: SIZE_BYTES, body: 'a compiled thing' };
+  return { name: 'my-server' as Filename, body: new Blob([new Uint8Array(SIZE_BYTES)]) };
 }
 
 const REAL_FETCH = globalThis.fetch;
@@ -237,10 +239,51 @@ describe('what a caller is told as it happens', () => {
       app: SLUG,
       whileUploading: ({ message, task }) => {
         waits.push(message);
-        return task();
+        return task(() => {});
       },
     });
 
     expect(waits).toEqual(['uploading my-server (1.0 MB)']);
+  });
+
+  // The wait is the only thing that can say the upload is moving, and on a slow link that is the
+  // difference between a long upload and one that looks like a hung terminal.
+  test('how far the upload has gone reaches whoever is showing the wait', async () => {
+    const seen: UploadProgress[] = [];
+
+    await deploy({
+      api: apiHolding({ apps: [{ id: APP_ID, slug: SLUG }], sent: [] }),
+      binary: binary(),
+      args: [],
+      app: SLUG,
+      upload: ({ body, onProgress }) => {
+        onProgress({ sentBytes: PART_BYTES, totalBytes: body.size });
+        onProgress({ sentBytes: body.size, totalBytes: body.size });
+        return Promise.resolve(new Response(''));
+      },
+      whileUploading: ({ task }) => task((progress) => seen.push(progress)),
+    });
+
+    expect(seen).toEqual([
+      { sentBytes: PART_BYTES, totalBytes: SIZE_BYTES },
+      { sentBytes: SIZE_BYTES, totalBytes: SIZE_BYTES },
+    ]);
+  });
+
+  test('the url the api signed is the one the bytes are sent to', async () => {
+    const asked: string[] = [];
+
+    await deploy({
+      api: apiHolding({ apps: [{ id: APP_ID, slug: SLUG }], sent: [] }),
+      binary: binary(),
+      args: [],
+      app: SLUG,
+      upload: ({ url }) => {
+        asked.push(url);
+        return Promise.resolve(new Response(''));
+      },
+    });
+
+    expect(asked).toEqual([PUT_URL]);
   });
 });

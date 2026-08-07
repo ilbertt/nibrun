@@ -5,7 +5,14 @@ export type Ui = {
   open: (message: string) => void;
   step: (message: string) => void;
   done: (message: string) => void;
-  waitingFor: <T>(input: { message: string; task: () => Promise<T> }) => Promise<T>;
+  /**
+   * The task is handed a way to rewrite the line it is waiting under, so a wait long enough to
+   * look like a hung terminal can say how far along it is.
+   */
+  waitingFor: <T>(input: {
+    message: string;
+    task: (update: (message: string) => void) => Promise<T>;
+  }) => Promise<T>;
 };
 
 /**
@@ -23,11 +30,13 @@ export function createUi({ print, interactive }: { print: Print; interactive: bo
       open: (message) => intro(message),
       step: (message) => log.step(message),
       done: (message) => outro(message),
+      // Settled on the message it started with rather than the last thing progress wrote, so what
+      // stays on screen is what the wait was for and not the moment it happened to end at.
       waitingFor: async ({ message, task }) => {
         const waiting = spinner();
         waiting.start(message);
         try {
-          const result = await task();
+          const result = await task((update) => waiting.message(update));
           waiting.stop(message);
           return result;
         } catch (failure) {
@@ -39,13 +48,14 @@ export function createUi({ print, interactive }: { print: Print; interactive: bo
   }
   return {
     // Plain output has no frame to open, and a spinner drawn into a log file is noise: what a
-    // reader of one wants is the line saying the wait started.
+    // reader of one wants is the line saying the wait started. Progress is dropped for the same
+    // reason — a log is read after the fact, when every step of a bar has the same answer.
     open: () => {},
     step: (message) => print.dim(message),
     done: (message) => print.success(message),
     waitingFor: ({ message, task }) => {
       print.dim(message);
-      return task();
+      return task(() => {});
     },
   };
 }

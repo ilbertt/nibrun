@@ -110,9 +110,7 @@ function asDeployRequest({
 }
 
 function uploadableFrom(file: File): UploadableBinary | undefined {
-  return Value.Check(FilenameSchema, file.name)
-    ? { name: file.name, sizeBytes: file.size, body: file }
-    : undefined;
+  return Value.Check(FilenameSchema, file.name) ? { name: file.name, body: file } : undefined;
 }
 
 function tenantArguments(onePerLine: string): string[] {

@@ -5,26 +5,21 @@ import {
   awaitDeploymentSettled,
   type DeployStep,
   deploy as startDeployment,
+  type UploadableBinary,
 } from '@repo/app-operations';
 import { type Filename, FilenameSchema, type TenantArguments, Value } from '@repo/protocol';
 import { UsageError } from '#lib/errors.ts';
 import type { RunOptions } from '#lib/plan.ts';
 import type { Ui } from '#lib/ui.ts';
+import { describeProgress } from '#lib/upload-progress.ts';
 
 const MS_PER_SECOND = 1_000;
 const ELAPSED_DECIMALS = 1;
 
-/** The binary as this end knows it: where to read it from, not the bytes themselves. */
-export type LocalBinary = {
-  path: string;
-  name: Filename;
-  sizeBytes: number;
-};
-
 export type DeployInput = RunOptions & {
   api: PublicApiClient;
   ui: Ui;
-  binary: LocalBinary;
+  binary: UploadableBinary;
   args: TenantArguments;
   detach?: boolean | undefined;
 };
@@ -41,13 +36,24 @@ export async function deploy({
 }: DeployInput): Promise<void> {
   const deployed = await startDeployment({
     api,
-    binary: { name: binary.name, sizeBytes: binary.sizeBytes, body: Bun.file(binary.path) },
+    binary,
     args,
     app,
     name,
     port,
     onStep: (step) => announce({ step, ui }),
-    whileUploading: ui.waitingFor,
+    whileUploading: ({ message, task }) => {
+      const startedAt = Date.now();
+      return ui.waitingFor({
+        message,
+        task: (update) =>
+          task((progress) =>
+            update(
+              `${message} — ${describeProgress({ progress, elapsedMs: Date.now() - startedAt })}`,
+            ),
+          ),
+      });
+    },
   });
 
   if (detach === true) {
@@ -86,14 +92,14 @@ function elapsed(ms: number): string {
 
 /**
  * Opened rather than read: the bytes are streamed to the store when the time comes, and all
- * that is wanted here is that there is a file, what it is called, and how large it is.
+ * that is wanted here is that there is a file and what it is called.
  */
-export async function openBinary(path: string): Promise<LocalBinary> {
-  const handle = Bun.file(path);
-  if (!(await handle.exists())) {
+export async function openBinary(path: string): Promise<UploadableBinary> {
+  const body = Bun.file(path);
+  if (!(await body.exists())) {
     throw new UsageError(`No such file: ${path}`);
   }
-  return { path, name: asFilename(basename(path)), sizeBytes: handle.size };
+  return { name: asFilename(basename(path)), body };
 }
 
 /**

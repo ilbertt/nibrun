@@ -8,6 +8,7 @@ import {
   Value,
 } from '@repo/protocol';
 import { appBySlug } from '#apps.ts';
+import { streamedUpload, type UploadProgress, type UploadTransport } from '#upload.ts';
 import { pause } from '#wait.ts';
 
 const SETTLING_STATES = new Set<DeploymentState>(['pending', 'starting']);
@@ -18,12 +19,9 @@ const SERVING_TIMEOUT_MS = 300_000;
 const SIZE_DECIMALS = 1;
 const BYTES_PER_MEBIBYTE = 1_048_576;
 
-type RequestBody = NonNullable<RequestInit['body']>;
-
 export type UploadableBinary = {
   name: Filename;
-  sizeBytes: number;
-  body: RequestBody;
+  body: Blob;
 };
 
 export type DeployStep =
@@ -31,7 +29,14 @@ export type DeployStep =
   | { kind: 'artifact'; artifactId: string; digest: string }
   | { kind: 'deployment'; deploymentId: string };
 
-export type UploadWait = (input: { message: string; task: () => Promise<void> }) => Promise<void>;
+/**
+ * The wait around the upload, given what the upload is doing rather than a line to print: how far
+ * along it is reads as a spinner in one place and a meter in another, and neither belongs here.
+ */
+export type UploadWait = (input: {
+  message: string;
+  task: (report: (progress: UploadProgress) => void) => Promise<void>;
+}) => Promise<void>;
 
 export type DeployInput = {
   api: PublicApiClient;
@@ -42,6 +47,7 @@ export type DeployInput = {
   port?: number | undefined;
   onStep?: ((step: DeployStep) => void) | undefined;
   whileUploading?: UploadWait | undefined;
+  upload?: UploadTransport | undefined;
 };
 
 export type Deployed = {
@@ -67,6 +73,7 @@ export async function deploy({
   port,
   onStep,
   whileUploading = unwatched,
+  upload = streamedUpload,
 }: DeployInput): Promise<Deployed> {
   const target = slug === undefined ? null : await appBySlug({ api, slug });
   const config = configPatch({ args, port });
@@ -77,7 +84,7 @@ export async function deploy({
       : unwrap(await api.api.apps({ appId: target.id }).patch(config));
   onStep?.({ kind: 'app', appId: app.id, slug: app.slug });
 
-  const artifact = await uploadBinary({ api, appId: app.id, binary, whileUploading });
+  const artifact = await uploadBinary({ api, appId: app.id, binary, whileUploading, upload });
   onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest });
 
   const deployment = unwrap(
@@ -107,24 +114,26 @@ async function uploadBinary({
   appId,
   binary,
   whileUploading,
+  upload,
 }: {
   api: PublicApiClient;
   appId: string;
   binary: UploadableBinary;
   whileUploading: UploadWait;
+  upload: UploadTransport;
 }) {
   const { artifactId, url } = unwrap(
     await api.api.apps({ appId }).artifacts.post({
       filename: binary.name,
-      sizeBytes: binary.sizeBytes,
+      sizeBytes: binary.body.size,
     }),
   );
   const artifact = api.api.apps({ appId }).artifacts({ artifactId });
 
   try {
     await whileUploading({
-      message: `uploading ${binary.name} (${mebibytes(binary.sizeBytes)})`,
-      task: () => putBinary({ url, body: binary.body }),
+      message: `uploading ${binary.name} (${mebibytes(binary.body.size)})`,
+      task: (report) => putBinary({ url, body: binary.body, upload, onProgress: report }),
     });
   } catch (failure) {
     await artifact.patch({ upload: 'failed' });
@@ -147,8 +156,18 @@ async function uploadBinary({
  * The url was signed for this exact length, so the store refuses anything else — which is also
  * why a file that changed since it was measured comes back as a signature that does not match.
  */
-async function putBinary({ url, body }: { url: string; body: RequestBody }): Promise<void> {
-  const response = await fetch(url, { method: 'PUT', body });
+async function putBinary({
+  url,
+  body,
+  upload,
+  onProgress,
+}: {
+  url: string;
+  body: Blob;
+  upload: UploadTransport;
+  onProgress: (progress: UploadProgress) => void;
+}): Promise<void> {
+  const response = await upload({ url, body, onProgress });
   if (!response.ok) {
     throw new ApiError(
       `The store refused the upload: ${response.status} ${await storeError(response)}`,
@@ -162,8 +181,13 @@ async function storeError(response: Response): Promise<string> {
   return /<Message>(?<message>[^<]*)<\/Message>/.exec(body)?.groups?.message ?? response.statusText;
 }
 
-function unwatched({ task }: { message: string; task: () => Promise<void> }): Promise<void> {
-  return task();
+function unwatched({
+  task,
+}: {
+  message: string;
+  task: (report: (progress: UploadProgress) => void) => Promise<void>;
+}): Promise<void> {
+  return task(() => {});
 }
 
 function mebibytes(bytes: number): string {
