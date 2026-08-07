@@ -7,8 +7,8 @@ import type { Ui } from '#lib/ui.ts';
 
 /**
  * A phrase rather than a y/n, because a y/n is answered by the muscle that has answered every
- * other one. There is nothing underneath this to undo it with: an export taken beforehand is the
- * only copy anyone gets to keep.
+ * other one. There is nothing underneath this to undo it with: an export goes with the app it
+ * was taken of, so not even a bundle downloaded first leaves a copy on the platform.
  */
 const CONFIRMATION_PHRASE = 'delete permanently';
 
@@ -21,8 +21,9 @@ export type DeleteInput = {
 };
 
 /**
- * Delete an app: every deployment of it, the hostnames it answered on, and everything its binary
- * ever wrote.
+ * Delete an app: the hostnames it answered on, everything its binary ever wrote, every deployment
+ * of it, and — once the api has torn it down — every binary uploaded to it and every export taken
+ * of it.
  *
  * The app is looked up before anything is asked, so a slug that names nothing costs one line
  * rather than a phrase typed out for an app that was never there.
@@ -70,9 +71,13 @@ async function confirmDeletion({
   }
 
   note(
-    [`app: ${slug}`, `hostnames: ${hostnames.join(' ')}`, 'data: everything on the volume'].join(
-      '\n',
-    ),
+    [
+      `app: ${slug}`,
+      `hostnames: ${hostnames.join(' ')}`,
+      'volume: everything on it',
+      'binaries: every one ever uploaded to this app',
+      'exports: every bundle ever taken of it',
+    ].join('\n'),
     'Deleted for good',
   );
   answered(
