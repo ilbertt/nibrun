@@ -12,6 +12,11 @@ import type { InstanceRecord } from '#lib/report/instance-record.ts';
 export type AgentSnapshot = {
   readonly records: ReadonlyMap<AppId, InstanceRecord>;
   readonly exportReports: ReadonlyMap<ExportId, ReportedExport>;
+  /**
+   * Volumes this host removed, held until desired state stops naming them. A removal leaves
+   * nothing behind to observe, so this is the only thing that keeps saying it happened.
+   */
+  readonly deletedVolumes: ReadonlyMap<VolumeId, ReportedVolume>;
   readonly nextProbeAtMs: ReadonlyMap<AppId, number>;
   readonly volumeReports: readonly ReportedVolume[];
   readonly checkpointReports: readonly ReportedCheckpoint[];
@@ -25,6 +30,7 @@ export type AgentSnapshot = {
 const EMPTY: AgentSnapshot = {
   records: new Map(),
   exportReports: new Map(),
+  deletedVolumes: new Map(),
   nextProbeAtMs: new Map(),
   volumeReports: [],
   checkpointReports: [],
@@ -75,10 +81,20 @@ export class AgentState extends Effect.Service<AgentState>()('AgentState', {
           return { ...current, records: remaining };
         }),
 
-      appIdByVolume: Effect.map(
-        records,
-        (all) => new Map<VolumeId, AppId>(all.map((record) => [record.volumeId, record.appId])),
-      ),
+      rememberDeletedVolume: (report: ReportedVolume) =>
+        modify((current) => ({
+          ...current,
+          deletedVolumes: new Map(current.deletedVolumes).set(report.volumeId, report),
+        })),
+
+      /** Once desired state stops naming it, the control plane has taken the removal in. */
+      forgetDeletedVolumes: (keep: ReadonlySet<VolumeId>) =>
+        modify((current) => ({
+          ...current,
+          deletedVolumes: new Map(
+            [...current.deletedVolumes].filter(([volumeId]) => keep.has(volumeId)),
+          ),
+        })),
     };
   }),
 }) {}

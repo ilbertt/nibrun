@@ -1,24 +1,23 @@
 import { defineCommand } from '@parshjs/core';
 import { GUEST_PATH_ROOT } from '@repo/protocol';
-import { z } from 'zod';
+import { SHARED_OPTIONS } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { listDirectory } from '#lib/filesystem.ts';
 import { isInteractive } from '#lib/ui.ts';
 
 /**
- * A command and the parent of `apps ls [path]` at once, which is how an optional positional is
- * spelled: the walk stops here when nothing follows, and the volume's root is what listing
+ * A command and the parent of `apps files ls [path]` at once, which is how an optional positional
+ * is spelled: the walk stops here when nothing follows, and the volume's root is what listing
  * without naming a directory means. `--deployment-id` is declared here and forwarded, so both
  * spellings take it the same way.
  */
-export const command = defineCommand('apps ls', {
+export const command = defineCommand('apps files ls', {
   description: "List a directory of an app's filesystem. Without a path, the volume root.",
   options: {
-    'deployment-id': {
-      schema: z.string().min(1).optional(),
+    [SHARED_OPTIONS.deploymentId.name]: {
+      ...SHARED_OPTIONS.deploymentId.option,
       forwardToChildren: true,
-      description: 'Read this deployment instead of looking up the app latest.',
     },
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
@@ -33,7 +32,7 @@ export const command = defineCommand('apps ls', {
     await listDirectory({
       api,
       slug,
-      deploymentId: options['deployment-id'],
+      deploymentId: options[SHARED_OPTIONS.deploymentId.name],
       path: GUEST_PATH_ROOT,
       print,
     });

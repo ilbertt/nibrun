@@ -60,6 +60,11 @@ class FakeAppsService {
     return Promise.resolve();
   }
 
+  finishDeletions(): Promise<void> {
+    this.trace.push('finishDeletions');
+    return Promise.resolve();
+  }
+
   purgeDeleted(): Promise<void> {
     this.trace.push('purgeDeleted');
     return Promise.resolve();
@@ -158,7 +163,8 @@ describe('a report is read by whatever owns what it talks about', () => {
   });
 
   // What a deleted app left behind is only safe to remove once a host has said the filesystem is
-  // gone, and that is what taking the report in records.
+  // gone, and that is what taking the report in records. A deletion finished on the way past is
+  // then purged by the same report rather than by the next one.
   test('and only then is what the deleted ones left behind cleaned up', async () => {
     const { apps, service } = build();
     const reported = {
@@ -170,6 +176,6 @@ describe('a report is read by whatever owns what it talks about', () => {
 
     await service.acceptReport({ reported });
 
-    expect(apps.trace).toEqual(['completeDeletions', 'purgeDeleted']);
+    expect(apps.trace).toEqual(['completeDeletions', 'finishDeletions', 'purgeDeleted']);
   });
 });

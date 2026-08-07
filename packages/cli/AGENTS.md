@@ -21,19 +21,28 @@ the layout under `src/commands/` is the command tree.
   redeclared per child. The parent is then a group: no handler, so `nib apps`
   lists what is under it, and the flag stays optional — a required one would make
   that listing an error. parsh spells a flag exactly as its key, so `--app` is
-  the key `'app'` — and a flag two unrelated commands both take is that key held
-  in `src/config.ts` (`APP_OPTION`), so they cannot drift apart.
+  the key `'app'` — and a flag two unrelated commands both take is a
+  `SHARED_OPTIONS` entry in `src/config.ts`, holding that name and the
+  declaration it points at, so neither half can drift. A site writes
+  `[SHARED_OPTIONS.x.name]: { ...SHARED_OPTIONS.x.option, … }` and adds only
+  what differs there — whether it forwards, and a description where the same
+  value means a different thing per command. `defineCommand` infers its options
+  through a `const` type parameter, so the key and the spread both survive as
+  literals and `parents['<path>'].options` stays typed. The `satisfies` on
+  `SHARED_OPTIONS` is what makes a mistyped field an error where it is written
+  rather than an overload failure at every command taking it.
 - A positional is a path segment, so a command taking one lives at
   `commands/<…>/[name].ts` and its path string ends in `[name]`. Leaving it out
   prints the parent's usage rather than a missing-argument error, because the
   walk stops at the node above the param — that listing is the only place the
   command's description is read, so it has to say what the value is for.
 - An **optional** positional is that node given a command of its own:
-  `commands/apps/ls.ts` beside `commands/apps/ls/[path].ts` makes `nib apps ls`
-  and `nib apps ls <path>` two commands, and the walk picks whichever the
-  positional it was handed reaches. There is no other spelling — a param is how
-  routing gets there, so a command reached without one is a different command.
-  Flags they share go on the `ls` node with `forwardToChildren: true`.
+  `commands/apps/files/ls.ts` beside `commands/apps/files/ls/[path].ts` makes
+  `nib apps files ls` and `nib apps files ls <path>` two commands, and the walk
+  picks whichever the positional it was handed reaches. There is no other
+  spelling — a param is how routing gets there, so a command reached without one
+  is a different command. Flags they share go on the `ls` node with
+  `forwardToChildren: true`.
 - **`options` is required by `defineCommand` even when a command has none.**
   Omitting it matches the alias overload instead, whose errors talk about
   `undefined` and never mention options. `options: {}` is the fix.
@@ -57,9 +66,7 @@ the layout under `src/commands/` is the command tree.
   it is asked. An app is not something that can be defaulted to, so without a
   terminal to ask at that is where the flag is demanded instead. `apps list` is
   the exception and the reason the rule is not enforced anywhere central: it
-  lists the apps themselves, so asking which one would be circular. `apps ls`
-  lists inside one — the two are a letter apart and neither name is free to
-  change, so check which you mean before adding to either.
+  lists the apps themselves, so asking which one would be circular.
 - **A command that destroys something is the exception**, because the only
   default it could take is the destruction. Without a terminal it is refused
   rather than answered on the owner's behalf, so `--yes` is the one way to mean

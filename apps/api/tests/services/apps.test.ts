@@ -74,6 +74,7 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly leftovers = new Map<AppId, Leftovers>();
   deleting: AppId[] = [];
   purgeable: AppId[] = [];
+  deployedApps: AppId[] = [];
   owns = false;
   #remainingFailures: number;
   readonly #failure: unknown;
@@ -81,6 +82,22 @@ class StubAppsRepository implements AppsRepositoryContract {
   constructor({ failures, failure }: { failures: number; failure?: unknown }) {
     this.#remainingFailures = failures;
     this.#failure = failure;
+  }
+
+  // A deletion is finishable when the app is going and no host holds a volume for it, which is
+  // to say it was never deployed. The view says both halves; this says them the same way.
+  #finishable(appId: AppId): boolean {
+    return this.deleting.includes(appId) && !this.deployedApps.includes(appId);
+  }
+
+  isDeletionFinishable({ appId }: { appId: AppId }): Promise<boolean> {
+    return Promise.resolve(this.#finishable(appId));
+  }
+
+  listFinishableDeletions({ limit }: { limit: number }): Promise<AppId[]> {
+    return Promise.resolve(
+      this.deleting.filter((appId) => this.#finishable(appId)).slice(0, limit),
+    );
   }
 
   finishDeleting({ appId }: { appId: AppId }): Promise<boolean> {
@@ -143,15 +160,22 @@ class StubAppsRepository implements AppsRepositoryContract {
   }
 
   updateState({
+    appId,
     state,
   }: {
     appId: AppId;
     ownerId: OwnerId;
     state: AppState;
   }): Promise<AppRow | null> {
-    return Promise.resolve(
-      this.owns ? { ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state } : null,
-    );
+    if (!this.owns) {
+      return Promise.resolve(null);
+    }
+    // The state the app is left in is what `finishDeleting` then has to find, so it is recorded
+    // rather than only returned.
+    if (state === 'deleting') {
+      this.deleting.push(appId);
+    }
+    return Promise.resolve({ ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state });
   }
 
   listPurgeable({ limit }: { limit: number }): Promise<AppId[]> {
@@ -384,9 +408,10 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     return { volumeId: VOLUME_ID, appId: APP_ID, state, sizeBytes: NO_BYTES };
   }
 
-  test('asking leaves the app deleting rather than deleted', async () => {
+  test('asking leaves an app with a filesystem deleting rather than deleted', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
+    appsRepo.deployedApps = [APP_ID];
 
     const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
 
@@ -587,5 +612,75 @@ describe('a purge that cannot finish leaves the work to be found again', () => {
 
     expect(appsRepo.trace).toContain(`rows:${SECOND_APP_ID}`);
     expect(appsRepo.purgeable).toEqual([APP_ID]);
+  });
+});
+
+describe('an app with no filesystem to tear down is not left waiting for one', () => {
+  // Reaching `deleted` takes a host saying the filesystem is gone, and no host is ever told
+  // about an app that was never deployed. Waiting for that is waiting forever.
+  test('an app deployed no times is deleted as it is asked for', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+
+    expect(app.state).toBe('deleted');
+    expect(appsRepo.deleted).toEqual([APP_ID]);
+  });
+
+  // The volume is the thing that has to be let go of, so an app that has one waits for the host
+  // holding it however the deletion was asked for.
+  test('an app that has been deployed still waits for the host holding it', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    appsRepo.deployedApps = [APP_ID];
+
+    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+
+    expect(app.state).toBe('deleting');
+    expect(appsRepo.deleted).toEqual([]);
+  });
+
+  // Deleting is what ends an export, and it ends one whether or not there is a filesystem left
+  // for the host to have been reading.
+  test('an export still being written is ended either way', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    const exportsRepo = new StubExportCancellation();
+
+    await serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+
+    expect(exportsRepo.cancelled).toEqual([APP_ID]);
+  });
+});
+
+describe('a deletion left stuck before any of this existed is finished when one is found', () => {
+  // These predate a deletion being able to finish itself, so nothing wrote down that they were
+  // owed: they are found by the state they are still in.
+  test('an app stuck deleting with no filesystem is finished by a host report', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.deleting = [APP_ID];
+
+    await serviceWith({ appsRepo }).finishDeletions();
+
+    expect(appsRepo.deleted).toEqual([APP_ID]);
+  });
+
+  test('an app still waiting on the host holding its volume is left alone', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.deleting = [APP_ID];
+    appsRepo.deployedApps = [APP_ID];
+
+    await serviceWith({ appsRepo }).finishDeletions();
+
+    expect(appsRepo.deleted).toEqual([]);
+  });
+
+  test('an app nobody asked to delete is not deleted by the sweep', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).finishDeletions();
+
+    expect(appsRepo.deleted).toEqual([]);
   });
 });
