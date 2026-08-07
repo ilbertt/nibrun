@@ -1,5 +1,6 @@
 import type { LinkProps } from '@tanstack/react-router';
-import { LayoutDashboardIcon, type LucideIcon } from 'lucide-react';
+import { BoxesIcon, LayoutDashboardIcon, type LucideIcon } from 'lucide-react';
+import { Route as AppsRoute } from '#routes/(dashboard)/apps/index.tsx';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 export type NavItem = {
@@ -12,4 +13,5 @@ export type NavItem = {
 // active, so a new page joins both by being added here.
 export const NAV_ITEMS: NavItem[] = [
   { title: 'Overview', to: IndexRoute.to, icon: LayoutDashboardIcon },
+  { title: 'Apps', to: AppsRoute.to, icon: BoxesIcon },
 ];
