@@ -1,6 +1,6 @@
 import type { UploadableBinary } from '@repo/app-operations';
 import { DEFAULT_GUEST_PORT, FilenameSchema, Value } from '@repo/protocol';
-import { type ReactFormExtendedApi, useForm, useStore } from '@tanstack/react-form';
+import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
 import { useApps } from '#lib/hooks/use-apps.ts';
 import type { DeployRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
@@ -8,7 +8,6 @@ import type { AppSummary } from '#queries/apps.ts';
 
 export type DeployFormValues = {
   binary: File | undefined;
-  target: string | null;
   name: string;
   port: string | undefined;
   args: string | undefined;
@@ -32,8 +31,6 @@ export type DeployFormApi = ReactFormExtendedApi<
 export type DeployFormState = {
   api: DeployFormApi;
   locked: boolean;
-  target: string | null;
-  choices: readonly AppSummary[];
   replacing: AppSummary | undefined;
   targetResolved: boolean;
   defaultPort: string;
@@ -42,7 +39,6 @@ export type DeployFormState = {
 
 const UNTOUCHED: DeployFormValues = {
   binary: undefined,
-  target: null,
   name: '',
   port: undefined,
   args: undefined,
@@ -68,28 +64,22 @@ export function useDeployForm({ appId }: { appId: string | undefined }): DeployF
   const apps = useApps();
   const owned = apps.data ?? [];
   const locked = appId !== undefined;
-  const lockedApp = owned.find((app) => app.id === appId);
-  const targetResolved = !locked || lockedApp !== undefined;
+  const replacing = owned.find((app) => app.id === appId);
+  const targetResolved = !locked || replacing !== undefined;
 
   const api: DeployFormApi = useForm({
     defaultValues: UNTOUCHED,
     onSubmit: ({ value }) => {
-      const request = targetResolved ? asDeployRequest({ value, target, replacing }) : undefined;
+      const request = targetResolved ? asDeployRequest({ value, replacing }) : undefined;
       if (request !== undefined) {
         start(request);
       }
     },
   });
 
-  const chosen = useStore(api.store, (state) => state.values.target);
-  const target = locked ? (lockedApp?.slug ?? null) : chosen;
-  const replacing = owned.find((app) => app.slug === target);
-
   return {
     api,
     locked,
-    target,
-    choices: owned.filter((app) => app.state === 'active'),
     replacing,
     targetResolved,
     defaultPort: String(replacing?.config.guestPort ?? DEFAULT_GUEST_PORT),
@@ -99,11 +89,9 @@ export function useDeployForm({ appId }: { appId: string | undefined }): DeployF
 
 function asDeployRequest({
   value,
-  target,
   replacing,
 }: {
   value: DeployFormValues;
-  target: string | null;
   replacing: AppSummary | undefined;
 }): DeployRequest | undefined {
   const binary = value.binary === undefined ? undefined : uploadableFrom(value.binary);
@@ -115,8 +103,8 @@ function asDeployRequest({
   return {
     binary,
     args: tenantArguments(value.args ?? replacing?.config.args.join('\n') ?? ''),
-    app: target ?? undefined,
-    name: target === null ? value.name.trim() || undefined : undefined,
+    app: replacing?.slug,
+    name: replacing === undefined ? value.name.trim() || undefined : undefined,
     port,
   };
 }
