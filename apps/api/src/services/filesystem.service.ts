@@ -45,8 +45,8 @@ export class FilesystemService extends Service {
 
   /**
    * Asks the fleet for one directory and waits for the answer, because there is nowhere to read it
-   * from: no host is ever connected to, so a read only happens when the host that holds the volume
-   * next asks whether there is anything to do. The request stays open across that round trip.
+   * from: no host is ever connected to, so a read happens on a request the host that holds the
+   * volume is holding open in the hope of one. This request stays open across that round trip.
    *
    * The deployment decides who may read, not what is read — the filesystem belongs to the app and
    * outlives every release of it. It is looked up rather than the app because a deployment under
@@ -85,9 +85,18 @@ export class FilesystemService extends Service {
    * Offered only to a host that says it serves the app. The claim is the host's, restated on each
    * poll: it is the only party that knows what it has attached, and a control plane deciding this
    * from its own records would keep sending reads to a host that no longer holds the volume.
+   *
+   * Answered when there is something to answer with rather than at once — `signal` is the host's
+   * own request, and holding it is what takes the poll interval out of what a reader waits.
    */
-  pendingQuery({ servedAppIds }: { servedAppIds: readonly AppId[] }): FilesystemQuery | undefined {
-    return this.pending.claim({ servedAppIds });
+  pendingQuery({
+    servedAppIds,
+    signal,
+  }: {
+    servedAppIds: readonly AppId[];
+    signal: AbortSignal;
+  }): Promise<FilesystemQuery | undefined> {
+    return this.pending.claim({ servedAppIds, signal });
   }
 
   acceptResult(result: FilesystemQueryResult): void {

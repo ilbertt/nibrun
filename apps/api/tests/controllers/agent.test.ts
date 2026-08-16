@@ -21,6 +21,8 @@ const A_SERVED_APP_ID = Value.Parse(AppIdSchema, 'app-pocketbase');
 
 const PROTOCOL_VERSION_SKEW = 1;
 
+const A_BRIEF_HOLD_MS = 30;
+
 const versions: HostVersions = {
   agent: 'abc123',
   guestImage: '6.1.180-436861c7d163',
@@ -35,11 +37,13 @@ function post({
   body,
   sessionToken,
   protocolVersion = PROTOCOL_VERSION,
+  signal,
 }: {
   route: string;
   body: unknown;
   sessionToken?: string;
   protocolVersion?: number;
+  signal?: AbortSignal;
 }) {
   return sendJson({
     method: 'POST',
@@ -49,6 +53,7 @@ function post({
       ...(sessionToken && { authorization: `Bearer ${sessionToken}` }),
     },
     body,
+    signal,
   });
 }
 
@@ -74,14 +79,25 @@ async function startSession() {
   return readSession(await openSession());
 }
 
+/**
+ * A poll with a hold of the test's own. The route holds an idle one open for 25s, so a test that
+ * did not end it itself would be waiting on that rather than on anything it wrote.
+ */
 function pollFilesystem({
   sessionToken,
   servedAppIds = [],
+  signal = AbortSignal.timeout(A_BRIEF_HOLD_MS),
 }: {
   sessionToken?: string;
   servedAppIds?: readonly AppId[];
+  signal?: AbortSignal;
 }) {
-  return post({ route: AGENT_ROUTES.filesystemQuery, body: { servedAppIds }, sessionToken });
+  return post({
+    route: AGENT_ROUTES.filesystemQuery,
+    body: { servedAppIds },
+    sessionToken,
+    signal,
+  });
 }
 
 function answerFilesystem({ sessionToken, queryId }: { sessionToken?: string; queryId: string }) {
@@ -118,6 +134,18 @@ describe('a host polls for filesystem reads on a channel of its own', () => {
     );
 
     expect(body).toEqual({ result: 'none' });
+  });
+
+  // The poll is where a host waits, so nothing comes back until there is something to say or the
+  // hold ends — here, the host's own request going away. Answering an idle poll on the spot is
+  // what used to leave a person browsing waiting on the host's next one.
+  test('and told so only once its request has ended', async () => {
+    const session = await startSession();
+    const startedAt = Date.now();
+
+    await pollFilesystem({ sessionToken: session.sessionToken });
+
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(A_BRIEF_HOLD_MS);
   });
 
   // A read exists only while somebody is waiting on it, so serving an app is not by itself a

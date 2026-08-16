@@ -1,18 +1,28 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  type AgentSession,
   AppIdSchema,
+  DEFAULT_AGENT_POLL_SETTINGS,
   type DirectoryListing,
   type FilesystemQuery,
   FilesystemQueryIdSchema,
+  type FilesystemQueryRequest,
+  type FilesystemQueryResult,
   GuestPathSchema,
+  type HostVersions,
   TimestampSchema,
   Value,
 } from '@repo/protocol';
-import { Effect, Layer } from 'effect';
-import { answer } from '#lib/agent/filesystem.ts';
+import { type Duration, Effect, Fiber, Layer, TestClock, TestContext } from 'effect';
+import { answer, filesystemLoop } from '#lib/agent/filesystem.ts';
 import { UnreadableDirectory } from '#lib/filesystem/debugfs.ts';
+import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
+import { ControlPlane } from '#services/control-plane.service.ts';
 import { FilesystemReader, NoDeviceForApp } from '#services/filesystem-reader.service.ts';
+import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { recordingCommands } from '#tests/support/commands.ts';
+import { agentConfig } from '#tests/support/config.ts';
+import { platform } from '#tests/support/run.ts';
 
 const APP = Value.Parse(AppIdSchema, 'app-pocketbase');
 const QUERY: FilesystemQuery = {
@@ -81,5 +91,127 @@ describe('a query is answered whatever the read did', () => {
     }
     expect(result.outcome.message).toContain('/dev/nbd7');
     expect(result.outcome.message).not.toContain('UnreadableDirectory');
+  });
+});
+
+// Virtual time, so a test that spans three polls of a five-second floor still runs in an instant.
+const NO_TIME_AT_ALL: Duration.DurationInput = '0 millis';
+const TWO_FLOORS_AND_A_MOMENT: Duration.DurationInput = '12 seconds';
+const POLLS_ACROSS_TWO_FLOORS = 3;
+
+const SESSION = {
+  hostId: 'host-1',
+  sessionToken: 'session-token',
+  expiresAt: '2026-08-03T11:00:00Z',
+  poll: DEFAULT_AGENT_POLL_SETTINGS,
+} as AgentSession;
+
+function unreached() {
+  return Effect.dieMessage('the filesystem loop speaks on its own two routes and no others');
+}
+
+/**
+ * An api that answers a poll the instant it arrives rather than holding it open — which is what an
+ * api deployed before the hold does, and what stands in front of a new agent for the length of
+ * every rollout. Whatever is queued comes back first; every poll after that finds nothing.
+ */
+function immediateApi(queued: FilesystemQuery[]) {
+  const polls: FilesystemQueryRequest[] = [];
+  const answers: FilesystemQueryResult[] = [];
+  const layer = Layer.succeed(
+    ControlPlane,
+    ControlPlane.make({
+      openSession: unreached,
+      fetchDesiredState: unreached,
+      sendReportedState: unreached,
+      fetchFilesystemQuery: ({ request }: { request: FilesystemQueryRequest }) =>
+        Effect.sync(() => {
+          polls.push(request);
+          const query = queued.shift();
+          return query ? { result: 'query' as const, query } : { result: 'none' as const };
+        }),
+      sendFilesystemQueryResult: ({ result }: { result: FilesystemQueryResult }) =>
+        Effect.sync(() => {
+          answers.push(result);
+        }),
+    }),
+  );
+  return { polls, answers, layer };
+}
+
+const sessionHolder = Layer.succeed(
+  AgentSessionHolder,
+  AgentSessionHolder.make({
+    versions: {} as HostVersions,
+    current: Effect.succeed(SESSION),
+    pollSettings: Effect.succeed(SESSION.poll),
+    onExpired: () => Effect.void,
+  }),
+);
+
+// What a read would reach for on a host, none of which is reached here: the stub above keeps the
+// reader's signature, and a signature that shells out is one the layer has to satisfy.
+const host = Layer.mergeAll(agentConfig(), platform, recordingCommands().layer);
+
+// The real allocator over a slots file nothing wrote: a host holding no volume serves no app,
+// which is what an idle poll carries.
+const slots = Layer.provide(SlotAllocator.DefaultWithoutDependencies, host);
+
+const reader = Layer.succeed(
+  FilesystemReader,
+  FilesystemReader.make({ list: () => Effect.succeed(LISTING) }),
+);
+
+/**
+ * The loop over virtual time, so what is asserted is the cadence rather than the clock. Everything
+ * the api answers is instant here, which leaves the floor as the only thing that can space two
+ * polls apart.
+ */
+async function polling({
+  queued = [],
+  over,
+}: {
+  queued?: FilesystemQuery[];
+  over: Duration.DurationInput;
+}) {
+  const api = immediateApi(queued);
+  await Effect.runPromise(
+    Effect.provide(
+      Effect.gen(function* () {
+        const loop = yield* Effect.fork(filesystemLoop);
+        yield* TestClock.adjust(over);
+        yield* Fiber.interrupt(loop);
+      }),
+      Layer.mergeAll(api.layer, sessionHolder, slots, reader, host, TestContext.TestContext),
+    ),
+  );
+  return api;
+}
+
+/**
+ * The api holds an idle poll open, so the floor below is spent only against one that does not —
+ * and an agent is in front of exactly that api for the length of every rollout. Without it the two
+ * would spin against each other as fast as the network allows.
+ */
+describe('a poll that comes straight back is not repeated straight away', () => {
+  test('an idle host polls once and waits out the floor', async () => {
+    expect((await polling({ over: NO_TIME_AT_ALL })).polls).toHaveLength(1);
+  });
+
+  test('and asks again once, and only once, per interval it has waited', async () => {
+    expect((await polling({ over: TWO_FLOORS_AND_A_MOMENT })).polls).toHaveLength(
+      POLLS_ACROSS_TWO_FLOORS,
+    );
+  });
+
+  // The floor is under an idle poll and nothing else: a host that was given a read answers it and
+  // asks for the next one at once, because somebody is waiting on both.
+  test('a read that came back is answered and the next poll opens immediately', async () => {
+    const { polls, answers } = await polling({ queued: [QUERY], over: NO_TIME_AT_ALL });
+
+    expect(answers).toEqual([
+      { queryId: QUERY.queryId, outcome: { status: 'listed', listing: LISTING } },
+    ]);
+    expect(polls).toHaveLength(2);
   });
 });

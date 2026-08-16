@@ -9,7 +9,7 @@ import {
   SecretStringSchema,
   Value,
 } from '@repo/protocol';
-import { Effect } from 'effect';
+import { type Duration, Effect, Exit, Fiber } from 'effect';
 import { ControlPlaneError, makeControlPlaneClient } from '#lib/control/client.ts';
 import { runScoped } from '#tests/support/run.ts';
 import {
@@ -17,9 +17,15 @@ import {
   HTTP_UNAUTHORIZED,
   HTTP_UNAVAILABLE,
   recordingServer,
+  serving,
 } from '#tests/support/server.ts';
 
 const SESSION_TOKEN = Value.Parse(SecretStringSchema, 'session-token');
+
+/** An api holding a poll open, which is what it does with every poll nothing has arrived for. */
+const NEVER_ANSWERED = new Promise<Response>(() => {});
+
+const IN_FLIGHT: Duration.DurationInput = '20 millis';
 
 const VALID_DESIRED_STATE = {
   hostId: 'host-1',
@@ -156,6 +162,29 @@ describe('a filesystem read travels on its own routes', () => {
 
     expect(result).toBeUndefined();
     expect(call?.url).toBe(`${baseUrl}${AGENT_API_PREFIX}${AGENT_ROUTES.filesystemQueryResult}`);
+  });
+
+  /**
+   * The api holds this poll open until it has a read to send down it, so it is the request the
+   * agent spends almost all of its life inside. A stop has to leave it where it stands: waiting
+   * for a reply that only arrives when somebody opens a folder would hold the whole binary open.
+   */
+  test('a poll the api is holding open is abandoned when the fiber is interrupted', async () => {
+    const exit = await runScoped(
+      Effect.gen(function* () {
+        const { baseUrl } = yield* serving(() => NEVER_ANSWERED);
+        const poll = yield* Effect.fork(
+          makeControlPlaneClient({ baseUrl }).fetchFilesystemQuery({
+            sessionToken: SESSION_TOKEN,
+            request: { servedAppIds: [] },
+          }),
+        );
+        yield* Effect.sleep(IN_FLIGHT);
+        return yield* Fiber.interrupt(poll);
+      }),
+    );
+
+    expect(Exit.isInterrupted(exit)).toBe(true);
   });
 
   test('a malformed query is rejected rather than read as a directory', async () => {
