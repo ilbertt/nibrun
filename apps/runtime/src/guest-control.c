@@ -26,10 +26,14 @@
 #define REQUEST_MAX_BYTES 32
 #define REQUEST_TIMEOUT_MS 5000
 
-/* A frozen filesystem is a tenant whose writes are blocked, and the host holds the
- * freeze for as long as it takes to read the whole device. This is the ceiling on
- * that: past it the guest thaws and drops the connection, which is how the host
- * learns the bundle it just built cannot be trusted. */
+/* A frozen filesystem is a tenant whose writes are blocked. The host holds the freeze
+ * only long enough to cut a storage checkpoint and read back that it still holds it,
+ * then thaws and builds the bundle from that checkpoint — so this bounds the cut, not
+ * the read, and no longer scales with how much the tenant has written. It is the
+ * backstop for a host that stopped asking without dropping its connection: past it the
+ * guest thaws and hangs up, which is how the host learns the checkpoint it just cut
+ * cannot be trusted. Slack rather than a budget — the host's own subprocess timeouts
+ * fail an order of magnitude sooner. */
 #define MAX_FREEZE_HOLD_MS 900000U
 
 static const char FREEZE_REQUEST[] = "FREEZE\n";

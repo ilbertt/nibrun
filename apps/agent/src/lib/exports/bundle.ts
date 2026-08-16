@@ -9,7 +9,15 @@ import { stdoutOf } from '#services/command-runner.service.ts';
 const STAGING_MODE = 0o700;
 const DATA_DIRECTORY = 'data';
 const BUNDLE_NAME = 'bundle.tar.gz';
-/** A tenant filesystem is unbounded, and the default would abort a large export part-way. */
+/**
+ * A tenant filesystem is unbounded, and the default would abort a large export part-way.
+ *
+ * An hour is now a number that can actually be reached. It used to sit under the guest's own
+ * 15-minute freeze ceiling, which ended the export at a quarter of it and made a filesystem
+ * slower than that to read impossible to export at all. The read runs against a checkpoint with
+ * nobody frozen behind it, so the two bound different things — that one the cut, this one the
+ * read — rather than being two answers to the same question.
+ */
 const DUMP_TIMEOUT = Duration.hours(1);
 
 export class EmptyDump extends Data.TaggedError('EmptyDump')<{
@@ -70,10 +78,13 @@ export function bundleBinaryName(artifact: DesiredArtifact): Either.Either<strin
 }
 
 /**
- * Kept apart from the archive step because this is the only part of an export a frozen tenant
- * pays for. Everything after it reads the staging tree rather than the device, so holding the
- * guest still through a binary download and a `tar` of the whole dataset would block writes for
- * several times as long as reading the device does.
+ * Kept apart from the archive step because this is the part that needs a device attached, and
+ * behind that device a checkpoint pinning every segment on the host against reclamation.
+ * Everything after it reads the staging tree instead, so a binary download and a `tar` of the
+ * whole dataset happen with nothing pinned.
+ *
+ * No tenant is frozen through this any more — what they pay for is the cut, which is over before
+ * this starts.
  */
 export const dumpVolume = Effect.fn('dumpVolume')(function* ({
   devicePath,

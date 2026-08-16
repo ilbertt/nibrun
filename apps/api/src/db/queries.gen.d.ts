@@ -514,6 +514,8 @@ export interface ISelectExportsByAppResult {
     size_bytes: string | null;
     /** Why the export is in the state it is in, as the host put it. Never the tenant's own output. */
     message: string | null;
+    /** The pinned view the bundle was read from, named by the host that cut it. */
+    checkpoint_id: import("@repo/protocol").CheckpointId | null;
     ready_at: Date | null;
     /** When the bucket's lifecycle rule removes the bundle. The api refuses to sign past it. */
     expires_at: Date;
@@ -531,6 +533,8 @@ export interface ISelectExportByIdResult {
     size_bytes: string | null;
     /** Why the export is in the state it is in, as the host put it. Never the tenant's own output. */
     message: string | null;
+    /** The pinned view the bundle was read from, named by the host that cut it. */
+    checkpoint_id: import("@repo/protocol").CheckpointId | null;
     ready_at: Date | null;
     /** When the bucket's lifecycle rule removes the bundle. The api refuses to sign past it. */
     expires_at: Date;
@@ -556,6 +560,8 @@ export interface ISelectInFlightExportResult {
     size_bytes: string | null;
     /** Why the export is in the state it is in, as the host put it. Never the tenant's own output. */
     message: string | null;
+    /** The pinned view the bundle was read from, named by the host that cut it. */
+    checkpoint_id: import("@repo/protocol").CheckpointId | null;
     ready_at: Date | null;
     /** When the bucket's lifecycle rule removes the bundle. The api refuses to sign past it. */
     expires_at: Date;

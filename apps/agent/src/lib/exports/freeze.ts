@@ -41,15 +41,16 @@ export class FreezeRefused extends Data.TaggedError('FreezeRefused')<{
 }
 
 /**
- * The guest thaws itself if a freeze is held past its ceiling, and a bundle read across that
- * moment is one whose tail the tenant was free to change underneath. Reported as a failed export
- * rather than uploaded, because the point of freezing is that nobody has to wonder afterwards.
+ * The guest thaws itself if a freeze is held past its ceiling, and a checkpoint cut across that
+ * moment is worthless: the tenant was writing while it was taken, so it is neither the state
+ * before nor the state after. Reported as a failed export rather than read from, because the
+ * point of freezing is that nobody has to wonder afterwards.
  */
 export class FreezeLost extends Data.TaggedError('FreezeLost')<{
   readonly appId: AppId;
 }> {
   override get message() {
-    return `the guest running ${this.appId} thawed before the bundle was finished`;
+    return `the guest running ${this.appId} thawed before the checkpoint was recorded`;
   }
 }
 
@@ -140,7 +141,7 @@ const readLine = ({ wire, socketPath }: { wire: Wire; socketPath: string }) =>
  * filesystem wedged behind it.
  */
 export type FreezeLease = {
-  /** Fails if the guest let go before the caller did. Ask before trusting what was read. */
+  /** Fails if the guest let go before the caller did. Ask before trusting anything taken inside. */
   readonly assertHeld: Effect.Effect<void, FreezeLost>;
 };
 

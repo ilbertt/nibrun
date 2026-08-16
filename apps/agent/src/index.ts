@@ -12,6 +12,7 @@ import { CommandRunner } from '#services/command-runner.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
+import { ExportUploader } from '#services/export-uploader.service.ts';
 import { FilesystemReader } from '#services/filesystem-reader.service.ts';
 import { LogStore } from '#services/log-store.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
@@ -44,6 +45,7 @@ const agent = Layer.mergeAll(
   TenantLogQueue.Default,
   TenantLogReceiver.Default,
   VolumeManager.Default,
+  ExportUploader.Default,
   ExportManager.Default,
   FilesystemReader.Default,
   VmManager.Default,

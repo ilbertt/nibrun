@@ -14,8 +14,17 @@ hand back every privilege it removed.
 - **Exactly one read-write `zerofs run` per storage prefix, fleet-wide.** ZeroFS does not reject a
   second one: SlateDB's writer epoch fences the older process, which then dies on its next durable
   write, after a window in which it has been acknowledging writes that are silently discarded. A
-  duplicate is an outage rather than an error message, and systemd's single-instance guarantee is
-  the only lock there is.
+  duplicate is an outage rather than an error message, and `nibrun-zerofs.service` being
+  non-templated is the only lock there is.
+
+  The rule is about *writers*. `nibrun-zerofs-checkpoint@.service` runs `zerofs run --checkpoint`,
+  which opens read-only against a pinned manifest, takes no writer epoch and can acknowledge
+  nothing — so the agent starts those, one per export, and the invariant is untouched. Nothing
+  here is licence to start a second writer, which remains systemd's to do and only once.
+
+  A checkpoint server needs its own listener addresses and its own cache directory, which is why
+  it has a config of its own rather than the live server's: two processes sharing either is two
+  processes fighting over it.
 
 ## Unsettled
 

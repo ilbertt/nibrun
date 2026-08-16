@@ -1,53 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import { type AppId, AppIdSchema, Value } from '@repo/protocol';
 import { Effect } from 'effect';
 import { frozen } from '#lib/exports/freeze.ts';
-import { GUEST_VSOCK_FILENAME } from '#lib/vm/vsock.ts';
+import { fakeGuest } from '#tests/support/guest.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const APP_ID: AppId = Value.Parse(AppIdSchema, 'pocketbase-8zv0ch');
 
 const run = provided(platform);
-
-type GuestBehaviour = {
-  readonly onConnect?: string;
-  readonly onFreeze?: string;
-  readonly hangUpAfterFreezing?: boolean;
-};
-
-/**
- * Firecracker's end of the vsock device, which is a plain unix socket speaking a text handshake
- * before the stream becomes the guest's. Standing it up for real is the only way to cover the
- * part that matters: what the agent does when the answer is not the one it wanted.
- */
-const fakeVmm = ({ vmDir, behaviour }: { vmDir: string; behaviour: GuestBehaviour }) =>
-  Effect.acquireRelease(
-    Effect.promise(async () => {
-      const workingDir = join(vmDir, APP_ID);
-      await mkdir(workingDir, { recursive: true });
-      const { onConnect = 'OK 1024\n', onFreeze = 'OK\n', hangUpAfterFreezing = false } = behaviour;
-      return Bun.listen({
-        unix: join(workingDir, GUEST_VSOCK_FILENAME),
-        socket: {
-          // biome-ignore lint/complexity/useMaxParams: Bun hands a socket handler its own socket
-          data: (socket, chunk) => {
-            const request = chunk.toString();
-            if (request.startsWith('CONNECT')) {
-              socket.write(onConnect);
-              return;
-            }
-            socket.write(onFreeze);
-            if (hangUpAfterFreezing) {
-              socket.end();
-            }
-          },
-        },
-      });
-    }),
-    (server) => Effect.sync(() => server.stop(true)),
-  );
 
 const HELD = 'held';
 const BUNDLE_TIME = '50 millis';
@@ -71,7 +31,7 @@ describe('freezing a tenant filesystem before it is read', () => {
     const held = await run(
       Effect.gen(function* () {
         const vmDir = yield* temporaryDirectory;
-        yield* fakeVmm({ vmDir, behaviour: {} });
+        yield* fakeGuest({ vmDir, appId: APP_ID });
         return yield* outcome({ vmDir });
       }),
     );
@@ -85,7 +45,7 @@ describe('freezing a tenant filesystem before it is read', () => {
     const held = await run(
       Effect.gen(function* () {
         const vmDir = yield* temporaryDirectory;
-        yield* fakeVmm({ vmDir, behaviour: { hangUpAfterFreezing: true } });
+        yield* fakeGuest({ vmDir, appId: APP_ID, behaviour: { hangUpAfterFreezing: true } });
         return yield* outcome({ vmDir });
       }),
     );
@@ -97,7 +57,11 @@ describe('freezing a tenant filesystem before it is read', () => {
     const held = await run(
       Effect.gen(function* () {
         const vmDir = yield* temporaryDirectory;
-        yield* fakeVmm({ vmDir, behaviour: { onFreeze: 'ERR the data filesystem is gone\n' } });
+        yield* fakeGuest({
+          vmDir,
+          appId: APP_ID,
+          behaviour: { onFreeze: 'ERR the data filesystem is gone\n' },
+        });
         return yield* outcome({ vmDir });
       }),
     );
@@ -111,7 +75,7 @@ describe('freezing a tenant filesystem before it is read', () => {
     const held = await run(
       Effect.gen(function* () {
         const vmDir = yield* temporaryDirectory;
-        yield* fakeVmm({ vmDir, behaviour: { onConnect: 'FAILED\n' } });
+        yield* fakeGuest({ vmDir, appId: APP_ID, behaviour: { onConnect: 'FAILED\n' } });
         return yield* outcome({ vmDir });
       }),
     );

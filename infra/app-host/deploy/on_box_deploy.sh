@@ -81,6 +81,14 @@ bash ensure_data_volume.sh zerofs
 id -u zerofs >/dev/null 2>&1 || useradd --system --no-create-home --shell /sbin/nologin zerofs
 chown -R zerofs:zerofs /data/zerofs
 
+# Where a checkpoint server keeps its own cache, one directory per checkpoint,
+# created and removed by the unit that serves it. The parent is made here because
+# that unit runs under ProtectSystem=strict and its ReadWritePaths can only open a
+# directory that already exists. Never inside /data/zerofs: that one is the live
+# server's, and it is the only writer in it.
+mkdir -p /data/zerofs-checkpoint
+chown zerofs:zerofs /data/zerofs-checkpoint
+
 # The public edge runs unprivileged; systemd grants it CAP_NET_BIND_SERVICE and
 # nothing else. Only the private key is its own, which is why tls/ is the one
 # directory here nobody else can traverse.
@@ -266,6 +274,13 @@ cp zerofs/config.toml /etc/zerofs/config.toml.new
 # value that is one arrives through zerofs.env.
 chmod 0644 /etc/zerofs/config.toml.new
 changed_file /etc/zerofs/config.toml && NEEDS_RESTART+=(zerofs) || true
+
+# What a checkpoint server reads. Nothing restarts on a change: no instance of it
+# outlives the export it was started for, so the next one picks this up by being
+# started, and there is never a long-running process holding the old file.
+cp zerofs/checkpoint.toml /etc/zerofs/checkpoint.toml.new
+chmod 0644 /etc/zerofs/checkpoint.toml.new
+changed_file /etc/zerofs/checkpoint.toml || true
 
 cat > /etc/nibrun/agent.env.new <<EOF
 AGENT_CONTROL_PLANE_URL=${CONTROL_PLANE_INTERNAL_URL}

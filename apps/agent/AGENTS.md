@@ -90,10 +90,27 @@ credentials, and the gap is wider than the test count suggests.
   plane.
 - **The Firecracker config is asserted as a structure, never booted.** Firecracker validates it
   with `deny_unknown_fields`, so a typo is a hard error at boot and nowhere earlier.
-- **Every subprocess argument list is unasserted** — only the parsers for their *output* are
-  tested. In particular nothing has confirmed that a `truncate` onto a `zerofs` mount produces a
-  device file ZeroFS then exports, which is the one step the whole volume path rests on.
-- **S3 and IMDS** are tested against stubs; nothing has spoken to AWS.
+- **Almost every subprocess argument list is unasserted** — only the parsers for their *output*
+  are tested, and the export path, where the order the commands come in is the guarantee. In
+  particular nothing has confirmed that a `truncate` onto a `zerofs` mount produces a device file
+  ZeroFS then exports, which is the one step the whole volume path rests on.
+- **S3 and IMDS** are tested against stubs; nothing has spoken to AWS. `ExportUploader` is the
+  seam the export tests stand in front of, so what happens to a bundle's bytes after `writeBundle`
+  is a recorded call and nothing more.
+- **No checkpoint has been cut.** The export is asserted as a sequence of invocations against a
+  recording runner: the cut happens while the guest is frozen, the read after it has thawed, and
+  the checkpoint, its server and its device go on every way out. That ZeroFS answers `checkpoint
+  create` by sealing the open segment and flushing metadata *before* it records — which is why the
+  export no longer flushes first, and under `ignore_fsync` is the whole durability guarantee — is
+  read from ZeroFS v2.2.1's source rather than observed here. A version bump has to re-read it.
+- **The read-only checkpoint server has never been started.** Whether
+  `nibrun-zerofs-checkpoint@.service` and `checkpoint.toml` between them produce a listening NBD
+  socket — the `%i` expansion, the `ExecStartPost` wait, ZeroFS's own `${VAR}` substitution — is a
+  question only a host can answer.
+- **A lost freeze is noticed by asking whether the connection is still open**, which trails the
+  guest hanging up by an event-loop turn. The export test makes its fake `checkpoint create` take
+  time for that reason, and a real one takes far longer, but a guest that thawed within
+  microseconds of the cut being recorded would get past this.
 - The Firecracker drive-on-`/dev/nbdN` path is upstream-undocumented — mechanically sound, never
   run here.
 - **No test builds the full layer graph**, so a service wired wrong in `index.ts` is caught by

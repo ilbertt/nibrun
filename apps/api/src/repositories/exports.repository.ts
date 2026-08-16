@@ -1,4 +1,4 @@
-import type { AppId, ExportId, ExportState, OwnerId } from '@repo/protocol';
+import type { AppId, CheckpointId, ExportId, ExportState, OwnerId } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.d.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -24,6 +24,7 @@ export type ExportsByAppInput = {
 /** What a host said about a bundle it was asked to write. */
 export type ReportedExportRow = {
   exportId: ExportId;
+  checkpointId: CheckpointId | null;
   state: ExportState;
   sizeBytes: number | null;
   readyAt: Date | null;
@@ -75,7 +76,7 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
       /* @notNull object_key */
       /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
-             e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
+             e.checkpoint_id, e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
       FROM nibrun.exports e
       JOIN nibrun.live_apps a ON a.id = e.app_id
       WHERE e.app_id = ${appId} AND a.owner_id = ${ownerId}
@@ -89,7 +90,7 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
       /* @notNull object_key */
       /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
-             e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
+             e.checkpoint_id, e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
       FROM nibrun.exports e
       JOIN nibrun.live_apps a ON a.id = e.app_id
       WHERE e.app_id = ${appId} AND e.id = ${exportId} AND a.owner_id = ${ownerId}
@@ -110,6 +111,7 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
         await tx.ApplyReportedExport`
           UPDATE nibrun.exports SET
             state = ${bundle.state},
+            checkpoint_id = ${bundle.checkpointId},
             size_bytes = ${bundle.sizeBytes},
             ready_at = ${bundle.readyAt},
             message = ${bundle.message}
@@ -136,7 +138,7 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
       /* @notNull object_key */
       /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
-             e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
+             e.checkpoint_id, e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
       FROM nibrun.exports e
       JOIN nibrun.live_apps a ON a.id = e.app_id
       WHERE e.app_id = ${appId} AND a.owner_id = ${ownerId}

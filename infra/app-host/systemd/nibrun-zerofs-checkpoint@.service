@@ -1,0 +1,71 @@
+[Unit]
+Description=ZeroFS serving checkpoint %i, read-only
+Documentation=https://www.zerofs.net
+# One instance per checkpoint, started by the agent for one export and stopped when
+# that export ends. Templated because the checkpoint name is what it serves, and a
+# non-templated unit would have nowhere to put it.
+#
+# Not a second writer, so not a breach of the one-read-write-`zerofs run`-per-prefix
+# invariant: `--checkpoint` opens read-only and pins a manifest that no longer
+# advances, so this takes no SlateDB writer epoch and cannot fence the live server.
+After=nibrun-zerofs.service
+# The checkpoint this serves is cut through the live server's admin RPC, so there is
+# never one to open unless that server has been running.
+Requires=nibrun-zerofs.service
+
+[Service]
+Type=exec
+User=zerofs
+Group=zerofs
+
+# Read by checkpoint.toml, which puts this instance's socket and cache under it.
+# Every path in that file is per-instance for one reason: two instances sharing a
+# listener address is two processes fighting over it, and sharing a cache directory
+# is two processes fighting over its contents.
+Environment=NIBRUN_CHECKPOINT=%i
+# The storage URL and encryption password, which are the live server's too — a
+# checkpoint is a view of the same prefix rather than a copy of it.
+EnvironmentFile=/etc/zerofs/zerofs.env
+
+# Scratch for one pass over one filesystem, not a working set to keep warm, so it is
+# made on the way in and removed on the way out rather than accumulating a directory
+# per export on the data volume.
+ExecStartPre=/usr/bin/mkdir -p /data/zerofs-checkpoint/%i
+ExecStart=/opt/nibrun/bin/zerofs/zerofs run --config /etc/zerofs/checkpoint.toml --checkpoint %i
+# Type=exec calls the unit started the moment the process execs, which for ZeroFS is
+# well before it is answering on anything. The agent attaches as soon as `systemctl
+# start` returns, so the wait belongs here rather than in a poll on the agent's side
+# that would have to know this path anyway.
+ExecStartPost=/bin/sh -c 'for _ in $(seq 100); do [ -S /run/zerofs-checkpoint/%i/nbd.sock ] && exit 0; sleep 0.1; done; exit 1'
+ExecStopPost=-/usr/bin/rm -rf /data/zerofs-checkpoint/%i
+
+# Nothing to come back for. This serves one export's read, and a restart would leave
+# the agent attached across a server that silently went away and returned — where a
+# unit that stays dead is something the export can notice and report.
+Restart=no
+
+RuntimeDirectory=zerofs-checkpoint/%i
+# nbd-client reaches the socket in here, as root.
+RuntimeDirectoryMode=0750
+
+LimitNOFILE=1048576
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# ProtectSystem=strict makes everything else read-only, and the cache lives on the
+# data volume rather than under CacheDirectory. Its own directory, never
+# /data/zerofs: that one belongs to the live server, which is its only writer.
+ReadWritePaths=/data/zerofs-checkpoint
+
+# The same `SOURCE` the live server writes under, deliberately: both are ZeroFS
+# serving this host's filesystems, and splitting them would mean asking two questions
+# to read one story.
+LogExtraFields=SOURCE=zerofs

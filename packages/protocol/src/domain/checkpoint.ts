@@ -14,15 +14,20 @@ export type CheckpointState = typeof CheckpointStateSchema.static;
 /**
  * A pinned, non-advancing view of a volume, cut by the host that currently has it open.
  *
- * Export does **not** need one: the owning host writes the export itself, from the device it
- * already has attached, so there is no second reader to give a consistent view to.
+ * Export needs one. The bundle is read by a second, read-only server rather than off the live
+ * device, and that second reader is exactly what a checkpoint exists to give a consistent view
+ * to. It is what shortens the tenant's freeze from the whole read to the cut, without the bundle
+ * becoming any staler: the checkpoint is taken while the guest is still frozen, so it pins the
+ * same moment the freeze does.
  *
- * A checkpoint is for the case a live view cannot serve: an image that must stay still across
- * a long operation, such as a migration. That is the only reason this is expressible as
- * desired state — the owning host is the only party that can cut one.
+ * The other case is an image that must stay still across a long operation, such as a migration.
+ * Either way the owning host is the only party that can cut one, which is why this is expressible
+ * as desired state at all.
  *
- * Checkpoints never expire, and pin the storage they reference against garbage collection
- * until deleted. Removing one is the point of `absent`, not an afterthought.
+ * Checkpoints never expire, and pin the storage they reference against garbage collection until
+ * deleted — segment deletion, segment compaction and metadata reclamation all stop while any
+ * checkpoint exists, for every volume that host serves rather than only the one it was cut from.
+ * Removing one is the point of `absent`, not an afterthought.
  *
  * `reference` is whatever the storage layer hands back to address it afterwards, kept opaque
  * so its shape stays the storage layer's business.
