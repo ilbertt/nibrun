@@ -55,8 +55,8 @@ export class FreezeLost extends Data.TaggedError('FreezeLost')<{
   }
 }
 
-const readLine = ({ wire, socketPath }: { wire: GuestWire; socketPath: string }) =>
-  Effect.tryPromise({
+function readLine({ wire, socketPath }: { wire: GuestWire; socketPath: string }) {
+  return Effect.tryPromise({
     try: () => wire.receiveLine(),
     catch: () => new GuestSilent({ socketPath }),
   }).pipe(
@@ -65,6 +65,7 @@ const readLine = ({ wire, socketPath }: { wire: GuestWire; socketPath: string })
       onTimeout: () => new GuestSilent({ socketPath }),
     }),
   );
+}
 
 /**
  * A held freeze, for as long as the scope lives. The connection *is* the lease: dropping it is
