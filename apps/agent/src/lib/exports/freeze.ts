@@ -2,7 +2,9 @@ import type { AppId } from '@repo/protocol';
 import { Data, Duration, Effect, Option } from 'effect';
 import {
   connectRequest,
+  dialGuest,
   GUEST_CONTROL_VSOCK_PORT,
+  type GuestWire,
   guestVsockPath,
   readConnectReply,
   vmWorkingDir,
@@ -54,79 +56,9 @@ export class FreezeLost extends Data.TaggedError('FreezeLost')<{
   }
 }
 
-type Wire = {
-  readonly send: (text: string) => void;
-  readonly readLine: () => Promise<string>;
-  readonly isOpen: () => boolean;
-  readonly close: () => void;
-};
-
-async function dial(socketPath: string): Promise<Wire> {
-  let buffered = '';
-  let open = true;
-  let waiting: (() => void) | undefined;
-
-  const socket = await Bun.connect({
-    unix: socketPath,
-    socket: {
-      // biome-ignore lint/complexity/useMaxParams: Bun hands a socket handler its own socket
-      data: (_socket, chunk) => {
-        buffered += chunk.toString();
-        waiting?.();
-      },
-      close: () => {
-        open = false;
-        waiting?.();
-      },
-      error: () => {
-        open = false;
-        waiting?.();
-      },
-    },
-  });
-
-  function takeLine(): string | undefined {
-    const end = buffered.indexOf('\n');
-    if (end < 0) {
-      return undefined;
-    }
-    const line = buffered.slice(0, end);
-    buffered = buffered.slice(end + 1);
-    return line;
-  }
-
-  return {
-    send: (text) => {
-      socket.write(text);
-    },
-    isOpen: () => open,
-    close: () => {
-      socket.end();
-    },
-    readLine: () =>
-      // biome-ignore lint/complexity/useMaxParams: an executor settles two ways
-      new Promise((resolve, reject) => {
-        function attempt() {
-          const line = takeLine();
-          if (line !== undefined) {
-            waiting = undefined;
-            resolve(line);
-            return;
-          }
-          if (!open) {
-            waiting = undefined;
-            reject(new Error(`${socketPath} closed before it answered`));
-          }
-        }
-        waiting = attempt;
-        attempt();
-      }),
-  };
-}
-
-const readLine = ({ wire, socketPath }: { wire: Wire; socketPath: string }) =>
-  Effect.tryPromise({
-    try: () => wire.readLine(),
+function readLine({ wire, socketPath }: { wire: GuestWire; socketPath: string }) {
+  return Effect.tryPromise({
+    try: () => wire.receiveLine(),
     catch: () => new GuestSilent({ socketPath }),
   }).pipe(
     Effect.timeoutFail({
@@ -134,6 +66,7 @@ const readLine = ({ wire, socketPath }: { wire: Wire; socketPath: string }) =>
       onTimeout: () => new GuestSilent({ socketPath }),
     }),
   );
+}
 
 /**
  * A held freeze, for as long as the scope lives. The connection *is* the lease: dropping it is
@@ -163,7 +96,7 @@ export const frozen = Effect.fn('frozen')(function* ({
   const socketPath = guestVsockPath({ workingDir: vmWorkingDir({ vmDir, appId }) });
   const dialled = yield* Effect.acquireRelease(
     Effect.tryPromise({
-      try: () => dial(socketPath),
+      try: () => dialGuest({ socketPath }),
       catch: (cause) => new GuestUnreachable({ socketPath, cause }),
     }),
     (wire) => Effect.sync(() => wire.close()),

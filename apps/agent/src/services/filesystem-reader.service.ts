@@ -1,20 +1,8 @@
 import type { AppId, DirectoryListing, GuestPath } from '@repo/protocol';
-import { Data, Duration, Effect, Either, Option } from 'effect';
-import {
-  LISTING_ENVIRONMENT,
-  listingCommand,
-  parseListing,
-  UnreadableDirectory,
-} from '#lib/filesystem/debugfs.ts';
-import { stdoutOf } from '#services/command-runner.service.ts';
+import { Data, Effect, Option } from 'effect';
+import { guestFilesystem } from '#lib/filesystem/client.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
-
-/**
- * Bounded well below the export path's hour: a listing is read while somebody waits for it, and
- * a directory large enough to take longer than this is one the entry limit would truncate anyway.
- */
-const LISTING_TIMEOUT_SECONDS = 20;
-const LISTING_TIMEOUT = Duration.seconds(LISTING_TIMEOUT_SECONDS);
 
 export class NoDeviceForApp extends Data.TaggedError('NoDeviceForApp')<{
   readonly appId: AppId;
@@ -25,15 +13,20 @@ export class NoDeviceForApp extends Data.TaggedError('NoDeviceForApp')<{
 }
 
 /**
- * Reads one directory out of one tenant's filesystem.
+ * Reads one directory out of one tenant's filesystem, by asking the guest that has it mounted.
  *
- * The slot lookup is what scopes it: an app resolves to the single device this host attached for
- * it, so a path is only ever resolved against the filesystem its own app owns. Nothing here takes
- * a device path from a caller.
+ * The slot lookup is what scopes it: an app resolves to the single microVM this host runs for it,
+ * so a path is only ever resolved inside the filesystem its own app owns — and inside the guest,
+ * which is the only place that can answer without the volume's flush interval standing between
+ * the tenant's last write and what somebody sees.
+ *
+ * Reading is all this offers. The write verbs are on the client, waiting for the control plane to
+ * carry a request for one.
  */
 export class FilesystemReader extends Effect.Service<FilesystemReader>()('FilesystemReader', {
   effect: Effect.gen(function* () {
     const allocator = yield* SlotAllocator;
+    const config = yield* AgentConfig;
 
     const list = Effect.fn('FilesystemReader.list')(function* ({
       appId,
@@ -43,26 +36,18 @@ export class FilesystemReader extends Effect.Service<FilesystemReader>()('Filesy
       path: GuestPath;
     }) {
       yield* Effect.annotateCurrentSpan({ appId, path });
-      const slot = yield* allocator.lookup(appId);
-      if (Option.isNone(slot)) {
+      if (Option.isNone(yield* allocator.lookup(appId))) {
         return yield* new NoDeviceForApp({ appId });
       }
-
-      const { nbdDevicePath } = slot.value;
-      const command = yield* listingCommand({ devicePath: nbdDevicePath, path });
-      const output = yield* stdoutOf({
-        command,
-        timeout: LISTING_TIMEOUT,
-        env: LISTING_ENVIRONMENT,
-      });
-
-      const listing = parseListing({ output, path });
-      return Either.isLeft(listing)
-        ? yield* new UnreadableDirectory({ devicePath: nbdDevicePath })
-        : (listing.right satisfies DirectoryListing);
+      const listing = yield* Effect.scoped(
+        Effect.flatMap(guestFilesystem({ appId, vmDir: config.vmDir }), (guest) =>
+          guest.list(path),
+        ),
+      );
+      return listing satisfies DirectoryListing;
     });
 
     return { list };
   }),
-  dependencies: [SlotAllocator.Default],
+  dependencies: [SlotAllocator.Default, AgentConfig.Default],
 }) {}

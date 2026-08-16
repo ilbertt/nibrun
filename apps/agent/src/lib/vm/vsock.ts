@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { join } from 'node:path';
 import type { AppId } from '@repo/protocol';
 import { Data, Either } from 'effect';
@@ -16,6 +17,13 @@ export const GUEST_VSOCK_FILENAME = 'logs.vsock';
 
 /** Answered by the control process in the guest's PID 1. `apps/runtime/src/vsock.h` is the other end. */
 export const GUEST_CONTROL_VSOCK_PORT = 51001;
+
+/**
+ * Answered by a second process beside it, on a port of its own because the control port
+ * serialises: it takes one connection at a time and a granted freeze holds it for as long as an
+ * export reads the device. Browsing a filesystem must never queue behind that.
+ */
+export const GUEST_FILESYSTEM_VSOCK_PORT = 51002;
 
 export const vmWorkingDir = ({ vmDir, appId }: { vmDir: string; appId: AppId }): string =>
   join(vmDir, appId);
@@ -52,4 +60,96 @@ export function readConnectReply({
   return reply.startsWith(CONNECT_ACCEPTED)
     ? Either.right(undefined)
     : Either.left(new GuestPortUnreachable({ port, reply }));
+}
+
+/**
+ * One connection to one guest's vsock device.
+ *
+ * Both readers exist because the handshake above is a line and everything after it is whatever
+ * the port carries — a line for the control port, framed bytes for the filesystem one. Neither
+ * resolves until it has what it was asked for, and both reject the moment the guest lets go, so
+ * a caller never has to ask whether a short read meant anything.
+ */
+export type GuestWire = {
+  readonly send: (bytes: string | Uint8Array) => void;
+  readonly receiveLine: () => Promise<string>;
+  readonly receive: (count: number) => Promise<Buffer>;
+  readonly isOpen: () => boolean;
+  readonly close: () => void;
+};
+
+export async function dialGuest({ socketPath }: { socketPath: string }): Promise<GuestWire> {
+  let buffered = Buffer.alloc(0);
+  let open = true;
+  let waiting: (() => void) | undefined;
+
+  const socket = await Bun.connect({
+    unix: socketPath,
+    socket: {
+      // biome-ignore lint/complexity/useMaxParams: Bun hands a socket handler its own socket
+      data: (_socket, chunk) => {
+        buffered = Buffer.concat([buffered, chunk]);
+        waiting?.();
+      },
+      close: () => {
+        open = false;
+        waiting?.();
+      },
+      error: () => {
+        open = false;
+        waiting?.();
+      },
+    },
+  });
+
+  function take(count: number): Buffer | undefined {
+    if (buffered.byteLength < count) {
+      return undefined;
+    }
+    const taken = buffered.subarray(0, count);
+    buffered = buffered.subarray(count);
+    return taken;
+  }
+
+  function takeLine(): string | undefined {
+    const end = buffered.indexOf('\n');
+    if (end < 0) {
+      return undefined;
+    }
+    const line = buffered.subarray(0, end).toString();
+    buffered = buffered.subarray(end + 1);
+    return line;
+  }
+
+  function awaiting<A>(pull: () => A | undefined): Promise<A> {
+    // biome-ignore lint/complexity/useMaxParams: an executor settles two ways
+    return new Promise((resolve, reject) => {
+      function attempt() {
+        const pulled = pull();
+        if (pulled !== undefined) {
+          waiting = undefined;
+          resolve(pulled);
+          return;
+        }
+        if (!open) {
+          waiting = undefined;
+          reject(new Error(`${socketPath} closed before it answered`));
+        }
+      }
+      waiting = attempt;
+      attempt();
+    });
+  }
+
+  return {
+    send: (bytes) => {
+      socket.write(bytes);
+    },
+    isOpen: () => open,
+    close: () => {
+      socket.end();
+    },
+    receiveLine: () => awaiting(takeLine),
+    receive: (count) => awaiting(() => take(count)),
+  };
 }
