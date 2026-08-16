@@ -15,7 +15,7 @@ import {
 } from '@repo/protocol';
 import { type Duration, Effect, Fiber, Layer, TestClock, TestContext } from 'effect';
 import { answer, filesystemLoop } from '#lib/agent/filesystem.ts';
-import { UnreadableDirectory } from '#lib/filesystem/debugfs.ts';
+import { GuestFilesystemRefused } from '#lib/filesystem/protocol.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
 import { FilesystemReader, NoDeviceForApp } from '#services/filesystem-reader.service.ts';
@@ -25,6 +25,8 @@ import { agentConfig } from '#tests/support/config.ts';
 import { platform } from '#tests/support/run.ts';
 
 const APP = Value.Parse(AppIdSchema, 'app-pocketbase');
+/** What the guest answers when nothing is at the path it was given. */
+const NO_SUCH_PATH = 1;
 const QUERY: FilesystemQuery = {
   queryId: Value.Parse(FilesystemQueryIdSchema, 'query-1'),
   appId: APP,
@@ -75,22 +77,26 @@ describe('a query is answered whatever the read did', () => {
     expect(result.outcome.status).toBe('failed');
   });
 
-  test('a device that could not be read is too', async () => {
-    const result = await answering(() => new UnreadableDirectory({ devicePath: '/dev/nbd7' }));
+  test('a directory the guest would not read is too', async () => {
+    const result = await answering(
+      () => new GuestFilesystemRefused({ appId: APP, status: NO_SUCH_PATH }),
+    );
 
     expect(result.outcome.status).toBe('failed');
   });
 
   // The message reaches whoever asked, so it has to read as a sentence rather than as a tag —
-  // and it must not carry the path, which is the tenant's to know.
+  // and it names the app rather than the path, which is the tenant's to know.
   test('a failure explains itself without quoting what was asked for', async () => {
-    const result = await answering(() => new UnreadableDirectory({ devicePath: '/dev/nbd7' }));
+    const result = await answering(
+      () => new GuestFilesystemRefused({ appId: APP, status: NO_SUCH_PATH }),
+    );
 
     if (result.outcome.status !== 'failed') {
       throw new Error('a failed read must answer with a failure');
     }
-    expect(result.outcome.message).toContain('/dev/nbd7');
-    expect(result.outcome.message).not.toContain('UnreadableDirectory');
+    expect(result.outcome.message).toContain(APP);
+    expect(result.outcome.message).not.toContain('GuestFilesystemRefused');
   });
 });
 
