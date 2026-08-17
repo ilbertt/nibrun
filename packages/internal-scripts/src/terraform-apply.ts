@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import { optionalEnv } from '#shared/env.ts';
-import { failOnUnexpectedDestroys, terraform } from '#shared/terraform.ts';
+import { failOnUnexpectedDestroys, terraform, terraformInit } from '#shared/terraform.ts';
 
 const PLAN_FILE = 'tfplan';
 
@@ -31,7 +31,7 @@ async function group<T>({ title, run }: { title: string; run: () => Promise<T> }
 
 await group({
   title: 'terraform init',
-  run: () => terraform(['init', '-input=false']),
+  run: () => terraformInit(),
 });
 
 await group({

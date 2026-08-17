@@ -44,8 +44,13 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      # S3 names are global, so this has to be unique across every AWS account.
-      BucketName: nibrun-infra-tfstate
+      # S3 names are global, so this has to be unique across every AWS account —
+      # and a closed account holds its buckets for around 90 days, so "the old
+      # deployment is gone" does not free the name. Derived from the account id
+      # rather than fixed, which makes a collision with a predecessor
+      # impossible. Terraform reads the same name from TF_STATE_BUCKET rather
+      # than naming it, since a backend cannot derive anything.
+      BucketName: !Sub nibrun-infra-tfstate-${AWS::AccountId}
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -162,5 +167,5 @@ Outputs:
     Description: Set this as the AWS_TERRAFORM_PLAN_ROLE_ARN variable in the GitHub repo.
     Value: !GetAtt TerraformPlanRole.Arn
   StateBucket:
-    Description: Must match the backend bucket in infra/terraform/versions.tf.
+    Description: Set this as the TF_STATE_BUCKET variable in the GitHub repo, and pass it to `terraform init -backend-config=bucket=` when running locally.
     Value: !Ref StateBucket

@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import { $ } from 'bun';
 import { writeSummary } from '#shared/actions.ts';
-import { optionalEnv } from '#shared/env.ts';
+import { optionalEnv, requiredEnv } from '#shared/env.ts';
 import { terraformDir } from '#shared/paths.ts';
 
 type ResourceChange = {
@@ -11,6 +11,19 @@ type ResourceChange = {
 
 export function terraform(args: string[]) {
   return $`terraform ${args}`.cwd(terraformDir);
+}
+
+// The state bucket is the one name nothing can derive: a backend is resolved
+// before any provider exists, so aws_caller_identity is out of reach where
+// s3.tf uses it. Supplied here rather than written into versions.tf, which
+// keeps the account id out of a public repo and lets a rebuild in a fresh
+// account claim its own bucket instead of a name its predecessor still holds.
+export function terraformInit() {
+  return terraform([
+    'init',
+    '-input=false',
+    `-backend-config=bucket=${requiredEnv('TF_STATE_BUCKET')}`,
+  ]);
 }
 
 // The data volume holds Postgres and the artifacts bucket holds users' uploaded

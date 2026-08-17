@@ -2,17 +2,27 @@
 # own retention, its own access pattern and its own set of principals, and each
 # feeds exactly one config value, so no name is ever rewritten on the way to the
 # box.
-#
-# Region suffix because the S3 namespace is global while a bucket is not: AWS
-# holds a deleted name for up to hours, so an unqualified name collides with the
-# one the previous region just released.
+
+locals {
+  # The S3 namespace is global while a bucket belongs to one account in one
+  # region, so a name has to carry both to be ours alone.
+  #
+  # The region half is about rebuilding elsewhere: AWS holds a deleted name for
+  # up to hours, so an unqualified name collides with the one the previous
+  # region just released. The account half is the same problem over a much
+  # longer window — a closed account keeps its buckets for around 90 days, and
+  # every name here was still held by its predecessor when this account first
+  # tried to claim them. Neither half is decoration; drop one and a rebuild
+  # fails on a name nothing in this account can see.
+  bucket_suffix = "${var.region}-${data.aws_caller_identity.current.account_id}"
+}
 
 # --- Deploy bundles ---
 #
 # The runtime bundle CI uploads and the instance downloads (compose files,
 # on-box scripts). Disposable — every deploy writes a new one.
 resource "aws_s3_bucket" "deploy" {
-  bucket        = "${local.resource_name_prefix}-deploy-${var.region}"
+  bucket        = "${local.resource_name_prefix}-deploy-${local.bucket_suffix}"
   force_destroy = true
 
   tags = {
@@ -46,7 +56,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "deploy" {
 # Written nightly by the pg-backup sidecar. Longer retention than the bundles,
 # and never force-destroyed.
 resource "aws_s3_bucket" "backups" {
-  bucket = "${local.resource_name_prefix}-backups-${var.region}"
+  bucket = "${local.resource_name_prefix}-backups-${local.bucket_suffix}"
 
   tags = {
     Name = "${local.resource_name_prefix}-backups"
@@ -93,7 +103,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
 # The binaries users upload. Customer data that outlives any single deploy, so
 # it is versioned and never force-destroyed.
 resource "aws_s3_bucket" "artifacts" {
-  bucket = "${local.resource_name_prefix}-artifacts-${var.region}"
+  bucket = "${local.resource_name_prefix}-artifacts-${local.bucket_suffix}"
 
   tags = {
     Name = "${local.resource_name_prefix}-artifacts"
@@ -211,7 +221,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
 # Never put a lifecycle expiry on this bucket either. It holds live data: the
 # host's local disk is the cache, and this is what it is a cache of.
 resource "aws_s3_bucket" "filesystems" {
-  bucket = "${local.resource_name_prefix}-filesystems-${var.region}"
+  bucket = "${local.resource_name_prefix}-filesystems-${local.bucket_suffix}"
 
   tags = {
     Name = "${local.resource_name_prefix}-filesystems"
@@ -249,7 +259,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "filesystems" {
 # artifacts either: CI writes here, and CI must never hold write access to the
 # bucket holding users' binaries.
 resource "aws_s3_bucket" "guest_images" {
-  bucket = "${local.resource_name_prefix}-guest-images-${var.region}"
+  bucket = "${local.resource_name_prefix}-guest-images-${local.bucket_suffix}"
 
   tags = {
     Name = "${local.resource_name_prefix}-guest-images"
@@ -292,7 +302,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "guest_images" {
 # No versioning, for the same reason. A version of an expired export is an
 # expired export that still exists.
 resource "aws_s3_bucket" "exports" {
-  bucket = "${local.resource_name_prefix}-exports-${var.region}"
+  bucket = "${local.resource_name_prefix}-exports-${local.bucket_suffix}"
 
   tags = {
     Name = "${local.resource_name_prefix}-exports"

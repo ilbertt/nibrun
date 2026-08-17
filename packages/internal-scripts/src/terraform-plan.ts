@@ -3,7 +3,7 @@ import { $ } from 'bun';
 import { writeSummary } from '#shared/actions.ts';
 import { optionalEnv } from '#shared/env.ts';
 import { repoRoot } from '#shared/paths.ts';
-import { failOnUnexpectedDestroys, terraform } from '#shared/terraform.ts';
+import { failOnUnexpectedDestroys, terraform, terraformInit } from '#shared/terraform.ts';
 
 const PLAN_FILE = 'tfplan';
 // A plan is worth reading in full, but the step summary caps out well below it.
@@ -23,7 +23,7 @@ if (baseRef) {
   }
 }
 
-await terraform(['init', '-input=false']);
+await terraformInit();
 
 // -lock=false keeps this read-only: the plan role has no write access to the
 // state bucket, and a pull request has no business holding the state lock.

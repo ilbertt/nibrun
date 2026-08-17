@@ -17,10 +17,16 @@ All of this is manual and none of it is in code.
 
 ```sh
 # Console → CloudFormation → upload bootstrap/github-oidc-bootstrap.yaml, once.
+# Its StateBucket output is the bucket below, and the TF_STATE_BUCKET
+# repository variable CI passes the same way.
 cd infra/terraform
-terraform init
+terraform init -backend-config=bucket=<StateBucket>
 terraform apply # prompts for every variable without a default
 ```
+
+The backend names no bucket of its own: it is resolved before any provider, so it cannot derive
+the account id the way `s3.tf` does, and hardcoding one would both publish the account id and pin
+a rebuilt account to names its predecessor still holds for ~90 days.
 
 DNS, every record **proxied** (orange cloud):
 
