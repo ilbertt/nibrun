@@ -6,7 +6,7 @@ import { themeScript } from '#lib/theme-script.ts';
 const SITE_URL = 'https://nibrun.com';
 const TITLE = 'nibrun — drop your binary, get a server';
 const DESCRIPTION =
-  'Drop a compiled binary and get it running on a server, in an isolated guest with a persistent volume. No Dockerfile, no YAML.';
+  'Drop a compiled binary and get a server: a microVM of its own, a persistent filesystem, and an HTTPS URL. No Dockerfile, no YAML, no cluster.';
 const OG_IMAGE = `${SITE_URL}/og.png`;
 
 export const Route = createRootRoute({
