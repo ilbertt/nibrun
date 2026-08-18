@@ -9,16 +9,11 @@ export function BinaryDrop() {
   const picker = useBinaryPicker({ onPick: handoff.offer });
 
   return (
-    <div className="relative isolate flex w-full flex-col gap-3">
-      <div
-        aria-hidden="true"
-        data-dragging={picker.dragging || undefined}
-        className="pointer-events-none absolute -inset-6 -z-10 rounded-full bg-primary/30 opacity-70 blur-3xl transition-opacity duration-300 data-[dragging=true]:opacity-100"
-      />
+    <div className="flex w-full flex-col gap-3">
       <div
         data-dragging={picker.dragging || undefined}
         data-invalid={handoff.failure !== undefined || undefined}
-        className="relative rounded-3xl border-2 border-muted-foreground/25 border-dashed bg-input/40 transition-[color,background-color,border-color] duration-200 hover:border-muted-foreground/40 hover:bg-input/70 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/30 data-[dragging=true]:border-ring data-[invalid=true]:border-destructive/60 data-[dragging=true]:border-solid data-[dragging=true]:bg-primary/10"
+        className="relative rounded-3xl border-2 border-muted-foreground/25 border-dashed bg-input/40 transition-[color,background-color,border-color] duration-200 hover:border-muted-foreground/40 hover:bg-input/70 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring/30 data-[dragging=true]:border-ring data-[invalid=true]:border-destructive/60 data-[dragging=true]:border-solid data-[dragging=true]:bg-primary/10 data-[dragging=true]:ring-4 data-[dragging=true]:ring-primary/20"
         {...picker.dropHandlers}
       >
         <input
