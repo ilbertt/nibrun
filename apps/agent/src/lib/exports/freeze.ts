@@ -2,7 +2,9 @@ import type { AppId } from '@repo/protocol';
 import { Data, Duration, Effect, Option } from 'effect';
 import {
   connectRequest,
+  dialGuest,
   GUEST_CONTROL_VSOCK_PORT,
+  type GuestWire,
   guestVsockPath,
   readConnectReply,
   vmWorkingDir,
@@ -41,91 +43,22 @@ export class FreezeRefused extends Data.TaggedError('FreezeRefused')<{
 }
 
 /**
- * The guest thaws itself if a freeze is held past its ceiling, and a bundle read across that
- * moment is one whose tail the tenant was free to change underneath. Reported as a failed export
- * rather than uploaded, because the point of freezing is that nobody has to wonder afterwards.
+ * The guest thaws itself if a freeze is held past its ceiling, and a checkpoint cut across that
+ * moment is worthless: the tenant was writing while it was taken, so it is neither the state
+ * before nor the state after. Reported as a failed export rather than read from, because the
+ * point of freezing is that nobody has to wonder afterwards.
  */
 export class FreezeLost extends Data.TaggedError('FreezeLost')<{
   readonly appId: AppId;
 }> {
   override get message() {
-    return `the guest running ${this.appId} thawed before the bundle was finished`;
+    return `the guest running ${this.appId} thawed before the checkpoint was recorded`;
   }
 }
 
-type Wire = {
-  readonly send: (text: string) => void;
-  readonly readLine: () => Promise<string>;
-  readonly isOpen: () => boolean;
-  readonly close: () => void;
-};
-
-async function dial(socketPath: string): Promise<Wire> {
-  let buffered = '';
-  let open = true;
-  let waiting: (() => void) | undefined;
-
-  const socket = await Bun.connect({
-    unix: socketPath,
-    socket: {
-      // biome-ignore lint/complexity/useMaxParams: Bun hands a socket handler its own socket
-      data: (_socket, chunk) => {
-        buffered += chunk.toString();
-        waiting?.();
-      },
-      close: () => {
-        open = false;
-        waiting?.();
-      },
-      error: () => {
-        open = false;
-        waiting?.();
-      },
-    },
-  });
-
-  function takeLine(): string | undefined {
-    const end = buffered.indexOf('\n');
-    if (end < 0) {
-      return undefined;
-    }
-    const line = buffered.slice(0, end);
-    buffered = buffered.slice(end + 1);
-    return line;
-  }
-
-  return {
-    send: (text) => {
-      socket.write(text);
-    },
-    isOpen: () => open,
-    close: () => {
-      socket.end();
-    },
-    readLine: () =>
-      // biome-ignore lint/complexity/useMaxParams: an executor settles two ways
-      new Promise((resolve, reject) => {
-        function attempt() {
-          const line = takeLine();
-          if (line !== undefined) {
-            waiting = undefined;
-            resolve(line);
-            return;
-          }
-          if (!open) {
-            waiting = undefined;
-            reject(new Error(`${socketPath} closed before it answered`));
-          }
-        }
-        waiting = attempt;
-        attempt();
-      }),
-  };
-}
-
-const readLine = ({ wire, socketPath }: { wire: Wire; socketPath: string }) =>
-  Effect.tryPromise({
-    try: () => wire.readLine(),
+function readLine({ wire, socketPath }: { wire: GuestWire; socketPath: string }) {
+  return Effect.tryPromise({
+    try: () => wire.receiveLine(),
     catch: () => new GuestSilent({ socketPath }),
   }).pipe(
     Effect.timeoutFail({
@@ -133,6 +66,7 @@ const readLine = ({ wire, socketPath }: { wire: Wire; socketPath: string }) =>
       onTimeout: () => new GuestSilent({ socketPath }),
     }),
   );
+}
 
 /**
  * A held freeze, for as long as the scope lives. The connection *is* the lease: dropping it is
@@ -140,7 +74,7 @@ const readLine = ({ wire, socketPath }: { wire: Wire; socketPath: string }) =>
  * filesystem wedged behind it.
  */
 export type FreezeLease = {
-  /** Fails if the guest let go before the caller did. Ask before trusting what was read. */
+  /** Fails if the guest let go before the caller did. Ask before trusting anything taken inside. */
   readonly assertHeld: Effect.Effect<void, FreezeLost>;
 };
 
@@ -162,7 +96,7 @@ export const frozen = Effect.fn('frozen')(function* ({
   const socketPath = guestVsockPath({ workingDir: vmWorkingDir({ vmDir, appId }) });
   const dialled = yield* Effect.acquireRelease(
     Effect.tryPromise({
-      try: () => dial(socketPath),
+      try: () => dialGuest({ socketPath }),
       catch: (cause) => new GuestUnreachable({ socketPath, cause }),
     }),
     (wire) => Effect.sync(() => wire.close()),

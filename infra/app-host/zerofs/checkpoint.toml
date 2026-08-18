@@ -1,0 +1,47 @@
+# ZeroFS serving one checkpoint of this host's filesystems, read-only. Read by
+# `zerofs run --config … --checkpoint <name>`, one process per checkpoint, started
+# by the agent for the length of one export's read.
+#
+# Every ${VAR} is expanded by ZeroFS itself from the process environment.
+# NIBRUN_CHECKPOINT is the instance name, set by the unit from its own %i, and it
+# is what keeps two instances off each other's socket and cache. The rest arrive
+# from /etc/zerofs/zerofs.env, the same file the live server reads — a checkpoint
+# is a view of the same prefix, so it has to be opened with the same key.
+
+[cache]
+dir = "/data/zerofs-checkpoint/${NIBRUN_CHECKPOINT}"
+# A small fraction of the live server's 70, and on purpose. This reads a
+# filesystem once, roughly in inode order, and then the process is gone: a cache
+# only earns its size on bytes that are read twice, which here is the metadata
+# `debugfs` walks — inode tables, bitmaps, directory blocks — and not the file data
+# it copies out. Four gigabytes covers that for a filesystem far larger than any
+# one this host serves, and is small enough that an export cannot eat into the
+# headroom the live cache deliberately leaves on this volume.
+disk_size_gb = 4.0
+# The default, written down because 2.0 sits in the file next to this one and
+# silence would read as an oversight rather than a decision.
+memory_size_gb = 0.25
+
+[storage]
+url = "${NIBRUN_FILESYSTEMS_URL}"
+encryption_password = "${NIBRUN_FILESYSTEMS_PASSWORD}"
+
+[aws]
+region = "${AWS_REGION}"
+
+# No [filesystem], [lsm] or [gc] section. Every setting in them is about writing —
+# fsync handling, compression, flush cadence, segment reclamation — and a
+# checkpoint server never writes. Copying the live values across would suggest this
+# process participates in any of it.
+
+# The only frontend it needs: the agent attaches this as a block device and reads
+# the tenant's filesystem image out of it with debugfs.
+[servers.nbd]
+unix_socket = "/run/zerofs-checkpoint/${NIBRUN_CHECKPOINT}/nbd.sock"
+
+# No [servers.rpc]: checkpoints are created, listed and deleted through the live
+# server, which is the only process that can. No [prometheus] either — the live
+# server holds 127.0.0.1:9091, and a second binding is a startup failure.
+
+[telemetry]
+enabled = false

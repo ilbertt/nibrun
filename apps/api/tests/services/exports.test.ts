@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
+  CheckpointIdSchema,
   DnsLabelSchema,
   type ExportId,
   ExportIdSchema,
@@ -28,6 +29,7 @@ import { ExportsService } from '#services/exports.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 
 const EXPORT_ID = Value.Parse(ExportIdSchema, 'export-1');
+const CHECKPOINT_ID = Value.Parse(CheckpointIdSchema, `export-${EXPORT_ID}`);
 const OBJECT_KEY = Value.Parse(ObjectKeySchema, `exports/${APP_ID}/${EXPORT_ID}.tar.gz`);
 const APP_SLUG = Value.Parse(DnsLabelSchema, 'quiet-meadow');
 const SIGNED_URL = 'https://exports.test/signed';
@@ -41,6 +43,7 @@ function exportRow(overrides: Partial<ExportRow> = {}): ExportRow {
     app_id: APP_ID,
     state: 'pending',
     object_key: OBJECT_KEY,
+    checkpoint_id: null,
     size_bytes: null,
     message: null,
     ready_at: null,
@@ -212,6 +215,17 @@ describe('polling an export', () => {
     expect(storage.signed).toEqual([OBJECT_KEY]);
   });
 
+  // Which moment the bundle is of. The checkpoint itself is gone by the time this is asked.
+  test('names the pinned view the host read it from', async () => {
+    const repo = new FakeExportsRepository();
+    repo.rows = [exportRow({ state: 'ready', checkpoint_id: CHECKPOINT_ID, ready_at: new Date() })];
+    const { service } = build(repo);
+
+    const found = await service.get({ appId: APP_ID, exportId: EXPORT_ID, ownerId: OWNER_ID });
+
+    expect(found.checkpointId).toBe(CHECKPOINT_ID);
+  });
+
   test('is signed for under the name of the app it was taken from', async () => {
     const repo = new FakeExportsRepository();
     repo.rows = [exportRow({ state: 'ready', ready_at: new Date() })];
@@ -269,6 +283,7 @@ describe('what a host says about the bundles it was told to write', () => {
         exports: [
           {
             exportId: EXPORT_ID,
+            checkpointId: CHECKPOINT_ID,
             state: 'ready' as ExportState,
             sizeBytes: BUNDLE_SIZE_BYTES,
             readyAt,
@@ -281,6 +296,7 @@ describe('what a host says about the bundles it was told to write', () => {
       [
         {
           exportId: EXPORT_ID,
+          checkpointId: CHECKPOINT_ID,
           state: 'ready',
           sizeBytes: BUNDLE_SIZE_BYTES,
           readyAt: new Date(readyAt),
@@ -288,6 +304,20 @@ describe('what a host says about the bundles it was told to write', () => {
         },
       ],
     ]);
+  });
+
+  // An agent that predates checkpoint-backed exports reports without one, and the two are out of
+  // sync for the length of every rollout.
+  test('says nothing about a checkpoint when the host named none', async () => {
+    const { service, exportsRepo } = build();
+
+    await service.applyHostReport({
+      reported: {
+        exports: [{ exportId: EXPORT_ID, state: 'failed' as ExportState }],
+      } as unknown as HostReportedState,
+    });
+
+    expect(exportsRepo.reported[0]?.[0]?.checkpointId).toBeNull();
   });
 
   // Every host reports on every poll, and most of them have written nothing.

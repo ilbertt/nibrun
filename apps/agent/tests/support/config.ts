@@ -10,6 +10,7 @@ export const AGENT_CONFIG = {
   zerofsStoragePrefix: HOST_STORAGE_PREFIX,
   zerofsMount: '/mnt/zerofs',
   zerofsNbdSocket: '/run/zerofs/nbd.sock',
+  zerofsCheckpointRuntimeDir: '/run/zerofs-checkpoint',
   zerofsBinary: '/opt/nibrun/bin/zerofs/zerofs',
   zerofsConfigFile: '/etc/zerofs/config.toml',
 } as const;

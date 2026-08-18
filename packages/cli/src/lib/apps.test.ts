@@ -10,11 +10,14 @@ type Asked = {
 const asked: Asked[] = [];
 let chosen: unknown = null;
 
+const clack = await import('@clack/prompts');
+
 // Replaced wholesale rather than reached through a port, as `plan.test.ts` does it: what is being
-// pinned down is which question an owner is asked and what it offers them. `mock.module` is
-// global, so this answers for clack for the rest of the run — only for what `#lib/apps.ts` asks of
-// it, which is why a file prompting for anything else stubs it itself.
+// pinned down is which question an owner is asked and what it offers them. `mock.module` is global
+// and outlives this file, so the rest of clack is spread back in: a stub carrying only what
+// `#lib/apps.ts` asks for leaves whichever file runs next unable to import the rest.
 mock.module('@clack/prompts', () => ({
+  ...clack,
   isCancel: (value: unknown) => typeof value === 'symbol',
   select(opts: Asked) {
     asked.push(opts);

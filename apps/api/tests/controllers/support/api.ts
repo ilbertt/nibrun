@@ -25,18 +25,22 @@ const api = createApp();
 // A bare path is not a URL, so every request here carries an origin. Nothing routes on it.
 export const ORIGIN = 'http://localhost';
 
+// `signal` is the caller going away, exactly as it is for a request off a socket: a route that
+// holds one open has nothing else to end it inside a test.
 export function send({
   method = 'GET',
   url,
   body,
   headers,
+  signal,
 }: {
   method?: string;
   url: string;
   body?: RequestInit['body'];
   headers?: Record<string, string>;
+  signal?: AbortSignal;
 }): Promise<Response> {
-  return api.handle(new Request(url, { method, headers, body }));
+  return api.handle(new Request(url, { method, headers, body, signal }));
 }
 
 export function sendJson({
@@ -44,16 +48,19 @@ export function sendJson({
   url,
   body,
   headers,
+  signal,
 }: {
   method?: string;
   url: string;
   body?: unknown;
   headers?: Record<string, string>;
+  signal?: AbortSignal;
 }): Promise<Response> {
   return send({
     method,
     url,
     headers: { 'content-type': 'application/json', ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
   });
 }

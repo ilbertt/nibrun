@@ -10,6 +10,13 @@
 #define TENANT_LOG_VSOCK_PORT 51000U
 #define GUEST_CONTROL_VSOCK_PORT 51001U
 
+/* Browsing files is a port of its own rather than another verb on the control port,
+ * because the control port is built to serialise: it takes one connection at a time
+ * and a granted FREEZE holds it for as long as the host reads the block device.
+ * Sharing it would mean an export in progress is somebody's directory listing
+ * hanging, which is the opposite of what a file browser is for. */
+#define GUEST_FILESYSTEM_VSOCK_PORT 51002U
+
 #ifndef AF_VSOCK
 #define AF_VSOCK 40
 #endif

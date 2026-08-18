@@ -71,9 +71,12 @@ export const ReportedCheckpointSchema = Type.Object({
 export type ReportedCheckpoint = typeof ReportedCheckpointSchema.static;
 
 // The host reports the size it wrote but not where it put it: the key came down in desired
-// state, so echoing it back would be a second place for it to be wrong.
+// state, so echoing it back would be a second place for it to be wrong. `checkpointId` goes the
+// other way for the same reason — the host names the view it read from, and being told is the
+// only way this end learns which moment the bundle is of.
 export const ReportedExportSchema = Type.Object({
   exportId: ExportIdSchema,
+  checkpointId: Type.Optional(CheckpointIdSchema),
   state: ExportStateSchema,
   sizeBytes: Type.Optional(ByteSizeSchema),
   readyAt: Type.Optional(TimestampSchema),

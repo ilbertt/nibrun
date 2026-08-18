@@ -90,7 +90,9 @@ export class ExportsService extends Service {
 
   /**
    * What the host says about the bundles it was told to write. Only these columns move — the key
-   * is not among them, because the host was told it rather than choosing it.
+   * is not among them, because the host was told it rather than choosing it. The checkpoint is
+   * the opposite case and so it is among them: the host named the view it read from, and being
+   * told is the only way this end learns which moment the bundle is of.
    */
   async applyHostReport({ reported }: { reported: HostReportedState }): Promise<void> {
     if (reported.exports.length === 0) {
@@ -99,6 +101,7 @@ export class ExportsService extends Service {
     await this.exportsRepo.applyReport({
       reported: reported.exports.map((bundle) => ({
         exportId: bundle.exportId,
+        checkpointId: bundle.checkpointId ?? null,
         state: bundle.state,
         sizeBytes: bundle.sizeBytes ?? null,
         readyAt: bundle.readyAt ? new Date(bundle.readyAt) : null,
@@ -121,6 +124,7 @@ export class ExportsService extends Service {
       id: row.id,
       appId: row.app_id,
       state,
+      checkpointId: row.checkpoint_id ?? undefined,
       sizeBytes: row.size_bytes === null ? undefined : Number(row.size_bytes),
       requestedAt: toTimestamp(row.created_at),
       readyAt: row.ready_at ? toTimestamp(row.ready_at) : undefined,

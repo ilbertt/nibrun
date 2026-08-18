@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  type AppId,
   AppIdSchema,
   type DirectoryListing,
   type FilesystemQuery,
@@ -23,6 +24,9 @@ import {
 
 const OTHER_APP = Value.Parse(AppIdSchema, 'app-somebody-else');
 const DATA = Value.Parse(GuestPathSchema, '/pb_data');
+
+// Long enough to be a hold and short enough that a test waits it out rather than the clock.
+const A_BRIEF_HOLD_MS = 20;
 
 const UNREADABLE_DEVICE = 'no directory could be read from /dev/nbd7';
 
@@ -70,12 +74,40 @@ function read({
 }
 
 /**
- * What a host polling now would be handed. The ownership lookup is awaited first, because a read
- * is only offered once it is one somebody is actually waiting on.
+ * What a host polling now would be handed without waiting for more. An already-aborted signal is a
+ * host that is no longer holding its poll open, which is the only way to ask what is standing
+ * without becoming the one it would be handed to.
  */
+function handedTo({
+  filesystemService,
+  servedAppIds = [APP_ID],
+}: {
+  filesystemService: FilesystemService;
+  servedAppIds?: readonly AppId[];
+}) {
+  return filesystemService.pendingQuery({ servedAppIds, signal: AbortSignal.abort() });
+}
+
+/**
+ * A host holding its poll open, as a request the api has not answered yet is. Nothing fires the
+ * signal unless a test does, so a host no test sends away waits the way a real one would.
+ */
+function polling({
+  filesystemService,
+  servedAppIds = [APP_ID],
+  signal = new AbortController().signal,
+}: {
+  filesystemService: FilesystemService;
+  servedAppIds?: readonly AppId[];
+  signal?: AbortSignal;
+}) {
+  return filesystemService.pendingQuery({ servedAppIds, signal });
+}
+
+/** The ownership lookup is awaited first, because a read is only offered once somebody waits on it. */
 async function offered(filesystemService: FilesystemService) {
   await Bun.sleep(0);
-  return filesystemService.pendingQuery({ servedAppIds: [APP_ID] });
+  return handedTo({ filesystemService });
 }
 
 async function claimed(filesystemService: FilesystemService): Promise<FilesystemQuery> {
@@ -131,8 +163,8 @@ describe('a read waits for the host that holds the volume', () => {
     void read({ filesystemService });
     await Bun.sleep(0);
 
-    expect(filesystemService.pendingQuery({ servedAppIds: [OTHER_APP] })).toBeUndefined();
-    expect(filesystemService.pendingQuery({ servedAppIds: [] })).toBeUndefined();
+    expect(await handedTo({ filesystemService, servedAppIds: [OTHER_APP] })).toBeUndefined();
+    expect(await handedTo({ filesystemService, servedAppIds: [] })).toBeUndefined();
   });
 
   // A second host taking it would read a filesystem for a request another host is already
@@ -142,7 +174,7 @@ describe('a read waits for the host that holds the volume', () => {
     void read({ filesystemService });
     await claimed(filesystemService);
 
-    expect(filesystemService.pendingQuery({ servedAppIds: [APP_ID] })).toBeUndefined();
+    expect(await handedTo({ filesystemService })).toBeUndefined();
   });
 });
 
@@ -153,7 +185,7 @@ describe('people looking at the same directory wait on one read', () => {
     void read({ filesystemService, path: DATA });
     await claimed(filesystemService);
 
-    expect(filesystemService.pendingQuery({ servedAppIds: [APP_ID] })).toBeUndefined();
+    expect(await handedTo({ filesystemService })).toBeUndefined();
   });
 
   test('and both are answered by the one listing that comes back', async () => {
@@ -230,7 +262,72 @@ describe('people looking at the same directory wait on one read', () => {
     giveUp.abort();
     await expect(abandoned).rejects.toThrow(GatewayTimeoutError);
 
-    expect(filesystemService.pendingQuery({ servedAppIds: [APP_ID] })).toBeUndefined();
+    expect(await handedTo({ filesystemService })).toBeUndefined();
+  });
+});
+
+/**
+ * Where the wait went. A host used to be told there was nothing and come back on a timer of its
+ * own, so a directory opened a moment after one poll was not read until the next — half an idle
+ * interval, on average, spent by somebody staring at a spinner while the host that could answer
+ * had nothing to do.
+ */
+describe('a host with nothing to read waits here rather than on a timer of its own', () => {
+  test('a read opening is what answers the host waiting for one', async () => {
+    const { filesystemService } = service();
+    const host = polling({ filesystemService });
+
+    void read({ filesystemService, path: DATA });
+
+    expect(await host).toMatchObject({ appId: APP_ID, path: DATA });
+  });
+
+  // A host is woken by the reads it could serve and by nothing else, or a fleet would be roused
+  // by every directory anybody opened.
+  test('a read for an app it does not serve leaves it waiting', async () => {
+    const { filesystemService } = service();
+    const host = polling({ filesystemService, servedAppIds: [OTHER_APP] });
+
+    void read({ filesystemService, path: DATA });
+    await Bun.sleep(0);
+
+    expect(Bun.peek.status(host)).toBe('pending');
+  });
+
+  // The hold expiring is an ordinary answer rather than a failure: the host reopens the poll, and
+  // a request nothing has travelled on is one every hop in between is entitled to close.
+  test('a hold that expires with nothing standing answers with nothing', async () => {
+    const { filesystemService } = service();
+
+    const query = await polling({
+      filesystemService,
+      signal: AbortSignal.timeout(A_BRIEF_HOLD_MS),
+    });
+
+    expect(query).toBeUndefined();
+  });
+
+  // A host that has gone must take nothing with it: a read handed to a waiter nobody is listening
+  // to is a read that is never performed and never offered again.
+  test('a host that goes away leaves no waiter behind it', async () => {
+    const { filesystemService } = service();
+    const gone = new AbortController();
+    const host = polling({ filesystemService, signal: gone.signal });
+
+    gone.abort();
+    expect(await host).toBeUndefined();
+    void read({ filesystemService, path: DATA });
+
+    expect(await offered(filesystemService)).toMatchObject({ path: DATA });
+  });
+
+  test('and a read handed to one that stayed is not offered to the next', async () => {
+    const { filesystemService } = service();
+    const host = polling({ filesystemService });
+    void read({ filesystemService, path: DATA });
+    await host;
+
+    expect(await offered(filesystemService)).toBeUndefined();
   });
 });
 
@@ -284,7 +381,7 @@ describe('a read that gets no usable answer says so rather than hanging', () => 
     giveUp.abort();
     await expect(listing).rejects.toThrow(GatewayTimeoutError);
 
-    expect(filesystemService.pendingQuery({ servedAppIds: [APP_ID] })).toBeUndefined();
+    expect(await handedTo({ filesystemService })).toBeUndefined();
   });
 
   // A host answering a request that has already ended is late, not broken.

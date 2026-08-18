@@ -18,6 +18,15 @@ import { Data, Effect } from 'effect';
 import { decode } from '#lib/protocol.ts';
 
 const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * The one route the api answers slowly on purpose: a poll for a read is held there until a read
+ * arrives or its own 25s hold expires, so the ordinary ceiling would abandon every idle poll a
+ * few seconds before the reply it was waiting for. Above the hold with room for the round trip,
+ * and never below it — a client that gives up first turns an idle fleet into a retry loop and
+ * loses every read handed to a host on the way out.
+ */
+const FILESYSTEM_QUERY_TIMEOUT_MS = 45_000;
 const HTTP_UNAUTHORIZED = 401;
 const NOT_DELIVERED = 0;
 const MAX_BODY = 256;
@@ -91,9 +100,15 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
       Effect.withSpan('controlPlane', { attributes: { route } }),
     );
 
-  const options = (sessionToken?: SecretString) => ({
+  const options = ({
+    sessionToken,
+    timeoutMs = REQUEST_TIMEOUT_MS,
+  }: {
+    sessionToken?: SecretString;
+    timeoutMs?: number;
+  } = {}) => ({
     headers: protocolHeaders({ sessionToken }),
-    fetch: { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+    fetch: { signal: AbortSignal.timeout(timeoutMs) },
   });
 
   return {
@@ -116,7 +131,7 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
     }) =>
       call({
         route: AGENT_ROUTES.desiredState,
-        send: () => api.internal.agent['desired-state'].post(request, options(sessionToken)),
+        send: () => api.internal.agent['desired-state'].post(request, options({ sessionToken })),
       }).pipe(
         Effect.flatMap((value) =>
           decode(() => parseMessage({ schema: DesiredStateResponseSchema, value })),
@@ -133,7 +148,7 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
       Effect.asVoid(
         call({
           route: AGENT_ROUTES.reportedState,
-          send: () => api.internal.agent['reported-state'].post(report, options(sessionToken)),
+          send: () => api.internal.agent['reported-state'].post(report, options({ sessionToken })),
         }),
       ),
 
@@ -146,7 +161,11 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
     }) =>
       call({
         route: AGENT_ROUTES.filesystemQuery,
-        send: () => api.internal.agent['filesystem-query'].post(request, options(sessionToken)),
+        send: () =>
+          api.internal.agent['filesystem-query'].post(
+            request,
+            options({ sessionToken, timeoutMs: FILESYSTEM_QUERY_TIMEOUT_MS }),
+          ),
       }).pipe(
         Effect.flatMap((value) =>
           decode(() => parseMessage({ schema: FilesystemQueryResponseSchema, value })),
@@ -164,7 +183,7 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
         call({
           route: AGENT_ROUTES.filesystemQueryResult,
           send: () =>
-            api.internal.agent['filesystem-query-result'].post(result, options(sessionToken)),
+            api.internal.agent['filesystem-query-result'].post(result, options({ sessionToken })),
         }),
       ),
   };

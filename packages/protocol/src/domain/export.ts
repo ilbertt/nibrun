@@ -21,6 +21,11 @@ export type ExportState = typeof ExportStateSchema.static;
  * device attached, so it reads one tenant's filesystem and no other, in userspace and without
  * mounting it. The control plane then needs no access at all to tenant filesystems — only read
  * on the export bucket, which is what lets it sign a download URL.
+ *
+ * `checkpointId` names the pinned view the bundle was read from, and is the export's own: cut
+ * while the tenant was frozen and deleted as soon as the read finished, because a checkpoint
+ * left behind stops garbage collection for every tenant on that host. So it says which moment
+ * the bundle is of rather than where to find one — by the time it is reported it is gone.
  */
 export const ExportSchema = Type.Object({
   id: ExportIdSchema,

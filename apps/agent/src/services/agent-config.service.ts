@@ -7,6 +7,7 @@ const DEFAULT_ZEROFS_BINARY = '/opt/nibrun/bin/zerofs/zerofs';
 const DEFAULT_ZEROFS_MOUNT = '/mnt/zerofs';
 const DEFAULT_ZEROFS_CONFIG = '/etc/zerofs/config.toml';
 const DEFAULT_ZEROFS_NBD_SOCKET = '/run/zerofs/nbd.sock';
+const DEFAULT_ZEROFS_CHECKPOINT_RUNTIME_DIR = '/run/zerofs-checkpoint';
 const DEFAULT_GUEST_IMAGE_DIR = '/opt/nibrun/bin/guest-image';
 const DEFAULT_FIRECRACKER_DIR = '/opt/nibrun/bin/firecracker';
 const DEFAULT_VERSIONS_FILE = '/opt/nibrun/bundle/versions.json';
@@ -91,6 +92,12 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
       zerofsNbdSocket: yield* optional({
         name: 'AGENT_ZEROFS_NBD_SOCKET',
         fallback: DEFAULT_ZEROFS_NBD_SOCKET,
+      }),
+      // One directory per checkpoint server below this, created and removed by the unit that
+      // serves it — which is why this names the parent rather than a socket.
+      zerofsCheckpointRuntimeDir: yield* optional({
+        name: 'AGENT_ZEROFS_CHECKPOINT_RUNTIME_DIR',
+        fallback: DEFAULT_ZEROFS_CHECKPOINT_RUNTIME_DIR,
       }),
       caddySitesFile: yield* optional({
         name: 'AGENT_CADDY_SITES_FILE',

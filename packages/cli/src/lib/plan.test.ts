@@ -6,10 +6,13 @@ const notes: string[] = [];
 let chosenApp: unknown = null;
 let confirmed: boolean = true;
 
+const clack = await import('@clack/prompts');
+
 // Stubbed at the module rather than behind an injected port: what is being pinned down is which
 // questions get asked and in what order, and a port would only let this file answer that about
-// itself.
+// itself. The rest of clack is spread back in because `mock.module` outlives this file.
 mock.module('@clack/prompts', () => ({
+  ...clack,
   isCancel: (value: unknown) => typeof value === 'symbol',
   select(opts: { message: string; options: Array<{ label: string }> }) {
     asked.push(`select:${opts.message} [${opts.options.map((option) => option.label).join('|')}]`);

@@ -5,7 +5,12 @@ import { ControlPlaneError } from '#lib/control/client.ts';
 import { CommandFailed, CommandTimedOut } from '#lib/exec.ts';
 import { EmptyDump, UnsafeFilename } from '#lib/exports/bundle.ts';
 import { reportedMessage } from '#lib/failure.ts';
-import { UnreadableDirectory, UnsafeGuestPath } from '#lib/filesystem/debugfs.ts';
+import { GuestFilesystemSilent, GuestFilesystemUnreachable } from '#lib/filesystem/client.ts';
+import {
+  GuestFilesystemRefused,
+  GuestRequestTooLarge,
+  MalformedGuestReply,
+} from '#lib/filesystem/protocol.ts';
 import { MalformedJsonError } from '#lib/json-store.ts';
 import { InvalidGuestLogFrame } from '#lib/logs/guest-protocol.ts';
 import { SlotExhausted } from '#lib/network/allocator.ts';
@@ -23,6 +28,8 @@ const MAX_MESSAGE_LENGTH = 512;
 const SOME_SIZE = 4_096;
 const OTHER_SIZE = 8_192;
 const SOME_LIMIT = 200;
+const SOME_APP = Value.Parse(AppIdSchema, 'app-pocketbase');
+const PATH_LEAVES_THE_VOLUME = 5;
 
 const everyFailure = [
   new SlotExhausted({ limit: SOME_LIMIT }),
@@ -47,9 +54,12 @@ const everyFailure = [
   new VolumeShrinkRefused({ current: OTHER_SIZE, requested: SOME_SIZE }),
   new ControlPlaneError({ status: HTTP_UNAUTHORIZED, route: '/desired-state', body: 'expired' }),
   new ProtocolMismatch({ issues: [] }),
-  new UnsafeGuestPath({ reason: 'it is not an absolute in-volume path' }),
-  new UnreadableDirectory({ devicePath: '/dev/nbd7' }),
-  new NoDeviceForApp({ appId: Value.Parse(AppIdSchema, 'app-pocketbase') }),
+  new GuestFilesystemUnreachable({ appId: SOME_APP, cause: new Error('no such file') }),
+  new GuestFilesystemSilent({ appId: SOME_APP }),
+  new GuestFilesystemRefused({ appId: SOME_APP, status: PATH_LEAVES_THE_VOLUME }),
+  new GuestRequestTooLarge({ appId: SOME_APP }),
+  new MalformedGuestReply({ reason: 'invalid magic value' }),
+  new NoDeviceForApp({ appId: SOME_APP }),
 ];
 
 // The message is what a report carries to the control plane, and from there to whoever is

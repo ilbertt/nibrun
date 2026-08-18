@@ -7,10 +7,15 @@ import type { ZerofsAdmin } from '#lib/volumes/zerofs.ts';
  *
  * `mountPath` is the host's own mount, where `.nbd/<volume-id>` is created and sized. What that
  * file contains is an image the host never asks its kernel to interpret.
+ *
+ * `checkpointRuntimeDir` holds a directory per checkpoint server, each with an NBD socket of its
+ * own. Separate from `nbdSocketPath` because a checkpoint is served by a second process: sharing
+ * the live server's socket path would be two listeners fighting over one address.
  */
 export type ZerofsFilesystem = {
   readonly storagePrefix: ObjectKey;
   readonly mountPath: string;
   readonly nbdSocketPath: string;
+  readonly checkpointRuntimeDir: string;
   readonly admin: ZerofsAdmin;
 };
