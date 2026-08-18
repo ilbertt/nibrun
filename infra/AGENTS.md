@@ -47,6 +47,26 @@ requires the client certificate it enables, and without it every visitor gets a 
 Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
 
+Custom domains, in the `app_domain` zone only:
+
+- **Cloudflare for SaaS** on, and `fallback.<app_domain>` A → `app_host_public_ips`, **proxied**,
+  set as the zone's **fallback origin**. Nothing serves that name — the site blocks are still
+  written per hostname — it exists so the edge has an address to resolve. Traffic for a custom
+  hostname reaches the origin naming *the custom hostname* in both the handshake and the request,
+  which is what lets Caddy's rendered site blocks match it with nothing added.
+- A **Configuration Rule**: where the host is not under `app_domain`, SSL → **Full**. The zone
+  stays Full (strict), so platform hostnames are unaffected. This is the one place the posture is
+  weakened, and it is deliberate: the origin certificate names `*.<app_domain>` and a brought
+  domain is not under it, so strict cannot validate a name no certificate we can issue covers.
+  Authenticated Origin Pulls still applies — global AOP covers custom hostnames on a
+  Cloudflare-for-SaaS zone — so what is given up is the origin proving itself to the edge, not
+  the edge proving itself to the origin, which is the half `security_group.tf` rests on.
+- An **API token** scoped to *Zone → SSL and Certificates → Edit* on this zone and nothing else,
+  as the `CLOUDFLARE_API_TOKEN` repository secret, with the zone id as `CLOUDFLARE_ZONE_ID`.
+
+Unlike every other Cloudflare step here, registering a hostname cannot be manual — a brought
+domain arrives whenever an owner adds one — which is what the token is for.
+
 ## Deploying
 
 `.github/workflows/cd.yml`, on every push to main. No SSH and no key material in CI: the last leg

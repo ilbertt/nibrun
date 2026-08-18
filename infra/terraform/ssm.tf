@@ -64,6 +64,22 @@ resource "aws_ssm_parameter" "api_github_client_secret" {
   }
 }
 
+# The token the api registers custom hostnames with. Here rather than in the
+# deploy's environment for the same reason the OAuth App secret is: RunCommand
+# keeps its parameters in command history, in the clear, for 30 days.
+#
+# The zone id it is used against is not secret and rides through the workflow
+# environment with the other non-secret config.
+resource "aws_ssm_parameter" "api_cloudflare_api_token" {
+  name  = "${var.ssm_secret_prefix}/api_cloudflare_api_token"
+  type  = "SecureString"
+  value = var.cloudflare_api_token
+
+  tags = {
+    Name = "${local.resource_name_prefix}-api-cloudflare-api-token"
+  }
+}
+
 # The proxy's TLS material. Both halves land here rather than in the deploy's
 # own environment, for the same reason the OAuth App secret does — and the
 # certificate rides along even though it is public, so the box has one way to
