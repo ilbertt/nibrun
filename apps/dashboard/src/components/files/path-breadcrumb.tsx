@@ -41,7 +41,7 @@ export function PathBreadcrumb() {
         </BreadcrumbItem>
         {steps.map((step) => (
           <Fragment key={step.path}>
-            <BreadcrumbSeparator />
+            <BreadcrumbSeparator>/</BreadcrumbSeparator>
             <BreadcrumbItem>
               {step.path === path ? (
                 <BreadcrumbPage>{step.name}</BreadcrumbPage>
