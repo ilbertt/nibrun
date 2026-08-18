@@ -21,7 +21,7 @@ export function AppBreadcrumb() {
         <BreadcrumbItem>
           <BreadcrumbLink render={<Link to={AppsRoute.to} />}>Apps</BreadcrumbLink>
         </BreadcrumbItem>
-        <BreadcrumbSeparator />
+        <BreadcrumbSeparator>/</BreadcrumbSeparator>
         <BreadcrumbItem>
           <BreadcrumbPage className="font-mono">{app.data?.slug ?? appId}</BreadcrumbPage>
         </BreadcrumbItem>
