@@ -12,12 +12,12 @@ export function DeployProgress() {
   const waiting = waitingOn(run.phase);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex min-w-0 flex-col gap-5">
       <ol className="flex flex-col gap-2 text-sm">
         {run.steps.map((step) => (
-          <li key={step.kind} className="flex items-center gap-2">
-            <CheckIcon className="size-4 shrink-0 text-muted-foreground" />
-            <span className="truncate font-mono">{describeStep(step)}</span>
+          <li key={step.kind} className="flex items-start gap-2">
+            <CheckIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <span className="wrap-anywhere font-mono">{describeStep(step)}</span>
           </li>
         ))}
         {waiting !== undefined && (
@@ -40,7 +40,7 @@ export function DeployProgress() {
             href={run.deployed.url}
             target="_blank"
             rel="noreferrer"
-            className="truncate font-medium font-mono underline underline-offset-4"
+            className="wrap-anywhere font-medium font-mono underline underline-offset-4"
           >
             {run.deployed.url}
           </a>
@@ -50,7 +50,7 @@ export function DeployProgress() {
       {run.reason !== undefined && (
         <p className="flex items-start gap-2 rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
           <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-          <span>{run.reason}</span>
+          <span className="wrap-anywhere">{run.reason}</span>
         </p>
       )}
 
