@@ -6,9 +6,9 @@
     "#*": "./src/*"
   },
   "scripts": {
-    "dev": "./scripts/with-real-node.sh vite dev --port 3002",
-    "build": "./scripts/with-real-node.sh vite build",
-    "preview": "./scripts/with-real-node.sh vite preview",
+    "dev": "vite dev --port 3002",
+    "build": "vite build",
+    "preview": "vite preview",
     "cf:typegen": "wrangler types",
     "cf:deploy": "bun run build && wrangler deploy",
     "check:types": "bun run cf:typegen && bun run --bun tsc"
