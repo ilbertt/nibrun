@@ -1,6 +1,6 @@
 import { DEFAULT_LOG_TIMERANGE, GUEST_PATH_ROOT } from '@repo/protocol';
+import { Tabs, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
 import { Link } from '@tanstack/react-router';
-import { Tabs, TabsList, TabsTrigger } from '#components/ui/tabs.tsx';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useAppTab } from '#lib/hooks/use-app-tab.ts';
 import { Route as FilesRoute } from '#routes/(dashboard)/apps/$appId/files.tsx';

@@ -1,6 +1,6 @@
+import { Button } from '@repo/ui/components/button';
+import { Field, FieldError } from '@repo/ui/components/field';
 import { DeviceCard } from '#components/device/device-card.tsx';
-import { Button } from '#components/ui/button.tsx';
-import { Field, FieldError } from '#components/ui/field.tsx';
 import { useDeviceCode } from '#lib/hooks/use-device-code.ts';
 import { useDeviceDecision } from '#lib/hooks/use-device-decision.ts';
 import { useSession } from '#lib/hooks/use-session.ts';

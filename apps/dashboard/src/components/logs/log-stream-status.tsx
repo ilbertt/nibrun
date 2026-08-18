@@ -1,5 +1,5 @@
+import { cn } from '@repo/ui/lib/utils';
 import type { DeploymentLogsView } from '#lib/hooks/use-deployment-logs.ts';
-import { cn } from '#lib/utils.ts';
 
 const PRESENTATION: Record<
   DeploymentLogsView['status'],

@@ -1,6 +1,12 @@
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@repo/ui/components/card';
+import { cn } from '@repo/ui/lib/utils';
 import type { ReactNode } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#components/ui/card.tsx';
-import { cn } from '#lib/utils.ts';
 
 export function DeviceCard({
   title,

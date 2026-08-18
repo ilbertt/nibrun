@@ -1,4 +1,3 @@
-import { DeploymentStateBadge } from '#components/apps/deployment-state-badge.tsx';
 import {
   Table,
   TableBody,
@@ -6,7 +5,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '#components/ui/table.tsx';
+} from '@repo/ui/components/table';
+import { DeploymentStateBadge } from '#components/apps/deployment-state-badge.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 import type { DeploymentSummary } from '#queries/deployments.ts';
 

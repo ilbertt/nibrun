@@ -1,6 +1,6 @@
 import type { AppState } from '@repo/protocol';
+import { Badge } from '@repo/ui/components/badge';
 import type { ComponentProps } from 'react';
-import { Badge } from '#components/ui/badge.tsx';
 
 type BadgeVariant = ComponentProps<typeof Badge>['variant'];
 

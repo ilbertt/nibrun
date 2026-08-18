@@ -1,5 +1,3 @@
-import { Trash2Icon, TriangleAlertIcon } from 'lucide-react';
-import { useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,11 +9,13 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '#components/ui/alert-dialog.tsx';
-import { Button } from '#components/ui/button.tsx';
-import { Field, FieldError, FieldLabel } from '#components/ui/field.tsx';
-import { Input } from '#components/ui/input.tsx';
-import { Spinner } from '#components/ui/spinner.tsx';
+} from '@repo/ui/components/alert-dialog';
+import { Button } from '@repo/ui/components/button';
+import { Field, FieldError, FieldLabel } from '@repo/ui/components/field';
+import { Input } from '@repo/ui/components/input';
+import { Spinner } from '@repo/ui/components/spinner';
+import { Trash2Icon, TriangleAlertIcon } from 'lucide-react';
+import { useState } from 'react';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppDeletion } from '#lib/hooks/use-app-deletion.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';

@@ -1,8 +1,4 @@
-import { RocketIcon } from 'lucide-react';
-import { useState } from 'react';
-import { DeployForm } from '#components/apps/deploy-form.tsx';
-import { DeployProgress } from '#components/apps/deploy-progress.tsx';
-import { Button } from '#components/ui/button.tsx';
+import { Button } from '@repo/ui/components/button';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '#components/ui/dialog.tsx';
+} from '@repo/ui/components/dialog';
+import { RocketIcon } from 'lucide-react';
+import { useState } from 'react';
+import { DeployForm } from '#components/apps/deploy-form.tsx';
+import { DeployProgress } from '#components/apps/deploy-progress.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 
 export function DeployDialogContent({ appId }: { appId?: string }) {

@@ -1,15 +1,15 @@
-import { PackageIcon } from 'lucide-react';
-import { DeploymentsTable } from '#components/apps/deployments-table.tsx';
-import { FailureEmpty } from '#components/failure-empty.tsx';
-import { Card, CardContent, CardHeader, CardTitle } from '#components/ui/card.tsx';
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from '#components/ui/empty.tsx';
-import { Skeleton } from '#components/ui/skeleton.tsx';
+} from '@repo/ui/components/empty';
+import { Skeleton } from '@repo/ui/components/skeleton';
+import { PackageIcon } from 'lucide-react';
+import { DeploymentsTable } from '#components/apps/deployments-table.tsx';
+import { FailureEmpty } from '#components/failure-empty.tsx';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDeployments } from '#lib/hooks/use-deployments.ts';
 

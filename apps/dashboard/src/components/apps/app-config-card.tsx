@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '#components/ui/card.tsx';
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
 import { formatBytes } from '#lib/format-bytes.ts';
 import type { AppSummary } from '#queries/apps.ts';
 

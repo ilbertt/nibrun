@@ -1,5 +1,4 @@
-import { LogOutIcon } from 'lucide-react';
-import { Button } from '#components/ui/button.tsx';
+import { Button } from '@repo/ui/components/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,7 +7,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '#components/ui/dropdown-menu.tsx';
+} from '@repo/ui/components/dropdown-menu';
+import { LogOutIcon } from 'lucide-react';
 import { UserAvatar } from '#components/user-avatar.tsx';
 import { useSession } from '#lib/hooks/use-session.ts';
 import { useSignOut } from '#lib/hooks/use-sign-out.ts';

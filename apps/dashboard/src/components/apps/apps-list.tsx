@@ -1,8 +1,8 @@
+import { Card } from '@repo/ui/components/card';
+import { Skeleton } from '@repo/ui/components/skeleton';
 import { AppsTable } from '#components/apps/apps-table.tsx';
 import { NoAppsEmpty } from '#components/apps/no-apps-empty.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
-import { Card } from '#components/ui/card.tsx';
-import { Skeleton } from '#components/ui/skeleton.tsx';
 import { useApps } from '#lib/hooks/use-apps.ts';
 
 export function AppsList() {

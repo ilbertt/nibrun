@@ -1,13 +1,13 @@
-import { useNavigate } from '@tanstack/react-router';
-import { ChevronDownIcon } from 'lucide-react';
-import { Button } from '#components/ui/button.tsx';
+import { Button } from '@repo/ui/components/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from '#components/ui/dropdown-menu.tsx';
+} from '@repo/ui/components/dropdown-menu';
+import { useNavigate } from '@tanstack/react-router';
+import { ChevronDownIcon } from 'lucide-react';
 import { useLogTimerange } from '#lib/hooks/use-log-timerange.ts';
 import { LOG_TIMERANGES, type LogTimerangeChoice } from '#lib/log-timeranges.ts';
 import { Route as LogsRoute } from '#routes/(dashboard)/apps/$appId/logs.tsx';

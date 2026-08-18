@@ -1,5 +1,11 @@
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@repo/ui/components/card';
 import { GithubSignInButton } from '#components/login/github-sign-in-button.tsx';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#components/ui/card.tsx';
 
 export function LoginForm() {
   return (

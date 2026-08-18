@@ -1,7 +1,7 @@
+import { Badge } from '@repo/ui/components/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
 import { ExternalLinkIcon } from 'lucide-react';
 import { AppStateBadge } from '#components/apps/app-state-badge.tsx';
-import { Badge } from '#components/ui/badge.tsx';
-import { Card, CardContent, CardHeader, CardTitle } from '#components/ui/card.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 import type { AppSummary } from '#queries/apps.ts';
 

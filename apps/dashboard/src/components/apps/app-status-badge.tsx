@@ -1,7 +1,7 @@
+import { Badge } from '@repo/ui/components/badge';
+import { Skeleton } from '@repo/ui/components/skeleton';
 import { AppStateBadge } from '#components/apps/app-state-badge.tsx';
 import { DeploymentStateBadge } from '#components/apps/deployment-state-badge.tsx';
-import { Badge } from '#components/ui/badge.tsx';
-import { Skeleton } from '#components/ui/skeleton.tsx';
 import { useDeployments } from '#lib/hooks/use-deployments.ts';
 import type { AppSummary } from '#queries/apps.ts';
 

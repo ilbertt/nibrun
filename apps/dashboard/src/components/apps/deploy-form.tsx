@@ -1,9 +1,9 @@
+import { Button } from '@repo/ui/components/button';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
+import { Input } from '@repo/ui/components/input';
+import { Textarea } from '@repo/ui/components/textarea';
 import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
-import { Button } from '#components/ui/button.tsx';
-import { Field, FieldDescription, FieldError, FieldLabel } from '#components/ui/field.tsx';
-import { Input } from '#components/ui/input.tsx';
-import { Textarea } from '#components/ui/textarea.tsx';
 import { useDeployForm, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 export function DeployForm({ appId }: { appId: string | undefined }) {

@@ -1,13 +1,13 @@
 import { DIRECTORY_ENTRY_LIMIT } from '@repo/protocol';
+import { Card } from '@repo/ui/components/card';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@repo/ui/components/empty';
+import { Skeleton } from '@repo/ui/components/skeleton';
 import { FolderOpenIcon } from 'lucide-react';
 import { DeploymentLine } from '#components/apps/deployment-line.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
 import { DirectoryRefreshButton } from '#components/files/directory-refresh-button.tsx';
 import { DirectoryTable } from '#components/files/directory-table.tsx';
 import { PathBreadcrumb } from '#components/files/path-breadcrumb.tsx';
-import { Card } from '#components/ui/card.tsx';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '#components/ui/empty.tsx';
-import { Skeleton } from '#components/ui/skeleton.tsx';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDirectoryListing } from '#lib/hooks/use-directory-listing.ts';
 import { useDirectoryPath } from '#lib/hooks/use-directory-path.ts';

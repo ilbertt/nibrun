@@ -1,6 +1,4 @@
 import { GUEST_PATH_ROOT } from '@repo/protocol';
-import { Link } from '@tanstack/react-router';
-import { Fragment } from 'react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -8,7 +6,9 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '#components/ui/breadcrumb.tsx';
+} from '@repo/ui/components/breadcrumb';
+import { Link } from '@tanstack/react-router';
+import { Fragment } from 'react';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDirectoryPath } from '#lib/hooks/use-directory-path.ts';
 import { Route as FilesRoute } from '#routes/(dashboard)/apps/$appId/files.tsx';

@@ -1,5 +1,5 @@
+import { Button } from '@repo/ui/components/button';
 import { RefreshCwIcon } from 'lucide-react';
-import { Button } from '#components/ui/button.tsx';
 import { useDirectoryRefresh } from '#lib/hooks/use-directory-refresh.ts';
 
 export function DirectoryRefreshButton() {

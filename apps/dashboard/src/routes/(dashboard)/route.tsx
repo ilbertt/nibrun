@@ -1,6 +1,6 @@
+import { Toaster } from '@repo/ui/components/sonner';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { SiteHeader } from '#components/site-header.tsx';
-import { Toaster } from '#components/ui/sonner.tsx';
 
 export const Route = createFileRoute('/(dashboard)')({ component: RouteComponent });
 

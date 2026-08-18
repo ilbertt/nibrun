@@ -1,5 +1,5 @@
+import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { Link } from '@tanstack/react-router';
-import { BrandMark } from '#components/brand-mark.tsx';
 import { SystemStatusBadge } from '#components/system-status-badge.tsx';
 import { UserMenu } from '#components/user-menu.tsx';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';

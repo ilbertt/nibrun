@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -6,7 +5,8 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '#components/ui/breadcrumb.tsx';
+} from '@repo/ui/components/breadcrumb';
+import { Link } from '@tanstack/react-router';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { Route as AppsRoute } from '#routes/(dashboard)/apps/index.tsx';

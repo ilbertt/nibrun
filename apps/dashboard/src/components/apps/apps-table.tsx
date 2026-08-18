@@ -1,5 +1,3 @@
-import { Link } from '@tanstack/react-router';
-import { AppStatusBadge } from '#components/apps/app-status-badge.tsx';
 import {
   Table,
   TableBody,
@@ -7,7 +5,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '#components/ui/table.tsx';
+} from '@repo/ui/components/table';
+import { Link } from '@tanstack/react-router';
+import { AppStatusBadge } from '#components/apps/app-status-badge.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 import type { AppSummary } from '#queries/apps.ts';
 import { Route as AppRoute } from '#routes/(dashboard)/apps/$appId/index.tsx';
