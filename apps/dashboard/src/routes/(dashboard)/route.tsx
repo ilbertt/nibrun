@@ -6,9 +6,9 @@ export const Route = createFileRoute('/(dashboard)')({ component: RouteComponent
 
 function RouteComponent() {
   return (
-    <div className="flex min-h-svh w-full flex-col bg-background">
+    <div className="flex h-svh w-full flex-col overflow-hidden bg-background">
       <SiteHeader />
-      <main className="flex min-h-0 flex-1 flex-col">
+      <main className="min-h-0 flex-1 overflow-y-auto">
         <Outlet />
       </main>
       <Toaster />
