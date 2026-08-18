@@ -35,6 +35,20 @@ CREATE TRIGGER app_config_environment_append_only
   BEFORE UPDATE OR DELETE ON nibrun.app_config_environment
   FOR EACH ROW EXECUTE FUNCTION nibrun.refuse_write();
 
+-- A config version with the names of its variables alongside it, so the nine queries that read a
+-- config say `environment_names` rather than each carrying its own copy of the subquery. Values
+-- are deliberately absent: this is what an owner may be shown.
+CREATE VIEW nibrun.app_configs_with_environment AS
+  SELECT c.*,
+         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
+                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
+  FROM nibrun.app_configs c;
+
+-- ARRAY() yields an empty array rather than NULL, but the catalog cannot say that of an
+-- expression and a marker here is only read on a base column, so each query pragmas it instead.
+COMMENT ON COLUMN nibrun.app_configs_with_environment.environment_names IS
+  'Names of the variables this config version runs with, never their values.';
+
 -- `config_id` is appended so the variables of a pinned version can be found from it, the way
 -- `desired_hostnames` hangs off this view rather than rebuilding its joins. CREATE OR REPLACE
 -- may only add columns at the end, which is also why it is last.

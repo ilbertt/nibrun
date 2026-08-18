@@ -107,7 +107,7 @@ function describeEnvironment(replacing: { config: { environment: object } } | un
   if (names.length === 0) {
     return 'One NAME=value per line. What the binary runs with.';
   }
-  return `One NAME=value per line. Leave empty to keep ${names.join(', ')} as they are.`;
+  return `One NAME=value per line. Empty keeps ${names.join(', ')} as they are; listing any replaces the lot.`;
 }
 
 function submitLabel({

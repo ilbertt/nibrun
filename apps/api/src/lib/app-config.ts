@@ -8,6 +8,7 @@ import {
   type TenantEnvironment,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.d.ts';
+import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 
 // Every app gets the same filesystem for now, so this is a constant rather than a column: a
 // value an owner cannot vary is one there is nothing to store per app.
@@ -31,15 +32,13 @@ export type AppConfigPatch = Partial<OwnedAppConfig> & {
   environment?: TenantEnvironment | undefined;
 };
 
-/** Values already sealed, which is the only form the database ever sees them in. */
-export type SealedEnvironment = Record<string, string>;
-
 export type StoredAppConfig = Omit<PublicAppConfig, 'environment'> & {
   environment: SealedEnvironment;
 };
 
-// What a repository takes, as against what an owner sent: the branding on `TenantEnvironment` is
-// what stops a plaintext value being stored by writing one where the other was meant.
+// What a repository takes, as against what an owner sent. Every one of these is a record of
+// strings, so the branding on `TenantEnvironment` and `SealedSecret` is the only thing standing
+// between a plaintext value, a `[redacted]` placeholder and the ciphertext that may be stored.
 export type SealedConfigPatch = Partial<OwnedAppConfig> & {
   environment?: SealedEnvironment | undefined;
 };
@@ -68,10 +67,13 @@ export type RunConfigColumns = Pick<
 export type AppConfigColumns = RunConfigColumns &
   Pick<Queries['SelectAppById'], 'environment_names'>;
 
-export function configWithDefaults(patch: AppConfigPatch = {}): PublicAppConfig {
+// Everything but the environment, which only the caller holding the key can supply in the one
+// form the database accepts.
+export function configWithDefaults(
+  patch: AppConfigPatch = {},
+): Omit<PublicAppConfig, 'environment'> {
   return {
     volumeSizeBytes: VOLUME_SIZE_BYTES,
-    environment: redacted(Object.keys(patch.environment ?? {})),
     guestPort: patch.guestPort ?? DEFAULT_GUEST_PORT,
     args: patch.args ?? [],
     resources: patch.resources ?? DEFAULT_INSTANCE_RESOURCES,
@@ -86,7 +88,7 @@ export function toAppConfig(row: AppConfigColumns): PublicAppConfig {
   return {
     ...toRunConfig(row),
     volumeSizeBytes: VOLUME_SIZE_BYTES,
-    environment: redacted(row.environment_names ?? []),
+    environment: redacted(row.environment_names),
   };
 }
 

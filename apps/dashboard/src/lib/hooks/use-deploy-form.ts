@@ -117,6 +117,7 @@ function asDeployRequest({
   replacing: AppSummary | undefined;
 }): DeployRequest | undefined {
   const binary = value.binary === undefined ? undefined : uploadableFrom(value.binary);
+  const entered = assignments(value.environment ?? '');
   const port = Number(value.port ?? replacing?.config.guestPort ?? DEFAULT_GUEST_PORT);
   if (binary === undefined || !Number.isInteger(port)) {
     return undefined;
@@ -125,11 +126,11 @@ function asDeployRequest({
   return {
     binary,
     args: tenantArguments(value.args ?? replacing?.config.args.join('\n') ?? ''),
-    // Left out entirely when the field was never touched, so a redeploy carries the variables the
-    // app already has rather than replacing them with what a form could not show.
-    ...(value.environment === undefined
-      ? {}
-      : { environment: parseEnvironment(assignments(value.environment)) }),
+    // An empty box leaves the stored variables alone rather than clearing them: the form cannot
+    // show a value it is not allowed to read, so an owner who is shown nothing and sends nothing
+    // must not be taken to mean "remove them all". Removing one is done by listing the ones that
+    // stay, which is a deliberate act rather than an empty field.
+    ...(entered.length === 0 ? {} : { environment: parseEnvironment(entered) }),
     app: replacing?.slug,
     name: replacing === undefined ? value.name.trim() || undefined : undefined,
     port,

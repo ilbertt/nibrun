@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import type { Brand } from '@repo/protocol';
 import { type TenantEnvironment, TenantEnvironmentSchema, Value } from '@repo/protocol';
 
 const ALGORITHM = 'aes-256-gcm';
@@ -11,7 +12,24 @@ const TAG_BYTES = 16;
 const ENVELOPE_VERSION = 'v1';
 const ENVELOPE_SEPARATOR = '.';
 
-export type TenantSecretsKey = Buffer & { readonly __brand: 'TenantSecretsKey' };
+export type TenantSecretsKey = Brand<Buffer, 'TenantSecretsKey'>;
+
+/**
+ * Ciphertext, as against the plaintext it was made from and the `[redacted]` an owner reads back.
+ * Branded because all three are strings, and only one of them may reach the database — a shape
+ * the type system would otherwise let any of them satisfy.
+ */
+export type SealedSecret = Brand<string, 'SealedSecret'>;
+
+export type SealedEnvironment = Record<string, SealedSecret>;
+
+/**
+ * The one place a plain string is taken as ciphertext: a column this api wrote and is reading
+ * back. Everywhere else the brand is what refuses a value that was never sealed.
+ */
+export function sealedFromStore(value: string): SealedSecret {
+  return value as SealedSecret;
+}
 
 /**
  * The key an owner's environment variables are sealed with, from its base64 in the environment.
@@ -40,7 +58,7 @@ export function sealSecret({
 }: {
   key: TenantSecretsKey;
   plaintext: string;
-}): string {
+}): SealedSecret {
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv(ALGORITHM, key, iv);
   const sealed = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
@@ -49,7 +67,7 @@ export function sealSecret({
     iv.toString('base64'),
     cipher.getAuthTag().toString('base64'),
     sealed.toString('base64'),
-  ].join(ENVELOPE_SEPARATOR);
+  ].join(ENVELOPE_SEPARATOR) as SealedSecret;
 }
 
 /**
@@ -57,7 +75,13 @@ export function sealSecret({
  * own database, so a failure is the key having changed or the row having been written by
  * something else — and a tenant started with the wrong environment is worse than one not started.
  */
-export function openSecret({ key, sealed }: { key: TenantSecretsKey; sealed: string }): string {
+export function openSecret({
+  key,
+  sealed,
+}: {
+  key: TenantSecretsKey;
+  sealed: SealedSecret;
+}): string {
   const [version, iv, tag, ciphertext] = sealed.split(ENVELOPE_SEPARATOR);
   if (version !== ENVELOPE_VERSION || iv === undefined || tag === undefined) {
     throw new Error('A sealed secret was not written by a scheme this knows.');
@@ -83,7 +107,7 @@ export function sealEnvironment({
 }: {
   key: TenantSecretsKey;
   environment: TenantEnvironment;
-}): Record<string, string> {
+}): SealedEnvironment {
   return Object.fromEntries(
     Object.entries(environment).map(([name, value]) => [
       name,
@@ -97,12 +121,18 @@ export function openEnvironment({
   sealed,
 }: {
   key: TenantSecretsKey;
-  sealed: Record<string, string>;
+  sealed: SealedEnvironment;
 }): TenantEnvironment {
-  return Value.Parse(
-    TenantEnvironmentSchema,
-    Object.fromEntries(
-      Object.entries(sealed).map(([name, value]) => [name, openSecret({ key, sealed: value })]),
-    ),
+  const opened = Object.fromEntries(
+    Object.entries(sealed).map(([name, value]) => [name, openSecret({ key, sealed: value })]),
   );
+
+  // Checked before it is parsed, never by parsing: parsing drops a name the schema does not allow
+  // and then succeeds, which would hand a host an environment quietly missing a variable its
+  // owner set. The column has a CHECK saying the same thing, so reaching this is a row written by
+  // something other than this api.
+  if (!Value.Check(TenantEnvironmentSchema, opened)) {
+    throw new Error('A stored environment holds a name this api would not have written.');
+  }
+  return Value.Parse(TenantEnvironmentSchema, opened);
 }

@@ -67,6 +67,24 @@ export class GatewayTimeoutError extends AppError {
   }
 }
 
+/**
+ * Which field was refused and why, never what was in it. Elysia serialises the whole request body
+ * into its message under `found`, and a request body now carries an app's environment — so
+ * returning that message verbatim would answer a mistyped port with every secret that was sent
+ * alongside it, in a response that crosses a proxy and lands in a browser's network log.
+ *
+ * Rebuilt from the parts worth keeping rather than filtered, so a field Elysia adds later is left
+ * out until someone decides it is safe to include.
+ */
+function whatWasWrong(message: string): string {
+  try {
+    const { on, property, summary } = JSON.parse(message) as Record<string, unknown>;
+    return JSON.stringify({ on, property, summary });
+  } catch {
+    return 'The request did not match what this endpoint accepts.';
+  }
+}
+
 type ErrorHandlerOptions = Parameters<ErrorHandler>[0];
 type ErrorHandlerResult = ReturnType<ErrorHandler>;
 
@@ -82,7 +100,10 @@ export function elysiaErrorHandler({
     return status(error.statusCode, { error: error.message });
   }
   if (code === 'VALIDATION') {
-    return status(StatusMap['Bad Request'], { error: 'Validation error', details: error.message });
+    return status(StatusMap['Bad Request'], {
+      error: 'Validation error',
+      details: whatWasWrong(error.message),
+    });
   }
   // A path segment is only a branded identifier once a handler has parsed it, so the schema that
   // rejects a malformed one throws here rather than at the edge, and would otherwise be a 500.

@@ -20,7 +20,7 @@ import {
 import { SQL } from 'bun';
 import type { AppConfigPatch, SealedConfigPatch, StoredAppConfig } from '#lib/app-config.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
-import { openSecret } from '#lib/tenant-secrets.ts';
+import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import type {
   AppHostnameRow,
   AppRow,
@@ -39,6 +39,7 @@ import {
   APP_ID,
   configColumns,
   DEFAULT_CONFIG,
+  DEFAULT_STORED_CONFIG,
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
@@ -360,7 +361,7 @@ describe('an app is created with the environment it was given, and never reports
 
     await createApp({ appsRepo, config: { args: ['serve'] } });
 
-    expect(appsRepo.offeredConfigs).toEqual([{ ...DEFAULT_CONFIG, args: ['serve'] }]);
+    expect(appsRepo.offeredConfigs).toEqual([{ ...DEFAULT_STORED_CONFIG, args: ['serve'] }]);
   });
 
   test('what reaches the database is sealed, never the value that was given', async () => {
@@ -371,7 +372,9 @@ describe('an app is created with the environment it was given, and never reports
     const stored = appsRepo.offeredConfigs[0]?.environment ?? {};
     expect(Object.keys(stored)).toEqual(['TOKEN']);
     expect(stored.TOKEN).not.toContain(SECRET);
-    expect(openSecret({ key: TEST_SECRETS_KEY, sealed: stored.TOKEN ?? '' })).toBe(SECRET);
+    expect(openSecret({ key: TEST_SECRETS_KEY, sealed: sealedFromStore(stored.TOKEN ?? '') })).toBe(
+      SECRET,
+    );
   });
 
   test('an unconfigured app falls back to the defaults the protocol publishes', async () => {
@@ -379,7 +382,7 @@ describe('an app is created with the environment it was given, and never reports
 
     await createApp({ appsRepo });
 
-    expect(appsRepo.offeredConfigs).toEqual([DEFAULT_CONFIG]);
+    expect(appsRepo.offeredConfigs).toEqual([DEFAULT_STORED_CONFIG]);
   });
 
   // An owner has to be told which variables are set without being told what they hold, which is
@@ -420,7 +423,9 @@ describe('a config patch only replaces the environment when it names one', () =>
     });
 
     const sealed = appsRepo.offeredPatches[0]?.environment ?? {};
-    expect(openSecret({ key: TEST_SECRETS_KEY, sealed: sealed.TOKEN ?? '' })).toBe(SECRET);
+    expect(openSecret({ key: TEST_SECRETS_KEY, sealed: sealedFromStore(sealed.TOKEN ?? '') })).toBe(
+      SECRET,
+    );
   });
 
   test('a patch emptying it says so, and that is not the same as silence', async () => {

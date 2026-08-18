@@ -58,8 +58,11 @@ export const DEFAULT_CONFIG: PublicAppConfig = {
   restartPolicy: DEFAULT_RESTART_POLICY,
 };
 
+/** The same defaults, in the shape a repository is handed rather than the one an owner reads. */
+export const DEFAULT_STORED_CONFIG: StoredAppConfig = { ...DEFAULT_CONFIG, environment: {} };
+
 /** The inverse of `toAppConfig`: the `app_configs` columns a row carries for this config. */
-export function configColumns(config: StoredAppConfig): AppConfigColumns {
+export function configColumns(config: StoredAppConfig | PublicAppConfig): AppConfigColumns {
   return {
     environment_names: Object.keys(config.environment),
     guest_port: config.guestPort,

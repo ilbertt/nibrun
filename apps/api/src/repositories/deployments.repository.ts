@@ -104,7 +104,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
         FROM nibrun.live_apps a
         JOIN nibrun.artifacts ar ON ar.app_id = a.id
         JOIN LATERAL (
-          SELECT id FROM nibrun.app_configs c
+          SELECT id FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND ar.id = ${artifactId}
@@ -155,6 +155,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
 
   listByApp({ appId, ownerId }: DeploymentsByAppInput): Promise<DeploymentRow[]> {
     return this.sql.SelectDeploymentsByApp`
+      /* @notNull environment_names */
       /* @notNull created_at */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at,
@@ -163,12 +164,10 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms,
-         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
-                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
       FROM nibrun.deployments d
       JOIN nibrun.live_apps a ON a.id = d.app_id
-      JOIN nibrun.app_configs c ON c.id = d.config_id
+      JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
       WHERE d.app_id = ${appId} AND a.owner_id = ${ownerId}
       ORDER BY d.id DESC
     `;
@@ -180,6 +179,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     ownerId,
   }: DeploymentByIdInput): Promise<DeploymentRow | null> {
     const [row] = await this.sql.SelectDeploymentById`
+      /* @notNull environment_names */
       /* @notNull created_at */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at,
@@ -188,12 +188,10 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms,
-         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
-                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
       FROM nibrun.deployments d
       JOIN nibrun.live_apps a ON a.id = d.app_id
-      JOIN nibrun.app_configs c ON c.id = d.config_id
+      JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
       WHERE d.app_id = ${appId} AND d.id = ${deploymentId} AND a.owner_id = ${ownerId}
     `;
     return row ?? null;
@@ -302,6 +300,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     deploymentId: DeploymentId;
   }): Promise<DeploymentRow | null> {
     const [row] = await tx.SelectInsertedDeployment`
+      /* @notNull environment_names */
       /* @notNull created_at */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at,
@@ -310,11 +309,9 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms,
-         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
-                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
       FROM nibrun.deployments d
-      JOIN nibrun.app_configs c ON c.id = d.config_id
+      JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
       WHERE d.id = ${deploymentId}
     `;
     return row ?? null;

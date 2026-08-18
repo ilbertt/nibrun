@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { openSecret, readSecretsKey, sealSecret } from '#lib/tenant-secrets.ts';
+import { openSecret, readSecretsKey, sealedFromStore, sealSecret } from '#lib/tenant-secrets.ts';
 
 const KEY_BYTES = 32;
 const SHORT_KEY_BYTES = 16;
@@ -37,7 +37,7 @@ describe('what will not open', () => {
     const sealed = sealSecret({ key: key(), plaintext: VALUE });
     const edited = `${sealed.slice(0, -EDITED_CHARS)}AAAA`;
 
-    expect(() => openSecret({ key: key(), sealed: edited })).toThrow();
+    expect(() => openSecret({ key: key(), sealed: sealedFromStore(edited) })).toThrow();
   });
 
   test('a value sealed under another key', () => {
@@ -49,13 +49,13 @@ describe('what will not open', () => {
   test('a value stamped with a scheme this does not know', () => {
     const sealed = sealSecret({ key: key(), plaintext: VALUE });
 
-    expect(() => openSecret({ key: key(), sealed: sealed.replace('v1.', 'v2.') })).toThrow(
-      'not written by a scheme this knows',
-    );
+    expect(() =>
+      openSecret({ key: key(), sealed: sealedFromStore(sealed.replace('v1.', 'v2.')) }),
+    ).toThrow('not written by a scheme this knows');
   });
 
   test('something that was never a sealed secret at all', () => {
-    expect(() => openSecret({ key: key(), sealed: VALUE })).toThrow();
+    expect(() => openSecret({ key: key(), sealed: sealedFromStore(VALUE) })).toThrow();
   });
 });
 

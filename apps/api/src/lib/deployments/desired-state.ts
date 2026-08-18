@@ -9,8 +9,13 @@ import {
   VolumeIdSchema,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.d.ts';
-import { type SealedEnvironment, toRunConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
-import { openEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
+import { toRunConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
+import {
+  openEnvironment,
+  type SealedEnvironment,
+  sealedFromStore,
+  type TenantSecretsKey,
+} from '#lib/tenant-secrets.ts';
 
 export type DesiredDeploymentRow = Queries['SelectDesiredDeployments'];
 
@@ -86,10 +91,11 @@ export function environmentByDeployment(
 ): Map<string, SealedEnvironment> {
   const byDeployment = new Map<string, SealedEnvironment>();
   for (const row of rows) {
-    byDeployment.set(row.deployment_id, {
-      ...byDeployment.get(row.deployment_id),
-      [row.name]: row.value,
-    });
+    // Written into the object already there rather than into a copy of it, so a deployment with
+    // many variables costs one pass and not one object per row.
+    const environment = byDeployment.get(row.deployment_id) ?? {};
+    environment[row.name] = sealedFromStore(row.value);
+    byDeployment.set(row.deployment_id, environment);
   }
   return byDeployment;
 }

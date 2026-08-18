@@ -10,12 +10,8 @@ import type {
 } from '@repo/protocol';
 import type { ArrayType } from 'bun';
 import type { Queries } from '#db/queries.gen.d.ts';
-import {
-  type SealedConfigPatch,
-  type SealedEnvironment,
-  type StoredAppConfig,
-  toAppConfig,
-} from '#lib/app-config.ts';
+import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
+import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import { Repository } from '#repositories/repository.ts';
 
 /**
@@ -140,6 +136,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       }
 
       const [app] = await tx.SelectCreatedApp`
+        /* @notNull environment_names */
         /* @notNull created_at */
         SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
                c.guest_port, c.args, c.vcpu_count, c.memory_mib,
@@ -147,12 +144,10 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms,
-         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
-                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
         FROM nibrun.live_apps a
         JOIN LATERAL (
-          SELECT * FROM nibrun.app_configs c
+          SELECT * FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
         WHERE a.id = ${inserted.id} AND a.owner_id = ${ownerId}
@@ -167,6 +162,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
   listByOwner({ ownerId }: { ownerId: OwnerId }): Promise<AppRow[]> {
     return this.sql.SelectAppsByOwner`
+      /* @notNull environment_names */
       /* @notNull created_at */
       SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
              c.guest_port, c.args, c.vcpu_count, c.memory_mib,
@@ -174,12 +170,10 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms,
-         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
-                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
       FROM nibrun.live_apps a
       JOIN LATERAL (
-        SELECT * FROM nibrun.app_configs c
+        SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
       WHERE a.owner_id = ${ownerId}
@@ -199,6 +193,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
   async findById({ appId, ownerId }: OwnedApp): Promise<AppRow | null> {
     const [app] = await this.sql.SelectAppById`
+      /* @notNull environment_names */
       /* @notNull created_at */
       SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
              c.guest_port, c.args, c.vcpu_count, c.memory_mib,
@@ -206,12 +201,10 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms,
-         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
-                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
       FROM nibrun.live_apps a
       JOIN LATERAL (
-        SELECT * FROM nibrun.app_configs c
+        SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
@@ -245,15 +238,14 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       }
 
       const [current] = await tx.SelectCurrentAppConfig`
+        /* @notNull environment_names */
         SELECT c.id, c.guest_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms,
-         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
-                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
-        FROM nibrun.app_configs c
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+        FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = ${appId}
         ORDER BY c.id DESC
         LIMIT 1
@@ -305,10 +297,11 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       // Reconfiguring an app changes the app, but the new version lands in another table, so
       // nothing would move `updated_at` without this.
       const [app] = await tx.TouchAppAfterConfigPatch`
+        /* @notNull environment_names */
         /* @notNull created_at */
         UPDATE nibrun.apps a
         SET updated_at = now()
-        FROM nibrun.app_configs c
+        FROM nibrun.app_configs_with_environment c
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND c.id = ${inserted.id}
         RETURNING a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
                   c.guest_port, c.args, c.vcpu_count, c.memory_mib,
@@ -316,9 +309,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                   c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                   c.health_check_unhealthy_threshold,
                   c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-                  c.restart_backoff_factor, c.restart_reset_after_ms,
-         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
-                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
+                  c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
       `;
       return app ?? null;
     });
@@ -435,6 +426,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       }
 
       const [app] = await tx.SelectAppAfterStateChange`
+        /* @notNull environment_names */
         /* @notNull created_at */
         SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
                c.guest_port, c.args, c.vcpu_count, c.memory_mib,
@@ -442,12 +434,10 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms,
-         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
-                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
         FROM nibrun.live_apps a
         JOIN LATERAL (
-          SELECT * FROM nibrun.app_configs c
+          SELECT * FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
