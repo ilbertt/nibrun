@@ -32,9 +32,13 @@ export const AppHostnameSchema = Type.Object({
 
 export type AppHostname = typeof AppHostnameSchema.static;
 
+// Closed, because a name the pattern does not match is otherwise neither validated nor rejected:
+// it simply is not part of the record, and parsing drops it. That reads as a variable accepted
+// and then silently not set, which is worse than being told the name is not one.
 export const TenantEnvironmentSchema = Type.Record(
   Type.String({ pattern: ENVIRONMENT_NAME_PATTERN }),
   SecretStringSchema,
+  { additionalProperties: false },
 );
 
 export type TenantEnvironment = typeof TenantEnvironmentSchema.static;
