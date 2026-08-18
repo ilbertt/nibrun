@@ -23,13 +23,16 @@ import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import type {
   AppHostnameRow,
+  OwnedAppHostnameRow,
+} from '#repositories/app-hostnames.repository.ts';
+import type {
   AppRow,
   AppsRepositoryContract,
   CreatedApp,
   Leftovers,
-  OwnedAppHostnameRow,
 } from '#repositories/apps.repository.ts';
 import {
+  type AppHostnameReads,
   AppsService,
   type ExportCancellation,
   type ObjectRemoval,
@@ -143,7 +146,7 @@ class StubAppsRepository implements AppsRepositoryContract {
     }
     return Promise.resolve({
       app: { ...appRow(slug), ...configColumns(config) },
-      hostnames: [{ hostname, kind: 'platform', state: 'active' }],
+      hostnames: [{ hostname, kind: 'platform', state: 'active', dcv_target: null }],
     });
   }
 
@@ -155,16 +158,8 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve([]);
   }
 
-  listHostnamesByOwner(): Promise<OwnedAppHostnameRow[]> {
-    return Promise.resolve([]);
-  }
-
   findById(): Promise<AppRow | null> {
     return Promise.resolve(null);
-  }
-
-  listHostnamesByApp(): Promise<AppHostnameRow[]> {
-    return Promise.resolve([]);
   }
 
   updateConfig({
@@ -218,6 +213,17 @@ class StubAppsRepository implements AppsRepositoryContract {
  * deleted after the row naming it: a bucket refusing a delete has to leave work a later pass can
  * still find.
  */
+/** Every read answers empty, which is what an app belonging to somebody else looks like. */
+class StubHostnameReads implements AppHostnameReads {
+  listByOwner(): Promise<OwnedAppHostnameRow[]> {
+    return Promise.resolve([]);
+  }
+
+  listByApp(): Promise<AppHostnameRow[]> {
+    return Promise.resolve([]);
+  }
+}
+
 class StubObjectStorage {
   readonly removed: ObjectKey[] = [];
   readonly #trace: string[];
@@ -270,6 +276,7 @@ function serviceWith({
 }) {
   return new AppsService({
     appsRepo,
+    hostnamesRepo: new StubHostnameReads(),
     exportsRepo,
     artifactStorageRepo,
     exportStorageRepo,
@@ -322,6 +329,7 @@ describe('a taken hostname is a re-roll, not something the owner sees', () => {
         hostname: Value.Parse(HostnameSchema, `${app.slug}.${APP_HOST_DOMAIN}`),
         kind: 'platform',
         state: 'active',
+        dcvTarget: null,
       },
     ]);
   });

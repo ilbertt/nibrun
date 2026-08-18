@@ -13,6 +13,7 @@ import type { ArrayType } from 'bun';
 import type { Queries } from '#db/queries.gen.d.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
+import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
 /**
@@ -23,8 +24,6 @@ import { Repository } from '#repositories/repository.ts';
 const TEXT_ARRAY: ArrayType = 'TEXT';
 
 export type AppRow = Queries['SelectAppById'];
-export type AppHostnameRow = Queries['SelectAppHostnamesByApp'];
-export type OwnedAppHostnameRow = Queries['SelectAppHostnamesByOwner'];
 
 export type CreatedApp = { app: AppRow; hostnames: AppHostnameRow[] };
 
@@ -49,9 +48,7 @@ export abstract class AppsRepositoryContract {
     config: StoredAppConfig;
   }): Promise<CreatedApp>;
   abstract listByOwner(input: { ownerId: OwnerId }): Promise<AppRow[]>;
-  abstract listHostnamesByOwner(input: { ownerId: OwnerId }): Promise<OwnedAppHostnameRow[]>;
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
-  abstract listHostnamesByApp(input: OwnedApp): Promise<AppHostnameRow[]>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: OwnedApp & { state: AppState }): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
@@ -134,7 +131,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       const [hostnameRow] = await tx.InsertAppHostname`
         INSERT INTO nibrun.app_hostnames (app_id, hostname, kind, state)
         VALUES (${inserted.id}, ${hostname}, ${PLATFORM_KIND}, ${ACTIVE_STATE})
-        RETURNING hostname, kind, state
+        RETURNING hostname, kind, state, dcv_target
       `;
       if (!hostnameRow) {
         throw new Error('Inserting into nibrun.app_hostnames returned no row.');
@@ -186,16 +183,6 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     `;
   }
 
-  listHostnamesByOwner({ ownerId }: { ownerId: OwnerId }): Promise<OwnedAppHostnameRow[]> {
-    return this.sql.SelectAppHostnamesByOwner`
-      SELECT h.app_id, h.hostname, h.kind, h.state
-      FROM nibrun.app_hostnames h
-      JOIN nibrun.live_apps a ON a.id = h.app_id
-      WHERE a.owner_id = ${ownerId}
-      ORDER BY h.app_id, h.hostname
-    `;
-  }
-
   async findById({ appId, ownerId }: OwnedApp): Promise<AppRow | null> {
     const [app] = await this.sql.SelectAppById`
       /* @notNull environment_names */
@@ -215,16 +202,6 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
     `;
     return app ?? null;
-  }
-
-  listHostnamesByApp({ appId, ownerId }: OwnedApp): Promise<AppHostnameRow[]> {
-    return this.sql.SelectAppHostnamesByApp`
-      SELECT h.hostname, h.kind, h.state
-      FROM nibrun.app_hostnames h
-      JOIN nibrun.live_apps a ON a.id = h.app_id
-      WHERE h.app_id = ${appId} AND a.owner_id = ${ownerId}
-      ORDER BY h.hostname
-    `;
   }
 
   // A patch appends a version rather than editing one, and the newest version is the live one,

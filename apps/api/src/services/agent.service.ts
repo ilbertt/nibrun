@@ -16,6 +16,7 @@ import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { ExportsService } from '#services/exports.service.ts';
+import type { HostnamesService } from '#services/hostnames.service.ts';
 import { Service } from '#services/service.ts';
 
 const MS_PER_SECOND = 1000;
@@ -25,12 +26,16 @@ const SESSION_LIFETIME_MS = SECONDS_PER_HOUR * MS_PER_SECOND;
 /** What a report is borrowed for, and nothing else artifacts can do. */
 export type UploadSweep = Pick<ArtifactsService, 'sweepAbandoned'>;
 
+/** Likewise for hostnames: a report is the clock, not permission to add or remove one. */
+export type HostnameReconcile = Pick<HostnamesService, 'reconcile'>;
+
 export class AgentService extends Service {
   private readonly agentRepo: AgentRepositoryContract;
   private readonly deploymentsService: DeploymentsService;
   private readonly appsService: AppsService;
   private readonly exportsService: ExportsService;
   private readonly artifactsService: UploadSweep;
+  private readonly hostnamesService: HostnameReconcile;
 
   constructor({
     agentRepo,
@@ -38,12 +43,14 @@ export class AgentService extends Service {
     appsService,
     exportsService,
     artifactsService,
+    hostnamesService,
   }: {
     agentRepo: AgentRepositoryContract;
     deploymentsService: DeploymentsService;
     appsService: AppsService;
     exportsService: ExportsService;
     artifactsService: UploadSweep;
+    hostnamesService: HostnameReconcile;
   }) {
     super();
     this.agentRepo = agentRepo;
@@ -51,6 +58,7 @@ export class AgentService extends Service {
     this.appsService = appsService;
     this.exportsService = exportsService;
     this.artifactsService = artifactsService;
+    this.hostnamesService = hostnamesService;
   }
 
   /**
@@ -126,5 +134,8 @@ export class AgentService extends Service {
     // Nothing to do with this report. A report is simply the clock this process has, and an
     // upload nobody ever came back about is work that needs one.
     await this.artifactsService.sweepAbandoned();
+    // The same clock, for the same reason: whether a custom hostname has been pointed at us is
+    // decided in somebody else's DNS, so there is no moment to act on but a passing one.
+    await this.hostnamesService.reconcile();
   }
 }

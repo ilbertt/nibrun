@@ -41,11 +41,21 @@ export const AppConfigPatchSchema = t.Partial(
   { additionalProperties: false },
 );
 
-// What a host is told about a hostname, plus the one thing only its owner needs: whether the
-// edge can serve it yet.
+/**
+ * What a host is told about a hostname, plus the two things only its owner needs: whether the
+ * edge can serve it yet, and the record to place so that it can.
+ *
+ * Here rather than under `hostnames/` because the app response below carries it too, and a
+ * schema shared by sibling routes belongs to the folder above them.
+ */
 export const AppHostnameResponseSchema = t.Composite([
   AppHostnameSchema,
-  t.Object({ state: AppHostnameStateSchema }),
+  t.Object({
+    state: AppHostnameStateSchema,
+    // Absent on a platform hostname, which the wildcard certificate already covers, and until
+    // the edge has answered with a target for a custom one.
+    dcvTarget: t.Nullable(t.String()),
+  }),
 ]);
 
 // `hostnames` is widened the same way `config` is: what an owner is shown carries the state,
