@@ -13,7 +13,7 @@ export function DeployForm({ appId }: { appId: string | undefined }) {
 
   return (
     <form
-      className="flex flex-col gap-5"
+      className="flex min-w-0 flex-col gap-5"
       onSubmit={(event) => {
         event.preventDefault();
         void api.handleSubmit();
@@ -63,7 +63,7 @@ export function DeployForm({ appId }: { appId: string | undefined }) {
       </api.Field>
 
       {replacing !== undefined && (
-        <p className="rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
+        <p className="wrap-anywhere rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
           This replaces the binary <span className="font-medium font-mono">{replacing.slug}</span>{' '}
           is running. Its hostnames and everything on its volume stay as they are.
         </p>
@@ -72,7 +72,7 @@ export function DeployForm({ appId }: { appId: string | undefined }) {
       <api.Subscribe selector={(state) => state.canSubmit}>
         {(canSubmit) => (
           <Button type="submit" size="lg" disabled={!canSubmit || !targetResolved}>
-            {submitLabel({ replacing: replacing?.slug, locked })}
+            <span className="truncate">{submitLabel({ replacing: replacing?.slug, locked })}</span>
           </Button>
         )}
       </api.Subscribe>

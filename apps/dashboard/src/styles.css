@@ -88,6 +88,22 @@ body {
   --color-destructive-foreground: var(--destructive-foreground);
 }
 
+@theme {
+  --animate-live-halo: live-halo 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+
+  @keyframes live-halo {
+    0% {
+      transform: scale(1);
+      opacity: 0.5;
+    }
+    70%,
+    100% {
+      transform: scale(2.6);
+      opacity: 0;
+    }
+  }
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.25 0.051 149.2);
