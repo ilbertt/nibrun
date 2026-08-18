@@ -4,35 +4,37 @@ const WHAT_YOU_GET = [
   {
     icon: CpuIcon,
     title: 'A machine to itself',
-    body: 'One microVM per app. Your binary is the only thing running inside it, so nothing else can crash it or read its disk.',
+    body: 'One microVM per app. Nothing else runs in it.',
   },
   {
     icon: DatabaseIcon,
     title: 'Just write to the disk',
-    body: 'SQLite for your data, data/ for your uploads. No database to provision, no bucket to configure, and it survives every redeploy.',
+    body: 'SQLite for data, data/ for uploads. It survives every redeploy.',
   },
   {
     icon: PackageIcon,
     title: 'Take it all with you',
-    body: 'One click, one .tar.gz: the binary and every byte of its disk, read while the filesystem is frozen so the SQLite inside is intact. Runs on any Linux box.',
+    body: 'One click: the binary and its whole disk, as one .tar.gz.',
   },
   {
     icon: GlobeIcon,
     title: 'A URL right away',
-    body: 'An HTTPS subdomain, issued and served the moment it boots. Point a domain of your own at it when you are ready.',
+    body: 'An HTTPS subdomain, the moment it boots.',
   },
 ];
 
 export function WhatYouGet() {
   return (
-    <section className="grid w-full gap-10 border-border/60 border-t py-16 sm:grid-cols-2 sm:gap-8 sm:py-20 lg:grid-cols-4">
+    <section className="grid w-full gap-8 border-border/60 border-t py-16 sm:grid-cols-2 sm:gap-x-16 sm:gap-y-12 sm:py-20">
       {WHAT_YOU_GET.map(({ icon: Icon, title, body }) => (
-        <div key={title} className="flex flex-col items-start gap-3">
-          <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div key={title} className="flex items-start gap-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <Icon className="size-5" />
           </span>
-          <h2 className="text-balance font-medium">{title}</h2>
-          <p className="text-pretty text-muted-foreground text-sm leading-relaxed">{body}</p>
+          <div className="flex flex-col gap-1">
+            <h2 className="font-medium text-lg">{title}</h2>
+            <p className="text-pretty text-muted-foreground">{body}</p>
+          </div>
         </div>
       ))}
     </section>
