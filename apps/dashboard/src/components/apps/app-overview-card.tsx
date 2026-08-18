@@ -2,6 +2,7 @@ import { Badge } from '@repo/ui/components/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
 import { ExternalLinkIcon } from 'lucide-react';
 import { AppStateBadge } from '#components/apps/app-state-badge.tsx';
+import { HostnameStateBadge } from '#components/apps/hostname-state-badge.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
@@ -34,7 +35,14 @@ export function AppOverviewCard({ app }: { app: AppSummary }) {
                   <span className="truncate">{hostname.hostname}</span>
                   <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground" />
                 </a>
-                {hostname.kind === 'custom' ? <Badge variant="outline">Custom</Badge> : null}
+                <span className="flex shrink-0 items-center gap-2">
+                  {hostname.kind === 'custom' ? <Badge variant="outline">Custom</Badge> : null}
+                  {/* Only where it says something: a platform hostname is active from the moment
+                      it is minted, so a badge on one is a word that never changes. */}
+                  {hostname.state === 'active' ? null : (
+                    <HostnameStateBadge state={hostname.state} />
+                  )}
+                </span>
               </li>
             ))}
           </ul>

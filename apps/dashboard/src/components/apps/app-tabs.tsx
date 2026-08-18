@@ -3,6 +3,7 @@ import { Tabs, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
 import { Link } from '@tanstack/react-router';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useAppTab } from '#lib/hooks/use-app-tab.ts';
+import { Route as DomainsRoute } from '#routes/(dashboard)/apps/$appId/domains.tsx';
 import { Route as FilesRoute } from '#routes/(dashboard)/apps/$appId/files.tsx';
 import { Route as AppRoute } from '#routes/(dashboard)/apps/$appId/index.tsx';
 import { Route as LogsRoute } from '#routes/(dashboard)/apps/$appId/logs.tsx';
@@ -34,6 +35,9 @@ export function AppTabs() {
           render={<Link to={FilesRoute.to} params={{ appId }} search={{ path: GUEST_PATH_ROOT }} />}
         >
           Files
+        </TabsTrigger>
+        <TabsTrigger value="domains" render={<Link to={DomainsRoute.to} params={{ appId }} />}>
+          Domains
         </TabsTrigger>
       </TabsList>
     </Tabs>
