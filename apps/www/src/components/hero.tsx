@@ -5,9 +5,8 @@ export function Hero() {
         Drop a binary. Get a server.
       </h1>
       <p className="text-balance text-lg text-muted-foreground">
-        It boots in a microVM of its own, with a{' '}
-        <code className="font-mono text-foreground">data/</code> that outlives every redeploy. No
-        Dockerfile. No YAML.
+        No Dockerfile. No YAML. No cluster. A microVM and a filesystem is all most software ever
+        needed.
       </p>
     </div>
   );

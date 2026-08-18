@@ -1,26 +1,31 @@
-import { CpuIcon, GlobeIcon, HardDriveIcon } from 'lucide-react';
+import { CpuIcon, DatabaseIcon, GlobeIcon, PackageIcon } from 'lucide-react';
 
 const WHAT_YOU_GET = [
   {
     icon: CpuIcon,
-    title: 'A machine of its own',
-    body: 'One microVM per app. Its PID 1 measures 1.3 MiB of memory and 69 KiB on disk, and your binary is the only other thing that ever runs in there.',
+    title: 'One guest, one volume',
+    body: 'No orchestrator, no sidecars, no service mesh. Your binary is the only thing that ever executes in there.',
   },
   {
-    icon: HardDriveIcon,
-    title: 'A volume that outlives deploys',
-    body: 'Mounted at data/, kept across restarts and redeploys. Export the whole filesystem whenever you want it somewhere else.',
+    icon: DatabaseIcon,
+    title: 'SQLite is just a file',
+    body: 'And so are your uploads. A real ext4 volume at data/ — nothing to provision, no connection string to keep.',
+  },
+  {
+    icon: PackageIcon,
+    title: 'Take it and go',
+    body: 'One .tar.gz with the binary and everything on its volume, from a button. It runs anywhere Linux does.',
   },
   {
     icon: GlobeIcon,
-    title: 'A hostname as soon as it boots',
-    body: 'nibrun issues a subdomain and serves it over HTTPS. Point a domain of your own at it whenever you are ready.',
+    title: 'An HTTPS endpoint',
+    body: 'Issued and served the moment it boots. No certificate to renew, no load balancer to stand up.',
   },
 ];
 
 export function WhatYouGet() {
   return (
-    <section className="grid w-full gap-10 border-border/60 border-t py-16 sm:grid-cols-3 sm:gap-8 sm:py-20">
+    <section className="grid w-full gap-10 border-border/60 border-t py-16 sm:grid-cols-2 sm:gap-8 sm:py-20 lg:grid-cols-4">
       {WHAT_YOU_GET.map(({ icon: Icon, title, body }) => (
         <div key={title} className="flex flex-col items-start gap-3">
           <Icon className="size-5 text-primary" />
