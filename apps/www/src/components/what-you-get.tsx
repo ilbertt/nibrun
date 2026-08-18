@@ -9,7 +9,7 @@ const WHAT_YOU_GET = [
   {
     icon: DatabaseIcon,
     title: 'Just write to the disk',
-    body: 'SQLite for data, data/ for uploads. It survives every redeploy.',
+    body: 'data/ is yours: a SQLite file, uploads, both. It survives every redeploy.',
   },
   {
     icon: PackageIcon,
