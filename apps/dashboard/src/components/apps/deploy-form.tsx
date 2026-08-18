@@ -1,10 +1,10 @@
+import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
 import { Button } from '#components/ui/button.tsx';
 import { Field, FieldDescription, FieldError, FieldLabel } from '#components/ui/field.tsx';
 import { Input } from '#components/ui/input.tsx';
 import { Textarea } from '#components/ui/textarea.tsx';
-import { formatBytes } from '#lib/format-bytes.ts';
-import { useDeployForm, validateBinary, validatePort } from '#lib/hooks/use-deploy-form.ts';
+import { useDeployForm, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 export function DeployForm({ appId }: { appId: string | undefined }) {
   const { api, locked, replacing, targetResolved, defaultPort, defaultArgs } = useDeployForm({
@@ -19,26 +19,7 @@ export function DeployForm({ appId }: { appId: string | undefined }) {
         void api.handleSubmit();
       }}
     >
-      <api.Field name="binary" validators={{ onMount: validateBinary, onChange: validateBinary }}>
-        {(field) => {
-          const rejected = field.state.value !== undefined && field.state.meta.errors.length > 0;
-          return (
-            <Field data-invalid={rejected || undefined}>
-              <FieldLabel htmlFor="deploy-binary">Binary</FieldLabel>
-              <Input
-                id="deploy-binary"
-                type="file"
-                onChange={(event) => field.handleChange(event.target.files?.[0])}
-              />
-              {rejected ? (
-                <FieldError>{field.state.meta.errors[0]}</FieldError>
-              ) : (
-                <FieldDescription>{describeBinary(field.state.value)}</FieldDescription>
-              )}
-            </Field>
-          );
-        }}
-      </api.Field>
+      <DeployBinaryField api={api} />
 
       {!locked && <DeployNameField api={api} />}
 
@@ -97,12 +78,6 @@ export function DeployForm({ appId }: { appId: string | undefined }) {
       </api.Subscribe>
     </form>
   );
-}
-
-function describeBinary(binary: File | undefined): string {
-  return binary === undefined
-    ? 'The compiled binary to run in the guest.'
-    : `${formatBytes(binary.size)}, uploaded straight to the store.`;
 }
 
 function submitLabel({
