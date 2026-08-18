@@ -8,9 +8,11 @@
   "scripts": {
     "dev": "vite dev --port 3002",
     "build": "vite build",
+    "build:preview": "CLOUDFLARE_ENV=preview vite build",
     "preview": "vite preview",
     "cf:typegen": "wrangler types",
     "cf:deploy": "bun run build && wrangler deploy",
+    "cf:deploy:preview": "bun run build:preview && wrangler versions upload",
     "check:types": "bun run cf:typegen && bun run --bun tsc"
   },
   "dependencies": {

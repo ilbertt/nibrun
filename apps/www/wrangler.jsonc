@@ -10,5 +10,14 @@
   },
   "assets": {
     "binding": "ASSETS"
+  },
+  "env": {
+    // Wrangler derives `nibrun-www-preview` from the environment name and would deploy a
+    // second worker under it. Naming it back to the base keeps preview a version of the one
+    // worker — which is what `wrangler versions upload` ships, a version that serves no
+    // traffic until it is promoted. Anything a preview should do differently goes here.
+    "preview": {
+      "name": "nibrun-www"
+    }
   }
 }
