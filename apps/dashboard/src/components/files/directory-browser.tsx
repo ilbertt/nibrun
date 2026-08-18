@@ -2,6 +2,7 @@ import { DIRECTORY_ENTRY_LIMIT } from '@repo/protocol';
 import { FolderOpenIcon } from 'lucide-react';
 import { DeploymentLine } from '#components/apps/deployment-line.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
+import { DirectoryRefreshButton } from '#components/files/directory-refresh-button.tsx';
 import { DirectoryTable } from '#components/files/directory-table.tsx';
 import { PathBreadcrumb } from '#components/files/path-breadcrumb.tsx';
 import { Card } from '#components/ui/card.tsx';
@@ -19,7 +20,10 @@ export function DirectoryBrowser() {
   return (
     <div className="flex flex-col gap-4">
       {view.deploymentId !== undefined && <DeploymentLine deploymentId={view.deploymentId} />}
-      <PathBreadcrumb />
+      <div className="flex items-center justify-between gap-4">
+        <PathBreadcrumb />
+        <DirectoryRefreshButton />
+      </div>
       {view.status === 'failed' && (
         <FailureEmpty title="Could not read that directory" reason={view.reason ?? ''} />
       )}
