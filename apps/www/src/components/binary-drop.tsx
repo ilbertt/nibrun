@@ -9,7 +9,12 @@ export function BinaryDrop() {
   const picker = useBinaryPicker({ onPick: handoff.offer });
 
   return (
-    <div className="flex w-full flex-col gap-3">
+    <div className="relative isolate flex w-full flex-col gap-3">
+      <div
+        aria-hidden="true"
+        data-dragging={picker.dragging || undefined}
+        className="pointer-events-none absolute -inset-6 -z-10 rounded-full bg-primary/30 opacity-70 blur-3xl transition-opacity duration-300 data-[dragging=true]:opacity-100"
+      />
       <div
         data-dragging={picker.dragging || undefined}
         data-invalid={handoff.failure !== undefined || undefined}
@@ -26,13 +31,11 @@ export function BinaryDrop() {
         />
         <label
           htmlFor={BINARY_INPUT_ID}
-          className="flex cursor-pointer flex-col items-center gap-4 px-6 py-16 text-center sm:py-24"
+          className="flex cursor-pointer flex-col items-center gap-4 px-6 py-16 text-center sm:py-20"
         >
           <Glyph handoff={handoff} />
           <span className="flex flex-col gap-1.5">
-            <span className="font-medium text-lg sm:text-xl">
-              Drop your binary here, get a server
-            </span>
+            <span className="font-medium text-lg sm:text-xl">Drop it here</span>
             <span className="text-muted-foreground text-sm">{caption(handoff)}</span>
           </span>
         </label>
@@ -64,7 +67,7 @@ function caption(handoff: BinaryHandoff): string {
     return `Sending ${handoff.binary?.name}…`;
   }
   if (handoff.binary === undefined) {
-    return 'or click to browse for it';
+    return 'or click to browse';
   }
   return handoff.binary.name;
 }
