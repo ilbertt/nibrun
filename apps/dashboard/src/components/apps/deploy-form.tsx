@@ -1,10 +1,17 @@
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@repo/ui/components/accordion';
 import { Button } from '@repo/ui/components/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
 import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
+import { DeployEnvironmentField } from '#components/apps/deploy-environment-field.tsx';
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
-import { useDeployForm, validateEnvironment, validatePort } from '#lib/hooks/use-deploy-form.ts';
+import { useDeployForm, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 export function DeployForm({ appId }: { appId: string | undefined }) {
   const { api, locked, replacing, targetResolved, defaultPort, defaultArgs } = useDeployForm({
@@ -62,25 +69,25 @@ export function DeployForm({ appId }: { appId: string | undefined }) {
         )}
       </api.Field>
 
-      <api.Field name="environment" validators={{ onChange: validateEnvironment }}>
-        {(field) => (
-          <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
-            <FieldLabel htmlFor="deploy-environment">Environment</FieldLabel>
-            <Textarea
-              id="deploy-environment"
-              value={field.state.value ?? ''}
-              onChange={(event) => field.handleChange(event.target.value)}
-              placeholder={'OPENCLAW_STATE_DIR=/app/data/.openclaw'}
-              className="font-mono"
-            />
-            {field.state.meta.errors.length > 0 ? (
-              <FieldError>{field.state.meta.errors[0]}</FieldError>
-            ) : (
-              <FieldDescription>{describeEnvironment(replacing)}</FieldDescription>
-            )}
-          </Field>
-        )}
-      </api.Field>
+      <Accordion>
+        <AccordionItem>
+          <AccordionTrigger>
+            Advanced settings
+            {/* Collapsed, a refused variable would disable the button with nothing on screen
+                saying why, so the section that holds it says so itself. */}
+            <api.Subscribe selector={(state) => state.fieldMeta.environment?.errors.length ?? 0}>
+              {(refused) =>
+                refused > 0 ? (
+                  <span className="font-normal text-destructive">needs a look</span>
+                ) : null
+              }
+            </api.Subscribe>
+          </AccordionTrigger>
+          <AccordionContent>
+            <DeployEnvironmentField api={api} replacing={replacing} />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {replacing !== undefined && (
         <p className="wrap-anywhere rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
@@ -98,16 +105,6 @@ export function DeployForm({ appId }: { appId: string | undefined }) {
       </api.Subscribe>
     </form>
   );
-}
-
-// A value cannot be shown once it is set — the api returns the names and nothing else — so what
-// this says is what leaving the box alone will do.
-function describeEnvironment(replacing: { config: { environment: object } } | undefined): string {
-  const names = Object.keys(replacing?.config.environment ?? {});
-  if (names.length === 0) {
-    return 'One NAME=value per line. What the binary runs with.';
-  }
-  return `One NAME=value per line. Empty keeps ${names.join(', ')} as they are; listing any replaces the lot.`;
 }
 
 function submitLabel({
