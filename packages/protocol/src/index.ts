@@ -66,6 +66,7 @@ export {
 } from '#control/transport.ts';
 export {
   APP_HOSTNAME_KINDS,
+  APP_HOSTNAME_STATES,
   APP_STATES,
   type App,
   type AppConfig,
@@ -74,9 +75,12 @@ export {
   type AppHostnameKind,
   AppHostnameKindSchema,
   AppHostnameSchema,
+  type AppHostnameState,
+  AppHostnameStateSchema,
   AppSchema,
   type AppState,
   AppStateSchema,
+  MIN_HOSTNAMES,
   type TenantArguments,
   TenantArgumentsSchema,
   type TenantEnvironment,

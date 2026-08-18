@@ -1,4 +1,4 @@
-import type { App, AppHostname, AppId, OwnerId, ReportedVolume } from '@repo/protocol';
+import type { App, AppId, OwnerId, ReportedVolume } from '@repo/protocol';
 import {
   type AppConfigPatch,
   configWithDefaults,
@@ -6,7 +6,7 @@ import {
   type SealedConfigPatch,
   toAppConfig,
 } from '#lib/app-config.ts';
-import { platformHostname } from '#lib/app-hostname.ts';
+import { type PublicAppHostname, platformHostname, toAppHostname } from '#lib/app-hostname.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
@@ -21,7 +21,10 @@ import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-s
 import type { ExportsRepositoryContract } from '#repositories/exports.repository.ts';
 import { Service } from '#services/service.ts';
 
-export type PublicApp = Omit<App, 'config'> & { config: PublicAppConfig };
+export type PublicApp = Omit<App, 'config' | 'hostnames'> & {
+  config: PublicAppConfig;
+  hostnames: PublicAppHostname[];
+};
 
 type AppWithHostnames = { app: AppRow; hostnames: readonly AppHostnameRow[] };
 
@@ -307,10 +310,6 @@ function requireApp(app: AppRow | null): AppRow {
     throw new NotFoundError('App not found.');
   }
   return app;
-}
-
-function toAppHostname(row: AppHostnameRow): AppHostname {
-  return { hostname: row.hostname, kind: row.kind };
 }
 
 function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {

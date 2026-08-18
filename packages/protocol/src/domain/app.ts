@@ -10,7 +10,11 @@ import { stringEnum } from '#lib/string-enum.ts';
 import { DnsLabelSchema, GuestPortSchema, HostnameSchema, TimestampSchema } from '#lib/wire.ts';
 
 const ENVIRONMENT_NAME_PATTERN = '^[A-Za-z_][A-Za-z0-9_]*$';
-const MIN_HOSTNAMES = 1;
+
+// An app is always reachable at the hostname nibrun issued it, so every list of them has one.
+// Exported because the api narrows this array for its own response and would otherwise restate
+// the bound — or, as it did, quietly drop it.
+export const MIN_HOSTNAMES = 1;
 
 // Mirrored by CONFIG_MAX_ARGUMENTS in apps/runtime, which refuses a file exceeding it.
 const MAX_ARGUMENTS = 64;
@@ -25,6 +29,17 @@ export const AppHostnameKindSchema = stringEnum(APP_HOSTNAME_KINDS);
 
 export type AppHostnameKind = typeof AppHostnameKindSchema.static;
 
+// Whether the edge can serve the hostname yet. A platform hostname is born `active` — the
+// wildcard record and the wildcard certificate already cover it — while a custom one waits for
+// the owner to point DNS at us, which is the only proof of ownership there is.
+export const APP_HOSTNAME_STATES = ['pending', 'active', 'failed'] as const;
+
+export const AppHostnameStateSchema = stringEnum(APP_HOSTNAME_STATES);
+
+export type AppHostnameState = typeof AppHostnameStateSchema.static;
+
+// No state: a host is sent the hostnames it should be answering for, and one it should not
+// answer for yet is left out rather than sent with a flag saying so.
 export const AppHostnameSchema = Type.Object({
   hostname: HostnameSchema,
   kind: AppHostnameKindSchema,

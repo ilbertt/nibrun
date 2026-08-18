@@ -1,6 +1,7 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
 import type {
   AppHostnameKind,
+  AppHostnameState,
   AppId,
   AppState,
   DnsLabel,
@@ -64,6 +65,8 @@ export abstract class AppsRepositoryContract {
 
 export const PLATFORM_KIND: AppHostnameKind = 'platform';
 
+const ACTIVE_STATE: AppHostnameState = 'active';
+
 export class AppsRepository extends Repository implements AppsRepositoryContract {
   async isOwnedBy({ appId, ownerId }: OwnedApp): Promise<boolean> {
     const [row] = await this.sql.SelectAppOwnership`
@@ -126,10 +129,12 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         environment: config.environment,
       });
 
+      // Active on insert: the wildcard record and the wildcard certificate already cover this
+      // name, so there is nothing for it to wait for. Only a brought domain has to be proved.
       const [hostnameRow] = await tx.InsertAppHostname`
-        INSERT INTO nibrun.app_hostnames (app_id, hostname, kind)
-        VALUES (${inserted.id}, ${hostname}, ${PLATFORM_KIND})
-        RETURNING hostname, kind
+        INSERT INTO nibrun.app_hostnames (app_id, hostname, kind, state)
+        VALUES (${inserted.id}, ${hostname}, ${PLATFORM_KIND}, ${ACTIVE_STATE})
+        RETURNING hostname, kind, state
       `;
       if (!hostnameRow) {
         throw new Error('Inserting into nibrun.app_hostnames returned no row.');
@@ -183,7 +188,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
   listHostnamesByOwner({ ownerId }: { ownerId: OwnerId }): Promise<OwnedAppHostnameRow[]> {
     return this.sql.SelectAppHostnamesByOwner`
-      SELECT h.app_id, h.hostname, h.kind
+      SELECT h.app_id, h.hostname, h.kind, h.state
       FROM nibrun.app_hostnames h
       JOIN nibrun.live_apps a ON a.id = h.app_id
       WHERE a.owner_id = ${ownerId}
@@ -214,7 +219,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
   listHostnamesByApp({ appId, ownerId }: OwnedApp): Promise<AppHostnameRow[]> {
     return this.sql.SelectAppHostnamesByApp`
-      SELECT h.hostname, h.kind
+      SELECT h.hostname, h.kind, h.state
       FROM nibrun.app_hostnames h
       JOIN nibrun.live_apps a ON a.id = h.app_id
       WHERE h.app_id = ${appId} AND a.owner_id = ${ownerId}

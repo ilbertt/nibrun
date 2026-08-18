@@ -143,7 +143,7 @@ class StubAppsRepository implements AppsRepositoryContract {
     }
     return Promise.resolve({
       app: { ...appRow(slug), ...configColumns(config) },
-      hostnames: [{ hostname, kind: 'platform' }],
+      hostnames: [{ hostname, kind: 'platform', state: 'active' }],
     });
   }
 
@@ -318,7 +318,11 @@ describe('a taken hostname is a re-roll, not something the owner sees', () => {
     expect(appsRepo.offeredSlugs).toHaveLength(COLLISIONS_BEFORE_SUCCESS + 1);
     expect(distinct(appsRepo.offeredSlugs)).toBe(appsRepo.offeredSlugs.length);
     expect(app.hostnames).toEqual([
-      { hostname: Value.Parse(HostnameSchema, `${app.slug}.${APP_HOST_DOMAIN}`), kind: 'platform' },
+      {
+        hostname: Value.Parse(HostnameSchema, `${app.slug}.${APP_HOST_DOMAIN}`),
+        kind: 'platform',
+        state: 'active',
+      },
     ]);
   });
 });

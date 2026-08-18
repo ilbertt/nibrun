@@ -1,7 +1,10 @@
 import {
   AppConfigSchema,
+  AppHostnameSchema,
+  AppHostnameStateSchema,
   AppSchema,
   ByteSizeSchema,
+  MIN_HOSTNAMES,
   REDACTED,
   TenantEnvironmentSchema,
 } from '@repo/protocol';
@@ -38,9 +41,22 @@ export const AppConfigPatchSchema = t.Partial(
   { additionalProperties: false },
 );
 
+// What a host is told about a hostname, plus the one thing only its owner needs: whether the
+// edge can serve it yet.
+export const AppHostnameResponseSchema = t.Composite([
+  AppHostnameSchema,
+  t.Object({ state: AppHostnameStateSchema }),
+]);
+
+// `hostnames` is widened the same way `config` is: what an owner is shown carries the state,
+// which a host is never sent. `minItems` is restated from the schema it replaces rather than
+// left off — an app always has the hostname nibrun issued it.
 export const AppResponseSchema = t.Composite([
-  t.Omit(AppSchema, ['config']),
-  t.Object({ config: PublicAppConfigSchema }),
+  t.Omit(AppSchema, ['config', 'hostnames']),
+  t.Object({
+    config: PublicAppConfigSchema,
+    hostnames: t.Array(AppHostnameResponseSchema, { minItems: MIN_HOSTNAMES }),
+  }),
 ]);
 
 export const ListAppsResponseSchema = t.Object({ apps: t.Array(AppResponseSchema) });

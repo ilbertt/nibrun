@@ -1,0 +1,23 @@
+# The database the test suite brings up for itself. Its own file rather than a profile on the
+# dev stack: what starts it is `bun test`, not a developer, and nothing here should be reachable
+# by a `docker compose up` meant to run nibrun locally.
+#
+# Same image as the dev database, so CI and a developer's machine agree on the server the SQL is
+# checked against. No volume and its own port: what it holds is rebuilt from the migrations on
+# every run, and it must never be mistaken for the one holding a developer's apps.
+
+services:
+  postgres-test:
+    image: postgres:18-alpine
+    container_name: nibrun-postgres-test
+    environment:
+      POSTGRES_USER: nibrun
+      POSTGRES_PASSWORD: nibrun
+      POSTGRES_DB: nibrun_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U nibrun -d nibrun_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30

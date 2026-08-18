@@ -90,6 +90,7 @@ export interface IInsertAppConfigResult {
 export interface IInsertAppHostnameResult {
     hostname: import("@repo/protocol").Hostname;
     kind: import("@repo/protocol").AppHostnameKind;
+    state: import("@repo/protocol").AppHostnameState;
 }
 
 /** Result of query `SelectCreatedApp`. */
@@ -149,6 +150,7 @@ export interface ISelectAppHostnamesByOwnerResult {
     app_id: import("@repo/protocol").AppId;
     hostname: import("@repo/protocol").Hostname;
     kind: import("@repo/protocol").AppHostnameKind;
+    state: import("@repo/protocol").AppHostnameState;
 }
 
 /** Result of query `SelectAppById`. */
@@ -181,6 +183,7 @@ export interface ISelectAppByIdResult {
 export interface ISelectAppHostnamesByAppResult {
     hostname: import("@repo/protocol").Hostname;
     kind: import("@repo/protocol").AppHostnameKind;
+    state: import("@repo/protocol").AppHostnameState;
 }
 
 /** Result of query `SelectAppForConfigUpdate`. */
