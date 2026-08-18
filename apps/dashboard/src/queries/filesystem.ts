@@ -9,9 +9,13 @@ export type DirectoryTarget = {
   path: GuestPath | undefined;
 };
 
+export function filesystemQueryKey(appId: string) {
+  return ['filesystem', appId] as const;
+}
+
 export function directoryQueryOptions({ appId, deploymentId, path }: DirectoryTarget) {
   return queryOptions({
-    queryKey: ['filesystem', appId, deploymentId, path],
+    queryKey: [...filesystemQueryKey(appId), deploymentId, path],
     queryFn:
       deploymentId === undefined || path === undefined
         ? skipToken
