@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as authRouteRouteImport } from './routes/(auth)/route'
 import { Route as dashboardRouteRouteImport } from './routes/(dashboard)/route'
+import { Route as DeployRouteImport } from './routes/deploy'
 import { Route as authDeviceRouteImport } from './routes/(auth)/device'
 import { Route as authLoginRouteImport } from './routes/(auth)/login'
 import { Route as dashboardIndexRouteImport } from './routes/(dashboard)/index'
@@ -26,6 +27,11 @@ const authRouteRoute = authRouteRouteImport.update({
 } as any)
 const dashboardRouteRoute = dashboardRouteRouteImport.update({
   id: '/(dashboard)',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeployRoute = DeployRouteImport.update({
+  id: '/deploy',
+  path: '/deploy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const authDeviceRoute = authDeviceRouteImport.update({
@@ -70,6 +76,7 @@ const dashboardAppsAppIdLogsRoute = dashboardAppsAppIdLogsRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/deploy': typeof DeployRoute
   '/device': typeof authDeviceRoute
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/apps/$appId/': typeof dashboardAppsAppIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/deploy': typeof DeployRoute
   '/device': typeof authDeviceRoute
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(auth)': typeof authRouteRouteWithChildren
   '/(dashboard)': typeof dashboardRouteRouteWithChildren
+  '/deploy': typeof DeployRoute
   '/(auth)/device': typeof authDeviceRoute
   '/(auth)/login': typeof authLoginRoute
   '/(dashboard)/': typeof dashboardIndexRoute
@@ -104,6 +113,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/deploy'
     | '/device'
     | '/login'
     | '/'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
     | '/apps/$appId/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/deploy'
     | '/device'
     | '/login'
     | '/'
@@ -125,6 +136,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/(auth)'
     | '/(dashboard)'
+    | '/deploy'
     | '/(auth)/device'
     | '/(auth)/login'
     | '/(dashboard)/'
@@ -138,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   authRouteRoute: typeof authRouteRouteWithChildren
   dashboardRouteRoute: typeof dashboardRouteRouteWithChildren
+  DeployRoute: typeof DeployRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -154,6 +167,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: ''
       preLoaderRoute: typeof dashboardRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deploy': {
+      id: '/deploy'
+      path: '/deploy'
+      fullPath: '/deploy'
+      preLoaderRoute: typeof DeployRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth)/device': {
@@ -266,6 +286,7 @@ const dashboardRouteRouteWithChildren = dashboardRouteRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   authRouteRoute: authRouteRouteWithChildren,
   dashboardRouteRoute: dashboardRouteRouteWithChildren,
+  DeployRoute: DeployRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

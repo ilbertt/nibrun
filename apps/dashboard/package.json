@@ -13,6 +13,7 @@
   "dependencies": {
     "@repo/api-client": "workspace:*",
     "@repo/app-operations": "workspace:*",
+    "@repo/binary-handoff": "workspace:*",
     "@repo/protocol": "workspace:*",
     "@repo/ui": "workspace:*",
     "@tanstack/react-devtools": "^0.10.9",
