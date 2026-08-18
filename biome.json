@@ -16,6 +16,8 @@
       "!**/*.lock",
       "!apps/api/src/db/queries.gen.d.ts",
       "!apps/dashboard/src/routeTree.gen.ts",
+      "!apps/www/src/routeTree.gen.ts",
+      "!apps/www/worker-configuration.d.ts",
       "!packages/cli/src/command-tree.gen.ts",
       "!packages/ui/src/components/*.tsx"
     ]

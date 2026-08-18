@@ -1,44 +1,40 @@
 {
-  "name": "@repo/dashboard",
+  "name": "@repo/www",
   "private": true,
   "type": "module",
   "imports": {
     "#*": "./src/*"
   },
   "scripts": {
-    "dev": "bun run --bun vite dev --port 3001",
-    "build": "bun run --bun vite build",
-    "check:types": "bun run --bun tsc"
+    "dev": "./scripts/with-real-node.sh vite dev --port 3002",
+    "build": "./scripts/with-real-node.sh vite build",
+    "preview": "./scripts/with-real-node.sh vite preview",
+    "cf:typegen": "wrangler types",
+    "cf:deploy": "bun run build && wrangler deploy",
+    "check:types": "bun run cf:typegen && bun run --bun tsc"
   },
   "dependencies": {
-    "@repo/api-client": "workspace:*",
-    "@repo/app-operations": "workspace:*",
     "@repo/binary-handoff": "workspace:*",
     "@repo/protocol": "workspace:*",
     "@repo/ui": "workspace:*",
-    "@tanstack/react-devtools": "^0.10.9",
-    "@tanstack/react-form": "^1.33.3",
-    "@tanstack/react-query": "^5.101.4",
-    "@tanstack/react-query-devtools": "^5.101.4",
     "@tanstack/react-router": "catalog:",
-    "@tanstack/react-router-devtools": "^1.167.0",
-    "better-auth": "catalog:",
+    "@tanstack/react-start": "^1.168.46",
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "sonner": "catalog:",
     "tailwindcss": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.52.1",
     "@repo/typescript-config": "workspace:*",
     "@tailwindcss/vite": "catalog:",
-    "@tanstack/devtools-vite": "^0.8.3",
-    "@tanstack/router-cli": "^1.132.0",
     "@tanstack/router-plugin": "catalog:",
+    "@types/node": "^26.1.0",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "wrangler": "^4.123.0"
   }
 }

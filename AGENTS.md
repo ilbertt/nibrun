@@ -42,6 +42,11 @@ Bun's own runner and bypasses the workspace. They live beside the code they cove
 Not every package needs them; a package whose
 correctness is only checkable at runtime does.
 
+`bun run --bun` symlinks `node` to Bun in a temp directory it prepends to PATH for every
+descendant process. miniflare — which `@repo/www` prerenders through — crashes on teardown
+under Bun's `node:http`, so that app's vite scripts go through
+`apps/www/scripts/with-real-node.sh`, which drops that one PATH entry.
+
 Check `package.json` scripts (root and per-app) for other available commands.
 
 ## Run scripts
