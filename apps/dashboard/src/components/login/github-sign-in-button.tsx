@@ -1,5 +1,5 @@
-import { Button } from '#components/ui/button.tsx';
-import { Field, FieldError } from '#components/ui/field.tsx';
+import { Button } from '@repo/ui/components/button';
+import { Field, FieldError } from '@repo/ui/components/field';
 import { GithubIcon } from '#icons/github-icon.tsx';
 import { useSignIn } from '#lib/hooks/use-sign-in.ts';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';

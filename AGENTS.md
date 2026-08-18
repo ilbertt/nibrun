@@ -42,6 +42,11 @@ Bun's own runner and bypasses the workspace. They live beside the code they cove
 Not every package needs them; a package whose
 correctness is only checkable at runtime does.
 
+The root's `build` is the one turbo script without `bun run --bun`: that flag symlinks `node`
+to Bun for every descendant process, and miniflare — which `@repo/www` prerenders through —
+crashes on teardown under Bun's `node:http`. `.node-version` is what CI installs a real node
+from, so the www build finds one.
+
 Check `package.json` scripts (root and per-app) for other available commands.
 
 ## Run scripts

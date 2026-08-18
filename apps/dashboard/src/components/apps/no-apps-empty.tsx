@@ -1,11 +1,11 @@
-import { BoxIcon } from 'lucide-react';
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from '#components/ui/empty.tsx';
+} from '@repo/ui/components/empty';
+import { BoxIcon } from 'lucide-react';
 
 export function NoAppsEmpty() {
   return (

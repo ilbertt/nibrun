@@ -18,7 +18,9 @@ export function DeploymentLogs() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    // Fills the frame rather than growing inside it: the surrounding page scrolls, and a stream
+    // that scrolls with it has no height of its own to give the ScrollArea that tails it.
+    <div className="flex h-full flex-col gap-3">
       <div className="flex items-center justify-between gap-4">
         {logs.deploymentId === undefined ? (
           <p className="text-muted-foreground text-xs">Finding the current deployment…</p>

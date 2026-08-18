@@ -1,6 +1,6 @@
 import type { TenantLogRecord } from '@repo/protocol';
+import { ScrollArea } from '@repo/ui/components/scroll-area';
 import { LogLine } from '#components/logs/log-line.tsx';
-import { ScrollArea } from '#components/ui/scroll-area.tsx';
 import { usePinnedViewport } from '#lib/hooks/use-pinned-viewport.ts';
 
 export function LogStream({ records }: { records: readonly TenantLogRecord[] }) {

@@ -1,5 +1,5 @@
-import { Field, FieldDescription, FieldLabel } from '#components/ui/field.tsx';
-import { Input } from '#components/ui/input.tsx';
+import { Field, FieldDescription, FieldLabel } from '@repo/ui/components/field';
+import { Input } from '@repo/ui/components/input';
 import type { DeployFormApi } from '#lib/hooks/use-deploy-form.ts';
 
 export function DeployNameField({ api }: { api: DeployFormApi }) {

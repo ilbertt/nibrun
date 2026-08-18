@@ -1,9 +1,9 @@
+import { Button } from '@repo/ui/components/button';
+import { Field, FieldLabel } from '@repo/ui/components/field';
+import { Input } from '@repo/ui/components/input';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { DeviceCard } from '#components/device/device-card.tsx';
-import { Button } from '#components/ui/button.tsx';
-import { Field, FieldLabel } from '#components/ui/field.tsx';
-import { Input } from '#components/ui/input.tsx';
 
 /** Shown when nobody followed the link the CLI printed and typed the address themselves. */
 export function DeviceCodeForm() {

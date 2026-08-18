@@ -1,6 +1,6 @@
 import type { TenantLogRecord } from '@repo/protocol';
+import { cn } from '@repo/ui/lib/utils';
 import { timeOfDay } from '#lib/format-timestamp.ts';
-import { cn } from '#lib/utils.ts';
 
 const TERMINATOR = /\r?\n$/;
 

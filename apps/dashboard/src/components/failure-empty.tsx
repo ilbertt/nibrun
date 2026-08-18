@@ -1,11 +1,11 @@
-import { TriangleAlertIcon } from 'lucide-react';
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from '#components/ui/empty.tsx';
+} from '@repo/ui/components/empty';
+import { TriangleAlertIcon } from 'lucide-react';
 
 export function FailureEmpty({ title, reason }: { title: string; reason: string }) {
   return (

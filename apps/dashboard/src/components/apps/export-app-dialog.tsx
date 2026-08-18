@@ -1,6 +1,4 @@
-import { DownloadIcon, TriangleAlertIcon } from 'lucide-react';
-import { useState } from 'react';
-import { Button } from '#components/ui/button.tsx';
+import { Button } from '@repo/ui/components/button';
 import {
   Dialog,
   DialogClose,
@@ -9,8 +7,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '#components/ui/dialog.tsx';
-import { Spinner } from '#components/ui/spinner.tsx';
+} from '@repo/ui/components/dialog';
+import { Spinner } from '@repo/ui/components/spinner';
+import { DownloadIcon, TriangleAlertIcon } from 'lucide-react';
+import { useState } from 'react';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { useAppExport } from '#lib/hooks/use-app-export.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';

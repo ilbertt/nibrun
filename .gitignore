@@ -5,6 +5,10 @@ node_modules
 out
 dist
 *.tgz
+.wrangler
+
+# Cloudflare runtime types, regenerated from wrangler.jsonc by `wrangler types`.
+worker-configuration.d.ts
 
 # code coverage
 coverage

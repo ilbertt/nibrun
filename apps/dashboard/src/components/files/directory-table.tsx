@@ -1,5 +1,4 @@
 import type { FilesystemEntry } from '@repo/protocol';
-import { EntryName } from '#components/files/entry-name.tsx';
 import {
   Table,
   TableBody,
@@ -7,7 +6,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '#components/ui/table.tsx';
+} from '@repo/ui/components/table';
+import { EntryName } from '#components/files/entry-name.tsx';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 

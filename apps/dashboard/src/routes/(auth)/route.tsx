@@ -1,5 +1,5 @@
+import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { BrandMark } from '#components/brand-mark.tsx';
 
 export const Route = createFileRoute('/(auth)')({ component: RouteComponent });
 

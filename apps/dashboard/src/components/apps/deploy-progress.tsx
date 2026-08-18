@@ -1,9 +1,9 @@
 import type { DeployStep } from '@repo/app-operations';
+import { Button } from '@repo/ui/components/button';
+import { DialogClose } from '@repo/ui/components/dialog';
+import { Spinner } from '@repo/ui/components/spinner';
 import { CheckIcon, TriangleAlertIcon } from 'lucide-react';
 import { UploadMeter } from '#components/apps/upload-meter.tsx';
-import { Button } from '#components/ui/button.tsx';
-import { DialogClose } from '#components/ui/dialog.tsx';
-import { Spinner } from '#components/ui/spinner.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import type { DeployPhase } from '#lib/hooks/use-run-app.ts';
 

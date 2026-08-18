@@ -1,20 +1,17 @@
+import { Toaster } from '@repo/ui/components/sonner';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { AppSidebar } from '#components/app-sidebar/app-sidebar.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
-import { SidebarInset, SidebarProvider } from '#components/ui/sidebar.tsx';
-import { Toaster } from '#components/ui/sonner.tsx';
 
 export const Route = createFileRoute('/(dashboard)')({ component: RouteComponent });
 
 function RouteComponent() {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <SiteHeader />
+    <div className="flex h-svh w-full flex-col overflow-hidden bg-background">
+      <SiteHeader />
+      <main className="min-h-0 flex-1 overflow-y-auto">
         <Outlet />
-      </SidebarInset>
+      </main>
       <Toaster />
-    </SidebarProvider>
+    </div>
   );
 }

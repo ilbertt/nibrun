@@ -1,6 +1,6 @@
-import { Avatar, AvatarFallback, AvatarImage } from '#components/ui/avatar.tsx';
+import { Avatar, AvatarFallback, AvatarImage } from '@repo/ui/components/avatar';
+import { cn } from '@repo/ui/lib/utils';
 import type { Session } from '#lib/auth.ts';
-import { cn } from '#lib/utils.ts';
 
 const INITIALS_LENGTH = 2;
 

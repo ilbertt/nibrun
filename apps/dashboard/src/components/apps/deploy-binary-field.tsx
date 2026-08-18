@@ -1,5 +1,5 @@
+import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { BINARY_INPUT_ID, BinaryDropZone } from '#components/apps/binary-drop-zone.tsx';
-import { Field, FieldDescription, FieldError, FieldLabel } from '#components/ui/field.tsx';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { type DeployFormApi, validateBinary } from '#lib/hooks/use-deploy-form.ts';
 

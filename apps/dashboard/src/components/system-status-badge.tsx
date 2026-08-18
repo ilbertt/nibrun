@@ -1,6 +1,6 @@
-import { Badge } from '#components/ui/badge.tsx';
+import { Badge } from '@repo/ui/components/badge';
+import { cn } from '@repo/ui/lib/utils';
 import { type ApiHealth, useApiHealth } from '#lib/hooks/use-api-health.ts';
-import { cn } from '#lib/utils.ts';
 
 const PRESENTATION: Record<ApiHealth['status'], { label: string; dotClassName: string }> = {
   checking: { label: 'Checking', dotClassName: 'bg-muted-foreground animate-pulse' },

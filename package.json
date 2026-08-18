@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "bun run --bun turbo build",
+    "build": "turbo build",
     "check:types": "bun run --bun turbo check:types",
     "test": "bun run --bun turbo test",
     "check:codestyle": "bun run --bun biome check",
@@ -17,12 +17,20 @@
       "packages/*"
     ],
     "catalog": {
+      "@tailwindcss/vite": "^4.3.3",
+      "@tanstack/react-router": "^1.170.29",
+      "@tanstack/router-plugin": "^1.168.23",
       "@types/react": "^19.2.18",
       "@types/react-dom": "^19.2.4",
+      "@vitejs/plugin-react": "^6.0.5",
       "better-auth": "^1.6.26",
+      "lucide-react": "^1.28.0",
       "react": "^19.2.8",
       "react-dom": "^19.2.8",
-      "typescript": "^7.0.2"
+      "sonner": "^2.0.7",
+      "tailwindcss": "^4.3.3",
+      "typescript": "^7.0.2",
+      "vite": "^8.2.0"
     }
   },
   "devDependencies": {

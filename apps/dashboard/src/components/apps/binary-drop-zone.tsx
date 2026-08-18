@@ -1,6 +1,6 @@
+import { Button } from '@repo/ui/components/button';
+import { useBinaryPicker } from '@repo/ui/hooks/use-binary-picker';
 import { FileTerminalIcon, UploadIcon, XIcon } from 'lucide-react';
-import { Button } from '#components/ui/button.tsx';
-import { useBinaryPicker } from '#lib/hooks/use-binary-picker.ts';
 
 export const BINARY_INPUT_ID = 'deploy-binary';
 
