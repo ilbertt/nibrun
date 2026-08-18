@@ -4,12 +4,7 @@ import {
   isHandoffReady,
   isHandoffStored,
 } from '@repo/binary-handoff';
-
-// The app is a different origin, so its storage is only reachable from a document it serves
-// itself. A hidden frame is that document: the binary is posted into it and written on the
-// far side, which is why dropping here is something the app can still find after the
-// navigation below.
-const APP_ORIGIN = import.meta.env.DEV ? 'http://localhost:3001' : 'https://app.nibrun.com';
+import { APP_ORIGIN } from '#lib/app-origin.ts';
 
 // A frame that never answers would otherwise leave the page spinning for good.
 const REPLY_TIMEOUT_MS = 15_000;
@@ -18,6 +13,9 @@ export function appDestination(): string {
   return `${APP_ORIGIN}${HANDOFF_FRAME_PATH}`;
 }
 
+// The app is a different origin, so its storage is only reachable from a document it serves
+// itself. A hidden frame is that document: the binary is posted into it and written on the far
+// side, which is why dropping here is something the app can still find after the navigation.
 export function handOffBinary(binary: File): Promise<void> {
   const { promise, resolve, reject } = Promise.withResolvers<void>();
 
