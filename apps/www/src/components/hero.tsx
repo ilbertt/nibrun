@@ -5,7 +5,8 @@ export function Hero() {
         Drop a binary. Get a server.
       </h1>
       <p className="text-balance text-lg text-muted-foreground">
-        No Dockerfile. No YAML. No cluster. Just your binary, a microVM, and a disk that remembers.
+        No Dockerfile. No YAML. No cluster. Just your binary, a microVM, and a persistent
+        filesystem.
       </p>
     </div>
   );
