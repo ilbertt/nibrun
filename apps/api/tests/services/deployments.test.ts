@@ -184,7 +184,7 @@ function serviceWith(behaviour: FakeBehaviour = {}) {
 }
 
 describe('a deployment publishes the config version it pins', () => {
-  test('the pinned config reaches the wire, and carries no environment to leak', async () => {
+  test('the pinned config reaches the wire, its variables named but not readable', async () => {
     const { service } = serviceWith({ row: deploymentRow() });
 
     const deployment = await service.createOrRollback({
@@ -195,13 +195,13 @@ describe('a deployment publishes the config version it pins', () => {
 
     expect(deployment.config).toEqual({
       volumeSizeBytes: VOLUME_SIZE_BYTES,
+      environment: {},
       guestPort: GUEST_PORT,
       args: ['serve'],
       resources: DEFAULT_INSTANCE_RESOURCES,
       healthCheck: DEFAULT_HEALTH_CHECK,
       restartPolicy: DEFAULT_RESTART_POLICY,
     });
-    expect('environment' in deployment.config).toBe(false);
   });
 
   test('columns become the wire shape the protocol describes', async () => {

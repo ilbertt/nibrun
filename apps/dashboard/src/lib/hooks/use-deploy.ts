@@ -6,7 +6,7 @@ import {
   type UploadableBinary,
   type UploadProgress,
 } from '@repo/app-operations';
-import type { TenantArguments } from '@repo/protocol';
+import type { TenantArguments, TenantEnvironment } from '@repo/protocol';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 import { browserUpload } from '#lib/browser-upload.ts';
@@ -14,6 +14,7 @@ import { browserUpload } from '#lib/browser-upload.ts';
 export type DeployRequest = {
   binary: UploadableBinary;
   args: TenantArguments;
+  environment?: TenantEnvironment | undefined;
   app: string | undefined;
   name: string | undefined;
   port: number;

@@ -1,24 +1,42 @@
-import { AppConfigSchema, AppSchema, ByteSizeSchema } from '@repo/protocol';
+import {
+  AppConfigSchema,
+  AppSchema,
+  ByteSizeSchema,
+  REDACTED,
+  TenantEnvironmentSchema,
+} from '@repo/protocol';
 import { t } from 'elysia';
 
 const MAX_APP_NAME_LENGTH = 128;
 
-// Secrets storage is deferred, so `environment` is neither accepted nor returned.
+// `environment` is written and read in different shapes, so it is taken out here and each half
+// says its own.
 const OwnedAppConfigSchema = t.Omit(AppConfigSchema, ['environment']);
+
+// Which variables are set, never what they hold: the values are sealed in the database and only
+// opened on their way to the host, so there is nothing here that could return one.
+const RedactedEnvironmentSchema = t.Record(t.String(), t.Literal(REDACTED), {
+  description: 'The variables this app runs with. Values are never returned.',
+});
 
 // The api sizes an app's filesystem, so the size is read back but never set. It is added on
 // top of what an owner owns rather than omitted from it, which is what keeps it out of the
 // patch shape below without naming it twice.
 export const PublicAppConfigSchema = t.Composite([
   OwnedAppConfigSchema,
-  t.Object({ volumeSizeBytes: ByteSizeSchema }),
+  t.Object({ volumeSizeBytes: ByteSizeSchema, environment: RedactedEnvironmentSchema }),
 ]);
 
 // Strict: every field is optional, so without this a misspelled one is silently no request at
 // all and the caller is told 200.
-export const AppConfigPatchSchema = t.Partial(OwnedAppConfigSchema, {
-  additionalProperties: false,
-});
+//
+// Omitting `environment` leaves the one already stored alone, where omitting `args` replaces it
+// with none. They differ because a caller cannot read a secret back to restate it, so treating
+// silence as "none" would be how a deploy erases one nobody meant to touch.
+export const AppConfigPatchSchema = t.Partial(
+  t.Composite([OwnedAppConfigSchema, t.Object({ environment: TenantEnvironmentSchema })]),
+  { additionalProperties: false },
+);
 
 export const AppResponseSchema = t.Composite([
   t.Omit(AppSchema, ['config']),

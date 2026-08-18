@@ -4,10 +4,18 @@ import { ApiError } from '@repo/api-client/unwrap';
 import {
   awaitDeploymentSettled,
   type DeployStep,
+  InvalidEnvironmentError,
+  parseEnvironment,
   deploy as startDeployment,
   type UploadableBinary,
 } from '@repo/app-operations';
-import { type Filename, FilenameSchema, type TenantArguments, Value } from '@repo/protocol';
+import {
+  type Filename,
+  FilenameSchema,
+  type TenantArguments,
+  type TenantEnvironment,
+  Value,
+} from '@repo/protocol';
 import { UsageError } from '#lib/errors.ts';
 import type { RunOptions } from '#lib/plan.ts';
 import type { Ui } from '#lib/ui.ts';
@@ -32,6 +40,7 @@ export async function deploy({
   app,
   name,
   port,
+  env,
   detach,
 }: DeployInput): Promise<void> {
   const deployed = await startDeployment({
@@ -41,6 +50,7 @@ export async function deploy({
     app,
     name,
     port,
+    ...(env !== undefined && { environment: asEnvironment(env) }),
     onStep: (step) => announce({ step, ui }),
     whileUploading: ({ message, task }) => {
       const startedAt = Date.now();
@@ -100,6 +110,21 @@ export async function openBinary(path: string): Promise<UploadableBinary> {
     throw new UsageError(`No such file: ${path}`);
   }
   return { name: asFilename(basename(path)), body };
+}
+
+/**
+ * The shared parser does not know what a command line is, so what it refuses is reported here in
+ * the words `nib` refuses anything else in.
+ */
+function asEnvironment(assignments: string[]): TenantEnvironment {
+  try {
+    return parseEnvironment(assignments);
+  } catch (failure) {
+    if (failure instanceof InvalidEnvironmentError) {
+      throw new UsageError(failure.message);
+    }
+    throw failure;
+  }
 }
 
 /**

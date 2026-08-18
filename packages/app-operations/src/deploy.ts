@@ -5,6 +5,7 @@ import {
   type Filename,
   GuestPortSchema,
   type TenantArguments,
+  type TenantEnvironment,
   Value,
 } from '@repo/protocol';
 import { appBySlug } from '#apps.ts';
@@ -45,6 +46,7 @@ export type DeployInput = {
   app?: string | undefined;
   name?: string | undefined;
   port?: number | undefined;
+  environment?: TenantEnvironment | undefined;
   onStep?: ((step: DeployStep) => void) | undefined;
   whileUploading?: UploadWait | undefined;
   upload?: UploadTransport | undefined;
@@ -71,12 +73,13 @@ export async function deploy({
   app: slug,
   name,
   port,
+  environment,
   onStep,
   whileUploading = unwatched,
   upload = streamedUpload,
 }: DeployInput): Promise<Deployed> {
   const target = slug === undefined ? null : await appBySlug({ api, slug });
-  const config = configPatch({ args, port });
+  const config = configPatch({ args, port, environment });
 
   const app =
     target === null
@@ -199,10 +202,22 @@ function mebibytes(bytes: number): string {
  * run with, and carrying over the last deploy's arguments because none were given this time
  * would run something nobody asked for.
  */
-function configPatch({ args, port }: { args: TenantArguments; port: number | undefined }) {
+// `environment` is sent only when there is one to send: the api reads its absence as "leave the
+// stored one alone", where an absent `args` would mean none. A deploy cannot restate a secret it
+// is not allowed to read back, so saying nothing has to be how it leaves one untouched.
+function configPatch({
+  args,
+  port,
+  environment,
+}: {
+  args: TenantArguments;
+  port: number | undefined;
+  environment: TenantEnvironment | undefined;
+}) {
   return {
     args,
     ...(port !== undefined && { guestPort: Value.Parse(GuestPortSchema, port) }),
+    ...(environment !== undefined && { environment }),
   };
 }
 

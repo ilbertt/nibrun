@@ -10,6 +10,7 @@ import {
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.d.ts';
 import { toAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
+import { openEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 
 export type DesiredDeploymentRow = Queries['SelectDesiredDeployments'];
 
@@ -49,9 +50,11 @@ export function toDesiredVolume(row: DesiredVolumeRow): DesiredVolume {
 export function toDesiredInstance({
   row,
   hostnames,
+  secretsKey,
 }: {
   row: DesiredDeploymentRow;
   hostnames: Map<AppId, AppHostname[]>;
+  secretsKey: TenantSecretsKey;
 }): DesiredInstance {
   return {
     appId: row.app_id,
@@ -64,7 +67,7 @@ export function toDesiredInstance({
       objectKey: row.object_key,
       filename: row.original_file_name,
     },
-    config: toDesiredConfig(row),
+    config: toDesiredConfig({ row, secretsKey }),
     hostnames: hostnames.get(row.app_id) ?? [],
   };
 }
@@ -80,9 +83,23 @@ export function hostnamesByApp(rows: DesiredHostnameRow[]): Map<AppId, AppHostna
   return byApp;
 }
 
-// `environment` is empty because secrets storage is deferred, and `volumeSizeBytes` is the
-// owner's view of the volume the host is told about separately.
-function toDesiredConfig(row: DesiredDeploymentRow): AppConfig {
+// The one place a tenant's environment is in the clear, and the last moment it can be: past here
+// it is on its way to the host that runs the binary. `volumeSizeBytes` is dropped because it is
+// the owner's view of a volume the host is told about separately.
+function toDesiredConfig({
+  row,
+  secretsKey,
+}: {
+  row: DesiredDeploymentRow;
+  secretsKey: TenantSecretsKey;
+}): AppConfig {
   const { guestPort, args, resources, healthCheck, restartPolicy } = toAppConfig(row);
-  return { guestPort, args, resources, healthCheck, restartPolicy, environment: {} };
+  return {
+    guestPort,
+    args,
+    resources,
+    healthCheck,
+    restartPolicy,
+    environment: openEnvironment({ key: secretsKey, sealed: row.environment }),
+  };
 }

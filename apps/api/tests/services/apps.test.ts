@@ -10,13 +10,17 @@ import {
   type ObjectKey,
   ObjectKeySchema,
   type OwnerId,
+  REDACTED,
   type ReportedVolume,
+  type TenantEnvironment,
+  TenantEnvironmentSchema,
   Value,
   VolumeIdSchema,
 } from '@repo/protocol';
 import { SQL } from 'bun';
-import type { AppConfigPatch, PublicAppConfig } from '#lib/app-config.ts';
+import type { AppConfigPatch, SealedConfigPatch, StoredAppConfig } from '#lib/app-config.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
+import { openSecret } from '#lib/tenant-secrets.ts';
 import type {
   AppHostnameRow,
   AppRow,
@@ -38,6 +42,14 @@ import {
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
+import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
+
+const SECRET = 'sk-not-in-any-response';
+
+// The branded record a controller parses before the service ever sees one.
+function asEnvironment(entries: Record<string, string>): TenantEnvironment {
+  return Value.Parse(TenantEnvironmentSchema, entries);
+}
 
 const APP_NAME = 'pocketbase';
 
@@ -70,7 +82,8 @@ function appRow(slug: DnsLabel): AppRow {
  */
 class StubAppsRepository implements AppsRepositoryContract {
   readonly offeredSlugs: DnsLabel[] = [];
-  readonly offeredConfigs: PublicAppConfig[] = [];
+  readonly offeredConfigs: StoredAppConfig[] = [];
+  readonly offeredPatches: SealedConfigPatch[] = [];
   readonly deleted: AppId[] = [];
   readonly trace: string[] = [];
   readonly leftovers = new Map<AppId, Leftovers>();
@@ -119,7 +132,7 @@ class StubAppsRepository implements AppsRepositoryContract {
     ownerId: OwnerId;
     slug: DnsLabel;
     hostname: Hostname;
-    config: PublicAppConfig;
+    config: StoredAppConfig;
   }): Promise<CreatedApp> {
     this.offeredSlugs.push(slug);
     this.offeredConfigs.push(config);
@@ -128,7 +141,7 @@ class StubAppsRepository implements AppsRepositoryContract {
       return Promise.reject(this.#failure);
     }
     return Promise.resolve({
-      app: appRow(slug),
+      app: { ...appRow(slug), ...configColumns(config) },
       hostnames: [{ hostname, kind: 'platform' }],
     });
   }
@@ -153,12 +166,15 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve([]);
   }
 
-  updateConfig(_: {
+  updateConfig({
+    patch,
+  }: {
     appId: AppId;
     ownerId: OwnerId;
-    patch: AppConfigPatch;
+    patch: SealedConfigPatch;
   }): Promise<AppRow | null> {
-    return Promise.resolve(null);
+    this.offeredPatches.push(patch);
+    return Promise.resolve(this.owns ? appRow(Value.Parse(DnsLabelSchema, APP_NAME)) : null);
   }
 
   updateState({
@@ -257,6 +273,7 @@ function serviceWith({
     artifactStorageRepo,
     exportStorageRepo,
     appHostDomain: APP_HOST_DOMAIN,
+    secretsKey: TEST_SECRETS_KEY,
   });
 }
 
@@ -337,9 +354,7 @@ describe('retrying is bounded, and only covers collisions', () => {
   });
 });
 
-// Secrets storage is deferred, so `environment` is not a column and nothing the api writes
-// carries one. What a later secrets layer adds is a table, not a key in here.
-describe('an app is created with no environment and never reports one', () => {
+describe('an app is created with the environment it was given, and never reports a value', () => {
   test('a partial config is completed from the protocol defaults', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
@@ -348,12 +363,15 @@ describe('an app is created with no environment and never reports one', () => {
     expect(appsRepo.offeredConfigs).toEqual([{ ...DEFAULT_CONFIG, args: ['serve'] }]);
   });
 
-  test('the config the api persists has no environment to store', async () => {
+  test('what reaches the database is sealed, never the value that was given', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await createApp({ appsRepo });
+    await createApp({ appsRepo, config: { environment: asEnvironment({ TOKEN: SECRET }) } });
 
-    expect(Object.keys(appsRepo.offeredConfigs[0] ?? {})).not.toContain('environment');
+    const stored = appsRepo.offeredConfigs[0]?.environment ?? {};
+    expect(Object.keys(stored)).toEqual(['TOKEN']);
+    expect(stored.TOKEN).not.toContain(SECRET);
+    expect(openSecret({ key: TEST_SECRETS_KEY, sealed: stored.TOKEN ?? '' })).toBe(SECRET);
   });
 
   test('an unconfigured app falls back to the defaults the protocol publishes', async () => {
@@ -364,10 +382,59 @@ describe('an app is created with no environment and never reports one', () => {
     expect(appsRepo.offeredConfigs).toEqual([DEFAULT_CONFIG]);
   });
 
-  test('the config on the wire has no environment to leak', async () => {
-    const app = await createApp({ appsRepo: new StubAppsRepository({ failures: 0 }) });
+  // An owner has to be told which variables are set without being told what they hold, which is
+  // the whole reason the names are stored in the clear and the values are not.
+  test('the wire names every variable and returns none of them', async () => {
+    const app = await createApp({
+      appsRepo: new StubAppsRepository({ failures: 0 }),
+      config: { environment: asEnvironment({ TOKEN: SECRET }) },
+    });
 
-    expect(Object.keys(app.config)).not.toContain('environment');
+    expect(app.config.environment).toEqual({ TOKEN: REDACTED });
+    expect(JSON.stringify(app.config)).not.toContain(SECRET);
+  });
+});
+
+describe('a config patch only replaces the environment when it names one', () => {
+  test('a patch that says nothing about it carries no environment at all', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    const service = serviceWith({ appsRepo });
+
+    await service.updateConfig({ appId: APP_ID, ownerId: OWNER_ID, patch: { args: ['serve'] } });
+
+    // Absent rather than empty: the repository reads absence as "keep the stored one", and an
+    // empty object would erase every variable the app has.
+    expect('environment' in (appsRepo.offeredPatches[0] ?? {})).toBe(false);
+  });
+
+  test('a patch naming one replaces it, sealed', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    const service = serviceWith({ appsRepo });
+
+    await service.updateConfig({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      patch: { environment: asEnvironment({ TOKEN: SECRET }) },
+    });
+
+    const sealed = appsRepo.offeredPatches[0]?.environment ?? {};
+    expect(openSecret({ key: TEST_SECRETS_KEY, sealed: sealed.TOKEN ?? '' })).toBe(SECRET);
+  });
+
+  test('a patch emptying it says so, and that is not the same as silence', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    const service = serviceWith({ appsRepo });
+
+    await service.updateConfig({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      patch: { environment: asEnvironment({}) },
+    });
+
+    expect(appsRepo.offeredPatches[0]?.environment).toEqual({});
   });
 });
 

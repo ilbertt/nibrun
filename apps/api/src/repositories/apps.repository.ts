@@ -9,7 +9,7 @@ import type {
 } from '@repo/protocol';
 import type { ArrayType } from 'bun';
 import type { Queries } from '#db/queries.gen.d.ts';
-import { type AppConfigPatch, type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
+import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { Repository } from '#repositories/repository.ts';
 
 /**
@@ -43,13 +43,13 @@ export abstract class AppsRepositoryContract {
     ownerId: OwnerId;
     slug: DnsLabel;
     hostname: Hostname;
-    config: PublicAppConfig;
+    config: StoredAppConfig;
   }): Promise<CreatedApp>;
   abstract listByOwner(input: { ownerId: OwnerId }): Promise<AppRow[]>;
   abstract listHostnamesByOwner(input: { ownerId: OwnerId }): Promise<OwnedAppHostnameRow[]>;
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
   abstract listHostnamesByApp(input: OwnedApp): Promise<AppHostnameRow[]>;
-  abstract updateConfig(input: OwnedApp & { patch: AppConfigPatch }): Promise<AppRow | null>;
+  abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: OwnedApp & { state: AppState }): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
   abstract isDeletionFinishable(input: { appId: AppId }): Promise<boolean>;
@@ -81,7 +81,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     ownerId: OwnerId;
     slug: DnsLabel;
     hostname: Hostname;
-    config: PublicAppConfig;
+    config: StoredAppConfig;
   }): Promise<CreatedApp> {
     return this.sql.begin(async (tx) => {
       const [inserted] = await tx.InsertApp`
@@ -100,7 +100,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           health_check_grace_period_ms, health_check_healthy_threshold,
           health_check_unhealthy_threshold,
           restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-          restart_backoff_factor, restart_reset_after_ms
+          restart_backoff_factor, restart_reset_after_ms, environment
         )
         VALUES (
           ${inserted.id}, ${config.guestPort}, ${tx.array(config.args, TENANT_ARGS_TYPE)},
@@ -110,7 +110,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
           ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
           ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
-          ${config.restartPolicy.resetAfterMs}
+          ${config.restartPolicy.resetAfterMs}, ${JSON.stringify(config.environment)}::jsonb
         )
       `;
 
@@ -131,7 +131,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
         FROM nibrun.live_apps a
         JOIN LATERAL (
           SELECT * FROM nibrun.app_configs c
@@ -156,7 +156,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
       FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs c
@@ -186,7 +186,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
       FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs c
@@ -210,7 +210,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   // A patch appends a version rather than editing one, and the newest version is the live one,
   // so the write is a single INSERT. `FOR UPDATE` is what stops two concurrent patches reading
   // the same starting config and the later INSERT silently dropping the earlier one's fields.
-  updateConfig({ appId, ownerId, patch }: OwnedApp & { patch: AppConfigPatch }) {
+  updateConfig({ appId, ownerId, patch }: OwnedApp & { patch: SealedConfigPatch }) {
     return this.sql.begin(async (tx) => {
       const [locked] = await tx.SelectAppForConfigUpdate`
         SELECT a.id
@@ -228,7 +228,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
         FROM nibrun.app_configs c
         WHERE c.app_id = ${appId}
         ORDER BY c.id DESC
@@ -238,7 +238,11 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('An app exists with no config.');
       }
 
-      const config = { ...toAppConfig(current), ...patch };
+      const config = {
+        ...toAppConfig(current),
+        ...patch,
+        environment: patch.environment ?? current.environment,
+      };
 
       const [inserted] = await tx.InsertPatchedAppConfig`
         INSERT INTO nibrun.app_configs (
@@ -247,7 +251,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           health_check_grace_period_ms, health_check_healthy_threshold,
           health_check_unhealthy_threshold,
           restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-          restart_backoff_factor, restart_reset_after_ms
+          restart_backoff_factor, restart_reset_after_ms, environment
         )
         VALUES (
           ${appId}, ${config.guestPort}, ${tx.array(config.args, TENANT_ARGS_TYPE)},
@@ -257,7 +261,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
           ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
           ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
-          ${config.restartPolicy.resetAfterMs}
+          ${config.restartPolicy.resetAfterMs}, ${JSON.stringify(config.environment)}::jsonb
         )
         RETURNING id
       `;
@@ -279,7 +283,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                   c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                   c.health_check_unhealthy_threshold,
                   c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-                  c.restart_backoff_factor, c.restart_reset_after_ms
+                  c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
       `;
       return app ?? null;
     });
@@ -403,7 +407,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
         FROM nibrun.live_apps a
         JOIN LATERAL (
           SELECT * FROM nibrun.app_configs c

@@ -163,7 +163,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
       FROM nibrun.deployments d
       JOIN nibrun.live_apps a ON a.id = d.app_id
       JOIN nibrun.app_configs c ON c.id = d.config_id
@@ -186,7 +186,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
       FROM nibrun.deployments d
       JOIN nibrun.live_apps a ON a.id = d.app_id
       JOIN nibrun.app_configs c ON c.id = d.config_id
@@ -306,7 +306,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
       FROM nibrun.deployments d
       JOIN nibrun.app_configs c ON c.id = d.config_id
       WHERE d.id = ${deploymentId}

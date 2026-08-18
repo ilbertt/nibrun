@@ -13,6 +13,13 @@ resource "random_password" "api_better_auth_secret" {
   special = false
 }
 
+# 32 bytes of key material, carried as base64 so it survives an .env file intact.
+# AES-256 is what the api seals a tenant's environment variables with, and the
+# length is the cipher's, not a taste.
+resource "random_bytes" "api_tenant_secrets_key" {
+  length = 32
+}
+
 resource "aws_ssm_parameter" "api_db_password" {
   name  = "${var.ssm_secret_prefix}/api_db_password"
   type  = "SecureString"
@@ -30,6 +37,16 @@ resource "aws_ssm_parameter" "api_better_auth_secret" {
 
   tags = {
     Name = "${local.resource_name_prefix}-api-better-auth-secret"
+  }
+}
+
+resource "aws_ssm_parameter" "api_tenant_secrets_key" {
+  name  = "${var.ssm_secret_prefix}/api_tenant_secrets_key"
+  type  = "SecureString"
+  value = random_bytes.api_tenant_secrets_key.base64
+
+  tags = {
+    Name = "${local.resource_name_prefix}-api-tenant-secrets-key"
   }
 }
 

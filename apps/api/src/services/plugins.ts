@@ -3,6 +3,7 @@ import { sql } from '#db/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
 import { artifactsS3, artifactsSigner, exportsS3 } from '#lib/s3/client.ts';
+import { readSecretsKey } from '#lib/tenant-secrets.ts';
 import { VictoriaLogsClient } from '#lib/victorialogs/client.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -24,7 +25,11 @@ import { FilesystemService } from '#services/filesystem.service.ts';
 import { HealthService } from '#services/health.service.ts';
 import { LogsService } from '#services/logs.service.ts';
 
-const agentRepository = new AgentRepository(sql);
+// Read once, where every other piece of the environment is read: a key of the wrong length is a
+// deployment that fails to start rather than one that fails on the first secret written.
+const secretsKey = readSecretsKey(env.TENANT_SECRETS_KEY);
+
+const agentRepository = new AgentRepository({ sql, secretsKey });
 const assetsRepository = new AssetsRepository(sql);
 const healthRepository = new HealthRepository(sql);
 const appsRepository = new AppsRepository(sql);
@@ -46,6 +51,7 @@ const appsService = new AppsService({
   artifactStorageRepo: artifactStorageRepository,
   exportStorageRepo: exportStorageRepository,
   appHostDomain: env.APP_HOST_DOMAIN,
+  secretsKey,
 });
 const exportsService = new ExportsService({
   exportsRepo: exportsRepository,

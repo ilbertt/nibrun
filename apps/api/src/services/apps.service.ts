@@ -3,12 +3,14 @@ import {
   type AppConfigPatch,
   configWithDefaults,
   type PublicAppConfig,
+  type SealedConfigPatch,
   toAppConfig,
 } from '#lib/app-config.ts';
 import { platformHostname } from '#lib/app-hostname.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
+import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {
   AppHostnameRow,
@@ -64,6 +66,7 @@ export class AppsService extends Service {
   private readonly artifactStorageRepo: ObjectRemoval;
   private readonly exportStorageRepo: ObjectRemoval;
   private readonly appHostDomain: string;
+  private readonly secretsKey: TenantSecretsKey;
 
   constructor({
     appsRepo,
@@ -71,12 +74,14 @@ export class AppsService extends Service {
     artifactStorageRepo,
     exportStorageRepo,
     appHostDomain,
+    secretsKey,
   }: {
     appsRepo: AppsRepositoryContract;
     exportsRepo: ExportCancellation;
     artifactStorageRepo: ObjectRemoval;
     exportStorageRepo: ObjectRemoval;
     appHostDomain: string;
+    secretsKey: TenantSecretsKey;
   }) {
     super();
     this.appsRepo = appsRepo;
@@ -84,6 +89,7 @@ export class AppsService extends Service {
     this.artifactStorageRepo = artifactStorageRepo;
     this.exportStorageRepo = exportStorageRepo;
     this.appHostDomain = appHostDomain;
+    this.secretsKey = secretsKey;
   }
 
   /**
@@ -99,7 +105,13 @@ export class AppsService extends Service {
     name: string;
     config?: AppConfigPatch;
   }): Promise<PublicApp> {
-    const appConfig = configWithDefaults(config);
+    const appConfig = {
+      ...configWithDefaults(config),
+      environment: sealEnvironment({
+        key: this.secretsKey,
+        environment: config?.environment ?? {},
+      }),
+    };
 
     for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
       const slug = deriveAppSlug(name);
@@ -120,6 +132,17 @@ export class AppsService extends Service {
     }
 
     throw new ConflictError('Could not mint a free hostname for the app.');
+  }
+
+  // Absent stays absent: the repository reads that as "carry the previous version's" rather than
+  // as an empty environment, which is what stops a deploy that says nothing erasing a secret.
+  private sealed({ environment, ...rest }: AppConfigPatch): SealedConfigPatch {
+    return {
+      ...rest,
+      ...(environment !== undefined && {
+        environment: sealEnvironment({ key: this.secretsKey, environment }),
+      }),
+    };
   }
 
   async list({ ownerId }: { ownerId: OwnerId }): Promise<PublicApp[]> {
@@ -146,7 +169,9 @@ export class AppsService extends Service {
     ownerId,
     patch,
   }: OwnedApp & { patch: AppConfigPatch }): Promise<PublicApp> {
-    const app = requireApp(await this.appsRepo.updateConfig({ appId, ownerId, patch }));
+    const app = requireApp(
+      await this.appsRepo.updateConfig({ appId, ownerId, patch: this.sealed(patch) }),
+    );
     const hostnames = await this.appsRepo.listHostnamesByApp({ appId, ownerId });
 
     return toPublicApp({ app, hostnames });

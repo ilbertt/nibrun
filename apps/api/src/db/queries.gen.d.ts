@@ -29,6 +29,8 @@ export interface ISelectDesiredDeploymentsResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+    /** Variable name to the value sealed by the api. Never written or read in the clear. */
+    environment: Record<string, string>;
 }
 
 /** Result of query `SelectDesiredVolumes`. */
@@ -104,6 +106,8 @@ export interface ISelectCreatedAppResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+    /** Variable name to the value sealed by the api. Never written or read in the clear. */
+    environment: Record<string, string>;
 }
 
 /** Result of query `SelectAppsByOwner`. */
@@ -129,6 +133,8 @@ export interface ISelectAppsByOwnerResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+    /** Variable name to the value sealed by the api. Never written or read in the clear. */
+    environment: Record<string, string>;
 }
 
 /** Result of query `SelectAppHostnamesByOwner`. */
@@ -161,6 +167,8 @@ export interface ISelectAppByIdResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+    /** Variable name to the value sealed by the api. Never written or read in the clear. */
+    environment: Record<string, string>;
 }
 
 /** Result of query `SelectAppHostnamesByApp`. */
@@ -191,6 +199,8 @@ export interface ISelectCurrentAppConfigResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+    /** Variable name to the value sealed by the api. Never written or read in the clear. */
+    environment: Record<string, string>;
 }
 
 /** Result of query `InsertPatchedAppConfig`. */
@@ -221,6 +231,8 @@ export interface ITouchAppAfterConfigPatchResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+    /** Variable name to the value sealed by the api. Never written or read in the clear. */
+    environment: Record<string, string>;
 }
 
 /** Result of query `SelectFinishableDeletion`. */
@@ -295,6 +307,8 @@ export interface ISelectAppAfterStateChangeResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+    /** Variable name to the value sealed by the api. Never written or read in the clear. */
+    environment: Record<string, string>;
 }
 
 /** Result of query `InsertPendingArtifact`. */
@@ -419,6 +433,8 @@ export interface ISelectDeploymentsByAppResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+    /** Variable name to the value sealed by the api. Never written or read in the clear. */
+    environment: Record<string, string>;
 }
 
 /** Result of query `SelectDeploymentById`. */
@@ -446,6 +462,8 @@ export interface ISelectDeploymentByIdResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+    /** Variable name to the value sealed by the api. Never written or read in the clear. */
+    environment: Record<string, string>;
 }
 
 /** Result of query `SelectLiveDeployments`. */
@@ -497,6 +515,8 @@ export interface ISelectInsertedDeploymentResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
+    /** Variable name to the value sealed by the api. Never written or read in the clear. */
+    environment: Record<string, string>;
 }
 
 /** Result of query `InsertExport`. */

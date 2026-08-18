@@ -26,6 +26,11 @@ export const command = defineCommand('run [command]', {
       schema: z.number().int().optional(),
       description: 'Port the binary listens on inside the guest.',
     },
+    env: {
+      schema: z.array(z.string()).optional(),
+      description:
+        'Set an environment variable for the binary, as NAME=value. Repeatable. Given at all, these replace the ones the app already has.',
+    },
     detach: {
       schema: z.boolean().optional(),
       aliases: ['d'],

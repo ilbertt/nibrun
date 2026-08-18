@@ -4,7 +4,7 @@ import { Button } from '#components/ui/button.tsx';
 import { Field, FieldDescription, FieldError, FieldLabel } from '#components/ui/field.tsx';
 import { Input } from '#components/ui/input.tsx';
 import { Textarea } from '#components/ui/textarea.tsx';
-import { useDeployForm, validatePort } from '#lib/hooks/use-deploy-form.ts';
+import { useDeployForm, validateEnvironment, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 export function DeployForm({ appId }: { appId: string | undefined }) {
   const { api, locked, replacing, targetResolved, defaultPort, defaultArgs } = useDeployForm({
@@ -62,6 +62,26 @@ export function DeployForm({ appId }: { appId: string | undefined }) {
         )}
       </api.Field>
 
+      <api.Field name="environment" validators={{ onChange: validateEnvironment }}>
+        {(field) => (
+          <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
+            <FieldLabel htmlFor="deploy-environment">Environment</FieldLabel>
+            <Textarea
+              id="deploy-environment"
+              value={field.state.value ?? ''}
+              onChange={(event) => field.handleChange(event.target.value)}
+              placeholder={'OPENCLAW_STATE_DIR=/app/data/.openclaw'}
+              className="font-mono"
+            />
+            {field.state.meta.errors.length > 0 ? (
+              <FieldError>{field.state.meta.errors[0]}</FieldError>
+            ) : (
+              <FieldDescription>{describeEnvironment(replacing)}</FieldDescription>
+            )}
+          </Field>
+        )}
+      </api.Field>
+
       {replacing !== undefined && (
         <p className="wrap-anywhere rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
           This replaces the binary <span className="font-medium font-mono">{replacing.slug}</span>{' '}
@@ -78,6 +98,16 @@ export function DeployForm({ appId }: { appId: string | undefined }) {
       </api.Subscribe>
     </form>
   );
+}
+
+// A value cannot be shown once it is set — the api returns the names and nothing else — so what
+// this says is what leaving the box alone will do.
+function describeEnvironment(replacing: { config: { environment: object } } | undefined): string {
+  const names = Object.keys(replacing?.config.environment ?? {});
+  if (names.length === 0) {
+    return 'One NAME=value per line. What the binary runs with.';
+  }
+  return `One NAME=value per line. Leave empty to keep ${names.join(', ')} as they are.`;
 }
 
 function submitLabel({

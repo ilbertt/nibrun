@@ -10,6 +10,7 @@ export type RunOptions = {
   app?: string | undefined;
   name?: string | undefined;
   port?: number | undefined;
+  env?: string[] | undefined;
 };
 
 type Plan = {

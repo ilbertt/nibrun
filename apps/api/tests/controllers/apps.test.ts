@@ -52,6 +52,18 @@ describe('a malformed request is a bad request', () => {
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
 
+  // TypeBox treats a key the pattern does not match as no part of the record at all, so without
+  // the schema being closed this is a 200 for a variable that was never stored.
+  test('patching an environment variable a shell would not accept either', async () => {
+    const response = await sendJson({
+      method: 'PATCH',
+      url: APP_URL,
+      body: { environment: { 'NOT-A-NAME': 'x' } },
+    });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
   // Readable on the way out, refused on the way in: the api sizes the filesystem, so a caller
   // that thinks it can choose has to be told rather than quietly ignored.
   test('patching the volume size is refused, because the api owns it', async () => {
