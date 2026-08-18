@@ -1,6 +1,7 @@
 import { DeploymentLine } from '#components/apps/deployment-line.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
 import { LogStream } from '#components/logs/log-stream.tsx';
+import { LogStreamStatus } from '#components/logs/log-stream-status.tsx';
 import { LogTimerangeMenu } from '#components/logs/log-timerange-menu.tsx';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDeploymentLogs } from '#lib/hooks/use-deployment-logs.ts';
@@ -24,7 +25,10 @@ export function DeploymentLogs() {
         ) : (
           <DeploymentLine deploymentId={logs.deploymentId} />
         )}
-        <LogTimerangeMenu />
+        <div className="flex items-center gap-3">
+          <LogStreamStatus status={logs.status} />
+          <LogTimerangeMenu />
+        </div>
       </div>
       <LogStream records={logs.records} />
     </div>
