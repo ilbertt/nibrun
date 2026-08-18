@@ -61,7 +61,7 @@ export const DEFAULT_CONFIG: PublicAppConfig = {
 /** The inverse of `toAppConfig`: the `app_configs` columns a row carries for this config. */
 export function configColumns(config: StoredAppConfig): AppConfigColumns {
   return {
-    environment: config.environment,
+    environment_names: Object.keys(config.environment),
     guest_port: config.guestPort,
     args: [...config.args],
     vcpu_count: config.resources.vcpuCount,

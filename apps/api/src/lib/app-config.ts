@@ -46,7 +46,7 @@ export type SealedConfigPatch = Partial<OwnedAppConfig> & {
 
 // Keys named once here, types taken from the schema, so renaming a column fails to compile
 // rather than silently reading undefined.
-export type AppConfigColumns = Pick<
+export type RunConfigColumns = Pick<
   Queries['SelectAppById'],
   | 'guest_port'
   | 'args'
@@ -63,13 +63,15 @@ export type AppConfigColumns = Pick<
   | 'restart_max_backoff_ms'
   | 'restart_backoff_factor'
   | 'restart_reset_after_ms'
-  | 'environment'
 >;
+
+export type AppConfigColumns = RunConfigColumns &
+  Pick<Queries['SelectAppById'], 'environment_names'>;
 
 export function configWithDefaults(patch: AppConfigPatch = {}): PublicAppConfig {
   return {
     volumeSizeBytes: VOLUME_SIZE_BYTES,
-    environment: namesOf(patch.environment ?? {}),
+    environment: redacted(Object.keys(patch.environment ?? {})),
     guestPort: patch.guestPort ?? DEFAULT_GUEST_PORT,
     args: patch.args ?? [],
     resources: patch.resources ?? DEFAULT_INSTANCE_RESOURCES,
@@ -82,8 +84,16 @@ export function configWithDefaults(patch: AppConfigPatch = {}): PublicAppConfig 
 // instead of reaching the guest as undefined.
 export function toAppConfig(row: AppConfigColumns): PublicAppConfig {
   return {
+    ...toRunConfig(row),
     volumeSizeBytes: VOLUME_SIZE_BYTES,
-    environment: namesOf(row.environment),
+    environment: redacted(row.environment_names ?? []),
+  };
+}
+
+// Everything an instance runs with except the environment, which reaches this end as names in one
+// place and as sealed values in another, and is put back on by whichever caller has which.
+export function toRunConfig(row: RunConfigColumns): Omit<AppConfig, 'environment'> {
+  return {
     guestPort: row.guest_port,
     args: row.args,
     resources: {
@@ -108,6 +118,6 @@ export function toAppConfig(row: AppConfigColumns): PublicAppConfig {
   };
 }
 
-function namesOf(environment: Record<string, string>): RedactedEnvironment {
-  return Object.fromEntries(Object.keys(environment).map((name) => [name, REDACTED]));
+function redacted(names: readonly string[]): RedactedEnvironment {
+  return Object.fromEntries(names.map((name) => [name, REDACTED]));
 }

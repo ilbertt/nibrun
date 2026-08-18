@@ -1,28 +1,43 @@
 -- Migration 0006 left `environment` out with a note that secrets storage was deferred. This is
--- that storage: one jsonb object per config version, names in the clear and every value sealed
--- by the api before it arrives, so a dump or a nightly backup carries ciphertext.
+-- that storage: one row per variable, alongside the config version it belongs to.
 --
--- Names stay readable because an owner has to be told which variables are set without being told
--- what they are, and because nothing else can list them once the values are opaque.
+-- A table rather than a column on `app_configs`, following `app_hostnames`: what an app has a
+-- fixed number of is a column there, and what it has any number of is a table of its own.
 --
--- On the config row rather than the app: a deployment snapshots the config it launched with, so
--- a rollback replays the environment of the version it rolls back to rather than whatever is
--- current.
-ALTER TABLE nibrun.app_configs
-  ADD COLUMN environment jsonb NOT NULL DEFAULT '{}'::jsonb;
+-- Names are stored as they were written and values only ever sealed by the api. An owner has to
+-- be told which variables are set without being told what they hold, and a name in the clear is
+-- what makes that answerable without opening anything.
+--
+-- The CHECK repeats ENVIRONMENT_NAME_PATTERN from @repo/protocol and nothing compares the two, so
+-- changing it there is also a migration here. It is worth restating: a name is what a schema is
+-- most likely to wave through, and this is the layer that cannot be talked past.
+CREATE TABLE nibrun.app_config_environment (
+  id         uuid PRIMARY KEY DEFAULT uuidv7(),
+  config_id  uuid NOT NULL REFERENCES nibrun.app_configs (id) ON DELETE RESTRICT,
+  name       text NOT NULL,
+  value      text NOT NULL,
+  created_at timestamptz GENERATED ALWAYS AS (uuid_extract_timestamp(id)) VIRTUAL,
+  CONSTRAINT app_config_environment_name_key UNIQUE (config_id, name),
+  CONSTRAINT app_config_environment_name_check CHECK (name ~ '^[A-Za-z_][A-Za-z0-9_]*$')
+);
 
--- An object, never an array or a scalar: the api parses what it reads back, and a row shaped
--- wrongly is a tenant that cannot start rather than a validation error an owner could act on.
-ALTER TABLE nibrun.app_configs
-  ADD CONSTRAINT app_configs_environment_check
-    CHECK (jsonb_typeof(environment) = 'object');
+COMMENT ON COLUMN nibrun.app_config_environment.value IS
+  $c$Sealed by the api before it arrives. Never written or read in the clear.$c$;
+COMMENT ON COLUMN nibrun.app_config_environment.created_at IS 'Derived from the uuidv7 id; the moment the row was created. @notNull';
 
-COMMENT ON COLUMN nibrun.app_configs.environment IS
-  $c$Variable name to the value sealed by the api. Never written or read in the clear. @notNull @type Record<string, string>$c$;
+CREATE INDEX app_config_environment_config_id_idx
+  ON nibrun.app_config_environment (config_id);
 
--- Appended rather than placed with the other config columns: CREATE OR REPLACE VIEW may only add
--- columns at the end, and replacing the view outright would mean dropping the one that depends
--- on it.
+-- A config version is what a deployment pins, and its environment is part of that version. The
+-- parent refuses a rewrite; without this its variables would still take one, which would edit
+-- what a running deployment was launched with.
+CREATE TRIGGER app_config_environment_append_only
+  BEFORE UPDATE OR DELETE ON nibrun.app_config_environment
+  FOR EACH ROW EXECUTE FUNCTION nibrun.refuse_write();
+
+-- `config_id` is appended so the variables of a pinned version can be found from it, the way
+-- `desired_hostnames` hangs off this view rather than rebuilding its joins. CREATE OR REPLACE
+-- may only add columns at the end, which is also why it is last.
 CREATE OR REPLACE VIEW nibrun.desired_deployments AS
   SELECT d.id,
          d.app_id,
@@ -34,9 +49,16 @@ CREATE OR REPLACE VIEW nibrun.desired_deployments AS
          c.health_check_unhealthy_threshold,
          c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
          c.restart_backoff_factor, c.restart_reset_after_ms,
-         c.environment
+         d.config_id
   FROM nibrun.deployments d
   JOIN nibrun.apps a ON a.id = d.app_id
   JOIN nibrun.artifacts ar ON ar.id = d.artifact_id
   JOIN nibrun.app_configs c ON c.id = d.config_id
   WHERE d.state NOT IN ('superseded', 'failed') AND a.state IN ('active', 'suspended');
+
+-- The one relation carrying values rather than names: it is read on the way to the host that
+-- runs the binary, which is the only place they are wanted.
+CREATE VIEW nibrun.desired_environment AS
+  SELECT d.id AS deployment_id, e.name, e.value
+  FROM nibrun.app_config_environment e
+  JOIN nibrun.desired_deployments d ON d.config_id = e.config_id;

@@ -9,7 +9,7 @@ import {
   VolumeIdSchema,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.d.ts';
-import { toAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
+import { type SealedEnvironment, toRunConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
 import { openEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 
 export type DesiredDeploymentRow = Queries['SelectDesiredDeployments'];
@@ -50,10 +50,12 @@ export function toDesiredVolume(row: DesiredVolumeRow): DesiredVolume {
 export function toDesiredInstance({
   row,
   hostnames,
+  environments,
   secretsKey,
 }: {
   row: DesiredDeploymentRow;
   hostnames: Map<AppId, AppHostname[]>;
+  environments: Map<string, SealedEnvironment>;
   secretsKey: TenantSecretsKey;
 }): DesiredInstance {
   return {
@@ -67,9 +69,29 @@ export function toDesiredInstance({
       objectKey: row.object_key,
       filename: row.original_file_name,
     },
-    config: toDesiredConfig({ row, secretsKey }),
+    config: toDesiredConfig({
+      row,
+      sealed: environments.get(row.id) ?? {},
+      secretsKey,
+    }),
     hostnames: hostnames.get(row.app_id) ?? [],
   };
+}
+
+export type DesiredEnvironmentRow = Queries['SelectDesiredEnvironment'];
+
+/** Grouped the way hostnames are, for the same reason: one relation, many rows per instance. */
+export function environmentByDeployment(
+  rows: DesiredEnvironmentRow[],
+): Map<string, SealedEnvironment> {
+  const byDeployment = new Map<string, SealedEnvironment>();
+  for (const row of rows) {
+    byDeployment.set(row.deployment_id, {
+      ...byDeployment.get(row.deployment_id),
+      [row.name]: row.value,
+    });
+  }
+  return byDeployment;
 }
 
 export function hostnamesByApp(rows: DesiredHostnameRow[]): Map<AppId, AppHostname[]> {
@@ -88,18 +110,15 @@ export function hostnamesByApp(rows: DesiredHostnameRow[]): Map<AppId, AppHostna
 // the owner's view of a volume the host is told about separately.
 function toDesiredConfig({
   row,
+  sealed,
   secretsKey,
 }: {
   row: DesiredDeploymentRow;
+  sealed: SealedEnvironment;
   secretsKey: TenantSecretsKey;
 }): AppConfig {
-  const { guestPort, args, resources, healthCheck, restartPolicy } = toAppConfig(row);
   return {
-    guestPort,
-    args,
-    resources,
-    healthCheck,
-    restartPolicy,
-    environment: openEnvironment({ key: secretsKey, sealed: row.environment }),
+    ...toRunConfig(row),
+    environment: openEnvironment({ key: secretsKey, sealed }),
   };
 }

@@ -29,8 +29,8 @@ export interface ISelectDesiredDeploymentsResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
-    /** Variable name to the value sealed by the api. Never written or read in the clear. */
-    environment: Record<string, string>;
+    /** The app config version this deployment was launched with. */
+    config_id: string;
 }
 
 /** Result of query `SelectDesiredVolumes`. */
@@ -44,6 +44,14 @@ export interface ISelectDesiredHostnamesResult {
     app_id: import("@repo/protocol").AppId;
     hostname: import("@repo/protocol").Hostname;
     kind: import("@repo/protocol").AppHostnameKind;
+}
+
+/** Result of query `SelectDesiredEnvironment`. */
+export interface ISelectDesiredEnvironmentResult {
+    deployment_id: import("@repo/protocol").DeploymentId;
+    name: string;
+    /** Sealed by the api before it arrives. Never written or read in the clear. */
+    value: string;
 }
 
 /** Result of query `SelectDesiredExports`. */
@@ -75,6 +83,7 @@ export interface IInsertAppResult {
 
 /** Result of query `InsertAppConfig`. */
 export interface IInsertAppConfigResult {
+    id: string;
 }
 
 /** Result of query `InsertAppHostname`. */
@@ -106,8 +115,7 @@ export interface ISelectCreatedAppResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
-    /** Variable name to the value sealed by the api. Never written or read in the clear. */
-    environment: Record<string, string>;
+    environment_names: string[] | null;
 }
 
 /** Result of query `SelectAppsByOwner`. */
@@ -133,8 +141,7 @@ export interface ISelectAppsByOwnerResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
-    /** Variable name to the value sealed by the api. Never written or read in the clear. */
-    environment: Record<string, string>;
+    environment_names: string[] | null;
 }
 
 /** Result of query `SelectAppHostnamesByOwner`. */
@@ -167,8 +174,7 @@ export interface ISelectAppByIdResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
-    /** Variable name to the value sealed by the api. Never written or read in the clear. */
-    environment: Record<string, string>;
+    environment_names: string[] | null;
 }
 
 /** Result of query `SelectAppHostnamesByApp`. */
@@ -184,6 +190,7 @@ export interface ISelectAppForConfigUpdateResult {
 
 /** Result of query `SelectCurrentAppConfig`. */
 export interface ISelectCurrentAppConfigResult {
+    id: string;
     guest_port: import("@repo/protocol").GuestPort;
     args: string[];
     vcpu_count: number;
@@ -199,13 +206,16 @@ export interface ISelectCurrentAppConfigResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
-    /** Variable name to the value sealed by the api. Never written or read in the clear. */
-    environment: Record<string, string>;
+    environment_names: string[] | null;
 }
 
 /** Result of query `InsertPatchedAppConfig`. */
 export interface IInsertPatchedAppConfigResult {
     id: string;
+}
+
+/** Result of query `CarryEnvironmentForward`. */
+export interface ICarryEnvironmentForwardResult {
 }
 
 /** Result of query `TouchAppAfterConfigPatch`. */
@@ -231,8 +241,7 @@ export interface ITouchAppAfterConfigPatchResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
-    /** Variable name to the value sealed by the api. Never written or read in the clear. */
-    environment: Record<string, string>;
+    environment_names: string[] | null;
 }
 
 /** Result of query `SelectFinishableDeletion`. */
@@ -307,8 +316,7 @@ export interface ISelectAppAfterStateChangeResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
-    /** Variable name to the value sealed by the api. Never written or read in the clear. */
-    environment: Record<string, string>;
+    environment_names: string[] | null;
 }
 
 /** Result of query `InsertPendingArtifact`. */
@@ -433,8 +441,7 @@ export interface ISelectDeploymentsByAppResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
-    /** Variable name to the value sealed by the api. Never written or read in the clear. */
-    environment: Record<string, string>;
+    environment_names: string[] | null;
 }
 
 /** Result of query `SelectDeploymentById`. */
@@ -462,8 +469,7 @@ export interface ISelectDeploymentByIdResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
-    /** Variable name to the value sealed by the api. Never written or read in the clear. */
-    environment: Record<string, string>;
+    environment_names: string[] | null;
 }
 
 /** Result of query `SelectLiveDeployments`. */
@@ -515,8 +521,7 @@ export interface ISelectInsertedDeploymentResult {
     restart_max_backoff_ms: number;
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
-    /** Variable name to the value sealed by the api. Never written or read in the clear. */
-    environment: Record<string, string>;
+    environment_names: string[] | null;
 }
 
 /** Result of query `InsertExport`. */
@@ -598,6 +603,7 @@ export interface Queries {
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
     SelectDesiredHostnames: ISelectDesiredHostnamesResult;
+    SelectDesiredEnvironment: ISelectDesiredEnvironmentResult;
     SelectDesiredExports: ISelectDesiredExportsResult;
     SelectAppOwnership: ISelectAppOwnershipResult;
     InsertApp: IInsertAppResult;
@@ -611,6 +617,7 @@ export interface Queries {
     SelectAppForConfigUpdate: ISelectAppForConfigUpdateResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
+    CarryEnvironmentForward: ICarryEnvironmentForwardResult;
     TouchAppAfterConfigPatch: ITouchAppAfterConfigPatchResult;
     SelectFinishableDeletion: ISelectFinishableDeletionResult;
     SelectFinishableDeletions: ISelectFinishableDeletionsResult;

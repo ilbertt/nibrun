@@ -1,3 +1,4 @@
+import type { TypedSQL } from '@ilbertt/bun-sqlgen';
 import type {
   AppHostnameKind,
   AppId,
@@ -9,7 +10,12 @@ import type {
 } from '@repo/protocol';
 import type { ArrayType } from 'bun';
 import type { Queries } from '#db/queries.gen.d.ts';
-import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
+import {
+  type SealedConfigPatch,
+  type SealedEnvironment,
+  type StoredAppConfig,
+  toAppConfig,
+} from '#lib/app-config.ts';
 import { Repository } from '#repositories/repository.ts';
 
 /**
@@ -17,7 +23,7 @@ import { Repository } from '#repositories/repository.ts';
  * back element by element — so the arguments would arrive quoted rather than rejected. Naming
  * the type is what makes the column and the parameter agree.
  */
-const TENANT_ARGS_TYPE: ArrayType = 'TEXT';
+const TEXT_ARRAY: ArrayType = 'TEXT';
 
 export type AppRow = Queries['SelectAppById'];
 export type AppHostnameRow = Queries['SelectAppHostnamesByApp'];
@@ -93,26 +99,36 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('Inserting into nibrun.apps returned no row.');
       }
 
-      await tx.InsertAppConfig`
+      const [insertedConfig] = await tx.InsertAppConfig`
         INSERT INTO nibrun.app_configs (
           app_id, guest_port, args, vcpu_count, memory_mib,
           health_check_path, health_check_interval_ms, health_check_timeout_ms,
           health_check_grace_period_ms, health_check_healthy_threshold,
           health_check_unhealthy_threshold,
           restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-          restart_backoff_factor, restart_reset_after_ms, environment
+          restart_backoff_factor, restart_reset_after_ms
         )
         VALUES (
-          ${inserted.id}, ${config.guestPort}, ${tx.array(config.args, TENANT_ARGS_TYPE)},
+          ${inserted.id}, ${config.guestPort}, ${tx.array(config.args, TEXT_ARRAY)},
           ${config.resources.vcpuCount}, ${config.resources.memoryMib},
           ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
           ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
           ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
           ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
           ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
-          ${config.restartPolicy.resetAfterMs}, ${JSON.stringify(config.environment)}::jsonb
+          ${config.restartPolicy.resetAfterMs}
         )
+        RETURNING id
       `;
+      if (!insertedConfig) {
+        throw new Error('Inserting into nibrun.app_configs returned no row.');
+      }
+
+      await insertEnvironment({
+        tx,
+        configId: insertedConfig.id,
+        environment: config.environment,
+      });
 
       const [hostnameRow] = await tx.InsertAppHostname`
         INSERT INTO nibrun.app_hostnames (app_id, hostname, kind)
@@ -131,7 +147,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
+               c.restart_backoff_factor, c.restart_reset_after_ms,
+         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
+                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
         FROM nibrun.live_apps a
         JOIN LATERAL (
           SELECT * FROM nibrun.app_configs c
@@ -156,7 +174,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
+             c.restart_backoff_factor, c.restart_reset_after_ms,
+         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
+                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
       FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs c
@@ -186,7 +206,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
+             c.restart_backoff_factor, c.restart_reset_after_ms,
+         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
+                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
       FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs c
@@ -223,12 +245,14 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       }
 
       const [current] = await tx.SelectCurrentAppConfig`
-        SELECT c.guest_port, c.args, c.vcpu_count, c.memory_mib,
+        SELECT c.id, c.guest_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
+               c.restart_backoff_factor, c.restart_reset_after_ms,
+         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
+                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
         FROM nibrun.app_configs c
         WHERE c.app_id = ${appId}
         ORDER BY c.id DESC
@@ -238,11 +262,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('An app exists with no config.');
       }
 
-      const config = {
-        ...toAppConfig(current),
-        ...patch,
-        environment: patch.environment ?? current.environment,
-      };
+      const config = { ...toAppConfig(current), ...patch };
 
       const [inserted] = await tx.InsertPatchedAppConfig`
         INSERT INTO nibrun.app_configs (
@@ -251,22 +271,35 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           health_check_grace_period_ms, health_check_healthy_threshold,
           health_check_unhealthy_threshold,
           restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-          restart_backoff_factor, restart_reset_after_ms, environment
+          restart_backoff_factor, restart_reset_after_ms
         )
         VALUES (
-          ${appId}, ${config.guestPort}, ${tx.array(config.args, TENANT_ARGS_TYPE)},
+          ${appId}, ${config.guestPort}, ${tx.array(config.args, TEXT_ARRAY)},
           ${config.resources.vcpuCount}, ${config.resources.memoryMib},
           ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
           ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
           ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
           ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
           ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
-          ${config.restartPolicy.resetAfterMs}, ${JSON.stringify(config.environment)}::jsonb
+          ${config.restartPolicy.resetAfterMs}
         )
         RETURNING id
       `;
       if (!inserted) {
         throw new Error('Inserting into nibrun.app_configs returned no row.');
+      }
+
+      if (patch.environment === undefined) {
+        // Copied rather than read and rewritten: the api has no reason to open a value it is
+        // only carrying forward, so the ciphertext never leaves the database.
+        await tx.CarryEnvironmentForward`
+          INSERT INTO nibrun.app_config_environment (config_id, name, value)
+          SELECT ${inserted.id}, e.name, e.value
+          FROM nibrun.app_config_environment e
+          WHERE e.config_id = ${current.id}
+        `;
+      } else {
+        await insertEnvironment({ tx, configId: inserted.id, environment: patch.environment });
       }
 
       // Reconfiguring an app changes the app, but the new version lands in another table, so
@@ -283,7 +316,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                   c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                   c.health_check_unhealthy_threshold,
                   c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-                  c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
+                  c.restart_backoff_factor, c.restart_reset_after_ms,
+         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
+                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
       `;
       return app ?? null;
     });
@@ -407,7 +442,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment
+               c.restart_backoff_factor, c.restart_reset_after_ms,
+         ARRAY(SELECT e.name FROM nibrun.app_config_environment e
+                WHERE e.config_id = c.id ORDER BY e.name) AS environment_names
         FROM nibrun.live_apps a
         JOIN LATERAL (
           SELECT * FROM nibrun.app_configs c
@@ -418,4 +455,45 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       return app ?? null;
     });
   }
+}
+
+/**
+ * One statement rather than one per variable: an environment is small, but a round trip each is
+ * still a round trip inside the transaction that is holding the app's row.
+ *
+ * Nothing is written for an app that sets none, which is what keeps an empty environment from
+ * being a statement with no rows to insert.
+ */
+async function insertEnvironment({
+  tx,
+  configId,
+  environment,
+}: {
+  tx: TypedSQL<Queries>;
+  configId: string;
+  environment: SealedEnvironment;
+}): Promise<void> {
+  const names = Object.keys(environment);
+  if (names.length === 0) {
+    return;
+  }
+
+  // Untagged deliberately: `sql.array` is a clause the generator blanks out before it parses the
+  // statement, and `UNNEST(, )` is not a statement. Naming a query is what opts it into
+  // generation, so this opts out — there is no row type to lose, the insert returns none.
+  //
+  // The arrays are `sql.array` rather than plain ones because a bare JS array is serialised as a
+  // comma-joined list, which Postgres reads as one malformed array literal rather than as many
+  // values.
+  await tx`
+    INSERT INTO nibrun.app_config_environment (config_id, name, value)
+    SELECT ${configId}, pair.name, pair.value
+    FROM UNNEST(
+      ${tx.array(names, TEXT_ARRAY)},
+      ${tx.array(
+        names.map((name) => environment[name] ?? ''),
+        TEXT_ARRAY,
+      )}
+    ) AS pair(name, value)
+  `;
 }
