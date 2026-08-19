@@ -1,15 +1,12 @@
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PROGRAM_NAME } from '#config.ts';
+import { RELEASE_PLATFORMS } from './release-platforms.ts';
 
 const CLI_DIR = join(import.meta.dir, '..');
 const DIST_DIR = join(CLI_DIR, 'dist');
 const BUN_VERSION_FILE = join(CLI_DIR, '../../.bun-version');
 const ENTRYPOINT = 'src/main.ts';
-
-// Every platform a release carries an asset for. An owner downloads one of these by name, so a
-// suffix here is the asset's identity rather than an implementation detail of the compile target.
-const RELEASE_PLATFORMS = ['darwin-arm64', 'linux-x64', 'linux-arm64'] as const;
 
 const FAILURE_EXIT_CODE = 1;
 
