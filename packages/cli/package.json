@@ -6,6 +6,7 @@
     "#*": "./src/*"
   },
   "scripts": {
+    "build": "bun run scripts/build.ts",
     "nib": "bun run src/main.ts",
     "test": "bun test",
     "generate": "parsh-codegen generate --commands src/commands --out src/command-tree.gen.ts",

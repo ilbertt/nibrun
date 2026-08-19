@@ -76,3 +76,6 @@ the layout under `src/commands/` is the command tree.
 - Run it with `bun run --filter @repo/cli nib …`. A package script runs from the
   package directory, so relative paths resolve against `packages/cli` rather than
   the caller's shell — pass absolute ones until the CLI ships as a real `bin`.
+- `bun run build` compiles one binary per released platform into `dist/`, named
+  `nib-<os>-<arch>`. That name is what a release asset is downloaded as, so
+  renaming it breaks whatever already points at the old one.
