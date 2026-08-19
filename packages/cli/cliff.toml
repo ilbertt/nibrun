@@ -1,0 +1,74 @@
+# git-cliff configuration ~ https://git-cliff.org/docs/configuration
+#
+# The CLI's own release train. It lives here rather than at the repo root because the tag pattern,
+# the first version and the changelog heading are all about `nib` alone — a second train gets a
+# second file beside its own package, not another branch in this one.
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to `nib` are documented in this file.
+
+"""
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="cli-v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## [unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits %}
+        - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
+            {% if commit.breaking %}[**breaking**] {% endif %}\
+            {{ commit.message | upper_first }}\
+    {% endfor %}
+{% endfor %}\n
+"""
+trim = true
+render_always = true
+postprocessors = []
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = true
+# What the first release is called. Without it git-cliff proposes a bare `0.1.0` and then rejects
+# it against `tag_pattern`, because a bumped version only carries a prefix it read off an existing
+# tag and there is none to read yet.
+initial_tag = "cli-v0.1.0"
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+require_conventional = false
+split_commits = false
+commit_preprocessors = []
+protect_breaking_commits = false
+commit_parsers = [
+    { message = "^feat", group = "<!-- 0 -->🚀 Features" },
+    { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
+    { message = "^doc", group = "<!-- 3 -->📚 Documentation" },
+    { message = "^perf", group = "<!-- 4 -->⚡ Performance" },
+    { message = "^refactor", group = "<!-- 2 -->🚜 Refactor" },
+    { message = "^style", group = "<!-- 5 -->🎨 Styling" },
+    { message = "^test", group = "<!-- 6 -->🧪 Testing" },
+    { message = "^build", group = "<!-- 7 -->📦 Build & Dependencies" },
+    { message = "^chore\\(release\\)", skip = true },
+    { message = "^chore\\(deps.*\\)", skip = true },
+    { message = "^chore|^ci", group = "<!-- 8 -->⚙️ Miscellaneous Tasks" },
+    { body = ".*security", group = "<!-- 9 -->🛡️ Security" },
+    { message = "^revert", group = "<!-- 10 -->◀️ Revert" },
+    { message = ".*", group = "<!-- 11 -->💼 Other" },
+]
+filter_commits = false
+fail_on_unmatched_commit = false
+link_parsers = []
+use_branch_tags = false
+topo_order = false
+topo_order_commits = true
+sort_commits = "newest"
+recurse_submodules = false
+# Only this train's tags rank as releases, so a tag cut for anything else neither ends a section
+# nor lends its version to the next bump.
+tag_pattern = "cli-v[0-9]*"

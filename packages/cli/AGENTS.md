@@ -79,3 +79,8 @@ the layout under `src/commands/` is the command tree.
 - `bun run build` compiles one binary per released platform into `dist/`, named
   `nib-<os>-<arch>`. That name is what a release asset is downloaded as, so
   renaming it breaks whatever already points at the old one.
+- **Releasing is its own train, tagged `cli-v*`.** The `prepare-cli-release`
+  workflow opens a PR bumping `version` and regenerating `CHANGELOG.md`; pushing
+  the tag that PR names is what builds the binaries and cuts the release.
+  `cliff.toml` scopes both to commits touching this package, which is why the
+  release commit has to touch it — a tag outside that filter is not a release.

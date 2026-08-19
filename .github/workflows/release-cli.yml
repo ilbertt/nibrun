@@ -1,0 +1,48 @@
+name: release-cli
+
+on:
+  push:
+    tags:
+      # Its own prefix, so a train cut for anything else in this monorepo never lands here.
+      - "cli-v*"
+
+permissions:
+  contents: write # create the GitHub Release
+  id-token: write # OIDC token for the build provenance attestation
+  attestations: write # write the attestation
+
+jobs:
+  release-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The release notes are the commits since the previous tag, which a shallow clone has
+          # neither of.
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare
+
+      # Every asset cross-compiles from here, so one runner cuts the whole release.
+      - name: Build the binaries
+        run: bun run --filter @repo/cli build
+
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: packages/cli/dist/nib-*
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/cli-release-notes.md
+          ATTESTATION_URL: ${{ steps.attest.outputs.attestation-url }}
+        run: |
+          bun run --filter @repo/internal-scripts cli-release-notes
+          gh release create "$TAG_NAME" \
+            --title "$TAG_NAME" \
+            --notes-file "$RELEASE_NOTES_FILE" \
+            packages/cli/dist/nib-*

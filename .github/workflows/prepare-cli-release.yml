@@ -1,0 +1,59 @@
+name: prepare-cli-release
+
+on: workflow_dispatch
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare-cli-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          # git-cliff reads the version off the tags and the changelog off the commits between
+          # them, so a shallow clone would compute both from nothing.
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare
+
+      - name: Prepare the release
+        id: release
+        run: bun run --filter @repo/internal-scripts prepare-cli-release
+
+      - name: Configure git user
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Commit and push to the release branch
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_BRANCH: release/${{ steps.release.outputs.tag }}
+        run: |
+          git switch -c "$RELEASE_BRANCH"
+          git add packages/cli/package.json packages/cli/CHANGELOG.md
+          git commit -m "chore(release): ${TAG}"
+          git push --set-upstream origin "$RELEASE_BRANCH"
+
+      - name: Create the release PR
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > "${RUNNER_TEMP}/pr-body.md" <<EOF
+          Bumps \`@repo/cli\` to **${VERSION}** and regenerates its changelog.
+
+          Merging this releases nothing. Tagging the commit it lands as is what does:
+
+          \`\`\`sh
+          git switch main && git pull
+          git tag ${TAG}
+          git push origin ${TAG}
+          \`\`\`
+          EOF
+          gh pr create --title "chore(release): ${TAG}" --body-file "${RUNNER_TEMP}/pr-body.md"

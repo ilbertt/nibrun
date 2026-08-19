@@ -7,6 +7,8 @@
   },
   "scripts": {
     "build-and-push-image": "bun run src/build-and-push-image.ts",
+    "cli-release-notes": "bun run src/cli-release-notes.ts",
+    "prepare-cli-release": "bun run src/prepare-cli-release.ts",
     "publish-agent-binary": "bun run src/publish-agent-binary.ts",
     "publish-app-host-bundle": "bun run src/publish-app-host-bundle.ts",
     "publish-guest-image": "bun run src/publish-guest-image.ts",
@@ -21,6 +23,7 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
+    "git-cliff": "^2.13.1",
     "typescript": "catalog:"
   },
   "dependencies": {
