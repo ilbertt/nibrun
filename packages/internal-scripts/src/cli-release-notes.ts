@@ -1,17 +1,12 @@
 import * as core from '@actions/core';
-import { runGitCliff } from 'git-cliff';
-import { CLI_TAG_PREFIX, cliCliffOptions, readCliVersion } from '#shared/cli-release.ts';
+import { CLI_TAG_PREFIX, cliVersion, readCliCliff } from '#shared/cli-release.ts';
 import { optionalEnv } from '#shared/env.ts';
-import { repoRoot } from '#shared/paths.ts';
 
-await assertTagMatchesVersion();
+assertTagMatchesVersion();
 
-const { stdout } = await runGitCliff(
-  { ...cliCliffOptions, latest: true, strip: 'header' },
-  { cwd: repoRoot, stdio: ['ignore', 'pipe', 'inherit'] },
-);
+const changes = await readCliCliff({ latest: true, strip: 'header' });
 
-const notes = `${String(stdout).trimEnd()}\n${installSection()}${attestationFooter()}`;
+const notes = `${changes.trimEnd()}\n${installSection()}${attestationFooter()}`;
 
 // Written where the workflow points rather than printed, because `bun run --filter` labels every
 // line of stdout with the package it came from. Without the variable this is a local preview.
@@ -27,13 +22,13 @@ if (outFile) {
  * downstream would notice — the assets would ship under a number that matches no source — and this
  * is the last step before the release exists, so it is where the two are made to agree.
  */
-async function assertTagMatchesVersion() {
+function assertTagMatchesVersion() {
   const tag = optionalEnv('GITHUB_REF_NAME');
   if (!tag) {
     return;
   }
 
-  const expected = `${CLI_TAG_PREFIX}${await readCliVersion()}`;
+  const expected = `${CLI_TAG_PREFIX}${cliVersion}`;
   if (tag !== expected) {
     core.setFailed(
       `Tag ${tag} does not match the CLI version on this commit (expected ${expected}).`,
