@@ -1,23 +1,27 @@
-# nibrun
+<div align="center">
+  <img src="apps/www/public/favicon.svg" alt="nibrun logo" width="128" />
+  <h1>nibrun</h1>
+  <p><em>Drop a binary. Get a server.</em></p>
+</div>
 
-A monorepo powered by [Bun](https://bun.sh) and [Turborepo](https://turborepo.dev/).
+Each binary gets a microVM of its own, a persistent filesystem, and an HTTPS URL. No Dockerfile,
+no YAML, no cluster.
 
-## Requirements
+## Get started
 
-- [Bun](https://bun.sh)
-- [Docker](https://docs.docker.com/get-started/get-docker/) — to run the stack
+Create an HTTP app (use the [bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter)
+template) and compile it to a single binary. Then deploy it:
 
-## Getting started
+### Use the dashboard
+
+Drag the binary onto [app.nibrun.com](https://app.nibrun.com).
+
+### Use the CLI
 
 ```sh
-bun install
-bun run build
+curl -fsSL https://nibrun.com/install.sh | sh
 ```
 
-## Tooling
-
-- [Bun](https://bun.sh) — runtime, package manager, bundler
-- [Turborepo](https://turborepo.dev/) — task orchestration with caching
-- [Biome](https://biomejs.dev/) — linter and formatter
-- [commitlint](https://commitlint.js.org/) — conventional commit enforcement
-- [TypeScript](https://www.typescriptlang.org/) — shared config via `@repo/typescript-config`
+```sh
+nib run ./my-server
+```

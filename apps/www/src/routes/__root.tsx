@@ -1,9 +1,9 @@
 import appCss from '@repo/ui/globals.css?url';
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
+import { SITE_URL } from '#lib/site-url.ts';
 import { themeScript } from '#lib/theme-script.ts';
 
-const SITE_URL = 'https://nibrun.com';
 const TITLE = 'nibrun — drop your binary, get a server';
 const DESCRIPTION =
   'Drop a compiled binary and get a server: a microVM of its own, a persistent filesystem, and an HTTPS URL. No Dockerfile, no YAML, no cluster.';
