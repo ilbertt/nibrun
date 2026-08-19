@@ -1,7 +1,10 @@
 import type { CommandOption } from '@parshjs/core';
 import { z } from 'zod';
+import packageJson from '../package.json' with { type: 'json' };
 
 export const PROGRAM_NAME = 'nib';
+
+export const PROGRAM_VERSION = packageJson.version;
 
 export const DEFAULT_API_URL = 'https://app.nibrun.com';
 

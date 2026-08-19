@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 import { createCli } from '@parshjs/core';
 import { commandTree } from '#command-tree.gen.ts';
-import { PROGRAM_NAME } from '#config.ts';
+import { PROGRAM_NAME, PROGRAM_VERSION } from '#config.ts';
 import { createCliContext } from '#context.ts';
 import { CancelledError } from '#lib/errors.ts';
 
 const cli = createCli({
   programName: PROGRAM_NAME,
   programDescription: 'Run a binary on nibrun.',
+  version: PROGRAM_VERSION,
   tree: commandTree,
   context: createCliContext,
   errors: { CANCELLED: CancelledError },
