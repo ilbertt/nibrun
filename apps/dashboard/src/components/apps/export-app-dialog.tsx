@@ -41,9 +41,9 @@ export function ExportAppDialog() {
         </p>
 
         {run.isPending && (
-          <div className="flex items-center gap-2 rounded-2xl bg-muted px-3 py-2 text-sm">
-            <Spinner className="shrink-0" />
-            <span className="truncate font-mono">
+          <div className="flex items-start gap-2 rounded-2xl bg-muted px-3 py-2 text-sm">
+            <Spinner className="mt-0.5 shrink-0" />
+            <span className="wrap-anywhere font-mono">
               {run.exportId === undefined
                 ? 'asking for an export'
                 : `preparing export ${run.exportId}`}
@@ -62,7 +62,7 @@ export function ExportAppDialog() {
         {run.reason !== undefined && (
           <p className="flex items-start gap-2 rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
             <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-            <span>{run.reason}</span>
+            <span className="wrap-anywhere">{run.reason}</span>
           </p>
         )}
 
