@@ -2,6 +2,18 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.20-2]
+
+### 🚀 Features
+
+- *(dashboard)* A new app's environment can come from a .env file (#233)
+- *(api,cli)* An environment patch edits the variables it names, and only those (#231)
+- *(cli,dashboard)* An app is addressed by the domain its owner brought (#230)
+
+### ⚙️ Miscellaneous Tasks
+
+- Bun 1.4 ships what the build was pulling a canary for (#238)
+
 ## [2026.8.20-1]
 
 ### 🚀 Features
