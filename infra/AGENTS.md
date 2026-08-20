@@ -61,6 +61,11 @@ Custom domains, in the `app_domain` zone only:
   Authenticated Origin Pulls still applies — global AOP covers custom hostnames on a
   Cloudflare-for-SaaS zone — so what is given up is the origin proving itself to the edge, not
   the edge proving itself to the origin, which is the half `security_group.tf` rests on.
+- The apex redirects to the marketing site from the app-host proxy, and reaching it takes two
+  things here: `<app_domain>` A → `app_host_public_ips`, **proxied**, since the bare name has no
+  record of its own; and an **Origin Certificate** naming `<app_domain>` beside `*.<app_domain>`,
+  because a wildcard does not cover the bare name and the zone is Full (strict) — without the
+  reissue the apex answers `526`. `fallback.<app_domain>` needs neither and works as it stands.
 - An **API token** scoped to *Zone → SSL and Certificates → Edit* on this zone and nothing else,
   as the `CLOUDFLARE_API_TOKEN` repository secret, with the zone id as `CLOUDFLARE_ZONE_ID`.
 

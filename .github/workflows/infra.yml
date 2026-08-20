@@ -67,6 +67,7 @@ jobs:
           # Still APP_DOMAIN on purpose: the repository variable is read outside this repo
           # too, so it is not ours alone to rename.
           TF_VAR_app_host_domain: ${{ vars.APP_DOMAIN }}
+          TF_VAR_www_hostname: ${{ vars.WWW_HOSTNAME }}
           TF_VAR_api_github_client_id: ${{ vars.API_GITHUB_CLIENT_ID }}
           TF_VAR_api_github_client_secret: ${{ secrets.API_GITHUB_CLIENT_SECRET }}
           TF_VAR_caddy_tls_cert: ${{ vars.CADDY_TLS_CERT }}

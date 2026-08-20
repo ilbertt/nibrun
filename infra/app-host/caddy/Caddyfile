@@ -34,6 +34,23 @@
 # app on it — or one whose agent has not converged yet — still starts.
 import /etc/caddy/rendered/*.caddy
 
+# The two names here that serve nothing: the apex, and the fallback origin the
+# edge resolves a custom hostname to. Both send their visitor to the marketing
+# site rather than to the 404 below.
+#
+# Custom-domain traffic never lands here. It reaches this host naming the brought
+# domain in both the handshake and the request, so it matches a rendered site
+# block, not the address the edge resolved to find the host.
+#
+# The apex needs two things elsewhere before it reaches this block at all: a
+# record of its own, and an origin certificate naming <app_domain> beside the
+# wildcard — the edge validates the name it asked for, and *.<app_domain> does
+# not cover the bare one.
+https://{$APP_HOST_DOMAIN}, https://fallback.{$APP_HOST_DOMAIN} {
+	import origin_tls
+	redir https://{$WWW_HOSTNAME} permanent
+}
+
 # Everything else under the app domain: a hostname whose app is not running
 # here, or not running at all. Caddy orders site blocks most-specific first, so
 # the rendered ones above win and this is what is left.
@@ -41,11 +58,6 @@ import /etc/caddy/rendered/*.caddy
 # It exists so an unknown hostname is answered rather than handled by whatever
 # TLS policy Caddy falls back to — this way every connection the edge makes to
 # this host is one Authenticated Origin Pulls has already checked.
-#
-# The apex is deliberately absent: the origin certificate names *.<app_domain>
-# and not <app_domain>, and serving a redirect there would still mean
-# terminating TLS for a name the certificate does not cover. Cloudflare redirects
-# the apex at the edge, where no origin certificate is involved.
 https://*.{$APP_HOST_DOMAIN} {
 	import origin_tls
 	respond 404

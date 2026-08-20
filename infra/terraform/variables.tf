@@ -261,6 +261,20 @@ variable "cloudflare_zone_id" {
   }
 }
 
+# Where the two names in the app host zone that serve nothing send their visitors:
+# the apex, and the fallback origin. Nothing here provisions it — the marketing
+# site is a Worker of its own — so it enters as configuration, and has no default
+# for the reason api_hostname has none.
+variable "www_hostname" {
+  type        = string
+  description = "Public hostname of the marketing site. CI passes the WWW_HOSTNAME repository variable through."
+
+  validation {
+    condition     = trimspace(var.www_hostname) != ""
+    error_message = "www_hostname must not be empty."
+  }
+}
+
 variable "enable_github_deploy" {
   type        = bool
   description = "Create the GitHub Actions OIDC deploy role. Set false to apply before the bootstrap stack exists, since the role looks up the OIDC provider it creates."

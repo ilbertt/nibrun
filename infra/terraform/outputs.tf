@@ -18,6 +18,10 @@ output "victorialogs_hostname" {
   value = var.victorialogs_hostname
 }
 
+output "www_hostname" {
+  value = var.www_hostname
+}
+
 output "app_host_domain" {
   description = "User apps are served under this. One wildcard record covers the fleet, so there is nothing per-app in DNS."
   value       = var.app_host_domain

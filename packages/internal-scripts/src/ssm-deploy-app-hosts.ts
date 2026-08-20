@@ -28,6 +28,7 @@ const sharedEnv: Record<string, string> = {
   SSM_SECRET_PREFIX: requiredEnv('SSM_SECRET_PREFIX'),
   API_HOSTNAME: requiredEnv('API_HOSTNAME'),
   APP_HOST_DOMAIN: requiredEnv('APP_HOST_DOMAIN'),
+  WWW_HOSTNAME: requiredEnv('WWW_HOSTNAME'),
   CONTROL_PLANE_INTERNAL_URL: requiredEnv('CONTROL_PLANE_INTERNAL_URL'),
   LOG_INGEST_URL: requiredEnv('LOG_INGEST_URL'),
   VPC_IPV4_CIDR_BLOCK: requiredEnv('VPC_IPV4_CIDR_BLOCK'),
