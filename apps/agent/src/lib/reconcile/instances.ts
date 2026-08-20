@@ -68,7 +68,7 @@ export const stopInstance = Effect.fn('stopInstance')(function* ({
   yield* setState({ appId, state: 'stopped' });
 });
 
-const setState = ({
+function setState({
   appId,
   state,
   stopRequested,
@@ -76,8 +76,8 @@ const setState = ({
   appId: AppId;
   state: InstanceState;
   stopRequested?: boolean;
-}) =>
-  AgentState.updateRecord({
+}) {
+  return AgentState.updateRecord({
     appId,
     change: (record) => ({
       ...record,
@@ -85,8 +85,9 @@ const setState = ({
       ...(stopRequested === undefined ? {} : { stopRequested }),
     }),
   });
+}
 
-const isStartable = ({
+function isStartable({
   existing,
   nowMs,
   desired,
@@ -94,7 +95,7 @@ const isStartable = ({
   existing: InstanceRecord | undefined;
   nowMs: number;
   desired: DesiredInstance;
-}) => {
+}): boolean {
   if (!existing) {
     return true;
   }
@@ -103,7 +104,7 @@ const isStartable = ({
     existing.startAttempts.attempts <= policy.maxRestarts &&
     isReadyToRetry({ window: existing.startAttempts, nowMs, policy })
   );
-};
+}
 
 /**
  * One entry per digest: two apps deploying the same bytes share the image, and fetching it
@@ -242,8 +243,8 @@ function verdict({
     : undefined;
 }
 
-const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
-  Effect.gen(function* () {
+function probed({ record, nowMs }: { record: InstanceRecord; nowMs: number }) {
+  return Effect.gen(function* () {
     const healthy = yield* probeInstance({
       guestIpv4: record.guestIpv4,
       guestPort: record.guestPort,
@@ -264,6 +265,7 @@ const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
       healthyThreshold: record.healthCheck.healthyThreshold,
     });
   });
+}
 
 /** Probes the tenants that are due, then settles each state from systemd and the probe together. */
 export const refreshStates = Effect.gen(function* () {
