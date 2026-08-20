@@ -221,6 +221,7 @@ export {
   ObjectKeySchema,
   type Sha256Digest,
   Sha256DigestSchema,
+  StateMessageSchema,
   type Timestamp,
   TimestampSchema,
 } from '#lib/wire.ts';

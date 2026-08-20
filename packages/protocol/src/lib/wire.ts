@@ -111,6 +111,15 @@ export const FilenameSchema = Type.String({
   maxLength: MAX_FILENAME_LENGTH,
 }) as BrandedSchema<TString, Filename>;
 
+const MAX_STATE_MESSAGE_LENGTH = 512;
+
+// Operator-facing detail about why something is in the state it is in. Never the tenant's own
+// output: that has a dedicated streaming path and must not arrive in a state report.
+export const StateMessageSchema = Type.String({
+  description: 'Why something is in the state it is in, as the host put it.',
+  maxLength: MAX_STATE_MESSAGE_LENGTH,
+});
+
 // The port the tenant's binary listens on inside its guest, and the port the agent forwards
 // to it on the host, are different numbers that mean different things. They are branded
 // apart so that assigning one to the other is a type error rather than a routing bug.

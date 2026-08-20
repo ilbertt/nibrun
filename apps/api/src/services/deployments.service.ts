@@ -195,6 +195,7 @@ function toPublicDeployment(row: DeploymentRow): PublicDeployment {
     state: row.state,
     createdAt: toTimestamp(row.created_at),
     ...(row.activated_at && { activatedAt: toTimestamp(row.activated_at) }),
+    ...(row.message && { message: row.message }),
     ...(row.rollback_of_deployment_id && { rollbackOf: row.rollback_of_deployment_id }),
   };
 }

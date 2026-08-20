@@ -473,6 +473,8 @@ export interface ISelectDeploymentsByAppResult {
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: import("@repo/protocol").DeploymentId | null;
     created_at: Date;
+    /** Why the deployment is in the state it is in, as the host put it. Never the tenant's own output, which has a streaming path of its own. */
+    message: string | null;
     guest_port: import("@repo/protocol").GuestPort;
     args: string[];
     vcpu_count: number;
@@ -501,6 +503,8 @@ export interface ISelectDeploymentByIdResult {
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: import("@repo/protocol").DeploymentId | null;
     created_at: Date;
+    /** Why the deployment is in the state it is in, as the host put it. Never the tenant's own output, which has a streaming path of its own. */
+    message: string | null;
     guest_port: import("@repo/protocol").GuestPort;
     args: string[];
     vcpu_count: number;
@@ -553,6 +557,8 @@ export interface ISelectInsertedDeploymentResult {
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: import("@repo/protocol").DeploymentId | null;
     created_at: Date;
+    /** Why the deployment is in the state it is in, as the host put it. Never the tenant's own output, which has a streaming path of its own. */
+    message: string | null;
     guest_port: import("@repo/protocol").GuestPort;
     args: string[];
     vcpu_count: number;

@@ -18,15 +18,11 @@ import {
   Ipv4AddressSchema,
   ObjectKeySchema,
   Sha256DigestSchema,
+  StateMessageSchema,
   TimestampSchema,
 } from '#lib/wire.ts';
 
-const MAX_MESSAGE_LENGTH = 512;
 const MAX_DEVICE_PATH_LENGTH = 256;
-
-// Operator-facing detail about why something is in the state it is in. Never the tenant's own
-// output: that has a dedicated streaming path and must not arrive in a state report.
-const MessageSchema = Type.String({ maxLength: MAX_MESSAGE_LENGTH });
 
 export const ReportedInstanceSchema = Type.Object({
   appId: AppIdSchema,
@@ -41,7 +37,7 @@ export const ReportedInstanceSchema = Type.Object({
   startedAt: Type.Optional(TimestampSchema),
   lastHealthyAt: Type.Optional(TimestampSchema),
   lastExitCode: Type.Optional(Type.Integer()),
-  message: Type.Optional(MessageSchema),
+  message: Type.Optional(StateMessageSchema),
 });
 
 export type ReportedInstance = typeof ReportedInstanceSchema.static;
@@ -54,7 +50,7 @@ export const ReportedVolumeSchema = Type.Object({
   // Which ZeroFS filesystem the host put it in.
   storagePrefix: Type.Optional(ObjectKeySchema),
   devicePath: Type.Optional(Type.String({ maxLength: MAX_DEVICE_PATH_LENGTH })),
-  message: Type.Optional(MessageSchema),
+  message: Type.Optional(StateMessageSchema),
 });
 
 export type ReportedVolume = typeof ReportedVolumeSchema.static;
@@ -63,9 +59,9 @@ export const ReportedCheckpointSchema = Type.Object({
   checkpointId: CheckpointIdSchema,
   volumeId: VolumeIdSchema,
   state: CheckpointStateSchema,
-  reference: Type.Optional(MessageSchema),
+  reference: Type.Optional(StateMessageSchema),
   readyAt: Type.Optional(TimestampSchema),
-  message: Type.Optional(MessageSchema),
+  message: Type.Optional(StateMessageSchema),
 });
 
 export type ReportedCheckpoint = typeof ReportedCheckpointSchema.static;
@@ -80,7 +76,7 @@ export const ReportedExportSchema = Type.Object({
   state: ExportStateSchema,
   sizeBytes: Type.Optional(ByteSizeSchema),
   readyAt: Type.Optional(TimestampSchema),
-  message: Type.Optional(MessageSchema),
+  message: Type.Optional(StateMessageSchema),
 });
 
 export type ReportedExport = typeof ReportedExportSchema.static;

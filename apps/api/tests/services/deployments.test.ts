@@ -45,6 +45,7 @@ const GUEST_PORT = Value.Parse(GuestPortSchema, GUEST_PORT_NUMBER);
 const OWNER_SCOPED_METHODS = 4;
 const CREATED_AT = new Date('2026-08-04T10:00:00.000Z');
 const ACTIVATED_AT = new Date('2026-08-04T11:30:00.000Z');
+const FAILURE_MESSAGE = 'No host started this deployment in time.';
 const HEALTHY_AT = new Date('2026-08-04T11:31:00.000Z');
 const REPORTED_AT = new Date('2026-08-04T11:32:00.000Z');
 const HOST_PORT = Value.Parse(HostPortSchema, HOST_PORT_NUMBER);
@@ -82,6 +83,7 @@ function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
     activated_at: null,
     rollback_of_deployment_id: null,
     created_at: CREATED_AT,
+    message: null,
     ...configColumns(PINNED_CONFIG),
     ...overrides,
   };
@@ -232,6 +234,22 @@ describe('a deployment publishes the config version it pins', () => {
     const deployment = await service.get(OWNED_DEPLOYMENT);
 
     expect(deployment.activatedAt).toBe(Value.Parse(TimestampSchema, ACTIVATED_AT.toISOString()));
+  });
+
+  test('a release that failed publishes what the host said about it', async () => {
+    const { service } = serviceWith({
+      row: deploymentRow({ state: 'failed', message: FAILURE_MESSAGE }),
+    });
+
+    expect((await service.get(OWNED_DEPLOYMENT)).message).toBe(FAILURE_MESSAGE);
+  });
+
+  // Optional on the wire like `activatedAt`, so a release with nothing to say omits it rather
+  // than publishing a null the schema would reject.
+  test('and one with nothing to say about itself omits it', async () => {
+    const { service } = serviceWith({ row: deploymentRow() });
+
+    expect('message' in (await service.get(OWNED_DEPLOYMENT))).toBe(false);
   });
 });
 

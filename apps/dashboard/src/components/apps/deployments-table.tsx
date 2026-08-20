@@ -28,6 +28,9 @@ export function DeploymentsTable({ deployments }: { deployments: readonly Deploy
             <TableCell className="font-mono">{deployment.id}</TableCell>
             <TableCell>
               <DeploymentStateBadge state={deployment.state} />
+              {deployment.message === undefined ? null : (
+                <p className="mt-1 max-w-xs text-muted-foreground text-xs">{deployment.message}</p>
+              )}
             </TableCell>
             <TableCell className="text-muted-foreground tabular-nums">
               {dayAndMinute(deployment.createdAt)}
