@@ -1,4 +1,4 @@
-import type { EnvironmentEdit } from '@repo/app-operations';
+import type { EnvironmentAssignment, EnvironmentEdit } from '@repo/app-operations';
 import type { AppSummary } from '#queries/apps.ts';
 
 /**
@@ -78,4 +78,30 @@ export function repeatedName(variables: readonly EnvironmentVariable[]): string 
     seen.add(name);
   }
   return undefined;
+}
+
+/**
+ * The rows a file leaves behind: a name it sets lands on the row that already had that name, one
+ * it does not is added, and a row nobody has typed into makes way. Picking a file fills the table
+ * in — it does not add a variable beside a half-typed one.
+ */
+export function withEntries({
+  variables,
+  entries,
+}: {
+  variables: readonly EnvironmentVariable[];
+  entries: readonly EnvironmentAssignment[];
+}): EnvironmentVariable[] {
+  const loaded = new Map(entries.map((entry) => [entry.name, entry.value]));
+  const filled = filledVariables(variables).map((variable) => {
+    const name = variable.name.trim();
+    if (!loaded.has(name)) {
+      return variable;
+    }
+    const value = loaded.get(name) ?? '';
+    loaded.delete(name);
+    return { ...variable, value, sealed: false };
+  });
+
+  return [...filled, ...[...loaded].map(([name, value]) => ({ ...blankVariable(), name, value }))];
 }

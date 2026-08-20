@@ -5,6 +5,7 @@ import {
   environmentEdits,
   repeatedName,
   storedVariables,
+  withEntries,
 } from '#lib/environment-variables.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
@@ -68,4 +69,31 @@ test('two rows under one name are found before either is sent', () => {
   const twice = [...rows(), { id: 'new', name: 'TOKEN', value: 'sk-other', sealed: false }];
 
   expect(repeatedName(twice)).toBe('TOKEN');
+});
+
+test('a file lands on the rows that share its names and adds the rest', () => {
+  const typed = [{ id: 'a', name: 'PORT', value: '3000', sealed: false }];
+
+  expect(
+    withEntries({
+      variables: typed,
+      entries: [
+        { name: 'PORT', value: '8080' },
+        { name: 'TOKEN', value: 'sk-1' },
+      ],
+    }).map(({ name, value }) => ({ name, value })),
+  ).toEqual([
+    { name: 'PORT', value: '8080' },
+    { name: 'TOKEN', value: 'sk-1' },
+  ]);
+});
+
+// Picking a file fills the table in rather than adding beside the row that was open when it was
+// picked, which is otherwise what the blank row at the end becomes.
+test('a row nobody typed into makes way for it', () => {
+  const blank = [{ id: 'a', name: '', value: '', sealed: false }];
+
+  expect(
+    withEntries({ variables: blank, entries: [{ name: 'PORT', value: '8080' }] }),
+  ).toHaveLength(1);
 });

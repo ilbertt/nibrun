@@ -1,6 +1,7 @@
 import { Field, FieldDescription, FieldError, FieldTitle } from '@repo/ui/components/field';
+import { EnvFilePicker } from '#components/apps/env-file-picker.tsx';
 import { EnvironmentTable } from '#components/apps/environment-table.tsx';
-import { storedVariables } from '#lib/environment-variables.ts';
+import { storedVariables, withEntries } from '#lib/environment-variables.ts';
 import { type DeployFormApi, validateEnvironment } from '#lib/hooks/use-deploy-form.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
@@ -15,25 +16,32 @@ export function DeployEnvironmentField({
 }) {
   return (
     <api.Field name="environment" validators={{ onChange: validateEnvironment }}>
-      {(field) => (
-        <Field
-          aria-labelledby={TITLE_ID}
-          data-invalid={field.state.meta.errors.length > 0 || undefined}
-        >
-          <FieldTitle id={TITLE_ID}>Environment</FieldTitle>
-          {/* Seeded from the app rather than held in the form until something is edited: the app
-              is read while the dialog is already open, and defaults are fixed when it mounts. */}
-          <EnvironmentTable
-            variables={field.state.value ?? storedVariables(replacing)}
-            onChange={field.handleChange}
-          />
-          {field.state.meta.errors.length > 0 ? (
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          ) : (
-            <FieldDescription>{describeEnvironment(replacing)}</FieldDescription>
-          )}
-        </Field>
-      )}
+      {(field) => {
+        // Seeded from the app rather than held as a default: the app is read while the dialog is
+        // already open, and a form's defaults are fixed when it mounts.
+        const variables = field.state.value ?? storedVariables(replacing);
+
+        return (
+          <Field
+            aria-labelledby={TITLE_ID}
+            data-invalid={field.state.meta.errors.length > 0 || undefined}
+          >
+            <FieldTitle id={TITLE_ID}>Environment</FieldTitle>
+            <EnvironmentTable variables={variables} onChange={field.handleChange}>
+              {replacing === undefined && (
+                <EnvFilePicker
+                  onLoad={(entries) => field.handleChange(withEntries({ variables, entries }))}
+                />
+              )}
+            </EnvironmentTable>
+            {field.state.meta.errors.length > 0 ? (
+              <FieldError>{field.state.meta.errors[0]}</FieldError>
+            ) : (
+              <FieldDescription>{describeEnvironment(replacing)}</FieldDescription>
+            )}
+          </Field>
+        );
+      }}
     </api.Field>
   );
 }

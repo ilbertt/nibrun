@@ -8,15 +8,18 @@ import {
   TableRow,
 } from '@repo/ui/components/table';
 import { PlusIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { EnvironmentRow } from '#components/apps/environment-row.tsx';
 import { blankVariable, type EnvironmentVariable } from '#lib/environment-variables.ts';
 
 export function EnvironmentTable({
   variables,
   onChange,
+  children,
 }: {
   variables: readonly EnvironmentVariable[];
   onChange: (variables: EnvironmentVariable[]) => void;
+  children?: ReactNode;
 }) {
   function replace(replacement: EnvironmentVariable): void {
     onChange(
@@ -56,15 +59,18 @@ export function EnvironmentTable({
           )}
         </TableBody>
       </Table>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => onChange([...variables, blankVariable()])}
-      >
-        <PlusIcon data-icon="inline-start" />
-        Add a variable
-      </Button>
+      <div className="flex flex-wrap items-center gap-1">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onChange([...variables, blankVariable()])}
+        >
+          <PlusIcon data-icon="inline-start" />
+          Add a variable
+        </Button>
+        {children}
+      </div>
     </div>
   );
 }

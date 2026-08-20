@@ -10,11 +10,20 @@ import {
 import { EyeOffIcon } from 'lucide-react';
 
 /**
- * Why a stored value has no eye to toggle. The button looks like the one on every other row and
- * answers instead of doing nothing, because a control that is simply dead is one an owner tries
- * again.
+ * Why a value has no eye to toggle. The button looks like the one on every other row and answers
+ * instead of doing nothing, because a control that is simply dead is one an owner tries again.
  */
-export function SealedValuePopover({ name, onReplace }: { name: string; onReplace: () => void }) {
+export function HiddenValuePopover({
+  name,
+  title,
+  description,
+  onReplace,
+}: {
+  name: string;
+  title: string;
+  description: string;
+  onReplace: () => void;
+}) {
   return (
     <Popover>
       <PopoverTrigger
@@ -32,11 +41,8 @@ export function SealedValuePopover({ name, onReplace }: { name: string; onReplac
       </PopoverTrigger>
       <PopoverContent align="end">
         <PopoverHeader>
-          <PopoverTitle>Sealed</PopoverTitle>
-          <PopoverDescription>
-            This value was encrypted when it was set, and nothing here can read it back — not this
-            page, and not nibrun. Replacing it is the only way to change what the app runs with.
-          </PopoverDescription>
+          <PopoverTitle>{title}</PopoverTitle>
+          <PopoverDescription>{description}</PopoverDescription>
         </PopoverHeader>
         <Button type="button" variant="outline" size="sm" onClick={onReplace}>
           Replace the value
