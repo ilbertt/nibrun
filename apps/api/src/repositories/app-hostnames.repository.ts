@@ -5,6 +5,7 @@ import { Repository } from '#repositories/repository.ts';
 export type AppHostnameRow = Queries['SelectAppHostnamesByApp'];
 export type OwnedAppHostnameRow = Queries['SelectAppHostnamesByOwner'];
 export type PendingHostnameRow = Queries['SelectPendingCustomHostnames'];
+export type DisposableAppHostnameRow = Queries['SelectDisposableAppHostnames'];
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
@@ -30,6 +31,8 @@ export abstract class AppHostnamesRepositoryContract {
   abstract setCustomState(input: { hostname: Hostname; state: AppHostnameState }): Promise<boolean>;
   abstract removeCustom(input: OwnedApp & { hostname: Hostname }): Promise<string | null>;
   abstract listPendingCustom(input: { limit: number }): Promise<PendingHostnameRow[]>;
+  abstract listDisposable(input: { appId: AppId }): Promise<DisposableAppHostnameRow[]>;
+  abstract removeDisposable(input: { appId: AppId; hostname: Hostname }): Promise<boolean>;
 }
 
 export class AppHostnamesRepository extends Repository implements AppHostnamesRepositoryContract {
@@ -143,5 +146,33 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
       ORDER BY h.id
       LIMIT ${limit}
     `;
+  }
+
+  listDisposable({ appId }: { appId: AppId }): Promise<DisposableAppHostnameRow[]> {
+    return this.sql.SelectDisposableAppHostnames`
+      SELECT h.hostname, h.kind, h.cloudflare_id
+      FROM nibrun.app_hostnames h
+      JOIN nibrun.apps a ON a.id = h.app_id
+      WHERE h.app_id = ${appId} AND a.state IN ('deleting', 'deleted')
+      ORDER BY h.id
+    `;
+  }
+
+  async removeDisposable({
+    appId,
+    hostname,
+  }: {
+    appId: AppId;
+    hostname: Hostname;
+  }): Promise<boolean> {
+    const [removed] = await this.sql.DeleteDisposableAppHostname`
+      DELETE FROM nibrun.app_hostnames h
+      USING nibrun.apps a
+      WHERE h.app_id = a.id
+        AND h.app_id = ${appId} AND h.hostname = ${hostname}
+        AND a.state IN ('deleting', 'deleted')
+      RETURNING h.hostname
+    `;
+    return removed !== undefined;
   }
 }

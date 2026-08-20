@@ -28,6 +28,7 @@ import type {
 } from '#repositories/app-hostnames.repository.ts';
 import type { AppRow, AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
+import type { CustomHostnamesRepositoryContract } from '#repositories/custom-hostnames.repository.ts';
 import type { ExportsRepositoryContract } from '#repositories/exports.repository.ts';
 import { Service } from '#services/service.ts';
 
@@ -51,8 +52,13 @@ const SLUG_CONSTRAINTS = [
 // a signal that something other than luck is wrong.
 const MAX_SLUG_ATTEMPTS = 5;
 
-/** Reading them back is all an app needs of its hostnames; the rest is the hostnames' own. */
-export type AppHostnameReads = Pick<AppHostnamesRepositoryContract, 'listByOwner' | 'listByApp'>;
+/** What an app needs from its hostnames while it lives and while it is being removed. */
+export type AppHostnameAccess = Pick<
+  AppHostnamesRepositoryContract,
+  'listByOwner' | 'listByApp' | 'listDisposable' | 'removeDisposable'
+>;
+
+export type CustomHostnameRemoval = Pick<CustomHostnamesRepositoryContract, 'remove'>;
 
 /** What deleting an app needs from the exports it leaves behind, and nothing else. */
 export type ExportCancellation = Pick<ExportsRepositoryContract, 'failInFlight'>;
@@ -81,7 +87,8 @@ const FINISH_BATCH = 8;
 
 export class AppsService extends Service {
   private readonly appsRepo: AppsRepositoryContract;
-  private readonly hostnamesRepo: AppHostnameReads;
+  private readonly hostnamesRepo: AppHostnameAccess;
+  private readonly customHostnamesRepo: CustomHostnameRemoval;
   private readonly exportsRepo: ExportCancellation;
   private readonly artifactStorageRepo: ObjectRemoval;
   private readonly exportStorageRepo: ObjectRemoval;
@@ -91,6 +98,7 @@ export class AppsService extends Service {
   constructor({
     appsRepo,
     hostnamesRepo,
+    customHostnamesRepo,
     exportsRepo,
     artifactStorageRepo,
     exportStorageRepo,
@@ -98,7 +106,8 @@ export class AppsService extends Service {
     secretsKey,
   }: {
     appsRepo: AppsRepositoryContract;
-    hostnamesRepo: AppHostnameReads;
+    hostnamesRepo: AppHostnameAccess;
+    customHostnamesRepo: CustomHostnameRemoval;
     exportsRepo: ExportCancellation;
     artifactStorageRepo: ObjectRemoval;
     exportStorageRepo: ObjectRemoval;
@@ -108,6 +117,7 @@ export class AppsService extends Service {
     super();
     this.appsRepo = appsRepo;
     this.hostnamesRepo = hostnamesRepo;
+    this.customHostnamesRepo = customHostnamesRepo;
     this.exportsRepo = exportsRepo;
     this.artifactStorageRepo = artifactStorageRepo;
     this.exportStorageRepo = exportStorageRepo;
@@ -251,6 +261,7 @@ export class AppsService extends Service {
    */
   private async purgeApp({ appId }: { appId: AppId }): Promise<void> {
     try {
+      await this.releaseHostnames({ appId });
       const leftovers = await this.appsRepo.listLeftovers({ appId });
       await Promise.all([
         ...leftovers.exports.map((objectKey) => this.exportStorageRepo.remove({ objectKey })),
@@ -280,12 +291,35 @@ export class AppsService extends Service {
   async delete({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
     const app = requireApp(await this.appsRepo.updateState({ appId, ownerId, state: 'deleting' }));
     await this.exportsRepo.failInFlight({ appId, message: APP_DELETED });
-    const [torndown, hostnames] = await Promise.all([
+    const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
+    const [torndown] = await Promise.all([
       this.finishIfNothingToTearDown({ appId }),
-      this.hostnamesRepo.listByApp({ appId, ownerId }),
+      this.releaseHostnames({ appId }),
     ]);
 
     return toPublicApp({ app: torndown ? { ...app, state: 'deleted' } : app, hostnames });
+  }
+
+  private async releaseHostnames({ appId }: { appId: AppId }): Promise<void> {
+    const hostnames = await this.hostnamesRepo.listDisposable({ appId });
+    for (const hostname of hostnames) {
+      try {
+        if (hostname.cloudflare_id) {
+          await this.customHostnamesRepo.remove({ cloudflareId: hostname.cloudflare_id });
+        }
+        await this.hostnamesRepo.removeDisposable({ appId, hostname: hostname.hostname });
+        this.logger.info('deleted app hostname released', {
+          appId,
+          hostname: hostname.hostname,
+        });
+      } catch (error) {
+        this.logger.error('releasing a deleted app hostname failed', {
+          appId,
+          hostname: hostname.hostname,
+          error,
+        });
+      }
+    }
   }
 
   /**

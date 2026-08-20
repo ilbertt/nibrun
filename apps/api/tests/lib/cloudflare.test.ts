@@ -6,6 +6,7 @@ const API_TOKEN = 'token-1';
 const HOSTNAME = 'app.example.dev';
 const HTTP_OK = 200;
 const HTTP_BAD_GATEWAY = 502;
+const HTTP_NOT_FOUND = 404;
 
 const realFetch = globalThis.fetch;
 
@@ -96,6 +97,27 @@ describe('a refusal is an error however the edge phrases it', () => {
     answering([{ status: HTTP_BAD_GATEWAY, body: undefined }]);
 
     await expect(client().createCustomHostname({ hostname: HOSTNAME })).rejects.toBeInstanceOf(
+      CloudflareError,
+    );
+  });
+});
+
+describe('deleting a hostname is safe to repeat', () => {
+  test('one already absent is the requested outcome', async () => {
+    answering([
+      {
+        status: HTTP_NOT_FOUND,
+        body: { success: false, result: null, errors: [{ code: 1436, message: 'not found' }] },
+      },
+    ]);
+
+    await expect(client().deleteCustomHostname({ id: 'ch-1' })).resolves.toBeUndefined();
+  });
+
+  test('other failures still leave the cleanup to retry', async () => {
+    answering([{ status: HTTP_BAD_GATEWAY, body: undefined }]);
+
+    await expect(client().deleteCustomHostname({ id: 'ch-1' })).rejects.toBeInstanceOf(
       CloudflareError,
     );
   });

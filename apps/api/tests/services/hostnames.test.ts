@@ -78,6 +78,9 @@ class StubHostnamesRepository implements AppHostnamesRepositoryContract {
     return Promise.resolve(this.pending);
   }
 
+  listDisposable = notAsked;
+  removeDisposable = notAsked;
+
   // Reads an app makes of its own hostnames; nothing here asks for them.
   listByOwner = notAsked;
   listByApp = notAsked;

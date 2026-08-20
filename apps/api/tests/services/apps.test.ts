@@ -26,6 +26,7 @@ import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import type {
   AppHostnameRow,
+  DisposableAppHostnameRow,
   OwnedAppHostnameRow,
 } from '#repositories/app-hostnames.repository.ts';
 import type {
@@ -35,8 +36,9 @@ import type {
   Leftovers,
 } from '#repositories/apps.repository.ts';
 import {
-  type AppHostnameReads,
+  type AppHostnameAccess,
   AppsService,
+  type CustomHostnameRemoval,
   type ExportCancellation,
   type ObjectRemoval,
 } from '#services/apps.service.ts';
@@ -64,6 +66,8 @@ function asPatch(entries: Record<string, string | null>): TenantEnvironmentPatch
 }
 
 const APP_NAME = 'pocketbase';
+const BROUGHT_HOSTNAME = Value.Parse(HostnameSchema, 'pocketbase.example.dev');
+const CLOUDFLARE_ID = 'ch-1';
 
 // Restated rather than imported from the implementation: that the bound exists and how many
 // rolls it allows is the contract this file holds the service to.
@@ -222,13 +226,44 @@ class StubAppsRepository implements AppsRepositoryContract {
  * still find.
  */
 /** Every read answers empty, which is what an app belonging to somebody else looks like. */
-class StubHostnameReads implements AppHostnameReads {
+class StubHostnameAccess implements AppHostnameAccess {
+  readonly disposable = new Map<AppId, DisposableAppHostnameRow[]>();
+  readonly removed: Hostname[] = [];
+
   listByOwner(): Promise<OwnedAppHostnameRow[]> {
     return Promise.resolve([]);
   }
 
   listByApp(): Promise<AppHostnameRow[]> {
     return Promise.resolve([]);
+  }
+
+  listDisposable({ appId }: { appId: AppId }): Promise<DisposableAppHostnameRow[]> {
+    return Promise.resolve(this.disposable.get(appId) ?? []);
+  }
+
+  removeDisposable({ appId, hostname }: { appId: AppId; hostname: Hostname }): Promise<boolean> {
+    const before = this.disposable.get(appId) ?? [];
+    const after = before.filter((row) => row.hostname !== hostname);
+    this.disposable.set(appId, after);
+    if (before.length === after.length) {
+      return Promise.resolve(false);
+    }
+    this.removed.push(hostname);
+    return Promise.resolve(true);
+  }
+}
+
+class StubCustomHostnameRemoval implements CustomHostnameRemoval {
+  readonly removed: string[] = [];
+  readonly failures = new Set<string>();
+
+  remove({ cloudflareId }: { cloudflareId: string }): Promise<void> {
+    if (this.failures.has(cloudflareId)) {
+      return Promise.reject(new Error(`the edge refused ${cloudflareId}`));
+    }
+    this.removed.push(cloudflareId);
+    return Promise.resolve();
   }
 }
 
@@ -273,18 +308,23 @@ class StubExportCancellation implements ExportCancellation {
 
 function serviceWith({
   appsRepo,
+  hostnamesRepo = new StubHostnameAccess(),
+  customHostnamesRepo = new StubCustomHostnameRemoval(),
   exportsRepo = new StubExportCancellation(),
   artifactStorageRepo = new StubObjectStorage({ trace: [] }),
   exportStorageRepo = new StubObjectStorage({ trace: [] }),
 }: {
   appsRepo: AppsRepositoryContract;
+  hostnamesRepo?: AppHostnameAccess;
+  customHostnamesRepo?: CustomHostnameRemoval;
   exportsRepo?: ExportCancellation;
   artifactStorageRepo?: ObjectRemoval;
   exportStorageRepo?: ObjectRemoval;
 }) {
   return new AppsService({
     appsRepo,
-    hostnamesRepo: new StubHostnameReads(),
+    hostnamesRepo,
+    customHostnamesRepo,
     exportsRepo,
     artifactStorageRepo,
     exportStorageRepo,
@@ -614,6 +654,61 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     await serviceWith({ appsRepo }).completeDeletions({ volumes: [reportedVolume('deleted')] });
 
     expect(appsRepo.deleted).toEqual([]);
+  });
+});
+
+describe('deleting an app releases every hostname it held', () => {
+  function appHostnames(): DisposableAppHostnameRow[] {
+    return [
+      {
+        hostname: Value.Parse(HostnameSchema, `${APP_NAME}.${APP_HOST_DOMAIN}`),
+        kind: 'platform',
+        cloudflare_id: null,
+      },
+      { hostname: BROUGHT_HOSTNAME, kind: 'custom', cloudflare_id: CLOUDFLARE_ID },
+    ];
+  }
+
+  test('the platform name and a custom domain are both free when deletion returns', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const hostnamesRepo = new StubHostnameAccess();
+    const edge = new StubCustomHostnameRemoval();
+    appsRepo.owns = true;
+    hostnamesRepo.disposable.set(APP_ID, appHostnames());
+
+    await serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge }).delete({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
+
+    expect(hostnamesRepo.removed).toEqual([
+      Value.Parse(HostnameSchema, `${APP_NAME}.${APP_HOST_DOMAIN}`),
+      BROUGHT_HOSTNAME,
+    ]);
+    expect(edge.removed).toEqual([CLOUDFLARE_ID]);
+  });
+
+  test('an edge failure keeps its row for the deleted-app sweep to retry', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const hostnamesRepo = new StubHostnameAccess();
+    const edge = new StubCustomHostnameRemoval();
+    appsRepo.owns = true;
+    hostnamesRepo.disposable.set(APP_ID, appHostnames());
+    edge.failures.add(CLOUDFLARE_ID);
+    const apps = serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge });
+
+    await apps.delete({ appId: APP_ID, ownerId: OWNER_ID });
+
+    expect(hostnamesRepo.disposable.get(APP_ID)).toEqual([
+      { hostname: BROUGHT_HOSTNAME, kind: 'custom', cloudflare_id: CLOUDFLARE_ID },
+    ]);
+
+    edge.failures.delete(CLOUDFLARE_ID);
+    appsRepo.purgeable.push(APP_ID);
+    await apps.purgeDeleted();
+
+    expect(hostnamesRepo.disposable.get(APP_ID)).toEqual([]);
+    expect(edge.removed).toEqual([CLOUDFLARE_ID]);
   });
 });
 
