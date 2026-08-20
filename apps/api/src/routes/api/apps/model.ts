@@ -6,6 +6,7 @@ import {
   ByteSizeSchema,
   MIN_HOSTNAMES,
   REDACTED,
+  TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
 } from '@repo/protocol';
 import { t } from 'elysia';
@@ -33,10 +34,17 @@ export const PublicAppConfigSchema = t.Composite([
 // Strict: every field is optional, so without this a misspelled one is silently no request at
 // all and the caller is told 200.
 //
-// Omitting `environment` leaves the one already stored alone, where omitting `args` replaces it
-// with none. They differ because a caller cannot read a secret back to restate it, so treating
-// silence as "none" would be how a deploy erases one nobody meant to touch.
+// `environment` is an edit rather than a replacement, where `args` is always the whole list. They
+// differ because a caller cannot read a secret back to restate it: a variable it says nothing
+// about is one it is leaving alone, and removing one is `null`.
 export const AppConfigPatchSchema = t.Partial(
+  t.Composite([OwnedAppConfigSchema, t.Object({ environment: TenantEnvironmentPatchSchema })]),
+  { additionalProperties: false },
+);
+
+// An app being created has nothing to leave alone and nothing to remove, so what it is given is
+// the whole environment rather than an edit to one.
+const NewAppConfigSchema = t.Partial(
   t.Composite([OwnedAppConfigSchema, t.Object({ environment: TenantEnvironmentSchema })]),
   { additionalProperties: false },
 );
@@ -75,7 +83,7 @@ export const ListAppsResponseSchema = t.Object({ apps: t.Array(AppResponseSchema
 export const CreateAppRequestSchema = t.Object(
   {
     name: t.String({ minLength: 1, maxLength: MAX_APP_NAME_LENGTH }),
-    config: t.Optional(AppConfigPatchSchema),
+    config: t.Optional(NewAppConfigSchema),
   },
   { additionalProperties: false },
 );

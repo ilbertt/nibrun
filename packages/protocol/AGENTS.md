@@ -13,5 +13,8 @@ The model is desired state, never commands. Nothing here may be shaped like `sta
   TypeBox is the only dependency, and this package must acquire no side effects and no client.
 - Types derive from schemas (`typeof XSchema.static`), state enums from one `const` array. Never
   hand-write a type a schema already describes.
-- Absent means unknown or not applicable. **No field is ever `null`.**
+- Absent means unknown or not applicable. **No field is ever `null`.** The one exception is
+  `TenantEnvironmentPatchSchema`, which is an owner editing their app rather than anything a host
+  is sent: there absent means "leave this variable as it is", so removing one needs a word of its
+  own.
 - **Log shipping, when it is built, gets its own path.** A log burst must never delay a stop.

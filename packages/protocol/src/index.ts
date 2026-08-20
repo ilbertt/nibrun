@@ -84,6 +84,8 @@ export {
   type TenantArguments,
   TenantArgumentsSchema,
   type TenantEnvironment,
+  type TenantEnvironmentPatch,
+  TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
 } from '#domain/app.ts';
 export {

@@ -261,10 +261,6 @@ export interface IInsertPatchedAppConfigResult {
     id: string;
 }
 
-/** Result of query `CarryEnvironmentForward`. */
-export interface ICarryEnvironmentForwardResult {
-}
-
 /** Result of query `TouchAppAfterConfigPatch`. */
 export interface ITouchAppAfterConfigPatchResult {
     id: import("@repo/protocol").AppId;
@@ -684,7 +680,6 @@ export interface Queries {
     SelectAppForConfigUpdate: ISelectAppForConfigUpdateResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
-    CarryEnvironmentForward: ICarryEnvironmentForwardResult;
     TouchAppAfterConfigPatch: ITouchAppAfterConfigPatchResult;
     SelectFinishableDeletion: ISelectFinishableDeletionResult;
     SelectFinishableDeletions: ISelectFinishableDeletionsResult;

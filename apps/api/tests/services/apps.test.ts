@@ -13,13 +13,15 @@ import {
   REDACTED,
   type ReportedVolume,
   type TenantEnvironment,
+  type TenantEnvironmentPatch,
+  TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
   Value,
   VolumeIdSchema,
 } from '@repo/protocol';
 import { SQL } from 'bun';
-import type { AppConfigPatch, SealedConfigPatch, StoredAppConfig } from '#lib/app-config.ts';
-import { ConflictError, NotFoundError } from '#lib/errors.ts';
+import type { NewAppConfig, SealedConfigPatch, StoredAppConfig } from '#lib/app-config.ts';
+import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import type {
   AppHostnameRow,
@@ -50,9 +52,14 @@ import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const SECRET = 'sk-not-in-any-response';
 
-// The branded record a controller parses before the service ever sees one.
+// The branded records a controller parses before the service ever sees one: the whole of an
+// environment for an app being created, and an edit to one for an app that exists.
 function asEnvironment(entries: Record<string, string>): TenantEnvironment {
   return Value.Parse(TenantEnvironmentSchema, entries);
+}
+
+function asPatch(entries: Record<string, string | null>): TenantEnvironmentPatch {
+  return Value.Parse(TenantEnvironmentPatchSchema, entries);
 }
 
 const APP_NAME = 'pocketbase';
@@ -290,7 +297,7 @@ function createApp({
   config,
 }: {
   appsRepo: AppsRepositoryContract;
-  config?: AppConfigPatch;
+  config?: NewAppConfig;
 }) {
   return serviceWith({ appsRepo }).create({ ownerId: OWNER_ID, name: APP_NAME, config });
 }
@@ -410,7 +417,7 @@ describe('an app is created with the environment it was given, and never reports
   });
 });
 
-describe('a config patch only replaces the environment when it names one', () => {
+describe('a config patch edits the environment rather than replacing it', () => {
   test('a patch that says nothing about it carries no environment at all', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
@@ -418,12 +425,12 @@ describe('a config patch only replaces the environment when it names one', () =>
 
     await service.updateConfig({ appId: APP_ID, ownerId: OWNER_ID, patch: { args: ['serve'] } });
 
-    // Absent rather than empty: the repository reads absence as "keep the stored one", and an
-    // empty object would erase every variable the app has.
+    // Absent rather than empty: the repository reads absence as "carry every variable forward",
+    // and there is no shape of empty that means anything else.
     expect('environment' in (appsRepo.offeredPatches[0] ?? {})).toBe(false);
   });
 
-  test('a patch naming one replaces it, sealed', async () => {
+  test('a patch setting one seals the value and takes nothing away', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
     const service = serviceWith({ appsRepo });
@@ -431,16 +438,19 @@ describe('a config patch only replaces the environment when it names one', () =>
     await service.updateConfig({
       appId: APP_ID,
       ownerId: OWNER_ID,
-      patch: { environment: asEnvironment({ TOKEN: SECRET }) },
+      patch: { environment: asPatch({ TOKEN: SECRET }) },
     });
 
-    const sealed = appsRepo.offeredPatches[0]?.environment ?? {};
-    expect(openSecret({ key: TEST_SECRETS_KEY, sealed: sealedFromStore(sealed.TOKEN ?? '') })).toBe(
-      SECRET,
-    );
+    const environment = appsRepo.offeredPatches[0]?.environment;
+    expect(
+      openSecret({ key: TEST_SECRETS_KEY, sealed: sealedFromStore(environment?.set.TOKEN ?? '') }),
+    ).toBe(SECRET);
+    expect(environment?.removed).toEqual([]);
   });
 
-  test('a patch emptying it says so, and that is not the same as silence', async () => {
+  // The name and nothing else: an empty value is a value, so saying a variable should go cannot
+  // be done by giving it one.
+  test('a variable is removed by naming it with no value', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
     const service = serviceWith({ appsRepo });
@@ -448,10 +458,57 @@ describe('a config patch only replaces the environment when it names one', () =>
     await service.updateConfig({
       appId: APP_ID,
       ownerId: OWNER_ID,
-      patch: { environment: asEnvironment({}) },
+      patch: { environment: asPatch({ TOKEN: null }) },
     });
 
-    expect(appsRepo.offeredPatches[0]?.environment).toEqual({});
+    expect(appsRepo.offeredPatches[0]?.environment).toEqual({ set: {}, removed: ['TOKEN'] });
+  });
+
+  test('the two halves of one patch reach the repository apart', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    const service = serviceWith({ appsRepo });
+
+    await service.updateConfig({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      patch: { environment: asPatch({ TOKEN: SECRET, GONE: null }) },
+    });
+
+    const environment = appsRepo.offeredPatches[0]?.environment;
+    expect(Object.keys(environment?.set ?? {})).toEqual(['TOKEN']);
+    expect(environment?.removed).toEqual(['GONE']);
+  });
+});
+
+/**
+ * `[redacted]` is what an owner reads in place of every value, so a caller sending it as one is
+ * echoing what it read rather than setting anything. Stored, it would overwrite the secret with
+ * the word and leave the app running on it, with nothing said.
+ */
+describe('the placeholder a read returns cannot be set as a value', () => {
+  test('a patch carrying it is refused before anything is sealed', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    const service = serviceWith({ appsRepo });
+
+    await expect(
+      service.updateConfig({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        patch: { environment: asPatch({ TOKEN: REDACTED }) },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(appsRepo.offeredPatches).toHaveLength(0);
+  });
+
+  test('and so is an app created with it', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await expect(
+      createApp({ appsRepo, config: { environment: asEnvironment({ TOKEN: REDACTED }) } }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(appsRepo.offeredConfigs).toHaveLength(0);
   });
 });
 

@@ -14,7 +14,11 @@ export {
   type UploadWait,
 } from '#deploy.ts';
 export { type AddDomainInput, addDomain, type RemoveDomainInput, removeDomain } from '#domains.ts';
-export { parseEnvironment } from '#environment.ts';
+export {
+  type EnvironmentEdit,
+  parseEnvironment,
+  parseEnvironmentPatch,
+} from '#environment.ts';
 export { InvalidEnvironmentError, InvalidPathError } from '#errors.ts';
 export { awaitExportBundle, type ExportBundle, requestExport } from '#exports.ts';
 export { guestPath, readDirectory } from '#filesystem.ts';

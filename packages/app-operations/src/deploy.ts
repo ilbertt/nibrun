@@ -5,7 +5,7 @@ import {
   type Filename,
   GuestPortSchema,
   type TenantArguments,
-  type TenantEnvironment,
+  type TenantEnvironmentPatch,
   Value,
 } from '@repo/protocol';
 import { appBySlug } from '#apps.ts';
@@ -46,7 +46,7 @@ export type DeployInput = {
   app?: string | undefined;
   name?: string | undefined;
   port?: number | undefined;
-  environment?: TenantEnvironment | undefined;
+  environment?: TenantEnvironmentPatch | undefined;
   onStep?: ((step: DeployStep) => void) | undefined;
   whileUploading?: UploadWait | undefined;
   upload?: UploadTransport | undefined;
@@ -202,9 +202,9 @@ function mebibytes(bytes: number): string {
  * run with, and carrying over the last deploy's arguments because none were given this time
  * would run something nobody asked for.
  */
-// `environment` is sent only when there is one to send: the api reads its absence as "leave the
-// stored one alone", where an absent `args` would mean none. A deploy cannot restate a secret it
-// is not allowed to read back, so saying nothing has to be how it leaves one untouched.
+// `environment` is an edit where `args` is the whole list, so an absent one changes no variable
+// while an absent `args` would clear them all. A deploy cannot read a value back to restate it,
+// which is why saying nothing about a variable has to be how it survives.
 function configPatch({
   args,
   port,
@@ -212,7 +212,7 @@ function configPatch({
 }: {
   args: TenantArguments;
   port: number | undefined;
-  environment: TenantEnvironment | undefined;
+  environment: TenantEnvironmentPatch | undefined;
 }) {
   return {
     args,

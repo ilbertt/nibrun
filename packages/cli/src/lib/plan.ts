@@ -11,6 +11,7 @@ export type RunOptions = {
   name?: string | undefined;
   port?: number | undefined;
   env?: string[] | undefined;
+  unset?: string[] | undefined;
 };
 
 type Plan = {

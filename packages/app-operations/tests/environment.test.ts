@@ -1,49 +1,87 @@
 import { describe, expect, test } from 'bun:test';
-import { parseEnvironment } from '#environment.ts';
+import { parseEnvironment, parseEnvironmentPatch } from '#environment.ts';
 import { InvalidEnvironmentError } from '#errors.ts';
 
 // The values come back branded as secrets, which is not what a literal in an expectation is.
-function parsed(assignments: string[]): Record<string, string> {
-  return parseEnvironment(assignments);
+function parsed({
+  set = [],
+  remove = [],
+}: {
+  set?: string[];
+  remove?: string[];
+}): Record<string, string | null> {
+  return parseEnvironment({ set, remove });
 }
 
 test('a name and a value become one entry', () => {
-  expect(parsed(['OPENCLAW_STATE_DIR=/app/data/.openclaw'])).toEqual({
+  expect(parsed({ set: ['OPENCLAW_STATE_DIR=/app/data/.openclaw'] })).toEqual({
     OPENCLAW_STATE_DIR: '/app/data/.openclaw',
   });
 });
 
-test('several are one environment', () => {
-  expect(parsed(['A=1', 'B=2'])).toEqual({ A: '1', B: '2' });
+test('several are one edit', () => {
+  expect(parsed({ set: ['A=1', 'B=2'] })).toEqual({ A: '1', B: '2' });
 });
 
 // A value is arbitrary text and secrets routinely hold an `=`, so only the first one separates.
 test('only the first separator separates', () => {
-  expect(parsed(['TOKEN=a=b=c'])).toEqual({ TOKEN: 'a=b=c' });
+  expect(parsed({ set: ['TOKEN=a=b=c'] })).toEqual({ TOKEN: 'a=b=c' });
 });
 
 test('an empty value is a value', () => {
-  expect(parsed(['EMPTY='])).toEqual({ EMPTY: '' });
+  expect(parsed({ set: ['EMPTY='] })).toEqual({ EMPTY: '' });
 });
 
 test('the last value given for a name is the one it takes', () => {
-  expect(parsed(['PORT=1', 'PORT=2'])).toEqual({ PORT: '2' });
+  expect(parsed({ set: ['PORT=1', 'PORT=2'] })).toEqual({ PORT: '2' });
+});
+
+// A name alone cannot mean "set this to nothing": an empty value is a value, and the only way to
+// say a variable should go is to say nothing about what it holds.
+test('a name to remove is that name and no value', () => {
+  expect(parsed({ set: ['A=1'], remove: ['B'] })).toEqual({ A: '1', B: null });
 });
 
 describe('what is refused as something that was typed wrong', () => {
   test('a word with no value', () => {
-    expect(() => parseEnvironment(['JUST_A_NAME'])).toThrow(InvalidEnvironmentError);
+    expect(() => parsed({ set: ['JUST_A_NAME'] })).toThrow(InvalidEnvironmentError);
   });
 
   test('a value with no name', () => {
-    expect(() => parseEnvironment(['=orphaned'])).toThrow(InvalidEnvironmentError);
+    expect(() => parsed({ set: ['=orphaned'] })).toThrow(InvalidEnvironmentError);
   });
 
   test('a name a shell would not accept either', () => {
-    expect(() => parseEnvironment(['NOT-A-NAME=1'])).toThrow(InvalidEnvironmentError);
+    expect(() => parsed({ set: ['NOT-A-NAME=1'] })).toThrow(InvalidEnvironmentError);
   });
 
   test('a name that starts with a digit', () => {
-    expect(() => parseEnvironment(['1ST=1'])).toThrow(InvalidEnvironmentError);
+    expect(() => parsed({ set: ['1ST=1'] })).toThrow(InvalidEnvironmentError);
+  });
+
+  // Removing is the same name in the same place, so it is held to the same rule.
+  test('a name to remove that could never have been set', () => {
+    expect(() => parsed({ remove: ['NOT-A-NAME'] })).toThrow(InvalidEnvironmentError);
+  });
+});
+
+describe('an edit given as a name and a value already apart', () => {
+  function edited(edits: Array<{ name: string; value: string | null }>) {
+    return parseEnvironmentPatch(edits) as Record<string, string | null>;
+  }
+
+  test('a value sets the variable and null removes it', () => {
+    expect(
+      edited([
+        { name: 'TOKEN', value: 'sk-1' },
+        { name: 'GONE', value: null },
+      ]),
+    ).toEqual({ TOKEN: 'sk-1', GONE: null });
+  });
+
+  // The same refusal wherever a name was typed: a form with a field for each half must not accept
+  // what the command line would not.
+  test('a name a shell would not accept either is refused here too', () => {
+    expect(() => edited([{ name: 'NOT-A-NAME', value: '1' }])).toThrow(InvalidEnvironmentError);
   });
 });

@@ -263,18 +263,18 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('Inserting into nibrun.app_configs returned no row.');
       }
 
-      if (patch.environment === undefined) {
-        // Copied rather than read and rewritten: the api has no reason to open a value it is
-        // only carrying forward, so the ciphertext never leaves the database.
-        await tx.CarryEnvironmentForward`
-          INSERT INTO nibrun.app_config_environment (config_id, name, value)
-          SELECT ${inserted.id}, e.name, e.value
-          FROM nibrun.app_config_environment e
-          WHERE e.config_id = ${current.id}
-        `;
-      } else {
-        await insertEnvironment({ tx, configId: inserted.id, environment: patch.environment });
-      }
+      // Everything the patch said nothing about, which is every variable there is when it said
+      // nothing at all. A name it sets or removes is left out of the copy: one row per name per
+      // version, and for a name it sets that row is the one inserted below.
+      const environment = patch.environment ?? { set: {}, removed: [] };
+      const edited = new Set([...Object.keys(environment.set), ...environment.removed]);
+      await carryEnvironmentForward({
+        tx,
+        fromConfigId: current.id,
+        toConfigId: inserted.id,
+        names: current.environment_names.filter((name) => !edited.has(name)),
+      });
+      await insertEnvironment({ tx, configId: inserted.id, environment: environment.set });
 
       // Reconfiguring an app changes the app, but the new version lands in another table, so
       // nothing would move `updated_at` without this.
@@ -427,6 +427,36 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       return app ?? null;
     });
   }
+}
+
+/**
+ * The variables a new config version inherits from the one before it, copied rather than read and
+ * rewritten: the api has no reason to open a value it is only carrying forward, so the ciphertext
+ * never leaves the database.
+ *
+ * Untagged for the reason the insert below is.
+ */
+async function carryEnvironmentForward({
+  tx,
+  fromConfigId,
+  toConfigId,
+  names,
+}: {
+  tx: TypedSQL<Queries>;
+  fromConfigId: string;
+  toConfigId: string;
+  names: readonly string[];
+}): Promise<void> {
+  if (names.length === 0) {
+    return;
+  }
+
+  await tx`
+    INSERT INTO nibrun.app_config_environment (config_id, name, value)
+    SELECT ${toConfigId}, e.name, e.value
+    FROM nibrun.app_config_environment e
+    WHERE e.config_id = ${fromConfigId} AND e.name = ANY(${tx.array([...names], TEXT_ARRAY)})
+  `;
 }
 
 /**

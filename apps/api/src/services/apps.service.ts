@@ -1,14 +1,23 @@
-import type { App, AppId, OwnerId, ReportedVolume } from '@repo/protocol';
+import {
+  type App,
+  type AppId,
+  type OwnerId,
+  REDACTED,
+  type ReportedVolume,
+  type TenantEnvironment,
+} from '@repo/protocol';
 import {
   type AppConfigPatch,
   configWithDefaults,
+  type NewAppConfig,
   type PublicAppConfig,
   type SealedConfigPatch,
+  splitEnvironmentPatch,
   toAppConfig,
 } from '#lib/app-config.ts';
 import { type PublicAppHostname, platformHostname, toAppHostname } from '#lib/app-hostname.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
-import { ConflictError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -113,14 +122,13 @@ export class AppsService extends Service {
   }: {
     ownerId: OwnerId;
     name: string;
-    config?: AppConfigPatch;
+    config?: NewAppConfig;
   }): Promise<PublicApp> {
+    const environment = config?.environment ?? {};
+    refuseRedactedValues(environment);
     const appConfig = {
       ...configWithDefaults(config),
-      environment: sealEnvironment({
-        key: this.secretsKey,
-        environment: config?.environment ?? {},
-      }),
+      environment: sealEnvironment({ key: this.secretsKey, environment }),
     };
 
     for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
@@ -144,14 +152,17 @@ export class AppsService extends Service {
     throw new ConflictError('Could not mint a free hostname for the app.');
   }
 
-  // Absent stays absent: the repository reads that as "carry the previous version's" rather than
-  // as an empty environment, which is what stops a deploy that says nothing erasing a secret.
   private sealed({ environment, ...rest }: AppConfigPatch): SealedConfigPatch {
+    if (environment === undefined) {
+      return rest;
+    }
+
+    const { set, removed } = splitEnvironmentPatch(environment);
+    refuseRedactedValues(set);
+
     return {
       ...rest,
-      ...(environment !== undefined && {
-        environment: sealEnvironment({ key: this.secretsKey, environment }),
-      }),
+      environment: { set: sealEnvironment({ key: this.secretsKey, environment: set }), removed },
     };
   }
 
@@ -307,6 +318,22 @@ export class AppsService extends Service {
       this.logger.info('app deleted without a filesystem to tear down', { appId });
     }
     return finished;
+  }
+}
+
+/**
+ * `[redacted]` is what every read returns in place of a value, so a caller sending it as one is a
+ * caller echoing what it read. Stored, it would overwrite the secret with the word — and the app
+ * would go on running, on the wrong value, with nothing said.
+ */
+function refuseRedactedValues(environment: TenantEnvironment): void {
+  const echoed = Object.entries(environment)
+    .filter(([, value]) => value === REDACTED)
+    .map(([name]) => name);
+  if (echoed.length > 0) {
+    throw new BadRequestError(
+      `${REDACTED} is what a read returns in place of a value, so it cannot be set as one: ${echoed.join(', ')}.`,
+    );
   }
 }
 

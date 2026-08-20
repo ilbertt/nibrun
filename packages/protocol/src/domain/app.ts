@@ -58,6 +58,22 @@ export const TenantEnvironmentSchema = Type.Record(
 
 export type TenantEnvironment = typeof TenantEnvironmentSchema.static;
 
+/**
+ * An edit to an app's environment rather than the whole of one: a variable named is set to what it
+ * is given, one given `null` is removed, and one not named is left exactly as it is. That is what
+ * lets an owner change one variable without restating values they are not allowed to read back.
+ *
+ * The one schema here whose values may be `null`, and only ever sent by an owner — a host is told
+ * the environment an instance runs with, in full, and never an edit to one.
+ */
+export const TenantEnvironmentPatchSchema = Type.Record(
+  Type.String({ pattern: ENVIRONMENT_NAME_PATTERN }),
+  Type.Union([SecretStringSchema, Type.Null()]),
+  { additionalProperties: false },
+);
+
+export type TenantEnvironmentPatch = typeof TenantEnvironmentPatchSchema.static;
+
 // What the user configured, snapshotted into every deployment so a rollback replays exactly
 // what ran rather than whatever the app happens to be configured with now.
 // argv[1..] for the tenant binary; argv[0] is always the binary itself. Empty for anything

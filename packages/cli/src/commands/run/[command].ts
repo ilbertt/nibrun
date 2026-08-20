@@ -29,7 +29,11 @@ export const command = defineCommand('run [command]', {
     env: {
       schema: z.array(z.string()).optional(),
       description:
-        'Set an environment variable for the binary, as NAME=value. Repeatable. Given at all, these replace the ones the app already has.',
+        'Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is.',
+    },
+    unset: {
+      schema: z.array(z.string()).optional(),
+      description: 'Remove an environment variable from the app, by name. Repeatable.',
     },
     detach: {
       schema: z.boolean().optional(),

@@ -40,5 +40,5 @@ function describeEnvironment(replacing: AppSummary | undefined): string {
   if (names.length === 0) {
     return 'One NAME=value per line. What the binary runs with.';
   }
-  return `One NAME=value per line. Empty keeps ${names.join(', ')} as they are; listing any replaces the lot.`;
+  return `One NAME=value per line. What is not named here is left as it is — ${names.join(', ')} are set.`;
 }

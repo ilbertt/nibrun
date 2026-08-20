@@ -67,7 +67,7 @@ export function validatePort({ value }: { value: string | undefined }): string |
 
 export function validateEnvironment({ value }: { value: string | undefined }): string | undefined {
   try {
-    parseEnvironment(assignments(value ?? ''));
+    parseEnvironment({ set: assignments(value ?? ''), remove: [] });
     return undefined;
   } catch (failure) {
     return failure instanceof InvalidEnvironmentError ? failure.message : undefined;
@@ -126,11 +126,12 @@ function asDeployRequest({
   return {
     binary,
     args: tenantArguments(value.args ?? replacing?.config.args.join('\n') ?? ''),
-    // An empty box leaves the stored variables alone rather than clearing them: the form cannot
-    // show a value it is not allowed to read, so an owner who is shown nothing and sends nothing
-    // must not be taken to mean "remove them all". Removing one is done by listing the ones that
-    // stay, which is a deliberate act rather than an empty field.
-    ...(entered.length === 0 ? {} : { environment: parseEnvironment(entered) }),
+    // An empty box changes nothing, and a full one only the variables it names: the form cannot
+    // show a value it is not allowed to read, so what it says nothing about has to be what it
+    // leaves alone. Taking a variable away is `nib run --unset` until this box is a table.
+    ...(entered.length === 0
+      ? {}
+      : { environment: parseEnvironment({ set: entered, remove: [] }) }),
     app: replacing?.slug,
     name: replacing === undefined ? value.name.trim() || undefined : undefined,
     port,

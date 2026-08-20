@@ -5,7 +5,9 @@ import {
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
   REDACTED,
+  type SecretString,
   type TenantEnvironment,
+  type TenantEnvironmentPatch,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.d.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
@@ -25,23 +27,56 @@ export type PublicAppConfig = OwnedAppConfig & {
   environment: RedactedEnvironment;
 };
 
-// `environment` absent means leave it as it is, where an absent `args` means the same as an empty
-// one. They differ because a deploy always states its arguments and almost never restates a
-// secret — and restating one it could not read would be how an owner erases it by accident.
-export type AppConfigPatch = Partial<OwnedAppConfig> & {
+// What an app is created with: the whole environment, because there is not yet one to edit.
+export type NewAppConfig = Partial<OwnedAppConfig> & {
   environment?: TenantEnvironment | undefined;
+};
+
+// `environment` is an edit, where `args` is always the whole list: a deploy states its arguments
+// every time and can restate none of its secrets, so a variable it says nothing about is one it
+// is leaving alone.
+export type AppConfigPatch = Partial<OwnedAppConfig> & {
+  environment?: TenantEnvironmentPatch | undefined;
 };
 
 export type StoredAppConfig = Omit<PublicAppConfig, 'environment'> & {
   environment: SealedEnvironment;
 };
 
+/**
+ * What a patch does to an app's environment: the variables it sets, sealed, and the ones it
+ * removes. Anything it named neither way is untouched — which is most of them.
+ */
+export type SealedEnvironmentPatch = {
+  set: SealedEnvironment;
+  removed: readonly string[];
+};
+
 // What a repository takes, as against what an owner sent. Every one of these is a record of
 // strings, so the branding on `TenantEnvironment` and `SealedSecret` is the only thing standing
 // between a plaintext value, a `[redacted]` placeholder and the ciphertext that may be stored.
 export type SealedConfigPatch = Partial<OwnedAppConfig> & {
-  environment?: SealedEnvironment | undefined;
+  environment?: SealedEnvironmentPatch | undefined;
 };
+
+/** The two halves of an edit: what it sets, and the names it takes away. */
+export function splitEnvironmentPatch(environment: TenantEnvironmentPatch): {
+  set: TenantEnvironment;
+  removed: string[];
+} {
+  const set: Record<string, SecretString> = {};
+  const removed: string[] = [];
+
+  for (const [name, value] of Object.entries(environment)) {
+    if (value === null) {
+      removed.push(name);
+    } else {
+      set[name] = value;
+    }
+  }
+
+  return { set, removed };
+}
 
 // Keys named once here, types taken from the schema, so renaming a column fails to compile
 // rather than silently reading undefined.
