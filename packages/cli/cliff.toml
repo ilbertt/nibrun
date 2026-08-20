@@ -13,7 +13,7 @@ All notable changes to `nib` are documented in this file.
 """
 body = """
 {% if version %}\
-    ## [{{ version | trim_start_matches(pat="cli-v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version | trim_start_matches(pat="cli-v") }}]
 {% else %}\
     ## [unreleased]
 {% endif %}\
@@ -64,7 +64,7 @@ recurse_submodules = false
 # Only this train's tags rank as releases, so a tag cut for anything else neither ends a section
 # nor lends its version to the next bump.
 tag_pattern = "cli-v[0-9]*"
-# The 0.x releases predate CalVer. Skipping them starts the changelog at the first dated release
-# rather than leaving one semver heading above every later one — what they shipped is still on
-# their GitHub release, which is where a reader of a 0.x version would look anyway.
-skip_tags = "cli-v0\\..*"
+# The 0.x releases predate CalVer. Ignoring them drops their headings without dropping what they
+# shipped: those commits fold into the first dated release rather than vanishing, so the changelog
+# starts at CalVer and still accounts for everything the CLI has ever carried.
+ignore_tags = "cli-v0\\..*"
