@@ -11,9 +11,12 @@ import { Spinner } from '@repo/ui/components/spinner';
 import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { Link } from '@tanstack/react-router';
 import { FileTerminalIcon, UploadIcon } from 'lucide-react';
+import { HandoffDeploy } from '#components/handoff/handoff-deploy.tsx';
 import { formatBytes } from '#lib/format-bytes.ts';
+import { useFinishHandoff } from '#lib/hooks/use-finish-handoff.ts';
 import { useHandedOffBinary } from '#lib/hooks/use-handed-off-binary.ts';
 import { useSession } from '#lib/hooks/use-session.ts';
+import { DeployRunProvider } from '#lib/providers/deploy-run-provider.tsx';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
 import { Route as DeployRoute } from '#routes/deploy.tsx';
 
@@ -24,7 +27,7 @@ export function HandedOffBinary() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
       <BrandMark />
-      <div className="flex w-full max-w-sm flex-col gap-6">
+      <div className="flex w-full max-w-lg flex-col gap-6">
         {loading ? <Spinner /> : <Waiting binary={binary} signedIn={session !== null} />}
       </div>
     </div>
@@ -32,6 +35,8 @@ export function HandedOffBinary() {
 }
 
 function Waiting({ binary, signedIn }: { binary: File | undefined; signedIn: boolean }) {
+  const finishHandoff = useFinishHandoff();
+
   if (binary === undefined) {
     return (
       <Empty>
@@ -46,22 +51,30 @@ function Waiting({ binary, signedIn }: { binary: File | undefined; signedIn: boo
     );
   }
 
-  return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <FileTerminalIcon />
-        </EmptyMedia>
-        <EmptyTitle className="break-all font-mono">{binary.name}</EmptyTitle>
-        <EmptyDescription>{formatBytes(binary.size)}, waiting to be deployed.</EmptyDescription>
-      </EmptyHeader>
-      {!signedIn && (
+  // The form asks the api what the owner already has, so there is nothing to render until
+  // there is an owner.
+  if (!signedIn) {
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <FileTerminalIcon />
+          </EmptyMedia>
+          <EmptyTitle className="break-all font-mono">{binary.name}</EmptyTitle>
+          <EmptyDescription>{formatBytes(binary.size)}, waiting to be deployed.</EmptyDescription>
+        </EmptyHeader>
         <EmptyContent>
           <Button render={<Link to={LoginRoute.to} search={{ redirect: DeployRoute.to }} />}>
             Sign in to deploy it
           </Button>
         </EmptyContent>
-      )}
-    </Empty>
+      </Empty>
+    );
+  }
+
+  return (
+    <DeployRunProvider onDeployed={finishHandoff}>
+      <HandoffDeploy binary={binary} />
+    </DeployRunProvider>
   );
 }

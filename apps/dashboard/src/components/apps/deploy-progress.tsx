@@ -1,13 +1,15 @@
 import type { DeployStep } from '@repo/app-operations';
 import { Button } from '@repo/ui/components/button';
-import { DialogClose } from '@repo/ui/components/dialog';
 import { Spinner } from '@repo/ui/components/spinner';
 import { CheckIcon, TriangleAlertIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { UploadMeter } from '#components/apps/upload-meter.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import type { DeployPhase } from '#lib/hooks/use-run-app.ts';
 
-export function DeployProgress() {
+// `done` is the caller's: a dialog closes itself where a page of its own has somewhere to go,
+// and this view has no way to know which of those it is inside.
+export function DeployProgress({ done }: { done: ReactNode }) {
   const run = useDeployRun();
   const waiting = waitingOn(run.phase);
 
@@ -59,7 +61,7 @@ export function DeployProgress() {
           <Button variant="outline" onClick={run.reset}>
             Deploy another
           </Button>
-          <DialogClose render={<Button />}>Done</DialogClose>
+          {done}
         </div>
       )}
     </div>

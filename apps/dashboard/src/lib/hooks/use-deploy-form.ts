@@ -97,7 +97,13 @@ export function validateEnvironment({
   }
 }
 
-export function useDeployForm({ appId }: { appId: string | undefined }): DeployFormState {
+export function useDeployForm({
+  appId,
+  binary,
+}: {
+  appId: string | undefined;
+  binary: File | undefined;
+}): DeployFormState {
   const { start } = useDeployRun();
   const apps = useApps();
   const owned = apps.data ?? [];
@@ -106,7 +112,9 @@ export function useDeployForm({ appId }: { appId: string | undefined }): DeployF
   const targetResolved = !locked || replacing !== undefined;
 
   const api: DeployFormApi = useForm({
-    defaultValues: UNTOUCHED,
+    // Read once, at mount. A binary handed over from the landing page is only rendered into
+    // this form after it has been read out of storage, so there is nothing to arrive later.
+    defaultValues: { ...UNTOUCHED, binary },
     onSubmit: ({ value }) => {
       const request = targetResolved ? asDeployRequest({ value, replacing }) : undefined;
       if (request !== undefined) {
