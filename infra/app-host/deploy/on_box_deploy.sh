@@ -346,9 +346,17 @@ chmod 0755 /etc/caddy /etc/caddy/rendered
 
 log "Installing systemd units"
 units_changed=0
+# Modes are set on the installed path rather than on the staged copy, because a
+# unit whose content has not moved never has one installed — and every unit
+# already on the fleet was written under the umask above, so correcting only
+# what changes would leave them at 0600 forever. systemd loads them either way
+# and says so on every reload; none of them holds a secret, and the environment
+# files they name keep their own mode.
 for unit in systemd/*.service; do
-  cp "$unit" "/etc/systemd/system/$(basename "$unit").new"
-  changed_file "/etc/systemd/system/$(basename "$unit")" && units_changed=1 || true
+  installed="/etc/systemd/system/$(basename "$unit")"
+  cp "$unit" "$installed.new"
+  changed_file "$installed" && units_changed=1 || true
+  chmod 0644 "$installed"
 done
 
 # The uploader's unit belongs to systemd rather than to us, so what we have to
@@ -357,6 +365,8 @@ journal_upload_dropin=/etc/systemd/system/systemd-journal-upload.service.d
 mkdir -p "$journal_upload_dropin"
 cp systemd/systemd-journal-upload.service.d/nibrun.conf "$journal_upload_dropin/nibrun.conf.new"
 changed_file "$journal_upload_dropin/nibrun.conf" && units_changed=1 || true
+chmod 0755 "$journal_upload_dropin"
+chmod 0644 "$journal_upload_dropin/nibrun.conf"
 
 if [ "$units_changed" = "1" ]; then
   systemctl daemon-reload
