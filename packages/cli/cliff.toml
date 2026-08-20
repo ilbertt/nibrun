@@ -13,7 +13,7 @@ All notable changes to `nib` are documented in this file.
 """
 body = """
 {% if version %}\
-    ## [{{ version | trim_start_matches(pat="cli-v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version | trim_start_matches(pat="cli-v") }}]
 {% else %}\
     ## [unreleased]
 {% endif %}\
@@ -29,14 +29,6 @@ body = """
 trim = true
 render_always = true
 postprocessors = []
-
-[bump]
-features_always_bump_minor = true
-breaking_always_bump_major = true
-# What the first release is called. Without it git-cliff proposes a bare `0.1.0` and then rejects
-# it against `tag_pattern`, because a bumped version only carries a prefix it read off an existing
-# tag and there is none to read yet.
-initial_tag = "cli-v0.1.0"
 
 [git]
 conventional_commits = true
@@ -72,3 +64,7 @@ recurse_submodules = false
 # Only this train's tags rank as releases, so a tag cut for anything else neither ends a section
 # nor lends its version to the next bump.
 tag_pattern = "cli-v[0-9]*"
+# The 0.x releases predate CalVer. Ignoring them drops their headings without dropping what they
+# shipped: those commits fold into the first dated release rather than vanishing, so the changelog
+# starts at CalVer and still accounts for everything the CLI has ever carried.
+ignore_tags = "cli-v0\\..*"

@@ -244,6 +244,19 @@ describe('what the VM itself is doing', () => {
     ).toBe('stopping');
   });
 
+  test('a start still being staged is pending, though the replaced unit is still loaded', () => {
+    expect(
+      evaluateInstanceState({
+        unit: exited,
+        tracker: initialTracker(),
+        healthCheck: check(),
+        desiredRunning: true,
+        stopRequested: false,
+        nowMs: STARTED_AT_MS,
+      }),
+    ).toBe('pending');
+  });
+
   test('an instance that was never started is pending', () => {
     expect(
       evaluateInstanceState({

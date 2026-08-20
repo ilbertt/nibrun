@@ -3,22 +3,21 @@ import {
   CLI_TAG_PREFIX,
   cliChangelog,
   cliVersion,
-  readCliCliff,
+  hasUnreleasedChanges,
+  nextCliVersion,
   runCliCliff,
   writeCliVersion,
 } from '#shared/cli-release.ts';
 
-const nextTag = (await readCliCliff({ bumpedVersion: true })).trim();
-const nextVersion = nextTag.slice(CLI_TAG_PREFIX.length);
-
-// git-cliff answers with the last tag rather than an error when nothing it counts has landed, so
-// this is what tells a release cut too early from one with something in it.
-if (nextVersion === cliVersion) {
+if (!(await hasUnreleasedChanges())) {
   core.setFailed(
     `Nothing to release: no commit under the CLI since ${CLI_TAG_PREFIX}${cliVersion}.`,
   );
   process.exit(1);
 }
+
+const nextVersion = await nextCliVersion();
+const nextTag = `${CLI_TAG_PREFIX}${nextVersion}`;
 
 await writeCliVersion(nextVersion);
 
