@@ -12,9 +12,8 @@ const FAILURE_EXIT_CODE = 1;
 
 // The target pins the released Bun `.bun-version` names rather than resolving to whichever one
 // runs the build. Left unversioned, Bun embeds its own version and downloads it for every platform
-// that is not the host — and CI upgrades to a canary after installing, which publishes no such
-// download, so two of these three would fail there. The versioned form is undocumented, and the
-// type does not describe it.
+// that is not the host — and a canary publishes no such download, so two of these three would fail
+// for anyone on one. The versioned form is undocumented, and the type does not describe it.
 const bunVersion = (await Bun.file(BUN_VERSION_FILE).text()).trim();
 
 console.log('🧹 Cleaning dist dir...');
@@ -30,6 +29,11 @@ for (const platform of RELEASE_PLATFORMS) {
       outfile: join(DIST_DIR, binaryName),
       target: `bun-v${bunVersion}-${platform}` as unknown as Bun.Build.CompileTarget,
     },
+    // Startup is paid on every invocation of an interactive CLI and the size once, at download.
+    // `format` is spelled out because `bytecode` defaults it to CommonJS, which has no top-level
+    // await — and `main.ts` awaits the command it is about to run.
+    bytecode: true,
+    format: 'esm',
     minify: { whitespace: true, syntax: true },
     target: 'bun',
   });

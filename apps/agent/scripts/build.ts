@@ -5,12 +5,14 @@ const AGENT_DIR = join(import.meta.dir, '..');
 const AGENT_DIST_DIR = join(AGENT_DIR, 'dist');
 const AGENT_BINARY_FILE = join(AGENT_DIST_DIR, 'nibrun-agent');
 const AGENT_ENTRYPOINT = 'src/index.ts';
+const BUN_VERSION_FILE = join(AGENT_DIR, '../../.bun-version');
 
 // App hosts are x86_64 Linux, and the target names a *released* Bun rather than whichever one
 // runs the build: a canary has no published Linux download, so an unpinned target turns "the
-// developer is on a canary" into a broken deploy instead of a build error. The version tracks
-// `.bun-version`, and the type does not describe the versioned form the CLI accepts.
-const AGENT_COMPILE_TARGET = 'bun-v1.3.14-linux-x64' as unknown as Bun.Build.CompileTarget;
+// developer is on a canary" into a broken deploy instead of a build error. The versioned form is
+// undocumented, and the type does not describe it.
+const bunVersion = (await Bun.file(BUN_VERSION_FILE).text()).trim();
+const AGENT_COMPILE_TARGET = `bun-v${bunVersion}-linux-x64` as unknown as Bun.Build.CompileTarget;
 
 const FAILURE_EXIT_CODE = 1;
 
