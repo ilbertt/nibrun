@@ -6,7 +6,9 @@ import { reportedMessage } from '#lib/failure.ts';
 import { probeInstance } from '#lib/health/probe.ts';
 import {
   applyProbe,
+  describeInstanceFailure,
   evaluateInstanceState,
+  type HealthTracker,
   initialTracker,
   nextProbeDelayMs,
 } from '#lib/health/state.ts';
@@ -18,7 +20,7 @@ import {
 } from '#lib/report/instance-record.ts';
 import { ensureArtifactImage } from '#lib/vm/artifacts.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
-import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
+import { UNKNOWN_UNIT, type UnitStatus } from '#lib/vm/unit-status.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
@@ -218,6 +220,27 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
   });
 });
 
+/** Only a failure has anything to say: every other state is its own account of itself. */
+const verdict = ({
+  state,
+  status,
+  health,
+  record,
+}: {
+  state: InstanceState;
+  status: UnitStatus;
+  health: HealthTracker;
+  record: InstanceRecord;
+}) =>
+  state === 'failed'
+    ? describeInstanceFailure({
+        unit: status,
+        tracker: health,
+        healthCheck: record.healthCheck,
+        guestPort: record.guestPort,
+      })
+    : undefined;
+
 const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
   Effect.gen(function* () {
     const healthy = yield* probeInstance({
@@ -271,6 +294,9 @@ export const refreshStates = Effect.gen(function* () {
           ...(changed && status.exitCode !== undefined && !status.active
             ? { lastExitCode: status.exitCode }
             : {}),
+          // Cleared as readily as it is written: a message outliving the state it explains is
+          // read as an account of the state that replaced it.
+          ...(changed ? { message: verdict({ state, status, health, record }) } : {}),
         });
         if (changed) {
           yield* Effect.logInfo('instance state changed').pipe(

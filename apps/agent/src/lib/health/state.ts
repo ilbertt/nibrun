@@ -1,4 +1,4 @@
-import type { HealthCheck, InstanceState, Timestamp } from '@repo/protocol';
+import type { GuestPort, HealthCheck, InstanceState, Timestamp } from '@repo/protocol';
 import type { UnitStatus } from '#lib/vm/unit-status.ts';
 
 const NO_PROBES = 0;
@@ -91,6 +91,32 @@ export function nextProbeDelayMs(inputs: ProbeInputs): number {
   return isOnStartupGrid(inputs)
     ? Math.min(STARTUP_PROBE_INTERVAL_MS, inputs.healthCheck.intervalMs)
     : inputs.healthCheck.intervalMs;
+}
+
+/**
+ * Why a `failed` verdict was reached, for the owner who only ever sees the verdict.
+ *
+ * There are two ways to reach it and one fact tells them apart: an instance either stopped when
+ * nothing had asked it to, or was still up and never answered. Reading that off the unit is what
+ * keeps this from being a second copy of the branches below, drifting out of step with them.
+ */
+export function describeInstanceFailure({
+  unit,
+  tracker,
+  healthCheck,
+  guestPort,
+}: {
+  unit: UnitStatus;
+  tracker: HealthTracker;
+  healthCheck: HealthCheck;
+  guestPort: GuestPort;
+}): string {
+  if (!unit.active) {
+    return unit.exitCode === undefined
+      ? 'the microVM stopped without being asked to'
+      : `the microVM stopped without being asked to, exit code ${unit.exitCode}`;
+  }
+  return `nothing answered on port ${guestPort} inside the guest: ${tracker.consecutiveFailures} health probes failed after the ${healthCheck.gracePeriodMs}ms grace period`;
 }
 
 export type LifecycleInputs = {

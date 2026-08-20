@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_HEALTH_CHECK, type HealthCheck } from '@repo/protocol';
+import { DEFAULT_GUEST_PORT, DEFAULT_HEALTH_CHECK, type HealthCheck } from '@repo/protocol';
 import {
   applyProbe,
+  describeInstanceFailure,
   evaluateInstanceState,
   initialTracker,
   nextProbeDelayMs,
@@ -314,5 +315,37 @@ describe('thresholds are honoured', () => {
         healthCheck: check({ healthyThreshold: TWO_SUCCESSES }),
       }),
     ).toBe('running');
+  });
+});
+
+describe('a failure accounts for itself', () => {
+  const failure = (unit: UnitStatus, tracker: Tracker) =>
+    describeInstanceFailure({
+      unit,
+      tracker,
+      healthCheck: check(),
+      guestPort: DEFAULT_GUEST_PORT,
+    });
+
+  test('a VM that stopped names the code it stopped with', () => {
+    expect(failure(exited, initialTracker())).toBe(
+      'the microVM stopped without being asked to, exit code 0',
+    );
+  });
+
+  // systemd has nothing to report for a unit it has already been asked to forget, and an owner
+  // told only that a number is missing learns less than one told the VM stopped.
+  test('and one whose code systemd no longer has still says what happened', () => {
+    expect(failure({ ...crashed, exitCode: undefined }, initialTracker())).toBe(
+      'the microVM stopped without being asked to',
+    );
+  });
+
+  test('a guest nobody could reach names the port and what was spent trying', () => {
+    const tracker = { ...initialTracker(), consecutiveFailures: UNHEALTHY_RUN };
+
+    expect(failure(active, tracker)).toBe(
+      `nothing answered on port ${DEFAULT_GUEST_PORT} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
+    );
   });
 });
