@@ -14,6 +14,7 @@ import {
   TimestampSchema,
   Value,
 } from '@repo/protocol';
+import { schema } from '#db/queries.gen.ts';
 import { type PublicAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
 import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
@@ -355,7 +356,9 @@ describe('creating a deployment is asking for it to run', () => {
 
   // Same index, same race, whichever call is asking: creating now claims the running slot too.
   test('losing the race while creating is a conflict, not a 500', async () => {
-    const { service } = serviceWith({ runError: uniqueViolation('deployments_live_idx') });
+    const { service } = serviceWith({
+      runError: uniqueViolation(schema.deployments._indexes.deployments_live_idx._indexName),
+    });
 
     await expect(
       service.createOrRollback({
@@ -510,7 +513,9 @@ describe('going back to a release is a new deployment, not an old one revived', 
   // Two callers racing meet the partial unique index, not each other. The loser is told to
   // retry rather than left believing it won.
   test('losing the race to the live index is a conflict, not a 500', async () => {
-    const { service } = serviceWith({ runError: uniqueViolation('deployments_live_idx') });
+    const { service } = serviceWith({
+      runError: uniqueViolation(schema.deployments._indexes.deployments_live_idx._indexName),
+    });
 
     await expect(service.createOrRollback(ROLLBACK_REQUEST)).rejects.toBeInstanceOf(ConflictError);
   });

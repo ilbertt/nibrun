@@ -20,6 +20,7 @@ import {
   VolumeIdSchema,
 } from '@repo/protocol';
 import { SQL } from 'bun';
+import { schema } from '#db/queries.gen.ts';
 import type { NewAppConfig, SealedConfigPatch, StoredAppConfig } from '#lib/app-config.ts';
 import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
@@ -306,7 +307,7 @@ describe('a taken hostname is a re-roll, not something the owner sees', () => {
   test('a collision produces a second attempt carrying fresh entropy', async () => {
     const appsRepo = new StubAppsRepository({
       failures: 1,
-      failure: uniqueViolation('apps_slug_key'),
+      failure: uniqueViolation(schema.apps._indexes.apps_slug_key._indexName),
     });
 
     const app = await createApp({ appsRepo });
@@ -324,7 +325,7 @@ describe('a taken hostname is a re-roll, not something the owner sees', () => {
   test('a collision on the hostname is retried just like one on the slug', async () => {
     const appsRepo = new StubAppsRepository({
       failures: COLLISIONS_BEFORE_SUCCESS,
-      failure: uniqueViolation('app_hostnames_hostname_key'),
+      failure: uniqueViolation(schema.app_hostnames._indexes.app_hostnames_hostname_key._indexName),
     });
 
     const app = await createApp({ appsRepo });
@@ -346,7 +347,7 @@ describe('retrying is bounded, and only covers collisions', () => {
   test('an unbroken run of collisions is surfaced instead of retried forever', async () => {
     const appsRepo = new StubAppsRepository({
       failures: Number.POSITIVE_INFINITY,
-      failure: uniqueViolation('apps_slug_key'),
+      failure: uniqueViolation(schema.apps._indexes.apps_slug_key._indexName),
     });
 
     await expect(createApp({ appsRepo })).rejects.toBeInstanceOf(ConflictError);

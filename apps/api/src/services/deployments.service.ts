@@ -7,6 +7,7 @@ import type {
   ReportedInstance,
   Timestamp,
 } from '@repo/protocol';
+import { schema } from '#db/queries.gen.ts';
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { DeploymentLifecycle } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
@@ -23,7 +24,7 @@ import type {
 } from '#repositories/deployments.repository.ts';
 import { Service } from '#services/service.ts';
 
-const LIVE_DEPLOYMENT_CONSTRAINT = 'deployments_live_idx';
+const LIVE_DEPLOYMENT_CONSTRAINT = schema.deployments._indexes.deployments_live_idx._indexName;
 
 const NEVER_STARTED = 'No host started this deployment in time.';
 

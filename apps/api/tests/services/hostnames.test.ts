@@ -9,6 +9,7 @@ import {
   OwnerIdSchema,
   Value,
 } from '@repo/protocol';
+import { schema } from '#db/queries.gen.ts';
 import { MS_PER_DAY } from '#lib/duration.ts';
 import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
@@ -156,7 +157,9 @@ describe('a domain the platform issues is not one an owner may claim', () => {
   // when it names a hostname nibrun issued to somebody else.
   test('a hostname another app already holds is a conflict the owner can read', async () => {
     const { service, appsRepo } = build();
-    appsRepo.insertFailure = uniqueViolation('app_hostnames_hostname_key');
+    appsRepo.insertFailure = uniqueViolation(
+      schema.app_hostnames._indexes.app_hostnames_hostname_key._indexName,
+    );
 
     await expect(service.add(owned())).rejects.toBeInstanceOf(ConflictError);
   });

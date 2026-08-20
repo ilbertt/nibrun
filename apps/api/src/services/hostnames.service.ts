@@ -1,4 +1,5 @@
 import type { AppId, Hostname, OwnerId } from '@repo/protocol';
+import { schema } from '#db/queries.gen.ts';
 import { isPlatformHostname, type PublicAppHostname, toAppHostname } from '#lib/app-hostname.ts';
 import { MS_PER_DAY } from '#lib/duration.ts';
 import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
@@ -12,7 +13,7 @@ import { Service } from '#services/service.ts';
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
-const HOSTNAME_TAKEN = 'app_hostnames_hostname_key';
+const HOSTNAME_TAKEN = schema.app_hostnames._indexes.app_hostnames_hostname_key._indexName;
 
 /**
  * How many waiting hostnames one host report asks the edge about. Each is its own round trip to

@@ -6,6 +6,7 @@ import {
   type ReportedVolume,
   type TenantEnvironment,
 } from '@repo/protocol';
+import { schema } from '#db/queries.gen.ts';
 import {
   type AppConfigPatch,
   configWithDefaults,
@@ -41,7 +42,10 @@ type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
 // Both are unique platform-wide and both are minted from the same label, so either one coming
 // back as taken means the same thing: this roll of the dice is spent.
-const SLUG_CONSTRAINTS = ['apps_slug_key', 'app_hostnames_hostname_key'];
+const SLUG_CONSTRAINTS = [
+  schema.apps._indexes.apps_slug_key._indexName,
+  schema.app_hostnames._indexes.app_hostnames_hostname_key._indexName,
+];
 
 // Six characters of base32 make a collision vanishingly rare, so exhausting this many rolls is
 // a signal that something other than luck is wrong.
