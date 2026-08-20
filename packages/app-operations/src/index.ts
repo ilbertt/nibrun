@@ -8,6 +8,8 @@ export {
   type DeployInput,
   type DeployStep,
   deploy,
+  describeUnservedDeployment,
+  type SettledDeployment,
   type UploadableBinary,
   type UploadWait,
 } from '#deploy.ts';

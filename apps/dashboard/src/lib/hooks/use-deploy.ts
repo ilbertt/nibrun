@@ -3,6 +3,7 @@ import {
   type Deployed,
   type DeployStep,
   deploy,
+  describeUnservedDeployment,
   type UploadableBinary,
   type UploadProgress,
 } from '@repo/app-operations';
@@ -40,13 +41,13 @@ export function useDeploy({
         upload: browserUpload,
         whileUploading: ({ task }) => task(onProgress),
       });
-      const state = await awaitDeploymentSettled({
+      const settled = await awaitDeploymentSettled({
         api,
         appId: deployed.appId,
         deploymentId: deployed.deploymentId,
       });
-      if (state !== 'active') {
-        throw new Error(`Deployment ${deployed.deploymentId} is ${state}.`);
+      if (settled.state !== 'active') {
+        throw new Error(describeUnservedDeployment(settled));
       }
       return deployed;
     },

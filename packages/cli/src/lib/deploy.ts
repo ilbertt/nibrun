@@ -4,6 +4,7 @@ import { ApiError } from '@repo/api-client/unwrap';
 import {
   awaitDeploymentSettled,
   type DeployStep,
+  describeUnservedDeployment,
   InvalidEnvironmentError,
   parseEnvironment,
   deploy as startDeployment,
@@ -72,7 +73,7 @@ export async function deploy({
   }
 
   const startedAt = Date.now();
-  const state = await ui.waitingFor({
+  const settled = await ui.waitingFor({
     message: `starting deployment ${deployed.deploymentId}`,
     task: () =>
       awaitDeploymentSettled({
@@ -81,8 +82,8 @@ export async function deploy({
         deploymentId: deployed.deploymentId,
       }),
   });
-  if (state !== 'active') {
-    throw new ApiError(`Deployment ${deployed.deploymentId} is ${state}.`);
+  if (settled.state !== 'active') {
+    throw new ApiError(describeUnservedDeployment(settled));
   }
   ui.done(`${deployed.url} — ready in ${elapsed(Date.now() - startedAt)}`);
 }

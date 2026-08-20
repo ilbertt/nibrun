@@ -475,6 +475,9 @@ export interface ISelectDeploymentsByAppResult {
     created_at: Date;
     /** Why the deployment is in the state it is in, as the host put it. Never the tenant's own output, which has a streaming path of its own. */
     message: string | null;
+    started_at: Date | null;
+    last_healthy_at: Date | null;
+    restart_count: number;
     guest_port: import("@repo/protocol").GuestPort;
     args: string[];
     vcpu_count: number;
@@ -505,6 +508,9 @@ export interface ISelectDeploymentByIdResult {
     created_at: Date;
     /** Why the deployment is in the state it is in, as the host put it. Never the tenant's own output, which has a streaming path of its own. */
     message: string | null;
+    started_at: Date | null;
+    last_healthy_at: Date | null;
+    restart_count: number;
     guest_port: import("@repo/protocol").GuestPort;
     args: string[];
     vcpu_count: number;
@@ -559,6 +565,9 @@ export interface ISelectInsertedDeploymentResult {
     created_at: Date;
     /** Why the deployment is in the state it is in, as the host put it. Never the tenant's own output, which has a streaming path of its own. */
     message: string | null;
+    started_at: Date | null;
+    last_healthy_at: Date | null;
+    restart_count: number;
     guest_port: import("@repo/protocol").GuestPort;
     args: string[];
     vcpu_count: number;

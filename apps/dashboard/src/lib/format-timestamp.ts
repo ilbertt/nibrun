@@ -15,6 +15,14 @@ const TIME_OF_DAY: Intl.DateTimeFormatOptions = {
   hour12: false,
 };
 
+// A deployment's whole life can happen inside one minute — staged, started, serving, gone — so
+// anything reading it as a sequence needs the seconds that tell those moments apart.
+const DAY_AND_SECOND: Intl.DateTimeFormatOptions = { ...DAY_AND_MINUTE, second: '2-digit' };
+
+export function dayAndSecond(instant: string): string {
+  return new Date(instant).toLocaleString(undefined, DAY_AND_SECOND);
+}
+
 export function dayAndMinute(instant: string): string {
   return new Date(instant).toLocaleString(undefined, DAY_AND_MINUTE);
 }

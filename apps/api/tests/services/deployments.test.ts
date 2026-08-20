@@ -45,6 +45,8 @@ const GUEST_PORT = Value.Parse(GuestPortSchema, GUEST_PORT_NUMBER);
 const OWNER_SCOPED_METHODS = 4;
 const CREATED_AT = new Date('2026-08-04T10:00:00.000Z');
 const ACTIVATED_AT = new Date('2026-08-04T11:30:00.000Z');
+const STARTED_AT = new Date('2026-08-04T11:29:00.000Z');
+const LAST_HEALTHY_AT = new Date('2026-08-04T12:00:00.000Z');
 const FAILURE_MESSAGE = 'No host started this deployment in time.';
 const HEALTHY_AT = new Date('2026-08-04T11:31:00.000Z');
 const REPORTED_AT = new Date('2026-08-04T11:32:00.000Z');
@@ -84,6 +86,9 @@ function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
     rollback_of_deployment_id: null,
     created_at: CREATED_AT,
     message: null,
+    started_at: null,
+    last_healthy_at: null,
+    restart_count: 0,
     ...configColumns(PINNED_CONFIG),
     ...overrides,
   };
@@ -234,6 +239,34 @@ describe('a deployment publishes the config version it pins', () => {
     const deployment = await service.get(OWNED_DEPLOYMENT);
 
     expect(deployment.activatedAt).toBe(Value.Parse(TimestampSchema, ACTIVATED_AT.toISOString()));
+  });
+
+  test('what a host observed of the microVM reaches the wire', async () => {
+    const { service } = serviceWith({
+      row: deploymentRow({
+        state: 'active',
+        started_at: STARTED_AT,
+        activated_at: ACTIVATED_AT,
+        last_healthy_at: LAST_HEALTHY_AT,
+        restart_count: RESTART_COUNT,
+      }),
+    });
+
+    expect(await service.get(OWNED_DEPLOYMENT)).toMatchObject({
+      startedAt: STARTED_AT.toISOString(),
+      lastHealthyAt: LAST_HEALTHY_AT.toISOString(),
+      restartCount: RESTART_COUNT,
+    });
+  });
+
+  // Every instant is optional on the wire, so one a release has not reached is omitted rather
+  // than published as a null the schema would reject.
+  test('and the instants it never reached are omitted', async () => {
+    const deployment = await serviceWith({ row: deploymentRow() }).service.get(OWNED_DEPLOYMENT);
+
+    expect('startedAt' in deployment).toBe(false);
+    expect('lastHealthyAt' in deployment).toBe(false);
+    expect(deployment.restartCount).toBe(0);
   });
 
   test('a release that failed publishes what the host said about it', async () => {

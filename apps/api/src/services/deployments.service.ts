@@ -194,7 +194,10 @@ function toPublicDeployment(row: DeploymentRow): PublicDeployment {
     config: toAppConfig(row),
     state: row.state,
     createdAt: toTimestamp(row.created_at),
+    restartCount: row.restart_count,
+    ...(row.started_at && { startedAt: toTimestamp(row.started_at) }),
     ...(row.activated_at && { activatedAt: toTimestamp(row.activated_at) }),
+    ...(row.last_healthy_at && { lastHealthyAt: toTimestamp(row.last_healthy_at) }),
     ...(row.message && { message: row.message }),
     ...(row.rollback_of_deployment_id && { rollbackOf: row.rollback_of_deployment_id }),
   };

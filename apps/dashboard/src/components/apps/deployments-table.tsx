@@ -6,7 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from '@repo/ui/components/table';
-import { DeploymentStateBadge } from '#components/apps/deployment-state-badge.tsx';
+import { DeploymentDetails } from '#components/apps/deployment-details.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 import type { DeploymentSummary } from '#queries/deployments.ts';
 
@@ -27,10 +27,7 @@ export function DeploymentsTable({ deployments }: { deployments: readonly Deploy
           <TableRow key={deployment.id}>
             <TableCell className="font-mono">{deployment.id}</TableCell>
             <TableCell>
-              <DeploymentStateBadge state={deployment.state} />
-              {deployment.message === undefined ? null : (
-                <p className="mt-1 max-w-xs text-muted-foreground text-xs">{deployment.message}</p>
-              )}
+              <DeploymentDetails deployment={deployment} />
             </TableCell>
             <TableCell className="text-muted-foreground tabular-nums">
               {dayAndMinute(deployment.createdAt)}

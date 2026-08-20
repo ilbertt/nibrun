@@ -221,6 +221,23 @@ function configPatch({
   };
 }
 
+/** What a caller needs of a release that has stopped moving: which end it reached, and why. */
+export type SettledDeployment = {
+  id: string;
+  state: DeploymentState;
+  message?: string | undefined;
+};
+
+/**
+ * Why a release that settled is not serving, in the host's own words where it left any. Shared
+ * because a terminal and a browser accounting for the same failure differently is how one of
+ * them ends up saying only that it happened.
+ */
+export function describeUnservedDeployment(deployment: SettledDeployment): string {
+  const reason = deployment.message === undefined ? '' : ` ${deployment.message}`;
+  return `Deployment ${deployment.id} is ${deployment.state}.${reason}`;
+}
+
 export async function awaitDeploymentSettled({
   api,
   appId,
@@ -231,13 +248,13 @@ export async function awaitDeploymentSettled({
   appId: string;
   deploymentId: string;
   signal?: AbortSignal | undefined;
-}): Promise<DeploymentState> {
+}): Promise<SettledDeployment> {
   const deadline = Date.now() + SERVING_TIMEOUT_MS;
   while (Date.now() < deadline) {
     signal?.throwIfAborted();
     const deployment = unwrap(await api.api.apps({ appId }).deployments({ deploymentId }).get());
     if (!SETTLING_STATES.has(deployment.state)) {
-      return deployment.state;
+      return deployment;
     }
     await pause(POLL_INTERVAL_MS);
   }
