@@ -20,14 +20,6 @@ runs:
         restore-keys: |
           ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.job }}-
 
-    # Installs on the pinned bun, before the canary bump: canary rejects a
-    # lockfile it has just written itself when a dependency carries a large set
-    # of optional peers (oven-sh/bun#20913).
     - name: Install dependencies
       shell: bash
       run: bun install --frozen-lockfile
-
-    # TODO: remove this step once bun v1.4 is out and update .bun-version
-    - name: Bump bun to canary
-      shell: bash
-      run: bun upgrade --canary

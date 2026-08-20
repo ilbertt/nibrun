@@ -6,11 +6,8 @@ const AGENT_DIST_DIR = join(AGENT_DIR, 'dist');
 const AGENT_BINARY_FILE = join(AGENT_DIST_DIR, 'nibrun-agent');
 const AGENT_ENTRYPOINT = 'src/index.ts';
 
-// App hosts are x86_64 Linux, and the target names a *released* Bun rather than whichever one
-// runs the build: a canary has no published Linux download, so an unpinned target turns "the
-// developer is on a canary" into a broken deploy instead of a build error. The version tracks
-// `.bun-version`, and the type does not describe the versioned form the CLI accepts.
-const AGENT_COMPILE_TARGET = 'bun-v1.3.14-linux-x64' as unknown as Bun.Build.CompileTarget;
+// App hosts are x86_64 Linux, so this cross-compiles rather than taking the host it was built on.
+const AGENT_COMPILE_TARGET = 'bun-linux-x64';
 
 const FAILURE_EXIT_CODE = 1;
 

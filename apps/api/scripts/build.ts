@@ -24,11 +24,7 @@ const buildResult = await Bun.build({
   entrypoints: [API_ENTRYPOINT],
   compile: {
     outfile: API_BINARY_FILE,
-    // @ts-expect-error: assets is still not in the types
     assets: [PUBLIC_DASHBOARD_DIR, DB_MIGRATIONS_DIR],
-  },
-  naming: {
-    asset: '[dir]/[name].[ext]',
   },
   minify: { whitespace: true, syntax: true },
   target: 'bun',
