@@ -52,12 +52,12 @@ export function DeleteAppDialog() {
 
         <dl className="flex flex-col gap-2 rounded-2xl bg-muted px-3 py-2 text-sm">
           <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">app</dt>
+            <dt className="shrink-0 text-muted-foreground">app</dt>
             <dd className="truncate font-mono">{slug}</dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">hostnames</dt>
-            <dd className="flex min-w-0 flex-col items-end font-mono">
+            <dt className="shrink-0 text-muted-foreground">hostnames</dt>
+            <dd className="flex min-w-0 flex-col text-right font-mono">
               {app.data?.hostnames.map((each) => (
                 <span key={each.hostname} className="truncate">
                   {each.hostname}
@@ -66,15 +66,15 @@ export function DeleteAppDialog() {
             </dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">volume</dt>
+            <dt className="shrink-0 text-muted-foreground">volume</dt>
             <dd>everything on it</dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">binaries</dt>
+            <dt className="shrink-0 text-muted-foreground">binaries</dt>
             <dd>every one ever uploaded</dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">exports</dt>
+            <dt className="shrink-0 text-muted-foreground">exports</dt>
             <dd>every bundle ever taken</dd>
           </div>
         </dl>

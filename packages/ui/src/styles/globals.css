@@ -242,3 +242,17 @@ body {
     @apply font-sans;
   }
 }
+
+@layer base {
+  /* The popup is `grid` and its items default to `min-width: auto`, so a digest or an id long
+     enough sizes its item past the popup and spills onto the page. Set here rather than on
+     `DialogContent` because that file is the shadcn CLI's output. Content held in one line by
+     `white-space: nowrap` — a button's label — is out of reach of both and still needs handling
+     where it is written. */
+  :is([data-slot="dialog-content"], [data-slot="alert-dialog-content"]) {
+    overflow-wrap: anywhere;
+  }
+  :is([data-slot="dialog-content"], [data-slot="alert-dialog-content"]) > * {
+    min-width: 0;
+  }
+}
