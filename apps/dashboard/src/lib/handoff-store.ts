@@ -7,33 +7,59 @@ const DB_VERSION = 1;
 const STORE_NAME = 'binaries';
 const BINARY_KEY = 'dropped';
 
-function request<T>(source: IDBRequest<T>): Promise<T> {
-  const { promise, resolve, reject } = Promise.withResolvers<T>();
-
-  source.onsuccess = () => resolve(source.result);
-  source.onerror = () => reject(source.error ?? new Error('The browser refused the read.'));
-
-  return promise;
-}
-
-function openStore(mode: IDBTransactionMode): Promise<IDBObjectStore> {
-  const { promise, resolve, reject } = Promise.withResolvers<IDBObjectStore>();
+function openDatabase(): Promise<IDBDatabase> {
+  const { promise, resolve, reject } = Promise.withResolvers<IDBDatabase>();
   const open = indexedDB.open(DB_NAME, DB_VERSION);
 
   open.onupgradeneeded = () => open.result.createObjectStore(STORE_NAME);
   open.onerror = () => reject(open.error ?? new Error('The browser refused to open storage.'));
-  open.onsuccess = () => resolve(open.result.transaction(STORE_NAME, mode).objectStore(STORE_NAME));
+  open.onsuccess = () => resolve(open.result);
 
   return promise;
 }
 
+/**
+ * Settles on the transaction, never on the request inside it.
+ *
+ * A request's `onsuccess` only means the value is staged; `oncomplete` is the commit. The
+ * landing page navigates the instant this is acknowledged, which unloads the document holding
+ * the frame — so acknowledging at `onsuccess` promises a binary that the teardown then throws
+ * away. Strict durability is what makes the commit outlive that, since the default lets the
+ * browser keep it in memory and write it whenever it likes.
+ */
 export async function storeHandedOffBinary(binary: File): Promise<void> {
-  const store = await openStore('readwrite');
-  await request(store.put(binary, BINARY_KEY));
+  const database = await openDatabase();
+  const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+  try {
+    const write = database.transaction(STORE_NAME, 'readwrite', { durability: 'strict' });
+
+    write.oncomplete = () => resolve();
+    write.onabort = () => reject(write.error ?? new Error('The browser refused the write.'));
+    write.objectStore(STORE_NAME).put(binary, BINARY_KEY);
+
+    await promise;
+  } finally {
+    database.close();
+  }
 }
 
 export async function readHandedOffBinary(): Promise<File | undefined> {
-  const store = await openStore('readonly');
-  const stored = await request<unknown>(store.get(BINARY_KEY));
-  return stored instanceof File ? stored : undefined;
+  const database = await openDatabase();
+  const { promise, resolve, reject } = Promise.withResolvers<unknown>();
+
+  try {
+    const read = database
+      .transaction(STORE_NAME, 'readonly')
+      .objectStore(STORE_NAME)
+      .get(BINARY_KEY);
+
+    read.onsuccess = () => resolve(read.result);
+    read.onerror = () => reject(read.error ?? new Error('The browser refused the read.'));
+
+    const stored = await promise;
+    return stored instanceof File ? stored : undefined;
+  } finally {
+    database.close();
+  }
 }
