@@ -13,6 +13,7 @@ import { Link } from '@tanstack/react-router';
 import { FileTerminalIcon, UploadIcon } from 'lucide-react';
 import { HandoffDeploy } from '#components/handoff/handoff-deploy.tsx';
 import { formatBytes } from '#lib/format-bytes.ts';
+import { useFinishHandoff } from '#lib/hooks/use-finish-handoff.ts';
 import { useHandedOffBinary } from '#lib/hooks/use-handed-off-binary.ts';
 import { useSession } from '#lib/hooks/use-session.ts';
 import { DeployRunProvider } from '#lib/providers/deploy-run-provider.tsx';
@@ -34,6 +35,8 @@ export function HandedOffBinary() {
 }
 
 function Waiting({ binary, signedIn }: { binary: File | undefined; signedIn: boolean }) {
+  const finishHandoff = useFinishHandoff();
+
   if (binary === undefined) {
     return (
       <Empty>
@@ -70,7 +73,7 @@ function Waiting({ binary, signedIn }: { binary: File | undefined; signedIn: boo
   }
 
   return (
-    <DeployRunProvider>
+    <DeployRunProvider onDeployed={finishHandoff}>
       <HandoffDeploy binary={binary} />
     </DeployRunProvider>
   );

@@ -10,13 +10,11 @@ import { Link } from '@tanstack/react-router';
 import { DeployForm } from '#components/apps/deploy-form.tsx';
 import { DeployProgress } from '#components/apps/deploy-progress.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
-import { useLeaveOnceDeployed } from '#lib/hooks/use-leave-once-deployed.ts';
 import type { DeployPhase } from '#lib/hooks/use-run-app.ts';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 export function HandoffDeploy({ binary }: { binary: File }) {
   const run = useDeployRun();
-  useLeaveOnceDeployed();
 
   return (
     <Card>
