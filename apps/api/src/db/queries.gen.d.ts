@@ -71,6 +71,63 @@ export interface ISelectDesiredExportsResult {
     original_file_name: import("@repo/protocol").Filename;
 }
 
+/** Result of query `SelectAppHostnamesByOwner`. */
+export interface ISelectAppHostnamesByOwnerResult {
+    app_id: import("@repo/protocol").AppId;
+    hostname: import("@repo/protocol").Hostname;
+    kind: import("@repo/protocol").AppHostnameKind;
+    state: import("@repo/protocol").AppHostnameState;
+    /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
+    dcv_target: string | null;
+}
+
+/** Result of query `SelectAppHostnamesByApp`. */
+export interface ISelectAppHostnamesByAppResult {
+    hostname: import("@repo/protocol").Hostname;
+    kind: import("@repo/protocol").AppHostnameKind;
+    state: import("@repo/protocol").AppHostnameState;
+    /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
+    dcv_target: string | null;
+}
+
+/** Result of query `InsertCustomAppHostname`. */
+export interface IInsertCustomAppHostnameResult {
+    hostname: import("@repo/protocol").Hostname;
+    kind: import("@repo/protocol").AppHostnameKind;
+    state: import("@repo/protocol").AppHostnameState;
+    /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
+    dcv_target: string | null;
+}
+
+/** Result of query `UpdateCustomAppHostnameEdge`. */
+export interface IUpdateCustomAppHostnameEdgeResult {
+    hostname: import("@repo/protocol").Hostname;
+    kind: import("@repo/protocol").AppHostnameKind;
+    state: import("@repo/protocol").AppHostnameState;
+    /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
+    dcv_target: string | null;
+}
+
+/** Result of query `UpdateCustomAppHostnameState`. */
+export interface IUpdateCustomAppHostnameStateResult {
+    hostname: import("@repo/protocol").Hostname;
+}
+
+/** Result of query `DeleteCustomAppHostname`. */
+export interface IDeleteCustomAppHostnameResult {
+    /** The custom hostname this row is projected onto at the edge. Absent for a platform hostname, which the wildcard already covers. */
+    cloudflare_id: string | null;
+}
+
+/** Result of query `SelectPendingCustomHostnames`. */
+export interface ISelectPendingCustomHostnamesResult {
+    hostname: import("@repo/protocol").Hostname;
+    /** The custom hostname this row is projected onto at the edge. Absent for a platform hostname, which the wildcard already covers. */
+    cloudflare_id: string | null;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
 /** Result of query `SelectAppOwnership`. */
 export interface ISelectAppOwnershipResult {
     id: import("@repo/protocol").AppId;
@@ -91,6 +148,8 @@ export interface IInsertAppHostnameResult {
     hostname: import("@repo/protocol").Hostname;
     kind: import("@repo/protocol").AppHostnameKind;
     state: import("@repo/protocol").AppHostnameState;
+    /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
+    dcv_target: string | null;
 }
 
 /** Result of query `SelectCreatedApp`. */
@@ -145,14 +204,6 @@ export interface ISelectAppsByOwnerResult {
     environment_names: string[];
 }
 
-/** Result of query `SelectAppHostnamesByOwner`. */
-export interface ISelectAppHostnamesByOwnerResult {
-    app_id: import("@repo/protocol").AppId;
-    hostname: import("@repo/protocol").Hostname;
-    kind: import("@repo/protocol").AppHostnameKind;
-    state: import("@repo/protocol").AppHostnameState;
-}
-
 /** Result of query `SelectAppById`. */
 export interface ISelectAppByIdResult {
     id: import("@repo/protocol").AppId;
@@ -177,13 +228,6 @@ export interface ISelectAppByIdResult {
     restart_backoff_factor: number;
     restart_reset_after_ms: number;
     environment_names: string[];
-}
-
-/** Result of query `SelectAppHostnamesByApp`. */
-export interface ISelectAppHostnamesByAppResult {
-    hostname: import("@repo/protocol").Hostname;
-    kind: import("@repo/protocol").AppHostnameKind;
-    state: import("@repo/protocol").AppHostnameState;
 }
 
 /** Result of query `SelectAppForConfigUpdate`. */
@@ -608,15 +652,20 @@ export interface Queries {
     SelectDesiredHostnames: ISelectDesiredHostnamesResult;
     SelectDesiredEnvironment: ISelectDesiredEnvironmentResult;
     SelectDesiredExports: ISelectDesiredExportsResult;
+    SelectAppHostnamesByOwner: ISelectAppHostnamesByOwnerResult;
+    SelectAppHostnamesByApp: ISelectAppHostnamesByAppResult;
+    InsertCustomAppHostname: IInsertCustomAppHostnameResult;
+    UpdateCustomAppHostnameEdge: IUpdateCustomAppHostnameEdgeResult;
+    UpdateCustomAppHostnameState: IUpdateCustomAppHostnameStateResult;
+    DeleteCustomAppHostname: IDeleteCustomAppHostnameResult;
+    SelectPendingCustomHostnames: ISelectPendingCustomHostnamesResult;
     SelectAppOwnership: ISelectAppOwnershipResult;
     InsertApp: IInsertAppResult;
     InsertAppConfig: IInsertAppConfigResult;
     InsertAppHostname: IInsertAppHostnameResult;
     SelectCreatedApp: ISelectCreatedAppResult;
     SelectAppsByOwner: ISelectAppsByOwnerResult;
-    SelectAppHostnamesByOwner: ISelectAppHostnamesByOwnerResult;
     SelectAppById: ISelectAppByIdResult;
-    SelectAppHostnamesByApp: ISelectAppHostnamesByAppResult;
     SelectAppForConfigUpdate: ISelectAppForConfigUpdateResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;

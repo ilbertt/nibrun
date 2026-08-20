@@ -230,6 +230,37 @@ variable "app_host_caddy_tls_key" {
   }
 }
 
+# Custom domains. A brought domain is in nobody's zone here, so the edge has to
+# be told about each one as it is added — the one Cloudflare operation that
+# cannot be a manual step in infra/AGENTS.md the way the rest of them are.
+#
+# Created by hand in the Cloudflare dashboard, so like the OAuth App credentials
+# these enter from outside rather than being generated, and like them they have
+# no default: an api deployed without them answers every custom-domain request
+# with a 502, which is a broken feature rather than an absent one.
+variable "cloudflare_api_token" {
+  type        = string
+  sensitive   = true
+  description = "API token scoped to Zone -> SSL and Certificates -> Edit on the app_host_domain zone, and nothing else. CI passes the CLOUDFLARE_API_TOKEN repository secret through."
+
+  validation {
+    condition     = trimspace(var.cloudflare_api_token) != ""
+    error_message = "cloudflare_api_token must not be empty."
+  }
+}
+
+# Not secret — it is in every dashboard URL for the zone — but it travels with
+# the token so the box has one place to read both, and one thing to be missing.
+variable "cloudflare_zone_id" {
+  type        = string
+  description = "Zone id of app_host_domain. CI passes the CLOUDFLARE_ZONE_ID repository variable through."
+
+  validation {
+    condition     = trimspace(var.cloudflare_zone_id) != ""
+    error_message = "cloudflare_zone_id must not be empty."
+  }
+}
+
 variable "enable_github_deploy" {
   type        = bool
   description = "Create the GitHub Actions OIDC deploy role. Set false to apply before the bootstrap stack exists, since the role looks up the OIDC provider it creates."

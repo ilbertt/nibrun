@@ -14,9 +14,9 @@ import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {
   AppHostnameRow,
-  AppRow,
-  AppsRepositoryContract,
-} from '#repositories/apps.repository.ts';
+  AppHostnamesRepositoryContract,
+} from '#repositories/app-hostnames.repository.ts';
+import type { AppRow, AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type { ExportsRepositoryContract } from '#repositories/exports.repository.ts';
 import { Service } from '#services/service.ts';
@@ -37,6 +37,9 @@ const SLUG_CONSTRAINTS = ['apps_slug_key', 'app_hostnames_hostname_key'];
 // Six characters of base32 make a collision vanishingly rare, so exhausting this many rolls is
 // a signal that something other than luck is wrong.
 const MAX_SLUG_ATTEMPTS = 5;
+
+/** Reading them back is all an app needs of its hostnames; the rest is the hostnames' own. */
+export type AppHostnameReads = Pick<AppHostnamesRepositoryContract, 'listByOwner' | 'listByApp'>;
 
 /** What deleting an app needs from the exports it leaves behind, and nothing else. */
 export type ExportCancellation = Pick<ExportsRepositoryContract, 'failInFlight'>;
@@ -65,6 +68,7 @@ const FINISH_BATCH = 8;
 
 export class AppsService extends Service {
   private readonly appsRepo: AppsRepositoryContract;
+  private readonly hostnamesRepo: AppHostnameReads;
   private readonly exportsRepo: ExportCancellation;
   private readonly artifactStorageRepo: ObjectRemoval;
   private readonly exportStorageRepo: ObjectRemoval;
@@ -73,6 +77,7 @@ export class AppsService extends Service {
 
   constructor({
     appsRepo,
+    hostnamesRepo,
     exportsRepo,
     artifactStorageRepo,
     exportStorageRepo,
@@ -80,6 +85,7 @@ export class AppsService extends Service {
     secretsKey,
   }: {
     appsRepo: AppsRepositoryContract;
+    hostnamesRepo: AppHostnameReads;
     exportsRepo: ExportCancellation;
     artifactStorageRepo: ObjectRemoval;
     exportStorageRepo: ObjectRemoval;
@@ -88,6 +94,7 @@ export class AppsService extends Service {
   }) {
     super();
     this.appsRepo = appsRepo;
+    this.hostnamesRepo = hostnamesRepo;
     this.exportsRepo = exportsRepo;
     this.artifactStorageRepo = artifactStorageRepo;
     this.exportStorageRepo = exportStorageRepo;
@@ -151,7 +158,7 @@ export class AppsService extends Service {
   async list({ ownerId }: { ownerId: OwnerId }): Promise<PublicApp[]> {
     const [apps, hostnames] = await Promise.all([
       this.appsRepo.listByOwner({ ownerId }),
-      this.appsRepo.listHostnamesByOwner({ ownerId }),
+      this.hostnamesRepo.listByOwner({ ownerId }),
     ]);
     const byApp = Map.groupBy(hostnames, (row) => row.app_id);
 
@@ -161,7 +168,7 @@ export class AppsService extends Service {
   async get({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
     const [app, hostnames] = await Promise.all([
       this.appsRepo.findById({ appId, ownerId }),
-      this.appsRepo.listHostnamesByApp({ appId, ownerId }),
+      this.hostnamesRepo.listByApp({ appId, ownerId }),
     ]);
 
     return toPublicApp({ app: requireApp(app), hostnames });
@@ -175,7 +182,7 @@ export class AppsService extends Service {
     const app = requireApp(
       await this.appsRepo.updateConfig({ appId, ownerId, patch: this.sealed(patch) }),
     );
-    const hostnames = await this.appsRepo.listHostnamesByApp({ appId, ownerId });
+    const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
 
     return toPublicApp({ app, hostnames });
   }
@@ -260,7 +267,7 @@ export class AppsService extends Service {
     await this.exportsRepo.failInFlight({ appId, message: APP_DELETED });
     const [torndown, hostnames] = await Promise.all([
       this.finishIfNothingToTearDown({ appId }),
-      this.appsRepo.listHostnamesByApp({ appId, ownerId }),
+      this.hostnamesRepo.listByApp({ appId, ownerId }),
     ]);
 
     return toPublicApp({ app: torndown ? { ...app, state: 'deleted' } : app, hostnames });

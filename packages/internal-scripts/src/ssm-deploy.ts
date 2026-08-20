@@ -32,6 +32,7 @@ const onBoxEnv: Record<string, string> = {
   DATA_VOLUME_ID: requiredEnv('DATA_VOLUME_ID'),
   AWS_REGION: requiredEnv('AWS_REGION'),
   APP_HOST_DOMAIN: requiredEnv('APP_HOST_DOMAIN'),
+  API_CLOUDFLARE_ZONE_ID: requiredEnv('API_CLOUDFLARE_ZONE_ID'),
 };
 
 const [instanceId] = await findInstanceIds({ deployGroup });

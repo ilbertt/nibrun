@@ -11,7 +11,7 @@ import {
 } from '@repo/protocol';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
-import { AgentService, type UploadSweep } from '#services/agent.service.ts';
+import { AgentService, type HostnameReconcile, type UploadSweep } from '#services/agent.service.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { ExportsService } from '#services/exports.service.ts';
@@ -99,22 +99,35 @@ class FakeUploadSweep implements UploadSweep {
   }
 }
 
+/** The same clock, borrowed for the hostnames whose fate is decided in somebody else's DNS. */
+class FakeHostnameReconcile implements HostnameReconcile {
+  reconciled = 0;
+
+  reconcile(): Promise<void> {
+    this.reconciled += 1;
+    return Promise.resolve();
+  }
+}
+
 function build() {
   const deployments = new FakeDeploymentsService();
   const apps = new FakeAppsService();
   const exports = new FakeExportsService();
   const artifacts = new FakeUploadSweep();
+  const hostnames = new FakeHostnameReconcile();
   return {
     apps,
     deployments,
     exports,
     artifacts,
+    hostnames,
     service: new AgentService({
       agentRepo: new FakeAgentRepository(),
       deploymentsService: deployments as unknown as DeploymentsService,
       appsService: apps as unknown as AppsService,
       exportsService: exports as unknown as ExportsService,
       artifactsService: artifacts,
+      hostnamesService: hostnames,
     }),
   };
 }
@@ -190,5 +203,22 @@ describe('a report is read by whatever owns what it talks about', () => {
     await service.acceptReport({ reported });
 
     expect(apps.trace).toEqual(['completeDeletions', 'finishDeletions', 'purgeDeleted']);
+  });
+
+  // Nothing in the report says anything about hostnames. It is borrowed as a clock, because
+  // whether an owner has pointed their domain at us happens in DNS with nobody to announce it.
+  test('and the clock it lends is what advances a custom hostname nobody announced', async () => {
+    const { artifacts, hostnames, service } = build();
+    const reported = {
+      hostId: Value.Parse(HostIdSchema, 'host-1'),
+      instances: [],
+      volumes: [],
+      exports: [],
+    } as unknown as HostReportedState;
+
+    await service.acceptReport({ reported });
+
+    expect(artifacts.swept).toBe(1);
+    expect(hostnames.reconciled).toBe(1);
   });
 });

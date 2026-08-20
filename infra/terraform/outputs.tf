@@ -28,6 +28,11 @@ output "api_github_client_id" {
   value       = var.api_github_client_id
 }
 
+output "api_cloudflare_zone_id" {
+  description = "Zone custom hostnames are registered in; the token used against it is read from SSM on the box."
+  value       = var.cloudflare_zone_id
+}
+
 output "artifacts_bucket" {
   value = aws_s3_bucket.artifacts.bucket
 }

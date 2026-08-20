@@ -3,6 +3,9 @@
 import type { InferForwardedOptions, InferParams, RuntimeNode } from '@parshjs/core';
 import type { command as appsCmd } from './commands/apps.ts';
 import type { command as appsDeleteCmd } from './commands/apps/delete.ts';
+import type { command as appsDomainsAddHostnameCmd } from './commands/apps/domains/add/[hostname].ts';
+import type { command as appsDomainsCmd } from './commands/apps/domains.ts';
+import type { command as appsDomainsRemoveHostnameCmd } from './commands/apps/domains/remove/[hostname].ts';
 import type { command as appsExportDestinationCmd } from './commands/apps/export/[destination].ts';
 import type { command as appsFilesLsCmd } from './commands/apps/files/ls.ts';
 import type { command as appsFilesLsPathCmd } from './commands/apps/files/ls/[path].ts';
@@ -20,6 +23,26 @@ declare module '@parshjs/core' {
     'apps delete': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: {};
+    };
+    'apps domains': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: {};
+    };
+    'apps domains add [hostname]': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+        'apps domains': { options: InferForwardedOptions<typeof appsDomainsCmd.options>; params: InferParams<typeof appsDomainsCmd.params> };
+      };
+      rootOptions: {};
+    };
+    'apps domains remove [hostname]': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+        'apps domains': { options: InferForwardedOptions<typeof appsDomainsCmd.options>; params: InferParams<typeof appsDomainsCmd.params> };
       };
       rootOptions: {};
     };
@@ -77,6 +100,35 @@ export const commandTree: RuntimeNode = {
           segment: { kind: 'literal', value: 'delete' },
           command: { path: 'apps delete', load: () => import('./commands/apps/delete.ts').then((m) => m.command) },
           literalChildren: {},
+          paramChild: null,
+        },
+        'domains': {
+          segment: { kind: 'literal', value: 'domains' },
+          command: { path: 'apps domains', load: () => import('./commands/apps/domains.ts').then((m) => m.command) },
+          literalChildren: {
+            'add': {
+              segment: { kind: 'literal', value: 'add' },
+              command: null,
+              literalChildren: {},
+              paramChild: {
+                segment: { kind: 'param', name: 'hostname' },
+                command: { path: 'apps domains add [hostname]', load: () => import('./commands/apps/domains/add/[hostname].ts').then((m) => m.command) },
+                literalChildren: {},
+                paramChild: null,
+              },
+            },
+            'remove': {
+              segment: { kind: 'literal', value: 'remove' },
+              command: null,
+              literalChildren: {},
+              paramChild: {
+                segment: { kind: 'param', name: 'hostname' },
+                command: { path: 'apps domains remove [hostname]', load: () => import('./commands/apps/domains/remove/[hostname].ts').then((m) => m.command) },
+                literalChildren: {},
+                paramChild: null,
+              },
+            },
+          },
           paramChild: null,
         },
         'export': {

@@ -13,7 +13,8 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${API_S3_ENDPOINT:?}" "${PG_BACKUP_IMAGE_URI:?}" \
   "${PG_BACKUP_BUCKET:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" \
   "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}" "${VICTORIALOGS_HOSTNAME:?}" \
-  "${INTERNAL_PORT:?}" "${LOG_INGEST_PORT:?}" "${APP_HOST_DOMAIN:?}"
+  "${INTERNAL_PORT:?}" "${LOG_INGEST_PORT:?}" "${APP_HOST_DOMAIN:?}" \
+  "${API_CLOUDFLARE_ZONE_ID:?}"
 
 # Per-deployment values no infrastructure resource feeds, still overridable from
 # the deploy so they never have to be edited here. The host port bindings are
@@ -46,6 +47,7 @@ API_DB_PASSWORD="$(secret api_db_password)"
 API_BETTER_AUTH_SECRET="$(secret api_better_auth_secret)"
 API_TENANT_SECRETS_KEY="$(secret api_tenant_secrets_key)"
 API_GITHUB_CLIENT_SECRET="$(secret api_github_client_secret)"
+API_CLOUDFLARE_API_TOKEN="$(secret api_cloudflare_api_token)"
 API_S3_ACCESS_KEY_ID="$(secret api_s3_access_key_id)"
 API_S3_SECRET_ACCESS_KEY="$(secret api_s3_secret_access_key)"
 
@@ -81,6 +83,8 @@ API_TENANT_SECRETS_KEY=${API_TENANT_SECRETS_KEY}
 API_GITHUB_CLIENT_ID=${API_GITHUB_CLIENT_ID}
 API_GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
 APP_HOST_DOMAIN=${APP_HOST_DOMAIN}
+API_CLOUDFLARE_API_TOKEN=${API_CLOUDFLARE_API_TOKEN}
+API_CLOUDFLARE_ZONE_ID=${API_CLOUDFLARE_ZONE_ID}
 
 API_DB_USER=${API_DB_USER}
 API_DB_PASSWORD=${API_DB_PASSWORD}
