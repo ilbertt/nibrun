@@ -27,7 +27,7 @@ export function HandedOffBinary() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
       <BrandMark />
-      <div className="flex w-full max-w-lg flex-col gap-6">
+      <div className="flex w-full max-w-lg flex-col gap-6 lg:max-w-3xl">
         {loading ? <Spinner /> : <Waiting binary={binary} signedIn={session !== null} />}
       </div>
     </div>

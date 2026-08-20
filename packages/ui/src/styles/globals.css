@@ -256,3 +256,15 @@ body {
     min-width: 0;
   }
 }
+
+/* The CLI sizes every popup for a phone and never grows it, so a wide screen still gets a column
+   too narrow to read a secret back in the deploy form's environment table. Set here rather than on
+   `DialogContent` because that file is the CLI's output, and outside any layer because a utility
+   class is what it has to outrank — which is also why a `max-w-*` written on a dialog only decides
+   the width below this breakpoint. */
+@media (width >= 64rem) {
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"][data-size="default"] {
+    max-width: 48rem;
+  }
+}
