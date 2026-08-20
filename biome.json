@@ -14,7 +14,7 @@
       "!**/dist",
       "!**/bun.lock",
       "!**/*.lock",
-      "!apps/api/src/db/queries.gen.d.ts",
+      "!apps/api/src/db/queries.gen.ts",
       "!apps/dashboard/src/routeTree.gen.ts",
       "!apps/www/src/routeTree.gen.ts",
       "!apps/www/worker-configuration.d.ts",

@@ -8,7 +8,7 @@ import {
   type VolumeId,
   VolumeIdSchema,
 } from '@repo/protocol';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import { toRunConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
 import {
   openEnvironment,

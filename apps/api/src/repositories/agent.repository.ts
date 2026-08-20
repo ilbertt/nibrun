@@ -1,6 +1,6 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
 import type { HostDesiredState, HostId, SecretString } from '@repo/protocol';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import {
   environmentByDeployment,
   hostnamesByApp,

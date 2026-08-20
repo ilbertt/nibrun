@@ -9,7 +9,7 @@ import {
   type TenantEnvironment,
   type TenantEnvironmentPatch,
 } from '@repo/protocol';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 
 // Every app gets the same filesystem for now, so this is a constant rather than a column: a

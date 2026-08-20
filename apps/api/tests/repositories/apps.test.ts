@@ -11,7 +11,7 @@ import {
   Value,
 } from '@repo/protocol';
 import type { SQL } from 'bun';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';

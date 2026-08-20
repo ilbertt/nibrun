@@ -1,5 +1,5 @@
 import type { AppId, ArtifactId, Filename, ObjectKey, OwnerId, Sha256Digest } from '@repo/protocol';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type ArtifactRow = Queries['SelectArtifactById'];
@@ -53,7 +53,6 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     originalFileName: Filename;
   }): Promise<PendingArtifactRow | null> {
     const [row] = await this.sql.InsertPendingArtifact`
-      /* @notNull created_at */
       INSERT INTO nibrun.artifacts (app_id, original_file_name)
       SELECT a.id, ${originalFileName}
       FROM nibrun.live_apps a
@@ -76,7 +75,6 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     objectKey,
   }: CompleteArtifactInput): Promise<ArtifactRow | null> {
     const [row] = await this.sql.CompleteArtifact`
-      /* @notNull created_at */
       /* @notNull digest */
       /* @notNull size_bytes */
       /* @notNull object_key */
@@ -118,7 +116,6 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     ownerId: OwnerId;
   }): Promise<PendingArtifactRow | null> {
     const [row] = await this.sql.SelectPendingArtifact`
-      /* @notNull created_at */
       SELECT ar.id, ar.app_id, ar.original_file_name, ar.created_at
       FROM nibrun.artifacts ar
       JOIN nibrun.live_apps a ON a.id = ar.app_id
@@ -159,7 +156,6 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
 
   listByApp({ appId, ownerId }: { appId: AppId; ownerId: OwnerId }): Promise<ArtifactRow[]> {
     return this.sql.SelectArtifactsByApp`
-      /* @notNull created_at */
       /* @notNull digest */
       /* @notNull size_bytes */
       /* @notNull object_key */
@@ -182,7 +178,6 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     ownerId: OwnerId;
   }): Promise<ArtifactRow | null> {
     const [row] = await this.sql.SelectArtifactById`
-      /* @notNull created_at */
       /* @notNull digest */
       /* @notNull size_bytes */
       /* @notNull object_key */

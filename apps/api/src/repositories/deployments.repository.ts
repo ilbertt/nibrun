@@ -8,7 +8,7 @@ import type {
   Ipv4Address,
   OwnerId,
 } from '@repo/protocol';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type DeploymentRow = Queries['SelectDeploymentById'];
@@ -156,7 +156,6 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   listByApp({ appId, ownerId }: DeploymentsByAppInput): Promise<DeploymentRow[]> {
     return this.sql.SelectDeploymentsByApp`
       /* @notNull environment_names */
-      /* @notNull created_at */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
@@ -181,7 +180,6 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   }: DeploymentByIdInput): Promise<DeploymentRow | null> {
     const [row] = await this.sql.SelectDeploymentById`
       /* @notNull environment_names */
-      /* @notNull created_at */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
@@ -206,7 +204,6 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
    */
   listLive(): Promise<LiveDeploymentRow[]> {
     return this.sql.SelectLiveDeployments`
-      /* @notNull created_at */
       /* @notNull desired_running */
       SELECT d.id, d.state, d.created_at, (a.state = 'active') AS desired_running
       FROM nibrun.deployments d
@@ -303,7 +300,6 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   }): Promise<DeploymentRow | null> {
     const [row] = await tx.SelectInsertedDeployment`
       /* @notNull environment_names */
-      /* @notNull created_at */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,

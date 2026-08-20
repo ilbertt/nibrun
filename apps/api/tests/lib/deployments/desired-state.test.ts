@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import { environmentByDeployment, toDesiredInstance } from '#lib/deployments/desired-state.ts';
 import { sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';

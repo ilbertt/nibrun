@@ -6,7 +6,7 @@ import {
   HostnameSchema,
   Value,
 } from '@repo/protocol';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 
 /**
  * The app domain is a different registrable domain from the one the dashboard is served on, so

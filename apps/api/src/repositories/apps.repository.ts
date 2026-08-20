@@ -10,7 +10,7 @@ import type {
   OwnerId,
 } from '@repo/protocol';
 import type { ArrayType } from 'bun';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
@@ -139,7 +139,6 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const [app] = await tx.SelectCreatedApp`
         /* @notNull environment_names */
-        /* @notNull created_at */
         SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
                c.guest_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
@@ -165,7 +164,6 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   listByOwner({ ownerId }: { ownerId: OwnerId }): Promise<AppRow[]> {
     return this.sql.SelectAppsByOwner`
       /* @notNull environment_names */
-      /* @notNull created_at */
       SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
              c.guest_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
@@ -186,7 +184,6 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   async findById({ appId, ownerId }: OwnedApp): Promise<AppRow | null> {
     const [app] = await this.sql.SelectAppById`
       /* @notNull environment_names */
-      /* @notNull created_at */
       SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
              c.guest_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
@@ -280,7 +277,6 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       // nothing would move `updated_at` without this.
       const [app] = await tx.TouchAppAfterConfigPatch`
         /* @notNull environment_names */
-        /* @notNull created_at */
         UPDATE nibrun.apps a
         SET updated_at = now()
         FROM nibrun.app_configs_with_environment c
@@ -409,7 +405,6 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const [app] = await tx.SelectAppAfterStateChange`
         /* @notNull environment_names */
-        /* @notNull created_at */
         SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
                c.guest_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,

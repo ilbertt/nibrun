@@ -1,5 +1,5 @@
 import type { DesiredExport } from '@repo/protocol';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import { volumeIdOf } from '#lib/deployments/desired-state.ts';
 
 export type DesiredExportRow = Queries['SelectDesiredExports'];

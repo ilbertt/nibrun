@@ -1,4 +1,4 @@
-import type { ISelectHealthPingResult } from '#db/queries.gen.js';
+import type { ISelectHealthPingResult } from '#db/queries.gen.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export class HealthRepository extends Repository {

@@ -1,5 +1,5 @@
 import type { AppHostnameKind, AppHostnameState, AppId, Hostname, OwnerId } from '@repo/protocol';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type AppHostnameRow = Queries['SelectAppHostnamesByApp'];

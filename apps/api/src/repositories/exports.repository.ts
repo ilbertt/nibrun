@@ -1,5 +1,5 @@
 import type { AppId, CheckpointId, ExportId, ExportState, OwnerId } from '@repo/protocol';
-import type { Queries } from '#db/queries.gen.d.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type ExportRow = Queries['SelectExportById'];
@@ -72,7 +72,6 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
 
   listByApp({ appId, ownerId }: ExportsByAppInput): Promise<ExportRow[]> {
     return this.sql.SelectExportsByApp`
-      /* @notNull created_at */
       /* @notNull object_key */
       /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
@@ -86,7 +85,6 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
 
   async findById({ appId, exportId, ownerId }: ExportByIdInput): Promise<ExportRow | null> {
     const [row] = await this.sql.SelectExportById`
-      /* @notNull created_at */
       /* @notNull object_key */
       /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
@@ -134,7 +132,6 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
 
   private async findInFlight({ appId, ownerId }: ExportsByAppInput): Promise<ExportRow | null> {
     const [row] = await this.sql.SelectInFlightExport`
-      /* @notNull created_at */
       /* @notNull object_key */
       /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
