@@ -126,7 +126,11 @@ export function evaluateInstanceState({
     if (stopRequested || !desiredRunning) {
       return 'stopped';
     }
-    return unit.loaded || startedAtMs !== undefined ? 'failed' : 'pending';
+    // Being loaded is not having been started: systemd keeps a template instance loaded after
+    // it stops, so the unit a replace has just torn down is still loaded while the next one is
+    // being staged. Only a start this agent saw through records a time, which is what separates
+    // a boot still in flight from one that died.
+    return startedAtMs !== undefined ? 'failed' : 'pending';
   }
   if (stopRequested) {
     return 'stopping';
