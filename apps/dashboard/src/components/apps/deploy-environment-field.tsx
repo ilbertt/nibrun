@@ -1,7 +1,10 @@
-import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
-import { Textarea } from '@repo/ui/components/textarea';
+import { Field, FieldDescription, FieldError, FieldTitle } from '@repo/ui/components/field';
+import { EnvironmentTable } from '#components/apps/environment-table.tsx';
+import { storedVariables } from '#lib/environment-variables.ts';
 import { type DeployFormApi, validateEnvironment } from '#lib/hooks/use-deploy-form.ts';
 import type { AppSummary } from '#queries/apps.ts';
+
+const TITLE_ID = 'deploy-environment-title';
 
 export function DeployEnvironmentField({
   api,
@@ -13,14 +16,16 @@ export function DeployEnvironmentField({
   return (
     <api.Field name="environment" validators={{ onChange: validateEnvironment }}>
       {(field) => (
-        <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
-          <FieldLabel htmlFor="deploy-environment">Environment</FieldLabel>
-          <Textarea
-            id="deploy-environment"
-            value={field.state.value ?? ''}
-            onChange={(event) => field.handleChange(event.target.value)}
-            placeholder={'OPENCLAW_STATE_DIR=/app/data/.openclaw'}
-            className="font-mono"
+        <Field
+          aria-labelledby={TITLE_ID}
+          data-invalid={field.state.meta.errors.length > 0 || undefined}
+        >
+          <FieldTitle id={TITLE_ID}>Environment</FieldTitle>
+          {/* Seeded from the app rather than held in the form until something is edited: the app
+              is read while the dialog is already open, and defaults are fixed when it mounts. */}
+          <EnvironmentTable
+            variables={field.state.value ?? storedVariables(replacing)}
+            onChange={field.handleChange}
           />
           {field.state.meta.errors.length > 0 ? (
             <FieldError>{field.state.meta.errors[0]}</FieldError>
@@ -33,12 +38,9 @@ export function DeployEnvironmentField({
   );
 }
 
-// A value cannot be shown once it is set — the api returns the names and nothing else — so what
-// this says is what leaving the box alone will do.
 function describeEnvironment(replacing: AppSummary | undefined): string {
-  const names = Object.keys(replacing?.config.environment ?? {});
-  if (names.length === 0) {
-    return 'One NAME=value per line. What the binary runs with.';
+  if (replacing === undefined) {
+    return 'What the binary runs with.';
   }
-  return `One NAME=value per line. What is not named here is left as it is — ${names.join(', ')} are set.`;
+  return 'What the binary runs with. A value already set can be replaced but never read back, and a row removed here is a variable the app stops running with.';
 }

@@ -3,6 +3,6 @@
   "compilerOptions": {
     "types": ["vite/client", "react", "react-dom"]
   },
-  "include": ["src", "vite.config.ts"],
+  "include": ["src", "tests", "vite.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

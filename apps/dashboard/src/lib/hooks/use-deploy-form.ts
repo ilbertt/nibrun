@@ -1,10 +1,17 @@
 import {
   InvalidEnvironmentError,
-  parseEnvironment,
+  parseEnvironmentPatch,
   type UploadableBinary,
 } from '@repo/app-operations';
 import { DEFAULT_GUEST_PORT, FilenameSchema, Value } from '@repo/protocol';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
+import {
+  type EnvironmentVariable,
+  environmentEdits,
+  filledVariables,
+  repeatedName,
+  storedNames,
+} from '#lib/environment-variables.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
 import type { DeployRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
@@ -15,7 +22,7 @@ export type DeployFormValues = {
   name: string;
   port: string | undefined;
   args: string | undefined;
-  environment: string | undefined;
+  environment: EnvironmentVariable[] | undefined;
 };
 
 export type DeployFormApi = ReactFormExtendedApi<
@@ -65,20 +72,29 @@ export function validatePort({ value }: { value: string | undefined }): string |
     : 'Ports are whole numbers.';
 }
 
-export function validateEnvironment({ value }: { value: string | undefined }): string | undefined {
+export function validateEnvironment({
+  value,
+}: {
+  value: EnvironmentVariable[] | undefined;
+}): string | undefined {
+  const variables = filledVariables(value ?? []);
+  if (variables.some((variable) => variable.name.trim().length === 0)) {
+    return 'A variable needs a name.';
+  }
+
+  // Two rows under one name are one variable by the time they are a record, so the row that lost
+  // would go without a word — and which of them lost is not something a form should decide.
+  const repeated = repeatedName(variables);
+  if (repeated !== undefined) {
+    return `Two rows name ${repeated}; one of them has to go.`;
+  }
+
   try {
-    parseEnvironment({ set: assignments(value ?? ''), remove: [] });
+    parseEnvironmentPatch(environmentEdits({ variables, stored: [] }));
     return undefined;
   } catch (failure) {
     return failure instanceof InvalidEnvironmentError ? failure.message : undefined;
   }
-}
-
-function assignments(onePerLine: string): string[] {
-  return onePerLine
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
 }
 
 export function useDeployForm({ appId }: { appId: string | undefined }): DeployFormState {
@@ -117,21 +133,23 @@ function asDeployRequest({
   replacing: AppSummary | undefined;
 }): DeployRequest | undefined {
   const binary = value.binary === undefined ? undefined : uploadableFrom(value.binary);
-  const entered = assignments(value.environment ?? '');
   const port = Number(value.port ?? replacing?.config.guestPort ?? DEFAULT_GUEST_PORT);
   if (binary === undefined || !Number.isInteger(port)) {
     return undefined;
   }
 
+  const edits = environmentEdits({
+    variables: value.environment,
+    stored: storedNames(replacing),
+  });
+
   return {
     binary,
     args: tenantArguments(value.args ?? replacing?.config.args.join('\n') ?? ''),
-    // An empty box changes nothing, and a full one only the variables it names: the form cannot
-    // show a value it is not allowed to read, so what it says nothing about has to be what it
-    // leaves alone. Taking a variable away is `nib run --unset` until this box is a table.
-    ...(entered.length === 0
-      ? {}
-      : { environment: parseEnvironment({ set: entered, remove: [] }) }),
+    // Only what the table changed. A row still sealed holds a value this end has never read, so
+    // it is sent as nothing at all — which is what leaves it alone — and a name the app has that
+    // the table no longer does goes as null, the only way to say a variable should be removed.
+    ...(edits.length === 0 ? {} : { environment: parseEnvironmentPatch(edits) }),
     app: replacing?.slug,
     name: replacing === undefined ? value.name.trim() || undefined : undefined,
     port,
