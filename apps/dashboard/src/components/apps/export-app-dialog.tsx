@@ -41,13 +41,14 @@ export function ExportAppDialog() {
         </p>
 
         {run.isPending && (
-          <div className="flex items-start gap-2 rounded-2xl bg-muted px-3 py-2 text-sm">
-            <Spinner className="mt-0.5 shrink-0" />
-            <span className="wrap-anywhere font-mono">
-              {run.exportId === undefined
-                ? 'asking for an export'
-                : `preparing export ${run.exportId}`}
+          <div className="flex flex-col gap-1 rounded-2xl bg-muted px-3 py-2 text-sm">
+            <span className="flex items-center gap-2 text-muted-foreground">
+              <Spinner className="shrink-0" />
+              {run.exportId === undefined ? 'asking for an export' : 'preparing export'}
             </span>
+            {run.exportId !== undefined && (
+              <span className="wrap-anywhere font-mono">{run.exportId}</span>
+            )}
           </div>
         )}
 
