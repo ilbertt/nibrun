@@ -14,12 +14,13 @@ export type DeployRun = {
   reset: () => void;
 };
 
-export function useRunApp(): DeployRun {
+export function useRunApp({ onDeployed }: { onDeployed: (() => void) | undefined }): DeployRun {
   const [steps, setSteps] = useState<readonly DeployStep[]>([]);
   const [progress, setProgress] = useState<UploadProgress | undefined>(undefined);
   const run = useDeploy({
     onStep: (step) => setSteps((seen) => [...seen, step]),
     onProgress: setProgress,
+    onDeployed,
   });
 
   return {

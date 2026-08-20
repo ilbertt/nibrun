@@ -22,12 +22,12 @@ function openDatabase(): Promise<IDBDatabase> {
  * Settles on the transaction, never on the request inside it.
  *
  * A request's `onsuccess` only means the value is staged; `oncomplete` is the commit. The
- * landing page navigates the instant this is acknowledged, which unloads the document holding
- * the frame — so acknowledging at `onsuccess` promises a binary that the teardown then throws
- * away. Strict durability is what makes the commit outlive that, since the default lets the
- * browser keep it in memory and write it whenever it likes.
+ * landing page navigates the instant a write is acknowledged, which unloads the document
+ * holding the frame — so acknowledging at `onsuccess` promises a binary that the teardown then
+ * throws away. Strict durability is what makes the commit outlive that, since the default lets
+ * the browser keep it in memory and write it whenever it likes.
  */
-export async function storeHandedOffBinary(binary: File): Promise<void> {
+async function commitWrite(change: (binaries: IDBObjectStore) => void): Promise<void> {
   const database = await openDatabase();
   const { promise, resolve, reject } = Promise.withResolvers<void>();
 
@@ -36,12 +36,21 @@ export async function storeHandedOffBinary(binary: File): Promise<void> {
 
     write.oncomplete = () => resolve();
     write.onabort = () => reject(write.error ?? new Error('The browser refused the write.'));
-    write.objectStore(STORE_NAME).put(binary, BINARY_KEY);
+    change(write.objectStore(STORE_NAME));
 
     await promise;
   } finally {
     database.close();
   }
+}
+
+export function storeHandedOffBinary(binary: File): Promise<void> {
+  return commitWrite((binaries) => binaries.put(binary, BINARY_KEY));
+}
+
+/** A binary is spent once it has been deployed; left here it would be offered again. */
+export function forgetHandedOffBinary(): Promise<void> {
+  return commitWrite((binaries) => binaries.delete(BINARY_KEY));
 }
 
 export async function readHandedOffBinary(): Promise<File | undefined> {

@@ -26,9 +26,11 @@ export type DeployMutation = UseMutationResult<Deployed, Error, DeployRequest>;
 export function useDeploy({
   onStep,
   onProgress,
+  onDeployed,
 }: {
   onStep: (step: DeployStep) => void;
   onProgress: (progress: UploadProgress) => void;
+  onDeployed: (() => void) | undefined;
 }): DeployMutation {
   const queryClient = useQueryClient();
 
@@ -51,6 +53,7 @@ export function useDeploy({
       }
       return deployed;
     },
+    onSuccess: onDeployed,
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: ['apps'] });
       await queryClient.invalidateQueries({ queryKey: ['deployments'] });
