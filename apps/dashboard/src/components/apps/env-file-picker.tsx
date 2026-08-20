@@ -41,7 +41,6 @@ export function EnvFilePicker({ onLoad }: { onLoad: (entries: EnvironmentAssignm
       <input
         ref={input}
         type="file"
-        accept=".env,text/plain"
         className="sr-only"
         tabIndex={-1}
         aria-hidden
