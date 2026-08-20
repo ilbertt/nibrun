@@ -319,16 +319,17 @@ describe('thresholds are honoured', () => {
 });
 
 describe('a failure accounts for itself', () => {
-  const failure = (unit: UnitStatus, tracker: Tracker) =>
-    describeInstanceFailure({
+  function failure({ unit, tracker }: { unit: UnitStatus; tracker: Tracker }): string {
+    return describeInstanceFailure({
       unit,
       tracker,
       healthCheck: check(),
       guestPort: DEFAULT_GUEST_PORT,
     });
+  }
 
   test('a VM that stopped names the code it stopped with', () => {
-    expect(failure(exited, initialTracker())).toBe(
+    expect(failure({ unit: exited, tracker: initialTracker() })).toBe(
       'the microVM stopped without being asked to, exit code 0',
     );
   });
@@ -336,7 +337,7 @@ describe('a failure accounts for itself', () => {
   // systemd has nothing to report for a unit it has already been asked to forget, and an owner
   // told only that a number is missing learns less than one told the VM stopped.
   test('and one whose code systemd no longer has still says what happened', () => {
-    expect(failure({ ...crashed, exitCode: undefined }, initialTracker())).toBe(
+    expect(failure({ unit: { ...crashed, exitCode: undefined }, tracker: initialTracker() })).toBe(
       'the microVM stopped without being asked to',
     );
   });
@@ -344,7 +345,7 @@ describe('a failure accounts for itself', () => {
   test('a guest nobody could reach names the port and what was spent trying', () => {
     const tracker = { ...initialTracker(), consecutiveFailures: UNHEALTHY_RUN };
 
-    expect(failure(active, tracker)).toBe(
+    expect(failure({ unit: active, tracker })).toBe(
       `nothing answered on port ${DEFAULT_GUEST_PORT} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
     );
   });
