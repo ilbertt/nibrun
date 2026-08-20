@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@repo/ui/components/dialog';
+import { DialogBody } from '@repo/ui/custom/dialog-body';
 import { RocketIcon } from 'lucide-react';
 import { useState } from 'react';
 import { DeployForm } from '#components/apps/deploy-form.tsx';
@@ -31,10 +32,7 @@ export function DeployDialogContent({ appId }: { appId?: string }) {
         <RocketIcon data-icon="inline-start" />
         Deploy
       </DialogTrigger>
-      <DialogContent
-        showCloseButton={!running}
-        className="flex max-h-[calc(100dvh-2rem)] flex-col sm:max-w-lg"
-      >
+      <DialogContent showCloseButton={!running} className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Deploy a binary</DialogTitle>
           <DialogDescription>
@@ -43,9 +41,9 @@ export function DeployDialogContent({ appId }: { appId?: string }) {
               : 'The binary is on its way. Closing this does not stop it.'}
           </DialogDescription>
         </DialogHeader>
-        <div className="-mx-6 min-h-0 overflow-y-auto px-6">
+        <DialogBody>
           {run.phase === 'idle' ? <DeployForm appId={appId} /> : <DeployProgress />}
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );
