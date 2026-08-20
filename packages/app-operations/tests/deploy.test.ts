@@ -15,16 +15,30 @@ const PART_BYTES = 262_144;
 const REFUSED = 403;
 
 type Sent = { what: string; body?: unknown };
+type HostnameRow = { hostname: string; kind: string; state: string };
+
+const PLATFORM: HostnameRow = { hostname: `${SLUG}.nibrun.app`, kind: 'platform', state: 'active' };
+const PENDING_CUSTOM: HostnameRow = {
+  hostname: 'not-pointed-here-yet.example',
+  kind: 'custom',
+  state: 'pending',
+};
 
 function apiHolding({
   apps,
   sent,
   completed = { id: ARTIFACT_ID, digest: DIGEST },
+  hostnames = [PENDING_CUSTOM, PLATFORM],
 }: {
   apps: Array<{ id: string; slug: string }>;
   sent: Sent[];
   completed?: { id: string; digest: string } | null;
+  hostnames?: HostnameRow[];
 }): PublicApiClient {
+  function app(id: string) {
+    return { id, slug: SLUG, hostnames };
+  }
+
   function addressed({ appId }: { appId: string }) {
     function artifact() {
       return {
@@ -62,17 +76,6 @@ function apiHolding({
     },
   });
   return { api: { apps: route } } as unknown as PublicApiClient;
-}
-
-function app(id: string) {
-  return {
-    id,
-    slug: SLUG,
-    hostnames: [
-      { hostname: 'someone-else.example', kind: 'custom' },
-      { hostname: `${SLUG}.nibrun.app`, kind: 'platform' },
-    ],
-  };
 }
 
 function binary() {
@@ -124,6 +127,41 @@ test('a slug names the app the release lands on', async () => {
     deploymentId: 'deployment-1',
     url: `https://${SLUG}.nibrun.app`,
   });
+});
+
+test('a domain the owner brought is the address handed back, once it is serving', async () => {
+  const sent: Sent[] = [];
+  storeAnswering({ sent });
+
+  const deployed = await deploy({
+    api: apiHolding({
+      apps: [{ id: APP_ID, slug: SLUG }],
+      sent,
+      hostnames: [PLATFORM, { hostname: 'shop.example.com', kind: 'custom', state: 'active' }],
+    }),
+    binary: binary(),
+    args: [],
+    app: SLUG,
+  });
+
+  expect(deployed.url).toBe('https://shop.example.com');
+});
+
+// The link is offered the moment the deploy lands, and a brought domain is pending until the edge
+// holds a certificate for it — so preferring one too early hands out an address that does not
+// resolve.
+test('a domain still waiting on its records is not the one handed back', async () => {
+  const sent: Sent[] = [];
+  storeAnswering({ sent });
+
+  const deployed = await deploy({
+    api: apiHolding({ apps: [{ id: APP_ID, slug: SLUG }], sent }),
+    binary: binary(),
+    args: [],
+    app: SLUG,
+  });
+
+  expect(deployed.url).toBe(`https://${SLUG}.nibrun.app`);
 });
 
 test('naming no app creates one, named after the binary when nothing else says', async () => {

@@ -6,7 +6,9 @@ import { reportedMessage } from '#lib/failure.ts';
 import { probeInstance } from '#lib/health/probe.ts';
 import {
   applyProbe,
+  describeInstanceFailure,
   evaluateInstanceState,
+  type HealthTracker,
   initialTracker,
   nextProbeDelayMs,
 } from '#lib/health/state.ts';
@@ -18,7 +20,7 @@ import {
 } from '#lib/report/instance-record.ts';
 import { ensureArtifactImage } from '#lib/vm/artifacts.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
-import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
+import { UNKNOWN_UNIT, type UnitStatus } from '#lib/vm/unit-status.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
@@ -66,7 +68,7 @@ export const stopInstance = Effect.fn('stopInstance')(function* ({
   yield* setState({ appId, state: 'stopped' });
 });
 
-const setState = ({
+function setState({
   appId,
   state,
   stopRequested,
@@ -74,8 +76,8 @@ const setState = ({
   appId: AppId;
   state: InstanceState;
   stopRequested?: boolean;
-}) =>
-  AgentState.updateRecord({
+}) {
+  return AgentState.updateRecord({
     appId,
     change: (record) => ({
       ...record,
@@ -83,8 +85,9 @@ const setState = ({
       ...(stopRequested === undefined ? {} : { stopRequested }),
     }),
   });
+}
 
-const isStartable = ({
+function isStartable({
   existing,
   nowMs,
   desired,
@@ -92,7 +95,7 @@ const isStartable = ({
   existing: InstanceRecord | undefined;
   nowMs: number;
   desired: DesiredInstance;
-}) => {
+}): boolean {
   if (!existing) {
     return true;
   }
@@ -101,7 +104,7 @@ const isStartable = ({
     existing.startAttempts.attempts <= policy.maxRestarts &&
     isReadyToRetry({ window: existing.startAttempts, nowMs, policy })
   );
-};
+}
 
 /**
  * One entry per digest: two apps deploying the same bytes share the image, and fetching it
@@ -218,8 +221,30 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
   });
 });
 
-const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
-  Effect.gen(function* () {
+/** Only a failure has anything to say: every other state is its own account of itself. */
+function verdict({
+  state,
+  status,
+  health,
+  record,
+}: {
+  state: InstanceState;
+  status: UnitStatus;
+  health: HealthTracker;
+  record: InstanceRecord;
+}): string | undefined {
+  return state === 'failed'
+    ? describeInstanceFailure({
+        unit: status,
+        tracker: health,
+        healthCheck: record.healthCheck,
+        guestPort: record.guestPort,
+      })
+    : undefined;
+}
+
+function probed({ record, nowMs }: { record: InstanceRecord; nowMs: number }) {
+  return Effect.gen(function* () {
     const healthy = yield* probeInstance({
       guestIpv4: record.guestIpv4,
       guestPort: record.guestPort,
@@ -240,6 +265,7 @@ const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
       healthyThreshold: record.healthCheck.healthyThreshold,
     });
   });
+}
 
 /** Probes the tenants that are due, then settles each state from systemd and the probe together. */
 export const refreshStates = Effect.gen(function* () {
@@ -271,6 +297,9 @@ export const refreshStates = Effect.gen(function* () {
           ...(changed && status.exitCode !== undefined && !status.active
             ? { lastExitCode: status.exitCode }
             : {}),
+          // Cleared as readily as it is written: a message outliving the state it explains is
+          // read as an account of the state that replaced it.
+          ...(changed ? { message: verdict({ state, status, health, record }) } : {}),
         });
         if (changed) {
           yield* Effect.logInfo('instance state changed').pipe(

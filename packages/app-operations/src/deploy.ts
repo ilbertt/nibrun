@@ -99,7 +99,7 @@ export async function deploy({
     appId: app.id,
     slug: app.slug,
     deploymentId: deployment.id,
-    url: `https://${platformHostname(app.hostnames)}`,
+    url: `https://${servingHostname(app.hostnames)}`,
   };
 }
 
@@ -263,10 +263,22 @@ export async function awaitDeploymentSettled({
   );
 }
 
-function platformHostname(hostnames: ReadonlyArray<{ hostname: string; kind: string }>): string {
-  const platform = hostnames.find((entry) => entry.kind === 'platform') ?? hostnames[0];
-  if (!platform) {
+/**
+ * The address to hand back, preferring a domain the owner brought: the platform hostname is what
+ * nibrun issued, but a custom one is what they call their app.
+ *
+ * Active only. A brought domain is pending until the edge holds a certificate for it, and a link
+ * that does not resolve yet is worse than the one that does.
+ */
+function servingHostname(
+  hostnames: ReadonlyArray<{ hostname: string; kind: string; state: string }>,
+): string {
+  const serving =
+    hostnames.find((entry) => entry.kind === 'custom' && entry.state === 'active') ??
+    hostnames.find((entry) => entry.kind === 'platform') ??
+    hostnames[0];
+  if (!serving) {
     throw new ApiError('The app was created without a hostname.');
   }
-  return platform.hostname;
+  return serving.hostname;
 }

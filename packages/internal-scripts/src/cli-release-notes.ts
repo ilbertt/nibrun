@@ -38,20 +38,16 @@ function assertTagMatchesVersion() {
 }
 
 /**
- * macOS quarantines anything a browser downloaded, and these binaries are cross-compiled on Linux,
- * so none of them carries a signature Gatekeeper accepts. Saying so here is cheaper than an owner
- * meeting "cannot be opened" with nothing to go on.
+ * The script picks the asset, so the assets below are what it fetches rather than what an owner is
+ * meant to wire up by hand. It also sidesteps Gatekeeper: these binaries carry no signature macOS
+ * accepts, and a browser download would be quarantined where a curl is not.
  */
 function installSection() {
   return `
 ## Install
 
-Download the asset for your platform, then:
-
 \`\`\`sh
-chmod +x nib-<platform>
-xattr -d com.apple.quarantine nib-<platform>  # macOS only
-mv nib-<platform> /usr/local/bin/nib
+curl -fsSL https://nibrun.com/install.sh | sh
 \`\`\`
 `;
 }
