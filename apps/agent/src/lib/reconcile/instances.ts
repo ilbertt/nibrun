@@ -221,7 +221,7 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
 });
 
 /** Only a failure has anything to say: every other state is its own account of itself. */
-const verdict = ({
+function verdict({
   state,
   status,
   health,
@@ -231,8 +231,8 @@ const verdict = ({
   status: UnitStatus;
   health: HealthTracker;
   record: InstanceRecord;
-}) =>
-  state === 'failed'
+}): string | undefined {
+  return state === 'failed'
     ? describeInstanceFailure({
         unit: status,
         tracker: health,
@@ -240,6 +240,7 @@ const verdict = ({
         guestPort: record.guestPort,
       })
     : undefined;
+}
 
 const probed = ({ record, nowMs }: { record: InstanceRecord; nowMs: number }) =>
   Effect.gen(function* () {
