@@ -13,9 +13,16 @@ import { DeployEnvironmentField } from '#components/apps/deploy-environment-fiel
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
 import { useDeployForm, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
-export function DeployForm({ appId }: { appId: string | undefined }) {
+export function DeployForm({
+  appId,
+  binary,
+}: {
+  appId: string | undefined;
+  binary: File | undefined;
+}) {
   const { api, locked, replacing, targetResolved, defaultPort, defaultArgs } = useDeployForm({
     appId,
+    binary,
   });
 
   return (

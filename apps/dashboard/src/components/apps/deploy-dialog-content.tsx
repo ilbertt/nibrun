@@ -1,6 +1,7 @@
 import { Button } from '@repo/ui/components/button';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -42,7 +43,11 @@ export function DeployDialogContent({ appId }: { appId?: string }) {
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
-          {run.phase === 'idle' ? <DeployForm appId={appId} /> : <DeployProgress />}
+          {run.phase === 'idle' ? (
+            <DeployForm appId={appId} binary={undefined} />
+          ) : (
+            <DeployProgress done={<DialogClose render={<Button />}>Done</DialogClose>} />
+          )}
         </DialogBody>
       </DialogContent>
     </Dialog>
