@@ -10,7 +10,7 @@ import {
 import { Spinner } from '@repo/ui/components/spinner';
 import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { Link, useLocation } from '@tanstack/react-router';
-import { FileTerminalIcon, UploadIcon } from 'lucide-react';
+import { FileTerminalIcon } from 'lucide-react';
 import { HandoffDeploy } from '#components/handoff/handoff-deploy.tsx';
 import { formatBytes } from '#lib/format-bytes.ts';
 import type { DeploySuggestion } from '#lib/hooks/use-deploy-form.ts';
@@ -38,6 +38,11 @@ export function HandedOffBinary({ suggested }: { suggested?: DeploySuggestion | 
   );
 }
 
+/**
+ * A binary handed over from the landing page is a head start, not a precondition: the form
+ * carries a picker of its own, so an owner who arrived with nothing still has everything they
+ * need to deploy — which is why there is no empty state to land in.
+ */
 function Waiting({
   binary,
   signedIn,
@@ -48,26 +53,9 @@ function Waiting({
   suggested: DeploySuggestion | undefined;
 }) {
   const finishHandoff = useFinishHandoff();
-  // Arriving from a "Deploy on nibrun" link is an errand of its own: nothing was handed over,
-  // and the form's own picker is what the visitor came here to reach.
-  const invited = suggested?.name !== undefined || suggested?.port !== undefined;
-  // Whatever was asked for has to survive the trip through the login form, or signing in is
-  // what loses it.
+  // Whatever was handed over or asked for has to survive the trip through the login form, or
+  // signing in is what loses it.
   const here = useLocation({ select: (location) => location.href });
-
-  if (binary === undefined && !invited) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <UploadIcon />
-          </EmptyMedia>
-          <EmptyTitle>No binary waiting</EmptyTitle>
-          <EmptyDescription>Drop one on nibrun.com to bring it here.</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
 
   // The form asks the api what the owner already has, so there is nothing to render until
   // there is an owner.
