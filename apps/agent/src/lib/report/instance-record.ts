@@ -44,12 +44,15 @@ export type InstanceRecord = {
   readonly message?: string;
 };
 
+/** A budget nothing has spent: what an instance is born with, and what a deliberate stop gives back. */
+export const NO_START_ATTEMPTS: AttemptWindow = { attempts: NO_ATTEMPTS };
+
 export const newInstanceRecord = (
   fields: Omit<InstanceRecord, 'restartCount' | 'startAttempts' | 'stopRequested'>,
 ): InstanceRecord => ({
   ...fields,
   restartCount: NO_RESTARTS,
-  startAttempts: { attempts: NO_ATTEMPTS },
+  startAttempts: NO_START_ATTEMPTS,
   stopRequested: false,
 });
 

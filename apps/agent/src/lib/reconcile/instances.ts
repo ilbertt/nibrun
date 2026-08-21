@@ -16,6 +16,7 @@ import type { ReconcilePlan } from '#lib/reconcile/plan.ts';
 import {
   graceInputs,
   type InstanceRecord,
+  NO_START_ATTEMPTS,
   newInstanceRecord,
 } from '#lib/report/instance-record.ts';
 import { ensureArtifactImage } from '#lib/vm/artifacts.ts';
@@ -65,7 +66,12 @@ export const stopInstance = Effect.fn('stopInstance')(function* ({
     Effect.catchAll((error) => Effect.logError('instance stop failed', error)),
     Effect.annotateLogs({ appId, reason }),
   );
-  yield* setState({ appId, state: 'stopped' });
+  // The budget goes back with it: a stop that was asked for is not a failed start, and an app
+  // suspended while it was struggling to boot would otherwise be one nothing could resume.
+  yield* AgentState.updateRecord({
+    appId,
+    change: (record) => ({ ...record, state: 'stopped', startAttempts: NO_START_ATTEMPTS }),
+  });
 });
 
 function setState({
@@ -172,7 +178,7 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
         desiredRunning: true,
       })),
     startAttempts: nextAttemptWindow({
-      window: existing?.startAttempts ?? { attempts: 0 },
+      window: existing?.startAttempts ?? NO_START_ATTEMPTS,
       nowMs,
       resetAfterMs: desired.config.restartPolicy.resetAfterMs,
     }),
