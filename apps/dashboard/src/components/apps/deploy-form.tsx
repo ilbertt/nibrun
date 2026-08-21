@@ -11,18 +11,21 @@ import { Textarea } from '@repo/ui/components/textarea';
 import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
 import { DeployEnvironmentField } from '#components/apps/deploy-environment-field.tsx';
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
-import { useDeployForm, validatePort } from '#lib/hooks/use-deploy-form.ts';
+import { type DeploySuggestion, useDeployForm, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 export function DeployForm({
   appId,
   binary,
+  suggested,
 }: {
   appId: string | undefined;
   binary: File | undefined;
+  suggested?: DeploySuggestion | undefined;
 }) {
   const { api, locked, replacing, targetResolved, defaultPort, defaultArgs } = useDeployForm({
     appId,
     binary,
+    suggested,
   });
 
   return (
