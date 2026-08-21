@@ -1,5 +1,12 @@
 import { FileSystem, Path } from '@effect/platform';
-import type { GuestPort, RestartPolicy, TenantArguments, TenantEnvironment } from '@repo/protocol';
+import type {
+  AppHostname,
+  GuestPort,
+  Hostname,
+  RestartPolicy,
+  TenantArguments,
+  TenantEnvironment,
+} from '@repo/protocol';
 import { Data, Effect, Either } from 'effect';
 import { stdoutOf } from '#services/command-runner.service.ts';
 
@@ -20,6 +27,17 @@ const FORBIDDEN_VALUE_CHARACTERS = /[\n\r\0]/;
 // a resolver inside one would mean opening that back up for whatever else answers on the address.
 const DNS_SERVERS = ['1.1.1.1', '1.0.0.1'];
 
+/**
+ * The name nibrun issued the app, never one its owner brought: it is the hostname the app is
+ * always reachable at, and the only one that cannot be taken away underneath a running binary.
+ *
+ * Undefined has no meaning beyond a control plane that sent none — the runtime reads the line as
+ * optional, which is what lets a host adopt the guest image that reads it before this writes it.
+ */
+function platformHostname(hostnames: AppHostname[]): Hostname | undefined {
+  return hostnames.find((each) => each.kind === 'platform')?.hostname;
+}
+
 export class UnrepresentableEnvironment extends Data.TaggedError('UnrepresentableEnvironment')<{
   readonly variableName: string;
 }> {
@@ -36,17 +54,21 @@ export class UnrepresentableEnvironment extends Data.TaggedError('Unrepresentabl
  */
 export function renderInstanceEnv({
   guestPort,
+  hostnames,
   args,
   environment,
   restartPolicy,
 }: {
   guestPort: GuestPort;
+  hostnames: AppHostname[];
   args: TenantArguments;
   environment: TenantEnvironment;
   restartPolicy: RestartPolicy;
 }): Either.Either<string, UnrepresentableEnvironment> {
+  const hostname = platformHostname(hostnames);
   const lines = [
     `${RUNTIME_PREFIX}PORT=${guestPort}`,
+    ...(hostname === undefined ? [] : [`${RUNTIME_PREFIX}HOSTNAME=${hostname}`]),
     `${RUNTIME_PREFIX}MAX_RESTARTS=${restartPolicy.maxRestarts}`,
     `${RUNTIME_PREFIX}INITIAL_BACKOFF_MS=${restartPolicy.initialBackoffMs}`,
     `${RUNTIME_PREFIX}MAX_BACKOFF_MS=${restartPolicy.maxBackoffMs}`,
@@ -81,6 +103,7 @@ export const buildInstanceConfigImage = ({
 }: {
   workingDir: string;
   guestPort: GuestPort;
+  hostnames: AppHostname[];
   args: TenantArguments;
   environment: TenantEnvironment;
   restartPolicy: RestartPolicy;

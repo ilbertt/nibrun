@@ -18,13 +18,24 @@ Everything the binary can count on, and nothing else:
 | Working directory | `/app` |
 | Persistent volume | `/app/data` — 8 GiB, survives every redeploy |
 | Port | `PORT` is set by the guest; the app **must** listen on it, on `0.0.0.0` |
+| Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs and is lost on restart. So is everything outside `/app/data` |
 | Resources | 1 vCPU, 512 MiB RAM |
 | `HOME` | `/app` |
 | URL | `https://<slug>.nibrun.app`, live as soon as it boots |
 
 An app that writes its SQLite file and its uploads under `./data` and reads `PORT` needs no
-configuration to run here. A `PORT` you set yourself is ignored — the guest owns it.
+configuration to run here. A `PORT` or `NIBRUN_HOSTNAME` you set yourself is ignored — the guest
+owns both.
+
+A binary that needs its own absolute URL — an OAuth redirect, a webhook it registers, a link in
+an email — builds it from `NIBRUN_HOSTNAME` rather than being told it, and falls back to whatever
+it uses when it is not on nibrun:
+
+```ts
+const hostname = process.env.NIBRUN_HOSTNAME;
+const baseUrl = hostname ? `https://${hostname}` : `http://localhost:${port}`;
+```
 
 ## Deploying
 
@@ -61,11 +72,9 @@ Environment variables are an **edit**, not a replacement — anything a deploy d
 alone, so secrets are set once:
 
 ```sh
-nib run ./my-server --app my-app --env BASE_URL=https://my-app.nibrun.app --env LOG_LEVEL=debug
+nib run ./my-server --app my-app --env STRIPE_SECRET_KEY=sk_live_... --env LOG_LEVEL=debug
 nib run ./my-server --app my-app --unset LOG_LEVEL
 ```
-
-`BASE_URL` is the usual chicken-and-egg: deploy once, read the URL it prints, then set it.
 
 `nib --help` lists the rest — logs, domains, filesystem, export, delete.
 

@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  type AppHostname,
   DEFAULT_GUEST_PORT,
   DEFAULT_RESTART_POLICY,
   GuestPortSchema,
+  HostnameSchema,
   SecretStringSchema,
   Value,
 } from '@repo/protocol';
@@ -10,6 +12,14 @@ import { Either } from 'effect';
 import { renderInstanceEnv } from '#lib/vm/instance-env.ts';
 
 const NON_DEFAULT_PORT = 8080;
+
+const PLATFORM_HOSTNAME = 'my-app.nibrun.app';
+
+function hostname({ name, kind }: { name: string; kind: AppHostname['kind'] }): AppHostname {
+  return { hostname: Value.Parse(HostnameSchema, name), kind };
+}
+
+const PLATFORM = hostname({ name: PLATFORM_HOSTNAME, kind: 'platform' });
 
 function secret(value: string) {
   return Value.Parse(SecretStringSchema, value);
@@ -20,6 +30,7 @@ type Overrides = Partial<Parameters<typeof renderInstanceEnv>[0]>;
 function attempt(overrides: Overrides = {}) {
   return renderInstanceEnv({
     guestPort: DEFAULT_GUEST_PORT,
+    hostnames: [PLATFORM],
     args: [],
     environment: {},
     restartPolicy: DEFAULT_RESTART_POLICY,
@@ -39,9 +50,10 @@ function refusedVariable(overrides: Overrides) {
 // apps/runtime/src/config.c accepts NIBRUN_ and ENV_ and rejects every other line, so these
 // assertions are the boot contract rather than a formatting preference.
 describe('what apps/runtime parses off the config drive', () => {
-  test('the runtime keys it requires are all present', () => {
+  test('every key it writes is one the runtime knows', () => {
     expect(render().split('\n').filter(Boolean)).toEqual([
       `NIBRUN_PORT=${DEFAULT_GUEST_PORT}`,
+      `NIBRUN_HOSTNAME=${PLATFORM_HOSTNAME}`,
       `NIBRUN_MAX_RESTARTS=${DEFAULT_RESTART_POLICY.maxRestarts}`,
       `NIBRUN_INITIAL_BACKOFF_MS=${DEFAULT_RESTART_POLICY.initialBackoffMs}`,
       `NIBRUN_MAX_BACKOFF_MS=${DEFAULT_RESTART_POLICY.maxBackoffMs}`,
@@ -71,6 +83,22 @@ describe('what apps/runtime parses off the config drive', () => {
 
   test('an empty value stays an empty value', () => {
     expect(render({ environment: { EMPTY: secret('') } })).toContain('ENV_EMPTY=\n');
+  });
+
+  // The app answers on every hostname it holds, but only this one was issued by nibrun and
+  // cannot be taken away, so it is the one a binary can safely address itself by.
+  test('the hostname written is the platform one, whatever else the app answers on', () => {
+    const rendered = render({
+      hostnames: [hostname({ name: 'www.example.com', kind: 'custom' }), PLATFORM],
+    });
+    expect(rendered).toContain(`NIBRUN_HOSTNAME=${PLATFORM_HOSTNAME}\n`);
+    expect(rendered).not.toContain('www.example.com');
+  });
+
+  // A guest image older than this agent rejects a key it does not know, and would fail every
+  // boot on the fleet. Optional there, omitted here, so the two can be deployed apart.
+  test('an app with no platform hostname is sent no line rather than an empty one', () => {
+    expect(render({ hostnames: [] })).not.toContain('NIBRUN_HOSTNAME');
   });
 
   test('a non-default port is the one written', () => {
