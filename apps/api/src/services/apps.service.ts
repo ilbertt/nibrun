@@ -1,6 +1,7 @@
 import {
   type App,
   type AppId,
+  type OwnedAppState,
   type OwnerId,
   REDACTED,
   type ReportedVolume,
@@ -207,6 +208,36 @@ export class AppsService extends Service {
     const app = requireApp(
       await this.appsRepo.updateConfig({ appId, ownerId, patch: this.sealed(patch) }),
     );
+    const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
+
+    return toPublicApp({ app, hostnames });
+  }
+
+  /**
+   * Suspending an app takes the microVM down and leaves everything else standing: the volume and
+   * every byte on it, the hostnames, the deployment that was current. Resuming boots that same
+   * release again, so an app comes back as the thing that went away rather than as a new one.
+   *
+   * A host is not told to stop anything — the app being anything other than `active` is what its
+   * desired instance state is read from, so this is one row and the next poll.
+   *
+   * An app being deleted is refused rather than moved: the teardown is already running, and
+   * `deleting` is not a state there is a way back out of.
+   */
+  async setState({
+    appId,
+    ownerId,
+    state,
+  }: OwnedApp & { state: OwnedAppState }): Promise<PublicApp> {
+    const app = await this.appsRepo.updateOwnedState({ appId, ownerId, state });
+    if (!app) {
+      // Owned and unmoved means the predicate refused it, which it only ever does for a deletion
+      // already under way. Asked only when the update declined, so the usual path is one write.
+      if (await this.appsRepo.isOwnedBy({ appId, ownerId })) {
+        throw new ConflictError('The app is being deleted.');
+      }
+      throw new NotFoundError('App not found.');
+    }
     const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
 
     return toPublicApp({ app, hostnames });

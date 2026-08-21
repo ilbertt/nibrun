@@ -105,6 +105,15 @@ export const AppStateSchema = stringEnum(APP_STATES);
 
 export type AppState = typeof AppStateSchema.static;
 
+// The two an owner moves an app between, and the whole of what a request may ask for.
+// `deleting` is asked for by deleting the app, and `deleted` is a host's word for a filesystem
+// it no longer holds — neither is a state something outside can name.
+export const OWNED_APP_STATES = ['active', 'suspended'] as const satisfies readonly AppState[];
+
+export const OwnedAppStateSchema = stringEnum(OWNED_APP_STATES);
+
+export type OwnedAppState = typeof OwnedAppStateSchema.static;
+
 export const AppSchema = Type.Object({
   id: AppIdSchema,
   ownerId: OwnerIdSchema,

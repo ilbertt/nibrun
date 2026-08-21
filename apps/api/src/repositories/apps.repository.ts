@@ -7,6 +7,7 @@ import type {
   DnsLabel,
   Hostname,
   ObjectKey,
+  OwnedAppState,
   OwnerId,
 } from '@repo/protocol';
 import type { ArrayType } from 'bun';
@@ -51,6 +52,7 @@ export abstract class AppsRepositoryContract {
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: OwnedApp & { state: AppState }): Promise<AppRow | null>;
+  abstract updateOwnedState(input: OwnedApp & { state: OwnedAppState }): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
   abstract isDeletionFinishable(input: { appId: AppId }): Promise<boolean>;
   abstract listFinishableDeletions(input: { limit: number }): Promise<AppId[]>;
@@ -399,29 +401,56 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         WHERE id = ${appId} AND owner_id = ${ownerId} AND state <> 'deleted'
         RETURNING id
       `;
-      if (!updated) {
-        return null;
-      }
-
-      const [app] = await tx.SelectAppAfterStateChange`
-        /* @notNull environment_names */
-        SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
-               c.guest_port, c.args, c.vcpu_count, c.memory_mib,
-               c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
-               c.health_check_grace_period_ms, c.health_check_healthy_threshold,
-               c.health_check_unhealthy_threshold,
-               c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
-        FROM nibrun.live_apps a
-        JOIN LATERAL (
-          SELECT * FROM nibrun.app_configs_with_environment c
-          WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
-        ) c ON true
-        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      `;
-      return app ?? null;
+      return updated ? await appAfterStateChange({ tx, appId, ownerId }) : null;
     });
   }
+
+  /**
+   * The predicate is the whole point: a teardown is not something a state change can call off,
+   * so an app already `deleting` is left exactly as it is and answers `null` rather than coming
+   * back from the dead as `active`. Naming the states it may be moved out of rather than the one
+   * it may not is what keeps a state added later from silently becoming suspendable.
+   */
+  updateOwnedState({ appId, ownerId, state }: OwnedApp & { state: OwnedAppState }) {
+    return this.sql.begin(async (tx) => {
+      const [updated] = await tx.UpdateOwnedAppState`
+        UPDATE nibrun.apps
+        SET state = ${state}
+        WHERE id = ${appId} AND owner_id = ${ownerId} AND state IN ('active', 'suspended')
+        RETURNING id
+      `;
+      return updated ? await appAfterStateChange({ tx, appId, ownerId }) : null;
+    });
+  }
+}
+
+/** The app as the transaction that just moved it can see it, which is the state it is now in. */
+async function appAfterStateChange({
+  tx,
+  appId,
+  ownerId,
+}: {
+  tx: TypedSQL<Queries>;
+  appId: AppId;
+  ownerId: OwnerId;
+}): Promise<AppRow | null> {
+  const [app] = await tx.SelectAppAfterStateChange`
+    /* @notNull environment_names */
+    SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+           c.guest_port, c.args, c.vcpu_count, c.memory_mib,
+           c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
+           c.health_check_grace_period_ms, c.health_check_healthy_threshold,
+           c.health_check_unhealthy_threshold,
+           c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
+           c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+    FROM nibrun.live_apps a
+    JOIN LATERAL (
+      SELECT * FROM nibrun.app_configs_with_environment c
+      WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
+    ) c ON true
+    WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+  `;
+  return app ?? null;
 }
 
 /**

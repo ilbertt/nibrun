@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import type { AppState } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import { environmentByDeployment, toDesiredInstance } from '#lib/deployments/desired-state.ts';
 import { sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
@@ -82,6 +83,32 @@ describe('what a host is told to run with', () => {
     expect(instance.config.environment).toEqual({});
   });
 });
+
+/**
+ * The app's own state, carried on the deployment row: a host is told about every app it holds
+ * data for, and what it should be doing with each is read off here rather than from the app
+ * dropping out of the list. Suspending is that and nothing more — one row, and the next poll.
+ */
+describe('whether a host runs it is the state of the app, not of the release', () => {
+  test('an active app is the one that runs', () => {
+    expect(desiredInstance('active').desiredState).toBe('running');
+  });
+
+  // `deleting` is here because the app stays in desired state until its filesystem is gone, and
+  // a microVM still serving out of one being torn down is the thing that must not happen.
+  test.each(['suspended', 'deleting'] as const)('a %s app is one the host stops', (state) => {
+    expect(desiredInstance(state).desiredState).toBe('stopped');
+  });
+});
+
+function desiredInstance(state: AppState) {
+  return toDesiredInstance({
+    row: { ...deploymentRow(), state },
+    hostnames: new Map(),
+    environments: new Map(),
+    secretsKey: TEST_SECRETS_KEY,
+  });
+}
 
 function deploymentRow() {
   return {

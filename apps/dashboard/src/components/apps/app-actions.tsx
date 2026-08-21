@@ -1,6 +1,7 @@
 import { DeleteAppDialog } from '#components/apps/delete-app-dialog.tsx';
 import { DeployDialog } from '#components/apps/deploy-dialog.tsx';
 import { ExportAppDialog } from '#components/apps/export-app-dialog.tsx';
+import { SuspendAppButton } from '#components/apps/suspend-app-button.tsx';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 
 export function AppActions() {
@@ -10,6 +11,7 @@ export function AppActions() {
     <div className="flex shrink-0 items-center gap-2">
       <DeployDialog appId={appId} />
       <ExportAppDialog />
+      <SuspendAppButton />
       <DeleteAppDialog />
     </div>
   );

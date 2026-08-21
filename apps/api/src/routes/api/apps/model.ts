@@ -5,6 +5,7 @@ import {
   AppSchema,
   ByteSizeSchema,
   MIN_HOSTNAMES,
+  OwnedAppStateSchema,
   REDACTED,
   TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
@@ -78,6 +79,14 @@ export const AppResponseSchema = t.Composite([
 ]);
 
 export const ListAppsResponseSchema = t.Object({ apps: t.Array(AppResponseSchema) });
+
+// What state the app should be in, rather than an instruction to stop or start it: the host is
+// never sent either, and reads what it should be running off this. Narrowed to the two an owner
+// moves an app between, so a request cannot ask for a deletion or claim one is finished.
+export const AppStateRequestSchema = t.Object(
+  { state: OwnedAppStateSchema },
+  { additionalProperties: false },
+);
 
 // A name, not a URL: the hostname is derived from it once and never follows a rename.
 export const CreateAppRequestSchema = t.Object(

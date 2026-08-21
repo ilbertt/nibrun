@@ -10,6 +10,7 @@ const OWNED_ROUTES = [
   { method: 'POST', url: APPS_URL, body: { name: 'pocketbase' } },
   { method: 'GET', url: APP_URL },
   { method: 'PATCH', url: APP_URL, body: {} },
+  { method: 'PUT', url: `${APP_URL}/state`, body: { state: 'suspended' } },
   { method: 'DELETE', url: APP_URL },
 ];
 
@@ -79,6 +80,19 @@ describe('a malformed request is a bad request', () => {
 
   // Readable on the way out, refused on the way in: the api sizes the filesystem, so a caller
   // that thinks it can choose has to be told rather than quietly ignored.
+  // `deleting` and `deleted` are states an app is put in by being deleted and by a host saying
+  // its filesystem is gone. Accepting either here would be a deletion asked for by the wrong
+  // route, or an app calling itself gone while its bytes are still on a disk somewhere.
+  test.each(['deleting', 'deleted', 'paused'])('asking for the %s state', async (state) => {
+    const response = await sendJson({
+      method: 'PUT',
+      url: `${APP_URL}/state`,
+      body: { state },
+    });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
   test('patching the volume size is refused, because the api owns it', async () => {
     const response = await sendJson({
       method: 'PATCH',

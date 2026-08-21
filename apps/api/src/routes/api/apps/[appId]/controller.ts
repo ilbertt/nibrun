@@ -1,7 +1,11 @@
 import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
-import { AppConfigPatchSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
+import {
+  AppConfigPatchSchema,
+  AppResponseSchema,
+  AppStateRequestSchema,
+} from '#routes/api/apps/model.ts';
 import { AppsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdController = new Elysia()
@@ -34,6 +38,23 @@ export const AppsAppIdController = new Elysia()
     },
     {
       body: AppConfigPatchSchema,
+      response: { [StatusMap.OK]: AppResponseSchema },
+    },
+  )
+  // Idempotent on purpose: suspending an app twice is suspending it, so a retry after a lost
+  // response is the same request rather than a second one.
+  .put(
+    '/apps/:appId/state',
+    async ({ appsService, params, body, user, status }) => {
+      const app = await appsService.setState({
+        appId: Value.Parse(AppIdSchema, params.appId),
+        ownerId: Value.Parse(OwnerIdSchema, user.id),
+        state: body.state,
+      });
+      return status(StatusMap.OK, app);
+    },
+    {
+      body: AppStateRequestSchema,
       response: { [StatusMap.OK]: AppResponseSchema },
     },
   )

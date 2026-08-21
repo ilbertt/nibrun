@@ -9,6 +9,8 @@ import {
   HostnameSchema,
   type ObjectKey,
   ObjectKeySchema,
+  OWNED_APP_STATES,
+  type OwnedAppState,
   type OwnerId,
   REDACTED,
   type ReportedVolume,
@@ -163,7 +165,7 @@ class StubAppsRepository implements AppsRepositoryContract {
   }
 
   isOwnedBy(): Promise<boolean> {
-    return Promise.resolve(false);
+    return Promise.resolve(this.owns);
   }
 
   listByOwner(): Promise<AppRow[]> {
@@ -200,6 +202,21 @@ class StubAppsRepository implements AppsRepositoryContract {
     // rather than only returned.
     if (state === 'deleting') {
       this.deleting.push(appId);
+    }
+    return Promise.resolve({ ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state });
+  }
+
+  // An app already going is left where it is, which is the predicate the real statement carries.
+  updateOwnedState({
+    appId,
+    state,
+  }: {
+    appId: AppId;
+    ownerId: OwnerId;
+    state: OwnedAppState;
+  }): Promise<AppRow | null> {
+    if (!this.owns || this.deleting.includes(appId)) {
+      return Promise.resolve(null);
     }
     return Promise.resolve({ ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state });
   }
@@ -564,6 +581,40 @@ describe('an app the caller does not own is one that does not exist', () => {
       NotFoundError,
     );
     await expect(service.delete(owned)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.setState({ ...owned, state: 'suspended' })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+});
+
+/**
+ * Nothing is stopped from here. The app being anything other than `active` is what its desired
+ * instance state is read from, so what this has to get right is the row and what it refuses.
+ */
+describe('an app is suspended by saying so, and comes back the release it left as', () => {
+  const owned = { appId: APP_ID, ownerId: OWNER_ID };
+
+  for (const state of OWNED_APP_STATES) {
+    test(`an owner moves their app to ${state}`, async () => {
+      const appsRepo = new StubAppsRepository({ failures: 0 });
+      appsRepo.owns = true;
+
+      const app = await serviceWith({ appsRepo }).setState({ ...owned, state });
+
+      expect(app.state).toBe(state);
+    });
+  }
+
+  // The teardown is already running and there is nothing to bring back to: a volume the host has
+  // been told to remove is not one an app can be resumed onto.
+  test('an app being deleted is refused rather than brought back', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    appsRepo.deleting = [APP_ID];
+
+    await expect(
+      serviceWith({ appsRepo }).setState({ ...owned, state: 'active' }),
+    ).rejects.toBeInstanceOf(ConflictError);
   });
 });
 

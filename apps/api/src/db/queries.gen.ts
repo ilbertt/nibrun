@@ -353,6 +353,11 @@ export interface IUpdateAppStateResult {
     id: IAppsColumns["id"];
 }
 
+/** Result of query `UpdateOwnedAppState`. */
+export interface IUpdateOwnedAppStateResult {
+    id: IAppsColumns["id"];
+}
+
 /** Result of query `SelectAppAfterStateChange`. */
 export interface ISelectAppAfterStateChangeResult {
     id: IAppsColumns["id"];
@@ -723,6 +728,7 @@ export interface Queries {
     DeleteDeploymentsByApp: IDeleteDeploymentsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     UpdateAppState: IUpdateAppStateResult;
+    UpdateOwnedAppState: IUpdateOwnedAppStateResult;
     SelectAppAfterStateChange: ISelectAppAfterStateChangeResult;
     InsertPendingArtifact: IInsertPendingArtifactResult;
     CompleteArtifact: ICompleteArtifactResult;
