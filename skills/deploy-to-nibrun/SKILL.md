@@ -67,20 +67,7 @@ nib run ./my-server --app my-app --unset LOG_LEVEL
 
 `BASE_URL` is the usual chicken-and-egg: deploy once, read the URL it prints, then set it.
 
-## The rest of the CLI
-
-| Command | |
-| --- | --- |
-| `nib apps list` | slugs, states, when each last changed |
-| `nib apps logs --app <slug>` | stdout and stderr, followed until you stop it (`--timerange 5m` for history) |
-| `nib apps files ls [path] --app <slug>` | browse the volume without shelling in |
-| `nib apps domains --app <slug>` | hostnames it answers on |
-| `nib apps domains add <hostname> --app <slug>` | prints the two DNS records to add |
-| `nib apps export ./backup.tar.gz --app <slug>` | the binary and the whole disk, as one archive |
-| `nib apps delete --app <slug> --yes` | volume, binaries and exports. No undo |
-
-Every command takes `--app`; without it and without a terminal to ask at, it fails rather than
-guesses. `nib apps list` is the exception.
+`nib --help` lists the rest — logs, domains, filesystem, export, delete.
 
 Or drag the binary onto [app.nibrun.com](https://app.nibrun.com) — same thing, no CLI.
 
