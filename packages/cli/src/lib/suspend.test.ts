@@ -89,14 +89,11 @@ test('and resuming one that is already running sends nothing either', async () =
 
 // The api refuses this too. Said here because the read that turns a slug into an id has already
 // been paid for, and being told what is happening to the app beats being told it was not found.
-test.each(['deleting', 'deleted'])(
-  'an app that is %s is refused rather than sent',
-  async (state) => {
-    const asked: Asked[] = [];
+test('an app being deleted is refused rather than sent', async () => {
+  const asked: Asked[] = [];
 
-    await expect(
-      resumeApp({ api: apiHolding({ state, asked }), slug: SLUG, ui: uiSaying([]) }),
-    ).rejects.toBeInstanceOf(UsageError);
-    expect(asked).toEqual([]);
-  },
-);
+  await expect(
+    resumeApp({ api: apiHolding({ state: 'deleting', asked }), slug: SLUG, ui: uiSaying([]) }),
+  ).rejects.toBeInstanceOf(UsageError);
+  expect(asked).toEqual([]);
+});

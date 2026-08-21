@@ -41,10 +41,13 @@ export async function resumeApp({ api, slug, ui }: SuspendInput): Promise<void> 
  * An app is looked up here either way — a slug is what an owner types and an id is what the api
  * takes — so a teardown already running is answered from what that read said rather than by
  * sending a request the api would refuse.
+ *
+ * `deleting` is the only state that has to be ruled out: an app whose filesystem is gone has left
+ * the listing this read, so there is no `deleted` case to reach.
  */
 async function liveApp({ api, slug }: Omit<SuspendInput, 'ui'>) {
   const app = await appBySlug({ api, slug });
-  if (app.state === 'deleting' || app.state === 'deleted') {
+  if (app.state === 'deleting') {
     throw new UsageError(`${app.slug} is being deleted, and there is no way back out of that.`);
   }
   return app;
