@@ -2,6 +2,12 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.21-1]
+
+### 🚀 Features
+
+- *(api,cli,dashboard)* An app can be suspended and resumed (#246)
+
 ## [2026.8.20-2]
 
 ### 🚀 Features
