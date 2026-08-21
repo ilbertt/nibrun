@@ -44,8 +44,12 @@ export type InstanceRecord = {
   readonly message?: string;
 };
 
-/** A budget nothing has spent: what an instance is born with, and what a deliberate stop gives back. */
-export const NO_START_ATTEMPTS: AttemptWindow = { attempts: NO_ATTEMPTS };
+/**
+ * A budget nothing has spent: what an instance is born with, and what a deliberate stop gives
+ * back. Frozen because every record holds this one object, so a window edited in place rather
+ * than replaced would spend every other instance's budget along with its own.
+ */
+export const NO_START_ATTEMPTS: AttemptWindow = Object.freeze({ attempts: NO_ATTEMPTS });
 
 export const newInstanceRecord = (
   fields: Omit<InstanceRecord, 'restartCount' | 'startAttempts' | 'stopRequested'>,

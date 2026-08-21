@@ -93,6 +93,15 @@ function setState({
   });
 }
 
+/**
+ * A boot that follows a stop somebody asked for is the instance coming back, not the tenant
+ * having gone down: counting it would have an app that was suspended over the weekend read as one
+ * that crashed.
+ */
+function restarted(existing: InstanceRecord | undefined): boolean {
+  return existing !== undefined && !existing.stopRequested;
+}
+
 function isStartable({
   existing,
   nowMs,
@@ -194,7 +203,7 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
           state: 'starting',
           stopRequested: false,
           health: initialTracker(),
-          restartCount: attempted.restartCount + (existing ? ONE_RESTART : NO_RESTART),
+          restartCount: attempted.restartCount + (restarted(existing) ? ONE_RESTART : NO_RESTART),
           message: undefined,
         });
         yield* AgentState.modify((current) => {
