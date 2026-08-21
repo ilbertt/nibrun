@@ -37,6 +37,12 @@ export const Route = createRootRoute({
     links: [
       { rel: 'stylesheet', href: appCss },
       { rel: 'canonical', href: `${SITE_URL}/` },
+      {
+        rel: 'alternate',
+        type: 'text/markdown',
+        href: `${SITE_URL}/llms.txt`,
+        title: 'nibrun for agents',
+      },
       { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
     ],
   }),
