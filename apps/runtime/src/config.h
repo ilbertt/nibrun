@@ -20,6 +20,8 @@
  * one rather than papered over. */
 
 #define CONFIG_MAX_BYTES (128 * 1024)
+/* Mirrors MAX_HOSTNAME_LENGTH in packages/protocol, which refuses to write a longer one. */
+#define CONFIG_MAX_HOSTNAME 253
 #define CONFIG_MAX_TENANT_VARIABLES 256
 /* Mirrors MAX_ARGUMENTS in packages/protocol, which refuses to write more. */
 #define CONFIG_MAX_ARGUMENTS 64
@@ -36,6 +38,11 @@ struct restart_policy {
 
 struct instance_config {
   uint32_t port;
+  /* The hostname nibrun issued the app, handed to the tenant so a binary can build
+   * its own absolute URLs. NULL when the writer sent none, which is what lets a host
+   * adopt this image before the agent that writes it — every other key here is
+   * required, and an agent older than the image would fail every boot. */
+  char *hostname;
   struct restart_policy restart_policy;
   char *nameservers[CONFIG_MAX_NAMESERVERS];
   size_t nameserver_count;
@@ -59,9 +66,11 @@ bool config_read_file(struct instance_config *config, const char *path, char *bu
 /* argv for execve: the binary, then the parsed arguments, then NULL. */
 char *const *config_build_argv(const struct instance_config *config, const char *executable);
 
-/* The environment the tenant is exec'd with: PORT, which the platform owns because
- * it is the port the agent probes and routes to, then the tenant's own variables,
- * then defaults for anything they did not set. */
+/* The environment the tenant is exec'd with: PORT and NIBRUN_HOSTNAME, which the
+ * platform owns because they are the port the agent probes and the name the edge
+ * routes to, then the tenant's own variables, then defaults for anything they did
+ * not set. A tenant variable of either name is dropped rather than exported: it
+ * would describe an instance that does not exist. */
 char *const *config_build_environment(const struct instance_config *config);
 
 #endif

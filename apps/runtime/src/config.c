@@ -15,6 +15,9 @@
 #define RUNTIME_PREFIX "NIBRUN_"
 #define ARGUMENT_KEY_PREFIX "ARG_"
 #define TENANT_PREFIX "ENV_"
+#define HOSTNAME_KEY "HOSTNAME"
+/* The one runtime key the tenant is handed under its own name, so it is spelled once. */
+#define HOSTNAME_VARIABLE RUNTIME_PREFIX HOSTNAME_KEY
 
 #define MIN_PORT 1
 #define MAX_PORT 65535
@@ -23,13 +26,15 @@
 #define MIN_BACKOFF_FACTOR 1.0
 #define MAX_BACKOFF_FACTOR 1000.0
 
-/* PORT, HOME and TMPDIR, on top of whatever the tenant configured. */
-#define BASE_VARIABLES 3
+/* PORT, NIBRUN_HOSTNAME, HOME and TMPDIR, on top of whatever the tenant configured. */
+#define BASE_VARIABLES 4
 
 enum field_type {
   FIELD_UNSIGNED,
   FIELD_BACKOFF_FACTOR,
   FIELD_NAMESERVERS,
+  /* `minimum` and `maximum` bound its length rather than its value. */
+  FIELD_TEXT,
 };
 
 struct field {
@@ -54,6 +59,8 @@ static const struct field FIELDS[] = {
     {"RESET_AFTER_MS", FIELD_UNSIGNED, offsetof(struct instance_config, restart_policy.reset_after_ms), 0,
      MAX_DURATION_MS, true},
     {"DNS", FIELD_NAMESERVERS, 0, 0, 0, false},
+    {HOSTNAME_KEY, FIELD_TEXT, offsetof(struct instance_config, hostname), 1, CONFIG_MAX_HOSTNAME,
+     false},
 };
 
 #define FIELD_COUNT (sizeof(FIELDS) / sizeof(FIELDS[0]))
@@ -148,6 +155,16 @@ static bool assign(struct instance_config *config, const struct field *field, ch
     }
     case FIELD_NAMESERVERS:
       return parse_nameservers(config, value);
+    case FIELD_TEXT: {
+      size_t length = strlen(value);
+      if (length < field->minimum || length > field->maximum) {
+        log_line("%s%s is not between %u and %u bytes", RUNTIME_PREFIX, field->key, field->minimum,
+                 field->maximum);
+        return false;
+      }
+      *(char **)target = value;
+      return true;
+    }
   }
   return false;
 }
@@ -363,14 +380,26 @@ char *const *config_build_argv(const struct instance_config *config, const char 
 char *const *config_build_environment(const struct instance_config *config) {
   static char *environment[CONFIG_MAX_TENANT_VARIABLES + BASE_VARIABLES + 1];
   static char port_variable[sizeof("PORT=65535")];
+  static char hostname_variable[sizeof(HOSTNAME_VARIABLE "=") + CONFIG_MAX_HOSTNAME];
 
   snprintf(port_variable, sizeof(port_variable), "PORT=%u", config->port);
   size_t count = 0;
   environment[count++] = port_variable;
+  if (config->hostname != NULL) {
+    snprintf(hostname_variable, sizeof(hostname_variable), "%s=%s", HOSTNAME_VARIABLE,
+             config->hostname);
+    environment[count++] = hostname_variable;
+  }
 
   for (size_t index = 0; index < config->tenant_variable_count; index++) {
     if (is_named(config->tenant_environment[index], "PORT")) {
       log_line("ignoring the tenant's own PORT; this instance is served on %u", config->port);
+      continue;
+    }
+    /* Dropped whether or not one was written: the name belongs to the platform, so a
+     * value the tenant set would read as issued by it. */
+    if (is_named(config->tenant_environment[index], HOSTNAME_VARIABLE)) {
+      log_line("ignoring the tenant's own %s; the platform owns that name", HOSTNAME_VARIABLE);
       continue;
     }
     environment[count++] = config->tenant_environment[index];

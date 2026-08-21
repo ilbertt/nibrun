@@ -39,10 +39,12 @@ static void report(const char *record) {
     _exit(UNWRITABLE_EXIT_CODE);
   }
   const char *port = getenv("PORT");
+  const char *hostname = getenv("NIBRUN_HOSTNAME");
   const char *home = getenv("HOME");
   char line[512];
-  snprintf(line, sizeof(line), "PORT=%s HOME=%s CWD=%s UID=%d GID=%d\n", port == NULL ? "" : port,
-           home == NULL ? "" : home, directory, (int)getuid(), (int)getgid());
+  snprintf(line, sizeof(line), "PORT=%s NIBRUN_HOSTNAME=%s HOME=%s CWD=%s UID=%d GID=%d\n",
+           port == NULL ? "" : port, hostname == NULL ? "" : hostname, home == NULL ? "" : home,
+           directory, (int)getuid(), (int)getgid());
   append(record, line);
 }
 

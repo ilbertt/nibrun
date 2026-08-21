@@ -83,6 +83,38 @@ static void accepts_a_fractional_backoff_factor(void) {
   EXPECT(config.restart_policy.backoff_factor == 1.5);
 }
 
+/* The name the platform issued, and the one thing here a tenant binary needs in order
+ * to address itself. Optional, so a host may adopt this image before the agent that
+ * writes it. */
+static void carries_the_hostname_to_the_tenant(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "NIBRUN_HOSTNAME=my-app.nibrun.app\n"));
+
+  const char *issued = value_of(config_build_environment(&config), "NIBRUN_HOSTNAME");
+  EXPECT(issued != NULL && strcmp(issued, "my-app.nibrun.app") == 0);
+
+  EXPECT(parse(&config, REQUIRED));
+  EXPECT(config.hostname == NULL);
+  EXPECT(value_of(config_build_environment(&config), "NIBRUN_HOSTNAME") == NULL);
+}
+
+/* Their own would name an instance nobody is served by, and the prefix cannot keep the
+ * two apart here: both reach execve under the one name. */
+static void drops_a_tenant_hostname(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "NIBRUN_HOSTNAME=mine.nibrun.app\n"
+                                 "ENV_NIBRUN_HOSTNAME=elsewhere.example\n"));
+
+  char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "NIBRUN_HOSTNAME"), "mine.nibrun.app") == 0);
+
+  size_t count = 0;
+  while (environment[count] != NULL) {
+    count++;
+  }
+  EXPECT(count == 4); /* PORT, NIBRUN_HOSTNAME, HOME, TMPDIR */
+}
+
 static void accepts_an_ipv6_nameserver(void) {
   struct instance_config config;
   EXPECT(parse(&config, REQUIRED "NIBRUN_DNS=2606:4700:4700::1111\n"));
@@ -102,6 +134,18 @@ static void rejects_a_broken_file(void) {
   EXPECT(rejects(REQUIRED "NIBRUN_DNS=not-an-address\n"));
   EXPECT(rejects(REQUIRED "NIBRUN_DNS=\n"));
   EXPECT(rejects(REQUIRED "NIBRUN_DNS=1.1.1.1,8.8.8.8,9.9.9.9,1.0.0.1\n"));
+  EXPECT(rejects(REQUIRED "NIBRUN_HOSTNAME=\n"));
+}
+
+static void rejects_a_hostname_that_does_not_fit(void) {
+  static char text[CONFIG_MAX_BYTES];
+  size_t used = (size_t)snprintf(text, sizeof(text), "%sNIBRUN_HOSTNAME=", REQUIRED);
+  for (int index = 0; index <= CONFIG_MAX_HOSTNAME; index++) {
+    text[used++] = 'a';
+  }
+  text[used++] = '\n';
+  text[used] = '\0';
+  EXPECT(rejects(text));
 }
 
 static void rejects_a_value_that_is_not_a_number(void) {
@@ -214,8 +258,11 @@ int main(void) {
   accepts_a_file_without_a_trailing_newline();
   accepts_a_fractional_backoff_factor();
   accepts_an_ipv6_nameserver();
+  carries_the_hostname_to_the_tenant();
+  drops_a_tenant_hostname();
   rejects_a_broken_file();
   rejects_a_value_that_is_not_a_number();
+  rejects_a_hostname_that_does_not_fit();
   rejects_a_value_containing_a_newline();
   rejects_a_nul_byte();
   rejects_too_many_tenant_variables();

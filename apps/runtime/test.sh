@@ -75,8 +75,8 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 
-require 'the tenant runs unprivileged, in /app, on the port the config named' \
-  contains "$report" 'PORT=8080 HOME=/app CWD=/app UID=65534 GID=65534'
+require 'the tenant runs unprivileged, in /app, on the port and under the name the config gave it' \
+  contains "$report" 'PORT=8080 NIBRUN_HOSTNAME=boot-test.nibrun.app HOME=/app CWD=/app UID=65534 GID=65534'
 
 mounts=$(docker exec "$container" cat /proc/1/mounts)
 require 'the artifact is read-only and the data filesystem is not' \
