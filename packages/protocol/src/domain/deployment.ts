@@ -4,7 +4,18 @@ import { AppIdSchema, ArtifactIdSchema, DeploymentIdSchema } from '#domain/ident
 import { stringEnum } from '#lib/string-enum.ts';
 import { StateMessageSchema, TimestampSchema } from '#lib/wire.ts';
 
-export const DEPLOYMENT_STATES = ['pending', 'starting', 'active', 'superseded', 'failed'] as const;
+// `stopped` is the one an owner puts a release into and takes it back out of: a suspended app's
+// microVM is down and the release is still the app's current one, which is a different thing from
+// a release that failed and from one a newer deployment replaced. Non-terminal, so a host is
+// still told about it — being told is what lets the app be resumed onto the same release.
+export const DEPLOYMENT_STATES = [
+  'pending',
+  'starting',
+  'active',
+  'stopped',
+  'superseded',
+  'failed',
+] as const;
 
 export const DeploymentStateSchema = stringEnum(DEPLOYMENT_STATES);
 

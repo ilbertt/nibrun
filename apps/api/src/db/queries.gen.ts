@@ -348,16 +348,6 @@ export interface IDeleteDeploymentsByAppResult {
 export interface IDeleteArtifactsByAppResult {
 }
 
-/** Result of query `UpdateAppState`. */
-export interface IUpdateAppStateResult {
-    id: IAppsColumns["id"];
-}
-
-/** Result of query `UpdateOwnedAppState`. */
-export interface IUpdateOwnedAppStateResult {
-    id: IAppsColumns["id"];
-}
-
 /** Result of query `SelectAppAfterStateChange`. */
 export interface ISelectAppAfterStateChangeResult {
     id: IAppsColumns["id"];
@@ -561,6 +551,7 @@ export interface ISelectLiveDeploymentsResult {
     state: IDeploymentsColumns["state"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
+    state_changed_at: IAppsColumns["updated_at"];
     desired_running: boolean;
 }
 
@@ -727,8 +718,6 @@ export interface Queries {
     DeleteExportsByApp: IDeleteExportsByAppResult;
     DeleteDeploymentsByApp: IDeleteDeploymentsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
-    UpdateAppState: IUpdateAppStateResult;
-    UpdateOwnedAppState: IUpdateOwnedAppStateResult;
     SelectAppAfterStateChange: ISelectAppAfterStateChangeResult;
     InsertPendingArtifact: IInsertPendingArtifactResult;
     CompleteArtifact: ICompleteArtifactResult;

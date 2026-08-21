@@ -1,6 +1,7 @@
 import {
   type App,
   type AppId,
+  OWNED_APP_STATES,
   type OwnedAppState,
   type OwnerId,
   REDACTED,
@@ -27,7 +28,11 @@ import type {
   AppHostnameRow,
   AppHostnamesRepositoryContract,
 } from '#repositories/app-hostnames.repository.ts';
-import type { AppRow, AppsRepositoryContract } from '#repositories/apps.repository.ts';
+import {
+  type AppRow,
+  type AppsRepositoryContract,
+  LIVE_APP_STATES,
+} from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type { CustomHostnamesRepositoryContract } from '#repositories/custom-hostnames.repository.ts';
 import type { ExportsRepositoryContract } from '#repositories/exports.repository.ts';
@@ -229,7 +234,12 @@ export class AppsService extends Service {
     ownerId,
     state,
   }: OwnedApp & { state: OwnedAppState }): Promise<PublicApp> {
-    const app = await this.appsRepo.updateOwnedState({ appId, ownerId, state });
+    const app = await this.appsRepo.updateState({
+      appId,
+      ownerId,
+      state,
+      from: OWNED_APP_STATES,
+    });
     if (!app) {
       // Owned and unmoved means the predicate refused it, which it only ever does for a deletion
       // already under way. Asked only when the update declined, so the usual path is one write.
@@ -239,6 +249,9 @@ export class AppsService extends Service {
       throw new NotFoundError('App not found.');
     }
     const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
+    // The row is the whole of what this does, and it is what a host reads to decide whether to
+    // run the app — so an app that stopped serving has one line here saying who asked for it.
+    this.logger.info('app state changed', { appId, state });
 
     return toPublicApp({ app, hostnames });
   }
@@ -320,7 +333,14 @@ export class AppsService extends Service {
    * desired state the host is told about it in.
    */
   async delete({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
-    const app = requireApp(await this.appsRepo.updateState({ appId, ownerId, state: 'deleting' }));
+    const app = requireApp(
+      await this.appsRepo.updateState({
+        appId,
+        ownerId,
+        state: 'deleting',
+        from: LIVE_APP_STATES,
+      }),
+    );
     await this.exportsRepo.failInFlight({ appId, message: APP_DELETED });
     const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
     const [torndown] = await Promise.all([

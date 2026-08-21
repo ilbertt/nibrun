@@ -21,10 +21,13 @@ export function useAppSuspension(
 
   return useMutation({
     mutationFn: (state: OwnedAppState) => OPERATION[state]({ api, appId }),
-    // A prefix, so this takes the app's own row with it: `['apps', appId]` is what the badge and
-    // this button read the state from, and it is the state that just moved.
+    // Both, because the answer is made of both: `['apps']` is a prefix that takes the app's own
+    // row with it, and the release beside it is what says whether the host has caught up yet.
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['apps'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['apps'] }),
+        queryClient.invalidateQueries({ queryKey: ['deployments', appId] }),
+      ]);
     },
   });
 }

@@ -10,7 +10,6 @@ import {
   type ObjectKey,
   ObjectKeySchema,
   OWNED_APP_STATES,
-  type OwnedAppState,
   type OwnerId,
   REDACTED,
   type ReportedVolume,
@@ -36,6 +35,7 @@ import type {
   AppsRepositoryContract,
   CreatedApp,
   Leftovers,
+  StateChange,
 } from '#repositories/apps.repository.ts';
 import {
   type AppHostnameAccess,
@@ -95,8 +95,8 @@ function appRow(slug: DnsLabel): AppRow {
 
 /**
  * Records every slug it is offered and rejects the first `failures` of them, so a test can ask
- * what the service did rather than how it did it. Every read answers empty, which is what an
- * app belonging to somebody else looks like.
+ * what the service did rather than how it did it. Every read answers empty until `owns` says the
+ * app is this owner's, which is what an app belonging to somebody else looks like.
  */
 class StubAppsRepository implements AppsRepositoryContract {
   readonly offeredSlugs: DnsLabel[] = [];
@@ -187,15 +187,13 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve(this.owns ? appRow(Value.Parse(DnsLabelSchema, APP_NAME)) : null);
   }
 
-  updateState({
-    appId,
-    state,
-  }: {
-    appId: AppId;
-    ownerId: OwnerId;
-    state: AppState;
-  }): Promise<AppRow | null> {
+  updateState({ appId, state, from }: StateChange): Promise<AppRow | null> {
     if (!this.owns) {
+      return Promise.resolve(null);
+    }
+    // The predicate the real statement carries, said the same way: an app in none of the states
+    // the caller named is one it does not touch.
+    if (!from.includes(this.#stateOf(appId))) {
       return Promise.resolve(null);
     }
     // The state the app is left in is what `finishDeleting` then has to find, so it is recorded
@@ -206,19 +204,11 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve({ ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state });
   }
 
-  // An app already going is left where it is, which is the predicate the real statement carries.
-  updateOwnedState({
-    appId,
-    state,
-  }: {
-    appId: AppId;
-    ownerId: OwnerId;
-    state: OwnedAppState;
-  }): Promise<AppRow | null> {
-    if (!this.owns || this.deleting.includes(appId)) {
-      return Promise.resolve(null);
+  #stateOf(appId: AppId): AppState {
+    if (this.deleted.includes(appId)) {
+      return 'deleted';
     }
-    return Promise.resolve({ ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state });
+    return this.deleting.includes(appId) ? 'deleting' : 'active';
   }
 
   listPurgeable({ limit }: { limit: number }): Promise<AppId[]> {

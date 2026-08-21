@@ -159,11 +159,17 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
   }
 }
 
+/**
+ * `state_changed_at` follows `created_at` unless a case says otherwise: an app nobody has
+ * suspended last moved when it was created, which is before every deployment it has.
+ */
 function liveRow(overrides: Partial<LiveDeploymentRow> = {}): LiveDeploymentRow {
+  const createdAt = overrides.created_at ?? new Date();
   return {
     id: DEPLOYMENT_ID,
     state: 'pending' as DeploymentState,
-    created_at: new Date(),
+    created_at: createdAt,
+    state_changed_at: createdAt,
     desired_running: true,
     ...overrides,
   };

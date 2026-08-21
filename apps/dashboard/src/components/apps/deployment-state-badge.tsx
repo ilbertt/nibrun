@@ -8,6 +8,7 @@ const VARIANT: Record<DeploymentState, BadgeVariant> = {
   pending: 'outline',
   starting: 'outline',
   active: 'default',
+  stopped: 'secondary',
   superseded: 'secondary',
   failed: 'destructive',
 };

@@ -102,6 +102,7 @@ export class DeploymentsService extends Service {
         state: row.state,
         desiredRunning: row.desired_running,
         createdAt: row.created_at,
+        stateChangedAt: row.state_changed_at,
       }).advanceState({ reported: instance, now });
 
       if (state !== row.state) {

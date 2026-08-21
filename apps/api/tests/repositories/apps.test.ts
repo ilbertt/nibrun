@@ -4,6 +4,7 @@ import {
   type AppId,
   DnsLabelSchema,
   HostnameSchema,
+  OWNED_APP_STATES,
   type OwnerId,
   OwnerIdSchema,
   type TenantEnvironment,
@@ -14,17 +15,40 @@ import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
-import { AppsRepository } from '#repositories/apps.repository.ts';
+import { AppsRepository, LIVE_APP_STATES } from '#repositories/apps.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
 
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner');
+const STRANGER_ID = Value.Parse(OwnerIdSchema, 'stranger');
 const APP_SLUG = Value.Parse(DnsLabelSchema, 'pocketbase');
 const PLATFORM = Value.Parse(HostnameSchema, 'pocketbase.apps.example.com');
 
 const FIRST_TOKEN = 'sk-sealed-once';
+
+// One database for the file, because bringing a container up and migrating it is the expensive
+// part and every describe below wants the same empty schema.
+let sql: SQL;
+let repo: AppsRepository;
+
+// Long enough to pull the image, which the first run on a fresh machine does inside this hook.
+beforeAll(async () => {
+  sql = await startTestDatabase();
+  for (const id of [OWNER_ID, STRANGER_ID]) {
+    await sql.unsafe(
+      `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+       VALUES ($1, $1, $2, true, now(), now())`,
+      [id, `${id}@example.com`],
+    );
+  }
+  repo = new AppsRepository(withTypes<Queries>(sql));
+}, DATABASE_START_TIMEOUT_MS);
+
+afterAll(async () => {
+  await stopTestDatabase(sql);
+}, DATABASE_START_TIMEOUT_MS);
 
 function environment(entries: Record<string, string>): TenantEnvironment {
   return Value.Parse(TenantEnvironmentSchema, entries);
@@ -34,6 +58,27 @@ function sealed(entries: Record<string, string>) {
   return sealEnvironment({ key: TEST_SECRETS_KEY, environment: environment(entries) });
 }
 
+/** An app of its own for whoever asks, so no test is holding a row another test is moving. */
+async function createApp(slug: string): Promise<AppId> {
+  const label = Value.Parse(DnsLabelSchema, slug);
+  const created = await repo.create({
+    ownerId: OWNER_ID,
+    slug: label,
+    hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+    config: { ...configWithDefaults(), environment: {} },
+  });
+  return created.app.id;
+}
+
+async function storedState(appId: AppId): Promise<string | undefined> {
+  const [row] = (await sql.unsafe('SELECT state FROM nibrun.apps WHERE id = $1', [
+    appId,
+  ])) as Array<{
+    state: string;
+  }>;
+  return row?.state;
+}
+
 /**
  * A config version is what a deployment pins and its variables are part of that version, so a
  * patch writes a new version rather than editing one. Which of the previous version's variables
@@ -41,21 +86,10 @@ function sealed(entries: Record<string, string>) {
  * so this is exercised against the database rather than a fake.
  */
 describe('a config patch carries forward every variable it says nothing about', () => {
-  let sql: SQL;
-  let repo: AppsRepository;
   let appId: AppId;
   let ownerId: OwnerId;
 
-  // Long enough to pull the image, which the first run on a fresh machine does inside this hook.
   beforeAll(async () => {
-    sql = await startTestDatabase();
-    await sql.unsafe(
-      `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
-       VALUES ($1, 'owner', 'owner@example.com', true, now(), now())`,
-      [OWNER_ID],
-    );
-
-    repo = new AppsRepository(withTypes<Queries>(sql));
     const created = await repo.create({
       ownerId: OWNER_ID,
       slug: APP_SLUG,
@@ -67,11 +101,7 @@ describe('a config patch carries forward every variable it says nothing about', 
     });
     appId = created.app.id;
     ownerId = created.app.owner_id;
-  }, DATABASE_START_TIMEOUT_MS);
-
-  afterAll(async () => {
-    await stopTestDatabase(sql);
-  }, DATABASE_START_TIMEOUT_MS);
+  });
 
   /** As it is stored: ciphertext, which is the only form any of this ever reaches the column in. */
   async function storedEnvironment(): Promise<Record<string, string>> {
@@ -139,9 +169,80 @@ describe('a config patch carries forward every variable it says nothing about', 
   });
 
   test('a deleted app with only its hostname left is still purgeable', async () => {
-    await repo.updateState({ appId, ownerId, state: 'deleting' });
+    await repo.updateState({ appId, ownerId, state: 'deleting', from: LIVE_APP_STATES });
     await repo.finishDeleting({ appId });
 
     expect(await repo.listPurgeable({ limit: 8 })).toEqual([appId]);
+  });
+});
+
+/**
+ * Which states an app may be moved out of is the `WHERE` clause and nothing else, so no test over
+ * a fake repository can reach it — this is the one place it is exercised.
+ */
+describe('an owner moves their app between the two states they own', () => {
+  test('suspending it is the row moving, and the row that comes back is the one that moved', async () => {
+    const appId = await createApp('suspends');
+
+    const app = await repo.updateState({
+      appId,
+      ownerId: OWNER_ID,
+      state: 'suspended',
+      from: OWNED_APP_STATES,
+    });
+
+    expect(app?.state).toBe('suspended');
+    expect(await storedState(appId)).toBe('suspended');
+  });
+
+  test('and resuming it puts it back where it was', async () => {
+    const appId = await createApp('resumes');
+    await repo.updateState({
+      appId,
+      ownerId: OWNER_ID,
+      state: 'suspended',
+      from: OWNED_APP_STATES,
+    });
+
+    const app = await repo.updateState({
+      appId,
+      ownerId: OWNER_ID,
+      state: 'active',
+      from: OWNED_APP_STATES,
+    });
+
+    expect(app?.state).toBe('active');
+    expect(await storedState(appId)).toBe('active');
+  });
+
+  // The host has already been told to remove the filesystem. Resuming onto one that is going is
+  // an app brought back to nothing, so the statement declines rather than writes.
+  test('an app being deleted is left exactly where it is', async () => {
+    const appId = await createApp('doomed');
+    await repo.updateState({ appId, ownerId: OWNER_ID, state: 'deleting', from: LIVE_APP_STATES });
+
+    expect(
+      await repo.updateState({
+        appId,
+        ownerId: OWNER_ID,
+        state: 'active',
+        from: OWNED_APP_STATES,
+      }),
+    ).toBeNull();
+    expect(await storedState(appId)).toBe('deleting');
+  });
+
+  test('and an app belonging to somebody else is not one to suspend', async () => {
+    const appId = await createApp('theirs');
+
+    expect(
+      await repo.updateState({
+        appId,
+        ownerId: STRANGER_ID,
+        state: 'suspended',
+        from: OWNED_APP_STATES,
+      }),
+    ).toBeNull();
+    expect(await storedState(appId)).toBe('active');
   });
 });

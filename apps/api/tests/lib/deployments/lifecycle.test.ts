@@ -23,16 +23,19 @@ function advance({
   instance,
   desiredRunning = true,
   afterMs = JUST_DEPLOYED_MS,
+  stateChangedAt = CREATED_AT,
 }: {
   from?: DeploymentState;
   instance?: InstanceState;
   desiredRunning?: boolean;
   afterMs?: number;
+  stateChangedAt?: Date;
 }): DeploymentState {
   return new DeploymentLifecycle({
     state: from,
     desiredRunning,
     createdAt: CREATED_AT,
+    stateChangedAt,
   }).advanceState({
     reported: instance && reported(instance),
     now: new Date(CREATED_AT.getTime() + afterMs),
@@ -94,6 +97,106 @@ describe('a deployment nothing ever starts is one the owner is told about', () =
     expect(advance({ from: 'starting', instance: 'unhealthy', afterMs: STARTUP_DEADLINE_MS })).toBe(
       'failed',
     );
+  });
+});
+
+/**
+ * The half an owner watches. Suspending is instant on the app row and not instant on the host, so
+ * what the release says is the only thing that can tell a microVM winding down from one that is
+ * down — and, on the way back, one booting from one that is serving.
+ */
+describe('a suspended app stops its release once the host says the microVM is down', () => {
+  test('a release stays serving while the microVM is still winding down', () => {
+    expect(advance({ from: 'active', instance: 'stopping', desiredRunning: false })).toBe('active');
+  });
+
+  test('and stops once the host reports it stopped', () => {
+    expect(advance({ from: 'active', instance: 'stopped', desiredRunning: false })).toBe('stopped');
+  });
+
+  // The same stop with the app still wanted running is a host that lost the microVM, which is
+  // news the release survives — desired state asks for it again on the next pass.
+  test('a stop nobody asked for leaves the release serving', () => {
+    expect(advance({ from: 'active', instance: 'stopped' })).toBe('active');
+  });
+
+  test('a release that never served stops too rather than waiting out a deadline', () => {
+    expect(
+      advance({
+        from: 'starting',
+        instance: 'stopped',
+        desiredRunning: false,
+        afterMs: STARTUP_DEADLINE_MS,
+      }),
+    ).toBe('stopped');
+  });
+});
+
+describe('resuming brings the release back up through starting', () => {
+  const cases: [InstanceState, DeploymentState][] = [
+    ['pending', 'starting'],
+    ['starting', 'starting'],
+    ['running', 'active'],
+    ['failed', 'failed'],
+  ];
+
+  for (const [instance, expected] of cases) {
+    test(`a ${instance} instance makes a stopped deployment ${expected}`, () => {
+      expect(advance({ from: 'stopped', instance })).toBe(expected);
+    });
+  }
+
+  // Nothing is late while it is stopped, and the host has yet to pick the resume up.
+  test('a stopped release waits for the host without failing', () => {
+    expect(advance({ from: 'stopped', afterMs: STARTUP_DEADLINE_MS })).toBe('stopped');
+  });
+
+  test('and one still reported stopped is one the host has not got to yet', () => {
+    expect(advance({ from: 'stopped', instance: 'stopped', afterMs: STARTUP_DEADLINE_MS })).toBe(
+      'stopped',
+    );
+  });
+});
+
+/**
+ * The deadline is what a release that never came up is failed on, and an app suspended for an
+ * hour would come back to one that ran out while nothing was allowed to start it.
+ */
+describe('the startup deadline runs from the moment the app was asked to run', () => {
+  const SUSPENDED_FOR_MS = STARTUP_DEADLINE_MS * 10;
+
+  test('a resume starts the clock again', () => {
+    expect(
+      advance({
+        from: 'starting',
+        instance: 'stopped',
+        afterMs: SUSPENDED_FOR_MS,
+        stateChangedAt: new Date(CREATED_AT.getTime() + SUSPENDED_FOR_MS),
+      }),
+    ).toBe('starting');
+  });
+
+  test('and it runs out again if the host still has nothing to show for it', () => {
+    expect(
+      advance({
+        from: 'starting',
+        instance: 'stopped',
+        afterMs: SUSPENDED_FOR_MS + STARTUP_DEADLINE_MS,
+        stateChangedAt: new Date(CREATED_AT.getTime() + SUSPENDED_FOR_MS),
+      }),
+    ).toBe('failed');
+  });
+
+  // An app nobody has ever suspended changed state when it was created, which is before every
+  // deployment it has — so the clock is the deployment's own.
+  test('an app whose state has never moved is on its deployment clock', () => {
+    expect(
+      advance({
+        instance: 'stopped',
+        afterMs: STARTUP_DEADLINE_MS,
+        stateChangedAt: new Date(CREATED_AT.getTime() - SUSPENDED_FOR_MS),
+      }),
+    ).toBe('failed');
   });
 });
 

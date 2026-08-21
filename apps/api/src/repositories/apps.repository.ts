@@ -1,14 +1,14 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
-import type {
-  AppHostnameKind,
-  AppHostnameState,
-  AppId,
-  AppState,
-  DnsLabel,
-  Hostname,
-  ObjectKey,
-  OwnedAppState,
-  OwnerId,
+import {
+  APP_STATES,
+  type AppHostnameKind,
+  type AppHostnameState,
+  type AppId,
+  type AppState,
+  type DnsLabel,
+  type Hostname,
+  type ObjectKey,
+  type OwnerId,
 } from '@repo/protocol';
 import type { ArrayType } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
@@ -41,6 +41,18 @@ export type Leftovers = { artifacts: ObjectKey[]; exports: ObjectKey[] };
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
+/**
+ * `from` is the whole of what makes one state change different from another: a teardown is not
+ * something a suspend can call off, so the states an app may be moved *out of* are named by
+ * whoever is asking rather than assumed here. An app in none of them is left exactly as it is.
+ */
+export type StateChange = OwnedApp & { state: AppState; from: readonly AppState[] };
+
+/** Everything but `deleted`, which is a host's word for a filesystem that is gone. */
+export const LIVE_APP_STATES: readonly AppState[] = APP_STATES.filter(
+  (state) => state !== 'deleted',
+);
+
 export abstract class AppsRepositoryContract {
   abstract create(input: {
     ownerId: OwnerId;
@@ -51,8 +63,7 @@ export abstract class AppsRepositoryContract {
   abstract listByOwner(input: { ownerId: OwnerId }): Promise<AppRow[]>;
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
-  abstract updateState(input: OwnedApp & { state: AppState }): Promise<AppRow | null>;
-  abstract updateOwnedState(input: OwnedApp & { state: OwnedAppState }): Promise<AppRow | null>;
+  abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
   abstract isDeletionFinishable(input: { appId: AppId }): Promise<boolean>;
   abstract listFinishableDeletions(input: { limit: number }): Promise<AppId[]>;
@@ -393,30 +404,17 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     });
   }
 
-  updateState({ appId, ownerId, state }: OwnedApp & { state: AppState }) {
+  updateState({ appId, ownerId, state, from }: StateChange) {
     return this.sql.begin(async (tx) => {
-      const [updated] = await tx.UpdateAppState`
+      // Untagged for the reason `insertEnvironment` is: `sql.array` is a clause the generator
+      // blanks out before it parses the statement, and `state = ANY()` is not a predicate. There
+      // is no row type to lose — the only column is the id, and all this reads from it is
+      // whether the predicate matched anything.
+      const [updated] = await tx`
         UPDATE nibrun.apps
         SET state = ${state}
-        WHERE id = ${appId} AND owner_id = ${ownerId} AND state <> 'deleted'
-        RETURNING id
-      `;
-      return updated ? await appAfterStateChange({ tx, appId, ownerId }) : null;
-    });
-  }
-
-  /**
-   * The predicate is the whole point: a teardown is not something a state change can call off,
-   * so an app already `deleting` is left exactly as it is and answers `null` rather than coming
-   * back from the dead as `active`. Naming the states it may be moved out of rather than the one
-   * it may not is what keeps a state added later from silently becoming suspendable.
-   */
-  updateOwnedState({ appId, ownerId, state }: OwnedApp & { state: OwnedAppState }) {
-    return this.sql.begin(async (tx) => {
-      const [updated] = await tx.UpdateOwnedAppState`
-        UPDATE nibrun.apps
-        SET state = ${state}
-        WHERE id = ${appId} AND owner_id = ${ownerId} AND state IN ('active', 'suspended')
+        WHERE id = ${appId} AND owner_id = ${ownerId}
+          AND state = ANY(${tx.array([...from], TEXT_ARRAY)})
         RETURNING id
       `;
       return updated ? await appAfterStateChange({ tx, appId, ownerId }) : null;
@@ -424,7 +422,13 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   }
 }
 
-/** The app as the transaction that just moved it can see it, which is the state it is now in. */
+/**
+ * The app as the transaction that just moved it can see it, which is the state it is now in.
+ *
+ * A row that moved and cannot be read back is an app with no config version, which nothing can
+ * produce: raised rather than returned as `null`, because a caller reading that `null` as "the
+ * state did not move" would report a change that did happen as one that was refused.
+ */
 async function appAfterStateChange({
   tx,
   appId,
@@ -433,7 +437,7 @@ async function appAfterStateChange({
   tx: TypedSQL<Queries>;
   appId: AppId;
   ownerId: OwnerId;
-}): Promise<AppRow | null> {
+}): Promise<AppRow> {
   const [app] = await tx.SelectAppAfterStateChange`
     /* @notNull environment_names */
     SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
@@ -450,7 +454,10 @@ async function appAfterStateChange({
     ) c ON true
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
   `;
-  return app ?? null;
+  if (!app) {
+    throw new Error(`app ${appId} changed state and has no config version to read it back with`);
+  }
+  return app;
 }
 
 /**

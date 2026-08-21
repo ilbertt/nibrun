@@ -1,7 +1,7 @@
 import { Badge } from '@repo/ui/components/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
 import { ExternalLinkIcon } from 'lucide-react';
-import { AppStateBadge } from '#components/apps/app-state-badge.tsx';
+import { AppStatusBadge } from '#components/apps/app-status-badge.tsx';
 import { HostnameStateBadge } from '#components/apps/hostname-state-badge.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 import type { AppSummary } from '#queries/apps.ts';
@@ -15,7 +15,7 @@ export function AppOverviewCard({ app }: { app: AppSummary }) {
       <CardContent className="flex flex-col gap-4 text-sm">
         <div className="flex items-center justify-between gap-4">
           <span className="text-muted-foreground">State</span>
-          <AppStateBadge state={app.state} />
+          <AppStatusBadge app={app} />
         </div>
         <div className="flex items-center justify-between gap-4">
           <span className="text-muted-foreground">Last change</span>
