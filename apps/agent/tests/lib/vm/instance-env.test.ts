@@ -23,7 +23,6 @@ function attempt(overrides: Overrides = {}) {
     args: [],
     environment: {},
     restartPolicy: DEFAULT_RESTART_POLICY,
-    dnsServers: [],
     ...overrides,
   });
 }
@@ -48,6 +47,7 @@ describe('what apps/runtime parses off the config drive', () => {
       `NIBRUN_MAX_BACKOFF_MS=${DEFAULT_RESTART_POLICY.maxBackoffMs}`,
       `NIBRUN_BACKOFF_FACTOR=${DEFAULT_RESTART_POLICY.backoffFactor}`,
       `NIBRUN_RESET_AFTER_MS=${DEFAULT_RESTART_POLICY.resetAfterMs}`,
+      'NIBRUN_DNS=1.1.1.1,1.0.0.1',
     ]);
   });
 
@@ -62,13 +62,6 @@ describe('what apps/runtime parses off the config drive', () => {
     const rendered = render({ environment: { NIBRUN_PORT: secret('9999') } });
     expect(rendered).toContain(`NIBRUN_PORT=${DEFAULT_GUEST_PORT}\n`);
     expect(rendered).toContain('ENV_NIBRUN_PORT=9999\n');
-  });
-
-  test('nameservers are one comma-joined line, and absent when there are none', () => {
-    expect(render({ dnsServers: ['1.1.1.1', '8.8.8.8'] })).toContain(
-      'NIBRUN_DNS=1.1.1.1,8.8.8.8\n',
-    );
-    expect(render()).not.toContain('NIBRUN_DNS');
   });
 
   test('values are raw bytes, not quoted or escaped', () => {

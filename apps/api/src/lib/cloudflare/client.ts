@@ -1,6 +1,7 @@
 const API_BASE = 'https://api.cloudflare.com/client/v4/';
 
 const MAX_ERROR_BODY = 256;
+const HTTP_NOT_FOUND = 404;
 
 /**
  * Where Cloudflare answers the challenge on the owner's behalf. They point `_acme-challenge` at
@@ -10,9 +11,12 @@ const MAX_ERROR_BODY = 256;
 const DCV_DELEGATION_SUFFIX = 'dcv.cloudflare.com';
 
 export class CloudflareError extends Error {
+  readonly status: number;
+
   constructor({ status, body }: { status: number; body: string }) {
     super(`cloudflare answered ${status}: ${body}`);
     this.name = 'CloudflareError';
+    this.status = status;
   }
 }
 
@@ -72,7 +76,13 @@ export class CloudflareClient {
   }
 
   async deleteCustomHostname({ id }: { id: string }): Promise<void> {
-    await this.#request({ method: 'DELETE', path: `custom_hostnames/${id}` });
+    try {
+      await this.#request({ method: 'DELETE', path: `custom_hostnames/${id}` });
+    } catch (error) {
+      if (!(error instanceof CloudflareError) || error.status !== HTTP_NOT_FOUND) {
+        throw error;
+      }
+    }
   }
 
   /**

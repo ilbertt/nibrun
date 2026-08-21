@@ -16,6 +16,10 @@ const TENANT_PREFIX = 'ENV_';
 
 const FORBIDDEN_VALUE_CHARACTERS = /[\n\r\0]/;
 
+// Public rather than the VPC's: the guest network is cut off from every private destination, and
+// a resolver inside one would mean opening that back up for whatever else answers on the address.
+const DNS_SERVERS = ['1.1.1.1', '1.0.0.1'];
+
 export class UnrepresentableEnvironment extends Data.TaggedError('UnrepresentableEnvironment')<{
   readonly variableName: string;
 }> {
@@ -35,13 +39,11 @@ export function renderInstanceEnv({
   args,
   environment,
   restartPolicy,
-  dnsServers,
 }: {
   guestPort: GuestPort;
   args: TenantArguments;
   environment: TenantEnvironment;
   restartPolicy: RestartPolicy;
-  dnsServers: readonly string[];
 }): Either.Either<string, UnrepresentableEnvironment> {
   const lines = [
     `${RUNTIME_PREFIX}PORT=${guestPort}`,
@@ -50,10 +52,8 @@ export function renderInstanceEnv({
     `${RUNTIME_PREFIX}MAX_BACKOFF_MS=${restartPolicy.maxBackoffMs}`,
     `${RUNTIME_PREFIX}BACKOFF_FACTOR=${restartPolicy.backoffFactor}`,
     `${RUNTIME_PREFIX}RESET_AFTER_MS=${restartPolicy.resetAfterMs}`,
+    `${RUNTIME_PREFIX}DNS=${DNS_SERVERS.join(',')}`,
   ];
-  if (dnsServers.length > 0) {
-    lines.push(`${RUNTIME_PREFIX}DNS=${dnsServers.join(',')}`);
-  }
   // Numbered rather than delimited: a format with no quoting cannot carry a separator an
   // argument might itself contain, and the guest refuses a gap rather than shifting the rest down.
   for (const [index, argument] of args.entries()) {
@@ -84,7 +84,6 @@ export const buildInstanceConfigImage = ({
   args: TenantArguments;
   environment: TenantEnvironment;
   restartPolicy: RestartPolicy;
-  dnsServers: readonly string[];
 }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

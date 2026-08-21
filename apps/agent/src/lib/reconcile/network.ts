@@ -45,7 +45,6 @@ export const applyNetwork = Effect.gen(function* () {
     instances: yield* forwards,
     controlPlaneCidrsV4: config.controlPlaneCidrsV4,
     controlPlaneCidrsV6: config.controlPlaneCidrsV6,
-    guestDnsServers: config.guestDnsServers,
   }).pipe(
     Effect.andThen(AgentState.modify((current) => ({ ...current, isolated: true }))),
     Effect.catchAll((error) =>

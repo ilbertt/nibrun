@@ -7,8 +7,6 @@ const TAP_MATCH = `"${TAP_NAME_PREFIX}*"`;
 export const INSTANCE_METADATA_ADDRESS_V4 = '169.254.169.254';
 export const INSTANCE_METADATA_ADDRESS_V6 = 'fd00:ec2::254';
 
-const DNS_PORT = 53;
-
 /** nft rejects the name `dstnat` on the output hook, and the whole ruleset with it. */
 const OUTPUT_NAT_PRIORITY = -100;
 
@@ -38,7 +36,6 @@ export type FirewallState = {
   readonly instances: readonly ForwardedInstance[];
   readonly controlPlaneCidrsV4: readonly string[];
   readonly controlPlaneCidrsV6: readonly string[];
-  readonly guestDnsServers: readonly string[];
 };
 
 const set = (values: readonly string[]) => `{ ${values.join(', ')} }`;
@@ -48,12 +45,6 @@ const chain = ({ header, rules }: { header: string; rules: readonly string[] }) 
   ...rules.map((rule) => `${RULE_INDENT}${rule}`),
   `${CHAIN_INDENT}}`,
 ];
-
-const resolverRules = (guestDnsServers: readonly string[]) =>
-  guestDnsServers.flatMap((server) => [
-    `iifname ${TAP_MATCH} ip daddr ${server} udp dport ${DNS_PORT} accept`,
-    `iifname ${TAP_MATCH} ip daddr ${server} tcp dport ${DNS_PORT} accept`,
-  ]);
 
 /**
  * Rendered whole and applied with `nft -f`, so the rules are a function of state rather than a
@@ -67,7 +58,7 @@ export function renderRuleset(state: FirewallState): string {
     `table ip ${NFTABLES_TABLE} {`,
     ...forwardChainV4(state),
     '',
-    ...inputChainV4(state),
+    ...inputChainV4(),
     '',
     ...natChainsV4(state),
     '}',
@@ -83,13 +74,12 @@ export function renderRuleset(state: FirewallState): string {
   ].join('\n')}\n`;
 }
 
-function forwardChainV4({ controlPlaneCidrsV4, guestDnsServers }: FirewallState): string[] {
+function forwardChainV4({ controlPlaneCidrsV4 }: FirewallState): string[] {
   return chain({
     header: 'forward {',
     rules: [
       'type filter hook forward priority filter; policy accept;',
       'ct state established,related accept',
-      ...resolverRules(guestDnsServers),
       `iifname ${TAP_MATCH} ip daddr ${INSTANCE_METADATA_ADDRESS_V4} drop comment "instance metadata endpoint"`,
       `iifname ${TAP_MATCH} oifname ${TAP_MATCH} drop comment "guest to guest"`,
       `iifname ${TAP_MATCH} ip daddr ${GUEST_NETWORK_CIDR} drop comment "guest to guest"`,
@@ -102,13 +92,12 @@ function forwardChainV4({ controlPlaneCidrsV4, guestDnsServers }: FirewallState)
 }
 
 /** Guest traffic to the host's own tap address never reaches the forward hook. */
-function inputChainV4({ guestDnsServers }: FirewallState): string[] {
+function inputChainV4(): string[] {
   return chain({
     header: 'input {',
     rules: [
       'type filter hook input priority filter; policy accept;',
       `iifname ${TAP_MATCH} ct state established,related accept`,
-      ...resolverRules(guestDnsServers),
       `iifname ${TAP_MATCH} drop comment "guest to host"`,
     ],
   });

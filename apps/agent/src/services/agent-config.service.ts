@@ -109,7 +109,6 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
       awsRegion: yield* required('AGENT_AWS_REGION'),
       controlPlaneCidrsV4: yield* requiredList('AGENT_CONTROL_PLANE_CIDRS_V4'),
       controlPlaneCidrsV6: yield* requiredList('AGENT_CONTROL_PLANE_CIDRS_V6'),
-      guestDnsServers: yield* list('AGENT_GUEST_DNS_SERVERS'),
     } as const;
   }),
 }) {}

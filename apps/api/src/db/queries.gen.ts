@@ -128,6 +128,19 @@ export interface ISelectPendingCustomHostnamesResult {
     created_at: Date;
 }
 
+/** Result of query `SelectDisposableAppHostnames`. */
+export interface ISelectDisposableAppHostnamesResult {
+    hostname: IAppHostnamesColumns["hostname"];
+    kind: IAppHostnamesColumns["kind"];
+    /** The custom hostname this row is projected onto at the edge. Absent for a platform hostname, which the wildcard already covers. */
+    cloudflare_id: IAppHostnamesColumns["cloudflare_id"];
+}
+
+/** Result of query `DeleteDisposableAppHostname`. */
+export interface IDeleteDisposableAppHostnameResult {
+    hostname: IAppHostnamesColumns["hostname"];
+}
+
 /** Result of query `SelectAppOwnership`. */
 export interface ISelectAppOwnershipResult {
     id: IAppsColumns["id"];
@@ -687,6 +700,8 @@ export interface Queries {
     UpdateCustomAppHostnameState: IUpdateCustomAppHostnameStateResult;
     DeleteCustomAppHostname: IDeleteCustomAppHostnameResult;
     SelectPendingCustomHostnames: ISelectPendingCustomHostnamesResult;
+    SelectDisposableAppHostnames: ISelectDisposableAppHostnamesResult;
+    DeleteDisposableAppHostname: IDeleteDisposableAppHostnameResult;
     SelectAppOwnership: ISelectAppOwnershipResult;
     InsertApp: IInsertAppResult;
     InsertAppConfig: IInsertAppConfigResult;

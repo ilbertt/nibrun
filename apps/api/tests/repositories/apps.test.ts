@@ -137,4 +137,11 @@ describe('a config patch carries forward every variable it says nothing about', 
     expect(rows.map((row) => row.name)).toEqual(['LOG_LEVEL', 'TOKEN']);
     expect(opened(rows[1]?.value)).toBe(FIRST_TOKEN);
   });
+
+  test('a deleted app with only its hostname left is still purgeable', async () => {
+    await repo.updateState({ appId, ownerId, state: 'deleting' });
+    await repo.finishDeleting({ appId });
+
+    expect(await repo.listPurgeable({ limit: 8 })).toEqual([appId]);
+  });
 });
