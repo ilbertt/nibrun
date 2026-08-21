@@ -2,9 +2,9 @@ import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { createFileRoute } from '@tanstack/react-router';
 import { BinaryDrop } from '#components/binary-drop.tsx';
 import { DashboardLink } from '#components/dashboard-link.tsx';
+import { GetStartedHints } from '#components/get-started-hints.tsx';
 import { Hero } from '#components/hero.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
-import { TerminalHint } from '#components/terminal-hint.tsx';
 import { WhatYouGet } from '#components/what-you-get.tsx';
 
 export const Route = createFileRoute('/')({ component: RouteComponent });
@@ -25,7 +25,7 @@ function RouteComponent() {
           </div>
           <div className="flex w-full flex-col items-center gap-4">
             <BinaryDrop />
-            <TerminalHint />
+            <GetStartedHints />
           </div>
         </section>
         <WhatYouGet />

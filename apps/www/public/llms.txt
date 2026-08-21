@@ -1,0 +1,44 @@
+# nibrun
+
+> Drop a binary. Get a server. Each compiled binary gets a microVM of its own, a persistent
+> filesystem, and an HTTPS URL. No Dockerfile, no YAML, no cluster.
+
+## What you get
+
+- **A machine to itself.** One microVM per app, 1 vCPU and 512 MiB by default. Nothing else runs in it.
+- **Just write to the disk.** `data/` is yours — a SQLite file, uploads, both. 8 GiB, and it survives every redeploy.
+- **Take it all with you.** One click: the binary and its whole disk, as one `.tar.gz`.
+- **A URL right away.** `https://<slug>.nibrun.app`, the moment it boots.
+
+## Deploying
+
+Drag the binary onto https://app.nibrun.com, or:
+
+```sh
+curl -fsSL https://nibrun.com/install.sh | sh
+nib login
+nib run ./my-server --name my-app
+```
+
+Redeploy onto the same app with `nib run ./my-server --app my-app`. Without `--app`, a
+non-interactive shell creates a second app rather than replacing the first.
+
+## What the binary can count on
+
+Linux x86_64 (glibc). Working directory `/app`. The persistent volume is `/app/data`; everything
+outside it, `/tmp` included, is lost on restart. `PORT` is set by the guest and the binary must
+listen on it, on `0.0.0.0`.
+
+## The tradeoffs
+
+One microVM per app: no horizontal scaling, no load balancing. A deploy stops the old VM before
+starting the new one, so it is a few seconds of downtime rather than blue/green. The disk is local
+and unreplicated, so `nib apps export` is the backup. It fits a single-binary app that owns its own
+state; it does not fit anything that has to be several machines.
+
+## Links
+
+- [Skill: deploy-to-nibrun](https://github.com/ilbertt/nibrun/blob/main/skills/deploy-to-nibrun/SKILL.md) — the full guest contract, every command, and when not to use nibrun. Install it with `npx skills add ilbertt/nibrun`.
+- [bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter) — a template already shaped for this: an Elysia API and a React SPA compiled into one binary.
+- [Dashboard](https://app.nibrun.com)
+- [Source](https://github.com/ilbertt/nibrun)
