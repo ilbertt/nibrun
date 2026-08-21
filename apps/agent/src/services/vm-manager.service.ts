@@ -60,7 +60,6 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
         args: desired.config.args,
         environment: desired.config.environment,
         restartPolicy: desired.config.restartPolicy,
-        dnsServers: config.guestDnsServers,
       });
 
       yield* writeJsonFile({

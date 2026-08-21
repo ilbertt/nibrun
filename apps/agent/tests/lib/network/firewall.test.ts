@@ -8,8 +8,6 @@ import {
   renderRuleset,
 } from '#lib/network/firewall.ts';
 
-const DNS_PORT = 53;
-
 // The ranges the blanket v6 rule covers, to assert that a VPC's range is not among them.
 const PRIVATE_DESTINATIONS_V6_SAMPLE = ['::1', 'fe80:', 'fc', 'fd'];
 
@@ -28,7 +26,6 @@ function state(overrides: Partial<FirewallState> = {}): FirewallState {
     instances: [],
     controlPlaneCidrsV4: [],
     controlPlaneCidrsV6: [],
-    guestDnsServers: [],
     ...overrides,
   };
 }
@@ -81,20 +78,6 @@ describe('the three isolation rules are never optional', () => {
     expect(dropsFrom(renderRuleset(state())).some((line) => line.includes('guest to host'))).toBe(
       true,
     );
-  });
-
-  // A resolver accepted by address alone opens every port on it. Harmless for a VPC resolver,
-  // and a hole in the guest-to-host drop the moment the address given is one of the host's own.
-  test('a named resolver is reachable on port 53 and not on everything else', () => {
-    const input = renderRuleset(state({ guestDnsServers: ['10.0.0.2'] }))
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.includes('10.0.0.2') && line.endsWith('accept'));
-
-    expect(input.length).toBeGreaterThan(0);
-    for (const rule of input) {
-      expect(rule).toContain(`dport ${DNS_PORT}`);
-    }
   });
 });
 
@@ -196,14 +179,5 @@ describe('the ruleset is a function of state, not a history of edits', () => {
   test('rendering twice from the same state is byte-identical', () => {
     const input = state({ instances: [instance], controlPlaneCidrsV4: ['203.0.113.0/24'] });
     expect(renderRuleset(input)).toBe(renderRuleset(input));
-  });
-
-  test('a named DNS resolver is allowed out before the blanket private drop', () => {
-    const ruleset = renderRuleset(state({ guestDnsServers: ['10.0.0.2'] }));
-    const lines = ruleset.split('\n').map((line) => line.trim());
-    const accept = lines.findIndex((line) => line.startsWith('iifname "nbr*" ip daddr 10.0.0.2'));
-    const drop = lines.findIndex((line) => line.includes('private destinations'));
-    expect(accept).toBeGreaterThan(-1);
-    expect(accept).toBeLessThan(drop);
   });
 });

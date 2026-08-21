@@ -17,6 +17,12 @@ import type { DeployRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
+/** What a "Deploy on nibrun" link asked for, before the owner has touched anything. */
+export type DeploySuggestion = {
+  name?: string | undefined;
+  port?: number | undefined;
+};
+
 export type DeployFormValues = {
   binary: File | undefined;
   name: string;
@@ -100,9 +106,11 @@ export function validateEnvironment({
 export function useDeployForm({
   appId,
   binary,
+  suggested,
 }: {
   appId: string | undefined;
   binary: File | undefined;
+  suggested?: DeploySuggestion | undefined;
 }): DeployFormState {
   const { start } = useDeployRun();
   const apps = useApps();
@@ -114,7 +122,7 @@ export function useDeployForm({
   const api: DeployFormApi = useForm({
     // Read once, at mount. A binary handed over from the landing page is only rendered into
     // this form after it has been read out of storage, so there is nothing to arrive later.
-    defaultValues: { ...UNTOUCHED, binary },
+    defaultValues: { ...UNTOUCHED, binary, name: suggested?.name ?? UNTOUCHED.name },
     onSubmit: ({ value }) => {
       const request = targetResolved ? asDeployRequest({ value, replacing }) : undefined;
       if (request !== undefined) {
@@ -128,7 +136,7 @@ export function useDeployForm({
     locked,
     replacing,
     targetResolved,
-    defaultPort: String(replacing?.config.guestPort ?? DEFAULT_GUEST_PORT),
+    defaultPort: String(replacing?.config.guestPort ?? suggested?.port ?? DEFAULT_GUEST_PORT),
     defaultArgs: replacing?.config.args.join('\n') ?? '',
   };
 }
