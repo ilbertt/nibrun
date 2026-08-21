@@ -22,17 +22,17 @@ export function AppStatusBadge({ app }: { app: AppSummary }) {
   if (status.isPending) {
     return <Skeleton className="h-5 w-20 rounded-2xl" />;
   }
-  if (status.isError) {
+  if (status.isError || status.status === undefined) {
     return <Badge variant="outline">unknown</Badge>;
   }
 
-  switch (status.data.kind) {
+  switch (status.status.kind) {
     case 'app':
-      return <AppStateBadge state={status.data.state} />;
+      return <AppStateBadge state={status.status.state} />;
     case 'deployment':
-      return <DeploymentStateBadge state={status.data.state} />;
+      return <DeploymentStateBadge state={status.status.state} />;
     case 'transition':
-      return <Badge variant="outline">{status.data.label}</Badge>;
+      return <Badge variant="outline">{status.status.label}</Badge>;
     case 'never-deployed':
       return <Badge variant="outline">never deployed</Badge>;
   }

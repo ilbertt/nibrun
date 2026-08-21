@@ -9,10 +9,13 @@ import type { AppState, DeploymentState } from '@repo/protocol';
  * whole point of this — an app is not suspended because someone pressed suspend, it is suspended
  * once the thing serving it has stopped.
  */
+/** The two moments the app row and the release disagree, named for what is happening. */
+export type AppTransition = 'suspending' | 'resuming';
+
 export type AppStatus =
   | { readonly kind: 'app'; readonly state: AppState }
   | { readonly kind: 'deployment'; readonly state: DeploymentState }
-  | { readonly kind: 'transition'; readonly label: 'suspending' | 'resuming' }
+  | { readonly kind: 'transition'; readonly label: AppTransition }
   | { readonly kind: 'never-deployed' };
 
 const SUSPENDED: AppStatus = { kind: 'app', state: 'suspended' };
