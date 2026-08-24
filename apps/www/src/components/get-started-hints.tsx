@@ -1,3 +1,4 @@
+import { CopyButton } from '@repo/ui/custom/copy-button';
 import { LabeledDivider } from '#components/labeled-divider.tsx';
 import { SITE_URL } from '#lib/site-url.ts';
 
@@ -25,12 +26,11 @@ export function GetStartedHints() {
   );
 }
 
-// A notch under the line around it: at the inherited size the install command wraps on a narrow
-// phone, and a lone `sh` on the second line reads like a typo.
 function Command({ children }: { children: string }) {
   return (
-    <code className="max-w-full rounded-md border bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] text-foreground">
-      {children}
-    </code>
+    <span className="flex max-w-full items-center gap-0.5 rounded-md border bg-muted py-0.5 pr-0.5 pl-1.5">
+      <code className="min-w-0 font-mono text-foreground">{children}</code>
+      <CopyButton value={children} />
+    </span>
   );
 }

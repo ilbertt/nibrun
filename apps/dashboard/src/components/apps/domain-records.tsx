@@ -6,7 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from '@repo/ui/components/table';
-import { CopyButton } from '#components/copy-button.tsx';
+import { CopyButton } from '@repo/ui/custom/copy-button';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { usePlatformSuffix } from '#lib/hooks/use-platform-suffix.ts';
