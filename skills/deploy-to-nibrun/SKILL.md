@@ -30,12 +30,7 @@ owns both.
 
 A binary that needs its own absolute URL — an OAuth redirect, a webhook it registers, a link in
 an email — builds it from `NIBRUN_HOSTNAME` rather than being told it, and falls back to whatever
-it uses when it is not on nibrun:
-
-```ts
-const hostname = process.env.NIBRUN_HOSTNAME;
-const baseUrl = hostname ? `https://${hostname}` : `http://localhost:${port}`;
-```
+it uses when it is not on nibrun.
 
 ## Deploying
 
@@ -44,14 +39,22 @@ curl -fsSL https://nibrun.com/install.sh | sh   # installs `nib` to ~/.local/bin
 nib login                                       # device flow: approve it in the browser
 ```
 
+`nib login` waits on a human approving it in a browser, so an agent that finds itself signed out
+asks the user to run it rather than trying to drive it.
+
+Whatever the binary needs from its environment has to be there on the **first** deploy: a process
+that exits over a missing variable never starts serving, and the deploy fails with it. Read off
+what it requires — a `.env.example`, whatever it loads config from — before deploying, not after.
+
 First deploy — creates the app:
 
 ```sh
-nib run ./my-server --name my-app --port 3000
+nib run ./my-server --name my-app --port 8080
 ```
 
-`--port` is what the binary listens on inside the guest, and it defaults to `3000`. It is the port
-the guest then hands back as `PORT`.
+`--port` is what the binary listens on inside the guest — read it off the app rather than carrying
+a number over from an example. It is the port the guest then hands back as `PORT`, and it defaults
+to `3000`.
 
 **Every deploy after that must name the app**, or a non-interactive shell creates a second one:
 
@@ -76,7 +79,10 @@ nib run ./my-server --app my-app --env STRIPE_SECRET_KEY=sk_live_... --env LOG_L
 nib run ./my-server --app my-app --unset LOG_LEVEL
 ```
 
-`nib --help` lists the rest — logs, domains, filesystem, export, delete.
+`nib apps list` finds the slug again when a later session has to redeploy, and `nib apps logs` says
+why one that was created never came up — worth reaching for, since serving is only a TCP connect
+and a broken process can hold the port. `nib --help` lists the rest — domains, filesystem, export,
+delete.
 
 Or drag the binary onto [app.nibrun.com](https://app.nibrun.com) — same thing, no CLI.
 
@@ -100,13 +106,19 @@ side project. It does not fit anything that needs to be several machines.
 
 ## Producing a binary
 
-Any self-contained `linux-x64` binary — static, or dynamically linked against glibc, which the
-rootfs carries. With Bun:
+One self-contained `linux-x86_64` file — static, or dynamically linked against glibc, which the
+rootfs carries. It has to be built *for* that target: a binary compiled on a Mac, or for arm64, is
+the most common reason a first deploy never boots.
 
-```sh
-bun build --compile --target=bun-linux-x64 --outfile ./my-server ./src/main.ts
-```
+**If the repo already builds one, run its build.** A project that ships a binary usually wraps more
+than a compiler invocation — assets embedded, constants substituted at build time, a frontend
+compiled first — and a hand-rolled command silently skips all of it, producing something that links
+and then dies on boot. [bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter)
+is one such: `bun run build` gives `backend/dist/app` with the frontend and the migrations inside
+it, defaulting to `PORT` 3000 and `./data`.
 
-[bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter) is a template already
-shaped this way: an Elysia API and a React SPA compiled into one binary, with the frontend and the
-migrations embedded, defaulting to `PORT` 3000 and `./data`.
+A Bun repo with nothing to inherit compiles one itself with `bun build --compile`, targeting
+`bun-linux-x64`. Embedding an asset directory, bytecode, build-time constants — all flags on that
+same command, and worth reading [Bun's single-file executable
+docs](https://bun.com/docs/bundler/executables) for rather than recalling: a flag invented from
+memory is how a binary ends up missing the files it expects to carry.
