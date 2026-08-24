@@ -1,7 +1,6 @@
 import { Button } from '@repo/ui/components/button';
 import { useClipboardCopy } from '@repo/ui/hooks/use-clipboard-copy';
 import { CheckIcon, CopyIcon } from 'lucide-react';
-import { LabeledDivider } from '#components/labeled-divider.tsx';
 import { OpenInMenu } from '#components/open-in-menu.tsx';
 
 const STARTER_REPO_URL = 'https://github.com/ilbertt/bun-full-stack-starter';
@@ -10,9 +9,11 @@ const TRY_IT_PROMPT = `Create my personal drive using ${STARTER_REPO_URL} and de
 export function TryItOut() {
   return (
     <section className="flex w-full flex-col gap-3">
-      <LabeledDivider>
+      <div className="flex items-center gap-3">
+        <span aria-hidden="true" className="h-px flex-1 bg-border" />
         <h2 className="text-muted-foreground text-sm">Try it out</h2>
-      </LabeledDivider>
+        <span aria-hidden="true" className="h-px flex-1 bg-border" />
+      </div>
       <div className="overflow-hidden rounded-2xl border bg-card/80 shadow-sm backdrop-blur-sm">
         <p className="text-pretty break-words px-4 py-3.5 text-sm leading-relaxed">
           {TRY_IT_PROMPT}
