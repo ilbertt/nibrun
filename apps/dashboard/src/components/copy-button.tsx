@@ -1,6 +1,6 @@
 import { Button } from '@repo/ui/components/button';
+import { useClipboardCopy } from '@repo/ui/hooks/use-clipboard-copy';
 import { CheckIcon, CopyIcon } from 'lucide-react';
-import { useClipboardCopy } from '#lib/hooks/use-clipboard-copy.ts';
 
 export function CopyButton({ value }: { value: string }) {
   const { copied, copy } = useClipboardCopy(value);
