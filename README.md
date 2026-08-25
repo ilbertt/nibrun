@@ -7,8 +7,41 @@
 
 </div>
 
-Each binary gets a microVM of its own, a persistent filesystem, and an HTTPS URL. No Dockerfile,
-no YAML, no cluster.
+Small apps don't need to scale. They need a machine and a disk.
+
+## Why
+
+`bun build --compile` already collapses a whole application into one executable — no
+`node_modules`, no runtime to install on the other side. The only two things it still needs are
+somewhere to run and somewhere to read and write files.
+
+A container image, a managed Postgres, an object store and a load balancer in front of a single
+instance are not infrastructure for an app five people use. They are overhead you carry because
+that is the shape every platform requires.
+
+nibrun is the machine and the disk, and nothing else.
+
+## What you get
+
+| | |
+| --- | --- |
+| **A machine to itself** | One Firecracker microVM per app. Nothing else runs inside it. |
+| **A filesystem that persists** | `data/` is yours — a SQLite file, uploads, both. It survives every redeploy. |
+| **A URL right away** | An HTTPS subdomain, the moment it boots. |
+| **A way out** | The binary and its whole disk, as one `.tar.gz`, whenever you want it. |
+
+## What you don't get
+
+On purpose:
+
+- **No autoscaling.** One instance per app, single writer. That is the whole concurrency model.
+- **No load balancer, no service discovery.** There is one place your app runs.
+- **No managed database.** Your database is a file on your disk.
+- **No object storage.** Your uploads are files on your disk.
+- **No Dockerfile, no YAML, no build pipeline.** You deploy the binary you built.
+
+An app that genuinely needs one of these is better off somewhere else. That is an answer, not a
+roadmap item.
 
 ## Get started
 
@@ -37,3 +70,20 @@ contract, the commands and the tradeoffs:
 ```sh
 npx skills add ilbertt/nibrun
 ```
+
+## The contract
+
+Your binary listens on `PORT`, on `0.0.0.0`, and writes whatever it wants to keep under `./data`.
+That is the whole interface — no SDK to import, no agent to run beside it. The
+[full guest contract](./skills/deploy-to-nibrun/SKILL.md#the-guest-contract) is one table.
+
+## Take it with you
+
+```sh
+nib apps export .
+tar -xzf my-app.tar.gz
+PORT=3000 ./my-server
+```
+
+The same binary you uploaded, and the same bytes that were on the disk. There is no managed
+database to migrate off, because there never was one.
