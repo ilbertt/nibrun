@@ -39,11 +39,23 @@ it is the design.
 Create an HTTP app (use the [bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter)
 template) and compile it to a single Linux x86_64 binary. Then deploy it:
 
-### Use the dashboard
+### For Agents
 
-Drag the binary onto [app.nibrun.com](https://app.nibrun.com).
+Prepare the app and deploy it to nibrun using the [`deploy-to-nibrun`](./skills/deploy-to-nibrun/SKILL.md) skill.
 
-### Use the CLI
+Install it using:
+
+```sh
+npx skills add ilbertt/nibrun
+```
+
+### For Humans
+
+**Use the dashboard**
+
+Drag and drop the binary onto [app.nibrun.com](https://app.nibrun.com).
+
+**Use the CLI**
 
 ```sh
 curl -fsSL https://nibrun.com/install.sh | sh
@@ -51,15 +63,6 @@ curl -fsSL https://nibrun.com/install.sh | sh
 
 ```sh
 nib run ./my-server
-```
-
-### Let an agent do it
-
-[`skills/deploy-to-nibrun`](./skills/deploy-to-nibrun/SKILL.md) teaches an agent the guest
-contract, the commands and the tradeoffs:
-
-```sh
-npx skills add ilbertt/nibrun
 ```
 
 ## Take it with you
