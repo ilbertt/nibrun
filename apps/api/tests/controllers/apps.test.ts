@@ -15,6 +15,14 @@ const A_HEALTH_CHECK = {
   unhealthyThreshold: 3,
 };
 
+const A_RESTART_POLICY = {
+  maxRestarts: 100,
+  initialBackoffMs: 500,
+  maxBackoffMs: 30_000,
+  backoffFactor: 2,
+  resetAfterMs: 60_000,
+};
+
 const OWNED_ROUTES = [
   { method: 'GET', url: APPS_URL },
   { method: 'POST', url: APPS_URL, body: { name: 'pocketbase' } },
@@ -139,6 +147,18 @@ describe('a malformed request is a bad request', () => {
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
 
+  // A tenant that set its own budget could ask to be restarted forever, and an app that crashes
+  // on every boot would then be a host's problem rather than its owner's.
+  test('patching the restart policy is refused, because the api owns it', async () => {
+    const response = await sendJson({
+      method: 'PATCH',
+      url: APP_URL,
+      body: { restartPolicy: A_RESTART_POLICY },
+    });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
   test('creating an app that asks for its own machine resources', async () => {
     const response = await sendJson({
       method: 'POST',
@@ -154,6 +174,16 @@ describe('a malformed request is a bad request', () => {
       method: 'POST',
       url: APPS_URL,
       body: { name: 'pocketbase', config: { healthCheck: A_HEALTH_CHECK } },
+    });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
+  test('creating an app that asks for its own restart policy', async () => {
+    const response = await sendJson({
+      method: 'POST',
+      url: APPS_URL,
+      body: { name: 'pocketbase', config: { restartPolicy: A_RESTART_POLICY } },
     });
 
     expect(response.status).toBe(StatusMap['Bad Request']);

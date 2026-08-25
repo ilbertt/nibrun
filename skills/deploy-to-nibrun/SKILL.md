@@ -101,6 +101,8 @@ Worth saying out loud before recommending it:
   reaches for the tenant first.
 - **Health is a TCP connect** to `PORT`, and not something you configure. A process that accepts
   connections while broken reads as healthy.
+- **A crash loop is fatal.** The guest restarts your process on a fixed budget you do not set;
+  once it runs out the app is `failed` rather than restarted forever.
 
 It fits a single-binary app that owns its own state — an internal tool, a small SaaS, a demo, a
 side project. It does not fit anything that needs to be several machines.

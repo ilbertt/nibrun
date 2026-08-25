@@ -4,8 +4,6 @@ import {
   AppHostnameStateSchema,
   AppSchema,
   ByteSizeSchema,
-  HealthCheckSchema,
-  InstanceResourcesSchema,
   MIN_HOSTNAMES,
   REDACTED,
   TenantEnvironmentPatchSchema,
@@ -15,29 +13,23 @@ import { t } from 'elysia';
 
 const MAX_APP_NAME_LENGTH = 128;
 
-// What an owner may actually send. `environment` comes out because it is written and read in
-// different shapes and each half says its own below; `resources` and `healthCheck` come out
-// because nibrun sizes the machine and decides when it is alive.
-const OwnedAppConfigSchema = t.Omit(AppConfigSchema, ['environment', 'resources', 'healthCheck']);
-
 // Which variables are set, never what they hold: the values are sealed in the database and only
 // opened on their way to the host, so there is nothing here that could return one.
 const RedactedEnvironmentSchema = t.Record(t.String(), t.Literal(REDACTED), {
   description: 'The variables this app runs with. Values are never returned.',
 });
 
-// The api sizes the machine an app gets and probes it on its own terms, so all of this is read
-// back but never set. It is added on top of what an owner owns rather than omitted from it,
-// which is what keeps it out of the write shapes below without naming it twice.
+// Everything an app runs with, plus the filesystem the api sized for it. `environment` is written
+// and read in different shapes, so it is taken out and each half says its own.
 export const PublicAppConfigSchema = t.Composite([
-  OwnedAppConfigSchema,
-  t.Object({
-    volumeSizeBytes: ByteSizeSchema,
-    resources: InstanceResourcesSchema,
-    healthCheck: HealthCheckSchema,
-    environment: RedactedEnvironmentSchema,
-  }),
+  t.Omit(AppConfigSchema, ['environment']),
+  t.Object({ volumeSizeBytes: ByteSizeSchema, environment: RedactedEnvironmentSchema }),
 ]);
+
+// How the binary is started, which is the whole of what an owner chooses. The machine it starts
+// on — vCPUs, memory, filesystem, health probe, restart budget — is nibrun's, and naming the two
+// that are not is what turns a request for the rest into an answer rather than silence.
+const OwnedAppConfigSchema = t.Pick(AppConfigSchema, ['guestPort', 'args']);
 
 // Strict: every field is optional, so without this a misspelled one is silently no request at
 // all and the caller is told 200.

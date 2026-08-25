@@ -4,8 +4,6 @@ import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
-  type HealthCheck,
-  type InstanceResources,
   REDACTED,
   type SecretString,
   type TenantEnvironment,
@@ -22,17 +20,15 @@ export const VOLUME_SIZE_BYTES = 8_589_934_592;
 // database and only opened where desired state is built, so there is nothing here to return.
 export type RedactedEnvironment = Record<string, typeof REDACTED>;
 
-// What an owner may send. Nibrun sizes the machine an app runs on and decides when it is alive,
-// so `resources` and `healthCheck` are read back beside the volume size rather than written, and
-// leaving them out here is what keeps them out of every write shape below.
-type OwnedAppConfig = Omit<AppConfig, 'environment' | 'resources' | 'healthCheck'>;
-
-export type PublicAppConfig = OwnedAppConfig & {
+export type PublicAppConfig = Omit<AppConfig, 'environment'> & {
   volumeSizeBytes: number;
-  resources: InstanceResources;
-  healthCheck: HealthCheck;
   environment: RedactedEnvironment;
 };
+
+// How the binary is started, which is the whole of what an owner chooses. The machine it starts
+// on — vCPUs, memory, filesystem, health probe, restart budget — is nibrun's, and leaving it out
+// of this one type is what keeps it out of every write shape below.
+type OwnedAppConfig = Pick<AppConfig, 'guestPort' | 'args'>;
 
 // What an app is created with: the whole environment, because there is not yet one to edit.
 export type NewAppConfig = Partial<OwnedAppConfig> & {
@@ -118,9 +114,9 @@ export function configWithDefaults(
     volumeSizeBytes: VOLUME_SIZE_BYTES,
     resources: DEFAULT_INSTANCE_RESOURCES,
     healthCheck: DEFAULT_HEALTH_CHECK,
+    restartPolicy: DEFAULT_RESTART_POLICY,
     guestPort: patch.guestPort ?? DEFAULT_GUEST_PORT,
     args: patch.args ?? [],
-    restartPolicy: patch.restartPolicy ?? DEFAULT_RESTART_POLICY,
   };
 }
 
