@@ -34,8 +34,13 @@ const ESSENTIALS: { icon: typeof CpuIcon; name: string; detail: ReactNode }[] = 
   {
     icon: PackageIcon,
     name: 'A way out',
-    detail:
-      "One click gives you the binary and the entire disk. There's no managed database to migrate off, because there was never a managed database.",
+    detail: (
+      <>
+        One click gives you the binary, the entire disk and its{' '}
+        <code className="text-foreground">.env</code>. There&apos;s no managed database to migrate
+        off, because there was never a managed database.
+      </>
+    ),
   },
 ];
 

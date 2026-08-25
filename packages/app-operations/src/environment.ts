@@ -40,7 +40,7 @@ export function parseEnvironmentPatch(edits: readonly EnvironmentEdit[]): Tenant
     .filter((name) => !Value.Check(TenantEnvironmentPatchSchema, { [name]: null }));
   if (refused.length > 0) {
     throw new InvalidEnvironmentError(
-      `An environment variable's name must start with a letter or underscore and hold only letters, digits and underscores: ${refused.join(', ')}`,
+      `An environment variable's name must start with a letter or underscore, hold only letters, digits and underscores, and not be __proto__: ${refused.join(', ')}`,
     );
   }
 

@@ -63,6 +63,17 @@ describe('what is refused as something that was typed wrong', () => {
   test('a name to remove that could never have been set', () => {
     expect(() => parsed({ remove: ['NOT-A-NAME'] })).toThrow(InvalidEnvironmentError);
   });
+
+  /**
+   * A name a shell would take, and the one an environment cannot survive: it travels as a
+   * JavaScript object, where writing that key sets a prototype rather than a property. Refusing it
+   * here is what makes it something the person typing it is told, rather than a variable they set
+   * and nobody ever carries.
+   */
+  test('the one name that would be lost between here and the host', () => {
+    expect(() => parsed({ set: ['__proto__=1'] })).toThrow(InvalidEnvironmentError);
+    expect(() => parsed({ set: ['__proto__x=1'] })).not.toThrow();
+  });
 });
 
 describe('an edit given as a name and a value already apart', () => {

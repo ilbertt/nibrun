@@ -9,7 +9,13 @@ import { SecretStringSchema } from '#lib/secret.ts';
 import { stringEnum } from '#lib/string-enum.ts';
 import { DnsLabelSchema, GuestPortSchema, HostnameSchema, TimestampSchema } from '#lib/wire.ts';
 
-const ENVIRONMENT_NAME_PATTERN = '^[A-Za-z_][A-Za-z0-9_]*$';
+/**
+ * One name is carved out of what is otherwise the shell's own rule, because a JavaScript object is
+ * how an environment travels from here to a host: `environment.__proto__ = value` sets a prototype
+ * rather than a property, and a value assigned that way is silently gone. Refusing the name is what
+ * turns that into something an owner is told, rather than a variable they set and nobody carries.
+ */
+const ENVIRONMENT_NAME_PATTERN = '^(?!__proto__$)[A-Za-z_][A-Za-z0-9_]*$';
 
 // An app is always reachable at the hostname nibrun issued it, so every list of them has one.
 // Exported because the api narrows this array for its own response and would otherwise restate

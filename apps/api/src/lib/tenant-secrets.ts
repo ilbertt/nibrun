@@ -32,6 +32,30 @@ export function sealedFromStore(value: string): SealedSecret {
 }
 
 /**
+ * One relation, many rows per owner, whether that owner is a deployment about to run or an export
+ * about to be written. What the two share is the shape of a stored environment rather than the id
+ * it hangs off, so the id is the caller's to name.
+ */
+export function sealedEnvironmentBy<Row extends { name: string; value: string }>({
+  rows,
+  owner,
+}: {
+  rows: readonly Row[];
+  owner: (row: Row) => string;
+}): Map<string, SealedEnvironment> {
+  const byOwner = new Map<string, SealedEnvironment>();
+  for (const row of rows) {
+    const id = owner(row);
+    // Written into the object already there rather than into a copy of it, so an owner with many
+    // variables costs one pass and not one object per row.
+    const environment = byOwner.get(id) ?? {};
+    environment[row.name] = sealedFromStore(row.value);
+    byOwner.set(id, environment);
+  }
+  return byOwner;
+}
+
+/**
  * The key an owner's environment variables are sealed with, from its base64 in the environment.
  *
  * Its length is the cipher's rather than a preference, so a key of any other size is a
