@@ -17,27 +17,17 @@ to run and somewhere to read and write files.
 
 For an app that five people use, most of the rest is ceremony:
 
-| What it usually gets | What it actually needs |
+| What it usually gets | What you get here |
 | --- | --- |
-| ~~A container image~~<br>~~A managed Postgres~~<br>~~An object storage bucket~~<br>~~A load balancer, for one instance~~<br>~~A build pipeline~~<br>~~A YAML file you copied~~ | **A machine to run on**<br>**A disk to write to** |
+| ❌ ~~A container image~~ | ✅ A Firecracker microVM of its own |
+| ❌ ~~A build pipeline, a YAML file~~ | ✅ The binary you already built |
+| ❌ ~~A managed Postgres~~ | ✅ A SQLite file on a disk that persists |
+| ❌ ~~An object storage bucket~~ | ✅ Uploads on that same disk |
+| ❌ ~~A DNS record, a certificate~~ | ✅ An HTTPS subdomain the moment it boots |
+| ❌ ~~A load balancer, for one instance~~ | ✅ One instance, one writer |
 
-nibrun is those two things, and nothing else.
-
-## What you get
-
-| | |
-| --- | --- |
-| **A machine to itself** | One Firecracker microVM per app. Nothing else runs inside it. |
-| **A filesystem that persists** | `data/` is yours — a SQLite file, uploads, both. It survives every redeploy. |
-| **A URL right away** | An HTTPS subdomain the moment it boots. No DNS to point, no certificate to renew. |
-| **A way out** | The binary and its whole disk, as one `.tar.gz`, whenever you want it. |
-
-## What it doesn't do
-
-One instance per app, single writer. No autoscaling, no load balancing, no multi-region. An app
-that needs those has outgrown this and should go somewhere else.
-
-That is not a roadmap. It is the design.
+nibrun is those two things, and nothing else. If your app needs to be more than one machine, it
+has outgrown this — and that is not a roadmap, it is the design.
 
 ## Get started
 
@@ -72,7 +62,7 @@ npx skills add ilbertt/nibrun
 ```sh
 nib apps export .
 tar -xzf my-app.tar.gz
-PORT=3000 ./my-server
+./my-server
 ```
 
 The same binary you uploaded, and the same bytes that were on the disk. There is no managed
