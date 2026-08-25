@@ -17,17 +17,20 @@ to run and somewhere to read and write files.
 
 For an app that five people use, most of the rest is ceremony:
 
-| What it usually gets | What you get here |
+| What it usually gets | What it actually needs |
 | --- | --- |
-| ❌ ~~A container image~~ | ✅ A Firecracker microVM of its own |
-| ❌ ~~A build pipeline, a YAML file~~ | ✅ The binary you already built |
-| ❌ ~~A managed Postgres~~ | ✅ A SQLite file on a disk that persists |
-| ❌ ~~An object storage bucket~~ | ✅ Uploads on that same disk |
-| ❌ ~~A DNS record, a certificate~~ | ✅ An HTTPS subdomain the moment it boots |
-| ❌ ~~A load balancer, for one instance~~ | ✅ One instance, one writer |
+| ❌ ~~A container image~~ | ✅ **A machine to run on** |
+| ❌ ~~A managed Postgres~~ | ✅ **A disk to write to** |
+| ❌ ~~An object storage bucket~~ | |
+| ❌ ~~A load balancer, for one instance~~ | |
+| ❌ ~~A build pipeline~~ | |
+| ❌ ~~A YAML file you copied~~ | |
 
-nibrun is those two things, and nothing else. If your app needs to be more than one machine, it
-has outgrown this — and that is not a roadmap, it is the design.
+nibrun is those two things and nothing else: a Firecracker microVM of its own, and a `data/`
+directory that survives every redeploy. It answers on an HTTPS subdomain the moment it boots.
+
+If your app needs to be more than one machine, it has outgrown this — and that is not a roadmap,
+it is the design.
 
 ## Get started
 
