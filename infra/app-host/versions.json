@@ -1,8 +1,8 @@
 {
   "zerofs": {
-    "version": "v2.3.1",
-    "url": "https://github.com/Barre/ZeroFS/releases/download/v2.3.1/zerofs-pgo-multiplatform.tar.gz",
-    "sha256": "7a7d083f58677ccf5480850347fcf570e364baf48573bbd51f6f8d412972df3a",
+    "version": "v2.2.1",
+    "url": "https://github.com/Barre/ZeroFS/releases/download/v2.2.1/zerofs-pgo-multiplatform.tar.gz",
+    "sha256": "d4ae4e4e9bc0a6f4cc4253b6a9fc6c9b57feda6dc0f0cb7443f9264b2eeec621",
     "member": "zerofs-linux-amd64-pgo"
   },
   "firecracker": {
