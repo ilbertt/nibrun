@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
-import type { DesiredArtifact } from '@repo/protocol';
+import type { DesiredArtifact, TenantEnvironment } from '@repo/protocol';
 import { Data, Duration, Effect, Either } from 'effect';
 import { BINARY_MODE, downloadAndVerify } from '#lib/vm/artifacts.ts';
 import { MKFS_ROOT_ENTRIES } from '#lib/volumes/ext4.ts';
@@ -8,6 +8,9 @@ import { stdoutOf } from '#services/command-runner.service.ts';
 
 const STAGING_MODE = 0o700;
 const DATA_DIRECTORY = 'data';
+const ENV_FILENAME = '.env';
+/** The tenant's environment in the clear, which is what it is for and why nobody else may read it. */
+const ENV_MODE = 0o600;
 const BUNDLE_NAME = 'bundle.tar.gz';
 /**
  * A tenant filesystem is unbounded, and the default would abort a large export part-way.
@@ -78,6 +81,24 @@ export function bundleBinaryName(artifact: DesiredArtifact): Either.Either<strin
 }
 
 /**
+ * Quoted, where the config drive's `instance.env` refuses a value it cannot represent instead.
+ * The two have different readers: that one is parsed by an init with no parser, so a value it
+ * cannot carry is an instance that must not boot, while this one is read by whatever the owner
+ * runs the binary under next — and an export is the last thing that may fail on a value somebody
+ * set. So the escaping is dotenv's, and a newline becomes `\n` rather than the end of the line.
+ */
+export function renderDotenv(environment: TenantEnvironment): string {
+  return Object.keys(environment)
+    .sort()
+    .map((name) => `${name}=${quoted(environment[name] ?? '')}\n`)
+    .join('');
+}
+
+function quoted(value: string): string {
+  return `"${value.replace(/[\\"]/g, '\\$&').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`;
+}
+
+/**
  * Kept apart from the archive step because this is the part that needs a device attached, and
  * behind that device a checkpoint pinning every segment on the host against reclamation.
  * Everything after it reads the staging tree instead, so a binary download and a `tar` of the
@@ -109,9 +130,11 @@ export const dumpVolume = Effect.fn('dumpVolume')(function* ({
  */
 export const writeBundle = Effect.fn('writeBundle')(function* ({
   artifact,
+  environment,
   stagingDir,
 }: {
   artifact: DesiredArtifact;
+  environment: TenantEnvironment;
   stagingDir: string;
 }) {
   const fs = yield* FileSystem.FileSystem;
@@ -124,10 +147,16 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
   // the bundle carries a binary the owner has to chmod before the copy they were handed will run.
   yield* fs.chmod(binaryPath, BINARY_MODE);
 
+  // Written even when the app has no variables, so the bundle has one shape and an owner reading
+  // it learns their app ran with none rather than wondering where the file went.
+  yield* fs.writeFileString(path.join(stagingDir, ENV_FILENAME), renderDotenv(environment), {
+    mode: ENV_MODE,
+  });
+
   const bundlePath = path.join(stagingDir, BUNDLE_NAME);
   yield* stdoutOf({
     // Named entries rather than `.`, which would sweep the archive into itself.
-    command: ['tar', 'czf', bundlePath, '-C', stagingDir, DATA_DIRECTORY, binaryName],
+    command: ['tar', 'czf', bundlePath, '-C', stagingDir, DATA_DIRECTORY, binaryName, ENV_FILENAME],
     timeout: DUMP_TIMEOUT,
   });
 

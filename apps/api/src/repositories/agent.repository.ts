@@ -7,7 +7,7 @@ import {
   toDesiredInstance,
   toDesiredVolume,
 } from '#lib/deployments/desired-state.ts';
-import { toDesiredExport } from '#lib/exports/desired-state.ts';
+import { environmentByExport, toDesiredExport } from '#lib/exports/desired-state.ts';
 import type { TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -87,6 +87,11 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
              digest, size_bytes, artifact_object_key, original_file_name
       FROM nibrun.desired_exports
     `;
+    const exportEnvironments = environmentByExport(
+      await this.sql.SelectDesiredExportEnvironment`
+        SELECT export_id, name, value FROM nibrun.desired_export_environment
+      `,
+    );
 
     return {
       hostId,
@@ -95,7 +100,9 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
         toDesiredInstance({ row, hostnames, environments, secretsKey: this.#secretsKey }),
       ),
       checkpoints: [],
-      exports: exports.map(toDesiredExport),
+      exports: exports.map((row) =>
+        toDesiredExport({ row, environments: exportEnvironments, secretsKey: this.#secretsKey }),
+      ),
     };
   }
 }

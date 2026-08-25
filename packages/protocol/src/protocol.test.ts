@@ -94,6 +94,7 @@ const desiredExport = () => ({
     objectKey: Value.Parse(ObjectKeySchema, 'artifacts/app_1/a'),
     filename: Value.Parse(FilenameSchema, 'server'),
   },
+  environment: { API_KEY: TENANT_SECRET },
   desiredState: 'present',
 });
 
@@ -318,6 +319,18 @@ describe('version skew', () => {
 describe('secrets', () => {
   test('redaction reaches tenant environment values anywhere in a message', () => {
     const redacted = redactSecrets({ schema: HostDesiredStateSchema, value: desiredState() });
+    expect(JSON.stringify(redacted)).not.toInclude(TENANT_SECRET);
+    expect(JSON.stringify(redacted)).toInclude(REDACTED);
+  });
+
+  // A second place tenant values cross the wire, so a message carrying an export has to be as
+  // safe to log as one carrying an instance.
+  test('redaction reaches the environment an export carries', () => {
+    const redacted = redactSecrets({
+      schema: HostDesiredStateSchema,
+      value: { ...desiredState(), instances: [], exports: [desiredExport()] },
+    });
+
     expect(JSON.stringify(redacted)).not.toInclude(TENANT_SECRET);
     expect(JSON.stringify(redacted)).toInclude(REDACTED);
   });

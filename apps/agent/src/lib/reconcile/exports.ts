@@ -30,7 +30,7 @@ const write = ({ action }: { action: Extract<ExportPlan, { action: 'write' }> })
   Effect.gen(function* () {
     const exports = yield* ExportManager;
     const allocator = yield* SlotAllocator;
-    const { exportId, appId, artifact } = action.desired;
+    const { exportId, appId } = action.desired;
     const slot = yield* allocator.lookup(appId);
 
     if (Option.isNone(slot)) {
@@ -41,7 +41,7 @@ const write = ({ action }: { action: Extract<ExportPlan, { action: 'write' }> })
       return { exportId, state: 'failed', message: reason } satisfies ReportedExport;
     }
 
-    return yield* exports.write({ desired: action.desired, artifact }).pipe(
+    return yield* exports.write({ desired: action.desired }).pipe(
       Effect.catchAll((error) =>
         Effect.logError('export failed', error).pipe(
           Effect.annotateLogs({ exportId, appId }),

@@ -12,7 +12,7 @@ import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
-import { APP_ID, artifact, desiredExport } from '#tests/support/fixtures.ts';
+import { APP_ID, desiredExport } from '#tests/support/fixtures.ts';
 import { fakeGuest, type GuestBehaviour } from '#tests/support/guest.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
@@ -155,7 +155,7 @@ function exporting(script: Script = {}) {
     const result = yield* Effect.provide(
       Effect.gen(function* () {
         const exports = yield* ExportManager;
-        const writing = exports.write({ desired: stage.desired, artifact: artifact() });
+        const writing = exports.write({ desired: stage.desired });
         if (!script.interrupt) {
           return yield* Effect.exit(writing);
         }

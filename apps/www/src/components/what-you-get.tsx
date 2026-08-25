@@ -14,7 +14,7 @@ const WHAT_YOU_GET = [
   {
     icon: PackageIcon,
     title: 'Take it all with you',
-    body: 'One click: the binary and its whole disk, as one .tar.gz.',
+    body: 'One click: the binary, its whole disk and its .env, as one .tar.gz.',
   },
   {
     icon: GlobeIcon,

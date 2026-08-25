@@ -46,18 +46,20 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
    * racing resolve the same way as two arriving a minute apart.
    *
    * The artifact is whichever binary the app most recently had a deployment for — the app's data
-   * is what is being exported, and the binary rides along so the bundle can be run. An app that
-   * has never been deployed has no binary to send and inserts nothing.
+   * is what is being exported, and the binary rides along so the bundle can be run. Its config
+   * version comes from that same deployment, because the variables the binary needs are as much
+   * a part of running it as the bytes are. An app that has never been deployed has neither to
+   * send and inserts nothing.
    */
   async request({ appId, ownerId, expiresAt }: RequestExportInput): Promise<ExportRow | null> {
     // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one the
     // row is written through rather than one checked beside it.
     const [inserted] = await this.sql.InsertExport`
-      INSERT INTO nibrun.exports (app_id, artifact_id, expires_at)
-      SELECT a.id, d.artifact_id, ${expiresAt}
+      INSERT INTO nibrun.exports (app_id, artifact_id, config_id, expires_at)
+      SELECT a.id, d.artifact_id, d.config_id, ${expiresAt}
       FROM nibrun.live_apps a
       JOIN LATERAL (
-        SELECT artifact_id FROM nibrun.deployments d
+        SELECT artifact_id, config_id FROM nibrun.deployments d
         WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
       ) d ON true
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}

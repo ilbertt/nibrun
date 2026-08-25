@@ -1,9 +1,15 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { type Filename, FilenameSchema, Value } from '@repo/protocol';
+import {
+  type Filename,
+  FilenameSchema,
+  SecretStringSchema,
+  type TenantEnvironment,
+  Value,
+} from '@repo/protocol';
 import { Effect, Either, Layer } from 'effect';
-import { bundleBinaryName, dumpVolume, writeBundle } from '#lib/exports/bundle.ts';
+import { bundleBinaryName, dumpVolume, renderDotenv, writeBundle } from '#lib/exports/bundle.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { artifact } from '#tests/support/fixtures.ts';
@@ -13,6 +19,13 @@ const DEVICE_PATH = '/dev/nbd7';
 const PERMISSION_BITS = 0o777;
 /** Spelled out rather than imported: what the archive has to carry, not what the source says it does. */
 const RUNNABLE_MODE = 0o755;
+const PRIVATE_MODE = 0o600;
+
+function environment(values: Record<string, string>): TenantEnvironment {
+  return Object.fromEntries(
+    Object.entries(values).map(([name, value]) => [name, Value.Parse(SecretStringSchema, value)]),
+  );
+}
 
 const run = provided(Layer.merge(artifactStore(), platform));
 
@@ -34,7 +47,13 @@ const DUMPS = {
  * staging tree is read inside the scope that owns it, because it is gone by the time the test
  * body resumes.
  */
-function bundling({ dumps = 'tenant' }: { dumps?: keyof typeof DUMPS } = {}) {
+function bundling({
+  dumps = 'tenant',
+  variables = {},
+}: {
+  dumps?: keyof typeof DUMPS;
+  variables?: Record<string, string>;
+} = {}) {
   return Effect.gen(function* () {
     const stagingDir = yield* temporaryDirectory;
     const dataDir = join(stagingDir, 'data');
@@ -53,7 +72,11 @@ function bundling({ dumps = 'tenant' }: { dumps?: keyof typeof DUMPS } = {}) {
     const result = yield* Effect.either(
       Effect.provide(
         Effect.flatMap(dumpVolume({ devicePath: DEVICE_PATH, stagingDir }), () =>
-          writeBundle({ artifact: artifact(), stagingDir }),
+          writeBundle({
+            artifact: artifact(),
+            environment: environment(variables),
+            stagingDir,
+          }),
         ),
         layer,
       ),
@@ -64,7 +87,15 @@ function bundling({ dumps = 'tenant' }: { dumps?: keyof typeof DUMPS } = {}) {
         .then((stats) => stats.mode & PERMISSION_BITS)
         .catch(() => null),
     );
-    return { commands, result, stagingDir, archived, binaryMode };
+    const dotenv = yield* Effect.promise(() =>
+      readFile(join(stagingDir, '.env'), 'utf8').catch(() => null),
+    );
+    const dotenvMode = yield* Effect.promise(() =>
+      stat(join(stagingDir, '.env'))
+        .then((stats) => stats.mode & PERMISSION_BITS)
+        .catch(() => null),
+    );
+    return { commands, result, stagingDir, archived, binaryMode, dotenv, dotenvMode };
   });
 }
 
@@ -83,7 +114,7 @@ test('reads the device with debugfs and never mounts it', async () => {
   expect(dump?.command).not.toContain('-w');
 });
 
-test('archives the data tree and the binary under its uploaded name', async () => {
+test('archives the data tree, the binary under its uploaded name, and the environment', async () => {
   const { commands, result, stagingDir } = await run(bundling());
 
   const tar = commands.find((call) => call.command[0] === 'tar');
@@ -95,6 +126,7 @@ test('archives the data tree and the binary under its uploaded name', async () =
     stagingDir,
     'data',
     'pocketbase',
+    '.env',
   ]);
   // `.` would sweep the archive into itself.
   expect(tar?.command).not.toContain('.');
@@ -130,6 +162,48 @@ test('a volume holding only that is an empty export rather than a failed one', a
 
   expect(Either.isRight(result)).toBe(true);
   expect(archived).toEqual([]);
+});
+
+// The bundle is what an owner runs somewhere else, and a binary handed over without the variables
+// it was configured with is not one that runs.
+describe('the environment the app ran with', () => {
+  test('is written beside the binary', async () => {
+    const { dotenv } = await run(bundling({ variables: { API_KEY: 'sk-live' } }));
+
+    expect(dotenv).toBe('API_KEY="sk-live"\n');
+  });
+
+  // A tenant's secrets in the clear, and `tar` records the mode it finds, so this is also the mode
+  // of the file whoever extracts the bundle ends up with.
+  test('is readable by nobody but the owner it belongs to', async () => {
+    const { dotenvMode } = await run(bundling({ variables: { API_KEY: 'sk-live' } }));
+
+    expect(dotenvMode).toBe(PRIVATE_MODE);
+  });
+
+  // One shape for every bundle: an owner who set no variables reads that off an empty file rather
+  // than off a missing one.
+  test('is there even for an app that had none', async () => {
+    const { dotenv } = await run(bundling());
+
+    expect(dotenv).toBe('');
+  });
+
+  test('is written in a fixed order, so two bundles of the same app compare', () => {
+    expect(renderDotenv(environment({ ZED: 'last', ALPHA: 'first' }))).toBe(
+      'ALPHA="first"\nZED="last"\n',
+    );
+  });
+
+  // `instance.env` refuses each of these, because the guest's init has no parser to unquote them.
+  // This file has a reader that does, and an export must not be what fails on a value somebody set.
+  test.each([
+    { holds: 'a newline', value: 'one\ntwo', line: 'KEY="one\\ntwo"\n' },
+    { holds: 'a quote', value: 'say "hi"', line: 'KEY="say \\"hi\\""\n' },
+    { holds: 'a backslash', value: 'C:\\path', line: 'KEY="C:\\\\path"\n' },
+  ])('carries a value holding $holds', ({ value, line }) => {
+    expect(renderDotenv(environment({ KEY: value }))).toBe(line);
+  });
 });
 
 describe('the bundle keeps the name the binary was uploaded under', () => {

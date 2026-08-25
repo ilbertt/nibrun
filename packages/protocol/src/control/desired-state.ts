@@ -1,5 +1,5 @@
 import { Type } from '@sinclair/typebox';
-import { AppConfigSchema, AppHostnameSchema } from '#domain/app.ts';
+import { AppConfigSchema, AppHostnameSchema, TenantEnvironmentSchema } from '#domain/app.ts';
 import {
   AppIdSchema,
   CheckpointIdSchema,
@@ -94,6 +94,11 @@ export type DesiredCheckpoint = typeof DesiredCheckpointSchema.static;
  * most wants their data out is after they have stopped the app — and a stopped app has no
  * instance to take a binary from. Which binary belongs in the bundle is a fact the control
  * plane holds either way, so asking the host to infer it only made it inferrable less often.
+ *
+ * `environment` rides along for the same reason, and becomes the bundle's `.env`: what an owner
+ * is handed has to run somewhere else, and a binary whose configuration stayed behind does not.
+ * Empty for an export the host is being told to forget — a bundle already written has no use for
+ * its owner's variables, so they go down only while there is still one to write.
  */
 export const DesiredExportSchema = Type.Object({
   exportId: ExportIdSchema,
@@ -101,6 +106,7 @@ export const DesiredExportSchema = Type.Object({
   volumeId: VolumeIdSchema,
   objectKey: ObjectKeySchema,
   artifact: DesiredArtifactSchema,
+  environment: TenantEnvironmentSchema,
   desiredState: DesiredPresenceSchema,
 });
 

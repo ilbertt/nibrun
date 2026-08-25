@@ -95,6 +95,7 @@ export function desiredExport(overrides: Partial<DesiredExport> = {}): DesiredEx
     volumeId: VOLUME_ID,
     objectKey: Value.Parse(ObjectKeySchema, 'exports/app-1/exp-1.tar.gz'),
     artifact: artifact(),
+    environment: {},
     desiredState: 'present',
     ...overrides,
   };

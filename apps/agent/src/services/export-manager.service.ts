@@ -1,5 +1,5 @@
 import { FileSystem, Path } from '@effect/platform';
-import type { DesiredArtifact, DesiredExport, ReportedExport } from '@repo/protocol';
+import type { DesiredExport, ReportedExport } from '@repo/protocol';
 import { Effect } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { dumpVolume, writeBundle } from '#lib/exports/bundle.ts';
@@ -92,10 +92,8 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
      */
     const write = Effect.fn('ExportManager.write')(function* ({
       desired,
-      artifact,
     }: {
       desired: DesiredExport;
-      artifact: DesiredArtifact;
     }) {
       yield* Effect.annotateCurrentSpan({ exportId: desired.exportId });
       const stagingDir = path.join(config.exportStagingDir, desired.exportId);
@@ -124,7 +122,11 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
               }),
             ),
           );
-          const bundle = yield* writeBundle({ artifact, stagingDir });
+          const bundle = yield* writeBundle({
+            artifact: desired.artifact,
+            environment: desired.environment,
+            stagingDir,
+          });
           yield* uploader.upload({ bundlePath: bundle.path, objectKey: desired.objectKey });
           yield* Effect.logInfo('export written').pipe(
             Effect.annotateLogs({
