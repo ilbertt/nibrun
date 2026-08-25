@@ -7,7 +7,7 @@ import { themeScript } from '#lib/theme-script.ts';
 
 const TITLE = 'nibrun — drop your binary, get a server';
 const DESCRIPTION =
-  'Drop a compiled binary and get a server: a microVM of its own, a persistent filesystem, and an HTTPS URL. No Dockerfile, no YAML, no cluster.';
+  "Small apps don't need to scale. Drop a compiled binary and get a microVM of its own, a filesystem that persists, and an HTTPS URL. Export the binary and the whole disk whenever you want.";
 const OG_IMAGE = `${SITE_URL}/og.png`;
 
 export const Route = createRootRoute({

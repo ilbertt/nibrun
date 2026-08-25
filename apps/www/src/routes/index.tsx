@@ -2,12 +2,13 @@ import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { createFileRoute } from '@tanstack/react-router';
 import { BinaryDrop } from '#components/binary-drop.tsx';
 import { DashboardLink } from '#components/dashboard-link.tsx';
+import { DeployCta } from '#components/deploy-cta.tsx';
 import { GetStartedHint } from '#components/get-started-hint.tsx';
 import { GithubLink } from '#components/github-link.tsx';
 import { Hero } from '#components/hero.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { TryItOut } from '#components/try-it-out.tsx';
-import { WhatYouGet } from '#components/what-you-get.tsx';
+import { WhatItActuallyNeeds } from '#components/what-it-actually-needs.tsx';
 
 export const Route = createFileRoute('/')({ component: RouteComponent });
 
@@ -32,7 +33,8 @@ function RouteComponent() {
             <GetStartedHint />
           </div>
         </section>
-        <WhatYouGet />
+        <WhatItActuallyNeeds />
+        <DeployCta />
       </main>
     </>
   );
