@@ -3,10 +3,10 @@ import { createFileRoute } from '@tanstack/react-router';
 import { BinaryDrop } from '#components/binary-drop.tsx';
 import { DashboardLink } from '#components/dashboard-link.tsx';
 import { ExportAnytime } from '#components/export-anytime.tsx';
+import { GetStartedHint } from '#components/get-started-hint.tsx';
 import { GithubLink } from '#components/github-link.tsx';
 import { Hero } from '#components/hero.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
-import { SiteFooter } from '#components/site-footer.tsx';
 import { TryItOut } from '#components/try-it-out.tsx';
 import { WhatItActuallyNeeds } from '#components/what-it-actually-needs.tsx';
 import { WhatItDoesntDo } from '#components/what-it-doesnt-do.tsx';
@@ -28,15 +28,15 @@ function RouteComponent() {
             <BrandMark />
             <Hero />
           </div>
-          <div className="flex w-full flex-col gap-6">
+          <div className="flex w-full flex-col items-center gap-6">
             <BinaryDrop />
             <TryItOut />
+            <GetStartedHint />
           </div>
         </section>
         <WhatItActuallyNeeds />
         <ExportAnytime />
         <WhatItDoesntDo />
-        <SiteFooter />
       </main>
     </>
   );
