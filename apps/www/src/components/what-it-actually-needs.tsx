@@ -42,15 +42,9 @@ const ESSENTIALS: { icon: typeof CpuIcon; name: string; detail: ReactNode }[] = 
 export function WhatItActuallyNeeds() {
   return (
     <section className="flex w-full flex-col gap-10 border-border/60 border-t py-16 sm:py-20">
-      <div className="flex max-w-2xl flex-col gap-4">
-        <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          A small app doesn&apos;t need infrastructure.
-        </h2>
-        <p className="text-pretty text-muted-foreground">
-          A compiled binary is already the whole app as one file. nibrun gives that file what
-          it&apos;s still missing.
-        </p>
-      </div>
+      <h2 className="max-w-2xl font-semibold text-2xl tracking-tight sm:text-3xl">
+        A small app doesn&apos;t need infrastructure.
+      </h2>
       <div className="grid gap-10 sm:grid-cols-2 sm:gap-0">
         <div className="flex flex-col gap-4 sm:pr-10">
           <h3 className="text-muted-foreground text-sm">What it usually gets</h3>
