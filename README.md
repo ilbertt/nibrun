@@ -26,6 +26,8 @@ For an app that five people use, most of the rest is ceremony:
 | ❌ ~~A build pipeline~~ | |
 | ❌ ~~A YAML file you copied~~ | |
 
+## What you get
+
 nibrun is those two things and nothing else: a Firecracker microVM of its own, and a `data/`
 directory that survives every redeploy. It answers on an HTTPS subdomain the moment it boots.
 
