@@ -1,4 +1,4 @@
-import { CpuIcon, DatabaseIcon, GlobeIcon } from 'lucide-react';
+import { CpuIcon, DatabaseIcon, GlobeIcon, PackageIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 const CEREMONY = [
@@ -31,6 +31,12 @@ const ESSENTIALS: { icon: typeof CpuIcon; name: string; detail: ReactNode }[] = 
     name: 'A URL right away',
     detail: 'An HTTPS subdomain, the moment it boots. No DNS to point, no certificate to renew.',
   },
+  {
+    icon: PackageIcon,
+    name: 'A way out',
+    detail:
+      "One click gives you the binary and the entire disk. There's no managed database to migrate off, because there was never a managed database.",
+  },
 ];
 
 export function WhatItActuallyNeeds() {
@@ -48,7 +54,10 @@ export function WhatItActuallyNeeds() {
       <div className="grid gap-10 sm:grid-cols-2 sm:gap-0">
         <div className="flex flex-col gap-4 sm:pr-10">
           <h3 className="text-muted-foreground text-sm">What it usually gets</h3>
-          <ul className="flex flex-col gap-2.5">
+          {/* Distributed rather than stacked: six one-line entries against four that each carry a
+              paragraph would otherwise leave the struck column bunched at the top of a much taller
+              row. The gap is the floor for when the two columns stack. */}
+          <ul className="flex flex-1 flex-col justify-between gap-4">
             {CEREMONY.map((item) => (
               <li key={item} className="text-muted-foreground/70 line-through">
                 {item}

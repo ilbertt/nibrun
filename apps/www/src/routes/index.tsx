@@ -2,7 +2,6 @@ import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { createFileRoute } from '@tanstack/react-router';
 import { BinaryDrop } from '#components/binary-drop.tsx';
 import { DashboardLink } from '#components/dashboard-link.tsx';
-import { ExportAnytime } from '#components/export-anytime.tsx';
 import { GetStartedHint } from '#components/get-started-hint.tsx';
 import { GithubLink } from '#components/github-link.tsx';
 import { Hero } from '#components/hero.tsx';
@@ -34,7 +33,6 @@ function RouteComponent() {
           </div>
         </section>
         <WhatItActuallyNeeds />
-        <ExportAnytime />
       </main>
     </>
   );
