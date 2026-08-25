@@ -44,7 +44,7 @@ export function WhatItActuallyNeeds() {
     <section className="flex w-full flex-col gap-10 border-border/60 border-t py-16 sm:py-20">
       <div className="flex max-w-2xl flex-col gap-4">
         <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          A small app doesn&apos;t need a stack.
+          A small app doesn&apos;t need infrastructure.
         </h2>
         <p className="text-pretty text-muted-foreground">
           A compiled binary is already the whole app as one file. nibrun gives that file what
