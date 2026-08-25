@@ -56,8 +56,11 @@ export function WhatItActuallyNeeds() {
           <h3 className="text-muted-foreground text-sm">What it usually gets</h3>
           {/* Distributed rather than stacked: six one-line entries against four that each carry a
               paragraph would otherwise leave the struck column bunched at the top of a much taller
-              row. The gap is the floor for when the two columns stack. */}
-          <ul className="flex flex-1 flex-col justify-between gap-4">
+              row. The bottom inset gives the distribution less room to spread across, since
+              matching the row exactly pushed the entries far enough apart to stop reading as one
+              list — and it goes at the bottom so the label above stays attached to its first entry.
+              The gap is the floor for when the two columns stack. */}
+          <ul className="flex flex-1 flex-col justify-between gap-4 sm:pb-28">
             {CEREMONY.map((item) => (
               <li key={item} className="text-muted-foreground/70 line-through">
                 {item}
