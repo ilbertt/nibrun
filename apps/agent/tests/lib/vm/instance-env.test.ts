@@ -5,11 +5,11 @@ import {
   DEFAULT_RESTART_POLICY,
   GuestPortSchema,
   HostnameSchema,
-  SecretStringSchema,
   Value,
 } from '@repo/protocol';
 import { Either } from 'effect';
 import { renderInstanceEnv } from '#lib/vm/instance-env.ts';
+import { tenantEnvironment } from '#tests/support/fixtures.ts';
 
 const NON_DEFAULT_PORT = 8080;
 
@@ -20,10 +20,6 @@ function hostname({ name, kind }: { name: string; kind: AppHostname['kind'] }): 
 }
 
 const PLATFORM = hostname({ name: PLATFORM_HOSTNAME, kind: 'platform' });
-
-function secret(value: string) {
-  return Value.Parse(SecretStringSchema, value);
-}
 
 type Overrides = Partial<Parameters<typeof renderInstanceEnv>[0]>;
 
@@ -64,25 +60,27 @@ describe('what apps/runtime parses off the config drive', () => {
   });
 
   test('tenant variables carry the tenant prefix, in a stable order', () => {
-    const rendered = render({ environment: { ZED: secret('1'), ALPHA: secret('2') } });
+    const rendered = render({ environment: tenantEnvironment({ ZED: '1', ALPHA: '2' }) });
     expect(rendered).toContain('\nENV_ALPHA=2\nENV_ZED=1\n');
   });
 
   // The prefix is what makes this impossible rather than merely handled: the runtime reads it
   // as a tenant variable named NIBRUN_PORT, and its own PORT stays the one written above.
   test('a tenant variable named after a runtime key stays the tenant’s', () => {
-    const rendered = render({ environment: { NIBRUN_PORT: secret('9999') } });
+    const rendered = render({ environment: tenantEnvironment({ NIBRUN_PORT: '9999' }) });
     expect(rendered).toContain(`NIBRUN_PORT=${DEFAULT_GUEST_PORT}\n`);
     expect(rendered).toContain('ENV_NIBRUN_PORT=9999\n');
   });
 
   test('values are raw bytes, not quoted or escaped', () => {
-    const rendered = render({ environment: { DSN: secret('postgres://u:p@h/db?x=1 y=2') } });
+    const rendered = render({
+      environment: tenantEnvironment({ DSN: 'postgres://u:p@h/db?x=1 y=2' }),
+    });
     expect(rendered).toContain('ENV_DSN=postgres://u:p@h/db?x=1 y=2\n');
   });
 
   test('an empty value stays an empty value', () => {
-    expect(render({ environment: { EMPTY: secret('') } })).toContain('ENV_EMPTY=\n');
+    expect(render({ environment: tenantEnvironment({ EMPTY: '' }) })).toContain('ENV_EMPTY=\n');
   });
 
   // The app answers on every hostname it holds, but only this one was issued by nibrun and
@@ -113,14 +111,15 @@ describe('what has no representation fails the instance', () => {
     'a value containing %j is refused rather than truncated',
     (character) => {
       expect(
-        refusedVariable({ environment: { BAD: secret(`a${character}INJECTED=1`) } })?.variableName,
+        refusedVariable({ environment: tenantEnvironment({ BAD: `a${character}INJECTED=1` }) })
+          ?.variableName,
       ).toBe('BAD');
     },
   );
 
   test('the failure names the variable but never carries its value', () => {
     const refused = refusedVariable({
-      environment: { API_KEY: secret('secret-value\nmore') },
+      environment: tenantEnvironment({ API_KEY: 'secret-value\nmore' }),
     });
     expect(refused?.variableName).toBe('API_KEY');
     expect(JSON.stringify(refused)).not.toContain('secret-value');

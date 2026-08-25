@@ -69,6 +69,16 @@ export interface ISelectDesiredExportsResult {
     artifact_object_key: NonNullable<IArtifactsColumns["object_key"]>;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
+    /** The config version whose environment belongs in the bundle, pinned when the export was asked for. */
+    config_id: IExportsColumns["config_id"];
+}
+
+/** Result of query `SelectDesiredExportEnvironment`. */
+export interface ISelectDesiredExportEnvironmentResult {
+    export_id: IExportsColumns["id"];
+    name: IAppConfigEnvironmentColumns["name"];
+    /** Sealed by the api before it arrives. Never written or read in the clear. */
+    value: IAppConfigEnvironmentColumns["value"];
 }
 
 /** Result of query `SelectAppHostnamesByOwner`. */
@@ -689,6 +699,7 @@ export interface Queries {
     SelectDesiredHostnames: ISelectDesiredHostnamesResult;
     SelectDesiredEnvironment: ISelectDesiredEnvironmentResult;
     SelectDesiredExports: ISelectDesiredExportsResult;
+    SelectDesiredExportEnvironment: ISelectDesiredExportEnvironmentResult;
     SelectAppHostnamesByOwner: ISelectAppHostnamesByOwnerResult;
     SelectAppHostnamesByApp: ISelectAppHostnamesByAppResult;
     InsertCustomAppHostname: IInsertCustomAppHostnameResult;
@@ -1083,6 +1094,21 @@ export interface IDesiredEnvironmentTable {
     constraints: keyof (typeof schema)["desired_environment"]["_constraints"];
 }
 
+/** Columns of `desired_export_environment`. */
+export interface IDesiredExportEnvironmentColumns {
+    export_id: string | null;
+    name: string | null;
+    value: string | null;
+}
+
+/** Schema of `desired_export_environment`. */
+export interface IDesiredExportEnvironmentTable {
+    columns: IDesiredExportEnvironmentColumns;
+    relationType: (typeof schema)["desired_export_environment"]["_relationType"];
+    indexes: keyof (typeof schema)["desired_export_environment"]["_indexes"];
+    constraints: keyof (typeof schema)["desired_export_environment"]["_constraints"];
+}
+
 /** Columns of `desired_exports`. */
 export interface IDesiredExportsColumns {
     id: string | null;
@@ -1093,6 +1119,7 @@ export interface IDesiredExportsColumns {
     size_bytes: string | null;
     artifact_object_key: string | null;
     original_file_name: string | null;
+    config_id: string | null;
 }
 
 /** Schema of `desired_exports`. */
@@ -1151,6 +1178,8 @@ export interface IExportsColumns {
     updated_at: Date;
     /** The pinned view the bundle was read from, named by the host that cut it. */
     checkpoint_id: import("@repo/protocol").CheckpointId | null;
+    /** The config version whose environment belongs in the bundle, pinned when the export was asked for. */
+    config_id: string | null;
 }
 
 /** Schema of `exports`. */
@@ -1570,6 +1599,17 @@ export const schema = {
         _indexes: {},
         _constraints: {}
     },
+    desired_export_environment: {
+        _relationName: "desired_export_environment",
+        _relationType: "view",
+        _columns: {
+            export_id: { _columnName: "export_id", _foreignKeys: {} },
+            name: { _columnName: "name", _foreignKeys: {} },
+            value: { _columnName: "value", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
     desired_exports: {
         _relationName: "desired_exports",
         _relationType: "view",
@@ -1581,7 +1621,8 @@ export const schema = {
             digest: { _columnName: "digest", _foreignKeys: {} },
             size_bytes: { _columnName: "size_bytes", _foreignKeys: {} },
             artifact_object_key: { _columnName: "artifact_object_key", _foreignKeys: {} },
-            original_file_name: { _columnName: "original_file_name", _foreignKeys: {} }
+            original_file_name: { _columnName: "original_file_name", _foreignKeys: {} },
+            config_id: { _columnName: "config_id", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -1622,7 +1663,8 @@ export const schema = {
             expires_at: { _columnName: "expires_at", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
-            checkpoint_id: { _columnName: "checkpoint_id", _foreignKeys: {} }
+            checkpoint_id: { _columnName: "checkpoint_id", _foreignKeys: {} },
+            config_id: { _columnName: "config_id", _foreignKeys: { exports_config_id_fkey: { _constraintName: "exports_config_id_fkey", _references: { _relationName: "app_configs", _columnName: "id" } } } }
         },
         _indexes: {
             exports_app_id_idx: { _indexName: "exports_app_id_idx" },
@@ -1633,6 +1675,7 @@ export const schema = {
         _constraints: {
             exports_app_id_fkey: { _constraintName: "exports_app_id_fkey" },
             exports_artifact_id_fkey: { _constraintName: "exports_artifact_id_fkey" },
+            exports_config_id_fkey: { _constraintName: "exports_config_id_fkey" },
             exports_pkey: { _constraintName: "exports_pkey" },
             exports_state_check: { _constraintName: "exports_state_check" }
         }
@@ -1686,6 +1729,7 @@ export interface Tables {
     deployments: IDeploymentsTable;
     desired_deployments: IDesiredDeploymentsTable;
     desired_environment: IDesiredEnvironmentTable;
+    desired_export_environment: IDesiredExportEnvironmentTable;
     desired_exports: IDesiredExportsTable;
     desired_hostnames: IDesiredHostnamesTable;
     desired_volumes: IDesiredVolumesTable;

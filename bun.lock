@@ -25,6 +25,7 @@
         "effect": "3.22.1",
       },
       "devDependencies": {
+        "@repo/app-operations": "workspace:*",
         "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",
       },
@@ -140,7 +141,7 @@
     },
     "packages/cli": {
       "name": "@repo/cli",
-      "version": "2026.8.20-1",
+      "version": "2026.8.21-1",
       "dependencies": {
         "@clack/prompts": "^1.7.0",
         "@parshjs/core": "^0.0.10",

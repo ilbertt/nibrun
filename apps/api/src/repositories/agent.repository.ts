@@ -7,7 +7,7 @@ import {
   toDesiredInstance,
   toDesiredVolume,
 } from '#lib/deployments/desired-state.ts';
-import { toDesiredExport } from '#lib/exports/desired-state.ts';
+import { environmentByExport, toDesiredExport } from '#lib/exports/desired-state.ts';
 import type { TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -51,42 +51,51 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
   async desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
     // An artifact still awaiting its upload cannot be deployed or exported — the deployment
     // that would name it is refused — so what reaches a host here always has its bytes.
-    const deployments = await this.sql.SelectDesiredDeployments`
-      /* @notNull digest */
-      /* @notNull size_bytes */
-      /* @notNull object_key */
-      SELECT id, app_id, state,
-             digest, size_bytes, object_key, original_file_name,
-             guest_port, args, vcpu_count, memory_mib,
-             health_check_path, health_check_interval_ms, health_check_timeout_ms,
-             health_check_grace_period_ms, health_check_healthy_threshold,
-             health_check_unhealthy_threshold,
-             restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-             restart_backoff_factor, restart_reset_after_ms, config_id
-      FROM nibrun.desired_deployments
-    `;
-    const volumes = await this.sql.SelectDesiredVolumes`
-      SELECT app_id, state FROM nibrun.desired_volumes
-    `;
-    const hostnames = hostnamesByApp(
-      await this.sql.SelectDesiredHostnames`
-        SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
-      `,
-    );
-    const environments = environmentByDeployment(
-      await this.sql.SelectDesiredEnvironment`
-        SELECT deployment_id, name, value FROM nibrun.desired_environment
-      `,
-    );
-    const exports = await this.sql.SelectDesiredExports`
-      /* @notNull object_key */
-      /* @notNull artifact_object_key */
-      /* @notNull digest */
-      /* @notNull size_bytes */
-      SELECT id, app_id, object_key, state,
-             digest, size_bytes, artifact_object_key, original_file_name
-      FROM nibrun.desired_exports
-    `;
+    //
+    // Together rather than one after another: none of them reads what another returns, and this
+    // runs on every poll of every host.
+    const [deployments, volumes, hostnameRows, environmentRows, exports, exportEnvironmentRows] =
+      await Promise.all([
+        this.sql.SelectDesiredDeployments`
+          /* @notNull digest */
+          /* @notNull size_bytes */
+          /* @notNull object_key */
+          SELECT id, app_id, state,
+                 digest, size_bytes, object_key, original_file_name,
+                 guest_port, args, vcpu_count, memory_mib,
+                 health_check_path, health_check_interval_ms, health_check_timeout_ms,
+                 health_check_grace_period_ms, health_check_healthy_threshold,
+                 health_check_unhealthy_threshold,
+                 restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
+                 restart_backoff_factor, restart_reset_after_ms, config_id
+          FROM nibrun.desired_deployments
+        `,
+        this.sql.SelectDesiredVolumes`
+          SELECT app_id, state FROM nibrun.desired_volumes
+        `,
+        this.sql.SelectDesiredHostnames`
+          SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
+        `,
+        this.sql.SelectDesiredEnvironment`
+          SELECT deployment_id, name, value FROM nibrun.desired_environment
+        `,
+        this.sql.SelectDesiredExports`
+          /* @notNull object_key */
+          /* @notNull artifact_object_key */
+          /* @notNull digest */
+          /* @notNull size_bytes */
+          SELECT id, app_id, object_key, state,
+                 digest, size_bytes, artifact_object_key, original_file_name, config_id
+          FROM nibrun.desired_exports
+        `,
+        this.sql.SelectDesiredExportEnvironment`
+          SELECT export_id, name, value FROM nibrun.desired_export_environment
+        `,
+      ]);
+
+    const hostnames = hostnamesByApp(hostnameRows);
+    const environments = environmentByDeployment(environmentRows);
+    const exportEnvironments = environmentByExport(exportEnvironmentRows);
 
     return {
       hostId,
@@ -95,7 +104,9 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
         toDesiredInstance({ row, hostnames, environments, secretsKey: this.#secretsKey }),
       ),
       checkpoints: [],
-      exports: exports.map(toDesiredExport),
+      exports: exports.map((row) =>
+        toDesiredExport({ row, environments: exportEnvironments, secretsKey: this.#secretsKey }),
+      ),
     };
   }
 }
