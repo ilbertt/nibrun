@@ -4,6 +4,7 @@ import {
   AppHostnameStateSchema,
   AppSchema,
   ByteSizeSchema,
+  InstanceResourcesSchema,
   MIN_HOSTNAMES,
   REDACTED,
   TenantEnvironmentPatchSchema,
@@ -13,9 +14,10 @@ import { t } from 'elysia';
 
 const MAX_APP_NAME_LENGTH = 128;
 
-// `environment` is written and read in different shapes, so it is taken out here and each half
-// says its own.
-const OwnedAppConfigSchema = t.Omit(AppConfigSchema, ['environment']);
+// What an owner may actually send. `environment` comes out because it is written and read in
+// different shapes and each half says its own below; `resources` comes out because nibrun sizes
+// the machine, the same way it sizes the filesystem.
+const OwnedAppConfigSchema = t.Omit(AppConfigSchema, ['environment', 'resources']);
 
 // Which variables are set, never what they hold: the values are sealed in the database and only
 // opened on their way to the host, so there is nothing here that could return one.
@@ -23,12 +25,16 @@ const RedactedEnvironmentSchema = t.Record(t.String(), t.Literal(REDACTED), {
   description: 'The variables this app runs with. Values are never returned.',
 });
 
-// The api sizes an app's filesystem, so the size is read back but never set. It is added on
-// top of what an owner owns rather than omitted from it, which is what keeps it out of the
-// patch shape below without naming it twice.
+// The api sizes the machine an app gets — its vCPUs, its memory, its filesystem — so all three
+// are read back but never set. They are added on top of what an owner owns rather than omitted
+// from it, which is what keeps them out of the write shapes below without naming them twice.
 export const PublicAppConfigSchema = t.Composite([
   OwnedAppConfigSchema,
-  t.Object({ volumeSizeBytes: ByteSizeSchema, environment: RedactedEnvironmentSchema }),
+  t.Object({
+    volumeSizeBytes: ByteSizeSchema,
+    resources: InstanceResourcesSchema,
+    environment: RedactedEnvironmentSchema,
+  }),
 ]);
 
 // Strict: every field is optional, so without this a misspelled one is silently no request at

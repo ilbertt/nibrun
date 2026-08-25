@@ -90,14 +90,15 @@ Or drag the binary onto [app.nibrun.com](https://app.nibrun.com) — same thing,
 
 Worth saying out loud before recommending it:
 
-- **One microVM per app.** No horizontal scaling and no load balancing. Vertical only.
+- **One microVM per app, one size.** No horizontal scaling, no load balancing, no resizing.
 - **A deploy is a replace.** The old VM is stopped before the new one starts, because they share
   one volume — so there are a few seconds of downtime, and no blue/green or canary.
 - **A local disk, not a distributed one.** Ideal for SQLite, uploads, caches. It is not
   replicated, so an export (`nib apps export`) is your backup.
 - **The binary is the unit.** The guest boots yours and nothing else — no sidecar, no cron
   container, no managed database next to it.
-- **256 MiB and 1 vCPU by default**, and the OOM killer reaches for the tenant first.
+- **256 MiB and 1 vCPU**, sized by nibrun rather than configured by you, and the OOM killer
+  reaches for the tenant first.
 - **Health is a TCP connect** to `PORT` by default. A process that accepts connections while
   broken reads as healthy.
 

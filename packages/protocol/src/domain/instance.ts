@@ -10,8 +10,8 @@ const DEFAULT_VCPU_COUNT = 1;
 
 // The divisor on a host's usable memory: it decides how many apps a host carries and what one
 // costs. 256 leaves a Bun server several times its resident baseline while doubling density
-// against the 512 it replaces, and an app that needs more sets its own. Only new apps start
-// here — an existing one keeps the value already on its config.
+// against the 512 it replaces. Only new apps start here — an existing one keeps the value
+// already on its config, and no owner can ask for another.
 const DEFAULT_MEMORY_MIB = 256;
 
 const MIN_HEALTH_PROBE_MS = 100;

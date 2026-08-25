@@ -103,6 +103,29 @@ describe('a malformed request is a bad request', () => {
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
 
+  // The rest of the machine is the api's to size for the same reason the filesystem is, and a
+  // request asking for a bigger one has to be told so rather than answered 200 by a schema that
+  // dropped the field.
+  test('patching the machine resources is refused, because the api owns them', async () => {
+    const response = await sendJson({
+      method: 'PATCH',
+      url: APP_URL,
+      body: { resources: { vcpuCount: 4, memoryMib: 4096 } },
+    });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
+  test('creating an app that asks for its own machine resources', async () => {
+    const response = await sendJson({
+      method: 'POST',
+      url: APPS_URL,
+      body: { name: 'pocketbase', config: { resources: { vcpuCount: 4, memoryMib: 4096 } } },
+    });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
   test('creating an app with a field it does not have', async () => {
     const response = await sendJson({
       method: 'POST',
