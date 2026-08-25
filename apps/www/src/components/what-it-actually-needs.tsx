@@ -19,7 +19,7 @@ export function WhatItActuallyNeeds() {
       </h2>
       <div className="grid gap-10 sm:grid-cols-2 sm:gap-0">
         <div className="flex flex-col gap-4 sm:pr-10">
-          <h3 className="text-muted-foreground text-sm">What you&apos;re asked to bring</h3>
+          <h3 className="text-muted-foreground text-sm">What it usually gets</h3>
           <ul className="flex flex-col gap-2.5">
             {CEREMONY.map((item) => (
               <li key={item} className="flex items-start gap-3 text-muted-foreground/70">
