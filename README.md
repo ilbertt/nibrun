@@ -15,11 +15,13 @@ A compiled binary is already a whole application in one file. Whatever language 
 nothing has to be installed on the other side. The only two things it still needs are somewhere
 to run and somewhere to read and write files.
 
-A container image, a managed Postgres, an object store and a load balancer in front of a single
-instance are not infrastructure for an app five people use. They are overhead you carry because
-that is the shape every platform requires.
+For an app that five people use, most of the rest is ceremony:
 
-nibrun is the machine and the disk, and nothing else.
+| What it usually gets | What it actually needs |
+| --- | --- |
+| ~~A container image~~<br>~~A managed Postgres~~<br>~~An object storage bucket~~<br>~~A load balancer, for one instance~~<br>~~A build pipeline~~<br>~~A YAML file you copied~~ | **A machine to run on**<br>**A disk to write to** |
+
+nibrun is those two things, and nothing else.
 
 ## What you get
 
@@ -27,16 +29,15 @@ nibrun is the machine and the disk, and nothing else.
 | --- | --- |
 | **A machine to itself** | One Firecracker microVM per app. Nothing else runs inside it. |
 | **A filesystem that persists** | `data/` is yours — a SQLite file, uploads, both. It survives every redeploy. |
-| **A URL right away** | An HTTPS subdomain, the moment it boots. |
+| **A URL right away** | An HTTPS subdomain the moment it boots. No DNS to point, no certificate to renew. |
 | **A way out** | The binary and its whole disk, as one `.tar.gz`, whenever you want it. |
-| ~~Autoscaling~~ | One instance per app, single writer. That is the whole concurrency model. |
-| ~~A load balancer~~ | There is one place your app runs. |
-| ~~A managed database~~ | Your database is a file on your disk. |
-| ~~Object storage~~ | Your uploads are files on your disk. |
-| ~~A Dockerfile~~ | No YAML and no build pipeline either. You deploy the binary you built. |
 
-The struck-through rows are not a roadmap. An app that genuinely needs one of them is better off
-somewhere else.
+## What it doesn't do
+
+One instance per app, single writer. No autoscaling, no load balancing, no multi-region. An app
+that needs those has outgrown this and should go somewhere else.
+
+That is not a roadmap. It is the design.
 
 ## Get started
 
