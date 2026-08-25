@@ -23,6 +23,18 @@ export function TryItOut() {
           <OpenInMenu prompt={TRY_IT_PROMPT} />
         </div>
       </div>
+      <p className="text-balance text-center text-muted-foreground text-xs">
+        It builds{' '}
+        <a
+          className="underline underline-offset-2 hover:text-foreground"
+          href={STARTER_REPO_URL}
+          target="_blank"
+          rel="noreferrer"
+        >
+          bun-full-stack-starter
+        </a>{' '}
+        into one binary, yours to run anywhere — nibrun or not.
+      </p>
     </section>
   );
 }
