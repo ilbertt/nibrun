@@ -42,6 +42,27 @@ resource "aws_instance" "app_host" {
     nested_virtualization = "enabled"
   }
 
+  # A persistent request rather than the default one-time one: a one-time request
+  # is not re-placed after an interruption, so the host would stop and simply stay
+  # stopped. There is no max_price, which means the on-demand price is the cap —
+  # bidding under it buys nothing but a second way to be interrupted.
+  #
+  # Adding or removing this block replaces the instance. A running on-demand host
+  # cannot be converted to a spot one, so turning var.app_host_spot on or off is a
+  # rebuild, with every tenant microVM on it going down for the length of one boot.
+  dynamic "instance_market_options" {
+    for_each = var.app_host_spot ? [1] : []
+
+    content {
+      market_type = "spot"
+
+      spot_options {
+        instance_interruption_behavior = "stop"
+        spot_instance_type             = "persistent"
+      }
+    }
+  }
+
   depends_on = [aws_route_table_association.app]
 
   # cloud-init runs user_data once per instance and records it in sem/, so a
