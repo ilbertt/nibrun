@@ -29,19 +29,14 @@ nibrun is the machine and the disk, and nothing else.
 | **A filesystem that persists** | `data/` is yours — a SQLite file, uploads, both. It survives every redeploy. |
 | **A URL right away** | An HTTPS subdomain, the moment it boots. |
 | **A way out** | The binary and its whole disk, as one `.tar.gz`, whenever you want it. |
+| ~~Autoscaling~~ | One instance per app, single writer. That is the whole concurrency model. |
+| ~~A load balancer~~ | There is one place your app runs. |
+| ~~A managed database~~ | Your database is a file on your disk. |
+| ~~Object storage~~ | Your uploads are files on your disk. |
+| ~~A Dockerfile~~ | No YAML and no build pipeline either. You deploy the binary you built. |
 
-## What you don't get
-
-On purpose:
-
-- **No autoscaling.** One instance per app, single writer. That is the whole concurrency model.
-- **No load balancer, no service discovery.** There is one place your app runs.
-- **No managed database.** Your database is a file on your disk.
-- **No object storage.** Your uploads are files on your disk.
-- **No Dockerfile, no YAML, no build pipeline.** You deploy the binary you built.
-
-An app that genuinely needs one of these is better off somewhere else. That is an answer, not a
-roadmap item.
+The struck-through rows are not a roadmap. An app that genuinely needs one of them is better off
+somewhere else.
 
 ## Get started
 
