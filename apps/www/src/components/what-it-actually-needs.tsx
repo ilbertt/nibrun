@@ -42,8 +42,8 @@ export function WhatItActuallyNeeds() {
         </div>
       </div>
       <p className="max-w-2xl text-pretty text-muted-foreground">
-        <code className="font-mono text-foreground">bun build --compile</code> already gives you the
-        whole app as one file. nibrun gives that file the only two things it&apos;s still missing.
+        A compiled binary is already the whole app as one file. nibrun gives that file the only two
+        things it&apos;s still missing.
       </p>
     </section>
   );
