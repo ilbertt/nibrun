@@ -20,7 +20,7 @@ Everything the binary can count on, and nothing else:
 | Port | `PORT` is set by the guest; the app **must** listen on it, on `0.0.0.0` |
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs and is lost on restart. So is everything outside `/app/data` |
-| Resources | 1 vCPU, 512 MiB RAM |
+| Resources | 1 vCPU, 256 MiB RAM |
 | `HOME` | `/app` |
 | URL | `https://<slug>.nibrun.app`, live as soon as it boots |
 
@@ -97,7 +97,7 @@ Worth saying out loud before recommending it:
   replicated, so an export (`nib apps export`) is your backup.
 - **The binary is the unit.** The guest boots yours and nothing else — no sidecar, no cron
   container, no managed database next to it.
-- **512 MiB and 1 vCPU by default**, and the OOM killer reaches for the tenant first.
+- **256 MiB and 1 vCPU by default**, and the OOM killer reaches for the tenant first.
 - **Health is a TCP connect** to `PORT` by default. A process that accepts connections while
   broken reads as healthy.
 
