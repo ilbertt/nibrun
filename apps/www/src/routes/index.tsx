@@ -28,12 +28,14 @@ function RouteComponent() {
             <BrandMark />
             <Hero />
           </div>
-          <BinaryDrop />
+          <div className="flex w-full flex-col gap-6">
+            <BinaryDrop />
+            <TryItOut />
+          </div>
         </section>
         <WhatItActuallyNeeds />
         <ExportAnytime />
         <WhatItDoesntDo />
-        <TryItOut />
         <SiteFooter />
       </main>
     </>
