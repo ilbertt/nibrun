@@ -14,6 +14,11 @@ export function TryItOut() {
 
   return (
     <section className="flex w-full flex-col items-center gap-3">
+      <div className="flex w-full items-center gap-3">
+        <span aria-hidden="true" className="h-px flex-1 bg-border" />
+        <h2 className="text-muted-foreground text-sm">Try it out</h2>
+        <span aria-hidden="true" className="h-px flex-1 bg-border" />
+      </div>
       <div className="flex items-center rounded-full border bg-card/70 shadow-sm backdrop-blur-sm">
         <Button
           variant="ghost"
