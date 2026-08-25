@@ -11,9 +11,9 @@ Small apps don't need to scale. They need a machine and a disk.
 
 ## Why
 
-`bun build --compile` already collapses a whole application into one executable — no
-`node_modules`, no runtime to install on the other side. The only two things it still needs are
-somewhere to run and somewhere to read and write files.
+A compiled binary is already a whole application in one file — `go build`, `cargo build`,
+`bun build --compile`. Nothing to install on the other side. The only two things it still needs
+are somewhere to run and somewhere to read and write files.
 
 A container image, a managed Postgres, an object store and a load balancer in front of a single
 instance are not infrastructure for an app five people use. They are overhead you carry because
@@ -46,7 +46,7 @@ roadmap item.
 ## Get started
 
 Create an HTTP app (use the [bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter)
-template) and compile it to a single binary. Then deploy it:
+template) and compile it to a single Linux x86_64 binary. Then deploy it:
 
 ### Use the dashboard
 
@@ -70,12 +70,6 @@ contract, the commands and the tradeoffs:
 ```sh
 npx skills add ilbertt/nibrun
 ```
-
-## The contract
-
-Your binary listens on `PORT`, on `0.0.0.0`, and writes whatever it wants to keep under `./data`.
-That is the whole interface — no SDK to import, no agent to run beside it. The
-[full guest contract](./skills/deploy-to-nibrun/SKILL.md#the-guest-contract) is one table.
 
 ## Take it with you
 
