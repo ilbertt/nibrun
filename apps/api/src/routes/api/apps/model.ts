@@ -4,6 +4,7 @@ import {
   AppHostnameStateSchema,
   AppSchema,
   ByteSizeSchema,
+  HealthCheckSchema,
   InstanceResourcesSchema,
   MIN_HOSTNAMES,
   REDACTED,
@@ -15,9 +16,9 @@ import { t } from 'elysia';
 const MAX_APP_NAME_LENGTH = 128;
 
 // What an owner may actually send. `environment` comes out because it is written and read in
-// different shapes and each half says its own below; `resources` comes out because nibrun sizes
-// the machine, the same way it sizes the filesystem.
-const OwnedAppConfigSchema = t.Omit(AppConfigSchema, ['environment', 'resources']);
+// different shapes and each half says its own below; `resources` and `healthCheck` come out
+// because nibrun sizes the machine and decides when it is alive.
+const OwnedAppConfigSchema = t.Omit(AppConfigSchema, ['environment', 'resources', 'healthCheck']);
 
 // Which variables are set, never what they hold: the values are sealed in the database and only
 // opened on their way to the host, so there is nothing here that could return one.
@@ -25,14 +26,15 @@ const RedactedEnvironmentSchema = t.Record(t.String(), t.Literal(REDACTED), {
   description: 'The variables this app runs with. Values are never returned.',
 });
 
-// The api sizes the machine an app gets — its vCPUs, its memory, its filesystem — so all three
-// are read back but never set. They are added on top of what an owner owns rather than omitted
-// from it, which is what keeps them out of the write shapes below without naming them twice.
+// The api sizes the machine an app gets and probes it on its own terms, so all of this is read
+// back but never set. It is added on top of what an owner owns rather than omitted from it,
+// which is what keeps it out of the write shapes below without naming it twice.
 export const PublicAppConfigSchema = t.Composite([
   OwnedAppConfigSchema,
   t.Object({
     volumeSizeBytes: ByteSizeSchema,
     resources: InstanceResourcesSchema,
+    healthCheck: HealthCheckSchema,
     environment: RedactedEnvironmentSchema,
   }),
 ]);

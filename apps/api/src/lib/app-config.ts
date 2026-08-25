@@ -4,6 +4,7 @@ import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
+  type HealthCheck,
   type InstanceResources,
   REDACTED,
   type SecretString,
@@ -21,14 +22,15 @@ export const VOLUME_SIZE_BYTES = 8_589_934_592;
 // database and only opened where desired state is built, so there is nothing here to return.
 export type RedactedEnvironment = Record<string, typeof REDACTED>;
 
-// What an owner may send. Nibrun sizes the machine an app runs on, so `resources` is read back
-// beside the volume size rather than written, and leaving it out here is what keeps it out of
-// every write shape below.
-type OwnedAppConfig = Omit<AppConfig, 'environment' | 'resources'>;
+// What an owner may send. Nibrun sizes the machine an app runs on and decides when it is alive,
+// so `resources` and `healthCheck` are read back beside the volume size rather than written, and
+// leaving them out here is what keeps them out of every write shape below.
+type OwnedAppConfig = Omit<AppConfig, 'environment' | 'resources' | 'healthCheck'>;
 
 export type PublicAppConfig = OwnedAppConfig & {
   volumeSizeBytes: number;
   resources: InstanceResources;
+  healthCheck: HealthCheck;
   environment: RedactedEnvironment;
 };
 
@@ -115,9 +117,9 @@ export function configWithDefaults(
   return {
     volumeSizeBytes: VOLUME_SIZE_BYTES,
     resources: DEFAULT_INSTANCE_RESOURCES,
+    healthCheck: DEFAULT_HEALTH_CHECK,
     guestPort: patch.guestPort ?? DEFAULT_GUEST_PORT,
     args: patch.args ?? [],
-    healthCheck: patch.healthCheck ?? DEFAULT_HEALTH_CHECK,
     restartPolicy: patch.restartPolicy ?? DEFAULT_RESTART_POLICY,
   };
 }

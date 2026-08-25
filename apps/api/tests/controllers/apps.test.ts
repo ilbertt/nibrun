@@ -5,6 +5,16 @@ import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
 const APPS_URL = `${ORIGIN}/api/apps`;
 const APP_URL = `${APPS_URL}/app-1`;
 
+// Well-formed on its own terms, so what refuses it is the api owning the field rather than the
+// value being wrong.
+const A_HEALTH_CHECK = {
+  intervalMs: 1_000,
+  timeoutMs: 500,
+  gracePeriodMs: 10_000,
+  healthyThreshold: 1,
+  unhealthyThreshold: 3,
+};
+
 const OWNED_ROUTES = [
   { method: 'GET', url: APPS_URL },
   { method: 'POST', url: APPS_URL, body: { name: 'pocketbase' } },
@@ -116,11 +126,34 @@ describe('a malformed request is a bad request', () => {
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
 
+  // A TCP connect to `PORT` is the whole probe, and how often it runs and how many failures
+  // condemn an instance are nibrun's to decide — an app that could set its own thresholds could
+  // also make itself unkillable.
+  test('patching the health check is refused, because the api owns it', async () => {
+    const response = await sendJson({
+      method: 'PATCH',
+      url: APP_URL,
+      body: { healthCheck: { ...A_HEALTH_CHECK, path: '/healthz' } },
+    });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
   test('creating an app that asks for its own machine resources', async () => {
     const response = await sendJson({
       method: 'POST',
       url: APPS_URL,
       body: { name: 'pocketbase', config: { resources: { vcpuCount: 4, memoryMib: 4096 } } },
+    });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
+  test('creating an app that asks for its own health check', async () => {
+    const response = await sendJson({
+      method: 'POST',
+      url: APPS_URL,
+      body: { name: 'pocketbase', config: { healthCheck: A_HEALTH_CHECK } },
     });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
