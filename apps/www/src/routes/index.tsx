@@ -9,7 +9,6 @@ import { Hero } from '#components/hero.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { TryItOut } from '#components/try-it-out.tsx';
 import { WhatItActuallyNeeds } from '#components/what-it-actually-needs.tsx';
-import { WhatItDoesntDo } from '#components/what-it-doesnt-do.tsx';
 
 export const Route = createFileRoute('/')({ component: RouteComponent });
 
@@ -36,7 +35,6 @@ function RouteComponent() {
         </section>
         <WhatItActuallyNeeds />
         <ExportAnytime />
-        <WhatItDoesntDo />
       </main>
     </>
   );
