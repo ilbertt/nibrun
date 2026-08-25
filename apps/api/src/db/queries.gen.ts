@@ -69,6 +69,8 @@ export interface ISelectDesiredExportsResult {
     artifact_object_key: NonNullable<IArtifactsColumns["object_key"]>;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
+    /** The config version whose environment belongs in the bundle, pinned when the export was asked for. */
+    config_id: IExportsColumns["config_id"];
 }
 
 /** Result of query `SelectDesiredExportEnvironment`. */
@@ -1667,7 +1669,6 @@ export const schema = {
         _indexes: {
             exports_app_id_idx: { _indexName: "exports_app_id_idx" },
             exports_artifact_id_idx: { _indexName: "exports_artifact_id_idx" },
-            exports_config_id_idx: { _indexName: "exports_config_id_idx" },
             exports_in_flight_idx: { _indexName: "exports_in_flight_idx" },
             exports_pkey: { _indexName: "exports_pkey" }
         },

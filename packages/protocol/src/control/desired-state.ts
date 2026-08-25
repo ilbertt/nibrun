@@ -97,8 +97,12 @@ export type DesiredCheckpoint = typeof DesiredCheckpointSchema.static;
  *
  * `environment` rides along for the same reason, and becomes the bundle's `.env`: what an owner
  * is handed has to run somewhere else, and a binary whose configuration stayed behind does not.
- * Empty for an export the host is being told to forget — a bundle already written has no use for
- * its owner's variables, so they go down only while there is still one to write.
+ *
+ * Optional, and the distinction is the point: `{}` is an app that set no variables, and absent is
+ * a control plane that cannot say which — an export taken before it recorded the config version,
+ * or one whose values it could not open. The host writes no `.env` at all for the second, because
+ * an empty one would answer a question nobody could answer. Absent is also what an api that
+ * predates this field sends, which is what keeps a host that has already adopted it converging.
  */
 export const DesiredExportSchema = Type.Object({
   exportId: ExportIdSchema,
@@ -106,7 +110,7 @@ export const DesiredExportSchema = Type.Object({
   volumeId: VolumeIdSchema,
   objectKey: ObjectKeySchema,
   artifact: DesiredArtifactSchema,
-  environment: TenantEnvironmentSchema,
+  environment: Type.Optional(TenantEnvironmentSchema),
   desiredState: DesiredPresenceSchema,
 });
 

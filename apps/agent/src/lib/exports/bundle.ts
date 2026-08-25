@@ -134,7 +134,7 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
   stagingDir,
 }: {
   artifact: DesiredArtifact;
-  environment: TenantEnvironment;
+  environment: TenantEnvironment | undefined;
   stagingDir: string;
 }) {
   const fs = yield* FileSystem.FileSystem;
@@ -147,16 +147,28 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
   // the bundle carries a binary the owner has to chmod before the copy they were handed will run.
   yield* fs.chmod(binaryPath, BINARY_MODE);
 
-  // Written even when the app has no variables, so the bundle has one shape and an owner reading
-  // it learns their app ran with none rather than wondering where the file went.
-  yield* fs.writeFileString(path.join(stagingDir, ENV_FILENAME), renderDotenv(environment), {
-    mode: ENV_MODE,
-  });
+  // An empty file for an app that set no variables, and no file at all when the control plane
+  // could not say what it was configured with: the first is an answer, and the second would be an
+  // empty file pretending to be one.
+  if (environment !== undefined) {
+    yield* fs.writeFileString(path.join(stagingDir, ENV_FILENAME), renderDotenv(environment), {
+      mode: ENV_MODE,
+    });
+  }
 
   const bundlePath = path.join(stagingDir, BUNDLE_NAME);
   yield* stdoutOf({
     // Named entries rather than `.`, which would sweep the archive into itself.
-    command: ['tar', 'czf', bundlePath, '-C', stagingDir, DATA_DIRECTORY, binaryName, ENV_FILENAME],
+    command: [
+      'tar',
+      'czf',
+      bundlePath,
+      '-C',
+      stagingDir,
+      DATA_DIRECTORY,
+      binaryName,
+      ...(environment === undefined ? [] : [ENV_FILENAME]),
+    ],
     timeout: DUMP_TIMEOUT,
   });
 

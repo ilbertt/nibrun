@@ -47,9 +47,11 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
    *
    * The artifact is whichever binary the app most recently had a deployment for — the app's data
    * is what is being exported, and the binary rides along so the bundle can be run. Its config
-   * version comes from that same deployment, because the variables the binary needs are as much
-   * a part of running it as the bytes are. An app that has never been deployed has neither to
-   * send and inserts nothing.
+   * version comes from that same deployment, because the variables the binary needs are as much a
+   * part of running it as the bytes are, and the two only belong together if they come from one
+   * release. That release is the most recent one whether or not it ever served: an owner whose
+   * last deploy failed is exported what they last asked to run, which is why nothing here says it
+   * ran. An app that has never been deployed has neither to send and inserts nothing.
    */
   async request({ appId, ownerId, expiresAt }: RequestExportInput): Promise<ExportRow | null> {
     // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one the

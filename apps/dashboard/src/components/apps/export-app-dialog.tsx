@@ -32,7 +32,7 @@ export function ExportAppDialog() {
           <DialogDescription>
             One <span className="font-mono">.tar.gz</span> holding the binary this app runs,
             everything on its volume, and a <span className="font-mono">.env</span> of the variables
-            it runs with.
+            it was deployed with.
           </DialogDescription>
         </DialogHeader>
 

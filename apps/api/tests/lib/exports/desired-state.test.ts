@@ -27,6 +27,7 @@ const ARTIFACT_DIGEST = Value.Parse(
 );
 const ARTIFACT_SIZE_BYTES = 4096;
 const OTHER_EXPORT = 'export-2';
+const CONFIG_ID = 'config-1';
 const SECRET = 'sk-live-do-not-log-this';
 
 type ExportEnvironmentRow = Queries['SelectDesiredExportEnvironment'];
@@ -41,12 +42,14 @@ function environmentRows(entries: Array<[string, string, string]>): ExportEnviro
 function desired({
   state,
   environments = new Map(),
+  configId = CONFIG_ID,
 }: {
   state: ExportState;
   environments?: Map<string, SealedEnvironment>;
+  configId?: string | null;
 }) {
   return toDesiredExport({
-    row: desiredExportRow(state),
+    row: { ...desiredExportRow(state), config_id: configId },
     environments,
     secretsKey: TEST_SECRETS_KEY,
   });
@@ -71,6 +74,7 @@ function desiredExportRow(state: ExportState): DesiredExportRow {
     size_bytes: String(ARTIFACT_SIZE_BYTES),
     artifact_object_key: ARTIFACT_OBJECT_KEY,
     original_file_name: ARTIFACT_FILENAME,
+    config_id: CONFIG_ID,
   };
 }
 
@@ -123,8 +127,37 @@ describe('the environment that belongs in the bundle', () => {
     expect(bundle.environment).toEqual({ API_KEY: SECRET } as never);
   });
 
-  test('is empty for an export nothing was stored for', () => {
+  // The app set no variables, which is an answer: the host writes an empty `.env` for it.
+  test('is empty for an app that set none', () => {
     expect(desired({ state: 'pending' }).environment).toEqual({});
+  });
+
+  /**
+   * Absent is the other thing, and the host tells the two apart: it writes no `.env` at all for
+   * one of these rather than an empty file claiming the app was configured with nothing.
+   */
+  test('is absent for an export taken before a config version was pinned', () => {
+    const bundle = desired({
+      state: 'pending',
+      configId: null,
+      environments: sealedFor({ exportId: EXPORT_ID, name: 'API_KEY' }),
+    });
+
+    expect(bundle.environment).toBeUndefined();
+  });
+
+  /**
+   * `openEnvironment` raises on a value it cannot open, which is right for an instance — one
+   * started with the wrong environment is worse than one not started. Here it would fail the whole
+   * poll, and with it every app on every host, over one bundle's `.env`.
+   */
+  test('is absent for values this end can no longer open', () => {
+    const bundle = desired({
+      state: 'pending',
+      environments: new Map([[EXPORT_ID, { API_KEY: sealedFromStore('not-a-sealed-value') }]]),
+    });
+
+    expect(bundle.environment).toBeUndefined();
   });
 
   /**
@@ -137,7 +170,7 @@ describe('the environment that belongs in the bundle', () => {
       environments: sealedFor({ exportId: EXPORT_ID, name: 'API_KEY' }),
     });
 
-    expect(bundle.environment).toEqual({});
+    expect(bundle.environment).toBeUndefined();
   });
 });
 

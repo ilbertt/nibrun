@@ -29,6 +29,8 @@ import {
   SecretStringSchema,
   SeenTenantLogs,
   Sha256DigestSchema,
+  TenantEnvironmentPatchSchema,
+  TenantEnvironmentSchema,
   type TenantLogRecord,
   TimestampSchema,
   Value,
@@ -117,6 +119,24 @@ describe('an export names the binary it packages', () => {
         value: { ...desiredState(), exports: [unnamed] },
       }),
     ).toBe(false);
+  });
+
+  /**
+   * The environment is the other half of what makes a bundle runnable, and it is optional exactly
+   * so this stays true: a control plane that predates the field, or one that cannot say what an
+   * export was configured with, still sends state a host can act on. Were it required, an agent
+   * deployed an hour before the api would reject the whole reply — every instance and every volume
+   * with it — over a field about one bundle's `.env`.
+   */
+  test('an export that names no environment is still one', () => {
+    const { environment: _environment, ...unconfigured } = desiredExport();
+
+    expect(
+      isValidMessage({
+        schema: HostDesiredStateSchema,
+        value: { ...desiredState(), exports: [unconfigured] },
+      }),
+    ).toBe(true);
   });
 });
 
@@ -313,6 +333,37 @@ describe('version skew', () => {
         value: { result: 'unchanged', generation: 7 },
       }),
     ).toBe(false);
+  });
+});
+
+/**
+ * An environment travels from the api to a host as a JavaScript object, and `object.__proto__ = x`
+ * sets a prototype rather than a property: a variable by that name would be accepted, stored, and
+ * then be quietly missing from everything that read it back. The schema is where an owner is told
+ * instead, and `nibrun.app_config_environment` says the same thing in SQL.
+ */
+describe('a variable named __proto__ is not one', () => {
+  // Built with fromEntries rather than a literal, which is the one way to give a plain object that
+  // key as a property at all — and the shape the api would receive from JSON.parse.
+  const named = (name: string) => Object.fromEntries([[name, TENANT_SECRET]]);
+
+  test('setting one is refused', () => {
+    expect(isValidMessage({ schema: TenantEnvironmentSchema, value: named('__proto__') })).toBe(
+      false,
+    );
+  });
+
+  test('so is an edit that names one', () => {
+    expect(
+      isValidMessage({ schema: TenantEnvironmentPatchSchema, value: named('__proto__') }),
+    ).toBe(false);
+  });
+
+  test('a name that merely starts with it is a name like any other', () => {
+    expect(isValidMessage({ schema: TenantEnvironmentSchema, value: named('__proto__x') })).toBe(
+      true,
+    );
+    expect(isValidMessage({ schema: TenantEnvironmentSchema, value: named('_PROTO_') })).toBe(true);
   });
 });
 

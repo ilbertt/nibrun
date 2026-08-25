@@ -7,7 +7,7 @@ import { createUi, isInteractive } from '#lib/ui.ts';
 
 export const command = defineCommand('apps export [destination]', {
   description:
-    "Download an app's data, the binary that ran against it and a .env of the variables it ran with, as a .tar.gz. The destination is the file to write, or a directory to write <app-slug>.tar.gz into.",
+    "Download an app's data, the binary that ran against it and a .env of the variables it was deployed with, as a .tar.gz. The destination is the file to write, or a directory to write <app-slug>.tar.gz into.",
   options: {},
   params: {
     destination: {

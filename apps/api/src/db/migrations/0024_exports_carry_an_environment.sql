@@ -1,21 +1,19 @@
 -- Which config version the bundle's `.env` is written from.
 --
 -- Pinned at request time for the same reason `artifact_id` is: an owner asking for their data out
--- has usually stopped the app first, and the variables it ran with are held by a config version
--- that nothing live points at any more. Resolving it later would make it unresolvable exactly
+-- has usually stopped the app first, and the variables it was deployed with are held by a config
+-- version that nothing live points at any more. Resolving it later would make it unresolvable exactly
 -- when it is most wanted.
 --
--- Nullable, because rows written before this column existed have no answer and a migration may
--- not invent one. An export carrying no config version exports no variables, which is what an app
--- with none looks like too.
+-- Nullable, because rows written before this column existed have no answer and a migration may not
+-- invent one. A host is sent no environment at all for one of those rather than an empty one, so
+-- the bundle carries no `.env` instead of one claiming the app set nothing.
 
 ALTER TABLE nibrun.exports
   ADD COLUMN config_id uuid REFERENCES nibrun.app_configs (id) ON DELETE RESTRICT;
 
 COMMENT ON COLUMN nibrun.exports.config_id IS
   $c$The config version whose environment belongs in the bundle, pinned when the export was asked for.$c$;
-
-CREATE INDEX exports_config_id_idx ON nibrun.exports (config_id);
 
 -- Appended, because CREATE OR REPLACE VIEW may only add columns at the end.
 CREATE OR REPLACE VIEW nibrun.desired_exports AS

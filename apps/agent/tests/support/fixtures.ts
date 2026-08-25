@@ -17,6 +17,8 @@ import {
   HostIdSchema,
   HostPortSchema,
   ObjectKeySchema,
+  SecretStringSchema,
+  type TenantEnvironment,
   TimestampSchema,
   Value,
   VolumeIdSchema,
@@ -37,6 +39,13 @@ export const OBSERVED_AT = Value.Parse(TimestampSchema, '2026-08-03T10:00:00.000
 
 export const VOLUME_SIZE_BYTES = 4_096;
 export const FIRST_HOST_PORT = Value.Parse(HostPortSchema, HOST_PORT_BASE);
+
+/** A tenant's own variables, which are secrets wherever they are typed — including in a test. */
+export function tenantEnvironment(values: Record<string, string>): TenantEnvironment {
+  return Object.fromEntries(
+    Object.entries(values).map(([name, value]) => [name, Value.Parse(SecretStringSchema, value)]),
+  );
+}
 
 export function artifact(overrides: Partial<DesiredArtifact> = {}): DesiredArtifact {
   return {

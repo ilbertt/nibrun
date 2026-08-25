@@ -74,4 +74,4 @@ tar -xzf my-app.tar.gz
 ```
 
 The same binary you uploaded, the same bytes that were on the disk, and a `.env` of the variables
-it ran with. There is no managed database to migrate off, because there never was one.
+it was deployed with. There is no managed database to migrate off, because there never was one.
