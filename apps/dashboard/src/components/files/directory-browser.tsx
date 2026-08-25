@@ -1,53 +1,21 @@
-import { DIRECTORY_ENTRY_LIMIT } from '@repo/protocol';
-import { Card } from '@repo/ui/components/card';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@repo/ui/components/empty';
-import { Skeleton } from '@repo/ui/components/skeleton';
-import { FolderOpenIcon } from 'lucide-react';
-import { DeploymentLine } from '#components/apps/deployment-line.tsx';
-import { FailureEmpty } from '#components/failure-empty.tsx';
-import { DirectoryRefreshButton } from '#components/files/directory-refresh-button.tsx';
-import { DirectoryTable } from '#components/files/directory-table.tsx';
-import { PathBreadcrumb } from '#components/files/path-breadcrumb.tsx';
+import { DirectoryListing } from '#components/files/directory-listing.tsx';
+import { SuspendedFilesystem } from '#components/files/suspended-filesystem.tsx';
+import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
-import { useDirectoryListing } from '#lib/hooks/use-directory-listing.ts';
-import { useDirectoryPath } from '#lib/hooks/use-directory-path.ts';
 
+/**
+ * A directory is read inside the microVM that has the volume mounted, so a suspended app has
+ * nothing to answer with and a browse can only fail. Said here rather than waited for, because
+ * what a host reports for this is deliberately vague — a directory that could not be read is the
+ * same sentence whether the app is down or the device is broken.
+ *
+ * Read off the app row rather than the release: an app whose microVM has not stopped yet is one
+ * that is about to, and offering a browse for the seconds it has left is worse than saying it is
+ * suspended a moment early.
+ */
 export function DirectoryBrowser() {
   const appId = useAppId();
-  const typedPath = useDirectoryPath();
-  const view = useDirectoryListing({ appId, typedPath });
+  const app = useApp(appId);
 
-  return (
-    <div className="flex flex-col gap-4">
-      {view.deploymentId !== undefined && <DeploymentLine deploymentId={view.deploymentId} />}
-      <div className="flex items-center justify-between gap-4">
-        <PathBreadcrumb />
-        <DirectoryRefreshButton />
-      </div>
-      {view.status === 'failed' && (
-        <FailureEmpty title="Could not read that directory" reason={view.reason ?? ''} />
-      )}
-      {view.status === 'loading' && <Skeleton className="h-48 w-full rounded-2xl" />}
-      {view.listing !== undefined &&
-        (view.listing.entries.length === 0 ? (
-          <Empty className="border">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <FolderOpenIcon />
-              </EmptyMedia>
-              <EmptyTitle>This directory is empty</EmptyTitle>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <Card className="overflow-hidden p-0">
-            <DirectoryTable entries={view.listing.entries} />
-          </Card>
-        ))}
-      {view.listing?.truncated === true && (
-        <p className="text-muted-foreground text-sm">
-          Only the first {DIRECTORY_ENTRY_LIMIT} entries of {view.listing.path} are shown.
-        </p>
-      )}
-    </div>
-  );
+  return app.data?.state === 'suspended' ? <SuspendedFilesystem /> : <DirectoryListing />;
 }

@@ -13,23 +13,23 @@ import { t } from 'elysia';
 
 const MAX_APP_NAME_LENGTH = 128;
 
-// `environment` is written and read in different shapes, so it is taken out here and each half
-// says its own.
-const OwnedAppConfigSchema = t.Omit(AppConfigSchema, ['environment']);
-
 // Which variables are set, never what they hold: the values are sealed in the database and only
 // opened on their way to the host, so there is nothing here that could return one.
 const RedactedEnvironmentSchema = t.Record(t.String(), t.Literal(REDACTED), {
   description: 'The variables this app runs with. Values are never returned.',
 });
 
-// The api sizes an app's filesystem, so the size is read back but never set. It is added on
-// top of what an owner owns rather than omitted from it, which is what keeps it out of the
-// patch shape below without naming it twice.
+// Everything an app runs with, plus the filesystem the api sized for it. `environment` is written
+// and read in different shapes, so it is taken out and each half says its own.
 export const PublicAppConfigSchema = t.Composite([
-  OwnedAppConfigSchema,
+  t.Omit(AppConfigSchema, ['environment']),
   t.Object({ volumeSizeBytes: ByteSizeSchema, environment: RedactedEnvironmentSchema }),
 ]);
+
+// How the binary is started, which is the whole of what an owner chooses. The machine it starts
+// on — vCPUs, memory, filesystem, health probe, restart budget — is nibrun's, and naming the two
+// that are not is what turns a request for the rest into an answer rather than silence.
+const OwnedAppConfigSchema = t.Pick(AppConfigSchema, ['guestPort', 'args']);
 
 // Strict: every field is optional, so without this a misspelled one is silently no request at
 // all and the caller is told 200.

@@ -20,12 +20,15 @@ export const VOLUME_SIZE_BYTES = 8_589_934_592;
 // database and only opened where desired state is built, so there is nothing here to return.
 export type RedactedEnvironment = Record<string, typeof REDACTED>;
 
-type OwnedAppConfig = Omit<AppConfig, 'environment'>;
-
-export type PublicAppConfig = OwnedAppConfig & {
+export type PublicAppConfig = Omit<AppConfig, 'environment'> & {
   volumeSizeBytes: number;
   environment: RedactedEnvironment;
 };
+
+// How the binary is started, which is the whole of what an owner chooses. The machine it starts
+// on — vCPUs, memory, filesystem, health probe, restart budget — is nibrun's, and leaving it out
+// of this one type is what keeps it out of every write shape below.
+type OwnedAppConfig = Pick<AppConfig, 'guestPort' | 'args'>;
 
 // What an app is created with: the whole environment, because there is not yet one to edit.
 export type NewAppConfig = Partial<OwnedAppConfig> & {
@@ -109,11 +112,11 @@ export function configWithDefaults(
 ): Omit<PublicAppConfig, 'environment'> {
   return {
     volumeSizeBytes: VOLUME_SIZE_BYTES,
+    resources: DEFAULT_INSTANCE_RESOURCES,
+    healthCheck: DEFAULT_HEALTH_CHECK,
+    restartPolicy: DEFAULT_RESTART_POLICY,
     guestPort: patch.guestPort ?? DEFAULT_GUEST_PORT,
     args: patch.args ?? [],
-    resources: patch.resources ?? DEFAULT_INSTANCE_RESOURCES,
-    healthCheck: patch.healthCheck ?? DEFAULT_HEALTH_CHECK,
-    restartPolicy: patch.restartPolicy ?? DEFAULT_RESTART_POLICY,
   };
 }
 

@@ -20,7 +20,7 @@ Everything the binary can count on, and nothing else:
 | Port | `PORT` is set by the guest; the app **must** listen on it, on `0.0.0.0` |
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs and is lost on restart. So is everything outside `/app/data` |
-| Resources | 1 vCPU, 512 MiB RAM |
+| Resources | 1 vCPU, 256 MiB RAM |
 | `HOME` | `/app` |
 | URL | `https://<slug>.nibrun.app`, live as soon as it boots |
 
@@ -90,16 +90,19 @@ Or drag the binary onto [app.nibrun.com](https://app.nibrun.com) — same thing,
 
 Worth saying out loud before recommending it:
 
-- **One microVM per app.** No horizontal scaling and no load balancing. Vertical only.
+- **One microVM per app, one size.** No horizontal scaling, no load balancing, no resizing.
 - **A deploy is a replace.** The old VM is stopped before the new one starts, because they share
   one volume — so there are a few seconds of downtime, and no blue/green or canary.
 - **A local disk, not a distributed one.** Ideal for SQLite, uploads, caches. It is not
   replicated, so an export (`nib apps export`) is your backup.
 - **The binary is the unit.** The guest boots yours and nothing else — no sidecar, no cron
   container, no managed database next to it.
-- **512 MiB and 1 vCPU by default**, and the OOM killer reaches for the tenant first.
-- **Health is a TCP connect** to `PORT` by default. A process that accepts connections while
-  broken reads as healthy.
+- **256 MiB and 1 vCPU**, sized by nibrun rather than configured by you, and the OOM killer
+  reaches for the tenant first.
+- **Health is a TCP connect** to `PORT`, and not something you configure. A process that accepts
+  connections while broken reads as healthy.
+- **A crash loop is fatal.** The guest restarts your process on a fixed budget you do not set;
+  once it runs out the app is `failed` rather than restarted forever.
 
 It fits a single-binary app that owns its own state — an internal tool, a small SaaS, a demo, a
 side project. It does not fit anything that needs to be several machines.
