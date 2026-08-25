@@ -11,9 +11,9 @@ Small apps don't need to scale. They need a machine and a disk.
 
 ## Why
 
-A compiled binary is already a whole application in one file — `go build`, `cargo build`,
-`bun build --compile`. Nothing to install on the other side. The only two things it still needs
-are somewhere to run and somewhere to read and write files.
+A compiled binary is already a whole application in one file. Whatever language produced it,
+nothing has to be installed on the other side. The only two things it still needs are somewhere
+to run and somewhere to read and write files.
 
 A container image, a managed Postgres, an object store and a load balancer in front of a single
 instance are not infrastructure for an app five people use. They are overhead you carry because
