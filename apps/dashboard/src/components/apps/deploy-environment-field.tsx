@@ -50,5 +50,5 @@ function describeEnvironment(replacing: AppSummary | undefined): string {
   if (replacing === undefined) {
     return 'What the binary runs with.';
   }
-  return 'What the binary runs with. A value already set can be replaced but never read back, and a row removed here is a variable the app stops running with.';
+  return 'What the binary runs with. A value already set can be replaced, and a row removed here is a variable the app stops running with.';
 }

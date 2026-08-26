@@ -9,9 +9,8 @@ import type { EnvironmentVariable } from '#lib/environment-variables.ts';
 const HIDDEN_VALUE = '••••••••••••';
 
 const SEALED = {
-  title: 'Sealed',
-  description:
-    'This value was encrypted when it was set, and nothing here can read it back — not this page, and not nibrun. Replacing it is the only way to change what the app runs with.',
+  title: 'Already set',
+  description: 'Replacing it is the only way to change what the app runs with.',
 };
 
 // A row is one line high, so a value with more than one in it can be carried and sent but never
