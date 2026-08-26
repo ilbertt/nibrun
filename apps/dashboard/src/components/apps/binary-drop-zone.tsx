@@ -7,10 +7,12 @@ export const BINARY_INPUT_ID = 'deploy-binary';
 export function BinaryDropZone({
   binary,
   invalid,
+  keeping,
   onPick,
 }: {
   binary: File | undefined;
   invalid: boolean;
+  keeping: boolean;
   onPick: (binary: File | undefined) => void;
 }) {
   const picker = useBinaryPicker({ onPick });
@@ -37,7 +39,11 @@ export function BinaryDropZone({
         {binary === undefined ? (
           <>
             <UploadIcon className="size-4 shrink-0 text-muted-foreground" />
-            <span>Drop the binary here, or browse for it.</span>
+            <span>
+              {keeping
+                ? 'Drop a binary here to replace the one it runs.'
+                : 'Drop the binary here, or browse for it.'}
+            </span>
           </>
         ) : (
           <>

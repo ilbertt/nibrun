@@ -8,6 +8,7 @@ import { Button } from '@repo/ui/components/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
+import { useStore } from '@tanstack/react-form';
 import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
 import { DeployEnvironmentField } from '#components/apps/deploy-environment-field.tsx';
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
@@ -27,6 +28,7 @@ export function DeployForm({
     binary,
     suggested,
   });
+  const picked = useStore(api.store, (state) => state.values.binary !== undefined);
 
   return (
     <form
@@ -36,7 +38,7 @@ export function DeployForm({
         void api.handleSubmit();
       }}
     >
-      <DeployBinaryField api={api} />
+      <DeployBinaryField api={api} replacing={replacing} />
 
       {!locked && <DeployNameField api={api} />}
 
@@ -101,15 +103,18 @@ export function DeployForm({
 
       {replacing !== undefined && (
         <p className="wrap-anywhere rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
-          This replaces the binary <span className="font-medium font-mono">{replacing.slug}</span>{' '}
-          is running. Its hostnames and everything on its volume stay as they are.
+          This restarts <span className="font-medium font-mono">{replacing.slug}</span>
+          {picked ? ' on the binary above' : ' on the binary it already runs'}. Its hostnames and
+          everything on its volume stay as they are.
         </p>
       )}
 
       <api.Subscribe selector={(state) => state.canSubmit}>
         {(canSubmit) => (
           <Button type="submit" size="lg" disabled={!canSubmit || !targetResolved}>
-            <span className="truncate">{submitLabel({ replacing: replacing?.slug, locked })}</span>
+            <span className="truncate">
+              {submitLabel({ replacing: replacing?.slug, locked, picked })}
+            </span>
           </Button>
         )}
       </api.Subscribe>
@@ -120,12 +125,14 @@ export function DeployForm({
 function submitLabel({
   replacing,
   locked,
+  picked,
 }: {
   replacing: string | undefined;
   locked: boolean;
+  picked: boolean;
 }): string {
   if (replacing !== undefined) {
-    return `Replace what ${replacing} runs`;
+    return picked ? `Replace what ${replacing} runs` : `Redeploy ${replacing}`;
   }
   return locked ? 'Reading the app…' : 'Create the app and deploy';
 }

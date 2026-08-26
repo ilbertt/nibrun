@@ -35,11 +35,11 @@ export function DeployDialogContent({ appId }: { appId?: string }) {
       </DialogTrigger>
       <DialogContent showCloseButton={!running} className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Deploy a binary</DialogTitle>
+          <DialogTitle>{appId === undefined ? 'Deploy a binary' : 'Deploy'}</DialogTitle>
           <DialogDescription>
             {run.phase === 'idle'
-              ? 'The binary is uploaded to the store, then released as what the app runs.'
-              : 'The binary is on its way. Closing this does not stop it.'}
+              ? describeDeploy(appId)
+              : 'The release is on its way. Closing this does not stop it.'}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
@@ -52,4 +52,10 @@ export function DeployDialogContent({ appId }: { appId?: string }) {
       </DialogContent>
     </Dialog>
   );
+}
+
+function describeDeploy(appId: string | undefined): string {
+  return appId === undefined
+    ? 'The binary is uploaded to the store, then released as what the app runs.'
+    : 'The app is released again with whatever this leaves it set to. A binary replaces the one it runs; without one, it keeps it.';
 }

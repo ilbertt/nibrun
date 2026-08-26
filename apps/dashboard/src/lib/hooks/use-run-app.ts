@@ -1,8 +1,8 @@
 import type { Deployed, DeployStep, UploadProgress } from '@repo/app-operations';
 import { useState } from 'react';
-import { type DeployRequest, useDeploy } from '#lib/hooks/use-deploy.ts';
+import { carriesBinary, type ReleaseRequest, useDeploy } from '#lib/hooks/use-deploy.ts';
 
-export type DeployPhase = 'idle' | 'uploading' | 'settling' | 'done' | 'failed';
+export type DeployPhase = 'idle' | 'uploading' | 'releasing' | 'settling' | 'done' | 'failed';
 
 export type DeployRun = {
   phase: DeployPhase;
@@ -10,13 +10,16 @@ export type DeployRun = {
   progress: UploadProgress | undefined;
   deployed: Deployed | undefined;
   reason: string | undefined;
-  start: (request: DeployRequest) => void;
+  start: (request: ReleaseRequest) => void;
   reset: () => void;
 };
 
 export function useRunApp({ onDeployed }: { onDeployed: (() => void) | undefined }): DeployRun {
   const [steps, setSteps] = useState<readonly DeployStep[]>([]);
   const [progress, setProgress] = useState<UploadProgress | undefined>(undefined);
+  // What the run was asked for, because the steps cannot say it: a release that reuses the stored
+  // binary reports the same artifact as one that just uploaded it.
+  const [uploading, setUploading] = useState(false);
   const run = useDeploy({
     onStep: (step) => setSteps((seen) => [...seen, step]),
     onProgress: setProgress,
@@ -24,7 +27,7 @@ export function useRunApp({ onDeployed }: { onDeployed: (() => void) | undefined
   });
 
   return {
-    phase: phaseOf({ status: run.status, steps }),
+    phase: phaseOf({ status: run.status, steps, uploading }),
     steps,
     progress,
     deployed: run.data,
@@ -32,6 +35,7 @@ export function useRunApp({ onDeployed }: { onDeployed: (() => void) | undefined
     start: (request) => {
       setSteps([]);
       setProgress(undefined);
+      setUploading(carriesBinary(request));
       run.mutate(request);
     },
     reset: () => {
@@ -45,9 +49,11 @@ export function useRunApp({ onDeployed }: { onDeployed: (() => void) | undefined
 function phaseOf({
   status,
   steps,
+  uploading,
 }: {
   status: 'idle' | 'pending' | 'success' | 'error';
   steps: readonly DeployStep[];
+  uploading: boolean;
 }): DeployPhase {
   if (status === 'success') {
     return 'done';
@@ -58,5 +64,8 @@ function phaseOf({
   if (status === 'idle') {
     return 'idle';
   }
-  return steps.some((step) => step.kind === 'deployment') ? 'settling' : 'uploading';
+  if (steps.some((step) => step.kind === 'deployment')) {
+    return 'settling';
+  }
+  return uploading ? 'uploading' : 'releasing';
 }
