@@ -7,9 +7,9 @@ an instance has no Bun; everything CI runs lives in `@repo/internal-scripts`.
 The Terraform explains itself — read it rather than a description of it here.
 
 Config carries its component's prefix (`API_`, `POSTGRES_`, `PG_BACKUP_`, `CADDY_`, `DOZZLE_`,
-`VICTORIALOGS_`) unless more than one component reads it, and keeps one name from the Terraform
-output through the SSM command to the `.env` the box writes. Nothing is aliased in transit, so
-nothing can drift.
+`VICTORIALOGS_`, `PGWEB_`) unless more than one component reads it, and keeps one name from the
+Terraform output through the SSM command to the `.env` the box writes. Nothing is aliased in
+transit, so nothing can drift.
 
 ## First run
 

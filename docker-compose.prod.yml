@@ -93,6 +93,22 @@ services:
     volumes:
       - ./dozzle/data:/data
 
+  # Loopback only here as in local, so this login is not what stands between a
+  # SQL console and the internet — the absence of any route to it is. It exists
+  # because the session behind it is the cluster superuser's, and a port
+  # published by mistake should not be the last thing that mattered.
+  #
+  # The credentials themselves rather than a hash, unlike Dozzle's user list and
+  # the log dashboard's basic_auth: pgweb compares what the browser sends against
+  # what it was given, so there is nothing on the box to hash. Both halves are
+  # SSM parameters, read into .env by on_box_deploy.sh — the username as much as
+  # the password, since nothing publishes this console and an unguessable name
+  # costs an admin nothing that looking up the password did not already.
+  pgweb:
+    environment:
+      - PGWEB_AUTH_USER=${PGWEB_AUTH_USER}
+      - PGWEB_AUTH_PASS=${PGWEB_AUTH_PASS}
+
   # Both exist only to stand in for S3 locally. An inactive profile is how a
   # service gets switched off from an override file.
   minio:

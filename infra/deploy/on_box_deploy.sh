@@ -25,6 +25,7 @@ API_PORT="${API_PORT:-3000}"
 API_DB_USER="${API_DB_USER:-nibrun}"
 API_DB_NAME="${API_DB_NAME:-nibrun}"
 API_DB_PORT="${API_DB_PORT:-5432}"
+PGWEB_PORT="${PGWEB_PORT:-8081}"
 API_S3_PORT="${API_S3_PORT:-9000}"
 API_S3_CONSOLE_PORT="${API_S3_CONSOLE_PORT:-9001}"
 DOZZLE_PORT="${DOZZLE_PORT:-8080}"
@@ -50,6 +51,8 @@ API_GITHUB_CLIENT_SECRET="$(secret api_github_client_secret)"
 API_CLOUDFLARE_API_TOKEN="$(secret api_cloudflare_api_token)"
 API_S3_ACCESS_KEY_ID="$(secret api_s3_access_key_id)"
 API_S3_SECRET_ACCESS_KEY="$(secret api_s3_secret_access_key)"
+PGWEB_AUTH_USER="$(secret pgweb_auth_user)"
+PGWEB_AUTH_PASS="$(secret pgweb_auth_pass)"
 
 # Everything written from here on carries a secret: the PEMs below, then .env.
 umask 077
@@ -90,6 +93,10 @@ API_DB_USER=${API_DB_USER}
 API_DB_PASSWORD=${API_DB_PASSWORD}
 API_DB_NAME=${API_DB_NAME}
 API_DB_PORT=${API_DB_PORT}
+
+PGWEB_PORT=${PGWEB_PORT}
+PGWEB_AUTH_USER=${PGWEB_AUTH_USER}
+PGWEB_AUTH_PASS=${PGWEB_AUTH_PASS}
 
 API_S3_ENDPOINT=${API_S3_ENDPOINT}
 ARTIFACTS_BUCKET=${ARTIFACTS_BUCKET}

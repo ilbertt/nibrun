@@ -154,6 +154,44 @@ resource "aws_ssm_parameter" "victorialogs_password" {
   }
 }
 
+# pgweb's login, read back exactly like the two above. Both halves, unlike them:
+# nothing publishes this console — an SSM port-forward is the only way to it — so
+# the username is a second unguessable value rather than a name to remember, and
+# an admin who is already looking up one parameter pays nothing to look up two.
+#
+# The credentials, not a hash. Dozzle and Caddy both want bcrypt and both re-salt,
+# which is why the box does that hashing once per deploy; pgweb compares basic
+# auth input directly, so what the box reads is what the container is given.
+resource "random_password" "pgweb_auth_user" {
+  length  = 16
+  special = false
+}
+
+resource "random_password" "pgweb_auth_pass" {
+  length  = 32
+  special = false
+}
+
+resource "aws_ssm_parameter" "pgweb_auth_user" {
+  name  = "${var.ssm_secret_prefix}/pgweb_auth_user"
+  type  = "SecureString"
+  value = random_password.pgweb_auth_user.result
+
+  tags = {
+    Name = "${local.resource_name_prefix}-pgweb-auth-user"
+  }
+}
+
+resource "aws_ssm_parameter" "pgweb_auth_pass" {
+  name  = "${var.ssm_secret_prefix}/pgweb_auth_pass"
+  type  = "SecureString"
+  value = random_password.pgweb_auth_pass.result
+
+  tags = {
+    Name = "${local.resource_name_prefix}-pgweb-auth-pass"
+  }
+}
+
 # --- App hosts ---
 
 # The user-app proxy's TLS material, carried exactly like the control plane

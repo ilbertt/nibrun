@@ -1,5 +1,5 @@
-# Local stack: Postgres, MinIO, the API, and Dozzle. Copy .env.example to .env
-# first.
+# Local stack: Postgres, MinIO, the API, VictoriaLogs, Dozzle and pgweb. Copy
+# .env.example to .env first.
 #
 # Anything truly opinionated (internal service URLs, container ports, bucket
 # bootstrap) lives here, not in .env.
@@ -189,6 +189,47 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+    networks:
+      - nibrun
+
+  # A SQL console on the api's database, for admins. Loopback only in local and
+  # production alike, and with no site in the Caddyfile: it connects as the role
+  # that owns the database — the cluster superuser, which is what lets pg-backup
+  # dump roles — so an SSM port-forward, which already costs AWS credentials, is
+  # the whole way in. The login production adds (docker-compose.prod.yml) is a
+  # second lock on that door rather than the door itself.
+  #
+  # sslmode is spelled out because pgweb only infers `disable` for a host
+  # literally named localhost or 127.0.0.1. Any other host falls through to
+  # lib/pq's default of `require`, which this Postgres, serving no TLS, refuses.
+  pgweb:
+    image: sosedoff/pgweb:0.17.0
+    container_name: pgweb
+    command:
+      - --lock-session
+    environment:
+      - PGWEB_DATABASE_URL=postgresql://${API_DB_USER}:${API_DB_PASSWORD}@postgres-db:5432/${API_DB_NAME}?sslmode=disable
+    ports:
+      - "127.0.0.1:${PGWEB_PORT}:8081"
+    healthcheck:
+      # /api/connection rather than /api/info: info sits on pgweb's allowlist for
+      # its own database check and keeps answering once the connection is gone,
+      # where this round-trips to Postgres. Credentials because basic auth covers
+      # every route including this one; they are unset locally, where there is no
+      # login, and curl sends an empty pair that pgweb ignores.
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -o /dev/null -u $$PGWEB_AUTH_USER:$$PGWEB_AUTH_PASS http://127.0.0.1:8081/api/connection",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: always
+    depends_on:
+      postgres-db:
+        condition: service_healthy
     networks:
       - nibrun
 
