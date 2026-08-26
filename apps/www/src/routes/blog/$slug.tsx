@@ -4,6 +4,7 @@ import { ArrowLeftIcon, FileTextIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CodeCopyButton } from '#components/code-copy-button.tsx';
+import { DeployCta } from '#components/deploy-cta.tsx';
 import { HomeLink } from '#components/home-link.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
@@ -129,6 +130,7 @@ function RouteComponent() {
           </header>
           <ArticleBody post={post} />
         </article>
+        <DeployCta />
       </main>
     </>
   );

@@ -129,21 +129,8 @@ Inside: the binary that was running, the entire `data/` directory as it stood on
 `./pocketbase serve --dir=./data/pb_data` is serving the same app again — same records, same
 uploaded files, same superuser accounts, off the same command line as further up this page.
 
+It is also your backup, and the only one — the disk is local and unreplicated, so taking a copy
+now and then is on you.
+
 There is no managed database to migrate off, because there was never a managed database. Leaving
 costs you a download.
-
-## What you give up
-
-Worth saying plainly, because it is the design and not a roadmap:
-
-- **One microVM, one size.** 1 vCPU and 256 MiB, and no horizontal scaling. PocketBase is
-  comfortable there for a small app; it is not where you put something with real traffic.
-- **A deploy is a replace.** The old VM stops before the new one starts, because they share the
-  volume. That is a few seconds of downtime, not blue/green.
-- **The disk is local and unreplicated.** The export above doubles as the backup, and taking it
-  is on you.
-- **One process.** No sidecar, no cron container, no separate `pocketbase superuser` invocation
-  against the same volume.
-
-If that list is disqualifying, you have outgrown this. If it is not, PocketBase is one file, and
-running it should take about as long as downloading it.
