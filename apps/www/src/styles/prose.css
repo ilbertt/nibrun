@@ -82,6 +82,17 @@
   font-size: 0.9em;
 }
 
+.prose .code-block {
+  position: relative;
+  margin-block: 1.25rem;
+}
+
+.prose .code-block pre {
+  margin-block: 0;
+  /* Room kept for the copy button, which sits over the block while the code scrolls under it. */
+  padding-inline-end: 3.5rem;
+}
+
 .prose pre {
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) / 2);

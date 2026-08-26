@@ -1,4 +1,4 @@
-import { marked } from 'marked';
+import { Marked, Renderer } from 'marked';
 
 export type BlogPost = {
   slug: string;
@@ -28,8 +28,21 @@ export function findPost(slug: string): BlogPost | undefined {
   return POSTS.find((post) => post.slug === slug);
 }
 
+const DEFAULT_RENDERER = new Renderer();
+
+// An empty slot rather than a rendered button: copying is a React component with the shared
+// clipboard hook behind it, and this is the element it is portalled into once the page is
+// interactive. The wrapper is what positions it, so it has to come from here and not from CSS.
+const ARTICLE = new Marked({
+  renderer: {
+    code(token) {
+      return `<div class="code-block">${DEFAULT_RENDERER.code(token)}<span data-copy-slot></span></div>`;
+    },
+  },
+});
+
 export function renderPost(post: BlogPost): string {
-  return marked.parse(post.markdown.replace(FRONTMATTER, ''), { async: false });
+  return ARTICLE.parse(post.markdown.replace(FRONTMATTER, ''), { async: false });
 }
 
 // UTC on both sides: the date is a plain `YYYY-MM-DD`, which parses as UTC midnight, and

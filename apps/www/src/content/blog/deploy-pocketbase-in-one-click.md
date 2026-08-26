@@ -53,11 +53,6 @@ serve
 --dir=./data/pb_data
 ```
 
-`--dir` is the one to get right: `data/` is the only directory that survives a restart, and
-PocketBase would otherwise write its database beside the binary, where it does not. The port is
-spelled out rather than passed as `$PORT` because nothing shell-like sits in between — it only
-has to match the Guest port field.
-
 Deploy. A few seconds later PocketBase is answering on `https://<your-app>.nibrun.app`, and the
 admin UI is at `/_/`. There is no certificate to obtain and no OS underneath it that is yours to
 patch.
