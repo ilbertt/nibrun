@@ -29,6 +29,15 @@ export function parseCommandLine(line: string): CommandLine {
 }
 
 /**
+ * The same line without a binary in front of it, which is what `--args` carries. Quoted as one
+ * value for the same reason the positional is: a bare list cannot be told apart from this
+ * program's own flags.
+ */
+export function parseArguments(line: string): TenantArguments {
+  return tokenize(line);
+}
+
+/**
  * The shell's own rules, applied a second time to the string the shell handed over whole. Only
  * the part that separates arguments: nothing here expands a variable, a glob or a `$(…)`, so a
  * tenant argument that contains one arrives at the guest exactly as written.

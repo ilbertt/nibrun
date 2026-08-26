@@ -79,6 +79,14 @@ nib run ./my-server --app my-app --env STRIPE_SECRET_KEY=sk_live_... --env LOG_L
 nib run ./my-server --app my-app --unset LOG_LEVEL
 ```
 
+Changing only how the binary starts is `nib apps update`, which runs the one the app already has
+rather than asking for it again. What no flag names is left alone:
+
+```sh
+nib apps update --app my-app --env LOG_LEVEL=debug
+nib apps update --app my-app --args "serve --verbose"
+```
+
 `nib apps list` finds the slug again when a later session has to redeploy, and `nib apps logs` says
 why one that was created never came up — worth reaching for, since serving is only a TCP connect
 and a broken process can hold the port. `nib --help` lists the rest — domains, filesystem, export,

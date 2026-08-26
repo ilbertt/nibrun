@@ -13,6 +13,7 @@ import type { command as appsListCmd } from './commands/apps/list.ts';
 import type { command as appsLogsCmd } from './commands/apps/logs.ts';
 import type { command as appsResumeCmd } from './commands/apps/resume.ts';
 import type { command as appsSuspendCmd } from './commands/apps/suspend.ts';
+import type { command as appsUpdateCmd } from './commands/apps/update.ts';
 import type { command as loginCmd } from './commands/login.ts';
 import type { command as runCommandCmd } from './commands/run/[command].ts';
 
@@ -86,6 +87,12 @@ declare module '@parshjs/core' {
       rootOptions: {};
     };
     'apps suspend': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: {};
+    };
+    'apps update': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
@@ -195,6 +202,12 @@ export const commandTree: RuntimeNode = {
         'suspend': {
           segment: { kind: 'literal', value: 'suspend' },
           command: { path: 'apps suspend', load: () => import('./commands/apps/suspend.ts').then((m) => m.command) },
+          literalChildren: {},
+          paramChild: null,
+        },
+        'update': {
+          segment: { kind: 'literal', value: 'update' },
+          command: { path: 'apps update', load: () => import('./commands/apps/update.ts').then((m) => m.command) },
           literalChildren: {},
           paramChild: null,
         },

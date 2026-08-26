@@ -26,4 +26,34 @@ export const SHARED_OPTIONS = {
       description: 'Read this deployment instead of looking up the app latest.',
     },
   },
+  port: {
+    name: 'port',
+    option: {
+      schema: z.number().int().optional(),
+      description: 'Port the binary listens on inside the guest.',
+    },
+  },
+  env: {
+    name: 'env',
+    option: {
+      schema: z.array(z.string()).optional(),
+      description:
+        'Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is.',
+    },
+  },
+  unset: {
+    name: 'unset',
+    option: {
+      schema: z.array(z.string()).optional(),
+      description: 'Remove an environment variable from the app, by name. Repeatable.',
+    },
+  },
+  detach: {
+    name: 'detach',
+    option: {
+      schema: z.boolean().optional(),
+      aliases: ['d'],
+      description: 'Return once the deployment is created instead of waiting for it to serve.',
+    },
+  },
 } as const satisfies Record<string, { name: string; option: CommandOption }>;
