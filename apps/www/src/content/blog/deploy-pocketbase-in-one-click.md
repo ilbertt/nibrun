@@ -53,6 +53,11 @@ serve
 --dir=./data/pb_data
 ```
 
+`--dir` is the one to get right: `data/` is the only directory that survives a restart, and
+PocketBase would otherwise write its database beside the binary, where it does not. The port is
+spelled out rather than passed as `$PORT` because nothing shell-like sits in between — it only
+has to match the Guest port field.
+
 Deploy. A few seconds later PocketBase is answering on `https://<your-app>.nibrun.app`, and the
 admin UI is at `/_/`. There is no certificate to obtain and no OS underneath it that is yours to
 patch.
@@ -63,26 +68,6 @@ If you would rather stay in a terminal, it is the same thing in one command:
 nib run "./pocketbase serve --http=0.0.0.0:8090 --dir=./data/pb_data" \
   --name pocketbase --port 8090
 ```
-
-## Why those three arguments
-
-None of them are nibrun-specific ceremony. They are the three defaults PocketBase picks for
-running on your laptop, and all three are wrong on any server.
-
-`serve` is PocketBase's own subcommand — the binary is a multi-command tool, and running it bare
-prints help and exits.
-
-`--http=0.0.0.0:8090` is the important one. PocketBase binds `127.0.0.1` by default, which on a
-machine of its own means nothing outside can reach it. nibrun hands your process a port in `PORT`
-and routes to it, and here you are telling PocketBase to take that port on every interface. The
-port number is written out rather than passed as `$PORT` because there is no shell involved —
-arguments go straight to `exec`, so `8090` has to match the Guest port field. Pick any number
-you like, as long as it is the same in both places.
-
-`--dir=./data/pb_data` is where your database ends up. PocketBase defaults to `pb_data` next to
-the binary, and on nibrun the only directory that survives a restart is `data/`. Point it inside
-and your data outlives every redeploy; leave it at the default and you lose the whole database the
-first time the app restarts. This is the one that bites people, and it bites them a week later.
 
 ## Creating the first superuser
 
@@ -128,6 +113,22 @@ volume, billed separately. Free tiers usually exclude the disk, or sleep the ins
 app with a SQLite file is exactly the kind of app that does not enjoy being slept. Check the
 current numbers yourself — they move — but budget for two line items, not one.
 
+## Tired of nibrun? Zip and go
+
+One command — or one click in the dashboard — and the whole app comes back as a `.tar.gz`:
+
+```sh
+nib apps export --app pocketbase .
+```
+
+Inside: the binary that was running, the entire `data/` directory as it stood on disk, and a
+`.env` of the variables it was deployed with. Unpack it anywhere and
+`./pocketbase serve --dir=./data/pb_data` is serving the same app again — same records, same
+uploaded files, same superuser accounts, off the same command line as further up this page.
+
+There is no managed database to migrate off, because there was never a managed database. Leaving
+costs you a download.
+
 ## What you give up
 
 Worth saying plainly, because it is the design and not a roadmap:
@@ -136,8 +137,8 @@ Worth saying plainly, because it is the design and not a roadmap:
   comfortable there for a small app; it is not where you put something with real traffic.
 - **A deploy is a replace.** The old VM stops before the new one starts, because they share the
   volume. That is a few seconds of downtime, not blue/green.
-- **The disk is local and unreplicated.** `nib apps export` gives you the binary and the whole
-  `data/` directory as one `.tar.gz`. That is your backup, and you should take it.
+- **The disk is local and unreplicated.** The export above doubles as the backup, and taking it
+  is on you.
 - **One process.** No sidecar, no cron container, no separate `pocketbase superuser` invocation
   against the same volume.
 
