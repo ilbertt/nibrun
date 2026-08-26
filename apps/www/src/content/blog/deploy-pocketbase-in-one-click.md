@@ -8,38 +8,28 @@ date: 2026-08-26
 you have a database, an auth system, file storage, realtime subscriptions and an admin UI — one
 process, one directory on disk, no dependencies to install.
 
-Anyone who has self-hosted [Supabase](https://supabase.com) knows that same list as a stack:
-Postgres, GoTrue, PostgREST, Realtime, Storage, Kong, Studio, and a compose file holding them
-together. PocketBase is roughly the same surface area, folded into one file.
+Anyone who has self-hosted [Supabase](https://supabase.com) knows that same feature list as half
+a dozen services and a compose file holding them together. PocketBase is roughly that surface
+area, in one file.
 
 Then you go to deploy it, and the file stops mattering.
 
 ## The detour
 
-Here is the shortest honest path from that binary to a URL, on the platforms people actually
-reach for.
+There are two ways to get it online, and both spend the simplicity you just bought.
 
-You write a Dockerfile. It is three lines — a base image, a `COPY`, a `CMD` — and it exists
-entirely so that a platform which only knows how to run images will agree to run your file. Now
-you own it. It rebuilds on every PocketBase release, and a build step sits between you and every
-deploy from here on.
+Put it on a platform like [Railway](https://railway.com) and the first redeploy eats your
+database, because a container filesystem is not a disk. You buy the disk back as a volume, and
+the volume pins the service to one machine — mentioned in the tone of a limitation, though
+PocketBase was only ever going to be one machine.
 
-[Railway](https://railway.com) builds it and it boots. You create a collection, add a record,
-push a fix, and the record is gone — a container filesystem is not a disk. So you provision a
-volume, mount it, point `--dir` at the mount, and deploy again. Now it survives.
+Take a VM at [DigitalOcean](https://www.digitalocean.com) instead and the app is the easy part.
+What you actually signed up for is the TLS certificate and its renewal, the reverse proxy in
+front of it, the OS updates, the firewall, and the backups — not for an evening, but for as long
+as the thing is up.
 
-The volume pins the service to a single machine, which the platform mentions in the tone of a
-limitation. It is not one. PocketBase was only ever going to be one machine.
-
-Or you skip the image entirely and take a VM at [DigitalOcean](https://www.digitalocean.com),
-where the work is not a Dockerfile but a user, a systemd unit, a reverse proxy, a certificate
-that has to renew, a firewall, and a backup job you promise yourself you will write next weekend.
-
-Either way, the evening went to putting a machine back together. That is what every step on both
-lists is. A container is a machine with the disk pulled out and the name taken away, so the
-platform sells the disk back to you as a volume and the name back as a service. A VM is a machine
-with nothing on it yet, so you fit the parts by hand. PocketBase asked for neither. It asked for
-a directory it could write to and a port it could listen on.
+Either way the work is assembling a machine. PocketBase never asked for one to be taken apart.
+It asked for a directory it could write to and a port it could listen on.
 
 ## The one click
 
@@ -64,7 +54,8 @@ serve
 ```
 
 Deploy. A few seconds later PocketBase is answering on `https://<your-app>.nibrun.app`, and the
-admin UI is at `/_/`.
+admin UI is at `/_/`. There is no certificate to obtain and no OS underneath it that is yours to
+patch.
 
 If you would rather stay in a terminal, it is the same thing in one command:
 
