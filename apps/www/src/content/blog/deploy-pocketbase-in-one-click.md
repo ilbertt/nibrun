@@ -4,9 +4,9 @@ description: PocketBase is one file. Most ways to host it want a Dockerfile, a Y
 date: 2026-08-26
 ---
 
-PocketBase ships as a single compiled binary. Download it, run it, and you have a database, an
-auth system, file storage, realtime subscriptions and an admin UI — one process, one directory
-on disk, no dependencies to install.
+[PocketBase](https://pocketbase.io) ships as a single compiled binary. Download it, run it, and
+you have a database, an auth system, file storage, realtime subscriptions and an admin UI — one
+process, one directory on disk, no dependencies to install.
 
 Then you go to host it, and every option asks you to put that one file back inside a container
 image.
