@@ -62,7 +62,14 @@ Deploy. A few seconds later PocketBase is answering on `https://<your-app>.nibru
 admin UI is at `/_/`. There is no certificate to obtain and no OS underneath it that is yours to
 patch.
 
-If you would rather stay in a terminal, it is the same thing in one command:
+There is a CLI too, if you would rather not leave the terminal for any of it:
+
+```sh
+curl -fsSL https://nibrun.com/install.sh | sh
+nib login
+```
+
+`nib run` is then the same deploy in one line — same binary, same arguments, same port:
 
 ```sh
 nib run "./pocketbase serve --http=0.0.0.0:8090 --dir=./data/pb_data" \
@@ -71,7 +78,8 @@ nib run "./pocketbase serve --http=0.0.0.0:8090 --dir=./data/pb_data" \
 
 ## Creating the first superuser
 
-On its first start PocketBase prints a one-time installer link to its log. Read it back with:
+On its first start PocketBase prints a one-time installer link to its log. It is under the app's
+Logs tab in the dashboard, or from the terminal:
 
 ```sh
 nib apps logs --app pocketbase
