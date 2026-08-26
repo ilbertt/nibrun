@@ -17,6 +17,25 @@ REPO="ilbertt/nibrun"
 TAG_PREFIX="cli-v"
 DEFAULT_INSTALL_DIR="$HOME/.local/bin"
 
+# Styling is for a terminal to read: a pipe, a log file or NO_COLOR gets the same lines unadorned.
+if [ -t 2 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != dumb ]; then
+  BOLD=$(printf '\033[1m')
+  DIM=$(printf '\033[2m')
+  RED=$(printf '\033[31m')
+  GREEN=$(printf '\033[32m')
+  YELLOW=$(printf '\033[33m')
+  RESET=$(printf '\033[0m')
+else
+  BOLD='' DIM='' RED='' GREEN='' YELLOW='' RESET=''
+fi
+
+# Asked of the locale rather than of $TERM, which says nothing about encoding: under LC_ALL=C these
+# arrive as mojibake, and a broken glyph in the first line an owner sees costs more than it buys.
+case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+  *[Uu][Tt][Ff]8* | *[Uu][Tt][Ff]-8*) DOWN='↓' ARROW='→' TICK='✓' ;;
+  *) DOWN='>' ARROW='->' TICK='*' ;;
+esac
+
 main() {
   target=$(resolve_target)
 
@@ -35,9 +54,15 @@ main() {
   wanted=${version#"$TAG_PREFIX"}
 
   if [ "$installed" = "$wanted" ]; then
-    say "nib $wanted is already installed at $binary"
+    ok "nib ${BOLD}${wanted}${RESET} is already installed at ${DIM}${binary}${RESET}"
     report_path "$install_dir"
     return 0
+  fi
+
+  if [ -n "$installed" ]; then
+    step "Updating nib ${BOLD}${installed}${RESET} $ARROW ${BOLD}${wanted}${RESET} ${DIM}($target)${RESET}"
+  else
+    step "Installing nib ${BOLD}${wanted}${RESET} ${DIM}($target)${RESET}"
   fi
 
   mkdir -p "$install_dir"
@@ -48,7 +73,6 @@ main() {
   trap 'rm -f "$staged"' EXIT
 
   url="https://github.com/$REPO/releases/download/$version/nib-$target"
-  say "Downloading nib $version ($target)"
   curl --fail --silent --show-error --location "$url" --output "$staged" ||
     die "Could not download $url"
 
@@ -57,11 +81,9 @@ main() {
   chmod 755 "$staged"
   mv "$staged" "$binary"
 
-  if [ -n "$installed" ]; then
-    say "Updated nib $installed -> $(nib_version "$binary")"
-  else
-    say "Installed nib $(nib_version "$binary") to $binary"
-  fi
+  # The version comes from the binary rather than from the tag, so this line is also the proof that
+  # what was just downloaded runs on this machine.
+  ok "nib ${BOLD}$(nib_version "$binary")${RESET} is installed at ${DIM}${binary}${RESET}"
   report_path "$install_dir"
 }
 
@@ -136,17 +158,20 @@ report_path() {
       # On PATH is not the same as reached: an older nib earlier in it still wins.
       reached=$(command -v nib || true)
       if [ -n "$reached" ] && [ "$reached" != "$1/nib" ]; then
-        say "Note: $reached comes first on your PATH and will be used instead."
+        warn "$reached comes first on your PATH and will be used instead."
       fi
       ;;
     *)
-      say "Note: $1 is not on your PATH. Add it with:"
-      say "  export PATH=\"$1:\$PATH\""
+      warn "$1 is not on your PATH. Add it with:"
+      say "    ${BOLD}export PATH=\"$1:\$PATH\"${RESET}"
       ;;
   esac
 }
 
 say() { echo "$*" >&2; }
-die() { echo "install.sh: $*" >&2; exit 1; }
+step() { say "${DIM}${DOWN}${RESET} $*"; }
+ok() { say "${GREEN}${TICK}${RESET} $*"; }
+warn() { say "${YELLOW}!${RESET} $*"; }
+die() { echo "${RED}install.sh:${RESET} $*" >&2; exit 1; }
 
 main "$@"

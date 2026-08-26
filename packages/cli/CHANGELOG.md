@@ -2,6 +2,15 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.25-1]
+
+### 🚀 Features
+
+- *(api)* Nibrun sizes the machine, not the owner (#261)
+- *(protocol)* An app starts at 256 MiB rather than 512 (#259)
+- *(agent,api)* The export bundle carries the variables the app was deployed with (#258)
+- *(api,dashboard)* A suspended app says so once the microVM is down (#249)
+
 ## [2026.8.21-1]
 
 ### 🚀 Features

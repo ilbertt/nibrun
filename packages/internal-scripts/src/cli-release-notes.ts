@@ -44,7 +44,7 @@ function assertTagMatchesVersion() {
  */
 function installSection() {
   return `
-## Install
+## Install or update
 
 \`\`\`sh
 curl -fsSL https://nibrun.com/install.sh | sh
