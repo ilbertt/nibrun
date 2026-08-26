@@ -21,14 +21,20 @@ variable "data_volume_size" {
   description = "Persistent data EBS volume size in GB. Backs Postgres. Survives instance replacement."
 }
 
-# m7i rather than m7i-flex, which this was and which nested virtualisation was
-# verified on. A flex instance sustains 40% of its vCPUs and bursts above that on
-# credit, and a host whose whole job is packing microVMs has nothing to spare when
-# the credit runs out. On the spot market it is also the cheaper of the two, so
-# the flex discount buys nothing here.
+# Not m7i-flex, which this was and which nested virtualisation was verified on: a
+# flex instance sustains 40% of its vCPUs and bursts above that on credit, and a
+# host whose whole job is packing microVMs has nothing to spare when the credit
+# runs out.
+#
+# m8id rather than m7i because it is the cheaper of the two on spot and carries a
+# 118 GB NVMe instance store. Nothing uses that disk yet: /data is still the EBS
+# volume below, and moving the ZeroFS cache onto ephemeral storage needs a
+# boot-time format that nothing here does — ensure_data_volume.sh runs from the
+# deploy while /data remounts from fstab, so a blank instance store would come back
+# unmounted after every spot stop rather than merely cold.
 variable "app_host_instance_type" {
   type        = string
-  default     = "m7i.large"
+  default     = "m8id.large"
   description = "Runs Firecracker microVMs and ZeroFS. Nested virtualisation works on ordinary Intel instances, so this is not a metal type and does not need to be — but it must be a type whose ProcessorInfo.SupportedFeatures lists nested-virtualization, or the host boots no microVM."
 }
 
