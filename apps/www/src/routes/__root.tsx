@@ -2,12 +2,9 @@ import { Toaster } from '@repo/ui/components/sonner';
 import appCss from '@repo/ui/globals.css?url';
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
-import { SITE_URL } from '#lib/site-url.ts';
+import { SITE_TITLE, SITE_URL } from '#lib/site.ts';
 import { themeScript } from '#lib/theme-script.ts';
 
-const TITLE = 'nibrun — drop your binary, get a server';
-const DESCRIPTION =
-  "Small apps don't need to scale. Drop a compiled binary and get a microVM of its own, a filesystem that persists, and an HTTPS URL. Export the binary and the whole disk whenever you want.";
 const OG_IMAGE = `${SITE_URL}/og.png`;
 
 export const Route = createRootRoute({
@@ -15,29 +12,20 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: TITLE },
-      { name: 'description', content: DESCRIPTION },
       { name: 'theme-color', media: '(prefers-color-scheme: dark)', content: '#0a1410' },
-      { property: 'og:type', content: 'website' },
-      { property: 'og:url', content: `${SITE_URL}/` },
       { property: 'og:site_name', content: 'nibrun' },
       { property: 'og:locale', content: 'en_US' },
-      { property: 'og:title', content: TITLE },
-      { property: 'og:description', content: DESCRIPTION },
       { property: 'og:image', content: OG_IMAGE },
       { property: 'og:image:type', content: 'image/png' },
       { property: 'og:image:width', content: '1200' },
       { property: 'og:image:height', content: '630' },
-      { property: 'og:image:alt', content: TITLE },
+      { property: 'og:image:alt', content: SITE_TITLE },
       { name: 'twitter:card', content: 'summary_large_image' },
-      { name: 'twitter:title', content: TITLE },
-      { name: 'twitter:description', content: DESCRIPTION },
       { name: 'twitter:image', content: OG_IMAGE },
-      { name: 'twitter:image:alt', content: TITLE },
+      { name: 'twitter:image:alt', content: SITE_TITLE },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
-      { rel: 'canonical', href: `${SITE_URL}/` },
       {
         rel: 'alternate',
         type: 'text/markdown',

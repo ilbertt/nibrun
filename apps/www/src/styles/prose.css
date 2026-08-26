@@ -1,0 +1,140 @@
+/* Tailwind's reset strips every default the browser gives an article — heading sizes, list
+   markers, paragraph margins. Markdown emits exactly those bare tags, so without this a post
+   renders as one undifferentiated block of body text. Written against the shadcn variables
+   rather than utilities, because the HTML comes from `marked` and carries no classes. */
+
+.prose {
+  color: var(--foreground);
+  line-height: 1.75;
+  overflow-wrap: break-word;
+}
+
+.prose > :first-child {
+  margin-block-start: 0;
+}
+
+.prose > :last-child {
+  margin-block-end: 0;
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose pre,
+.prose blockquote,
+.prose table {
+  margin-block: 1.25rem;
+}
+
+.prose h2 {
+  margin-block: 3rem 1rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.prose h3 {
+  margin-block: 2rem 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.prose a {
+  color: var(--primary);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.prose a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.prose ul,
+.prose ol {
+  padding-inline-start: 1.5rem;
+}
+
+.prose ul {
+  list-style: disc;
+}
+
+.prose ol {
+  list-style: decimal;
+}
+
+.prose li {
+  margin-block: 0.5rem;
+}
+
+.prose li::marker {
+  color: var(--muted-foreground);
+}
+
+.prose strong {
+  font-weight: 600;
+}
+
+.prose code {
+  border-radius: calc(var(--radius) / 6);
+  background: var(--muted);
+  padding: 0.125em 0.375em;
+  font-size: 0.9em;
+}
+
+.prose pre {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) / 2);
+  background: var(--muted);
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.875rem;
+}
+
+.prose blockquote {
+  border-inline-start: 2px solid var(--border);
+  padding-inline-start: 1rem;
+  color: var(--muted-foreground);
+}
+
+.prose hr {
+  margin-block: 3rem;
+  border: 0;
+  border-block-start: 1px solid var(--border);
+}
+
+/* A block, so a table too wide for the column scrolls itself. As a table it would stretch the
+   article instead, and the page would scroll sideways around the paragraphs too. */
+.prose table {
+  display: block;
+  border-collapse: collapse;
+  overflow-x: auto;
+  font-size: 0.9375rem;
+}
+
+.prose th,
+.prose td {
+  border-block-end: 1px solid var(--border);
+  padding: 0.625rem 0.75rem;
+  text-align: start;
+  vertical-align: top;
+}
+
+.prose th {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.prose img {
+  border-radius: calc(var(--radius) / 2);
+  max-width: 100%;
+  height: auto;
+}

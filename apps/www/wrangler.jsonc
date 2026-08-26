@@ -9,7 +9,11 @@
     "head_sampling_rate": 1
   },
   "assets": {
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    // Default is `auto-trailing-slash`, which answers /blog by redirecting to /blog/ — a URL
+    // that is not the one the page names as its canonical. Dropping it instead makes the two
+    // agree, so the address that gets shared is the address that gets served.
+    "html_handling": "drop-trailing-slash"
   },
   "env": {
     // Wrangler derives `nibrun-www-preview` from the environment name and would deploy a

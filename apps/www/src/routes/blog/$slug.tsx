@@ -1,0 +1,95 @@
+import { Button } from '@repo/ui/components/button';
+import { createFileRoute, Link, notFound } from '@tanstack/react-router';
+import { ArrowLeftIcon, FileTextIcon } from 'lucide-react';
+import { HomeLink } from '#components/home-link.tsx';
+import { PageBackdrop } from '#components/page-backdrop.tsx';
+import { SiteHeader } from '#components/site-header.tsx';
+import { type BlogPost, findPost, formatPostDate, renderPost } from '#lib/blog.ts';
+import { pageHead } from '#lib/page-head.ts';
+import { SITE_URL } from '#lib/site.ts';
+import '#styles/prose.css';
+
+export const Route = createFileRoute('/blog/$slug')({
+  // Returns nothing: the post is already in the bundle, and handing it back would serialize the
+  // whole article into the page a second time, beside the HTML it was rendered into.
+  loader: ({ params }) => {
+    if (findPost(params.slug) === undefined) {
+      throw notFound();
+    }
+  },
+  head: ({ params }) => {
+    const post = findPost(params.slug);
+    if (post === undefined) {
+      return {};
+    }
+    const head = pageHead({
+      path: `/blog/${post.slug}`,
+      title: `${post.title} — nibrun`,
+      description: post.description,
+      publishedAt: post.date,
+    });
+
+    return {
+      ...head,
+      links: [
+        ...head.links,
+        {
+          rel: 'alternate',
+          type: 'text/markdown',
+          href: markdownPath(post),
+          title: 'This post in Markdown',
+        },
+      ],
+    };
+  },
+  component: RouteComponent,
+});
+
+function markdownPath(post: BlogPost): string {
+  return `${SITE_URL}/blog/${post.slug}.md`;
+}
+
+function RouteComponent() {
+  const { slug } = Route.useParams();
+  const post = findPost(slug);
+  if (post === undefined) {
+    return null;
+  }
+
+  return (
+    <>
+      <PageBackdrop />
+      <main className="mx-auto flex w-full max-w-3xl flex-col px-6">
+        <SiteHeader left={<HomeLink />} />
+        <article className="flex flex-col py-12 sm:py-16">
+          <Button variant="ghost" size="sm" className="self-start" render={<Link to="/blog" />}>
+            <ArrowLeftIcon data-icon="inline-start" />
+            All posts
+          </Button>
+          <header className="flex flex-col gap-4 py-8">
+            <time dateTime={post.date} className="text-muted-foreground text-sm">
+              {formatPostDate(post.date)}
+            </time>
+            <h1 className="text-balance font-semibold text-4xl tracking-tight">{post.title}</h1>
+            <p className="text-balance text-lg text-muted-foreground">{post.description}</p>
+            {/* Not a router link: the target is a file the worker hands back, not a route. */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="self-start"
+              render={<a href={`/blog/${post.slug}.md`} />}
+            >
+              <FileTextIcon data-icon="inline-start" />
+              View markdown
+            </Button>
+          </header>
+          {/* The source is a file in this repo, written by us and compiled at build time. */}
+          <div
+            className="prose border-border/60 border-t pt-10"
+            dangerouslySetInnerHTML={{ __html: renderPost(post) }}
+          />
+        </article>
+      </main>
+    </>
+  );
+}

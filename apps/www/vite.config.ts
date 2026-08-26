@@ -12,7 +12,16 @@ const config = defineConfig({
   plugins: [
     cloudflare({ viteEnvironment: { name: 'ssr' } }),
     tailwindcss(),
-    tanstackStart({ prerender: { enabled: true } }),
+    tanstackStart({
+      prerender: {
+        enabled: true,
+        // The crawler follows every root-relative `<a href>` it renders, which includes each
+        // post's "View markdown" link. Prerendered, those would become static assets typed by
+        // extension rather than by us — so they are left to the worker, which serves them as
+        // `text/markdown`.
+        filter: (page) => !page.path.endsWith('.md'),
+      },
+    }),
     viteReact(),
   ],
 });

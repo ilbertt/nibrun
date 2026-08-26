@@ -22,6 +22,7 @@
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "^1.168.46",
     "lucide-react": "catalog:",
+    "marked": "^18.0.11",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:"
