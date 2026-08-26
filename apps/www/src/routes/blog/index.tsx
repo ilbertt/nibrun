@@ -6,8 +6,7 @@ import { formatPostDate, POSTS } from '#lib/blog.ts';
 import { pageHead } from '#lib/page-head.ts';
 
 const TITLE = 'Blog — nibrun';
-const DESCRIPTION =
-  'What running one binary on one machine is actually like, and how it compares to the alternatives.';
+const DESCRIPTION = "Notes on small apps, single binaries, and the infrastructure they don't need.";
 
 export const Route = createFileRoute('/blog/')({
   head: () => pageHead({ path: '/blog', title: TITLE, description: DESCRIPTION }),
