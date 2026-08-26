@@ -13,7 +13,7 @@ cd "$(dirname "$0")"
 
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
-: "${AWS_REGION:?}" "${SSM_SECRET_PREFIX:?}" "${DATA_VOLUME_ID:?}" \
+: "${AWS_REGION:?}" "${SSM_SECRET_PREFIX:?}" "${DATA_VOLUME_ID:?}" "${HOST_INDEX:?}" \
   "${AGENT_VERSION:?}" "${AGENT_URL:?}" \
   "${ZEROFS_VERSION:?}" "${ZEROFS_URL:?}" "${ZEROFS_SHA256:?}" "${ZEROFS_MEMBER:?}" \
   "${FIRECRACKER_VERSION:?}" "${FIRECRACKER_URL:?}" "${FIRECRACKER_SHA256:?}" \
@@ -29,16 +29,14 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 # the correct state before any tenant app exists.
 GUEST_IMAGE_VERSION="${GUEST_IMAGE_VERSION:-}"
 
-# Composed here rather than in CI because the prefix is scoped to this host and
-# the instance id is only known on it. ZeroFS opens exactly one prefix read-write
-# fleet-wide, and this is what makes that true by construction.
-instance_id=$(
-  token=$(curl -fsS -X PUT http://169.254.169.254/latest/api/token \
-    -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')
-  curl -fsS -H "X-aws-ec2-metadata-token: $token" \
-    http://169.254.169.254/latest/meta-data/instance-id
-)
-NIBRUN_FILESYSTEMS_URL="s3://${FILESYSTEMS_BUCKET}/hosts/${instance_id}"
+# The host's index, not its instance id. Replacing an instance is how this fleet
+# is maintained, and a prefix named for the id the host is about to lose hands its
+# replacement an empty store while every tenant filesystem stays behind under a
+# name nothing reads again — silently, because a host that finds no volume simply
+# formats a new one. One index per host is also what keeps ZeroFS's one
+# read-write prefix fleet-wide true, which is the property the instance id was
+# picked for in the first place.
+NIBRUN_FILESYSTEMS_URL="s3://${FILESYSTEMS_BUCKET}/hosts/${HOST_INDEX}"
 
 NIBRUN_DIR=/opt/nibrun
 VERSIONS_DIR="$NIBRUN_DIR/versions"

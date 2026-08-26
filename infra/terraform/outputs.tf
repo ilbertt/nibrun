@@ -133,6 +133,17 @@ output "app_host_data_volume_ids" {
   value       = { for index, host in aws_instance.app_host : host.id => aws_ebs_volume.app_host_data[index].id }
 }
 
+# What a host's tenant filesystems are stored under, and deliberately not the
+# instance id. Replacing an instance is how this fleet is maintained — a spot
+# rebuild, a type change, an ami roll — and a prefix named for the id the host is
+# about to lose points its replacement at an empty store while the tenant data
+# stays behind under a name nothing reads again. The index is what `count`
+# numbers rather than what AWS assigns, so it survives all of it.
+output "app_host_indexes" {
+  description = "Instance id to the index the host occupies. Names its ZeroFS storage prefix."
+  value       = { for index, host in aws_instance.app_host : host.id => index }
+}
+
 output "exports_bucket" {
   description = "Downloadable app exports. Written by app hosts, read by the api only to sign a download URL."
   value       = aws_s3_bucket.exports.bucket

@@ -18,6 +18,11 @@ const revision = requiredEnv('GITHUB_SHA');
 // from a map keyed by instance id rather than a single output.
 const dataVolumeIds = JSON.parse(requiredEnv('APP_HOST_DATA_VOLUME_IDS')) as Record<string, string>;
 
+// Keyed by instance id like the volumes above, but what it carries is the host's
+// index — which is the point. See the app_host_indexes output for why the storage
+// prefix must not be named after the id the map is keyed by.
+const hostIndexes = JSON.parse(requiredEnv('APP_HOST_INDEXES')) as Record<string, number>;
+
 const versions = await readAppHostVersions();
 
 // Every name here is the name the box reads, and every version is the one pinned
@@ -74,14 +79,14 @@ if [ "$(cloud-init status | awk '{print $2}')" = "error" ]; then
 fi
 timeout 900 bash -c 'until [ -f /opt/nibrun-app-host-bootstrap.done ]; do echo waiting for instance bootstrap; sleep 5; done'`;
 
-const remoteScript = ({ dataVolumeId }: { dataVolumeId: string }) => `
+const remoteScript = ({ dataVolumeId, hostIndex }: { dataVolumeId: string; hostIndex: number }) => `
 set -euo pipefail
 ${awaitBootstrap}
 mkdir -p /opt/nibrun/bundle
 aws s3 cp ${quote(bundleUrl)} /tmp/app-host-bundle.tar.gz
 tar xzf /tmp/app-host-bundle.tar.gz --overwrite -C /opt/nibrun/bundle
 cd /opt/nibrun/bundle
-export ${exportLine({ ...sharedEnv, DATA_VOLUME_ID: dataVolumeId })}
+export ${exportLine({ ...sharedEnv, DATA_VOLUME_ID: dataVolumeId, HOST_INDEX: String(hostIndex) })}
 bash on_box_deploy.sh
 `;
 
@@ -91,6 +96,13 @@ async function deployTo({ instanceId }: { instanceId: string }) {
     return { instanceId, status: 'NoDataVolume', stdout: '', stderr: '' };
   }
 
+  // Compared against undefined rather than tested for truth: host 0 is the first
+  // one there is, and the only one there is today.
+  const hostIndex = hostIndexes[instanceId];
+  if (hostIndex === undefined) {
+    return { instanceId, status: 'NoHostIndex', stdout: '', stderr: '' };
+  }
+
   console.log(`[${instanceId}] waiting for SSM registration...`);
   if (!(await waitForSsmRegistration({ instanceId }))) {
     return { instanceId, status: 'NotRegistered', stdout: '', stderr: '' };
@@ -98,7 +110,7 @@ async function deployTo({ instanceId }: { instanceId: string }) {
 
   const commandId = await sendCommand({
     instanceIds: [instanceId],
-    script: remoteScript({ dataVolumeId }),
+    script: remoteScript({ dataVolumeId, hostIndex }),
     comment: `Deploy ${optionalEnv('GITHUB_SHA') ?? 'manual'}`,
   });
   console.log(`[${instanceId}] SSM command: ${commandId}`);
