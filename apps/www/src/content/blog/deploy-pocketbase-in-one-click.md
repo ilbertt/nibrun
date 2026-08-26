@@ -107,15 +107,6 @@ PocketHost is the honest exception: it is managed PocketBase, and if what you wa
 with none of the operating, it is a good answer. The tradeoff is that the instance is theirs. You
 are on their version, their machine, and their upgrade schedule.
 
-## What it costs
-
-nibrun is free while it is in beta.
-
-Everywhere else, the shape of the bill is the same: a small always-on instance, plus a persistent
-volume, billed separately. Free tiers usually exclude the disk, or sleep the instance, and an
-app with a SQLite file is exactly the kind of app that does not enjoy being slept. Check the
-current numbers yourself — they move — but budget for two line items, not one.
-
 ## Tired of nibrun? Zip and go
 
 One command — or one click in the dashboard — and the whole app comes back as a `.tar.gz`:
