@@ -1,13 +1,13 @@
 import { expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { addressedDeployment, appBySlug, currentArtifact, latestDeployment } from '#apps.ts';
+import { addressedDeployment, appBySlug, currentArtifact, newestDeployment } from '#apps.ts';
 
 function apiHolding({
   apps,
   deployments = [],
 }: {
   apps: Array<{ id: string; slug: string }>;
-  deployments?: Array<{ id: string; artifactId?: string }>;
+  deployments?: Array<{ id: string; artifactId?: string; state?: string }>;
 }): PublicApiClient {
   function underApp() {
     return {
@@ -49,13 +49,13 @@ test('the deployment nobody named is the newest one', async () => {
     deployments: [{ id: 'deployment-2' }, { id: 'deployment-1' }],
   });
 
-  expect(await latestDeployment({ api, appId: 'app-1' })).toBe('deployment-2');
+  expect(await newestDeployment({ api, appId: 'app-1' })).toMatchObject({ id: 'deployment-2' });
 });
 
 test('an app that has never been deployed has no newest deployment', async () => {
   const api = apiHolding({ apps: [{ id: 'app-1', slug: 'quiet-otter' }] });
 
-  await expect(latestDeployment({ api, appId: 'app-1' })).rejects.toThrow(
+  await expect(newestDeployment({ api, appId: 'app-1' })).rejects.toThrow(
     'This app has never been deployed.',
   );
 });
@@ -85,21 +85,42 @@ test('an app that has never been deployed is running no binary', async () => {
 test('addressing without a deployment id resolves to the newest one', async () => {
   const api = apiHolding({
     apps: [{ id: 'app-1', slug: 'quiet-otter' }],
-    deployments: [{ id: 'deployment-2' }],
+    deployments: [{ id: 'deployment-2', state: 'active' }],
   });
 
   expect(await addressedDeployment({ api, slug: 'quiet-otter', deploymentId: undefined })).toEqual({
     appId: 'app-1',
     deploymentId: 'deployment-2',
     slug: 'quiet-otter',
+    newest: { id: 'deployment-2', state: 'active' },
   });
 });
 
 // The app is looked up either way, because a deployment is addressed under the app that owns it.
 test('a deployment named outright still comes back under its app', async () => {
-  const api = apiHolding({ apps: [{ id: 'app-1', slug: 'quiet-otter' }] });
+  const api = apiHolding({
+    apps: [{ id: 'app-1', slug: 'quiet-otter' }],
+    deployments: [{ id: 'deployment-2', state: 'active' }],
+  });
 
   expect(
     await addressedDeployment({ api, slug: 'quiet-otter', deploymentId: 'deployment-9' }),
-  ).toEqual({ appId: 'app-1', deploymentId: 'deployment-9', slug: 'quiet-otter' });
+  ).toMatchObject({ appId: 'app-1', deploymentId: 'deployment-9', slug: 'quiet-otter' });
+});
+
+// Which release the app is on is a different question from which one was addressed, and the one
+// that says whether anything is running: naming an older deployment does not skip asking it.
+test('the release the app is on comes back alongside the one addressed', async () => {
+  const api = apiHolding({
+    apps: [{ id: 'app-1', slug: 'quiet-otter' }],
+    deployments: [{ id: 'deployment-2', state: 'failed' }, { id: 'deployment-1' }],
+  });
+
+  const addressed = await addressedDeployment({
+    api,
+    slug: 'quiet-otter',
+    deploymentId: 'deployment-1',
+  });
+
+  expect(addressed.newest).toMatchObject({ id: 'deployment-2', state: 'failed' });
 });

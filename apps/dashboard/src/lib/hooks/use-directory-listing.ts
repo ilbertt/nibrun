@@ -1,7 +1,7 @@
 import { guestPath } from '@repo/app-operations';
 import type { DirectoryListing, GuestPath } from '@repo/protocol';
 import { useQuery } from '@tanstack/react-query';
-import { useLatestDeployment } from '#lib/hooks/use-latest-deployment.ts';
+import { useNewestDeployment } from '#lib/hooks/use-newest-deployment.ts';
 import { directoryQueryOptions } from '#queries/filesystem.ts';
 
 export type DirectoryListingView = {
@@ -20,10 +20,10 @@ export function useDirectoryListing({
   appId,
   typedPath,
 }: DirectoryListingInput): DirectoryListingView {
-  const latest = useLatestDeployment(appId);
+  const newest = useNewestDeployment(appId);
   const parsed = parsePath(typedPath);
   const listing = useQuery(
-    directoryQueryOptions({ appId, deploymentId: latest.data, path: parsed.path }),
+    directoryQueryOptions({ appId, deploymentId: newest.data?.id, path: parsed.path }),
   );
 
   if (parsed.reason !== undefined) {
@@ -34,19 +34,19 @@ export function useDirectoryListing({
       reason: parsed.reason,
     };
   }
-  if (latest.isError) {
+  if (newest.isError) {
     return {
       status: 'failed',
       listing: undefined,
       deploymentId: undefined,
-      reason: latest.error.message,
+      reason: newest.error.message,
     };
   }
   if (listing.isError) {
     return {
       status: 'failed',
       listing: undefined,
-      deploymentId: latest.data,
+      deploymentId: newest.data?.id,
       reason: listing.error.message,
     };
   }
@@ -54,14 +54,14 @@ export function useDirectoryListing({
     return {
       status: 'loading',
       listing: undefined,
-      deploymentId: latest.data,
+      deploymentId: newest.data?.id,
       reason: undefined,
     };
   }
   return {
     status: 'ready',
     listing: listing.data,
-    deploymentId: latest.data,
+    deploymentId: newest.data?.id,
     reason: undefined,
   };
 }

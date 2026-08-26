@@ -2,7 +2,7 @@ import { select } from '@clack/prompts';
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import { addressedDeployment } from '@repo/app-operations';
+import { type AddressedDeployment, addressedDeployment } from '@repo/app-operations';
 import { SHARED_OPTIONS } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
@@ -63,9 +63,9 @@ async function chooseApp({ api }: { api: PublicApiClient }): Promise<string> {
 /**
  * The deployment a command was pointed at, and a line saying which one it turned out to be.
  *
- * What naming one skips is only the question of which deployment is current. Which makes the line
- * worth printing: the answer to that question is the difference between reading the release
- * someone just made and reading the one before it.
+ * The line is worth printing because naming no deployment is a question rather than a default, and
+ * its answer is the difference between reading the release someone just made and reading the one
+ * before it.
  */
 export async function announcedDeployment({
   api,
@@ -77,7 +77,7 @@ export async function announcedDeployment({
   slug: string;
   deploymentId: string | undefined;
   print: Print;
-}): Promise<{ appId: string; deploymentId: string; slug: string }> {
+}): Promise<AddressedDeployment> {
   const addressed = await addressedDeployment({ api, slug, deploymentId });
   print.dim(`${addressed.slug} · deployment ${addressed.deploymentId}`);
   return addressed;

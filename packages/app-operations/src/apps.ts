@@ -1,5 +1,6 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import type { SettledDeployment } from '#deploy.ts';
 
 const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
@@ -15,17 +16,17 @@ export async function appBySlug({ api, slug }: { api: PublicApiClient; slug: str
 }
 
 /**
- * The deployment a reader means by not naming one. The api lists them newest first, so this is
- * the head of the list rather than a search through it.
+ * The release the app is on: the one a reader means by not naming one, and the only one that says
+ * what the app is doing now. The api lists them newest first, so this is the head of the list
+ * rather than a search through it.
  */
-export async function latestDeployment({
-  api,
-  appId,
-}: {
-  api: PublicApiClient;
-  appId: string;
-}): Promise<string> {
-  return (await newestDeployment({ api, appId })).id;
+export async function newestDeployment({ api, appId }: { api: PublicApiClient; appId: string }) {
+  const { deployments } = unwrap(await api.api.apps({ appId }).deployments.get());
+  const newest = deployments[0];
+  if (!newest) {
+    throw new ApiError(NO_DEPLOYMENTS);
+  }
+  return newest;
 }
 
 /**
@@ -39,20 +40,24 @@ export async function currentArtifact({ api, appId }: { api: PublicApiClient; ap
   return unwrap(await api.api.apps({ appId }).artifacts({ artifactId }).get());
 }
 
-async function newestDeployment({ api, appId }: { api: PublicApiClient; appId: string }) {
-  const { deployments } = unwrap(await api.api.apps({ appId }).deployments.get());
-  const newest = deployments[0];
-  if (!newest) {
-    throw new ApiError(NO_DEPLOYMENTS);
-  }
-  return newest;
-}
+export type AddressedDeployment = {
+  appId: string;
+  deploymentId: string;
+  slug: string;
+  /**
+   * The release the app is on, which is a different question from the one addressed: naming an
+   * older deployment addresses a release that has been replaced, not the one running now.
+   */
+  newest: SettledDeployment;
+};
 
 /**
- * The deployment a command was pointed at.
+ * The deployment a command was pointed at, and the release the app is actually on.
  *
- * The app is looked up either way — a deployment is addressed under the app that owns it — so
- * what naming one skips is only the question of which deployment is current.
+ * The app is looked up either way — a deployment is addressed under the app that owns it — and so
+ * is the newest release, even when naming one made it unnecessary to ask which that is: whether
+ * anything is running is a question about the app rather than about the deployment addressed, and
+ * it is the answer to that one that decides whether a command can do anything at all.
  */
 export async function addressedDeployment({
   api,
@@ -62,8 +67,13 @@ export async function addressedDeployment({
   api: PublicApiClient;
   slug: string;
   deploymentId: string | undefined;
-}): Promise<{ appId: string; deploymentId: string; slug: string }> {
+}): Promise<AddressedDeployment> {
   const app = await appBySlug({ api, slug });
-  const addressed = deploymentId ?? (await latestDeployment({ api, appId: app.id }));
-  return { appId: app.id, deploymentId: addressed, slug: app.slug };
+  const newest = await newestDeployment({ api, appId: app.id });
+  return {
+    appId: app.id,
+    deploymentId: deploymentId ?? newest.id,
+    slug: app.slug,
+    newest,
+  };
 }

@@ -1,6 +1,7 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
 import { type DirectoryListing, type GuestPath, GuestPathSchema, Value } from '@repo/protocol';
+import { describeUnservedDeployment, type SettledDeployment } from '#deploy.ts';
 import { InvalidPathError } from '#errors.ts';
 
 /**
@@ -36,4 +37,23 @@ export async function readDirectory({
   return unwrap(
     await api.api.apps({ appId }).deployments({ deploymentId }).filesystem.get({ query: { path } }),
   );
+}
+
+/**
+ * Why this app's filesystem cannot be read, when it cannot.
+ *
+ * A directory is read inside the microVM that has the volume mounted, so an app running none has
+ * nothing to answer a read with. Asking anyway costs a wait on a host to be told the same thing in
+ * worse words: what comes back names no release and no reason, because a host cannot tell a
+ * directory that is not there from a device it could not reach.
+ *
+ * The newest release decides it rather than the one a caller addressed. The volume outlives every
+ * release of it, so a superseded deployment is a perfectly good handle on a filesystem something
+ * newer is still mounting — what matters is whether anything is mounting it now.
+ *
+ * Only a failed release is answered here. One still coming up is worth the wait, and a stopped one
+ * belongs to a suspended app, which is an owner's own doing and reads as such where they did it.
+ */
+export function describeUnreadableFilesystem(newest: SettledDeployment): string | undefined {
+  return newest.state === 'failed' ? describeUnservedDeployment(newest) : undefined;
 }

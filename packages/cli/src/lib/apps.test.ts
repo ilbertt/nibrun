@@ -139,6 +139,10 @@ test('which deployment a command settled on is said before it is read from', asy
     print: { dim: (line: string) => dimmed.push(line) } as unknown as Print,
   });
 
-  expect(addressed).toEqual({ appId: 'app-1', deploymentId: 'deployment-2', slug: 'quiet-otter' });
+  expect(addressed).toMatchObject({
+    appId: 'app-1',
+    deploymentId: 'deployment-2',
+    slug: 'quiet-otter',
+  });
   expect(dimmed).toEqual(['quiet-otter · deployment deployment-2']);
 });

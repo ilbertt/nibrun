@@ -1,5 +1,5 @@
 import { unwrap } from '@repo/api-client/unwrap';
-import { latestDeployment } from '@repo/app-operations';
+import { newestDeployment } from '@repo/app-operations';
 import { queryOptions, skipToken } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 
@@ -16,9 +16,9 @@ export function deploymentsQueryOptions(appId: string | undefined) {
   });
 }
 
-export function latestDeploymentQueryOptions(appId: string) {
+export function newestDeploymentQueryOptions(appId: string) {
   return queryOptions({
-    queryKey: ['deployments', appId, 'latest'],
-    queryFn: () => latestDeployment({ api, appId }),
+    queryKey: ['deployments', appId, 'newest'],
+    queryFn: () => newestDeployment({ api, appId }),
   });
 }

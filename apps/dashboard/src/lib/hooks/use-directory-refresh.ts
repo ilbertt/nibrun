@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
-import { latestDeploymentQueryOptions } from '#queries/deployments.ts';
+import { newestDeploymentQueryOptions } from '#queries/deployments.ts';
 import { filesystemQueryKey } from '#queries/filesystem.ts';
 
 export type DirectoryRefresh = {
@@ -18,7 +18,7 @@ export function useDirectoryRefresh(): DirectoryRefresh {
   const refreshing = useMutation({
     mutationFn: async () => {
       await queryClient.invalidateQueries({
-        queryKey: latestDeploymentQueryOptions(appId).queryKey,
+        queryKey: newestDeploymentQueryOptions(appId).queryKey,
       });
       await queryClient.invalidateQueries({ queryKey: filesystemQueryKey(appId) });
     },

@@ -1,7 +1,7 @@
 import type { TenantLogRecord } from '@repo/protocol';
 import { useQuery } from '@tanstack/react-query';
-import { useLatestDeployment } from '#lib/hooks/use-latest-deployment.ts';
 import { useLogTimerange } from '#lib/hooks/use-log-timerange.ts';
+import { useNewestDeployment } from '#lib/hooks/use-newest-deployment.ts';
 import { deploymentLogsQueryOptions } from '#queries/logs.ts';
 
 export type DeploymentLogsView = {
@@ -12,14 +12,14 @@ export type DeploymentLogsView = {
 };
 
 export function useDeploymentLogs(appId: string): DeploymentLogsView {
-  const latest = useLatestDeployment(appId);
-  const deploymentId = latest.data;
+  const newest = useNewestDeployment(appId);
+  const deploymentId = newest.data?.id;
   const timerange = useLogTimerange();
   const logs = useQuery(deploymentLogsQueryOptions({ appId, deploymentId, timerange }));
   const records = logs.data ?? [];
 
-  if (latest.isError) {
-    return { status: 'failed', records, deploymentId: undefined, reason: latest.error.message };
+  if (newest.isError) {
+    return { status: 'failed', records, deploymentId: undefined, reason: newest.error.message };
   }
   if (logs.isError) {
     return { status: 'failed', records, deploymentId, reason: logs.error.message };
