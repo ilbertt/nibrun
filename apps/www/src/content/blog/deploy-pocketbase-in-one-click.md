@@ -5,16 +5,16 @@ date: 2026-08-26
 ---
 
 [PocketBase](https://pocketbase.io) ships as a single compiled binary. Download it, run it, and
-you have a database, an auth system, file storage, realtime subscriptions and an admin UI — one
+you have a database, an auth system, file storage, realtime subscriptions and an admin UI. One
 process, one directory on disk, no dependencies to install.
 
 Anyone who has self-hosted [Supabase](https://supabase.com) knows that same feature list as half
 a dozen services and a compose file holding them together. PocketBase is roughly that surface
 area, in one file.
 
-Then you go to deploy it, and the file stops mattering.
+Then you go to deploy it, and the easy and quick deployment promise of a single binary stops mattering.
 
-## The detour
+## The current world
 
 There are two ways to get it online, and both spend the simplicity you just bought.
 
@@ -31,21 +31,21 @@ as the thing is up.
 Either way the work is assembling a machine. PocketBase never asked for one to be taken apart.
 It asked for a directory it could write to and a port it could listen on.
 
-## The one click
+## Fulfilling the promise
 
 That is all nibrun hands it.
 
 Grab the Linux build from the [PocketBase releases
-page](https://github.com/pocketbase/pocketbase/releases) — `pocketbase_<version>_linux_amd64.zip`
-— and unzip it. Inside is one file called `pocketbase`. That is the whole application.
+page](https://github.com/pocketbase/pocketbase/releases) (`pocketbase_<version>_linux_amd64.zip`)
+and unzip it. Inside is one file called `pocketbase`. That is the whole application.
 
-Drag it onto [nibrun.com](https://nibrun.com).
+Drag and drop it onto [nibrun.com](https://nibrun.com).
 
 You land on the deploy screen with the binary already attached. Two fields to fill in:
 
-**Guest port** — `8090`
+**Guest port**: `8090`
 
-**Arguments**, one per line:
+**Arguments** (one per line):
 
 ```
 serve
@@ -53,18 +53,20 @@ serve
 --dir=./data/pb_data
 ```
 
-Deploy. A few seconds later PocketBase is answering on `https://<your-app>.nibrun.app`, and the
+Deploy.
+
+A few seconds later PocketBase is answering on `https://<your-app>.nibrun.app`, and the
 admin UI is at `/_/`. There is no certificate to obtain and no OS underneath it that is yours to
 patch.
 
-There is a CLI too, if you would rather not leave the terminal for any of it:
+There is a CLI too, if your mouse click doesn't work anymore:
 
 ```sh
 curl -fsSL https://nibrun.com/install.sh | sh
 nib login
 ```
 
-`nib run` is then the same deploy in one line — same binary, same arguments, same port:
+`nib run` is then the same deploy in one line. Same binary, same arguments, same port:
 
 ```sh
 nib run "./pocketbase serve --http=0.0.0.0:8090 --dir=./data/pb_data" \
@@ -116,12 +118,9 @@ nib apps export ./my-export.tar.gz
 ```
 
 Inside: the binary that was running, the entire `data/` directory as it stood on disk, and a
-`.env` of the variables it was deployed with. Unpack it anywhere and
-`./pocketbase serve --dir=./data/pb_data` is serving the same app again — same records, same
+`.env` of the variables it was deployed with. Unpack it anywhere (Linux! or download the proper pocketbase binary)
+and `./pocketbase serve --dir=./data/pb_data` is serving the same app again. Same records, same
 uploaded files, same superuser accounts, off the same command line as further up this page.
-
-It is also your backup, and the only one — the disk is local and unreplicated, so taking a copy
-now and then is on you.
 
 There is no managed database to migrate off, because there was never a managed database. Leaving
 costs you a download.
