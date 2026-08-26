@@ -121,7 +121,7 @@ current numbers yourself — they move — but budget for two line items, not on
 One command — or one click in the dashboard — and the whole app comes back as a `.tar.gz`:
 
 ```sh
-nib apps export --app pocketbase .
+nib apps export ./my-export.tar.gz
 ```
 
 Inside: the binary that was running, the entire `data/` directory as it stood on disk, and a
