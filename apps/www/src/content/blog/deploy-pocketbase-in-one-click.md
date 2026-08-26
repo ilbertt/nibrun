@@ -8,10 +8,42 @@ date: 2026-08-26
 you have a database, an auth system, file storage, realtime subscriptions and an admin UI — one
 process, one directory on disk, no dependencies to install.
 
-Then you go to host it, and every option asks you to put that one file back inside a container
-image.
+Anyone who has self-hosted [Supabase](https://supabase.com) knows that same list as a stack:
+Postgres, GoTrue, PostgREST, Realtime, Storage, Kong, Studio, and a compose file holding them
+together. PocketBase is roughly the same surface area, folded into one file.
+
+Then you go to deploy it, and the file stops mattering.
+
+## The detour
+
+Here is the shortest honest path from that binary to a URL, on the platforms people actually
+reach for.
+
+You write a Dockerfile. It is three lines — a base image, a `COPY`, a `CMD` — and it exists
+entirely so that a platform which only knows how to run images will agree to run your file. Now
+you own it. It rebuilds on every PocketBase release, and a build step sits between you and every
+deploy from here on.
+
+[Railway](https://railway.com) builds it and it boots. You create a collection, add a record,
+push a fix, and the record is gone — a container filesystem is not a disk. So you provision a
+volume, mount it, point `--dir` at the mount, and deploy again. Now it survives.
+
+The volume pins the service to a single machine, which the platform mentions in the tone of a
+limitation. It is not one. PocketBase was only ever going to be one machine.
+
+Or you skip the image entirely and take a VM at [DigitalOcean](https://www.digitalocean.com),
+where the work is not a Dockerfile but a user, a systemd unit, a reverse proxy, a certificate
+that has to renew, a firewall, and a backup job you promise yourself you will write next weekend.
+
+Either way, the evening went to putting a machine back together. That is what every step on both
+lists is. A container is a machine with the disk pulled out and the name taken away, so the
+platform sells the disk back to you as a volume and the name back as a service. A VM is a machine
+with nothing on it yet, so you fit the parts by hand. PocketBase asked for neither. It asked for
+a directory it could write to and a port it could listen on.
 
 ## The one click
+
+That is all nibrun hands it.
 
 Grab the Linux build from the [PocketBase releases
 page](https://github.com/pocketbase/pocketbase/releases) — `pocketbase_<version>_linux_amd64.zip`
@@ -80,8 +112,8 @@ That opens the admin UI and lets you create the first superuser.
 
 ## What the alternatives want first
 
-The comparison is not really about price. It is about how much has to exist before your binary
-gets to run.
+Railway and a bare VM are two points on one list. Here is the rest of it, ordered by nothing
+except how much has to exist before your binary gets to run.
 
 | | What you build first | Where the data lives |
 | --- | --- | --- |
@@ -91,11 +123,6 @@ gets to run.
 | **Railway** | A Dockerfile or a buildpack it guesses at, plus a volume | A Railway volume |
 | **A VPS** | A user, a systemd unit, a reverse proxy, a TLS certificate, a firewall, a backup job | Wherever you put it |
 | **PocketHost** | Nothing, but you are on their PocketBase | Theirs |
-
-The Dockerfile is the part worth staring at. For a Go binary that is already static and already
-Linux, it is a `FROM`, a `COPY`, and a `CMD` — three lines that exist purely to satisfy a platform
-that only knows how to run images. You still get to maintain it, rebuild it on every release, push
-it to a registry, and debug it the first time the base image and the binary disagree about glibc.
 
 PocketHost is the honest exception: it is managed PocketBase, and if what you want is PocketBase
 with none of the operating, it is a good answer. The tradeoff is that the instance is theirs. You
