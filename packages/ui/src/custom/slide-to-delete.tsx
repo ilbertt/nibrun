@@ -1,7 +1,7 @@
 import { Spinner } from '@repo/ui/components/spinner';
 import { cn } from '@repo/ui/lib/utils';
 import { Trash2Icon } from 'lucide-react';
-import { type KeyboardEvent, type PointerEvent, useRef, useState } from 'react';
+import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from 'react';
 
 const KEYBOARD_STEP = 0.25;
 const LABEL_FADE_RATE = 1.6;
@@ -11,17 +11,26 @@ export function SlideToDelete({
   label,
   pendingLabel,
   pending,
+  autoFocus = false,
   onDelete,
 }: {
   label: string;
   pendingLabel: string;
   pending: boolean;
+  autoFocus?: boolean;
   onDelete: () => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLDivElement>(null);
   const grabOffset = useRef(0);
   const [dragged, setDragged] = useState(0);
   const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    if (autoFocus) {
+      handleRef.current?.focus();
+    }
+  }, [autoFocus]);
 
   const progress = pending ? 1 : dragged;
   const travelled = `calc(${progress} * (100% - var(--slide-handle-size)))`;
@@ -101,6 +110,7 @@ export function SlideToDelete({
         <span className="truncate px-2">{pending ? pendingLabel : label}</span>
       </span>
       <div
+        ref={handleRef}
         role="slider"
         tabIndex={pending ? -1 : 0}
         aria-label={label}
