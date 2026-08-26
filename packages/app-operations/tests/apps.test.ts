@@ -1,16 +1,20 @@
 import { expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { addressedDeployment, appBySlug, latestDeployment } from '#apps.ts';
+import { addressedDeployment, appBySlug, currentArtifact, latestDeployment } from '#apps.ts';
 
 function apiHolding({
   apps,
   deployments = [],
 }: {
   apps: Array<{ id: string; slug: string }>;
-  deployments?: Array<{ id: string }>;
+  deployments?: Array<{ id: string; artifactId?: string }>;
 }): PublicApiClient {
   function underApp() {
     return {
+      artifacts: ({ artifactId }: { artifactId: string }) => ({
+        get: () =>
+          Promise.resolve({ data: { id: artifactId, digest: 'sha256:abcd' }, error: null }),
+      }),
       deployments: { get: () => Promise.resolve({ data: { deployments }, error: null }) },
     };
   }
@@ -52,6 +56,28 @@ test('an app that has never been deployed has no newest deployment', async () =>
   const api = apiHolding({ apps: [{ id: 'app-1', slug: 'quiet-otter' }] });
 
   await expect(latestDeployment({ api, appId: 'app-1' })).rejects.toThrow(
+    'This app has never been deployed.',
+  );
+});
+
+// The newest release is what the app is running, so the artifact it pinned is the binary a
+// release again has to name.
+test('the binary an app is running is the one its newest release pinned', async () => {
+  const api = apiHolding({
+    apps: [{ id: 'app-1', slug: 'quiet-otter' }],
+    deployments: [
+      { id: 'deployment-2', artifactId: 'artifact-2' },
+      { id: 'deployment-1', artifactId: 'artifact-1' },
+    ],
+  });
+
+  expect(await currentArtifact({ api, appId: 'app-1' })).toMatchObject({ id: 'artifact-2' });
+});
+
+test('an app that has never been deployed is running no binary', async () => {
+  const api = apiHolding({ apps: [{ id: 'app-1', slug: 'quiet-otter' }] });
+
+  await expect(currentArtifact({ api, appId: 'app-1' })).rejects.toThrow(
     'This app has never been deployed.',
   );
 });

@@ -1,29 +1,13 @@
 import { basename } from 'node:path';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { ApiError } from '@repo/api-client/unwrap';
-import {
-  awaitDeploymentSettled,
-  type DeployStep,
-  describeUnservedDeployment,
-  InvalidEnvironmentError,
-  parseEnvironment,
-  deploy as startDeployment,
-  type UploadableBinary,
-} from '@repo/app-operations';
-import {
-  type Filename,
-  FilenameSchema,
-  type TenantArguments,
-  type TenantEnvironmentPatch,
-  Value,
-} from '@repo/protocol';
+import { deploy as startDeployment, type UploadableBinary } from '@repo/app-operations';
+import { type Filename, FilenameSchema, type TenantArguments, Value } from '@repo/protocol';
+import { environmentEdit } from '#lib/environment.ts';
 import { UsageError } from '#lib/errors.ts';
 import type { RunOptions } from '#lib/plan.ts';
+import { announce, awaitServing } from '#lib/release.ts';
 import type { Ui } from '#lib/ui.ts';
 import { describeProgress } from '#lib/upload-progress.ts';
-
-const MS_PER_SECOND = 1_000;
-const ELAPSED_DECIMALS = 1;
 
 export type DeployInput = RunOptions & {
   api: PublicApiClient;
@@ -45,7 +29,7 @@ export async function deploy({
   unset,
   detach,
 }: DeployInput): Promise<void> {
-  const environment = asEnvironment({ env, unset });
+  const environment = environmentEdit({ env, unset });
   const deployed = await startDeployment({
     api,
     binary,
@@ -69,38 +53,7 @@ export async function deploy({
     },
   });
 
-  if (detach === true) {
-    ui.done(`${deployed.url} — deployment ${deployed.deploymentId} is starting`);
-    return;
-  }
-
-  const startedAt = Date.now();
-  const settled = await ui.waitingFor({
-    message: `starting deployment ${deployed.deploymentId}`,
-    task: () =>
-      awaitDeploymentSettled({
-        api,
-        appId: deployed.appId,
-        deploymentId: deployed.deploymentId,
-      }),
-  });
-  if (settled.state !== 'active') {
-    throw new ApiError(describeUnservedDeployment(settled));
-  }
-  ui.done(`${deployed.url} — ready in ${elapsed(Date.now() - startedAt)}`);
-}
-
-function announce({ step, ui }: { step: DeployStep; ui: Ui }): void {
-  if (step.kind === 'app') {
-    ui.step(`app ${step.slug}`);
-  }
-  if (step.kind === 'artifact') {
-    ui.step(`artifact ${step.digest}`);
-  }
-}
-
-function elapsed(ms: number): string {
-  return `${(ms / MS_PER_SECOND).toFixed(ELAPSED_DECIMALS)}s`;
+  await awaitServing({ api, ui, deployed, detach });
 }
 
 /**
@@ -113,34 +66,6 @@ export async function openBinary(path: string): Promise<UploadableBinary> {
     throw new UsageError(`No such file: ${path}`);
   }
   return { name: asFilename(basename(path)), body };
-}
-
-/**
- * Undefined where neither flag was given, which is what leaves the app's environment alone: an
- * empty edit would be a request to change nothing, sent on every deploy that mentions none.
- *
- * The shared parser does not know what a command line is, so what it refuses is reported here in
- * the words `nib` refuses anything else in.
- */
-function asEnvironment({
-  env = [],
-  unset = [],
-}: {
-  env?: string[] | undefined;
-  unset?: string[] | undefined;
-}): TenantEnvironmentPatch | undefined {
-  if (env.length === 0 && unset.length === 0) {
-    return undefined;
-  }
-
-  try {
-    return parseEnvironment({ set: env, remove: unset });
-  } catch (failure) {
-    if (failure instanceof InvalidEnvironmentError) {
-      throw new UsageError(failure.message);
-    }
-    throw failure;
-  }
 }
 
 /**

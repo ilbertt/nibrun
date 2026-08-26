@@ -25,6 +25,16 @@ const PRIVATE_DESTINATIONS_V6 = ['::1/128', 'fe80::/10', 'fc00::/7'] as const;
 const CHAIN_INDENT = '  ';
 const RULE_INDENT = '    ';
 
+/**
+ * One verdict for every isolation rule, so none of them can silently be the odd one out.
+ *
+ * `reject` rather than `drop`: a dropped packet is indistinguishable from a slow one, so a tenant
+ * reaching a denied address waits out its own timeout with nothing logged — and on a one-vCPU
+ * guest one stuck call is enough to starve a runtime's IO threads. Staying silent hides only that
+ * a filter exists, which the addresses a guest cannot reach already tell it.
+ */
+const DENY = 'reject';
+
 export type ForwardedInstance = {
   readonly hostPort: HostPort;
   readonly guestPort: GuestPort;
@@ -80,13 +90,13 @@ function forwardChainV4({ controlPlaneCidrsV4 }: FirewallState): string[] {
     rules: [
       'type filter hook forward priority filter; policy accept;',
       'ct state established,related accept',
-      `iifname ${TAP_MATCH} ip daddr ${INSTANCE_METADATA_ADDRESS_V4} drop comment "instance metadata endpoint"`,
-      `iifname ${TAP_MATCH} oifname ${TAP_MATCH} drop comment "guest to guest"`,
-      `iifname ${TAP_MATCH} ip daddr ${GUEST_NETWORK_CIDR} drop comment "guest to guest"`,
+      `iifname ${TAP_MATCH} ip daddr ${INSTANCE_METADATA_ADDRESS_V4} ${DENY} comment "instance metadata endpoint"`,
+      `iifname ${TAP_MATCH} oifname ${TAP_MATCH} ${DENY} comment "guest to guest"`,
+      `iifname ${TAP_MATCH} ip daddr ${GUEST_NETWORK_CIDR} ${DENY} comment "guest to guest"`,
       ...controlPlaneCidrsV4.map(
-        (cidr) => `iifname ${TAP_MATCH} ip daddr ${cidr} drop comment "control plane"`,
+        (cidr) => `iifname ${TAP_MATCH} ip daddr ${cidr} ${DENY} comment "control plane"`,
       ),
-      `iifname ${TAP_MATCH} ip daddr ${set(PRIVATE_DESTINATIONS_V4)} drop comment "private destinations"`,
+      `iifname ${TAP_MATCH} ip daddr ${set(PRIVATE_DESTINATIONS_V4)} ${DENY} comment "private destinations"`,
     ],
   });
 }
@@ -98,7 +108,7 @@ function inputChainV4(): string[] {
     rules: [
       'type filter hook input priority filter; policy accept;',
       `iifname ${TAP_MATCH} ct state established,related accept`,
-      `iifname ${TAP_MATCH} drop comment "guest to host"`,
+      `iifname ${TAP_MATCH} ${DENY} comment "guest to host"`,
     ],
   });
 }
@@ -110,12 +120,12 @@ function forwardChainV6({ controlPlaneCidrsV6 }: FirewallState): string[] {
     rules: [
       'type filter hook forward priority filter; policy accept;',
       'ct state established,related accept',
-      `iifname ${TAP_MATCH} ip6 daddr ${INSTANCE_METADATA_ADDRESS_V6} drop comment "instance metadata endpoint"`,
-      `iifname ${TAP_MATCH} oifname ${TAP_MATCH} drop comment "guest to guest"`,
+      `iifname ${TAP_MATCH} ip6 daddr ${INSTANCE_METADATA_ADDRESS_V6} ${DENY} comment "instance metadata endpoint"`,
+      `iifname ${TAP_MATCH} oifname ${TAP_MATCH} ${DENY} comment "guest to guest"`,
       ...controlPlaneCidrsV6.map(
-        (cidr) => `iifname ${TAP_MATCH} ip6 daddr ${cidr} drop comment "control plane"`,
+        (cidr) => `iifname ${TAP_MATCH} ip6 daddr ${cidr} ${DENY} comment "control plane"`,
       ),
-      `iifname ${TAP_MATCH} ip6 daddr ${set(PRIVATE_DESTINATIONS_V6)} drop comment "private destinations"`,
+      `iifname ${TAP_MATCH} ip6 daddr ${set(PRIVATE_DESTINATIONS_V6)} ${DENY} comment "private destinations"`,
     ],
   });
 }
@@ -126,7 +136,7 @@ function inputChainV6(): string[] {
     rules: [
       'type filter hook input priority filter; policy accept;',
       `iifname ${TAP_MATCH} ct state established,related accept`,
-      `iifname ${TAP_MATCH} drop comment "guest to host"`,
+      `iifname ${TAP_MATCH} ${DENY} comment "guest to host"`,
     ],
   });
 }

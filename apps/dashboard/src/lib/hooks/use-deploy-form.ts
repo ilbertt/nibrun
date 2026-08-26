@@ -13,7 +13,7 @@ import {
   storedNames,
 } from '#lib/environment-variables.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
-import type { DeployRequest } from '#lib/hooks/use-deploy.ts';
+import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
@@ -67,7 +67,16 @@ export function validateBinary({ value }: { value: File | undefined }): string |
   if (value === undefined) {
     return 'Pick the binary to deploy.';
   }
-  return Value.Check(FilenameSchema, value.name)
+  return validateBinaryName(value);
+}
+
+/** What an app already running one asks of the field: a name it could keep, or nothing at all. */
+export function validateKeptBinary({ value }: { value: File | undefined }): string | undefined {
+  return value === undefined ? undefined : validateBinaryName(value);
+}
+
+function validateBinaryName(binary: File): string | undefined {
+  return Value.Check(FilenameSchema, binary.name)
     ? undefined
     : 'That file cannot be named inside an export. Rename it and pick it again.';
 }
@@ -124,7 +133,7 @@ export function useDeployForm({
     // this form after it has been read out of storage, so there is nothing to arrive later.
     defaultValues: { ...UNTOUCHED, binary, name: suggested?.name ?? UNTOUCHED.name },
     onSubmit: ({ value }) => {
-      const request = targetResolved ? asDeployRequest({ value, replacing }) : undefined;
+      const request = targetResolved ? asReleaseRequest({ value, replacing }) : undefined;
       if (request !== undefined) {
         start(request);
       }
@@ -141,16 +150,20 @@ export function useDeployForm({
   };
 }
 
-function asDeployRequest({
+/**
+ * The form as the release it asks for. No binary is a release of the one the app already runs,
+ * which only an app that is running one can mean — so a form with neither is a form that has
+ * nothing to deploy, and nothing is what it submits.
+ */
+function asReleaseRequest({
   value,
   replacing,
 }: {
   value: DeployFormValues;
   replacing: AppSummary | undefined;
-}): DeployRequest | undefined {
-  const binary = value.binary === undefined ? undefined : uploadableFrom(value.binary);
+}): ReleaseRequest | undefined {
   const port = Number(value.port ?? replacing?.config.guestPort ?? DEFAULT_GUEST_PORT);
-  if (binary === undefined || !Number.isInteger(port)) {
+  if (!Number.isInteger(port)) {
     return undefined;
   }
 
@@ -159,17 +172,28 @@ function asDeployRequest({
     stored: storedNames(replacing),
   });
 
-  return {
-    binary,
+  const configured = {
     args: tenantArguments(value.args ?? replacing?.config.args.join('\n') ?? ''),
     // Only what the table changed. A row still sealed holds a value this end has never read, so
     // it is sent as nothing at all — which is what leaves it alone — and a name the app has that
     // the table no longer does goes as null, the only way to say a variable should be removed.
     ...(edits.length === 0 ? {} : { environment: parseEnvironmentPatch(edits) }),
-    app: replacing?.slug,
-    name: replacing === undefined ? value.name.trim() || undefined : undefined,
     port,
   };
+
+  if (value.binary === undefined) {
+    return replacing === undefined ? undefined : { ...configured, app: replacing.slug };
+  }
+
+  const binary = uploadableFrom(value.binary);
+  return binary === undefined
+    ? undefined
+    : {
+        ...configured,
+        binary,
+        app: replacing?.slug,
+        name: replacing === undefined ? value.name.trim() || undefined : undefined,
+      };
 }
 
 function uploadableFrom(file: File): UploadableBinary | undefined {

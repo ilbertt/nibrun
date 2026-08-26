@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { parseCommandLine } from '#lib/command-line.ts';
+import { parseArguments, parseCommandLine } from '#lib/command-line.ts';
 
 test('a binary on its own is a command line with nothing to add', () => {
   expect(parseCommandLine('./my-server')).toEqual({ binaryPath: './my-server', args: [] });
@@ -51,4 +51,13 @@ test('a quote nothing closes is refused rather than guessed at', () => {
 
 test('a command line naming nothing is refused', () => {
   expect(() => parseCommandLine('   ')).toThrow('Name the binary to run.');
+});
+
+// `--args` carries the rest of the line without a binary in front of it, read the same way.
+test('arguments without a binary in front of them are all arguments', () => {
+  expect(parseArguments('serve --port 8080')).toEqual(['serve', '--port', '8080']);
+});
+
+test('an empty value is a binary asked to run bare', () => {
+  expect(parseArguments('')).toEqual([]);
 });

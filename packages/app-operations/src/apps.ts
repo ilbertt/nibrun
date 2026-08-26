@@ -25,12 +25,27 @@ export async function latestDeployment({
   api: PublicApiClient;
   appId: string;
 }): Promise<string> {
+  return (await newestDeployment({ api, appId })).id;
+}
+
+/**
+ * The binary the app is running, read back off the release that pinned it.
+ *
+ * An artifact rather than the id the deployment carries: what a caller does with this is release
+ * it again, and the digest is the only thing that says which binary that is.
+ */
+export async function currentArtifact({ api, appId }: { api: PublicApiClient; appId: string }) {
+  const { artifactId } = await newestDeployment({ api, appId });
+  return unwrap(await api.api.apps({ appId }).artifacts({ artifactId }).get());
+}
+
+async function newestDeployment({ api, appId }: { api: PublicApiClient; appId: string }) {
   const { deployments } = unwrap(await api.api.apps({ appId }).deployments.get());
   const newest = deployments[0];
   if (!newest) {
     throw new ApiError(NO_DEPLOYMENTS);
   }
-  return newest.id;
+  return newest;
 }
 
 /**

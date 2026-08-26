@@ -5,7 +5,7 @@
 
 ## What you get
 
-- **A machine to itself.** One microVM per app, 1 vCPU and 512 MiB by default. Nothing else runs in it.
+- **A machine to itself.** One microVM per app, 1 vCPU and 256 MiB by default. Nothing else runs in it.
 - **Just write to the disk.** `data/` is yours — a SQLite file, uploads, both. 8 GiB, and it survives every redeploy.
 - **Take it all with you.** One click: the binary and its whole disk, as one `.tar.gz`.
 - **A URL right away.** `https://<slug>.nibrun.app`, the moment it boots.

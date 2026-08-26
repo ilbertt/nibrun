@@ -22,24 +22,10 @@ export const command = defineCommand('run [command]', {
       schema: z.string().optional(),
       description: 'Name for the new app. Defaults to the binary filename.',
     },
-    port: {
-      schema: z.number().int().optional(),
-      description: 'Port the binary listens on inside the guest.',
-    },
-    env: {
-      schema: z.array(z.string()).optional(),
-      description:
-        'Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is.',
-    },
-    unset: {
-      schema: z.array(z.string()).optional(),
-      description: 'Remove an environment variable from the app, by name. Repeatable.',
-    },
-    detach: {
-      schema: z.boolean().optional(),
-      aliases: ['d'],
-      description: 'Return once the deployment is created instead of waiting for it to serve.',
-    },
+    [SHARED_OPTIONS.port.name]: SHARED_OPTIONS.port.option,
+    [SHARED_OPTIONS.env.name]: SHARED_OPTIONS.env.option,
+    [SHARED_OPTIONS.unset.name]: SHARED_OPTIONS.unset.option,
+    [SHARED_OPTIONS.detach.name]: SHARED_OPTIONS.detach.option,
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ params, options, context, print }) => {

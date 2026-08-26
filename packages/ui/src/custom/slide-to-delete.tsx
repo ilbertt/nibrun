@@ -1,7 +1,7 @@
 import { Spinner } from '@repo/ui/components/spinner';
 import { cn } from '@repo/ui/lib/utils';
 import { Trash2Icon } from 'lucide-react';
-import { type KeyboardEvent, type PointerEvent, useRef, useState } from 'react';
+import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from 'react';
 
 const KEYBOARD_STEP = 0.25;
 const LABEL_FADE_RATE = 1.6;
@@ -11,31 +11,55 @@ export function SlideToDelete({
   label,
   pendingLabel,
   pending,
+  autoFocus = false,
   onDelete,
 }: {
   label: string;
   pendingLabel: string;
   pending: boolean;
+  autoFocus?: boolean;
   onDelete: () => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLDivElement>(null);
   const grabOffset = useRef(0);
   const [dragged, setDragged] = useState(0);
   const [dragging, setDragging] = useState(false);
 
+  useEffect(() => {
+    if (autoFocus) {
+      handleRef.current?.focus();
+    }
+  }, [autoFocus]);
+
   const progress = pending ? 1 : dragged;
   const travelled = `calc(${progress} * (100% - var(--slide-handle-size)))`;
 
-  function slideTo(next: number): void {
-    if (next < 1) {
-      setDragged(Math.max(0, next));
-      return;
+  function reachedBy(event: PointerEvent<HTMLDivElement>): number {
+    const track = trackRef.current;
+    if (track === null) {
+      return 0;
     }
+    const travel = track.clientWidth - event.currentTarget.offsetWidth;
+    if (travel <= 0) {
+      return 0;
+    }
+    const reached =
+      (event.clientX - track.getBoundingClientRect().left - grabOffset.current) / travel;
+    return Math.min(1, Math.max(0, reached));
+  }
+
+  function confirm(): void {
     // Only `pending` holds the handle at the end, so a deletion that comes back
     // with an error leaves the slider armed at the start for another attempt.
     setDragged(0);
     setDragging(false);
     onDelete();
+  }
+
+  function abandonSlide(): void {
+    setDragged(0);
+    setDragging(false);
   }
 
   function grabHandle(event: PointerEvent<HTMLDivElement>): void {
@@ -48,20 +72,21 @@ export function SlideToDelete({
   }
 
   function dragHandle(event: PointerEvent<HTMLDivElement>): void {
-    const track = trackRef.current;
-    if (!dragging || track === null) {
+    if (!dragging) {
       return;
     }
-    const travel = track.clientWidth - event.currentTarget.offsetWidth;
-    if (travel <= 0) {
-      return;
-    }
-    slideTo((event.clientX - track.getBoundingClientRect().left - grabOffset.current) / travel);
+    setDragged(reachedBy(event));
   }
 
-  function releaseHandle(): void {
-    setDragging(false);
-    setDragged(0);
+  function releaseHandle(event: PointerEvent<HTMLDivElement>): void {
+    if (!dragging) {
+      return;
+    }
+    if (reachedBy(event) === 1) {
+      confirm();
+      return;
+    }
+    abandonSlide();
   }
 
   function stepHandle(event: KeyboardEvent<HTMLDivElement>): void {
@@ -78,7 +103,11 @@ export function SlideToDelete({
       return;
     }
     event.preventDefault();
-    slideTo(stepped);
+    if (stepped >= 1) {
+      confirm();
+      return;
+    }
+    setDragged(Math.max(0, stepped));
   }
 
   return (
@@ -101,6 +130,7 @@ export function SlideToDelete({
         <span className="truncate px-2">{pending ? pendingLabel : label}</span>
       </span>
       <div
+        ref={handleRef}
         role="slider"
         tabIndex={pending ? -1 : 0}
         aria-label={label}
@@ -112,7 +142,7 @@ export function SlideToDelete({
         onPointerDown={grabHandle}
         onPointerMove={dragHandle}
         onPointerUp={releaseHandle}
-        onPointerCancel={releaseHandle}
+        onPointerCancel={abandonSlide}
         onKeyDown={stepHandle}
         className={cn(
           'absolute top-0 flex size-(--slide-handle-size) items-center justify-center rounded-full bg-destructive text-destructive-foreground outline-none focus-visible:ring-3 focus-visible:ring-destructive/30',

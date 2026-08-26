@@ -232,6 +232,25 @@ changed_file() {
   return 0
 }
 
+# A guest reaches the internet through this host: its default route is the tap,
+# and the agent's ruleset masquerades what leaves. Without forwarding the kernel
+# discards those packets before a single rule is consulted, and discards them
+# silently — so a tenant's outbound call hangs to its own timeout rather than
+# failing, with nothing anywhere saying why.
+#
+# Not in user_data, which only runs on a host being created: this has to reach
+# the fleet already running as well. Numbered so it wins over anything AL2023
+# ships under a lower prefix.
+cat > /etc/sysctl.d/99-nibrun.conf.new <<'EOF'
+net.ipv4.ip_forward = 1
+EOF
+chmod 0644 /etc/sysctl.d/99-nibrun.conf.new
+changed_file /etc/sysctl.d/99-nibrun.conf && log "Guest egress forwarding enabled" || true
+# Applied every deploy rather than only when the file moved: what forwards a
+# packet is the running kernel, and the file only decides what the next boot
+# starts from. Setting a value the kernel already holds does nothing.
+sysctl -q -p /etc/sysctl.d/99-nibrun.conf
+
 cat > /etc/zerofs/zerofs.env.new <<EOF
 NIBRUN_FILESYSTEMS_URL=${NIBRUN_FILESYSTEMS_URL}
 NIBRUN_FILESYSTEMS_PASSWORD=$(secret filesystems_encryption_password)

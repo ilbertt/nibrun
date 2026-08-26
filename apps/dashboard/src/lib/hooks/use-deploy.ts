@@ -4,6 +4,7 @@ import {
   type DeployStep,
   deploy,
   describeUnservedDeployment,
+  redeploy,
   type UploadableBinary,
   type UploadProgress,
 } from '@repo/app-operations';
@@ -12,16 +13,28 @@ import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/r
 import { api } from '#lib/api.ts';
 import { browserUpload } from '#lib/browser-upload.ts';
 
-export type DeployRequest = {
-  binary: UploadableBinary;
+type Configured = {
   args: TenantArguments;
   environment?: TenantEnvironmentPatch | undefined;
-  app: string | undefined;
-  name: string | undefined;
   port: number;
 };
 
-export type DeployMutation = UseMutationResult<Deployed, Error, DeployRequest>;
+export type DeployRequest = Configured & {
+  binary: UploadableBinary;
+  app: string | undefined;
+  name: string | undefined;
+};
+
+/** The same release without a binary to upload, which only an app already running one can ask for. */
+export type RedeployRequest = Configured & { app: string };
+
+export type ReleaseRequest = DeployRequest | RedeployRequest;
+
+export function carriesBinary(request: ReleaseRequest): request is DeployRequest {
+  return 'binary' in request;
+}
+
+export type DeployMutation = UseMutationResult<Deployed, Error, ReleaseRequest>;
 
 export function useDeploy({
   onStep,
@@ -34,15 +47,17 @@ export function useDeploy({
 }): DeployMutation {
   const queryClient = useQueryClient();
 
-  return useMutation<Deployed, Error, DeployRequest>({
+  return useMutation<Deployed, Error, ReleaseRequest>({
     mutationFn: async (request) => {
-      const deployed = await deploy({
-        api,
-        ...request,
-        onStep,
-        upload: browserUpload,
-        whileUploading: ({ task }) => task(onProgress),
-      });
+      const deployed = carriesBinary(request)
+        ? await deploy({
+            api,
+            ...request,
+            onStep,
+            upload: browserUpload,
+            whileUploading: ({ task }) => task(onProgress),
+          })
+        : await redeploy({ api, ...request, onStep });
       const settled = await awaitDeploymentSettled({
         api,
         appId: deployed.appId,

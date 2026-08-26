@@ -1,5 +1,6 @@
 import {
   AlertDialog,
+  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -13,6 +14,7 @@ import { Button } from '@repo/ui/components/button';
 import { Field, FieldError } from '@repo/ui/components/field';
 import { SlideToDelete } from '@repo/ui/custom/slide-to-delete';
 import { Trash2Icon, TriangleAlertIcon } from 'lucide-react';
+import { useState } from 'react';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppDeletion } from '#lib/hooks/use-app-deletion.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
@@ -21,12 +23,18 @@ export function DeleteAppDialog() {
   const appId = useAppId();
   const app = useApp(appId);
   const deletion = useAppDeletion(appId);
+  const [armed, setArmed] = useState(false);
 
   const slug = app.data?.slug;
   const alreadyDeleting = app.data?.state === 'deleting';
 
   return (
-    <AlertDialog>
+    <AlertDialog
+      onOpenChange={() => {
+        setArmed(false);
+        deletion.reset();
+      }}
+    >
       <AlertDialogTrigger
         render={<Button variant="destructive" disabled={slug === undefined || alreadyDeleting} />}
       >
@@ -73,18 +81,24 @@ export function DeleteAppDialog() {
           </div>
         </dl>
 
-        <Field data-invalid={deletion.isError || undefined}>
-          <SlideToDelete
-            label={`Slide to delete ${slug}`}
-            pendingLabel={`Deleting ${slug}…`}
-            pending={deletion.isPending}
-            onDelete={() => deletion.mutate()}
-          />
-          {deletion.isError && <FieldError>{deletion.error.message}</FieldError>}
-        </Field>
+        {armed && (
+          <Field data-invalid={deletion.isError || undefined}>
+            <SlideToDelete
+              label="Slide to delete"
+              pendingLabel="Deleting…"
+              pending={deletion.isPending}
+              autoFocus
+              onDelete={() => deletion.mutate()}
+            />
+            {deletion.isError && <FieldError>{deletion.error.message}</FieldError>}
+          </Field>
+        )}
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={deletion.isPending}>Keep the app</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" disabled={armed} onClick={() => setArmed(true)}>
+            Delete {slug}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

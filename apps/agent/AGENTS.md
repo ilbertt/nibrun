@@ -72,10 +72,12 @@ Owned by `infra/app-host/`, not fixable here.
   way to do this over the socket the agent already uses.
 - **`iproute2`, `nftables`, `nbd-client`, `e2fsprogs`, `squashfs-tools`.** Each is a subprocess the
   agent shells out to, and nothing installs any of them.
-- **`net.ipv4.ip_forward=1`**, and a base `FORWARD` policy of `ACCEPT`. The agent owns
-  `table ip nibrun` and expresses isolation as `drop` rules, which are final wherever they appear;
-  its `accept` rules only end its own chain, so it composes with a coexisting ruleset but cannot
-  open one that is closed.
+- **A base `FORWARD` policy of `ACCEPT`.** The agent owns `table ip nibrun` and expresses isolation
+  as `reject` rules, which are final wherever they appear; its `accept` rules only end its own
+  chain, so it composes with a coexisting ruleset but cannot open one that is closed. The other
+  half of a guest reaching the internet, `net.ipv4.ip_forward=1`, *is* provided — by
+  `infra/app-host/deploy/on_box_deploy.sh`, and without it the kernel discards a guest's packets
+  before any of these rules is consulted.
 - **A tracer.** The agent names its spans — every reconcile phase, subprocess and control-plane
   request — and nothing collects them, so they go nowhere. Where they are exported to is a
   deployment decision, not one the binary should hold.

@@ -1,14 +1,14 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
-import {
-  type DeploymentState,
-  type Filename,
-  GuestPortSchema,
-  type TenantArguments,
-  type TenantEnvironmentPatch,
-  Value,
-} from '@repo/protocol';
+import type { DeploymentState, Filename, TenantArguments } from '@repo/protocol';
 import { appBySlug } from '#apps.ts';
+import {
+  type ConfigEdit,
+  configPatch,
+  type Deployed,
+  type DeployStep,
+  servingHostname,
+} from '#release.ts';
 import { streamedUpload, type UploadProgress, type UploadTransport } from '#upload.ts';
 import { pause } from '#wait.ts';
 
@@ -25,11 +25,6 @@ export type UploadableBinary = {
   body: Blob;
 };
 
-export type DeployStep =
-  | { kind: 'app'; appId: string; slug: string }
-  | { kind: 'artifact'; artifactId: string; digest: string }
-  | { kind: 'deployment'; deploymentId: string };
-
 /**
  * The wait around the upload, given what the upload is doing rather than a line to print: how far
  * along it is reads as a spinner in one place and a meter in another, and neither belongs here.
@@ -39,24 +34,18 @@ export type UploadWait = (input: {
   task: (report: (progress: UploadProgress) => void) => Promise<void>;
 }) => Promise<void>;
 
-export type DeployInput = {
+export type DeployInput = ConfigEdit & {
   api: PublicApiClient;
   binary: UploadableBinary;
+  // Required where the rest of the edit is optional: what the caller typed is what the binary is
+  // asked to run with, and carrying over the last release's arguments because none were given
+  // this time would run something nobody asked for.
   args: TenantArguments;
   app?: string | undefined;
   name?: string | undefined;
-  port?: number | undefined;
-  environment?: TenantEnvironmentPatch | undefined;
   onStep?: ((step: DeployStep) => void) | undefined;
   whileUploading?: UploadWait | undefined;
   upload?: UploadTransport | undefined;
-};
-
-export type Deployed = {
-  appId: string;
-  slug: string;
-  deploymentId: string;
-  url: string;
 };
 
 /**
@@ -69,17 +58,15 @@ export type Deployed = {
 export async function deploy({
   api,
   binary,
-  args,
   app: slug,
   name,
-  port,
-  environment,
   onStep,
   whileUploading = unwatched,
   upload = streamedUpload,
+  ...edit
 }: DeployInput): Promise<Deployed> {
   const target = slug === undefined ? null : await appBySlug({ api, slug });
-  const config = configPatch({ args, port, environment });
+  const config = configPatch(edit);
 
   const app =
     target === null
@@ -197,30 +184,6 @@ function mebibytes(bytes: number): string {
   return `${(bytes / BYTES_PER_MEBIBYTE).toFixed(SIZE_DECIMALS)} MB`;
 }
 
-/**
- * `args` is always written, empty included: what the caller typed is what the binary is asked to
- * run with, and carrying over the last deploy's arguments because none were given this time
- * would run something nobody asked for.
- */
-// `environment` is an edit where `args` is the whole list, so an absent one changes no variable
-// while an absent `args` would clear them all. A deploy cannot read a value back to restate it,
-// which is why saying nothing about a variable has to be how it survives.
-function configPatch({
-  args,
-  port,
-  environment,
-}: {
-  args: TenantArguments;
-  port: number | undefined;
-  environment: TenantEnvironmentPatch | undefined;
-}) {
-  return {
-    args,
-    ...(port !== undefined && { guestPort: Value.Parse(GuestPortSchema, port) }),
-    ...(environment !== undefined && { environment }),
-  };
-}
-
 /** What a caller needs of a release that has stopped moving: which end it reached, and why. */
 export type SettledDeployment = {
   id: string;
@@ -261,24 +224,4 @@ export async function awaitDeploymentSettled({
   throw new ApiError(
     `Deployment ${deploymentId} was still starting after ${SERVING_TIMEOUT_MS}ms.`,
   );
-}
-
-/**
- * The address to hand back, preferring a domain the owner brought: the platform hostname is what
- * nibrun issued, but a custom one is what they call their app.
- *
- * Active only. A brought domain is pending until the edge holds a certificate for it, and a link
- * that does not resolve yet is worse than the one that does.
- */
-function servingHostname(
-  hostnames: ReadonlyArray<{ hostname: string; kind: string; state: string }>,
-): string {
-  const serving =
-    hostnames.find((entry) => entry.kind === 'custom' && entry.state === 'active') ??
-    hostnames.find((entry) => entry.kind === 'platform') ??
-    hostnames[0];
-  if (!serving) {
-    throw new ApiError('The app was created without a hostname.');
-  }
-  return serving.hostname;
 }
