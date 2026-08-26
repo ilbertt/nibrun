@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
 import type { Filename } from '@repo/protocol';
-import { type DeployStep, deploy, describeUnservedDeployment } from '#deploy.ts';
+import { deploy, describeUnservedDeployment } from '#deploy.ts';
+import type { DeployStep } from '#release.ts';
 import type { UploadProgress } from '#upload.ts';
 
 const SLUG = 'quiet-otter';
