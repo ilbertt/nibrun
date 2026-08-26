@@ -102,7 +102,7 @@ credentials, and the gap is wider than the test count suggests.
   the checkpoint, its server and its device go on every way out. That ZeroFS answers `checkpoint
   create` by sealing the open segment and flushing metadata *before* it records — which is why the
   export no longer flushes first, and under `ignore_fsync` is the whole durability guarantee — is
-  read from ZeroFS v2.2.1's source rather than observed here. A version bump has to re-read it.
+  read from ZeroFS v2.3.1's source rather than observed here. A version bump has to re-read it.
 - **The read-only checkpoint server has never been started.** Whether
   `nibrun-zerofs-checkpoint@.service` and `checkpoint.toml` between them produce a listening NBD
   socket — the `%i` expansion, the `ExecStartPost` wait, ZeroFS's own `${VAR}` substitution — is a

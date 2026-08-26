@@ -61,7 +61,7 @@ export const releaseCheckpoint = Effect.fn('releaseCheckpoint')(
  *
  * No `flush` before the checkpoint. `checkpoint create` seals the open data segment and flushes
  * the metadata memtable through the very same flush coordinator the admin `flush` RPC drives
- * (ZeroFS v2.2.1, `CheckpointManager::create_checkpoint`), so a flush here would be a second
+ * (ZeroFS v2.3.1, `CheckpointManager::create_checkpoint`), so a flush here would be a second
  * round trip against a barrier the next call takes anyway — inside the one window where the
  * tenant cannot write. It is load-bearing rather than belt-and-braces: with `ignore_fsync` that
  * barrier is the entire durability guarantee, so a ZeroFS bump that moved it would silently cost
