@@ -19,9 +19,9 @@ Then you go to deploy it, and the file stops mattering.
 There are two ways to get it online, and both spend the simplicity you just bought.
 
 Put it on a platform like [Railway](https://railway.com) and the first redeploy eats your
-database, because a container filesystem is not a disk. You buy the disk back as a volume, and
-the volume pins the service to one machine — mentioned in the tone of a limitation, though
-PocketBase was only ever going to be one machine.
+database. A container's filesystem is thrown away and rebuilt on every deploy, so the app comes
+back up looking fine with nothing in it. The fix is a volume: another resource to provision,
+mount, point `--dir` at, and pay for — all so the app can keep a directory.
 
 Take a VM at [DigitalOcean](https://www.digitalocean.com) instead and the app is the easy part.
 What you actually signed up for is the TLS certificate and its renewal, the reverse proxy in
