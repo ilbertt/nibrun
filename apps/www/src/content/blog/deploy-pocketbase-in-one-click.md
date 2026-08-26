@@ -1,6 +1,6 @@
 ---
 title: Deploy PocketBase in one click
-description: PocketBase is one file. Most ways to host it want a Dockerfile, a YAML file and a volume you provisioned first.
+description: The database, the auth, the admin UI — one file. Then you try to host it.
 date: 2026-08-26
 ---
 
