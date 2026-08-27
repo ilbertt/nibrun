@@ -241,8 +241,44 @@ changed_file() {
 # Not in user_data, which only runs on a host being created: this has to reach
 # the fleet already running as well. Numbered so it wins over anything AL2023
 # ships under a lower prefix.
+#
+# The conntrack settings below exist only once nf_conntrack is loaded, and
+# systemd runs modules-load.d before sysctl.d — so the module is named there
+# rather than left to the agent's first ruleset, which comes up long after
+# sysctl has already run and given up. Its own file, because the one user_data
+# writes reaches a host only by replacing it.
+cat > /etc/modules-load.d/nibrun-conntrack.conf.new <<'EOF'
+nf_conntrack
+EOF
+chmod 0644 /etc/modules-load.d/nibrun-conntrack.conf.new
+changed_file /etc/modules-load.d/nibrun-conntrack.conf && log "Connection tracking pinned at boot" || true
+# Idempotent, and what makes the sysctls below apply on this deploy rather than
+# only on the next boot.
+modprobe nf_conntrack
+
+# Masquerading is what puts every guest's outbound connection in the host's
+# connection table, and that table is one per host shared by every app on it.
+# Exhausting it is not a slowdown: new connections are refused, for every tenant
+# at once, until entries age out.
+#
+# The ceiling is left to the kernel, which sizes it from RAM — measured on 6.1 it
+# lands above any number worth writing here, and one written here would stop
+# following the RAM it was chosen against. What is wrong by default is how long
+# an entry outlives the connection it describes.
 cat > /etc/sysctl.d/99-nibrun.conf.new <<'EOF'
 net.ipv4.ip_forward = 1
+
+# Five days by default, for an established connection whose far end never sent a
+# FIN — a microVM replaced by a redeploy, a link that dropped. That is long after
+# anyone could say which deploy left it behind.
+net.netfilter.nf_conntrack_tcp_timeout_established = 86400
+# The kernel's own TIME_WAIT is 60s, so remembering the flow after the socket is
+# gone buys nothing, and short-lived outbound calls are what pile these up.
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 60
+# Bounds only UDP nothing has answered — here a guest's DNS to 1.1.1.1, which
+# answers in milliseconds. A flow that got a reply is held by udp_timeout_stream
+# instead, which QUIC needs and this leaves alone.
+net.netfilter.nf_conntrack_udp_timeout = 10
 EOF
 chmod 0644 /etc/sysctl.d/99-nibrun.conf.new
 changed_file /etc/sysctl.d/99-nibrun.conf && log "Guest egress forwarding enabled" || true
