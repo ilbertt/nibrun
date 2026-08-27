@@ -1,6 +1,6 @@
+import { isRunning } from '@repo/app-operations';
 import type { TenantLogRecord } from '@repo/protocol';
 import { useQuery } from '@tanstack/react-query';
-import { isRunning } from '#lib/app-status.ts';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppStatus } from '#lib/hooks/use-app-status.ts';
 import { useLogTimerange } from '#lib/hooks/use-log-timerange.ts';

@@ -27,5 +27,14 @@ export { describeUnreadableFilesystem, guestPath, readDirectory } from '#filesys
 export { type FollowInput, followLogs } from '#logs.ts';
 export { type RedeployInput, redeploy } from '#redeploy.ts';
 export type { ConfigEdit, Deployed, DeployStep } from '#release.ts';
+export {
+  type AppStatus,
+  type AppStatusKey,
+  type AppTransition,
+  appStatus,
+  isRunning,
+  isSettling,
+  statusKey,
+} from '#status.ts';
 export { resumeApp, suspendApp } from '#suspend.ts';
 export { streamedUpload, type UploadProgress, type UploadTransport } from '#upload.ts';
