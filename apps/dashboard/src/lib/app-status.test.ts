@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { AppState, DeploymentState } from '@repo/protocol';
-import { type AppStatus, appStatus, isSettling } from '#lib/app-status.ts';
+import { type AppStatus, appStatus, isRunning, isSettling } from '#lib/app-status.ts';
 
 function status({
   appState = 'active',
@@ -111,6 +111,38 @@ describe('what is worth asking about again', () => {
   for (const [name, status] of settled) {
     test(`${name} is not`, () => {
       expect(isSettling(status)).toBe(false);
+    });
+  }
+});
+
+describe('what has something running to write output', () => {
+  const writing: [string, AppStatus][] = [
+    ['a serving release', status({ deploymentState: 'active' })],
+    ['a booting one', status({ deploymentState: 'starting' })],
+    ['an app still winding down', status({ appState: 'suspended', deploymentState: 'active' })],
+    ['one on its way back', status({ deploymentState: 'stopped' })],
+  ];
+
+  for (const [name, each] of writing) {
+    test(`${name} has`, () => {
+      expect(isRunning(each)).toBe(true);
+    });
+  }
+
+  // A release being staged is the one that looks like it is coming up and has nothing up yet: no
+  // host has made a microVM for it, so there is nothing tailing it can carry.
+  const silent: [string, AppStatus][] = [
+    ['a release still being staged', status({ deploymentState: 'pending' })],
+    ['a failed one', status({ deploymentState: 'failed' })],
+    ['a superseded one', status({ deploymentState: 'superseded' })],
+    ['a suspended app', status({ appState: 'suspended', deploymentState: 'stopped' })],
+    ['one nobody has deployed', status()],
+    ['one being deleted', status({ appState: 'deleting' })],
+  ];
+
+  for (const [name, each] of silent) {
+    test(`${name} has not`, () => {
+      expect(isRunning(each)).toBe(false);
     });
   }
 });

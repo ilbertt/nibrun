@@ -75,6 +75,31 @@ export function appStatus({
   return deploymentState === 'stopped' ? RESUMING : { kind: 'deployment', state: deploymentState };
 }
 
+/**
+ * Whether a microVM is up to write anything. A stream tailing an app in any other state is
+ * connected to something that will never say a word, which is not what live means.
+ */
+const RUNNING: Record<AppStatusKey, boolean> = {
+  'never-deployed': false,
+  // Staged rather than started: there is no microVM until a host has made one.
+  pending: false,
+  starting: true,
+  active: true,
+  failed: false,
+  superseded: false,
+  suspended: false,
+  // One is still up until the host says otherwise and the other is on its way back, so both are
+  // states output can still arrive in.
+  suspending: true,
+  resuming: true,
+  deleting: false,
+  deleted: false,
+};
+
+export function isRunning(status: AppStatus): boolean {
+  return RUNNING[statusKey(status)];
+}
+
 /** Whether this is a state something else is still moving out of, and so worth asking again. */
 export function isSettling(status: AppStatus): boolean {
   if (status.kind === 'transition') {

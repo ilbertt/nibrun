@@ -15,6 +15,11 @@ const PRESENTATION: Record<
     dotClassName: 'bg-emerald-500',
     haloClassName: 'bg-emerald-500 motion-safe:animate-live-halo',
   },
+  'not-running': {
+    label: 'Not running',
+    dotClassName: 'bg-muted-foreground',
+    haloClassName: 'hidden',
+  },
   failed: {
     label: 'Stream disconnected',
     dotClassName: 'bg-destructive',
