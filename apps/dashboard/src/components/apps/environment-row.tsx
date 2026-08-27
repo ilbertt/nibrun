@@ -1,7 +1,7 @@
 import { Button } from '@repo/ui/components/button';
 import { Input } from '@repo/ui/components/input';
 import { TableCell, TableRow } from '@repo/ui/components/table';
-import { EyeIcon, EyeOffIcon, PencilIcon, Trash2Icon, XIcon } from 'lucide-react';
+import { PencilIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { EnvironmentVariable } from '#lib/environment-variables.ts';
 
@@ -26,7 +26,6 @@ export function EnvironmentRow({
   onChange: (variable: EnvironmentVariable) => void;
   onRemove: () => void;
 }) {
-  const [revealed, setRevealed] = useState(false);
   const [kept, setKept] = useState<Kept | undefined>(undefined);
   const named = variable.name.trim();
   const hidden = variable.sealed ? SEALED : variable.value.includes('\n') ? MANY_LINES : undefined;
@@ -38,7 +37,6 @@ export function EnvironmentRow({
 
   function keep(restored: Kept): void {
     setKept(undefined);
-    setRevealed(false);
     onChange({ ...variable, ...restored });
   }
 
@@ -62,7 +60,6 @@ export function EnvironmentRow({
       <TableCell className="w-1/2 p-1">
         {hidden === undefined ? (
           <Input
-            type={revealed ? 'text' : 'password'}
             value={variable.value}
             onChange={(event) => onChange({ ...variable, value: event.target.value })}
             aria-label={named === '' ? 'Variable value' : `Value of ${named}`}
@@ -89,17 +86,7 @@ export function EnvironmentRow({
               <XIcon />
             </Button>
           )}
-          {hidden === undefined ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={revealed ? 'Hide the value' : 'Show the value'}
-              onClick={() => setRevealed(!revealed)}
-            >
-              {revealed ? <EyeOffIcon /> : <EyeIcon />}
-            </Button>
-          ) : (
+          {hidden !== undefined && (
             <Button
               type="button"
               variant="ghost"
