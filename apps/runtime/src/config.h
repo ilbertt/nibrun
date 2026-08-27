@@ -14,12 +14,23 @@
  * The prefixes exist so the two can never collide: a tenant variable actually
  * called NIBRUN_PORT arrives as ENV_NIBRUN_PORT and stays the tenant's.
  *
+ * A tenant value may name a runtime one it is handed: `$NIBRUN_PORT` and
+ * `${NIBRUN_PORT}` both expand, and a name this runtime does not offer fails the
+ * boot rather than reaching the tenant as itself. Nothing else expands, so a secret
+ * holding `$`, `$$` or `$HOME` arrives byte for byte — the prefix is what keeps the
+ * substitution off values it was never meant for. The cost is that a value holding a
+ * literal `$NIBRUN_` has no representation, which is the bargain the format already
+ * makes for one holding a newline.
+ *
  * The runtime carries no defaults for any of it. DEFAULT_RESTART_POLICY in
  * packages/protocol is the only place those values exist; the agent resolves them
  * and writes them out, so a missing key is a bug in the writer and is reported as
  * one rather than papered over. */
 
 #define CONFIG_MAX_BYTES (128 * 1024)
+/* Only a value naming a runtime one is copied here, so this bounds what interpolation
+ * may add rather than the file it adds to. */
+#define CONFIG_MAX_EXPANDED_BYTES CONFIG_MAX_BYTES
 /* Mirrors MAX_HOSTNAME_LENGTH in packages/protocol, which refuses to write a longer one. */
 #define CONFIG_MAX_HOSTNAME 253
 #define CONFIG_MAX_TENANT_VARIABLES 256
@@ -57,7 +68,9 @@ struct instance_config {
 };
 
 /* Parses in place: every string in `config` points into `text`, which is modified
- * and needs one writable byte at text[length] for the last line's terminator.
+ * and needs one writable byte at text[length] for the last line's terminator. The
+ * exception is a tenant value that named a runtime one, which cannot be written back
+ * over the reference it grew out of and points into storage of this module's instead.
  * Reports the first thing it rejects and returns false — never a partial config. */
 bool config_parse(struct instance_config *config, char *text, size_t length);
 

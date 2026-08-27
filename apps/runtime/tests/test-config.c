@@ -115,6 +115,70 @@ static void drops_a_tenant_hostname(void) {
   EXPECT(count == 4); /* PORT, NIBRUN_HOSTNAME, HOME, TMPDIR */
 }
 
+/* The only way a tenant value is not passed through byte for byte, and what a binary
+ * configured by its own variable names rather than by ours is reached with. */
+static void expands_a_runtime_reference(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "NIBRUN_HOSTNAME=my-app.nibrun.app\n"
+                                 "ENV_BARE=$NIBRUN_PORT\n"
+                                 "ENV_BRACED=${NIBRUN_PORT}\n"
+                                 "ENV_WITHIN=http://$NIBRUN_HOSTNAME:${NIBRUN_PORT}/health\n"
+                                 "ENV_TWICE=$NIBRUN_PORT-$NIBRUN_PORT\n"
+                                 "ENV_ADJACENT=${NIBRUN_PORT}0\n"));
+
+  char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "BARE"), "8080") == 0);
+  EXPECT(strcmp(value_of(environment, "BRACED"), "8080") == 0);
+  EXPECT(strcmp(value_of(environment, "WITHIN"), "http://my-app.nibrun.app:8080/health") == 0);
+  EXPECT(strcmp(value_of(environment, "TWICE"), "8080-8080") == 0);
+  /* Braces are the whole reason there are two forms: without them this names PORT0. */
+  EXPECT(strcmp(value_of(environment, "ADJACENT"), "80800") == 0);
+}
+
+/* Every other '$' belongs to whoever set the value: a bcrypt hash and a password that
+ * happens to read like a shell variable reach the tenant exactly as they were typed. */
+static void leaves_every_other_dollar_alone(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "ENV_HASH=$2b$12$sQ8Rn0eXm3kZpLtYvWuAiO\n"
+                                 "ENV_SHELLISH=$HOME/$PATH:${FOO}\n"
+                                 "ENV_DOUBLED=$$\n"
+                                 "ENV_TRAILING=the cost is $\n"));
+
+  char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "HASH"), "$2b$12$sQ8Rn0eXm3kZpLtYvWuAiO") == 0);
+  EXPECT(strcmp(value_of(environment, "SHELLISH"), "$HOME/$PATH:${FOO}") == 0);
+  EXPECT(strcmp(value_of(environment, "DOUBLED"), "$$") == 0);
+  EXPECT(strcmp(value_of(environment, "TRAILING"), "the cost is $") == 0);
+}
+
+/* A reference nobody can answer fails the boot rather than reaching the tenant as
+ * itself, where it would read as a value somebody meant to write. */
+static void rejects_a_reference_it_cannot_answer(void) {
+  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_NOTHING\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_PORT0\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_PORT\n"));
+  /* Offered, but this instance was issued no hostname. */
+  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_HOSTNAME\n"));
+  /* The supervisor's own, and never handed to a tenant. */
+  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_MAX_RESTARTS\n"));
+}
+
+static void rejects_an_expansion_that_does_not_fit(void) {
+  static char text[CONFIG_MAX_BYTES];
+  size_t used = (size_t)snprintf(text, sizeof(text), "%sNIBRUN_HOSTNAME=", REQUIRED);
+  for (int index = 0; index < CONFIG_MAX_HOSTNAME; index++) {
+    text[used++] = 'a';
+  }
+  used += (size_t)snprintf(text + used, sizeof(text) - used, "\nENV_LONG=");
+  /* Enough copies of the longest value there is to outgrow the arena. */
+  for (size_t copy = 0; copy <= CONFIG_MAX_EXPANDED_BYTES / CONFIG_MAX_HOSTNAME; copy++) {
+    used += (size_t)snprintf(text + used, sizeof(text) - used, "${NIBRUN_HOSTNAME}");
+  }
+  text[used++] = '\n';
+  text[used] = '\0';
+  EXPECT(rejects(text));
+}
+
 static void accepts_an_ipv6_nameserver(void) {
   struct instance_config config;
   EXPECT(parse(&config, REQUIRED "NIBRUN_DNS=2606:4700:4700::1111\n"));
@@ -260,6 +324,10 @@ int main(void) {
   accepts_an_ipv6_nameserver();
   carries_the_hostname_to_the_tenant();
   drops_a_tenant_hostname();
+  expands_a_runtime_reference();
+  leaves_every_other_dollar_alone();
+  rejects_a_reference_it_cannot_answer();
+  rejects_an_expansion_that_does_not_fit();
   rejects_a_broken_file();
   rejects_a_value_that_is_not_a_number();
   rejects_a_hostname_that_does_not_fit();
