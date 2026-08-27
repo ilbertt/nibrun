@@ -35,8 +35,8 @@ export function HandoffDeploy({
         {run.phase === 'idle' ? (
           <DeployForm appId={undefined} binary={binary} suggested={suggested} />
         ) : (
-          // Only ever seen when the deploy failed: a run that lands leaves for the dashboard
-          // on its own, so there is nothing here to click.
+          // Only ever seen when the deploy failed: a run that lands leaves for the app it made
+          // on its own, and a failed one made none to offer.
           <DeployProgress
             done={<Button render={<Link to={IndexRoute.to} />}>Go to the dashboard</Button>}
           />

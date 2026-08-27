@@ -43,7 +43,7 @@ export function useDeploy({
 }: {
   onStep: (step: DeployStep) => void;
   onProgress: (progress: UploadProgress) => void;
-  onDeployed: (() => void) | undefined;
+  onDeployed: ((deployed: Deployed) => void) | undefined;
 }): DeployMutation {
   const queryClient = useQueryClient();
 

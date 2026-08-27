@@ -1,3 +1,4 @@
+import type { Deployed } from '@repo/app-operations';
 import type { ReactNode } from 'react';
 import { DeployRunContext } from '#lib/contexts/deploy-run-context.ts';
 import { useRunApp } from '#lib/hooks/use-run-app.ts';
@@ -7,7 +8,7 @@ export function DeployRunProvider({
   onDeployed,
 }: {
   children: ReactNode;
-  onDeployed?: () => void;
+  onDeployed?: (deployed: Deployed) => void;
 }) {
   const run = useRunApp({ onDeployed });
 

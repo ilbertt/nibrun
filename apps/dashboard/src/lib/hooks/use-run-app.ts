@@ -14,7 +14,11 @@ export type DeployRun = {
   reset: () => void;
 };
 
-export function useRunApp({ onDeployed }: { onDeployed: (() => void) | undefined }): DeployRun {
+export function useRunApp({
+  onDeployed,
+}: {
+  onDeployed: ((deployed: Deployed) => void) | undefined;
+}): DeployRun {
   const [steps, setSteps] = useState<readonly DeployStep[]>([]);
   const [progress, setProgress] = useState<UploadProgress | undefined>(undefined);
   // What the run was asked for, because the steps cannot say it: a release that reuses the stored
