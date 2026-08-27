@@ -10,7 +10,7 @@ import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { type BlogPost, findPost, formatPostDate, renderPost } from '#lib/blog.ts';
 import { pageHead } from '#lib/page-head.ts';
-import { SITE_URL } from '#lib/site.ts';
+import { pageTitle, SITE_URL } from '#lib/site.ts';
 import '#styles/prose.css';
 
 export const Route = createFileRoute('/blog/$slug')({
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/blog/$slug')({
     }
     const head = pageHead({
       path: `/blog/${post.slug}`,
-      title: `${post.title} — nibrun`,
+      title: pageTitle(post.title),
       description: post.description,
       publishedAt: post.date,
       image: post.image,

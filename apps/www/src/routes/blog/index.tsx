@@ -4,8 +4,9 @@ import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { formatPostDate, POSTS } from '#lib/blog.ts';
 import { pageHead } from '#lib/page-head.ts';
+import { pageTitle } from '#lib/site.ts';
 
-const TITLE = 'Blog — nibrun';
+const TITLE = pageTitle('Blog');
 const DESCRIPTION = "Notes on small apps, single binaries, and the infrastructure they don't need.";
 
 export const Route = createFileRoute('/blog/')({
