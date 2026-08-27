@@ -35,6 +35,7 @@ export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
         deploymentId: Value.Parse(DeploymentIdSchema, params.deploymentId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         timerange: query.timerange ?? DEFAULT_LOG_TIMERANGE,
+        follow: query.follow ?? true,
         signal,
       });
       return events({ records, signal });

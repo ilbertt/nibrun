@@ -6,6 +6,7 @@
     "#*": "./src/*"
   },
   "scripts": {
+    "adopt-guest-image": "bun run src/adopt-guest-image.ts",
     "build-and-push-image": "bun run src/build-and-push-image.ts",
     "cli-release-notes": "bun run src/cli-release-notes.ts",
     "prepare-cli-release": "bun run src/prepare-cli-release.ts",

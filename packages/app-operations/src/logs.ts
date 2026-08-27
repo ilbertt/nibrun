@@ -20,6 +20,8 @@ export type FollowInput = {
   appId: string;
   deploymentId: string;
   timerange: string;
+  /** Whether to wait on what the app has not written yet, which one that is not running never will. */
+  following?: boolean | undefined;
   signal: AbortSignal;
 };
 
@@ -36,6 +38,7 @@ export async function* followLogs({
   appId,
   deploymentId,
   timerange,
+  following = true,
   signal,
 }: FollowInput): AsyncGenerator<TenantLogRecord> {
   const logs = api.api.apps({ appId }).deployments({ deploymentId }).logs;
@@ -46,11 +49,18 @@ export async function* followLogs({
   // rather than a last record. The signal is what says so, not the error.
   try {
     while (!signal.aborted) {
-      const stream = unwrap(await logs.get({ query: { timerange: asked }, fetch: { signal } }));
+      const stream = unwrap(
+        await logs.get({ query: { timerange: asked, follow: following }, fetch: { signal } }),
+      );
       for await (const { data } of stream) {
         if (seen.admit(data)) {
           yield data;
         }
+      }
+      // Reaching the end of a stream that was not following is reaching the end of the log: the
+      // api answered with everything it had rather than closing on its own clock.
+      if (!following) {
+        return;
       }
       asked = RECONNECT_TIMERANGE;
       await pause(RECONNECT_PAUSE_MS);

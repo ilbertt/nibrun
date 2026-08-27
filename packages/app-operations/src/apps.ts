@@ -1,6 +1,8 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import type { SettledDeployment } from '#deploy.ts';
+import { type AppOperation, operationRefusal } from '#operations.ts';
+import { type AppStatus, appStatus } from '#status.ts';
 
 const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
@@ -16,20 +18,48 @@ export async function appBySlug({ api, slug }: { api: PublicApiClient; slug: str
 }
 
 /**
- * The app a release is being made onto.
- *
- * A host is only sent releases whose app is asking to run, so one made onto a suspended app would
- * sit pending until it is resumed rather than fail — a wait with no end. Refused where the app is
- * first read, which on a deploy is before the binary is uploaded.
+ * The app and what it is doing: the row is what its owner asked for and the newest release is what
+ * a host has done about it, and no command can tell what it may do from either alone.
  */
-export async function releaseTarget({ api, slug }: { api: PublicApiClient; slug: string }) {
+export async function appWithStatus({ api, slug }: { api: PublicApiClient; slug: string }) {
   const app = await appBySlug({ api, slug });
-  if (app.state === 'suspended') {
-    throw new ApiError(
-      `App ${app.slug} is suspended, so a new release would never start. Resume it first.`,
-    );
+  const { deployments } = unwrap(await api.api.apps({ appId: app.id }).deployments.get());
+  const newest = deployments[0];
+  return {
+    app,
+    newest,
+    status: appStatus({ appState: app.state, deploymentState: newest?.state }),
+  };
+}
+
+/**
+ * The app a command may act on, and the release it is on, refused where the state it is in has an
+ * answer of its own — which is asked before anything is sent and before anything is waited on.
+ *
+ * A deploy is the reason this reads the release as well as the row: a host is only sent releases
+ * whose app is asking to run, so one made onto a suspended app would sit pending until it is
+ * resumed rather than fail, and the refusal has to arrive before the binary does.
+ */
+export async function appFor({
+  api,
+  slug,
+  operation,
+}: {
+  api: PublicApiClient;
+  slug: string;
+  operation: AppOperation;
+}) {
+  const found = await appWithStatus({ api, slug });
+  const refusal = operationRefusal({
+    status: found.status,
+    operation,
+    slug: found.app.slug,
+    release: found.newest,
+  });
+  if (refusal !== undefined) {
+    throw new ApiError(refusal);
   }
-  return app;
+  return found;
 }
 
 /**
@@ -47,13 +77,18 @@ export async function newestDeployment({ api, appId }: { api: PublicApiClient; a
 }
 
 /**
- * The binary the app is running, read back off the release that pinned it.
- *
- * An artifact rather than the id the deployment carries: what a caller does with this is release
- * it again, and the digest is the only thing that says which binary that is.
+ * The binary a release pinned, which is what releasing it again means: the digest is the only
+ * thing that says which binary that is.
  */
-export async function currentArtifact({ api, appId }: { api: PublicApiClient; appId: string }) {
-  const { artifactId } = await newestDeployment({ api, appId });
+export async function pinnedArtifact({
+  api,
+  appId,
+  artifactId,
+}: {
+  api: PublicApiClient;
+  appId: string;
+  artifactId: string;
+}) {
   return unwrap(await api.api.apps({ appId }).artifacts({ artifactId }).get());
 }
 
@@ -66,6 +101,8 @@ export type AddressedDeployment = {
    * older deployment addresses a release that has been replaced, not the one running now.
    */
   newest: SettledDeployment;
+  /** What the app is doing, which is what decides whether the command asking may do anything. */
+  status: AppStatus;
 };
 
 /**
@@ -80,17 +117,22 @@ export async function addressedDeployment({
   api,
   slug,
   deploymentId,
+  operation,
 }: {
   api: PublicApiClient;
   slug: string;
   deploymentId: string | undefined;
+  operation: AppOperation;
 }): Promise<AddressedDeployment> {
-  const app = await appBySlug({ api, slug });
-  const newest = await newestDeployment({ api, appId: app.id });
+  const { app, newest, status } = await appFor({ api, slug, operation });
+  if (!newest) {
+    throw new ApiError(NO_DEPLOYMENTS);
+  }
   return {
     appId: app.id,
     deploymentId: deploymentId ?? newest.id,
     slug: app.slug,
     newest,
+    status,
   };
 }

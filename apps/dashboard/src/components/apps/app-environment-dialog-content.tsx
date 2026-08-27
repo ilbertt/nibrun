@@ -1,7 +1,6 @@
 import { Button } from '@repo/ui/components/button';
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -12,6 +11,7 @@ import { Field, FieldError } from '@repo/ui/components/field';
 import { DialogBody } from '@repo/ui/custom/dialog-body';
 import { PencilIcon } from 'lucide-react';
 import { useState } from 'react';
+import { DeployDoneButton } from '#components/apps/deploy-done-button.tsx';
 import { DeployProgress } from '#components/apps/deploy-progress.tsx';
 import { EnvironmentTable } from '#components/apps/environment-table.tsx';
 import { greyedReason } from '#lib/app-actions.ts';
@@ -73,7 +73,7 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
               </Button>
             </form>
           ) : (
-            <DeployProgress done={<DialogClose render={<Button />}>Done</DialogClose>} />
+            <DeployProgress done={<DeployDoneButton />} />
           )}
         </DialogBody>
       </DialogContent>

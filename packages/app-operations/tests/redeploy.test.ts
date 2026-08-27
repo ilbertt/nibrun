@@ -144,7 +144,8 @@ test('a suspended app is refused before its config moves', async () => {
   await expect(attempt).rejects.toThrow(
     'App quiet-otter is suspended, so a new release would never start. Resume it first.',
   );
-  expect(sent).toEqual([]);
+  // Reading what the app is on is what decides it, and a read is all that happened.
+  expect(sent.map((each) => each.what)).toEqual(['deployments read']);
 });
 
 test('a slug naming nothing is said to name nothing', async () => {

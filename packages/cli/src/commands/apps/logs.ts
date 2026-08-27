@@ -2,7 +2,7 @@ import { defineCommand } from '@parshjs/core';
 import { DEFAULT_LOG_TIMERANGE, LOG_TIMERANGE_PATTERN } from '@repo/protocol';
 import { z } from 'zod';
 import { SHARED_OPTIONS } from '#config.ts';
-import { announcedDeployment, selectApp } from '#lib/apps.ts';
+import { announcedDeployment, selectApp, stillWriting } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { follow, untilInterrupted } from '#lib/logs.ts';
 import { isInteractive } from '#lib/ui.ts';
@@ -30,18 +30,20 @@ export const command = defineCommand('apps logs', {
       slug: parents.apps.options.app,
       interactive: isInteractive(),
     });
-    const { appId, deploymentId } = await announcedDeployment({
+    const addressed = await announcedDeployment({
       api,
       slug,
       deploymentId: options[SHARED_OPTIONS.deploymentId.name],
+      operation: 'logs',
       print,
     });
 
     await follow({
       api,
-      appId,
-      deploymentId,
+      appId: addressed.appId,
+      deploymentId: addressed.deploymentId,
       timerange: options.timerange,
+      following: stillWriting(addressed),
       print,
       signal: untilInterrupted(),
     });

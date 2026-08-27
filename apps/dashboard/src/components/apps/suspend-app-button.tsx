@@ -1,8 +1,8 @@
+import type { AppTransition } from '@repo/app-operations';
 import { Button } from '@repo/ui/components/button';
 import { Spinner } from '@repo/ui/components/spinner';
 import { PauseIcon, PlayIcon } from 'lucide-react';
 import type { AppActionAvailability } from '#lib/app-actions.ts';
-import type { AppTransition } from '#lib/app-status.ts';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useAppStatus } from '#lib/hooks/use-app-status.ts';

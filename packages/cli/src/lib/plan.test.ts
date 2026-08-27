@@ -41,15 +41,33 @@ beforeEach(() => {
   confirmed = true;
 });
 
-function apiListing(apps: Array<{ slug: string; state: string }>): PublicApiClient {
-  return {
-    api: { apps: { get: () => Promise.resolve({ data: { apps }, error: null }) } },
-  } as unknown as PublicApiClient;
+// A slug typed rather than chosen is read against the listing and the release the app is on,
+// which together are what say whether a deploy can land.
+function apiListing({
+  apps,
+  release = 'active',
+}: {
+  apps: Array<{ slug: string; state: string }>;
+  release?: string;
+}): PublicApiClient {
+  const route = Object.assign(
+    () => ({
+      deployments: {
+        get: () =>
+          Promise.resolve({
+            data: { deployments: [{ id: 'deployment-1', state: release }] },
+            error: null,
+          }),
+      },
+    }),
+    { get: () => Promise.resolve({ data: { apps }, error: null }) },
+  );
+  return { api: { apps: route } } as unknown as PublicApiClient;
 }
 
 test('an owner with no apps is asked what to call one, not which to use', async () => {
   const resolved = await completeOptions({
-    api: apiListing([]),
+    api: apiListing({ apps: [] }),
     options: {},
     binaryPath: '/tmp/my-server',
     args: ['serve'],
@@ -67,10 +85,12 @@ test('an app the owner cannot deploy onto is not offered', async () => {
   chosenApp = 'demo-abc123';
 
   const resolved = await completeOptions({
-    api: apiListing([
-      { slug: 'demo-abc123', state: 'active' },
-      { slug: 'gone-xyz789', state: 'deleted' },
-    ]),
+    api: apiListing({
+      apps: [
+        { slug: 'demo-abc123', state: 'active' },
+        { slug: 'gone-xyz789', state: 'deleted' },
+      ],
+    }),
     options: {},
     binaryPath: '/tmp/my-server',
     args: [],
@@ -85,7 +105,7 @@ test('an app the owner cannot deploy onto is not offered', async () => {
 
 test('a flag already given is not asked about again', async () => {
   const resolved = await completeOptions({
-    api: apiListing([]),
+    api: apiListing({ apps: [] }),
     options: { name: 'my-app', port: 8080 },
     binaryPath: '/tmp/my-server',
     args: ['serve', '--verbose'],
@@ -97,7 +117,7 @@ test('a flag already given is not asked about again', async () => {
 
 test('what the binary will be run with is shown before anything is uploaded', async () => {
   await completeOptions({
-    api: apiListing([{ slug: 'demo-abc123', state: 'active' }]),
+    api: apiListing({ apps: [{ slug: 'demo-abc123', state: 'active' }] }),
     options: { app: 'demo-abc123' },
     binaryPath: '/tmp/my-server',
     args: ['serve', '--verbose'],
@@ -111,7 +131,7 @@ test('what the binary will be run with is shown before anything is uploaded', as
 // replace, and nothing would start what it landed.
 test('a named app that cannot be deployed onto is refused before anything is asked', async () => {
   const attempt = completeOptions({
-    api: apiListing([{ slug: 'demo-abc123', state: 'suspended' }]),
+    api: apiListing({ apps: [{ slug: 'demo-abc123', state: 'suspended' }], release: 'stopped' }),
     options: { app: 'demo-abc123' },
     binaryPath: '/tmp/my-server',
     args: [],
@@ -128,7 +148,7 @@ test('declining the confirmation cancels rather than deploying', async () => {
   confirmed = false;
 
   const attempt = completeOptions({
-    api: apiListing([]),
+    api: apiListing({ apps: [] }),
     options: {},
     binaryPath: '/tmp/my-server',
     args: [],

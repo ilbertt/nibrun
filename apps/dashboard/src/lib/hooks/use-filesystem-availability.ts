@@ -1,5 +1,6 @@
-import { describeUnreadableFilesystem } from '@repo/app-operations';
+import { operationRefusal } from '@repo/app-operations';
 import { useApp } from '#lib/hooks/use-app.ts';
+import { useAppStatus } from '#lib/hooks/use-app-status.ts';
 import { useNewestDeployment } from '#lib/hooks/use-newest-deployment.ts';
 
 /**
@@ -10,30 +11,32 @@ import { useNewestDeployment } from '#lib/hooks/use-newest-deployment.ts';
  */
 export type FilesystemAvailability =
   | { readonly kind: 'browsable' }
-  | { readonly kind: 'suspended' }
   | { readonly kind: 'unreadable'; readonly reason: string };
 
 const BROWSABLE: FilesystemAvailability = { kind: 'browsable' };
-const SUSPENDED: FilesystemAvailability = { kind: 'suspended' };
 
 /**
  * A directory is read inside the microVM that has the volume mounted, so an app running none has
- * nothing to answer a browse with. Decided here rather than waited for, because what a host
- * reports for this is deliberately vague — a directory that could not be read is the same sentence
- * whether the app is down or the device is broken — while the release that never came up kept the
- * reason it didn't.
+ * nothing to answer a browse with. Decided here rather than waited for, because the api holds the
+ * request open for half a minute in the hope of a host that is never going to poll — and what
+ * comes back then names neither the app nor why.
  *
- * Suspension is read off the app row rather than the release: an app whose microVM has not stopped
- * yet is one that is about to, and offering a browse for the seconds it has left is worse than
- * saying it is suspended a moment early.
+ * Which states those are is the table every surface asks, so the tab is not the place a state
+ * added later is found to be missing.
  */
 export function useFilesystemAvailability(appId: string): FilesystemAvailability {
   const app = useApp(appId);
+  const status = useAppStatus(app.data).status;
   const newest = useNewestDeployment(appId);
 
-  if (app.data?.state === 'suspended') {
-    return SUSPENDED;
+  if (app.data === undefined || status === undefined) {
+    return BROWSABLE;
   }
-  const reason = newest.data === undefined ? undefined : describeUnreadableFilesystem(newest.data);
-  return reason === undefined ? BROWSABLE : { kind: 'unreadable', reason };
+  const refusal = operationRefusal({
+    status,
+    operation: 'files',
+    slug: app.data.slug,
+    release: newest.data,
+  });
+  return refusal === undefined ? BROWSABLE : { kind: 'unreadable', reason: refusal };
 }

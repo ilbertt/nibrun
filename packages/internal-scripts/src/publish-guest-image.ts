@@ -7,9 +7,10 @@ import { requiredEnv } from '#shared/env.ts';
 import { repoRoot } from '#shared/paths.ts';
 
 // Publishing is not adopting. This uploads an image under its own version and
-// stops; a host only runs it once a separate, reviewable commit edits `guestImage`
-// in infra/app-host/versions.json. That split is what keeps the fleet's kernel a
-// deliberate input rather than whatever the last build produced.
+// stops; a host only runs it once `guestImage` in infra/app-host/versions.json
+// points at it. CI proposes that edit as a pull request, so the fleet's kernel
+// still changes on a merge someone approved rather than on whatever the last
+// build produced.
 
 type Manifest = {
   version: string;
@@ -73,16 +74,13 @@ await aws(['s3', 'cp', '--recursive', distDir, `s3://${bucket}/${version}/`]);
 
 core.info(`Published s3://${bucket}/${version}/`);
 
-// Publishing is not adopting, and adopting is a human editing a pin. That person
-// should not have to dig the version out of a build log to find what to paste.
 await writeSummary(
   [
     '## Guest image published',
     '',
     `\`${version}\``,
     '',
-    'No host runs it yet. To adopt it, set `guestImage` to that value in',
-    '`infra/app-host/versions.json` and open a pull request — that commit is the',
-    'reviewable record of the fleet changing kernel.',
+    'No host runs it yet. The pull request pinning it in',
+    '`infra/app-host/versions.json` is what puts it on the fleet.',
   ].join('\n'),
 );

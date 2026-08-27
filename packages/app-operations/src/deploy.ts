@@ -1,7 +1,7 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import type { DeploymentState, Filename, TenantArguments } from '@repo/protocol';
-import { releaseTarget } from '#apps.ts';
+import { appFor } from '#apps.ts';
 import {
   type ConfigEdit,
   configPatch,
@@ -65,13 +65,13 @@ export async function deploy({
   upload = streamedUpload,
   ...edit
 }: DeployInput): Promise<Deployed> {
-  const target = slug === undefined ? null : await releaseTarget({ api, slug });
+  const target = slug === undefined ? null : await appFor({ api, slug, operation: 'release' });
   const config = configPatch(edit);
 
   const app =
     target === null
       ? unwrap(await api.api.apps.post({ name: name ?? binary.name, config }))
-      : unwrap(await api.api.apps({ appId: target.id }).patch(config));
+      : unwrap(await api.api.apps({ appId: target.app.id }).patch(config));
   onStep?.({ kind: 'app', appId: app.id, slug: app.slug });
 
   const artifact = await uploadBinary({ api, appId: app.id, binary, whileUploading, upload });

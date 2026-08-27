@@ -213,6 +213,10 @@ jobs:
   build-guest-image:
     needs: terraform
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the adoption branch
+      pull-requests: write # open the adoption PR
+      id-token: write # OIDC token for the deploy role
     env:
       GUEST_IMAGES_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).guest_images_bucket }}
     steps:
@@ -229,5 +233,26 @@ jobs:
         run: bun run --filter @repo/runtime build
 
       - name: Publish the guest image
+        id: publish
         timeout-minutes: 45
         run: bun run --filter @repo/internal-scripts publish-guest-image
+
+      - name: Pin the published image
+        id: pin
+        env:
+          GUEST_IMAGE_VERSION: ${{ steps.publish.outputs.version }}
+        run: bun run --filter @repo/internal-scripts adopt-guest-image
+
+      - name: Open the adoption pull request
+        if: steps.pin.outputs.changed == 'true'
+        uses: ./.github/actions/open-pr
+        with:
+          branch: guest-image/${{ steps.publish.outputs.version }}
+          title: "chore(infra): adopt guest image ${{ steps.publish.outputs.version }}"
+          paths: infra/app-host/versions.json
+          token: ${{ secrets.OPEN_PR_TOKEN || github.token }}
+          body: |
+            Points the fleet at guest image `${{ steps.publish.outputs.version }}`, published by
+            [this run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+
+            Merging is the adoption: from then on every app host deploy boots this kernel.

@@ -61,6 +61,9 @@ function apiHolding({
         },
       }),
       deployments: {
+        // What the app is on is read to decide whether it can take a release; nothing is sent by
+        // asking, so it is not among what was.
+        get: () => Promise.resolve({ data: { deployments: [] }, error: null }),
         post: (body: unknown) => {
           sent.push({ what: 'deployment', body });
           return Promise.resolve({ data: { id: 'deployment-1' }, error: null });

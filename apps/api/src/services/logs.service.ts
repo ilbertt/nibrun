@@ -31,6 +31,8 @@ export type TenantLogStreamRequest = {
   ownerId: OwnerId;
   /** How much history precedes the follow. */
   timerange: string;
+  /** Whether to wait for what has not been written yet, or end once what has is handed over. */
+  follow: boolean;
 };
 
 export class LogsService extends Service {
@@ -63,14 +65,15 @@ export class LogsService extends Service {
     deploymentId,
     ownerId,
     timerange,
+    follow,
     signal,
   }: TenantLogStreamRequest & { signal: AbortSignal }): Promise<AsyncIterable<TenantLogRecord>> {
     const deployment = await this.deploymentsRepo.findById({ appId, deploymentId, ownerId });
     if (!deployment) {
       throw new NotFoundError(NO_SUCH_DEPLOYMENT);
     }
-    this.logger.info('tenant log stream opened', { appId, deploymentId, timerange });
-    return this.records({ appId, deploymentId, since: startOf(timerange), signal });
+    this.logger.info('tenant log stream opened', { appId, deploymentId, timerange, follow });
+    return this.records({ appId, deploymentId, since: startOf(timerange), follow, signal });
   }
 
   /**
@@ -83,8 +86,9 @@ export class LogsService extends Service {
     appId,
     deploymentId,
     since,
+    follow,
     signal,
-  }: Pick<TenantLogStreamRequest, 'appId' | 'deploymentId'> & {
+  }: Pick<TenantLogStreamRequest, 'appId' | 'deploymentId' | 'follow'> & {
     since: Timestamp;
     signal: AbortSignal;
   }): AsyncGenerator<TenantLogRecord> {
@@ -104,6 +108,11 @@ export class LogsService extends Service {
       }
       from = resumeAt({ records, from });
 
+      // A window the store did not fill is the end of what it holds. Following is waiting for the
+      // rest to be written; a reader who is not has been handed everything there is.
+      if (records.length < PAGE_LIMIT && !follow) {
+        return;
+      }
       if (fresh.length === 0) {
         await wait({ ms: IDLE_INTERVAL_MS, signal });
       }

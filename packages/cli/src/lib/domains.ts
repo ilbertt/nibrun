@@ -1,6 +1,6 @@
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { addDomain, appBySlug, removeDomain } from '@repo/app-operations';
+import { addDomain, appBySlug, appFor, removeDomain } from '@repo/app-operations';
 import type { Ui } from '#lib/ui.ts';
 
 const COLUMN_GAP = '  ';
@@ -50,7 +50,7 @@ export async function addAppDomain({
   hostname: string;
   ui: Ui;
 }): Promise<void> {
-  const app = await appBySlug({ api, slug });
+  const { app } = await appFor({ api, slug, operation: 'domains' });
   const added = await addDomain({ api, appId: app.id, hostname });
 
   for (const record of pendingRecords({
@@ -100,7 +100,7 @@ export async function removeAppDomain({
   hostname: string;
   ui: Ui;
 }): Promise<void> {
-  const app = await appBySlug({ api, slug });
+  const { app } = await appFor({ api, slug, operation: 'domains' });
   await removeDomain({ api, appId: app.id, hostname });
 
   ui.done(`${hostname} no longer points at ${app.slug}.`);

@@ -1,12 +1,6 @@
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { ApiError } from '@repo/api-client/unwrap';
-import {
-  describeUnreadableFilesystem,
-  guestPath,
-  InvalidPathError,
-  readDirectory,
-} from '@repo/app-operations';
+import { guestPath, InvalidPathError, readDirectory } from '@repo/app-operations';
 import {
   DIRECTORY_ENTRY_LIMIT,
   FILESYSTEM_ENTRY_KINDS,
@@ -43,8 +37,8 @@ export type ListInput = {
  *
  * The request is held open by the api until a host next polls, so this is a wait rather than a
  * read — hence the deployment being named before it starts rather than alongside the answer, and
- * hence a release that failed being answered from here: the wait is the expensive part, and what
- * it buys in that case is a refusal that names neither the release nor why it never came up.
+ * hence an app with nothing mounting its filesystem being answered before it: the wait is the
+ * expensive part, and what it buys is a refusal that names neither the app nor why.
  */
 export async function listDirectory({
   api,
@@ -53,12 +47,13 @@ export async function listDirectory({
   path,
   print,
 }: ListInput): Promise<void> {
-  const addressed = await announcedDeployment({ api, slug, deploymentId, print });
-
-  const unreadable = describeUnreadableFilesystem(addressed.newest);
-  if (unreadable !== undefined) {
-    throw new ApiError(unreadable);
-  }
+  const addressed = await announcedDeployment({
+    api,
+    slug,
+    deploymentId,
+    operation: 'files',
+    print,
+  });
 
   const listing = await readDirectory({
     api,
