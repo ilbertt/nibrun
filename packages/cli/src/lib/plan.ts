@@ -2,7 +2,7 @@ import { basename } from 'node:path';
 import { confirm, note, select, text } from '@clack/prompts';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import { releaseTarget } from '@repo/app-operations';
+import { appFor } from '@repo/app-operations';
 import { DEFAULT_GUEST_PORT, type TenantArguments } from '@repo/protocol';
 import { CancelledError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
@@ -46,7 +46,7 @@ async function fillGaps({
   if (options.app !== undefined) {
     // A slug typed rather than chosen has been checked against nothing yet, and a summary saying
     // what the deploy replaces is worse than useless in front of an app it cannot land on.
-    await releaseTarget({ api, slug: options.app });
+    await appFor({ api, slug: options.app, operation: 'release' });
     return options;
   }
   const app = await chooseApp({ api });

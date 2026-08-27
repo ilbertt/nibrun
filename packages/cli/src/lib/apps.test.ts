@@ -25,7 +25,7 @@ mock.module('@clack/prompts', () => ({
   },
 }));
 
-const { announcedDeployment, selectApp } = await import('#lib/apps.ts');
+const { announcedDeployment, selectApp, stillWriting } = await import('#lib/apps.ts');
 
 let listings = 0;
 
@@ -110,33 +110,46 @@ test('walking away from the question is not answering it', async () => {
   await expect(attempt).rejects.toThrow('Cancelled.');
 });
 
-test('which deployment a command settled on is said before it is read from', async () => {
-  const dimmed: string[] = [];
-  const api = {
+/** An app and what it is on, which together are what a command is allowed to act on. */
+function apiRunning({
+  state = 'active',
+  deployments = [{ id: 'deployment-2', state: 'active' }],
+}: {
+  state?: string;
+  deployments?: Array<{ id: string; state: string }>;
+} = {}): PublicApiClient {
+  return {
     api: {
       apps: Object.assign(
         () => ({
-          deployments: {
-            get: () =>
-              Promise.resolve({ data: { deployments: [{ id: 'deployment-2' }] }, error: null }),
-          },
+          deployments: { get: () => Promise.resolve({ data: { deployments }, error: null }) },
         }),
         {
           get: () =>
             Promise.resolve({
-              data: { apps: [{ id: 'app-1', slug: 'quiet-otter' }] },
+              data: { apps: [{ id: 'app-1', slug: 'quiet-otter', state }] },
               error: null,
             }),
         },
       ),
     },
   } as unknown as PublicApiClient;
+}
+
+function printingDim(dimmed: string[]): Print {
+  return { dim: (line: string) => dimmed.push(line) } as unknown as Print;
+}
+
+test('which deployment a command settled on is said before it is read from', async () => {
+  const dimmed: string[] = [];
+  const api = apiRunning();
 
   const addressed = await announcedDeployment({
     api,
     slug: 'quiet-otter',
     deploymentId: undefined,
-    print: { dim: (line: string) => dimmed.push(line) } as unknown as Print,
+    operation: 'logs',
+    print: printingDim(dimmed),
   });
 
   expect(addressed).toMatchObject({
@@ -145,4 +158,64 @@ test('which deployment a command settled on is said before it is read from', asy
     slug: 'quiet-otter',
   });
   expect(dimmed).toEqual(['quiet-otter · deployment deployment-2']);
+});
+
+// The wait is the whole command, so what the app's state says about it is said before the first
+// line rather than after however many the store held.
+test('an app with nothing to read is refused before the stream is opened', async () => {
+  const dimmed: string[] = [];
+
+  const attempt = announcedDeployment({
+    api: apiRunning({ deployments: [] }),
+    slug: 'quiet-otter',
+    deploymentId: undefined,
+    operation: 'logs',
+    print: printingDim(dimmed),
+  });
+
+  await expect(attempt).rejects.toThrow(
+    'App quiet-otter has never been deployed, so there is no output to read.',
+  );
+  expect(dimmed).toEqual([]);
+});
+
+test('an app that is running is one whose output is worth waiting on', async () => {
+  const addressed = await announcedDeployment({
+    api: apiRunning(),
+    slug: 'quiet-otter',
+    deploymentId: undefined,
+    operation: 'logs',
+    print: printingDim([]),
+  });
+
+  expect(stillWriting(addressed)).toBe(true);
+});
+
+test('a suspended one is not, however much it wrote before it stopped', async () => {
+  const addressed = await announcedDeployment({
+    api: apiRunning({
+      state: 'suspended',
+      deployments: [{ id: 'deployment-2', state: 'stopped' }],
+    }),
+    slug: 'quiet-otter',
+    deploymentId: undefined,
+    operation: 'logs',
+    print: printingDim([]),
+  });
+
+  expect(stillWriting(addressed)).toBe(false);
+});
+
+// Which release is being read is a different question from whether the app is running: a stream
+// on the one it has moved off waits for a microVM that is not coming back.
+test('nor is a release the app has moved off, whatever the app is doing', async () => {
+  const addressed = await announcedDeployment({
+    api: apiRunning(),
+    slug: 'quiet-otter',
+    deploymentId: 'deployment-1',
+    operation: 'logs',
+    print: printingDim([]),
+  });
+
+  expect(stillWriting(addressed)).toBe(false);
 });

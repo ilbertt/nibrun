@@ -21,6 +21,15 @@ function listed(overrides: Partial<Listed> = {}): Listed {
 function apiHolding({ apps, deleted }: { apps: Listed[]; deleted: string[] }): PublicApiClient {
   function addressed({ appId }: { appId: string }) {
     return {
+      // Read to decide what the app's state allows, which for a delete is everything up to the
+      // teardown already under way.
+      deployments: {
+        get: () =>
+          Promise.resolve({
+            data: { deployments: [{ id: 'deployment-1', state: 'active' }] },
+            error: null,
+          }),
+      },
       delete: () => {
         deleted.push(appId);
         return Promise.resolve({ data: { slug: SLUG, state: 'deleting' }, error: null });

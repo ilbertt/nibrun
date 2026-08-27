@@ -1,6 +1,5 @@
 import { expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { UsageError } from '#lib/errors.ts';
 import { resumeApp, suspendApp } from '#lib/suspend.ts';
 import type { Ui } from '#lib/ui.ts';
 
@@ -12,9 +11,18 @@ type Asked = { appId: string; state: string };
  * The listing and the write behind one client, because what these commands do with the state an
  * app is already in is the whole of what they decide: the read is not a lookup they could skip.
  */
-function apiHolding({ state, asked }: { state: string; asked: Asked[] }): PublicApiClient {
+function apiHolding({
+  state,
+  asked,
+  deployments = [{ id: 'deployment-1', state: 'active' }],
+}: {
+  state: string;
+  asked: Asked[];
+  deployments?: Array<{ id: string; state: string }>;
+}): PublicApiClient {
   function apps({ appId }: { appId: string }) {
     return {
+      deployments: { get: () => Promise.resolve({ data: { deployments }, error: null }) },
       state: {
         put: (body: { state: string }) => {
           asked.push({ appId, state: body.state });
@@ -94,6 +102,6 @@ test('an app being deleted is refused rather than sent', async () => {
 
   await expect(
     resumeApp({ api: apiHolding({ state: 'deleting', asked }), slug: SLUG, ui: uiSaying([]) }),
-  ).rejects.toBeInstanceOf(UsageError);
+  ).rejects.toThrow('App quiet-otter is being deleted, so there is nothing left to bring back.');
   expect(asked).toEqual([]);
 });

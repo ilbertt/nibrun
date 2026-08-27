@@ -1,12 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
-import {
-  addressedDeployment,
-  appBySlug,
-  currentArtifact,
-  newestDeployment,
-  releaseTarget,
-} from '#apps.ts';
+import { addressedDeployment, appBySlug, appFor, newestDeployment } from '#apps.ts';
 
 function apiHolding({
   apps,
@@ -51,7 +45,22 @@ test('a slug naming nothing is said to name nothing', async () => {
 test('an app asking to run is one a release can be made onto', async () => {
   const api = apiHolding({ apps: [{ id: 'app-1', slug: 'quiet-otter', state: 'active' }] });
 
-  expect(await releaseTarget({ api, slug: 'quiet-otter' })).toMatchObject({ id: 'app-1' });
+  expect(await appFor({ api, slug: 'quiet-otter', operation: 'release' })).toMatchObject({
+    app: { id: 'app-1' },
+  });
+});
+
+// The read that says whether a release can be made says what it would be a release of, so the
+// caller making one is not sent back for it.
+test('and it comes back with the release it is on', async () => {
+  const api = apiHolding({
+    apps: [{ id: 'app-1', slug: 'quiet-otter', state: 'active' }],
+    deployments: [{ id: 'deployment-2', artifactId: 'artifact-2' }],
+  });
+
+  expect(await appFor({ api, slug: 'quiet-otter', operation: 'release' })).toMatchObject({
+    newest: { artifactId: 'artifact-2' },
+  });
 });
 
 // Nothing would refuse the deployment — it would sit pending for as long as the app stays down —
@@ -59,7 +68,7 @@ test('an app asking to run is one a release can be made onto', async () => {
 test('a suspended one is refused, with the way to make it deployable', async () => {
   const api = apiHolding({ apps: [{ id: 'app-1', slug: 'quiet-otter', state: 'suspended' }] });
 
-  await expect(releaseTarget({ api, slug: 'quiet-otter' })).rejects.toThrow(
+  await expect(appFor({ api, slug: 'quiet-otter', operation: 'release' })).rejects.toThrow(
     'App quiet-otter is suspended, so a new release would never start. Resume it first.',
   );
 });
@@ -82,39 +91,25 @@ test('an app that has never been deployed has no newest deployment', async () =>
   );
 });
 
-// The newest release is what the app is running, so the artifact it pinned is the binary a
-// release again has to name.
-test('the binary an app is running is the one its newest release pinned', async () => {
-  const api = apiHolding({
-    apps: [{ id: 'app-1', slug: 'quiet-otter' }],
-    deployments: [
-      { id: 'deployment-2', artifactId: 'artifact-2' },
-      { id: 'deployment-1', artifactId: 'artifact-1' },
-    ],
-  });
-
-  expect(await currentArtifact({ api, appId: 'app-1' })).toMatchObject({ id: 'artifact-2' });
-});
-
-test('an app that has never been deployed is running no binary', async () => {
-  const api = apiHolding({ apps: [{ id: 'app-1', slug: 'quiet-otter' }] });
-
-  await expect(currentArtifact({ api, appId: 'app-1' })).rejects.toThrow(
-    'This app has never been deployed.',
-  );
-});
-
 test('addressing without a deployment id resolves to the newest one', async () => {
   const api = apiHolding({
     apps: [{ id: 'app-1', slug: 'quiet-otter' }],
     deployments: [{ id: 'deployment-2', state: 'active' }],
   });
 
-  expect(await addressedDeployment({ api, slug: 'quiet-otter', deploymentId: undefined })).toEqual({
+  expect(
+    await addressedDeployment({
+      api,
+      slug: 'quiet-otter',
+      deploymentId: undefined,
+      operation: 'logs',
+    }),
+  ).toEqual({
     appId: 'app-1',
     deploymentId: 'deployment-2',
     slug: 'quiet-otter',
     newest: { id: 'deployment-2', state: 'active' },
+    status: { kind: 'deployment', state: 'active' },
   });
 });
 
@@ -126,7 +121,12 @@ test('a deployment named outright still comes back under its app', async () => {
   });
 
   expect(
-    await addressedDeployment({ api, slug: 'quiet-otter', deploymentId: 'deployment-9' }),
+    await addressedDeployment({
+      api,
+      slug: 'quiet-otter',
+      deploymentId: 'deployment-9',
+      operation: 'logs',
+    }),
   ).toMatchObject({ appId: 'app-1', deploymentId: 'deployment-9', slug: 'quiet-otter' });
 });
 
@@ -142,6 +142,7 @@ test('the release the app is on comes back alongside the one addressed', async (
     api,
     slug: 'quiet-otter',
     deploymentId: 'deployment-1',
+    operation: 'logs',
   });
 
   expect(addressed.newest).toMatchObject({ id: 'deployment-2', state: 'failed' });

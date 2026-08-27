@@ -26,6 +26,9 @@ const GIVE_UP_MS = 50;
 /** Long enough to outlast the service's own pause between two reads, and no longer. */
 const PAST_ONE_PAUSE_MS = 1_200;
 
+/** Longer than this suite would ever wait, so a read that ends did so on its own. */
+const NEVER_MS = 300_000;
+
 const AN_INSTANT = Value.Parse(TimestampSchema, '2026-08-06T09:41:00.123Z');
 const A_LATER_INSTANT = Value.Parse(TimestampSchema, '2026-08-06T09:41:02.456Z');
 
@@ -81,16 +84,19 @@ function open({
   subject,
   ownerId = OWNER_ID,
   giveUpMs = GIVE_UP_MS,
+  follow = true,
 }: {
   subject: ReturnType<typeof service>;
   ownerId?: typeof OWNER_ID;
   giveUpMs?: number;
+  follow?: boolean;
 }) {
   return subject.logsService.openStream({
     appId: APP_ID,
     deploymentId: DEPLOYMENT_ID,
     ownerId,
     timerange: TIMERANGE,
+    follow,
     signal: AbortSignal.timeout(giveUpMs),
   });
 }
@@ -132,6 +138,32 @@ describe('reading a deployment logs is asking whether you own it', () => {
     await drain(await open({ subject }));
 
     expect(subject.deploymentsRepo.asked[0]?.ownerId).toBe(OWNER_ID);
+  });
+});
+
+/**
+ * A reader with nothing to wait for. An app that is not running writes nothing more, so a stream
+ * held open on one is a terminal that never comes back — and the history is still worth having.
+ */
+describe('a read that is not following ends where the store does', () => {
+  test('what the store holds is handed over, and that is the end of it', async () => {
+    const subject = service({
+      row: A_DEPLOYMENT_ROW,
+      windows: [[record({ at: AN_INSTANT, sequence: 0 })]],
+    });
+
+    const seen = await drain(await open({ subject, follow: false, giveUpMs: NEVER_MS }));
+
+    expect(seen).toHaveLength(1);
+    expect(subject.logsRepo.asked).toHaveLength(1);
+  });
+
+  // The signal is what ends a follow, so a read that ends on its own is the one thing that proves
+  // this is not one: nothing here is waiting for it.
+  test('and it ends without waiting on anything to stop it', async () => {
+    const subject = service({ row: A_DEPLOYMENT_ROW });
+
+    expect(await drain(await open({ subject, follow: false, giveUpMs: NEVER_MS }))).toHaveLength(0);
   });
 });
 

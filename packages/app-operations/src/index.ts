@@ -4,9 +4,10 @@ export {
   type AddressedDeployment,
   addressedDeployment,
   appBySlug,
-  currentArtifact,
+  appFor,
+  appWithStatus,
   newestDeployment,
-  releaseTarget,
+  pinnedArtifact,
 } from '#apps.ts';
 export { deleteApp } from '#delete.ts';
 export {
@@ -25,6 +26,7 @@ export { InvalidEnvironmentError, InvalidPathError } from '#errors.ts';
 export { awaitExportBundle, type ExportBundle, requestExport } from '#exports.ts';
 export { describeUnreadableFilesystem, guestPath, readDirectory } from '#filesystem.ts';
 export { type FollowInput, followLogs } from '#logs.ts';
+export { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
 export { type RedeployInput, redeploy } from '#redeploy.ts';
 export type { ConfigEdit, Deployed, DeployStep } from '#release.ts';
 export {

@@ -2,7 +2,7 @@ import { rename, rm, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError } from '@repo/api-client/unwrap';
-import { appBySlug, awaitExportBundle, requestExport } from '@repo/app-operations';
+import { appFor, awaitExportBundle, requestExport } from '@repo/app-operations';
 import { UsageError } from '#lib/errors.ts';
 import type { Ui } from '#lib/ui.ts';
 
@@ -35,7 +35,7 @@ export type ExportInput = {
  */
 export async function exportApp({ api, slug, destination, ui }: ExportInput): Promise<void> {
   const path = await bundlePath({ destination, slug });
-  const app = await appBySlug({ api, slug });
+  const { app } = await appFor({ api, slug, operation: 'export' });
 
   const requested = await requestExport({ api, appId: app.id });
   ui.step(`export ${requested.id}`);

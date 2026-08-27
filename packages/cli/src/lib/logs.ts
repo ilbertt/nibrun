@@ -21,21 +21,39 @@ export type FollowInput = {
   appId: string;
   deploymentId: string;
   timerange: string;
+  /** Whether there is a microVM to write anything more, which is what makes this a wait at all. */
+  following: boolean;
   print: Print;
   signal: AbortSignal;
 };
 
-/** Print what a deployment has written, and keep printing what it writes until stopped. */
+/**
+ * Print what a deployment has written, and keep printing what it writes until stopped.
+ *
+ * An app with nothing running is not waited on: what it wrote is printed and that is the end of
+ * it, said in the last line so a log that stops is not read as one that was cut off.
+ */
 export async function follow({
   api,
   appId,
   deploymentId,
   timerange,
+  following,
   print,
   signal,
 }: FollowInput): Promise<void> {
-  for await (const record of followLogs({ api, appId, deploymentId, timerange, signal })) {
+  for await (const record of followLogs({
+    api,
+    appId,
+    deploymentId,
+    timerange,
+    following,
+    signal,
+  })) {
     show({ record, print });
+  }
+  if (!following) {
+    print.dim('nothing is running, so that is everything it wrote');
   }
 }
 

@@ -2,7 +2,12 @@ import { select } from '@clack/prompts';
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import { type AddressedDeployment, addressedDeployment } from '@repo/app-operations';
+import {
+  type AddressedDeployment,
+  type AppOperation,
+  addressedDeployment,
+  isRunning,
+} from '@repo/app-operations';
 import { SHARED_OPTIONS } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
@@ -71,14 +76,24 @@ export async function announcedDeployment({
   api,
   slug,
   deploymentId,
+  operation,
   print,
 }: {
   api: PublicApiClient;
   slug: string;
   deploymentId: string | undefined;
+  operation: AppOperation;
   print: Print;
 }): Promise<AddressedDeployment> {
-  const addressed = await addressedDeployment({ api, slug, deploymentId });
+  const addressed = await addressedDeployment({ api, slug, deploymentId, operation });
   print.dim(`${addressed.slug} · deployment ${addressed.deploymentId}`);
   return addressed;
+}
+
+/**
+ * Whether anything is still to arrive on this deployment's output: the app running, on the very
+ * release named. Following the one it has moved off is a wait for nothing, however busy it is.
+ */
+export function stillWriting(addressed: AddressedDeployment): boolean {
+  return isRunning(addressed.status) && addressed.deploymentId === addressed.newest.id;
 }

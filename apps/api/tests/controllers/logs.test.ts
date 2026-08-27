@@ -20,4 +20,18 @@ describe('a deployment logs are read through the api that owns the app', () => {
 
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
+
+  // A query string carries words, and asking not to follow is a word: the schema is what turns it
+  // back into the answer to a yes-or-no question, and getting past it is what says it did.
+  test('asking not to follow is a query the schema takes', async () => {
+    const response = await send({ url: `${LOGS_URL}?follow=false` });
+
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  });
+
+  test('and anything that is not a yes or a no is refused', async () => {
+    const response = await send({ url: `${LOGS_URL}?follow=maybe` });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
 });

@@ -1,6 +1,6 @@
 import type { PublicApiClient } from '@repo/api-client/public';
-import { unwrap } from '@repo/api-client/unwrap';
-import { currentArtifact, releaseTarget } from '#apps.ts';
+import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import { appFor, pinnedArtifact } from '#apps.ts';
 import {
   type ConfigEdit,
   configPatch,
@@ -8,6 +8,8 @@ import {
   type DeployStep,
   servingHostname,
 } from '#release.ts';
+
+const NOTHING_TO_RELEASE = 'This app has never been deployed.';
 
 export type RedeployInput = ConfigEdit & {
   api: PublicApiClient;
@@ -32,10 +34,17 @@ export async function redeploy({
   onStep,
   ...edit
 }: RedeployInput): Promise<Deployed> {
-  const target = await releaseTarget({ api, slug });
-  const artifact = await currentArtifact({ api, appId: target.id });
+  const target = await appFor({ api, slug, operation: 'release' });
+  if (!target.newest) {
+    throw new ApiError(NOTHING_TO_RELEASE);
+  }
+  const artifact = await pinnedArtifact({
+    api,
+    appId: target.app.id,
+    artifactId: target.newest.artifactId,
+  });
 
-  const app = unwrap(await api.api.apps({ appId: target.id }).patch(configPatch(edit)));
+  const app = unwrap(await api.api.apps({ appId: target.app.id }).patch(configPatch(edit)));
   onStep?.({ kind: 'app', appId: app.id, slug: app.slug });
   onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest });
 

@@ -1,6 +1,6 @@
 import { note, text } from '@clack/prompts';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { appBySlug, deleteApp as requestDeletion } from '@repo/app-operations';
+import { appFor, deleteApp as requestDeletion } from '@repo/app-operations';
 import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
 import type { Ui } from '#lib/ui.ts';
@@ -29,7 +29,7 @@ export type DeleteInput = {
  * rather than a phrase typed out for an app that was never there.
  */
 export async function deleteApp({ api, slug, ui, yes, interactive }: DeleteInput): Promise<void> {
-  const app = await appBySlug({ api, slug });
+  const { app } = await appFor({ api, slug, operation: 'delete' });
   // Asking twice is asking once: the teardown already running is the answer to the second.
   if (app.state === 'deleting') {
     ui.done(`${app.slug} is already being deleted.`);
