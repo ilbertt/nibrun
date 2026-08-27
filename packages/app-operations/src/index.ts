@@ -24,7 +24,7 @@ export { type EnvironmentAssignment, parseEnvFile } from '#env-file.ts';
 export { type EnvironmentEdit, parseEnvironment, parseEnvironmentPatch } from '#environment.ts';
 export { InvalidEnvironmentError, InvalidPathError } from '#errors.ts';
 export { awaitExportBundle, type ExportBundle, requestExport } from '#exports.ts';
-export { describeUnreadableFilesystem, guestPath, readDirectory } from '#filesystem.ts';
+export { guestPath, readDirectory } from '#filesystem.ts';
 export { type FollowInput, followLogs } from '#logs.ts';
 export { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
 export { type RedeployInput, redeploy } from '#redeploy.ts';

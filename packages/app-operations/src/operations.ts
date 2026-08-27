@@ -94,7 +94,13 @@ export function operationRefusal({
   if (!state.refuses.includes(operation)) {
     return undefined;
   }
+  const refusal = `App ${slug} ${state.because}, so ${CANNOT[operation]}`;
+  if (state.hint !== undefined) {
+    return `${refusal}. ${state.hint}`;
+  }
+  // A release that did not come up kept the host's account of why, which says more than the state
+  // does — set off rather than sentenced, because the words are the host's and start where it
+  // started them.
   const said = statusKey(status) === 'failed' ? release?.message : undefined;
-  const more = state.hint ?? said;
-  return `App ${slug} ${state.because}, so ${CANNOT[operation]}.${more === undefined ? '' : ` ${more}`}`;
+  return said === undefined ? `${refusal}.` : `${refusal} — ${said}`;
 }
