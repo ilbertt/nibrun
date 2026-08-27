@@ -1,6 +1,7 @@
 import { Skeleton } from '@repo/ui/components/skeleton';
 import { AppConfigCard } from '#components/apps/app-config-card.tsx';
 import { AppOverviewCard } from '#components/apps/app-overview-card.tsx';
+import { AppResourcesCard } from '#components/apps/app-resources-card.tsx';
 import { DeploymentHistory } from '#components/apps/deployment-history.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
 import { useApp } from '#lib/hooks/use-app.ts';
@@ -19,9 +20,10 @@ export function AppDetail() {
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
-      <div className="grid @3xl/main:grid-cols-2 grid-cols-1 gap-4 md:gap-6">
+      <div className="grid @3xl/main:grid-cols-2 @5xl/main:grid-cols-3 grid-cols-1 gap-4 md:gap-6">
         <AppOverviewCard app={app.data} />
         <AppConfigCard app={app.data} />
+        <AppResourcesCard app={app.data} />
       </div>
       <DeploymentHistory />
     </div>

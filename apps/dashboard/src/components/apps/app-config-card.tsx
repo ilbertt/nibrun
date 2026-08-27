@@ -1,9 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
-import { formatBytes } from '#lib/format-bytes.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export function AppConfigCard({ app }: { app: AppSummary }) {
-  const { guestPort, args, volumeSizeBytes } = app.config;
+  const { guestPort, args } = app.config;
 
   return (
     <Card>
@@ -14,12 +13,6 @@ export function AppConfigCard({ app }: { app: AppSummary }) {
         <div className="flex items-center justify-between gap-4">
           <span className="text-muted-foreground">Guest port</span>
           <span className="font-mono tabular-nums">{guestPort}</span>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <span className="text-muted-foreground">Volume size</span>
-          <span className="font-mono tabular-nums" title={`${volumeSizeBytes} bytes`}>
-            {formatBytes(volumeSizeBytes)}
-          </span>
         </div>
         <div className="flex flex-col gap-2">
           <span className="text-muted-foreground">Arguments</span>
