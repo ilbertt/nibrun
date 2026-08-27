@@ -71,9 +71,7 @@ export function DeployForm({
         )}
       </api.Field>
 
-      {/* Both sections are settings of the same release, not alternatives, so opening one
-          does not put the other away mid-edit. */}
-      <Accordion multiple>
+      <Accordion>
         <AccordionItem>
           <AccordionTrigger>
             <span className="flex items-baseline gap-2">
@@ -104,7 +102,9 @@ export function DeployForm({
             </api.Field>
           </AccordionContent>
         </AccordionItem>
+      </Accordion>
 
+      <Accordion>
         <AccordionItem>
           <AccordionTrigger>
             <span className="flex items-baseline gap-2">
