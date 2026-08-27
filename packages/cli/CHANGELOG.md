@@ -2,6 +2,22 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.27-2]
+
+### 🚀 Features
+
+- *(runtime)* A tenant value can name a runtime one (#306)
+- *(dashboard)* The files tab asks the same table every other surface does (#305)
+- *(cli)* One table decides what an app's state lets a command do (#303)
+
+### 🐛 Bug Fixes
+
+- A suspended app is not offered a release that would never start (#301)
+
+### 🚜 Refactor
+
+- What an app is doing is read the same way on both surfaces (#302)
+
 ## [2026.8.27-1]
 
 ### 🚀 Features
