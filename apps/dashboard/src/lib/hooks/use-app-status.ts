@@ -48,6 +48,12 @@ export function useAppStatus(app: AppSummary | undefined): AppStatusResult {
         : false,
   });
 
+  // The skipped query never succeeds, so an app that answers alone is answered for here rather
+  // than left waiting on a release nobody asked for.
+  if (app && !readsDeployments(app)) {
+    return { isPending: false, isError: false, status: statusOf({ app, deployments: undefined }) };
+  }
+
   return {
     isPending: deployments.isPending,
     isError: deployments.isError,

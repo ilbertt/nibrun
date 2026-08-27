@@ -15,15 +15,20 @@ import { Field, FieldError } from '@repo/ui/components/field';
 import { SlideToDelete } from '@repo/ui/custom/slide-to-delete';
 import { Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { useState } from 'react';
+import type { AppActionAvailability } from '#lib/app-actions.ts';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppDeletion } from '#lib/hooks/use-app-deletion.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 
-export function DeleteAppDialog() {
+export function DeleteAppDialog({ availability }: { availability: AppActionAvailability }) {
   const appId = useAppId();
   const app = useApp(appId);
   const deletion = useAppDeletion(appId);
   const [armed, setArmed] = useState(false);
+
+  if (availability === 'hidden') {
+    return null;
+  }
 
   const slug = app.data?.slug;
   const alreadyDeleting = app.data?.state === 'deleting';
@@ -36,7 +41,7 @@ export function DeleteAppDialog() {
       }}
     >
       <AlertDialogTrigger
-        render={<Button variant="destructive" disabled={slug === undefined || alreadyDeleting} />}
+        render={<Button variant="destructive" disabled={availability === 'disabled'} />}
       >
         <Trash2Icon data-icon="inline-start" />
         {alreadyDeleting ? 'Deleting…' : 'Delete'}

@@ -13,10 +13,35 @@ import type { AppState, DeploymentState } from '@repo/protocol';
 export type AppTransition = 'suspending' | 'resuming';
 
 export type AppStatus =
-  | { readonly kind: 'app'; readonly state: AppState }
-  | { readonly kind: 'deployment'; readonly state: DeploymentState }
+  // Never `active`: an app row is active from the moment it is created, so on its own it says
+  // nothing about what is serving, and the release answers instead.
+  | { readonly kind: 'app'; readonly state: Exclude<AppState, 'active'> }
+  // Never `stopped`: a release is only ever stopped because its app was suspended, which is the
+  // suspended app above or one of the two transitions below.
+  | { readonly kind: 'deployment'; readonly state: Exclude<DeploymentState, 'stopped'> }
   | { readonly kind: 'transition'; readonly label: AppTransition }
   | { readonly kind: 'never-deployed' };
+
+type Named<Status extends AppStatus> = Status extends { readonly label: AppTransition }
+  ? Status['label']
+  : Status extends { readonly state: string }
+    ? Status['state']
+    : Status['kind'];
+
+/** The one word a status goes by, and so what a table of every status is keyed by. */
+export type AppStatusKey = Named<AppStatus>;
+
+export function statusKey(status: AppStatus): AppStatusKey {
+  switch (status.kind) {
+    case 'app':
+    case 'deployment':
+      return status.state;
+    case 'transition':
+      return status.label;
+    case 'never-deployed':
+      return status.kind;
+  }
+}
 
 const SUSPENDED: AppStatus = { kind: 'app', state: 'suspended' };
 const SUSPENDING: AppStatus = { kind: 'transition', label: 'suspending' };

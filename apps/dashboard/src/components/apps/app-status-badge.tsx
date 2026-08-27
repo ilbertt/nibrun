@@ -9,16 +9,13 @@ import type { AppSummary } from '#queries/apps.ts';
  * What an app is doing, which is what its newest deployment is doing: an app row is `active`
  * from the moment it is created, so on its own it never says whether anything is serving.
  *
- * An app on its way out is the one case the row answers alone, and it answers before anything is
- * read — every other answer needs the release, including the two that say the host has not caught
- * up with what the owner asked for yet.
+ * An app on its way out is the one case the row answers alone; every other answer needs the
+ * release, including the two that say the host has not caught up with what the owner asked for
+ * yet.
  */
 export function AppStatusBadge({ app }: { app: AppSummary }) {
   const status = useAppStatus(app);
 
-  if (app.state === 'deleting' || app.state === 'deleted') {
-    return <AppStateBadge state={app.state} />;
-  }
   if (status.isPending) {
     return <Skeleton className="h-5 w-20 rounded-2xl" />;
   }

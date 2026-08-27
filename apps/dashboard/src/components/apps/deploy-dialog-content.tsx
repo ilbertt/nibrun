@@ -15,7 +15,7 @@ import { DeployForm } from '#components/apps/deploy-form.tsx';
 import { DeployProgress } from '#components/apps/deploy-progress.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 
-export function DeployDialogContent({ appId }: { appId?: string }) {
+export function DeployDialogContent({ appId, disabled }: { appId?: string; disabled: boolean }) {
   const [open, setOpen] = useState(false);
   const run = useDeployRun();
   const running = run.phase === 'uploading' || run.phase === 'settling';
@@ -29,7 +29,11 @@ export function DeployDialogContent({ appId }: { appId?: string }) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button variant={appId === undefined ? 'default' : 'outline'} />}>
+      <DialogTrigger
+        render={
+          <Button variant={appId === undefined ? 'default' : 'outline'} disabled={disabled} />
+        }
+      >
         <RocketIcon data-icon="inline-start" />
         Deploy
       </DialogTrigger>

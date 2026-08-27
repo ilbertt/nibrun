@@ -13,7 +13,7 @@ function status({
 }
 
 describe('an app on its way out answers for itself', () => {
-  const going: AppState[] = ['deleting', 'deleted'];
+  const going = ['deleting', 'deleted'] as const satisfies readonly AppState[];
 
   for (const appState of going) {
     test(`a ${appState} app says so whatever its release says`, () => {
@@ -66,7 +66,13 @@ describe('resuming is not running until the host has started it', () => {
     });
   });
 
-  const followed: DeploymentState[] = ['pending', 'starting', 'active', 'failed', 'superseded'];
+  const followed = [
+    'pending',
+    'starting',
+    'active',
+    'failed',
+    'superseded',
+  ] as const satisfies readonly DeploymentState[];
 
   for (const deploymentState of followed) {
     test(`and a ${deploymentState} release is what the app is doing`, () => {
@@ -93,11 +99,10 @@ describe('what is worth asking about again', () => {
     });
   }
 
-  // A stopped release is the one that looks transitional and is not: the host has done what it
-  // was asked, and asking again every two seconds forever is what this stops.
+  // A suspended app is the one that looks transitional and is not: the host has done what it was
+  // asked, and asking again every two seconds forever is what this stops.
   const settled: [string, AppStatus][] = [
     ['a serving release', { kind: 'deployment', state: 'active' }],
-    ['a stopped release', { kind: 'deployment', state: 'stopped' }],
     ['a failed release', { kind: 'deployment', state: 'failed' }],
     ['a suspended app', { kind: 'app', state: 'suspended' }],
     ['an app never deployed', { kind: 'never-deployed' }],

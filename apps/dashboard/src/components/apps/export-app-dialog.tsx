@@ -11,18 +11,23 @@ import {
 import { Spinner } from '@repo/ui/components/spinner';
 import { DownloadIcon, TriangleAlertIcon } from 'lucide-react';
 import { useState } from 'react';
+import type { AppActionAvailability } from '#lib/app-actions.ts';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { useAppExport } from '#lib/hooks/use-app-export.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 
-export function ExportAppDialog() {
+export function ExportAppDialog({ availability }: { availability: AppActionAvailability }) {
   const appId = useAppId();
   const [open, setOpen] = useState(false);
   const run = useAppExport(appId);
 
+  if (availability === 'hidden') {
+    return null;
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" />}>
+      <DialogTrigger render={<Button variant="outline" disabled={availability === 'disabled'} />}>
         <DownloadIcon data-icon="inline-start" />
         Export
       </DialogTrigger>
