@@ -108,6 +108,26 @@ export function isInstanceRecord(value: unknown): value is InstanceRecord {
   );
 }
 
+/**
+ * Notes written before `guestPort` was renamed to `httpPort`, read once by the agent that lands
+ * the rename and rewritten under the new name by its first `persist`.
+ *
+ * Without it a record fails the guard, is dropped, and its still-running unit is then observed
+ * with no `deploymentId` — a mismatch, which replaces every app on the host at the same time.
+ * Delete once no host holds a file written before that deploy.
+ */
+function withRenamedPort(record: Record<string, unknown>): Record<string, unknown> {
+  if ('httpPort' in record || !('guestPort' in record)) {
+    return record;
+  }
+  const { guestPort, ...rest } = record;
+  return { ...rest, httpPort: guestPort };
+}
+
 export function readInstanceRecords(value: unknown): InstanceRecord[] {
-  return Array.isArray(value) ? value.filter(isInstanceRecord) : [];
+  return Array.isArray(value)
+    ? value
+        .map((entry) => (isObject(entry) ? withRenamedPort(entry) : entry))
+        .filter(isInstanceRecord)
+    : [];
 }
