@@ -126,7 +126,7 @@ export const StateMessageSchema = Type.String({
 export type GuestPort = Brand<number, 'GuestPort'>;
 
 export const GuestPortSchema = Type.Integer({
-  description: 'Port the tenant binary listens on inside the guest.',
+  description: 'HTTP port the tenant binary listens on inside the guest.',
   minimum: MIN_PORT,
   maximum: MAX_PORT,
 }) as BrandedSchema<TInteger, GuestPort>;

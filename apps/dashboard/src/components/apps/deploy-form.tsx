@@ -53,7 +53,7 @@ export function DeployForm({
       <api.Field name="port" validators={{ onChange: validatePort }}>
         {(field) => (
           <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
-            <FieldLabel htmlFor="deploy-port">Guest port</FieldLabel>
+            <FieldLabel htmlFor="deploy-port">HTTP port</FieldLabel>
             <Input
               id="deploy-port"
               value={field.state.value ?? defaultPort}

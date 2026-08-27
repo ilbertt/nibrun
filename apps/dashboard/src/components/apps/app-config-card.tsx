@@ -11,7 +11,7 @@ export function AppConfigCard({ app }: { app: AppSummary }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-4 text-sm">
         <div className="flex items-center justify-between gap-4">
-          <span className="text-muted-foreground">Guest port</span>
+          <span className="text-muted-foreground">HTTP port</span>
           <span className="font-mono tabular-nums">{app.config.guestPort}</span>
         </div>
         <AppRunCommand app={app} />

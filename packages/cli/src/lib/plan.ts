@@ -95,7 +95,7 @@ async function askName({ suggestion }: { suggestion: string }): Promise<string> 
 // Bounds are the api's to enforce; this only refuses what it could not send as a port at all.
 async function askPort(): Promise<number> {
   const answer = await text({
-    message: 'Which port does the binary listen on?',
+    message: 'Which HTTP port does the binary listen on?',
     initialValue: String(DEFAULT_GUEST_PORT),
     validate: (value) => (Number.isInteger(Number(value)) ? undefined : 'Ports are whole numbers.'),
   });
