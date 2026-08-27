@@ -9,6 +9,12 @@ const HTTP_UNAVAILABLE = 503;
  * Plain and short, because a person reads it in a browser with no styling around it. It says the
  * app is down rather than unknown: the wildcard site's 404 is the answer for a hostname this host
  * serves nothing on, and a suspended app is not that.
+ *
+ * `connection: close` is what keeps a resume immediate. The proxy pools its upstream connections,
+ * and one opened while the microVM was down was accepted *here* rather than forwarded to a guest —
+ * so the forward rule appearing later cannot redirect it, and every request the proxy sends down
+ * that connection is answered by this until it retires it. Refusing to be reused is what bounds
+ * that to the one request already in flight.
  */
 function sayAppIsDown(): Response {
   return new Response('This app is not running.\n', {
@@ -16,6 +22,7 @@ function sayAppIsDown(): Response {
     headers: {
       'content-type': 'text/plain; charset=utf-8',
       'cache-control': 'no-store',
+      connection: 'close',
     },
   });
 }
