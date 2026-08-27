@@ -1,7 +1,7 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import type { DeploymentState, Filename, TenantArguments } from '@repo/protocol';
-import { appBySlug } from '#apps.ts';
+import { releaseTarget } from '#apps.ts';
 import {
   type ConfigEdit,
   configPatch,
@@ -65,7 +65,7 @@ export async function deploy({
   upload = streamedUpload,
   ...edit
 }: DeployInput): Promise<Deployed> {
-  const target = slug === undefined ? null : await appBySlug({ api, slug });
+  const target = slug === undefined ? null : await releaseTarget({ api, slug });
   const config = configPatch(edit);
 
   const app =

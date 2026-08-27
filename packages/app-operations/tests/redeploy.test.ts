@@ -20,10 +20,12 @@ function apiHolding({
   sent,
   deployments = [{ id: 'deployment-1', artifactId: ARTIFACT_ID }],
   hostnames = [PLATFORM],
+  state = 'active',
 }: {
   sent: Sent[];
   deployments?: Array<{ id: string; artifactId: string }>;
   hostnames?: HostnameRow[];
+  state?: string;
 }): PublicApiClient {
   function underApp({ appId }: { appId: string }) {
     function artifact({ artifactId }: { artifactId: string }) {
@@ -59,7 +61,8 @@ function apiHolding({
   return {
     api: {
       apps: Object.assign(underApp, {
-        get: () => Promise.resolve({ data: { apps: [{ id: APP_ID, slug: SLUG }] }, error: null }),
+        get: () =>
+          Promise.resolve({ data: { apps: [{ id: APP_ID, slug: SLUG, state }] }, error: null }),
       }),
     },
   } as unknown as PublicApiClient;
@@ -125,6 +128,23 @@ test('an app that has never been deployed is refused before its config moves', a
 
   await expect(attempt).rejects.toThrow('This app has never been deployed.');
   expect(sent.map((each) => each.what)).not.toContain('app patch');
+});
+
+// The config would be written for a release that then sits pending until the app comes back, so
+// what the app runs on would have changed without anything running it.
+test('a suspended app is refused before its config moves', async () => {
+  const sent: Sent[] = [];
+
+  const attempt = redeploy({
+    api: apiHolding({ sent, state: 'suspended' }),
+    app: SLUG,
+    args: ['serve'],
+  });
+
+  await expect(attempt).rejects.toThrow(
+    'App quiet-otter is suspended, so a new release would never start. Resume it first.',
+  );
+  expect(sent).toEqual([]);
 });
 
 test('a slug naming nothing is said to name nothing', async () => {

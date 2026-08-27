@@ -16,6 +16,23 @@ export async function appBySlug({ api, slug }: { api: PublicApiClient; slug: str
 }
 
 /**
+ * The app a release is being made onto.
+ *
+ * A host is only sent releases whose app is asking to run, so one made onto a suspended app would
+ * sit pending until it is resumed rather than fail — a wait with no end. Refused where the app is
+ * first read, which on a deploy is before the binary is uploaded.
+ */
+export async function releaseTarget({ api, slug }: { api: PublicApiClient; slug: string }) {
+  const app = await appBySlug({ api, slug });
+  if (app.state === 'suspended') {
+    throw new ApiError(
+      `App ${app.slug} is suspended, so a new release would never start. Resume it first.`,
+    );
+  }
+  return app;
+}
+
+/**
  * The release the app is on: the one a reader means by not naming one, and the only one that says
  * what the app is doing now. The api lists them newest first, so this is the head of the list
  * rather than a search through it.

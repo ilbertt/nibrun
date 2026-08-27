@@ -1,12 +1,18 @@
 import { expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { addressedDeployment, appBySlug, currentArtifact, newestDeployment } from '#apps.ts';
+import {
+  addressedDeployment,
+  appBySlug,
+  currentArtifact,
+  newestDeployment,
+  releaseTarget,
+} from '#apps.ts';
 
 function apiHolding({
   apps,
   deployments = [],
 }: {
-  apps: Array<{ id: string; slug: string }>;
+  apps: Array<{ id: string; slug: string; state?: string }>;
   deployments?: Array<{ id: string; artifactId?: string; state?: string }>;
 }): PublicApiClient {
   function underApp() {
@@ -39,6 +45,22 @@ test('a slug naming nothing is said to name nothing', async () => {
 
   await expect(appBySlug({ api, slug: 'loud-badger' })).rejects.toThrow(
     'No app with slug loud-badger.',
+  );
+});
+
+test('an app asking to run is one a release can be made onto', async () => {
+  const api = apiHolding({ apps: [{ id: 'app-1', slug: 'quiet-otter', state: 'active' }] });
+
+  expect(await releaseTarget({ api, slug: 'quiet-otter' })).toMatchObject({ id: 'app-1' });
+});
+
+// Nothing would refuse the deployment — it would sit pending for as long as the app stays down —
+// so the sentence has to come from here, before the binary that would have gone with it.
+test('a suspended one is refused, with the way to make it deployable', async () => {
+  const api = apiHolding({ apps: [{ id: 'app-1', slug: 'quiet-otter', state: 'suspended' }] });
+
+  await expect(releaseTarget({ api, slug: 'quiet-otter' })).rejects.toThrow(
+    'App quiet-otter is suspended, so a new release would never start. Resume it first.',
   );
 });
 

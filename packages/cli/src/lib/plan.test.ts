@@ -107,6 +107,23 @@ test('what the binary will be run with is shown before anything is uploaded', as
   expect(notes.at(-1)).toContain('binary: /tmp/my-server');
 });
 
+// Both halves of the summary are wrong for a suspended app: nothing is running for the deploy to
+// replace, and nothing would start what it landed.
+test('a named app that cannot be deployed onto is refused before anything is asked', async () => {
+  const attempt = completeOptions({
+    api: apiListing([{ slug: 'demo-abc123', state: 'suspended' }]),
+    options: { app: 'demo-abc123' },
+    binaryPath: '/tmp/my-server',
+    args: [],
+  });
+
+  await expect(attempt).rejects.toThrow(
+    'App demo-abc123 is suspended, so a new release would never start. Resume it first.',
+  );
+  expect(asked).toEqual([]);
+  expect(notes).toEqual([]);
+});
+
 test('declining the confirmation cancels rather than deploying', async () => {
   confirmed = false;
 

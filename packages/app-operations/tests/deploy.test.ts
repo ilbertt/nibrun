@@ -31,7 +31,7 @@ function apiHolding({
   completed = { id: ARTIFACT_ID, digest: DIGEST },
   hostnames = [PENDING_CUSTOM, PLATFORM],
 }: {
-  apps: Array<{ id: string; slug: string }>;
+  apps: Array<{ id: string; slug: string; state?: string }>;
   sent: Sent[];
   completed?: { id: string; digest: string } | null;
   hostnames?: HostnameRow[];
@@ -128,6 +128,25 @@ test('a slug names the app the release lands on', async () => {
     deploymentId: 'deployment-1',
     url: `https://${SLUG}.nibrun.app`,
   });
+});
+
+// Nothing downstream would refuse the deployment — it would sit pending for as long as the app
+// stays down — and the upload is the half of this that costs, so the refusal comes before it.
+test('a suspended app is refused before its binary goes anywhere', async () => {
+  const sent: Sent[] = [];
+  storeAnswering({ sent });
+
+  const attempt = deploy({
+    api: apiHolding({ apps: [{ id: APP_ID, slug: SLUG, state: 'suspended' }], sent }),
+    binary: binary(),
+    args: [],
+    app: SLUG,
+  });
+
+  await expect(attempt).rejects.toThrow(
+    'App quiet-otter is suspended, so a new release would never start. Resume it first.',
+  );
+  expect(sent).toEqual([]);
 });
 
 test('a domain the owner brought is the address handed back, once it is serving', async () => {

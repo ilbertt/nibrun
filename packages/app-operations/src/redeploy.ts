@@ -1,6 +1,6 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import { appBySlug, currentArtifact } from '#apps.ts';
+import { currentArtifact, releaseTarget } from '#apps.ts';
 import {
   type ConfigEdit,
   configPatch,
@@ -32,7 +32,7 @@ export async function redeploy({
   onStep,
   ...edit
 }: RedeployInput): Promise<Deployed> {
-  const target = await appBySlug({ api, slug });
+  const target = await releaseTarget({ api, slug });
   const artifact = await currentArtifact({ api, appId: target.id });
 
   const app = unwrap(await api.api.apps({ appId: target.id }).patch(configPatch(edit)));

@@ -6,6 +6,7 @@ export {
   appBySlug,
   currentArtifact,
   newestDeployment,
+  releaseTarget,
 } from '#apps.ts';
 export { deleteApp } from '#delete.ts';
 export {
