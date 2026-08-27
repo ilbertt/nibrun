@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { AppIdSchema, Value } from '@repo/protocol';
-import { appIdFromUnit, parseUnitNames, vmUnitName } from '#lib/vm/systemd.ts';
+import { appIdFromUnit, lastGuestLine, parseUnitNames, vmUnitName } from '#lib/vm/systemd.ts';
 import { parseProperties, parsePropertyBlocks, unitStatusFrom } from '#lib/vm/unit-status.ts';
 
 describe('unit naming round-trips', () => {
@@ -118,5 +118,35 @@ describe('unit status', () => {
 
   test('a missing exit code is absent rather than zero', () => {
     expect(unitStatusFrom({ LoadState: 'loaded', ActiveState: 'active' }).exitCode).toBeUndefined();
+  });
+});
+
+describe("the guest's own account of why it stopped", () => {
+  // Firecracker writes to the same console, and its lines come after the guest's — so the last
+  // line of the capture is routinely not the one that explains anything.
+  const CONSOLE = [
+    '[nibrun] starting the tenant as uid 65534 with data at /app/data',
+    '[nibrun] the tenant exited with status 126 after 0ms',
+    '[nibrun] restarting the tenant in 8000ms (restart 5 of 5)',
+    '[nibrun] the tenant used its 5 restarts without staying up; shutting the guest down',
+    '[   15.736786] reboot: Restarting system',
+    '2026-08-26T15:46:48.429 [anonymous-instance:main] Vmm is stopping.',
+    '',
+  ].join('\n');
+
+  test('the last line the guest wrote is the verdict, without its prefix', () => {
+    expect(lastGuestLine(CONSOLE)).toBe(
+      'the tenant used its 5 restarts without staying up; shutting the guest down',
+    );
+  });
+
+  test('a console holding nothing from the guest has no verdict to give', () => {
+    expect(
+      lastGuestLine('[    0.000000] Linux version 6.1.180\nVmm is stopping.\n'),
+    ).toBeUndefined();
+  });
+
+  test('an empty capture is not a verdict', () => {
+    expect(lastGuestLine('')).toBeUndefined();
   });
 });

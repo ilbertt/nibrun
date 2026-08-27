@@ -93,3 +93,62 @@ export const stop = Effect.fn('systemd.stop')((appId: AppId) =>
 export const forget = Effect.fn('systemd.forget')((appId: AppId) =>
   run({ command: [SYSTEMCTL, 'reset-failed', vmUnitName(appId)] }),
 );
+
+const JOURNALCTL = 'journalctl';
+
+/**
+ * The prefix `apps/runtime` writes its console diagnostics with, from `src/log.c`. Nothing
+ * compares the two, so renaming it there is also a change here.
+ */
+const GUEST_LOG_PREFIX = '[nibrun] ';
+
+/** Only the tail is ever wanted, and a guest that crash-looped can have written a great many. */
+const CONSOLE_TAIL_LINES = 200;
+const MS_PER_SECOND = 1000;
+
+/**
+ * The last thing the guest's own init said.
+ *
+ * `/init` ends every way it can stop with a line saying which one it took, so the last of them
+ * is its verdict — and reading only that keeps this from carrying a second copy of the runtime's
+ * vocabulary around.
+ */
+export function lastGuestLine(output: string): string | undefined {
+  const lines = output.split('\n');
+  for (let index = lines.length - 1; index >= 0; index--) {
+    const line = lines[index]?.trim() ?? '';
+    if (line.startsWith(GUEST_LOG_PREFIX)) {
+      return line.slice(GUEST_LOG_PREFIX.length);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Why the guest powered itself off, off the console systemd captured for this microVM.
+ *
+ * Bounded to the run that began at `sinceMs`: a redeploy reuses the unit name, so this unit's
+ * journal still holds every earlier deployment's console and the newest line in it may belong to
+ * one of those. Answers `undefined` rather than failing — a verdict is an improvement on the exit
+ * code, not something the reconciler can be blocked on.
+ */
+export const guestVerdict = Effect.fn('systemd.guestVerdict')(
+  ({ appId, sinceMs }: { appId: AppId; sinceMs: number }) =>
+    run({
+      command: [
+        JOURNALCTL,
+        '--unit',
+        vmUnitName(appId),
+        '--since',
+        `@${Math.floor(sinceMs / MS_PER_SECOND)}`,
+        '--lines',
+        String(CONSOLE_TAIL_LINES),
+        '--output',
+        'cat',
+        '--no-pager',
+      ],
+    }).pipe(
+      Effect.map((result) => lastGuestLine(result.stdout)),
+      Effect.orElseSucceed(() => undefined),
+    ),
+);

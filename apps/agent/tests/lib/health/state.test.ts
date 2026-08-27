@@ -342,6 +342,36 @@ describe('a failure accounts for itself', () => {
     );
   });
 
+  // The exit code beside a stopped VM is Firecracker's, and a guest that powered itself off
+  // deliberately leaves it 0 — so an owner reading it is told the failure succeeded.
+  test('a guest that said why it stopped is quoted rather than the VMM exit code', () => {
+    expect(
+      describeInstanceFailure({
+        unit: exited,
+        tracker: initialTracker(),
+        healthCheck: check(),
+        guestPort: DEFAULT_GUEST_PORT,
+        guestVerdict: 'the tenant used its 5 restarts without staying up; shutting the guest down',
+      }),
+    ).toBe('the tenant used its 5 restarts without staying up; shutting the guest down');
+  });
+
+  // A VM still up never stopped, so there is no console verdict to prefer over the one branch
+  // that is about not being answered at all.
+  test('a verdict does not displace the account of a guest nothing could reach', () => {
+    expect(
+      describeInstanceFailure({
+        unit: active,
+        tracker: { ...initialTracker(), consecutiveFailures: UNHEALTHY_RUN },
+        healthCheck: check(),
+        guestPort: DEFAULT_GUEST_PORT,
+        guestVerdict: 'the tenant has stopped; shutting the guest down',
+      }),
+    ).toBe(
+      `nothing answered on port ${DEFAULT_GUEST_PORT} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
+    );
+  });
+
   test('a guest nobody could reach names the port and what was spent trying', () => {
     const tracker = { ...initialTracker(), consecutiveFailures: UNHEALTHY_RUN };
 

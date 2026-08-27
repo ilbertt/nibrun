@@ -237,7 +237,7 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
 });
 
 /** Only a failure has anything to say: every other state is its own account of itself. */
-function verdict({
+const verdict = Effect.fn('verdict')(function* ({
   state,
   status,
   health,
@@ -247,16 +247,24 @@ function verdict({
   status: UnitStatus;
   health: HealthTracker;
   record: InstanceRecord;
-}): string | undefined {
-  return state === 'failed'
-    ? describeInstanceFailure({
-        unit: status,
-        tracker: health,
-        healthCheck: record.healthCheck,
-        guestPort: record.guestPort,
-      })
-    : undefined;
-}
+}) {
+  if (state !== 'failed') {
+    return undefined;
+  }
+  // Only a VM that stopped has left a console to read, and only one this agent started has a run
+  // to bound that read to.
+  const guestVerdict =
+    status.active || record.startedAt === undefined
+      ? undefined
+      : yield* Systemd.guestVerdict({ appId: record.appId, sinceMs: Date.parse(record.startedAt) });
+  return describeInstanceFailure({
+    unit: status,
+    tracker: health,
+    healthCheck: record.healthCheck,
+    guestPort: record.guestPort,
+    ...(guestVerdict !== undefined ? { guestVerdict } : {}),
+  });
+});
 
 function probed({ record, nowMs }: { record: InstanceRecord; nowMs: number }) {
   return Effect.gen(function* () {
@@ -305,6 +313,7 @@ export const refreshStates = Effect.gen(function* () {
         });
 
         const changed = state !== record.state;
+        const message = changed ? yield* verdict({ state, status, health, record }) : undefined;
         yield* AgentState.putRecord({
           ...record,
           health,
@@ -314,7 +323,7 @@ export const refreshStates = Effect.gen(function* () {
             : {}),
           // Cleared as readily as it is written: a message outliving the state it explains is
           // read as an account of the state that replaced it.
-          ...(changed ? { message: verdict({ state, status, health, record }) } : {}),
+          ...(changed ? { message } : {}),
         });
         if (changed) {
           yield* Effect.logInfo('instance state changed').pipe(

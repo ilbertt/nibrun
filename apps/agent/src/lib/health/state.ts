@@ -99,19 +99,28 @@ export function nextProbeDelayMs(inputs: ProbeInputs): number {
  * There are two ways to reach it and one fact tells them apart: an instance either stopped when
  * nothing had asked it to, or was still up and never answered. Reading that off the unit is what
  * keeps this from being a second copy of the branches below, drifting out of step with them.
+ *
+ * A guest that stopped has usually said why on its console, and that account wins: the exit code
+ * beside it is the one *Firecracker* ended with, which is 0 whenever the guest powered itself off
+ * deliberately — so on the failure the owner is most likely to hit, it reads as success.
  */
 export function describeInstanceFailure({
   unit,
   tracker,
   healthCheck,
   guestPort,
+  guestVerdict,
 }: {
   unit: UnitStatus;
   tracker: HealthTracker;
   healthCheck: HealthCheck;
   guestPort: GuestPort;
+  guestVerdict?: string;
 }): string {
   if (!unit.active) {
+    if (guestVerdict !== undefined) {
+      return guestVerdict;
+    }
     return unit.exitCode === undefined
       ? 'the microVM stopped without being asked to'
       : `the microVM stopped without being asked to, exit code ${unit.exitCode}`;
