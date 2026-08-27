@@ -14,6 +14,13 @@ inputs:
   paths:
     description: Space-separated paths to commit.
     required: true
+  token:
+    description: >-
+      Token to open the pull request with. GitHub fires no events for what
+      GITHUB_TOKEN does, so the default opens a pull request none of main's
+      required checks will ever run on. Pass a PAT or app token to get one that
+      can merge.
+    default: ${{ github.token }}
 
 outputs:
   url:
@@ -31,7 +38,7 @@ runs:
         TITLE: ${{ inputs.title }}
         BODY: ${{ inputs.body }}
         PATHS: ${{ inputs.paths }}
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ inputs.token }}
       run: |
         set -euo pipefail
 

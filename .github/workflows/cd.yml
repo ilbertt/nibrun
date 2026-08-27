@@ -250,6 +250,7 @@ jobs:
           branch: guest-image/${{ steps.publish.outputs.version }}
           title: "chore(infra): adopt guest image ${{ steps.publish.outputs.version }}"
           paths: infra/app-host/versions.json
+          token: ${{ secrets.OPEN_PR_TOKEN || github.token }}
           body: |
             Points the fleet at guest image `${{ steps.publish.outputs.version }}`, published by
             [this run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).

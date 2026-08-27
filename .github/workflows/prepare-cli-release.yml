@@ -30,6 +30,7 @@ jobs:
           branch: release/${{ steps.release.outputs.tag }}
           title: "chore(release): ${{ steps.release.outputs.tag }}"
           paths: packages/cli/package.json packages/cli/CHANGELOG.md
+          token: ${{ secrets.OPEN_PR_TOKEN || github.token }}
           body: |
             Bumps `@repo/cli` to **${{ steps.release.outputs.version }}** and regenerates its changelog.
 
