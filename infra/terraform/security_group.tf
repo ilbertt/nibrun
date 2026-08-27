@@ -129,16 +129,20 @@ resource "aws_security_group" "app_host" {
   # This is what the relay buys that a load balancer could not: a UDP target
   # group preserves the client's address and will not be told otherwise, so its
   # targets have to admit the whole internet. Here the app host admits one group.
-  dynamic "ingress" {
-    for_each = var.port_relay_count > 0 ? toset(["tcp", "udp"]) : toset([])
+  ingress {
+    description     = "Tenant ports, UDP, from the port relay"
+    from_port       = var.tenant_port_first
+    to_port         = var.tenant_port_last
+    protocol        = "udp"
+    security_groups = [aws_security_group.port_relay.id]
+  }
 
-    content {
-      description     = "Tenant ports (${ingress.value}) from the port relay"
-      from_port       = var.tenant_port_first
-      to_port         = var.tenant_port_last
-      protocol        = ingress.value
-      security_groups = [aws_security_group.port_relay[0].id]
-    }
+  ingress {
+    description     = "Tenant ports, TCP, from the port relay"
+    from_port       = var.tenant_port_first
+    to_port         = var.tenant_port_last
+    protocol        = "tcp"
+    security_groups = [aws_security_group.port_relay.id]
   }
 
   egress {

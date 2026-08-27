@@ -167,5 +167,5 @@ output "github_deploy_role_arn" {
 # on anyway. Null while no relay exists.
 output "port_relay_public_ip" {
   description = "The address a tenant's own ports are reached at. Stable across replacing the relay, which is what makes moving it later invisible to the clients already using it."
-  value       = var.port_relay_count > 0 ? aws_eip.port_relay[0].public_ip : null
+  value       = aws_eip.port_relay.public_ip
 }

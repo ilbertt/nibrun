@@ -61,12 +61,6 @@ variable "app_host_count" {
   description = "Size of the app host fleet. Terraform does not provision hosts dynamically, so scaling is changing this — but scaling down is not a plain decrement, see app_host.tf."
 }
 
-variable "port_relay_count" {
-  type        = number
-  default     = 0
-  description = "Number of tenant port relays, which is 0 or 1. The public address for a tenant port that is not the HTTPS edge; nothing needs one until an app can ask for a port, so it defaults to none. See port_relay.tf."
-}
-
 variable "port_relay_instance_type" {
   type        = string
   default     = "t3.micro"
@@ -76,8 +70,12 @@ variable "port_relay_instance_type" {
 # The range the app host's agent allocates a tenant's public port from, restated
 # here because a security group is the other half of opening one and nothing
 # compares the two numbers — the same bargain as nbds_max in
-# app_host_user_data.sh.tftpl. Deliberately narrow: it is a range anyone may
-# reach, so it should be no wider than the ports actually handed out.
+# app_host_user_data.sh.tftpl.
+#
+# One port per slot, derived the way the loopback range already is, so it cannot
+# run out while a host cannot hold more apps than it has slots. Sized once on
+# purpose: the relay carries this range in its user_data, so widening it later is
+# replacing that machine and dropping every connection crossing it.
 variable "tenant_port_first" {
   type        = number
   default     = 22000
@@ -86,8 +84,8 @@ variable "tenant_port_first" {
 
 variable "tenant_port_last" {
   type        = number
-  default     = 22015
-  description = "Last port a tenant can be given, inclusive."
+  default     = 22062
+  description = "Last port a tenant can be given, inclusive. One per slot, so this covers every app a host can hold. There is headroom to about 32767 before the range would meet the kernel's own ephemeral ports, which the host draws its outbound source ports from."
 }
 
 variable "app_host_root_volume_size" {
