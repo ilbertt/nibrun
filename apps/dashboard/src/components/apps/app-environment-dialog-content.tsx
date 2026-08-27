@@ -40,7 +40,7 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
       </DialogTrigger>
       <DialogContent showCloseButton={!releasing} className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Environment</DialogTitle>
+          <DialogTitle>Environment variables</DialogTitle>
           <DialogDescription>
             {run.phase === 'idle'
               ? `Saving releases ${app.slug} again on the binary it already runs. Its hostnames and everything on its volume stay as they are.`

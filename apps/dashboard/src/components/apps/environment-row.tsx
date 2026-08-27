@@ -1,25 +1,21 @@
 import { Button } from '@repo/ui/components/button';
 import { Input } from '@repo/ui/components/input';
 import { TableCell, TableRow } from '@repo/ui/components/table';
-import { EyeIcon, EyeOffIcon, Trash2Icon } from 'lucide-react';
+import { EyeIcon, EyeOffIcon, PencilIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useState } from 'react';
-import { HiddenValuePopover } from '#components/apps/hidden-value-popover.tsx';
 import type { EnvironmentVariable } from '#lib/environment-variables.ts';
 
 const HIDDEN_VALUE = '••••••••••••';
 
-const SEALED = {
-  title: 'Already set',
-  description: 'Replacing it is the only way to change what the app runs with.',
-};
+const SEALED = 'Already set. Replacing it is the only way to change what the app runs with.';
 
 // A row is one line high, so a value with more than one in it can be carried and sent but never
 // shown: an input would drop the line breaks the moment it was typed in.
-const MANY_LINES = {
-  title: 'Several lines',
-  description:
-    'This value spans several lines, which is more than a row can show. It is deployed exactly as the file had it; replace it to change what the app runs with.',
-};
+const MANY_LINES =
+  'This value spans several lines, which is more than a row can show. It is deployed exactly as the file had it; replace it to change what the app runs with.';
+
+/** What replacing a value took the row away from, so that giving up on it puts the row back. */
+type Kept = Pick<EnvironmentVariable, 'value' | 'sealed'>;
 
 export function EnvironmentRow({
   variable,
@@ -31,8 +27,20 @@ export function EnvironmentRow({
   onRemove: () => void;
 }) {
   const [revealed, setRevealed] = useState(false);
+  const [kept, setKept] = useState<Kept | undefined>(undefined);
   const named = variable.name.trim();
   const hidden = variable.sealed ? SEALED : variable.value.includes('\n') ? MANY_LINES : undefined;
+
+  function replace(): void {
+    setKept({ value: variable.value, sealed: variable.sealed });
+    onChange({ ...variable, value: '', sealed: false });
+  }
+
+  function keep(restored: Kept): void {
+    setKept(undefined);
+    setRevealed(false);
+    onChange({ ...variable, ...restored });
+  }
 
   // A stored variable is identified by its name, so renaming one would be removing it and adding
   // another under a name whose value nobody can supply.
@@ -63,11 +71,24 @@ export function EnvironmentRow({
             className="font-mono"
           />
         ) : (
-          <span className="px-2.5 font-mono text-muted-foreground">{HIDDEN_VALUE}</span>
+          <span className="px-2.5 font-mono text-muted-foreground" title={hidden}>
+            {HIDDEN_VALUE}
+          </span>
         )}
       </TableCell>
       <TableCell className="w-px p-1">
         <div className="flex items-center gap-0.5">
+          {kept !== undefined && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={named === '' ? 'Keep the value it had' : `Keep the value ${named} had`}
+              onClick={() => keep(kept)}
+            >
+              <XIcon />
+            </Button>
+          )}
           {hidden === undefined ? (
             <Button
               type="button"
@@ -79,12 +100,15 @@ export function EnvironmentRow({
               {revealed ? <EyeOffIcon /> : <EyeIcon />}
             </Button>
           ) : (
-            <HiddenValuePopover
-              name={named}
-              title={hidden.title}
-              description={hidden.description}
-              onReplace={() => onChange({ ...variable, value: '', sealed: false })}
-            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={named === '' ? 'Replace the value' : `Replace the value of ${named}`}
+              onClick={replace}
+            >
+              <PencilIcon />
+            </Button>
           )}
           <Button
             type="button"

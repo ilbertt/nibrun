@@ -26,7 +26,7 @@ export function DeployEnvironmentField({
             aria-labelledby={TITLE_ID}
             data-invalid={field.state.meta.errors.length > 0 || undefined}
           >
-            <FieldTitle id={TITLE_ID}>Environment</FieldTitle>
+            <FieldTitle id={TITLE_ID}>Environment variables</FieldTitle>
             <EnvironmentTable variables={variables} onChange={field.handleChange}>
               {replacing === undefined && (
                 <EnvFilePicker
