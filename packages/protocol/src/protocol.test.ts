@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import {
   AppIdSchema,
   DEFAULT_AGENT_POLL_SETTINGS,
-  DEFAULT_GUEST_PORT,
   DEFAULT_HEALTH_CHECK,
+  DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
   DeploymentIdSchema,
@@ -13,12 +13,12 @@ import {
   ExportIdSchema,
   FilesystemEntryNameSchema,
   GuestPathSchema,
-  type GuestPort,
   type HostDesiredState,
   HostDesiredStateSchema,
   HostIdSchema,
   HostnameSchema,
   type HostPort,
+  type HttpPort,
   isValidMessage,
   ObjectKeySchema,
   ProtocolValidationError,
@@ -36,7 +36,7 @@ import {
   Value,
   VolumeIdSchema,
 } from '#index.ts';
-import { FilenameSchema, GuestPortSchema, HostPortSchema } from '#lib/wire.ts';
+import { FilenameSchema, HostPortSchema, HttpPortSchema } from '#lib/wire.ts';
 
 const TENANT_SECRET = Value.Parse(SecretStringSchema, 'sk-live-do-not-log-this');
 
@@ -71,7 +71,7 @@ const desiredState = (): HostDesiredState => ({
         filename: Value.Parse(FilenameSchema, 'server'),
       },
       config: {
-        guestPort: DEFAULT_GUEST_PORT,
+        httpPort: DEFAULT_HTTP_PORT,
         args: ['serve', '--http=0.0.0.0:8090'],
         environment: { DATABASE_URL: TENANT_SECRET },
         resources: DEFAULT_INSTANCE_RESOURCES,
@@ -165,10 +165,10 @@ describe('branding leaves runtime validation intact', () => {
   });
 
   test('ports still reject out-of-range numbers', () => {
-    expect(isValidMessage({ schema: GuestPortSchema, value: 3000 })).toBe(true);
-    expect(isValidMessage({ schema: GuestPortSchema, value: 0 })).toBe(false);
-    expect(isValidMessage({ schema: GuestPortSchema, value: 65_536 })).toBe(false);
-    expect(isValidMessage({ schema: GuestPortSchema, value: 3000.5 })).toBe(false);
+    expect(isValidMessage({ schema: HttpPortSchema, value: 3000 })).toBe(true);
+    expect(isValidMessage({ schema: HttpPortSchema, value: 0 })).toBe(false);
+    expect(isValidMessage({ schema: HttpPortSchema, value: 65_536 })).toBe(false);
+    expect(isValidMessage({ schema: HttpPortSchema, value: 3000.5 })).toBe(false);
   });
 
   // A filename crosses the wire from whoever uploaded the binary and becomes a path inside an
@@ -273,10 +273,10 @@ test('a listing carries one flat directory and says when it held back', () => {
   ).toBe(false);
 });
 
-test('a guest port cannot be used where a host port belongs', () => {
-  const guestPort: GuestPort = DEFAULT_GUEST_PORT;
+test('an HTTP port cannot be used where a host port belongs', () => {
+  const httpPort: HttpPort = DEFAULT_HTTP_PORT;
   // @ts-expect-error the two ports mean different things and are branded apart
-  const hostPort: HostPort = guestPort;
+  const hostPort: HostPort = httpPort;
   expect(isValidMessage({ schema: HostPortSchema, value: hostPort })).toBe(true);
 });
 

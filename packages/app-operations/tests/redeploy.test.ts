@@ -98,7 +98,7 @@ test('config is written before the deployment that snapshots it', async () => {
   expect(sent.filter((each) => each.what === 'app patch')).toEqual([
     {
       what: 'app patch',
-      body: { args: ['serve'], guestPort: PORT, environment: { TOKEN: 'shh' } },
+      body: { args: ['serve'], httpPort: PORT, environment: { TOKEN: 'shh' } },
     },
   ]);
   expect(sent.at(-1)?.what).toBe('deployment');

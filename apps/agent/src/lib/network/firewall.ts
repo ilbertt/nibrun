@@ -1,4 +1,4 @@
-import type { GuestPort, HostPort, Ipv4Address } from '@repo/protocol';
+import type { HostPort, HttpPort, Ipv4Address } from '@repo/protocol';
 import { GUEST_NETWORK_CIDR, TAP_NAME_PREFIX } from '#lib/network/slot.ts';
 
 export const NFTABLES_TABLE = 'nibrun';
@@ -37,7 +37,7 @@ const DENY = 'reject';
 
 export type ForwardedInstance = {
   readonly hostPort: HostPort;
-  readonly guestPort: GuestPort;
+  readonly httpPort: HttpPort;
   readonly hostIpv4: Ipv4Address;
   readonly guestIpv4: Ipv4Address;
 };
@@ -149,7 +149,7 @@ function natChainsV4({ instances }: FirewallState): string[] {
         'type nat hook prerouting priority dstnat; policy accept;',
         ...instances.map(
           (instance) =>
-            `iifname != ${TAP_MATCH} tcp dport ${instance.hostPort} dnat to ${instance.guestIpv4}:${instance.guestPort}`,
+            `iifname != ${TAP_MATCH} tcp dport ${instance.hostPort} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
         ),
       ],
     }),
@@ -160,7 +160,7 @@ function natChainsV4({ instances }: FirewallState): string[] {
         `type nat hook output priority ${OUTPUT_NAT_PRIORITY}; policy accept;`,
         ...instances.map(
           (instance) =>
-            `ip daddr 127.0.0.1 tcp dport ${instance.hostPort} dnat to ${instance.guestIpv4}:${instance.guestPort}`,
+            `ip daddr 127.0.0.1 tcp dport ${instance.hostPort} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
         ),
       ],
     }),

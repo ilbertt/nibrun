@@ -43,7 +43,7 @@ export function useEnvironmentForm(app: AppSummary): EnvironmentForm {
       start({
         app: app.slug,
         args: app.config.args,
-        port: app.config.guestPort,
+        port: app.config.httpPort,
         environment: parseEnvironmentPatch(edits),
       }),
   };

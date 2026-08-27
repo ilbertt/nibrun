@@ -119,7 +119,7 @@ function deploymentRow() {
     size_bytes: 1n,
     object_key: 'artifacts/app-1/a',
     original_file_name: 'my-server',
-    guest_port: 8080,
+    http_port: 8080,
     args: [],
     vcpu_count: 1,
     memory_mib: 512,

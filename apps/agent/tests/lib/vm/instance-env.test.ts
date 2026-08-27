@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
   type AppHostname,
-  DEFAULT_GUEST_PORT,
+  DEFAULT_HTTP_PORT,
   DEFAULT_RESTART_POLICY,
-  GuestPortSchema,
   HostnameSchema,
+  HttpPortSchema,
   Value,
 } from '@repo/protocol';
 import { Either } from 'effect';
@@ -25,7 +25,7 @@ type Overrides = Partial<Parameters<typeof renderInstanceEnv>[0]>;
 
 function attempt(overrides: Overrides = {}) {
   return renderInstanceEnv({
-    guestPort: DEFAULT_GUEST_PORT,
+    httpPort: DEFAULT_HTTP_PORT,
     hostnames: [PLATFORM],
     args: [],
     environment: {},
@@ -48,7 +48,7 @@ function refusedVariable(overrides: Overrides) {
 describe('what apps/runtime parses off the config drive', () => {
   test('every key it writes is one the runtime knows', () => {
     expect(render().split('\n').filter(Boolean)).toEqual([
-      `NIBRUN_PORT=${DEFAULT_GUEST_PORT}`,
+      `NIBRUN_PORT=${DEFAULT_HTTP_PORT}`,
       `NIBRUN_HOSTNAME=${PLATFORM_HOSTNAME}`,
       `NIBRUN_MAX_RESTARTS=${DEFAULT_RESTART_POLICY.maxRestarts}`,
       `NIBRUN_INITIAL_BACKOFF_MS=${DEFAULT_RESTART_POLICY.initialBackoffMs}`,
@@ -68,7 +68,7 @@ describe('what apps/runtime parses off the config drive', () => {
   // as a tenant variable named NIBRUN_PORT, and its own PORT stays the one written above.
   test('a tenant variable named after a runtime key stays the tenant’s', () => {
     const rendered = render({ environment: tenantEnvironment({ NIBRUN_PORT: '9999' }) });
-    expect(rendered).toContain(`NIBRUN_PORT=${DEFAULT_GUEST_PORT}\n`);
+    expect(rendered).toContain(`NIBRUN_PORT=${DEFAULT_HTTP_PORT}\n`);
     expect(rendered).toContain('ENV_NIBRUN_PORT=9999\n');
   });
 
@@ -100,7 +100,7 @@ describe('what apps/runtime parses off the config drive', () => {
   });
 
   test('a non-default port is the one written', () => {
-    expect(render({ guestPort: Value.Parse(GuestPortSchema, NON_DEFAULT_PORT) })).toContain(
+    expect(render({ httpPort: Value.Parse(HttpPortSchema, NON_DEFAULT_PORT) })).toContain(
       `NIBRUN_PORT=${NON_DEFAULT_PORT}\n`,
     );
   });

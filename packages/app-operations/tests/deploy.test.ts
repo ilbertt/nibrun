@@ -210,7 +210,7 @@ test('config is written before the deployment that snapshots it', async () => {
     port: PORT,
   });
 
-  expect(sent[0]).toEqual({ what: 'app patch', body: { args: ['serve'], guestPort: PORT } });
+  expect(sent[0]).toEqual({ what: 'app patch', body: { args: ['serve'], httpPort: PORT } });
   expect(sent.at(-1)?.what).toBe('deployment');
 });
 

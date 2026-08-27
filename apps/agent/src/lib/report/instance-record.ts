@@ -2,9 +2,9 @@ import type {
   AppHostname,
   AppId,
   DeploymentId,
-  GuestPort,
   HealthCheck,
   HostPort,
+  HttpPort,
   InstanceResources,
   InstanceState,
   Ipv4Address,
@@ -28,7 +28,7 @@ export type InstanceRecord = {
   readonly volumeId: VolumeId;
   readonly hostnames: readonly AppHostname[];
   readonly hostPort: HostPort;
-  readonly guestPort: GuestPort;
+  readonly httpPort: HttpPort;
   readonly guestIpv4: Ipv4Address;
   readonly artifactDigest: Sha256Digest;
   readonly state: InstanceState;
@@ -92,7 +92,7 @@ const REQUIRED_STRING_FIELDS = [
   'state',
 ] as const;
 
-const REQUIRED_NUMBER_FIELDS = ['hostPort', 'guestPort', 'restartCount'] as const;
+const REQUIRED_NUMBER_FIELDS = ['hostPort', 'httpPort', 'restartCount'] as const;
 
 /** Structural rather than schema-driven: these are the agent's own notes, and the recovery for an
  * unreadable one is to re-derive it from systemd rather than to reject the file. */

@@ -1,8 +1,8 @@
 import {
   AppIdSchema,
   ArtifactIdSchema,
-  DEFAULT_GUEST_PORT,
   DEFAULT_HEALTH_CHECK,
+  DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
   DeploymentIdSchema,
@@ -51,7 +51,7 @@ export function deploymentLookup(
 export const DEFAULT_CONFIG: PublicAppConfig = {
   volumeSizeBytes: VOLUME_SIZE_BYTES,
   environment: {},
-  guestPort: DEFAULT_GUEST_PORT,
+  httpPort: DEFAULT_HTTP_PORT,
   args: [],
   resources: DEFAULT_INSTANCE_RESOURCES,
   healthCheck: DEFAULT_HEALTH_CHECK,
@@ -65,7 +65,7 @@ export const DEFAULT_STORED_CONFIG: StoredAppConfig = { ...DEFAULT_CONFIG, envir
 export function configColumns(config: StoredAppConfig | PublicAppConfig): AppConfigColumns {
   return {
     environment_names: Object.keys(config.environment),
-    guest_port: config.guestPort,
+    http_port: config.httpPort,
     args: [...config.args],
     vcpu_count: config.resources.vcpuCount,
     memory_mib: config.resources.memoryMib,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_GUEST_PORT, DEFAULT_HEALTH_CHECK, type HealthCheck } from '@repo/protocol';
+import { DEFAULT_HEALTH_CHECK, DEFAULT_HTTP_PORT, type HealthCheck } from '@repo/protocol';
 import {
   applyProbe,
   describeInstanceFailure,
@@ -324,7 +324,7 @@ describe('a failure accounts for itself', () => {
       unit,
       tracker,
       healthCheck: check(),
-      guestPort: DEFAULT_GUEST_PORT,
+      httpPort: DEFAULT_HTTP_PORT,
     });
   }
 
@@ -350,7 +350,7 @@ describe('a failure accounts for itself', () => {
         unit: exited,
         tracker: initialTracker(),
         healthCheck: check(),
-        guestPort: DEFAULT_GUEST_PORT,
+        httpPort: DEFAULT_HTTP_PORT,
         guestVerdict: 'the tenant used its 5 restarts without staying up; shutting the guest down',
       }),
     ).toBe('the tenant used its 5 restarts without staying up; shutting the guest down');
@@ -364,11 +364,11 @@ describe('a failure accounts for itself', () => {
         unit: active,
         tracker: { ...initialTracker(), consecutiveFailures: UNHEALTHY_RUN },
         healthCheck: check(),
-        guestPort: DEFAULT_GUEST_PORT,
+        httpPort: DEFAULT_HTTP_PORT,
         guestVerdict: 'the tenant has stopped; shutting the guest down',
       }),
     ).toBe(
-      `nothing answered on port ${DEFAULT_GUEST_PORT} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
+      `nothing answered on port ${DEFAULT_HTTP_PORT} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
     );
   });
 
@@ -376,7 +376,7 @@ describe('a failure accounts for itself', () => {
     const tracker = { ...initialTracker(), consecutiveFailures: UNHEALTHY_RUN };
 
     expect(failure({ unit: active, tracker })).toBe(
-      `nothing answered on port ${DEFAULT_GUEST_PORT} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
+      `nothing answered on port ${DEFAULT_HTTP_PORT} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
     );
   });
 });

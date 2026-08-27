@@ -143,7 +143,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
               healthCheck: wanted.config.healthCheck,
               resources: wanted.config.resources,
               desiredRunning: wanted.desiredState === 'running',
-              guestPort: wanted.config.guestPort,
+              httpPort: wanted.config.httpPort,
             }),
           }),
         { discard: true },
