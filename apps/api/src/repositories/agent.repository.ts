@@ -1,5 +1,12 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
-import type { HostDesiredState, HostId, SecretString } from '@repo/protocol';
+import type {
+  HostDesiredState,
+  HostId,
+  HostReportedState,
+  HostState,
+  SecretString,
+  Timestamp,
+} from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import {
   environmentByDeployment,
@@ -11,15 +18,29 @@ import { environmentByExport, toDesiredExport } from '#lib/exports/desired-state
 import type { TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { Repository } from '#repositories/repository.ts';
 
+/**
+ * The last thing a host said about itself, which is the whole of what this end knows about one
+ * between two reports. Kept rather than the report itself: nothing here is a substitute for the
+ * tables the report's contents land in, and holding those twice is how they come apart.
+ */
+export type HostObservation = {
+  hostId: HostId;
+  reportedAt: Timestamp;
+  state: HostState;
+};
+
 export abstract class AgentRepositoryContract {
   abstract saveSession(input: { sessionToken: SecretString; hostId: HostId }): Promise<void>;
   abstract hostForSession(input: { sessionToken: string }): Promise<HostId | undefined>;
   abstract desiredState(input: { hostId: HostId }): Promise<HostDesiredState>;
+  abstract observeReport(input: { reported: HostReportedState }): Promise<void>;
+  abstract lastObservation(): Promise<HostObservation | undefined>;
 }
 
 export class AgentRepository extends Repository implements AgentRepositoryContract {
   readonly #hostBySession = new Map<string, HostId>();
   readonly #secretsKey: TenantSecretsKey;
+  #lastObservation: HostObservation | undefined;
 
   constructor({ sql, secretsKey }: { sql: TypedSQL<Queries>; secretsKey: TenantSecretsKey }) {
     super(sql);
@@ -39,6 +60,26 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
 
   hostForSession({ sessionToken }: { sessionToken: string }): Promise<HostId | undefined> {
     return Promise.resolve(this.#hostBySession.get(sessionToken));
+  }
+
+  /**
+   * In memory and only in memory. A restarted api has heard from no host yet, which is the truth
+   * — the last report was made to a process that is gone, and the next one is a poll away.
+   *
+   * One host, like `desiredState`: the newest report wins, and a second host would need this to
+   * become a map keyed on the id it already carries.
+   */
+  observeReport({ reported }: { reported: HostReportedState }): Promise<void> {
+    this.#lastObservation = {
+      hostId: reported.hostId,
+      reportedAt: reported.reportedAt,
+      state: reported.state,
+    };
+    return Promise.resolve();
+  }
+
+  lastObservation(): Promise<HostObservation | undefined> {
+    return Promise.resolve(this.#lastObservation);
   }
 
   /**

@@ -10,7 +10,7 @@ import {
   Value,
 } from '@repo/protocol';
 import { UnauthorizedError } from '#lib/errors.ts';
-import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
+import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
 import { AgentService, type HostnameReconcile, type UploadSweep } from '#services/agent.service.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
@@ -23,6 +23,7 @@ const SESSION_REQUEST = {
 
 class FakeAgentRepository implements AgentRepositoryContract {
   readonly #hostBySession = new Map<string, HostId>();
+  observed: HostObservation | undefined;
 
   saveSession({
     sessionToken,
@@ -47,6 +48,19 @@ class FakeAgentRepository implements AgentRepositoryContract {
       checkpoints: [],
       exports: [],
     });
+  }
+
+  observeReport({ reported }: { reported: HostReportedState }): Promise<void> {
+    this.observed = {
+      hostId: reported.hostId,
+      reportedAt: reported.reportedAt,
+      state: reported.state,
+    };
+    return Promise.resolve();
+  }
+
+  lastObservation(): Promise<HostObservation | undefined> {
+    return Promise.resolve(this.observed);
   }
 }
 

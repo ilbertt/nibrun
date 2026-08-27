@@ -1,6 +1,7 @@
 import { type LogRow, lines, toRow } from '#lib/victorialogs/parse.ts';
 
 const QUERY_PATH = '/select/logsql/query';
+const HEALTH_PATH = '/health';
 
 /** The store's own name for a query submitted in a body, which is where a filter this long belongs. */
 const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
@@ -28,12 +29,8 @@ abstract class VictoriaLogsEndpoint {
     this.url = new URL(path, baseUrl).toString();
   }
 
-  protected async post({ params }: { params: Record<string, string> }): Promise<Response> {
-    const response = await fetch(this.url, {
-      method: 'POST',
-      headers: { 'content-type': FORM_CONTENT_TYPE },
-      body: new URLSearchParams(params),
-    });
+  protected async send(init: RequestInit): Promise<Response> {
+    const response = await fetch(this.url, init);
     if (!response.ok) {
       throw new VictoriaLogsError({
         status: response.status,
@@ -41,6 +38,18 @@ abstract class VictoriaLogsEndpoint {
       });
     }
     return response;
+  }
+
+  protected post({ params }: { params: Record<string, string> }): Promise<Response> {
+    return this.send({
+      method: 'POST',
+      headers: { 'content-type': FORM_CONTENT_TYPE },
+      body: new URLSearchParams(params),
+    });
+  }
+
+  protected get(): Promise<Response> {
+    return this.send({ method: 'GET' });
   }
 }
 
@@ -81,6 +90,20 @@ export class VictoriaLogsQuery extends VictoriaLogsEndpoint {
 }
 
 /**
+ * Whether the store is answering at all, which is a different question from whether a query
+ * returns rows: an app that has written nothing has no rows either way.
+ */
+export class VictoriaLogsHealth extends VictoriaLogsEndpoint {
+  constructor(baseUrl: URL) {
+    super({ baseUrl, path: HEALTH_PATH });
+  }
+
+  async check(): Promise<void> {
+    await this.get();
+  }
+}
+
+/**
  * Reads the store, and only reads it.
  *
  * Records arrive from the fleet over an ingest listener that admits app hosts and nothing else,
@@ -89,8 +112,10 @@ export class VictoriaLogsQuery extends VictoriaLogsEndpoint {
  */
 export class VictoriaLogsClient {
   readonly query: VictoriaLogsQuery;
+  readonly health: VictoriaLogsHealth;
 
   constructor(baseUrl: URL) {
     this.query = new VictoriaLogsQuery(baseUrl);
+    this.health = new VictoriaLogsHealth(baseUrl);
   }
 }

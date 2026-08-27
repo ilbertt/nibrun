@@ -41,9 +41,15 @@ const cloudflareClient =
       })
     : undefined;
 
+const victoriaLogsClient = new VictoriaLogsClient(env.VICTORIALOGS_ENDPOINT);
+
 const agentRepository = new AgentRepository({ sql, secretsKey });
 const assetsRepository = new AssetsRepository(sql);
-const healthRepository = new HealthRepository(sql);
+const healthRepository = new HealthRepository({
+  sql,
+  logStore: victoriaLogsClient.health,
+  objectStore: artifactsS3,
+});
 const appsRepository = new AppsRepository(sql);
 const appHostnamesRepository = new AppHostnamesRepository(sql);
 const artifactsRepository = new ArtifactsRepository(sql);
@@ -56,7 +62,7 @@ const artifactStorageRepository = new ArtifactStorageRepository({
 const exportsRepository = new ExportsRepository(sql);
 const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient);
-const logsRepository = new LogsRepository(new VictoriaLogsClient(env.VICTORIALOGS_ENDPOINT));
+const logsRepository = new LogsRepository(victoriaLogsClient);
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
@@ -82,7 +88,10 @@ const exportsService = new ExportsService({
 });
 
 const assetsService = new AssetsService(assetsRepository);
-const healthService = new HealthService(healthRepository);
+const healthService = new HealthService({
+  healthRepo: healthRepository,
+  agentRepo: agentRepository,
+});
 const filesystemService = new FilesystemService({ deploymentsRepo: deploymentsRepository });
 const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,

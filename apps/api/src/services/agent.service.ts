@@ -113,9 +113,10 @@ export class AgentService extends Service {
    * Read by the things that own what it talks about: the releases running on the host, the apps
    * whose filesystems it is holding or has just let go of, and the bundles it was told to write.
    *
-   * The rest is dropped. Capacity, versions and the host's own state have no table to land in
-   * while hosts are not modelled, and holding them in this process would be a second source of
-   * truth to unpick once they do.
+   * The rest is dropped. Capacity and versions have no table to land in while hosts are not
+   * modelled, and holding them in this process would be a second source of truth to unpick once
+   * they do. The host's own state is kept, but only as the passing observation liveness reads —
+   * see `observeReport`.
    */
   async acceptReport({ reported }: { reported: HostReportedState }): Promise<void> {
     this.logger.info('host reported', {
@@ -124,6 +125,10 @@ export class AgentService extends Service {
       instances: reported.instances.length,
       volumes: reported.volumes.length,
     });
+    // First, and unconditionally: what a report says about the host itself is the only thing
+    // this end learns from one that nothing below records, and a report that goes on to fail
+    // still arrived — which is the whole of what liveness asks.
+    await this.agentRepo.observeReport({ reported });
     await this.deploymentsService.applyHostReport({ reported });
     await this.appsService.completeDeletions({ volumes: reported.volumes });
     await this.exportsService.applyHostReport({ reported });
