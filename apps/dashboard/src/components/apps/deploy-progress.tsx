@@ -58,9 +58,11 @@ export function DeployProgress({ done }: { done: ReactNode }) {
 
       {waiting === undefined && (
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="outline" onClick={run.reset}>
-            Deploy another
-          </Button>
+          {run.phase === 'failed' && (
+            <Button variant="outline" onClick={run.reset}>
+              Deploy another
+            </Button>
+          )}
           {done}
         </div>
       )}
