@@ -83,7 +83,7 @@ export function DeployForm({
               </api.Subscribe>
             </span>
           </AccordionTrigger>
-          <AccordionContent>
+          <AccordionContent keepMounted>
             <api.Field name="args">
               {(field) => (
                 <Field>
@@ -118,8 +118,8 @@ export function DeployForm({
               </api.Subscribe>
             </span>
             {/* Collapsed, a refused variable would disable the button with nothing on screen
-                saying why, so the section that holds it says so itself — which is why its
-                panel stays mounted, and its variables keep being validated, while it is shut. */}
+                saying why, so the section that holds it says so itself. A shut panel keeps its
+                variables validated, which is what leaves anything to say. */}
             <api.Subscribe selector={(state) => state.fieldMeta.environment?.errors.length ?? 0}>
               {(refused) =>
                 refused > 0 ? (
