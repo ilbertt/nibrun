@@ -19,6 +19,12 @@
 /* The one runtime key the tenant is handed under its own name, so it is spelled once. */
 #define HOSTNAME_VARIABLE RUNTIME_PREFIX HOSTNAME_KEY
 
+/* Only a sigil followed by RUNTIME_PREFIX opens a reference, which is what leaves a
+ * secret's own '$' alone — see the format contract in config.h. */
+#define REFERENCE_SIGIL '$'
+#define REFERENCE_OPEN '{'
+#define REFERENCE_CLOSE '}'
+
 #define MIN_PORT 1
 #define MAX_PORT 65535
 #define MAX_RESTARTS_LIMIT 100000
@@ -67,6 +73,15 @@ static const struct field FIELDS[] = {
 
 static bool starts_with(const char *text, const char *prefix) {
   return strncmp(text, prefix, strlen(prefix)) == 0;
+}
+
+static bool is_digit(char character) {
+  return character >= '0' && character <= '9';
+}
+
+static bool is_name_character(char character) {
+  return (character >= 'A' && character <= 'Z') || (character >= 'a' && character <= 'z') ||
+         character == '_' || is_digit(character);
 }
 
 static bool parse_unsigned(const char *text, const struct field *field, uint32_t *out) {
@@ -229,14 +244,11 @@ static bool parse_runtime_key(struct instance_config *config, bool *seen, char *
 
 /* Mirrors TenantEnvironmentSchema's name pattern in packages/protocol. */
 static bool is_valid_variable_name(const char *name, const char *end) {
-  if (name == end) {
+  if (name == end || is_digit(*name)) {
     return false;
   }
   for (const char *character = name; character < end; character++) {
-    bool letter = (*character >= 'A' && *character <= 'Z') || (*character >= 'a' && *character <= 'z');
-    bool digit = *character >= '0' && *character <= '9';
-    bool allowed = letter || *character == '_' || (digit && character != name);
-    if (!allowed) {
+    if (!is_name_character(*character)) {
       return false;
     }
   }
@@ -275,6 +287,164 @@ static bool parse_tenant_variable(struct instance_config *config, char *line, si
     }
   }
   config->tenant_environment[config->tenant_variable_count++] = variable;
+  return true;
+}
+
+struct reference {
+  const char *name;
+  size_t length;
+  const char *after;
+};
+
+static bool at_reference(const char *text) {
+  if (*text != REFERENCE_SIGIL) {
+    return false;
+  }
+  const char *name = text + 1;
+  if (*name == REFERENCE_OPEN) {
+    name++;
+  }
+  return starts_with(name, RUNTIME_PREFIX);
+}
+
+static const char *find_reference(const char *value) {
+  for (const char *cursor = strchr(value, REFERENCE_SIGIL); cursor != NULL;
+       cursor = strchr(cursor + 1, REFERENCE_SIGIL)) {
+    if (at_reference(cursor)) {
+      return cursor;
+    }
+  }
+  return NULL;
+}
+
+/* `text` starts at a sigil at_reference has already accepted, so the only way this
+ * fails is a braced form nobody closed — a typo rather than a value meant literally. */
+static bool read_reference(const char *text, struct reference *out) {
+  const char *cursor = text + 1;
+  bool braced = *cursor == REFERENCE_OPEN;
+  if (braced) {
+    cursor++;
+  }
+  out->name = cursor;
+  while (is_name_character(*cursor)) {
+    cursor++;
+  }
+  out->length = (size_t)(cursor - out->name);
+  if (braced) {
+    if (*cursor != REFERENCE_CLOSE) {
+      log_line("a tenant variable names %.*s with no closing '%c'", (int)out->length, out->name,
+               REFERENCE_CLOSE);
+      return false;
+    }
+    cursor++;
+  }
+  out->after = cursor;
+  return true;
+}
+
+static bool names_key(const struct reference *reference, const char *key) {
+  const char *name = reference->name + strlen(RUNTIME_PREFIX);
+  size_t length = reference->length - strlen(RUNTIME_PREFIX);
+  return length == strlen(key) && strncmp(name, key, length) == 0;
+}
+
+/* The runtime values a tenant is handed, and nothing else: the restart budget and the
+ * nameservers are the supervisor's own and describe nothing a binary could act on.
+ * Rendered from the parsed config rather than read back out of the file, so a
+ * reference and the variable exported beside it cannot disagree. `*out` is NULL for a
+ * name this runtime offers but this instance was not given. */
+static bool reference_value(const struct instance_config *config, const struct reference *reference,
+                            char *rendered, size_t rendered_size, const char **out) {
+  if (names_key(reference, "PORT")) {
+    snprintf(rendered, rendered_size, "%u", config->port);
+    *out = rendered;
+    return true;
+  }
+  if (names_key(reference, HOSTNAME_KEY)) {
+    *out = config->hostname;
+    return true;
+  }
+  return false;
+}
+
+/* `overflowed` is poisoned by the first overrun rather than returned, so building a
+ * value reads as the concatenation it is and the caller asks once at the end. */
+struct arena {
+  char *cursor;
+  const char *end;
+  bool overflowed;
+};
+
+static void append(struct arena *arena, const char *text, size_t length) {
+  if (arena->overflowed || (size_t)(arena->end - arena->cursor) < length) {
+    arena->overflowed = true;
+    return;
+  }
+  memcpy(arena->cursor, text, length);
+  arena->cursor += length;
+}
+
+/* `entry` is "NAME=value". Left pointing into the file when the value names nothing,
+ * which is almost every one of them. */
+static bool expand_entry(const struct instance_config *config, struct arena *arena, char **entry) {
+  const char *value = strchr(*entry, '=') + 1;
+  if (find_reference(value) == NULL) {
+    return true;
+  }
+
+  char *expansion = arena->cursor;
+  append(arena, *entry, (size_t)(value - *entry));
+
+  for (const char *remaining = value;;) {
+    const char *found = find_reference(remaining);
+    if (found == NULL) {
+      append(arena, remaining, strlen(remaining));
+      break;
+    }
+    append(arena, remaining, (size_t)(found - remaining));
+
+    struct reference reference;
+    if (!read_reference(found, &reference)) {
+      return false;
+    }
+    /* uint32_t's whole range rather than the port's: anything narrower is a
+     * truncation the compiler is right to refuse. */
+    char rendered[sizeof("4294967295")];
+    const char *substitution;
+    if (!reference_value(config, &reference, rendered, sizeof(rendered), &substitution)) {
+      log_line("a tenant variable names %.*s, which is not a name this runtime offers",
+               (int)reference.length, reference.name);
+      return false;
+    }
+    if (substitution == NULL) {
+      log_line("a tenant variable names %.*s, which this instance was not given",
+               (int)reference.length, reference.name);
+      return false;
+    }
+    append(arena, substitution, strlen(substitution));
+    remaining = reference.after;
+  }
+  append(arena, "", 1);
+
+  if (arena->overflowed) {
+    log_line("instance.env expands to more than %d bytes", CONFIG_MAX_EXPANDED_BYTES);
+    return false;
+  }
+  *entry = expansion;
+  return true;
+}
+
+/* Last, because the file states its keys in whatever order the writer chose: what a
+ * reference resolves to is only settled once every line has been read. */
+static bool expand_tenant_values(struct instance_config *config) {
+  static char expanded[CONFIG_MAX_EXPANDED_BYTES];
+  struct arena arena = {expanded, expanded + sizeof(expanded), false};
+
+  for (size_t index = 0; index < config->tenant_variable_count; index++) {
+    if (!expand_entry(config, &arena, &config->tenant_environment[index])) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -348,7 +518,7 @@ bool config_parse(struct instance_config *config, char *text, size_t length) {
       return false;
     }
   }
-  return true;
+  return expand_tenant_values(config);
 }
 
 static bool is_named(const char *entry, const char *name) {

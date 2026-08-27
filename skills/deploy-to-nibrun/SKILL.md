@@ -32,6 +32,11 @@ A binary that needs its own absolute URL — an OAuth redirect, a webhook it reg
 an email — builds it from `NIBRUN_HOSTNAME` rather than being told it, and falls back to whatever
 it uses when it is not on nibrun.
 
+One that insists on a variable name of its own reaches the same values through it: a value may
+name a runtime one — `APP_BASE_URL=https://${NIBRUN_HOSTNAME}` — and the guest expands it before
+exec. Only that prefix expands, so a secret holding a `$` arrives untouched, and a name the guest
+does not offer fails the boot rather than reaching the process as itself.
+
 ## Deploying
 
 ```sh
