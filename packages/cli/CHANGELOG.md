@@ -2,6 +2,15 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.27-1]
+
+### 🚀 Features
+
+- *(app-operations)* A failed app's files say so rather than asking a host (#285)
+- *(cli)* Nib apps update changes how an app starts, not its binary (#277)
+- *(app-operations)* A release can reuse the binary the app already runs (#276)
+- *(cli)* The installer says which of the two things it is doing (#267)
+
 ## [2026.8.25-1]
 
 ### 🚀 Features
