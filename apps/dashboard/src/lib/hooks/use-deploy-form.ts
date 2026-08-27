@@ -200,7 +200,8 @@ function uploadableFrom(file: File): UploadableBinary | undefined {
   return Value.Check(FilenameSchema, file.name) ? { name: file.name, body: file } : undefined;
 }
 
-function tenantArguments(onePerLine: string): string[] {
+/** The lines that are arguments: what a blank one is not, and what the trailing newline is not. */
+export function tenantArguments(onePerLine: string): string[] {
   return onePerLine
     .split('\n')
     .map((line) => line.trim())

@@ -12,7 +12,15 @@ import { useStore } from '@tanstack/react-form';
 import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
 import { DeployEnvironmentField } from '#components/apps/deploy-environment-field.tsx';
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
-import { type DeploySuggestion, useDeployForm, validatePort } from '#lib/hooks/use-deploy-form.ts';
+import { filledVariables, storedVariables } from '#lib/environment-variables.ts';
+import {
+  type DeploySuggestion,
+  tenantArguments,
+  useDeployForm,
+  validatePort,
+} from '#lib/hooks/use-deploy-form.ts';
+
+const ARGUMENTS = 'Arguments';
 
 export function DeployForm({
   appId,
@@ -63,30 +71,55 @@ export function DeployForm({
         )}
       </api.Field>
 
-      <api.Field name="args">
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="deploy-args">Arguments</FieldLabel>
-            <Textarea
-              id="deploy-args"
-              value={field.state.value ?? defaultArgs}
-              onChange={(event) => field.handleChange(event.target.value)}
-              placeholder={'serve\n--verbose'}
-              className="font-mono"
-            />
-            <FieldDescription>
-              One per line. What is here is what the binary runs with — empty runs it bare.
-            </FieldDescription>
-          </Field>
-        )}
-      </api.Field>
-
-      <Accordion>
+      {/* Both sections are settings of the same release, not alternatives, so opening one
+          does not put the other away mid-edit. */}
+      <Accordion multiple>
         <AccordionItem>
           <AccordionTrigger>
-            Advanced settings
+            <span className="flex items-baseline gap-2">
+              {ARGUMENTS}
+              <api.Subscribe
+                selector={(state) => tenantArguments(state.values.args ?? defaultArgs).length}
+              >
+                {(count) => <CollapsedCount count={count} />}
+              </api.Subscribe>
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <api.Field name="args">
+              {(field) => (
+                <Field>
+                  <Textarea
+                    aria-label={ARGUMENTS}
+                    value={field.state.value ?? defaultArgs}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                    placeholder={'serve\n--verbose'}
+                    className="font-mono"
+                  />
+                  <FieldDescription>
+                    One per line. What is here is what the binary runs with — empty runs it bare.
+                  </FieldDescription>
+                </Field>
+              )}
+            </api.Field>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem>
+          <AccordionTrigger>
+            <span className="flex items-baseline gap-2">
+              Environment variables
+              <api.Subscribe
+                selector={(state) =>
+                  filledVariables(state.values.environment ?? storedVariables(replacing)).length
+                }
+              >
+                {(count) => <CollapsedCount count={count} />}
+              </api.Subscribe>
+            </span>
             {/* Collapsed, a refused variable would disable the button with nothing on screen
-                saying why, so the section that holds it says so itself. */}
+                saying why, so the section that holds it says so itself — which is why its
+                panel stays mounted, and its variables keep being validated, while it is shut. */}
             <api.Subscribe selector={(state) => state.fieldMeta.environment?.errors.length ?? 0}>
               {(refused) =>
                 refused > 0 ? (
@@ -95,7 +128,7 @@ export function DeployForm({
               }
             </api.Subscribe>
           </AccordionTrigger>
-          <AccordionContent>
+          <AccordionContent keepMounted>
             <DeployEnvironmentField api={api} replacing={replacing} />
           </AccordionContent>
         </AccordionItem>
@@ -119,6 +152,15 @@ export function DeployForm({
         )}
       </api.Subscribe>
     </form>
+  );
+}
+
+/** What the section holds, for as long as it is closed over it. */
+function CollapsedCount({ count }: { count: number }) {
+  return (
+    <span className="font-normal text-muted-foreground text-xs group-aria-expanded/accordion-trigger:hidden">
+      {count === 0 ? 'none' : count}
+    </span>
   );
 }
 

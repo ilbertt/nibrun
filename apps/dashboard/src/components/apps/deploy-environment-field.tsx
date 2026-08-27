@@ -1,11 +1,9 @@
-import { Field, FieldDescription, FieldError, FieldTitle } from '@repo/ui/components/field';
+import { Field, FieldDescription, FieldError } from '@repo/ui/components/field';
 import { EnvFilePicker } from '#components/apps/env-file-picker.tsx';
 import { EnvironmentTable } from '#components/apps/environment-table.tsx';
 import { storedVariables, withEntries } from '#lib/environment-variables.ts';
 import { type DeployFormApi, validateEnvironment } from '#lib/hooks/use-deploy-form.ts';
 import type { AppSummary } from '#queries/apps.ts';
-
-const TITLE_ID = 'deploy-environment-title';
 
 export function DeployEnvironmentField({
   api,
@@ -22,11 +20,7 @@ export function DeployEnvironmentField({
         const variables = field.state.value ?? storedVariables(replacing);
 
         return (
-          <Field
-            aria-labelledby={TITLE_ID}
-            data-invalid={field.state.meta.errors.length > 0 || undefined}
-          >
-            <FieldTitle id={TITLE_ID}>Environment variables</FieldTitle>
+          <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
             <EnvironmentTable variables={variables} onChange={field.handleChange}>
               {replacing === undefined && (
                 <EnvFilePicker
