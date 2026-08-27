@@ -37,6 +37,26 @@ sysctl -q -p /etc/sysctl.d/99-nibrun-relay.conf
 mkdir -p /etc/nftables
 cat > /etc/nftables/nibrun-relay.nft <<'NFT'
 table ip nibrun_relay {
+	# How much of the connection table one address may hold. Keyed on the source
+	# rather than counted per rule, because a plain rate limit is a single bucket
+	# for everybody: the first flood empties it and the drop lands on whoever asks
+	# next, which is an outage of one's own making.
+	#
+	# A count rather than a packet rate, and this is the whole reason it is safe:
+	# an office behind one NAT is a single address sending a great deal, so a rate
+	# cap refuses the people it is meant to serve while an attacker spraying source
+	# ports stays under it. How many connections one address holds separates the
+	# two; how fast it sends does not.
+	#
+	# 512 is a starting point, not a measurement. Raising it weakens the cap and
+	# lowering it starts refusing large shared networks — and either is replacing
+	# this instance, since the whole of its configuration is this file.
+	set sources {
+		type ipv4_addr
+		size 65535
+		flags dynamic
+	}
+
 	chain prerouting {
 		type nat hook prerouting priority dstnat; policy accept;
 		udp dport ${tenant_port_first}-${tenant_port_last} dnat to ${app_host_private_ip}
@@ -53,7 +73,11 @@ table ip nibrun_relay {
 	# else arriving here is not a case to be reasoned about.
 	chain forward {
 		type filter hook forward priority filter; policy drop;
+		# First, so an established flow never reaches the cap below and a source
+		# already at its limit keeps the connections it has.
 		ct state established,related accept
+		ip daddr ${app_host_private_ip} udp dport ${tenant_port_first}-${tenant_port_last} add @sources { ip saddr ct count over 512 } drop
+		ip daddr ${app_host_private_ip} tcp dport ${tenant_port_first}-${tenant_port_last} add @sources { ip saddr ct count over 512 } drop
 		ip daddr ${app_host_private_ip} udp dport ${tenant_port_first}-${tenant_port_last} accept
 		ip daddr ${app_host_private_ip} tcp dport ${tenant_port_first}-${tenant_port_last} accept
 	}
