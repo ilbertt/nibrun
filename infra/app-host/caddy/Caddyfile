@@ -11,6 +11,23 @@
 	# next to this file. Hostnames are handed out per app, so there is no moment
 	# at which issuing a certificate would be a step in creating one.
 	auto_https off
+
+	# Authenticated Origin Pulls refuses a connection during the handshake, but
+	# nothing bounds how long a caller may take to reach that point: Go derives
+	# its TLS handshake deadline from the smallest read or write timeout set, and
+	# with none set there is no deadline at all. A connection opened and left
+	# mid-handshake is then held for as long as its opener likes, and the refusal
+	# that was the whole point never arrives.
+	#
+	# The header timeout alone, because it is the only one that bounds the
+	# handshake without also bounding the tenant: a write timeout would cut a
+	# streaming response and a body timeout a slow upload, and both are the
+	# tenant's to take as long over as their own users need.
+	servers {
+		timeouts {
+			read_header 10s
+		}
+	}
 }
 
 # Authenticated Origin Pulls. The origin IP is discoverable, so the edge has to

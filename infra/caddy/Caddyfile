@@ -7,6 +7,22 @@
 	# every hostname below, so every site serves the same pair — which is why
 	# adding one here means reissuing that certificate.
 	auto_https off
+
+	# Authenticated Origin Pulls refuses a connection during the handshake, but
+	# nothing bounds how long a caller may take to reach that point: Go derives
+	# its TLS handshake deadline from the smallest read or write timeout set, and
+	# with none set there is no deadline at all. A connection opened and left
+	# mid-handshake is then held for as long as its opener likes, and the refusal
+	# that was the whole point never arrives. This listener is open to the world
+	# rather than to Cloudflare's ranges, so it is the one anyone can hold.
+	#
+	# The header timeout alone: a write timeout would cut the log stream, which
+	# is meant to stay open, and a body timeout an upload of a binary.
+	servers {
+		timeouts {
+			read_header 10s
+		}
+	}
 }
 
 # Authenticated Origin Pulls. The origin IP is discoverable, so the edge has to
