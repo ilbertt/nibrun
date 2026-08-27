@@ -71,6 +71,11 @@ export function EnvironmentTable({
         </Button>
         {children}
       </div>
+      <p className="text-muted-foreground text-xs">
+        A value may name one the guest sets, like{' '}
+        {/* biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being documented, shown to the reader rather than interpolated */}
+        <code className="font-mono">{'${NIBRUN_HOSTNAME}'}</code>.
+      </p>
     </div>
   );
 }
