@@ -1,86 +1,39 @@
 ---
 title: Small apps don't need to scale
-description: Most software is small. It gets deployed as if it might be big. Then you try to leave.
+description: Most software is small and stays small. Deploying it like it isn't makes it hard to leave.
 date: 2026-08-27
 ---
 
-Most software is small. Not small as in unfinished. Small as in five people use it, it holds a
-couple of gigabytes, and on its busiest day it serves a few thousand requests.
+Most software is small. Five people use it, it holds a couple of gigabytes, and on a busy day it
+serves a few thousand requests. Internal tools, a booking page for one clinic, a dashboard someone
+opens on Mondays.
 
-An internal tool. A booking page for one clinic. A dashboard three people open on Mondays. The
-thing you built for your own team and never told anyone about.
+It still gets deployed like it might be the next big thing: a container image, a managed Postgres,
+an object storage bucket, a load balancer sitting in front of a single instance.
 
-None of it needs to scale. All of it gets deployed as if it might.
+That costs money every month, but the real problem turns up when you want to leave. The app isn't
+in one place anymore. It's an image, plus a database someone else runs, plus a bucket, plus
+environment variables you typed into a web form, plus a YAML file wiring the four of them
+together. Exporting the data is easy. Rebuilding that arrangement somewhere else is the actual
+work.
 
-## Built for traffic that never came
+nibrun does the boring version instead. You give it one compiled binary and it gets a microVM to
+itself (1 vCPU, 256 MiB) with 8 GiB of disk that survives redeploys. Write your SQLite file and
+your uploads to `data/` and you're done. It's online at `https://<slug>.nibrun.app` as soon as it
+boots, or on your own domain if you point one at it. No image to build, no database to provision,
+no bucket, and no load balancer in front of one instance.
 
-The default shape of a deployed app assumes it will be big one day. A load balancer, in front of
-one instance. A managed Postgres, for a database that would fit in a single file. An object
-storage bucket, for two hundred uploads. A container image, so the thing can be scheduled onto
-any machine, by a platform that will only ever put it on one.
-
-None of that is wrong. It is just sized for a problem you do not have.
-
-And you pay for it twice. Once a month, and again every time you touch the app.
-
-## The exit test
-
-Here is a question worth asking before you deploy anything.
-
-If this platform tripled its price tomorrow, how long would it take you to leave?
-
-For a small app on a normal platform, the honest answer is a weekend. If you are lucky. Not
-because anyone is holding your data hostage. Postgres has `pg_dump` and the bucket speaks S3.
-The problem is that the app is not in one place any more.
-
-It is a container image, plus a managed database, plus a bucket, plus environment variables typed
-into a web form, plus a YAML file describing how those four are wired together. The rows and the
-uploads are the easy part. What you cannot export is the arrangement.
-
-You do not move a small app. You reassemble one.
-
-## A machine and a disk
-
-nibrun is the other answer. Not a smaller platform. A different unit.
-
-You give it one compiled binary. It gets a Firecracker microVM of its own, 1 vCPU and 256 MiB,
-and nothing else runs in it. `data/` is 8 GiB that survives every redeploy: put a SQLite file
-there, put uploads there, put both. It answers on `https://<slug>.nibrun.app` the moment it boots,
-and on your own domain as soon as you point one at it.
-
-There is no image to build, because the binary is the artifact. There is no database to
-provision, because the disk is right there. There is no bucket, for the same reason. There is no
-load balancer, because there is one instance and there was always going to be one instance.
-
-And the exit test has an answer:
+When you want out:
 
 ```sh
 nib apps export ./my-app.tar.gz
 ```
 
-That is the binary, the entire `data/` directory as it stood on disk, and a `.env` of the
-variables it ran with. Unzip it on a Linux box and run the binary. It is the same app, with the
-same rows and the same uploaded files. There is no managed database to migrate off, because there
-was never a managed database.
+That's the binary, everything in `data/`, and a `.env` with the variables it was running with.
+Unzip it on any Linux box, run the binary, and you have the same app back with the same data in
+it.
 
-Leaving costs you a download. That is the part we actually care about.
-
-## Where it does not fit
-
-Worth saying plainly, because it is the design and not a roadmap.
-
-One microVM per app, at one size. No horizontal scaling and no load balancing. A deploy stops the
-old VM before starting the new one, because they share the volume, so it is a few seconds of
-downtime rather than blue/green. The disk is local and not replicated, which is what makes that
-export your backup rather than a convenience. The guest boots your binary and nothing else. No
-sidecar, no cron container, no second process.
-
-If your app has to be several machines, it has outgrown this. That is not a roadmap item. It is
-the shape of the thing.
-
-## The whole product
-
-Small apps do not need to scale. They need somewhere to run, somewhere to write files, and a way
-to pick the whole thing up and walk out with it.
-
-That is all nibrun is, and it is on purpose.
+The catch is that this only works for apps that fit on one machine. There's no horizontal scaling,
+a deploy means a few seconds of downtime while the old VM stops and the new one starts, and the
+disk isn't replicated, so that export is also your backup. If your app needs to be more than one
+machine, nibrun is the wrong tool. Most small apps never do.
