@@ -1,4 +1,5 @@
 import {
+  type AppHostname,
   AppIdSchema,
   CheckpointIdSchema,
   DEFAULT_GUEST_PORT,
@@ -15,6 +16,7 @@ import {
   FilenameSchema,
   type HostDesiredState,
   HostIdSchema,
+  HostnameSchema,
   HostPortSchema,
   ObjectKeySchema,
   SecretStringSchema,
@@ -23,9 +25,11 @@ import {
   Value,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { initialTracker } from '#lib/health/state.ts';
 import type { TenantLogEvent } from '#lib/logs/event.ts';
-import { HOST_PORT_BASE } from '#lib/network/slot.ts';
+import { describeSlot, FIRST_SLOT, HOST_PORT_BASE } from '#lib/network/slot.ts';
 import type { ObservedInstance, ObservedState, ObservedVolume } from '#lib/reconcile/plan.ts';
+import { type InstanceRecord, newInstanceRecord } from '#lib/report/instance-record.ts';
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST } from '#tests/support/artifacts.ts';
 import { HOST_STORAGE_PREFIX } from '#tests/support/config.ts';
 
@@ -39,6 +43,11 @@ export const OBSERVED_AT = Value.Parse(TimestampSchema, '2026-08-03T10:00:00.000
 
 export const VOLUME_SIZE_BYTES = 4_096;
 export const FIRST_HOST_PORT = Value.Parse(HostPortSchema, HOST_PORT_BASE);
+
+export const APP_HOSTNAME: AppHostname = {
+  hostname: Value.Parse(HostnameSchema, 'app-1.apps.example.com'),
+  kind: 'platform',
+};
 
 /** A tenant's own variables, which are secrets wherever they are typed — including in a test. */
 export function tenantEnvironment(values: Record<string, string>): TenantEnvironment {
@@ -117,6 +126,27 @@ export function desiredState(overrides: Partial<HostDesiredState> = {}): HostDes
     instances: [],
     checkpoints: [],
     exports: [],
+    ...overrides,
+  };
+}
+
+export function instanceRecord(overrides: Partial<InstanceRecord> = {}): InstanceRecord {
+  return {
+    ...newInstanceRecord({
+      appId: APP_ID,
+      deploymentId: DEPLOYMENT_ID,
+      volumeId: VOLUME_ID,
+      hostnames: [APP_HOSTNAME],
+      hostPort: FIRST_HOST_PORT,
+      guestPort: DEFAULT_GUEST_PORT,
+      guestIpv4: describeSlot({ slot: FIRST_SLOT, appId: APP_ID }).guestIpv4,
+      artifactDigest: ARTIFACT_DIGEST,
+      state: 'running',
+      health: initialTracker(),
+      healthCheck: DEFAULT_HEALTH_CHECK,
+      resources: DEFAULT_INSTANCE_RESOURCES,
+      desiredRunning: true,
+    }),
     ...overrides,
   };
 }

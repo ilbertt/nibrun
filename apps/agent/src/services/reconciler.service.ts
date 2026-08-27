@@ -10,7 +10,7 @@ import {
   startInstance,
   stopInstance,
 } from '#lib/reconcile/instances.ts';
-import { applyNetwork, applyRoutes } from '#lib/reconcile/network.ts';
+import { applyActivators, applyNetwork, applyRoutes } from '#lib/reconcile/network.ts';
 import { hasDeferredWork, type ObservedState, planReconcile } from '#lib/reconcile/plan.ts';
 import { applyTeardowns, applyVolumes, volumeOwners } from '#lib/reconcile/volumes.ts';
 import { readInstanceRecords } from '#lib/report/instance-record.ts';
@@ -58,6 +58,9 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
           exports: exports.length,
         }),
       );
+      // Before the first poll has even been answered: an app this host stopped before the agent
+      // restarted has no forward, so until something is listening its port refuses connections.
+      yield* applyActivators;
     }).pipe(Effect.withSpan('Reconciler.load'));
 
     /**
@@ -213,6 +216,9 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
         { concurrency: 'unbounded', discard: true },
       );
       yield* applyVolumes({ plan, observed, desired }).pipe(Effect.withSpan('reconcile.volumes'));
+      // Before the forwards below are withdrawn from a tenant that has just stopped, so the port
+      // it was reached on is answered rather than closed.
+      yield* applyActivators.pipe(Effect.withSpan('reconcile.activators'));
       // Before anything boots: nothing persists the ruleset across a reboot, so a host that
       // started its VMs first would serve tenants through a kernel with no `nibrun` table.
       yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
@@ -237,9 +243,10 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       load,
       observe,
       reconcile,
-      // An instance becomes routable here rather than in reconcile: the probe is what tells a
-      // booted VM from one whose tenant has answered.
+      // An instance takes traffic here rather than in reconcile: the probe is what tells a booted
+      // VM from one whose tenant has answered, and the forward is what puts its port through.
       refresh: refreshStates.pipe(
+        Effect.andThen(applyNetwork),
         Effect.andThen(applyRoutes),
         Effect.andThen(persist),
         Effect.withSpan('Reconciler.refresh'),

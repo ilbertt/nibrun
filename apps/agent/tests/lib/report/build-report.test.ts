@@ -1,37 +1,27 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  AppIdSchema,
   DEFAULT_GUEST_PORT,
-  DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   type GuestPort,
-  HostnameSchema,
   type HostPort,
   HostPortSchema,
   HostReportedStateSchema,
-  type InstanceState,
-  Ipv4AddressSchema,
   isValidMessage,
-  Sha256DigestSchema,
   Value,
 } from '@repo/protocol';
-import { initialTracker } from '#lib/health/state.ts';
 import { buildReportedState, toReportedInstance } from '#lib/report/build-report.ts';
 import { allocatableCapacity } from '#lib/report/capacity.ts';
-import type { InstanceRecord } from '#lib/report/instance-record.ts';
-import { renderableRoutes } from '#lib/report/routes.ts';
 import {
   APP_ID,
-  DEPLOYMENT_ID,
   EXPORT_ID,
   FIRST_HOST_PORT,
   HOST_ID,
+  instanceRecord,
   OBSERVED_AT,
   VOLUME_ID,
   VOLUME_SIZE_BYTES,
 } from '#tests/support/fixtures.ts';
 
-const DIGEST_HEX_LENGTH = 64;
 const BUNDLE_SIZE_BYTES = 1_782_579;
 const HOST_VCPUS = 4;
 const HOST_MEMORY_MIB = 8_192;
@@ -49,35 +39,13 @@ const DEFAULT_INSTANCE_RESOURCES_AS_CAPACITY = {
   cacheBytes: HOST_CACHE_BYTES,
 };
 
-function record(overrides: Partial<InstanceRecord> = {}): InstanceRecord {
-  return {
-    appId: APP_ID,
-    deploymentId: DEPLOYMENT_ID,
-    volumeId: VOLUME_ID,
-    hostnames: [{ hostname: Value.Parse(HostnameSchema, 'a.example.com'), kind: 'platform' }],
-    hostPort: FIRST_HOST_PORT,
-    guestPort: DEFAULT_GUEST_PORT,
-    guestIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.2'),
-    artifactDigest: Value.Parse(Sha256DigestSchema, 'a'.repeat(DIGEST_HEX_LENGTH)),
-    state: 'running' as InstanceState,
-    health: initialTracker(),
-    healthCheck: DEFAULT_HEALTH_CHECK,
-    resources: DEFAULT_INSTANCE_RESOURCES,
-    desiredRunning: true,
-    startAttempts: { attempts: 1 },
-    restartCount: 0,
-    stopRequested: false,
-    ...overrides,
-  };
-}
-
 describe('the report always names the host-side port', () => {
   test('routing is local, but the control plane cannot debug a host without it', () => {
-    expect(toReportedInstance(record()).hostPort).toBe(FIRST_HOST_PORT);
+    expect(toReportedInstance(instanceRecord()).hostPort).toBe(FIRST_HOST_PORT);
   });
 
   test('absent means unknown: no field is ever sent null', () => {
-    const reported = toReportedInstance(record());
+    const reported = toReportedInstance(instanceRecord());
     expect('startedAt' in reported).toBe(false);
     expect('lastHealthyAt' in reported).toBe(false);
     expect('lastExitCode' in reported).toBe(false);
@@ -85,7 +53,7 @@ describe('the report always names the host-side port', () => {
   });
 
   test('an exit code of zero is reported rather than dropped as falsy', () => {
-    expect(toReportedInstance(record({ lastExitCode: 0 })).lastExitCode).toBe(0);
+    expect(toReportedInstance(instanceRecord({ lastExitCode: 0 })).lastExitCode).toBe(0);
   });
 });
 
@@ -102,7 +70,7 @@ describe('the assembled report satisfies the protocol', () => {
         cacheBytes: FREE_CACHE_BYTES,
       },
       versions: { agent: 'sha', guestImage: '6.1', zerofs: '2.2.1', firecracker: '1.16.1' },
-      records: [record({ startedAt: OBSERVED_AT })],
+      records: [instanceRecord({ startedAt: OBSERVED_AT })],
       volumes: [
         { volumeId: VOLUME_ID, appId: APP_ID, state: 'ready', sizeBytes: VOLUME_SIZE_BYTES },
       ],
@@ -117,27 +85,6 @@ describe('the assembled report satisfies the protocol', () => {
       ],
     });
     expect(isValidMessage({ schema: HostReportedStateSchema, value: report })).toBe(true);
-  });
-});
-
-describe('the same records render the routing layer', () => {
-  test('only instances whose tenant answered are routable', () => {
-    const records = [
-      record(),
-      record({ appId: Value.Parse(AppIdSchema, 'inst-2'), state: 'starting' }),
-      record({ appId: Value.Parse(AppIdSchema, 'inst-3'), state: 'unhealthy' }),
-    ];
-    expect(renderableRoutes(records)).toEqual([
-      {
-        appId: APP_ID,
-        hostnames: records[0]?.hostnames ?? [],
-        hostPort: FIRST_HOST_PORT,
-      },
-    ]);
-  });
-
-  test('an app with no hostname yet is not routed', () => {
-    expect(renderableRoutes([record({ hostnames: [] })])).toEqual([]);
   });
 });
 

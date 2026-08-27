@@ -6,6 +6,7 @@ import { AgentLogger } from '#lib/logger.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { AppActivator } from '#services/app-activator.service.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { CaddyProxy } from '#services/caddy-proxy.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
@@ -14,6 +15,7 @@ import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
 import { ExportUploader } from '#services/export-uploader.service.ts';
 import { FilesystemReader } from '#services/filesystem-reader.service.ts';
+import { HostFirewall } from '#services/host-firewall.service.ts';
 import { LogStore } from '#services/log-store.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
@@ -41,6 +43,8 @@ const agent = Layer.mergeAll(
   ArtifactStore.Default,
   SlotAllocator.Default,
   ZerofsTopology.Default,
+  HostFirewall.Default,
+  AppActivator.Default,
   CaddyProxy.Default,
   TenantLogQueue.Default,
   TenantLogReceiver.Default,

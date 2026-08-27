@@ -51,9 +51,11 @@ https://{$APP_HOST_DOMAIN}, https://fallback.{$APP_HOST_DOMAIN} {
 	redir https://{$WWW_HOSTNAME} permanent
 }
 
-# Everything else under the app domain: a hostname whose app is not running
-# here, or not running at all. Caddy orders site blocks most-specific first, so
-# the rendered ones above win and this is what is left.
+# Everything else under the app domain: a hostname no app on this host answers
+# for. Caddy orders site blocks most-specific first, so the rendered ones above
+# win and this is what is left. An app that lives here is never one of them —
+# its block is rendered whether or not its microVM is up, and while it is down
+# the agent answers the port with a 503 of its own.
 #
 # It exists so an unknown hostname is answered rather than handled by whatever
 # TLS policy Caddy falls back to — this way every connection the edge makes to
