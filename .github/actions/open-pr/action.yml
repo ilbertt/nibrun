@@ -1,0 +1,56 @@
+name: Open a pull request
+description: Commit the staged paths onto a branch and open a pull request for it.
+
+inputs:
+  branch:
+    description: Branch to push the commit to. Also the change's identity — if a pull request was ever opened for it, this one is not opened again.
+    required: true
+  title:
+    description: Pull request title, also the commit message.
+    required: true
+  body:
+    description: Pull request body, as Markdown.
+    required: true
+  paths:
+    description: Space-separated paths to commit.
+    required: true
+
+outputs:
+  url:
+    description: The pull request's URL, empty when one had already been opened.
+    value: ${{ steps.open.outputs.url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Open the pull request
+      id: open
+      shell: bash
+      env:
+        BRANCH: ${{ inputs.branch }}
+        TITLE: ${{ inputs.title }}
+        BODY: ${{ inputs.body }}
+        PATHS: ${{ inputs.paths }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+
+        if [ -n "$(gh pr list --head "$BRANCH" --state all --json number --jq '.[].number')" ]; then
+          echo "Already proposed: a pull request for $BRANCH exists."
+          exit 0
+        fi
+
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+        git switch -c "$BRANCH"
+        # Unquoted on purpose: the input is a list, not one path.
+        # shellcheck disable=SC2086
+        git add -- $PATHS
+        git commit -m "$TITLE"
+        git push --set-upstream origin "$BRANCH"
+
+        printf '%s\n' "$BODY" > "${RUNNER_TEMP}/pr-body.md"
+        url=$(gh pr create --title "$TITLE" --body-file "${RUNNER_TEMP}/pr-body.md")
+        echo "url=$url" >> "$GITHUB_OUTPUT"
+        echo "Opened $url"
