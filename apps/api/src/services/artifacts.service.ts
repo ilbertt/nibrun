@@ -8,7 +8,7 @@ import {
   type OwnerId,
   Value,
 } from '@repo/protocol';
-import { inspectArtifact } from '#lib/artifact-digest.ts';
+import { type ArtifactInspection, inspectArtifact } from '#lib/artifact-digest.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
@@ -41,6 +41,22 @@ const MAX_ARTIFACT_MEBIBYTES = 256;
  */
 export const MAX_ARTIFACT_SIZE_BYTES = MAX_ARTIFACT_MEBIBYTES * BYTES_PER_MEBIBYTE;
 const TOO_LARGE = `A binary may be at most ${MAX_ARTIFACT_MEBIBYTES} MB.`;
+
+function unsupportedInterpreter(interpreter: string): string {
+  return `The artifact needs the dynamic loader at ${interpreter}, which the guest does not have. Link it against /lib64/ld-linux-x86-64.so.2, or compile it static.`;
+}
+
+/** Why the bytes were refused, in the uploader's terms rather than the inspection's. */
+function refusalMessage(inspection: Exclude<ArtifactInspection, { outcome: 'stored' }>): string {
+  switch (inspection.outcome) {
+    case 'too-large':
+      return TOO_LARGE;
+    case 'unsupported-interpreter':
+      return unsupportedInterpreter(inspection.interpreter);
+    case 'not-executable':
+      return NOT_AN_EXECUTABLE;
+  }
+}
 
 /**
  * Long enough that no upload is still on its way to a row this old — the signed policy expires
@@ -178,7 +194,7 @@ export class ArtifactsService extends Service {
     });
     if (inspection.outcome !== 'stored') {
       await this.abandon({ appId, artifactId, ownerId });
-      throw new BadRequestError(inspection.outcome === 'too-large' ? TOO_LARGE : NOT_AN_EXECUTABLE);
+      throw new BadRequestError(refusalMessage(inspection));
     }
 
     const { digest, sizeBytes, objectKey } = inspection;

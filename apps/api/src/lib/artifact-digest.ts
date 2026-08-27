@@ -5,10 +5,20 @@ import {
   Sha256DigestSchema,
   Value,
 } from '@repo/protocol';
-import { ELF_MAGIC_LENGTH, isElfExecutable } from '#lib/elf.ts';
+import { ELF_MAGIC_LENGTH, interpreterOf, isElfExecutable, isGuestInterpreter } from '#lib/elf.ts';
 
 const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
+
+/**
+ * How much of the object is held to read the program headers out of.
+ *
+ * The interpreter is named by a segment the linker puts near the front — a kibibyte or two in,
+ * across every toolchain seen here — and one that sat past this would be read as a binary that
+ * names none, which is the lenient verdict. Generous rather than exact because the cost is one
+ * buffer per upload and the cost of being wrong is a rejected deploy.
+ */
+const HEADER_BYTES = 65_536;
 
 export type ArtifactIdentity = {
   digest: Sha256Digest;
@@ -19,7 +29,16 @@ export type ArtifactIdentity = {
 export type ArtifactInspection =
   | ({ outcome: 'stored' } & ArtifactIdentity)
   | { outcome: 'not-executable' }
+  | { outcome: 'unsupported-interpreter'; interpreter: string }
   | { outcome: 'too-large' };
+
+/** Only ever a verdict on a loader path actually read; see `interpreterOf`. */
+function refuseInterpreter(bytes: Uint8Array): ArtifactInspection | undefined {
+  const interpreter = interpreterOf(bytes);
+  return interpreter !== undefined && !isGuestInterpreter(interpreter)
+    ? { outcome: 'unsupported-interpreter', interpreter }
+    : undefined;
+}
 
 /**
  * The digest a host will verify, taken from the bytes the store now holds.
@@ -28,9 +47,9 @@ export type ArtifactInspection =
  * that never converges rather than a rejected upload — so the bytes are read back and hashed
  * here even though the api never had them in hand.
  *
- * Executability and size are settled in the same pass because the pass is the expensive part:
- * the object is a whole binary, and reading it three times to answer three questions about it
- * would cost three times the bandwidth to reach the same verdict.
+ * Executability, the loader it asks for, and size are settled in the same pass because the pass
+ * is the expensive part: the object is a whole binary, and reading it four times to answer four
+ * questions about it would cost four times the bandwidth to reach the same verdict.
  */
 export async function inspectArtifact({
   stream,
@@ -40,15 +59,29 @@ export async function inspectArtifact({
   maxSizeBytes: number;
 }): Promise<ArtifactInspection> {
   const hasher = new Bun.CryptoHasher(DIGEST_ALGORITHM);
-  const magic: number[] = [];
+  const header = new Uint8Array(HEADER_BYTES);
+  let headerLength = 0;
   let sizeBytes = 0;
 
   for await (const chunk of stream) {
-    magic.push(...chunk.slice(0, ELF_MAGIC_LENGTH - magic.length));
+    const wasComplete = headerLength === HEADER_BYTES;
+    if (!wasComplete) {
+      const taken = Math.min(chunk.byteLength, HEADER_BYTES - headerLength);
+      header.set(chunk.subarray(0, taken), headerLength);
+      headerLength += taken;
+    }
     // Leaving the loop cancels the read, so something that was never a binary costs one chunk
     // rather than the whole object.
-    if (magic.length >= ELF_MAGIC_LENGTH && !isElfExecutable(Uint8Array.from(magic))) {
+    if (headerLength >= ELF_MAGIC_LENGTH && !isElfExecutable(header)) {
       return { outcome: 'not-executable' };
+    }
+    // On the one chunk that completes the header, so a binary the guest could never exec is
+    // refused without pulling the rest of it either.
+    if (!wasComplete && headerLength === HEADER_BYTES) {
+      const refusal = refuseInterpreter(header);
+      if (refusal) {
+        return refusal;
+      }
     }
 
     sizeBytes += chunk.byteLength;
@@ -59,9 +92,16 @@ export async function inspectArtifact({
     hasher.update(chunk);
   }
 
+  const read = header.subarray(0, headerLength);
   // Shorter than the magic itself, so the loop above never reached a verdict.
-  if (!isElfExecutable(Uint8Array.from(magic))) {
+  if (!isElfExecutable(read)) {
     return { outcome: 'not-executable' };
+  }
+  if (headerLength < HEADER_BYTES) {
+    const refusal = refuseInterpreter(read);
+    if (refusal) {
+      return refusal;
+    }
   }
 
   const digest = Value.Parse(Sha256DigestSchema, hasher.digest(HEX_ENCODING));

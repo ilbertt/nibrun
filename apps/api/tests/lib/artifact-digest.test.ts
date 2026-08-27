@@ -147,3 +147,116 @@ describe('a size the store accepted is still a size this api will not', () => {
     expect(delivered).toEqual([chunks[0] as Uint8Array]);
   });
 });
+
+const ELF_HEADER_BYTES = 0x40;
+const ELF_CLASS_AT = 4;
+const ELF_CLASS_64 = 2;
+const ELF_ENDIANNESS_AT = 5;
+const ELF_LITTLE_ENDIAN = 1;
+const SEGMENT_TABLE_START_AT = 0x20;
+const SEGMENT_ENTRY_BYTES_AT = 0x36;
+const SEGMENT_COUNT_AT = 0x38;
+const SEGMENT_START_AT = 8;
+const SEGMENT_BYTES_AT = 32;
+const SEGMENT_ENTRY_BYTES = 56;
+const SEGMENT_TYPE_INTERPRETER = 3;
+const ONE_SEGMENT = 1;
+const NO_SEGMENTS = 0;
+const LITTLE_ENDIAN = true;
+
+const GUEST_LOADER = '/lib64/ld-linux-x86-64.so.2';
+const NIX_LOADER =
+  '/nix/store/xx7cm72qy2c0643cm1ipngd87aqwkcdp-glibc-2.40-66/lib/ld-linux-x86-64.so.2';
+const MUSL_LOADER = '/lib/ld-musl-x86_64.so.1';
+
+/** Comfortably past the prefix the inspection holds, whatever that prefix is set to. */
+const PAST_THE_HEADER_BYTES = 131_072;
+
+/**
+ * A 64-bit ELF whose only segment names a loader — or, given none, one that names no loader at
+ * all, which is what a static binary looks like here.
+ *
+ * The layout is spelled out rather than taken from `#lib/elf.ts`, so that a test asserting how
+ * an ELF is read cannot be satisfied by the reader agreeing with itself.
+ */
+function elfNaming(interpreter?: string): Uint8Array {
+  const path = interpreter === undefined ? new Uint8Array() : bytesOf(`${interpreter}\0`);
+  const pathStart = ELF_HEADER_BYTES + SEGMENT_ENTRY_BYTES;
+  const bytes = new Uint8Array(pathStart + path.length);
+  const view = new DataView(bytes.buffer);
+
+  bytes.set(bytesOf('\x7fELF'));
+  bytes[ELF_CLASS_AT] = ELF_CLASS_64;
+  bytes[ELF_ENDIANNESS_AT] = ELF_LITTLE_ENDIAN;
+  view.setBigUint64(SEGMENT_TABLE_START_AT, BigInt(ELF_HEADER_BYTES), LITTLE_ENDIAN);
+  view.setUint16(SEGMENT_ENTRY_BYTES_AT, SEGMENT_ENTRY_BYTES, LITTLE_ENDIAN);
+  view.setUint16(
+    SEGMENT_COUNT_AT,
+    interpreter === undefined ? NO_SEGMENTS : ONE_SEGMENT,
+    LITTLE_ENDIAN,
+  );
+  view.setUint32(ELF_HEADER_BYTES, SEGMENT_TYPE_INTERPRETER, LITTLE_ENDIAN);
+  view.setBigUint64(ELF_HEADER_BYTES + SEGMENT_START_AT, BigInt(pathStart), LITTLE_ENDIAN);
+  view.setBigUint64(ELF_HEADER_BYTES + SEGMENT_BYTES_AT, BigInt(path.length), LITTLE_ENDIAN);
+  bytes.set(path, pathStart);
+
+  return bytes;
+}
+
+function inspectBytes(chunks: Uint8Array[]): Promise<ArtifactInspection> {
+  return inspectArtifact({ stream: streamOf(chunks).stream, maxSizeBytes: PAST_THE_HEADER_BYTES });
+}
+
+describe('a loader the guest does not have is refused before a host ever sees it', () => {
+  test('a binary built against a Nix toolchain is refused, naming the loader it asked for', async () => {
+    expect(await inspectBytes([elfNaming(NIX_LOADER)])).toEqual({
+      outcome: 'unsupported-interpreter',
+      interpreter: NIX_LOADER,
+    });
+  });
+
+  test('a binary built against musl is refused the same way', async () => {
+    expect(await inspectBytes([elfNaming(MUSL_LOADER)])).toEqual({
+      outcome: 'unsupported-interpreter',
+      interpreter: MUSL_LOADER,
+    });
+  });
+
+  test('the loader the image actually ships is stored', async () => {
+    expect((await inspectBytes([elfNaming(GUEST_LOADER)])).outcome).toBe('stored');
+  });
+
+  // The guest execs it directly, so naming no loader is the one case that needs nothing from
+  // the image at all.
+  test('a static binary names no loader and is stored', async () => {
+    expect((await inspectBytes([elfNaming()])).outcome).toBe('stored');
+  });
+
+  // Refusing on a path that was never read would reject binaries that are fine, so anything
+  // this cannot parse has to pass.
+  test('an ELF whose headers this cannot read is stored rather than guessed at', async () => {
+    expect((await inspect({ text: BINARY })).outcome).toBe('stored');
+  });
+
+  test('where the chunks fall makes no difference to the verdict', async () => {
+    const split = [...elfNaming(NIX_LOADER)].map((byte) => Uint8Array.of(byte));
+
+    expect(await inspectBytes(split)).toEqual({
+      outcome: 'unsupported-interpreter',
+      interpreter: NIX_LOADER,
+    });
+  });
+
+  // Longer than the prefix, so the verdict is reached partway through the first chunk rather
+  // than at the end of an object that may be hundreds of megabytes.
+  test('the rest of it is never pulled', async () => {
+    const head = new Uint8Array(PAST_THE_HEADER_BYTES);
+    head.set(elfNaming(NIX_LOADER));
+    const chunks = [head, bytesOf('and a great deal more')];
+    const { stream, delivered } = streamOf(chunks);
+
+    await inspectArtifact({ stream, maxSizeBytes: PAST_THE_HEADER_BYTES });
+
+    expect(delivered).toEqual([chunks[0] as Uint8Array]);
+  });
+});
