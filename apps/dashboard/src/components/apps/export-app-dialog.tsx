@@ -21,13 +21,15 @@ export function ExportAppDialog({ availability }: { availability: AppActionAvail
   const [open, setOpen] = useState(false);
   const run = useAppExport(appId);
 
-  if (availability === 'hidden') {
+  if (availability.kind === 'hidden') {
     return null;
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" disabled={availability === 'disabled'} />}>
+      <DialogTrigger
+        render={<Button variant="outline" disabled={availability.kind === 'disabled'} />}
+      >
         <DownloadIcon data-icon="inline-start" />
         Export
       </DialogTrigger>

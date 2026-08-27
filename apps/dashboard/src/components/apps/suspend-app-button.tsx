@@ -30,14 +30,14 @@ export function SuspendAppButton({ availability }: { availability: AppActionAvai
   const suspension = useAppSuspension(appId);
   useFailureToast(suspension.error?.message);
 
-  if (availability === 'hidden') {
+  if (availability.kind === 'hidden') {
     return null;
   }
 
   const suspended = app.data?.state === 'suspended';
   const Icon = suspended ? PlayIcon : PauseIcon;
   const moving = status.status?.kind === 'transition' ? status.status.label : undefined;
-  const waiting = availability === 'disabled' || suspension.isPending;
+  const waiting = availability.kind === 'disabled' || suspension.isPending;
 
   return (
     <Button

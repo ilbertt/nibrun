@@ -3,6 +3,10 @@ import { APP_STATES, type AppState, DEPLOYMENT_STATES, type DeploymentState } fr
 import { APP_ACTIONS, type AppActions, appActions } from '#lib/app-actions.ts';
 import { appStatus } from '#lib/app-status.ts';
 
+const ENABLED = { kind: 'enabled' } as const;
+const DISABLED = { kind: 'disabled' } as const;
+const HIDDEN = { kind: 'hidden' } as const;
+
 function actions({
   appState = 'active',
   deploymentState,
@@ -16,10 +20,10 @@ function actions({
 describe('an app is offered what its state can actually do', () => {
   test('one nobody has deployed has nothing to export and nothing to take offline', () => {
     expect(actions()).toEqual({
-      deploy: 'enabled',
-      export: 'hidden',
-      suspend: 'hidden',
-      delete: 'enabled',
+      deploy: ENABLED,
+      export: HIDDEN,
+      suspend: HIDDEN,
+      delete: ENABLED,
     });
   });
 
@@ -28,25 +32,25 @@ describe('an app is offered what its state can actually do', () => {
   for (const deploymentState of down) {
     test(`one whose release is ${deploymentState} is exportable and has nothing to suspend`, () => {
       expect(actions({ deploymentState })).toEqual({
-        deploy: 'enabled',
-        export: 'enabled',
-        suspend: 'hidden',
-        delete: 'enabled',
+        deploy: ENABLED,
+        export: ENABLED,
+        suspend: HIDDEN,
+        delete: ENABLED,
       });
     });
   }
 
   test('a serving one is offered every button', () => {
     expect(actions({ deploymentState: 'active' })).toEqual({
-      deploy: 'enabled',
-      export: 'enabled',
-      suspend: 'enabled',
-      delete: 'enabled',
+      deploy: ENABLED,
+      export: ENABLED,
+      suspend: ENABLED,
+      delete: ENABLED,
     });
   });
 
   test('a suspended one is offered the same, the suspend button being the way back', () => {
-    expect(actions({ appState: 'suspended', deploymentState: 'stopped' }).suspend).toBe('enabled');
+    expect(actions({ appState: 'suspended', deploymentState: 'stopped' }).suspend).toEqual(ENABLED);
   });
 });
 
@@ -56,39 +60,59 @@ describe('an app is offered what its state can actually do', () => {
  */
 describe('an app the host has not caught up with yet', () => {
   test('is not asked to suspend while it is suspending', () => {
-    expect(actions({ appState: 'suspended', deploymentState: 'active' }).suspend).toBe('disabled');
+    expect(actions({ appState: 'suspended', deploymentState: 'active' }).suspend).toEqual(DISABLED);
   });
 
   test('nor while it is coming back', () => {
-    expect(actions({ deploymentState: 'stopped' }).suspend).toBe('disabled');
+    expect(actions({ deploymentState: 'stopped' }).suspend).toEqual(DISABLED);
   });
 
   test('and one not read yet offers nothing to press', () => {
     expect(appActions(undefined)).toEqual({
-      deploy: 'disabled',
-      export: 'disabled',
-      suspend: 'disabled',
-      delete: 'disabled',
+      deploy: DISABLED,
+      export: DISABLED,
+      suspend: DISABLED,
+      delete: DISABLED,
     });
+  });
+});
+
+/**
+ * A release is only started for an app whose row asks to run, so one deployed here would sit
+ * pending until the app is resumed. The button is greyed with the sentence saying so, because
+ * unlike the two above it has no label of its own to say what it is waiting on.
+ */
+describe('a suspended app', () => {
+  for (const deploymentState of [...DEPLOYMENT_STATES, undefined]) {
+    test(`is not offered a deploy, and says why, with a ${deploymentState ?? 'missing'} release`, () => {
+      expect(actions({ appState: 'suspended', deploymentState }).deploy).toEqual({
+        kind: 'disabled',
+        reason: expect.any(String),
+      });
+    });
+  }
+
+  test('is offered one again the moment it is asked to run, before the host has started it', () => {
+    expect(actions({ deploymentState: 'stopped' }).deploy).toEqual(ENABLED);
   });
 });
 
 describe('an app on its way out', () => {
   test('has one button left, and it is the one saying so', () => {
     expect(actions({ appState: 'deleting' })).toEqual({
-      deploy: 'hidden',
-      export: 'hidden',
-      suspend: 'hidden',
-      delete: 'disabled',
+      deploy: HIDDEN,
+      export: HIDDEN,
+      suspend: HIDDEN,
+      delete: DISABLED,
     });
   });
 
   test('and once it is gone, none at all', () => {
     expect(actions({ appState: 'deleted' })).toEqual({
-      deploy: 'hidden',
-      export: 'hidden',
-      suspend: 'hidden',
-      delete: 'hidden',
+      deploy: HIDDEN,
+      export: HIDDEN,
+      suspend: HIDDEN,
+      delete: HIDDEN,
     });
   });
 });

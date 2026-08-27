@@ -26,7 +26,7 @@ export function DeleteAppDialog({ availability }: { availability: AppActionAvail
   const deletion = useAppDeletion(appId);
   const [armed, setArmed] = useState(false);
 
-  if (availability === 'hidden') {
+  if (availability.kind === 'hidden') {
     return null;
   }
 
@@ -41,7 +41,7 @@ export function DeleteAppDialog({ availability }: { availability: AppActionAvail
       }}
     >
       <AlertDialogTrigger
-        render={<Button variant="destructive" disabled={availability === 'disabled'} />}
+        render={<Button variant="destructive" disabled={availability.kind === 'disabled'} />}
       >
         <Trash2Icon data-icon="inline-start" />
         {alreadyDeleting ? 'Deleting…' : 'Delete'}

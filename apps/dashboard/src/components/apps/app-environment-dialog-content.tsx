@@ -14,6 +14,8 @@ import { PencilIcon } from 'lucide-react';
 import { useState } from 'react';
 import { DeployProgress } from '#components/apps/deploy-progress.tsx';
 import { EnvironmentTable } from '#components/apps/environment-table.tsx';
+import { greyedReason } from '#lib/app-actions.ts';
+import { useAppActions } from '#lib/hooks/use-app-actions.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import { useEnvironmentForm } from '#lib/hooks/use-environment-form.ts';
 import type { AppSummary } from '#queries/apps.ts';
@@ -22,6 +24,8 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
   const [open, setOpen] = useState(false);
   const run = useDeployRun();
   const form = useEnvironmentForm(app);
+  // Saving is a release, so it is offered exactly where the deploy button is.
+  const deploy = useAppActions(app.id).deploy;
   const releasing = run.phase === 'releasing' || run.phase === 'settling';
 
   function handleOpenChange(next: boolean): void {
@@ -43,7 +47,7 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
           <DialogTitle>Environment variables</DialogTitle>
           <DialogDescription>
             {run.phase === 'idle'
-              ? `Saving releases ${app.slug} again on the binary it already runs. Its hostnames and everything on its volume stay as they are.`
+              ? describeSave({ slug: app.slug, withheld: greyedReason(deploy) })
               : 'The release is on its way. Closing this does not stop it.'}
           </DialogDescription>
         </DialogHeader>
@@ -60,7 +64,11 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
                 <EnvironmentTable variables={form.variables} onChange={form.change} />
                 {form.error !== undefined && <FieldError>{form.error}</FieldError>}
               </Field>
-              <Button type="submit" size="lg" disabled={!form.submittable}>
+              <Button
+                type="submit"
+                size="lg"
+                disabled={!form.submittable || deploy.kind !== 'enabled'}
+              >
                 <span className="truncate">Save and redeploy {app.slug}</span>
               </Button>
             </form>
@@ -70,5 +78,12 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
         </DialogBody>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function describeSave({ slug, withheld }: { slug: string; withheld: string | undefined }): string {
+  return (
+    withheld ??
+    `Saving releases ${slug} again on the binary it already runs. Its hostnames and everything on its volume stay as they are.`
   );
 }
