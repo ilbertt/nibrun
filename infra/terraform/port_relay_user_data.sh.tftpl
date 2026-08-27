@@ -1,0 +1,64 @@
+#!/bin/bash
+set -euxo pipefail
+
+# Everything this machine does happens in the kernel. There is no daemon here, no
+# deploy, and nothing to keep in step with a release — which is why the whole of
+# its configuration is this file, run once, rather than an agent that polls.
+
+dnf update -y
+dnf install -y nftables
+
+# A forwarded packet is a connection the kernel has to remember in order to send
+# the reply back, so this box lives or dies by that table under a flood. Same
+# values as the app host's, and for the same reasons — see
+# infra/app-host/deploy/on_box_deploy.sh, which explains each one.
+printf 'nf_conntrack\n' > /etc/modules-load.d/nibrun-relay.conf
+modprobe nf_conntrack
+
+cat > /etc/sysctl.d/99-nibrun-relay.conf <<'SYSCTL'
+net.ipv4.ip_forward = 1
+net.netfilter.nf_conntrack_tcp_timeout_established = 86400
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 60
+net.netfilter.nf_conntrack_udp_timeout = 10
+SYSCTL
+sysctl -q -p /etc/sysctl.d/99-nibrun-relay.conf
+
+# `dnat to <address>` with no port keeps the port the packet arrived on, and that
+# is a correctness requirement rather than a simplification. nibrun tells a
+# tenant which port it has, and a tenant is free to hand that number out —
+# advertised in its own protocol, written into a config its users copy, printed
+# in its own logs. A relay that renumbered in transit would make what nibrun said
+# untrue, and every one of those callers would arrive somewhere nothing answers.
+#
+# The masquerade is what keeps the app host out of the conversation. Without it
+# the app host replies straight to the client, from its own address over its own
+# route to the internet — which fails, because nothing was ever sent there, and
+# publishes the address this machine exists to keep quiet.
+mkdir -p /etc/nftables
+cat > /etc/nftables/nibrun-relay.nft <<'NFT'
+table ip nibrun_relay {
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+		udp dport ${tenant_port_first}-${tenant_port_last} dnat to ${app_host_private_ip}
+		tcp dport ${tenant_port_first}-${tenant_port_last} dnat to ${app_host_private_ip}
+	}
+
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip daddr ${app_host_private_ip} masquerade
+	}
+
+	# Default drop, unlike the app host's forward chain: everything crossing this
+	# machine is a tenant port on a known range to a known address, so anything
+	# else arriving here is not a case to be reasoned about.
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ct state established,related accept
+		ip daddr ${app_host_private_ip} udp dport ${tenant_port_first}-${tenant_port_last} accept
+		ip daddr ${app_host_private_ip} tcp dport ${tenant_port_first}-${tenant_port_last} accept
+	}
+}
+NFT
+
+echo 'include "/etc/nftables/nibrun-relay.nft"' >> /etc/sysconfig/nftables.conf
+systemctl enable --now nftables

@@ -160,3 +160,12 @@ output "github_deploy_role_arn" {
   description = "Assumed by the deploy steps, after Terraform has run."
   value       = var.enable_github_deploy ? aws_iam_role.github_deploy[0].arn : null
 }
+
+# What a tenant hands to its own users, and therefore what the agent has to put
+# on an instance's config drive — a guest cannot discover it, because the ruleset
+# denies the metadata endpoint and this is not the address of the machine it runs
+# on anyway. Null while no relay exists.
+output "port_relay_public_ip" {
+  description = "The address a tenant's own ports are reached at. Stable across replacing the relay, which is what makes moving it later invisible to the clients already using it."
+  value       = var.port_relay_count > 0 ? aws_eip.port_relay[0].public_ip : null
+}

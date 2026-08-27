@@ -121,6 +121,26 @@ resource "aws_security_group" "app_host" {
     ipv6_cidr_blocks = local.cloudflare_ipv6_cidrs
   }
 
+  # Tenant ports, and only ever from the relay. The address a tenant hands to its
+  # own users is the relay's, so nothing has any business reaching these ports
+  # another way — and pinning it to a group rather than a range is what keeps
+  # that true while the relay is replaced.
+  #
+  # This is what the relay buys that a load balancer could not: a UDP target
+  # group preserves the client's address and will not be told otherwise, so its
+  # targets have to admit the whole internet. Here the app host admits one group.
+  dynamic "ingress" {
+    for_each = var.port_relay_count > 0 ? toset(["tcp", "udp"]) : toset([])
+
+    content {
+      description     = "Tenant ports (${ingress.value}) from the port relay"
+      from_port       = var.tenant_port_first
+      to_port         = var.tenant_port_last
+      protocol        = ingress.value
+      security_groups = [aws_security_group.port_relay[0].id]
+    }
+  }
+
   egress {
     description      = "All outbound"
     from_port        = 0
