@@ -31,6 +31,7 @@ export const Route = createFileRoute('/blog/$slug')({
       title: `${post.title} — nibrun`,
       description: post.description,
       publishedAt: post.date,
+      image: post.image,
     });
 
     return {

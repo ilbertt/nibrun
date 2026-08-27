@@ -1,4 +1,4 @@
-import { Marked, Renderer } from 'marked';
+import { Marked, Renderer, type Token, type Tokens } from 'marked';
 
 export type BlogPost = {
   slug: string;
@@ -7,10 +7,13 @@ export type BlogPost = {
   date: string;
   /** The file as it sits in the repo, frontmatter and all — what `/blog/<slug>.md` serves. */
   markdown: string;
+  /** The first image in the post, which is also the card it gets shared as. */
+  image: string | undefined;
 };
 
 const MARKDOWN_EXTENSION = '.md';
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n/;
+const FIRST_IMAGE = /^!\[[^\]]*]\(([^\s)]+)/m;
 
 const SOURCES = import.meta.glob('../content/blog/*.md', {
   query: '?raw',
@@ -28,7 +31,20 @@ export function findPost(slug: string): BlogPost | undefined {
   return POSTS.find((post) => post.slug === slug);
 }
 
+// Borrowed rather than reimplemented, and always through `.call(this, …)`: these read
+// `this.parser` to render their own inner tokens, and a standalone renderer has none.
 const DEFAULT_RENDERER = new Renderer();
+
+// The cast is what `type === 'image'` cannot do on its own: marked's token union ends in a
+// generic member whose `type` is an open string, so nothing narrows away from it.
+function loneImage(tokens: Token[]): Tokens.Image | undefined {
+  const [only] = tokens;
+  return tokens.length === 1 && only?.type === 'image' ? (only as Tokens.Image) : undefined;
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 // An empty slot rather than a rendered button: copying is a React component with the shared
 // clipboard hook behind it, and this is the element it is portalled into once the page is
@@ -36,7 +52,18 @@ const DEFAULT_RENDERER = new Renderer();
 const ARTICLE = new Marked({
   renderer: {
     code(token) {
-      return `<div class="code-block">${DEFAULT_RENDERER.code(token)}<span data-copy-slot></span></div>`;
+      return `<div class="code-block">${DEFAULT_RENDERER.code.call(this, token)}<span data-copy-slot></span></div>`;
+    },
+    // A paragraph that is only an image is a figure, and markdown's image title is the one place
+    // a caption can be written without dropping HTML into the post. Anything else falls through.
+    paragraph(token) {
+      const image = loneImage(token.tokens);
+      if (image === undefined) {
+        return false;
+      }
+      const caption =
+        image.title === null ? '' : `<figcaption>${escapeHtml(image.title)}</figcaption>`;
+      return `<figure>${DEFAULT_RENDERER.image.call(this, image)}${caption}</figure>\n`;
     },
   },
 });
@@ -77,6 +104,7 @@ function read({ slug, markdown }: { slug: string; markdown: string }): BlogPost 
     description: required({ slug, fields, key: 'description' }),
     date: required({ slug, fields, key: 'date' }),
     markdown,
+    image: FIRST_IMAGE.exec(markdown)?.[1],
   };
 }
 

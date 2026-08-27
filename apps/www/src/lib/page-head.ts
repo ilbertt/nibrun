@@ -10,13 +10,25 @@ export function pageHead({
   title,
   description,
   publishedAt,
+  image,
 }: {
   path: string;
   title: string;
   description: string;
   publishedAt?: string;
+  /** Root-relative, and 1200x630 to match the dimensions the root route declares. */
+  image?: string;
 }) {
   const url = `${SITE_URL}${path}`;
+  const card =
+    image === undefined
+      ? []
+      : [
+          { property: 'og:image', content: `${SITE_URL}${image}` },
+          { property: 'og:image:alt', content: title },
+          { name: 'twitter:image', content: `${SITE_URL}${image}` },
+          { name: 'twitter:image:alt', content: title },
+        ];
 
   return {
     meta: [
@@ -31,6 +43,7 @@ export function pageHead({
       ...(publishedAt === undefined
         ? []
         : [{ property: 'article:published_time', content: publishedAt }]),
+      ...card,
     ],
     links: [{ rel: 'canonical', href: url }],
   };

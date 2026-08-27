@@ -23,6 +23,8 @@ your uploads to `data/` and you're done. It's online at `https://<slug>.nibrun.a
 boots, or on your own domain if you point one at it. No image to build, no database to provision,
 no bucket, and no load balancer in front of one instance.
 
+![The nibrun home page, with a dashed box reading "Drop it here"](/blog/drop-a-binary.png "Drag the binary onto the page. That's the whole deploy.")
+
 When you want out:
 
 ```sh

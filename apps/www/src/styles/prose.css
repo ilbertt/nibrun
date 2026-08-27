@@ -149,3 +149,20 @@
   max-width: 100%;
   height: auto;
 }
+
+.prose figure {
+  margin-block: 2rem;
+}
+
+.prose figure img {
+  display: block;
+  border: 1px solid var(--border);
+  width: 100%;
+}
+
+.prose figcaption {
+  margin-block-start: 0.75rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  text-align: center;
+}
