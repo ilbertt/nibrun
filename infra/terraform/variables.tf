@@ -64,18 +64,12 @@ variable "app_host_count" {
 variable "port_relay_instance_type" {
   type        = string
   default     = "t3.micro"
-  description = "Sized by network baseline rather than by CPU, because forwarding is kernel work and what crosses it is whatever the tenants behind it send. t3.micro carries 64 Mbps sustained and leans on burst credits above that; step up a size if the baseline is the thing being reached."
+  description = "Sized by network baseline rather than CPU: forwarding is kernel work. t3.micro sustains 64 Mbps and bursts above it."
 }
 
-# The range the app host's agent allocates a tenant's public port from, restated
-# here because a security group is the other half of opening one and nothing
-# compares the two numbers — the same bargain as nbds_max in
-# app_host_user_data.sh.tftpl.
-#
-# One port per slot, derived the way the loopback range already is, so it cannot
-# run out while a host cannot hold more apps than it has slots. Sized once on
-# purpose: the relay carries this range in its user_data, so widening it later is
-# replacing that machine and dropping every connection crossing it.
+# Restated from the agent's own base, because a security group is the other half
+# of opening a port and nothing compares the two numbers — the same bargain as
+# nbds_max in app_host_user_data.sh.tftpl. One per slot, so it cannot run out.
 variable "tenant_port_first" {
   type        = number
   default     = 22000
@@ -85,7 +79,7 @@ variable "tenant_port_first" {
 variable "tenant_port_last" {
   type        = number
   default     = 22062
-  description = "Last port a tenant can be given, inclusive. One per slot, so this covers every app a host can hold. There is headroom to about 32767 before the range would meet the kernel's own ephemeral ports, which the host draws its outbound source ports from."
+  description = "Last port a tenant can be given, inclusive. Headroom runs to about 32767, where this would meet the kernel's own ephemeral range."
 }
 
 variable "app_host_root_volume_size" {
