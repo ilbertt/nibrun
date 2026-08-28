@@ -7,12 +7,13 @@ import { DEFAULT_HTTP_PORT, FilenameSchema, Value } from '@repo/protocol';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
 import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import {
+  askedVariables,
   type EnvironmentVariable,
   environmentEdits,
   filledVariables,
   repeatedName,
   storedNames,
-  withEntries,
+  unfilledAsked,
 } from '#lib/environment-variables.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
@@ -96,6 +97,13 @@ export function validateEnvironment({
     return 'A variable needs a name.';
   }
 
+  // A link names what the app needs and carries no value for it, so this is the one thing on the
+  // form that nothing else could supply: not the link, not the app, not a default.
+  const unfilled = unfilledAsked(variables);
+  if (unfilled.length > 0) {
+    return `Fill in what the link asked for: ${unfilled.join(', ')}.`;
+  }
+
   // Two rows under one name are one variable by the time they are a record, so the row that lost
   // would go without a word — and which of them lost is not something a form should decide.
   const repeated = repeatedName(variables);
@@ -169,8 +177,7 @@ function suggestedValues({
     port: suggested?.port === undefined ? undefined : String(suggested.port),
     extraPublicPort: suggested?.extraPublicPort,
     args: suggested?.args?.join('\n'),
-    environment:
-      suggested?.environment && withEntries({ variables: [], entries: suggested.environment }),
+    environment: suggested?.environment && askedVariables(suggested.environment),
   };
 }
 
