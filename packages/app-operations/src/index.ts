@@ -12,9 +12,11 @@ export {
 export { deleteApp } from '#delete.ts';
 export {
   awaitDeploymentSettled,
+  type DeployableBinary,
   type DeployInput,
   deploy,
   describeUnservedDeployment,
+  type FetchableBinary,
   type SettledDeployment,
   type UploadableBinary,
   type UploadWait,

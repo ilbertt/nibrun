@@ -20,6 +20,7 @@ const UPLOAD_URL_TTL_SECONDS = 900;
 
 export abstract class ArtifactStorageRepositoryContract {
   abstract signUpload(input: { objectKey: ObjectKey; sizeBytes: number }): Promise<string>;
+  abstract write(input: { objectKey: ObjectKey; body: ReadableStream<Uint8Array> }): Promise<void>;
   abstract read(input: { objectKey: ObjectKey }): ReadableStream<Uint8Array>;
   abstract copy(input: { from: ObjectKey; to: ObjectKey }): Promise<void>;
   abstract exists(input: { objectKey: ObjectKey }): Promise<boolean>;
@@ -77,25 +78,26 @@ export class ArtifactStorageRepository implements ArtifactStorageRepositoryContr
     );
   }
 
-  read({ objectKey }: { objectKey: ObjectKey }): ReadableStream<Uint8Array> {
-    return this.client.file(objectKey).stream();
-  }
-
   /**
+   * The only way bytes reach a key without a signed url: the api fetched them itself, or is moving
+   * what it already holds, so it is the api that has to put them somewhere.
+   *
    * Streamed rather than buffered: this runs on an object as large as a whole binary, and holding
    * one in memory is the cost that signing the upload away was meant to avoid.
-   *
-   * Nothing else writes the content-addressed namespace. That is what lets a key found there be
-   * trusted without reading it again — the bytes under it were hashed by this process, on their
-   * way to it.
    */
-  async copy({ from, to }: { from: ObjectKey; to: ObjectKey }): Promise<void> {
-    const writer = this.client.file(to).writer({
+  async write({
+    objectKey,
+    body,
+  }: {
+    objectKey: ObjectKey;
+    body: ReadableStream<Uint8Array>;
+  }): Promise<void> {
+    const writer = this.client.file(objectKey).writer({
       type: ARTIFACT_CONTENT_TYPE,
       retry: UPLOAD_RETRIES,
     });
     try {
-      for await (const chunk of this.client.file(from).stream()) {
+      for await (const chunk of body) {
         await writer.write(chunk);
       }
       await writer.end();
@@ -103,6 +105,19 @@ export class ArtifactStorageRepository implements ArtifactStorageRepositoryContr
       await abandon({ writer, failure });
       throw failure;
     }
+  }
+
+  read({ objectKey }: { objectKey: ObjectKey }): ReadableStream<Uint8Array> {
+    return this.client.file(objectKey).stream();
+  }
+
+  /**
+   * Nothing else writes the content-addressed namespace. That is what lets a key found there be
+   * trusted without reading it again — the bytes under it were hashed by this process, on their
+   * way to it.
+   */
+  async copy({ from, to }: { from: ObjectKey; to: ObjectKey }): Promise<void> {
+    await this.write({ objectKey: to, body: this.read({ objectKey: from }) });
   }
 
   exists({ objectKey }: { objectKey: ObjectKey }): Promise<boolean> {

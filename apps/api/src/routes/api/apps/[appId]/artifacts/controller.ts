@@ -26,18 +26,24 @@ export const AppsAppIdArtifactsController = new Elysia()
       response: { [StatusMap.OK]: ListArtifactsResponseSchema },
     },
   )
-  // Created rather than OK: the artifact exists from here on, and the upload it is waiting for is
-  // what the response says where to send.
+  // Created rather than OK: the artifact exists from here on. What is left to do with it is what
+  // differs — an upload is told where to send the bytes, while a url has already been followed by
+  // the time this answers, and the request the caller is waiting on is the one that fetched it.
   .post(
     '/apps/:appId/artifacts',
     async ({ artifactsService, params, body, user, status }) => {
-      const upload = await artifactsService.create({
-        appId: Value.Parse(AppIdSchema, params.appId),
-        ownerId: Value.Parse(OwnerIdSchema, user.id),
-        filename: body.filename,
-        sizeBytes: body.sizeBytes,
-      });
-      return status(StatusMap.Created, upload);
+      const appId = Value.Parse(AppIdSchema, params.appId);
+      const ownerId = Value.Parse(OwnerIdSchema, user.id);
+      const created =
+        'url' in body
+          ? await artifactsService.createFromUrl({ appId, ownerId, url: body.url })
+          : await artifactsService.create({
+              appId,
+              ownerId,
+              filename: body.filename,
+              sizeBytes: body.sizeBytes,
+            });
+      return status(StatusMap.Created, created);
     },
     {
       body: CreateArtifactBodySchema,
