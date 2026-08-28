@@ -16,8 +16,10 @@
 #define ARGUMENT_KEY_PREFIX "ARG_"
 #define TENANT_PREFIX "ENV_"
 #define HOSTNAME_KEY "HOSTNAME"
-/* The one runtime key the tenant is handed under its own name, so it is spelled once. */
+#define DATA_DIR_KEY "DATA_DIR"
+/* The runtime keys the tenant is handed under their own names, each spelled once. */
 #define HOSTNAME_VARIABLE RUNTIME_PREFIX HOSTNAME_KEY
+#define DATA_DIR_VARIABLE RUNTIME_PREFIX DATA_DIR_KEY
 
 /* Only a sigil followed by RUNTIME_PREFIX opens a reference, which is what leaves a
  * secret's own '$' alone — see the format contract in config.h. */
@@ -32,8 +34,9 @@
 #define MIN_BACKOFF_FACTOR 1.0
 #define MAX_BACKOFF_FACTOR 1000.0
 
-/* PORT, NIBRUN_HOSTNAME, HOME and TMPDIR, on top of whatever the tenant configured. */
-#define BASE_VARIABLES 4
+/* PORT, NIBRUN_HOSTNAME, NIBRUN_DATA_DIR, HOME and TMPDIR, on top of whatever the
+ * tenant configured. */
+#define BASE_VARIABLES 5
 
 enum field_type {
   FIELD_UNSIGNED,
@@ -364,6 +367,10 @@ static bool reference_value(const struct instance_config *config, const struct r
     *out = config->hostname;
     return true;
   }
+  if (names_key(reference, DATA_DIR_KEY)) {
+    *out = DATA_DIR;
+    return true;
+  }
   return false;
 }
 
@@ -526,6 +533,19 @@ static bool is_named(const char *entry, const char *name) {
   return strncmp(entry, name, length) == 0 && entry[length] == '=';
 }
 
+/* The names the platform issues: a tenant value under one of them would read as
+ * issued too, and the prefix cannot keep the two apart here — both reach execve
+ * under the one name. */
+static const char *platform_owned_name(const char *entry) {
+  if (is_named(entry, HOSTNAME_VARIABLE)) {
+    return HOSTNAME_VARIABLE;
+  }
+  if (is_named(entry, DATA_DIR_VARIABLE)) {
+    return DATA_DIR_VARIABLE;
+  }
+  return NULL;
+}
+
 static bool defines(char *const *entries, size_t count, const char *name) {
   for (size_t index = 0; index < count; index++) {
     if (is_named(entries[index], name)) {
@@ -555,6 +575,7 @@ char *const *config_build_environment(const struct instance_config *config) {
   snprintf(port_variable, sizeof(port_variable), "PORT=%u", config->port);
   size_t count = 0;
   environment[count++] = port_variable;
+  environment[count++] = DATA_DIR_VARIABLE "=" DATA_DIR;
   if (config->hostname != NULL) {
     snprintf(hostname_variable, sizeof(hostname_variable), "%s=%s", HOSTNAME_VARIABLE,
              config->hostname);
@@ -566,10 +587,11 @@ char *const *config_build_environment(const struct instance_config *config) {
       log_line("ignoring the tenant's own PORT; this instance is served on %u", config->port);
       continue;
     }
-    /* Dropped whether or not one was written: the name belongs to the platform, so a
-     * value the tenant set would read as issued by it. */
-    if (is_named(config->tenant_environment[index], HOSTNAME_VARIABLE)) {
-      log_line("ignoring the tenant's own %s; the platform owns that name", HOSTNAME_VARIABLE);
+    /* The hostname is dropped whether or not one was written, so a tenant's own never
+     * stands in for an instance that was issued none. */
+    const char *owned = platform_owned_name(config->tenant_environment[index]);
+    if (owned != NULL) {
+      log_line("ignoring the tenant's own %s; the platform owns that name", owned);
       continue;
     }
     environment[count++] = config->tenant_environment[index];

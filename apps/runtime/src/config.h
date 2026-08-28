@@ -79,11 +79,11 @@ bool config_read_file(struct instance_config *config, const char *path, char *bu
 /* argv for execve: the binary, then the parsed arguments, then NULL. */
 char *const *config_build_argv(const struct instance_config *config, const char *executable);
 
-/* The environment the tenant is exec'd with: PORT and NIBRUN_HOSTNAME, which the
- * platform owns because they are the port the agent probes and the name the edge
- * routes to, then the tenant's own variables, then defaults for anything they did
- * not set. A tenant variable of either name is dropped rather than exported: it
- * would describe an instance that does not exist. */
+/* The environment the tenant is exec'd with: PORT, NIBRUN_HOSTNAME and NIBRUN_DATA_DIR,
+ * which the platform owns because they are the port the agent probes, the name the edge
+ * routes to and the path the volume is mounted at, then the tenant's own variables, then
+ * defaults for anything they did not set. A tenant variable of any of those names is
+ * dropped rather than exported: it would describe an instance that does not exist. */
 char *const *config_build_environment(const struct instance_config *config);
 
 #endif

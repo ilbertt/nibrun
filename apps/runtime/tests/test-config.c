@@ -112,7 +112,7 @@ static void drops_a_tenant_hostname(void) {
   while (environment[count] != NULL) {
     count++;
   }
-  EXPECT(count == 4); /* PORT, NIBRUN_HOSTNAME, HOME, TMPDIR */
+  EXPECT(count == 5); /* PORT, NIBRUN_DATA_DIR, NIBRUN_HOSTNAME, HOME, TMPDIR */
 }
 
 /* The only way a tenant value is not passed through byte for byte, and what a binary
@@ -123,6 +123,7 @@ static void expands_a_runtime_reference(void) {
                                  "ENV_BARE=$NIBRUN_PORT\n"
                                  "ENV_BRACED=${NIBRUN_PORT}\n"
                                  "ENV_WITHIN=http://$NIBRUN_HOSTNAME:${NIBRUN_PORT}/health\n"
+                                 "ENV_UNDER_THE_VOLUME=${NIBRUN_DATA_DIR}/state.db\n"
                                  "ENV_TWICE=$NIBRUN_PORT-$NIBRUN_PORT\n"
                                  "ENV_ADJACENT=${NIBRUN_PORT}0\n"));
 
@@ -130,6 +131,7 @@ static void expands_a_runtime_reference(void) {
   EXPECT(strcmp(value_of(environment, "BARE"), "8080") == 0);
   EXPECT(strcmp(value_of(environment, "BRACED"), "8080") == 0);
   EXPECT(strcmp(value_of(environment, "WITHIN"), "http://my-app.nibrun.app:8080/health") == 0);
+  EXPECT(strcmp(value_of(environment, "UNDER_THE_VOLUME"), "/app/data/state.db") == 0);
   EXPECT(strcmp(value_of(environment, "TWICE"), "8080-8080") == 0);
   /* Braces are the whole reason there are two forms: without them this names PORT0. */
   EXPECT(strcmp(value_of(environment, "ADJACENT"), "80800") == 0);
@@ -257,12 +259,25 @@ static void builds_the_tenant_environment(void) {
   EXPECT(strcmp(value_of(environment, "HOME"), "/somewhere") == 0);
   EXPECT(strcmp(value_of(environment, "TOKEN"), "abc") == 0);
   EXPECT(strcmp(value_of(environment, "TMPDIR"), "/tmp") == 0);
+  EXPECT(strcmp(value_of(environment, "NIBRUN_DATA_DIR"), "/app/data") == 0);
 
   size_t count = 0;
   while (environment[count] != NULL) {
     count++;
   }
-  EXPECT(count == 4); /* PORT, HOME, TOKEN, TMPDIR — the tenant's own PORT dropped */
+  /* PORT, NIBRUN_DATA_DIR, HOME, TOKEN, TMPDIR — the tenant's own PORT dropped, its
+   * HOME kept, because only the first of the two names an instance it is served on. */
+  EXPECT(count == 5);
+}
+
+/* Where the volume is mounted is the platform's to say: a tenant's own would point the
+ * binary at a path that is not the one thing surviving its next boot. */
+static void drops_a_tenant_data_dir(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "ENV_NIBRUN_DATA_DIR=/somewhere-else\n"));
+
+  char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "NIBRUN_DATA_DIR"), "/app/data") == 0);
 }
 
 /* A binary that needs a subcommand cannot be started without these, and an argv
@@ -335,6 +350,7 @@ int main(void) {
   rejects_a_nul_byte();
   rejects_too_many_tenant_variables();
   builds_the_tenant_environment();
+  drops_a_tenant_data_dir();
   passes_arguments_through_in_order();
   accepts_arguments_in_any_order();
   a_binary_with_no_arguments_is_exec_d_bare();
