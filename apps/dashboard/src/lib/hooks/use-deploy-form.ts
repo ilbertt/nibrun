@@ -3,7 +3,7 @@ import {
   parseEnvironmentPatch,
   type UploadableBinary,
 } from '@repo/app-operations';
-import { DEFAULT_GUEST_PORT, FilenameSchema, Value } from '@repo/protocol';
+import { DEFAULT_HTTP_PORT, FilenameSchema, Value } from '@repo/protocol';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
 import {
   type EnvironmentVariable,
@@ -145,7 +145,7 @@ export function useDeployForm({
     locked,
     replacing,
     targetResolved,
-    defaultPort: String(replacing?.config.guestPort ?? suggested?.port ?? DEFAULT_GUEST_PORT),
+    defaultPort: String(replacing?.config.httpPort ?? suggested?.port ?? DEFAULT_HTTP_PORT),
     defaultArgs: replacing?.config.args.join('\n') ?? '',
   };
 }
@@ -162,7 +162,7 @@ function asReleaseRequest({
   value: DeployFormValues;
   replacing: AppSummary | undefined;
 }): ReleaseRequest | undefined {
-  const port = Number(value.port ?? replacing?.config.guestPort ?? DEFAULT_GUEST_PORT);
+  const port = Number(value.port ?? replacing?.config.httpPort ?? DEFAULT_HTTP_PORT);
   if (!Number.isInteger(port)) {
     return undefined;
   }

@@ -58,7 +58,7 @@ describe('a malformed request is a bad request', () => {
   });
 
   test('patching an app with a port that is not one', async () => {
-    const response = await sendJson({ method: 'PATCH', url: APP_URL, body: { guestPort: 0 } });
+    const response = await sendJson({ method: 'PATCH', url: APP_URL, body: { httpPort: 0 } });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
@@ -66,7 +66,7 @@ describe('a malformed request is a bad request', () => {
   // Every field is optional, so a misspelled one matches nothing and would otherwise be a 200
   // for an edit that never happened.
   test('patching an app with a field it does not have', async () => {
-    const response = await sendJson({ method: 'PATCH', url: APP_URL, body: { guestport: 8080 } });
+    const response = await sendJson({ method: 'PATCH', url: APP_URL, body: { httpport: 8080 } });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
@@ -89,7 +89,7 @@ describe('a malformed request is a bad request', () => {
     const response = await sendJson({
       method: 'PATCH',
       url: APP_URL,
-      body: { environment: { TOKEN: 'sk-must-not-come-back' }, guestPort: 0 },
+      body: { environment: { TOKEN: 'sk-must-not-come-back' }, httpPort: 0 },
     });
 
     expect(response.status).toBe(StatusMap['Bad Request']);

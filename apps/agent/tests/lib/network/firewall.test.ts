@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { GuestPortSchema, HostPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
+import { HostPortSchema, HttpPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
 import {
   type FirewallState,
   INSTANCE_METADATA_ADDRESS_V4,
@@ -12,11 +12,11 @@ import {
 const PRIVATE_DESTINATIONS_V6_SAMPLE = ['::1', 'fe80:', 'fc', 'fd'];
 
 const HOST_PORT_NUMBER = 21_000;
-const GUEST_PORT_NUMBER = 3000;
+const HTTP_PORT_NUMBER = 3000;
 
 const instance = {
   hostPort: Value.Parse(HostPortSchema, HOST_PORT_NUMBER),
-  guestPort: Value.Parse(GuestPortSchema, GUEST_PORT_NUMBER),
+  httpPort: Value.Parse(HttpPortSchema, HTTP_PORT_NUMBER),
   hostIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.1'),
   guestIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.2'),
 };
@@ -154,7 +154,7 @@ describe('the same isolation holds over ipv6', () => {
 });
 
 describe('forwarding', () => {
-  test('a host port is forwarded to the guest port, not to itself', () => {
+  test('a host port is forwarded to the HTTP port, not to itself', () => {
     const ruleset = renderRuleset(state({ instances: [instance] }));
     expect(ruleset).toContain('tcp dport 21000 dnat to 10.201.0.2:3000');
   });

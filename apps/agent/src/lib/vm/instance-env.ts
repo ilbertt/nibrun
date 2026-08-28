@@ -1,8 +1,8 @@
 import { FileSystem, Path } from '@effect/platform';
 import type {
   AppHostname,
-  GuestPort,
   Hostname,
+  HttpPort,
   RestartPolicy,
   TenantArguments,
   TenantEnvironment,
@@ -53,13 +53,13 @@ export class UnrepresentableEnvironment extends Data.TaggedError('Unrepresentabl
  * truncating somebody's configuration into the next line.
  */
 export function renderInstanceEnv({
-  guestPort,
+  httpPort,
   hostnames,
   args,
   environment,
   restartPolicy,
 }: {
-  guestPort: GuestPort;
+  httpPort: HttpPort;
   hostnames: AppHostname[];
   args: TenantArguments;
   environment: TenantEnvironment;
@@ -67,7 +67,7 @@ export function renderInstanceEnv({
 }): Either.Either<string, UnrepresentableEnvironment> {
   const hostname = platformHostname(hostnames);
   const lines = [
-    `${RUNTIME_PREFIX}PORT=${guestPort}`,
+    `${RUNTIME_PREFIX}PORT=${httpPort}`,
     ...(hostname === undefined ? [] : [`${RUNTIME_PREFIX}HOSTNAME=${hostname}`]),
     `${RUNTIME_PREFIX}MAX_RESTARTS=${restartPolicy.maxRestarts}`,
     `${RUNTIME_PREFIX}INITIAL_BACKOFF_MS=${restartPolicy.initialBackoffMs}`,
@@ -102,7 +102,7 @@ export const buildInstanceConfigImage = ({
   ...content
 }: {
   workingDir: string;
-  guestPort: GuestPort;
+  httpPort: HttpPort;
   hostnames: AppHostname[];
   args: TenantArguments;
   environment: TenantEnvironment;

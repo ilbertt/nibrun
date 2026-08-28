@@ -7,7 +7,7 @@ import {
 } from '#domain/instance.ts';
 import { SecretStringSchema } from '#lib/secret.ts';
 import { stringEnum } from '#lib/string-enum.ts';
-import { DnsLabelSchema, GuestPortSchema, HostnameSchema, TimestampSchema } from '#lib/wire.ts';
+import { DnsLabelSchema, HostnameSchema, HttpPortSchema, TimestampSchema } from '#lib/wire.ts';
 
 /**
  * One name is carved out of what is otherwise the shell's own rule, because a JavaScript object is
@@ -95,7 +95,7 @@ export const TenantArgumentsSchema = Type.Array(Type.String({ maxLength: MAX_ARG
 export type TenantArguments = typeof TenantArgumentsSchema.static;
 
 export const AppConfigSchema = Type.Object({
-  guestPort: GuestPortSchema,
+  httpPort: HttpPortSchema,
   args: TenantArgumentsSchema,
   environment: TenantEnvironmentSchema,
   resources: InstanceResourcesSchema,

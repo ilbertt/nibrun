@@ -53,7 +53,7 @@ export function DeployForm({
       <api.Field name="port" validators={{ onChange: validatePort }}>
         {(field) => (
           <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
-            <FieldLabel htmlFor="deploy-port">Guest port</FieldLabel>
+            <FieldLabel htmlFor="deploy-port">HTTP port</FieldLabel>
             <Input
               id="deploy-port"
               value={field.state.value ?? defaultPort}
@@ -71,9 +71,7 @@ export function DeployForm({
         )}
       </api.Field>
 
-      {/* Both sections are settings of the same release, not alternatives, so opening one
-          does not put the other away mid-edit. */}
-      <Accordion multiple>
+      <Accordion>
         <AccordionItem>
           <AccordionTrigger>
             <span className="flex items-baseline gap-2">
@@ -85,7 +83,7 @@ export function DeployForm({
               </api.Subscribe>
             </span>
           </AccordionTrigger>
-          <AccordionContent>
+          <AccordionContent keepMounted>
             <api.Field name="args">
               {(field) => (
                 <Field>
@@ -104,7 +102,9 @@ export function DeployForm({
             </api.Field>
           </AccordionContent>
         </AccordionItem>
+      </Accordion>
 
+      <Accordion>
         <AccordionItem>
           <AccordionTrigger>
             <span className="flex items-baseline gap-2">
@@ -118,8 +118,8 @@ export function DeployForm({
               </api.Subscribe>
             </span>
             {/* Collapsed, a refused variable would disable the button with nothing on screen
-                saying why, so the section that holds it says so itself — which is why its
-                panel stays mounted, and its variables keep being validated, while it is shut. */}
+                saying why, so the section that holds it says so itself. A shut panel keeps its
+                variables validated, which is what leaves anything to say. */}
             <api.Subscribe selector={(state) => state.fieldMeta.environment?.errors.length ?? 0}>
               {(refused) =>
                 refused > 0 ? (

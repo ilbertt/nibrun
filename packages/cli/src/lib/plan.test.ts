@@ -76,7 +76,7 @@ test('an owner with no apps is asked what to call one, not which to use', async 
   expect(resolved).toEqual({ name: 'my-server', port: 3000 });
   expect(asked).toEqual([
     'text:Name the app (my-server)',
-    'text:Which port does the binary listen on? (3000)',
+    'text:Which HTTP port does the binary listen on? (3000)',
     'confirm:Create my-server and deploy?',
   ]);
 });

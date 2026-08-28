@@ -30,7 +30,7 @@ export const SHARED_OPTIONS = {
     name: 'port',
     option: {
       schema: z.number().int().optional(),
-      description: 'Port the binary listens on inside the guest.',
+      description: 'HTTP port the binary listens on inside the guest.',
     },
   },
   env: {

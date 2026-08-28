@@ -30,7 +30,7 @@ export const DEFAULT_INSTANCE_RESOURCES: InstanceResources = {
   memoryMib: DEFAULT_MEMORY_MIB,
 };
 
-// Run by the agent against the guest port the user declared. A bare TCP connect is the
+// Run by the agent against the HTTP port the user declared. A bare TCP connect is the
 // default because that is precisely the question being asked — is the tenant's process
 // accepting connections — and it needs nothing of the tenant. A path upgrades the probe to
 // an HTTP GET that must answer 2xx.

@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  DEFAULT_GUEST_PORT,
+  DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
-  type GuestPort,
   type HostPort,
   HostPortSchema,
   HostReportedStateSchema,
+  type HttpPort,
   isValidMessage,
   Value,
 } from '@repo/protocol';
@@ -113,10 +113,10 @@ describe('allocatable capacity', () => {
     ).toEqual({ vcpuCount: 0, memoryMib: 0, cacheBytes: FREE_CACHE_BYTES });
   });
 
-  test('guest ports are branded apart from host ports at the type level', () => {
-    const guestPort: GuestPort = DEFAULT_GUEST_PORT;
-    // @ts-expect-error a GuestPort is not a HostPort, which is what stops a routing bug type-checking
-    const hostPort: HostPort = guestPort;
-    expect(hostPort).toBe(Value.Parse(HostPortSchema, guestPort as unknown));
+  test('HTTP ports are branded apart from host ports at the type level', () => {
+    const httpPort: HttpPort = DEFAULT_HTTP_PORT;
+    // @ts-expect-error an HttpPort is not a HostPort, which is what stops a routing bug type-checking
+    const hostPort: HostPort = httpPort;
+    expect(hostPort).toBe(Value.Parse(HostPortSchema, httpPort as unknown));
   });
 });
