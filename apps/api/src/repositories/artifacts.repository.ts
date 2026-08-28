@@ -6,6 +6,15 @@ export type ArtifactRow = Queries['SelectArtifactById'];
 export type PendingArtifactRow = Queries['SelectPendingArtifact'];
 export type AbandonedArtifactRow = Queries['SelectAbandonedArtifacts'];
 
+export type InsertPendingArtifactInput = {
+  appId: AppId;
+  ownerId: OwnerId;
+  originalFileName: Filename;
+  // Only an artifact the api fetched has one, so the column it lands in is nullable and this is
+  // how a caller says the bytes were sent instead.
+  originalFileUrl: string | null;
+};
+
 export type CompleteArtifactInput = {
   appId: AppId;
   artifactId: ArtifactId;
@@ -16,11 +25,7 @@ export type CompleteArtifactInput = {
 };
 
 export abstract class ArtifactsRepositoryContract {
-  abstract insertPending(input: {
-    appId: AppId;
-    ownerId: OwnerId;
-    originalFileName: Filename;
-  }): Promise<PendingArtifactRow | null>;
+  abstract insertPending(input: InsertPendingArtifactInput): Promise<PendingArtifactRow | null>;
   abstract complete(input: CompleteArtifactInput): Promise<ArtifactRow | null>;
   abstract remove(input: { appId: AppId; artifactId: ArtifactId; ownerId: OwnerId }): Promise<void>;
   abstract findPending(input: {
@@ -47,17 +52,14 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     appId,
     ownerId,
     originalFileName,
-  }: {
-    appId: AppId;
-    ownerId: OwnerId;
-    originalFileName: Filename;
-  }): Promise<PendingArtifactRow | null> {
+    originalFileUrl,
+  }: InsertPendingArtifactInput): Promise<PendingArtifactRow | null> {
     const [row] = await this.sql.InsertPendingArtifact`
-      INSERT INTO nibrun.artifacts (app_id, original_file_name)
-      SELECT a.id, ${originalFileName}
+      INSERT INTO nibrun.artifacts (app_id, original_file_name, original_file_url)
+      SELECT a.id, ${originalFileName}, ${originalFileUrl}
       FROM nibrun.live_apps a
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      RETURNING id, app_id, original_file_name, created_at
+      RETURNING id, app_id, original_file_name, original_file_url, created_at
     `;
     return row ?? null;
   }
@@ -84,7 +86,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.id = ar.app_id
         AND a.owner_id = ${ownerId} AND ar.digest IS NULL
       RETURNING ar.id, ar.app_id, ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
-                ar.created_at
+                ar.original_file_url, ar.created_at
     `;
     return row ?? null;
   }
@@ -116,7 +118,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     ownerId: OwnerId;
   }): Promise<PendingArtifactRow | null> {
     const [row] = await this.sql.SelectPendingArtifact`
-      SELECT ar.id, ar.app_id, ar.original_file_name, ar.created_at
+      SELECT ar.id, ar.app_id, ar.original_file_name, ar.original_file_url, ar.created_at
       FROM nibrun.artifacts ar
       JOIN nibrun.live_apps a ON a.id = ar.app_id
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}
@@ -160,7 +162,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       /* @notNull size_bytes */
       /* @notNull object_key */
       SELECT ar.id, ar.app_id, ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
-             ar.created_at
+             ar.original_file_url, ar.created_at
       FROM nibrun.artifacts ar
       JOIN nibrun.live_apps a ON a.id = ar.app_id
       WHERE ar.app_id = ${appId} AND a.owner_id = ${ownerId} AND ar.digest IS NOT NULL
@@ -182,7 +184,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       /* @notNull size_bytes */
       /* @notNull object_key */
       SELECT ar.id, ar.app_id, ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
-             ar.created_at
+             ar.original_file_url, ar.created_at
       FROM nibrun.artifacts ar
       JOIN nibrun.live_apps a ON a.id = ar.app_id
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}

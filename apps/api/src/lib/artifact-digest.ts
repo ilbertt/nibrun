@@ -20,6 +20,34 @@ const HEX_ENCODING = 'hex';
  */
 const HEADER_BYTES = 65_536;
 
+/** Raised into a stream rather than returned, because the reader is what has to stop. */
+export class ArtifactTooLargeError extends Error {}
+
+/**
+ * The stream, up to the point where what is left of it could not be stored anyway.
+ *
+ * It errors rather than ends: a truncated binary is not the binary that was asked for, and a
+ * reader that took it for one would store something nobody chose to deploy.
+ */
+export function cappedTo({
+  maxSizeBytes,
+}: {
+  maxSizeBytes: number;
+}): TransformStream<Uint8Array, Uint8Array> {
+  let sizeBytes = 0;
+  return new TransformStream<Uint8Array, Uint8Array>({
+    // biome-ignore lint/complexity/useMaxParams: a transform is handed what to pass it on to
+    transform(chunk, controller) {
+      sizeBytes += chunk.byteLength;
+      if (sizeBytes > maxSizeBytes) {
+        controller.error(new ArtifactTooLargeError());
+        return;
+      }
+      controller.enqueue(chunk);
+    },
+  });
+}
+
 export type ArtifactIdentity = {
   digest: Sha256Digest;
   sizeBytes: number;

@@ -8,7 +8,13 @@ import {
   type OwnerId,
   Value,
 } from '@repo/protocol';
-import { type ArtifactInspection, inspectArtifact } from '#lib/artifact-digest.ts';
+import {
+  type ArtifactInspection,
+  ArtifactTooLargeError,
+  cappedTo,
+  inspectArtifact,
+} from '#lib/artifact-digest.ts';
+import { filenameFromUrl } from '#lib/binary-url.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
@@ -17,6 +23,10 @@ import type {
   ArtifactRow,
   ArtifactsRepositoryContract,
 } from '#repositories/artifacts.repository.ts';
+import type {
+  BinarySource,
+  BinarySourceRepositoryContract,
+} from '#repositories/binary-source.repository.ts';
 import { Service } from '#services/service.ts';
 
 // An app the caller does not own has to be indistinguishable from one that does not exist: a
@@ -25,6 +35,9 @@ const NO_SUCH_APP = 'App not found.';
 const NO_SUCH_ARTIFACT = 'Artifact not found.';
 const NO_SUCH_UPLOAD = 'No upload is awaiting that artifact.';
 const NOTHING_UPLOADED = 'Nothing was uploaded against that artifact.';
+const UNNAMED_BINARY =
+  "The url has to end in the binary's own name, as a release download does: .../my-server";
+const NOTHING_FETCHED = 'The url answered with no body.';
 const NOT_AN_EXECUTABLE = 'The artifact is not a Linux executable.';
 
 const BYTES_PER_MEBIBYTE = 1_048_576;
@@ -41,6 +54,19 @@ const MAX_ARTIFACT_MEBIBYTES = 256;
  */
 export const MAX_ARTIFACT_SIZE_BYTES = MAX_ARTIFACT_MEBIBYTES * BYTES_PER_MEBIBYTE;
 const TOO_LARGE = `A binary may be at most ${MAX_ARTIFACT_MEBIBYTES} MB.`;
+
+/**
+ * A url that answers nothing, said with the url in it. The api reaches it from where the api runs
+ * rather than from where the link was followed, so a host only the caller's own network can see is
+ * a url that works everywhere they tried it and nowhere this runs.
+ */
+function unreachable(url: string): string {
+  return `The url could not be reached from nibrun: ${url}`;
+}
+
+function refusedBy({ url, status }: { url: string; status: number }): string {
+  return `The url answered ${status}, so there was nothing to deploy: ${url}`;
+}
 
 function unsupportedInterpreter(interpreter: string): string {
   return `The artifact needs the dynamic loader at ${interpreter}, which the guest does not have. Link it against /lib64/ld-linux-x86-64.so.2, or compile it static.`;
@@ -92,20 +118,24 @@ function toArtifact(row: ArtifactRow): Artifact {
 export class ArtifactsService extends Service {
   private readonly artifactsRepo: ArtifactsRepositoryContract;
   private readonly storageRepo: ArtifactStorageRepositoryContract;
+  private readonly sourceRepo: BinarySourceRepositoryContract;
   private readonly appsRepo: AppOwnership;
 
   constructor({
     artifactsRepo,
     storageRepo,
+    sourceRepo,
     appsRepo,
   }: {
     artifactsRepo: ArtifactsRepositoryContract;
     storageRepo: ArtifactStorageRepositoryContract;
+    sourceRepo: BinarySourceRepositoryContract;
     appsRepo: AppOwnership;
   }) {
     super();
     this.artifactsRepo = artifactsRepo;
     this.storageRepo = storageRepo;
+    this.sourceRepo = sourceRepo;
     this.appsRepo = appsRepo;
   }
 
@@ -142,6 +172,7 @@ export class ArtifactsService extends Service {
       appId,
       ownerId,
       originalFileName: filename,
+      originalFileUrl: null,
     });
     if (!pending) {
       throw new NotFoundError(NO_SUCH_APP);
@@ -192,6 +223,118 @@ export class ArtifactsService extends Service {
       stream: this.storageRepo.read({ objectKey: staged }),
       maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES,
     });
+
+    return await this.promote({ appId, artifactId, ownerId, staged, inspection });
+  }
+
+  /**
+   * The bytes fetched instead of sent, which is the only way some of them can arrive at all: a
+   * release asset is served by a store that answers no cross-origin request, so a browser cannot
+   * read one to upload it. It is also the shorter path — the api holds the bytes once, on their
+   * way past, rather than reading back what a caller already sent.
+   *
+   * Hashed on that same pass. The stream is teed, so what is written to the staging key and what
+   * decides whether it is an artifact at all are one read of the source.
+   */
+  async createFromUrl({
+    appId,
+    ownerId,
+    url,
+  }: {
+    appId: AppId;
+    ownerId: OwnerId;
+    url: string;
+  }): Promise<Artifact> {
+    if (!(await this.appsRepo.isOwnedBy({ appId, ownerId }))) {
+      throw new NotFoundError(NO_SUCH_APP);
+    }
+
+    // The name a host writes into an export comes from the url, because nobody else is here to
+    // give one. A url that ends in no name at all is refused before it is fetched.
+    const filename = filenameFromUrl(url);
+    if (filename === undefined) {
+      throw new BadRequestError(UNNAMED_BINARY);
+    }
+
+    const source = await this.sourceRepo.open({ url });
+    if (source.outcome !== 'open') {
+      throw new BadRequestError(sourceRefusal({ url, source }));
+    }
+    if (
+      source.declaredSizeBytes !== undefined &&
+      source.declaredSizeBytes > MAX_ARTIFACT_SIZE_BYTES
+    ) {
+      throw new BadRequestError(TOO_LARGE);
+    }
+
+    const pending = await this.artifactsRepo.insertPending({
+      appId,
+      ownerId,
+      originalFileName: filename,
+      originalFileUrl: url,
+    });
+    if (!pending) {
+      throw new NotFoundError(NO_SUCH_APP);
+    }
+
+    const staged = stagingKey({ appId, artifactId: pending.id });
+    const inspection = await this.stage({ staged, body: source.body });
+
+    return await this.promote({ appId, artifactId: pending.id, ownerId, staged, inspection });
+  }
+
+  /**
+   * The source read once, into the staging key and into the inspection at the same time.
+   *
+   * Capped before it is teed rather than by the inspection alone: a refusal only stops the branch
+   * that reached it, and the branch still writing would otherwise spend a bucket on however much
+   * a url that lied about its length cares to send.
+   */
+  private async stage({
+    staged,
+    body,
+  }: {
+    staged: ObjectKey;
+    body: ReadableStream<Uint8Array>;
+  }): Promise<ArtifactInspection> {
+    const [stored, inspected] = body
+      .pipeThrough(cappedTo({ maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES }))
+      .tee();
+    try {
+      const [, inspection] = await Promise.all([
+        this.storageRepo.write({ objectKey: staged, body: stored }),
+        inspectArtifact({ stream: inspected, maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES }),
+      ]);
+      return inspection;
+    } catch (failure) {
+      // One branch failing leaves the other reading a source nothing will consume, so both are
+      // let go of before the failure is anybody else's.
+      await Promise.allSettled([stored.cancel(), inspected.cancel()]);
+      if (failure instanceof ArtifactTooLargeError) {
+        return { outcome: 'too-large' };
+      }
+      throw failure;
+    }
+  }
+
+  /**
+   * The staged bytes as the artifact they turned out to be, which is the same last step whether
+   * they were uploaded or fetched: what the inspection settled is written down, the bytes are put
+   * where their digest says, and the slot they came through is given up.
+   */
+  private async promote({
+    appId,
+    artifactId,
+    ownerId,
+    staged,
+    inspection,
+  }: {
+    appId: AppId;
+    artifactId: ArtifactId;
+    ownerId: OwnerId;
+    staged: ObjectKey;
+    inspection: ArtifactInspection;
+  }): Promise<Artifact> {
     if (inspection.outcome !== 'stored') {
       await this.abandon({ appId, artifactId, ownerId });
       throw new BadRequestError(refusalMessage(inspection));
@@ -302,6 +445,24 @@ export class ArtifactsService extends Service {
     } catch (error) {
       this.logger.warn('a staged upload could not be removed', { objectKey, error });
     }
+  }
+}
+
+/** Why the url gave nothing to store, in the terms of whoever wrote the link. */
+function sourceRefusal({
+  url,
+  source,
+}: {
+  url: string;
+  source: Exclude<BinarySource, { outcome: 'open' }>;
+}): string {
+  switch (source.outcome) {
+    case 'unreachable':
+      return unreachable(url);
+    case 'refused':
+      return refusedBy({ url, status: source.status });
+    case 'empty':
+      return NOTHING_FETCHED;
   }
 }
 

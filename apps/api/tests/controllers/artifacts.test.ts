@@ -34,6 +34,12 @@ describe('an app is not somewhere strangers can read from or write to', () => {
     expect(response.status).toBe(StatusMap.Unauthorized);
   });
 
+  test('asking for a binary at a url to be fetched requires a session', async () => {
+    const response = await create({ url: 'https://releases.test/my-server' });
+
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  });
+
   test('saying how an upload went requires a session', async () => {
     expect((await report({ upload: 'complete' })).status).toBe(StatusMap.Unauthorized);
   });
@@ -56,6 +62,20 @@ describe('a request that could not name a binary is not one', () => {
   // rather than sanitised into a different name.
   test('a filename that is a path is not a filename', async () => {
     const response = await create({ filename: '../../etc/passwd', sizeBytes: 1 });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
+  // The api is what follows this url, and a plaintext hop is one where what the guest ends up
+  // running was chosen by whoever sat between.
+  test('a url the api would not be alone on the wire for is refused', async () => {
+    expect((await create({ url: 'http://releases.test/my-server' })).status).toBe(
+      StatusMap['Bad Request'],
+    );
+  });
+
+  test('half of each way of naming a binary is neither', async () => {
+    const response = await create({ url: 'https://releases.test/my-server', sizeBytes: 'large' });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
   });

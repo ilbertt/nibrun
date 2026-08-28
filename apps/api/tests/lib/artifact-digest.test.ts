@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { isValidMessage, ObjectKeySchema, Sha256DigestSchema, Value } from '@repo/protocol';
-import { type ArtifactInspection, inspectArtifact } from '#lib/artifact-digest.ts';
+import {
+  type ArtifactInspection,
+  ArtifactTooLargeError,
+  cappedTo,
+  inspectArtifact,
+} from '#lib/artifact-digest.ts';
 
 // The api refuses anything that is not a Linux executable, so every fixture that is meant to be
 // read to the end opens with the ELF magic the way a real upload does.
@@ -258,5 +263,45 @@ describe('a loader the guest does not have is refused before a host ever sees it
     await inspectArtifact({ stream, maxSizeBytes: PAST_THE_HEADER_BYTES });
 
     expect(delivered).toEqual([chunks[0] as Uint8Array]);
+  });
+});
+
+/**
+ * What holds a fetch to the size a store would accept. The inspection reaches the same verdict on
+ * its own, but only for the reader that asked: a stream being written somewhere at the same time
+ * has to be stopped where it is, not judged after the fact.
+ */
+describe('a stream is capped at what could be stored', () => {
+  async function drain(stream: ReadableStream<Uint8Array>): Promise<number> {
+    let sizeBytes = 0;
+    for await (const chunk of stream) {
+      sizeBytes += chunk.byteLength;
+    }
+    return sizeBytes;
+  }
+
+  function streamed(chunks: string[]): ReadableStream<Uint8Array> {
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(bytesOf(chunk));
+        }
+        controller.close();
+      },
+    });
+  }
+
+  test('everything within it is passed on untouched', async () => {
+    const capped = streamed([BINARY]).pipeThrough(cappedTo({ maxSizeBytes: NO_LIMIT }));
+
+    expect(await drain(capped)).toBe(BINARY.length);
+  });
+
+  test('a stream past it errors rather than ending short', async () => {
+    const capped = streamed([BINARY, OTHER_BINARY]).pipeThrough(
+      cappedTo({ maxSizeBytes: BINARY.length }),
+    );
+
+    await expect(drain(capped)).rejects.toBeInstanceOf(ArtifactTooLargeError);
   });
 });

@@ -398,6 +398,7 @@ export interface IInsertPendingArtifactResult {
     app_id: IArtifactsColumns["app_id"];
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
 }
@@ -414,6 +415,7 @@ export interface ICompleteArtifactResult {
     object_key: NonNullable<IArtifactsColumns["object_key"]>;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
 }
@@ -428,6 +430,7 @@ export interface ISelectPendingArtifactResult {
     app_id: IArtifactsColumns["app_id"];
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
 }
@@ -454,6 +457,7 @@ export interface ISelectArtifactsByAppResult {
     object_key: NonNullable<IArtifactsColumns["object_key"]>;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
 }
@@ -470,6 +474,7 @@ export interface ISelectArtifactByIdResult {
     object_key: NonNullable<IArtifactsColumns["object_key"]>;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
 }
@@ -1021,6 +1026,7 @@ export interface IArtifactsColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
+    original_file_url: string | null;
 }
 
 /** Schema of `artifacts`. */
@@ -1531,7 +1537,8 @@ export const schema = {
             object_key: { _columnName: "object_key", _foreignKeys: {} },
             original_file_name: { _columnName: "original_file_name", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            original_file_url: { _columnName: "original_file_url", _foreignKeys: {} }
         },
         _indexes: {
             artifacts_app_id_idx: { _indexName: "artifacts_app_id_idx" },

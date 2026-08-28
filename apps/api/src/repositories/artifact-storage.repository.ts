@@ -20,6 +20,7 @@ const UPLOAD_URL_TTL_SECONDS = 900;
 
 export abstract class ArtifactStorageRepositoryContract {
   abstract signUpload(input: { objectKey: ObjectKey; sizeBytes: number }): Promise<string>;
+  abstract write(input: { objectKey: ObjectKey; body: ReadableStream<Uint8Array> }): Promise<void>;
   abstract read(input: { objectKey: ObjectKey }): ReadableStream<Uint8Array>;
   abstract copy(input: { from: ObjectKey; to: ObjectKey }): Promise<void>;
   abstract exists(input: { objectKey: ObjectKey }): Promise<boolean>;
@@ -75,6 +76,33 @@ export class ArtifactStorageRepository implements ArtifactStorageRepositoryContr
       }),
       { expiresIn: UPLOAD_URL_TTL_SECONDS, signableHeaders: new Set(['content-length']) },
     );
+  }
+
+  /**
+   * The only way bytes reach a staging key without a signed url: the api fetched them itself, so
+   * it is the api that has to put them somewhere. Streamed for the same reason `copy` is — a
+   * binary held whole is memory this process is not sized for.
+   */
+  async write({
+    objectKey,
+    body,
+  }: {
+    objectKey: ObjectKey;
+    body: ReadableStream<Uint8Array>;
+  }): Promise<void> {
+    const writer = this.client.file(objectKey).writer({
+      type: ARTIFACT_CONTENT_TYPE,
+      retry: UPLOAD_RETRIES,
+    });
+    try {
+      for await (const chunk of body) {
+        await writer.write(chunk);
+      }
+      await writer.end();
+    } catch (failure) {
+      await abandon({ writer, failure });
+      throw failure;
+    }
   }
 
   read({ objectKey }: { objectKey: ObjectKey }): ReadableStream<Uint8Array> {
