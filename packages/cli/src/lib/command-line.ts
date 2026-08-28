@@ -37,6 +37,36 @@ export function parseArguments(line: string): TenantArguments {
   return tokenize(line);
 }
 
+function separates({ char, quote }: { char: string; quote: string | null }): boolean {
+  return quote === null && WHITESPACE.test(char);
+}
+
+function opensQuote({ char, quote }: { char: string; quote: string | null }): boolean {
+  return quote === null && (char === SINGLE || char === DOUBLE);
+}
+
+/**
+ * The character a backslash stands for, or `undefined` where it is only itself — as it is inside
+ * single quotes, where nothing is special, which is what makes them the way to hand a Windows
+ * path or a regex through untouched.
+ */
+function escapedAt({
+  line,
+  index,
+  quote,
+}: {
+  line: string;
+  index: number;
+  quote: string | null;
+}): string | undefined {
+  return line[index] === ESCAPE && quote !== SINGLE ? line[index + 1] : undefined;
+}
+
+/** `''` between two quotes is a token; never having started one is not. */
+function ended(token: string | null): string[] {
+  return token === null ? [] : [token];
+}
+
 /**
  * The shell's own rules, applied a second time to the string the shell handed over whole. Only
  * the part that separates arguments: nothing here expands a variable, a glob or a `$(…)`, so a
@@ -50,11 +80,9 @@ function tokenize(line: string): string[] {
   for (let index = 0; index < line.length; index++) {
     const char = line[index]!;
 
-    if (quote === null && WHITESPACE.test(char)) {
-      if (token !== null) {
-        tokens.push(token);
-        token = null;
-      }
+    if (separates({ char, quote })) {
+      tokens.push(...ended(token));
+      token = null;
       continue;
     }
 
@@ -64,14 +92,13 @@ function tokenize(line: string): string[] {
       quote = null;
       continue;
     }
-    if (quote === null && (char === SINGLE || char === DOUBLE)) {
+    if (opensQuote({ char, quote })) {
       quote = char;
       continue;
     }
-    // Literal inside single quotes, where nothing is special — which is what makes them the way
-    // to hand a Windows path or a regex through untouched.
-    const escaped = line[index + 1];
-    if (char === ESCAPE && quote !== SINGLE && escaped !== undefined) {
+
+    const escaped = escapedAt({ line, index, quote });
+    if (escaped !== undefined) {
       token += escaped;
       index++;
       continue;
@@ -82,8 +109,6 @@ function tokenize(line: string): string[] {
   if (quote !== null) {
     throw new UsageError(`Unbalanced ${quote} in the command line.`);
   }
-  if (token !== null) {
-    tokens.push(token);
-  }
+  tokens.push(...ended(token));
   return tokens;
 }
