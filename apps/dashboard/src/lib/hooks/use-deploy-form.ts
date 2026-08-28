@@ -1,10 +1,17 @@
 import {
+  type DeployableBinary,
   InvalidEnvironmentError,
   parseEnvironmentPatch,
-  type UploadableBinary,
 } from '@repo/app-operations';
 import { DEFAULT_HTTP_PORT, FilenameSchema, Value } from '@repo/protocol';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
+import {
+  type BinarySource,
+  fetchedUrl,
+  namedByUrl,
+  pickedFile,
+  refusedUrl,
+} from '#lib/binary-source.ts';
 import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import {
   askedVariables,
@@ -21,7 +28,7 @@ import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export type DeployFormValues = {
-  binary: File | undefined;
+  binary: BinarySource | undefined;
   name: string;
   port: string | undefined;
   extraPublicPort: boolean | undefined;
@@ -63,22 +70,31 @@ const UNTOUCHED: DeployFormValues = {
   environment: undefined,
 };
 
-export function validateBinary({ value }: { value: File | undefined }): string | undefined {
+export function validateBinary({ value }: { value: BinarySource | undefined }): string | undefined {
   if (value === undefined) {
-    return 'Pick the binary to deploy.';
+    return 'Pick the binary to deploy, or give the url it can be fetched at.';
   }
-  return validateBinaryName(value);
+  return validateBinarySource(value);
 }
 
-/** What an app already running one asks of the field: a name it could keep, or nothing at all. */
-export function validateKeptBinary({ value }: { value: File | undefined }): string | undefined {
-  return value === undefined ? undefined : validateBinaryName(value);
+/** What an app already running one asks of the field: a binary it could keep, or nothing at all. */
+export function validateKeptBinary({
+  value,
+}: {
+  value: BinarySource | undefined;
+}): string | undefined {
+  return value === undefined ? undefined : validateBinarySource(value);
 }
 
-function validateBinaryName(binary: File): string | undefined {
-  return Value.Check(FilenameSchema, binary.name)
-    ? undefined
-    : 'That file cannot be named inside an export. Rename it and pick it again.';
+function validateBinarySource(source: BinarySource): string | undefined {
+  const url = fetchedUrl(source);
+  if (url !== undefined) {
+    return refusedUrl(url);
+  }
+  const file = pickedFile(source);
+  return file !== undefined && !Value.Check(FilenameSchema, file.name)
+    ? 'That file cannot be named inside an export. Rename it and pick it again.'
+    : undefined;
 }
 
 export function validatePort({ value }: { value: string | undefined }): string | undefined {
@@ -172,8 +188,10 @@ function suggestedValues({
 }): DeployFormValues {
   return {
     ...UNTOUCHED,
-    binary,
-    name: suggested?.name ?? UNTOUCHED.name,
+    // A binary handed over from the landing page is one somebody dropped, which outranks a url a
+    // link they followed happened to name.
+    binary: binary ?? (suggested?.binary === undefined ? undefined : { url: suggested.binary }),
+    name: suggested?.name ?? namedByUrl(suggested?.binary ?? '') ?? UNTOUCHED.name,
     port: suggested?.port === undefined ? undefined : String(suggested.port),
     extraPublicPort: suggested?.extraPublicPort,
     args: suggested?.args?.join('\n'),
@@ -217,7 +235,7 @@ function asReleaseRequest({
     return replacing === undefined ? undefined : { ...configured, app: replacing.slug };
   }
 
-  const binary = uploadableFrom(value.binary);
+  const binary = deployableFrom(value.binary);
   return binary === undefined
     ? undefined
     : {
@@ -228,7 +246,19 @@ function asReleaseRequest({
       };
 }
 
-function uploadableFrom(file: File): UploadableBinary | undefined {
+/**
+ * The source as what the deploy sends: a file goes to the store from here, and a url goes to the
+ * api, which is the end that can read it.
+ */
+function deployableFrom(source: BinarySource): DeployableBinary | undefined {
+  const url = fetchedUrl(source);
+  if (url !== undefined) {
+    return refusedUrl(url) === undefined ? { url } : undefined;
+  }
+  const file = pickedFile(source);
+  if (file === undefined) {
+    return undefined;
+  }
   return Value.Check(FilenameSchema, file.name) ? { name: file.name, body: file } : undefined;
 }
 

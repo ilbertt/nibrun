@@ -41,6 +41,24 @@ function rewritten(link: string): string {
   return defaultStringifySearch(written(link));
 }
 
+/**
+ * The binary is not part of what a deploy configures — it is what is deployed — so a link carrying
+ * one is the difference between a form to fill in and a button to press.
+ */
+test('a link may carry the binary itself', () => {
+  expect(followed('?binary=https://releases.test/v1/my-server').binary).toBe(
+    'https://releases.test/v1/my-server',
+  );
+  expect(followed(rewritten('?binary=https://releases.test/v1/my-server')).binary).toBe(
+    'https://releases.test/v1/my-server',
+  );
+});
+
+test('a url nibrun could not fetch a binary from prefills nothing', () => {
+  expect(followed('?binary=http://releases.test/v1/my-server').binary).toBeUndefined();
+  expect(followed('?binary=https://releases.test/downloads/').binary).toBeUndefined();
+});
+
 test('a link may ask for everything a deploy configures', () => {
   expect(followed(EVERYTHING)).toEqual(ASKED);
 });
@@ -88,6 +106,7 @@ test('a port that is no port is nothing to prefill', () => {
 test('a link that asks for nothing suggests nothing', () => {
   expect(followed('')).toEqual({
     name: undefined,
+    binary: undefined,
     port: undefined,
     extraPublicPort: undefined,
     args: undefined,

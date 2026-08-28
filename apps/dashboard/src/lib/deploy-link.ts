@@ -1,4 +1,5 @@
 import type { ConfigEdit, EnvironmentAssignment } from '@repo/app-operations';
+import { refusedUrl } from '#lib/binary-source.ts';
 
 const ASSIGNMENT = '=';
 
@@ -36,15 +37,24 @@ type Written = {
  */
 export type DeployLink = Written & {
   name?: string | undefined;
+  binary?: string | undefined;
   minimal?: boolean | undefined;
 };
 
 export function deployLink(search: Record<string, unknown>): DeployLink {
   return {
     name: asText(search.name),
+    binary: asBinaryUrl(search.binary),
     minimal: asFlag(search.minimal),
     ...written(search),
   };
+}
+
+// Refused rather than prefilled: a url this end can already say is wrong is one the owner would
+// otherwise send, wait for, and be told about by the api.
+function asBinaryUrl(value: unknown): string | undefined {
+  const url = asText(value);
+  return url !== undefined && refusedUrl(url) === undefined ? url : undefined;
 }
 
 // Read off the parameters rather than the keys: `Object.fromEntries` cannot carry which reader
@@ -65,12 +75,16 @@ type Meant = {
 /** What a link asked for, before the owner has touched anything. */
 export type DeploySuggestion = { [K in keyof typeof CONFIGURED]?: Meant[K] } & {
   name?: string | undefined;
+  // Not part of what a deploy configures — it is what is being deployed. A link carrying one is
+  // the difference between a form with one thing left to do and a form with none.
+  binary?: string | undefined;
 };
 
 /** The link as the deploy it describes. A parameter renamed above is a line here that stops compiling. */
 export function deploySuggestion(link: DeployLink): DeploySuggestion {
   return {
     name: link.name,
+    binary: link.binary,
     port: link.port,
     extraPublicPort: link['extra-public-port'],
     args: link.arg,

@@ -4,6 +4,7 @@ import { AdvancedConfiguration } from '#components/apps/advanced-configuration.t
 import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
 import { asksForVariables, DeployConfiguration } from '#components/apps/deploy-configuration.tsx';
 import { MinimalBinaryField } from '#components/apps/minimal-binary-field.tsx';
+import { binaryName } from '#lib/binary-source.ts';
 import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import { type DeployFormValues, useDeployForm } from '#lib/hooks/use-deploy-form.ts';
 import type { AppSummary } from '#queries/apps.ts';
@@ -80,7 +81,8 @@ function deployedName({
     return replacing.slug;
   }
   const typed = values.name.trim();
-  return typed === '' ? values.binary?.name : typed;
+  // Whichever way the binary was given: the file that was picked, or the file the url ends in.
+  return typed === '' ? binaryName(values.binary) : typed;
 }
 
 function submitLabel({
