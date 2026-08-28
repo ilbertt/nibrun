@@ -1,4 +1,4 @@
-import { RUNTIME_VALUE_NAMES, writtenRuntimeValue } from '@repo/protocol';
+import { EXTRA_PUBLIC_PORT_VALUES, RUNTIME_VALUE_NAMES, writtenRuntimeValue } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import {
   Table,
@@ -12,6 +12,12 @@ import { PlusIcon } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
 import { EnvironmentRow } from '#components/apps/environment-row.tsx';
 import { blankVariable, type EnvironmentVariable } from '#lib/environment-variables.ts';
+
+// Named rather than "the last two": they are second and fifth in the list above, and a reader
+// counting from the wrong end sets a variable the deploy then refuses.
+const PORT_VALUE_NAMES = EXTRA_PUBLIC_PORT_VALUES.map((value) =>
+  writtenRuntimeValue(value.name),
+).join(' and ');
 
 function separatorBefore(index: number): string {
   return index === RUNTIME_VALUE_NAMES.length - 1 ? ' or ' : ', ';
@@ -84,7 +90,7 @@ export function EnvironmentTable({
             <code className="font-mono">{writtenRuntimeValue(name)}</code>
           </Fragment>
         ))}
-        .
+        . {PORT_VALUE_NAMES} only on an app with an additional port.
       </p>
     </div>
   );
