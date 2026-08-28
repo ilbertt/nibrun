@@ -26,7 +26,7 @@ function apiHolding({ apps, deleted }: { apps: Listed[]; deleted: string[] }): P
       deployments: {
         get: () =>
           Promise.resolve({
-            data: { deployments: [{ id: 'deployment-1', state: 'active' }] },
+            data: { deployments: [{ id: 'deployment-1', state: 'running' }] },
             error: null,
           }),
       },

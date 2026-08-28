@@ -63,7 +63,7 @@ export function useDeploy({
         appId: deployed.appId,
         deploymentId: deployed.deploymentId,
       });
-      if (settled.state !== 'active') {
+      if (settled.state !== 'running') {
         throw new Error(describeUnservedDeployment(settled));
       }
       return deployed;

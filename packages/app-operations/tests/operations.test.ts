@@ -79,7 +79,7 @@ describe('a suspended app', () => {
   // seconds it has left is worse than saying the app is suspended a moment early.
   test('and one still winding down answers the same way', () => {
     expect(
-      refusal({ operation: 'files', appState: 'suspended', deploymentState: 'active' }),
+      refusal({ operation: 'files', appState: 'suspended', deploymentState: 'running' }),
     ).toContain('is suspending');
   });
 
@@ -108,7 +108,7 @@ describe('an app on its way out', () => {
 
 test('a serving app refuses nothing', () => {
   for (const operation of APP_OPERATIONS) {
-    expect(refusal({ operation, deploymentState: 'active' })).toBeUndefined();
+    expect(refusal({ operation, deploymentState: 'running' })).toBeUndefined();
   }
 });
 

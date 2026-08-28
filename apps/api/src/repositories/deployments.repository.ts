@@ -156,7 +156,11 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   listByApp({ appId, ownerId }: DeploymentsByAppInput): Promise<DeploymentRow[]> {
     return this.sql.SelectDeploymentsByApp`
       /* @notNull environment_names */
-      SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
+      /* @notNull state */
+      -- TODO: remove with the migration dropping 'active' from deployments_state_check.
+      SELECT d.id, d.app_id, d.artifact_id,
+             CASE WHEN d.state = 'active' THEN 'running' ELSE d.state END AS state,
+             d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
                c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -180,7 +184,11 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   }: DeploymentByIdInput): Promise<DeploymentRow | null> {
     const [row] = await this.sql.SelectDeploymentById`
       /* @notNull environment_names */
-      SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
+      /* @notNull state */
+      -- TODO: remove with the migration dropping 'active' from deployments_state_check.
+      SELECT d.id, d.app_id, d.artifact_id,
+             CASE WHEN d.state = 'active' THEN 'running' ELSE d.state END AS state,
+             d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
                c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -205,7 +213,13 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   listLive(): Promise<LiveDeploymentRow[]> {
     return this.sql.SelectLiveDeployments`
       /* @notNull desired_running */
-      SELECT d.id, d.state, d.created_at, a.updated_at AS state_changed_at,
+      /* @notNull state */
+      -- TODO: remove with the migration that drops 'active' from deployments_state_check, once
+      -- every row has been moved off it. Nothing else in the api knows the word, and a row still
+      -- holding it fails the whole report its host sent rather than only itself.
+      SELECT d.id,
+             CASE WHEN d.state = 'active' THEN 'running' ELSE d.state END AS state,
+             d.created_at, a.updated_at AS state_changed_at,
              (a.state = 'active') AS desired_running
       FROM nibrun.deployments d
       JOIN nibrun.apps a ON a.id = d.app_id

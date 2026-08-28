@@ -58,7 +58,7 @@ export class DeploymentLifecycle {
       case 'superseded':
       case 'failed':
         return this.#state;
-      case 'active':
+      case 'running':
         return this.#whileServing(reported);
       case 'stopped':
         return this.#whileStopped(reported);
@@ -83,7 +83,7 @@ export class DeploymentLifecycle {
     if (reported?.state === 'failed') {
       return 'failed';
     }
-    return this.#stoppedOnPurpose(reported) ? 'stopped' : 'active';
+    return this.#stoppedOnPurpose(reported) ? 'stopped' : 'running';
   }
 
   /**
@@ -95,7 +95,7 @@ export class DeploymentLifecycle {
   #whileStopped(reported: ReportedInstance | undefined): DeploymentState {
     switch (reported?.state) {
       case 'running':
-        return 'active';
+        return 'running';
       case 'failed':
         return 'failed';
       case 'pending':
@@ -121,7 +121,7 @@ export class DeploymentLifecycle {
       case 'starting':
         return 'starting';
       case 'running':
-        return 'active';
+        return 'running';
       case 'failed':
         return 'failed';
       // Nothing about the release: a microVM restarting, waiting on a probe or deliberately

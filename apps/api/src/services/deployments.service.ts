@@ -111,7 +111,7 @@ export class DeploymentsService extends Service {
           from: row.state,
           to: state,
         });
-        if (state === 'active') {
+        if (state === 'running') {
           activated.push(row.id);
         }
       }

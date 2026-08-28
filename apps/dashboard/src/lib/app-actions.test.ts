@@ -41,7 +41,7 @@ describe('an app is offered what its state can actually do', () => {
   }
 
   test('a serving one is offered every button', () => {
-    expect(actions({ deploymentState: 'active' })).toEqual({
+    expect(actions({ deploymentState: 'running' })).toEqual({
       deploy: ENABLED,
       export: ENABLED,
       suspend: ENABLED,
@@ -60,7 +60,9 @@ describe('an app is offered what its state can actually do', () => {
  */
 describe('an app the host has not caught up with yet', () => {
   test('is not asked to suspend while it is suspending', () => {
-    expect(actions({ appState: 'suspended', deploymentState: 'active' }).suspend).toEqual(DISABLED);
+    expect(actions({ appState: 'suspended', deploymentState: 'running' }).suspend).toEqual(
+      DISABLED,
+    );
   });
 
   test('nor while it is coming back', () => {

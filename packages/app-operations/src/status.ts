@@ -79,12 +79,12 @@ export function appStatus({
  * Whether a microVM is up to write anything. A stream tailing an app in any other state is
  * connected to something that will never say a word, which is not what live means.
  */
-const RUNNING: Record<AppStatusKey, boolean> = {
+const LIVE_OUTPUT: Record<AppStatusKey, boolean> = {
   'never-deployed': false,
   // Staged rather than started: there is no microVM until a host has made one.
   pending: false,
   starting: true,
-  active: true,
+  running: true,
   failed: false,
   superseded: false,
   suspended: false,
@@ -96,8 +96,8 @@ const RUNNING: Record<AppStatusKey, boolean> = {
   deleted: false,
 };
 
-export function isRunning(status: AppStatus): boolean {
-  return RUNNING[statusKey(status)];
+export function hasLiveOutput(status: AppStatus): boolean {
+  return LIVE_OUTPUT[statusKey(status)];
 }
 
 /** Whether this is a state something else is still moving out of, and so worth asking again. */

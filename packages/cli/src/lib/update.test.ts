@@ -26,7 +26,7 @@ function apiHolding({ patched }: { patched: unknown[] }): PublicApiClient {
       }),
       deployments: Object.assign(
         ({ deploymentId }: { deploymentId: string }) => ({
-          get: () => Promise.resolve({ data: { id: deploymentId, state: 'active' }, error: null }),
+          get: () => Promise.resolve({ data: { id: deploymentId, state: 'running' }, error: null }),
         }),
         {
           get: () =>

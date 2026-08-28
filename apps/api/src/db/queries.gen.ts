@@ -499,7 +499,7 @@ export interface ISelectDeploymentsByAppResult {
     id: IDeploymentsColumns["id"];
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
-    state: IDeploymentsColumns["state"];
+    state: import("@repo/protocol").DeploymentState;
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -534,7 +534,7 @@ export interface ISelectDeploymentByIdResult {
     id: IDeploymentsColumns["id"];
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
-    state: IDeploymentsColumns["state"];
+    state: import("@repo/protocol").DeploymentState;
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -567,7 +567,7 @@ export interface ISelectDeploymentByIdResult {
 /** Result of query `SelectLiveDeployments`. */
 export interface ISelectLiveDeploymentsResult {
     id: IDeploymentsColumns["id"];
-    state: IDeploymentsColumns["state"];
+    state: import("@repo/protocol").DeploymentState;
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     state_changed_at: IAppsColumns["updated_at"];

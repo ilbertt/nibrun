@@ -241,7 +241,7 @@ describe('a deployment publishes the config version it pins', () => {
 
   test('and one that has carries it as an ISO instant', async () => {
     const { service } = serviceWith({
-      row: deploymentRow({ state: 'active', activated_at: ACTIVATED_AT }),
+      row: deploymentRow({ state: 'running', activated_at: ACTIVATED_AT }),
     });
 
     const deployment = await service.get(OWNED_DEPLOYMENT);
@@ -252,7 +252,7 @@ describe('a deployment publishes the config version it pins', () => {
   test('what a host observed of the microVM reaches the wire', async () => {
     const { service } = serviceWith({
       row: deploymentRow({
-        state: 'active',
+        state: 'running',
         started_at: STARTED_AT,
         activated_at: ACTIVATED_AT,
         last_healthy_at: LAST_HEALTHY_AT,
@@ -378,13 +378,13 @@ describe('creating a deployment is asking for it to run', () => {
 });
 
 describe('a host reporting is what moves a release through its states', () => {
-  test('the first connection the tenant accepts is what makes the deployment active', async () => {
+  test('the first connection the tenant accepts is what makes the deployment running', async () => {
     const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
 
     await service.applyHostReport({ reported: report([instance({ state: 'running' })]) });
 
     expect(deploymentsRepo.applied).toEqual([
-      expect.objectContaining({ deploymentId: DEPLOYMENT_ID, state: 'active' }),
+      expect.objectContaining({ deploymentId: DEPLOYMENT_ID, state: 'running' }),
     ]);
   });
 
@@ -425,8 +425,8 @@ describe('a host reporting is what moves a release through its states', () => {
 
   // The reported columns are written on every heartbeat; this one is not, or it would creep
   // forward with each probe and end up saying when the app was last healthy.
-  test('one already active is not stamped a second time', async () => {
-    const { deploymentsRepo, service } = serviceWith({ live: [liveRow({ state: 'active' })] });
+  test('one already running is not stamped a second time', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow({ state: 'running' })] });
 
     await service.applyHostReport({ reported: report([instance({ state: 'running' })]) });
 
@@ -437,7 +437,7 @@ describe('a host reporting is what moves a release through its states', () => {
   // They move without the state moving — a running instance reports a restart count and a health
   // instant on every heartbeat — so they cannot ride along only on a transition.
   test('what the host observed lands even when the state does not move', async () => {
-    const { deploymentsRepo, service } = serviceWith({ live: [liveRow({ state: 'active' })] });
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow({ state: 'running' })] });
 
     await service.applyHostReport({
       reported: report([
@@ -453,7 +453,7 @@ describe('a host reporting is what moves a release through its states', () => {
 
     expect(deploymentsRepo.applied).toEqual([
       expect.objectContaining({
-        state: 'active',
+        state: 'running',
         hostPort: HOST_PORT,
         guestIpv4: GUEST_IPV4,
         restartCount: RESTART_COUNT,
