@@ -71,6 +71,9 @@ const ROLLBACK_REQUEST = {
   source: { rollbackOf: DEPLOYMENT_ID },
 };
 
+const RELAY_IPV4 = '203.0.113.7';
+const EXTRA_PUBLIC_PORT = 22_014;
+
 const OWNED_DEPLOYMENT: DeploymentByIdInput = {
   appId: APP_ID,
   deploymentId: DEPLOYMENT_ID,
@@ -90,6 +93,8 @@ function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
     started_at: null,
     last_healthy_at: null,
     restart_count: 0,
+    public_ipv4: null,
+    extra_public_port: null,
     ...configColumns(PINNED_CONFIG),
     ...overrides,
   };
@@ -386,6 +391,39 @@ describe('a host reporting is what moves a release through its states', () => {
     expect(deploymentsRepo.applied).toEqual([
       expect.objectContaining({ deploymentId: DEPLOYMENT_ID, state: 'running' }),
     ]);
+  });
+
+  // Neither half is the control plane's to work out — the address belongs to the relay and the
+  // port to the slot the host gave the app — so what it stores is whatever the host said.
+  test('where an app answers on its own port is taken from the report', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
+
+    await service.applyHostReport({
+      reported: report([
+        instance({
+          state: 'running',
+          publicIpv4: Value.Parse(Ipv4AddressSchema, RELAY_IPV4),
+          extraPublicPort: Value.Parse(HostPortSchema, EXTRA_PUBLIC_PORT),
+        }),
+      ]),
+    });
+
+    expect(deploymentsRepo.applied[0]).toMatchObject({
+      publicIpv4: RELAY_IPV4,
+      extraPublicPort: EXTRA_PUBLIC_PORT,
+    });
+  });
+
+  // Most apps asked for no port of their own, and null is what a column holds for one that did not.
+  test('an app that asked for none stores neither half', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
+
+    await service.applyHostReport({ reported: report([instance({ state: 'running' })]) });
+
+    expect(deploymentsRepo.applied[0]).toMatchObject({
+      publicIpv4: null,
+      extraPublicPort: null,
+    });
   });
 
   // The probe the host answered, not the moment this end got round to reading about it: a report

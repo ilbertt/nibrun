@@ -6,6 +6,7 @@ import {
   HostnameSchema,
   HostPortSchema,
   HttpPortSchema,
+  Ipv4AddressSchema,
   Value,
 } from '@repo/protocol';
 import { Either } from 'effect';
@@ -48,7 +49,7 @@ const RELAY_IPV4 = '203.0.113.7';
 const EXTRA_PUBLIC_PORT = 22_000;
 
 const REACHED_AT = {
-  ipv4: RELAY_IPV4,
+  ipv4: Value.Parse(Ipv4AddressSchema, RELAY_IPV4),
   port: Value.Parse(HostPortSchema, EXTRA_PUBLIC_PORT),
 };
 

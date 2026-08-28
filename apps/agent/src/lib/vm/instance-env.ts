@@ -4,6 +4,7 @@ import type {
   Hostname,
   HostPort,
   HttpPort,
+  Ipv4Address,
   RestartPolicy,
   TenantArguments,
   TenantEnvironment,
@@ -46,7 +47,7 @@ function platformHostname(hostnames: AppHostname[]): Hostname | undefined {
  * ruleset denies the metadata endpoint anyway.
  */
 export type PublicAddress = {
-  readonly ipv4: string;
+  readonly ipv4: Ipv4Address;
   readonly port: HostPort;
 };
 

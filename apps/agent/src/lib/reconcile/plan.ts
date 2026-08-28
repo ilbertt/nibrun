@@ -132,6 +132,32 @@ export function planReconcile({
   };
 }
 
+function planInstance({
+  wanted,
+  current,
+}: {
+  wanted: DesiredInstance;
+  current: ObservedInstance | undefined;
+}): InstancePlan {
+  if (wanted.desiredState === 'stopped') {
+    return current?.running
+      ? { action: 'stop', appId: wanted.appId, reason: 'desired-stopped' }
+      : { action: 'none', appId: wanted.appId };
+  }
+  if (!current?.present) {
+    return { action: 'start', desired: wanted };
+  }
+  if (current.deploymentId !== wanted.deploymentId) {
+    return { action: 'replace', desired: wanted };
+  }
+  if (current.running) {
+    return { action: 'none', appId: wanted.appId };
+  }
+  return current.exited
+    ? { action: 'none', appId: wanted.appId }
+    : { action: 'start', desired: wanted };
+}
+
 function planInstances({
   desired,
   observed,
@@ -140,50 +166,20 @@ function planInstances({
   observed: ObservedState;
 }): InstancePlan[] {
   const observedById = byId({ items: observed.instances, key: (instance) => instance.appId });
-  const plans: InstancePlan[] = [];
-
-  for (const wanted of desired.instances) {
-    const current = observedById.get(wanted.appId);
-    if (wanted.desiredState === 'stopped') {
-      plans.push(
-        current?.running
-          ? { action: 'stop', appId: wanted.appId, reason: 'desired-stopped' }
-          : { action: 'none', appId: wanted.appId },
-      );
-      continue;
-    }
-    if (!current?.present) {
-      plans.push({ action: 'start', desired: wanted });
-      continue;
-    }
-    if (current.deploymentId !== wanted.deploymentId) {
-      plans.push({ action: 'replace', desired: wanted });
-      continue;
-    }
-    if (current.running) {
-      plans.push({ action: 'none', appId: wanted.appId });
-      continue;
-    }
-    plans.push(
-      current.exited
-        ? { action: 'none', appId: wanted.appId }
-        : { action: 'start', desired: wanted },
-    );
-  }
-
   const desiredIds = new Set(desired.instances.map((instance) => instance.appId));
-  for (const current of observed.instances) {
-    if (desiredIds.has(current.appId)) {
-      continue;
-    }
-    plans.push(
-      current.running
-        ? { action: 'stop', appId: current.appId, reason: 'not-desired' }
-        : { action: 'forget', appId: current.appId },
-    );
-  }
-
-  return plans;
+  return [
+    ...desired.instances.map((wanted) =>
+      planInstance({ wanted, current: observedById.get(wanted.appId) }),
+    ),
+    ...observed.instances
+      .filter((current) => !desiredIds.has(current.appId))
+      .map(
+        (current): InstancePlan =>
+          current.running
+            ? { action: 'stop', appId: current.appId, reason: 'not-desired' }
+            : { action: 'forget', appId: current.appId },
+      ),
+  ];
 }
 
 function planVolumes({

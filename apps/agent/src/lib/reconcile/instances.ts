@@ -291,6 +291,51 @@ function probed({ record, nowMs }: { record: InstanceRecord; nowMs: number }) {
   });
 }
 
+function settle({
+  record,
+  status,
+  due,
+  nowMs,
+}: {
+  record: InstanceRecord;
+  status: UnitStatus;
+  due: boolean;
+  nowMs: number;
+}) {
+  return Effect.gen(function* () {
+    const health = status.active && due ? yield* probed({ record, nowMs }) : record.health;
+    const state = evaluateInstanceState({
+      unit: status,
+      tracker: health,
+      desiredRunning: record.desiredRunning,
+      stopRequested: record.stopRequested,
+      ...graceInputs({ record, nowMs }),
+    });
+
+    if (state === record.state) {
+      return yield* AgentState.putRecord({ ...record, health });
+    }
+
+    yield* AgentState.putRecord({
+      ...record,
+      health,
+      state,
+      ...(status.exitCode !== undefined && !status.active ? { lastExitCode: status.exitCode } : {}),
+      // Cleared as readily as it is written: a message outliving the state it explains is
+      // read as an account of the state that replaced it.
+      message: yield* verdict({ state, status, health, record }),
+    });
+    yield* Effect.logInfo('instance state changed').pipe(
+      Effect.annotateLogs({
+        appId: record.appId,
+        from: record.state,
+        to: state,
+      }),
+    );
+    yield* ReportSignal.raise;
+  });
+}
+
 /** Probes the tenants that are due, then settles each state from systemd and the probe together. */
 export const refreshStates = Effect.gen(function* () {
   const current = yield* AgentState.snapshot;
@@ -300,42 +345,11 @@ export const refreshStates = Effect.gen(function* () {
   yield* Effect.forEach(
     [...current.records.values()],
     (record) =>
-      Effect.gen(function* () {
-        const status = statuses.get(record.appId) ?? UNKNOWN_UNIT;
-        const due = nowMs >= (current.nextProbeAtMs.get(record.appId) ?? 0);
-        const health = status.active && due ? yield* probed({ record, nowMs }) : record.health;
-
-        const state = evaluateInstanceState({
-          unit: status,
-          tracker: health,
-          desiredRunning: record.desiredRunning,
-          stopRequested: record.stopRequested,
-          ...graceInputs({ record, nowMs }),
-        });
-
-        const changed = state !== record.state;
-        const message = changed ? yield* verdict({ state, status, health, record }) : undefined;
-        yield* AgentState.putRecord({
-          ...record,
-          health,
-          state,
-          ...(changed && status.exitCode !== undefined && !status.active
-            ? { lastExitCode: status.exitCode }
-            : {}),
-          // Cleared as readily as it is written: a message outliving the state it explains is
-          // read as an account of the state that replaced it.
-          ...(changed ? { message } : {}),
-        });
-        if (changed) {
-          yield* Effect.logInfo('instance state changed').pipe(
-            Effect.annotateLogs({
-              appId: record.appId,
-              from: record.state,
-              to: state,
-            }),
-          );
-          yield* ReportSignal.raise;
-        }
+      settle({
+        record,
+        status: statuses.get(record.appId) ?? UNKNOWN_UNIT,
+        due: nowMs >= (current.nextProbeAtMs.get(record.appId) ?? 0),
+        nowMs,
       }),
     { discard: true },
   );
