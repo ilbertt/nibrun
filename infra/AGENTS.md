@@ -72,6 +72,34 @@ Custom domains, in the `app_domain` zone only:
 Unlike every other Cloudflare step here, registering a hostname cannot be manual — a brought
 domain arrives whenever an owner adds one — which is what the token is for.
 
+## Changing the app domain
+
+A new domain is a new zone, set up exactly as above, and a new value for the `APP_DOMAIN`
+repository variable. What that does not move is the hostnames already minted: those are rows in
+`nibrun.app_hostnames`, the rendered proxy config is built from them, and a platform hostname is
+minted once when its app is created and never recomputed.
+
+Rewriting them is an operation on the box, not a migration — `apps/api/AGENTS.md` says why:
+
+```sh
+docker exec -i postgres-db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+UPDATE nibrun.app_hostnames
+SET hostname = left(hostname, length(hostname) - length('.old.example')) || '.new.example'
+WHERE kind = 'platform' AND hostname LIKE '%.old.example'
+RETURNING hostname;
+SQL
+```
+
+Only once the new zone answers: the rows are what the fleet routes from, so the old names stop
+working the moment they change. Retire the old zone with a Redirect Rule rather than by serving
+it — a rule runs before the origin, so the certificate the hosts hold stops mattering there, and
+the zone can then point at an address nothing listens on. Keep the registration; the links outlive
+it.
+
+A brought domain is not covered by any of this. It is registered against a zone at the edge, and
+its DCV delegation target is per zone, so moving zones means re-registering each one and its owner
+placing the new records.
+
 ## Deploying
 
 `.github/workflows/cd.yml`, on every push to main. No SSH and no key material in CI: the last leg
