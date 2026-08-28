@@ -77,7 +77,7 @@ function waitingOn(phase: DeployPhase): string | undefined {
   if (phase === 'releasing') {
     return 'releasing the binary the app already has';
   }
-  return phase === 'settling' ? 'waiting for the guest to answer' : undefined;
+  return phase === 'settling' ? 'the app is coming online' : undefined;
 }
 
 function describeStep(step: DeployStep): string {

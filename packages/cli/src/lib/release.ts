@@ -42,7 +42,7 @@ export async function awaitServing({
 
   const startedAt = Date.now();
   const settled = await ui.waitingFor({
-    message: `starting deployment ${deployed.deploymentId}`,
+    message: `the app is coming online — deployment ${deployed.deploymentId}`,
     task: () =>
       awaitDeploymentSettled({
         api,
