@@ -36,6 +36,7 @@ import {
   MAX_CONCURRENT_FETCHES,
 } from '#services/artifacts.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
+import { archiveOf } from '#tests/support/archives.ts';
 
 // The api refuses anything that is not a Linux executable, so the fixture opens with the ELF
 // magic the way a real upload does.
@@ -327,10 +328,20 @@ class FakeBinarySource implements BinarySourceRepositoryContract {
   }
 
   serves({ text, declaredSizeBytes }: { text: string; declaredSizeBytes?: number }): void {
+    this.servesBytes({ bytes: bytesOf(text), declaredSizeBytes });
+  }
+
+  servesBytes({
+    bytes,
+    declaredSizeBytes,
+  }: {
+    bytes: Uint8Array;
+    declaredSizeBytes?: number;
+  }): void {
     this.answers({
       outcome: 'open',
       body: streamOf({
-        text,
+        bytes,
         onCancel: () => {
           this.letGo = true;
         },
@@ -360,10 +371,10 @@ class FakeBinarySource implements BinarySourceRepositoryContract {
 }
 
 function streamOf({
-  text,
+  bytes,
   onCancel,
 }: {
-  text: string;
+  bytes: Uint8Array;
   onCancel?: () => void;
 }): ReadableStream<Uint8Array> {
   let sent = false;
@@ -374,7 +385,7 @@ function streamOf({
         return;
       }
       sent = true;
-      controller.enqueue(bytesOf(text));
+      controller.enqueue(bytes);
     },
     cancel() {
       onCancel?.();
@@ -767,6 +778,7 @@ describe('a row becomes the wire shape the dashboard and the agent both read', (
 });
 
 const BINARY_URL = 'https://releases.test/v1/my-server';
+const ARCHIVE_URL = 'https://releases.test/v1/my-server_1.2.3_linux_amd64.zip';
 const FETCHED_NAME = Value.Parse(FilenameSchema, 'my-server');
 
 /**
@@ -944,6 +956,59 @@ describe('a binary is fetched from the url it was given', () => {
     expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(
       'https://releases.test/v1/my-server',
     );
+  });
+
+  /**
+   * A release is published zipped more often than not, and the alternative to reading one here is
+   * telling whoever followed the link to download it, unzip it, and upload the one file inside.
+   */
+  test('a release that ships zipped is the executable inside it', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.servesBytes({
+      bytes: archiveOf([
+        { name: 'CHANGELOG.md', content: bytesOf('# Changelog\n\nAll of it.\n') },
+        { name: 'my-server', content: bytesOf(BINARY_TEXT) },
+      ]),
+    });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: ARCHIVE_URL,
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
+    expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(ARCHIVE_URL);
+  });
+
+  // The name an export writes the binary out as, which the url only ever spells `.zip`.
+  test('and is named after the entry rather than the archive that carried it', async () => {
+    const { service, sourceRepo } = build();
+    sourceRepo.servesBytes({
+      bytes: archiveOf([{ name: 'my-server', content: bytesOf(BINARY_TEXT) }]),
+    });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: ARCHIVE_URL,
+    });
+
+    expect(artifact.originalFileName).toBe(FETCHED_NAME);
+  });
+
+  test('a zip holding nothing executable is refused and leaves nothing behind', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.servesBytes({
+      bytes: archiveOf([{ name: 'LICENSE.md', content: bytesOf('The MIT Licence.\n') }]),
+    });
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: ARCHIVE_URL }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
   });
 
   /**
