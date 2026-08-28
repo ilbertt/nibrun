@@ -79,9 +79,11 @@ export class ArtifactStorageRepository implements ArtifactStorageRepositoryContr
   }
 
   /**
-   * The only way bytes reach a staging key without a signed url: the api fetched them itself, so
-   * it is the api that has to put them somewhere. Streamed for the same reason `copy` is — a
-   * binary held whole is memory this process is not sized for.
+   * The only way bytes reach a key without a signed url: the api fetched them itself, or is moving
+   * what it already holds, so it is the api that has to put them somewhere.
+   *
+   * Streamed rather than buffered: this runs on an object as large as a whole binary, and holding
+   * one in memory is the cost that signing the upload away was meant to avoid.
    */
   async write({
     objectKey,
@@ -110,27 +112,12 @@ export class ArtifactStorageRepository implements ArtifactStorageRepositoryContr
   }
 
   /**
-   * Streamed rather than buffered: this runs on an object as large as a whole binary, and holding
-   * one in memory is the cost that signing the upload away was meant to avoid.
-   *
    * Nothing else writes the content-addressed namespace. That is what lets a key found there be
    * trusted without reading it again — the bytes under it were hashed by this process, on their
    * way to it.
    */
   async copy({ from, to }: { from: ObjectKey; to: ObjectKey }): Promise<void> {
-    const writer = this.client.file(to).writer({
-      type: ARTIFACT_CONTENT_TYPE,
-      retry: UPLOAD_RETRIES,
-    });
-    try {
-      for await (const chunk of this.client.file(from).stream()) {
-        await writer.write(chunk);
-      }
-      await writer.end();
-    } catch (failure) {
-      await abandon({ writer, failure });
-      throw failure;
-    }
+    await this.write({ objectKey: to, body: this.read({ objectKey: from }) });
   }
 
   exists({ objectKey }: { objectKey: ObjectKey }): Promise<boolean> {
