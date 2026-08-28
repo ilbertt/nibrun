@@ -1,11 +1,11 @@
 import {
   awaitDeploymentSettled,
+  type DeployableBinary,
   type Deployed,
   type DeployStep,
   deploy,
   describeUnservedDeployment,
   redeploy,
-  type UploadableBinary,
   type UploadProgress,
 } from '@repo/app-operations';
 import type { TenantArguments, TenantEnvironmentPatch } from '@repo/protocol';
@@ -20,7 +20,7 @@ type Configured = {
 };
 
 export type DeployRequest = Configured & {
-  binary: UploadableBinary;
+  binary: DeployableBinary;
   app: string | undefined;
   name: string | undefined;
 };
@@ -32,6 +32,16 @@ export type ReleaseRequest = DeployRequest | RedeployRequest;
 
 export function carriesBinary(request: ReleaseRequest): request is DeployRequest {
   return 'binary' in request;
+}
+
+export type BinaryDelivery = 'upload' | 'fetch' | 'none';
+
+/** Who moves the bytes, which decides whether there is anything to put a meter on. */
+export function binaryDelivery(request: ReleaseRequest): BinaryDelivery {
+  if (!carriesBinary(request)) {
+    return 'none';
+  }
+  return 'body' in request.binary ? 'upload' : 'fetch';
 }
 
 export type DeployMutation = UseMutationResult<Deployed, Error, ReleaseRequest>;

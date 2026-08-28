@@ -12,6 +12,7 @@ import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { Link, useLocation } from '@tanstack/react-router';
 import { FileTerminalIcon } from 'lucide-react';
 import { HandoffDeploy } from '#components/handoff/handoff-deploy.tsx';
+import { namedByUrl } from '#lib/binary-source.ts';
 import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { useFinishHandoff } from '#lib/hooks/use-finish-handoff.ts';
@@ -53,6 +54,8 @@ function Waiting({
   suggested: DeploySuggestion | undefined;
 }) {
   const finishHandoff = useFinishHandoff();
+  // What is already known about what will be deployed, so signing in is not asked for on faith.
+  const named = binary?.name ?? namedByUrl(suggested?.binary ?? '');
   // Whatever was handed over or asked for has to survive the trip through the login form, or
   // signing in is what loses it.
   const here = useLocation({ select: (location) => location.href });
@@ -66,14 +69,10 @@ function Waiting({
           <EmptyMedia variant="icon">
             <FileTerminalIcon />
           </EmptyMedia>
-          <EmptyTitle className={binary === undefined ? undefined : 'break-all font-mono'}>
-            {binary?.name ?? 'Deploy a binary'}
+          <EmptyTitle className={named === undefined ? undefined : 'break-all font-mono'}>
+            {named ?? 'Deploy a binary'}
           </EmptyTitle>
-          <EmptyDescription>
-            {binary === undefined
-              ? 'Sign in, then pick the binary you compiled.'
-              : `${formatBytes(binary.size)}, waiting to be deployed.`}
-          </EmptyDescription>
+          <EmptyDescription>{describeWaiting({ binary, suggested })}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button render={<Link to={LoginRoute.to} search={{ redirect: here }} />}>
@@ -89,4 +88,19 @@ function Waiting({
       <HandoffDeploy binary={binary} suggested={suggested} />
     </DeployRunProvider>
   );
+}
+
+function describeWaiting({
+  binary,
+  suggested,
+}: {
+  binary: File | undefined;
+  suggested: DeploySuggestion | undefined;
+}): string {
+  if (binary !== undefined) {
+    return `${formatBytes(binary.size)}, waiting to be deployed.`;
+  }
+  return suggested?.binary === undefined
+    ? 'Sign in, then pick the binary you compiled.'
+    : 'Sign in, and nibrun fetches it from the url this link named.';
 }

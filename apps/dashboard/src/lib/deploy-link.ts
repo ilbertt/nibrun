@@ -1,4 +1,5 @@
 import type { ConfigEdit, EnvironmentAssignment } from '@repo/app-operations';
+import { refusedUrl } from '#lib/binary-source.ts';
 
 const ASSIGNMENT = '=';
 
@@ -27,10 +28,22 @@ type Configured = {
 };
 
 /** What a link asked for, before the owner has touched anything. */
-export type DeploySuggestion = Configured & { name?: string | undefined };
+export type DeploySuggestion = Configured & {
+  name?: string | undefined;
+  // Not part of what a deploy configures — it is what is being deployed. A link carrying one is
+  // the difference between somewhere to start and one click.
+  binary?: string | undefined;
+};
 
 export function deploySuggestion(search: Record<string, unknown>): DeploySuggestion {
-  return { name: asText(search.name), ...configured(search) };
+  return { name: asText(search.name), binary: asBinaryUrl(search.binary), ...configured(search) };
+}
+
+// Refused rather than prefilled: a url this end can already say is wrong is one the owner would
+// otherwise send, wait for, and be told about by the api.
+function asBinaryUrl(value: unknown): string | undefined {
+  const url = asText(value);
+  return url !== undefined && refusedUrl(url) === undefined ? url : undefined;
 }
 
 // `Object.fromEntries` cannot carry which reader answered for which key, and the record above is
