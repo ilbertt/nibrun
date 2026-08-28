@@ -10,9 +10,9 @@ import {
 } from '@repo/protocol';
 import {
   type ArtifactInspection,
-  ArtifactTooLargeError,
-  cappedTo,
   inspectArtifact,
+  inspectingPassThrough,
+  RefusedArtifactError,
 } from '#lib/artifact-digest.ts';
 import { filenameFromUrl } from '#lib/binary-url.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
@@ -284,11 +284,11 @@ export class ArtifactsService extends Service {
   }
 
   /**
-   * The source read once, into the staging key and into the inspection at the same time.
+   * The source written to the staging key and inspected on the way through, which is one read of
+   * it and one chunk in hand at a time. The upload the store is making is what holds the rest.
    *
-   * Capped before it is teed rather than by the inspection alone: a refusal only stops the branch
-   * that reached it, and the branch still writing would otherwise spend a bucket on however much
-   * a url that lied about its length cares to send.
+   * A refusal reaches this as the write failing, because that is what it did: the inspection
+   * errored the stream under it rather than letting a binary nobody will deploy finish arriving.
    */
   private async stage({
     staged,
@@ -297,24 +297,22 @@ export class ArtifactsService extends Service {
     staged: ObjectKey;
     body: ReadableStream<Uint8Array>;
   }): Promise<ArtifactInspection> {
-    const [stored, inspected] = body
-      .pipeThrough(cappedTo({ maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES }))
-      .tee();
+    const { through, inspection } = inspectingPassThrough({
+      maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES,
+    });
+
     try {
-      const [, inspection] = await Promise.all([
-        this.storageRepo.write({ objectKey: staged, body: stored }),
-        inspectArtifact({ stream: inspected, maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES }),
-      ]);
-      return inspection;
+      await this.storageRepo.write({ objectKey: staged, body: body.pipeThrough(through) });
     } catch (failure) {
-      // One branch failing leaves the other reading a source nothing will consume, so both are
-      // let go of before the failure is anybody else's.
-      await Promise.allSettled([stored.cancel(), inspected.cancel()]);
-      if (failure instanceof ArtifactTooLargeError) {
-        return { outcome: 'too-large' };
+      if (failure instanceof RefusedArtifactError) {
+        return failure.inspection;
       }
+      // The source stopped or the store did, and neither is a verdict on the binary — so the
+      // inspection is never awaited here: nothing ended the stream, and nothing will settle it.
       throw failure;
     }
+
+    return await inspection;
   }
 
   /**
