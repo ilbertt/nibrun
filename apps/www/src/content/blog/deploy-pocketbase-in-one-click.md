@@ -41,18 +41,30 @@ page](https://github.com/pocketbase/pocketbase/releases) (`pocketbase_<version>_
 and unzip it. Inside is one file called `pocketbase`. That is the whole application.
 
 Drag and drop it onto [nibrun.com](https://nibrun.com). You land on the deploy screen with the
-binary already attached and an HTTP port and arguments left to fill in.
+binary already attached. Two fields to fill in:
 
-Or skip that part. This link is the same screen with them already written down:
+**HTTP port**: `8090`
 
-[**Deploy PocketBase on nibrun**](https://app.nibrun.com/deploy?name=pocketbase&port=8090&arg=serve&arg=--http=0.0.0.0:8090&arg=--dir=./data/pb_data)
+**Arguments** (one per line):
 
-Pick the `pocketbase` file you just unzipped, and deploy.
+```
+serve
+--http=0.0.0.0:8090
+--dir=./data/pb_data
+```
 
-Nothing in that link is ours to hand out. It is the deploy screen reading its own query string —
-`name`, `port`, `arg` per argument, `env` per variable, `extra-public-port` for a second one — so
-any project can put its own in its README and have people arrive at a screen already configured
-for it.
+Deploy.
+
+Alternatively, this link is that same screen with all of it already configured, asking for nothing
+but the binary:
+
+[**Deploy PocketBase on nibrun**](https://app.nibrun.com/deploy?name=pocketbase&port=8090&arg=serve&arg=--http=0.0.0.0:8090&arg=--dir=./data/pb_data&minimal)
+
+Nothing in it is ours to hand out. It is the deploy screen reading its own query string — `name`,
+`port`, `arg` per argument, `env` per variable, `extra-public-port` for a second one, `minimal`
+for the form stripped to what is left to do, and `binary` for a url to fetch the executable from,
+which turns the drop into a click. PocketBase publishes its build zipped, so that last one is the
+one part this link cannot carry.
 
 A few seconds later PocketBase is answering on `https://<your-app>.nibrun.app`, and the
 admin UI is at `/_/`. There is no certificate to obtain and no OS underneath it that is yours to
