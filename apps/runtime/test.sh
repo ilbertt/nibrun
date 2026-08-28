@@ -76,7 +76,7 @@ for _ in $(seq 1 60); do
 done
 
 require 'the tenant runs unprivileged, in /app, on the port and under the name the config gave it' \
-  contains "$report" 'PORT=8080 NIBRUN_HOSTNAME=boot-test.nibrun.app NIBRUN_DATA_DIR=/app/data HOME=/app CWD=/app UID=65534 GID=65534'
+  contains "$report" 'NIBRUN_HTTP_PORT=8080 PORT=8080 NIBRUN_HOSTNAME=boot-test.nibrun.app NIBRUN_DATA_DIR=/app/data HOME=/app CWD=/app UID=65534 GID=65534'
 
 mounts=$(docker exec "$container" cat /proc/1/mounts)
 require 'the artifact is read-only and the data filesystem is not' \

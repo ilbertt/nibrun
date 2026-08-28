@@ -48,7 +48,7 @@ function refusedVariable(overrides: Overrides) {
 describe('what apps/runtime parses off the config drive', () => {
   test('every key it writes is one the runtime knows', () => {
     expect(render().split('\n').filter(Boolean)).toEqual([
-      `NIBRUN_PORT=${DEFAULT_HTTP_PORT}`,
+      `NIBRUN_HTTP_PORT=${DEFAULT_HTTP_PORT}`,
       `NIBRUN_HOSTNAME=${PLATFORM_HOSTNAME}`,
       `NIBRUN_MAX_RESTARTS=${DEFAULT_RESTART_POLICY.maxRestarts}`,
       `NIBRUN_INITIAL_BACKOFF_MS=${DEFAULT_RESTART_POLICY.initialBackoffMs}`,
@@ -64,12 +64,12 @@ describe('what apps/runtime parses off the config drive', () => {
     expect(rendered).toContain('\nENV_ALPHA=2\nENV_ZED=1\n');
   });
 
-  // The prefix is what makes this impossible rather than merely handled: the runtime reads it
-  // as a tenant variable named NIBRUN_PORT, and its own PORT stays the one written above.
-  test('a tenant variable named after a runtime key stays the tenant’s', () => {
-    const rendered = render({ environment: tenantEnvironment({ NIBRUN_PORT: '9999' }) });
-    expect(rendered).toContain(`NIBRUN_PORT=${DEFAULT_HTTP_PORT}\n`);
-    expect(rendered).toContain('ENV_NIBRUN_PORT=9999\n');
+  // The prefix is what keeps the two apart on the drive: the runtime reads this as a tenant
+  // variable named NIBRUN_HTTP_PORT, and drops it there rather than here.
+  test('a tenant variable named after a runtime key is written under the tenant prefix', () => {
+    const rendered = render({ environment: tenantEnvironment({ NIBRUN_HTTP_PORT: '9999' }) });
+    expect(rendered).toContain(`NIBRUN_HTTP_PORT=${DEFAULT_HTTP_PORT}\n`);
+    expect(rendered).toContain('ENV_NIBRUN_HTTP_PORT=9999\n');
   });
 
   test('values are raw bytes, not quoted or escaped', () => {
@@ -101,7 +101,7 @@ describe('what apps/runtime parses off the config drive', () => {
 
   test('a non-default port is the one written', () => {
     expect(render({ httpPort: Value.Parse(HttpPortSchema, NON_DEFAULT_PORT) })).toContain(
-      `NIBRUN_PORT=${NON_DEFAULT_PORT}\n`,
+      `NIBRUN_HTTP_PORT=${NON_DEFAULT_PORT}\n`,
     );
   });
 });

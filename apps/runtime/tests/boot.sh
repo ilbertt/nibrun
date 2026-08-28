@@ -18,7 +18,7 @@ mkdir -p /images/artifact /images/config
 cp /fake-tenant /images/artifact/server
 
 cat >/images/config/instance.env <<'ENV'
-NIBRUN_PORT=8080
+NIBRUN_HTTP_PORT=8080
 NIBRUN_HOSTNAME=boot-test.nibrun.app
 NIBRUN_MAX_RESTARTS=5
 NIBRUN_INITIAL_BACKOFF_MS=100

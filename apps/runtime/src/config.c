@@ -15,11 +15,17 @@
 #define RUNTIME_PREFIX "NIBRUN_"
 #define ARGUMENT_KEY_PREFIX "ARG_"
 #define TENANT_PREFIX "ENV_"
+#define HTTP_PORT_KEY "HTTP_PORT"
 #define HOSTNAME_KEY "HOSTNAME"
 #define DATA_DIR_KEY "DATA_DIR"
 /* The runtime keys the tenant is handed under their own names, each spelled once. */
+#define HTTP_PORT_VARIABLE RUNTIME_PREFIX HTTP_PORT_KEY
 #define HOSTNAME_VARIABLE RUNTIME_PREFIX HOSTNAME_KEY
 #define DATA_DIR_VARIABLE RUNTIME_PREFIX DATA_DIR_KEY
+
+/* The name every other host sets, carrying the same number, because a binary written
+ * against any of them reads this one and nothing of ours. */
+#define PORT_ALIAS "PORT"
 
 /* Only a sigil followed by RUNTIME_PREFIX opens a reference, which is what leaves a
  * secret's own '$' alone — see the format contract in config.h. */
@@ -34,9 +40,9 @@
 #define MIN_BACKOFF_FACTOR 1.0
 #define MAX_BACKOFF_FACTOR 1000.0
 
-/* PORT, NIBRUN_HOSTNAME, NIBRUN_DATA_DIR, HOME and TMPDIR, on top of whatever the
- * tenant configured. */
-#define BASE_VARIABLES 5
+/* NIBRUN_HTTP_PORT, PORT, NIBRUN_DATA_DIR, NIBRUN_HOSTNAME, HOME and TMPDIR, on top of
+ * whatever the tenant configured. */
+#define BASE_VARIABLES 6
 
 enum field_type {
   FIELD_UNSIGNED,
@@ -56,7 +62,8 @@ struct field {
 };
 
 static const struct field FIELDS[] = {
-    {"PORT", FIELD_UNSIGNED, offsetof(struct instance_config, port), MIN_PORT, MAX_PORT, true},
+    {HTTP_PORT_KEY, FIELD_UNSIGNED, offsetof(struct instance_config, port), MIN_PORT, MAX_PORT,
+     true},
     {"MAX_RESTARTS", FIELD_UNSIGNED, offsetof(struct instance_config, restart_policy.max_restarts), 0,
      MAX_RESTARTS_LIMIT, true},
     {"INITIAL_BACKOFF_MS", FIELD_UNSIGNED,
@@ -362,7 +369,7 @@ static bool names_key(const struct reference *reference, const char *key) {
  * something that never passed through it. */
 static bool reference_value(const struct instance_config *config, const struct reference *reference,
                             char *rendered, size_t rendered_size, const char **out) {
-  if (names_key(reference, "PORT")) {
+  if (names_key(reference, HTTP_PORT_KEY)) {
     snprintf(rendered, rendered_size, "%u", config->port);
     *out = rendered;
     return true;
@@ -541,6 +548,9 @@ static bool is_named(const char *entry, const char *name) {
  * issued too, and the prefix cannot keep the two apart here — both reach execve
  * under the one name. */
 static const char *platform_owned_name(const char *entry) {
+  if (is_named(entry, HTTP_PORT_VARIABLE)) {
+    return HTTP_PORT_VARIABLE;
+  }
   if (is_named(entry, HOSTNAME_VARIABLE)) {
     return HOSTNAME_VARIABLE;
   }
@@ -573,12 +583,16 @@ char *const *config_build_argv(const struct instance_config *config, const char 
 
 char *const *config_build_environment(const struct instance_config *config) {
   static char *environment[CONFIG_MAX_TENANT_VARIABLES + BASE_VARIABLES + 1];
-  static char port_variable[sizeof("PORT=65535")];
+  static char http_port_variable[sizeof(HTTP_PORT_VARIABLE "=65535")];
+  static char port_alias_variable[sizeof(PORT_ALIAS "=65535")];
   static char hostname_variable[sizeof(HOSTNAME_VARIABLE "=") + CONFIG_MAX_HOSTNAME];
 
-  snprintf(port_variable, sizeof(port_variable), "PORT=%u", config->port);
+  snprintf(http_port_variable, sizeof(http_port_variable), "%s=%u", HTTP_PORT_VARIABLE,
+           config->port);
+  snprintf(port_alias_variable, sizeof(port_alias_variable), "%s=%u", PORT_ALIAS, config->port);
   size_t count = 0;
-  environment[count++] = port_variable;
+  environment[count++] = http_port_variable;
+  environment[count++] = port_alias_variable;
   environment[count++] = DATA_DIR_VARIABLE "=" DATA_DIR;
   if (config->hostname != NULL) {
     snprintf(hostname_variable, sizeof(hostname_variable), "%s=%s", HOSTNAME_VARIABLE,
@@ -587,8 +601,9 @@ char *const *config_build_environment(const struct instance_config *config) {
   }
 
   for (size_t index = 0; index < config->tenant_variable_count; index++) {
-    if (is_named(config->tenant_environment[index], "PORT")) {
-      log_line("ignoring the tenant's own PORT; this instance is served on %u", config->port);
+    if (is_named(config->tenant_environment[index], PORT_ALIAS)) {
+      log_line("ignoring the tenant's own %s; this instance is served on %u", PORT_ALIAS,
+               config->port);
       continue;
     }
     /* The hostname is dropped whether or not one was written, so a tenant's own never

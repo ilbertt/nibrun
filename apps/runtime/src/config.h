@@ -12,10 +12,11 @@
  *   ENV_<NAME>=<value>     one of the tenant's own environment variables
  *
  * The prefixes exist so the two can never collide: a tenant variable actually
- * called NIBRUN_PORT arrives as ENV_NIBRUN_PORT and stays the tenant's.
+ * called NIBRUN_HTTP_PORT arrives as ENV_NIBRUN_HTTP_PORT and is read as the
+ * tenant's, which is what lets config_build_environment drop it on its own terms.
  *
- * A tenant value may name a runtime one it is handed: `$NIBRUN_PORT` and
- * `${NIBRUN_PORT}` both expand, and a name this runtime does not offer fails the
+ * A tenant value may name a runtime one it is handed: `$NIBRUN_HTTP_PORT` and
+ * `${NIBRUN_HTTP_PORT}` both expand, and a name this runtime does not offer fails the
  * boot rather than reaching the tenant as itself. Nothing else expands, so a secret
  * holding `$`, `$$` or `$HOME` arrives byte for byte — the prefix is what keeps the
  * substitution off values it was never meant for. The cost is that a value holding a
@@ -79,11 +80,16 @@ bool config_read_file(struct instance_config *config, const char *path, char *bu
 /* argv for execve: the binary, then the parsed arguments, then NULL. */
 char *const *config_build_argv(const struct instance_config *config, const char *executable);
 
-/* The environment the tenant is exec'd with: PORT, NIBRUN_HOSTNAME and NIBRUN_DATA_DIR,
- * which the platform owns because they are the port the agent probes, the name the edge
- * routes to and the path the volume is mounted at, then the tenant's own variables, then
- * defaults for anything they did not set. A tenant variable of any of those names is
- * dropped rather than exported: it would describe an instance that does not exist. */
+/* The environment the tenant is exec'd with: NIBRUN_HTTP_PORT, NIBRUN_HOSTNAME and
+ * NIBRUN_DATA_DIR, which the platform owns because they are the port the agent probes,
+ * the name the edge routes to and the path the volume is mounted at, then the tenant's
+ * own variables, then defaults for anything they did not set. A tenant variable of any
+ * of those names is dropped rather than exported: it would describe an instance that
+ * does not exist.
+ *
+ * PORT carries the same number as NIBRUN_HTTP_PORT under the name every other host uses,
+ * and is dropped from the tenant's own for the same reason. It is an alias and never a
+ * second choice: nothing reads it back, and a reference names the prefixed one. */
 char *const *config_build_environment(const struct instance_config *config);
 
 #endif

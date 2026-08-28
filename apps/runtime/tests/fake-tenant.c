@@ -38,16 +38,18 @@ static void report(const char *record) {
   if (getcwd(directory, sizeof(directory)) == NULL) {
     _exit(UNWRITABLE_EXIT_CODE);
   }
-  const char *port = getenv("PORT");
+  const char *port = getenv("NIBRUN_HTTP_PORT");
+  const char *port_alias = getenv("PORT");
   const char *hostname = getenv("NIBRUN_HOSTNAME");
   const char *home = getenv("HOME");
   const char *data_dir = getenv("NIBRUN_DATA_DIR");
   char line[512];
   snprintf(line, sizeof(line),
-           "PORT=%s NIBRUN_HOSTNAME=%s NIBRUN_DATA_DIR=%s HOME=%s CWD=%s UID=%d GID=%d\n",
-           port == NULL ? "" : port, hostname == NULL ? "" : hostname,
-           data_dir == NULL ? "" : data_dir, home == NULL ? "" : home, directory, (int)getuid(),
-           (int)getgid());
+           "NIBRUN_HTTP_PORT=%s PORT=%s NIBRUN_HOSTNAME=%s NIBRUN_DATA_DIR=%s HOME=%s CWD=%s "
+           "UID=%d GID=%d\n",
+           port == NULL ? "" : port, port_alias == NULL ? "" : port_alias,
+           hostname == NULL ? "" : hostname, data_dir == NULL ? "" : data_dir,
+           home == NULL ? "" : home, directory, (int)getuid(), (int)getgid());
   append(record, line);
 }
 
