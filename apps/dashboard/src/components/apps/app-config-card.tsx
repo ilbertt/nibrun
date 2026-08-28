@@ -16,8 +16,8 @@ export function AppConfigCard({ app }: { app: AppSummary }) {
         </div>
         {app.config.hasExtraPublicPort && (
           <div className="flex items-center justify-between gap-4">
-            <span className="text-muted-foreground">Extra public port</span>
-            <span>TCP and UDP</span>
+            <span className="text-muted-foreground">Additional ports</span>
+            <span>One, TCP and UDP, assigned</span>
           </div>
         )}
         <AppRunCommand app={app} />

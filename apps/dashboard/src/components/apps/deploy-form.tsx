@@ -28,6 +28,7 @@ import {
 } from '#lib/hooks/use-deploy-form.ts';
 
 const ARGUMENTS = 'Arguments';
+const ADDITIONAL_PORTS = 'Additional ports';
 
 export function DeployForm({
   appId,
@@ -86,24 +87,56 @@ export function DeployForm({
         )}
       </api.Field>
 
-      <api.Field name="extraPublicPort">
-        {(field) => (
-          <Field orientation="horizontal">
-            <Checkbox
-              id="deploy-extra-public-port"
-              checked={field.state.value ?? defaultExtraPublicPort}
-              onCheckedChange={(checked) => field.handleChange(checked)}
-            />
-            <FieldContent>
-              <FieldLabel htmlFor="deploy-extra-public-port">Extra public port</FieldLabel>
-              <FieldDescription>
-                A public TCP and UDP port of its own, for a protocol HTTPS cannot carry. The app is
-                told which address and port to announce.
-              </FieldDescription>
-            </FieldContent>
-          </Field>
-        )}
-      </api.Field>
+      <Accordion>
+        <AccordionItem>
+          <AccordionTrigger>
+            <span className="flex items-baseline gap-2">
+              {ADDITIONAL_PORTS}
+              <api.Subscribe
+                selector={(state) => state.values.extraPublicPort ?? defaultExtraPublicPort}
+              >
+                {(asked) => <CollapsedState on={asked} />}
+              </api.Subscribe>
+            </span>
+          </AccordionTrigger>
+          <AccordionContent keepMounted>
+            <api.Field name="extraPublicPort">
+              {(field) => (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="deploy-extra-public-port"
+                    checked={field.state.value ?? defaultExtraPublicPort}
+                    onCheckedChange={(checked) => field.handleChange(checked)}
+                  />
+                  <FieldContent>
+                    <FieldLabel htmlFor="deploy-extra-public-port">
+                      Give this app a public port besides HTTPS
+                    </FieldLabel>
+                    <FieldDescription>
+                      One port, TCP and UDP, for a protocol HTTPS cannot carry — WebRTC media, a
+                      game server, anything that has to be reached directly.
+                    </FieldDescription>
+                    <FieldDescription>
+                      You do not pick the number. nibrun assigns it and tells the app which address
+                      and port it was given, as{' '}
+                      <code className="font-mono">NIBRUN_PUBLIC_IPV4</code> and{' '}
+                      <code className="font-mono">NIBRUN_EXTRA_PUBLIC_PORT</code>. Your own
+                      variables may name them — set{' '}
+                      <code className="font-mono">
+                        ANNOUNCED_IP=${'{'}NIBRUN_PUBLIC_IPV4{'}'}
+                      </code>{' '}
+                      and the app reads it under the name it already expects.
+                    </FieldDescription>
+                    <FieldDescription>
+                      Free for now, and likely to become part of a paid plan later.
+                    </FieldDescription>
+                  </FieldContent>
+                </Field>
+              )}
+            </api.Field>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <Accordion>
         <AccordionItem>
@@ -190,6 +223,15 @@ export function DeployForm({
 }
 
 /** What the section holds, for as long as it is closed over it. */
+/** What the section says while it is shut, in the one word a count would be. */
+function CollapsedState({ on }: { on: boolean }) {
+  return (
+    <span className="font-normal text-muted-foreground text-xs group-aria-expanded/accordion-trigger:hidden">
+      {on ? 'one' : 'none'}
+    </span>
+  );
+}
+
 function CollapsedCount({ count }: { count: number }) {
   return (
     <span className="font-normal text-muted-foreground text-xs group-aria-expanded/accordion-trigger:hidden">
