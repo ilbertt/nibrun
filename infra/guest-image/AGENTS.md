@@ -111,8 +111,8 @@ privileged container, and the host kernel never parses a filesystem image.
 **Under Firecracker v1.16.1 on x86_64 with `/dev/kvm`, with the real `/init` and all four
 drives.** The whole contract above is measured, not assumed: `vda`…`vdd` enumerate in
 declaration order, the artifact mount is read-only from inside the guest, the tenant runs as
-uid 65534 with cwd `/app` and its data at `/app/data`, `PORT` and the tenant's own environment
-arrive from `vdc`, and the data disk survives a reboot. Boot to `Run /init` is 0.59–0.66 s.
+uid 65534 with cwd `/app` and its data at `/app/data`, the guest's own names and the tenant's
+environment arrive from `vdc`, and the data disk survives a reboot. Boot to `Run /init` is 0.59–0.66 s.
 
 The restart budget was exercised too: a tenant that exits immediately is restarted with
 200/400/800 ms backoff, three times as configured, after which the guest powers itself off —

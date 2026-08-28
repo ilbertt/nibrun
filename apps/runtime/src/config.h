@@ -12,10 +12,11 @@
  *   ENV_<NAME>=<value>     one of the tenant's own environment variables
  *
  * The prefixes exist so the two can never collide: a tenant variable actually
- * called NIBRUN_PORT arrives as ENV_NIBRUN_PORT and stays the tenant's.
+ * called NIBRUN_HTTP_PORT arrives as ENV_NIBRUN_HTTP_PORT and is read as the
+ * tenant's, which is what lets config_build_environment drop it on its own terms.
  *
- * A tenant value may name a runtime one it is handed: `$NIBRUN_PORT` and
- * `${NIBRUN_PORT}` both expand, and a name this runtime does not offer fails the
+ * A tenant value may name a runtime one it is handed: `$NIBRUN_HTTP_PORT` and
+ * `${NIBRUN_HTTP_PORT}` both expand, and a name this runtime does not offer fails the
  * boot rather than reaching the tenant as itself. Nothing else expands, so a secret
  * holding `$`, `$$` or `$HOME` arrives byte for byte — the prefix is what keeps the
  * substitution off values it was never meant for. The cost is that a value holding a
@@ -33,6 +34,8 @@
 #define CONFIG_MAX_EXPANDED_BYTES CONFIG_MAX_BYTES
 /* Mirrors MAX_HOSTNAME_LENGTH in packages/protocol, which refuses to write a longer one. */
 #define CONFIG_MAX_HOSTNAME 253
+/* INET6_ADDRSTRLEN without its terminator. */
+#define CONFIG_MAX_ADDRESS 45
 #define CONFIG_MAX_TENANT_VARIABLES 256
 /* Mirrors MAX_ARGUMENTS in packages/protocol, which refuses to write more. */
 #define CONFIG_MAX_ARGUMENTS 64
@@ -54,6 +57,13 @@ struct instance_config {
    * adopt this image before the agent that writes it — every other key here is
    * required, and an agent older than the image would fail every boot. */
   char *hostname;
+  /* The public address, and one port on it beside the HTTP one — reached directly
+   * rather than by name through the edge, so nothing proxies it and nothing assumes a
+   * protocol. A guest can discover neither half: the address belongs to a relay in
+   * front of the host, and the ruleset denies the metadata endpoint regardless. NULL
+   * and 0 for an app that asked for no extra port, which is most of them. */
+  char *public_ipv4;
+  uint32_t extra_public_port;
   struct restart_policy restart_policy;
   char *nameservers[CONFIG_MAX_NAMESERVERS];
   size_t nameserver_count;
@@ -79,11 +89,17 @@ bool config_read_file(struct instance_config *config, const char *path, char *bu
 /* argv for execve: the binary, then the parsed arguments, then NULL. */
 char *const *config_build_argv(const struct instance_config *config, const char *executable);
 
-/* The environment the tenant is exec'd with: PORT, NIBRUN_HOSTNAME and NIBRUN_DATA_DIR,
- * which the platform owns because they are the port the agent probes, the name the edge
- * routes to and the path the volume is mounted at, then the tenant's own variables, then
- * defaults for anything they did not set. A tenant variable of any of those names is
- * dropped rather than exported: it would describe an instance that does not exist. */
+/* The environment the tenant is exec'd with: NIBRUN_HTTP_PORT, NIBRUN_HOSTNAME,
+ * NIBRUN_DATA_DIR and, for an instance given them, NIBRUN_PUBLIC_IPV4 and
+ * NIBRUN_EXTRA_PUBLIC_PORT — the platform owns all of them, being the port the agent
+ * probes, the name the edge routes to, the path the volume is mounted at, and the address
+ * and port a tenant hands to its own users. Then the tenant's own variables, then defaults
+ * for anything they did not set. A tenant variable of any of those names is dropped rather
+ * than exported: it would describe an instance that does not exist.
+ *
+ * PORT carries the same number as NIBRUN_HTTP_PORT under the name every other host uses,
+ * and is dropped from the tenant's own for the same reason. It is an alias and never a
+ * second choice: nothing reads it back, and a reference names the prefixed one. */
 char *const *config_build_environment(const struct instance_config *config);
 
 #endif
