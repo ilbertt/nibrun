@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { TCPSocketListener } from 'bun';
+import { isPublicAddress } from '#lib/public-address.ts';
 import {
   type BinarySource,
   BinarySourceRepository,
@@ -17,7 +18,19 @@ const HEX = 16;
  */
 let releases: ReturnType<typeof Bun.serve>;
 let byHand: TCPSocketListener;
-const repo = new BinarySourceRepository();
+/**
+ * Every server below is on this machine, and dialling this machine is the one thing the default
+ * address policy exists to refuse — so the transport tests say so outright, and the policy has a
+ * describe of its own where it is left at its default.
+ */
+const repo = new BinarySourceRepository({ mayDial: () => true });
+const guarded = new BinarySourceRepository();
+// The default policy loosened by exactly this machine, so a test about which *hop* is judged is
+// not answered by the first one being on the wrong side of the rule.
+const fromHere = new BinarySourceRepository({
+  mayDial: (address) => LOOPBACK.has(address) || isPublicAddress(address),
+});
+const LOOPBACK = new Set(['127.0.0.1', '::1']);
 
 beforeAll(() => {
   releases = Bun.serve({ port: 0, fetch: answer });
@@ -39,6 +52,11 @@ function answer(request: Request): Response {
       return new Response(BINARY);
     case '/elsewhere':
       return new Response(null, { status: 302, headers: { location: '/my-server' } });
+    case '/inward':
+      return new Response(null, {
+        status: 302,
+        headers: { location: 'https://169.254.169.254/latest/meta-data/' },
+      });
     default:
       return new Response('no such release', { status: 404 });
   }
@@ -119,5 +137,45 @@ describe('a source that stops part way is the url, not the api', () => {
     const source = await repo.open({ url: byHandAt('/cut-off') });
 
     await expect(read(source)).rejects.toBeInstanceOf(InterruptedSourceError);
+  });
+});
+
+/**
+ * The api dials from inside a network the caller is not in. Without this it is a way to knock on
+ * doors nobody outside can reach, and to be told by which refusal comes back which of them
+ * answered — so an address is judged before it is dialled, and the address that passed is the one
+ * dialled.
+ */
+describe('a url is only followed to somewhere the caller could have gone themselves', () => {
+  test('a name that resolves onto this machine is refused, unfetched', async () => {
+    expect(await guarded.open({ url: at('/my-server') })).toEqual({
+      outcome: 'private-address',
+      host: 'localhost',
+    });
+  });
+
+  test('so is an address written out rather than resolved to', async () => {
+    expect(await guarded.open({ url: byHandAt('/my-server') })).toEqual({
+      outcome: 'private-address',
+      host: '127.0.0.1',
+    });
+  });
+
+  test.each([
+    ['https://169.254.169.254/latest/meta-data/', 'the instance metadata service'],
+    ['https://10.0.0.5/my-server', 'a private range'],
+    ['https://[::1]/my-server', 'loopback, in v6'],
+    ['https://[fd00::1]/my-server', 'unique-local'],
+  ])('and %s — %s', async (url) => {
+    expect(await guarded.open({ url })).toMatchObject({ outcome: 'private-address' });
+  });
+
+  // The hop the caller never saw is the one worth checking: a name they own can answer publicly
+  // and then redirect inward.
+  test('a redirect inward is refused at the hop it points to', async () => {
+    expect(await fromHere.open({ url: at('/inward') })).toEqual({
+      outcome: 'private-address',
+      host: '169.254.169.254',
+    });
   });
 });
