@@ -7,7 +7,8 @@ const SINGLE = "'";
 const DOUBLE = '"';
 
 export type CommandLine = {
-  binaryPath: string;
+  // A path on this machine or a url the api fetches; what it is, is decided where it is opened.
+  binarySource: string;
   args: TenantArguments;
 };
 
@@ -21,11 +22,11 @@ export type CommandLine = {
  * existing way of saying "this is one value".
  */
 export function parseCommandLine(line: string): CommandLine {
-  const [binaryPath, ...args] = tokenize(line);
-  if (binaryPath === undefined) {
+  const [binarySource, ...args] = tokenize(line);
+  if (binarySource === undefined) {
     throw new UsageError('Name the binary to run.');
   }
-  return { binaryPath, args };
+  return { binarySource, args };
 }
 
 /**

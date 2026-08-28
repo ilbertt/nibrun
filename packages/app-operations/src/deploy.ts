@@ -26,6 +26,45 @@ export type UploadableBinary = {
 };
 
 /**
+ * A binary the api fetches for itself. Nothing is sent from here at all: a release asset is served
+ * by a store that answers no cross-origin request, so the end that can read one is the api — and
+ * the bytes travel once, between the two ends that are not this one.
+ */
+export type FetchableBinary = {
+  url: string;
+};
+
+export type DeployableBinary = UploadableBinary | FetchableBinary;
+
+function isFetchable(binary: DeployableBinary): binary is FetchableBinary {
+  return 'url' in binary;
+}
+
+/**
+ * What to call the app when the caller named none: the binary, however it is being delivered.
+ *
+ * A url is read for a name here only to have one to call the app — what the binary is called once
+ * it is stored is the api's to decide, from the url it is the one fetching.
+ */
+function binaryName(binary: DeployableBinary): string | undefined {
+  return isFetchable(binary) ? lastSegment(binary.url) : binary.name;
+}
+
+/**
+ * Parsed rather than split: the api names the artifact from the url's *path*, and a name taken any
+ * other way is one it will refuse after this end has already made the app. A url with no path at
+ * all ends in the host, which is a name for a website and not for a binary.
+ */
+function lastSegment(url: string): string | undefined {
+  try {
+    const segment = decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '');
+    return segment === '' ? undefined : segment;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * The wait around the upload, given what the upload is doing rather than a line to print: how far
  * along it is reads as a spinner in one place and a meter in another, and neither belongs here.
  */
@@ -36,7 +75,7 @@ export type UploadWait = (input: {
 
 export type DeployInput = ConfigEdit & {
   api: PublicApiClient;
-  binary: UploadableBinary;
+  binary: DeployableBinary;
   // Required where the rest of the edit is optional: what the caller typed is what the binary is
   // asked to run with, and carrying over the last release's arguments because none were given
   // this time would run something nobody asked for.
@@ -70,11 +109,13 @@ export async function deploy({
 
   const app =
     target === null
-      ? unwrap(await api.api.apps.post({ name: name ?? binary.name, config }))
+      ? await createApp({ api, name: name ?? binaryName(binary), config })
       : unwrap(await api.api.apps({ appId: target.app.id }).patch(config));
   onStep?.({ kind: 'app', appId: app.id, slug: app.slug });
 
-  const artifact = await uploadBinary({ api, appId: app.id, binary, whileUploading, upload });
+  const artifact = isFetchable(binary)
+    ? await fetchBinary({ api, appId: app.id, binary })
+    : await uploadBinary({ api, appId: app.id, binary, whileUploading, upload });
   onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest });
 
   const deployment = unwrap(
@@ -88,6 +129,59 @@ export async function deploy({
     deploymentId: deployment.id,
     url: `https://${servingHostname(app.hostnames)}`,
   };
+}
+
+/**
+ * Named before anything is made rather than by the request that makes it: an app created for a
+ * deploy that cannot go on is one the caller is left to go and delete.
+ */
+async function createApp({
+  api,
+  name,
+  config,
+}: {
+  api: PublicApiClient;
+  name: string | undefined;
+  config: ReturnType<typeof configPatch>;
+}) {
+  if (name === undefined) {
+    throw new ApiError('An app needs a name, and this url ends in nothing to take one from.');
+  }
+  return unwrap(await api.api.apps.post({ name, config }));
+}
+
+/**
+ * The one request the bytes happen during: the api fetches, hashes and stores them while it is
+ * held open, so there is nothing to report on and nothing to say afterwards about how it went.
+ */
+async function fetchBinary({
+  api,
+  appId,
+  binary,
+}: {
+  api: PublicApiClient;
+  appId: string;
+  binary: FetchableBinary;
+}): Promise<StoredArtifact> {
+  const created = unwrap(await api.api.apps({ appId }).artifacts.post({ url: binary.url }));
+  if (!isStored(created)) {
+    throw new ApiError('The api answered a fetched binary with somewhere to upload one.');
+  }
+  return created;
+}
+
+/**
+ * Which of the two answers `POST artifacts` gave. A caller knows which it is owed by what it
+ * asked for, so this is only ever the check that the api agreed.
+ */
+type CreatedArtifact = Awaited<
+  ReturnType<ReturnType<PublicApiClient['api']['apps']>['artifacts']['post']>
+>['data'];
+
+type StoredArtifact = Extract<NonNullable<CreatedArtifact>, { digest: string }>;
+
+function isStored(created: NonNullable<CreatedArtifact>): created is StoredArtifact {
+  return 'digest' in created;
 }
 
 /**
@@ -112,12 +206,16 @@ async function uploadBinary({
   whileUploading: UploadWait;
   upload: UploadTransport;
 }) {
-  const { artifactId, url } = unwrap(
+  const created = unwrap(
     await api.api.apps({ appId }).artifacts.post({
       filename: binary.name,
       sizeBytes: binary.body.size,
     }),
   );
+  if (isStored(created)) {
+    throw new ApiError('The api answered an upload with an artifact nobody sent it.');
+  }
+  const { artifactId, url } = created;
   const artifact = api.api.apps({ appId }).artifacts({ artifactId });
 
   try {

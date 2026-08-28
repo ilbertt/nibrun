@@ -14,19 +14,26 @@ import {
   TimestampSchema,
   Value,
 } from '@repo/protocol';
-import { BadRequestError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
   AbandonedArtifactRow,
   ArtifactRow,
   ArtifactsRepositoryContract,
   CompleteArtifactInput,
+  InsertPendingArtifactInput,
   PendingArtifactRow,
 } from '#repositories/artifacts.repository.ts';
+import {
+  type BinarySource,
+  type BinarySourceRepositoryContract,
+  InterruptedSourceError,
+} from '#repositories/binary-source.repository.ts';
 import {
   type AppOwnership,
   ArtifactsService,
   MAX_ARTIFACT_SIZE_BYTES,
+  MAX_CONCURRENT_FETCHES,
 } from '#services/artifacts.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 
@@ -72,11 +79,8 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
     appId,
     ownerId,
     originalFileName,
-  }: {
-    appId: AppId;
-    ownerId: OwnerId;
-    originalFileName: Filename;
-  }): Promise<PendingArtifactRow | null> {
+    originalFileUrl,
+  }: InsertPendingArtifactInput): Promise<PendingArtifactRow | null> {
     if (ownerId !== this.ownedBy) {
       return Promise.resolve(null);
     }
@@ -87,6 +91,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
       size_bytes: null,
       object_key: null,
       original_file_name: originalFileName,
+      original_file_url: originalFileUrl,
       created_at: SEEDED_CREATED_AT,
     };
     this.rows.set(row.id, row);
@@ -94,6 +99,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
       id: row.id,
       app_id: row.app_id,
       original_file_name: row.original_file_name,
+      original_file_url: row.original_file_url,
       created_at: row.created_at,
     });
   }
@@ -153,6 +159,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
       id: row.id,
       app_id: row.app_id,
       original_file_name: row.original_file_name,
+      original_file_url: row.original_file_url,
       created_at: row.created_at,
     });
   }
@@ -212,6 +219,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
       size_bytes: String(SEEDED_SIZE_BYTES),
       object_key: Value.Parse(ObjectKeySchema, SEEDED_DIGEST),
       original_file_name: UPLOADED_NAME,
+      original_file_url: null,
       created_at: SEEDED_CREATED_AT,
     };
     this.rows.set(row.id, row);
@@ -237,6 +245,20 @@ class FakeStorage implements ArtifactStorageRepositoryContract {
   signUpload(input: { objectKey: ObjectKey; sizeBytes: number }): Promise<string> {
     this.signed.push(input);
     return Promise.resolve(`${SIGNED_URL}/${input.objectKey}`);
+  }
+
+  async write({
+    objectKey,
+    body,
+  }: {
+    objectKey: ObjectKey;
+    body: ReadableStream<Uint8Array>;
+  }): Promise<void> {
+    const written: number[] = [];
+    for await (const chunk of body) {
+      written.push(...chunk);
+    }
+    this.objects.set(objectKey, Uint8Array.from(written));
   }
 
   read({ objectKey }: { objectKey: ObjectKey }): ReadableStream<Uint8Array> {
@@ -287,12 +309,101 @@ const appsRepo: AppOwnership = {
   isOwnedBy: ({ ownerId }) => Promise.resolve(ownerId === OWNER_ID),
 };
 
+/** The url as whatever it answers with, so what a fetch runs into is set by the test asking. */
+class FakeBinarySource implements BinarySourceRepositoryContract {
+  readonly opened: string[] = [];
+  private answer: BinarySource = { outcome: 'unreachable' };
+  private gate: PromiseWithResolvers<void> | undefined;
+  private letGo = false;
+
+  async open({ url }: { url: string }): Promise<BinarySource> {
+    this.opened.push(url);
+    await this.gate?.promise;
+    return this.answer;
+  }
+
+  answers(source: BinarySource): void {
+    this.answer = source;
+  }
+
+  serves({ text, declaredSizeBytes }: { text: string; declaredSizeBytes?: number }): void {
+    this.answers({
+      outcome: 'open',
+      body: streamOf({
+        text,
+        onCancel: () => {
+          this.letGo = true;
+        },
+      }),
+      declaredSizeBytes,
+    });
+  }
+
+  /** A body that arrives in part and then does not, which is a download interrupted. */
+  stopsPartWay(): void {
+    this.answers({ outcome: 'open', body: stoppingPartWay(), declaredSizeBytes: undefined });
+  }
+
+  /** Every fetch waits where it is until the returned function is called. */
+  holdsOpen(): () => void {
+    const gate = Promise.withResolvers<void>();
+    this.gate = gate;
+    return () => {
+      gate.resolve();
+    };
+  }
+
+  /** Whether a body handed over and then not wanted was let go of rather than left open. */
+  get wasLetGo(): boolean {
+    return this.letGo;
+  }
+}
+
+function streamOf({
+  text,
+  onCancel,
+}: {
+  text: string;
+  onCancel?: () => void;
+}): ReadableStream<Uint8Array> {
+  let sent = false;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (sent) {
+        controller.close();
+        return;
+      }
+      sent = true;
+      controller.enqueue(bytesOf(text));
+    },
+    cancel() {
+      onCancel?.();
+    },
+  });
+}
+
+function stoppingPartWay(): ReadableStream<Uint8Array> {
+  let sent = false;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (sent) {
+        controller.error(new InterruptedSourceError(new Error('the source went away')));
+        return;
+      }
+      sent = true;
+      controller.enqueue(bytesOf(BINARY_TEXT));
+    },
+  });
+}
+
 function build(storageRepo: FakeStorage = new FakeStorage()) {
   const artifactsRepo = new FakeArtifactsRepository(OWNER_ID);
+  const sourceRepo = new FakeBinarySource();
   return {
     storage: storageRepo,
     artifactsRepo,
-    service: new ArtifactsService({ artifactsRepo, storageRepo, appsRepo }),
+    sourceRepo,
+    service: new ArtifactsService({ artifactsRepo, storageRepo, sourceRepo, appsRepo }),
   };
 }
 
@@ -652,5 +763,214 @@ describe('a row becomes the wire shape the dashboard and the agent both read', (
     expect(artifact.sizeBytes).toBe(SEEDED_SIZE_BYTES);
     expect(artifact.createdAt).toBe(Value.Parse(TimestampSchema, SEEDED_CREATED_AT.toISOString()));
     expect(isValidMessage({ schema: ArtifactSchema, value: artifact })).toBe(true);
+  });
+});
+
+const BINARY_URL = 'https://releases.test/v1/my-server';
+const FETCHED_NAME = Value.Parse(FilenameSchema, 'my-server');
+
+/**
+ * A binary the api fetched itself. Every refusal here is about a url somebody typed, so each one
+ * has to leave the app exactly as it was — an artifact half made is a deploy that cannot be
+ * retried by following the same link again.
+ */
+describe('a binary is fetched from the url it was given', () => {
+  test('the bytes are stored under their digest, named and addressed by the url', async () => {
+    const { service, sourceRepo, storage } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(artifact.originalFileName).toBe(FETCHED_NAME);
+    expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
+    expect(isValidMessage({ schema: ArtifactSchema, value: artifact })).toBe(true);
+  });
+
+  // Kept where the bytes are described rather than answered with: nothing downstream is told
+  // where a binary was found, and a host least of all.
+  test('where it came from is written down beside the name it was given', async () => {
+    const { service, sourceRepo, artifactsRepo } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+    });
+
+    expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(BINARY_URL);
+    expect(Object.keys(artifact)).not.toContain('originalFileUrl');
+  });
+
+  test('the staging slot it came through is given up', async () => {
+    const { service, sourceRepo, storage } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    await service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+
+    expect([...storage.objects.keys()]).toEqual([Value.Parse(ObjectKeySchema, BINARY_DIGEST)]);
+  });
+
+  test('an app the caller does not own is never fetched for', async () => {
+    const { service, sourceRepo } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OTHER_OWNER_ID, url: BINARY_URL }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(sourceRepo.opened).toEqual([]);
+  });
+
+  test('a url nibrun cannot reach is said back with the url in it', async () => {
+    const { service, sourceRepo, artifactsRepo } = build();
+    sourceRepo.answers({ outcome: 'unreachable' });
+
+    const refusal = service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+    await expect(refusal).rejects.toThrow(BINARY_URL);
+    expect(artifactsRepo.rows.size).toBe(0);
+  });
+
+  test('a url that answers with a status is that status, not a nibrun failure', async () => {
+    const { service, sourceRepo, artifactsRepo } = build();
+    sourceRepo.answers({ outcome: 'refused', status: 404 });
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    ).rejects.toThrow('404');
+    expect(artifactsRepo.rows.size).toBe(0);
+  });
+
+  test('a url ending in nothing an export could be named after is refused unread', async () => {
+    const { service, sourceRepo } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    await expect(
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        url: 'https://releases.test/downloads/',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(sourceRepo.opened).toEqual([]);
+  });
+
+  test('a source declaring more than may be stored is refused before it is read', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.serves({ text: BINARY_TEXT, declaredSizeBytes: MAX_ARTIFACT_SIZE_BYTES + 1 });
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
+  });
+
+  test('what the url served is refused on its own terms, and leaves nothing behind', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.serves({ text: 'not an executable' });
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
+  });
+
+  // Every other way this url could be unusable is answered as the url's; a socket that dropped
+  // part way is no more this api's fault than a 404, and reads as one to whoever has to retry.
+  test('a source that stops part way is the link, and leaves nothing behind either', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.stopsPartWay();
+
+    const refusal = service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+    await expect(refusal).rejects.toThrow(BINARY_URL);
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
+  });
+
+  // The refusal comes after the fetch is already open, and a body nobody is going to read holds
+  // its connection until it is let go of.
+  test('a body handed over and then not wanted is let go of', async () => {
+    const { service, sourceRepo } = build();
+    sourceRepo.serves({ text: BINARY_TEXT, declaredSizeBytes: MAX_ARTIFACT_SIZE_BYTES + 1 });
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(sourceRepo.wasLetGo).toBe(true);
+  });
+
+  test('a url that resolves inside nibrun is said back as the host it resolved to', async () => {
+    const { service, sourceRepo, artifactsRepo } = build();
+    sourceRepo.answers({ outcome: 'private-address', host: 'internal.releases.test' });
+
+    const refusal = service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+    await expect(refusal).rejects.toThrow('internal.releases.test');
+    expect(artifactsRepo.rows.size).toBe(0);
+  });
+
+  test('a redirect out of https is said back as the hop the caller never saw', async () => {
+    const { service, sourceRepo } = build();
+    sourceRepo.answers({ outcome: 'insecure-redirect', to: 'http://mirror.test/my-server' });
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    ).rejects.toThrow('http://mirror.test/my-server');
+  });
+
+  test('what a caller authenticated with is fetched with and not written down', async () => {
+    const { service, sourceRepo, artifactsRepo } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+    const withToken = 'https://owner:ghp_secret@releases.test/v1/my-server';
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: withToken,
+    });
+
+    expect(sourceRepo.opened).toEqual([withToken]);
+    expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(
+      'https://releases.test/v1/my-server',
+    );
+  });
+
+  /**
+   * A fetched binary passes through this process, which is the cost signing an upload away was
+   * meant to avoid paying — so what is bounded is how many of them it carries at once, and a
+   * caller told to come back has a request that ended rather than one still being held.
+   */
+  test('only so many binaries are fetched through this end at once', async () => {
+    const { service, sourceRepo } = build();
+    sourceRepo.answers({ outcome: 'unreachable' });
+    const letThemGo = sourceRepo.holdsOpen();
+
+    const held = Array.from({ length: MAX_CONCURRENT_FETCHES }, () =>
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    );
+    await Bun.sleep(0);
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    ).rejects.toBeInstanceOf(TooManyRequestsError);
+
+    letThemGo();
+    await Promise.allSettled(held);
+
+    // The slot each was holding is given back, so the next caller is not refused for their sake.
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    ).rejects.toBeInstanceOf(BadRequestError);
   });
 });

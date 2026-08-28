@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { isValidMessage, ObjectKeySchema, Sha256DigestSchema, Value } from '@repo/protocol';
-import { type ArtifactInspection, inspectArtifact } from '#lib/artifact-digest.ts';
+import {
+  type ArtifactInspection,
+  inspectArtifact,
+  inspectingPassThrough,
+  RefusedArtifactError,
+} from '#lib/artifact-digest.ts';
 
 // The api refuses anything that is not a Linux executable, so every fixture that is meant to be
 // read to the end opens with the ELF magic the way a real upload does.
@@ -258,5 +263,63 @@ describe('a loader the guest does not have is refused before a host ever sees it
     await inspectArtifact({ stream, maxSizeBytes: PAST_THE_HEADER_BYTES });
 
     expect(delivered).toEqual([chunks[0] as Uint8Array]);
+  });
+});
+
+/**
+ * The inspection made of bytes on their way into the store, which is how a fetched binary is read:
+ * once, with one chunk in hand. What it refuses it refuses into the stream, so the upload carrying
+ * those bytes stops where it is rather than finishing something nobody will deploy.
+ */
+describe('bytes are inspected on their way past', () => {
+  function streamed(chunks: string[]): ReadableStream<Uint8Array> {
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(bytesOf(chunk));
+        }
+        controller.close();
+      },
+    });
+  }
+
+  async function written(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+    const chunks: number[] = [];
+    for await (const chunk of stream) {
+      chunks.push(...chunk);
+    }
+    return Uint8Array.from(chunks);
+  }
+
+  test('what comes out is what went in, and the verdict is the same as reading it whole', async () => {
+    const { through, inspection } = inspectingPassThrough({ maxSizeBytes: NO_LIMIT });
+
+    const bytes = await written(streamed([BINARY]).pipeThrough(through));
+
+    expect(bytes).toEqual(bytesOf(BINARY));
+    expect(await inspection).toEqual(
+      await inspectArtifact({ stream: streamed([BINARY]), maxSizeBytes: NO_LIMIT }),
+    );
+  });
+
+  test('a refusal stops whoever is writing, and says what it was', async () => {
+    const { through } = inspectingPassThrough({ maxSizeBytes: NO_LIMIT });
+
+    const refused = written(streamed(['not an executable']).pipeThrough(through));
+
+    await expect(refused).rejects.toBeInstanceOf(RefusedArtifactError);
+    await expect(refused).rejects.toMatchObject({
+      inspection: { outcome: 'not-executable' },
+    });
+  });
+
+  // The reason a cap is not needed beside this: a source that keeps sending is cut off by the same
+  // pass, at the byte the store would not have taken anyway.
+  test('a stream past what could be stored is cut off rather than finished', async () => {
+    const { through } = inspectingPassThrough({ maxSizeBytes: BINARY.length });
+
+    const refused = written(streamed([BINARY, OTHER_BINARY]).pipeThrough(through));
+
+    await expect(refused).rejects.toMatchObject({ inspection: { outcome: 'too-large' } });
   });
 });

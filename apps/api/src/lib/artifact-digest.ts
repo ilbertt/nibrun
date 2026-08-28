@@ -67,6 +67,71 @@ function refuseChunk({
 }
 
 /**
+ * The inspection as it is made, a chunk at a time.
+ *
+ * Held apart from where the bytes come from because they come two ways: read back out of the store
+ * after an upload, or on their way into it from a url. Both reach the same verdict from the same
+ * pass; only who is pulling the chunks differs.
+ */
+function reading({ maxSizeBytes }: { maxSizeBytes: number }) {
+  const hasher = new Bun.CryptoHasher(DIGEST_ALGORITHM);
+  const header = new Uint8Array(HEADER_BYTES);
+  let headerLength = 0;
+  let sizeBytes = 0;
+
+  return {
+    /** Whatever this chunk already settles; `undefined` while the rest could still change it. */
+    take(chunk: Uint8Array): ArtifactInspection | undefined {
+      const wasComplete = headerLength === HEADER_BYTES;
+      if (!wasComplete) {
+        const taken = Math.min(chunk.byteLength, HEADER_BYTES - headerLength);
+        header.set(chunk.subarray(0, taken), headerLength);
+        headerLength += taken;
+      }
+      sizeBytes += chunk.byteLength;
+
+      const refusal = refuseChunk({
+        header,
+        headerLength,
+        headerJustFilled: !wasComplete && headerLength === HEADER_BYTES,
+        sizeBytes,
+        maxSizeBytes,
+      });
+      if (refusal) {
+        return refusal;
+      }
+
+      hasher.update(chunk);
+      return undefined;
+    },
+
+    /** What the bytes came to, once there are no more of them. */
+    verdict(): ArtifactInspection {
+      const read = header.subarray(0, headerLength);
+      // Shorter than the magic itself, so no chunk ever reached a verdict.
+      if (!isElfExecutable(read)) {
+        return { outcome: 'not-executable' };
+      }
+      if (headerLength < HEADER_BYTES) {
+        const refusal = refuseInterpreter(read);
+        if (refusal) {
+          return refusal;
+        }
+      }
+
+      const digest = Value.Parse(Sha256DigestSchema, hasher.digest(HEX_ENCODING));
+
+      return {
+        outcome: 'stored',
+        digest,
+        sizeBytes,
+        objectKey: Value.Parse(ObjectKeySchema, digest),
+      };
+    },
+  };
+}
+
+/**
  * The digest a host will verify, taken from the bytes the store now holds.
  *
  * An uploader-supplied digest could only ever fail out on the host, where it becomes a deploy
@@ -84,54 +149,63 @@ export async function inspectArtifact({
   stream: ReadableStream<Uint8Array>;
   maxSizeBytes: number;
 }): Promise<ArtifactInspection> {
-  const hasher = new Bun.CryptoHasher(DIGEST_ALGORITHM);
-  const header = new Uint8Array(HEADER_BYTES);
-  let headerLength = 0;
-  let sizeBytes = 0;
+  const read = reading({ maxSizeBytes });
 
   for await (const chunk of stream) {
-    const wasComplete = headerLength === HEADER_BYTES;
-    if (!wasComplete) {
-      const taken = Math.min(chunk.byteLength, HEADER_BYTES - headerLength);
-      header.set(chunk.subarray(0, taken), headerLength);
-      headerLength += taken;
-    }
-    sizeBytes += chunk.byteLength;
-
     // Leaving the loop cancels the read, so an object that can already be refused costs one
     // chunk rather than the whole of itself.
-    const refusal = refuseChunk({
-      header,
-      headerLength,
-      headerJustFilled: !wasComplete && headerLength === HEADER_BYTES,
-      sizeBytes,
-      maxSizeBytes,
-    });
-    if (refusal) {
-      return refusal;
-    }
-
-    hasher.update(chunk);
-  }
-
-  const read = header.subarray(0, headerLength);
-  // Shorter than the magic itself, so the loop above never reached a verdict.
-  if (!isElfExecutable(read)) {
-    return { outcome: 'not-executable' };
-  }
-  if (headerLength < HEADER_BYTES) {
-    const refusal = refuseInterpreter(read);
+    const refusal = read.take(chunk);
     if (refusal) {
       return refusal;
     }
   }
 
-  const digest = Value.Parse(Sha256DigestSchema, hasher.digest(HEX_ENCODING));
+  return read.verdict();
+}
 
-  return {
-    outcome: 'stored',
-    digest,
-    sizeBytes,
-    objectKey: Value.Parse(ObjectKeySchema, digest),
-  };
+/** What a refusal is raised as, so that whoever was writing the bytes stops and says why. */
+export class RefusedArtifactError extends Error {
+  readonly inspection: ArtifactInspection;
+
+  constructor(inspection: ArtifactInspection) {
+    super(`The bytes were refused: ${inspection.outcome}`);
+    this.inspection = inspection;
+  }
+}
+
+/**
+ * The same inspection, made of bytes on their way somewhere else.
+ *
+ * A pass-through rather than a second reader: the bytes are hashed as they are handed on, so one
+ * chunk is in hand at a time. Teeing the stream instead would have made the two readers race — the
+ * hash runs at memory speed and an upload does not — and everything the slower one had not reached
+ * would sit in a queue, which for a binary is the whole binary.
+ *
+ * A refusal errors the stream rather than ending it: whoever is writing has to stop where they
+ * are, and a half-written object is not something to mistake for what was asked for.
+ */
+export function inspectingPassThrough({ maxSizeBytes }: { maxSizeBytes: number }): {
+  through: TransformStream<Uint8Array, Uint8Array>;
+  inspection: Promise<ArtifactInspection>;
+} {
+  const read = reading({ maxSizeBytes });
+  const { promise, resolve } = Promise.withResolvers<ArtifactInspection>();
+
+  const through = new TransformStream<Uint8Array, Uint8Array>({
+    // biome-ignore lint/complexity/useMaxParams: a transform is handed what to pass it on to
+    transform(chunk, controller) {
+      const refusal = read.take(chunk);
+      if (refusal) {
+        resolve(refusal);
+        controller.error(new RefusedArtifactError(refusal));
+        return;
+      }
+      controller.enqueue(chunk);
+    },
+    flush() {
+      resolve(read.verdict());
+    },
+  });
+
+  return { through, inspection: promise };
 }

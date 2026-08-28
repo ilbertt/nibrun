@@ -76,6 +76,10 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
       runtimeDir: yield* optional({ name: 'AGENT_RUNTIME_DIR', fallback: DEFAULT_RUNTIME_DIR }),
       hostIdFile: inStateDir('host-id'),
       slotsFile: inStateDir('slots.json'),
+      // Beside the slots rather than inside them: `slots.json` is a plain app-to-slot record that
+      // an agent either side of this reads the same way, and a key that is not an app in there
+      // would read back as one holding a slot.
+      slotCursorFile: inStateDir('slot-cursor.json'),
       instancesFile: inStateDir('instances.json'),
       exportsFile: inStateDir('exports.json'),
       deletedVolumesFile: inStateDir('deleted-volumes.json'),

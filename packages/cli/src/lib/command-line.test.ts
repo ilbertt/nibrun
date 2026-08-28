@@ -2,12 +2,19 @@ import { expect, test } from 'bun:test';
 import { parseArguments, parseCommandLine } from '#lib/command-line.ts';
 
 test('a binary on its own is a command line with nothing to add', () => {
-  expect(parseCommandLine('./my-server')).toEqual({ binaryPath: './my-server', args: [] });
+  expect(parseCommandLine('./my-server')).toEqual({ binarySource: './my-server', args: [] });
+});
+
+test('a url is a binary the same way a path is: the first token, then its arguments', () => {
+  expect(parseCommandLine('https://releases.test/v1/my-server serve')).toEqual({
+    binarySource: 'https://releases.test/v1/my-server',
+    args: ['serve'],
+  });
 });
 
 test('everything after the binary is the binary its arguments', () => {
   expect(parseCommandLine('./my-server serve --port 8080')).toEqual({
-    binaryPath: './my-server',
+    binarySource: './my-server',
     args: ['serve', '--port', '8080'],
   });
 });
@@ -18,7 +25,7 @@ test('a flag written here is the tenant its own, whatever this program calls the
 
 test('quotes hold a value together, and are gone from the value they held', () => {
   expect(parseCommandLine(`'/my apps/server' --name "foo bar"`)).toEqual({
-    binaryPath: '/my apps/server',
+    binarySource: '/my apps/server',
     args: ['--name', 'foo bar'],
   });
 });
@@ -40,7 +47,7 @@ test('an argument may be deliberately empty', () => {
 
 test('runs of whitespace separate rather than produce arguments', () => {
   expect(parseCommandLine('  ./my-server   serve  ')).toEqual({
-    binaryPath: './my-server',
+    binarySource: './my-server',
     args: ['serve'],
   });
 });

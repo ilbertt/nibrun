@@ -40,9 +40,8 @@ Grab the Linux build from the [PocketBase releases
 page](https://github.com/pocketbase/pocketbase/releases) (`pocketbase_<version>_linux_amd64.zip`)
 and unzip it. Inside is one file called `pocketbase`. That is the whole application.
 
-Drag and drop it onto [nibrun.com](https://nibrun.com).
-
-You land on the deploy screen with the binary already attached. Two fields to fill in:
+Drag and drop it onto [nibrun.com](https://nibrun.com). You land on the deploy screen with the
+binary already attached. Two fields to fill in:
 
 **HTTP port**: `8090`
 
@@ -55,6 +54,17 @@ serve
 ```
 
 Deploy.
+
+Alternatively, this link is that same screen with all of it already configured, asking for nothing
+but the binary:
+
+[**Deploy PocketBase on nibrun**](https://app.nibrun.com/deploy?name=pocketbase&port=8090&arg=serve&arg=--http=0.0.0.0:8090&arg=--dir=./data/pb_data&minimal)
+
+Nothing in it is ours to hand out. It is the deploy screen reading its own query string — `name`,
+`port`, `arg` per argument, `env` per variable, `extra-public-port` for a second one, `minimal`
+for the form stripped to what is left to do, and `binary` for a url to fetch the executable from,
+which turns the drop into a click. PocketBase publishes its build zipped, so that last one is the
+one part this link cannot carry.
 
 A few seconds later PocketBase is answering on `https://<your-app>.nibrun.app`, and the
 admin UI is at `/_/`. There is no certificate to obtain and no OS underneath it that is yours to

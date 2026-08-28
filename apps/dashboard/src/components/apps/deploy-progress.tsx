@@ -74,10 +74,15 @@ function waitingOn(phase: DeployPhase): string | undefined {
   if (phase === 'uploading') {
     return 'uploading the binary';
   }
+  // No meter under this one: the bytes are moving between the url and nibrun, and this end is
+  // only waiting to be told how it went.
+  if (phase === 'fetching') {
+    return 'nibrun is fetching the binary';
+  }
   if (phase === 'releasing') {
     return 'releasing the binary the app already has';
   }
-  return phase === 'settling' ? 'waiting for the guest to answer' : undefined;
+  return phase === 'settling' ? 'the app is coming online' : undefined;
 }
 
 function describeStep(step: DeployStep): string {
