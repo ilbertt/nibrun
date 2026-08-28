@@ -1,4 +1,10 @@
-import { type TenantEnvironmentPatch, TenantEnvironmentPatchSchema, Value } from '@repo/protocol';
+import {
+  namesOfferedRuntimeValues,
+  RUNTIME_VALUE_NAMES,
+  type TenantEnvironmentPatch,
+  TenantEnvironmentPatchSchema,
+  Value,
+} from '@repo/protocol';
 import { InvalidEnvironmentError } from '#errors.ts';
 
 const ASSIGNMENT = '=';
@@ -44,10 +50,27 @@ export function parseEnvironmentPatch(edits: readonly EnvironmentEdit[]): Tenant
     );
   }
 
+  // The guest is what substitutes these, and a name it does not offer fails the boot rather than
+  // reaching the binary as itself — so a typo is answered here, before anything is deployed over
+  // it. The variable is named and its value never is: it is the tenant's secret either way.
+  const naming = edits
+    .filter(({ value }) => value !== null && !namesOfferedRuntimeValues(value))
+    .map(({ name }) => name);
+  if (naming.length > 0) {
+    throw new InvalidEnvironmentError(
+      `A value may name a runtime value the guest sets — ${RUNTIME_VALUE_NAMES.map(written).join(', ')} — and nothing else: ${naming.join(', ')}`,
+    );
+  }
+
   return Value.Parse(
     TenantEnvironmentPatchSchema,
     Object.fromEntries(edits.map(({ name, value }) => [name, value])),
   );
+}
+
+/** A runtime value as it is named in a tenant value, which is the form worth showing back. */
+function written(name: string): string {
+  return `\${${name}}`;
 }
 
 function assigned(assignment: string): EnvironmentEdit {

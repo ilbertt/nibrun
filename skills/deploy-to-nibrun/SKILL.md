@@ -16,7 +16,7 @@ Everything the binary can count on, and nothing else:
 | --- | --- |
 | Platform | Linux **x86_64**, glibc (Debian rootfs) |
 | Working directory | `/app` |
-| Persistent volume | `/app/data` — 8 GiB, survives every redeploy |
+| Persistent volume | `/app/data` — 8 GiB, survives every redeploy. `NIBRUN_DATA_DIR` names it |
 | Port | `PORT` is set by the guest; the app **must** listen on it, on `0.0.0.0` |
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs and is lost on restart. So is everything outside `/app/data` |
@@ -25,17 +25,20 @@ Everything the binary can count on, and nothing else:
 | URL | `https://<slug>.nibrun.app`, live as soon as it boots |
 
 An app that writes its SQLite file and its uploads under `./data` and reads `PORT` needs no
-configuration to run here. A `PORT` or `NIBRUN_HOSTNAME` you set yourself is ignored — the guest
-owns both.
+configuration to run here. A `PORT`, `NIBRUN_HOSTNAME` or `NIBRUN_DATA_DIR` you set yourself is
+ignored — the guest owns all three. `HOME` and `TMPDIR` are defaults rather than owned, so one you
+set yourself is what the binary reads.
 
 A binary that needs its own absolute URL — an OAuth redirect, a webhook it registers, a link in
 an email — builds it from `NIBRUN_HOSTNAME` rather than being told it, and falls back to whatever
 it uses when it is not on nibrun.
 
 One that insists on a variable name of its own reaches the same values through it: a value may
-name a runtime one — `APP_BASE_URL=https://${NIBRUN_HOSTNAME}` — and the guest expands it before
-exec. Only that prefix expands, so a secret holding a `$` arrives untouched, and a name the guest
-does not offer fails the boot rather than reaching the process as itself.
+name a runtime one — `APP_BASE_URL=https://${NIBRUN_HOSTNAME}`,
+`DATABASE_URL=file:${NIBRUN_DATA_DIR}/app.db` — and the guest expands it before exec. Only that
+prefix expands, so a secret holding a `$` arrives untouched, and `NIBRUN_PORT`, `NIBRUN_HOSTNAME`
+and `NIBRUN_DATA_DIR` are the whole of what may be named: anything else is refused when you deploy
+it.
 
 ## Deploying
 

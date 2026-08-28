@@ -1,4 +1,4 @@
-import { Kind, type TSchema, type TString, Type } from '@sinclair/typebox';
+import { Kind, type StringOptions, type TSchema, type TString, Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import type { Brand, BrandedSchema } from '#lib/brand.ts';
 
@@ -12,11 +12,17 @@ export type SecretString = Brand<string, 'SecretString'>;
 
 // Annotated rather than merely named, so redaction is driven by the schema: a field added
 // later is redacted because it is declared secret, not because someone remembered to extend
-// a list of field names somewhere else.
-export const SecretStringSchema = Type.String({
-  [SECRET_ANNOTATION]: true,
-  maxLength: MAX_SECRET_LENGTH,
-}) as BrandedSchema<TString, SecretString>;
+// a list of field names somewhere else. A caller narrowing one further says only what differs,
+// so what makes a string a secret is stated once whatever else is asked of it.
+export function secretString(options: StringOptions = {}) {
+  return Type.String({
+    ...options,
+    [SECRET_ANNOTATION]: true,
+    maxLength: MAX_SECRET_LENGTH,
+  }) as BrandedSchema<TString, SecretString>;
+}
+
+export const SecretStringSchema = secretString();
 
 const isSecret = (schema: TSchema) => schema[SECRET_ANNOTATION] === true;
 

@@ -41,10 +41,13 @@ static void report(const char *record) {
   const char *port = getenv("PORT");
   const char *hostname = getenv("NIBRUN_HOSTNAME");
   const char *home = getenv("HOME");
+  const char *data_dir = getenv("NIBRUN_DATA_DIR");
   char line[512];
-  snprintf(line, sizeof(line), "PORT=%s NIBRUN_HOSTNAME=%s HOME=%s CWD=%s UID=%d GID=%d\n",
-           port == NULL ? "" : port, hostname == NULL ? "" : hostname, home == NULL ? "" : home,
-           directory, (int)getuid(), (int)getgid());
+  snprintf(line, sizeof(line),
+           "PORT=%s NIBRUN_HOSTNAME=%s NIBRUN_DATA_DIR=%s HOME=%s CWD=%s UID=%d GID=%d\n",
+           port == NULL ? "" : port, hostname == NULL ? "" : hostname,
+           data_dir == NULL ? "" : data_dir, home == NULL ? "" : home, directory, (int)getuid(),
+           (int)getgid());
   append(record, line);
 }
 
