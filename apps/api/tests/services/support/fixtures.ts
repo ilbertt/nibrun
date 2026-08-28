@@ -52,6 +52,7 @@ export const DEFAULT_CONFIG: PublicAppConfig = {
   volumeSizeBytes: VOLUME_SIZE_BYTES,
   environment: {},
   httpPort: DEFAULT_HTTP_PORT,
+  hasExtraPublicPort: false,
   args: [],
   resources: DEFAULT_INSTANCE_RESOURCES,
   healthCheck: DEFAULT_HEALTH_CHECK,
@@ -66,6 +67,7 @@ export function configColumns(config: StoredAppConfig | PublicAppConfig): AppCon
   return {
     environment_names: Object.keys(config.environment),
     http_port: config.httpPort,
+    has_extra_public_port: config.hasExtraPublicPort,
     args: [...config.args],
     vcpu_count: config.resources.vcpuCount,
     memory_mib: config.resources.memoryMib,

@@ -76,6 +76,7 @@ export function desiredInstance(overrides: Partial<DesiredInstance> = {}): Desir
     artifact: artifact(),
     config: {
       httpPort: DEFAULT_HTTP_PORT,
+      hasExtraPublicPort: false,
       args: [],
       environment: {},
       resources: DEFAULT_INSTANCE_RESOURCES,

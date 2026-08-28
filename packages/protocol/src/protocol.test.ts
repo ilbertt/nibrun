@@ -72,6 +72,7 @@ const desiredState = (): HostDesiredState => ({
       },
       config: {
         httpPort: DEFAULT_HTTP_PORT,
+        hasExtraPublicPort: true,
         args: ['serve', '--http=0.0.0.0:8090'],
         environment: { DATABASE_URL: TENANT_SECRET },
         resources: DEFAULT_INSTANCE_RESOURCES,

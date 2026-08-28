@@ -153,6 +153,11 @@ export type TenantArguments = typeof TenantArgumentsSchema.static;
 
 export const AppConfigSchema = Type.Object({
   httpPort: HttpPortSchema,
+  // Whether the app is reached on a public TCP and UDP port besides HTTP. A yes or no rather than
+  // a number, because the port has to be the same on every hop for a binary that announces the one
+  // it bound to be announcing a reachable one — which makes choosing it the host's, and the guest
+  // is told which it got.
+  hasExtraPublicPort: Type.Boolean(),
   args: TenantArgumentsSchema,
   environment: TenantEnvironmentSchema,
   resources: InstanceResourcesSchema,

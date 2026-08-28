@@ -28,7 +28,7 @@ export type PublicAppConfig = Omit<AppConfig, 'environment'> & {
 // How the binary is started, which is the whole of what an owner chooses. The machine it starts
 // on — vCPUs, memory, filesystem, health probe, restart budget — is nibrun's, and leaving it out
 // of this one type is what keeps it out of every write shape below.
-type OwnedAppConfig = Pick<AppConfig, 'httpPort' | 'args'>;
+type OwnedAppConfig = Pick<AppConfig, 'httpPort' | 'hasExtraPublicPort' | 'args'>;
 
 // What an app is created with: the whole environment, because there is not yet one to edit.
 export type NewAppConfig = Partial<OwnedAppConfig> & {
@@ -86,6 +86,7 @@ export function splitEnvironmentPatch(environment: TenantEnvironmentPatch): {
 export type RunConfigColumns = Pick<
   Queries['SelectAppById'],
   | 'http_port'
+  | 'has_extra_public_port'
   | 'args'
   | 'vcpu_count'
   | 'memory_mib'
@@ -116,6 +117,7 @@ export function configWithDefaults(
     healthCheck: DEFAULT_HEALTH_CHECK,
     restartPolicy: DEFAULT_RESTART_POLICY,
     httpPort: patch.httpPort ?? DEFAULT_HTTP_PORT,
+    hasExtraPublicPort: patch.hasExtraPublicPort ?? false,
     args: patch.args ?? [],
   };
 }
@@ -135,6 +137,7 @@ export function toAppConfig(row: AppConfigColumns): PublicAppConfig {
 export function toRunConfig(row: RunConfigColumns): Omit<AppConfig, 'environment'> {
   return {
     httpPort: row.http_port,
+    hasExtraPublicPort: row.has_extra_public_port,
     args: row.args,
     resources: {
       vcpuCount: row.vcpu_count,

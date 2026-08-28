@@ -103,7 +103,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
           /* @notNull object_key */
           SELECT id, app_id, state,
                  digest, size_bytes, object_key, original_file_name,
-                 http_port, args, vcpu_count, memory_mib,
+                 http_port, has_extra_public_port, args, vcpu_count, memory_mib,
                  health_check_path, health_check_interval_ms, health_check_timeout_ms,
                  health_check_grace_period_ms, health_check_healthy_threshold,
                  health_check_unhealthy_threshold,

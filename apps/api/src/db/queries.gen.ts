@@ -15,6 +15,7 @@ export interface ISelectDesiredDeploymentsResult {
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
     http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -185,6 +186,7 @@ export interface ISelectCreatedAppResult {
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
     http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -212,6 +214,7 @@ export interface ISelectAppsByOwnerResult {
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
     http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -239,6 +242,7 @@ export interface ISelectAppByIdResult {
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
     http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -265,6 +269,7 @@ export interface ISelectAppForConfigUpdateResult {
 export interface ISelectCurrentAppConfigResult {
     id: IAppConfigsColumns["id"];
     http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -297,6 +302,7 @@ export interface ITouchAppAfterConfigPatchResult {
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
     http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -368,6 +374,7 @@ export interface ISelectAppAfterStateChangeResult {
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
     http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -504,6 +511,7 @@ export interface ISelectDeploymentsByAppResult {
     last_healthy_at: IDeploymentsColumns["last_healthy_at"];
     restart_count: IDeploymentsColumns["restart_count"];
     http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -538,6 +546,7 @@ export interface ISelectDeploymentByIdResult {
     last_healthy_at: IDeploymentsColumns["last_healthy_at"];
     restart_count: IDeploymentsColumns["restart_count"];
     http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -598,6 +607,7 @@ export interface ISelectInsertedDeploymentResult {
     last_healthy_at: IDeploymentsColumns["last_healthy_at"];
     restart_count: IDeploymentsColumns["restart_count"];
     http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -903,6 +913,7 @@ export interface IAppConfigsColumns {
     restart_reset_after_ms: number;
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
+    has_extra_public_port: boolean;
 }
 
 /** Schema of `app_configs`. */
@@ -933,6 +944,7 @@ export interface IAppConfigsWithEnvironmentColumns {
     restart_backoff_factor: number | null;
     restart_reset_after_ms: number | null;
     created_at: Date | null;
+    has_extra_public_port: boolean | null;
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[] | null;
 }
@@ -1069,6 +1081,7 @@ export interface IDesiredDeploymentsColumns {
     restart_backoff_factor: number | null;
     restart_reset_after_ms: number | null;
     config_id: string | null;
+    has_extra_public_port: boolean | null;
 }
 
 /** Schema of `desired_deployments`. */
@@ -1391,7 +1404,8 @@ export const schema = {
             restart_max_backoff_ms: { _columnName: "restart_max_backoff_ms", _foreignKeys: {} },
             restart_backoff_factor: { _columnName: "restart_backoff_factor", _foreignKeys: {} },
             restart_reset_after_ms: { _columnName: "restart_reset_after_ms", _foreignKeys: {} },
-            created_at: { _columnName: "created_at", _foreignKeys: {} }
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} }
         },
         _indexes: {
             app_configs_app_id_id_idx: { _indexName: "app_configs_app_id_id_idx" },
@@ -1439,6 +1453,7 @@ export const schema = {
             restart_backoff_factor: { _columnName: "restart_backoff_factor", _foreignKeys: {} },
             restart_reset_after_ms: { _columnName: "restart_reset_after_ms", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
+            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} },
             environment_names: { _columnName: "environment_names", _foreignKeys: {} }
         },
         _indexes: {},
@@ -1583,7 +1598,8 @@ export const schema = {
             restart_max_backoff_ms: { _columnName: "restart_max_backoff_ms", _foreignKeys: {} },
             restart_backoff_factor: { _columnName: "restart_backoff_factor", _foreignKeys: {} },
             restart_reset_after_ms: { _columnName: "restart_reset_after_ms", _foreignKeys: {} },
-            config_id: { _columnName: "config_id", _foreignKeys: {} }
+            config_id: { _columnName: "config_id", _foreignKeys: {} },
+            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}

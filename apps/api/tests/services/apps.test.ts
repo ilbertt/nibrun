@@ -465,6 +465,46 @@ describe('an app is created with the environment it was given, and never reports
   });
 });
 
+describe('an app asks for a public port besides HTTP, and is never handed one it did not', () => {
+  test('an app that asks has it recorded', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await createApp({ appsRepo, config: { hasExtraPublicPort: true } });
+
+    expect(appsRepo.offeredConfigs).toEqual([
+      { ...DEFAULT_STORED_CONFIG, hasExtraPublicPort: true },
+    ]);
+  });
+
+  // Absent rather than false: the repository carries forward what a patch says nothing about, so
+  // an edit to something else must not be able to take the port away.
+  test('a patch about something else says nothing about it', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    await serviceWith({ appsRepo }).updateConfig({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      patch: { args: ['serve'] },
+    });
+
+    expect('hasExtraPublicPort' in (appsRepo.offeredPatches[0] ?? {})).toBe(false);
+  });
+
+  test('a patch giving one up carries the answer rather than the silence', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    await serviceWith({ appsRepo }).updateConfig({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      patch: { hasExtraPublicPort: false },
+    });
+
+    expect(appsRepo.offeredPatches[0]?.hasExtraPublicPort).toBe(false);
+  });
+});
+
 describe('a config patch edits the environment rather than replacing it', () => {
   test('a patch that says nothing about it carries no environment at all', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });

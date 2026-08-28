@@ -211,6 +211,7 @@ describe('a deployment publishes the config version it pins', () => {
       volumeSizeBytes: VOLUME_SIZE_BYTES,
       environment: {},
       httpPort: HTTP_PORT,
+      hasExtraPublicPort: false,
       args: ['serve'],
       resources: DEFAULT_INSTANCE_RESOURCES,
       healthCheck: DEFAULT_HEALTH_CHECK,
