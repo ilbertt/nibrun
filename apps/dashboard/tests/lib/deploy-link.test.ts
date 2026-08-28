@@ -2,10 +2,12 @@ import { expect, test } from 'bun:test';
 import { RUNTIME_VALUES, writtenRuntimeValue } from '@repo/protocol';
 import { defaultParseSearch, defaultStringifySearch } from '@tanstack/react-router';
 import {
+  asksForVariables,
   type DeployLink,
   type DeploySuggestion,
   deployLink,
   deploySuggestion,
+  namesVariables,
 } from '#lib/deploy-link.ts';
 
 const HOSTNAME = writtenRuntimeValue(RUNTIME_VALUES.HOSTNAME.name);
@@ -129,4 +131,23 @@ test('and the rest of it survives that parameter going', () => {
 
   expect(written(configured).minimal).toBeUndefined();
   expect(followed(configured)).toEqual(ASKED);
+});
+
+/**
+ * The section opens on both, and for the same reason it holds them: a value written into a link is
+ * one everybody who follows it can already read, so shutting it keeps that value from nobody but
+ * the owner about to deploy an app that runs with it.
+ */
+test('a link that names a variable is a link the environment is shown for', () => {
+  expect(namesVariables(followed('?env=GREETING=hello'))).toBe(true);
+  expect(namesVariables(followed('?env=API_KEY'))).toBe(true);
+  expect(namesVariables(followed('?port=9000'))).toBe(false);
+  expect(namesVariables(undefined)).toBe(false);
+});
+
+// The narrower question, which is what the form waits on rather than what it shows.
+test('and only one it carried no value for is one the owner has to fill in', () => {
+  expect(asksForVariables(followed('?env=API_KEY'))).toBe(true);
+  expect(asksForVariables(followed('?env=GREETING=hello'))).toBe(false);
+  expect(asksForVariables(undefined)).toBe(false);
 });

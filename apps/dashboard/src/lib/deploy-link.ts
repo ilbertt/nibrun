@@ -80,6 +80,23 @@ export type DeploySuggestion = { [K in keyof typeof CONFIGURED]?: Meant[K] } & {
   binary?: string | undefined;
 };
 
+/**
+ * Whether the link named a variable it carried no value for. Such a link cannot deploy on its own,
+ * whatever it asked to show: the owner is the only one who has the value.
+ */
+export function asksForVariables(suggested: DeploySuggestion | undefined): boolean {
+  return suggested?.environment?.some((entry) => entry.value.length === 0) ?? false;
+}
+
+/**
+ * Whether the link named a variable at all. A value it carried is one everybody who follows the
+ * link can already read, so there is nothing left for a shut section to keep from them — and
+ * plenty it would keep from them about what the app is a press away from running with.
+ */
+export function namesVariables(suggested: DeploySuggestion | undefined): boolean {
+  return (suggested?.environment?.length ?? 0) > 0;
+}
+
 /** The link as the deploy it describes. A parameter renamed above is a line here that stops compiling. */
 export function deploySuggestion(link: DeployLink): DeploySuggestion {
   return {

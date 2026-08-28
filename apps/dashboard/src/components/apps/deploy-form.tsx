@@ -2,10 +2,10 @@ import { Button } from '@repo/ui/components/button';
 import { useStore } from '@tanstack/react-form';
 import { AdvancedConfiguration } from '#components/apps/advanced-configuration.tsx';
 import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
-import { asksForVariables, DeployConfiguration } from '#components/apps/deploy-configuration.tsx';
+import { DeployConfiguration } from '#components/apps/deploy-configuration.tsx';
 import { MinimalBinaryField } from '#components/apps/minimal-binary-field.tsx';
 import { binaryName } from '#lib/binary-source.ts';
-import type { DeploySuggestion } from '#lib/deploy-link.ts';
+import { asksForVariables, type DeploySuggestion } from '#lib/deploy-link.ts';
 import { type DeployFormValues, useDeployForm } from '#lib/hooks/use-deploy-form.ts';
 import type { AppSummary } from '#queries/apps.ts';
 

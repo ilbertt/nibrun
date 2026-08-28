@@ -17,7 +17,7 @@ import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
 import { DeployEnvironmentField } from '#components/apps/deploy-environment-field.tsx';
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
-import type { DeploySuggestion } from '#lib/deploy-link.ts';
+import { type DeploySuggestion, namesVariables } from '#lib/deploy-link.ts';
 import { filledVariables, storedVariables } from '#lib/environment-variables.ts';
 import { type DeployFormState, tenantArguments, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
@@ -150,9 +150,10 @@ export function DeployConfiguration({
         </AccordionItem>
       </Accordion>
 
-      {/* Open where a link asked for a variable it could not carry: the owner is the only one who
-          holds the value, and a shut section is no way to ask them for it. */}
-      <Accordion defaultValue={asksForVariables(suggested) ? [ENVIRONMENT] : []}>
+      {/* Open where a link named a variable at all: the owner is the only one who holds a value it
+          could not carry, and a shut section is no way to ask them for it — nor to say what a
+          value it did carry is about to make the app run with. */}
+      <Accordion defaultValue={namesVariables(suggested) ? [ENVIRONMENT] : []}>
         <AccordionItem value={ENVIRONMENT}>
           <AccordionTrigger>
             <span className="flex items-baseline gap-2">
@@ -183,14 +184,6 @@ export function DeployConfiguration({
       </Accordion>
     </>
   );
-}
-
-/**
- * Whether the link named a variable it carried no value for. Such a link cannot deploy on its own,
- * whatever it asked to show: the owner is the only one who has the value.
- */
-export function asksForVariables(suggested: DeploySuggestion | undefined): boolean {
-  return suggested?.environment?.some((entry) => entry.value.length === 0) ?? false;
 }
 
 /** What the section says while it is shut, in the one word a count would be. */
