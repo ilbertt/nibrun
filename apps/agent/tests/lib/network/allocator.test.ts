@@ -1,6 +1,6 @@
+import { describe, expect, test } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, test } from 'bun:test';
 import { type AppId, AppIdSchema, HostPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
 import { Effect, Either, Layer, Option } from 'effect';
 import {
@@ -25,6 +25,12 @@ const BOUNDARY_SLOT = 64;
 const SOME_SLOT = 3;
 const DISTINCT_APPS = ['alpha', 'beta', 'gamma'];
 const BEYOND_THE_LAST_SLOT = 1_000;
+const NOT_A_WHOLE_NUMBER = 1.5;
+
+/** Where the cursor would sit had the slot just handed out moved it. */
+function wouldBeNext(slot: number): number {
+  return slot + 1;
+}
 const everySlot = [...Array(SLOT_COUNT).keys()];
 
 const run = provided(
@@ -133,13 +139,13 @@ describe('allocation is stable for the lifetime of an app', () => {
   test('being handed the slot an app already holds does not move the cursor', async () => {
     const [released, next] = await withAllocator((allocator) =>
       Effect.gen(function* () {
-        const first = yield* allocator.allocate(app(1));
-        yield* allocator.allocate(app(2));
-        yield* allocator.release(app(2));
-        // The redeploy: app 1 asking again for the slot it never gave up.
-        yield* allocator.allocate(app(1));
-        const third = yield* allocator.allocate(app(3));
-        return [first.slot + 1, third.slot];
+        const staying = yield* allocator.allocate(app('staying'));
+        yield* allocator.allocate(app('leaving'));
+        yield* allocator.release(app('leaving'));
+        // The redeploy: an app asking again for the slot it never gave up.
+        yield* allocator.allocate(app('staying'));
+        const arriving = yield* allocator.allocate(app('arriving'));
+        return [wouldBeNext(staying.slot), arriving.slot];
       }).pipe(Effect.orDie),
     );
     expect(next).not.toBe(released);
@@ -167,7 +173,7 @@ describe('a cursor read off disk cannot hand out a slot somebody holds', () => {
     expect(readSlotCursor(undefined)).toBe(FIRST_SLOT);
     expect(readSlotCursor(null)).toBe(FIRST_SLOT);
     expect(readSlotCursor('7')).toBe(FIRST_SLOT);
-    expect(readSlotCursor(1.5)).toBe(FIRST_SLOT);
+    expect(readSlotCursor(NOT_A_WHOLE_NUMBER)).toBe(FIRST_SLOT);
     expect(readSlotCursor(SOME_SLOT)).toBe(SOME_SLOT);
   });
 
@@ -180,7 +186,9 @@ describe('a cursor read off disk cannot hand out a slot somebody holds', () => {
         SlotAllocator.DefaultWithoutDependencies.pipe(
           Layer.provide(Layer.merge(agentConfig({ slotCursorFile: file }), platform)),
         ),
-      )(Effect.flatMap(SlotAllocator, (allocator) => allocator.allocate(app(1))).pipe(Effect.orDie));
+      )(
+        Effect.flatMap(SlotAllocator, (allocator) => allocator.allocate(app(1))).pipe(Effect.orDie),
+      );
 
       expect(slot.slot).toBeGreaterThanOrEqual(FIRST_SLOT);
       expect(slot.slot).toBeLessThan(SLOT_COUNT);
