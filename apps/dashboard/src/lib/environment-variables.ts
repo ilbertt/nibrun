@@ -5,23 +5,54 @@ import type { AppSummary } from '#queries/apps.ts';
  * A row of the environment table. `sealed` is a variable the app already runs with: the api
  * returns its name and never its value, so there is nothing to show for it and nothing this end
  * could send for it — which is exactly what leaves it as it is.
+ *
+ * `asked` is one a link named without a value. It is the row nobody but the owner can fill, so it
+ * is the row a deploy waits on.
  */
 export type EnvironmentVariable = {
   id: string;
   name: string;
   value: string;
   sealed: boolean;
+  asked: boolean;
 };
 
 /** What the app runs with now, as rows: every name it has, none of their values. */
 export function storedVariables(app: AppSummary | undefined): EnvironmentVariable[] {
-  return storedNames(app).map((name) => ({ id: name, name, value: '', sealed: true }));
+  return storedNames(app).map((name) => ({
+    id: name,
+    name,
+    value: '',
+    sealed: true,
+    asked: false,
+  }));
 }
 
 // A name is what identifies a stored variable, so a fresh row cannot be keyed by one: it has no
 // name until it is typed, and two of them would collide before anything could say so.
 export function blankVariable(): EnvironmentVariable {
-  return { id: crypto.randomUUID(), name: '', value: '', sealed: false };
+  return { id: crypto.randomUUID(), name: '', value: '', sealed: false, asked: false };
+}
+
+/**
+ * What a link asked for, as rows. A name it carried no value for is asked rather than set: a link
+ * is read by everyone who follows it, which makes it the wrong place for a secret and the right
+ * place to say which ones the app needs.
+ */
+export function askedVariables(entries: readonly EnvironmentAssignment[]): EnvironmentVariable[] {
+  return entries.map(({ name, value }) => ({
+    ...blankVariable(),
+    name,
+    value,
+    asked: value.length === 0,
+  }));
+}
+
+/** The names a link asked for that still hold nothing, which is what a deploy cannot be made of. */
+export function unfilledAsked(variables: readonly EnvironmentVariable[]): string[] {
+  return variables
+    .filter((variable) => variable.asked && variable.value.length === 0)
+    .map((variable) => variable.name.trim());
 }
 
 /** A row nobody has filled in yet is not a variable, and is not sent as one. */

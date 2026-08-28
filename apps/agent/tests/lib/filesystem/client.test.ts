@@ -11,6 +11,7 @@ import {
   TimestampSchema,
   Value,
 } from '@repo/protocol';
+import type { SocketHandler } from 'bun';
 import { Effect } from 'effect';
 import { type GuestFilesystem, guestFilesystem } from '#lib/filesystem/client.ts';
 import { GUEST_FILESYSTEM_CHUNK_BYTES } from '#lib/filesystem/protocol.ts';
@@ -44,6 +45,46 @@ type GuestScript = {
   readonly hangUpAfterReplies?: boolean;
 };
 
+/** The text handshake first, then one scripted reply per request until the script runs out. */
+function guestSocket({
+  script,
+  received,
+}: {
+  script: GuestScript;
+  received: ReceivedRequest[];
+}): SocketHandler<undefined> {
+  const { onConnect = 'OK 1024\n', replies = [], hangUpAfterReplies = false } = script;
+  const pending = [...replies];
+  let buffered: Buffer = Buffer.alloc(0);
+
+  return {
+    // biome-ignore lint/complexity/useMaxParams: Bun hands a socket handler its own socket
+    data: (socket, chunk) => {
+      if (
+        buffered.byteLength === 0 &&
+        chunk.subarray(0, 'CONNECT'.length).toString() === 'CONNECT'
+      ) {
+        socket.write(onConnect);
+        return;
+      }
+      const read = requestsIn(Buffer.concat([buffered, chunk]));
+      buffered = read.rest;
+      for (const request of read.requests) {
+        received.push(request);
+        const reply = pending.shift();
+        if (reply === undefined) {
+          socket.end();
+          return;
+        }
+        socket.write(reply);
+        if (pending.length === 0 && hangUpAfterReplies) {
+          socket.end();
+        }
+      }
+    },
+  };
+}
+
 /**
  * Firecracker's end of the vsock device, which is a plain unix socket speaking a text handshake
  * before the stream becomes the guest's — and behind it a guest that answers in bytes written out
@@ -57,37 +98,9 @@ function fakeGuest({ vmDir, script }: { vmDir: string; script: GuestScript }) {
       Effect.promise(async () => {
         const workingDir = join(vmDir, APP_ID);
         await mkdir(workingDir, { recursive: true });
-        const { onConnect = 'OK 1024\n', replies = [], hangUpAfterReplies = false } = script;
-        const pending = [...replies];
-        let buffered: Buffer = Buffer.alloc(0);
         return Bun.listen({
           unix: join(workingDir, GUEST_VSOCK_FILENAME),
-          socket: {
-            // biome-ignore lint/complexity/useMaxParams: Bun hands a socket handler its own socket
-            data: (socket, chunk) => {
-              if (
-                buffered.byteLength === 0 &&
-                chunk.subarray(0, 'CONNECT'.length).toString() === 'CONNECT'
-              ) {
-                socket.write(onConnect);
-                return;
-              }
-              const read = requestsIn(Buffer.concat([buffered, chunk]));
-              buffered = read.rest;
-              for (const request of read.requests) {
-                received.push(request);
-                const reply = pending.shift();
-                if (reply === undefined) {
-                  socket.end();
-                  return;
-                }
-                socket.write(reply);
-                if (pending.length === 0 && hangUpAfterReplies) {
-                  socket.end();
-                }
-              }
-            },
-          },
+          socket: guestSocket({ script, received }),
         });
       }),
       (server) => Effect.sync(() => server.stop(true)),

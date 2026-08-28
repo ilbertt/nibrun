@@ -31,6 +31,7 @@
     "rules": {
       "preset": "recommended",
       "complexity": {
+        "noExcessiveCognitiveComplexity": "error",
         "useMaxParams": {
           "level": "error",
           "options": {
@@ -98,11 +99,71 @@
   },
   "overrides": [
     {
-      "includes": ["**/*.ts"],
+      "includes": ["**/*.ts", "**/*.tsx"],
       "linter": {
         "rules": {
           "style": {
             "useFilenamingConvention": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/api/src/repositories/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["#routes/**", "#services/**"],
+                    "message": "Repositories must not depend on controllers or services."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/api/src/services/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["#routes/**"],
+                    "message": "Services must not depend on controllers."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/api/src/routes/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["#repositories/**"],
+                    "message": "Controllers must depend on services, not repositories."
+                  }
+                ]
+              }
+            }
           }
         }
       }

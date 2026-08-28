@@ -33,6 +33,11 @@ export const ReportedInstanceSchema = Type.Object({
   // host it cannot connect to, and it is what a second app host would route on.
   hostPort: Type.Optional(HostPortSchema),
   guestIpv4: Type.Optional(Ipv4AddressSchema),
+  // Where a tenant's own port is reached, for an app that asked for one. Reported rather than
+  // worked out: the address belongs to the relay in front of the fleet and the port to the slot
+  // this host gave the app, and the control plane holds neither.
+  publicIpv4: Type.Optional(Ipv4AddressSchema),
+  extraPublicPort: Type.Optional(HostPortSchema),
   artifactDigest: Type.Optional(Sha256DigestSchema),
   restartCount: Type.Integer({ minimum: 0 }),
   startedAt: Type.Optional(TimestampSchema),

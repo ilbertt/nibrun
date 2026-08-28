@@ -2,7 +2,12 @@ import { Type } from '@sinclair/typebox';
 import { AppConfigSchema } from '#domain/app.ts';
 import { AppIdSchema, ArtifactIdSchema, DeploymentIdSchema } from '#domain/identifiers.ts';
 import { stringEnum } from '#lib/string-enum.ts';
-import { StateMessageSchema, TimestampSchema } from '#lib/wire.ts';
+import {
+  HostPortSchema,
+  Ipv4AddressSchema,
+  StateMessageSchema,
+  TimestampSchema,
+} from '#lib/wire.ts';
 
 // `stopped` is the one an owner puts a release into and takes it back out of: a suspended app's
 // microVM is down and the release is still the app's current one, which is a different thing from
@@ -35,6 +40,10 @@ export const DeploymentSchema = Type.Object({
   activatedAt: Type.Optional(TimestampSchema),
   lastHealthyAt: Type.Optional(TimestampSchema),
   restartCount: Type.Integer({ minimum: 0 }),
+  // Where the app answers on the port it asked for, once a host is running it and has said so.
+  // Absent for an app that asked for none, and until the first report of one that did.
+  publicIpv4: Type.Optional(Ipv4AddressSchema),
+  extraPublicPort: Type.Optional(HostPortSchema),
   // The only account an owner gets of a release that did not come up. The database has kept all
   // of this since deployments existed; until now nothing read it back out.
   message: Type.Optional(StateMessageSchema),

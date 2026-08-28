@@ -6,11 +6,13 @@ import {
   HostPortSchema,
   HostReportedStateSchema,
   type HttpPort,
+  Ipv4AddressSchema,
   isValidMessage,
   Value,
 } from '@repo/protocol';
 import { buildReportedState, toReportedInstance } from '#lib/report/build-report.ts';
 import { allocatableCapacity } from '#lib/report/capacity.ts';
+import type { InstanceRecord } from '#lib/report/instance-record.ts';
 import {
   APP_ID,
   EXPORT_ID,
@@ -39,21 +41,45 @@ const DEFAULT_INSTANCE_RESOURCES_AS_CAPACITY = {
   cacheBytes: HOST_CACHE_BYTES,
 };
 
+const RELAY_IPV4 = Value.Parse(Ipv4AddressSchema, '203.0.113.7');
+const FIRST_EXTRA_PUBLIC_PORT = 22_000;
+const EXTRA_PUBLIC_PORT = Value.Parse(HostPortSchema, FIRST_EXTRA_PUBLIC_PORT);
+
+/** The common case: an app that asked for no public port of its own, which is most of them. */
+function reported(overrides: Partial<InstanceRecord> = {}) {
+  return toReportedInstance({ record: instanceRecord(overrides), reachedAt: undefined });
+}
+
 describe('the report always names the host-side port', () => {
   test('routing is local, but the control plane cannot debug a host without it', () => {
-    expect(toReportedInstance(instanceRecord()).hostPort).toBe(FIRST_HOST_PORT);
+    expect(reported().hostPort).toBe(FIRST_HOST_PORT);
   });
 
   test('absent means unknown: no field is ever sent null', () => {
-    const reported = toReportedInstance(instanceRecord());
-    expect('startedAt' in reported).toBe(false);
-    expect('lastHealthyAt' in reported).toBe(false);
-    expect('lastExitCode' in reported).toBe(false);
-    expect('message' in reported).toBe(false);
+    const instance = reported();
+    expect('startedAt' in instance).toBe(false);
+    expect('lastHealthyAt' in instance).toBe(false);
+    expect('lastExitCode' in instance).toBe(false);
+    expect('message' in instance).toBe(false);
+    // The pair an app that asked for no public port is not given, held to the same rule.
+    expect('publicIpv4' in instance).toBe(false);
+    expect('extraPublicPort' in instance).toBe(false);
+  });
+
+  // The control plane holds neither half — the address is the relay's and the port is the slot's —
+  // so a report that omits them is an app nothing can be told where to reach.
+  test('an app that asked for its own port is reported with where it answers', () => {
+    const reported = toReportedInstance({
+      record: instanceRecord({ hasExtraPublicPort: true }),
+      reachedAt: { ipv4: RELAY_IPV4, port: EXTRA_PUBLIC_PORT },
+    });
+
+    expect(reported.publicIpv4).toBe(RELAY_IPV4);
+    expect(reported.extraPublicPort).toBe(EXTRA_PUBLIC_PORT);
   });
 
   test('an exit code of zero is reported rather than dropped as falsy', () => {
-    expect(toReportedInstance(instanceRecord({ lastExitCode: 0 })).lastExitCode).toBe(0);
+    expect(reported({ lastExitCode: 0 }).lastExitCode).toBe(0);
   });
 });
 
@@ -70,7 +96,8 @@ describe('the assembled report satisfies the protocol', () => {
         cacheBytes: FREE_CACHE_BYTES,
       },
       versions: { agent: 'sha', guestImage: '6.1', zerofs: '2.2.1', firecracker: '1.16.1' },
-      records: [instanceRecord({ startedAt: OBSERVED_AT })],
+      records: [instanceRecord({ startedAt: OBSERVED_AT, hasExtraPublicPort: true })],
+      reachedAt: new Map([[APP_ID, { ipv4: RELAY_IPV4, port: EXTRA_PUBLIC_PORT }]]),
       volumes: [
         { volumeId: VOLUME_ID, appId: APP_ID, state: 'ready', sizeBytes: VOLUME_SIZE_BYTES },
       ],

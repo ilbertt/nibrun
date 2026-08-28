@@ -548,6 +548,8 @@ export interface ISelectDeploymentsByAppResult {
     started_at: IDeploymentsColumns["started_at"];
     last_healthy_at: IDeploymentsColumns["last_healthy_at"];
     restart_count: IDeploymentsColumns["restart_count"];
+    public_ipv4: IDeploymentsColumns["public_ipv4"];
+    extra_public_port: IDeploymentsColumns["extra_public_port"];
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -583,6 +585,8 @@ export interface ISelectDeploymentByIdResult {
     started_at: IDeploymentsColumns["started_at"];
     last_healthy_at: IDeploymentsColumns["last_healthy_at"];
     restart_count: IDeploymentsColumns["restart_count"];
+    public_ipv4: IDeploymentsColumns["public_ipv4"];
+    extra_public_port: IDeploymentsColumns["extra_public_port"];
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -644,6 +648,8 @@ export interface ISelectInsertedDeploymentResult {
     started_at: IDeploymentsColumns["started_at"];
     last_healthy_at: IDeploymentsColumns["last_healthy_at"];
     restart_count: IDeploymentsColumns["restart_count"];
+    public_ipv4: IDeploymentsColumns["public_ipv4"];
+    extra_public_port: IDeploymentsColumns["extra_public_port"];
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -1086,6 +1092,8 @@ export interface IDeploymentsColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
+    public_ipv4: import("@repo/protocol").Ipv4Address | null;
+    extra_public_port: import("@repo/protocol").HostPort | null;
 }
 
 /** Schema of `deployments`. */
@@ -1616,7 +1624,9 @@ export const schema = {
             last_healthy_at: { _columnName: "last_healthy_at", _foreignKeys: {} },
             activated_at: { _columnName: "activated_at", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            public_ipv4: { _columnName: "public_ipv4", _foreignKeys: {} },
+            extra_public_port: { _columnName: "extra_public_port", _foreignKeys: {} }
         },
         _indexes: {
             deployments_app_id_idx: { _indexName: "deployments_app_id_idx" },
@@ -1630,6 +1640,7 @@ export const schema = {
             deployments_app_id_fkey: { _constraintName: "deployments_app_id_fkey" },
             deployments_artifact_id_fkey: { _constraintName: "deployments_artifact_id_fkey" },
             deployments_config_id_fkey: { _constraintName: "deployments_config_id_fkey" },
+            deployments_extra_public_port_check: { _constraintName: "deployments_extra_public_port_check" },
             deployments_pkey: { _constraintName: "deployments_pkey" },
             deployments_rollback_of_deployment_id_fkey: { _constraintName: "deployments_rollback_of_deployment_id_fkey" },
             deployments_state_check: { _constraintName: "deployments_state_check" }

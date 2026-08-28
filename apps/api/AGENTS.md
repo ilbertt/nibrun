@@ -32,9 +32,9 @@ Work spanning the two is driven off a relation saying what is still outstanding
 what makes retrying the same code path as doing it the first time.
 
 Controllers call services; services call repositories. Never skip a layer — a
-controller must not touch a repository. Wire the graph once in
-`src/services/plugins.ts` and expose each service via an Elysia `.decorate`
-plugin.
+controller must not touch a repository, and Biome fails the build on the import
+that tries. Wire the graph once in `src/services/plugins.ts` and expose each
+service via an Elysia `.decorate` plugin.
 
 ## Routes
 

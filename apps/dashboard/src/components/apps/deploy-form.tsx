@@ -20,16 +20,13 @@ import { useStore } from '@tanstack/react-form';
 import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
 import { DeployEnvironmentField } from '#components/apps/deploy-environment-field.tsx';
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
+import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import { filledVariables, storedVariables } from '#lib/environment-variables.ts';
-import {
-  type DeploySuggestion,
-  tenantArguments,
-  useDeployForm,
-  validatePort,
-} from '#lib/hooks/use-deploy-form.ts';
+import { tenantArguments, useDeployForm, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 const ARGUMENTS = 'Arguments';
 const ADDITIONAL_PORTS = 'Additional ports';
+const ENVIRONMENT = 'environment';
 
 export function DeployForm({
   appId,
@@ -178,8 +175,10 @@ export function DeployForm({
         </AccordionItem>
       </Accordion>
 
-      <Accordion>
-        <AccordionItem>
+      {/* Open where a link asked for a variable it could not carry: the owner is the only one who
+          holds the value, and a shut section is no way to ask them for it. */}
+      <Accordion defaultValue={asksForVariables(suggested) ? [ENVIRONMENT] : []}>
+        <AccordionItem value={ENVIRONMENT}>
           <AccordionTrigger>
             <span className="flex items-baseline gap-2">
               Environment variables
@@ -229,7 +228,10 @@ export function DeployForm({
   );
 }
 
-/** What the section holds, for as long as it is closed over it. */
+function asksForVariables(suggested: DeploySuggestion | undefined): boolean {
+  return suggested?.environment?.some((entry) => entry.value.length === 0) ?? false;
+}
+
 /** What the section says while it is shut, in the one word a count would be. */
 function CollapsedState({ on }: { on: boolean }) {
   return (

@@ -5,23 +5,20 @@ import {
 } from '@repo/app-operations';
 import { DEFAULT_HTTP_PORT, FilenameSchema, Value } from '@repo/protocol';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
+import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import {
+  askedVariables,
   type EnvironmentVariable,
   environmentEdits,
   filledVariables,
   repeatedName,
   storedNames,
+  unfilledAsked,
 } from '#lib/environment-variables.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import type { AppSummary } from '#queries/apps.ts';
-
-/** What a "Deploy on nibrun" link asked for, before the owner has touched anything. */
-export type DeploySuggestion = {
-  name?: string | undefined;
-  port?: number | undefined;
-};
 
 export type DeployFormValues = {
   binary: File | undefined;
@@ -100,6 +97,13 @@ export function validateEnvironment({
     return 'A variable needs a name.';
   }
 
+  // A link names what the app needs and carries no value for it, so this is the one thing on the
+  // form that nothing else could supply: not the link, not the app, not a default.
+  const unfilled = unfilledAsked(variables);
+  if (unfilled.length > 0) {
+    return `Fill in what the link asked for: ${unfilled.join(', ')}.`;
+  }
+
   // Two rows under one name are one variable by the time they are a record, so the row that lost
   // would go without a word — and which of them lost is not something a form should decide.
   const repeated = repeatedName(variables);
@@ -134,7 +138,7 @@ export function useDeployForm({
   const api: DeployFormApi = useForm({
     // Read once, at mount. A binary handed over from the landing page is only rendered into
     // this form after it has been read out of storage, so there is nothing to arrive later.
-    defaultValues: { ...UNTOUCHED, binary, name: suggested?.name ?? UNTOUCHED.name },
+    defaultValues: suggestedValues({ binary, suggested }),
     onSubmit: ({ value }) => {
       const request = targetResolved ? asReleaseRequest({ value, replacing }) : undefined;
       if (request !== undefined) {
@@ -148,9 +152,32 @@ export function useDeployForm({
     locked,
     replacing,
     targetResolved,
-    defaultPort: String(replacing?.config.httpPort ?? suggested?.port ?? DEFAULT_HTTP_PORT),
+    defaultPort: String(replacing?.config.httpPort ?? DEFAULT_HTTP_PORT),
     defaultExtraPublicPort: replacing?.config.hasExtraPublicPort ?? false,
     defaultArgs: replacing?.config.args.join('\n') ?? '',
+  };
+}
+
+/**
+ * What a link asked for, as the form's own values rather than as anything shown in an empty field:
+ * a release is made of what these hold, so a suggestion only displayed would be one the owner has
+ * to retype for it to count.
+ */
+function suggestedValues({
+  binary,
+  suggested,
+}: {
+  binary: File | undefined;
+  suggested: DeploySuggestion | undefined;
+}): DeployFormValues {
+  return {
+    ...UNTOUCHED,
+    binary,
+    name: suggested?.name ?? UNTOUCHED.name,
+    port: suggested?.port === undefined ? undefined : String(suggested.port),
+    extraPublicPort: suggested?.extraPublicPort,
+    args: suggested?.args?.join('\n'),
+    environment: suggested?.environment && askedVariables(suggested.environment),
   };
 }
 

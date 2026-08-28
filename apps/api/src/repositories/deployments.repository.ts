@@ -44,6 +44,8 @@ export type ReportedDeployment = {
   state: DeploymentState;
   hostPort: HostPort | null;
   guestIpv4: Ipv4Address | null;
+  publicIpv4: Ipv4Address | null;
+  extraPublicPort: HostPort | null;
   restartCount: number;
   message: string | null;
   startedAt: Date | null;
@@ -159,6 +161,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
+             d.public_ipv4, d.extra_public_port,
                c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -183,6 +186,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
+             d.public_ipv4, d.extra_public_port,
                c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -232,6 +236,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
             state = ${instance.state},
             host_port = ${instance.hostPort},
             guest_ipv4 = ${instance.guestIpv4},
+            public_ipv4 = ${instance.publicIpv4},
+            extra_public_port = ${instance.extraPublicPort},
             restart_count = ${instance.restartCount},
             message = ${instance.message},
             started_at = ${instance.startedAt},
@@ -304,6 +310,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
+             d.public_ipv4, d.extra_public_port,
              c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,

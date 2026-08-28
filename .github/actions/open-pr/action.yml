@@ -3,7 +3,11 @@ description: Commit the staged paths onto a branch and open a pull request for i
 
 inputs:
   branch:
-    description: Branch to push the commit to. Also the change's identity — if a pull request was ever opened for it, this one is not opened again.
+    description: >-
+      Branch to push the commit to. Also the change's identity — a branch whose
+      pull request is open or merged is not proposed again. One whose pull
+      request was closed unmerged is: closing it threw the proposal away, and
+      running this again asks for it back.
     required: true
   title:
     description: Pull request title, also the commit message.
@@ -42,8 +46,10 @@ runs:
       run: |
         set -euo pipefail
 
-        if [ -n "$(gh pr list --head "$BRANCH" --state all --json number --jq '.[].number')" ]; then
-          echo "Already proposed: a pull request for $BRANCH exists."
+        standing=$(gh pr list --head "$BRANCH" --state all --json number,state \
+          --jq 'map(select(.state != "CLOSED")) | .[].number')
+        if [ -n "$standing" ]; then
+          echo "Already proposed: a pull request for $BRANCH is open or merged."
           exit 0
         fi
 
@@ -55,7 +61,9 @@ runs:
         # shellcheck disable=SC2086
         git add -- $PATHS
         git commit -m "$TITLE"
-        git push --set-upstream origin "$BRANCH"
+        # No open or merged pull request claims this branch, so anything left on it
+        # is a proposal that was thrown away.
+        git push --force --set-upstream origin "$BRANCH"
 
         printf '%s\n' "$BODY" > "${RUNNER_TEMP}/pr-body.md"
         url=$(gh pr create --title "$TITLE" --body-file "${RUNNER_TEMP}/pr-body.md")
