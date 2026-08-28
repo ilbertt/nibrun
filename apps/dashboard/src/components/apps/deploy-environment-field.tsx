@@ -13,7 +13,12 @@ export function DeployEnvironmentField({
   replacing: AppSummary | undefined;
 }) {
   return (
-    <api.Field name="environment" validators={{ onChange: validateEnvironment }}>
+    <api.Field
+      name="environment"
+      // At mount as well as on change: a table a link seeded is one nobody has touched, and what
+      // it holds still has to be something a release could be made of.
+      validators={{ onChange: validateEnvironment, onMount: validateEnvironment }}
+    >
       {(field) => {
         // Seeded from the app rather than held as a default: the app is read while the dialog is
         // already open, and a form's defaults are fixed when it mounts.

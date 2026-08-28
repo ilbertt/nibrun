@@ -20,13 +20,9 @@ import { useStore } from '@tanstack/react-form';
 import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
 import { DeployEnvironmentField } from '#components/apps/deploy-environment-field.tsx';
 import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
+import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import { filledVariables, storedVariables } from '#lib/environment-variables.ts';
-import {
-  type DeploySuggestion,
-  tenantArguments,
-  useDeployForm,
-  validatePort,
-} from '#lib/hooks/use-deploy-form.ts';
+import { tenantArguments, useDeployForm, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 const ARGUMENTS = 'Arguments';
 const ADDITIONAL_PORTS = 'Additional ports';
