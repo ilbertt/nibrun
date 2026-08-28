@@ -9,19 +9,15 @@ import {
 import { Link } from '@tanstack/react-router';
 import { DeployForm } from '#components/apps/deploy-form.tsx';
 import { DeployProgress } from '#components/apps/deploy-progress.tsx';
-import type { DeploySuggestion } from '#lib/deploy-link.ts';
+import { deploySuggestion } from '#lib/deploy-link.ts';
+import { useDeployLink } from '#lib/hooks/use-deploy-link.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import type { DeployPhase } from '#lib/hooks/use-run-app.ts';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
-export function HandoffDeploy({
-  binary,
-  suggested,
-}: {
-  binary: File | undefined;
-  suggested?: DeploySuggestion | undefined;
-}) {
+export function HandoffDeploy({ binary }: { binary: File | undefined }) {
   const run = useDeployRun();
+  const link = useDeployLink();
 
   return (
     <Card>
@@ -33,7 +29,12 @@ export function HandoffDeploy({
       </CardHeader>
       <CardContent>
         {run.phase === 'idle' ? (
-          <DeployForm appId={undefined} binary={binary} suggested={suggested} />
+          <DeployForm
+            appId={undefined}
+            binary={binary}
+            suggested={deploySuggestion(link)}
+            minimal={link.minimal ?? false}
+          />
         ) : (
           // Only ever seen when the deploy failed: a run that lands leaves for the app it made
           // on its own, and a failed one made none to offer.

@@ -12,7 +12,6 @@ import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { Link, useLocation } from '@tanstack/react-router';
 import { FileTerminalIcon } from 'lucide-react';
 import { HandoffDeploy } from '#components/handoff/handoff-deploy.tsx';
-import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { useFinishHandoff } from '#lib/hooks/use-finish-handoff.ts';
 import { useHandedOffBinary } from '#lib/hooks/use-handed-off-binary.ts';
@@ -20,7 +19,7 @@ import { useSession } from '#lib/hooks/use-session.ts';
 import { DeployRunProvider } from '#lib/providers/deploy-run-provider.tsx';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
 
-export function HandedOffBinary({ suggested }: { suggested?: DeploySuggestion | undefined }) {
+export function HandedOffBinary() {
   const { binary, loading } = useHandedOffBinary();
   const session = useSession();
 
@@ -28,11 +27,7 @@ export function HandedOffBinary({ suggested }: { suggested?: DeploySuggestion | 
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
       <BrandMark />
       <div className="flex w-full max-w-lg flex-col gap-6 lg:max-w-3xl">
-        {loading ? (
-          <Spinner />
-        ) : (
-          <Waiting binary={binary} signedIn={session !== null} suggested={suggested} />
-        )}
+        {loading ? <Spinner /> : <Waiting binary={binary} signedIn={session !== null} />}
       </div>
     </div>
   );
@@ -43,15 +38,7 @@ export function HandedOffBinary({ suggested }: { suggested?: DeploySuggestion | 
  * carries a picker of its own, so an owner who arrived with nothing still has everything they
  * need to deploy — which is why there is no empty state to land in.
  */
-function Waiting({
-  binary,
-  signedIn,
-  suggested,
-}: {
-  binary: File | undefined;
-  signedIn: boolean;
-  suggested: DeploySuggestion | undefined;
-}) {
+function Waiting({ binary, signedIn }: { binary: File | undefined; signedIn: boolean }) {
   const finishHandoff = useFinishHandoff();
   // Whatever was handed over or asked for has to survive the trip through the login form, or
   // signing in is what loses it.
@@ -86,7 +73,7 @@ function Waiting({
 
   return (
     <DeployRunProvider onDeployed={finishHandoff}>
-      <HandoffDeploy binary={binary} suggested={suggested} />
+      <HandoffDeploy binary={binary} />
     </DeployRunProvider>
   );
 }

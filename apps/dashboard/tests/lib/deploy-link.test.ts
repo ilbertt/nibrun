@@ -1,7 +1,12 @@
 import { expect, test } from 'bun:test';
 import { RUNTIME_VALUES, writtenRuntimeValue } from '@repo/protocol';
 import { defaultParseSearch, defaultStringifySearch } from '@tanstack/react-router';
-import { type DeploySuggestion, deploySuggestion } from '#lib/deploy-link.ts';
+import {
+  type DeployLink,
+  type DeploySuggestion,
+  deployLink,
+  deploySuggestion,
+} from '#lib/deploy-link.ts';
 
 const HOSTNAME = writtenRuntimeValue(RUNTIME_VALUES.HOSTNAME.name);
 
@@ -19,24 +24,30 @@ const ASKED: DeploySuggestion = {
   ],
 };
 
+function written(link: string): DeployLink {
+  return deployLink(defaultParseSearch(link));
+}
+
 function followed(link: string): DeploySuggestion {
-  return deploySuggestion(defaultParseSearch(link));
+  return deploySuggestion(written(link));
 }
 
 /**
- * The link as the router writes it back, which is the form of it a sign-in carries: whoever
- * follows one while signed out reaches the form through a redirect holding this.
+ * The link as the router writes it back, which is what the address bar holds the moment the page
+ * navigates — following the ghost button out of the minimal form, or coming back through signing
+ * in. Whatever a link asked for has to survive being written by the router that read it.
  */
-function reopened(link: string): DeploySuggestion {
-  return followed(defaultStringifySearch(defaultParseSearch(link)));
+function rewritten(link: string): string {
+  return defaultStringifySearch(written(link));
 }
 
 test('a link may ask for everything a deploy configures', () => {
   expect(followed(EVERYTHING)).toEqual(ASKED);
 });
 
-test('and asks for the same after the round trip through signing in', () => {
-  expect(reopened(EVERYTHING)).toEqual(ASKED);
+test('and asks for the same once the router has written it back', () => {
+  expect(followed(rewritten(EVERYTHING))).toEqual(ASKED);
+  expect(rewritten(rewritten(EVERYTHING))).toBe(rewritten(EVERYTHING));
 });
 
 test('a repeatable parameter written once is that one thing', () => {
@@ -53,14 +64,13 @@ test('a runtime value survives however it was written into the link', () => {
 });
 
 test('a value the router could read as JSON is still the text it was', () => {
-  expect(reopened('?env=CONFIG={"port":1}').environment).toEqual([
-    { name: 'CONFIG', value: '{"port":1}' },
-  ]);
+  const link = '?env=CONFIG={"port":1}';
+  expect(followed(rewritten(link)).environment).toEqual([{ name: 'CONFIG', value: '{"port":1}' }]);
 });
 
 test('a flag is on where it is written at all', () => {
   expect(followed('?extra-public-port').extraPublicPort).toBe(true);
-  expect(reopened('?extra-public-port').extraPublicPort).toBe(true);
+  expect(followed(rewritten('?extra-public-port')).extraPublicPort).toBe(true);
   expect(followed('?extra-public-port=false').extraPublicPort).toBe(false);
 });
 
@@ -83,4 +93,21 @@ test('a link that asks for nothing suggests nothing', () => {
     args: undefined,
     environment: undefined,
   });
+});
+
+test('a link may ask for the form stripped to the binary', () => {
+  expect(written('?minimal').minimal).toBe(true);
+  expect(written(`${EVERYTHING}&minimal`).minimal).toBe(true);
+  expect(written('?minimal=false').minimal).toBe(false);
+  expect(written(EVERYTHING).minimal).toBeUndefined();
+});
+
+// What the ghost button does: the parameter that stripped the form goes, and the deploy the link
+// asked for is still every bit of what the form is holding.
+test('and the rest of it survives that parameter going', () => {
+  const stripped = written(`${EVERYTHING}&minimal`);
+  const configured = defaultStringifySearch({ ...stripped, minimal: undefined });
+
+  expect(written(configured).minimal).toBeUndefined();
+  expect(followed(configured)).toEqual(ASKED);
 });
