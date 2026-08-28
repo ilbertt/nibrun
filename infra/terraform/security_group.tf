@@ -45,6 +45,18 @@ resource "aws_security_group" "instance" {
     security_groups = [aws_security_group.app_host.id]
   }
 
+  # The relay's journal, which is the only thing that machine emits and the only
+  # way anything would notice it stop. Its own rule rather than widening the app
+  # hosts' above: the relay is the one machine here reachable from the internet,
+  # so the two write paths should widen independently.
+  ingress {
+    description     = "Log ingest from the port relay"
+    from_port       = var.log_ingest_port
+    to_port         = var.log_ingest_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.port_relay.id]
+  }
+
   # No inbound SSH: shell access is via SSM Session Manager.
 
   egress {

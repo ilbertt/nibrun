@@ -25,6 +25,7 @@ resource "aws_instance" "port_relay" {
     app_host_private_ip = aws_instance.app_host[0].private_ip
     tenant_port_first   = var.tenant_port_first
     tenant_port_last    = var.tenant_port_last
+    log_ingest_url      = "http://${aws_instance.app.private_ip}:${var.log_ingest_port}"
   })
   user_data_replace_on_change = true
 

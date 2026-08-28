@@ -2,7 +2,10 @@
 set -euxo pipefail
 
 dnf update -y
-dnf install -y nftables
+# journal-upload arrives with journal-remote, and installing it before anything
+# writes configuration keeps its own /etc/systemd/journal-upload.conf out of a
+# race with the one below.
+dnf install -y nftables systemd-journal-remote
 
 # Same values as the app host's, and for the same reasons — see
 # infra/app-host/deploy/on_box_deploy.sh. Named in modules-load.d because systemd
@@ -59,3 +62,25 @@ NFT
 
 echo 'include "/etc/nftables/nibrun-relay.nft"' >> /etc/sysconfig/nftables.conf
 systemctl enable --now nftables
+
+# No application runs here, so what ships is the boot, the ruleset loading, and
+# the kernel's own complaints. That a line arrived at all is the only liveness
+# signal this machine emits — nothing else here would notice it stop.
+cat > /etc/systemd/journal-upload.conf <<'UPLOAD'
+[Upload]
+URL=${log_ingest_url}/insert/journald
+UPLOAD
+chmod 0644 /etc/systemd/journal-upload.conf
+
+# The uploader exits whenever the store is unreachable, and its first restarts
+# outrun the default start limit long before its own backoff engages — which
+# latches the unit into `failed` for good. Same reasoning, and the same fix, as
+# infra/app-host/systemd/systemd-journal-upload.service.d/nibrun.conf.
+mkdir -p /etc/systemd/system/systemd-journal-upload.service.d
+cat > /etc/systemd/system/systemd-journal-upload.service.d/nibrun.conf <<'DROPIN'
+[Unit]
+StartLimitIntervalSec=0
+DROPIN
+
+systemctl daemon-reload
+systemctl enable --now systemd-journal-upload
