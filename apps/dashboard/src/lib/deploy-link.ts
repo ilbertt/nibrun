@@ -3,10 +3,12 @@ import { refusedUrl } from '#lib/binary-source.ts';
 
 const ASSIGNMENT = '=';
 
+type Carried = { param: string; read: (value: unknown) => unknown };
+
 /**
- * What a "Deploy on nibrun" link may ask for, as the parameter that carries each part of a deploy
- * and the way that parameter is read. Keyed by `ConfigEdit`, so anything a release grows the
- * ability to configure is a link that stops compiling until it can be written into one.
+ * Each part of a deploy a link may ask for, as the parameter that carries it and the way that
+ * parameter is read. Keyed by `ConfigEdit`, so anything a release grows the ability to configure
+ * is a link that stops compiling until it can carry it.
  *
  * Every one of these only prefills a field the owner can still edit, and the api validates what is
  * submitted, so an absurd value costs a correction rather than a refusal here.
@@ -17,26 +19,35 @@ const CONFIGURED = {
   // everyone who followed the link.
   port: { param: 'port', read: asPort },
   extraPublicPort: { param: 'extra-public-port', read: asFlag },
-  args: { param: 'arg', read: asArguments },
-  environment: { param: 'env', read: asAssignments },
-} as const satisfies {
-  [K in keyof Required<ConfigEdit>]: { param: string; read: (value: unknown) => unknown };
+  args: { param: 'arg', read: asWritten },
+  environment: { param: 'env', read: asWritten },
+} as const satisfies { [K in keyof Required<ConfigEdit>]: Carried };
+
+type Written = {
+  [K in keyof typeof CONFIGURED as (typeof CONFIGURED)[K]['param']]?: ReturnType<
+    (typeof CONFIGURED)[K]['read']
+  >;
 };
 
-type Configured = {
-  [K in keyof typeof CONFIGURED]?: ReturnType<(typeof CONFIGURED)[K]['read']>;
-};
-
-/** What a link asked for, before the owner has touched anything. */
-export type DeploySuggestion = Configured & {
+/**
+ * A link as it is written, one property per parameter. The router rebuilds the address bar out of
+ * this every time the page navigates — following the ghost button out of the minimal form is one —
+ * so a property named anything but the parameter it was read from would be written back beside it,
+ * as a second copy nothing here reads.
+ */
+export type DeployLink = Written & {
   name?: string | undefined;
-  // Not part of what a deploy configures — it is what is being deployed. A link carrying one is
-  // the difference between somewhere to start and one click.
   binary?: string | undefined;
+  minimal?: boolean | undefined;
 };
 
-export function deploySuggestion(search: Record<string, unknown>): DeploySuggestion {
-  return { name: asText(search.name), binary: asBinaryUrl(search.binary), ...configured(search) };
+export function deployLink(search: Record<string, unknown>): DeployLink {
+  return {
+    name: asText(search.name),
+    binary: asBinaryUrl(search.binary),
+    minimal: asFlag(search.minimal),
+    ...written(search),
+  };
 }
 
 // Refused rather than prefilled: a url this end can already say is wrong is one the owner would
@@ -46,12 +57,39 @@ function asBinaryUrl(value: unknown): string | undefined {
   return url !== undefined && refusedUrl(url) === undefined ? url : undefined;
 }
 
-// `Object.fromEntries` cannot carry which reader answered for which key, and the record above is
-// what says so — the same keys, read in the same order, with what each reader returns.
-function configured(search: Record<string, unknown>): Configured {
+// Read off the parameters rather than the keys: `Object.fromEntries` cannot carry which reader
+// answered for which, and it is the parameter each is written under that both halves agree on.
+function written(search: Record<string, unknown>): Written {
   return Object.fromEntries(
-    Object.entries(CONFIGURED).map(([key, { param, read }]) => [key, read(search[param])]),
-  ) as Configured;
+    Object.values(CONFIGURED).map(({ param, read }) => [param, read(search[param])]),
+  ) as Written;
+}
+
+type Meant = {
+  port: number;
+  extraPublicPort: boolean;
+  args: string[];
+  environment: EnvironmentAssignment[];
+};
+
+/** What a link asked for, before the owner has touched anything. */
+export type DeploySuggestion = { [K in keyof typeof CONFIGURED]?: Meant[K] } & {
+  name?: string | undefined;
+  // Not part of what a deploy configures — it is what is being deployed. A link carrying one is
+  // the difference between a form with one thing left to do and a form with none.
+  binary?: string | undefined;
+};
+
+/** The link as the deploy it describes. A parameter renamed above is a line here that stops compiling. */
+export function deploySuggestion(link: DeployLink): DeploySuggestion {
+  return {
+    name: link.name,
+    binary: link.binary,
+    port: link.port,
+    extraPublicPort: link['extra-public-port'],
+    args: link.arg,
+    environment: link.env && assignments(link.env),
+  };
 }
 
 // A value reaches here already taken for what it looks like: `?port=3000` is a number and
@@ -77,17 +115,20 @@ function asFlag(value: unknown): boolean | undefined {
   return value === '' ? true : undefined;
 }
 
-function asArguments(value: unknown): string[] | undefined {
-  const args = written(value);
-  return args.length === 0 ? undefined : args;
+/** What was written under a parameter: the router hands over one occurrence, or an array of them. */
+function asWritten(value: unknown): string[] | undefined {
+  const occurrences = Array.isArray(value) ? value : [value];
+  const written = occurrences.flatMap((occurrence) => {
+    const text = asText(occurrence);
+    return text === undefined || text.length === 0 ? [] : [text];
+  });
+  return written.length === 0 ? undefined : written;
 }
 
-function asAssignments(value: unknown): EnvironmentAssignment[] | undefined {
+function assignments(written: readonly string[]): EnvironmentAssignment[] {
   // A name given twice takes its last value, as the same words would in a shell.
-  const named = new Map(written(value).map(assigned));
-  return named.size === 0
-    ? undefined
-    : [...named].map(([name, assignedValue]) => ({ name, value: assignedValue }));
+  const named = new Map(written.map(assigned));
+  return [...named].map(([name, value]) => ({ name, value }));
 }
 
 /**
@@ -98,13 +139,4 @@ function asAssignments(value: unknown): EnvironmentAssignment[] | undefined {
 function assigned(entry: string): [string, string] {
   const at = entry.indexOf(ASSIGNMENT);
   return at < 0 ? [entry.trim(), ''] : [entry.slice(0, at).trim(), entry.slice(at + 1)];
-}
-
-/** What was written under a parameter: the router hands over one occurrence, or an array of them. */
-function written(value: unknown): string[] {
-  const occurrences = Array.isArray(value) ? value : [value];
-  return occurrences.flatMap((occurrence) => {
-    const text = asText(occurrence);
-    return text === undefined || text.length === 0 ? [] : [text];
-  });
 }
