@@ -29,7 +29,7 @@ export const PublicAppConfigSchema = t.Composite([
 // How the binary is started, which is the whole of what an owner chooses. The machine it starts
 // on — vCPUs, memory, filesystem, health probe, restart budget — is nibrun's, and naming the two
 // that are not is what turns a request for the rest into an answer rather than silence.
-const OwnedAppConfigSchema = t.Pick(AppConfigSchema, ['guestPort', 'args']);
+const OwnedAppConfigSchema = t.Pick(AppConfigSchema, ['httpPort', 'args']);
 
 // Strict: every field is optional, so without this a misspelled one is silently no request at
 // all and the caller is told 200.

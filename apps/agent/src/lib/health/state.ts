@@ -1,4 +1,4 @@
-import type { GuestPort, HealthCheck, InstanceState, Timestamp } from '@repo/protocol';
+import type { HealthCheck, HttpPort, InstanceState, Timestamp } from '@repo/protocol';
 import type { UnitStatus } from '#lib/vm/unit-status.ts';
 
 const NO_PROBES = 0;
@@ -108,13 +108,13 @@ export function describeInstanceFailure({
   unit,
   tracker,
   healthCheck,
-  guestPort,
+  httpPort,
   guestVerdict,
 }: {
   unit: UnitStatus;
   tracker: HealthTracker;
   healthCheck: HealthCheck;
-  guestPort: GuestPort;
+  httpPort: HttpPort;
   guestVerdict?: string;
 }): string {
   if (!unit.active) {
@@ -125,7 +125,7 @@ export function describeInstanceFailure({
       ? 'the microVM stopped without being asked to'
       : `the microVM stopped without being asked to, exit code ${unit.exitCode}`;
   }
-  return `nothing answered on port ${guestPort} inside the guest: ${tracker.consecutiveFailures} health probes failed after the ${healthCheck.gracePeriodMs}ms grace period`;
+  return `nothing answered on port ${httpPort} inside the guest: ${tracker.consecutiveFailures} health probes failed after the ${healthCheck.gracePeriodMs}ms grace period`;
 }
 
 export type LifecycleInputs = {

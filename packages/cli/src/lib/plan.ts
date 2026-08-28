@@ -3,7 +3,7 @@ import { confirm, note, select, text } from '@clack/prompts';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
 import { appFor } from '@repo/app-operations';
-import { DEFAULT_GUEST_PORT, type TenantArguments } from '@repo/protocol';
+import { DEFAULT_HTTP_PORT, type TenantArguments } from '@repo/protocol';
 import { CancelledError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
 
@@ -95,8 +95,8 @@ async function askName({ suggestion }: { suggestion: string }): Promise<string> 
 // Bounds are the api's to enforce; this only refuses what it could not send as a port at all.
 async function askPort(): Promise<number> {
   const answer = await text({
-    message: 'Which port does the binary listen on?',
-    initialValue: String(DEFAULT_GUEST_PORT),
+    message: 'Which HTTP port does the binary listen on?',
+    initialValue: String(DEFAULT_HTTP_PORT),
     validate: (value) => (Number.isInteger(Number(value)) ? undefined : 'Ports are whole numbers.'),
   });
   return Number(answered(answer));

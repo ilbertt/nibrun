@@ -84,7 +84,7 @@ test('arguments nobody named are not arguments cleared', async () => {
     port: 8080,
   });
 
-  expect(patched).toEqual([{ guestPort: 8080 }]);
+  expect(patched).toEqual([{ httpPort: 8080 }]);
 });
 
 // The difference `--args ""` exists to make: an empty list is a binary asked to run bare, where

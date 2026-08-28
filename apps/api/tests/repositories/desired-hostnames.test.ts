@@ -90,7 +90,7 @@ async function seedDeployedApp(sql: SQL): Promise<void> {
   );
   await sql.unsafe(
     `INSERT INTO nibrun.app_configs (
-       app_id, guest_port, args, vcpu_count, memory_mib,
+       app_id, http_port, args, vcpu_count, memory_mib,
        health_check_interval_ms, health_check_timeout_ms, health_check_grace_period_ms,
        health_check_healthy_threshold, health_check_unhealthy_threshold,
        restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,

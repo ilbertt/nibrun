@@ -5,9 +5,9 @@ import {
   DEFAULT_RESTART_POLICY,
   type DeploymentId,
   type DeploymentState,
-  GuestPortSchema,
   HostPortSchema,
   type HostReportedState,
+  HttpPortSchema,
   type InstanceState,
   Ipv4AddressSchema,
   type ReportedInstance,
@@ -39,10 +39,10 @@ import {
 } from '#tests/services/support/fixtures.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
 
-const GUEST_PORT_NUMBER = 8090;
+const HTTP_PORT_NUMBER = 8090;
 const HOST_PORT_NUMBER = 30_001;
 
-const GUEST_PORT = Value.Parse(GuestPortSchema, GUEST_PORT_NUMBER);
+const HTTP_PORT = Value.Parse(HttpPortSchema, HTTP_PORT_NUMBER);
 const OWNER_SCOPED_METHODS = 4;
 const CREATED_AT = new Date('2026-08-04T10:00:00.000Z');
 const ACTIVATED_AT = new Date('2026-08-04T11:30:00.000Z');
@@ -59,7 +59,7 @@ const RESTART_COUNT = 2;
 // the deployment was launched with however the app has since been reconfigured.
 const PINNED_CONFIG: PublicAppConfig = {
   ...DEFAULT_CONFIG,
-  guestPort: GUEST_PORT,
+  httpPort: HTTP_PORT,
   args: ['serve'],
 };
 
@@ -210,7 +210,7 @@ describe('a deployment publishes the config version it pins', () => {
     expect(deployment.config).toEqual({
       volumeSizeBytes: VOLUME_SIZE_BYTES,
       environment: {},
-      guestPort: GUEST_PORT,
+      httpPort: HTTP_PORT,
       args: ['serve'],
       resources: DEFAULT_INSTANCE_RESOURCES,
       healthCheck: DEFAULT_HEALTH_CHECK,

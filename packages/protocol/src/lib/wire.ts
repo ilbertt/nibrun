@@ -123,13 +123,13 @@ export const StateMessageSchema = Type.String({
 // The port the tenant's binary listens on inside its guest, and the port the agent forwards
 // to it on the host, are different numbers that mean different things. They are branded
 // apart so that assigning one to the other is a type error rather than a routing bug.
-export type GuestPort = Brand<number, 'GuestPort'>;
+export type HttpPort = Brand<number, 'HttpPort'>;
 
-export const GuestPortSchema = Type.Integer({
-  description: 'Port the tenant binary listens on inside the guest.',
+export const HttpPortSchema = Type.Integer({
+  description: 'HTTP port the tenant binary listens on inside the guest.',
   minimum: MIN_PORT,
   maximum: MAX_PORT,
-}) as BrandedSchema<TInteger, GuestPort>;
+}) as BrandedSchema<TInteger, HttpPort>;
 
 export type HostPort = Brand<number, 'HostPort'>;
 
@@ -139,6 +139,6 @@ export const HostPortSchema = Type.Integer({
   maximum: MAX_PORT,
 }) as BrandedSchema<TInteger, HostPort>;
 
-const DEFAULT_GUEST_PORT_NUMBER = 3000;
+const DEFAULT_HTTP_PORT_NUMBER = 3000;
 
-export const DEFAULT_GUEST_PORT = Value.Parse(GuestPortSchema, DEFAULT_GUEST_PORT_NUMBER);
+export const DEFAULT_HTTP_PORT = Value.Parse(HttpPortSchema, DEFAULT_HTTP_PORT_NUMBER);

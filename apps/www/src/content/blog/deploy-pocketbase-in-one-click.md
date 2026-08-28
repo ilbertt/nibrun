@@ -44,7 +44,7 @@ Drag and drop it onto [nibrun.com](https://nibrun.com).
 
 You land on the deploy screen with the binary already attached. Two fields to fill in:
 
-**Guest port**: `8090`
+**HTTP port**: `8090`
 
 **Arguments** (one per line):
 

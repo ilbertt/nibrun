@@ -1,7 +1,7 @@
 import {
   type AppConfig,
-  DEFAULT_GUEST_PORT,
   DEFAULT_HEALTH_CHECK,
+  DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
   REDACTED,
@@ -28,7 +28,7 @@ export type PublicAppConfig = Omit<AppConfig, 'environment'> & {
 // How the binary is started, which is the whole of what an owner chooses. The machine it starts
 // on — vCPUs, memory, filesystem, health probe, restart budget — is nibrun's, and leaving it out
 // of this one type is what keeps it out of every write shape below.
-type OwnedAppConfig = Pick<AppConfig, 'guestPort' | 'args'>;
+type OwnedAppConfig = Pick<AppConfig, 'httpPort' | 'args'>;
 
 // What an app is created with: the whole environment, because there is not yet one to edit.
 export type NewAppConfig = Partial<OwnedAppConfig> & {
@@ -85,7 +85,7 @@ export function splitEnvironmentPatch(environment: TenantEnvironmentPatch): {
 // rather than silently reading undefined.
 export type RunConfigColumns = Pick<
   Queries['SelectAppById'],
-  | 'guest_port'
+  | 'http_port'
   | 'args'
   | 'vcpu_count'
   | 'memory_mib'
@@ -115,7 +115,7 @@ export function configWithDefaults(
     resources: DEFAULT_INSTANCE_RESOURCES,
     healthCheck: DEFAULT_HEALTH_CHECK,
     restartPolicy: DEFAULT_RESTART_POLICY,
-    guestPort: patch.guestPort ?? DEFAULT_GUEST_PORT,
+    httpPort: patch.httpPort ?? DEFAULT_HTTP_PORT,
     args: patch.args ?? [],
   };
 }
@@ -134,7 +134,7 @@ export function toAppConfig(row: AppConfigColumns): PublicAppConfig {
 // place and as sealed values in another, and is put back on by whichever caller has which.
 export function toRunConfig(row: RunConfigColumns): Omit<AppConfig, 'environment'> {
   return {
-    guestPort: row.guest_port,
+    httpPort: row.http_port,
     args: row.args,
     resources: {
       vcpuCount: row.vcpu_count,

@@ -110,7 +110,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const [insertedConfig] = await tx.InsertAppConfig`
         INSERT INTO nibrun.app_configs (
-          app_id, guest_port, args, vcpu_count, memory_mib,
+          app_id, http_port, args, vcpu_count, memory_mib,
           health_check_path, health_check_interval_ms, health_check_timeout_ms,
           health_check_grace_period_ms, health_check_healthy_threshold,
           health_check_unhealthy_threshold,
@@ -118,7 +118,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           restart_backoff_factor, restart_reset_after_ms
         )
         VALUES (
-          ${inserted.id}, ${config.guestPort}, ${tx.array(config.args, TEXT_ARRAY)},
+          ${inserted.id}, ${config.httpPort}, ${tx.array(config.args, TEXT_ARRAY)},
           ${config.resources.vcpuCount}, ${config.resources.memoryMib},
           ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
           ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
@@ -153,7 +153,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       const [app] = await tx.SelectCreatedApp`
         /* @notNull environment_names */
         SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
-               c.guest_port, c.args, c.vcpu_count, c.memory_mib,
+               c.http_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
@@ -178,7 +178,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return this.sql.SelectAppsByOwner`
       /* @notNull environment_names */
       SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
-             c.guest_port, c.args, c.vcpu_count, c.memory_mib,
+             c.http_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
@@ -198,7 +198,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     const [app] = await this.sql.SelectAppById`
       /* @notNull environment_names */
       SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
-             c.guest_port, c.args, c.vcpu_count, c.memory_mib,
+             c.http_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
@@ -231,7 +231,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const [current] = await tx.SelectCurrentAppConfig`
         /* @notNull environment_names */
-        SELECT c.id, c.guest_port, c.args, c.vcpu_count, c.memory_mib,
+        SELECT c.id, c.http_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
@@ -250,7 +250,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const [inserted] = await tx.InsertPatchedAppConfig`
         INSERT INTO nibrun.app_configs (
-          app_id, guest_port, args, vcpu_count, memory_mib,
+          app_id, http_port, args, vcpu_count, memory_mib,
           health_check_path, health_check_interval_ms, health_check_timeout_ms,
           health_check_grace_period_ms, health_check_healthy_threshold,
           health_check_unhealthy_threshold,
@@ -258,7 +258,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           restart_backoff_factor, restart_reset_after_ms
         )
         VALUES (
-          ${appId}, ${config.guestPort}, ${tx.array(config.args, TEXT_ARRAY)},
+          ${appId}, ${config.httpPort}, ${tx.array(config.args, TEXT_ARRAY)},
           ${config.resources.vcpuCount}, ${config.resources.memoryMib},
           ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
           ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
@@ -295,7 +295,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         FROM nibrun.app_configs_with_environment c
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND c.id = ${inserted.id}
         RETURNING a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
-                  c.guest_port, c.args, c.vcpu_count, c.memory_mib,
+                  c.http_port, c.args, c.vcpu_count, c.memory_mib,
                   c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                   c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                   c.health_check_unhealthy_threshold,
@@ -441,7 +441,7 @@ async function appAfterStateChange({
   const [app] = await tx.SelectAppAfterStateChange`
     /* @notNull environment_names */
     SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
-           c.guest_port, c.args, c.vcpu_count, c.memory_mib,
+           c.http_port, c.args, c.vcpu_count, c.memory_mib,
            c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
            c.health_check_grace_period_ms, c.health_check_healthy_threshold,
            c.health_check_unhealthy_threshold,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { AppIdSchema, DEFAULT_GUEST_PORT, INSTANCE_STATES, Value } from '@repo/protocol';
+import { AppIdSchema, DEFAULT_HTTP_PORT, INSTANCE_STATES, Value } from '@repo/protocol';
 import { Effect, Layer, Option } from 'effect';
 import { forwardedInstances } from '#lib/reconcile/network.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
@@ -52,7 +52,7 @@ describe('the forward is what decides whether a port reaches the guest', () => {
         expect(forwarded).toEqual([
           {
             hostPort: slot.hostPort,
-            guestPort: DEFAULT_GUEST_PORT,
+            httpPort: DEFAULT_HTTP_PORT,
             hostIpv4: slot.hostIpv4,
             guestIpv4: slot.guestIpv4,
           },

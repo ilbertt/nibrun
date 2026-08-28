@@ -57,9 +57,9 @@ First deploy — creates the app:
 nib run ./my-server --name my-app --port 8080
 ```
 
-`--port` is what the binary listens on inside the guest — read it off the app rather than carrying
-a number over from an example. It is the port the guest then hands back as `PORT`, and it defaults
-to `3000`.
+`--port` is the HTTP port the binary listens on inside the guest — read it off the app rather
+than carrying a number over from an example. It is the port the guest then hands back as `PORT`,
+and it defaults to `3000`.
 
 **Every deploy after that must name the app**, or a non-interactive shell creates a second one:
 

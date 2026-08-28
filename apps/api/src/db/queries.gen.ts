@@ -14,7 +14,7 @@ export interface ISelectDesiredDeploymentsResult {
     object_key: NonNullable<IArtifactsColumns["object_key"]>;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
-    guest_port: IAppConfigsColumns["guest_port"];
+    http_port: IAppConfigsColumns["http_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -184,7 +184,7 @@ export interface ISelectCreatedAppResult {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
-    guest_port: IAppConfigsColumns["guest_port"];
+    http_port: IAppConfigsColumns["http_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -211,7 +211,7 @@ export interface ISelectAppsByOwnerResult {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
-    guest_port: IAppConfigsColumns["guest_port"];
+    http_port: IAppConfigsColumns["http_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -238,7 +238,7 @@ export interface ISelectAppByIdResult {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
-    guest_port: IAppConfigsColumns["guest_port"];
+    http_port: IAppConfigsColumns["http_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -264,7 +264,7 @@ export interface ISelectAppForConfigUpdateResult {
 /** Result of query `SelectCurrentAppConfig`. */
 export interface ISelectCurrentAppConfigResult {
     id: IAppConfigsColumns["id"];
-    guest_port: IAppConfigsColumns["guest_port"];
+    http_port: IAppConfigsColumns["http_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -296,7 +296,7 @@ export interface ITouchAppAfterConfigPatchResult {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
-    guest_port: IAppConfigsColumns["guest_port"];
+    http_port: IAppConfigsColumns["http_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -367,7 +367,7 @@ export interface ISelectAppAfterStateChangeResult {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
-    guest_port: IAppConfigsColumns["guest_port"];
+    http_port: IAppConfigsColumns["http_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -503,7 +503,7 @@ export interface ISelectDeploymentsByAppResult {
     started_at: IDeploymentsColumns["started_at"];
     last_healthy_at: IDeploymentsColumns["last_healthy_at"];
     restart_count: IDeploymentsColumns["restart_count"];
-    guest_port: IAppConfigsColumns["guest_port"];
+    http_port: IAppConfigsColumns["http_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -537,7 +537,7 @@ export interface ISelectDeploymentByIdResult {
     started_at: IDeploymentsColumns["started_at"];
     last_healthy_at: IDeploymentsColumns["last_healthy_at"];
     restart_count: IDeploymentsColumns["restart_count"];
-    guest_port: IAppConfigsColumns["guest_port"];
+    http_port: IAppConfigsColumns["http_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -597,7 +597,7 @@ export interface ISelectInsertedDeploymentResult {
     started_at: IDeploymentsColumns["started_at"];
     last_healthy_at: IDeploymentsColumns["last_healthy_at"];
     restart_count: IDeploymentsColumns["restart_count"];
-    guest_port: IAppConfigsColumns["guest_port"];
+    http_port: IAppConfigsColumns["http_port"];
     args: IAppConfigsColumns["args"];
     vcpu_count: IAppConfigsColumns["vcpu_count"];
     memory_mib: IAppConfigsColumns["memory_mib"];
@@ -886,7 +886,7 @@ export interface IAppConfigEnvironmentTable {
 export interface IAppConfigsColumns {
     id: string;
     app_id: import("@repo/protocol").AppId;
-    guest_port: import("@repo/protocol").GuestPort;
+    http_port: import("@repo/protocol").HttpPort;
     args: string[];
     vcpu_count: number;
     memory_mib: number;
@@ -917,7 +917,7 @@ export interface IAppConfigsTable {
 export interface IAppConfigsWithEnvironmentColumns {
     id: string | null;
     app_id: string | null;
-    guest_port: number | null;
+    http_port: number | null;
     args: string[] | null;
     vcpu_count: number | null;
     memory_mib: number | null;
@@ -1053,7 +1053,7 @@ export interface IDesiredDeploymentsColumns {
     size_bytes: string | null;
     object_key: string | null;
     original_file_name: string | null;
-    guest_port: number | null;
+    http_port: number | null;
     args: string[] | null;
     vcpu_count: number | null;
     memory_mib: number | null;
@@ -1376,7 +1376,7 @@ export const schema = {
         _columns: {
             id: { _columnName: "id", _foreignKeys: {} },
             app_id: { _columnName: "app_id", _foreignKeys: { app_configs_app_id_fkey: { _constraintName: "app_configs_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
-            guest_port: { _columnName: "guest_port", _foreignKeys: {} },
+            http_port: { _columnName: "http_port", _foreignKeys: {} },
             args: { _columnName: "args", _foreignKeys: {} },
             vcpu_count: { _columnName: "vcpu_count", _foreignKeys: {} },
             memory_mib: { _columnName: "memory_mib", _foreignKeys: {} },
@@ -1400,13 +1400,13 @@ export const schema = {
         _constraints: {
             app_configs_app_id_fkey: { _constraintName: "app_configs_app_id_fkey" },
             app_configs_args_check: { _constraintName: "app_configs_args_check" },
-            app_configs_guest_port_check: { _constraintName: "app_configs_guest_port_check" },
             app_configs_health_check_grace_period_ms_check: { _constraintName: "app_configs_health_check_grace_period_ms_check" },
             app_configs_health_check_healthy_threshold_check: { _constraintName: "app_configs_health_check_healthy_threshold_check" },
             app_configs_health_check_interval_ms_check: { _constraintName: "app_configs_health_check_interval_ms_check" },
             app_configs_health_check_path_check: { _constraintName: "app_configs_health_check_path_check" },
             app_configs_health_check_timeout_ms_check: { _constraintName: "app_configs_health_check_timeout_ms_check" },
             app_configs_health_check_unhealthy_threshold_check: { _constraintName: "app_configs_health_check_unhealthy_threshold_check" },
+            app_configs_http_port_check: { _constraintName: "app_configs_http_port_check" },
             app_configs_memory_mib_check: { _constraintName: "app_configs_memory_mib_check" },
             app_configs_pkey: { _constraintName: "app_configs_pkey" },
             app_configs_restart_backoff_factor_check: { _constraintName: "app_configs_restart_backoff_factor_check" },
@@ -1423,7 +1423,7 @@ export const schema = {
         _columns: {
             id: { _columnName: "id", _foreignKeys: {} },
             app_id: { _columnName: "app_id", _foreignKeys: {} },
-            guest_port: { _columnName: "guest_port", _foreignKeys: {} },
+            http_port: { _columnName: "http_port", _foreignKeys: {} },
             args: { _columnName: "args", _foreignKeys: {} },
             vcpu_count: { _columnName: "vcpu_count", _foreignKeys: {} },
             memory_mib: { _columnName: "memory_mib", _foreignKeys: {} },
@@ -1568,7 +1568,7 @@ export const schema = {
             size_bytes: { _columnName: "size_bytes", _foreignKeys: {} },
             object_key: { _columnName: "object_key", _foreignKeys: {} },
             original_file_name: { _columnName: "original_file_name", _foreignKeys: {} },
-            guest_port: { _columnName: "guest_port", _foreignKeys: {} },
+            http_port: { _columnName: "http_port", _foreignKeys: {} },
             args: { _columnName: "args", _foreignKeys: {} },
             vcpu_count: { _columnName: "vcpu_count", _foreignKeys: {} },
             memory_mib: { _columnName: "memory_mib", _foreignKeys: {} },

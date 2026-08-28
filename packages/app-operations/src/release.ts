@@ -1,6 +1,6 @@
 import { ApiError } from '@repo/api-client/unwrap';
 import {
-  GuestPortSchema,
+  HttpPortSchema,
   type TenantArguments,
   type TenantEnvironmentPatch,
   Value,
@@ -36,7 +36,7 @@ export type ConfigEdit = {
 export function configPatch({ args, port, environment }: ConfigEdit) {
   return {
     ...(args !== undefined && { args }),
-    ...(port !== undefined && { guestPort: Value.Parse(GuestPortSchema, port) }),
+    ...(port !== undefined && { httpPort: Value.Parse(HttpPortSchema, port) }),
     ...(environment !== undefined && { environment }),
   };
 }

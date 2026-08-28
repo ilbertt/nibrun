@@ -56,7 +56,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       yield* fs.makeDirectory(directory, { recursive: true, mode: VM_DIR_MODE });
       const instanceConfigImagePath = yield* buildInstanceConfigImage({
         workingDir: directory,
-        guestPort: desired.config.guestPort,
+        httpPort: desired.config.httpPort,
         hostnames: desired.hostnames,
         args: desired.config.args,
         environment: desired.config.environment,

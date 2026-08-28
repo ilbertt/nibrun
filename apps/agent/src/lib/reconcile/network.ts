@@ -38,7 +38,7 @@ export const forwardedInstances = Effect.gen(function* () {
     if (Option.isSome(slot)) {
       forwarded.push({
         hostPort: slot.value.hostPort,
-        guestPort: record.guestPort,
+        httpPort: record.httpPort,
         hostIpv4: slot.value.hostIpv4,
         guestIpv4: slot.value.guestIpv4,
       });

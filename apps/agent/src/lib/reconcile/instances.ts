@@ -177,7 +177,7 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
         volumeId: desired.volumeId,
         hostnames: desired.hostnames,
         hostPort: slot.hostPort,
-        guestPort: desired.config.guestPort,
+        httpPort: desired.config.httpPort,
         guestIpv4: slot.guestIpv4,
         artifactDigest: desired.artifact.digest,
         state: 'pending',
@@ -261,7 +261,7 @@ const verdict = Effect.fn('verdict')(function* ({
     unit: status,
     tracker: health,
     healthCheck: record.healthCheck,
-    guestPort: record.guestPort,
+    httpPort: record.httpPort,
     ...(guestVerdict !== undefined ? { guestVerdict } : {}),
   });
 });
@@ -270,7 +270,7 @@ function probed({ record, nowMs }: { record: InstanceRecord; nowMs: number }) {
   return Effect.gen(function* () {
     const healthy = yield* probeInstance({
       guestIpv4: record.guestIpv4,
-      guestPort: record.guestPort,
+      httpPort: record.httpPort,
       healthCheck: record.healthCheck,
     });
     const delayMs = nextProbeDelayMs({
