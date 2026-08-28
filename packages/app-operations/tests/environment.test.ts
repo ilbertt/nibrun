@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { RUNTIME_VALUE_NAMES } from '@repo/protocol';
 import { parseEnvironment, parseEnvironmentPatch } from '#environment.ts';
 import { InvalidEnvironmentError } from '#errors.ts';
 
@@ -94,10 +95,14 @@ describe('a value naming a runtime value', () => {
     });
   });
 
+  // The offered names are listed from the schema rather than restated, so a runtime value
+  // added later changes this message without also failing this test.
+  const offered = RUNTIME_VALUE_NAMES.map((name) => `\${${name}}`).join(', ');
+
   test('one it does not is refused, and the variable holding it is named', () => {
     expect(() => parsed({ set: [`URL=https://${MISSPELLED}`] })).toThrow(
       new InvalidEnvironmentError(
-        `A value may name a runtime value the guest sets — \${NIBRUN_DATA_DIR}, ${OFFERED}, \${NIBRUN_PORT} — and nothing else: URL`,
+        `A value may name a runtime value the guest sets — ${offered} — and nothing else: URL`,
       ),
     );
   });

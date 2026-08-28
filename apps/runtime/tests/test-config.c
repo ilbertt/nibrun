@@ -115,6 +115,51 @@ static void drops_a_tenant_hostname(void) {
   EXPECT(count == 5); /* PORT, NIBRUN_DATA_DIR, NIBRUN_HOSTNAME, HOME, TMPDIR */
 }
 
+/* Where the world reaches a port this instance was given, which a guest cannot discover
+ * for itself. Optional as a pair: an app that asked for no port is given neither, and an
+ * agent older than this image writes neither. */
+static void carries_the_public_address_to_the_tenant(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "NIBRUN_PUBLIC_IPV4=203.0.113.7\n"
+                                 "NIBRUN_EXTRA_PUBLIC_PORT=22003\n"));
+  char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "NIBRUN_PUBLIC_IPV4"), "203.0.113.7") == 0);
+  EXPECT(strcmp(value_of(environment, "NIBRUN_EXTRA_PUBLIC_PORT"), "22003") == 0);
+
+  EXPECT(parse(&config, REQUIRED));
+  EXPECT(config.public_ipv4 == NULL);
+  EXPECT(config.extra_public_port == 0);
+  environment = config_build_environment(&config);
+  /* Absent rather than empty: a binary asks whether it was given an address at all. */
+  EXPECT(value_of(environment, "NIBRUN_PUBLIC_IPV4") == NULL);
+  EXPECT(value_of(environment, "NIBRUN_EXTRA_PUBLIC_PORT") == NULL);
+}
+
+/* The pair a binary announcing its own endpoint needs, reached through whatever names
+ * that binary happens to read them under. */
+static void expands_the_public_address(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "NIBRUN_PUBLIC_IPV4=203.0.113.7\n"
+                                 "NIBRUN_EXTRA_PUBLIC_PORT=22003\n"
+                                 "ENV_ANNOUNCED=${NIBRUN_PUBLIC_IPV4}:${NIBRUN_EXTRA_PUBLIC_PORT}\n"
+                                 "ENV_RTC_PORT=$NIBRUN_EXTRA_PUBLIC_PORT\n"));
+  char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "ANNOUNCED"), "203.0.113.7:22003") == 0);
+  EXPECT(strcmp(value_of(environment, "RTC_PORT"), "22003") == 0);
+}
+
+/* Their own would name an address nothing routes to them. */
+static void drops_a_tenant_public_address(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "NIBRUN_PUBLIC_IPV4=203.0.113.7\n"
+                                 "NIBRUN_EXTRA_PUBLIC_PORT=22003\n"
+                                 "ENV_NIBRUN_PUBLIC_IPV4=198.51.100.1\n"
+                                 "ENV_NIBRUN_EXTRA_PUBLIC_PORT=9999\n"));
+  char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "NIBRUN_PUBLIC_IPV4"), "203.0.113.7") == 0);
+  EXPECT(strcmp(value_of(environment, "NIBRUN_EXTRA_PUBLIC_PORT"), "22003") == 0);
+}
+
 /* The only way a tenant value is not passed through byte for byte, and what a binary
  * configured by its own variable names rather than by ours is reached with. */
 static void expands_a_runtime_reference(void) {
@@ -161,6 +206,9 @@ static void rejects_a_reference_it_cannot_answer(void) {
   EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_PORT\n"));
   /* Offered, but this instance was issued no hostname. */
   EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_HOSTNAME\n"));
+  /* Likewise for an app that asked for no port. */
+  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_PUBLIC_IPV4\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_EXTRA_PUBLIC_PORT\n"));
   /* The supervisor's own, and never handed to a tenant. */
   EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_MAX_RESTARTS\n"));
 }
@@ -339,6 +387,9 @@ int main(void) {
   accepts_an_ipv6_nameserver();
   carries_the_hostname_to_the_tenant();
   drops_a_tenant_hostname();
+  carries_the_public_address_to_the_tenant();
+  expands_the_public_address();
+  drops_a_tenant_public_address();
   expands_a_runtime_reference();
   leaves_every_other_dollar_alone();
   rejects_a_reference_it_cannot_answer();
