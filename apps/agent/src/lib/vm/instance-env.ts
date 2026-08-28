@@ -17,7 +17,7 @@ export const INSTANCE_CONFIG_IMAGE = 'config.squashfs';
 const PRIVATE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
 
-/** The two namespaces the runtime parses, so a tenant variable called NIBRUN_PORT stays the tenant's. */
+/** The two namespaces the runtime parses, so a tenant variable called NIBRUN_HTTP_PORT stays the tenant's. */
 const RUNTIME_PREFIX = 'NIBRUN_';
 const TENANT_PREFIX = 'ENV_';
 
@@ -67,7 +67,7 @@ export function renderInstanceEnv({
 }): Either.Either<string, UnrepresentableEnvironment> {
   const hostname = platformHostname(hostnames);
   const lines = [
-    `${RUNTIME_PREFIX}PORT=${httpPort}`,
+    `${RUNTIME_PREFIX}HTTP_PORT=${httpPort}`,
     ...(hostname === undefined ? [] : [`${RUNTIME_PREFIX}HOSTNAME=${hostname}`]),
     `${RUNTIME_PREFIX}MAX_RESTARTS=${restartPolicy.maxRestarts}`,
     `${RUNTIME_PREFIX}INITIAL_BACKOFF_MS=${restartPolicy.initialBackoffMs}`,

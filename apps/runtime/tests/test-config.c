@@ -8,7 +8,7 @@
 #include "../src/config.h"
 #include "expect.h"
 
-#define PORT_KEY "NIBRUN_PORT=8080\n"
+#define PORT_KEY "NIBRUN_HTTP_PORT=8080\n"
 #define BACKOFF_FACTOR_KEY "NIBRUN_BACKOFF_FACTOR=2\n"
 #define OTHER_RESTART_KEYS          \
   "NIBRUN_MAX_RESTARTS=5\n"         \
@@ -74,7 +74,7 @@ static void accepts_a_file_without_a_trailing_newline(void) {
 
 static void accepts_a_fractional_backoff_factor(void) {
   struct instance_config config;
-  EXPECT(parse(&config, "NIBRUN_PORT=3000\n"
+  EXPECT(parse(&config, "NIBRUN_HTTP_PORT=3000\n"
                         "NIBRUN_MAX_RESTARTS=0\n"
                         "NIBRUN_INITIAL_BACKOFF_MS=0\n"
                         "NIBRUN_MAX_BACKOFF_MS=0\n"
@@ -112,7 +112,8 @@ static void drops_a_tenant_hostname(void) {
   while (environment[count] != NULL) {
     count++;
   }
-  EXPECT(count == 5); /* PORT, NIBRUN_DATA_DIR, NIBRUN_HOSTNAME, HOME, TMPDIR */
+  /* NIBRUN_HTTP_PORT, PORT, NIBRUN_DATA_DIR, NIBRUN_HOSTNAME, HOME, TMPDIR */
+  EXPECT(count == 6);
 }
 
 /* Where the world reaches a port this instance was given, which a guest cannot discover
@@ -165,12 +166,12 @@ static void drops_a_tenant_public_address(void) {
 static void expands_a_runtime_reference(void) {
   struct instance_config config;
   EXPECT(parse(&config, REQUIRED "NIBRUN_HOSTNAME=my-app.nibrun.app\n"
-                                 "ENV_BARE=$NIBRUN_PORT\n"
-                                 "ENV_BRACED=${NIBRUN_PORT}\n"
-                                 "ENV_WITHIN=http://$NIBRUN_HOSTNAME:${NIBRUN_PORT}/health\n"
+                                 "ENV_BARE=$NIBRUN_HTTP_PORT\n"
+                                 "ENV_BRACED=${NIBRUN_HTTP_PORT}\n"
+                                 "ENV_WITHIN=http://$NIBRUN_HOSTNAME:${NIBRUN_HTTP_PORT}/health\n"
                                  "ENV_UNDER_THE_VOLUME=${NIBRUN_DATA_DIR}/state.db\n"
-                                 "ENV_TWICE=$NIBRUN_PORT-$NIBRUN_PORT\n"
-                                 "ENV_ADJACENT=${NIBRUN_PORT}0\n"));
+                                 "ENV_TWICE=$NIBRUN_HTTP_PORT-$NIBRUN_HTTP_PORT\n"
+                                 "ENV_ADJACENT=${NIBRUN_HTTP_PORT}0\n"));
 
   char *const *environment = config_build_environment(&config);
   EXPECT(strcmp(value_of(environment, "BARE"), "8080") == 0);
@@ -202,8 +203,8 @@ static void leaves_every_other_dollar_alone(void) {
  * itself, where it would read as a value somebody meant to write. */
 static void rejects_a_reference_it_cannot_answer(void) {
   EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_NOTHING\n"));
-  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_PORT0\n"));
-  EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_PORT\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_HTTP_PORT0\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_HTTP_PORT\n"));
   /* Offered, but this instance was issued no hostname. */
   EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_HOSTNAME\n"));
   /* Likewise for an app that asked for no port. */
@@ -238,7 +239,7 @@ static void accepts_an_ipv6_nameserver(void) {
 static void rejects_a_broken_file(void) {
   EXPECT(rejects("NIBRUN_MAX_RESTARTS=5\n")); /* missing everything else */
   EXPECT(rejects(REQUIRED "NIBRUN_SOMETHING_NEW=1\n"));
-  EXPECT(rejects(REQUIRED "NIBRUN_PORT=8081\n"));
+  EXPECT(rejects(REQUIRED "NIBRUN_HTTP_PORT=8081\n"));
   EXPECT(rejects(REQUIRED "PATH=/usr/bin\n"));
   EXPECT(rejects(REQUIRED "ENV_A=1\nENV_A=2\n"));
   EXPECT(rejects(REQUIRED "ENV_1LEADING_DIGIT=x\n"));
@@ -263,12 +264,12 @@ static void rejects_a_hostname_that_does_not_fit(void) {
 }
 
 static void rejects_a_value_that_is_not_a_number(void) {
-  EXPECT(rejects("NIBRUN_PORT=0\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
-  EXPECT(rejects("NIBRUN_PORT=65536\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
-  EXPECT(rejects("NIBRUN_PORT=80a\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
-  EXPECT(rejects("NIBRUN_PORT= 80\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
-  EXPECT(rejects("NIBRUN_PORT=-1\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
-  EXPECT(rejects("NIBRUN_PORT=\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
+  EXPECT(rejects("NIBRUN_HTTP_PORT=0\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
+  EXPECT(rejects("NIBRUN_HTTP_PORT=65536\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
+  EXPECT(rejects("NIBRUN_HTTP_PORT=80a\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
+  EXPECT(rejects("NIBRUN_HTTP_PORT= 80\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
+  EXPECT(rejects("NIBRUN_HTTP_PORT=-1\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
+  EXPECT(rejects("NIBRUN_HTTP_PORT=\n" BACKOFF_FACTOR_KEY OTHER_RESTART_KEYS));
   EXPECT(rejects(PORT_KEY "NIBRUN_BACKOFF_FACTOR=0.5\n" OTHER_RESTART_KEYS));
   EXPECT(rejects(PORT_KEY "NIBRUN_BACKOFF_FACTOR=nan\n" OTHER_RESTART_KEYS));
 }
@@ -303,6 +304,7 @@ static void builds_the_tenant_environment(void) {
   EXPECT(parse(&config, REQUIRED "ENV_HOME=/somewhere\nENV_PORT=9999\nENV_TOKEN=abc\n"));
 
   char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "NIBRUN_HTTP_PORT"), "8080") == 0);
   EXPECT(strcmp(value_of(environment, "PORT"), "8080") == 0);
   EXPECT(strcmp(value_of(environment, "HOME"), "/somewhere") == 0);
   EXPECT(strcmp(value_of(environment, "TOKEN"), "abc") == 0);
@@ -313,9 +315,32 @@ static void builds_the_tenant_environment(void) {
   while (environment[count] != NULL) {
     count++;
   }
-  /* PORT, NIBRUN_DATA_DIR, HOME, TOKEN, TMPDIR — the tenant's own PORT dropped, its
-   * HOME kept, because only the first of the two names an instance it is served on. */
-  EXPECT(count == 5);
+  /* NIBRUN_HTTP_PORT, PORT, NIBRUN_DATA_DIR, HOME, TOKEN, TMPDIR — the tenant's own PORT
+   * dropped, its HOME kept, because only the first of the two names an instance it is
+   * served on. */
+  EXPECT(count == 6);
+}
+
+/* One number under two names, so a value naming the prefixed one and a binary reading the
+ * conventional one can never disagree about the port this instance is served on. */
+static void carries_the_port_under_both_names(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED));
+
+  char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "NIBRUN_HTTP_PORT"), "8080") == 0);
+  EXPECT(strcmp(value_of(environment, "PORT"), "8080") == 0);
+}
+
+/* The prefixed name is the platform's the way PORT already was: a tenant's own would
+ * disagree with what ${NIBRUN_HTTP_PORT} expands to in the value beside it. */
+static void drops_a_tenant_http_port(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "ENV_NIBRUN_HTTP_PORT=9999\nENV_PORT=7777\n"));
+
+  char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "NIBRUN_HTTP_PORT"), "8080") == 0);
+  EXPECT(strcmp(value_of(environment, "PORT"), "8080") == 0);
 }
 
 /* Where the volume is mounted is the platform's to say: a tenant's own would point the
@@ -401,6 +426,8 @@ int main(void) {
   rejects_a_nul_byte();
   rejects_too_many_tenant_variables();
   builds_the_tenant_environment();
+  carries_the_port_under_both_names();
+  drops_a_tenant_http_port();
   drops_a_tenant_data_dir();
   passes_arguments_through_in_order();
   accepts_arguments_in_any_order();

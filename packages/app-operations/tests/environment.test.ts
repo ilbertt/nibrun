@@ -90,8 +90,8 @@ describe('a value naming a runtime value', () => {
 
   test('one the guest offers is carried through as it was written', () => {
     expect(parsed({ set: [`URL=https://${OFFERED}`] })).toEqual({ URL: `https://${OFFERED}` });
-    expect(parsed({ set: ['URL=http://$NIBRUN_HOSTNAME:$NIBRUN_PORT'] })).toEqual({
-      URL: 'http://$NIBRUN_HOSTNAME:$NIBRUN_PORT',
+    expect(parsed({ set: ['URL=http://$NIBRUN_HOSTNAME:$NIBRUN_HTTP_PORT'] })).toEqual({
+      URL: 'http://$NIBRUN_HOSTNAME:$NIBRUN_HTTP_PORT',
     });
   });
 

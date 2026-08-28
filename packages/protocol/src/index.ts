@@ -92,6 +92,7 @@ export {
   type TenantEnvironmentPatch,
   TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
+  writtenRuntimeValue,
 } from '#domain/app.ts';
 export {
   type Artifact,

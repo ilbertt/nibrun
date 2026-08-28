@@ -17,7 +17,7 @@ Everything the binary can count on, and nothing else:
 | Platform | Linux **x86_64**, glibc (Debian rootfs) |
 | Working directory | `/app` |
 | Persistent volume | `/app/data` — 8 GiB, survives every redeploy. `NIBRUN_DATA_DIR` names it |
-| Port | `PORT` is set by the guest; the app **must** listen on it, on `0.0.0.0` |
+| Port | `NIBRUN_HTTP_PORT`, and `PORT` beside it; the app **must** listen on it, on `0.0.0.0` |
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs and is lost on restart. So is everything outside `/app/data` |
 | Resources | 1 vCPU, 256 MiB RAM |
@@ -25,9 +25,10 @@ Everything the binary can count on, and nothing else:
 | URL | `https://<slug>.nibrun.app`, live as soon as it boots |
 
 An app that writes its SQLite file and its uploads under `./data` and reads `PORT` needs no
-configuration to run here. A `PORT`, `NIBRUN_HOSTNAME` or `NIBRUN_DATA_DIR` you set yourself is
-ignored — the guest owns all three. `HOME` and `TMPDIR` are defaults rather than owned, so one you
-set yourself is what the binary reads.
+configuration to run here. The guest sets three names of its own — `NIBRUN_HTTP_PORT`,
+`NIBRUN_HOSTNAME`, `NIBRUN_DATA_DIR` — and any of them you set yourself is ignored, as is `PORT`,
+which carries the same number as `NIBRUN_HTTP_PORT` under the name every other host uses. `HOME`
+and `TMPDIR` are defaults rather than owned, so one you set yourself is what the binary reads.
 
 A binary that needs its own absolute URL — an OAuth redirect, a webhook it registers, a link in
 an email — builds it from `NIBRUN_HOSTNAME` rather than being told it, and falls back to whatever
@@ -36,9 +37,9 @@ it uses when it is not on nibrun.
 One that insists on a variable name of its own reaches the same values through it: a value may
 name a runtime one — `APP_BASE_URL=https://${NIBRUN_HOSTNAME}`,
 `DATABASE_URL=file:${NIBRUN_DATA_DIR}/app.db` — and the guest expands it before exec. Only that
-prefix expands, so a secret holding a `$` arrives untouched, and `NIBRUN_PORT`, `NIBRUN_HOSTNAME`
-and `NIBRUN_DATA_DIR` are the whole of what may be named: anything else is refused when you deploy
-it.
+prefix expands, so a secret holding a `$` arrives untouched, and `NIBRUN_HTTP_PORT`,
+`NIBRUN_HOSTNAME` and `NIBRUN_DATA_DIR` are the whole of what may be named — `${PORT}` is not one
+of them — with anything else refused when you deploy it.
 
 ## Deploying
 
@@ -61,8 +62,8 @@ nib run ./my-server --name my-app --port 8080
 ```
 
 `--port` is the HTTP port the binary listens on inside the guest — read it off the app rather
-than carrying a number over from an example. It is the port the guest then hands back as `PORT`,
-and it defaults to `3000`.
+than carrying a number over from an example. It is the number the guest hands back as
+`NIBRUN_HTTP_PORT` and `PORT`, and it defaults to `3000`.
 
 **Every deploy after that must name the app**, or a non-interactive shell creates a second one:
 
@@ -115,7 +116,7 @@ Worth saying out loud before recommending it:
   container, no managed database next to it.
 - **256 MiB and 1 vCPU**, sized by nibrun rather than configured by you, and the OOM killer
   reaches for the tenant first.
-- **Health is a TCP connect** to `PORT`, and not something you configure. A process that accepts
+- **Health is a TCP connect** to that port, and not something you configure. A process that accepts
   connections while broken reads as healthy.
 - **A crash loop is fatal.** The guest restarts your process on a fixed budget you do not set;
   once it runs out the app is `failed` rather than restarted forever.
