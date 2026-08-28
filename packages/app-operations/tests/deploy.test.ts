@@ -29,11 +29,15 @@ function apiHolding({
   apps,
   sent,
   completed = { id: ARTIFACT_ID, digest: DIGEST },
+  created = { artifactId: ARTIFACT_ID, url: PUT_URL },
   hostnames = [PENDING_CUSTOM, PLATFORM],
 }: {
   apps: Array<{ id: string; slug: string; state?: string }>;
   sent: Sent[];
   completed?: { id: string; digest: string } | null;
+  // Somewhere to send bytes, or the artifact those bytes already made: one endpoint answers both,
+  // and which one a caller is owed is decided by what it asked for.
+  created?: { artifactId: string; url: string } | { id: string; digest: string };
   hostnames?: HostnameRow[];
 }): PublicApiClient {
   function app(id: string) {
@@ -57,7 +61,7 @@ function apiHolding({
       artifacts: Object.assign(artifact, {
         post: (body: unknown) => {
           sent.push({ what: 'artifact', body });
-          return Promise.resolve({ data: { artifactId: ARTIFACT_ID, url: PUT_URL }, error: null });
+          return Promise.resolve({ data: created, error: null });
         },
       }),
       deployments: {
@@ -382,5 +386,111 @@ describe('a release that settled without serving accounts for itself', () => {
     expect(describeUnservedDeployment({ id: 'dep-1', state: 'superseded' })).toBe(
       'Deployment dep-1 is superseded.',
     );
+  });
+});
+
+const BINARY_URL = 'https://releases.test/v1.2.0/my-server';
+const FETCHED = { id: ARTIFACT_ID, digest: DIGEST };
+
+/**
+ * A release asset is served by a store that answers no cross-origin request, so the end that can
+ * read one is the api. Nothing is sent from here at all: the bytes travel once, between the two
+ * ends that are not this one.
+ */
+describe('a binary the api fetches is never sent from this end', () => {
+  test('the url is asked for and the artifact comes back, with nothing put anywhere', async () => {
+    const sent: Sent[] = [];
+    storeAnswering({ sent });
+
+    const deployed = await deploy({
+      api: apiHolding({ apps: [{ id: APP_ID, slug: SLUG }], sent, created: FETCHED }),
+      binary: { url: BINARY_URL },
+      args: [],
+      app: SLUG,
+    });
+
+    expect(sent.map((each) => each.what)).toEqual(['app patch', 'artifact', 'deployment']);
+    expect(sent[1]).toEqual({ what: 'artifact', body: { url: BINARY_URL } });
+    expect(deployed.deploymentId).toBe('deployment-1');
+  });
+
+  test('an app made for one is named after the file at the end of the url', async () => {
+    const sent: Sent[] = [];
+
+    await deploy({
+      api: apiHolding({ apps: [], sent, created: FETCHED }),
+      binary: { url: BINARY_URL },
+      args: [],
+    });
+
+    expect(sent[0]).toMatchObject({ what: 'create', body: { name: 'my-server' } });
+  });
+
+  // The api names the artifact from the url's *path*, so a name read out of one any other way is
+  // one it will refuse — after this end has already made the app the caller is then left to delete.
+  test('a url with no path is refused before an app is made for it', async () => {
+    const sent: Sent[] = [];
+
+    await expect(
+      deploy({
+        api: apiHolding({ apps: [], sent, created: FETCHED }),
+        binary: { url: 'https://releases.test' },
+        args: [],
+      }),
+    ).rejects.toThrow('An app needs a name');
+    expect(sent).toEqual([]);
+  });
+
+  test('and neither does one that ends in a slash name anything', async () => {
+    const sent: Sent[] = [];
+
+    await expect(
+      deploy({
+        api: apiHolding({ apps: [], sent, created: FETCHED }),
+        binary: { url: 'https://releases.test/downloads/' },
+        args: [],
+      }),
+    ).rejects.toThrow('An app needs a name');
+    expect(sent).toEqual([]);
+  });
+
+  test('a name given outright is the name, whatever the url ends in', async () => {
+    const sent: Sent[] = [];
+
+    await deploy({
+      api: apiHolding({ apps: [], sent, created: FETCHED }),
+      binary: { url: 'https://releases.test' },
+      args: [],
+      name: 'chosen',
+    });
+
+    expect(sent[0]).toMatchObject({ what: 'create', body: { name: 'chosen' } });
+  });
+
+  test('an api that answers a fetch with somewhere to upload has not agreed', async () => {
+    const sent: Sent[] = [];
+
+    await expect(
+      deploy({
+        api: apiHolding({ apps: [{ id: APP_ID, slug: SLUG }], sent }),
+        binary: { url: BINARY_URL },
+        args: [],
+        app: SLUG,
+      }),
+    ).rejects.toThrow('The api answered a fetched binary with somewhere to upload one.');
+  });
+
+  test('nor has one that answers an upload with an artifact nobody sent it', async () => {
+    const sent: Sent[] = [];
+    storeAnswering({ sent });
+
+    await expect(
+      deploy({
+        api: apiHolding({ apps: [{ id: APP_ID, slug: SLUG }], sent, created: FETCHED }),
+        binary: binary(),
+        args: [],
+        app: SLUG,
+      }),
+    ).rejects.toThrow('The api answered an upload with an artifact nobody sent it.');
   });
 });

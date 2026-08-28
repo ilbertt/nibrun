@@ -51,6 +51,14 @@ export class ConflictError extends AppError {
   }
 }
 
+/** The api is already carrying as much of this kind of work as it will at once. */
+export class TooManyRequestsError extends AppError {
+  constructor(message = 'Too Many Requests') {
+    super(StatusMap['Too Many Requests'], message);
+    this.name = 'TooManyRequestsError';
+  }
+}
+
 /** A host was asked something and said it could not answer it. */
 export class BadGatewayError extends AppError {
   constructor(message = 'Bad Gateway') {

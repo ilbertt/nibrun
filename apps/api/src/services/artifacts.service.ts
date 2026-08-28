@@ -14,8 +14,8 @@ import {
   inspectingPassThrough,
   RefusedArtifactError,
 } from '#lib/artifact-digest.ts';
-import { filenameFromUrl } from '#lib/binary-url.ts';
-import { BadRequestError, NotFoundError } from '#lib/errors.ts';
+import { filenameFromUrl, withoutCredentials } from '#lib/binary-url.ts';
+import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
@@ -23,9 +23,10 @@ import type {
   ArtifactRow,
   ArtifactsRepositoryContract,
 } from '#repositories/artifacts.repository.ts';
-import type {
-  BinarySource,
-  BinarySourceRepositoryContract,
+import {
+  type BinarySource,
+  type BinarySourceRepositoryContract,
+  InterruptedSourceError,
 } from '#repositories/binary-source.repository.ts';
 import { Service } from '#services/service.ts';
 
@@ -38,7 +39,18 @@ const NOTHING_UPLOADED = 'Nothing was uploaded against that artifact.';
 const UNNAMED_BINARY =
   "The url has to end in the binary's own name, as a release download does: .../my-server";
 const NOTHING_FETCHED = 'The url answered with no body.';
+const TOO_MANY_REDIRECTS = 'The url redirected more times than nibrun will follow.';
 const NOT_AN_EXECUTABLE = 'The artifact is not a Linux executable.';
+
+/**
+ * A binary being fetched passes through this process, which is the cost signing an upload away was
+ * meant to avoid paying — so how many may be in flight at once is a number rather than whatever a
+ * caller starts. Refused rather than queued: a caller told to come back has a request that ended,
+ * while one held in a queue is one more transfer this end is carrying while it waits.
+ */
+export const MAX_CONCURRENT_FETCHES = 8;
+const TOO_MANY_FETCHES =
+  'nibrun is fetching as many binaries as it will at once. Try again in a moment.';
 
 const BYTES_PER_MEBIBYTE = 1_048_576;
 const MAX_ARTIFACT_MEBIBYTES = 256;
@@ -66,6 +78,19 @@ function unreachable(url: string): string {
 
 function refusedBy({ url, status }: { url: string; status: number }): string {
   return `The url answered ${status}, so there was nothing to deploy: ${url}`;
+}
+
+/**
+ * The hop that was refused rather than the address that was typed: a redirect out of https is one
+ * the caller never saw, and naming it is the difference between a link they can fix and a fetch
+ * that failed for no reason they can see.
+ */
+function insecureRedirect(to: string): string {
+  return `The url redirected to ${withoutCredentials(to)}, which is not an https address nibrun will follow.`;
+}
+
+function interruptedSource(url: string): string {
+  return `The url stopped sending before the binary was whole: ${url}`;
 }
 
 function unsupportedInterpreter(interpreter: string): string {
@@ -120,6 +145,7 @@ export class ArtifactsService extends Service {
   private readonly storageRepo: ArtifactStorageRepositoryContract;
   private readonly sourceRepo: BinarySourceRepositoryContract;
   private readonly appsRepo: AppOwnership;
+  private fetchesInFlight = 0;
 
   constructor({
     artifactsRepo,
@@ -233,8 +259,8 @@ export class ArtifactsService extends Service {
    * read one to upload it. It is also the shorter path — the api holds the bytes once, on their
    * way past, rather than reading back what a caller already sent.
    *
-   * Hashed on that same pass. The stream is teed, so what is written to the staging key and what
-   * decides whether it is an artifact at all are one read of the source.
+   * Hashed on that same pass: the bytes are inspected as they are handed to the store, so what is
+   * written to the staging key and what decides whether it is an artifact at all are one read.
    */
   async createFromUrl({
     appId,
@@ -255,15 +281,47 @@ export class ArtifactsService extends Service {
     if (filename === undefined) {
       throw new BadRequestError(UNNAMED_BINARY);
     }
+    if (this.fetchesInFlight >= MAX_CONCURRENT_FETCHES) {
+      throw new TooManyRequestsError(TOO_MANY_FETCHES);
+    }
+
+    this.fetchesInFlight += 1;
+    try {
+      return await this.fetchInto({ appId, ownerId, url, filename });
+    } finally {
+      this.fetchesInFlight -= 1;
+    }
+  }
+
+  /**
+   * The url opened and made an artifact of, with the slot it is counted against already taken.
+   *
+   * What is written down and said back is the url without whatever a caller authenticated by: the
+   * bytes are fetched with the address as it was given, and a token in it belongs to that fetch
+   * rather than to a row that outlives it.
+   */
+  private async fetchInto({
+    appId,
+    ownerId,
+    url,
+    filename,
+  }: {
+    appId: AppId;
+    ownerId: OwnerId;
+    url: string;
+    filename: Filename;
+  }): Promise<Artifact> {
+    const said = withoutCredentials(url);
 
     const source = await this.sourceRepo.open({ url });
     if (source.outcome !== 'open') {
-      throw new BadRequestError(sourceRefusal({ url, source }));
+      throw new BadRequestError(sourceRefusal({ url: said, source }));
     }
     if (
       source.declaredSizeBytes !== undefined &&
       source.declaredSizeBytes > MAX_ARTIFACT_SIZE_BYTES
     ) {
+      await release(source.body);
       throw new BadRequestError(TOO_LARGE);
     }
 
@@ -271,16 +329,57 @@ export class ArtifactsService extends Service {
       appId,
       ownerId,
       originalFileName: filename,
-      originalFileUrl: url,
+      originalFileUrl: said,
     });
     if (!pending) {
+      await release(source.body);
       throw new NotFoundError(NO_SUCH_APP);
     }
 
     const staged = stagingKey({ appId, artifactId: pending.id });
-    const inspection = await this.stage({ staged, body: source.body });
+    const inspection = await this.stageOrGiveUp({
+      appId,
+      artifactId: pending.id,
+      ownerId,
+      staged,
+      body: source.body,
+      url: said,
+    });
 
     return await this.promote({ appId, artifactId: pending.id, ownerId, staged, inspection });
+  }
+
+  /**
+   * The staging write, with the row taken back whichever way it fails: somebody who is going to
+   * follow the same link again should not have to find what the last attempt left behind.
+   *
+   * A source that stopped part way is the caller's link rather than this api, and is answered as
+   * such — every other way this url could be unusable already is.
+   */
+  private async stageOrGiveUp({
+    appId,
+    artifactId,
+    ownerId,
+    staged,
+    body,
+    url,
+  }: {
+    appId: AppId;
+    artifactId: ArtifactId;
+    ownerId: OwnerId;
+    staged: ObjectKey;
+    body: ReadableStream<Uint8Array>;
+    url: string;
+  }): Promise<ArtifactInspection> {
+    try {
+      return await this.stage({ staged, body });
+    } catch (failure) {
+      await this.abandon({ appId, artifactId, ownerId });
+      if (failure instanceof InterruptedSourceError) {
+        throw new BadRequestError(interruptedSource(url));
+      }
+      throw failure;
+    }
   }
 
   /**
@@ -461,6 +560,19 @@ function sourceRefusal({
       return refusedBy({ url, status: source.status });
     case 'empty':
       return NOTHING_FETCHED;
+    case 'insecure-redirect':
+      return insecureRedirect(source.to);
+    case 'too-many-redirects':
+      return TOO_MANY_REDIRECTS;
+  }
+}
+
+/** A body nobody is going to read holds its connection open until it is let go of. */
+async function release(body: ReadableStream<Uint8Array>): Promise<void> {
+  try {
+    await body.cancel();
+  } catch {
+    return;
   }
 }
 

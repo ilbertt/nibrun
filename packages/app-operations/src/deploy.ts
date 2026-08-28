@@ -50,9 +50,18 @@ function binaryName(binary: DeployableBinary): string | undefined {
   return isFetchable(binary) ? lastSegment(binary.url) : binary.name;
 }
 
+/**
+ * Parsed rather than split: the api names the artifact from the url's *path*, and a name taken any
+ * other way is one it will refuse after this end has already made the app. A url with no path at
+ * all ends in the host, which is a name for a website and not for a binary.
+ */
 function lastSegment(url: string): string | undefined {
-  const segment = url.split('?')[0]?.split('/').at(-1);
-  return segment === undefined || segment === '' ? undefined : decodeURIComponent(segment);
+  try {
+    const segment = decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '');
+    return segment === '' ? undefined : segment;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

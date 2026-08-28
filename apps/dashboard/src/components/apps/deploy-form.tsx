@@ -1,11 +1,13 @@
 import { Button } from '@repo/ui/components/button';
 import { useStore } from '@tanstack/react-form';
-import { ConfigureDeployment } from '#components/apps/configure-deployment.tsx';
+import { AdvancedConfiguration } from '#components/apps/advanced-configuration.tsx';
 import { DeployBinaryField } from '#components/apps/deploy-binary-field.tsx';
 import { asksForVariables, DeployConfiguration } from '#components/apps/deploy-configuration.tsx';
 import { MinimalBinaryField } from '#components/apps/minimal-binary-field.tsx';
+import { binaryName } from '#lib/binary-source.ts';
 import type { DeploySuggestion } from '#lib/deploy-link.ts';
-import { useDeployForm } from '#lib/hooks/use-deploy-form.ts';
+import { type DeployFormValues, useDeployForm } from '#lib/hooks/use-deploy-form.ts';
+import type { AppSummary } from '#queries/apps.ts';
 
 export function DeployForm({
   appId,
@@ -19,8 +21,9 @@ export function DeployForm({
   minimal?: boolean | undefined;
 }) {
   const form = useDeployForm({ appId, binary, suggested });
-  const { api, locked, replacing, targetResolved } = form;
+  const { api, replacing, targetResolved } = form;
   const picked = useStore(api.store, (state) => state.values.binary !== undefined);
+  const appName = useStore(api.store, (state) => deployedName({ values: state.values, replacing }));
   // One form either way, so the binary survives the way out of the stripped one.
   const stripped = minimal && !asksForVariables(suggested);
 
@@ -38,11 +41,7 @@ export function DeployForm({
         <DeployBinaryField api={api} replacing={replacing} />
       )}
 
-      {stripped ? (
-        <ConfigureDeployment />
-      ) : (
-        <DeployConfiguration form={form} suggested={suggested} />
-      )}
+      {!stripped && <DeployConfiguration form={form} suggested={suggested} />}
 
       {replacing !== undefined && (
         <p className="wrap-anywhere rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
@@ -52,30 +51,49 @@ export function DeployForm({
         </p>
       )}
 
-      <api.Subscribe selector={(state) => state.canSubmit}>
-        {(canSubmit) => (
-          <Button type="submit" size="lg" disabled={!canSubmit || !targetResolved}>
-            <span className="truncate">
-              {submitLabel({ replacing: replacing?.slug, locked, picked })}
-            </span>
-          </Button>
-        )}
-      </api.Subscribe>
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <api.Subscribe selector={(state) => state.canSubmit}>
+          {(canSubmit) => (
+            <Button type="submit" size="lg" disabled={!canSubmit || !targetResolved}>
+              <span className="truncate">{submitLabel({ appName, targetResolved })}</span>
+            </Button>
+          )}
+        </api.Subscribe>
+        {stripped && <AdvancedConfiguration />}
+      </div>
     </form>
   );
 }
 
-function submitLabel({
+/**
+ * The app this deploys, as it is known right now: the one being released again, the name that was
+ * typed or asked for, or the binary the app would be named after. Whichever it is, the button says
+ * it as soon as the form knows it.
+ */
+function deployedName({
+  values,
   replacing,
-  locked,
-  picked,
 }: {
-  replacing: string | undefined;
-  locked: boolean;
-  picked: boolean;
-}): string {
+  values: DeployFormValues;
+  replacing: AppSummary | undefined;
+}): string | undefined {
   if (replacing !== undefined) {
-    return picked ? `Replace what ${replacing} runs` : `Redeploy ${replacing}`;
+    return replacing.slug;
   }
-  return locked ? 'Reading the app…' : 'Create the app and deploy';
+  const typed = values.name.trim();
+  // Whichever way the binary was given: the file that was picked, or the file the url ends in.
+  return typed === '' ? binaryName(values.binary) : typed;
+}
+
+function submitLabel({
+  appName,
+  targetResolved,
+}: {
+  appName: string | undefined;
+  targetResolved: boolean;
+}): string {
+  if (!targetResolved) {
+    return 'Reading the app…';
+  }
+  return appName === undefined ? 'Deploy the app' : `Deploy ${appName}`;
 }
