@@ -13,12 +13,18 @@ const PRIVATE_DESTINATIONS_V6_SAMPLE = ['::1', 'fe80:', 'fc', 'fd'];
 
 const HOST_PORT_NUMBER = 21_000;
 const HTTP_PORT_NUMBER = 3000;
+const EXTRA_PUBLIC_PORT_NUMBER = 22_000;
 
 const instance = {
   hostPort: Value.Parse(HostPortSchema, HOST_PORT_NUMBER),
   httpPort: Value.Parse(HttpPortSchema, HTTP_PORT_NUMBER),
   hostIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.1'),
   guestIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.2'),
+};
+
+const askedForAPort = {
+  ...instance,
+  extraPublicPort: Value.Parse(HostPortSchema, EXTRA_PUBLIC_PORT_NUMBER),
 };
 
 function state(overrides: Partial<FirewallState> = {}): FirewallState {
@@ -180,6 +186,33 @@ describe('forwarding', () => {
   test('host-local traffic to a forwarded port is re-sourced so the guest can reply', () => {
     const ruleset = renderRuleset(state({ instances: [instance] }));
     expect(ruleset).toContain('ip saddr 127.0.0.0/8 ip daddr 10.201.0.2 snat to 10.201.0.1');
+  });
+});
+
+// The port a tenant asked for, which is the one case where the number may not change: a binary
+// announcing the port it bound is announcing this one, so a rewrite here is a port nothing reaches.
+describe('the port an app asked for arrives as the port it was sent to', () => {
+  test('both protocols reach the guest on the same number', () => {
+    const ruleset = renderRuleset(state({ instances: [askedForAPort] }));
+    expect(ruleset).toContain('tcp dport 22000 dnat to 10.201.0.2:22000');
+    expect(ruleset).toContain('udp dport 22000 dnat to 10.201.0.2:22000');
+  });
+
+  test('an app that asked for none is given none', () => {
+    const ruleset = renderRuleset(state({ instances: [instance] }));
+    expect(ruleset).not.toContain('22000');
+    expect(ruleset).not.toContain('udp dport');
+  });
+
+  // The rule is what a packet from the internet meets; a guest reaching the host's own tap address
+  // on that port would otherwise be forwarded to whichever guest holds it.
+  test('the rule does not answer traffic coming from a guest', () => {
+    const rules = renderRuleset(state({ instances: [askedForAPort] }))
+      .split('\n')
+      .filter((line) => line.includes('dport 22000'));
+
+    expect(rules).toHaveLength(2);
+    expect(rules.every((line) => line.trim().startsWith('iifname != "nbr*"'))).toBe(true);
   });
 });
 

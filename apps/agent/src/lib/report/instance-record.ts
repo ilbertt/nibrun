@@ -29,6 +29,8 @@ export type InstanceRecord = {
   readonly hostnames: readonly AppHostname[];
   readonly hostPort: HostPort;
   readonly httpPort: HttpPort;
+  /** Absent on a note written before an app could ask for one, which is every app that had not. */
+  readonly hasExtraPublicPort?: boolean;
   readonly guestIpv4: Ipv4Address;
   readonly artifactDigest: Sha256Digest;
   readonly state: InstanceState;

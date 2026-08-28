@@ -42,6 +42,16 @@ export const SLOT_COUNT = NBD_DEVICE_COUNT - 1;
 
 export const HOST_PORT_BASE = 21_000;
 
+/**
+ * Where the port an app asking for one is reached at starts. A slot's own, so nothing has to be
+ * allocated or told apart, and the same number on both sides of every hop — a binary that
+ * announces the port it bound has to be announcing one that reaches it.
+ *
+ * `tenant_port_first` in infra/terraform bounds the range the relay forwards and the security
+ * group admits, and `SLOT_COUNT` is what decides how far it has to reach.
+ */
+export const EXTRA_PUBLIC_PORT_BASE = 22_000;
+
 /** A /30 per slot: .0 network, .1 host, .2 guest, .3 broadcast. */
 export const GUEST_NETWORK_CIDR = '10.201.0.0/16';
 const GUEST_SUBNET_PREFIX_LENGTH = 30;
@@ -63,6 +73,7 @@ export type AppSlot = {
   readonly slot: number;
   readonly appId: AppId;
   readonly hostPort: HostPort;
+  readonly extraPublicPort: HostPort;
   readonly hostIpv4: Ipv4Address;
   readonly guestIpv4: Ipv4Address;
   readonly guestMac: string;
@@ -92,6 +103,7 @@ export function describeSlot({ slot, appId }: { slot: number; appId: AppId }): A
     slot,
     appId,
     hostPort: Value.Parse(HostPortSchema, HOST_PORT_BASE + slot),
+    extraPublicPort: Value.Parse(HostPortSchema, EXTRA_PUBLIC_PORT_BASE + slot),
     hostIpv4: addressAt(base + HOST_ADDRESS_OFFSET),
     guestIpv4,
     guestMac: macFor(guestIpv4),

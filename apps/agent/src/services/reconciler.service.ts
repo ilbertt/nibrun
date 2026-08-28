@@ -144,6 +144,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
               resources: wanted.config.resources,
               desiredRunning: wanted.desiredState === 'running',
               httpPort: wanted.config.httpPort,
+              hasExtraPublicPort: wanted.config.hasExtraPublicPort,
             }),
           }),
         { discard: true },

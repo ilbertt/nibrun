@@ -38,6 +38,8 @@ const DENY = 'reject';
 export type ForwardedInstance = {
   readonly hostPort: HostPort;
   readonly httpPort: HttpPort;
+  /** Absent unless the app asked for one, which is what keeps a port off every app that did not. */
+  readonly extraPublicPort?: HostPort;
   readonly hostIpv4: Ipv4Address;
   readonly guestIpv4: Ipv4Address;
 };
@@ -150,6 +152,17 @@ function natChainsV4({ instances }: FirewallState): string[] {
         ...instances.map(
           (instance) =>
             `iifname != ${TAP_MATCH} tcp dport ${instance.hostPort} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
+        ),
+        // The same port on both sides, and both protocols: what arrives here has already been
+        // forwarded once without being renumbered, and rewriting it now would leave a binary
+        // announcing a port nothing reaches. Which protocol a tenant wants is not nibrun's to know.
+        ...instances.flatMap((instance) =>
+          instance.extraPublicPort === undefined
+            ? []
+            : (['tcp', 'udp'] as const).map(
+                (protocol) =>
+                  `iifname != ${TAP_MATCH} ${protocol} dport ${instance.extraPublicPort} dnat to ${instance.guestIpv4}:${instance.extraPublicPort}`,
+              ),
         ),
       ],
     }),

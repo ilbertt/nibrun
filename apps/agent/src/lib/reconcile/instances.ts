@@ -178,6 +178,7 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
         hostnames: desired.hostnames,
         hostPort: slot.hostPort,
         httpPort: desired.config.httpPort,
+        hasExtraPublicPort: desired.config.hasExtraPublicPort,
         guestIpv4: slot.guestIpv4,
         artifactDigest: desired.artifact.digest,
         state: 'pending',

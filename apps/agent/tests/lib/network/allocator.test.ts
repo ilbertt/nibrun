@@ -2,7 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import { type AppId, AppIdSchema, HostPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
 import { Effect, Either, Layer, Option } from 'effect';
 import { assignmentsFrom, readSlotRecords, type SlotRecords } from '#lib/network/allocator.ts';
-import { describeSlot, HOST_PORT_BASE, SLOT_COUNT } from '#lib/network/slot.ts';
+import {
+  describeSlot,
+  EXTRA_PUBLIC_PORT_BASE,
+  HOST_PORT_BASE,
+  SLOT_COUNT,
+} from '#lib/network/slot.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { platform, provided } from '#tests/support/run.ts';
@@ -34,6 +39,7 @@ describe('slot derivation', () => {
       slot: 0,
       appId: app(0),
       hostPort: Value.Parse(HostPortSchema, HOST_PORT_BASE),
+      extraPublicPort: Value.Parse(HostPortSchema, EXTRA_PUBLIC_PORT_BASE),
       hostIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.1'),
       guestIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.2'),
       guestMac: '02:00:0a:c9:00:02',

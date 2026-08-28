@@ -72,3 +72,37 @@ describe('the forward is what decides whether a port reaches the guest', () => {
       }),
     ));
 });
+
+describe('an app is forwarded the port it asked for and no other', () => {
+  test('one that asked takes the port its slot names', () =>
+    run(
+      Effect.gen(function* () {
+        const [forwarded] = yield* forwardsFor([instanceRecord({ hasExtraPublicPort: true })]);
+        const slot = Option.getOrThrow(yield* (yield* SlotAllocator).lookup(APP_ID));
+
+        expect(forwarded?.extraPublicPort).toBe(slot.extraPublicPort);
+      }),
+    ));
+
+  // Absent rather than present-and-ignored: what renders the rules reads the field's presence, so
+  // an app that did not ask has to be indistinguishable from one that could not have.
+  test('one that did not carries no port at all', () =>
+    run(
+      Effect.gen(function* () {
+        const [forwarded] = yield* forwardsFor([instanceRecord()]);
+
+        expect(forwarded && 'extraPublicPort' in forwarded).toBe(false);
+      }),
+    ));
+
+  // A note written before an app could ask for one says nothing, and reads as the no it meant.
+  test('a record that predates the question is read as a no', () =>
+    run(
+      Effect.gen(function* () {
+        const { hasExtraPublicPort: _, ...older } = instanceRecord({ hasExtraPublicPort: true });
+        const [forwarded] = yield* forwardsFor([older]);
+
+        expect(forwarded && 'extraPublicPort' in forwarded).toBe(false);
+      }),
+    ));
+});
