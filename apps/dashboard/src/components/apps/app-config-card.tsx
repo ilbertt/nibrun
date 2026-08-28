@@ -14,12 +14,6 @@ export function AppConfigCard({ app }: { app: AppSummary }) {
           <span className="text-muted-foreground">HTTP port</span>
           <span className="font-mono tabular-nums">{app.config.httpPort}</span>
         </div>
-        {app.config.hasExtraPublicPort && (
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-muted-foreground">Additional ports</span>
-            <span>One, TCP and UDP, assigned</span>
-          </div>
-        )}
         <AppRunCommand app={app} />
         <AppEnvironment app={app} />
       </CardContent>

@@ -64,11 +64,17 @@ export function AppOverviewCard({ app }: { app: AppSummary }) {
 function ReachedOnItsOwnPort({ appId }: { appId: string }) {
   const { publicIpv4, extraPublicPort } = useNewestDeployment(appId).data ?? {};
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-muted-foreground">Own port</span>
+    <div className="flex flex-col gap-2">
+      <span className="text-muted-foreground">Additional port</span>
       {publicIpv4 && extraPublicPort ? (
-        <span className="font-mono tabular-nums">
-          {publicIpv4}:{extraPublicPort}
+        <span className="flex items-center gap-2">
+          <span className="font-mono tabular-nums">
+            {publicIpv4}:{extraPublicPort}
+          </span>
+          {/* Both, always: nibrun does not ask what a tenant means to carry over it. */}
+          <Badge variant="outline" className="shrink-0">
+            TCP/UDP
+          </Badge>
         </span>
       ) : (
         // Asked for and not yet answered for: the host says where it is on its first report, so
