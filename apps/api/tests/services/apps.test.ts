@@ -22,7 +22,12 @@ import {
 } from '@repo/protocol';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
-import type { NewAppConfig, SealedConfigPatch, StoredAppConfig } from '#lib/app-config.ts';
+import type {
+  NewAppConfig,
+  PublicAppConfig,
+  SealedConfigPatch,
+  StoredAppConfig,
+} from '#lib/app-config.ts';
 import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import type {
@@ -172,8 +177,25 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve([]);
   }
 
+  /** The config an app already has, for a service that reads it before deciding about an edit. */
+  current: PublicAppConfig = DEFAULT_CONFIG;
+
+  #reads = 0;
+
+  /** How many times the current config was read, so a check can be shown not to cost one. */
+  get reads(): number {
+    return this.#reads;
+  }
+
   findById(): Promise<AppRow | null> {
-    return Promise.resolve(null);
+    this.#reads++;
+    if (!this.owns) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve({
+      ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)),
+      ...configColumns(this.current),
+    });
   }
 
   updateConfig({
@@ -502,6 +524,97 @@ describe('an app asks for a public port besides HTTP, and is never handed one it
     });
 
     expect(appsRepo.offeredPatches[0]?.hasExtraPublicPort).toBe(false);
+  });
+});
+
+/**
+ * The guest is given these two only for an app that asked for a public port, and fails the boot on
+ * a reference it was not given. Refused here, a variable costs a sentence rather than a deploy that
+ * never serves and says why only in the instance's console.
+ */
+describe('a value may name the port an app has, and not one it has not', () => {
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being validated, not an interpolation
+  const ANNOUNCED = 'ANNOUNCED_IP=${NIBRUN_PUBLIC_IPV4}';
+  const [, ADDRESS = ''] = ANNOUNCED.split('=');
+
+  test('an app created without a port cannot name one', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await expect(
+      createApp({ appsRepo, config: { environment: asEnvironment({ ANNOUNCED_IP: ADDRESS }) } }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  test('an app created with one may', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await createApp({
+      appsRepo,
+      config: {
+        hasExtraPublicPort: true,
+        environment: asEnvironment({ ANNOUNCED_IP: ADDRESS }),
+      },
+    });
+
+    expect(appsRepo.offeredConfigs).toHaveLength(1);
+  });
+
+  // The port the edit leaves behind, not the one it carries: naming one is allowed by an app that
+  // already had it.
+  test('a patch may name the port the app already has', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    appsRepo.current = { ...DEFAULT_CONFIG, hasExtraPublicPort: true };
+
+    await serviceWith({ appsRepo }).updateConfig({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      patch: { environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
+    });
+
+    expect(appsRepo.offeredPatches).toHaveLength(1);
+  });
+
+  test('a patch naming one the app does not have is refused', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    await expect(
+      serviceWith({ appsRepo }).updateConfig({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        patch: { environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(appsRepo.offeredPatches).toEqual([]);
+  });
+
+  test('one edit may ask for the port and name it at once', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    await serviceWith({ appsRepo }).updateConfig({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      patch: { hasExtraPublicPort: true, environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
+    });
+
+    expect(appsRepo.offeredPatches).toHaveLength(1);
+    // The edit answers the question itself, so there is nothing to go and look up.
+    expect(appsRepo.reads).toBe(0);
+  });
+
+  test('a patch naming none of them is the one write it was', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    await serviceWith({ appsRepo }).updateConfig({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      patch: { environment: asPatch({ TOKEN: SECRET }) },
+    });
+
+    expect(appsRepo.reads).toBe(0);
   });
 });
 
