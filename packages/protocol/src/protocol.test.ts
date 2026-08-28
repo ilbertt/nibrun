@@ -388,12 +388,12 @@ describe('a value naming a runtime value', () => {
 
   test('both forms the guest expands are accepted', () => {
     expect(accepts(`https://${OFFERED}/callback`)).toBe(true);
-    expect(accepts('$NIBRUN_PORT')).toBe(true);
+    expect(accepts('$NIBRUN_HTTP_PORT')).toBe(true);
   });
 
   test('a name the guest does not offer is refused', () => {
     expect(accepts(`https://${MISSPELLED}/callback`)).toBe(false);
-    expect(accepts('$NIBRUN_PORTS')).toBe(false);
+    expect(accepts('$NIBRUN_HTTP_PORTS')).toBe(false);
   });
 
   // The guest reads a name to its last name character, so this one is NIBRUN_HOSTNAME with no

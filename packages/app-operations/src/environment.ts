@@ -4,6 +4,7 @@ import {
   type TenantEnvironmentPatch,
   TenantEnvironmentPatchSchema,
   Value,
+  writtenRuntimeValue,
 } from '@repo/protocol';
 import { InvalidEnvironmentError } from '#errors.ts';
 
@@ -58,7 +59,7 @@ export function parseEnvironmentPatch(edits: readonly EnvironmentEdit[]): Tenant
     .map(({ name }) => name);
   if (naming.length > 0) {
     throw new InvalidEnvironmentError(
-      `A value may name a runtime value the guest sets — ${RUNTIME_VALUE_NAMES.map(written).join(', ')} — and nothing else: ${naming.join(', ')}`,
+      `A value may name a runtime value the guest sets — ${RUNTIME_VALUE_NAMES.map(writtenRuntimeValue).join(', ')} — and nothing else: ${naming.join(', ')}`,
     );
   }
 
@@ -66,11 +67,6 @@ export function parseEnvironmentPatch(edits: readonly EnvironmentEdit[]): Tenant
     TenantEnvironmentPatchSchema,
     Object.fromEntries(edits.map(({ name, value }) => [name, value])),
   );
-}
-
-/** A runtime value as it is named in a tenant value, which is the form worth showing back. */
-function written(name: string): string {
-  return `\${${name}}`;
 }
 
 function assigned(assignment: string): EnvironmentEdit {

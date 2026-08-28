@@ -25,11 +25,18 @@ const RUNTIME_VALUE_PREFIX = 'NIBRUN_';
  * The runtime values a tenant value may name, spelled as they are written. The guest is what
  * substitutes them, and it fails the boot over a name it does not offer — so a value naming
  * anything else is refused here instead, while whoever typed it is still listening.
+ *
+ * This is the list every other end reads rather than restates, so adding one is this array and
+ * whoever renders it. Two places cannot import it and have to be changed by hand:
+ * `reference_value` in `apps/runtime/src/config.c`, which is what actually substitutes them, and
+ * `skills/deploy-to-nibrun/SKILL.md`, which is what tells an agent they exist.
  */
 export const RUNTIME_VALUE_NAMES = [
   `${RUNTIME_VALUE_PREFIX}DATA_DIR`,
+  `${RUNTIME_VALUE_PREFIX}EXTRA_PUBLIC_PORT`,
   `${RUNTIME_VALUE_PREFIX}HOSTNAME`,
-  `${RUNTIME_VALUE_PREFIX}PORT`,
+  `${RUNTIME_VALUE_PREFIX}HTTP_PORT`,
+  `${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`,
 ] as const;
 
 const OFFERED = RUNTIME_VALUE_NAMES.join('|');
@@ -56,6 +63,11 @@ const TENANT_VALUE = new RegExp(TENANT_VALUE_PATTERN);
  */
 export function namesOfferedRuntimeValues(value: string): boolean {
   return TENANT_VALUE.test(value);
+}
+
+/** A runtime value as it is named in a tenant value, which is the form worth showing back. */
+export function writtenRuntimeValue(name: string): string {
+  return `\${${name}}`;
 }
 
 // The pattern rather than a check of its own, so what the schema refuses and what a caller may
