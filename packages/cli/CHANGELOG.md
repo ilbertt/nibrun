@@ -2,6 +2,23 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.28-1]
+
+### 🚀 Features
+
+- *(api)* A value may name the public port an app has, not one it has not (#330)
+- An app may ask for a public port besides HTTP, and is forwarded it (#328)
+- *(runtime)* A guest is told the address and extra port it is reached at (#323)
+- A value may only name a runtime one the guest offers (#320)
+- *(runtime)* The guest names the directory its volume is mounted at (#319)
+
+### 🚜 Refactor
+
+- [**breaking**] A release that is serving is running, not active (#331)
+- *(runtime)* [**breaking**] The port a tenant is handed is spelled one way (#321)
+- [**breaking**] An app config carries an httpPort, not a guestPort (#317)
+- The port a binary listens on is called its HTTP port (#316)
+
 ## [2026.8.27-2]
 
 ### 🚀 Features
