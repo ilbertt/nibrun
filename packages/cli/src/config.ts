@@ -15,6 +15,12 @@ export const DEFAULT_API_URL = 'https://app.nibrun.com';
  * what genuinely differs there: whether it forwards, and a description where the same value means a
  * different thing to each command.
  */
+// Reached by two of the descriptions below, and a record cannot read its own entries while it is
+// being built — so the one flag another flag has to name is a constant before either of them.
+const EXTRA_PUBLIC_PORT_FLAG = 'extra-public-port';
+
+const PORT_VALUE_NAMES = EXTRA_PUBLIC_PORT_VALUES.map((value) => value.name).join(' and ');
+
 export const SHARED_OPTIONS = {
   app: {
     name: 'app',
@@ -38,15 +44,14 @@ export const SHARED_OPTIONS = {
     name: 'env',
     option: {
       schema: z.array(z.string()).optional(),
-      description: `Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. A value may name one the guest sets — ${RUNTIME_VALUE_NAMES.join(', ')} — quote it, as in 'URL=https://\${NIBRUN_HOSTNAME}', or the shell expands it here instead. ${EXTRA_PUBLIC_PORT_VALUES.map((value) => value.name).join(' and ')} need --extra-public-port on the same app.`,
+      description: `Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. A value may name one the guest sets — ${RUNTIME_VALUE_NAMES.join(', ')} — quote it, as in 'URL=https://\${NIBRUN_HOSTNAME}', or the shell expands it here instead. ${PORT_VALUE_NAMES} need --${EXTRA_PUBLIC_PORT_FLAG} on the same app.`,
     },
   },
   extraPublicPort: {
-    name: 'extra-public-port',
+    name: EXTRA_PUBLIC_PORT_FLAG,
     option: {
       schema: z.boolean().optional(),
-      description:
-        'Give the app a public TCP and UDP port of its own, for a protocol HTTPS cannot carry. The guest is told the address and the port to announce as NIBRUN_PUBLIC_IPV4 and NIBRUN_EXTRA_PUBLIC_PORT. Pass --extra-public-port=false to give it up.',
+      description: `Give the app a public TCP and UDP port of its own, for a protocol HTTPS cannot carry. The number is assigned rather than chosen, and the guest is told which address and port it was given, as ${PORT_VALUE_NAMES}. Pass --${EXTRA_PUBLIC_PORT_FLAG}=false to give it up.`,
     },
   },
   unset: {

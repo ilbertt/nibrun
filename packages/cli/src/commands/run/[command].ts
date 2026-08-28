@@ -30,7 +30,10 @@ export const command = defineCommand('run [command]', {
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ params, options, context, print }) => {
-    const { detach, ...given } = options;
+    // parsh names an option as it is typed, so a flag with hyphens in it does not arrive under the
+    // name the deploy takes and has to be renamed rather than spread through.
+    const { detach, [SHARED_OPTIONS.extraPublicPort.name]: extraPublicPort, ...flags } = options;
+    const given = { ...flags, extraPublicPort };
     const { binaryPath, args } = parseCommandLine(params.command);
     const { api } = context;
 

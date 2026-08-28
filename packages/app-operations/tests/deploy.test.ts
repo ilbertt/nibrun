@@ -196,6 +196,22 @@ test('naming no app creates one, named after the binary when nothing else says',
   expect(sent[0]).toMatchObject({ what: 'create', body: { name: 'my-server' } });
 });
 
+// The api refuses a value naming a port the app has not, so a first deploy asking for one and
+// naming it has to carry both in the request that creates the app rather than in two.
+test('an app created asking for a public port asks for it in the same request', async () => {
+  const sent: Sent[] = [];
+  storeAnswering({ sent });
+
+  await deploy({
+    api: apiHolding({ apps: [], sent }),
+    binary: binary(),
+    args: [],
+    extraPublicPort: true,
+  });
+
+  expect(sent[0]).toMatchObject({ what: 'create', body: { config: { hasExtraPublicPort: true } } });
+});
+
 // A deployment snapshots the app's config as it stands, so the flags a caller just typed only run
 // if they were written first.
 test('config is written before the deployment that snapshots it', async () => {
