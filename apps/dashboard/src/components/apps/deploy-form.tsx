@@ -1,4 +1,4 @@
-import { RUNTIME_VALUES, type RuntimeValueName, writtenRuntimeValue } from '@repo/protocol';
+import { RUNTIME_VALUES, writtenRuntimeValue } from '@repo/protocol';
 import {
   Accordion,
   AccordionContent,
@@ -31,13 +31,9 @@ import {
 const ARGUMENTS = 'Arguments';
 const ADDITIONAL_PORTS = 'Additional ports';
 
-// Named from the record the guest is held to rather than spelled here, so a rename there is a
+// Taken from the record the guest is held to rather than spelled here, so a rename there is a
 // build error instead of a section describing variables nothing sets.
-const PUBLIC_ADDRESS = 'NIBRUN_PUBLIC_IPV4' satisfies RuntimeValueName;
-const GIVEN_WITH_THE_PORT = [
-  'NIBRUN_EXTRA_PUBLIC_PORT',
-  PUBLIC_ADDRESS,
-] as const satisfies readonly RuntimeValueName[];
+const GIVEN_WITH_THE_PORT = [RUNTIME_VALUES.EXTRA_PUBLIC_PORT, RUNTIME_VALUES.PUBLIC_IPV4];
 
 export function DeployForm({
   appId,
@@ -129,16 +125,16 @@ export function DeployForm({
                       You do not pick the number. nibrun assigns it and sets these for the app:
                     </FieldDescription>
                     <ul className="list-disc space-y-1 pt-2 pb-3 pl-4 text-muted-foreground text-sm">
-                      {GIVEN_WITH_THE_PORT.map((name) => (
+                      {GIVEN_WITH_THE_PORT.map(({ name, description }) => (
                         <li key={name}>
-                          <code className="font-mono">{name}</code> — {RUNTIME_VALUES[name]}
+                          <code className="font-mono">{name}</code> — {description}
                         </li>
                       ))}
                     </ul>
                     <FieldDescription>
                       Your own variables may name them — set{' '}
                       <code className="font-mono">
-                        ANNOUNCED_IP={writtenRuntimeValue(PUBLIC_ADDRESS)}
+                        ANNOUNCED_IP={writtenRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}
                       </code>{' '}
                       and the app reads it under the name it already expects.
                     </FieldDescription>

@@ -32,22 +32,41 @@ const RUNTIME_VALUE_PREFIX = 'NIBRUN_';
  * `skills/deploy-to-nibrun/SKILL.md`, which is what tells an agent they exist.
  */
 export const RUNTIME_VALUES = {
-  [`${RUNTIME_VALUE_PREFIX}DATA_DIR`]: 'the directory the volume is mounted at',
-  [`${RUNTIME_VALUE_PREFIX}EXTRA_PUBLIC_PORT`]: 'the port to bind and announce',
-  [`${RUNTIME_VALUE_PREFIX}HOSTNAME`]: "the app's own hostname",
-  [`${RUNTIME_VALUE_PREFIX}HTTP_PORT`]: 'the port the binary must listen on',
-  [`${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`]: 'the address it is reached at',
+  DATA_DIR: {
+    name: `${RUNTIME_VALUE_PREFIX}DATA_DIR`,
+    description: 'the directory the volume is mounted at',
+  },
+  EXTRA_PUBLIC_PORT: {
+    name: `${RUNTIME_VALUE_PREFIX}EXTRA_PUBLIC_PORT`,
+    description: 'the port to bind and announce',
+  },
+  HOSTNAME: {
+    name: `${RUNTIME_VALUE_PREFIX}HOSTNAME`,
+    description: "the app's own hostname",
+  },
+  HTTP_PORT: {
+    name: `${RUNTIME_VALUE_PREFIX}HTTP_PORT`,
+    description: 'the port the binary must listen on',
+  },
+  PUBLIC_IPV4: {
+    name: `${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`,
+    description: 'the address it is reached at',
+  },
 } as const;
 
+export type RuntimeValue = (typeof RUNTIME_VALUES)[keyof typeof RUNTIME_VALUES];
+
 /** A name the record holds, so anything naming one is a rename away from failing to compile. */
-export type RuntimeValueName = keyof typeof RUNTIME_VALUES;
+export type RuntimeValueName = RuntimeValue['name'];
 
 /**
  * The names alone, in the order they are written above. The guest fails the boot over one it does
  * not offer, so a value naming anything else is refused here instead, while whoever typed it is
  * still listening.
  */
-export const RUNTIME_VALUE_NAMES = Object.keys(RUNTIME_VALUES) as readonly RuntimeValueName[];
+export const RUNTIME_VALUE_NAMES: readonly RuntimeValueName[] = Object.values(RUNTIME_VALUES).map(
+  (value) => value.name,
+);
 
 const OFFERED = RUNTIME_VALUE_NAMES.join('|');
 const NAME_CHARACTER = '[A-Za-z0-9_]';
