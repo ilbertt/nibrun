@@ -23,6 +23,7 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 - Imports use `#*` subpath mapping (e.g. `import { foo } from '#services/foo'`)
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
+- Biome caps cognitive complexity at 15 — extract a named function rather than silencing it
 - Only re-export from index files - Biome enforces that
 - Declare functions with `function`, never a `const` bound to an arrow. Applies
   to test fixtures and one-line helpers too

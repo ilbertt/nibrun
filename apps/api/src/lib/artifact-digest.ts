@@ -40,6 +40,32 @@ function refuseInterpreter(bytes: Uint8Array): ArtifactInspection | undefined {
     : undefined;
 }
 
+/** Whatever the bytes read so far already settle; `undefined` while the rest could still change it. */
+function refuseChunk({
+  header,
+  headerLength,
+  headerJustFilled,
+  sizeBytes,
+  maxSizeBytes,
+}: {
+  header: Uint8Array;
+  headerLength: number;
+  headerJustFilled: boolean;
+  sizeBytes: number;
+  maxSizeBytes: number;
+}): ArtifactInspection | undefined {
+  if (headerLength >= ELF_MAGIC_LENGTH && !isElfExecutable(header)) {
+    return { outcome: 'not-executable' };
+  }
+  // Only on the chunk that completes the header, so parsing the segments costs one pass rather
+  // than one per chunk.
+  const refusal = headerJustFilled ? refuseInterpreter(header) : undefined;
+  if (refusal) {
+    return refusal;
+  }
+  return sizeBytes > maxSizeBytes ? { outcome: 'too-large' } : undefined;
+}
+
 /**
  * The digest a host will verify, taken from the bytes the store now holds.
  *
@@ -70,23 +96,19 @@ export async function inspectArtifact({
       header.set(chunk.subarray(0, taken), headerLength);
       headerLength += taken;
     }
-    // Leaving the loop cancels the read, so something that was never a binary costs one chunk
-    // rather than the whole object.
-    if (headerLength >= ELF_MAGIC_LENGTH && !isElfExecutable(header)) {
-      return { outcome: 'not-executable' };
-    }
-    // On the one chunk that completes the header, so a binary the guest could never exec is
-    // refused without pulling the rest of it either.
-    if (!wasComplete && headerLength === HEADER_BYTES) {
-      const refusal = refuseInterpreter(header);
-      if (refusal) {
-        return refusal;
-      }
-    }
-
     sizeBytes += chunk.byteLength;
-    if (sizeBytes > maxSizeBytes) {
-      return { outcome: 'too-large' };
+
+    // Leaving the loop cancels the read, so an object that can already be refused costs one
+    // chunk rather than the whole of itself.
+    const refusal = refuseChunk({
+      header,
+      headerLength,
+      headerJustFilled: !wasComplete && headerLength === HEADER_BYTES,
+      sizeBytes,
+      maxSizeBytes,
+    });
+    if (refusal) {
+      return refusal;
     }
 
     hasher.update(chunk);

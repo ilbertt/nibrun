@@ -3,7 +3,7 @@ import { BunSocketServer } from '@effect/platform-bun';
 import type { AppId, TenantLogStream } from '@repo/protocol';
 import { Deferred, Effect, Either, Exit, Ref, Scope } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
-import { decodeFrames, EMPTY_BUFFER } from '#lib/logs/guest-protocol.ts';
+import { decodeFrames, EMPTY_BUFFER, type GuestLogFrame } from '#lib/logs/guest-protocol.ts';
 import type { TenantLogSource } from '#lib/logs/vsock.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 
@@ -22,6 +22,32 @@ type Attachment = {
   readonly sequence: Ref.Ref<number>;
   readonly scope: Scope.CloseableScope;
 };
+
+/** A frame decoding to nothing is a character split across two of them, which the decoder holds
+ * until the rest of it arrives — an event carrying it now would carry half a glyph. */
+function emitFrames<E, R>({
+  frames,
+  text,
+  emit,
+}: {
+  frames: readonly GuestLogFrame[];
+  text: Record<TenantLogStream, TextDecoder>;
+  emit: (event: LogEventBody) => Effect.Effect<void, E, R>;
+}) {
+  return Effect.forEach(
+    frames,
+    (frame) => {
+      if (frame.kind === 'gap') {
+        return emit(frame);
+      }
+      const decoded = text[frame.stream].decode(frame.bytes, { stream: true });
+      return decoded.length > 0
+        ? emit({ kind: 'data', stream: frame.stream, text: decoded })
+        : Effect.void;
+    },
+    { discard: true },
+  );
+}
 
 export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('TenantLogReceiver', {
   scoped: Effect.gen(function* () {
@@ -70,19 +96,11 @@ export class TenantLogReceiver extends Effect.Service<TenantLogReceiver>()('Tena
               return yield* decoded.left;
             }
             yield* Ref.set(buffered, decoded.right.rest);
-            for (const frame of decoded.right.frames) {
-              if (frame.kind === 'gap') {
-                yield* emit({ attachment, event: frame });
-                continue;
-              }
-              const decodedText = text[frame.stream].decode(frame.bytes, { stream: true });
-              if (decodedText.length > 0) {
-                yield* emit({
-                  attachment,
-                  event: { kind: 'data', stream: frame.stream, text: decodedText },
-                });
-              }
-            }
+            yield* emitFrames({
+              frames: decoded.right.frames,
+              text,
+              emit: (event) => emit({ attachment, event }),
+            });
           }),
         );
 

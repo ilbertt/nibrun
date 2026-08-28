@@ -57,41 +57,71 @@ function answering({
   reachedDump: Deferred.Deferred<void>;
 }) {
   const dataDir = join(bundleDir, 'data');
-  return ({ command }: CommandRequest): Effect.Effect<CommandResult> =>
-    Effect.gen(function* () {
-      const [executable, ...args] = command;
-      if (executable === ZEROFS && args[0] === 'checkpoint' && args[1] === 'create') {
+
+  function checkpointing(args: readonly string[]) {
+    const [group, subcommand] = args;
+    return Effect.gen(function* () {
+      if (group !== 'checkpoint') {
+        return yield* succeeding();
+      }
+      if (subcommand === 'create') {
         frozenAtCut.push(guest.isFrozen());
         // A real cut is a subprocess that seals a segment and uploads it. Answering instantly
         // would leave no turn in which a guest that has already hung up could be noticed, so the
         // lease check afterwards would pass on speed rather than on the freeze holding.
         yield* Effect.sleep(A_CUT_TAKES);
       }
-      if (executable === ZEROFS && args[0] === 'checkpoint' && args[1] === 'list') {
-        return yield* succeeding({ stdout: (script.checkpoints ?? []).join('\n') });
-      }
-      if (executable === SYSTEMCTL && args[0] === 'start') {
+      return yield* subcommand === 'list'
+        ? succeeding({ stdout: (script.checkpoints ?? []).join('\n') })
+        : succeeding();
+    });
+  }
+
+  function starting(args: readonly string[]) {
+    return Effect.gen(function* () {
+      if (args[0] === 'start') {
         // The proof that the read waits for nobody: nothing but the freeze scope ending resolves
         // this, so a freeze still held here hangs the test instead of letting it pass on an
         // ordering that merely happened to hold.
         yield* Effect.promise(() => guest.thawed);
       }
-      if (executable === 'debugfs') {
-        yield* Deferred.succeed(reachedDump, undefined);
-        if (script.interrupt) {
-          return yield* Effect.never;
-        }
-        if (!script.emptyDump) {
-          // `lost+found` is written by mkfs.ext4, so a real rdump of any root produces it.
-          yield* Effect.promise(() => mkdir(join(dataDir, 'lost+found'), { recursive: true }));
-          yield* Effect.promise(() => writeFile(join(dataDir, 'data.db'), 'tenant'));
-        }
-      }
-      if (executable === 'tar') {
-        yield* Effect.promise(() => writeFile(join(bundleDir, 'bundle.tar.gz'), 'archive'));
-      }
       return yield* succeeding();
     });
+  }
+
+  const dumping = Effect.gen(function* () {
+    yield* Deferred.succeed(reachedDump, undefined);
+    if (script.interrupt) {
+      return yield* Effect.never;
+    }
+    if (!script.emptyDump) {
+      // `lost+found` is written by mkfs.ext4, so a real rdump of any root produces it.
+      yield* Effect.promise(() => mkdir(join(dataDir, 'lost+found'), { recursive: true }));
+      yield* Effect.promise(() => writeFile(join(dataDir, 'data.db'), 'tenant'));
+    }
+    return yield* succeeding();
+  });
+
+  const archiving = Effect.gen(function* () {
+    yield* Effect.promise(() => writeFile(join(bundleDir, 'bundle.tar.gz'), 'archive'));
+    return yield* succeeding();
+  });
+
+  return ({ command }: CommandRequest): Effect.Effect<CommandResult> => {
+    const [executable, ...args] = command;
+    switch (executable) {
+      case ZEROFS:
+        return checkpointing(args);
+      case SYSTEMCTL:
+        return starting(args);
+      case 'debugfs':
+        return dumping;
+      case 'tar':
+        return archiving;
+      default:
+        return succeeding();
+    }
+  };
 }
 
 const staged = (script: Script) =>
