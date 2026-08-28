@@ -1,5 +1,6 @@
 import { Badge } from '@repo/ui/components/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
+import { CopyButton } from '@repo/ui/custom/copy-button';
 import { ExternalLinkIcon } from 'lucide-react';
 import { AppStatusBadge } from '#components/apps/app-status-badge.tsx';
 import { HostnameStateBadge } from '#components/apps/hostname-state-badge.tsx';
@@ -67,16 +68,27 @@ function ReachedOnItsOwnPort({ appId }: { appId: string }) {
     <div className="flex flex-col gap-2">
       {/* Both protocols, always — nibrun never asks which a tenant means to carry over it — so it
           is part of what the row is called rather than something beside the address. */}
-      <span className="text-muted-foreground">Additional TCP/UDP port</span>
+      <span className="text-muted-foreground">Additional TCP/UDP address</span>
       {publicIpv4 && extraPublicPort ? (
-        <span className="font-mono tabular-nums">
-          {publicIpv4}:{extraPublicPort}
-        </span>
+        // Nothing here links anywhere: it is not a URL, and what an owner does with it is paste it
+        // into whatever is dialling the app. Same line as the run command for that reason.
+        <ReachedAt address={`${publicIpv4}:${extraPublicPort}`} />
       ) : (
         // Asked for and not yet answered for: the host says where it is on its first report, so
-        // this is a release that has not started rather than a port that failed to arrive.
+        // this is a release that has not started rather than an address that failed to arrive.
         <span className="text-muted-foreground">assigned when it starts</span>
       )}
+    </div>
+  );
+}
+
+function ReachedAt({ address }: { address: string }) {
+  return (
+    <div className="flex items-center gap-1 rounded-lg border bg-muted/40 py-1 pr-1 pl-3">
+      <code className="min-w-0 flex-1 select-all break-words font-mono text-xs tabular-nums">
+        {address}
+      </code>
+      <CopyButton value={address} />
     </div>
   );
 }
