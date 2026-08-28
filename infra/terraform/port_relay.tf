@@ -43,9 +43,15 @@ resource "aws_instance" "port_relay" {
   lifecycle {
     ignore_changes = [ami]
 
+    # One, not "at least one": the range is forwarded to a single host, and a tenant's port is
+    # 22000 + its slot, which every host numbers from 0 — so two hosts both hold 22005 and the
+    # port carries nothing to tell them apart. A second host would take no tenant traffic at all
+    # and nothing would say so, which is why this refuses the plan rather than a comment saying
+    # not to. Widening the fleet means giving the ports a number unique across it first, and
+    # editing this in the same change.
     precondition {
-      condition     = var.app_host_count > 0
-      error_message = "The port relay forwards to an app host, and app_host_count is 0."
+      condition     = var.app_host_count == 1
+      error_message = "The port relay forwards the whole tenant port range to app_host[0], and a slot's port is host-local, so a second app host would hold ports nothing routes to. Give tenant ports a fleet-wide number before raising app_host_count."
     }
   }
 
