@@ -45,6 +45,18 @@ resource "aws_security_group" "instance" {
     security_groups = [aws_security_group.app_host.id]
   }
 
+  # The relay's journal, which is the only thing that machine emits and the only
+  # way anything would notice it stop. Its own rule rather than widening the app
+  # hosts' above: the relay is the one machine here reachable from the internet,
+  # so the two write paths should widen independently.
+  ingress {
+    description     = "Log ingest from the port relay"
+    from_port       = var.log_ingest_port
+    to_port         = var.log_ingest_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.port_relay.id]
+  }
+
   # No inbound SSH: shell access is via SSM Session Manager.
 
   egress {
@@ -119,6 +131,26 @@ resource "aws_security_group" "app_host" {
     protocol         = "tcp"
     cidr_blocks      = local.cloudflare_ipv4_cidrs
     ipv6_cidr_blocks = local.cloudflare_ipv6_cidrs
+  }
+
+  # Only ever from the relay, and pinned to its group rather than an address so it
+  # survives the relay being replaced. This is what a load balancer could not do:
+  # a UDP target group preserves the client's address, so its targets have to
+  # admit the whole internet.
+  ingress {
+    description     = "Tenant ports, UDP, from the port relay"
+    from_port       = var.tenant_port_first
+    to_port         = var.tenant_port_last
+    protocol        = "udp"
+    security_groups = [aws_security_group.port_relay.id]
+  }
+
+  ingress {
+    description     = "Tenant ports, TCP, from the port relay"
+    from_port       = var.tenant_port_first
+    to_port         = var.tenant_port_last
+    protocol        = "tcp"
+    security_groups = [aws_security_group.port_relay.id]
   }
 
   egress {

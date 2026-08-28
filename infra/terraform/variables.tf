@@ -61,6 +61,27 @@ variable "app_host_count" {
   description = "Size of the app host fleet. Terraform does not provision hosts dynamically, so scaling is changing this — but scaling down is not a plain decrement, see app_host.tf."
 }
 
+variable "port_relay_instance_type" {
+  type        = string
+  default     = "t3.micro"
+  description = "Sized by network baseline rather than CPU: forwarding is kernel work. t3.micro sustains 64 Mbps and bursts above it."
+}
+
+# Restated from the agent's own base, because a security group is the other half
+# of opening a port and nothing compares the two numbers — the same bargain as
+# nbds_max in app_host_user_data.sh.tftpl. One per slot, so it cannot run out.
+variable "tenant_port_first" {
+  type        = number
+  default     = 22000
+  description = "First port a tenant can be given. Must match the agent's own base, and must not overlap the loopback range the proxy reaches an app's HTTP on — those ports are reachable only from the host and must stay that way."
+}
+
+variable "tenant_port_last" {
+  type        = number
+  default     = 22062
+  description = "Last port a tenant can be given, inclusive. Headroom runs to about 32767, where this would meet the kernel's own ephemeral range."
+}
+
 variable "app_host_root_volume_size" {
   type        = number
   default     = 50

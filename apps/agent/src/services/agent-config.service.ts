@@ -58,6 +58,11 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
       // started without it would run correctly and discard every tenant's output, which is the
       // kind of missing config nothing notices until someone asks where the logs went.
       logIngestUrl: yield* required('AGENT_LOG_INGEST_URL'),
+      // Where a tenant's own ports are reached: the relay's address, not this host's, and not
+      // something a guest can discover. Required for the same reason as the log store — an agent
+      // without it runs correctly and hands every guest no address at all, which nobody notices
+      // until an owner asks why the port they were given answers nothing.
+      portRelayPublicIpv4: yield* required('AGENT_PORT_RELAY_PUBLIC_IPV4'),
       runtimeDir: yield* optional({ name: 'AGENT_RUNTIME_DIR', fallback: DEFAULT_RUNTIME_DIR }),
       hostIdFile: inStateDir('host-id'),
       slotsFile: inStateDir('slots.json'),

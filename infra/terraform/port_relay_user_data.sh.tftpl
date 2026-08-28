@@ -1,0 +1,86 @@
+#!/bin/bash
+set -euxo pipefail
+
+dnf update -y
+# journal-upload arrives with journal-remote, and installing it before anything
+# writes configuration keeps its own /etc/systemd/journal-upload.conf out of a
+# race with the one below.
+dnf install -y nftables systemd-journal-remote
+
+# Same values as the app host's, and for the same reasons — see
+# infra/app-host/deploy/on_box_deploy.sh. Named in modules-load.d because systemd
+# runs that before sysctl.d, and these keys do not exist until it has.
+printf 'nf_conntrack\n' > /etc/modules-load.d/nibrun-relay.conf
+modprobe nf_conntrack
+
+cat > /etc/sysctl.d/99-nibrun-relay.conf <<'SYSCTL'
+net.ipv4.ip_forward = 1
+net.netfilter.nf_conntrack_tcp_timeout_established = 86400
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 60
+net.netfilter.nf_conntrack_udp_timeout = 10
+SYSCTL
+sysctl -q -p /etc/sysctl.d/99-nibrun-relay.conf
+
+mkdir -p /etc/nftables
+cat > /etc/nftables/nibrun-relay.nft <<'NFT'
+table ip nibrun_relay {
+	# Keyed on the source, and a count rather than a rate: an office behind one NAT
+	# is a single address sending a great deal, so a rate cap refuses the people it
+	# is meant to serve while an attacker spraying source ports stays under it.
+	set sources {
+		type ipv4_addr
+		size 65535
+		flags dynamic
+	}
+
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+		# No port named, so the arrival port is kept — nibrun told the tenant which
+		# port it has and the tenant is free to hand that number out.
+		udp dport ${tenant_port_first}-${tenant_port_last} dnat to ${app_host_private_ip}
+		tcp dport ${tenant_port_first}-${tenant_port_last} dnat to ${app_host_private_ip}
+	}
+
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		# Without this the app host answers clients from its own address, which fails
+		# and publishes the address this machine exists to keep quiet.
+		ip daddr ${app_host_private_ip} masquerade
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		# First, so a source at its limit keeps the connections it already has.
+		ct state established,related accept
+		ip daddr ${app_host_private_ip} udp dport ${tenant_port_first}-${tenant_port_last} add @sources { ip saddr ct count over 512 } drop
+		ip daddr ${app_host_private_ip} tcp dport ${tenant_port_first}-${tenant_port_last} add @sources { ip saddr ct count over 512 } drop
+		ip daddr ${app_host_private_ip} udp dport ${tenant_port_first}-${tenant_port_last} accept
+		ip daddr ${app_host_private_ip} tcp dport ${tenant_port_first}-${tenant_port_last} accept
+	}
+}
+NFT
+
+echo 'include "/etc/nftables/nibrun-relay.nft"' >> /etc/sysconfig/nftables.conf
+systemctl enable --now nftables
+
+# No application runs here, so what ships is the boot, the ruleset loading, and
+# the kernel's own complaints. That a line arrived at all is the only liveness
+# signal this machine emits — nothing else here would notice it stop.
+cat > /etc/systemd/journal-upload.conf <<'UPLOAD'
+[Upload]
+URL=${log_ingest_url}/insert/journald
+UPLOAD
+chmod 0644 /etc/systemd/journal-upload.conf
+
+# The uploader exits whenever the store is unreachable, and its first restarts
+# outrun the default start limit long before its own backoff engages — which
+# latches the unit into `failed` for good. Same reasoning, and the same fix, as
+# infra/app-host/systemd/systemd-journal-upload.service.d/nibrun.conf.
+mkdir -p /etc/systemd/system/systemd-journal-upload.service.d
+cat > /etc/systemd/system/systemd-journal-upload.service.d/nibrun.conf <<'DROPIN'
+[Unit]
+StartLimitIntervalSec=0
+DROPIN
+
+systemctl daemon-reload
+systemctl enable --now systemd-journal-upload

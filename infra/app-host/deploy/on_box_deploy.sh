@@ -20,7 +20,7 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${FIRECRACKER_DIRECTORY:?}" \
   "${CADDY_VERSION:?}" "${CADDY_URL:?}" "${CADDY_SHA256:?}" \
   "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${APP_HOST_DOMAIN:?}" "${WWW_HOSTNAME:?}" \
-  "${CONTROL_PLANE_INTERNAL_URL:?}" "${LOG_INGEST_URL:?}" \
+  "${CONTROL_PLANE_INTERNAL_URL:?}" "${LOG_INGEST_URL:?}" "${PORT_RELAY_PUBLIC_IPV4:?}" \
   "${VPC_IPV4_CIDR_BLOCK:?}" "${VPC_IPV6_CIDR_BLOCK:?}" \
   "${GUEST_IMAGES_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
 
@@ -343,6 +343,10 @@ AGENT_CONTROL_PLANE_URL=${CONTROL_PLANE_INTERNAL_URL}
 # same private address; what separates them is which security group rule admits
 # them, so widening one cannot widen the other.
 AGENT_LOG_INGEST_URL=${LOG_INGEST_URL}
+# Where a tenant's own ports are reached, which the agent puts on a config drive
+# because a guest can discover neither the relay's address nor that it is in front
+# of the host at all.
+AGENT_PORT_RELAY_PUBLIC_IPV4=${PORT_RELAY_PUBLIC_IPV4}
 AGENT_ARTIFACT_BUCKET=${ARTIFACTS_BUCKET}
 AGENT_EXPORT_BUCKET=${EXPORTS_BUCKET}
 # A tenant microVM reaching the api's internal port would be reaching it as the
