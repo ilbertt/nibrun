@@ -86,6 +86,8 @@ export {
   type OwnedAppState,
   OwnedAppStateSchema,
   RUNTIME_VALUE_NAMES,
+  RUNTIME_VALUES,
+  type RuntimeValueName,
   type TenantArguments,
   TenantArgumentsSchema,
   type TenantEnvironment,

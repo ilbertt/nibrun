@@ -22,22 +22,32 @@ const ENVIRONMENT_NAME_PATTERN = '^(?!__proto__$)[A-Za-z_][A-Za-z0-9_]*$';
 const RUNTIME_VALUE_PREFIX = 'NIBRUN_';
 
 /**
- * The runtime values a tenant value may name, spelled as they are written. The guest is what
- * substitutes them, and it fails the boot over a name it does not offer — so a value naming
- * anything else is refused here instead, while whoever typed it is still listening.
+ * Every runtime value the guest sets, spelled as it is written, against what it holds. The value
+ * is carried because a name on its own tells a reader nothing, and every end that lists them has
+ * somewhere to say which is which.
  *
- * This is the list every other end reads rather than restates, so adding one is this array and
+ * This is what every other end reads rather than restates, so adding one is this record and
  * whoever renders it. Two places cannot import it and have to be changed by hand:
  * `reference_value` in `apps/runtime/src/config.c`, which is what actually substitutes them, and
  * `skills/deploy-to-nibrun/SKILL.md`, which is what tells an agent they exist.
  */
-export const RUNTIME_VALUE_NAMES = [
-  `${RUNTIME_VALUE_PREFIX}DATA_DIR`,
-  `${RUNTIME_VALUE_PREFIX}EXTRA_PUBLIC_PORT`,
-  `${RUNTIME_VALUE_PREFIX}HOSTNAME`,
-  `${RUNTIME_VALUE_PREFIX}HTTP_PORT`,
-  `${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`,
-] as const;
+export const RUNTIME_VALUES = {
+  [`${RUNTIME_VALUE_PREFIX}DATA_DIR`]: 'the directory the volume is mounted at',
+  [`${RUNTIME_VALUE_PREFIX}EXTRA_PUBLIC_PORT`]: 'the port to bind and announce',
+  [`${RUNTIME_VALUE_PREFIX}HOSTNAME`]: "the app's own hostname",
+  [`${RUNTIME_VALUE_PREFIX}HTTP_PORT`]: 'the port the binary must listen on',
+  [`${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`]: 'the address it is reached at',
+} as const;
+
+/** A name the record holds, so anything naming one is a rename away from failing to compile. */
+export type RuntimeValueName = keyof typeof RUNTIME_VALUES;
+
+/**
+ * The names alone, in the order they are written above. The guest fails the boot over one it does
+ * not offer, so a value naming anything else is refused here instead, while whoever typed it is
+ * still listening.
+ */
+export const RUNTIME_VALUE_NAMES = Object.keys(RUNTIME_VALUES) as readonly RuntimeValueName[];
 
 const OFFERED = RUNTIME_VALUE_NAMES.join('|');
 const NAME_CHARACTER = '[A-Za-z0-9_]';

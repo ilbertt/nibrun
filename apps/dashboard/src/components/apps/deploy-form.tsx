@@ -1,3 +1,4 @@
+import { RUNTIME_VALUES, type RuntimeValueName, writtenRuntimeValue } from '@repo/protocol';
 import {
   Accordion,
   AccordionContent,
@@ -29,6 +30,14 @@ import {
 
 const ARGUMENTS = 'Arguments';
 const ADDITIONAL_PORTS = 'Additional ports';
+
+// Named from the record the guest is held to rather than spelled here, so a rename there is a
+// build error instead of a section describing variables nothing sets.
+const PUBLIC_ADDRESS = 'NIBRUN_PUBLIC_IPV4' satisfies RuntimeValueName;
+const GIVEN_WITH_THE_PORT = [
+  'NIBRUN_EXTRA_PUBLIC_PORT',
+  PUBLIC_ADDRESS,
+] as const satisfies readonly RuntimeValueName[];
 
 export function DeployForm({
   appId,
@@ -117,13 +126,19 @@ export function DeployForm({
                       game server, anything that has to be reached directly.
                     </FieldDescription>
                     <FieldDescription>
-                      You do not pick the number. nibrun assigns it and tells the app which address
-                      and port it was given, as{' '}
-                      <code className="font-mono">NIBRUN_PUBLIC_IPV4</code> and{' '}
-                      <code className="font-mono">NIBRUN_EXTRA_PUBLIC_PORT</code>. Your own
-                      variables may name them — set{' '}
+                      You do not pick the number. nibrun assigns it and sets these for the app:
+                    </FieldDescription>
+                    <ul className="list-disc space-y-1 pt-2 pb-3 pl-4 text-muted-foreground text-sm">
+                      {GIVEN_WITH_THE_PORT.map((name) => (
+                        <li key={name}>
+                          <code className="font-mono">{name}</code> — {RUNTIME_VALUES[name]}
+                        </li>
+                      ))}
+                    </ul>
+                    <FieldDescription>
+                      Your own variables may name them — set{' '}
                       <code className="font-mono">
-                        ANNOUNCED_IP=${'{'}NIBRUN_PUBLIC_IPV4{'}'}
+                        ANNOUNCED_IP={writtenRuntimeValue(PUBLIC_ADDRESS)}
                       </code>{' '}
                       and the app reads it under the name it already expects.
                     </FieldDescription>
