@@ -909,6 +909,17 @@ describe('a binary is fetched from the url it was given', () => {
     expect(sourceRepo.wasLetGo).toBe(true);
   });
 
+  test('a url that resolves inside nibrun is said back as the host it resolved to', async () => {
+    const { service, sourceRepo, artifactsRepo } = build();
+    sourceRepo.answers({ outcome: 'private-address', host: 'internal.releases.test' });
+
+    const refusal = service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+    await expect(refusal).rejects.toThrow('internal.releases.test');
+    expect(artifactsRepo.rows.size).toBe(0);
+  });
+
   test('a redirect out of https is said back as the hop the caller never saw', async () => {
     const { service, sourceRepo } = build();
     sourceRepo.answers({ outcome: 'insecure-redirect', to: 'http://mirror.test/my-server' });

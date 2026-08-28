@@ -89,6 +89,15 @@ function insecureRedirect(to: string): string {
   return `The url redirected to ${withoutCredentials(to)}, which is not an https address nibrun will follow.`;
 }
 
+/**
+ * A url that resolves inside the network the api runs in. Refused rather than fetched: the api can
+ * reach addresses the caller cannot, so following one on their behalf lends them a position they
+ * were never given — and tells them, in which sentence comes back, what is listening there.
+ */
+function privateAddress(host: string): string {
+  return `${host} resolves inside the network nibrun runs in, which is not somewhere it will fetch from.`;
+}
+
 function interruptedSource(url: string): string {
   return `The url stopped sending before the binary was whole: ${url}`;
 }
@@ -564,6 +573,8 @@ function sourceRefusal({
       return insecureRedirect(source.to);
     case 'too-many-redirects':
       return TOO_MANY_REDIRECTS;
+    case 'private-address':
+      return privateAddress(source.host);
   }
 }
 
