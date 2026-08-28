@@ -76,6 +76,41 @@ describe('what is refused as something that was typed wrong', () => {
   });
 });
 
+/**
+ * The guest expands a value that names a runtime value it sets, and fails the boot over a name it
+ * does not offer. Refused here, a typo costs a sentence rather than a deploy that never serves and
+ * says why only in the instance's console.
+ */
+describe('a value naming a runtime value', () => {
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being validated, not an interpolation
+  const OFFERED = '${NIBRUN_HOSTNAME}';
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being validated, not an interpolation
+  const MISSPELLED = '${NIBRUN_HSOTNAME}';
+
+  test('one the guest offers is carried through as it was written', () => {
+    expect(parsed({ set: [`URL=https://${OFFERED}`] })).toEqual({ URL: `https://${OFFERED}` });
+    expect(parsed({ set: ['URL=http://$NIBRUN_HOSTNAME:$NIBRUN_PORT'] })).toEqual({
+      URL: 'http://$NIBRUN_HOSTNAME:$NIBRUN_PORT',
+    });
+  });
+
+  test('one it does not is refused, and the variable holding it is named', () => {
+    expect(() => parsed({ set: [`URL=https://${MISSPELLED}`] })).toThrow(
+      new InvalidEnvironmentError(
+        `A value may name a runtime value the guest sets — \${NIBRUN_DATA_DIR}, ${OFFERED}, \${NIBRUN_PORT} — and nothing else: URL`,
+      ),
+    );
+  });
+
+  // The prefix is the whole of what expands, so a secret that reads like a shell variable is a
+  // value like any other rather than something to escape.
+  test('a $ that opens no reference is left alone', () => {
+    expect(parsed({ set: ['HASH=$2y$10$K3JqBQ8Rt7uVwXyZaBcDeF'] })).toEqual({
+      HASH: '$2y$10$K3JqBQ8Rt7uVwXyZaBcDeF',
+    });
+  });
+});
+
 describe('an edit given as a name and a value already apart', () => {
   function edited(edits: Array<{ name: string; value: string | null }>) {
     return parseEnvironmentPatch(edits) as Record<string, string | null>;

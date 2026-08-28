@@ -367,6 +367,59 @@ describe('a variable named __proto__ is not one', () => {
   });
 });
 
+/**
+ * A tenant value may name a runtime value the guest sets, and apps/runtime fails the boot over a
+ * name it does not offer. The schema is what turns a typo into a deploy nobody accepted, which is
+ * the only end of this where whoever wrote it is still listening.
+ */
+describe('a value naming a runtime value', () => {
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being validated, not an interpolation
+  const OFFERED = '${NIBRUN_HOSTNAME}';
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being validated, not an interpolation
+  const MISSPELLED = '${NIBRUN_HSOTNAME}';
+
+  function holding(value: string) {
+    return { CALLBACK_URL: value };
+  }
+
+  function accepts(value: string) {
+    return isValidMessage({ schema: TenantEnvironmentSchema, value: holding(value) });
+  }
+
+  test('both forms the guest expands are accepted', () => {
+    expect(accepts(`https://${OFFERED}/callback`)).toBe(true);
+    expect(accepts('$NIBRUN_PORT')).toBe(true);
+  });
+
+  test('a name the guest does not offer is refused', () => {
+    expect(accepts(`https://${MISSPELLED}/callback`)).toBe(false);
+    expect(accepts('$NIBRUN_PORTS')).toBe(false);
+  });
+
+  // The guest reads a name to its last name character, so this one is NIBRUN_HOSTNAME with no
+  // closing brace rather than the value someone meant.
+  test('a brace nobody closed is refused', () => {
+    expect(accepts('https://${NIBRUN_HOSTNAME')).toBe(false);
+  });
+
+  // The prefix is the whole of what expands, which is what lets a secret hold a `$` at all: a
+  // bcrypt hash and a password that reads like a shell variable are values like any other.
+  test('a $ that opens no reference is a $', () => {
+    expect(accepts('$2y$10$K3JqBQ8Rt7uVwXyZaBcDeF')).toBe(true);
+    expect(accepts('$HOME/bin')).toBe(true);
+    expect(accepts('$$')).toBe(true);
+  });
+
+  test('an edit is held to the same rule', () => {
+    expect(
+      isValidMessage({ schema: TenantEnvironmentPatchSchema, value: holding(`x${MISSPELLED}`) }),
+    ).toBe(false);
+    expect(
+      isValidMessage({ schema: TenantEnvironmentPatchSchema, value: { CALLBACK_URL: null } }),
+    ).toBe(true);
+  });
+});
+
 describe('secrets', () => {
   test('redaction reaches tenant environment values anywhere in a message', () => {
     const redacted = redactSecrets({ schema: HostDesiredStateSchema, value: desiredState() });

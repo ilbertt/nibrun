@@ -5,7 +5,7 @@ import {
   InstanceResourcesSchema,
   RestartPolicySchema,
 } from '#domain/instance.ts';
-import { SecretStringSchema } from '#lib/secret.ts';
+import { secretString } from '#lib/secret.ts';
 import { stringEnum } from '#lib/string-enum.ts';
 import { DnsLabelSchema, HostnameSchema, HttpPortSchema, TimestampSchema } from '#lib/wire.ts';
 
@@ -16,6 +16,51 @@ import { DnsLabelSchema, HostnameSchema, HttpPortSchema, TimestampSchema } from 
  * turns that into something an owner is told, rather than a variable they set and nobody carries.
  */
 const ENVIRONMENT_NAME_PATTERN = '^(?!__proto__$)[A-Za-z_][A-Za-z0-9_]*$';
+
+// What opens a reference in a tenant value, and the whole of what expands. The format contract is
+// in apps/runtime/src/config.h, which is also what resolves one.
+const RUNTIME_VALUE_PREFIX = 'NIBRUN_';
+
+/**
+ * The runtime values a tenant value may name, spelled as they are written. The guest is what
+ * substitutes them, and it fails the boot over a name it does not offer — so a value naming
+ * anything else is refused here instead, while whoever typed it is still listening.
+ */
+export const RUNTIME_VALUE_NAMES = [
+  `${RUNTIME_VALUE_PREFIX}DATA_DIR`,
+  `${RUNTIME_VALUE_PREFIX}HOSTNAME`,
+  `${RUNTIME_VALUE_PREFIX}PORT`,
+] as const;
+
+const OFFERED = RUNTIME_VALUE_NAMES.join('|');
+const NAME_CHARACTER = '[A-Za-z0-9_]';
+
+// A value as the guest reads it: anything but a `$`, a `$` that opens no reference — which is what
+// leaves a bcrypt hash and a literal `$HOME` alone — and the two forms that expand. A name the
+// guest would refuse matches none of them, so it has no way through.
+const TENANT_VALUE_PATTERN = [
+  '^(?:',
+  '[^$]',
+  `|\\$(?!\\{?${RUNTIME_VALUE_PREFIX})`,
+  `|\\$\\{(?:${OFFERED})\\}`,
+  `|\\$(?:${OFFERED})(?!${NAME_CHARACTER})`,
+  ')*$',
+].join('');
+
+const TENANT_VALUE = new RegExp(TENANT_VALUE_PATTERN);
+
+/**
+ * Whether every runtime value `value` names is one the guest offers, which most values name none
+ * of. The same rule the schema carries, for a caller with somewhere better to report it than a
+ * pattern nobody can read.
+ */
+export function namesOfferedRuntimeValues(value: string): boolean {
+  return TENANT_VALUE.test(value);
+}
+
+// The pattern rather than a check of its own, so what the schema refuses and what a caller may
+// spell out to whoever typed it are the same rule read twice.
+const TenantValueSchema = secretString({ pattern: TENANT_VALUE_PATTERN });
 
 // An app is always reachable at the hostname nibrun issued it, so every list of them has one.
 // Exported because the api narrows this array for its own response and would otherwise restate
@@ -58,7 +103,7 @@ export type AppHostname = typeof AppHostnameSchema.static;
 // and then silently not set, which is worse than being told the name is not one.
 export const TenantEnvironmentSchema = Type.Record(
   Type.String({ pattern: ENVIRONMENT_NAME_PATTERN }),
-  SecretStringSchema,
+  TenantValueSchema,
   { additionalProperties: false },
 );
 
@@ -74,7 +119,7 @@ export type TenantEnvironment = typeof TenantEnvironmentSchema.static;
  */
 export const TenantEnvironmentPatchSchema = Type.Record(
   Type.String({ pattern: ENVIRONMENT_NAME_PATTERN }),
-  Type.Union([SecretStringSchema, Type.Null()]),
+  Type.Union([TenantValueSchema, Type.Null()]),
   { additionalProperties: false },
 );
 

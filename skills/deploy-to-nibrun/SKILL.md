@@ -36,8 +36,9 @@ it uses when it is not on nibrun.
 One that insists on a variable name of its own reaches the same values through it: a value may
 name a runtime one — `APP_BASE_URL=https://${NIBRUN_HOSTNAME}`,
 `DATABASE_URL=file:${NIBRUN_DATA_DIR}/app.db` — and the guest expands it before exec. Only that
-prefix expands, so a secret holding a `$` arrives untouched, and a name the guest does not offer
-fails the boot rather than reaching the process as itself.
+prefix expands, so a secret holding a `$` arrives untouched, and `NIBRUN_PORT`, `NIBRUN_HOSTNAME`
+and `NIBRUN_DATA_DIR` are the whole of what may be named: anything else is refused when you deploy
+it.
 
 ## Deploying
 

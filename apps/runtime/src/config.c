@@ -355,7 +355,11 @@ static bool names_key(const struct reference *reference, const char *key) {
  * nameservers are the supervisor's own and describe nothing a binary could act on.
  * Rendered from the parsed config rather than read back out of the file, so a
  * reference and the variable exported beside it cannot disagree. `*out` is NULL for a
- * name this runtime offers but this instance was not given. */
+ * name this runtime offers but this instance was not given.
+ *
+ * Mirrored by RUNTIME_VALUE_NAMES in packages/protocol, which refuses a deploy naming
+ * anything else — so what reaches this is a value written before that rule, or by
+ * something that never passed through it. */
 static bool reference_value(const struct instance_config *config, const struct reference *reference,
                             char *rendered, size_t rendered_size, const char **out) {
   if (names_key(reference, "PORT")) {

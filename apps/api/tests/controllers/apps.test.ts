@@ -83,6 +83,20 @@ describe('a malformed request is a bad request', () => {
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
 
+  // The guest is what substitutes a value naming a runtime one, and a name it does not offer
+  // fails the boot rather than reaching the binary — so the api is where a typo is still an
+  // answer to whoever made it.
+  test('patching a variable that names a runtime value the guest does not offer', async () => {
+    const response = await sendJson({
+      method: 'PATCH',
+      url: APP_URL,
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being validated, not an interpolation
+      body: { environment: { URL: 'https://${NIBRUN_SLUG}/x' } },
+    });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
   // Elysia serialises the whole request body into its validation message, and a body now carries
   // an app's environment. A mistyped port must not answer with the secrets sent beside it.
   test('a refused request does not carry back what was sent with it', async () => {
