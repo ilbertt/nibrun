@@ -68,6 +68,11 @@ class FakeAppsService {
   readonly volumes: ReportedVolume[][] = [];
   readonly trace: string[] = [];
 
+  recordVolumeUsage(): Promise<void> {
+    this.trace.push('recordVolumeUsage');
+    return Promise.resolve();
+  }
+
   completeDeletions({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
     this.volumes.push([...volumes]);
     this.trace.push('completeDeletions');
@@ -216,7 +221,12 @@ describe('a report is read by whatever owns what it talks about', () => {
 
     await service.acceptReport({ reported });
 
-    expect(apps.trace).toEqual(['completeDeletions', 'finishDeletions', 'purgeDeleted']);
+    expect(apps.trace).toEqual([
+      'recordVolumeUsage',
+      'completeDeletions',
+      'finishDeletions',
+      'purgeDeleted',
+    ]);
   });
 
   // Nothing in the report says anything about hostnames. It is borrowed as a clock, because

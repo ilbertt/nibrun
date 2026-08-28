@@ -47,6 +47,7 @@ const report = Effect.gen(function* () {
       versions: sessions.versions,
       records,
       volumes: current.volumeReports,
+      volumeUsage: current.volumeUsage,
       checkpoints: current.checkpointReports,
       exports: [...current.exportReports.values()],
     }),

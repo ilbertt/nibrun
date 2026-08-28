@@ -134,6 +134,8 @@ export {
   FilesystemEntryKindSchema,
   FilesystemEntryNameSchema,
   FilesystemEntrySchema,
+  type FilesystemUsage,
+  FilesystemUsageSchema,
   GUEST_PATH_ROOT,
   type GuestPath,
   GuestPathSchema,

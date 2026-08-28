@@ -2,6 +2,7 @@ import {
   type App,
   type AppId,
   EXTRA_PUBLIC_PORT_VALUES,
+  type FilesystemUsage,
   namesExtraPublicPortValues,
   OWNED_APP_STATES,
   type OwnedAppState,
@@ -44,6 +45,8 @@ import { Service } from '#services/service.ts';
 export type PublicApp = Omit<App, 'config' | 'hostnames'> & {
   config: PublicAppConfig;
   hostnames: PublicAppHostname[];
+  /** `null` until a host has measured the filesystem, which it cannot while nothing mounts it. */
+  volumeUsage: FilesystemUsage | null;
 };
 
 type AppWithHostnames = { app: AppRow; hostnames: readonly AppHostnameRow[] };
@@ -311,6 +314,20 @@ export class AppsService extends Service {
    * Read off the volumes rather than their absence: a report that lost some would otherwise
    * delete the apps it forgot to mention.
    */
+  /**
+   * What the hosts last measured of the filesystems they hold. Only the volumes carrying a
+   * reading: a host reports every volume it has on every report, and most of those reports are
+   * between measurements — so a missing reading means nothing new was taken, never that the
+   * filesystem emptied.
+   */
+  async recordVolumeUsage({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
+    for (const volume of volumes) {
+      if (volume.usage) {
+        await this.appsRepo.recordVolumeUsage({ appId: volume.appId, usage: volume.usage });
+      }
+    }
+  }
+
   async completeDeletions({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
     for (const volume of volumes) {
       if (volume.state !== 'deleted') {
@@ -506,6 +523,22 @@ function requireApp(app: AppRow | null): AppRow {
   return app;
 }
 
+/** Three columns of one LEFT JOIN, so either the reading is there or the app has never had one. */
+function toVolumeUsage(app: AppRow): FilesystemUsage | null {
+  if (
+    app.volume_total_bytes === null ||
+    app.volume_used_bytes === null ||
+    app.volume_measured_at === null
+  ) {
+    return null;
+  }
+  return {
+    totalBytes: Number(app.volume_total_bytes),
+    usedBytes: Number(app.volume_used_bytes),
+    measuredAt: toTimestamp(app.volume_measured_at),
+  };
+}
+
 function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
   return {
     id: app.id,
@@ -513,6 +546,7 @@ function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
     slug: app.slug,
     hostnames: hostnames.map(toAppHostname),
     config: toAppConfig(app),
+    volumeUsage: toVolumeUsage(app),
     state: app.state,
     createdAt: toTimestamp(app.created_at),
     updatedAt: toTimestamp(app.updated_at),

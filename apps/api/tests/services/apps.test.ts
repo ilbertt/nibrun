@@ -5,6 +5,7 @@ import {
   type AppState,
   type DnsLabel,
   DnsLabelSchema,
+  type FilesystemUsage,
   type Hostname,
   HostnameSchema,
   type ObjectKey,
@@ -17,6 +18,7 @@ import {
   type TenantEnvironmentPatch,
   TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
+  TimestampSchema,
   Value,
   VolumeIdSchema,
 } from '@repo/protocol';
@@ -94,6 +96,9 @@ function appRow(slug: DnsLabel): AppRow {
     state: 'active',
     created_at: new Date(),
     updated_at: new Date(),
+    volume_total_bytes: null,
+    volume_used_bytes: null,
+    volume_measured_at: null,
     ...configColumns(DEFAULT_CONFIG),
   };
 }
@@ -110,6 +115,7 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly deleted: AppId[] = [];
   readonly trace: string[] = [];
   readonly leftovers = new Map<AppId, Leftovers>();
+  readonly measured: { appId: AppId; usage: FilesystemUsage }[] = [];
   deleting: AppId[] = [];
   purgeable: AppId[] = [];
   deployedApps: AppId[] = [];
@@ -196,6 +202,11 @@ class StubAppsRepository implements AppsRepositoryContract {
       ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)),
       ...configColumns(this.current),
     });
+  }
+
+  recordVolumeUsage({ appId, usage }: { appId: AppId; usage: FilesystemUsage }): Promise<void> {
+    this.measured.push({ appId, usage });
+    return Promise.resolve();
   }
 
   updateConfig({
@@ -848,6 +859,46 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     await serviceWith({ appsRepo }).completeDeletions({ volumes: [reportedVolume('deleted')] });
 
     expect(appsRepo.deleted).toEqual([]);
+  });
+});
+
+/**
+ * A host reports every volume it holds on every report, and measures them on a slower pass of
+ * its own — so most reports carry no reading, and the ones that do are the only writes.
+ */
+describe('how full a filesystem is, as the host that holds it last measured it', () => {
+  const MEASURED: FilesystemUsage = {
+    totalBytes: 8_455_712_768,
+    usedBytes: 1_503_238_553,
+    measuredAt: Value.Parse(TimestampSchema, '2026-08-03T10:00:00Z'),
+  };
+
+  function reportedVolume(usage?: FilesystemUsage): ReportedVolume {
+    return {
+      volumeId: VOLUME_ID,
+      appId: APP_ID,
+      state: 'ready',
+      sizeBytes: NO_BYTES,
+      ...(usage ? { usage } : {}),
+    };
+  }
+
+  test('a reading a host took is recorded against the app that owns the volume', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).recordVolumeUsage({ volumes: [reportedVolume(MEASURED)] });
+
+    expect(appsRepo.measured).toEqual([{ appId: APP_ID, usage: MEASURED }]);
+  });
+
+  // Otherwise every report between two measurements would look like a filesystem emptying and
+  // filling again, which is the one thing this must never be able to say.
+  test('a report carrying no reading writes nothing rather than writing nothing down', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).recordVolumeUsage({ volumes: [reportedVolume()] });
+
+    expect(appsRepo.measured).toEqual([]);
   });
 });
 

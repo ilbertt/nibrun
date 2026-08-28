@@ -44,6 +44,10 @@ enum guest_filesystem_verb {
   GUEST_FILESYSTEM_REMOVE = 6,
   /* Body: path, path. Reply: empty. */
   GUEST_FILESYSTEM_MOVE = 7,
+  /* Body: empty. Reply: uint64 total bytes, uint64 used bytes. The one verb that
+   * names no path: a volume is one filesystem, so how full it is is not a question
+   * about a place inside it. */
+  GUEST_FILESYSTEM_USAGE = 8,
 };
 
 /* Truncates to the offset written at before writing, so that replacing a large file
@@ -68,6 +72,12 @@ enum guest_filesystem_status {
  * name of up to 255 bytes behind its own single-byte length. `stat` answers with the
  * first three and no name, because the caller already named what it asked about. */
 #define GUEST_FILESYSTEM_DETAILS_BYTES 17
+
+/* What `usage` answers with: the filesystem's size and what is spent of it, both
+ * counted in the blocks the guest's own kernel counts. Used rather than free,
+ * because free and available differ by the blocks ext4 reserves for root and the
+ * tenant is not root — so the number that would be misread is the one left out. */
+#define GUEST_FILESYSTEM_USAGE_BYTES 16
 
 enum guest_filesystem_kind {
   GUEST_FILESYSTEM_FILE = 1,

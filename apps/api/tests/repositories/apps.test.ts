@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
 import {
   type AppId,
+  AppIdSchema,
   DnsLabelSchema,
   HostnameSchema,
   OWNED_APP_STATES,
@@ -9,6 +10,8 @@ import {
   OwnerIdSchema,
   type TenantEnvironment,
   TenantEnvironmentSchema,
+  type Timestamp,
+  TimestampSchema,
   Value,
 } from '@repo/protocol';
 import type { SQL } from 'bun';
@@ -244,5 +247,94 @@ describe('an owner moves their app between the two states they own', () => {
       }),
     ).toBeNull();
     expect(await storedState(appId)).toBe('active');
+  });
+});
+
+/**
+ * The one place the upsert and the join are actually run. A reading arrives on a host report, so
+ * it is written many times per app and read back on every request an owner makes for that app.
+ */
+describe('what a host measured of a filesystem is kept against the app that owns it', () => {
+  const TOTAL_BYTES = 8_455_712_768;
+  const FILLED_BYTES = 1_503_238_553;
+  const EMPTIED_BYTES = 4_096;
+
+  const EARLIER = Value.Parse(TimestampSchema, '2026-08-03T10:00:00.000Z');
+  const LATER = Value.Parse(TimestampSchema, '2026-08-03T10:01:00.000Z');
+
+  function reading({ usedBytes, measuredAt }: { usedBytes: number; measuredAt: Timestamp }) {
+    return { totalBytes: TOTAL_BYTES, usedBytes, measuredAt };
+  }
+
+  async function readBack(appId: AppId) {
+    return (await repo.findById({ appId, ownerId: OWNER_ID }))!;
+  }
+
+  test('an app nothing has measured reads back with no reading rather than a zero', async () => {
+    const app = await readBack(await createApp('unmeasured'));
+
+    expect(app.volume_total_bytes).toBeNull();
+    expect(app.volume_used_bytes).toBeNull();
+    expect(app.volume_measured_at).toBeNull();
+  });
+
+  test('a reading is written and read back beside the app', async () => {
+    const appId = await createApp('measured');
+
+    await repo.recordVolumeUsage({
+      appId,
+      usage: reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER }),
+    });
+    const app = await readBack(appId);
+
+    expect(Number(app.volume_used_bytes)).toBe(FILLED_BYTES);
+    expect(Number(app.volume_total_bytes)).toBe(TOTAL_BYTES);
+    expect(app.volume_measured_at?.toISOString()).toBe(EARLIER);
+  });
+
+  // A host reports the same volume every fifteen seconds and measures it every minute, so this
+  // is the ordinary case rather than the exception.
+  test('a later reading replaces the one before it', async () => {
+    const appId = await createApp('refilled');
+
+    await repo.recordVolumeUsage({
+      appId,
+      usage: reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER }),
+    });
+    await repo.recordVolumeUsage({
+      appId,
+      usage: reading({ usedBytes: EMPTIED_BYTES, measuredAt: LATER }),
+    });
+
+    expect(Number((await readBack(appId)).volume_used_bytes)).toBe(EMPTIED_BYTES);
+  });
+
+  // Two reports can arrive out of order; the older one must not put the older number back.
+  test('an older reading arriving late leaves the newer one standing', async () => {
+    const appId = await createApp('reordered');
+
+    await repo.recordVolumeUsage({
+      appId,
+      usage: reading({ usedBytes: EMPTIED_BYTES, measuredAt: LATER }),
+    });
+    await repo.recordVolumeUsage({
+      appId,
+      usage: reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER }),
+    });
+
+    expect(Number((await readBack(appId)).volume_used_bytes)).toBe(EMPTIED_BYTES);
+  });
+
+  // A report can name an app this end has already purged, and a reading about one is not worth
+  // failing the report that carried it.
+  test('a reading about an app that is not there writes nothing and raises nothing', async () => {
+    const stranger = Value.Parse(AppIdSchema, '01930000-0000-7000-8000-000000000000');
+
+    await repo.recordVolumeUsage({
+      appId: stranger,
+      usage: reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER }),
+    });
+
+    expect(await repo.findById({ appId: stranger, ownerId: OWNER_ID })).toBeNull();
   });
 });

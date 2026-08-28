@@ -5,6 +5,7 @@ import {
   decodeDetails,
   decodeHeader,
   decodeListing,
+  decodeUsage,
   decodeWritten,
   encodeRequest,
   type FilesystemDetails,
@@ -16,6 +17,7 @@ import {
   GuestRequestTooLarge,
   isRefusal,
   type MalformedGuestReply,
+  type MeasuredBytes,
 } from '#lib/filesystem/protocol.ts';
 import {
   connectRequest,
@@ -64,6 +66,8 @@ export class GuestFilesystemSilent extends Data.TaggedError('GuestFilesystemSile
 export type GuestFilesystem = {
   readonly list: (path: GuestPath) => Effect.Effect<DirectoryListing, GuestFilesystemError>;
   readonly stat: (path: GuestPath) => Effect.Effect<FilesystemDetails, GuestFilesystemError>;
+  /** How full the volume is. No path, because the volume is one filesystem all the way down. */
+  readonly usage: () => Effect.Effect<MeasuredBytes, GuestFilesystemError>;
   /** Short of `length` is the end of the file, which is how a reader in chunks learns to stop. */
   readonly read: (request: {
     readonly path: GuestPath;
@@ -147,6 +151,7 @@ export const guestFilesystem = Effect.fn('guestFilesystem')(function* ({
     list: (path) =>
       Effect.flatMap(exchange({ verb: 'list', path }), (body) => decodeListing({ body, path })),
     stat: (path) => Effect.flatMap(exchange({ verb: 'stat', path }), decodeDetails),
+    usage: () => Effect.flatMap(exchange({ verb: 'usage' }), decodeUsage),
     read: ({ path, offset, length }) =>
       exchange({
         verb: 'read',

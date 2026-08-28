@@ -4,6 +4,7 @@ import {
   AppHostnameStateSchema,
   AppSchema,
   ByteSizeSchema,
+  FilesystemUsageSchema,
   MIN_HOSTNAMES,
   REDACTED,
   TenantEnvironmentPatchSchema,
@@ -69,11 +70,16 @@ export const AppHostnameResponseSchema = t.Composite([
 // `hostnames` is widened the same way `config` is: what an owner is shown carries the state,
 // which a host is never sent. `minItems` is restated from the schema it replaces rather than
 // left off — an app always has the hostname nibrun issued it.
+//
+// `volumeUsage` is nullable rather than optional: an app that has never been measured is a
+// different thing from a field a client should go looking for, and the two read the same once a
+// key is simply missing.
 export const AppResponseSchema = t.Composite([
   t.Omit(AppSchema, ['config', 'hostnames']),
   t.Object({
     config: PublicAppConfigSchema,
     hostnames: t.Array(AppHostnameResponseSchema, { minItems: MIN_HOSTNAMES }),
+    volumeUsage: t.Nullable(FilesystemUsageSchema),
   }),
 ]);
 

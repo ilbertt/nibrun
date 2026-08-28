@@ -1,6 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import { CheckpointStateSchema } from '#domain/checkpoint.ts';
 import { ExportStateSchema } from '#domain/export.ts';
+import { FilesystemUsageSchema } from '#domain/filesystem.ts';
 import { HostCapacitySchema, HostStateSchema, HostVersionsSchema } from '#domain/host.ts';
 import {
   AppIdSchema,
@@ -50,6 +51,13 @@ export const ReportedVolumeSchema = Type.Object({
   // Which ZeroFS filesystem the host put it in.
   storagePrefix: Type.Optional(ObjectKeySchema),
   devicePath: Type.Optional(Type.String({ maxLength: MAX_DEVICE_PATH_LENGTH })),
+  /**
+   * How full the filesystem on it is, which only the guest holding it mounted can say — so it
+   * rides the report the host was sending anyway rather than being asked for. Absent while no
+   * guest has answered: a volume nothing has mounted has a size and no reading, and a zero here
+   * would be a filesystem somebody had just emptied.
+   */
+  usage: Type.Optional(FilesystemUsageSchema),
   message: Type.Optional(StateMessageSchema),
 });
 

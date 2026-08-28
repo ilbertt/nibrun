@@ -437,6 +437,30 @@ static void a_peer_that_leaves_mid_request_ends_the_worker(const char *mount_poi
   EXPECT(close_session(&starved));
 }
 
+/* How full the filesystem is, which is a question about the mount and not about a
+ * place inside it — so the one verb whose body is empty, and the one whose answer
+ * this test can only bound: the directory stands in for a real mount, and what is on
+ * the container's disk is not this file's to know. */
+static void how_full_the_volume_is_is_measured_without_naming_a_path(const char *mount_point) {
+  struct session session = open_session(mount_point);
+  struct reply heard;
+  const struct request nothing = {.body = {0}, .length = 0};
+
+  EXPECT(exchange(&session, GUEST_FILESYSTEM_USAGE, &nothing, &heard) == GUEST_FILESYSTEM_OK);
+  EXPECT(heard.length == GUEST_FILESYSTEM_USAGE_BYTES);
+
+  uint64_t total = decode(heard.body, sizeof(uint64_t));
+  uint64_t used = decode(heard.body + sizeof(uint64_t), sizeof(uint64_t));
+  EXPECT(total > 0);
+  EXPECT(used <= total);
+
+  /* A path is not merely ignored: sending one is a peer speaking a protocol this one
+   * does not, and reading the part that happened to fit would be the wrong half. */
+  EXPECT(answering(&session, GUEST_FILESYSTEM_USAGE, "/") == GUEST_FILESYSTEM_MALFORMED);
+  EXPECT(answering(&session, GUEST_FILESYSTEM_LIST, "/") == GUEST_FILESYSTEM_OK);
+  EXPECT(close_session(&session));
+}
+
 int main(void) {
   char mount_point[] = "/tmp/nibrun-filesystem-XXXXXX";
   if (mkdtemp(mount_point) == NULL) {
@@ -458,6 +482,7 @@ int main(void) {
   a_listing_says_when_it_did_not_fit(mount_point, root);
   a_request_this_side_cannot_read_costs_only_itself(mount_point);
   a_peer_that_leaves_mid_request_ends_the_worker(mount_point);
+  how_full_the_volume_is_is_measured_without_naming_a_path(mount_point);
 
   close(root);
   return EXPECT_REPORT("filesystem");

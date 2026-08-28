@@ -130,6 +130,7 @@ export class AgentService extends Service {
     // still arrived — which is the whole of what liveness asks.
     await this.agentRepo.observeReport({ reported });
     await this.deploymentsService.applyHostReport({ reported });
+    await this.appsService.recordVolumeUsage({ volumes: reported.volumes });
     await this.appsService.completeDeletions({ volumes: reported.volumes });
     await this.exportsService.applyHostReport({ reported });
     // Last, because what an app leaves behind is only safe to remove once a host has said its

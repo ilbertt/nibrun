@@ -5,6 +5,7 @@ import {
   type DirectoryListing,
   type FilesystemEntry,
   type FilesystemEntryKind,
+  type FilesystemUsage,
   GUEST_PATH_ROOT,
   type GuestPath,
   isValidMessage,
@@ -30,6 +31,8 @@ import { MKFS_ROOT_ENTRIES } from '#lib/volumes/ext4.ts';
 const UINT32_BYTES = 4;
 const UINT64_BYTES = 8;
 
+const EMPTY_BODY = Buffer.alloc(0);
+
 const FRAME_MAGIC = Buffer.from('NBF1');
 const CODE_OFFSET = FRAME_MAGIC.byteLength;
 const LENGTH_OFFSET = CODE_OFFSET + 1;
@@ -52,6 +55,7 @@ const VERBS = {
   makeDirectory: 5,
   remove: 6,
   move: 7,
+  usage: 8,
 } as const;
 
 const STATUS_OK = 0;
@@ -118,7 +122,8 @@ export type GuestFilesystemRequest =
     }
   | { readonly verb: 'makeDirectory'; readonly path: GuestPath }
   | { readonly verb: 'remove'; readonly path: GuestPath }
-  | { readonly verb: 'move'; readonly path: GuestPath; readonly destination: GuestPath };
+  | { readonly verb: 'move'; readonly path: GuestPath; readonly destination: GuestPath }
+  | { readonly verb: 'usage' };
 
 function field(value: string | Uint8Array): Buffer {
   const bytes = typeof value === 'string' ? Buffer.from(value, 'utf8') : Buffer.from(value);
@@ -140,6 +145,11 @@ function lengthOf(value: number): Buffer {
 }
 
 function bodyOf(request: GuestFilesystemRequest): Buffer {
+  // The one verb that names no path: a volume is one filesystem, so how full it is is not a
+  // question about a place inside it.
+  if (request.verb === 'usage') {
+    return EMPTY_BODY;
+  }
   const path = field(request.path);
   switch (request.verb) {
     case 'read':
@@ -243,6 +253,22 @@ export function decodeWritten(body: Buffer): Either.Either<number, MalformedGues
   return body.byteLength < UINT32_BYTES
     ? Either.left(new MalformedGuestReply({ reason: 'no count came back from a write' }))
     : Either.right(body.readUInt32BE(0));
+}
+
+const TOTAL_OFFSET = 0;
+const USED_OFFSET = TOTAL_OFFSET + UINT64_BYTES;
+const USAGE_BYTES = USED_OFFSET + UINT64_BYTES;
+
+/** What the guest measured, without the moment it was measured — which is this end's to stamp. */
+export type MeasuredBytes = Omit<FilesystemUsage, 'measuredAt'>;
+
+export function decodeUsage(body: Buffer): Either.Either<MeasuredBytes, MalformedGuestReply> {
+  return body.byteLength < USAGE_BYTES
+    ? Either.left(new MalformedGuestReply({ reason: 'the usage is the wrong length' }))
+    : Either.right({
+        totalBytes: Number(body.readBigUInt64BE(TOTAL_OFFSET)),
+        usedBytes: Number(body.readBigUInt64BE(USED_OFFSET)),
+      });
 }
 
 const TRUNCATED_OFFSET = 0;

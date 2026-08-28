@@ -15,6 +15,7 @@ import {
   decodeDetails,
   decodeHeader,
   decodeListing,
+  decodeUsage,
   decodeWritten,
   encodeRequest,
   FRAME_HEADER_BYTES,
@@ -32,6 +33,7 @@ import {
   pathIn,
   replyFrame,
   requestsIn,
+  usageBody,
 } from '#tests/support/guest-filesystem.ts';
 
 const ROOT = Value.Parse(GuestPathSchema, '/');
@@ -99,6 +101,7 @@ describe('a request carries what its verb needs and nothing else', () => {
       { request: { verb: 'makeDirectory', path: ROOT }, code: GUEST_VERB.makeDirectory },
       { request: { verb: 'remove', path: ROOT }, code: GUEST_VERB.remove },
       { request: { verb: 'move', path: ROOT, destination: ROOT }, code: GUEST_VERB.move },
+      { request: { verb: 'usage' }, code: GUEST_VERB.usage },
     ] as const;
 
     for (const { request, code } of verbs) {
@@ -123,6 +126,12 @@ describe('a request carries what its verb needs and nothing else', () => {
         truncate: true,
       }),
     ).toBe(false);
+  });
+
+  // A volume is one filesystem, so the question has no place in it to be about — and a path the
+  // guest was told to ignore is a path one field away from being read.
+  test('asking how full a volume is names nothing', () => {
+    expect(requestsIn(encodeRequest({ verb: 'usage' })).requests[0]?.body.byteLength).toBe(0);
   });
 
   test('content crosses byte for byte, NULs and all', () => {
@@ -236,6 +245,20 @@ describe('what the guest describes', () => {
     const decoded = decodeListing({ body: Buffer.concat([Buffer.of(0), nonsense]), path: ROOT });
 
     expect(Either.isRight(decoded) && decoded.right.entries[0]?.name).toBe('data.db');
+  });
+});
+
+describe('how full a volume is comes back as two counts', () => {
+  const MEASURED = { totalBytes: 8_455_712_768, usedBytes: 1_503_238_553 };
+
+  test('both survive the wire at sizes a 32-bit count could not hold', () => {
+    expect(decodeUsage(usageBody(MEASURED))).toEqual(Either.right(MEASURED));
+  });
+
+  test('a body too short to hold them is refused rather than read as zero', () => {
+    const short = usageBody(MEASURED).subarray(0, 1);
+
+    expect(Either.isLeft(decodeUsage(short))).toBe(true);
   });
 });
 

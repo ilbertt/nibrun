@@ -1,6 +1,7 @@
 import type {
   AppId,
   ExportId,
+  FilesystemUsage,
   ReportedCheckpoint,
   ReportedExport,
   ReportedVolume,
@@ -18,6 +19,12 @@ export type AgentSnapshot = {
    */
   readonly deletedVolumes: ReadonlyMap<VolumeId, ReportedVolume>;
   readonly nextProbeAtMs: ReadonlyMap<AppId, number>;
+  /**
+   * The last reading taken of each volume this host holds a slot for, which is not the same as
+   * each volume a guest can currently be asked about: a suspended app keeps its slot, so its last
+   * reading is kept too rather than the app going from a number to nothing on being stopped.
+   */
+  readonly volumeUsage: ReadonlyMap<AppId, FilesystemUsage>;
   readonly volumeReports: readonly ReportedVolume[];
   readonly checkpointReports: readonly ReportedCheckpoint[];
   readonly converged: boolean;
@@ -32,6 +39,7 @@ const EMPTY: AgentSnapshot = {
   exportReports: new Map(),
   deletedVolumes: new Map(),
   nextProbeAtMs: new Map(),
+  volumeUsage: new Map(),
   volumeReports: [],
   checkpointReports: [],
   converged: false,
@@ -80,6 +88,10 @@ export class AgentState extends Effect.Service<AgentState>()('AgentState', {
           remaining.delete(appId);
           return { ...current, records: remaining };
         }),
+
+      /** A whole pass at once, because what it leaves out is what this host has stopped holding. */
+      setVolumeUsage: (usage: ReadonlyMap<AppId, FilesystemUsage>) =>
+        modify((current) => ({ ...current, volumeUsage: new Map(usage) })),
 
       rememberDeletedVolume: (report: ReportedVolume) =>
         modify((current) => ({

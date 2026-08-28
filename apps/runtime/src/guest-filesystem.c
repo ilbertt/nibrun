@@ -14,6 +14,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -525,11 +526,35 @@ static enum guest_filesystem_status perform_move(struct operation *asked) {
   return status;
 }
 
-static bool parse_operation(struct cursor *body, unsigned char verb, struct operation *asked) {
+static bool take_path(struct cursor *from, char *path, size_t capacity) {
   const unsigned char *bytes = NULL;
   uint32_t length = 0;
-  if (!take_field(body, &bytes, &length) ||
-      !copy_path(bytes, length, asked->path, sizeof(asked->path))) {
+  return take_field(from, &bytes, &length) && copy_path(bytes, length, path, capacity);
+}
+
+/* The mount point rather than a path inside it, because there is no path inside it
+ * that is on a different filesystem: the volume is the whole of what the tenant has.
+ *
+ * `f_frsize` is what block counts are in — `f_bsize` is the size a filesystem would
+ * rather be asked for, and multiplying by it is how this reads plausibly wrong on a
+ * filesystem where the two differ. */
+static enum guest_filesystem_status perform_usage(const struct operation *asked,
+                                                  struct writer *into) {
+  struct statvfs measured;
+  if (statvfs(asked->mount_point, &measured) < 0) {
+    return status_for(errno);
+  }
+  if (!room_for(into, GUEST_FILESYSTEM_USAGE_BYTES)) {
+    return GUEST_FILESYSTEM_FAILED;
+  }
+  uint64_t block = measured.f_frsize;
+  put_wide(into, (uint64_t)measured.f_blocks * block, sizeof(uint64_t));
+  put_wide(into, (uint64_t)(measured.f_blocks - measured.f_bfree) * block, sizeof(uint64_t));
+  return GUEST_FILESYSTEM_OK;
+}
+
+static bool parse_operation(struct cursor *body, unsigned char verb, struct operation *asked) {
+  if (verb != GUEST_FILESYSTEM_USAGE && !take_path(body, asked->path, sizeof(asked->path))) {
     return false;
   }
   switch (verb) {
@@ -545,8 +570,7 @@ static bool parse_operation(struct cursor *body, unsigned char verb, struct oper
       }
       break;
     case GUEST_FILESYSTEM_MOVE:
-      if (!take_field(body, &bytes, &length) ||
-          !copy_path(bytes, length, asked->destination, sizeof(asked->destination))) {
+      if (!take_path(body, asked->destination, sizeof(asked->destination))) {
         return false;
       }
       break;
@@ -575,6 +599,8 @@ static enum guest_filesystem_status perform(unsigned char verb, struct operation
       return perform_remove(asked);
     case GUEST_FILESYSTEM_MOVE:
       return perform_move(asked);
+    case GUEST_FILESYSTEM_USAGE:
+      return perform_usage(asked, into);
     default:
       return GUEST_FILESYSTEM_MALFORMED;
   }

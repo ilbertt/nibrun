@@ -5,6 +5,7 @@ import { logLoop } from '#lib/agent/logs.ts';
 import { pollLoop, reconcileSafely } from '#lib/agent/poll.ts';
 import { reportLoop } from '#lib/agent/report.ts';
 import { statusLoop } from '#lib/agent/status.ts';
+import { volumeUsageLoop } from '#lib/agent/usage.ts';
 import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
@@ -56,7 +57,8 @@ export const run = Effect.gen(function* () {
   }
 
   yield* sessions.current;
-  yield* Effect.all([pollLoop, statusLoop, reportLoop, logLoop, heartbeatLoop, filesystemLoop], {
-    concurrency: 'unbounded',
-  });
+  yield* Effect.all(
+    [pollLoop, statusLoop, reportLoop, logLoop, heartbeatLoop, filesystemLoop, volumeUsageLoop],
+    { concurrency: 'unbounded' },
+  );
 });

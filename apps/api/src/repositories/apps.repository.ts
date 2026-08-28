@@ -6,6 +6,7 @@ import {
   type AppId,
   type AppState,
   type DnsLabel,
+  type FilesystemUsage,
   type Hostname,
   type ObjectKey,
   type OwnerId,
@@ -62,6 +63,7 @@ export abstract class AppsRepositoryContract {
   }): Promise<CreatedApp>;
   abstract listByOwner(input: { ownerId: OwnerId }): Promise<AppRow[]>;
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
+  abstract recordVolumeUsage(input: { appId: AppId; usage: FilesystemUsage }): Promise<void>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
@@ -159,12 +161,15 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+               u.total_bytes AS volume_total_bytes, u.used_bytes AS volume_used_bytes,
+               u.measured_at AS volume_measured_at
         FROM nibrun.live_apps a
         JOIN LATERAL (
           SELECT * FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
+        LEFT JOIN nibrun.volume_usage u ON u.app_id = a.id
         WHERE a.id = ${inserted.id} AND a.owner_id = ${ownerId}
       `;
       if (!app) {
@@ -184,14 +189,44 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             u.total_bytes AS volume_total_bytes, u.used_bytes AS volume_used_bytes,
+             u.measured_at AS volume_measured_at
       FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
+      LEFT JOIN nibrun.volume_usage u ON u.app_id = a.id
       WHERE a.owner_id = ${ownerId}
       ORDER BY a.created_at DESC
+    `;
+  }
+
+  /**
+   * The reading a host just took, replacing whatever was there — one host holds a volume at a
+   * time, so there is no second writer to lose to. `measured_at` guards the exception: a report
+   * delayed behind a newer one must not put an older reading back.
+   *
+   * Selected from `apps` rather than given the id outright, so that a reading about an app that
+   * has since been purged writes nothing instead of failing the report carrying it.
+   */
+  async recordVolumeUsage({
+    appId,
+    usage,
+  }: {
+    appId: AppId;
+    usage: FilesystemUsage;
+  }): Promise<void> {
+    await this.sql.UpsertVolumeUsage`
+      INSERT INTO nibrun.volume_usage (app_id, total_bytes, used_bytes, measured_at)
+      SELECT a.id, ${usage.totalBytes}, ${usage.usedBytes}, ${usage.measuredAt}
+      FROM nibrun.apps a WHERE a.id = ${appId}
+      ON CONFLICT ON CONSTRAINT volume_usage_app_id_key DO UPDATE
+        SET total_bytes = EXCLUDED.total_bytes,
+            used_bytes  = EXCLUDED.used_bytes,
+            measured_at = EXCLUDED.measured_at
+        WHERE EXCLUDED.measured_at > nibrun.volume_usage.measured_at
     `;
   }
 
@@ -204,12 +239,15 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             u.total_bytes AS volume_total_bytes, u.used_bytes AS volume_used_bytes,
+             u.measured_at AS volume_measured_at
       FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
+      LEFT JOIN nibrun.volume_usage u ON u.app_id = a.id
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
     `;
     return app ?? null;
@@ -295,6 +333,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         UPDATE nibrun.apps a
         SET updated_at = now()
         FROM nibrun.app_configs_with_environment c
+        LEFT JOIN nibrun.volume_usage u ON u.app_id = c.app_id
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND c.id = ${inserted.id}
         RETURNING a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
                   c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -302,7 +341,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                   c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                   c.health_check_unhealthy_threshold,
                   c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-                  c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+                  c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+                  u.total_bytes AS volume_total_bytes, u.used_bytes AS volume_used_bytes,
+                  u.measured_at AS volume_measured_at
       `;
       return app ?? null;
     });
@@ -403,6 +444,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       await tx.DeleteExportsByApp`DELETE FROM nibrun.exports WHERE app_id = ${appId}`;
       await tx.DeleteDeploymentsByApp`DELETE FROM nibrun.deployments WHERE app_id = ${appId}`;
       await tx.DeleteArtifactsByApp`DELETE FROM nibrun.artifacts WHERE app_id = ${appId}`;
+      await tx.DeleteVolumeUsageByApp`DELETE FROM nibrun.volume_usage WHERE app_id = ${appId}`;
     });
   }
 
@@ -448,12 +490,15 @@ async function appAfterStateChange({
            c.health_check_grace_period_ms, c.health_check_healthy_threshold,
            c.health_check_unhealthy_threshold,
            c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-           c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+           c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+           u.total_bytes AS volume_total_bytes, u.used_bytes AS volume_used_bytes,
+           u.measured_at AS volume_measured_at
     FROM nibrun.live_apps a
     JOIN LATERAL (
       SELECT * FROM nibrun.app_configs_with_environment c
       WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
     ) c ON true
+    LEFT JOIN nibrun.volume_usage u ON u.app_id = a.id
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
   `;
   if (!app) {

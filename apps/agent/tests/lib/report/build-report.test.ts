@@ -74,6 +74,7 @@ describe('the assembled report satisfies the protocol', () => {
       volumes: [
         { volumeId: VOLUME_ID, appId: APP_ID, state: 'ready', sizeBytes: VOLUME_SIZE_BYTES },
       ],
+      volumeUsage: new Map(),
       checkpoints: [],
       exports: [
         {

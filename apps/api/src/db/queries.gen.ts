@@ -202,6 +202,12 @@ export interface ISelectCreatedAppResult {
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     environment_names: string[];
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_total_bytes: IVolumeUsageColumns["total_bytes"] | null;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_used_bytes: IVolumeUsageColumns["used_bytes"] | null;
+    /** When the guest was asked, which is not when the report carrying it arrived. */
+    volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
 }
 
 /** Result of query `SelectAppsByOwner`. */
@@ -230,6 +236,16 @@ export interface ISelectAppsByOwnerResult {
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     environment_names: string[];
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_total_bytes: IVolumeUsageColumns["total_bytes"] | null;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_used_bytes: IVolumeUsageColumns["used_bytes"] | null;
+    /** When the guest was asked, which is not when the report carrying it arrived. */
+    volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
+}
+
+/** Result of query `UpsertVolumeUsage`. */
+export interface IUpsertVolumeUsageResult {
 }
 
 /** Result of query `SelectAppById`. */
@@ -258,6 +274,12 @@ export interface ISelectAppByIdResult {
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     environment_names: string[];
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_total_bytes: IVolumeUsageColumns["total_bytes"] | null;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_used_bytes: IVolumeUsageColumns["used_bytes"] | null;
+    /** When the guest was asked, which is not when the report carrying it arrived. */
+    volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
 }
 
 /** Result of query `SelectAppForConfigUpdate`. */
@@ -318,6 +340,12 @@ export interface ITouchAppAfterConfigPatchResult {
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     environment_names: string[];
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_total_bytes: IVolumeUsageColumns["total_bytes"] | null;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_used_bytes: IVolumeUsageColumns["used_bytes"] | null;
+    /** When the guest was asked, which is not when the report carrying it arrived. */
+    volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
 }
 
 /** Result of query `SelectFinishableDeletion`. */
@@ -364,6 +392,10 @@ export interface IDeleteDeploymentsByAppResult {
 export interface IDeleteArtifactsByAppResult {
 }
 
+/** Result of query `DeleteVolumeUsageByApp`. */
+export interface IDeleteVolumeUsageByAppResult {
+}
+
 /** Result of query `SelectAppAfterStateChange`. */
 export interface ISelectAppAfterStateChangeResult {
     id: IAppsColumns["id"];
@@ -390,6 +422,12 @@ export interface ISelectAppAfterStateChangeResult {
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     environment_names: string[];
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_total_bytes: IVolumeUsageColumns["total_bytes"] | null;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_used_bytes: IVolumeUsageColumns["used_bytes"] | null;
+    /** When the guest was asked, which is not when the report carrying it arrived. */
+    volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
 }
 
 /** Result of query `InsertPendingArtifact`. */
@@ -725,6 +763,7 @@ export interface Queries {
     InsertAppHostname: IInsertAppHostnameResult;
     SelectCreatedApp: ISelectCreatedAppResult;
     SelectAppsByOwner: ISelectAppsByOwnerResult;
+    UpsertVolumeUsage: IUpsertVolumeUsageResult;
     SelectAppById: ISelectAppByIdResult;
     SelectAppForConfigUpdate: ISelectAppForConfigUpdateResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
@@ -739,6 +778,7 @@ export interface Queries {
     DeleteExportsByApp: IDeleteExportsByAppResult;
     DeleteDeploymentsByApp: IDeleteDeploymentsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
+    DeleteVolumeUsageByApp: IDeleteVolumeUsageByAppResult;
     SelectAppAfterStateChange: ISelectAppAfterStateChangeResult;
     InsertPendingArtifact: IInsertPendingArtifactResult;
     CompleteArtifact: ICompleteArtifactResult;
@@ -1247,6 +1287,29 @@ export interface IPurgeableAppsTable {
     constraints: keyof (typeof schema)["purgeable_apps"]["_constraints"];
 }
 
+/** Columns of `volume_usage`. */
+export interface IVolumeUsageColumns {
+    id: string;
+    app_id: import("@repo/protocol").AppId;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    total_bytes: string;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    used_bytes: string;
+    /** When the guest was asked, which is not when the report carrying it arrived. */
+    measured_at: Date;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+}
+
+/** Schema of `volume_usage`. */
+export interface IVolumeUsageTable {
+    columns: IVolumeUsageColumns;
+    relationType: (typeof schema)["volume_usage"]["_relationType"];
+    indexes: keyof (typeof schema)["volume_usage"]["_indexes"];
+    constraints: keyof (typeof schema)["volume_usage"]["_constraints"];
+}
+
 export const schema = {
     account: {
         _relationName: "account",
@@ -1727,6 +1790,28 @@ export const schema = {
         },
         _indexes: {},
         _constraints: {}
+    },
+    volume_usage: {
+        _relationName: "volume_usage",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { volume_usage_app_id_fkey: { _constraintName: "volume_usage_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            total_bytes: { _columnName: "total_bytes", _foreignKeys: {} },
+            used_bytes: { _columnName: "used_bytes", _foreignKeys: {} },
+            measured_at: { _columnName: "measured_at", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+        },
+        _indexes: {
+            volume_usage_app_id_key: { _indexName: "volume_usage_app_id_key" },
+            volume_usage_pkey: { _indexName: "volume_usage_pkey" }
+        },
+        _constraints: {
+            volume_usage_app_id_fkey: { _constraintName: "volume_usage_app_id_fkey" },
+            volume_usage_app_id_key: { _constraintName: "volume_usage_app_id_key" },
+            volume_usage_pkey: { _constraintName: "volume_usage_pkey" }
+        }
     }
 } as const;
 
@@ -1753,6 +1838,7 @@ export interface Tables {
     finishable_deletions: IFinishableDeletionsTable;
     live_apps: ILiveAppsTable;
     purgeable_apps: IPurgeableAppsTable;
+    volume_usage: IVolumeUsageTable;
 }
 
 declare module "@ilbertt/bun-sqlgen" {

@@ -36,6 +36,7 @@ export const GUEST_VERB = {
   makeDirectory: 5,
   remove: 6,
   move: 7,
+  usage: 8,
 } as const;
 
 const KIND_CODES: Readonly<Record<FilesystemEntryKind, number>> = {
@@ -65,6 +66,22 @@ export function listingBody({
   truncated?: boolean;
 }): Buffer {
   return Buffer.concat([Buffer.of(truncated ? 1 : 0), ...entries.map(entryBytes)]);
+}
+
+const UINT64_BYTES = 8;
+
+/** Two big-endian counts and nothing else, which is the whole of what `usage` answers with. */
+export function usageBody({
+  totalBytes,
+  usedBytes,
+}: {
+  totalBytes: number;
+  usedBytes: number;
+}): Buffer {
+  const bytes = Buffer.alloc(UINT64_BYTES * 2);
+  bytes.writeBigUInt64BE(BigInt(totalBytes));
+  bytes.writeBigUInt64BE(BigInt(usedBytes), UINT64_BYTES);
+  return bytes;
 }
 
 export function replyFrame({
