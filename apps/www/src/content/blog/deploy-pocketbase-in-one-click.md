@@ -40,17 +40,12 @@ Grab the Linux build from the [PocketBase releases
 page](https://github.com/pocketbase/pocketbase/releases) (`pocketbase_<version>_linux_amd64.zip`)
 and unzip it. Inside is one file called `pocketbase`. That is the whole application.
 
-Then open the deploy link, which is carrying the rest of it:
+Drag and drop it onto [nibrun.com](https://nibrun.com). You land on the deploy screen with the
+binary already attached and an HTTP port and arguments left to fill in.
+
+Or skip that part. This link is the same screen with them already written down:
 
 [**Deploy PocketBase on nibrun**](https://app.nibrun.com/deploy?name=pocketbase&port=8090&arg=serve&arg=--http=0.0.0.0:8090&arg=--dir=./data/pb_data)
-
-The name, the HTTP port and the arguments land already filled in:
-
-```
-serve
---http=0.0.0.0:8090
---dir=./data/pb_data
-```
 
 Pick the `pocketbase` file you just unzipped, and deploy.
 
