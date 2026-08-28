@@ -1,4 +1,5 @@
 import { Path } from '@effect/platform';
+import { type Ipv4Address, Ipv4AddressSchema, Value } from '@repo/protocol';
 import { Config, Effect } from 'effect';
 
 const DEFAULT_STATE_DIR = '/var/lib/nibrun';
@@ -18,6 +19,15 @@ const trimmed = (name: string) => Config.map(Config.string(name), (value) => val
 const required = (name: string) =>
   trimmed(name).pipe(
     Config.validate({ message: `${name} is required`, validation: (value) => value.length > 0 }),
+  );
+
+/** Branded here, so an address that is not one stops the agent rather than reaching a guest. */
+const requiredIpv4 = (name: string) =>
+  required(name).pipe(
+    Config.validate({
+      message: `${name} is not an IPv4 address`,
+      validation: (value): value is Ipv4Address => Value.Check(Ipv4AddressSchema, value),
+    }),
   );
 
 const optional = ({ name, fallback }: { name: string; fallback: string }) =>
@@ -62,7 +72,7 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
       // something a guest can discover. Required for the same reason as the log store — an agent
       // without it runs correctly and hands every guest no address at all, which nobody notices
       // until an owner asks why the port they were given answers nothing.
-      portRelayPublicIpv4: yield* required('AGENT_PORT_RELAY_PUBLIC_IPV4'),
+      portRelayPublicIpv4: yield* requiredIpv4('AGENT_PORT_RELAY_PUBLIC_IPV4'),
       runtimeDir: yield* optional({ name: 'AGENT_RUNTIME_DIR', fallback: DEFAULT_RUNTIME_DIR }),
       hostIdFile: inStateDir('host-id'),
       slotsFile: inStateDir('slots.json'),
