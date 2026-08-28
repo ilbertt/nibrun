@@ -4,9 +4,10 @@ import { AgentConfig } from '#services/agent-config.service.ts';
 
 export const HOST_STORAGE_PREFIX = Value.Parse(ObjectKeySchema, 'filesystems/host-1');
 
-/** `slotsFile` names a directory nothing creates: what a test persists never reaches a host. */
+/** The slot files name a directory nothing creates: what a test persists never reaches a host. */
 export const AGENT_CONFIG = {
   slotsFile: '/nonexistent/nibrun-test/slots.json',
+  slotCursorFile: '/nonexistent/nibrun-test/slot-cursor.json',
   zerofsStoragePrefix: HOST_STORAGE_PREFIX,
   zerofsMount: '/mnt/zerofs',
   zerofsNbdSocket: '/run/zerofs/nbd.sock',

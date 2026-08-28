@@ -4,15 +4,32 @@ import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
 import {
   type Assignments,
   assignmentsFrom,
+  readSlotCursor,
   readSlotRecords,
   SlotExhausted,
 } from '#lib/network/allocator.ts';
 import { type AppSlot, describeSlot, FIRST_SLOT, SLOT_COUNT } from '#lib/network/slot.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
-const firstFree = (assignments: Assignments) => {
+const SLOT_SPAN = SLOT_COUNT - FIRST_SLOT;
+
+/** Twice, because a cursor read off disk may be negative and `%` keeps the sign. */
+function wrapped(offset: number): number {
+  return FIRST_SLOT + (((offset % SLOT_SPAN) + SLOT_SPAN) % SLOT_SPAN);
+}
+
+type Allocation = Either.Either<{ slot: AppSlot; fresh: boolean }, SlotExhausted>;
+
+/**
+ * The next free slot at or after the cursor rather than the lowest free one, wrapping once so the
+ * scan still ends. A slot only comes back when its app's volume is torn down, and handing it
+ * straight to the next app makes an address a client may still be dialling somebody else's — so a
+ * freed slot waits for the cursor to come round to it, which is every other slot first.
+ */
+const nextFree = ({ assignments, from }: { assignments: Assignments; from: number }) => {
   const taken = new Set(assignments.values());
-  for (let slot = FIRST_SLOT; slot < SLOT_COUNT; slot += 1) {
+  for (let step = 0; step < SLOT_SPAN; step += 1) {
+    const slot = wrapped(from - FIRST_SLOT + step);
     if (!taken.has(slot)) {
       return slot;
     }
@@ -32,28 +49,37 @@ export class SlotAllocator extends Effect.Service<SlotAllocator>()('SlotAllocato
     const config = yield* AgentConfig;
     const stored = yield* readJsonFile(config.slotsFile);
     const ref = yield* Ref.make(assignmentsFrom(readSlotRecords(Option.getOrUndefined(stored))));
+    const storedCursor = yield* readJsonFile(config.slotCursorFile);
+    const cursorRef = yield* Ref.make(readSlotCursor(Option.getOrUndefined(storedCursor)));
 
     return {
       allocate: (appId: AppId) =>
-        Effect.flatten(
-          Ref.modify(
-            ref,
-            (assignments): readonly [Either.Either<AppSlot, SlotExhausted>, Assignments] => {
+        Effect.gen(function* () {
+          const from = yield* Ref.get(cursorRef);
+          const taken = yield* Effect.flatten(
+            Ref.modify(ref, (assignments): readonly [Allocation, Assignments] => {
               const existing = withSlot({ assignments, appId });
               if (Option.isSome(existing)) {
-                return [Either.right(existing.value), assignments];
+                return [Either.right({ slot: existing.value, fresh: false }), assignments];
               }
-              const slot = firstFree(assignments);
-              if (slot === undefined) {
+              const free = nextFree({ assignments, from });
+              if (free === undefined) {
                 return [Either.left(new SlotExhausted({ limit: SLOT_COUNT })), assignments];
               }
               return [
-                Either.right(describeSlot({ slot, appId })),
-                new Map(assignments).set(appId, slot),
+                Either.right({ slot: describeSlot({ slot: free, appId }), fresh: true }),
+                new Map(assignments).set(appId, free),
               ];
-            },
-          ),
-        ),
+            }),
+          );
+          // Only past a slot this just gave away. An app being handed the one it already holds is
+          // every redeploy, and moving the cursor there would leave it wherever the last redeploy
+          // happened to be — which is as likely to sit on a freed slot as anywhere else.
+          if (taken.fresh) {
+            yield* Ref.set(cursorRef, taken.slot.slot + 1);
+          }
+          return taken.slot;
+        }),
 
       lookup: (appId: AppId) =>
         Effect.map(Ref.get(ref), (assignments) => withSlot({ assignments, appId })),
@@ -69,9 +95,13 @@ export class SlotAllocator extends Effect.Service<SlotAllocator>()('SlotAllocato
         [...assignments].map(([appId, slot]) => describeSlot({ slot, appId })),
       ),
 
-      persist: Effect.flatMap(Ref.get(ref), (assignments) =>
-        writeJsonFile({ path: config.slotsFile, value: Object.fromEntries(assignments) }),
-      ),
+      persist: Effect.gen(function* () {
+        const assignments = yield* Ref.get(ref);
+        yield* writeJsonFile({ path: config.slotsFile, value: Object.fromEntries(assignments) });
+        // After the slots, and never in place of them: a cursor written without them would point
+        // past allocations the next boot has no record of.
+        yield* writeJsonFile({ path: config.slotCursorFile, value: yield* Ref.get(cursorRef) });
+      }),
     };
   }),
   dependencies: [AgentConfig.Default],
