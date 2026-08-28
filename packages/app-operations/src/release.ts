@@ -30,13 +30,17 @@ export type DeployStep =
 export type ConfigEdit = {
   args?: TenantArguments | undefined;
   port?: number | undefined;
+  // A yes or no rather than a number: which port an app is given is nibrun's to decide, because it
+  // has to be the same on every hop for a binary announcing the one it bound to be reachable.
+  extraPublicPort?: boolean | undefined;
   environment?: TenantEnvironmentPatch | undefined;
 };
 
-export function configPatch({ args, port, environment }: ConfigEdit) {
+export function configPatch({ args, port, extraPublicPort, environment }: ConfigEdit) {
   return {
     ...(args !== undefined && { args }),
     ...(port !== undefined && { httpPort: Value.Parse(HttpPortSchema, port) }),
+    ...(extraPublicPort !== undefined && { hasExtraPublicPort: extraPublicPort }),
     ...(environment !== undefined && { environment }),
   };
 }

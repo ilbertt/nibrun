@@ -41,6 +41,14 @@ export const SHARED_OPTIONS = {
       description: `Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. A value may name one the guest sets — ${RUNTIME_VALUE_NAMES.join(', ')} — quote it, as in 'URL=https://\${NIBRUN_HOSTNAME}', or the shell expands it here instead.`,
     },
   },
+  extraPublicPort: {
+    name: 'extra-public-port',
+    option: {
+      schema: z.boolean().optional(),
+      description:
+        'Give the app a public TCP and UDP port of its own, for a protocol HTTPS cannot carry. The guest is told the address and the port to announce as NIBRUN_PUBLIC_IPV4 and NIBRUN_EXTRA_PUBLIC_PORT. Pass --extra-public-port=false to give it up.',
+    },
+  },
   unset: {
     name: 'unset',
     option: {

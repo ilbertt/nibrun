@@ -23,6 +23,7 @@ export const command = defineCommand('run [command]', {
       description: 'Name for the new app. Defaults to the binary filename.',
     },
     [SHARED_OPTIONS.port.name]: SHARED_OPTIONS.port.option,
+    [SHARED_OPTIONS.extraPublicPort.name]: SHARED_OPTIONS.extraPublicPort.option,
     [SHARED_OPTIONS.env.name]: SHARED_OPTIONS.env.option,
     [SHARED_OPTIONS.unset.name]: SHARED_OPTIONS.unset.option,
     [SHARED_OPTIONS.detach.name]: SHARED_OPTIONS.detach.option,

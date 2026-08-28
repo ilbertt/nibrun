@@ -5,7 +5,14 @@ import {
   AccordionTrigger,
 } from '@repo/ui/components/accordion';
 import { Button } from '@repo/ui/components/button';
-import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
+import { Checkbox } from '@repo/ui/components/checkbox';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
 import { useStore } from '@tanstack/react-form';
@@ -31,7 +38,15 @@ export function DeployForm({
   binary: File | undefined;
   suggested?: DeploySuggestion | undefined;
 }) {
-  const { api, locked, replacing, targetResolved, defaultPort, defaultArgs } = useDeployForm({
+  const {
+    api,
+    locked,
+    replacing,
+    targetResolved,
+    defaultPort,
+    defaultExtraPublicPort,
+    defaultArgs,
+  } = useDeployForm({
     appId,
     binary,
     suggested,
@@ -67,6 +82,25 @@ export function DeployForm({
             ) : (
               <FieldDescription>The port the binary listens on inside the guest.</FieldDescription>
             )}
+          </Field>
+        )}
+      </api.Field>
+
+      <api.Field name="extraPublicPort">
+        {(field) => (
+          <Field orientation="horizontal">
+            <Checkbox
+              id="deploy-extra-public-port"
+              checked={field.state.value ?? defaultExtraPublicPort}
+              onCheckedChange={(checked) => field.handleChange(checked)}
+            />
+            <FieldContent>
+              <FieldLabel htmlFor="deploy-extra-public-port">Extra public port</FieldLabel>
+              <FieldDescription>
+                A public TCP and UDP port of its own, for a protocol HTTPS cannot carry. The app is
+                told which address and port to announce.
+              </FieldDescription>
+            </FieldContent>
           </Field>
         )}
       </api.Field>

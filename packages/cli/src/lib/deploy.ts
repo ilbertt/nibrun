@@ -25,6 +25,7 @@ export async function deploy({
   app,
   name,
   port,
+  extraPublicPort,
   env,
   unset,
   detach,
@@ -37,6 +38,7 @@ export async function deploy({
     app,
     name,
     port,
+    extraPublicPort,
     ...(environment !== undefined && { environment }),
     onStep: (step) => announce({ step, ui }),
     whileUploading: ({ message, task }) => {

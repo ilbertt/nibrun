@@ -87,6 +87,26 @@ test('arguments nobody named are not arguments cleared', async () => {
   expect(patched).toEqual([{ httpPort: 8080 }]);
 });
 
+// Which port an app is given is nibrun's to decide, so the flag carries a yes or a no and never a
+// number — and the no has to travel, or there would be no way to give the port up.
+test('asking for a public port sends the answer, and so does giving it up', async () => {
+  const patched: unknown[] = [];
+  const api = apiHolding({ patched });
+
+  await updateApp({ api, ui: uiSaying([]), slug: SLUG, extraPublicPort: true });
+  await updateApp({ api, ui: uiSaying([]), slug: SLUG, extraPublicPort: false });
+
+  expect(patched).toEqual([{ hasExtraPublicPort: true }, { hasExtraPublicPort: false }]);
+});
+
+test('a flag nobody passed says nothing about the port', async () => {
+  const patched: unknown[] = [];
+
+  await updateApp({ api: apiHolding({ patched }), ui: uiSaying([]), slug: SLUG, port: 8080 });
+
+  expect(patched).toEqual([{ httpPort: 8080 }]);
+});
+
 // The difference `--args ""` exists to make: an empty list is a binary asked to run bare, where
 // no list at all is a caller who said nothing about arguments.
 test('an empty list of arguments is arguments cleared', async () => {
