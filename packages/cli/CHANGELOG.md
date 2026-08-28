@@ -2,6 +2,22 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.28-2]
+
+### 🚀 Features
+
+- *(cli)* Nib run takes a url where it takes a path (#349)
+- *(api)* A binary may be fetched from a url instead of uploaded (#347)
+- An owner sees where their app answers on its own port (#340)
+
+### 🐛 Bug Fixes
+
+- *(cli,dashboard)* A settling release is said in the app's terms, not the guest's (#353)
+
+### ⚙️ Miscellaneous Tasks
+
+- Cap cognitive complexity and enforce api layering with Biome (#343)
+
 ## [2026.8.28-1]
 
 ### 🚀 Features
