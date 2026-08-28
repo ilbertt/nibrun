@@ -1,12 +1,15 @@
 import {
   type App,
   type AppId,
+  EXTRA_PUBLIC_PORT_VALUE_NAMES,
+  namesExtraPublicPortValues,
   OWNED_APP_STATES,
   type OwnedAppState,
   type OwnerId,
   REDACTED,
   type ReportedVolume,
   type TenantEnvironment,
+  writtenRuntimeValue,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
 import {
@@ -146,8 +149,13 @@ export class AppsService extends Service {
   }): Promise<PublicApp> {
     const environment = config?.environment ?? {};
     refuseRedactedValues(environment);
+    const withDefaults = configWithDefaults(config);
+    refuseValuesNeedingAPort({
+      environment,
+      hasExtraPublicPort: withDefaults.hasExtraPublicPort,
+    });
     const appConfig = {
-      ...configWithDefaults(config),
+      ...withDefaults,
       environment: sealEnvironment({ key: this.secretsKey, environment }),
     };
 
@@ -170,6 +178,40 @@ export class AppsService extends Service {
     }
 
     throw new ConflictError('Could not mint a free hostname for the app.');
+  }
+
+  /**
+   * The same rule as on create, against the config the edit leaves behind rather than the one it
+   * carries: a value naming these is allowed by an app that already has the port, and refused by
+   * one whose port this very edit is taking away.
+   *
+   * Only ever a read when a value names one, which is almost never — so a patch that says nothing
+   * about them is the one write it was.
+   *
+   * The other direction is not guarded: an app that gives up its port while a variable it is not
+   * restating still names one fails its next boot, loudly, having asked for exactly that. What is
+   * worth an answer here is the value someone is typing now.
+   */
+  private async refuseValuesTheEditLeavesUngiven({
+    appId,
+    ownerId,
+    patch,
+  }: OwnedApp & { patch: AppConfigPatch }): Promise<void> {
+    const naming = Object.entries(patch.environment ?? {}).filter(
+      ([, value]) => value !== null && namesExtraPublicPortValues(value),
+    );
+    if (naming.length === 0) {
+      return;
+    }
+
+    const hasExtraPublicPort =
+      patch.hasExtraPublicPort ??
+      requireApp(await this.appsRepo.findById({ appId, ownerId })).has_extra_public_port;
+
+    refuseValuesNeedingAPort({
+      environment: Object.fromEntries(naming) as TenantEnvironment,
+      hasExtraPublicPort,
+    });
   }
 
   private sealed({ environment, ...rest }: AppConfigPatch): SealedConfigPatch {
@@ -210,6 +252,7 @@ export class AppsService extends Service {
     ownerId,
     patch,
   }: OwnedApp & { patch: AppConfigPatch }): Promise<PublicApp> {
+    await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch });
     const app = requireApp(
       await this.appsRepo.updateConfig({ appId, ownerId, patch: this.sealed(patch) }),
     );
@@ -422,6 +465,34 @@ function refuseRedactedValues(environment: TenantEnvironment): void {
   if (echoed.length > 0) {
     throw new BadRequestError(
       `${REDACTED} is what a read returns in place of a value, so it cannot be set as one: ${echoed.join(', ')}.`,
+    );
+  }
+}
+
+/**
+ * The guest is given these two only when the app asked for a public port besides HTTP, and refuses
+ * a reference it was not given rather than expanding it to nothing — so a value naming one on an
+ * app without the port is a deploy that boots into an error nobody is watching for. Answered here
+ * instead, while whoever typed it is still listening.
+ *
+ * The variable is named and its value never is: it is the tenant's secret either way.
+ */
+function refuseValuesNeedingAPort({
+  environment,
+  hasExtraPublicPort,
+}: {
+  environment: TenantEnvironment;
+  hasExtraPublicPort: boolean;
+}): void {
+  if (hasExtraPublicPort) {
+    return;
+  }
+  const naming = Object.entries(environment)
+    .filter(([, value]) => namesExtraPublicPortValues(value))
+    .map(([name]) => name);
+  if (naming.length > 0) {
+    throw new BadRequestError(
+      `${EXTRA_PUBLIC_PORT_VALUE_NAMES.map(writtenRuntimeValue).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
     );
   }
 }

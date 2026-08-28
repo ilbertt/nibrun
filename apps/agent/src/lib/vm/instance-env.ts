@@ -2,6 +2,7 @@ import { FileSystem, Path } from '@effect/platform';
 import type {
   AppHostname,
   Hostname,
+  HostPort,
   HttpPort,
   RestartPolicy,
   TenantArguments,
@@ -38,6 +39,26 @@ function platformHostname(hostnames: AppHostname[]): Hostname | undefined {
   return hostnames.find((each) => each.kind === 'platform')?.hostname;
 }
 
+/**
+ * Where a tenant's own port is reached, for an app that asked for one. The two together, because
+ * half of what a binary has to announce is not an announcement — and neither half is something a
+ * guest can find out for itself: the address belongs to the relay in front of the host, and the
+ * ruleset denies the metadata endpoint anyway.
+ */
+export type PublicAddress = {
+  readonly ipv4: string;
+  readonly port: HostPort;
+};
+
+type InstanceEnvContent = {
+  httpPort: HttpPort;
+  publicAddress?: PublicAddress | undefined;
+  hostnames: AppHostname[];
+  args: TenantArguments;
+  environment: TenantEnvironment;
+  restartPolicy: RestartPolicy;
+};
+
 export class UnrepresentableEnvironment extends Data.TaggedError('UnrepresentableEnvironment')<{
   readonly variableName: string;
 }> {
@@ -54,21 +75,22 @@ export class UnrepresentableEnvironment extends Data.TaggedError('Unrepresentabl
  */
 export function renderInstanceEnv({
   httpPort,
+  publicAddress,
   hostnames,
   args,
   environment,
   restartPolicy,
-}: {
-  httpPort: HttpPort;
-  hostnames: AppHostname[];
-  args: TenantArguments;
-  environment: TenantEnvironment;
-  restartPolicy: RestartPolicy;
-}): Either.Either<string, UnrepresentableEnvironment> {
+}: InstanceEnvContent): Either.Either<string, UnrepresentableEnvironment> {
   const hostname = platformHostname(hostnames);
   const lines = [
     `${RUNTIME_PREFIX}HTTP_PORT=${httpPort}`,
     ...(hostname === undefined ? [] : [`${RUNTIME_PREFIX}HOSTNAME=${hostname}`]),
+    ...(publicAddress === undefined
+      ? []
+      : [
+          `${RUNTIME_PREFIX}PUBLIC_IPV4=${publicAddress.ipv4}`,
+          `${RUNTIME_PREFIX}EXTRA_PUBLIC_PORT=${publicAddress.port}`,
+        ]),
     `${RUNTIME_PREFIX}MAX_RESTARTS=${restartPolicy.maxRestarts}`,
     `${RUNTIME_PREFIX}INITIAL_BACKOFF_MS=${restartPolicy.initialBackoffMs}`,
     `${RUNTIME_PREFIX}MAX_BACKOFF_MS=${restartPolicy.maxBackoffMs}`,
@@ -100,14 +122,7 @@ export function renderInstanceEnv({
 export const buildInstanceConfigImage = ({
   workingDir,
   ...content
-}: {
-  workingDir: string;
-  httpPort: HttpPort;
-  hostnames: AppHostname[];
-  args: TenantArguments;
-  environment: TenantEnvironment;
-  restartPolicy: RestartPolicy;
-}) =>
+}: InstanceEnvContent & { workingDir: string }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;

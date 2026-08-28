@@ -70,9 +70,16 @@ const checksums = manifest.artifacts
   .join('\n');
 await Bun.write(join(distDir, 'SHA256SUMS'), `${checksums}\n`);
 
-await aws(['s3', 'cp', '--recursive', distDir, `s3://${bucket}/${version}/`]);
+const prefix = `s3://${bucket}/${version}/`;
 
-core.info(`Published s3://${bucket}/${version}/`);
+// manifest.json is what the check above reads to decide the version is already
+// published, so it is written last and on its own. Uploaded inside the recursive
+// copy it can land before the artifacts do, and a job that dies in between
+// leaves a prefix every later run skips as done and every host fails to verify.
+await aws(['s3', 'cp', '--recursive', '--exclude', 'manifest.json', distDir, prefix]);
+await aws(['s3', 'cp', join(distDir, 'manifest.json'), `${prefix}manifest.json`]);
+
+core.info(`Published ${prefix}`);
 
 await writeSummary(
   [

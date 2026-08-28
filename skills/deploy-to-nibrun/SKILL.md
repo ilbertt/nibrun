@@ -19,6 +19,7 @@ Everything the binary can count on, and nothing else:
 | Persistent volume | `/app/data` — 8 GiB, survives every redeploy. `NIBRUN_DATA_DIR` names it |
 | Port | `NIBRUN_HTTP_PORT`, and `PORT` beside it; the app **must** listen on it, on `0.0.0.0` |
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
+| Second port | Only for an app that asked for one: `NIBRUN_EXTRA_PUBLIC_PORT` on `NIBRUN_PUBLIC_IPV4`, TCP and UDP, reached at that number and no other |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs and is lost on restart. So is everything outside `/app/data` |
 | Resources | 1 vCPU, 256 MiB RAM |
 | `HOME` | `/app` |
@@ -30,6 +31,11 @@ configuration to run here. The guest sets three names of its own — `NIBRUN_HTT
 which carries the same number as `NIBRUN_HTTP_PORT` under the name every other host uses. `HOME`
 and `TMPDIR` are defaults rather than owned, so one you set yourself is what the binary reads.
 
+An app needing a port HTTP cannot carry — WebRTC media, a game server, anything on UDP — asks for
+one, and is then set two more: `NIBRUN_PUBLIC_IPV4` and `NIBRUN_EXTRA_PUBLIC_PORT`. Bind that port
+and announce that pair; it is the same number end to end, which is what makes announcing it
+correct. Neither is discoverable from inside the guest.
+
 A binary that needs its own absolute URL — an OAuth redirect, a webhook it registers, a link in
 an email — builds it from `NIBRUN_HOSTNAME` rather than being told it, and falls back to whatever
 it uses when it is not on nibrun.
@@ -38,8 +44,13 @@ One that insists on a variable name of its own reaches the same values through i
 name a runtime one — `APP_BASE_URL=https://${NIBRUN_HOSTNAME}`,
 `DATABASE_URL=file:${NIBRUN_DATA_DIR}/app.db` — and the guest expands it before exec. Only that
 prefix expands, so a secret holding a `$` arrives untouched, and `NIBRUN_HTTP_PORT`,
-`NIBRUN_HOSTNAME` and `NIBRUN_DATA_DIR` are the whole of what may be named — `${PORT}` is not one
-of them — with anything else refused when you deploy it.
+`NIBRUN_HOSTNAME`, `NIBRUN_DATA_DIR`, `NIBRUN_PUBLIC_IPV4` and `NIBRUN_EXTRA_PUBLIC_PORT` are the
+whole of what may be named — `${PORT}` is not one of them — with anything else refused when you
+deploy it.
+
+The last two are set only for an app that asked for a second port, and naming one the app was not
+given fails the boot rather than expanding to nothing. Ask for the port in the same change that
+names it.
 
 ## Deploying
 

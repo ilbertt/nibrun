@@ -39,7 +39,22 @@ export const RUNTIME_VALUE_NAMES = [
   `${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`,
 ] as const;
 
+/**
+ * The two the guest is only given when the app asked for a public port besides HTTP. Naming one on
+ * an app without it fails the boot — the runtime refuses a reference it was not given rather than
+ * expanding it to nothing — so the pair has to be answerable here, where the config that decides it
+ * is also being written.
+ *
+ * A subset of the array above rather than a second list, so a name can only be conditional if it
+ * is offered at all.
+ */
+export const EXTRA_PUBLIC_PORT_VALUE_NAMES = [
+  `${RUNTIME_VALUE_PREFIX}EXTRA_PUBLIC_PORT`,
+  `${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`,
+] as const satisfies readonly (typeof RUNTIME_VALUE_NAMES)[number][];
+
 const OFFERED = RUNTIME_VALUE_NAMES.join('|');
+const NEEDS_A_PORT = EXTRA_PUBLIC_PORT_VALUE_NAMES.join('|');
 const NAME_CHARACTER = '[A-Za-z0-9_]';
 
 // A value as the guest reads it: anything but a `$`, a `$` that opens no reference — which is what
@@ -68,6 +83,18 @@ export function namesOfferedRuntimeValues(value: string): boolean {
 /** A runtime value as it is named in a tenant value, which is the form worth showing back. */
 export function writtenRuntimeValue(name: string): string {
   return `\${${name}}`;
+}
+
+// Both forms that expand, and only the names an app has to have asked for. Not a schema pattern
+// like the one above: whether this is allowed depends on the config beside it, which is not
+// something a value can be validated against on its own.
+const NAMES_A_PORT = new RegExp(
+  `\\$(?:\\{(?:${NEEDS_A_PORT})\\}|(?:${NEEDS_A_PORT})(?!${NAME_CHARACTER}))`,
+);
+
+/** Whether `value` names a runtime value only an app with an extra public port is given. */
+export function namesExtraPublicPortValues(value: string): boolean {
+  return NAMES_A_PORT.test(value);
 }
 
 // The pattern rather than a check of its own, so what the schema refuses and what a caller may

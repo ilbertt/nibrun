@@ -4,6 +4,7 @@ import {
   DEFAULT_HTTP_PORT,
   DEFAULT_RESTART_POLICY,
   HostnameSchema,
+  HostPortSchema,
   HttpPortSchema,
   Value,
 } from '@repo/protocol';
@@ -43,6 +44,14 @@ function refusedVariable(overrides: Overrides) {
   return Either.isLeft(result) ? result.left : undefined;
 }
 
+const RELAY_IPV4 = '203.0.113.7';
+const EXTRA_PUBLIC_PORT = 22_000;
+
+const REACHED_AT = {
+  ipv4: RELAY_IPV4,
+  port: Value.Parse(HostPortSchema, EXTRA_PUBLIC_PORT),
+};
+
 // apps/runtime/src/config.c accepts NIBRUN_ and ENV_ and rejects every other line, so these
 // assertions are the boot contract rather than a formatting preference.
 describe('what apps/runtime parses off the config drive', () => {
@@ -50,6 +59,29 @@ describe('what apps/runtime parses off the config drive', () => {
     expect(render().split('\n').filter(Boolean)).toEqual([
       `NIBRUN_HTTP_PORT=${DEFAULT_HTTP_PORT}`,
       `NIBRUN_HOSTNAME=${PLATFORM_HOSTNAME}`,
+      `NIBRUN_MAX_RESTARTS=${DEFAULT_RESTART_POLICY.maxRestarts}`,
+      `NIBRUN_INITIAL_BACKOFF_MS=${DEFAULT_RESTART_POLICY.initialBackoffMs}`,
+      `NIBRUN_MAX_BACKOFF_MS=${DEFAULT_RESTART_POLICY.maxBackoffMs}`,
+      `NIBRUN_BACKOFF_FACTOR=${DEFAULT_RESTART_POLICY.backoffFactor}`,
+      `NIBRUN_RESET_AFTER_MS=${DEFAULT_RESTART_POLICY.resetAfterMs}`,
+      'NIBRUN_DNS=1.1.1.1,1.0.0.1',
+    ]);
+  });
+
+  // The runtime reads both as optional and rejects a key it does not know, so an app that asked
+  // for no port has to be a file with neither line rather than one with an empty value.
+  test('an app that asked for no public port is sent neither half of one', () => {
+    const written = render();
+    expect(written).not.toContain('NIBRUN_PUBLIC_IPV4');
+    expect(written).not.toContain('NIBRUN_EXTRA_PUBLIC_PORT');
+  });
+
+  test('an app that asked is told the address and the port together', () => {
+    expect(render({ publicAddress: REACHED_AT }).split('\n').filter(Boolean)).toEqual([
+      `NIBRUN_HTTP_PORT=${DEFAULT_HTTP_PORT}`,
+      `NIBRUN_HOSTNAME=${PLATFORM_HOSTNAME}`,
+      `NIBRUN_PUBLIC_IPV4=${RELAY_IPV4}`,
+      `NIBRUN_EXTRA_PUBLIC_PORT=${EXTRA_PUBLIC_PORT}`,
       `NIBRUN_MAX_RESTARTS=${DEFAULT_RESTART_POLICY.maxRestarts}`,
       `NIBRUN_INITIAL_BACKOFF_MS=${DEFAULT_RESTART_POLICY.initialBackoffMs}`,
       `NIBRUN_MAX_BACKOFF_MS=${DEFAULT_RESTART_POLICY.maxBackoffMs}`,
