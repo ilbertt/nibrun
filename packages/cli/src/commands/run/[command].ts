@@ -3,13 +3,13 @@ import { z } from 'zod';
 import { SHARED_OPTIONS } from '#config.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { deploy, openBinary } from '#lib/deploy.ts';
+import { binaryFrom, deploy } from '#lib/deploy.ts';
 import { completeOptions } from '#lib/plan.ts';
 import { createUi, isInteractive } from '#lib/ui.ts';
 
 export const command = defineCommand('run [command]', {
   description:
-    'Deploy a compiled binary and run it. Quote the binary with its arguments to pass them on: nib run "./my-server serve --port 8080".',
+    'Deploy a compiled binary and run it, from this machine or from an https url nibrun fetches it at. Quote the binary with its arguments to pass them on: nib run "./my-server serve --port 8080".',
   params: {
     command: { schema: z.string().min(1) },
   },
@@ -34,19 +34,20 @@ export const command = defineCommand('run [command]', {
     // name the deploy takes and has to be renamed rather than spread through.
     const { detach, [SHARED_OPTIONS.extraPublicPort.name]: extraPublicPort, ...flags } = options;
     const given = { ...flags, extraPublicPort };
-    const { binaryPath, args } = parseCommandLine(params.command);
+    const { binarySource, args } = parseCommandLine(params.command);
     const { api } = context;
 
     const interactive = isInteractive();
     const ui = createUi({ print, interactive });
 
     // Before anything is asked, so a path nobody can read costs one line rather than a
-    // questionnaire whose answers are then thrown away.
-    const binary = await openBinary(binaryPath);
+    // questionnaire whose answers are then thrown away. A url is not opened here at all: the api
+    // is the end that fetches it, and it is the end that says whether it could.
+    const binary = await binaryFrom(binarySource);
     ui.open('nib run');
 
     const resolved = interactive
-      ? await completeOptions({ api, options: given, binaryPath, args })
+      ? await completeOptions({ api, options: given, binarySource, args })
       : given;
 
     await deploy({ ...resolved, api, ui, binary, args, detach });

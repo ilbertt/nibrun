@@ -18,7 +18,7 @@ export type RunOptions = {
 
 type Plan = {
   options: RunOptions;
-  binaryPath: string;
+  binarySource: string;
   args: TenantArguments;
 };
 
@@ -31,18 +31,18 @@ type Plan = {
 export async function completeOptions({
   api,
   options,
-  binaryPath,
+  binarySource,
   args,
 }: Plan & { api: PublicApiClient }) {
-  const completed = await fillGaps({ api, options, binaryPath });
-  await confirmPlan({ options: completed, binaryPath, args });
+  const completed = await fillGaps({ api, options, binarySource });
+  await confirmPlan({ options: completed, binarySource, args });
   return completed;
 }
 
 async function fillGaps({
   api,
   options,
-  binaryPath,
+  binarySource,
 }: Omit<Plan, 'args'> & { api: PublicApiClient }): Promise<RunOptions> {
   if (options.app !== undefined) {
     // A slug typed rather than chosen has been checked against nothing yet, and a summary saying
@@ -56,7 +56,7 @@ async function fillGaps({
   }
   return {
     ...options,
-    name: options.name ?? (await askName({ suggestion: basename(binaryPath) })),
+    name: options.name ?? (await askName({ suggestion: basename(binarySource) })),
     port: options.port ?? (await askPort()),
   };
 }
@@ -103,9 +103,9 @@ async function askPort(): Promise<number> {
   return Number(answered(answer));
 }
 
-async function confirmPlan({ options, binaryPath, args }: Plan): Promise<void> {
+async function confirmPlan({ options, binarySource, args }: Plan): Promise<void> {
   const creating = options.app === undefined;
-  note(summary({ options, binaryPath, args }), creating ? 'New app' : 'Existing app');
+  note(summary({ options, binarySource, args }), creating ? 'New app' : 'Existing app');
 
   const question = creating
     ? `Create ${options.name} and deploy?`
@@ -115,9 +115,9 @@ async function confirmPlan({ options, binaryPath, args }: Plan): Promise<void> {
   }
 }
 
-function summary({ options, binaryPath, args }: Plan): string {
+function summary({ options, binarySource, args }: Plan): string {
   const rows = [
-    ['binary', binaryPath],
+    ['binary', binarySource],
     ['app', options.app ?? options.name],
     ['port', options.port],
     // Only when it was asked for: a row saying no on every run is one nobody reads.

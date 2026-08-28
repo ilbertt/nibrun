@@ -69,7 +69,7 @@ test('an owner with no apps is asked what to call one, not which to use', async 
   const resolved = await completeOptions({
     api: apiListing({ apps: [] }),
     options: {},
-    binaryPath: '/tmp/my-server',
+    binarySource: '/tmp/my-server',
     args: ['serve'],
   });
 
@@ -79,6 +79,17 @@ test('an owner with no apps is asked what to call one, not which to use', async 
     'text:Which HTTP port does the binary listen on? (3000)',
     'confirm:Create my-server and deploy?',
   ]);
+});
+
+test('a url suggests the same name the path to the same binary would', async () => {
+  const resolved = await completeOptions({
+    api: apiListing({ apps: [] }),
+    options: {},
+    binarySource: 'https://releases.test/v1/my-server',
+    args: [],
+  });
+
+  expect(resolved).toEqual({ name: 'my-server', port: 3000 });
 });
 
 test('an app the owner cannot deploy onto is not offered', async () => {
@@ -92,7 +103,7 @@ test('an app the owner cannot deploy onto is not offered', async () => {
       ],
     }),
     options: {},
-    binaryPath: '/tmp/my-server',
+    binarySource: '/tmp/my-server',
     args: [],
   });
 
@@ -107,7 +118,7 @@ test('a flag already given is not asked about again', async () => {
   const resolved = await completeOptions({
     api: apiListing({ apps: [] }),
     options: { name: 'my-app', port: 8080 },
-    binaryPath: '/tmp/my-server',
+    binarySource: '/tmp/my-server',
     args: ['serve', '--verbose'],
   });
 
@@ -119,7 +130,7 @@ test('what the binary will be run with is shown before anything is uploaded', as
   await completeOptions({
     api: apiListing({ apps: [{ slug: 'demo-abc123', state: 'active' }] }),
     options: { app: 'demo-abc123' },
-    binaryPath: '/tmp/my-server',
+    binarySource: '/tmp/my-server',
     args: ['serve', '--verbose'],
   });
 
@@ -133,7 +144,7 @@ test('a named app that cannot be deployed onto is refused before anything is ask
   const attempt = completeOptions({
     api: apiListing({ apps: [{ slug: 'demo-abc123', state: 'suspended' }], release: 'stopped' }),
     options: { app: 'demo-abc123' },
-    binaryPath: '/tmp/my-server',
+    binarySource: '/tmp/my-server',
     args: [],
   });
 
@@ -150,7 +161,7 @@ test('declining the confirmation cancels rather than deploying', async () => {
   const attempt = completeOptions({
     api: apiListing({ apps: [] }),
     options: {},
-    binaryPath: '/tmp/my-server',
+    binarySource: '/tmp/my-server',
     args: [],
   });
 

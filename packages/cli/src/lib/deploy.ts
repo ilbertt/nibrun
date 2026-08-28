@@ -1,6 +1,10 @@
 import { basename } from 'node:path';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { deploy as startDeployment, type UploadableBinary } from '@repo/app-operations';
+import {
+  type DeployableBinary,
+  deploy as startDeployment,
+  type UploadableBinary,
+} from '@repo/app-operations';
 import { type Filename, FilenameSchema, type TenantArguments, Value } from '@repo/protocol';
 import { environmentEdit } from '#lib/environment.ts';
 import { UsageError } from '#lib/errors.ts';
@@ -12,7 +16,7 @@ import { describeProgress } from '#lib/upload-progress.ts';
 export type DeployInput = RunOptions & {
   api: PublicApiClient;
   ui: Ui;
-  binary: UploadableBinary;
+  binary: DeployableBinary;
   args: TenantArguments;
   detach?: boolean | undefined;
 };
@@ -58,11 +62,32 @@ export async function deploy({
   await awaitServing({ api, ui, deployed, detach });
 }
 
+const SECURE_SCHEME = 'https://';
+const INSECURE_SCHEME = 'http://';
+
+/**
+ * Where the binary is coming from, as the command line said it: a url for the api to fetch, or a
+ * file on this machine to send.
+ *
+ * A path cannot begin with a scheme, so nothing else has to tell them apart. What the api will
+ * take is the api's to say — this only refuses the one mistake whose other reading is a file
+ * nobody could ever find.
+ */
+export async function binaryFrom(source: string): Promise<DeployableBinary> {
+  if (source.startsWith(SECURE_SCHEME)) {
+    return { url: source };
+  }
+  if (source.startsWith(INSECURE_SCHEME)) {
+    throw new UsageError(`A binary is fetched over https, and this is not: ${source}`);
+  }
+  return await openBinary(source);
+}
+
 /**
  * Opened rather than read: the bytes are streamed to the store when the time comes, and all
  * that is wanted here is that there is a file and what it is called.
  */
-export async function openBinary(path: string): Promise<UploadableBinary> {
+async function openBinary(path: string): Promise<UploadableBinary> {
   const body = Bun.file(path);
   if (!(await body.exists())) {
     throw new UsageError(`No such file: ${path}`);

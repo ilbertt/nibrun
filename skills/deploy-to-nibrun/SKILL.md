@@ -88,6 +88,13 @@ than carrying a number over from an example. It is the number the guest hands ba
 nib run ./my-server --app my-app
 ```
 
+The binary may be an https url instead of a path, and nibrun fetches it rather than this machine
+uploading it:
+
+```sh
+nib run https://github.com/me/my-app/releases/download/v1/my-server --app my-app
+```
+
 `nib run` waits until the deployment is actually serving and prints the URL. Add `--detach` to
 return as soon as it is created.
 
