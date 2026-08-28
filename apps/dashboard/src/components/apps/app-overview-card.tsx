@@ -65,16 +65,12 @@ function ReachedOnItsOwnPort({ appId }: { appId: string }) {
   const { publicIpv4, extraPublicPort } = useNewestDeployment(appId).data ?? {};
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-muted-foreground">Additional port</span>
+      {/* Both protocols, always — nibrun never asks which a tenant means to carry over it — so it
+          is part of what the row is called rather than something beside the address. */}
+      <span className="text-muted-foreground">Additional TCP/UDP port</span>
       {publicIpv4 && extraPublicPort ? (
-        <span className="flex items-center gap-2">
-          <span className="font-mono tabular-nums">
-            {publicIpv4}:{extraPublicPort}
-          </span>
-          {/* Both, always: nibrun does not ask what a tenant means to carry over it. */}
-          <Badge variant="outline" className="shrink-0">
-            TCP/UDP
-          </Badge>
+        <span className="font-mono tabular-nums">
+          {publicIpv4}:{extraPublicPort}
         </span>
       ) : (
         // Asked for and not yet answered for: the host says where it is on its first report, so
