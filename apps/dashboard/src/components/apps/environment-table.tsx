@@ -1,3 +1,4 @@
+import { RUNTIME_VALUE_NAMES, writtenRuntimeValue } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import {
   Table,
@@ -8,9 +9,13 @@ import {
   TableRow,
 } from '@repo/ui/components/table';
 import { PlusIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { EnvironmentRow } from '#components/apps/environment-row.tsx';
 import { blankVariable, type EnvironmentVariable } from '#lib/environment-variables.ts';
+
+function separatorBefore(index: number): string {
+  return index === RUNTIME_VALUE_NAMES.length - 1 ? ' or ' : ', ';
+}
 
 export function EnvironmentTable({
   variables,
@@ -72,13 +77,14 @@ export function EnvironmentTable({
         {children}
       </div>
       <p className="text-muted-foreground text-xs">
-        A value may name one the guest sets:{' '}
-        {/* biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being documented, shown to the reader rather than interpolated */}
-        <code className="font-mono">{'${NIBRUN_HTTP_PORT}'}</code>,{' '}
-        {/* biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being documented, shown to the reader rather than interpolated */}
-        <code className="font-mono">{'${NIBRUN_HOSTNAME}'}</code> or{' '}
-        {/* biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being documented, shown to the reader rather than interpolated */}
-        <code className="font-mono">{'${NIBRUN_DATA_DIR}'}</code>.
+        A value may name one the guest sets, and nothing else:{' '}
+        {[...RUNTIME_VALUE_NAMES.entries()].map(([index, name]) => (
+          <Fragment key={name}>
+            {index > 0 && separatorBefore(index)}
+            <code className="font-mono">{writtenRuntimeValue(name)}</code>
+          </Fragment>
+        ))}
+        .
       </p>
     </div>
   );

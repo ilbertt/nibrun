@@ -89,15 +89,15 @@ describe('a value naming a runtime value', () => {
 
   test('one the guest offers is carried through as it was written', () => {
     expect(parsed({ set: [`URL=https://${OFFERED}`] })).toEqual({ URL: `https://${OFFERED}` });
-    expect(parsed({ set: ['URL=http://$NIBRUN_HOSTNAME:$NIBRUN_PORT'] })).toEqual({
-      URL: 'http://$NIBRUN_HOSTNAME:$NIBRUN_PORT',
+    expect(parsed({ set: ['URL=http://$NIBRUN_HOSTNAME:$NIBRUN_HTTP_PORT'] })).toEqual({
+      URL: 'http://$NIBRUN_HOSTNAME:$NIBRUN_HTTP_PORT',
     });
   });
 
   test('one it does not is refused, and the variable holding it is named', () => {
     expect(() => parsed({ set: [`URL=https://${MISSPELLED}`] })).toThrow(
       new InvalidEnvironmentError(
-        `A value may name a runtime value the guest sets — \${NIBRUN_DATA_DIR}, ${OFFERED}, \${NIBRUN_PORT} — and nothing else: URL`,
+        `A value may name a runtime value the guest sets — \${NIBRUN_DATA_DIR}, ${OFFERED}, \${NIBRUN_HTTP_PORT} — and nothing else: URL`,
       ),
     );
   });

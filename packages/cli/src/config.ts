@@ -1,4 +1,5 @@
 import type { CommandOption } from '@parshjs/core';
+import { RUNTIME_VALUE_NAMES } from '@repo/protocol';
 import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };
 
@@ -37,9 +38,7 @@ export const SHARED_OPTIONS = {
     name: 'env',
     option: {
       schema: z.array(z.string()).optional(),
-      description:
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being documented, shown to the reader rather than interpolated
-        "Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. A value may name one the guest sets — NIBRUN_HTTP_PORT, NIBRUN_HOSTNAME or NIBRUN_DATA_DIR — quote it, as in 'URL=https://${NIBRUN_HOSTNAME}', or the shell expands it here instead.",
+      description: `Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. A value may name one the guest sets — ${RUNTIME_VALUE_NAMES.join(', ')} — quote it, as in 'URL=https://\${NIBRUN_HOSTNAME}', or the shell expands it here instead.`,
     },
   },
   unset: {
