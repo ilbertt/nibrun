@@ -2,10 +2,9 @@
 -- release it is `active` — a translation with nothing on either side of it.
 --
 -- Both spellings, because a migration here may not rewrite rows and the ones already saying
--- `active` outlive this file. They are moved by hand once this is deployed, and a follow-up
--- migration drops the old word from the check. Nothing left in the api understands `active` and a
--- report is one transaction, so until that UPDATE runs one such release fails the whole report its
--- host sends — and every app on that host stops moving with it.
+-- `active` outlive this file. Until they are moved by hand, the three queries that read a release
+-- back carry a CASE that reads the old word as the new one; a follow-up migration drops `active`
+-- from this check along with them.
 
 ALTER TABLE nibrun.deployments
   DROP CONSTRAINT deployments_state_check,
