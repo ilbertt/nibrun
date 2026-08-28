@@ -1,10 +1,18 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 import { type AppId, AppIdSchema, HostPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
 import { Effect, Either, Layer, Option } from 'effect';
-import { assignmentsFrom, readSlotRecords, type SlotRecords } from '#lib/network/allocator.ts';
+import {
+  assignmentsFrom,
+  readSlotCursor,
+  readSlotRecords,
+  type SlotRecords,
+} from '#lib/network/allocator.ts';
 import {
   describeSlot,
   EXTRA_PUBLIC_PORT_BASE,
+  FIRST_SLOT,
   HOST_PORT_BASE,
   SLOT_COUNT,
 } from '#lib/network/slot.ts';
@@ -85,17 +93,56 @@ describe('allocation is stable for the lifetime of an app', () => {
     expect(new Set(ports).size).toBe(DISTINCT_APPS.length);
   });
 
+  // Asserted against a full host rather than an empty one: the freed slot is then the only one
+  // left, so this says the pool grew back without saying which order it is drawn from.
   test('a released slot becomes available again', async () => {
     const [released, reused] = await withAllocator((allocator) =>
       Effect.gen(function* () {
-        const first = yield* allocator.allocate(app(1));
-        yield* allocator.release(app(1));
-        const gone = yield* allocator.lookup(app(1));
-        const next = yield* allocator.allocate(app(2));
-        return [Option.isNone(gone) ? first.slot : -1, next.slot];
+        yield* Effect.forEach(everySlot, (index) => allocator.allocate(app(index)), {
+          discard: true,
+        });
+        const freed = yield* allocator.allocate(app(SOME_SLOT));
+        yield* allocator.release(app(SOME_SLOT));
+        const gone = yield* allocator.lookup(app(SOME_SLOT));
+        const next = yield* allocator.allocate(app(BEYOND_THE_LAST_SLOT));
+        return [Option.isNone(gone) ? freed.slot : -1, next.slot];
       }).pipe(Effect.orDie),
     );
     expect(reused).toBe(released as number);
+  });
+
+  /**
+   * The address a tenant hands its own users is this slot's, and a slot handed straight back out
+   * is that address pointing at somebody else. Every other slot goes first, which on a host with
+   * room is every allocation between now and the cursor coming round.
+   */
+  test('a released slot is not the next one handed out', async () => {
+    const [released, next] = await withAllocator((allocator) =>
+      Effect.gen(function* () {
+        const first = yield* allocator.allocate(app(1));
+        yield* allocator.release(app(1));
+        const second = yield* allocator.allocate(app(2));
+        return [first.slot, second.slot];
+      }).pipe(Effect.orDie),
+    );
+    expect(next).not.toBe(released);
+  });
+
+  // A redeploy asks for a slot the app already holds. Moving the cursor there would park it
+  // wherever the busiest app happens to sit, and a slot freed beside it would go straight back out.
+  test('being handed the slot an app already holds does not move the cursor', async () => {
+    const [released, next] = await withAllocator((allocator) =>
+      Effect.gen(function* () {
+        const first = yield* allocator.allocate(app(1));
+        yield* allocator.allocate(app(2));
+        yield* allocator.release(app(2));
+        // The redeploy: app 1 asking again for the slot it never gave up.
+        yield* allocator.allocate(app(1));
+        const third = yield* allocator.allocate(app(3));
+        return [first.slot + 1, third.slot];
+      }).pipe(Effect.orDie),
+    );
+    expect(next).not.toBe(released);
   });
 
   test('running out of slots is a typed failure, not a silent reuse', async () => {
@@ -109,6 +156,36 @@ describe('allocation is stable for the lifetime of an app', () => {
     );
     expect(Either.isLeft(exhausted) && exhausted.left._tag).toBe('SlotExhausted');
   });
+});
+
+/**
+ * The cursor is a hint and the scan is the authority: it decides where to start looking, never
+ * what may be handed out. Nothing a file holds can make this give away a slot another app has.
+ */
+describe('a cursor read off disk cannot hand out a slot somebody holds', () => {
+  test('anything that is not a whole number starts at the first slot', () => {
+    expect(readSlotCursor(undefined)).toBe(FIRST_SLOT);
+    expect(readSlotCursor(null)).toBe(FIRST_SLOT);
+    expect(readSlotCursor('7')).toBe(FIRST_SLOT);
+    expect(readSlotCursor(1.5)).toBe(FIRST_SLOT);
+    expect(readSlotCursor(SOME_SLOT)).toBe(SOME_SLOT);
+  });
+
+  test.each([BEYOND_THE_LAST_SLOT, -BEYOND_THE_LAST_SLOT])(
+    'a cursor of %s still lands on a slot this host has',
+    async (cursor) => {
+      const file = join(tmpdir(), `nibrun-cursor-${cursor}.json`);
+      await Bun.write(file, JSON.stringify(cursor));
+      const slot = await provided(
+        SlotAllocator.DefaultWithoutDependencies.pipe(
+          Layer.provide(Layer.merge(agentConfig({ slotCursorFile: file }), platform)),
+        ),
+      )(Effect.flatMap(SlotAllocator, (allocator) => allocator.allocate(app(1))).pipe(Effect.orDie));
+
+      expect(slot.slot).toBeGreaterThanOrEqual(FIRST_SLOT);
+      expect(slot.slot).toBeLessThan(SLOT_COUNT);
+    },
+  );
 });
 
 describe('allocation survives an agent restart', () => {
