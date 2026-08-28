@@ -7,7 +7,7 @@ type BadgeVariant = ComponentProps<typeof Badge>['variant'];
 const VARIANT: Record<DeploymentState, BadgeVariant> = {
   pending: 'outline',
   starting: 'outline',
-  active: 'default',
+  running: 'default',
   stopped: 'secondary',
   superseded: 'secondary',
   failed: 'destructive',

@@ -39,7 +39,7 @@ const STATE: Record<AppStatusKey, AppState> = {
   'never-deployed': { because: 'has never been deployed', refuses: ['logs', 'files', 'export'] },
   pending: { because: 'is staging a release', refuses: [] },
   starting: { because: 'is starting', refuses: [] },
-  active: { because: 'is running', refuses: [] },
+  running: { because: 'is running', refuses: [] },
   // The volume outlives the release that failed on it, so everything but reading it from inside
   // a microVM still works — including the export that is how you get at it instead.
   failed: { because: 'is on a release that failed', refuses: ['files'] },

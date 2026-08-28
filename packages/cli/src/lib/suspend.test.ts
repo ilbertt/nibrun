@@ -14,7 +14,7 @@ type Asked = { appId: string; state: string };
 function apiHolding({
   state,
   asked,
-  deployments = [{ id: 'deployment-1', state: 'active' }],
+  deployments = [{ id: 'deployment-1', state: 'running' }],
 }: {
   state: string;
   asked: Asked[];

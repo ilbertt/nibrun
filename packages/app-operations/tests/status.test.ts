@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { AppState, DeploymentState } from '@repo/protocol';
-import { type AppStatus, appStatus, isRunning, isSettling } from '#status.ts';
+import { type AppStatus, appStatus, hasLiveOutput, isSettling } from '#status.ts';
 
 function status({
   appState = 'active',
@@ -17,7 +17,7 @@ describe('an app on its way out answers for itself', () => {
 
   for (const appState of going) {
     test(`a ${appState} app says so whatever its release says`, () => {
-      expect(status({ appState, deploymentState: 'active' })).toEqual({
+      expect(status({ appState, deploymentState: 'running' })).toEqual({
         kind: 'app',
         state: appState,
       });
@@ -31,7 +31,7 @@ describe('an app on its way out answers for itself', () => {
  * claiming something that has not happened.
  */
 describe('suspending is not suspended until the release stops', () => {
-  const serving: DeploymentState[] = ['active', 'starting', 'pending'];
+  const serving: DeploymentState[] = ['running', 'starting', 'pending'];
 
   for (const deploymentState of serving) {
     test(`a ${deploymentState} release under a suspended app is still winding down`, () => {
@@ -69,7 +69,7 @@ describe('resuming is not running until the host has started it', () => {
   const followed = [
     'pending',
     'starting',
-    'active',
+    'running',
     'failed',
     'superseded',
   ] as const satisfies readonly DeploymentState[];
@@ -102,7 +102,7 @@ describe('what is worth asking about again', () => {
   // A suspended app is the one that looks transitional and is not: the host has done what it was
   // asked, and asking again every two seconds forever is what this stops.
   const settled: [string, AppStatus][] = [
-    ['a serving release', { kind: 'deployment', state: 'active' }],
+    ['a serving release', { kind: 'deployment', state: 'running' }],
     ['a failed release', { kind: 'deployment', state: 'failed' }],
     ['a suspended app', { kind: 'app', state: 'suspended' }],
     ['an app never deployed', { kind: 'never-deployed' }],
@@ -117,15 +117,15 @@ describe('what is worth asking about again', () => {
 
 describe('what has something running to write output', () => {
   const writing: [string, AppStatus][] = [
-    ['a serving release', status({ deploymentState: 'active' })],
+    ['a serving release', status({ deploymentState: 'running' })],
     ['a booting one', status({ deploymentState: 'starting' })],
-    ['an app still winding down', status({ appState: 'suspended', deploymentState: 'active' })],
+    ['an app still winding down', status({ appState: 'suspended', deploymentState: 'running' })],
     ['one on its way back', status({ deploymentState: 'stopped' })],
   ];
 
   for (const [name, each] of writing) {
     test(`${name} has`, () => {
-      expect(isRunning(each)).toBe(true);
+      expect(hasLiveOutput(each)).toBe(true);
     });
   }
 
@@ -142,7 +142,7 @@ describe('what has something running to write output', () => {
 
   for (const [name, each] of silent) {
     test(`${name} has not`, () => {
-      expect(isRunning(each)).toBe(false);
+      expect(hasLiveOutput(each)).toBe(false);
     });
   }
 });

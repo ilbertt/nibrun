@@ -1,4 +1,4 @@
-import { isRunning } from '@repo/app-operations';
+import { hasLiveOutput } from '@repo/app-operations';
 import type { TenantLogRecord } from '@repo/protocol';
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '#lib/hooks/use-app.ts';
@@ -39,7 +39,7 @@ export function useDeploymentLogs(appId: string): DeploymentLogsView {
     return { status: 'connecting', records, deploymentId, reason: undefined };
   }
   return {
-    status: isRunning(status) ? 'following' : 'not-running',
+    status: hasLiveOutput(status) ? 'following' : 'not-running',
     records,
     deploymentId,
     reason: undefined,

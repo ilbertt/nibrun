@@ -6,7 +6,7 @@ import {
   type AddressedDeployment,
   type AppOperation,
   addressedDeployment,
-  isRunning,
+  hasLiveOutput,
 } from '@repo/app-operations';
 import { SHARED_OPTIONS } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
@@ -95,5 +95,5 @@ export async function announcedDeployment({
  * release named. Following the one it has moved off is a wait for nothing, however busy it is.
  */
 export function stillWriting(addressed: AddressedDeployment): boolean {
-  return isRunning(addressed.status) && addressed.deploymentId === addressed.newest.id;
+  return hasLiveOutput(addressed.status) && addressed.deploymentId === addressed.newest.id;
 }

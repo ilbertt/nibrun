@@ -50,7 +50,7 @@ export async function awaitServing({
         deploymentId: deployed.deploymentId,
       }),
   });
-  if (settled.state !== 'active') {
+  if (settled.state !== 'running') {
     throw new ApiError(describeUnservedDeployment(settled));
   }
   ui.done(`${deployed.url} — ready in ${elapsed(Date.now() - startedAt)}`);

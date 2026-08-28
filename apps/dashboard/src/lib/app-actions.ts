@@ -45,7 +45,7 @@ const AVAILABILITY: Record<AppStatusKey, AppActions> = {
   'never-deployed': { deploy: ENABLED, export: HIDDEN, suspend: HIDDEN, delete: ENABLED },
   pending: { deploy: ENABLED, export: ENABLED, suspend: ENABLED, delete: ENABLED },
   starting: { deploy: ENABLED, export: ENABLED, suspend: ENABLED, delete: ENABLED },
-  active: { deploy: ENABLED, export: ENABLED, suspend: ENABLED, delete: ENABLED },
+  running: { deploy: ENABLED, export: ENABLED, suspend: ENABLED, delete: ENABLED },
   // Nothing is serving under either of these, so there is nothing to take offline — and a bundle
   // is cut from the volume rather than from a running microVM, so exporting still works.
   failed: { deploy: ENABLED, export: ENABLED, suspend: HIDDEN, delete: ENABLED },

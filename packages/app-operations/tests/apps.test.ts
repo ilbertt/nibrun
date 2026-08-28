@@ -94,7 +94,7 @@ test('an app that has never been deployed has no newest deployment', async () =>
 test('addressing without a deployment id resolves to the newest one', async () => {
   const api = apiHolding({
     apps: [{ id: 'app-1', slug: 'quiet-otter' }],
-    deployments: [{ id: 'deployment-2', state: 'active' }],
+    deployments: [{ id: 'deployment-2', state: 'running' }],
   });
 
   expect(
@@ -108,8 +108,8 @@ test('addressing without a deployment id resolves to the newest one', async () =
     appId: 'app-1',
     deploymentId: 'deployment-2',
     slug: 'quiet-otter',
-    newest: { id: 'deployment-2', state: 'active' },
-    status: { kind: 'deployment', state: 'active' },
+    newest: { id: 'deployment-2', state: 'running' },
+    status: { kind: 'deployment', state: 'running' },
   });
 });
 
@@ -117,7 +117,7 @@ test('addressing without a deployment id resolves to the newest one', async () =
 test('a deployment named outright still comes back under its app', async () => {
   const api = apiHolding({
     apps: [{ id: 'app-1', slug: 'quiet-otter' }],
-    deployments: [{ id: 'deployment-2', state: 'active' }],
+    deployments: [{ id: 'deployment-2', state: 'running' }],
   });
 
   expect(

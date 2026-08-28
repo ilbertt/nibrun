@@ -45,7 +45,7 @@ beforeEach(() => {
 // which together are what say whether a deploy can land.
 function apiListing({
   apps,
-  release = 'active',
+  release = 'running',
 }: {
   apps: Array<{ slug: string; state: string }>;
   release?: string;

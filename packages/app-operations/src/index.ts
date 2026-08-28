@@ -34,7 +34,7 @@ export {
   type AppStatusKey,
   type AppTransition,
   appStatus,
-  isRunning,
+  hasLiveOutput,
   isSettling,
   statusKey,
 } from '#status.ts';

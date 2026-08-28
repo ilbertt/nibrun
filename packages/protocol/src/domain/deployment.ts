@@ -11,7 +11,7 @@ import { StateMessageSchema, TimestampSchema } from '#lib/wire.ts';
 export const DEPLOYMENT_STATES = [
   'pending',
   'starting',
-  'active',
+  'running',
   'stopped',
   'superseded',
   'failed',

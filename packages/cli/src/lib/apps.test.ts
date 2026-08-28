@@ -113,7 +113,7 @@ test('walking away from the question is not answering it', async () => {
 /** An app and what it is on, which together are what a command is allowed to act on. */
 function apiRunning({
   state = 'active',
-  deployments = [{ id: 'deployment-2', state: 'active' }],
+  deployments = [{ id: 'deployment-2', state: 'running' }],
 }: {
   state?: string;
   deployments?: Array<{ id: string; state: string }>;

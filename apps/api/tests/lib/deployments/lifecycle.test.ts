@@ -46,7 +46,7 @@ describe('a release follows the microVM running it', () => {
   const cases: [InstanceState, DeploymentState][] = [
     ['pending', 'starting'],
     ['starting', 'starting'],
-    ['running', 'active'],
+    ['running', 'running'],
     ['failed', 'failed'],
   ];
 
@@ -63,19 +63,19 @@ describe('serving is what a release is for', () => {
   const survivable: InstanceState[] = ['unhealthy', 'stopping', 'stopped', 'starting', 'pending'];
 
   for (const instance of survivable) {
-    test(`an active deployment stays active while its instance is ${instance}`, () => {
-      expect(advance({ from: 'active', instance })).toBe('active');
+    test(`a running deployment keeps running while its instance is ${instance}`, () => {
+      expect(advance({ from: 'running', instance })).toBe('running');
     });
   }
 
   test('and leaves only when the instance runs out of restarts', () => {
-    expect(advance({ from: 'active', instance: 'failed' })).toBe('failed');
+    expect(advance({ from: 'running', instance: 'failed' })).toBe('failed');
   });
 
   // Desired state still asks for it, so the host either brings it back and says so or gives up
   // and reports `failed`. Reading absence as failure would race every agent restart instead.
-  test('an active deployment missing from a report is not a failed one', () => {
-    expect(advance({ from: 'active', afterMs: STARTUP_DEADLINE_MS })).toBe('active');
+  test('a running deployment missing from a report is not a failed one', () => {
+    expect(advance({ from: 'running', afterMs: STARTUP_DEADLINE_MS })).toBe('running');
   });
 });
 
@@ -107,17 +107,21 @@ describe('a deployment nothing ever starts is one the owner is told about', () =
  */
 describe('a suspended app stops its release once the host says the microVM is down', () => {
   test('a release stays serving while the microVM is still winding down', () => {
-    expect(advance({ from: 'active', instance: 'stopping', desiredRunning: false })).toBe('active');
+    expect(advance({ from: 'running', instance: 'stopping', desiredRunning: false })).toBe(
+      'running',
+    );
   });
 
   test('and stops once the host reports it stopped', () => {
-    expect(advance({ from: 'active', instance: 'stopped', desiredRunning: false })).toBe('stopped');
+    expect(advance({ from: 'running', instance: 'stopped', desiredRunning: false })).toBe(
+      'stopped',
+    );
   });
 
   // The same stop with the app still wanted running is a host that lost the microVM, which is
   // news the release survives — desired state asks for it again on the next pass.
   test('a stop nobody asked for leaves the release serving', () => {
-    expect(advance({ from: 'active', instance: 'stopped' })).toBe('active');
+    expect(advance({ from: 'running', instance: 'stopped' })).toBe('running');
   });
 
   test('a release that never served stops too rather than waiting out a deadline', () => {
@@ -136,7 +140,7 @@ describe('resuming brings the release back up through starting', () => {
   const cases: [InstanceState, DeploymentState][] = [
     ['pending', 'starting'],
     ['starting', 'starting'],
-    ['running', 'active'],
+    ['running', 'running'],
     ['failed', 'failed'],
   ];
 
