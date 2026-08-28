@@ -101,7 +101,7 @@ async function seedDeployedApp(sql: SQL): Promise<void> {
   );
   await sql.unsafe(
     `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state)
-     SELECT a.id, ar.id, c.id, 'active'
+     SELECT a.id, ar.id, c.id, 'running'
      FROM nibrun.apps a
      JOIN nibrun.artifacts ar ON ar.app_id = a.id
      JOIN nibrun.app_configs c ON c.app_id = a.id
