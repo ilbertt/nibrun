@@ -74,16 +74,16 @@ export const RUNTIME_VALUE_NAMES: readonly RuntimeValueName[] = Object.values(RU
  * expanding it to nothing — so the pair has to be answerable here, where the config that decides it
  * is also being written.
  *
- * A subset of the array above rather than a second list, so a name can only be conditional if it
- * is offered at all.
+ * Entries of the record above rather than a second list, so one of these can only be a value the
+ * guest offers at all.
  */
-export const EXTRA_PUBLIC_PORT_VALUE_NAMES = [
-  `${RUNTIME_VALUE_PREFIX}EXTRA_PUBLIC_PORT`,
-  `${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`,
-] as const satisfies readonly (typeof RUNTIME_VALUE_NAMES)[number][];
+export const EXTRA_PUBLIC_PORT_VALUES = [
+  RUNTIME_VALUES.EXTRA_PUBLIC_PORT,
+  RUNTIME_VALUES.PUBLIC_IPV4,
+] as const;
 
 const OFFERED = RUNTIME_VALUE_NAMES.join('|');
-const NEEDS_A_PORT = EXTRA_PUBLIC_PORT_VALUE_NAMES.join('|');
+const NEEDS_A_PORT = EXTRA_PUBLIC_PORT_VALUES.map((value) => value.name).join('|');
 const NAME_CHARACTER = '[A-Za-z0-9_]';
 
 // A value as the guest reads it: anything but a `$`, a `$` that opens no reference — which is what

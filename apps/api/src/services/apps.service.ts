@@ -1,7 +1,7 @@
 import {
   type App,
   type AppId,
-  EXTRA_PUBLIC_PORT_VALUE_NAMES,
+  EXTRA_PUBLIC_PORT_VALUES,
   namesExtraPublicPortValues,
   OWNED_APP_STATES,
   type OwnedAppState,
@@ -492,7 +492,7 @@ function refuseValuesNeedingAPort({
     .map(([name]) => name);
   if (naming.length > 0) {
     throw new BadRequestError(
-      `${EXTRA_PUBLIC_PORT_VALUE_NAMES.map(writtenRuntimeValue).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
+      `${EXTRA_PUBLIC_PORT_VALUES.map((value) => writtenRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
     );
   }
 }

@@ -80,7 +80,7 @@ export {
   AppSchema,
   type AppState,
   AppStateSchema,
-  EXTRA_PUBLIC_PORT_VALUE_NAMES,
+  EXTRA_PUBLIC_PORT_VALUES,
   MIN_HOSTNAMES,
   namesExtraPublicPortValues,
   namesOfferedRuntimeValues,
