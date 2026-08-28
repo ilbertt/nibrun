@@ -19,7 +19,7 @@ Everything the binary can count on, and nothing else:
 | Persistent volume | `/app/data` — 8 GiB, survives every redeploy. `NIBRUN_DATA_DIR` names it |
 | Port | `NIBRUN_HTTP_PORT`, and `PORT` beside it; the app **must** listen on it, on `0.0.0.0` |
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
-| Second port | Only for an app that asked for one: `NIBRUN_EXTRA_PUBLIC_PORT` on `NIBRUN_PUBLIC_IPV4`, TCP and UDP, reached at that number and no other |
+| Second port | Only with `--extra-public-port`: `NIBRUN_EXTRA_PUBLIC_PORT` on `NIBRUN_PUBLIC_IPV4`, TCP and UDP, assigned rather than chosen, and reached at that number and no other |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs and is lost on restart. So is everything outside `/app/data` |
 | Resources | 1 vCPU, 256 MiB RAM |
 | `HOME` | `/app` |
@@ -32,7 +32,8 @@ which carries the same number as `NIBRUN_HTTP_PORT` under the name every other h
 and `TMPDIR` are defaults rather than owned, so one you set yourself is what the binary reads.
 
 An app needing a port HTTP cannot carry — WebRTC media, a game server, anything on UDP — asks for
-one, and is then set two more: `NIBRUN_PUBLIC_IPV4` and `NIBRUN_EXTRA_PUBLIC_PORT`. Bind that port
+one with `--extra-public-port`, and is then set two more: `NIBRUN_PUBLIC_IPV4` and
+`NIBRUN_EXTRA_PUBLIC_PORT`. You do not pick the number; nibrun assigns it. Bind that port
 and announce that pair; it is the same number end to end, which is what makes announcing it
 correct. Neither is discoverable from inside the guest.
 
@@ -49,8 +50,13 @@ whole of what may be named — `${PORT}` is not one of them — with anything el
 deploy it.
 
 The last two are set only for an app that asked for a second port, and naming one the app was not
-given fails the boot rather than expanding to nothing. Ask for the port in the same change that
-names it.
+given is refused when you deploy it. Ask for the port in the same change that names it:
+
+```sh
+nib apps update --app my-app --extra-public-port --env 'ANNOUNCED_IP=${NIBRUN_PUBLIC_IPV4}'
+```
+
+`--extra-public-port=false` gives the port up. Saying nothing about it leaves it as it is.
 
 ## Deploying
 
