@@ -6,13 +6,25 @@ import { APP_STATES } from '@repo/protocol';
 import { NO_APPS } from '#lib/apps.ts';
 import { dayAndMinute } from '#lib/timestamp.ts';
 
-export type AppListing = Pick<ListedApp, 'slug' | 'state' | 'updatedAt' | 'config' | 'volumeUsage'>;
+export type AppListing = Pick<
+  ListedApp,
+  'slug' | 'state' | 'updatedAt' | 'config' | 'volumeUsage' | 'computeUsage'
+>;
 
 // `LAST CHANGE` rather than `UPDATED`, which reads as the owner having done it: the row moves on
 // a config patch or a state change, and a deploy leaves it alone entirely.
-const HEADINGS = { slug: 'SLUG', state: 'STATE', updated: 'LAST CHANGE', volume: 'VOLUME' };
+const HEADINGS = {
+  slug: 'SLUG',
+  state: 'STATE',
+  cpu: 'CPU',
+  memory: 'MEM',
+  volume: 'VOLUME',
+  updated: 'LAST CHANGE',
+};
 
 const COLUMN_GAP = '  ';
+
+const BYTES_PER_MIB = 1_048_576;
 
 // Every state the column can ever hold, so a suspended app appearing in a later listing does not
 // move the columns of the one before it.
@@ -25,21 +37,21 @@ const FULL = 1;
 const UNMEASURED = '-';
 
 // Sized for every share the column can hold rather than for the rows in front of it, the way the
-// state column beside it is: `100%` is four characters and the heading is six, so this is the
-// heading's width and a listing of one app lines up with a listing of ten.
-const VOLUME_WIDTH = Math.max(HEADINGS.volume.length, `${PERCENT_SCALE}%`.length);
+// state column beside it is: `100%` is four characters, so a listing of one app lines up with a
+// listing of ten.
+function shareWidth(heading: string): number {
+  return Math.max(heading.length, `${PERCENT_SCALE}%`.length);
+}
 
 /**
- * A share rather than a size, because this column sits in a list: what an owner scanning one is
- * looking for is the app that is filling up, and the bytes behind it are a line on that app's
- * own page.
+ * A share rather than a size, because these columns sit in a list: what an owner scanning one is
+ * looking for is the app that is filling up or pinning a core, and the bytes behind it are a line
+ * on that app's own page.
  */
-function volumeShare(app: AppListing): string {
-  if (!app.volumeUsage) {
-    return UNMEASURED;
-  }
-  const share = Math.min(app.volumeUsage.usedBytes / app.config.volumeSizeBytes, FULL);
-  return `${Math.round(share * PERCENT_SCALE)}%`;
+function share(measured: number | undefined): string {
+  return measured === undefined
+    ? UNMEASURED
+    : `${Math.round(Math.min(measured, FULL) * PERCENT_SCALE)}%`;
 }
 
 /** Print what the owner has, one app to a line. */
@@ -67,7 +79,7 @@ export async function listApps({
  * somewhere in the middle.
  *
  * A heading, unlike the filesystem listing: there a name and a size say what they are, and here
- * three of the four columns are words that would read as the app's own.
+ * every column but one is a number that would read as any of the others.
  */
 export function render(apps: readonly AppListing[]): string[] {
   const rows = [HEADINGS, ...apps.map(toRow)];
@@ -77,17 +89,28 @@ export function render(apps: readonly AppListing[]): string[] {
     [
       row.slug.padEnd(slugWidth),
       row.state.padEnd(STATE_WIDTH),
-      row.volume.padStart(VOLUME_WIDTH),
+      row.cpu.padStart(shareWidth(HEADINGS.cpu)),
+      row.memory.padStart(shareWidth(HEADINGS.memory)),
+      row.volume.padStart(shareWidth(HEADINGS.volume)),
       row.updated,
     ].join(COLUMN_GAP),
   );
 }
 
 function toRow(app: AppListing) {
+  const compute = app.computeUsage;
   return {
     slug: app.slug,
     state: app.state,
-    volume: volumeShare(app),
+    cpu: share(compute?.cpuShare),
+    memory: share(
+      compute
+        ? compute.memoryUsedBytes / (app.config.resources.memoryMib * BYTES_PER_MIB)
+        : undefined,
+    ),
+    volume: share(
+      app.volumeUsage ? app.volumeUsage.usedBytes / app.config.volumeSizeBytes : undefined,
+    ),
     updated: dayAndMinute(app.updatedAt),
   };
 }

@@ -37,6 +37,7 @@ export const GUEST_VERB = {
   remove: 6,
   move: 7,
   usage: 8,
+  compute: 9,
 } as const;
 
 const KIND_CODES: Readonly<Record<FilesystemEntryKind, number>> = {
@@ -81,6 +82,26 @@ export function usageBody({
   const bytes = Buffer.alloc(UINT64_BYTES * 2);
   bytes.writeBigUInt64BE(BigInt(totalBytes));
   bytes.writeBigUInt64BE(BigInt(usedBytes), UINT64_BYTES);
+  return bytes;
+}
+
+/** Four counters, in the order `GUEST_FILESYSTEM_COMPUTE_BYTES` lays them out. */
+export function computeBody(measured: {
+  memoryTotalBytes: number;
+  memoryUsedBytes: number;
+  cpuTotalTicks: number;
+  cpuBusyTicks: number;
+}): Buffer {
+  const counters = [
+    measured.memoryTotalBytes,
+    measured.memoryUsedBytes,
+    measured.cpuTotalTicks,
+    measured.cpuBusyTicks,
+  ];
+  const bytes = Buffer.alloc(UINT64_BYTES * counters.length);
+  for (const [index, counter] of counters.entries()) {
+    bytes.writeBigUInt64BE(BigInt(counter), index * UINT64_BYTES);
+  }
   return bytes;
 }
 

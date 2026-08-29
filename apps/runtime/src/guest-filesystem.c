@@ -36,9 +36,31 @@
 #define EXCHANGE_TIMEOUT_MS 5000
 
 #define PATH_MAX_BYTES 4096
+
 #define DIRENT_BATCH_BYTES 4096
 #define TENANT_FILE_MODE 0644
 #define TENANT_DIRECTORY_MODE 0755
+
+#define PROC_MEMINFO "/proc/meminfo"
+#define PROC_STAT "/proc/stat"
+
+/* Enough for what is read out of either file, both of which put what this wants in
+ * their first few lines: `MemTotal` and `MemAvailable` are the first and third of
+ * /proc/meminfo, and the aggregate `cpu` line is the first of /proc/stat. A host
+ * with enough cores to push /proc/stat past this loses only the per-core lines
+ * underneath, which nothing here reads. */
+#define PROC_READ_MAX_BYTES 4096
+
+/* /proc/meminfo counts in kibibytes and says so on every line. */
+#define KIB_BYTES 1024
+
+/* The fields on the aggregate `cpu` line, in the order the kernel writes them. Read
+ * through `steal` and no further: the `guest` and `guest_nice` behind it are already
+ * counted inside `user` and `nice`, so a sum of the whole line counts them twice. */
+#define CPU_FIELD_COUNT 8
+#define CPU_FIELD_IDLE 3
+#define CPU_FIELD_IOWAIT 4
+#define CPU_FIELD_STEAL 7
 
 static const unsigned char FRAME_MAGIC[GUEST_FILESYSTEM_MAGIC_BYTES] = {'N', 'B', 'F', '1'};
 
@@ -559,8 +581,150 @@ static enum guest_filesystem_status perform_usage(const struct operation *asked,
   return GUEST_FILESYSTEM_OK;
 }
 
+/* Read whole into the caller's buffer, and terminated. A file in /proc is generated
+ * on the read rather than stored, so there is nothing to stat for a size first and
+ * nothing that grows underneath while this walks it. */
+static bool read_whole(const char *path, char *into, size_t capacity) {
+  int file = open(path, O_RDONLY | O_CLOEXEC);
+  if (file < 0) {
+    return false;
+  }
+  size_t filled = 0;
+  while (filled + 1 < capacity) {
+    ssize_t taken = read(file, into + filled, capacity - filled - 1);
+    if (taken < 0 && errno == EINTR) {
+      continue;
+    }
+    if (taken < 0) {
+      close(file);
+      return false;
+    }
+    if (taken == 0) {
+      break;
+    }
+    filled += (size_t)taken;
+  }
+  close(file);
+  into[filled] = '\0';
+  return true;
+}
+
+/* Positioned just past `label`, and only where a line begins with it: `MemFree` is
+ * what a search anywhere for `Mem` would land on, and `cpu0` is what one for `cpu`
+ * would find on a guest whose aggregate line had gone missing. */
+static const char *line_after(const char *text, const char *label) {
+  const size_t length = strlen(label);
+  for (const char *at = text; at != NULL && *at != '\0';) {
+    if (strncmp(at, label, length) == 0) {
+      return at + length;
+    }
+    const char *newline = strchr(at, '\n');
+    at = newline == NULL ? NULL : newline + 1;
+  }
+  return NULL;
+}
+
+/* One unsigned number with the space in front of it skipped, leaving the cursor
+ * after it. False where the line has run out, which is how a short `cpu` line on an
+ * older kernel stops the read rather than misreading what follows it. */
+static bool take_digits(const char **from, uint64_t *value) {
+  const char *at = *from;
+  while (*at == ' ' || *at == '\t') {
+    at++;
+  }
+  if (*at < '0' || *at > '9') {
+    return false;
+  }
+  uint64_t taken = 0;
+  while (*at >= '0' && *at <= '9') {
+    taken = (taken * 10) + (uint64_t)(*at - '0');
+    at++;
+  }
+  *from = at;
+  *value = taken;
+  return true;
+}
+
+static bool measure_memory(uint64_t *total_bytes, uint64_t *used_bytes) {
+  char text[PROC_READ_MAX_BYTES];
+  if (!read_whole(PROC_MEMINFO, text, sizeof(text))) {
+    return false;
+  }
+  const char *total_at = line_after(text, "MemTotal:");
+  const char *available_at = line_after(text, "MemAvailable:");
+  uint64_t total_kib = 0;
+  uint64_t available_kib = 0;
+  if (total_at == NULL || available_at == NULL || !take_digits(&total_at, &total_kib) ||
+      !take_digits(&available_at, &available_kib) || available_kib > total_kib) {
+    return false;
+  }
+  *total_bytes = total_kib * KIB_BYTES;
+  *used_bytes = (total_kib - available_kib) * KIB_BYTES;
+  return true;
+}
+
+static bool is_busy_field(unsigned field) {
+  return field != CPU_FIELD_IDLE && field != CPU_FIELD_IOWAIT && field != CPU_FIELD_STEAL;
+}
+
+static bool measure_cpu(uint64_t *total_ticks, uint64_t *busy_ticks) {
+  char text[PROC_READ_MAX_BYTES];
+  if (!read_whole(PROC_STAT, text, sizeof(text))) {
+    return false;
+  }
+  const char *at = line_after(text, "cpu ");
+  if (at == NULL) {
+    return false;
+  }
+  uint64_t total = 0;
+  uint64_t busy = 0;
+  for (unsigned field = 0; field < CPU_FIELD_COUNT; field++) {
+    uint64_t ticks = 0;
+    if (!take_digits(&at, &ticks)) {
+      break;
+    }
+    total += ticks;
+    if (is_busy_field(field)) {
+      busy += ticks;
+    }
+  }
+  /* A guest that has booted has spent ticks, so nothing here divides by this later. */
+  if (total == 0) {
+    return false;
+  }
+  *total_ticks = total;
+  *busy_ticks = busy;
+  return true;
+}
+
+/* Takes no operation at all, not even the mount point: what a guest is spending is
+ * the one question in this protocol that is not about the tenant's filesystem. */
+static enum guest_filesystem_status perform_compute(struct writer *into) {
+  uint64_t memory_total = 0;
+  uint64_t memory_used = 0;
+  uint64_t cpu_total = 0;
+  uint64_t cpu_busy = 0;
+  if (!measure_memory(&memory_total, &memory_used) || !measure_cpu(&cpu_total, &cpu_busy)) {
+    return GUEST_FILESYSTEM_FAILED;
+  }
+  if (!room_for(into, GUEST_FILESYSTEM_COMPUTE_BYTES)) {
+    return GUEST_FILESYSTEM_FAILED;
+  }
+  put_wide(into, memory_total, sizeof(uint64_t));
+  put_wide(into, memory_used, sizeof(uint64_t));
+  put_wide(into, cpu_total, sizeof(uint64_t));
+  put_wide(into, cpu_busy, sizeof(uint64_t));
+  return GUEST_FILESYSTEM_OK;
+}
+
+/* What the guest answers about itself names nowhere, so a body carrying a path is a
+ * peer speaking something this one does not. */
+static bool names_a_path(unsigned char verb) {
+  return verb != GUEST_FILESYSTEM_USAGE && verb != GUEST_FILESYSTEM_COMPUTE;
+}
+
 static bool parse_operation(struct cursor *body, unsigned char verb, struct operation *asked) {
-  if (verb != GUEST_FILESYSTEM_USAGE && !take_path(body, asked->path, sizeof(asked->path))) {
+  if (names_a_path(verb) && !take_path(body, asked->path, sizeof(asked->path))) {
     return false;
   }
   switch (verb) {
@@ -607,6 +771,8 @@ static enum guest_filesystem_status perform(unsigned char verb, struct operation
       return perform_move(asked);
     case GUEST_FILESYSTEM_USAGE:
       return perform_usage(asked, into);
+    case GUEST_FILESYSTEM_COMPUTE:
+      return perform_compute(into);
     default:
       return GUEST_FILESYSTEM_MALFORMED;
   }

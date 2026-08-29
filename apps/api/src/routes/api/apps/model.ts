@@ -4,6 +4,7 @@ import {
   AppHostnameStateSchema,
   AppSchema,
   ByteSizeSchema,
+  ComputeUsageSchema,
   FilesystemUsageSchema,
   MIN_HOSTNAMES,
   REDACTED,
@@ -80,6 +81,7 @@ export const AppResponseSchema = t.Composite([
     config: PublicAppConfigSchema,
     hostnames: t.Array(AppHostnameResponseSchema, { minItems: MIN_HOSTNAMES }),
     volumeUsage: t.Nullable(FilesystemUsageSchema),
+    computeUsage: t.Nullable(ComputeUsageSchema),
   }),
 ]);
 

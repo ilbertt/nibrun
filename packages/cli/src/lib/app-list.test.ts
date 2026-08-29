@@ -2,8 +2,14 @@ import { describe, expect, test } from 'bun:test';
 import { type AppListing, render } from '#lib/app-list.ts';
 
 const VOLUME_SIZE_BYTES = 8_589_934_592;
+const MEMORY_MIB = 1_024;
+const BYTES_PER_MIB = 1_048_576;
 const MEASURED_SHARE = 0.17;
 const MEASURED_PERCENT = '17%';
+const CPU_SHARE = 0.42;
+const CPU_PERCENT = '42%';
+const MEMORY_SHARE = 0.5;
+const MEMORY_PERCENT = '50%';
 
 type Overrides = Partial<{
   [Key in keyof AppListing]: AppListing[Key] | string;
@@ -16,8 +22,9 @@ function app(overrides: Overrides = {}): AppListing {
     slug: 'quiet-otter',
     state: 'active',
     updatedAt: '2026-08-07T09:41:00.123Z',
-    config: { volumeSizeBytes: VOLUME_SIZE_BYTES },
+    config: { volumeSizeBytes: VOLUME_SIZE_BYTES, resources: { memoryMib: MEMORY_MIB } },
     volumeUsage: null,
+    computeUsage: null,
     ...overrides,
   } as AppListing;
 }
@@ -32,19 +39,34 @@ function used(share: number): AppListing['volumeUsage'] {
   } as NonNullable<AppListing['volumeUsage']>;
 }
 
+function spending({
+  memoryShare,
+  cpuShare,
+}: {
+  memoryShare: number;
+  cpuShare?: number;
+}): AppListing['computeUsage'] {
+  return {
+    memoryTotalBytes: MEMORY_MIB * BYTES_PER_MIB,
+    memoryUsedBytes: MEMORY_MIB * BYTES_PER_MIB * memoryShare,
+    ...(cpuShare === undefined ? {} : { cpuShare }),
+    measuredAt: '2026-08-07T09:40:00.000Z',
+  } as NonNullable<AppListing['computeUsage']>;
+}
+
 describe('a listing is read down a column', () => {
   test('a heading says what each column is', () => {
     expect(render([app()])).toEqual([
-      'SLUG         STATE      VOLUME  LAST CHANGE',
-      'quiet-otter  active          -  2026-08-07 09:41',
+      'SLUG         STATE       CPU   MEM  VOLUME  LAST CHANGE',
+      'quiet-otter  active        -     -       -  2026-08-07 09:41',
     ]);
   });
 
   test('the widest slug is what the column is wide enough for', () => {
     expect(render([app({ slug: 'a' }), app({ slug: 'considerably-longer' })])).toEqual([
-      'SLUG                 STATE      VOLUME  LAST CHANGE',
-      'a                    active          -  2026-08-07 09:41',
-      'considerably-longer  active          -  2026-08-07 09:41',
+      'SLUG                 STATE       CPU   MEM  VOLUME  LAST CHANGE',
+      'a                    active        -     -       -  2026-08-07 09:41',
+      'considerably-longer  active        -     -       -  2026-08-07 09:41',
     ]);
   });
 
@@ -52,9 +74,9 @@ describe('a listing is read down a column', () => {
   // reading the same shape twice.
   test('a state wider than the one beside it does not shift the columns', () => {
     expect(render([app({ state: 'suspended' }), app({ state: 'deleting' })])).toEqual([
-      'SLUG         STATE      VOLUME  LAST CHANGE',
-      'quiet-otter  suspended       -  2026-08-07 09:41',
-      'quiet-otter  deleting        -  2026-08-07 09:41',
+      'SLUG         STATE       CPU   MEM  VOLUME  LAST CHANGE',
+      'quiet-otter  suspended     -     -       -  2026-08-07 09:41',
+      'quiet-otter  deleting      -     -       -  2026-08-07 09:41',
     ]);
   });
 
@@ -65,15 +87,33 @@ describe('a listing is read down a column', () => {
   });
 });
 
-describe('the volume column says how full the filesystem is', () => {
+describe('the share columns say what an app is using of what it was given', () => {
   test('a measured app shows what share of its volume it is using', () => {
     expect(render([app({ volumeUsage: used(MEASURED_SHARE) })]).at(-1)).toContain(MEASURED_PERCENT);
   });
 
-  // A reading is only taken while a guest has the filesystem mounted, so an app that has never
-  // come up has none — which is a different thing from one measured at nothing.
+  test('a measured guest shows what share of its cpu and memory it is using', () => {
+    const line = render([
+      app({ computeUsage: spending({ memoryShare: MEMORY_SHARE, cpuShare: CPU_SHARE }) }),
+    ]).at(-1);
+
+    expect(line).toContain(CPU_PERCENT);
+    expect(line).toContain(MEMORY_PERCENT);
+  });
+
+  // A share is a rate, so the first reading taken of a guest has none — while the memory beside
+  // it is a level and arrives whole. One column empty must not empty the other.
+  test('a guest measured before it had a rate still shows its memory', () => {
+    const line = render([app({ computeUsage: spending({ memoryShare: MEMORY_SHARE }) })]).at(-1);
+
+    expect(line).toContain(MEMORY_PERCENT);
+    expect(line).toContain(`-   ${MEMORY_PERCENT}`);
+  });
+
+  // A reading is only taken while a guest is running, so an app that has never come up has none —
+  // which is a different thing from one measured at nothing.
   test('an app nothing has measured says so rather than reading as empty', () => {
-    expect(render([app()]).at(-1)).toContain('   -  ');
+    expect(render([app()]).at(-1)).toContain('-     -       -');
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
   AppIdSchema,
+  type ComputeUsage,
   DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   type FilesystemUsage,
@@ -50,7 +51,11 @@ const EXTRA_PUBLIC_PORT = Value.Parse(HostPortSchema, FIRST_EXTRA_PUBLIC_PORT);
 
 /** The common case: an app that asked for no public port of its own, which is most of them. */
 function reported(overrides: Partial<InstanceRecord> = {}) {
-  return toReportedInstance({ record: instanceRecord(overrides), reachedAt: undefined });
+  return toReportedInstance({
+    record: instanceRecord(overrides),
+    reachedAt: undefined,
+    measured: undefined,
+  });
 }
 
 describe('the report always names the host-side port', () => {
@@ -75,6 +80,7 @@ describe('the report always names the host-side port', () => {
     const reported = toReportedInstance({
       record: instanceRecord({ hasExtraPublicPort: true }),
       reachedAt: { ipv4: RELAY_IPV4, port: EXTRA_PUBLIC_PORT },
+      measured: undefined,
     });
 
     expect(reported.publicIpv4).toBe(RELAY_IPV4);
@@ -107,6 +113,7 @@ describe('a volume carries the reading last taken of it', () => {
       versions: { agent: 'sha', guestImage: '6.1', zerofs: '2.2.1', firecracker: '1.16.1' },
       records: [],
       reachedAt: new Map(),
+      computeUsage: new Map(),
       volumes: [
         { volumeId: VOLUME_ID, appId: APP_ID, state: 'ready', sizeBytes: VOLUME_SIZE_BYTES },
       ],
@@ -158,6 +165,7 @@ describe('the assembled report satisfies the protocol', () => {
         { volumeId: VOLUME_ID, appId: APP_ID, state: 'ready', sizeBytes: VOLUME_SIZE_BYTES },
       ],
       volumeUsage: new Map(),
+      computeUsage: new Map(),
       checkpoints: [],
       exports: [
         {
@@ -169,6 +177,39 @@ describe('the assembled report satisfies the protocol', () => {
       ],
     });
     expect(isValidMessage({ schema: HostReportedStateSchema, value: report })).toBe(true);
+  });
+});
+
+/**
+ * The compute half of the same arrangement, matched on the app rather than on the record: what a
+ * guest is spending is asked for on a loop of its own, and an instance is observed by looking at
+ * a systemd unit that knows nothing about it.
+ */
+describe('an instance carries the reading last taken of its guest', () => {
+  const SPENDING: ComputeUsage = {
+    memoryTotalBytes: 1_031_012_352,
+    memoryUsedBytes: 412_401_664,
+    cpuShare: 0.18,
+    measuredAt: OBSERVED_AT,
+  };
+
+  test('a measured guest reports what it is spending', () => {
+    expect(
+      toReportedInstance({
+        record: instanceRecord(),
+        reachedAt: undefined,
+        measured: SPENDING,
+      }).compute,
+    ).toEqual(SPENDING);
+  });
+
+  // An instance that has never been measured is one nothing has asked yet, which is every
+  // instance for the first minute it is up — and absent is this protocol's one word for unknown.
+  test('an unmeasured guest carries no field at all', () => {
+    expect(
+      'compute' in
+        toReportedInstance({ record: instanceRecord(), reachedAt: undefined, measured: undefined }),
+    ).toBe(false);
   });
 });
 

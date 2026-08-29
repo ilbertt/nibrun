@@ -3,6 +3,7 @@ import {
   type AppId,
   AppIdSchema,
   type AppState,
+  type ComputeUsage,
   type DnsLabel,
   DnsLabelSchema,
   type FilesystemUsage,
@@ -13,6 +14,7 @@ import {
   OWNED_APP_STATES,
   type OwnerId,
   REDACTED,
+  type ReportedInstance,
   type ReportedVolume,
   type TenantEnvironment,
   type TenantEnvironmentPatch,
@@ -57,6 +59,7 @@ import {
   configColumns,
   DEFAULT_CONFIG,
   DEFAULT_STORED_CONFIG,
+  DEPLOYMENT_ID,
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
@@ -99,6 +102,10 @@ function appRow(slug: DnsLabel): AppRow {
     volume_total_bytes: null,
     volume_used_bytes: null,
     volume_measured_at: null,
+    memory_total_bytes: null,
+    memory_used_bytes: null,
+    cpu_share: null,
+    compute_measured_at: null,
     ...configColumns(DEFAULT_CONFIG),
   };
 }
@@ -116,6 +123,7 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly trace: string[] = [];
   readonly leftovers = new Map<AppId, Leftovers>();
   readonly measured: ReadonlyMap<AppId, FilesystemUsage>[] = [];
+  readonly spending: ReadonlyMap<AppId, ComputeUsage>[] = [];
   deleting: AppId[] = [];
   purgeable: AppId[] = [];
   deployedApps: AppId[] = [];
@@ -210,6 +218,11 @@ class StubAppsRepository implements AppsRepositoryContract {
     readings: ReadonlyMap<AppId, FilesystemUsage>;
   }): Promise<void> {
     this.measured.push(new Map(readings));
+    return Promise.resolve();
+  }
+
+  recordComputeUsage({ readings }: { readings: ReadonlyMap<AppId, ComputeUsage> }): Promise<void> {
+    this.spending.push(new Map(readings));
     return Promise.resolve();
   }
 
@@ -919,6 +932,61 @@ describe('how full a filesystem is, as the host that holds it last measured it',
     });
 
     expect(appsRepo.measured).toEqual([new Map([[APP_ID, MEASURED]])]);
+  });
+});
+
+/**
+ * The compute half, which comes off the instances rather than the volumes — and is held to the
+ * same three rules, because it arrives on the same report through the same seam.
+ */
+describe('what a guest is spending, as the host running it last measured it', () => {
+  const SPENDING: ComputeUsage = {
+    memoryTotalBytes: 1_031_012_352,
+    memoryUsedBytes: 412_401_664,
+    cpuShare: 0.18,
+    measuredAt: Value.Parse(TimestampSchema, '2026-08-03T10:00:00Z'),
+  };
+
+  function reportedInstance(compute?: ComputeUsage): ReportedInstance {
+    return {
+      appId: APP_ID,
+      deploymentId: DEPLOYMENT_ID,
+      state: 'running',
+      restartCount: 0,
+      ...(compute ? { compute } : {}),
+    };
+  }
+
+  test('a reading a host took is recorded against the app it is running', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).recordComputeUsage({ instances: [reportedInstance(SPENDING)] });
+
+    expect(appsRepo.spending).toEqual([new Map([[APP_ID, SPENDING]])]);
+  });
+
+  // Every report between two measurements carries instances and no readings, and a write on each
+  // of those would be an app that stops spending anything a second after it was measured.
+  test('a report carrying no reading writes nothing', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).recordComputeUsage({ instances: [reportedInstance()] });
+
+    expect(appsRepo.spending).toEqual([]);
+  });
+
+  test('two instances naming one app are written once, as the later reading', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const earlier = {
+      ...SPENDING,
+      measuredAt: Value.Parse(TimestampSchema, '2026-08-03T09:00:00Z'),
+    };
+
+    await serviceWith({ appsRepo }).recordComputeUsage({
+      instances: [reportedInstance(earlier), reportedInstance(SPENDING)],
+    });
+
+    expect(appsRepo.spending).toEqual([new Map([[APP_ID, SPENDING]])]);
   });
 });
 

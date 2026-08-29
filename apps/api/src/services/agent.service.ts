@@ -131,6 +131,7 @@ export class AgentService extends Service {
     await this.agentRepo.observeReport({ reported });
     await this.deploymentsService.applyHostReport({ reported });
     await this.appsService.recordVolumeUsage({ volumes: reported.volumes });
+    await this.appsService.recordComputeUsage({ instances: reported.instances });
     await this.appsService.completeDeletions({ volumes: reported.volumes });
     await this.exportsService.applyHostReport({ reported });
     // Last, because what an app leaves behind is only safe to remove once a host has said its

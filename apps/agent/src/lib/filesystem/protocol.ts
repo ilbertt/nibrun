@@ -56,6 +56,7 @@ const VERBS = {
   remove: 6,
   move: 7,
   usage: 8,
+  compute: 9,
 } as const;
 
 const STATUS_OK = 0;
@@ -123,7 +124,8 @@ export type GuestFilesystemRequest =
   | { readonly verb: 'makeDirectory'; readonly path: GuestPath }
   | { readonly verb: 'remove'; readonly path: GuestPath }
   | { readonly verb: 'move'; readonly path: GuestPath; readonly destination: GuestPath }
-  | { readonly verb: 'usage' };
+  | { readonly verb: 'usage' }
+  | { readonly verb: 'compute' };
 
 function field(value: string | Uint8Array): Buffer {
   const bytes = typeof value === 'string' ? Buffer.from(value, 'utf8') : Buffer.from(value);
@@ -145,9 +147,10 @@ function lengthOf(value: number): Buffer {
 }
 
 function bodyOf(request: GuestFilesystemRequest): Buffer {
-  // The one verb that names no path: a volume is one filesystem, so how full it is is not a
-  // question about a place inside it.
-  if (request.verb === 'usage') {
+  // The verbs that name no path, because what they answer about is the guest rather than a place
+  // in the tenant's filesystem: a volume is one filesystem all the way down, and what the machine
+  // is spending is not about a file at all.
+  if (request.verb === 'usage' || request.verb === 'compute') {
     return EMPTY_BODY;
   }
   const path = field(request.path);
@@ -268,6 +271,38 @@ export function decodeUsage(body: Buffer): Either.Either<MeasuredBytes, Malforme
     : Either.right({
         totalBytes: Number(body.readBigUInt64BE(TOTAL_OFFSET)),
         usedBytes: Number(body.readBigUInt64BE(USED_OFFSET)),
+      });
+}
+
+const MEMORY_TOTAL_OFFSET = 0;
+const MEMORY_USED_OFFSET = MEMORY_TOTAL_OFFSET + UINT64_BYTES;
+const CPU_TOTAL_OFFSET = MEMORY_USED_OFFSET + UINT64_BYTES;
+const CPU_BUSY_OFFSET = CPU_TOTAL_OFFSET + UINT64_BYTES;
+const COMPUTE_BYTES = CPU_BUSY_OFFSET + UINT64_BYTES;
+
+/**
+ * What one reading of the guest holds, before anything has turned the ticks into a rate.
+ *
+ * The ticks are cumulative since the guest booted and mean nothing on their own — a share is the
+ * difference between two of these over the time between them, which is why the counters are kept
+ * rather than reported. They reset when the microVM does, which is the one thing whoever divides
+ * them has to check for.
+ */
+export type MeasuredCompute = {
+  readonly memoryTotalBytes: number;
+  readonly memoryUsedBytes: number;
+  readonly cpuTotalTicks: number;
+  readonly cpuBusyTicks: number;
+};
+
+export function decodeCompute(body: Buffer): Either.Either<MeasuredCompute, MalformedGuestReply> {
+  return body.byteLength < COMPUTE_BYTES
+    ? Either.left(new MalformedGuestReply({ reason: 'the compute reading is the wrong length' }))
+    : Either.right({
+        memoryTotalBytes: Number(body.readBigUInt64BE(MEMORY_TOTAL_OFFSET)),
+        memoryUsedBytes: Number(body.readBigUInt64BE(MEMORY_USED_OFFSET)),
+        cpuTotalTicks: Number(body.readBigUInt64BE(CPU_TOTAL_OFFSET)),
+        cpuBusyTicks: Number(body.readBigUInt64BE(CPU_BUSY_OFFSET)),
       });
 }
 

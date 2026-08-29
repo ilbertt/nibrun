@@ -34,7 +34,7 @@ const QUERY: FilesystemQuery = {
 };
 
 /** Measuring is the sixth loop's, not this one's: nothing here asks, so nothing here answers. */
-const unmeasured: FilesystemReader['usage'] = () => Effect.die('nothing measures a volume here');
+const unmeasured: FilesystemReader['measure'] = () => Effect.die('nothing measures a guest here');
 
 const LISTING: DirectoryListing = {
   path: Value.Parse(GuestPathSchema, '/'),
@@ -55,7 +55,7 @@ const LISTING: DirectoryListing = {
  */
 function answering(list: FilesystemReader['list']) {
   const layer = Layer.merge(
-    Layer.succeed(FilesystemReader, FilesystemReader.make({ list, usage: unmeasured })),
+    Layer.succeed(FilesystemReader, FilesystemReader.make({ list, measure: unmeasured })),
     recordingCommands().layer,
   );
   return Effect.runPromise(Effect.provide(answer(QUERY), layer));
@@ -168,7 +168,7 @@ const slots = Layer.provide(SlotAllocator.DefaultWithoutDependencies, host);
 
 const reader = Layer.succeed(
   FilesystemReader,
-  FilesystemReader.make({ list: () => Effect.succeed(LISTING), usage: unmeasured }),
+  FilesystemReader.make({ list: () => Effect.succeed(LISTING), measure: unmeasured }),
 );
 
 /**

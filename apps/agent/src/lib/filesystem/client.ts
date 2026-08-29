@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer';
 import type { AppId, DirectoryListing, GuestPath } from '@repo/protocol';
 import { Data, Duration, Effect } from 'effect';
 import {
+  decodeCompute,
   decodeDetails,
   decodeHeader,
   decodeListing,
@@ -18,6 +19,7 @@ import {
   isRefusal,
   type MalformedGuestReply,
   type MeasuredBytes,
+  type MeasuredCompute,
 } from '#lib/filesystem/protocol.ts';
 import {
   connectRequest,
@@ -68,6 +70,8 @@ export type GuestFilesystem = {
   readonly stat: (path: GuestPath) => Effect.Effect<FilesystemDetails, GuestFilesystemError>;
   /** How full the volume is. No path, because the volume is one filesystem all the way down. */
   readonly usage: () => Effect.Effect<MeasuredBytes, GuestFilesystemError>;
+  /** What the guest is spending. No path either: this one is not about the filesystem at all. */
+  readonly compute: () => Effect.Effect<MeasuredCompute, GuestFilesystemError>;
   /** Short of `length` is the end of the file, which is how a reader in chunks learns to stop. */
   readonly read: (request: {
     readonly path: GuestPath;
@@ -152,6 +156,7 @@ export const guestFilesystem = Effect.fn('guestFilesystem')(function* ({
       Effect.flatMap(exchange({ verb: 'list', path }), (body) => decodeListing({ body, path })),
     stat: (path) => Effect.flatMap(exchange({ verb: 'stat', path }), decodeDetails),
     usage: () => Effect.flatMap(exchange({ verb: 'usage' }), decodeUsage),
+    compute: () => Effect.flatMap(exchange({ verb: 'compute' }), decodeCompute),
     read: ({ path, offset, length }) =>
       exchange({
         verb: 'read',

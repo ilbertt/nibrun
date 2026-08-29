@@ -1,5 +1,6 @@
 import { Type } from '@sinclair/typebox';
 import { CheckpointStateSchema } from '#domain/checkpoint.ts';
+import { ComputeUsageSchema } from '#domain/compute.ts';
 import { ExportStateSchema } from '#domain/export.ts';
 import { FilesystemUsageSchema } from '#domain/filesystem.ts';
 import { HostCapacitySchema, HostStateSchema, HostVersionsSchema } from '#domain/host.ts';
@@ -43,6 +44,13 @@ export const ReportedInstanceSchema = Type.Object({
   startedAt: Type.Optional(TimestampSchema),
   lastHealthyAt: Type.Optional(TimestampSchema),
   lastExitCode: Type.Optional(Type.Integer()),
+  /**
+   * What the guest is spending of the machine it was given, which only the guest can say — so it
+   * rides the report the host was sending anyway rather than being asked for. Absent while
+   * nothing has answered, which is every instance that is not running and every guest whose
+   * image predates the verb.
+   */
+  compute: Type.Optional(ComputeUsageSchema),
   message: Type.Optional(StateMessageSchema),
 });
 

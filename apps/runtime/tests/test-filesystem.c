@@ -461,6 +461,40 @@ static void how_full_the_volume_is_is_measured_without_naming_a_path(const char 
   EXPECT(close_session(&session));
 }
 
+/* Reads the real /proc of whatever is running this, which is the point: the parsing
+ * is the part that can be wrong, and a fixture of made-up lines would only prove that
+ * this side can read lines it wrote itself. What is asserted is what holds of every
+ * running Linux rather than of this one — the numbers themselves belong to the host
+ * the suite happens to be on. */
+static void what_the_machine_is_spending_is_measured_without_naming_a_path(const char *mount_point) {
+  struct session session = open_session(mount_point);
+  struct reply heard;
+  const struct request nothing = {.body = {0}, .length = 0};
+
+  EXPECT(exchange(&session, GUEST_FILESYSTEM_COMPUTE, &nothing, &heard) == GUEST_FILESYSTEM_OK);
+  EXPECT(heard.length == GUEST_FILESYSTEM_COMPUTE_BYTES);
+
+  uint64_t memory_total = decode(heard.body, sizeof(uint64_t));
+  uint64_t memory_used = decode(heard.body + sizeof(uint64_t), sizeof(uint64_t));
+  uint64_t cpu_total = decode(heard.body + (2 * sizeof(uint64_t)), sizeof(uint64_t));
+  uint64_t cpu_busy = decode(heard.body + (3 * sizeof(uint64_t)), sizeof(uint64_t));
+  EXPECT(memory_total > 0);
+  EXPECT(memory_used <= memory_total);
+  EXPECT(cpu_total > 0);
+  EXPECT(cpu_busy <= cpu_total);
+
+  /* Cumulative rather than a level, which is the whole reason the host keeps two of
+   * them: a second reading can equal the first on an idle guest, and can never be
+   * behind it. */
+  struct reply again;
+  EXPECT(exchange(&session, GUEST_FILESYSTEM_COMPUTE, &nothing, &again) == GUEST_FILESYSTEM_OK);
+  EXPECT(decode(again.body + (2 * sizeof(uint64_t)), sizeof(uint64_t)) >= cpu_total);
+
+  EXPECT(answering(&session, GUEST_FILESYSTEM_COMPUTE, "/") == GUEST_FILESYSTEM_MALFORMED);
+  EXPECT(answering(&session, GUEST_FILESYSTEM_LIST, "/") == GUEST_FILESYSTEM_OK);
+  EXPECT(close_session(&session));
+}
+
 int main(void) {
   char mount_point[] = "/tmp/nibrun-filesystem-XXXXXX";
   if (mkdtemp(mount_point) == NULL) {
@@ -483,6 +517,7 @@ int main(void) {
   a_request_this_side_cannot_read_costs_only_itself(mount_point);
   a_peer_that_leaves_mid_request_ends_the_worker(mount_point);
   how_full_the_volume_is_is_measured_without_naming_a_path(mount_point);
+  what_the_machine_is_spending_is_measured_without_naming_a_path(mount_point);
 
   close(root);
   return EXPECT_REPORT("filesystem");

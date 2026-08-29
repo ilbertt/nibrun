@@ -68,6 +68,11 @@ class FakeAppsService {
   readonly volumes: ReportedVolume[][] = [];
   readonly trace: string[] = [];
 
+  recordComputeUsage(): Promise<void> {
+    this.trace.push('recordComputeUsage');
+    return Promise.resolve();
+  }
+
   recordVolumeUsage(): Promise<void> {
     this.trace.push('recordVolumeUsage');
     return Promise.resolve();
@@ -223,6 +228,7 @@ describe('a report is read by whatever owns what it talks about', () => {
 
     expect(apps.trace).toEqual([
       'recordVolumeUsage',
+      'recordComputeUsage',
       'completeDeletions',
       'finishDeletions',
       'purgeDeleted',

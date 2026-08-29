@@ -1,5 +1,6 @@
 import type {
   AppId,
+  ComputeUsage,
   FilesystemUsage,
   HostCapacity,
   HostId,
@@ -19,9 +20,12 @@ import type { PublicAddress } from '#lib/vm/instance-env.ts';
 export function toReportedInstance({
   record,
   reachedAt,
+  measured,
 }: {
   record: InstanceRecord;
   reachedAt: PublicAddress | undefined;
+  /** What the guest last said it was spending, which is not on the record either. */
+  measured: ComputeUsage | undefined;
 }): ReportedInstance {
   return {
     appId: record.appId,
@@ -37,6 +41,7 @@ export function toReportedInstance({
     ...(record.startedAt ? { startedAt: record.startedAt } : {}),
     ...(record.health.lastHealthyAt ? { lastHealthyAt: record.health.lastHealthyAt } : {}),
     ...(record.lastExitCode === undefined ? {} : { lastExitCode: record.lastExitCode }),
+    ...(measured === undefined ? {} : { compute: measured }),
     ...(record.message ? { message: record.message } : {}),
   };
 }
@@ -67,6 +72,7 @@ export function buildReportedState({
   reachedAt,
   volumes,
   volumeUsage,
+  computeUsage,
   checkpoints,
   exports,
 }: {
@@ -81,6 +87,7 @@ export function buildReportedState({
   reachedAt: ReadonlyMap<AppId, PublicAddress>;
   volumes: readonly ReportedVolume[];
   volumeUsage: ReadonlyMap<AppId, FilesystemUsage>;
+  computeUsage: ReadonlyMap<AppId, ComputeUsage>;
   checkpoints: readonly ReportedCheckpoint[];
   exports: readonly ReportedExport[];
 }): HostReportedState {
@@ -95,7 +102,11 @@ export function buildReportedState({
       withUsage({ volume, measured: volumeUsage.get(volume.appId) }),
     ),
     instances: records.map((record) =>
-      toReportedInstance({ record, reachedAt: reachedAt.get(record.appId) }),
+      toReportedInstance({
+        record,
+        reachedAt: reachedAt.get(record.appId),
+        measured: computeUsage.get(record.appId),
+      }),
     ),
     checkpoints: [...checkpoints],
     exports: [...exports],

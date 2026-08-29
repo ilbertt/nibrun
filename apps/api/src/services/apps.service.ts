@@ -1,6 +1,7 @@
 import {
   type App,
   type AppId,
+  type ComputeUsage,
   EXTRA_PUBLIC_PORT_VALUES,
   type FilesystemUsage,
   namesExtraPublicPortValues,
@@ -8,6 +9,7 @@ import {
   type OwnedAppState,
   type OwnerId,
   REDACTED,
+  type ReportedInstance,
   type ReportedVolume,
   type TenantEnvironment,
   writtenRuntimeValue,
@@ -47,6 +49,7 @@ export type PublicApp = Omit<App, 'config' | 'hostnames'> & {
   hostnames: PublicAppHostname[];
   /** `null` until a host has measured the filesystem, which it cannot while nothing mounts it. */
   volumeUsage: FilesystemUsage | null;
+  computeUsage: ComputeUsage | null;
 };
 
 type AppWithHostnames = { app: AppRow; hostnames: readonly AppHostnameRow[] };
@@ -328,6 +331,29 @@ export class AppsService extends Service {
   }
 
   /**
+   * The compute half, taken off the instances rather than the volumes: what a guest is spending
+   * belongs to the microVM running the app, and a volume outlives every microVM that mounts it.
+   *
+   * Deduplicated for the same reason, and by the same rule — an app has one instance on a host,
+   * and a report naming it twice must not take the whole report down with it.
+   */
+  async recordComputeUsage({
+    instances,
+  }: {
+    instances: readonly ReportedInstance[];
+  }): Promise<void> {
+    const readings = new Map<AppId, ComputeUsage>();
+    for (const instance of instances) {
+      if (instance.compute) {
+        readings.set(instance.appId, instance.compute);
+      }
+    }
+    if (readings.size > 0) {
+      await this.appsRepo.recordComputeUsage({ readings });
+    }
+  }
+
+  /**
    * The row stays behind: tearing an app down is the agent's work, the owner follows it through
    * this same state, and the slug must never be handed to a second app whatever happens.
    */
@@ -550,6 +576,29 @@ function toVolumeUsage(app: AppRow): FilesystemUsage | null {
   };
 }
 
+/**
+ * The same, for the compute family — which keeps its own moment, so an app measured by a guest
+ * that answered only one of the two verbs has one reading and not the other.
+ *
+ * `cpu_share` is the exception inside the exception: a share is a rate, so it can be missing from
+ * a reading whose moment is not, and it is left out rather than sent as a nought.
+ */
+function toComputeUsage(app: AppRow): ComputeUsage | null {
+  if (
+    app.memory_total_bytes === null ||
+    app.memory_used_bytes === null ||
+    app.compute_measured_at === null
+  ) {
+    return null;
+  }
+  return {
+    memoryTotalBytes: Number(app.memory_total_bytes),
+    memoryUsedBytes: Number(app.memory_used_bytes),
+    ...(app.cpu_share === null ? {} : { cpuShare: app.cpu_share }),
+    measuredAt: toTimestamp(app.compute_measured_at),
+  };
+}
+
 function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
   return {
     id: app.id,
@@ -558,6 +607,7 @@ function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
     hostnames: hostnames.map(toAppHostname),
     config: toAppConfig(app),
     volumeUsage: toVolumeUsage(app),
+    computeUsage: toComputeUsage(app),
     state: app.state,
     createdAt: toTimestamp(app.created_at),
     updatedAt: toTimestamp(app.updated_at),

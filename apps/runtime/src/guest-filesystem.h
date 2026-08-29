@@ -11,6 +11,12 @@
  * in here is neither: it sees what the tenant just wrote, and a directory of a
  * thousand entries costs what one of nine costs.
  *
+ * Two of the verbs answer about the guest rather than about a file in it: how full
+ * the volume is, and what the machine it is on is spending. They are here rather
+ * than on a port of their own because each is a syscall away from the same place,
+ * and a listener of their own would be another process the tenant's own memory pays
+ * for — which is one of the things being measured.
+ *
  * The wire format is below. The host agent's `lib/filesystem/protocol.ts` is the
  * other end of it. */
 
@@ -48,6 +54,10 @@ enum guest_filesystem_verb {
    * names no path: a volume is one filesystem, so how full it is is not a question
    * about a place inside it. */
   GUEST_FILESYSTEM_USAGE = 8,
+  /* Body: empty. Reply: uint64 memory total, uint64 memory used, uint64 cpu ticks,
+   * uint64 of those spent computing. Names no path either, and for the same reason:
+   * what it answers about is the machine the filesystem is on. */
+  GUEST_FILESYSTEM_COMPUTE = 9,
 };
 
 /* Truncates to the offset written at before writing, so that replacing a large file
@@ -78,6 +88,19 @@ enum guest_filesystem_status {
  * because free and available differ by the blocks ext4 reserves for root and the
  * tenant is not root — so the number that would be misread is the one left out. */
 #define GUEST_FILESYSTEM_USAGE_BYTES 16
+
+/* What `compute` answers with. Memory is `MemTotal` and what is left of it once
+ * `MemAvailable` is taken off, rather than `MemFree`: Linux spends every page it is
+ * not using on cache it hands straight back when asked, so free is the number that
+ * reads as an emergency on a guest with nothing wrong with it.
+ *
+ * The tick counts are cumulative since the guest booted, because a rate is not
+ * something one reading holds — whoever has two of them divides the difference and
+ * gets the share of the vCPUs spent computing in between. Ticks spent idle, waiting
+ * on IO, or stolen by the host are in the total and not in the busy count: none of
+ * the three is the tenant computing, and leaving steal in the total is what makes a
+ * starved guest read as starved rather than as busy. */
+#define GUEST_FILESYSTEM_COMPUTE_BYTES 32
 
 enum guest_filesystem_kind {
   GUEST_FILESYSTEM_FILE = 1,

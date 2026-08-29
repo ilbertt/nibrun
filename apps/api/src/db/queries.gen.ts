@@ -203,11 +203,19 @@ export interface ISelectCreatedAppResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     environment_names: string[];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_total_bytes: IVolumeUsageColumns["total_bytes"] | null;
+    volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_used_bytes: IVolumeUsageColumns["used_bytes"] | null;
-    /** When the guest was asked, which is not when the report carrying it arrived. */
-    volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
+    volume_used_bytes: IAppUsageColumns["volume_used_bytes"];
+    /** When the guest was asked how full its filesystem was, not when the report carrying it arrived. */
+    volume_measured_at: IAppUsageColumns["volume_measured_at"];
+    /** MemTotal, which reads under the memory the app was allocated. A bigint, so it arrives as a string. */
+    memory_total_bytes: IAppUsageColumns["memory_total_bytes"];
+    /** MemTotal less MemAvailable, so cache the kernel would hand back is not counted as spent. */
+    memory_used_bytes: IAppUsageColumns["memory_used_bytes"];
+    /** The mean share of the vCPUs spent computing over the interval ending at compute_measured_at. */
+    cpu_share: IAppUsageColumns["cpu_share"];
+    /** When the guest was asked what it was spending, not when the report carrying it arrived. */
+    compute_measured_at: IAppUsageColumns["compute_measured_at"];
 }
 
 /** Result of query `SelectAppsByOwner`. */
@@ -237,11 +245,19 @@ export interface ISelectAppsByOwnerResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     environment_names: string[];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_total_bytes: IVolumeUsageColumns["total_bytes"] | null;
+    volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_used_bytes: IVolumeUsageColumns["used_bytes"] | null;
-    /** When the guest was asked, which is not when the report carrying it arrived. */
-    volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
+    volume_used_bytes: IAppUsageColumns["volume_used_bytes"];
+    /** When the guest was asked how full its filesystem was, not when the report carrying it arrived. */
+    volume_measured_at: IAppUsageColumns["volume_measured_at"];
+    /** MemTotal, which reads under the memory the app was allocated. A bigint, so it arrives as a string. */
+    memory_total_bytes: IAppUsageColumns["memory_total_bytes"];
+    /** MemTotal less MemAvailable, so cache the kernel would hand back is not counted as spent. */
+    memory_used_bytes: IAppUsageColumns["memory_used_bytes"];
+    /** The mean share of the vCPUs spent computing over the interval ending at compute_measured_at. */
+    cpu_share: IAppUsageColumns["cpu_share"];
+    /** When the guest was asked what it was spending, not when the report carrying it arrived. */
+    compute_measured_at: IAppUsageColumns["compute_measured_at"];
 }
 
 /** Result of query `SelectAppById`. */
@@ -271,11 +287,19 @@ export interface ISelectAppByIdResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     environment_names: string[];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_total_bytes: IVolumeUsageColumns["total_bytes"] | null;
+    volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_used_bytes: IVolumeUsageColumns["used_bytes"] | null;
-    /** When the guest was asked, which is not when the report carrying it arrived. */
-    volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
+    volume_used_bytes: IAppUsageColumns["volume_used_bytes"];
+    /** When the guest was asked how full its filesystem was, not when the report carrying it arrived. */
+    volume_measured_at: IAppUsageColumns["volume_measured_at"];
+    /** MemTotal, which reads under the memory the app was allocated. A bigint, so it arrives as a string. */
+    memory_total_bytes: IAppUsageColumns["memory_total_bytes"];
+    /** MemTotal less MemAvailable, so cache the kernel would hand back is not counted as spent. */
+    memory_used_bytes: IAppUsageColumns["memory_used_bytes"];
+    /** The mean share of the vCPUs spent computing over the interval ending at compute_measured_at. */
+    cpu_share: IAppUsageColumns["cpu_share"];
+    /** When the guest was asked what it was spending, not when the report carrying it arrived. */
+    compute_measured_at: IAppUsageColumns["compute_measured_at"];
 }
 
 /** Result of query `SelectAppForConfigUpdate`. */
@@ -337,11 +361,19 @@ export interface ITouchAppAfterConfigPatchResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     environment_names: string[];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_total_bytes: IVolumeUsageColumns["total_bytes"] | null;
+    volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_used_bytes: IVolumeUsageColumns["used_bytes"] | null;
-    /** When the guest was asked, which is not when the report carrying it arrived. */
-    volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
+    volume_used_bytes: IAppUsageColumns["volume_used_bytes"];
+    /** When the guest was asked how full its filesystem was, not when the report carrying it arrived. */
+    volume_measured_at: IAppUsageColumns["volume_measured_at"];
+    /** MemTotal, which reads under the memory the app was allocated. A bigint, so it arrives as a string. */
+    memory_total_bytes: IAppUsageColumns["memory_total_bytes"];
+    /** MemTotal less MemAvailable, so cache the kernel would hand back is not counted as spent. */
+    memory_used_bytes: IAppUsageColumns["memory_used_bytes"];
+    /** The mean share of the vCPUs spent computing over the interval ending at compute_measured_at. */
+    cpu_share: IAppUsageColumns["cpu_share"];
+    /** When the guest was asked what it was spending, not when the report carrying it arrived. */
+    compute_measured_at: IAppUsageColumns["compute_measured_at"];
 }
 
 /** Result of query `SelectFinishableDeletion`. */
@@ -388,8 +420,8 @@ export interface IDeleteDeploymentsByAppResult {
 export interface IDeleteArtifactsByAppResult {
 }
 
-/** Result of query `DeleteVolumeUsageByApp`. */
-export interface IDeleteVolumeUsageByAppResult {
+/** Result of query `DeleteAppUsageByApp`. */
+export interface IDeleteAppUsageByAppResult {
 }
 
 /** Result of query `SelectAppAfterStateChange`. */
@@ -419,11 +451,19 @@ export interface ISelectAppAfterStateChangeResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     environment_names: string[];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_total_bytes: IVolumeUsageColumns["total_bytes"] | null;
+    volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_used_bytes: IVolumeUsageColumns["used_bytes"] | null;
-    /** When the guest was asked, which is not when the report carrying it arrived. */
-    volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
+    volume_used_bytes: IAppUsageColumns["volume_used_bytes"];
+    /** When the guest was asked how full its filesystem was, not when the report carrying it arrived. */
+    volume_measured_at: IAppUsageColumns["volume_measured_at"];
+    /** MemTotal, which reads under the memory the app was allocated. A bigint, so it arrives as a string. */
+    memory_total_bytes: IAppUsageColumns["memory_total_bytes"];
+    /** MemTotal less MemAvailable, so cache the kernel would hand back is not counted as spent. */
+    memory_used_bytes: IAppUsageColumns["memory_used_bytes"];
+    /** The mean share of the vCPUs spent computing over the interval ending at compute_measured_at. */
+    cpu_share: IAppUsageColumns["cpu_share"];
+    /** When the guest was asked what it was spending, not when the report carrying it arrived. */
+    compute_measured_at: IAppUsageColumns["compute_measured_at"];
 }
 
 /** Result of query `InsertPendingArtifact`. */
@@ -784,7 +824,7 @@ export interface Queries {
     DeleteExportsByApp: IDeleteExportsByAppResult;
     DeleteDeploymentsByApp: IDeleteDeploymentsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
-    DeleteVolumeUsageByApp: IDeleteVolumeUsageByAppResult;
+    DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
     SelectAppAfterStateChange: ISelectAppAfterStateChangeResult;
     InsertPendingArtifact: IInsertPendingArtifactResult;
     CompleteArtifact: ICompleteArtifactResult;
@@ -1025,6 +1065,37 @@ export interface IAppHostnamesTable {
     relationType: (typeof schema)["app_hostnames"]["_relationType"];
     indexes: keyof (typeof schema)["app_hostnames"]["_indexes"];
     constraints: keyof (typeof schema)["app_hostnames"]["_constraints"];
+}
+
+/** Columns of `app_usage`. */
+export interface IAppUsageColumns {
+    id: string;
+    app_id: import("@repo/protocol").AppId;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_total_bytes: string | null;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    volume_used_bytes: string | null;
+    /** When the guest was asked how full its filesystem was, not when the report carrying it arrived. */
+    volume_measured_at: Date | null;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+    /** MemTotal, which reads under the memory the app was allocated. A bigint, so it arrives as a string. */
+    memory_total_bytes: string | null;
+    /** MemTotal less MemAvailable, so cache the kernel would hand back is not counted as spent. */
+    memory_used_bytes: string | null;
+    /** The mean share of the vCPUs spent computing over the interval ending at compute_measured_at. */
+    cpu_share: number | null;
+    /** When the guest was asked what it was spending, not when the report carrying it arrived. */
+    compute_measured_at: Date | null;
+}
+
+/** Schema of `app_usage`. */
+export interface IAppUsageTable {
+    columns: IAppUsageColumns;
+    relationType: (typeof schema)["app_usage"]["_relationType"];
+    indexes: keyof (typeof schema)["app_usage"]["_indexes"];
+    constraints: keyof (typeof schema)["app_usage"]["_constraints"];
 }
 
 /** Columns of `apps`. */
@@ -1296,29 +1367,6 @@ export interface IPurgeableAppsTable {
     constraints: keyof (typeof schema)["purgeable_apps"]["_constraints"];
 }
 
-/** Columns of `volume_usage`. */
-export interface IVolumeUsageColumns {
-    id: string;
-    app_id: import("@repo/protocol").AppId;
-    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    total_bytes: string;
-    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    used_bytes: string;
-    /** When the guest was asked, which is not when the report carrying it arrived. */
-    measured_at: Date;
-    /** Derived from the uuidv7 id; the moment the row was created. */
-    created_at: Date;
-    updated_at: Date;
-}
-
-/** Schema of `volume_usage`. */
-export interface IVolumeUsageTable {
-    columns: IVolumeUsageColumns;
-    relationType: (typeof schema)["volume_usage"]["_relationType"];
-    indexes: keyof (typeof schema)["volume_usage"]["_indexes"];
-    constraints: keyof (typeof schema)["volume_usage"]["_constraints"];
-}
-
 export const schema = {
     account: {
         _relationName: "account",
@@ -1558,6 +1606,35 @@ export const schema = {
             app_hostnames_kind_check: { _constraintName: "app_hostnames_kind_check" },
             app_hostnames_pkey: { _constraintName: "app_hostnames_pkey" },
             app_hostnames_state_check: { _constraintName: "app_hostnames_state_check" }
+        }
+    },
+    app_usage: {
+        _relationName: "app_usage",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { volume_usage_app_id_fkey: { _constraintName: "volume_usage_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            volume_total_bytes: { _columnName: "volume_total_bytes", _foreignKeys: {} },
+            volume_used_bytes: { _columnName: "volume_used_bytes", _foreignKeys: {} },
+            volume_measured_at: { _columnName: "volume_measured_at", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            memory_total_bytes: { _columnName: "memory_total_bytes", _foreignKeys: {} },
+            memory_used_bytes: { _columnName: "memory_used_bytes", _foreignKeys: {} },
+            cpu_share: { _columnName: "cpu_share", _foreignKeys: {} },
+            compute_measured_at: { _columnName: "compute_measured_at", _foreignKeys: {} }
+        },
+        _indexes: {
+            app_usage_app_id_key: { _indexName: "app_usage_app_id_key" },
+            app_usage_pkey: { _indexName: "app_usage_pkey" }
+        },
+        _constraints: {
+            app_usage_app_id_key: { _constraintName: "app_usage_app_id_key" },
+            app_usage_compute_whole: { _constraintName: "app_usage_compute_whole" },
+            app_usage_cpu_share_is_a_share: { _constraintName: "app_usage_cpu_share_is_a_share" },
+            app_usage_pkey: { _constraintName: "app_usage_pkey" },
+            app_usage_volume_whole: { _constraintName: "app_usage_volume_whole" },
+            volume_usage_app_id_fkey: { _constraintName: "volume_usage_app_id_fkey" }
         }
     },
     apps: {
@@ -1803,28 +1880,6 @@ export const schema = {
         },
         _indexes: {},
         _constraints: {}
-    },
-    volume_usage: {
-        _relationName: "volume_usage",
-        _relationType: "table",
-        _columns: {
-            id: { _columnName: "id", _foreignKeys: {} },
-            app_id: { _columnName: "app_id", _foreignKeys: { volume_usage_app_id_fkey: { _constraintName: "volume_usage_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
-            total_bytes: { _columnName: "total_bytes", _foreignKeys: {} },
-            used_bytes: { _columnName: "used_bytes", _foreignKeys: {} },
-            measured_at: { _columnName: "measured_at", _foreignKeys: {} },
-            created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
-        },
-        _indexes: {
-            volume_usage_app_id_key: { _indexName: "volume_usage_app_id_key" },
-            volume_usage_pkey: { _indexName: "volume_usage_pkey" }
-        },
-        _constraints: {
-            volume_usage_app_id_fkey: { _constraintName: "volume_usage_app_id_fkey" },
-            volume_usage_app_id_key: { _constraintName: "volume_usage_app_id_key" },
-            volume_usage_pkey: { _constraintName: "volume_usage_pkey" }
-        }
     }
 } as const;
 
@@ -1838,6 +1893,7 @@ export interface Tables {
     app_configs: IAppConfigsTable;
     app_configs_with_environment: IAppConfigsWithEnvironmentTable;
     app_hostnames: IAppHostnamesTable;
+    app_usage: IAppUsageTable;
     apps: IAppsTable;
     artifacts: IArtifactsTable;
     deployments: IDeploymentsTable;
@@ -1851,7 +1907,6 @@ export interface Tables {
     finishable_deletions: IFinishableDeletionsTable;
     live_apps: ILiveAppsTable;
     purgeable_apps: IPurgeableAppsTable;
-    volume_usage: IVolumeUsageTable;
 }
 
 declare module "@ilbertt/bun-sqlgen" {

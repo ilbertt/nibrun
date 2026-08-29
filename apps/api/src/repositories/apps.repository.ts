@@ -5,6 +5,7 @@ import {
   type AppHostnameState,
   type AppId,
   type AppState,
+  type ComputeUsage,
   type DnsLabel,
   type FilesystemUsage,
   type Hostname,
@@ -66,6 +67,7 @@ export abstract class AppsRepositoryContract {
   abstract recordVolumeUsage(input: {
     readings: ReadonlyMap<AppId, FilesystemUsage>;
   }): Promise<void>;
+  abstract recordComputeUsage(input: { readings: ReadonlyMap<AppId, ComputeUsage> }): Promise<void>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
@@ -164,14 +166,14 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
-               u.total_bytes AS volume_total_bytes, u.used_bytes AS volume_used_bytes,
-               u.measured_at AS volume_measured_at
+               u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
+               u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at
         FROM nibrun.live_apps a
         JOIN LATERAL (
           SELECT * FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
-        LEFT JOIN nibrun.volume_usage u ON u.app_id = a.id
+        LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
         WHERE a.id = ${inserted.id} AND a.owner_id = ${ownerId}
       `;
       if (!app) {
@@ -192,27 +194,28 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
-             u.total_bytes AS volume_total_bytes, u.used_bytes AS volume_used_bytes,
-             u.measured_at AS volume_measured_at
+             u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
+             u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at
       FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
-      LEFT JOIN nibrun.volume_usage u ON u.app_id = a.id
+      LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
       WHERE a.owner_id = ${ownerId}
       ORDER BY a.created_at DESC
     `;
   }
 
   /**
-   * Every reading one report carried, replacing whatever was there — one host holds a volume at a
+   * Every reading one report carried, replacing whatever was there — one host holds an app at a
    * time, so there is no second writer to lose to. `measured_at` guards the exception: a report
-   * delayed behind a newer one must not put an older reading back.
+   * delayed behind a newer one must not put an older reading back. A row whose moment is null has
+   * only ever held the other family, so there is nothing older there to protect.
    *
    * The fleet's view rather than an owner's, so there is no `ownerId` to scope on: a host reports
-   * the volumes it holds, and which owner each belongs to is this end's to know and not the
-   * host's to be asked about.
+   * what it holds, and which owner each app belongs to is this end's to know and not the host's
+   * to be asked about.
    *
    * Joined to `apps` rather than given the ids outright, so that a reading about an app that has
    * since been purged writes nothing instead of failing the report carrying it.
@@ -228,7 +231,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   }): Promise<void> {
     const taken = [...readings];
     await this.sql`
-      INSERT INTO nibrun.volume_usage (app_id, total_bytes, used_bytes, measured_at)
+      INSERT INTO nibrun.app_usage (app_id, volume_total_bytes, volume_used_bytes,
+                                    volume_measured_at)
       SELECT a.id, reading.total_bytes::bigint, reading.used_bytes::bigint,
              reading.measured_at::timestamptz
       FROM UNNEST(
@@ -250,11 +254,67 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         )}
       ) AS reading(app_id, total_bytes, used_bytes, measured_at)
       JOIN nibrun.apps a ON a.id = reading.app_id::uuid
-      ON CONFLICT ON CONSTRAINT volume_usage_app_id_key DO UPDATE
-        SET total_bytes = EXCLUDED.total_bytes,
-            used_bytes  = EXCLUDED.used_bytes,
-            measured_at = EXCLUDED.measured_at
-        WHERE EXCLUDED.measured_at > nibrun.volume_usage.measured_at
+      ON CONFLICT ON CONSTRAINT app_usage_app_id_key DO UPDATE
+        SET volume_total_bytes = EXCLUDED.volume_total_bytes,
+            volume_used_bytes  = EXCLUDED.volume_used_bytes,
+            volume_measured_at = EXCLUDED.volume_measured_at
+        WHERE nibrun.app_usage.volume_measured_at IS NULL
+           OR EXCLUDED.volume_measured_at > nibrun.app_usage.volume_measured_at
+    `;
+  }
+
+  /**
+   * The compute half of the same arrangement, written by the same report and guarded the same
+   * way. Its own statement rather than more columns on the one above, because the two families
+   * arrive from two exchanges with the guest and either can be missing while the other is not.
+   *
+   * `cpu_share` is absent from a reading that had none, which is the first one taken of a guest
+   * and the first after it rebooted: a rate needs a reading behind it, and a nought written where
+   * there was nothing to divide is the figure an owner would act on. It crosses as an empty
+   * string rather than a null, because `sql.array` writes a JavaScript null into a text array as
+   * the four characters that spell it — which Postgres then refuses to read as a number.
+   */
+  async recordComputeUsage({
+    readings,
+  }: {
+    readings: ReadonlyMap<AppId, ComputeUsage>;
+  }): Promise<void> {
+    const taken = [...readings];
+    await this.sql`
+      INSERT INTO nibrun.app_usage (app_id, memory_total_bytes, memory_used_bytes, cpu_share,
+                                    compute_measured_at)
+      SELECT a.id, reading.memory_total_bytes::bigint, reading.memory_used_bytes::bigint,
+             NULLIF(reading.cpu_share, '')::double precision, reading.measured_at::timestamptz
+      FROM UNNEST(
+        ${this.sql.array(
+          taken.map(([appId]) => appId),
+          TEXT_ARRAY,
+        )},
+        ${this.sql.array(
+          taken.map(([, usage]) => String(usage.memoryTotalBytes)),
+          TEXT_ARRAY,
+        )},
+        ${this.sql.array(
+          taken.map(([, usage]) => String(usage.memoryUsedBytes)),
+          TEXT_ARRAY,
+        )},
+        ${this.sql.array(
+          taken.map(([, usage]) => (usage.cpuShare === undefined ? '' : String(usage.cpuShare))),
+          TEXT_ARRAY,
+        )},
+        ${this.sql.array(
+          taken.map(([, usage]) => usage.measuredAt),
+          TEXT_ARRAY,
+        )}
+      ) AS reading(app_id, memory_total_bytes, memory_used_bytes, cpu_share, measured_at)
+      JOIN nibrun.apps a ON a.id = reading.app_id::uuid
+      ON CONFLICT ON CONSTRAINT app_usage_app_id_key DO UPDATE
+        SET memory_total_bytes  = EXCLUDED.memory_total_bytes,
+            memory_used_bytes   = EXCLUDED.memory_used_bytes,
+            cpu_share           = EXCLUDED.cpu_share,
+            compute_measured_at = EXCLUDED.compute_measured_at
+        WHERE nibrun.app_usage.compute_measured_at IS NULL
+           OR EXCLUDED.compute_measured_at > nibrun.app_usage.compute_measured_at
     `;
   }
 
@@ -268,14 +328,14 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
-             u.total_bytes AS volume_total_bytes, u.used_bytes AS volume_used_bytes,
-             u.measured_at AS volume_measured_at
+             u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
+             u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at
       FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
-      LEFT JOIN nibrun.volume_usage u ON u.app_id = a.id
+      LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
     `;
     return app ?? null;
@@ -361,7 +421,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         UPDATE nibrun.apps a
         SET updated_at = now()
         FROM nibrun.app_configs_with_environment c
-        LEFT JOIN nibrun.volume_usage u ON u.app_id = c.app_id
+        LEFT JOIN nibrun.app_usage u ON u.app_id = c.app_id
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND c.id = ${inserted.id}
         RETURNING a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
                   c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -370,8 +430,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                   c.health_check_unhealthy_threshold,
                   c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                   c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
-                  u.total_bytes AS volume_total_bytes, u.used_bytes AS volume_used_bytes,
-                  u.measured_at AS volume_measured_at
+                  u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
+                  u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at
       `;
       return app ?? null;
     });
@@ -472,7 +532,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       await tx.DeleteExportsByApp`DELETE FROM nibrun.exports WHERE app_id = ${appId}`;
       await tx.DeleteDeploymentsByApp`DELETE FROM nibrun.deployments WHERE app_id = ${appId}`;
       await tx.DeleteArtifactsByApp`DELETE FROM nibrun.artifacts WHERE app_id = ${appId}`;
-      await tx.DeleteVolumeUsageByApp`DELETE FROM nibrun.volume_usage WHERE app_id = ${appId}`;
+      await tx.DeleteAppUsageByApp`DELETE FROM nibrun.app_usage WHERE app_id = ${appId}`;
     });
   }
 
@@ -519,14 +579,14 @@ async function appAfterStateChange({
            c.health_check_unhealthy_threshold,
            c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
            c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
-           u.total_bytes AS volume_total_bytes, u.used_bytes AS volume_used_bytes,
-           u.measured_at AS volume_measured_at
+           u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
+           u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at
     FROM nibrun.live_apps a
     JOIN LATERAL (
       SELECT * FROM nibrun.app_configs_with_environment c
       WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
     ) c ON true
-    LEFT JOIN nibrun.volume_usage u ON u.app_id = a.id
+    LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
   `;
   if (!app) {

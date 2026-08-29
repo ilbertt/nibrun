@@ -12,6 +12,7 @@ import {
 } from '@repo/protocol';
 import { Either } from 'effect';
 import {
+  decodeCompute,
   decodeDetails,
   decodeHeader,
   decodeListing,
@@ -25,6 +26,7 @@ import {
   isRefusal,
 } from '#lib/filesystem/protocol.ts';
 import {
+  computeBody,
   detailsBytes,
   entryBytes,
   GUEST_STATUS,
@@ -102,6 +104,7 @@ describe('a request carries what its verb needs and nothing else', () => {
       { request: { verb: 'remove', path: ROOT }, code: GUEST_VERB.remove },
       { request: { verb: 'move', path: ROOT, destination: ROOT }, code: GUEST_VERB.move },
       { request: { verb: 'usage' }, code: GUEST_VERB.usage },
+      { request: { verb: 'compute' }, code: GUEST_VERB.compute },
     ] as const;
 
     for (const { request, code } of verbs) {
@@ -132,6 +135,10 @@ describe('a request carries what its verb needs and nothing else', () => {
   // guest was told to ignore is a path one field away from being read.
   test('asking how full a volume is names nothing', () => {
     expect(requestsIn(encodeRequest({ verb: 'usage' })).requests[0]?.body.byteLength).toBe(0);
+  });
+
+  test('asking what a guest is spending names nothing either', () => {
+    expect(requestsIn(encodeRequest({ verb: 'compute' })).requests[0]?.body.byteLength).toBe(0);
   });
 
   test('content crosses byte for byte, NULs and all', () => {
@@ -259,6 +266,28 @@ describe('how full a volume is comes back as two counts', () => {
     const short = usageBody(MEASURED).subarray(0, 1);
 
     expect(Either.isLeft(decodeUsage(short))).toBe(true);
+  });
+});
+
+describe('what a guest is spending comes back as four counters', () => {
+  const MEASURED = {
+    memoryTotalBytes: 1_031_012_352,
+    memoryUsedBytes: 412_401_664,
+    cpuTotalTicks: 5_998_412,
+    cpuBusyTicks: 1_071_233,
+  };
+
+  test('all four survive the wire in the order the guest writes them', () => {
+    expect(decodeCompute(computeBody(MEASURED))).toEqual(Either.right(MEASURED));
+  });
+
+  // A guest whose image predates the verb refuses it outright, which is a status and not a short
+  // body. A short body is a guest speaking something else, and reading the part that fits would
+  // report a machine spending nothing.
+  test('a body too short to hold them is refused rather than read as zero', () => {
+    const short = computeBody(MEASURED).subarray(0, 1);
+
+    expect(Either.isLeft(decodeCompute(short))).toBe(true);
   });
 });
 

@@ -18,6 +18,10 @@ written at all. `src/guest-filesystem.c` answers a `readdir` instead, on a port 
 never on the control port, which takes one connection at a time and holds it for the length of an
 export. Its wire format is in `src/guest-filesystem.h`.
 
+Two of its verbs answer about the guest rather than about a file in it: how full the volume is,
+and what the machine is spending, read out of `/proc`. Neither earned a port of its own — a
+listener is another fork of PID 1, and its memory is part of what the second one measures.
+
 Both answer in a child of PID 1, not on the supervisor's poll loop, which does not run while the
 tenant is between restarts. Neither allocates: `getdents` rather than `opendir`, two bounded
 buffers on the stack of whoever is answering, and a request that cannot make either grow. The

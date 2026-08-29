@@ -8,9 +8,14 @@ import {
   Value,
 } from '@repo/protocol';
 import { Effect, Layer } from 'effect';
-import { measureVolumes } from '#lib/agent/usage.ts';
+import { measureUsage } from '#lib/agent/usage.ts';
 import { AgentState } from '#services/agent-state.service.ts';
-import { FilesystemReader, NoDeviceForApp } from '#services/filesystem-reader.service.ts';
+import {
+  FilesystemReader,
+  type GuestReading,
+  type MeasuredComputeAt,
+  NoDeviceForApp,
+} from '#services/filesystem-reader.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { platform } from '#tests/support/run.ts';
@@ -27,8 +32,36 @@ const TOTAL_BYTES = 8_455_712_768;
 const FILLED_BYTES = 1_503_238_553;
 const EMPTY_BYTES = 4_096;
 
-function reading(usedBytes: number): FilesystemUsage {
+/** A gibibyte of guest memory as the guest kernel counts it, and what a tenant has of it. */
+const MEMORY_TOTAL_BYTES = 1_031_012_352;
+const MEMORY_USED_BYTES = 412_401_664;
+
+/** Two readings a quarter of an interval apart: 100 busy ticks out of 400 elapsed. */
+const FIRST_TOTAL_TICKS = 1_000;
+const FIRST_BUSY_TICKS = 100;
+const SECOND_TOTAL_TICKS = 1_400;
+const SECOND_BUSY_TICKS = 200;
+const EXPECTED_SHARE = 0.25;
+
+function filesystem(usedBytes: number): FilesystemUsage {
   return { totalBytes: TOTAL_BYTES, usedBytes, measuredAt: at('2026-08-03T10:00:00Z') };
+}
+
+function compute({ total, busy }: { total: number; busy: number }): MeasuredComputeAt {
+  return {
+    memoryTotalBytes: MEMORY_TOTAL_BYTES,
+    memoryUsedBytes: MEMORY_USED_BYTES,
+    cpuTotalTicks: total,
+    cpuBusyTicks: busy,
+    measuredAt: at('2026-08-03T10:00:00Z'),
+  };
+}
+
+const FIRST_PASS = compute({ total: FIRST_TOTAL_TICKS, busy: FIRST_BUSY_TICKS });
+const SECOND_PASS = compute({ total: SECOND_TOTAL_TICKS, busy: SECOND_BUSY_TICKS });
+
+function reading(both: Partial<GuestReading> = {}): GuestReading {
+  return { filesystem: both.filesystem, compute: both.compute };
 }
 
 /**
@@ -40,21 +73,21 @@ const host = Layer.mergeAll(agentConfig(), platform);
 const slots = Layer.provide(SlotAllocator.DefaultWithoutDependencies, host);
 
 /** Answers with whatever the test put in front of it, and refuses the apps it was given none for. */
-function measuring(readings: ReadonlyMap<AppId, FilesystemUsage>) {
+function measuring(readings: ReadonlyMap<AppId, GuestReading>) {
   return Layer.succeed(
     FilesystemReader,
     FilesystemReader.make({
       list: () => Effect.die('nothing lists a directory here'),
-      usage: ({ appId }) => {
-        const measured = readings.get(appId);
-        return measured ? Effect.succeed(measured) : new NoDeviceForApp({ appId });
+      measure: ({ appId }) => {
+        const taken = readings.get(appId);
+        return taken ? Effect.succeed(taken) : new NoDeviceForApp({ appId });
       },
     }),
   );
 }
 
 function run<A, E>(input: {
-  readings: ReadonlyMap<AppId, FilesystemUsage>;
+  readings: ReadonlyMap<AppId, GuestReading>;
   program: Effect.Effect<A, E, AgentState | SlotAllocator | FilesystemReader>;
 }) {
   return Effect.runPromise(
@@ -65,24 +98,26 @@ function run<A, E>(input: {
   );
 }
 
-describe('every volume this host holds is measured on a pass of its own', () => {
+describe('every guest this host holds is measured on a pass of its own', () => {
   test('a reading is taken for each app holding a slot', async () => {
-    const usage = await run({
+    const snapshot = await run({
       readings: new Map([
-        [BUSY, reading(FILLED_BYTES)],
-        [QUIET, reading(EMPTY_BYTES)],
+        [BUSY, reading({ filesystem: filesystem(FILLED_BYTES), compute: FIRST_PASS })],
+        [QUIET, reading({ filesystem: filesystem(EMPTY_BYTES), compute: FIRST_PASS })],
       ]),
       program: Effect.gen(function* () {
         const allocator = yield* SlotAllocator;
         yield* allocator.allocate(BUSY);
         yield* allocator.allocate(QUIET);
-        yield* measureVolumes;
-        return (yield* AgentState.snapshot).volumeUsage;
+        yield* measureUsage;
+        return yield* AgentState.snapshot;
       }),
     });
 
-    expect(usage.get(BUSY)?.usedBytes).toBe(FILLED_BYTES);
-    expect(usage.get(QUIET)?.usedBytes).toBe(EMPTY_BYTES);
+    expect(snapshot.volumeUsage.get(BUSY)?.usedBytes).toBe(FILLED_BYTES);
+    expect(snapshot.volumeUsage.get(QUIET)?.usedBytes).toBe(EMPTY_BYTES);
+    expect(snapshot.computeUsage.get(BUSY)?.memoryUsedBytes).toBe(MEMORY_USED_BYTES);
+    expect(snapshot.computeUsage.get(QUIET)?.memoryUsedBytes).toBe(MEMORY_USED_BYTES);
   });
 
   /**
@@ -90,52 +125,122 @@ describe('every volume this host holds is measured on a pass of its own', () => 
    * filesystem mounted, nothing can be asked, and the honest answer is what was true when it was
    * last running rather than nothing at all.
    */
-  test('an app whose guest cannot be asked keeps the reading it had', async () => {
-    const usage = await run({
-      readings: new Map([[BUSY, reading(FILLED_BYTES)]]),
+  test('an app whose guest cannot be asked keeps the readings it had', async () => {
+    const snapshot = await run({
+      readings: new Map([
+        [BUSY, reading({ filesystem: filesystem(FILLED_BYTES), compute: FIRST_PASS })],
+      ]),
       program: Effect.gen(function* () {
         const allocator = yield* SlotAllocator;
         yield* allocator.allocate(BUSY);
-        yield* measureVolumes;
+        yield* measureUsage;
         // The same pass again against a reader that has since stopped answering for it.
-        yield* Effect.provide(measureVolumes, measuring(new Map()));
-        return (yield* AgentState.snapshot).volumeUsage;
+        yield* Effect.provide(measureUsage, measuring(new Map()));
+        return yield* AgentState.snapshot;
       }),
     });
 
-    expect(usage.get(BUSY)).toEqual(reading(FILLED_BYTES));
+    expect(snapshot.volumeUsage.get(BUSY)).toEqual(filesystem(FILLED_BYTES));
+    expect(snapshot.computeUsage.get(BUSY)?.memoryUsedBytes).toBe(MEMORY_USED_BYTES);
   });
 
   // The slot goes when the control plane says the volume is absent, which is the one moment the
-  // reading stops being about anything.
+  // readings stop being about anything.
   test('an app that has lost its slot is not carried forward', async () => {
-    const usage = await run({
-      readings: new Map([[BUSY, reading(FILLED_BYTES)]]),
+    const snapshot = await run({
+      readings: new Map([
+        [BUSY, reading({ filesystem: filesystem(FILLED_BYTES), compute: FIRST_PASS })],
+      ]),
       program: Effect.gen(function* () {
         const allocator = yield* SlotAllocator;
         yield* allocator.allocate(BUSY);
-        yield* measureVolumes;
+        yield* measureUsage;
         yield* allocator.release(BUSY);
-        yield* measureVolumes;
-        return (yield* AgentState.snapshot).volumeUsage;
+        yield* measureUsage;
+        return yield* AgentState.snapshot;
       }),
     });
 
-    expect(usage.has(BUSY)).toBe(false);
+    expect(snapshot.volumeUsage.has(BUSY)).toBe(false);
+    expect(snapshot.computeUsage.has(BUSY)).toBe(false);
+    expect(snapshot.computeTicks.has(BUSY)).toBe(false);
   });
 
   // Nobody is waiting on a measurement, and the report it feeds must go out regardless.
   test('a guest that will not answer is not a failure of the pass', async () => {
-    const usage = await run({
+    const snapshot = await run({
       readings: new Map(),
       program: Effect.gen(function* () {
         const allocator = yield* SlotAllocator;
         yield* allocator.allocate(BUSY);
-        yield* measureVolumes;
-        return (yield* AgentState.snapshot).volumeUsage;
+        yield* measureUsage;
+        return yield* AgentState.snapshot;
       }),
     });
 
-    expect(usage.size).toBe(0);
+    expect(snapshot.volumeUsage.size).toBe(0);
+    expect(snapshot.computeUsage.size).toBe(0);
+  });
+
+  /**
+   * The two halves are two exchanges, and a guest whose image predates one of the verbs refuses
+   * that one and answers the other — which is what every host looks like between this shipping
+   * and the guest image release behind it.
+   */
+  test('a guest that answers about only one of the two is reported on that one', async () => {
+    const snapshot = await run({
+      readings: new Map([[BUSY, reading({ filesystem: filesystem(FILLED_BYTES) })]]),
+      program: Effect.gen(function* () {
+        const allocator = yield* SlotAllocator;
+        yield* allocator.allocate(BUSY);
+        yield* measureUsage;
+        return yield* AgentState.snapshot;
+      }),
+    });
+
+    expect(snapshot.volumeUsage.get(BUSY)?.usedBytes).toBe(FILLED_BYTES);
+    expect(snapshot.computeUsage.has(BUSY)).toBe(false);
+  });
+});
+
+describe('a cpu share is what happened between two readings', () => {
+  function overTwoPasses(second: MeasuredComputeAt) {
+    return run({
+      readings: new Map([[BUSY, reading({ compute: FIRST_PASS })]]),
+      program: Effect.gen(function* () {
+        const allocator = yield* SlotAllocator;
+        yield* allocator.allocate(BUSY);
+        yield* measureUsage;
+        const first = (yield* AgentState.snapshot).computeUsage.get(BUSY);
+        yield* Effect.provide(
+          measureUsage,
+          measuring(new Map([[BUSY, reading({ compute: second })]])),
+        );
+        return { first, after: (yield* AgentState.snapshot).computeUsage.get(BUSY) };
+      }),
+    });
+  }
+
+  // Memory is a level and arrives whole on the first reading; the share is a rate and cannot.
+  test('the first reading after an agent starts has nothing to have been a rate since', async () => {
+    const { first, after } = await overTwoPasses(SECOND_PASS);
+
+    expect(first?.memoryUsedBytes).toBe(MEMORY_USED_BYTES);
+    expect(first?.cpuShare).toBeUndefined();
+    expect(after?.cpuShare).toBe(EXPECTED_SHARE);
+  });
+
+  /**
+   * The counters are since the guest booted, so a reading standing behind the one before it is a
+   * guest that is not the same guest any more. Dividing by that difference reads a reboot as a
+   * negative rate, and a made-up nought is the number an owner would act on.
+   */
+  test('a guest that has rebooted since is not measured against what it was', async () => {
+    const { after } = await overTwoPasses(
+      compute({ total: FIRST_TOTAL_TICKS / 2, busy: FIRST_BUSY_TICKS / 2 }),
+    );
+
+    expect(after?.cpuShare).toBeUndefined();
+    expect(after?.memoryUsedBytes).toBe(MEMORY_USED_BYTES);
   });
 });

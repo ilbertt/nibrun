@@ -76,6 +76,7 @@ const report = Effect.gen(function* () {
       reachedAt,
       volumes: current.volumeReports,
       volumeUsage: current.volumeUsage,
+      computeUsage: current.computeUsage,
       checkpoints: current.checkpointReports,
       exports: [...current.exportReports.values()],
     }),

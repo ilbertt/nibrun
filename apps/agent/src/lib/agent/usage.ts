@@ -1,17 +1,22 @@
-import type { AppId, FilesystemUsage } from '@repo/protocol';
+import type { AppId, ComputeUsage, FilesystemUsage } from '@repo/protocol';
 import { type Duration, Effect, Schedule } from 'effect';
 import { supervised } from '#lib/agent/loop.ts';
-import { AgentState } from '#services/agent-state.service.ts';
-import { FilesystemReader } from '#services/filesystem-reader.service.ts';
+import type { MeasuredCompute } from '#lib/filesystem/protocol.ts';
+import { type AgentSnapshot, AgentState } from '#services/agent-state.service.ts';
+import { FilesystemReader, type GuestReading } from '#services/filesystem-reader.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
 /**
- * How often each volume this host holds is measured.
+ * How often each guest this host runs is measured.
  *
  * Slower than the report it rides on, because a filesystem fills at the speed a tenant writes and
  * nobody is waiting on this the way they wait on a listing. What it buys at this interval is one
  * connection per app per minute, against one per app per report — and each of those costs the
  * guest a forked worker, which is a cost the tenant pays.
+ *
+ * It is also the window every CPU share is averaged over, which is what that figure means and the
+ * reason it is not the same question as what an app is doing right now: a minute of one vCPU
+ * pinned and three idle reads the same as four vCPUs busy for fifteen seconds.
  */
 const MEASUREMENT_INTERVAL: Duration.DurationInput = '1 minute';
 
@@ -21,40 +26,129 @@ const MEASUREMENT_INTERVAL: Duration.DurationInput = '1 minute';
  */
 const MEASUREMENT_CONCURRENCY = 4;
 
+/** Every vCPU the app was given, busy. Two saturated vCPUs is this, not twice it. */
+const FULLY_BUSY = 1;
+
+type Taken = { readonly appId: AppId; readonly reading: GuestReading | undefined };
+
 /**
- * What every volume with a slot on this host currently measures, keeping the last reading for one
+ * The share of the vCPUs spent computing between two readings.
+ *
+ * Missing rather than zero where there is nothing to compare against: the counters are cumulative
+ * since the guest booted, so the first reading after an agent starts has no interval behind it,
+ * and one standing behind the reading before it is a guest that has rebooted since. Both would
+ * divide by a difference that is not an interval, and a made-up nought is the reading an owner
+ * would act on.
+ */
+function shareBetween({
+  before,
+  after,
+}: {
+  before: MeasuredCompute | undefined;
+  after: MeasuredCompute;
+}): number | undefined {
+  if (before === undefined) {
+    return undefined;
+  }
+  const total = after.cpuTotalTicks - before.cpuTotalTicks;
+  const busy = after.cpuBusyTicks - before.cpuBusyTicks;
+  return total <= 0 || busy < 0 ? undefined : Math.min(busy / total, FULLY_BUSY);
+}
+
+function asComputeUsage({
+  measured,
+  before,
+}: {
+  measured: NonNullable<GuestReading['compute']>;
+  before: MeasuredCompute | undefined;
+}): ComputeUsage {
+  const cpuShare = shareBetween({ before, after: measured });
+  return {
+    memoryTotalBytes: measured.memoryTotalBytes,
+    memoryUsedBytes: measured.memoryUsedBytes,
+    ...(cpuShare === undefined ? {} : { cpuShare }),
+    measuredAt: measured.measuredAt,
+  };
+}
+
+function volumeUsageAfter({
+  taken,
+  previous,
+}: {
+  taken: readonly Taken[];
+  previous: AgentSnapshot;
+}): ReadonlyMap<AppId, FilesystemUsage> {
+  const usage = new Map<AppId, FilesystemUsage>();
+  for (const { appId, reading } of taken) {
+    const measured = reading?.filesystem ?? previous.volumeUsage.get(appId);
+    if (measured) {
+      usage.set(appId, measured);
+    }
+  }
+  return usage;
+}
+
+function computeUsageAfter({
+  taken,
+  previous,
+}: {
+  taken: readonly Taken[];
+  previous: AgentSnapshot;
+}) {
+  const compute = new Map<AppId, ComputeUsage>();
+  const ticks = new Map<AppId, MeasuredCompute>();
+  for (const { appId, reading } of taken) {
+    const before = previous.computeTicks.get(appId);
+    const measured = reading?.compute;
+    if (measured === undefined) {
+      const kept = previous.computeUsage.get(appId);
+      if (kept) {
+        compute.set(appId, kept);
+      }
+      if (before) {
+        ticks.set(appId, before);
+      }
+      continue;
+    }
+    compute.set(appId, asComputeUsage({ measured, before }));
+    ticks.set(appId, measured);
+  }
+  return { compute, ticks };
+}
+
+/**
+ * What every guest with a slot on this host currently measures, keeping the last reading for one
  * that could not be asked.
  *
  * A slot outlives the microVM, so this is also what a suspended app keeps: it stopped, its guest
- * went with it, and the honest answer about its filesystem is what was true when it was last
- * running rather than nothing at all. The reading carries the moment it was taken, which is what
- * lets whoever reads it tell the two apart.
+ * went with it, and the honest answer about it is what was true when it was last running rather
+ * than nothing at all. Each reading carries the moment it was taken, which is what lets whoever
+ * reads it tell the two apart.
  */
-export const measureVolumes = Effect.gen(function* () {
+export const measureUsage = Effect.gen(function* () {
   const allocator = yield* SlotAllocator;
   const reader = yield* FilesystemReader;
-  const previous = (yield* AgentState.snapshot).volumeUsage;
+  const previous = yield* AgentState.snapshot;
 
-  const measured = yield* Effect.forEach(
+  const taken = yield* Effect.forEach(
     yield* allocator.slots,
     (slot) =>
-      reader.usage({ appId: slot.appId }).pipe(
+      reader.measure({ appId: slot.appId }).pipe(
         Effect.catchAll((error) =>
-          Effect.logDebug('volume usage could not be measured', error).pipe(
+          Effect.logDebug('a guest could not be measured', error).pipe(
             Effect.annotateLogs({ appId: slot.appId }),
-            Effect.as(previous.get(slot.appId)),
+            Effect.as(undefined),
           ),
         ),
-        Effect.map((usage) => [slot.appId, usage] as const),
+        Effect.map((reading) => ({ appId: slot.appId, reading }) satisfies Taken),
       ),
     { concurrency: MEASUREMENT_CONCURRENCY },
   );
 
-  yield* AgentState.setVolumeUsage(
-    new Map(
-      measured.filter((reading): reading is readonly [AppId, FilesystemUsage] => !!reading[1]),
-    ),
-  );
+  yield* AgentState.setUsage({
+    volumes: volumeUsageAfter({ taken, previous }),
+    ...computeUsageAfter({ taken, previous }),
+  });
 });
 
 /**
@@ -63,8 +157,8 @@ export const measureVolumes = Effect.gen(function* () {
  * report that waited for those would be a report a hung tenant could stop — while what the report
  * carries otherwise is what the control plane converges a deploy on.
  */
-export const volumeUsageLoop = supervised({
-  once: Effect.andThen(measureVolumes, Effect.sleep(MEASUREMENT_INTERVAL)),
-  onFailure: (cause) => Effect.logWarning('volume usage loop failed', cause),
+export const usageLoop = supervised({
+  once: Effect.andThen(measureUsage, Effect.sleep(MEASUREMENT_INTERVAL)),
+  onFailure: (cause) => Effect.logWarning('the usage loop failed', cause),
   schedule: Schedule.spaced(MEASUREMENT_INTERVAL),
 });

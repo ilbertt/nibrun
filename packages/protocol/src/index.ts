@@ -110,6 +110,7 @@ export {
   type CheckpointState,
   CheckpointStateSchema,
 } from '#domain/checkpoint.ts';
+export { type ComputeUsage, ComputeUsageSchema } from '#domain/compute.ts';
 export {
   DEPLOYMENT_STATES,
   type Deployment,

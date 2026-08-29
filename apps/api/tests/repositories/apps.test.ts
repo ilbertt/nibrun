@@ -3,6 +3,7 @@ import { withTypes } from '@ilbertt/bun-sqlgen';
 import {
   type AppId,
   AppIdSchema,
+  type ComputeUsage,
   DnsLabelSchema,
   HostnameSchema,
   OWNED_APP_STATES,
@@ -276,6 +277,9 @@ describe('what a host measured of a filesystem is kept against the app that owns
     expect(app.volume_total_bytes).toBeNull();
     expect(app.volume_used_bytes).toBeNull();
     expect(app.volume_measured_at).toBeNull();
+    expect(app.memory_used_bytes).toBeNull();
+    expect(app.cpu_share).toBeNull();
+    expect(app.compute_measured_at).toBeNull();
   });
 
   test('a reading is written and read back beside the app', async () => {
@@ -362,5 +366,175 @@ describe('what a host measured of a filesystem is kept against the app that owns
     });
 
     expect(await repo.findById({ appId: stranger, ownerId: OWNER_ID })).toBeNull();
+  });
+});
+
+/**
+ * The compute half, in the same table and written by a statement of its own — so what this has to
+ * prove beyond the family above is that the two do not stand on each other: either can make the
+ * row, and the one that made it must not stop the other from landing on it.
+ */
+describe('what a host measured of a guest is kept beside how full its filesystem is', () => {
+  const VOLUME_TOTAL_BYTES = 8_455_712_768;
+  const VOLUME_USED_BYTES = 1_503_238_553;
+  const MEMORY_TOTAL_BYTES = 1_031_012_352;
+  const BUSY_BYTES = 412_401_664;
+  const IDLE_BYTES = 96_468_992;
+  const BUSY_SHARE = 0.42;
+  const IDLE_SHARE = 0.01;
+
+  const EARLIER = Value.Parse(TimestampSchema, '2026-08-03T10:00:00.000Z');
+  const LATER = Value.Parse(TimestampSchema, '2026-08-03T10:01:00.000Z');
+
+  function spending({
+    memoryUsedBytes,
+    cpuShare,
+    measuredAt,
+  }: {
+    memoryUsedBytes: number;
+    cpuShare?: number;
+    measuredAt: Timestamp;
+  }): ComputeUsage {
+    return {
+      memoryTotalBytes: MEMORY_TOTAL_BYTES,
+      memoryUsedBytes,
+      ...(cpuShare === undefined ? {} : { cpuShare }),
+      measuredAt,
+    };
+  }
+
+  async function readBack(appId: AppId) {
+    return (await repo.findById({ appId, ownerId: OWNER_ID }))!;
+  }
+
+  test('a reading is written and read back beside the app', async () => {
+    const appId = await createApp('spending');
+
+    await repo.recordComputeUsage({
+      readings: new Map([
+        [
+          appId,
+          spending({ memoryUsedBytes: BUSY_BYTES, cpuShare: BUSY_SHARE, measuredAt: EARLIER }),
+        ],
+      ]),
+    });
+    const app = await readBack(appId);
+
+    expect(Number(app.memory_total_bytes)).toBe(MEMORY_TOTAL_BYTES);
+    expect(Number(app.memory_used_bytes)).toBe(BUSY_BYTES);
+    expect(app.cpu_share).toBe(BUSY_SHARE);
+    expect(app.compute_measured_at?.toISOString()).toBe(EARLIER);
+  });
+
+  /**
+   * The first reading taken of a guest has no reading behind it to have been a rate since, and a
+   * nought written there is a figure an owner would act on. The column is null while the moment
+   * beside it is not, which is the one place the two families differ in shape.
+   */
+  test('a reading with no share yet writes no share rather than none spent', async () => {
+    const appId = await createApp('unrated');
+
+    await repo.recordComputeUsage({
+      readings: new Map([[appId, spending({ memoryUsedBytes: BUSY_BYTES, measuredAt: EARLIER })]]),
+    });
+    const app = await readBack(appId);
+
+    expect(app.cpu_share).toBeNull();
+    expect(Number(app.memory_used_bytes)).toBe(BUSY_BYTES);
+  });
+
+  test('a later reading replaces the one before it', async () => {
+    const appId = await createApp('quietened');
+
+    await repo.recordComputeUsage({
+      readings: new Map([
+        [
+          appId,
+          spending({ memoryUsedBytes: BUSY_BYTES, cpuShare: BUSY_SHARE, measuredAt: EARLIER }),
+        ],
+      ]),
+    });
+    await repo.recordComputeUsage({
+      readings: new Map([
+        [appId, spending({ memoryUsedBytes: IDLE_BYTES, cpuShare: IDLE_SHARE, measuredAt: LATER })],
+      ]),
+    });
+
+    expect((await readBack(appId)).cpu_share).toBe(IDLE_SHARE);
+  });
+
+  test('an older reading arriving late leaves the newer one standing', async () => {
+    const appId = await createApp('reordered-compute');
+
+    await repo.recordComputeUsage({
+      readings: new Map([
+        [appId, spending({ memoryUsedBytes: IDLE_BYTES, cpuShare: IDLE_SHARE, measuredAt: LATER })],
+      ]),
+    });
+    await repo.recordComputeUsage({
+      readings: new Map([
+        [
+          appId,
+          spending({ memoryUsedBytes: BUSY_BYTES, cpuShare: BUSY_SHARE, measuredAt: EARLIER }),
+        ],
+      ]),
+    });
+
+    expect((await readBack(appId)).cpu_share).toBe(IDLE_SHARE);
+  });
+
+  /**
+   * A guest whose image predates one of the verbs answers the other, so a host can measure one
+   * family for as long as it takes an image to roll out. Whichever arrives first makes the row,
+   * and the moment guarding the other family is null on it — which must read as nothing to
+   * protect rather than as a reading no newer one can beat.
+   */
+  test('either family alone makes the row, and the other lands on it afterwards', async () => {
+    const appId = await createApp('half-measured');
+
+    await repo.recordComputeUsage({
+      readings: new Map([
+        [
+          appId,
+          spending({ memoryUsedBytes: BUSY_BYTES, cpuShare: BUSY_SHARE, measuredAt: EARLIER }),
+        ],
+      ]),
+    });
+    const compute = await readBack(appId);
+    expect(compute.volume_measured_at).toBeNull();
+
+    await repo.recordVolumeUsage({
+      readings: new Map([
+        [
+          appId,
+          { totalBytes: VOLUME_TOTAL_BYTES, usedBytes: VOLUME_USED_BYTES, measuredAt: LATER },
+        ],
+      ]),
+    });
+    const both = await readBack(appId);
+
+    expect(Number(both.volume_used_bytes)).toBe(VOLUME_USED_BYTES);
+    expect(both.cpu_share).toBe(BUSY_SHARE);
+  });
+
+  test('every reading in one report is written by one statement', async () => {
+    const first = await createApp('batched-compute-one');
+    const second = await createApp('batched-compute-two');
+
+    await repo.recordComputeUsage({
+      readings: new Map([
+        [
+          first,
+          spending({ memoryUsedBytes: BUSY_BYTES, cpuShare: BUSY_SHARE, measuredAt: EARLIER }),
+        ],
+        [
+          second,
+          spending({ memoryUsedBytes: IDLE_BYTES, cpuShare: IDLE_SHARE, measuredAt: EARLIER }),
+        ],
+      ]),
+    });
+
+    expect(Number((await readBack(first)).memory_used_bytes)).toBe(BUSY_BYTES);
+    expect(Number((await readBack(second)).memory_used_bytes)).toBe(IDLE_BYTES);
   });
 });
