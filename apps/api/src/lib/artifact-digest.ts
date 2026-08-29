@@ -177,25 +177,41 @@ export class ArtifactTooLargeError extends Error {
 }
 
 /**
- * The bytes as far as the cap, and an error rather than a truncation past it: what is being read
+ * The source as far as the cap, and an error rather than a truncation past it: what is being read
  * is a binary, and the first half of one is not a smaller binary.
+ *
+ * Written around the source rather than piped through a transform, because what this is bounding
+ * is a socket: whoever gives up on these bytes has to let go of the connection they were arriving
+ * on, and a stream that only forwards them cannot be given up on that way. Going past the cap lets
+ * go of it here for the same reason — there is nothing left to learn from the rest.
  */
 export function boundedTo({
+  source,
   maxSizeBytes,
 }: {
+  source: ReadableStream<Uint8Array>;
   maxSizeBytes: number;
-}): TransformStream<Uint8Array, Uint8Array> {
+}): ReadableStream<Uint8Array> {
+  const reader = source.getReader();
   let read = 0;
 
-  return new TransformStream<Uint8Array, Uint8Array>({
-    // biome-ignore lint/complexity/useMaxParams: a transform is handed what to pass it on to
-    transform(chunk, controller) {
-      read += chunk.byteLength;
-      if (read > maxSizeBytes) {
-        controller.error(new ArtifactTooLargeError());
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.close();
         return;
       }
-      controller.enqueue(chunk);
+      read += value.byteLength;
+      if (read > maxSizeBytes) {
+        controller.error(new ArtifactTooLargeError());
+        await reader.cancel().catch(() => undefined);
+        return;
+      }
+      controller.enqueue(value);
+    },
+    cancel(reason) {
+      return reader.cancel(reason);
     },
   });
 }
