@@ -2,7 +2,7 @@ import { Input } from '@repo/ui/components/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
 import { LinkIcon, UploadIcon } from 'lucide-react';
 import { useState } from 'react';
-import { BinaryDropZone } from '#components/apps/binary-drop-zone.tsx';
+import { BinaryDropZone } from '#components/deploy/binary-drop-zone.tsx';
 import { type BinarySource, fetchedUrl, pickedFile, sourceFromUrl } from '#lib/binary-source.ts';
 
 export const BINARY_URL_INPUT_ID = 'deploy-binary-url';

@@ -1,6 +1,6 @@
 import { Field, FieldError, FieldLabel } from '@repo/ui/components/field';
-import { BINARY_INPUT_ID } from '#components/apps/binary-drop-zone.tsx';
-import { BinarySourcePicker } from '#components/apps/binary-source-picker.tsx';
+import { BINARY_INPUT_ID } from '#components/deploy/binary-drop-zone.tsx';
+import { BinarySourcePicker } from '#components/deploy/binary-source-picker.tsx';
 import {
   type DeployFormApi,
   validateBinary,

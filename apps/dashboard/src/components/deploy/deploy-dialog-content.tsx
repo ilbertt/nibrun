@@ -10,9 +10,9 @@ import {
 import { DialogBody } from '@repo/ui/custom/dialog-body';
 import { RocketIcon } from 'lucide-react';
 import { useState } from 'react';
-import { DeployDoneButton } from '#components/apps/deploy-done-button.tsx';
-import { DeployForm } from '#components/apps/deploy-form.tsx';
-import { DeployProgress } from '#components/apps/deploy-progress.tsx';
+import { DeployDoneButton } from '#components/deploy/deploy-done-button.tsx';
+import { DeployForm } from '#components/deploy/deploy-form.tsx';
+import { DeployProgress } from '#components/deploy/deploy-progress.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 
 export function DeployDialogContent({ appId, disabled }: { appId?: string; disabled: boolean }) {
