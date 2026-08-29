@@ -1,6 +1,6 @@
 import { Field, FieldError } from '@repo/ui/components/field';
-import { EnvFilePicker } from '#components/apps/env-file-picker.tsx';
 import { EnvironmentTable } from '#components/apps/environment-table.tsx';
+import { EnvFilePicker } from '#components/deploy/env-file-picker.tsx';
 import { storedVariables, withEntries } from '#lib/environment-variables.ts';
 import { type DeployFormApi, validateEnvironment } from '#lib/hooks/use-deploy-form.ts';
 import type { AppSummary } from '#queries/apps.ts';

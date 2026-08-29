@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { EnvFilePicker } from '#components/apps/env-file-picker.tsx';
+import { EnvFilePicker } from '#components/deploy/env-file-picker.tsx';
 
 function ignoreLoadedEnvironment(): void {}
 

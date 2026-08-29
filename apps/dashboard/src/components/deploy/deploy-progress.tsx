@@ -3,7 +3,7 @@ import { Button } from '@repo/ui/components/button';
 import { Spinner } from '@repo/ui/components/spinner';
 import { CheckIcon, TriangleAlertIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { UploadMeter } from '#components/apps/upload-meter.tsx';
+import { UploadMeter } from '#components/deploy/upload-meter.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import type { DeployPhase } from '#lib/hooks/use-run-app.ts';
 
