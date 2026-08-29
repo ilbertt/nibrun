@@ -11,7 +11,13 @@ import {
   Value,
 } from '@repo/protocol';
 import { unwrapExecutable } from '#lib/archive/unwrap.ts';
-import { MAX_ENTRIES, UnreadableArchiveError, type Unwrapping } from '#lib/archive/walk.ts';
+import {
+  ExpandsTooFarError,
+  MAX_ENTRIES,
+  MAX_EXPANSION,
+  UnreadableArchiveError,
+  type Unwrapping,
+} from '#lib/archive/walk.ts';
 import {
   type ArtifactInspection,
   ArtifactTooLargeError,
@@ -114,6 +120,13 @@ const WALKED_TOO_FAR = `nibrun read as far into that archive as it will — ${MA
 
 const ENTRY_TOO_LARGE =
   'An entry in that archive is longer than its own header can say, which is more than nibrun will read past.';
+
+/**
+ * Said as what the url served rather than as what nibrun refused to do: whoever followed the link
+ * is being told their download is not the shape a release is, and the way past it is the upload
+ * that was always there.
+ */
+const EXPANDS_TOO_FAR = `That download holds more than ${MAX_EXPANSION} times the bytes it sent, which is past anything a release is published as. Upload the binary instead.`;
 
 function unreadableArchive(url: string): string {
   return `The archive ended before the entry it was describing: ${url}`;
@@ -483,6 +496,11 @@ export class ArtifactsService extends Service {
       if (failure instanceof UnreadableArchiveError) {
         throw new BadRequestError(unreadableArchive(url));
       }
+      // A gzip handed on rather than walked is decompressed as it is written, so one holding far
+      // more than it sent is found here rather than by the walk that never looked inside it.
+      if (failure instanceof ExpandsTooFarError) {
+        throw new BadRequestError(EXPANDS_TOO_FAR);
+      }
       throw failure;
     }
   }
@@ -704,6 +722,8 @@ async function unwrapped({
       throw new BadRequestError(WALKED_TOO_FAR);
     case 'entry-too-large':
       throw new BadRequestError(ENTRY_TOO_LARGE);
+    case 'expands-too-far':
+      throw new BadRequestError(EXPANDS_TOO_FAR);
     case 'unreadable':
       throw new BadRequestError(unreadableArchive(url));
   }

@@ -13,10 +13,12 @@ import {
   NOTES,
   NOTHING,
   PAST_THE_ENTRY_LIMIT,
+  PAST_THE_EXPANSION_FLOOR,
   sourceOf,
   streamOf,
 } from '#tests/lib/archive/support/fixtures.ts';
 import { type ArchiveEntry, archiveOf, LOCAL_HEADER_BYTES } from '#tests/support/archives.ts';
+import { expandsTooFar } from '#tests/support/downloads.ts';
 
 /** The crc and the two sizes a descriptor carries after its signature. */
 const DESCRIPTOR_FIELD_BYTES = 12;
@@ -279,6 +281,22 @@ describe('a zip that holds no executable is not one to fetch from', () => {
 
     expect(unwrapped.outcome).toBe('unwrapped');
     expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
+  });
+
+  // Every entry is inflated through the same engine a gzip is, so an entry that expands past what
+  // the archive around it took to send is refused on the same terms.
+  test('an entry holding far more than the archive it arrived in', async () => {
+    const archive = archiveOf([
+      { name: 'pad.bin', content: expandsTooFar() },
+      { name: 'my-server', content: BINARY },
+    ]);
+
+    const unwrapped = await unwrapExecutable({
+      archive: streamOf(archive),
+      maxSkippedBytes: PAST_THE_EXPANSION_FLOOR,
+    });
+
+    expect(unwrapped.outcome).toBe('expands-too-far');
   });
 
   // The header points at a field the archive never wrote, so the length is one nothing can know.

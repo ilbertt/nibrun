@@ -3,7 +3,7 @@
 // fixtures that stand for a release download belong to neither of them.
 
 import { Buffer } from 'node:buffer';
-import { MAX_ENTRIES } from '#lib/archive/walk.ts';
+import { EXPANSION_FLOOR_BYTES, MAX_ENTRIES } from '#lib/archive/walk.ts';
 
 const NOTE_LINES = 8;
 
@@ -15,6 +15,13 @@ export const NOTHING = new Uint8Array(0);
 
 /** Larger than any fixture here, so a walk only stops early when stopping early is the test. */
 export const NO_LIMIT = 1_048_576;
+
+/**
+ * A budget past the point an expansion is asked about, which the api's own is and `NO_LIMIT` is
+ * not. Without it a walk reaches its own bound first and the ratio never comes up.
+ */
+const FLOORS_OF_HEADROOM = 4;
+export const PAST_THE_EXPANSION_FLOOR = EXPANSION_FLOOR_BYTES * FLOORS_OF_HEADROOM;
 
 /**
  * Small enough to fall inside a header, a name and the window a descriptor is looked for in, so

@@ -6,7 +6,12 @@ import { Buffer } from 'node:buffer';
 import { createGunzip } from 'node:zlib';
 import { decompressed, type Queued, queued, streamed } from '#lib/archive/bytes.ts';
 import { executableInTarball, isTarball, TAR_IDENTITY_BYTES } from '#lib/archive/tar.ts';
-import { EntryTooLargeError, UnreadableArchiveError, type Unwrapping } from '#lib/archive/walk.ts';
+import {
+  EntryTooLargeError,
+  ExpandsTooFarError,
+  UnreadableArchiveError,
+  type Unwrapping,
+} from '#lib/archive/walk.ts';
 import { executableInZip, ZIP_MAGIC } from '#lib/archive/zip.ts';
 
 /** What a gzip opens with, whatever it turns out to be wrapped around. */
@@ -91,6 +96,9 @@ async function walked({
     }
     if (failure instanceof EntryTooLargeError) {
       return { outcome: 'entry-too-large' };
+    }
+    if (failure instanceof ExpandsTooFarError) {
+      return { outcome: 'expands-too-far' };
     }
     throw failure;
   }
