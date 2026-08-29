@@ -50,6 +50,14 @@ function arcColour(share: number): string {
   return share >= NEARLY_FULL ? 'text-warning' : 'text-primary';
 }
 
+/**
+ * A share as a whole number, which is the most a ring three quarters of a line tall can claim: a
+ * decimal here would read as a precision the reading does not have, being one sample of a minute.
+ */
+function percentOf(share: number): number {
+  return Math.round(Math.min(share, FULL) * PERCENT_SCALE);
+}
+
 function arcLength(share: number): number {
   const drawn = Math.min(share, FULL) * RING_LENGTH;
   return share > 0 ? Math.max(drawn, SMALLEST_VISIBLE_ARC) : 0;
@@ -59,16 +67,20 @@ function MeterFigure({
   label,
   total,
   reading,
+  showsPercent,
 }: {
   label: string;
   total: string;
   reading: ResourceReading | null;
+  showsPercent: boolean;
 }) {
   return (
     <span className="flex items-center gap-3">
       <span className="font-mono tabular-nums">
         {reading?.used ?? UNMEASURED}
-        <span className="text-muted-foreground"> / {total}</span>
+        <span className="text-muted-foreground">
+          {reading && showsPercent ? ` (${percentOf(reading.share)}%)` : ''} / {total}
+        </span>
       </span>
       <svg
         className={`shrink-0 -rotate-90 ${reading ? arcColour(reading.share) : ''}`}
@@ -78,9 +90,7 @@ function MeterFigure({
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={PERCENT_SCALE}
-        aria-valuenow={
-          reading ? Math.round(Math.min(reading.share, FULL) * PERCENT_SCALE) : undefined
-        }
+        aria-valuenow={reading ? percentOf(reading.share) : undefined}
         aria-label={`${label} used`}
       >
         <circle
@@ -126,12 +136,15 @@ export function ResourceMeter({
   label,
   total,
   reading,
+  showsPercent = false,
 }: {
   icon: LucideIcon;
   label: string;
   /** What the app was allocated, which it has whether anything has measured it or not. */
   total: string;
   reading: ResourceReading | null;
+  /** For a figure whose unit does not say what share it is — 0.36 of 2 vCPU says nothing. */
+  showsPercent?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
@@ -142,12 +155,17 @@ export function ResourceMeter({
       {reading ? (
         <Tooltip>
           <TooltipTrigger className="cursor-help">
-            <MeterFigure label={label} total={total} reading={reading} />
+            <MeterFigure
+              label={label}
+              total={total}
+              reading={reading}
+              showsPercent={showsPercent}
+            />
           </TooltipTrigger>
           <TooltipContent side="left">Measured {dayAndMinute(reading.measuredAt)}</TooltipContent>
         </Tooltip>
       ) : (
-        <MeterFigure label={label} total={total} reading={null} />
+        <MeterFigure label={label} total={total} reading={null} showsPercent={showsPercent} />
       )}
     </div>
   );

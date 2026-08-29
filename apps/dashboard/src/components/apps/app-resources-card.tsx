@@ -36,6 +36,7 @@ export function AppResourcesCard({ app }: { app: AppSummary }) {
           icon={CpuIcon}
           label="vCPU"
           total={String(resources.vcpuCount)}
+          showsPercent
           reading={
             compute?.cpuShare === undefined
               ? null
