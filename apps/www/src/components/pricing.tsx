@@ -2,6 +2,8 @@ import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/pro
 
 const BYTES_PER_GIB = 1_073_741_824;
 
+const FREE_APP_LIMIT = 3;
+
 const MACHINE_SPEC = [
   `${DEFAULT_INSTANCE_RESOURCES.vcpuCount} vCPU`,
   `${DEFAULT_INSTANCE_RESOURCES.memoryMib} MB`,
@@ -10,7 +12,7 @@ const MACHINE_SPEC = [
 
 const TIERS = [
   {
-    name: 'Your first app',
+    name: `Your first ${FREE_APP_LIMIT} apps`,
     price: 'Free, forever',
     detail: 'No card to start, and no trial clock counting down behind it.',
   },
@@ -26,7 +28,7 @@ export function Pricing() {
     <section className="flex w-full flex-col gap-10 border-border/60 border-t py-16 sm:py-20">
       <div className="flex max-w-2xl flex-col gap-4">
         <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          Your first app is free. Forever.
+          Your first {FREE_APP_LIMIT} apps are free. Forever.
         </h2>
         <p className="text-pretty text-muted-foreground">
           Every app gets the same machine — <span className="text-foreground">{MACHINE_SPEC}</span>{' '}
