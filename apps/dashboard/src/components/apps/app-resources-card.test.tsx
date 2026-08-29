@@ -47,6 +47,7 @@ describe('what an app is using is read against what it was given', () => {
     const markup = renderToStaticMarkup(<AppResourcesCard app={measured} />);
 
     expect(markup).toContain('0.36');
+    expect(markup).toContain('(18%)');
     expect(markup).toContain('393.3 MiB');
     expect(markup).toContain('1.4 GiB');
     expect(markup).toContain('/ 8.0 GiB');

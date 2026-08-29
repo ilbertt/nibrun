@@ -36,7 +36,7 @@ export function AppResourcesCard({ app }: { app: AppSummary }) {
           icon={CpuIcon}
           label="vCPU"
           total={String(resources.vcpuCount)}
-          note="Averaged across every vCPU over the minute before it was measured, so a moment of one core pinned does not show here."
+          showsPercent
           reading={
             compute?.cpuShare === undefined
               ? null
@@ -51,7 +51,6 @@ export function AppResourcesCard({ app }: { app: AppSummary }) {
           icon={MemoryStickIcon}
           label="Memory"
           total={formatBytes(memoryBytes)}
-          note="Cache the kernel hands back the moment anything asks for it is not counted as used."
           reading={
             compute
               ? {
@@ -66,7 +65,6 @@ export function AppResourcesCard({ app }: { app: AppSummary }) {
           icon={HardDriveIcon}
           label="Volume"
           total={formatBytes(volumeSizeBytes)}
-          note="Counts what the filesystem itself takes, so a volume nothing has ever written to is not empty."
           reading={
             volume
               ? {

@@ -2,6 +2,14 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.29-1]
+
+### 🚀 Features
+
+- An app says what cpu and memory it is spending (#364)
+- An app says how much of its volume it is using (#333)
+- *(cli)* A release publishes its checksums, and the install checks against them (#360)
+
 ## [2026.8.28-2]
 
 ### 🚀 Features
