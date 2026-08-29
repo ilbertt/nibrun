@@ -1,4 +1,3 @@
-import { Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui/components/tooltip';
 import type { LucideIcon } from 'lucide-react';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 
@@ -63,69 +62,18 @@ function arcLength(share: number): number {
   return share > 0 ? Math.max(drawn, SMALLEST_VISIBLE_ARC) : 0;
 }
 
-function MeterFigure({
-  label,
-  total,
-  reading,
-  showsPercent,
-}: {
-  label: string;
-  total: string;
-  reading: ResourceReading | null;
-  showsPercent: boolean;
-}) {
-  return (
-    <span className="flex items-center gap-3">
-      <span className="font-mono tabular-nums">
-        {reading?.used ?? UNMEASURED}
-        <span className="text-muted-foreground">
-          {reading && showsPercent ? ` (${percentOf(reading.share)}%)` : ''} / {total}
-        </span>
-      </span>
-      <svg
-        className={`shrink-0 -rotate-90 ${reading ? arcColour(reading.share) : ''}`}
-        width={RING_PIXELS}
-        height={RING_PIXELS}
-        viewBox={`0 0 ${RING_PIXELS} ${RING_PIXELS}`}
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={PERCENT_SCALE}
-        aria-valuenow={reading ? percentOf(reading.share) : undefined}
-        aria-label={`${label} used`}
-      >
-        <circle
-          className="text-muted"
-          cx={RING_PIXELS / 2}
-          cy={RING_PIXELS / 2}
-          r={RING_RADIUS}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={RING_STROKE}
-        />
-        {reading ? (
-          <circle
-            cx={RING_PIXELS / 2}
-            cy={RING_PIXELS / 2}
-            r={RING_RADIUS}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={RING_STROKE}
-            strokeLinecap="round"
-            strokeDasharray={`${arcLength(reading.share)} ${RING_LENGTH}`}
-          />
-        ) : null}
-      </svg>
-    </span>
-  );
+function ringLabel({ label, reading }: { label: string; reading: ResourceReading | null }): string {
+  return reading
+    ? `${label} used, measured ${dayAndMinute(reading.measuredAt)}`
+    : `${label} not measured yet`;
 }
 
 /**
  * One resource the app was given, with a ring of what it is using of it.
  *
- * The moment the reading was taken is on hover, because an app that has stopped keeps the last
- * reading taken while it ran and a bare number reads as now — but three of those spelled out down
- * a card is three lines nobody reads. It opens to the left so that running the pointer up the
- * column shows each row's in turn rather than covering the row above.
+ * The row shows what is being spent and the ring's label when that was measured, which is the part
+ * a figure on its own gets wrong: an app that has stopped keeps the last reading taken while it
+ * ran, so the number sitting there reads as now.
  *
  * The ring is drawn even where nothing has been measured, as an empty track. It is what keeps the
  * three rows in one column when only some of them have a reading, and the dash beside it is what
@@ -152,21 +100,47 @@ export function ResourceMeter({
         <Icon className="size-4 shrink-0" />
         {label}
       </span>
-      {reading ? (
-        <Tooltip>
-          <TooltipTrigger className="cursor-help">
-            <MeterFigure
-              label={label}
-              total={total}
-              reading={reading}
-              showsPercent={showsPercent}
+      <span className="flex items-center gap-3">
+        <span className="font-mono tabular-nums">
+          {reading?.used ?? UNMEASURED}
+          <span className="text-muted-foreground">
+            {reading && showsPercent ? ` (${percentOf(reading.share)}%)` : ''} / {total}
+          </span>
+        </span>
+        <svg
+          className={`shrink-0 -rotate-90 ${reading ? arcColour(reading.share) : ''}`}
+          width={RING_PIXELS}
+          height={RING_PIXELS}
+          viewBox={`0 0 ${RING_PIXELS} ${RING_PIXELS}`}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={PERCENT_SCALE}
+          aria-valuenow={reading ? percentOf(reading.share) : undefined}
+          aria-label={ringLabel({ label, reading })}
+        >
+          <circle
+            className="text-muted"
+            cx={RING_PIXELS / 2}
+            cy={RING_PIXELS / 2}
+            r={RING_RADIUS}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={RING_STROKE}
+          />
+          {reading ? (
+            <circle
+              cx={RING_PIXELS / 2}
+              cy={RING_PIXELS / 2}
+              r={RING_RADIUS}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={RING_STROKE}
+              strokeLinecap="round"
+              strokeDasharray={`${arcLength(reading.share)} ${RING_LENGTH}`}
             />
-          </TooltipTrigger>
-          <TooltipContent side="left">Measured {dayAndMinute(reading.measuredAt)}</TooltipContent>
-        </Tooltip>
-      ) : (
-        <MeterFigure label={label} total={total} reading={null} showsPercent={showsPercent} />
-      )}
+          ) : null}
+        </svg>
+      </span>
     </div>
   );
 }

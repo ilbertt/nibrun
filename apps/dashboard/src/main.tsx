@@ -1,4 +1,3 @@
-import { TooltipProvider } from '@repo/ui/components/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import ReactDOM from 'react-dom/client';
@@ -14,11 +13,9 @@ if (!rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <ThemeProvider>
-      <TooltipProvider>
-        <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
-        </QueryClientProvider>
-      </TooltipProvider>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
     </ThemeProvider>,
   );
 }
