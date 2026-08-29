@@ -630,9 +630,9 @@ async function unwrapped({
 
   switch (unwrapping.outcome) {
     case 'not-an-archive':
-      return { body: unwrapping.body, filename: named };
+      return { body: unwrapping.body, filename: unpacked(named) };
     case 'unwrapped':
-      return { body: unwrapping.body, filename: entryName(unwrapping.name) ?? named };
+      return { body: unwrapping.body, filename: entryName(unwrapping.name) ?? unpacked(named) };
     case 'no-executable':
       throw new BadRequestError(NOTHING_EXECUTABLE);
     case 'walked-too-far':
@@ -668,6 +668,22 @@ async function walked({
 /** The entry's name where it is one an export could carry, and nothing where it is not. */
 function entryName(name: string): Filename | undefined {
   return Value.Check(FilenameSchema, name) ? name : undefined;
+}
+
+/**
+ * The suffixes that name what the bytes arrived in rather than what they are. Longest first, so a
+ * `.tar.gz` is not read as a `.gz` of something called `.tar`.
+ */
+const CONTAINER_SUFFIXES = ['.tar.gz', '.tgz', '.tar', '.zip', '.gz'];
+
+/**
+ * The url's own name with the container taken off it. What is stored is always the bare executable
+ * — everything else is refused — so a url ending in one of these is describing the download, and an
+ * export that wrote it back out would name a binary after the archive it stopped being.
+ */
+function unpacked(named: Filename): Filename {
+  const suffix = CONTAINER_SUFFIXES.find((candidate) => named.endsWith(candidate));
+  return (suffix === undefined ? undefined : entryName(named.slice(0, -suffix.length))) ?? named;
 }
 
 /** A body nobody is going to read holds its connection open until it is let go of. */

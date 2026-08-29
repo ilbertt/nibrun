@@ -1,6 +1,8 @@
 // The bytes an archive is read out of, a piece at a time and forwards only, which is the shape a
-// fetch gives them in. Nothing here knows what an archive is: a zip and a tarball ask the same
-// things of a source, and only what they make of the answers differs.
+// fetch gives them in. Nothing here knows what shape an archive has: a zip and a tarball ask the
+// same things of a source, and only what they make of the answers differs. What they share beyond
+// the asking is how a source that stops short is reported, which is why the two errors a walk can
+// end on are raised from here as well as from the formats.
 
 import { Buffer } from 'node:buffer';
 import type { Duplex } from 'node:stream';
@@ -214,6 +216,11 @@ export async function* decompressed({
     throw failure instanceof ArtifactTooLargeError || failure instanceof EntryTooLargeError
       ? failure
       : new UnreadableArchiveError();
+  } finally {
+    // Whoever gives up on the decompressed bytes is giving up on the compressed ones too, and a
+    // pipe carries that no further than the engine: unpiping a destroyed destination leaves the
+    // source sitting on a connection nobody is ever going to read again.
+    compressed.destroy();
   }
 }
 

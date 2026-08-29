@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { gzipSync } from 'node:zlib';
 import {
   type AppId,
   type ArtifactId,
@@ -803,6 +804,7 @@ describe('a row becomes the wire shape the dashboard and the agent both read', (
 const BINARY_URL = 'https://releases.test/v1/my-server';
 const ARCHIVE_URL = 'https://releases.test/v1/my-server_1.2.3_linux_amd64.zip';
 const TARBALL_URL = 'https://releases.test/v1/my-server_1.2.3_linux_amd64.tar.gz';
+const COMPRESSED_URL = 'https://releases.test/v1/my-server.gz';
 const FETCHED_NAME = Value.Parse(FilenameSchema, 'my-server');
 
 /**
@@ -1058,6 +1060,26 @@ describe('a binary is fetched from the url it was given', () => {
     expect(artifact.originalFileName).toBe(FETCHED_NAME);
     expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
     expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(TARBALL_URL);
+  });
+
+  /**
+   * A release published as a bare `my-server.gz` is one gunzip away from being deployable, and
+   * what is stored is the executable rather than the download — so the suffix that named the
+   * download is not the name a host writes it back out under.
+   */
+  test('a release that ships as a bare gzip is the executable inside it, unsuffixed', async () => {
+    const { service, sourceRepo, storage } = build();
+    sourceRepo.servesBytes({ bytes: gzipSync(bytesOf(BINARY_TEXT)) });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: COMPRESSED_URL,
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(artifact.originalFileName).toBe(FETCHED_NAME);
+    expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
   });
 
   test('a tarball holding nothing executable is refused and leaves nothing behind', async () => {

@@ -36,8 +36,23 @@ export const TAR_IDENTITY_BYTES = MAGIC_AT + MAGIC.length;
 const TYPE_FILE = '0';
 const TYPE_FILE_UNSET = '\0';
 
+/**
+ * The entry gnu tar writes in front of one whose path is longer than a header can hold, carrying
+ * that path as its data. Gnu is what `tar czf` writes by default on linux, which is where release
+ * tarballs come from.
+ */
+const TYPE_LONG_NAME = 'L';
+
+/**
+ * As much of one of those as will be held to read a path out of. Longer than any path a release
+ * archive carries, and far short of what the entry could claim: the name is read into memory,
+ * where every other entry is walked past a chunk at a time.
+ */
+const MAX_LONG_NAME_BYTES = 4096;
+
 /** Lengths are octal text, except where the high bit says the rest of the field is base 256. */
 const OCTAL = 8;
+const OCTAL_DIGITS = /^[0-7]+$/;
 const BASE_256_MARKER = 0x80;
 
 const NUL = 0;
@@ -52,6 +67,8 @@ type Entry = {
   name: string;
   sizeBytes: number;
   isFile: boolean;
+  /** Carries the path of the entry after it rather than any content of its own. */
+  isLongName: boolean;
 };
 
 /**
@@ -69,28 +86,32 @@ export async function executableInTarball({
 }): Promise<Unwrapping> {
   let skipped = 0;
   let entries = 0;
+  let announced: string | undefined;
 
   while (skipped <= maxSkippedBytes && entries < MAX_ENTRIES) {
-    const block = await bytes.take(BLOCK_BYTES);
-    if (block === undefined) {
+    const header = await readHeader(bytes);
+    if (header.outcome !== 'entry') {
       await bytes.cancel();
-      return { outcome: 'unreadable' };
+      return header.outcome === 'end' ? { outcome: 'no-executable' } : { outcome: 'unreadable' };
     }
-    // A block of nothing is how a tar says it is over; what follows is padding to a tape length.
-    if (isEnd(block)) {
-      await bytes.cancel();
-      return { outcome: 'no-executable' };
-    }
-
-    const entry = entryIn(block);
-    if (entry === undefined) {
-      await bytes.cancel();
-      return { outcome: 'unreadable' };
-    }
+    const { entry } = header;
     skipped += BLOCK_BYTES;
     entries += 1;
 
-    const found = await walkedPast({ bytes, entry, maxSkippedBytes: maxSkippedBytes - skipped });
+    if (carriesLongName(entry)) {
+      const carried = await longNameIn({ bytes, sizeBytes: entry.sizeBytes });
+      announced = carried.name;
+      skipped += carried.readBytes;
+      continue;
+    }
+
+    const found = await walkedPast({
+      bytes,
+      entry,
+      name: announced ?? entry.name,
+      maxSkippedBytes: maxSkippedBytes - skipped,
+    });
+    announced = undefined;
     if (found.outcome !== 'skipped') {
       return found.outcome === 'unwrapped' ? found.unwrapping : { outcome: 'walked-too-far' };
     }
@@ -99,6 +120,57 @@ export async function executableInTarball({
 
   await bytes.cancel();
   return { outcome: 'walked-too-far' };
+}
+
+type Header =
+  | { outcome: 'entry'; entry: Entry }
+  /** A block of nothing, which is how a tar says its entries have stopped. */
+  | { outcome: 'end' }
+  | { outcome: 'unreadable' };
+
+async function readHeader(bytes: Queued): Promise<Header> {
+  const block = await bytes.take(BLOCK_BYTES);
+  if (block === undefined) {
+    return { outcome: 'unreadable' };
+  }
+  // What follows the block of nothing is padding out to a tape length, which nothing here reads.
+  if (isEnd(block)) {
+    return { outcome: 'end' };
+  }
+  const entry = entryIn(block);
+  return entry === undefined ? { outcome: 'unreadable' } : { outcome: 'entry', entry };
+}
+
+/**
+ * Whether this entry is one to read a path out of rather than walk past.
+ *
+ * The path is held in memory, where every other entry is read a chunk at a time — so one claiming
+ * more than a path could be is skipped like anything else, and the name falls back to the header's
+ * own truncated copy.
+ */
+function carriesLongName(entry: Entry): boolean {
+  return entry.isLongName && entry.sizeBytes <= MAX_LONG_NAME_BYTES;
+}
+
+/**
+ * The path a long-name entry carries, and what it cost to read. The header that follows keeps only
+ * the first hundred bytes of that path, and those are the leading directories rather than the
+ * trailing name — so a walk reading the header alone would call the binary after a fragment of the
+ * folder it sits in.
+ */
+async function longNameIn({
+  bytes,
+  sizeBytes,
+}: {
+  bytes: Queued;
+  sizeBytes: number;
+}): Promise<{ name: string; readBytes: number }> {
+  const path = await bytes.take(sizeBytes);
+  const padding = paddingAfter(sizeBytes);
+  if (path === undefined || (padding > 0 && (await bytes.take(padding)) === undefined)) {
+    throw new UnreadableArchiveError();
+  }
+  return { name: textIn(path), readBytes: sizeBytes + padding };
 }
 
 type Walked =
@@ -111,10 +183,12 @@ type Walked =
 async function walkedPast({
   bytes,
   entry,
+  name,
   maxSkippedBytes,
 }: {
   bytes: Queued;
   entry: Entry;
+  name: string;
   maxSkippedBytes: number;
 }): Promise<Walked> {
   const content = streamed(ofSize({ bytes, sizeBytes: entry.sizeBytes }));
@@ -125,7 +199,7 @@ async function walkedPast({
       outcome: 'unwrapped',
       unwrapping: {
         outcome: 'unwrapped',
-        name: named(entry.name),
+        name: named(name),
         body: streamed(closing({ body, bytes })),
       },
     };
@@ -165,6 +239,7 @@ function entryIn(block: Buffer): Entry | undefined {
     name: textAt({ block, at: NAME_AT, bytes: NAME_BYTES }),
     sizeBytes,
     isFile: type === TYPE_FILE || type === TYPE_FILE_UNSET,
+    isLongName: type === TYPE_LONG_NAME,
   };
 }
 
@@ -184,12 +259,18 @@ function sizeIn(block: Buffer): number | undefined {
   if (digits.length === 0) {
     return 0;
   }
-  const size = Number.parseInt(digits, OCTAL);
-  return Number.isSafeInteger(size) && size >= 0 ? size : undefined;
+  // Read rather than parsed: `parseInt` takes whatever digits a field opens with and stops at the
+  // first byte it cannot use, so a corrupt length would come back as a plausible shorter one and
+  // put the walk a few bytes out of step with the headers rather than refusing the archive.
+  return OCTAL_DIGITS.test(digits) ? Number.parseInt(digits, OCTAL) : undefined;
 }
 
 function textAt({ block, at, bytes }: { block: Buffer; at: number; bytes: number }): string {
-  const field = block.subarray(at, at + bytes);
+  return textIn(block.subarray(at, at + bytes));
+}
+
+/** A fixed-width field as what was written in it, which ends at the first NUL where there is one. */
+function textIn(field: Buffer): string {
   const end = field.indexOf(NUL);
   return field.subarray(0, end < 0 ? field.length : end).toString('utf8');
 }

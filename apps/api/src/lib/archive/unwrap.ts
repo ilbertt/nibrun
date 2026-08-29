@@ -12,7 +12,7 @@ import { executableInZip, ZIP_MAGIC } from '#lib/archive/zip.ts';
 /** What a gzip opens with, whatever it turns out to be wrapped around. */
 const GZIP_MAGIC = Buffer.from('\x1f\x8b', 'latin1');
 
-/** Enough to tell every container apart, which is the longest of the openings that name one. */
+/** Enough to tell the two containers apart that say what they are in their first bytes. */
 const OPENING_BYTES = Math.max(ZIP_MAGIC.length, GZIP_MAGIC.length);
 
 /**
@@ -32,15 +32,18 @@ export async function unwrapExecutable({
 }): Promise<Unwrapping> {
   const bytes = queued(archive);
   const opening = await bytes.need(OPENING_BYTES);
-  if (opening === undefined) {
-    return { outcome: 'not-an-archive', body: bytes.rest() };
-  }
 
-  if (opening.equals(ZIP_MAGIC)) {
+  if (opening?.equals(ZIP_MAGIC)) {
     return await walked({ bytes, walk: () => executableInZip({ bytes, maxSkippedBytes }) });
   }
-  if (opening.subarray(0, GZIP_MAGIC.length).equals(GZIP_MAGIC)) {
+  if (opening?.subarray(0, GZIP_MAGIC.length).equals(GZIP_MAGIC)) {
     return await walked({ bytes, walk: () => gunzipped({ bytes, maxSkippedBytes }) });
+  }
+  // A tar says what it is a quarter of a kibibyte in, so it is asked for last and asked for
+  // separately: a zip small enough to end before that is still a zip.
+  const header = await bytes.need(TAR_IDENTITY_BYTES);
+  if (header !== undefined && isTarball(header)) {
+    return await walked({ bytes, walk: () => executableInTarball({ bytes, maxSkippedBytes }) });
   }
   return { outcome: 'not-an-archive', body: bytes.rest() };
 }

@@ -11,6 +11,8 @@ export type TarballEntry = {
   typeUnset?: boolean;
   /** Declares its length in base 256, which is what a length past eight gibibytes needs. */
   sizeInBase256?: boolean;
+  /** Written into the size field as it stands, which is how a corrupt length reaches a walk. */
+  sizeText?: string;
 };
 
 export const BLOCK_BYTES = 512;
@@ -73,11 +75,9 @@ function writeSize({ header, entry }: { header: Buffer; entry: TarballEntry }): 
     header[SIZE_AT] = BASE_256_MARKER;
     return;
   }
-  header.write(
-    octal({ value: entry.content.byteLength, bytes: SIZE_FIELD_BYTES }),
-    SIZE_AT,
-    'latin1',
-  );
+  const field =
+    entry.sizeText ?? octal({ value: entry.content.byteLength, bytes: SIZE_FIELD_BYTES });
+  header.write(field, SIZE_AT, SIZE_FIELD_BYTES, 'latin1');
 }
 
 /** Octal text in a fixed width, NUL-terminated, which is how a tar writes every number it has. */

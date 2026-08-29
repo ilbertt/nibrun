@@ -1,31 +1,48 @@
 import { describe, expect, test } from 'bun:test';
-import { Buffer } from 'node:buffer';
 import { gzipSync } from 'node:zlib';
 import { unwrapExecutable } from '#lib/archive/unwrap.ts';
-import { MAX_ENTRIES, UnreadableArchiveError } from '#lib/archive/walk.ts';
-import { BLOCK_BYTES, gzippedTarballOf, type TarballEntry } from '#tests/support/tarballs.ts';
-
-const NOTE_LINES = 8;
-
-// What the api will store, and the only thing a walk of an archive is looking for.
-const BINARY = bytesOf('\x7fELFnibrun-test-binary');
-const NOTES = bytesOf('# Changelog\n\nEverything, all at once.\n'.repeat(NOTE_LINES));
-const LICENCE = bytesOf('The MIT Licence, as every release archive carries it.\n');
-const NOTHING = new Uint8Array(0);
-
-const NO_LIMIT = 1_048_576;
-
-/** Small enough to fall inside a header, so every fixture is read across chunk boundaries. */
-const CHUNK_BYTES = 7;
-
-/** Shorter than the notes a release archive opens with, so the walk gives up inside them. */
-const A_SHORT_WALK = 8;
-
-/** One past what a walk will read the headers of. */
-const PAST_THE_ENTRY_LIMIT = MAX_ENTRIES + 1;
+import { UnreadableArchiveError } from '#lib/archive/walk.ts';
+import {
+  A_SHORT_WALK,
+  BINARY,
+  bytesOf,
+  collected,
+  incompressible,
+  LICENCE,
+  NO_LIMIT,
+  NOTES,
+  NOTHING,
+  PAST_THE_ENTRY_LIMIT,
+  sourceOf,
+  streamOf,
+} from '#tests/lib/archive/support/fixtures.ts';
+import {
+  BLOCK_BYTES,
+  gzippedTarballOf,
+  type TarballEntry,
+  tarballOf,
+} from '#tests/support/tarballs.ts';
 
 const TYPE_DIRECTORY = '5';
 const TYPE_SYMLINK = '2';
+
+/** What gnu tar writes a path too long for a header as, in front of the entry it names. */
+const TYPE_LONG_NAME = 'L';
+const LONG_NAME_ENTRY = '././@LongLink';
+
+/** As much of the path as the header that follows a long-name entry keeps. */
+const NAME_FIELD_BYTES = 100;
+
+/** Longer than that, which is the whole reason gnu tar writes the path out on its own. */
+const A_LONG_PATH =
+  'dist/a-long-release-directory-segment/another-segment-of-similar-length/and-one-more-for-good-measure/my-server';
+
+/**
+ * More than a gunzip reads ahead of what it has been asked for, so a walk that gives up early
+ * leaves the rest of the source still on its way rather than already arrived.
+ */
+const A_LONG_DOWNLOAD = 524_288;
+const A_TRANSFER_CHUNK = 65_536;
 
 describe('a tarball is walked to the executable inside it', () => {
   test('past the notes and the licence a release ships beside the binary', async () => {
@@ -89,6 +106,55 @@ describe('a tarball is walked to the executable inside it', () => {
 
     expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
   });
+
+  /**
+   * Gnu is what `tar czf` writes by default on linux, which is where release tarballs come from.
+   * The header after a long-name entry keeps the first hundred bytes of the path, and those are
+   * the leading directories — so a walk reading the header alone names the binary after a piece
+   * of the folder it sits in.
+   */
+  test('under the path a gnu long-name entry carries rather than the truncated header', async () => {
+    expect(A_LONG_PATH.length).toBeGreaterThan(NAME_FIELD_BYTES);
+
+    const unwrapped = await walk({ entries: longNamed({ path: A_LONG_PATH, content: BINARY }) });
+
+    expect(unwrapped.outcome).toBe('unwrapped');
+    if (unwrapped.outcome !== 'unwrapped') {
+      return;
+    }
+    expect(unwrapped.name).toBe('my-server');
+    expect(await collected(unwrapped.body)).toEqual(BINARY);
+  });
+
+  // The path is read into memory where every other entry is walked past a chunk at a time, so an
+  // entry claiming more than a path could be is skipped like any other rather than held.
+  test('past a long-name entry claiming more than a path could be', async () => {
+    const unwrapped = await walk({
+      entries: [
+        { name: LONG_NAME_ENTRY, content: NOTES, type: TYPE_LONG_NAME },
+        { name: 'my-server', content: BINARY },
+      ],
+    });
+
+    expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
+  });
+
+  // A tar says what it is a quarter of a kibibyte in rather than in its first bytes, so nothing
+  // about the opening of an uncompressed one distinguishes it from a binary until that far.
+  test('where the tarball was published without being compressed at all', async () => {
+    const unwrapped = await unwrapExecutable({
+      archive: streamOf(
+        tarballOf([
+          { name: 'CHANGELOG.md', content: NOTES },
+          { name: 'my-server', content: BINARY },
+        ]),
+      ),
+      maxSkippedBytes: NO_LIMIT,
+    });
+
+    expect(unwrapped.outcome).toBe('unwrapped');
+    expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
+  });
 });
 
 describe('a tarball that holds no executable is not one to fetch from', () => {
@@ -119,7 +185,7 @@ describe('a tarball that holds no executable is not one to fetch from', () => {
     ]);
 
     const unwrapped = await unwrapExecutable({
-      archive: streamOf(whole.subarray(0, whole.byteLength / 2)),
+      archive: streamOf(whole.subarray(0, Math.floor(whole.byteLength / 2))),
       maxSkippedBytes: NO_LIMIT,
     });
 
@@ -157,6 +223,43 @@ describe('a tarball that holds no executable is not one to fetch from', () => {
     });
 
     expect(unwrapped.outcome).toBe('entry-too-large');
+  });
+
+  // A length is octal text read as a whole. Taking the digits a corrupt field opens with and
+  // stopping at the first byte that is not one would put the walk a few bytes out of step with the
+  // headers, and everything after that is read out of the middle of something.
+  test('an archive whose entry declares a length that is not octal at all', async () => {
+    const unwrapped = await walk({
+      entries: [
+        { name: 'CHANGELOG.md', content: NOTES, sizeText: '00000000012x' },
+        { name: 'my-server', content: BINARY },
+      ],
+    });
+
+    expect(unwrapped.outcome).toBe('unreadable');
+  });
+
+  /**
+   * The walk stops with the rest of the archive still on its way, and a source nobody is reading
+   * holds its connection open until it is let go of. Through the gunzip as much as around it: a
+   * pipe carries being given up on no further than the engine it feeds.
+   */
+  test('and the source it stopped part way through is let go of', async () => {
+    const source = sourceOf({
+      bytes: gzippedTarballOf([
+        { name: 'CHANGELOG.md', content: incompressible(A_LONG_DOWNLOAD) },
+        { name: 'my-server', content: BINARY },
+      ]),
+      chunkBytes: A_TRANSFER_CHUNK,
+    });
+
+    const unwrapped = await unwrapExecutable({
+      archive: source.stream,
+      maxSkippedBytes: A_SHORT_WALK,
+    });
+
+    expect(unwrapped.outcome).toBe('walked-too-far');
+    expect(source.wasLetGo()).toBe(true);
   });
 });
 
@@ -216,28 +319,10 @@ function entryOfNothing(index: number): TarballEntry {
   return { name: `note-${index}`, content: NOTHING };
 }
 
-function bytesOf(text: string): Uint8Array {
-  return Buffer.from(text, 'utf8');
-}
-
-function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
-  let at = 0;
-  return new ReadableStream<Uint8Array>({
-    pull(controller) {
-      if (at >= bytes.byteLength) {
-        controller.close();
-        return;
-      }
-      controller.enqueue(bytes.subarray(at, at + CHUNK_BYTES));
-      at += CHUNK_BYTES;
-    },
-  });
-}
-
-async function collected(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
+/** The pair gnu tar writes for a path a header cannot hold: the path, then the entry it belongs to. */
+function longNamed({ path, content }: { path: string; content: Uint8Array }): TarballEntry[] {
+  return [
+    { name: LONG_NAME_ENTRY, content: bytesOf(`${path}\0`), type: TYPE_LONG_NAME },
+    { name: path.slice(0, NAME_FIELD_BYTES), content },
+  ];
 }
