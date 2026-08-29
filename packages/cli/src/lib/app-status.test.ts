@@ -9,9 +9,6 @@ const MEMORY_USED_BYTES = 412_401_664;
 const VOLUME_USED_BYTES = 1_503_238_553;
 const CPU_SHARE = 0.18;
 
-/** vCPU, memory and volume: the three an app is given and the three it is measured on. */
-const RESOURCE_COUNT = 3;
-
 // Plain strings rather than the branded ones the wire carries: what is pinned down here is how a
 // status reads, and a cast per field would be spelling rather than meaning.
 function app(overrides: object = {}): AppStatusView {
@@ -44,7 +41,7 @@ const measured = app({
 
 describe('a status says what one app is using of what it was given', () => {
   test('every resource reads as what is spent over what was allocated', () => {
-    const lines = renderStatus(measured);
+    const { lines } = renderStatus(measured);
 
     expect(lines[0]).toBe('quiet-otter  running');
     expect(lines.join('\n')).toContain('vCPU    0.36 / 2');
@@ -54,27 +51,50 @@ describe('a status says what one app is using of what it was given', () => {
 
   // A reading is only taken while the app is running, so this is every app that has never come up.
   test('a resource nothing has measured says so rather than reading as none spent', () => {
-    const lines = renderStatus(app()).join('\n');
+    const { lines, measured } = renderStatus(app());
 
-    expect(lines).toContain('vCPU    - / 2');
-    expect(lines).toContain('Memory  - / 1.0 GiB');
-    expect(lines).not.toContain('(2026-');
+    expect(lines.join('\n')).toContain('vCPU    - / 2');
+    expect(lines.join('\n')).toContain('Memory  - / 1.0 GiB');
+    expect(measured).toBeUndefined();
+  });
+
+  test('one moment under the table rather than the same one on every line', () => {
+    const rendered = renderStatus(measured);
+
+    expect(rendered.measured).toBe('measured at 2026-08-29 11:01');
+    expect(rendered.lines.filter((line) => line.includes('2026-'))).toHaveLength(0);
   });
 
   /**
-   * The two readings come from two exchanges with the guest, so either can be older than the
-   * other — which is why the moment sits on the line it belongs to rather than under all three.
+   * The two readings are two exchanges with the guest and can come apart, so the moment under
+   * them is the older one: the newer would date a stale reading as fresh, which is the one thing
+   * a moment is here to stop.
    */
-  test('each line carries the moment its own reading was taken', () => {
-    const lines = renderStatus(measured).filter((line) => line.includes('(2026-'));
+  test('two readings taken apart are summarised by the older of them', () => {
+    const { measured } = renderStatus(
+      app({
+        volumeUsage: {
+          totalBytes: VOLUME_SIZE_BYTES,
+          usedBytes: VOLUME_USED_BYTES,
+          measuredAt: '2026-08-29T11:01:00.000Z',
+        },
+        computeUsage: {
+          memoryTotalBytes: MEMORY_MIB * BYTES_PER_MIB,
+          memoryUsedBytes: MEMORY_USED_BYTES,
+          measuredAt: '2026-08-27T09:12:00.000Z',
+        },
+      }),
+    );
 
-    expect(lines).toHaveLength(RESOURCE_COUNT);
+    expect(measured).toBe('measured at 2026-08-27 09:12');
   });
 
   // The dashboard's badge says this one in two words, and an owner reading both surfaces should
   // not have to work out that they are the same thing.
   test('an app nothing has ever deployed is said the way the dashboard says it', () => {
-    expect(renderStatus(app({ status: 'never-deployed' }))[0]).toBe('quiet-otter  never deployed');
+    expect(renderStatus(app({ status: 'never-deployed' })).lines[0]).toBe(
+      'quiet-otter  never deployed',
+    );
   });
 
   // Memory is a level and arrives whole; a share needs a reading behind it and cannot.
@@ -87,7 +107,7 @@ describe('a status says what one app is using of what it was given', () => {
           measuredAt: '2026-08-29T11:01:00.000Z',
         },
       }),
-    ).join('\n');
+    ).lines.join('\n');
 
     expect(lines).toContain('vCPU    - / 2');
     expect(lines).toContain('Memory  393.3 MiB / 1.0 GiB');

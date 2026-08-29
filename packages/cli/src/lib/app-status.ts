@@ -40,15 +40,37 @@ function spent({ used, total }: { used: string | undefined; total: string }): st
   return `${used ?? UNMEASURED} / ${total}`;
 }
 
+/** The table, and the one moment printed under it — dimmed, which is the caller's to do. */
+export type RenderedStatus = { lines: string[]; measured: string | undefined };
+
+/**
+ * The oldest reading's moment, not the newest.
+ *
+ * One line rather than three because the two readings are taken in the same pass and almost
+ * always carry the same moment, so saying it three times says nothing twice. They can still come
+ * apart — they are two exchanges with the guest, and one can be refused while the other answers —
+ * and the oldest is the summary that stays true when they do. The newest would date a stale
+ * reading as fresh, which is the one thing a moment is here to stop.
+ */
+function measuredAt(moments: readonly (string | undefined)[]): string | undefined {
+  const taken = moments.filter((moment) => moment !== undefined);
+  let oldest: string | undefined;
+  for (const moment of taken) {
+    if (oldest === undefined || Date.parse(moment) < Date.parse(oldest)) {
+      oldest = moment;
+    }
+  }
+  return oldest;
+}
+
 /**
  * What the app is using of what it was given, one resource to a line.
  *
  * Sizes where the listing prints shares: a listing is read to find the app that is filling up, and
  * this is read once that app is found — so the question here is how much, which a percentage does
- * not answer. The moment sits on each line rather than under all three, because the two readings
- * are taken by two exchanges with the guest and either can be older than the other.
+ * not answer.
  */
-export function renderStatus(app: AppStatusView): string[] {
+export function renderStatus(app: AppStatusView): RenderedStatus {
   const compute = app.computeUsage;
   const volume = app.volumeUsage;
   const memoryBytes = app.config.resources.memoryMib * BYTES_PER_MIB;
@@ -83,21 +105,18 @@ export function renderStatus(app: AppStatusView): string[] {
     },
   ];
 
-  const spentWidth = Math.max(...resources.map((resource) => resource.spent.length));
+  const taken = measuredAt(resources.map((resource) => resource.measuredAt));
 
-  return [
-    `${app.slug}  ${APP_STATUS_LABELS[app.status]}`,
-    '',
-    ...resources.map((resource) =>
-      [
-        resource.label.padEnd(LABEL_WIDTH),
-        resource.spent.padEnd(spentWidth),
-        resource.measuredAt ? `(${dayAndMinute(resource.measuredAt)})` : '',
-      ]
-        .join('  ')
-        .trimEnd(),
-    ),
-  ];
+  return {
+    lines: [
+      `${app.slug}  ${APP_STATUS_LABELS[app.status]}`,
+      '',
+      ...resources.map((resource) =>
+        `${resource.label.padEnd(LABEL_WIDTH)}  ${resource.spent}`.trimEnd(),
+      ),
+    ],
+    measured: taken ? `measured at ${dayAndMinute(taken)}` : undefined,
+  };
 }
 
 export async function showStatus({
@@ -110,7 +129,13 @@ export async function showStatus({
   print: Print;
 }): Promise<void> {
   const { app, status } = await appWithStatus({ api, slug });
-  for (const line of renderStatus({ ...app, status: statusKey(status) })) {
+  const { lines, measured } = renderStatus({ ...app, status: statusKey(status) });
+  for (const line of lines) {
     print.info(line);
+  }
+  // Under the table and dimmed, because it qualifies every figure above rather than being one.
+  if (measured) {
+    print.info('');
+    print.dim(measured);
   }
 }
