@@ -2,6 +2,7 @@ import {
   type AppConfig,
   type AppHostname,
   type AppId,
+  DEFAULT_VOLUME_SIZE_BYTES,
   type DesiredInstance,
   type DesiredVolume,
   Value,
@@ -9,7 +10,7 @@ import {
   VolumeIdSchema,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
-import { toRunConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
+import { toRunConfig } from '#lib/app-config.ts';
 import {
   openEnvironment,
   type SealedEnvironment,
@@ -40,7 +41,7 @@ export function toDesiredVolume(row: DesiredVolumeRow): DesiredVolume {
   return {
     volumeId: volumeIdOf(row.app_id),
     appId: row.app_id,
-    sizeBytes: VOLUME_SIZE_BYTES,
+    sizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
     desiredState: row.state === 'deleting' ? 'absent' : 'present',
   };
 }

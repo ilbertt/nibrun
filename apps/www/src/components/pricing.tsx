@@ -1,13 +1,11 @@
-import { DEFAULT_INSTANCE_RESOURCES } from '@repo/protocol';
+import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/protocol';
 
-// The one number here not read from the protocol: volume size is fixed in the API, which a
-// static site has no import path to. Both stay constants until an owner may ask for another.
-const VOLUME_GB = 8;
+const BYTES_PER_GIB = 1_073_741_824;
 
 const MACHINE_SPEC = [
   `${DEFAULT_INSTANCE_RESOURCES.vcpuCount} vCPU`,
   `${DEFAULT_INSTANCE_RESOURCES.memoryMib} MB`,
-  `${VOLUME_GB} GB disk`,
+  `${DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB} GB disk`,
 ].join(' · ');
 
 const TIERS = [
