@@ -4,6 +4,7 @@ import {
   DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
+  DEFAULT_VOLUME_SIZE_BYTES,
   REDACTED,
   type SecretString,
   type TenantEnvironment,
@@ -11,10 +12,6 @@ import {
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
-
-// Every app gets the same filesystem for now, so this is a constant rather than a column: a
-// value an owner cannot vary is one there is nothing to store per app.
-export const VOLUME_SIZE_BYTES = 8_589_934_592;
 
 // An owner reads which variables are set, never what they hold: the values are sealed in the
 // database and only opened where desired state is built, so there is nothing here to return.
@@ -112,7 +109,7 @@ export function configWithDefaults(
   patch: AppConfigPatch = {},
 ): Omit<PublicAppConfig, 'environment'> {
   return {
-    volumeSizeBytes: VOLUME_SIZE_BYTES,
+    volumeSizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
     resources: DEFAULT_INSTANCE_RESOURCES,
     healthCheck: DEFAULT_HEALTH_CHECK,
     restartPolicy: DEFAULT_RESTART_POLICY,
@@ -127,7 +124,7 @@ export function configWithDefaults(
 export function toAppConfig(row: AppConfigColumns): PublicAppConfig {
   return {
     ...toRunConfig(row),
-    volumeSizeBytes: VOLUME_SIZE_BYTES,
+    volumeSizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
     environment: redacted(row.environment_names),
   };
 }

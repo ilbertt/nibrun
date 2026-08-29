@@ -3,6 +3,7 @@ import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
+  DEFAULT_VOLUME_SIZE_BYTES,
   type DeploymentId,
   type DeploymentState,
   HostPortSchema,
@@ -15,7 +16,7 @@ import {
   Value,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
-import { type PublicAppConfig, VOLUME_SIZE_BYTES } from '#lib/app-config.ts';
+import type { PublicAppConfig } from '#lib/app-config.ts';
 import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
@@ -213,7 +214,7 @@ describe('a deployment publishes the config version it pins', () => {
     });
 
     expect(deployment.config).toEqual({
-      volumeSizeBytes: VOLUME_SIZE_BYTES,
+      volumeSizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
       environment: {},
       httpPort: HTTP_PORT,
       hasExtraPublicPort: false,

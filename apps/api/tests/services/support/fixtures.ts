@@ -5,16 +5,12 @@ import {
   DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
+  DEFAULT_VOLUME_SIZE_BYTES,
   DeploymentIdSchema,
   OwnerIdSchema,
   Value,
 } from '@repo/protocol';
-import {
-  type AppConfigColumns,
-  type PublicAppConfig,
-  type StoredAppConfig,
-  VOLUME_SIZE_BYTES,
-} from '#lib/app-config.ts';
+import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import type {
   DeploymentByIdInput,
   DeploymentLookup,
@@ -49,7 +45,7 @@ export function deploymentLookup(
 // Spelled out from the protocol's own defaults rather than built with `configWithDefaults`,
 // which is the thing under test wherever this is the expected value.
 export const DEFAULT_CONFIG: PublicAppConfig = {
-  volumeSizeBytes: VOLUME_SIZE_BYTES,
+  volumeSizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
   environment: {},
   httpPort: DEFAULT_HTTP_PORT,
   hasExtraPublicPort: false,
