@@ -825,6 +825,45 @@ describe('a binary is fetched from the url it was given', () => {
     expect(isValidMessage({ schema: ArtifactSchema, value: artifact })).toBe(true);
   });
 
+  /**
+   * The one thing about the bytes a caller can know before the fetch, and so the one thing worth
+   * taking their word about — as an expectation, checked against what they came to.
+   */
+  test('a checksum the bytes hash to is the fetch going ahead as it would have', async () => {
+    const { service, sourceRepo, storage } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+      sha256: Value.Parse(Sha256DigestSchema, BINARY_DIGEST),
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
+  });
+
+  // Both digests, because either could be the surprising one: the release the link was written
+  // against may have been replaced, or the checksum beside it may never have been this binary's.
+  test('and a checksum they hash to nothing like is refused, leaving nothing behind', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const refusal = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+      sha256: SEEDED_DIGEST,
+    });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+    await expect(refusal).rejects.toThrow(SEEDED_DIGEST);
+    await expect(refusal).rejects.toThrow(BINARY_DIGEST);
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
+  });
+
   // Kept where the bytes are described rather than answered with: nothing downstream is told
   // where a binary was found, and a host least of all.
   test('where it came from is written down beside the name it was given', async () => {
@@ -1015,6 +1054,27 @@ describe('a binary is fetched from the url it was given', () => {
     expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
     expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
     expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(ARCHIVE_URL);
+  });
+
+  /**
+   * Held against the binary rather than against the download, because the binary is what a host
+   * verifies before it will run one — and the digest of a zip says nothing about whether the
+   * executable inside it is the one that was published.
+   */
+  test('and a checksum is what the executable inside hashes to, not the zip', async () => {
+    const { service, sourceRepo } = build();
+    sourceRepo.servesBytes({
+      bytes: archiveOf([{ name: 'my-server', content: bytesOf(BINARY_TEXT) }]),
+    });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: ARCHIVE_URL,
+      sha256: Value.Parse(Sha256DigestSchema, BINARY_DIGEST),
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
   });
 
   // The name an export writes the binary out as, which the url only ever spells `.zip`.

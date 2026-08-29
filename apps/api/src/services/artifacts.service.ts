@@ -7,6 +7,7 @@ import {
   type ObjectKey,
   ObjectKeySchema,
   type OwnerId,
+  type Sha256Digest,
   Value,
 } from '@repo/protocol';
 import {
@@ -119,6 +120,15 @@ const ENTRY_TOO_LARGE =
 
 function unreadableArchive(url: string): string {
   return `The zip ended before the entry it was describing: ${url}`;
+}
+
+/**
+ * The binary is not the one the caller said would be there. Both digests are named because either
+ * could be the surprising one: the link may have been written against a release that has since
+ * been replaced, or the checksum beside it may simply be the wrong one.
+ */
+function wrongDigest({ expected, stored }: { expected: string; stored: string }): string {
+  return `The binary hashes to ${stored}, not the ${expected} that was asked for.`;
 }
 
 function unsupportedInterpreter(interpreter: string): string {
@@ -289,15 +299,23 @@ export class ArtifactsService extends Service {
    *
    * Hashed on that same pass: the bytes are inspected as they are handed to the store, so what is
    * written to the staging key and what decides whether it is an artifact at all are one read.
+   *
+   * A caller who knows what the url should be serving may say so, and what their digest is held
+   * against is the artifact's own — the binary that will be deployed, which for an archive is the
+   * executable inside it rather than the download it arrived in. It can only be checked once the
+   * bytes are read, so a url serving something else costs the fetch; what it does not cost is a
+   * deploy of whatever turned up.
    */
   async createFromUrl({
     appId,
     ownerId,
     url,
+    sha256,
   }: {
     appId: AppId;
     ownerId: OwnerId;
     url: string;
+    sha256?: Sha256Digest | undefined;
   }): Promise<Artifact> {
     if (!(await this.appsRepo.isOwnedBy({ appId, ownerId }))) {
       throw new NotFoundError(NO_SUCH_APP);
@@ -315,7 +333,7 @@ export class ArtifactsService extends Service {
 
     this.fetchesInFlight += 1;
     try {
-      return await this.fetchInto({ appId, ownerId, url, filename });
+      return await this.fetchInto({ appId, ownerId, url, filename, sha256 });
     } finally {
       this.fetchesInFlight -= 1;
     }
@@ -333,11 +351,13 @@ export class ArtifactsService extends Service {
     ownerId,
     url,
     filename,
+    sha256,
   }: {
     appId: AppId;
     ownerId: OwnerId;
     url: string;
     filename: Filename;
+    sha256: Sha256Digest | undefined;
   }): Promise<Artifact> {
     const said = withoutCredentials(url);
 
@@ -380,7 +400,14 @@ export class ArtifactsService extends Service {
       url: said,
     });
 
-    return await this.promote({ appId, artifactId: pending.id, ownerId, staged, inspection });
+    return await this.promote({
+      appId,
+      artifactId: pending.id,
+      ownerId,
+      staged,
+      inspection,
+      expected: sha256,
+    });
   }
 
   /**
@@ -462,6 +489,10 @@ export class ArtifactsService extends Service {
    * The staged bytes as the artifact they turned out to be, which is the same last step whether
    * they were uploaded or fetched: what the inspection settled is written down, the bytes are put
    * where their digest says, and the slot they came through is given up.
+   *
+   * A digest that was expected is checked here rather than where it was given, because here is
+   * where there is one to check it against — and it is refused like any other verdict on the
+   * bytes, which is to say the row and the staging slot go with it.
    */
   private async promote({
     appId,
@@ -469,12 +500,14 @@ export class ArtifactsService extends Service {
     ownerId,
     staged,
     inspection,
+    expected,
   }: {
     appId: AppId;
     artifactId: ArtifactId;
     ownerId: OwnerId;
     staged: ObjectKey;
     inspection: ArtifactInspection;
+    expected?: Sha256Digest | undefined;
   }): Promise<Artifact> {
     if (inspection.outcome !== 'stored') {
       await this.abandon({ appId, artifactId, ownerId });
@@ -482,6 +515,10 @@ export class ArtifactsService extends Service {
     }
 
     const { digest, sizeBytes, objectKey } = inspection;
+    if (expected !== undefined && digest !== expected) {
+      await this.abandon({ appId, artifactId, ownerId });
+      throw new BadRequestError(wrongDigest({ expected, stored: digest }));
+    }
     if (!(await this.storageRepo.exists({ objectKey }))) {
       await this.storageRepo.copy({ from: staged, to: objectKey });
     }

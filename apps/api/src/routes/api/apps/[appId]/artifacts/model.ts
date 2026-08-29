@@ -1,4 +1,10 @@
-import { ArtifactIdSchema, ArtifactSchema, ByteSizeSchema, FilenameSchema } from '@repo/protocol';
+import {
+  ArtifactIdSchema,
+  ArtifactSchema,
+  ByteSizeSchema,
+  FilenameSchema,
+  Sha256DigestSchema,
+} from '@repo/protocol';
 import { t } from 'elysia';
 import { BINARY_URL_PATTERN, MAX_BINARY_URL_LENGTH } from '#lib/binary-url.ts';
 
@@ -15,12 +21,18 @@ const UploadedBinarySchema = t.Object({
 
 // Bytes the caller does not hold: no name and no size, because the api is the one fetching and so
 // the one that finds out how large the binary is and what the file at the end of the url is called.
+//
+// The digest is the one thing about them a caller can know before the fetch, and the only one this
+// end will take their word about — as an expectation to hold the bytes to rather than as a fact
+// about them. Optional because most callers have none: it is written down where a release
+// publishes its checksums, and nowhere else.
 const FetchedBinarySchema = t.Object({
   url: t.String({
     description: 'Public https url the api fetches the binary from.',
     pattern: BINARY_URL_PATTERN,
     maxLength: MAX_BINARY_URL_LENGTH,
   }),
+  sha256: t.Optional(Sha256DigestSchema),
 });
 
 // Where the binary is, however that is answered. One request either way: what differs is who ends

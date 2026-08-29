@@ -4,8 +4,11 @@ import { defaultParseSearch, defaultStringifySearch } from '@tanstack/react-rout
 import { type DeployLink, type DeploySuggestion, deployLink, deploySuggestion } from '#link.ts';
 
 const HOSTNAME = writtenRuntimeValue(RUNTIME_VALUES.HOSTNAME.name);
+const CHECKSUM = 'd9403d88cdf0684fbb9d8e97cf3508e9fb4506cf309a34e42653a1c2bc04a298';
 
 const EVERYTHING = `?name=my-app&port=9000&extra-public-port=true&arg=serve&arg=--verbose&env=API_KEY&env=GREETING=hello&env=URL=https://${HOSTNAME}`;
+
+const BINARY_URL = 'https://releases.test/v1/my-server';
 
 const ASKED: DeploySuggestion = {
   name: 'my-app',
@@ -41,12 +44,22 @@ function rewritten(link: string): string {
  * one is the difference between a form to fill in and a button to press.
  */
 test('a link may carry the binary itself', () => {
-  expect(followed('?binary=https://releases.test/v1/my-server').binary).toBe(
-    'https://releases.test/v1/my-server',
-  );
-  expect(followed(rewritten('?binary=https://releases.test/v1/my-server')).binary).toBe(
-    'https://releases.test/v1/my-server',
-  );
+  expect(followed(`?binary=${BINARY_URL}`).binary).toBe(BINARY_URL);
+  expect(followed(rewritten(`?binary=${BINARY_URL}`)).binary).toBe(BINARY_URL);
+});
+
+/**
+ * Carried as it was written rather than checked here: what this end drops, nothing downstream can
+ * miss — and a deploy that went ahead without the checksum the link came with is the one outcome
+ * carrying one has to rule out. The form is where a malformed one is refused by name.
+ */
+test('a link may carry what that binary should hash to', () => {
+  expect(followed(`?binary=${BINARY_URL}&sha256=${CHECKSUM}`).sha256).toBe(CHECKSUM);
+  expect(followed(rewritten(`?binary=${BINARY_URL}&sha256=${CHECKSUM}`)).sha256).toBe(CHECKSUM);
+  expect(followed(`?sha256=${CHECKSUM.toUpperCase()}`).sha256).toBe(CHECKSUM);
+  expect(followed('?sha256=').sha256).toBeUndefined();
+  expect(followed('?sha256=not-a-digest').sha256).toBe('not-a-digest');
+  expect(followed(`?sha256=${CHECKSUM}&sha256=${CHECKSUM}`).sha256).not.toBeUndefined();
 });
 
 test('a url nibrun could not fetch a binary from prefills nothing', () => {
@@ -102,6 +115,7 @@ test('a link that asks for nothing suggests nothing', () => {
   expect(followed('')).toEqual({
     name: undefined,
     binary: undefined,
+    sha256: undefined,
     port: undefined,
     extraPublicPort: undefined,
     args: undefined,
