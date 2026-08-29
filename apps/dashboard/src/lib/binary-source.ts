@@ -1,7 +1,7 @@
 import { namedByUrl } from '@repo/deploy-link';
 
 /**
- * A url for the api to fetch, and what a link said the binary there should hash to.
+ * A url for the api to fetch, and what a link said the file there should hash to.
  *
  * The checksum is text rather than a digest because it is whatever the link was written with, and
  * what is not a sha256 is refused by name rather than dropped — see `refusedChecksum`. A checksum

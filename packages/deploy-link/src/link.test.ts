@@ -53,7 +53,7 @@ test('a link may carry the binary itself', () => {
  * miss — and a deploy that went ahead without the checksum the link came with is the one outcome
  * carrying one has to rule out. The form is where a malformed one is refused by name.
  */
-test('a link may carry what that binary should hash to', () => {
+test('a link may carry what the url should hash to', () => {
   expect(followed(`?binary=${BINARY_URL}&sha256=${CHECKSUM}`).sha256).toBe(CHECKSUM);
   expect(followed(rewritten(`?binary=${BINARY_URL}&sha256=${CHECKSUM}`)).sha256).toBe(CHECKSUM);
   expect(followed(`?sha256=${CHECKSUM.toUpperCase()}`).sha256).toBe(CHECKSUM);

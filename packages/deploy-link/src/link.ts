@@ -96,8 +96,8 @@ export type DeploySuggestion = { [K in keyof typeof CONFIGURED]?: Meant[K] } & {
   // Not part of what a deploy configures — it is what is being deployed. A link carrying one is
   // the difference between a form with one thing left to do and a form with none.
   binary?: string | undefined;
-  // What that binary should hash to, for the api to hold the bytes it fetches to. Never shown:
-  // there is nothing to decide about it, and the owner is not the one who wrote it down.
+  // What the url should serve, for the api to hold what it fetches to. Never shown: there is
+  // nothing to decide about it, and the owner is not the one who wrote it down.
   sha256?: string | undefined;
 };
 

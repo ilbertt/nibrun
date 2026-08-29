@@ -25,7 +25,7 @@ export const command = defineCommand('run [command]', {
     sha256: {
       schema: z.string().optional(),
       description:
-        'What the binary at the url should hash to, as its release publishes it. nibrun refuses one that hashes to anything else. Only for a url — a file on this machine is not fetched.',
+        'What the file at the url should hash to, as its release publishes it — for an archive, the archive rather than the executable inside it. nibrun refuses a download that hashes to anything else. Only for a url: a file on this machine is not fetched.',
     },
     [SHARED_OPTIONS.port.name]: SHARED_OPTIONS.port.option,
     [SHARED_OPTIONS.extraPublicPort.name]: SHARED_OPTIONS.extraPublicPort.option,

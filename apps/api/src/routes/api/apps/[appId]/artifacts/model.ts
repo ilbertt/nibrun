@@ -23,9 +23,9 @@ const UploadedBinarySchema = t.Object({
 // the one that finds out how large the binary is and what the file at the end of the url is called.
 //
 // The digest is the one thing about them a caller can know before the fetch, and the only one this
-// end will take their word about — as an expectation to hold the bytes to rather than as a fact
-// about them. Optional because most callers have none: it is written down where a release
-// publishes its checksums, and nowhere else.
+// end will take their word about — as an expectation to hold the download to rather than as a fact
+// about it. Over the file the url serves, which for an archive is the archive: that is what a
+// release publishes a checksum for, and the only form one is ever written down in.
 const FetchedBinarySchema = t.Object({
   url: t.String({
     description: 'Public https url the api fetches the binary from.',
