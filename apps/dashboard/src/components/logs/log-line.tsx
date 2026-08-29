@@ -1,5 +1,6 @@
 import type { TenantLogRecord } from '@repo/protocol';
 import { cn } from '@repo/ui/lib/utils';
+import { ansiSpans } from '#lib/ansi.ts';
 import { timeOfDay } from '#lib/format-timestamp.ts';
 
 const TERMINATOR = /\r?\n$/;
@@ -16,7 +17,11 @@ export function LogLine({ record }: { record: TenantLogRecord }) {
         {wroteToStderr ? 'err' : 'out'}
       </span>
       <span className={cn('whitespace-pre-wrap break-all', wroteToStderr && 'text-destructive')}>
-        {record._msg.replace(TERMINATOR, '')}
+        {ansiSpans(record._msg.replace(TERMINATOR, '')).map((span) => (
+          <span key={span.offset} style={span.style}>
+            {span.text}
+          </span>
+        ))}
         {record.droppedBytes !== undefined && (
           <span className="text-muted-foreground"> ({record.droppedBytes} bytes)</span>
         )}
