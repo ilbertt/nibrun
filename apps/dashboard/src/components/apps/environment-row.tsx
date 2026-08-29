@@ -1,9 +1,10 @@
 import { Button } from '@repo/ui/components/button';
 import { Input } from '@repo/ui/components/input';
 import { TableCell, TableRow } from '@repo/ui/components/table';
+import { cn } from '@repo/ui/lib/utils';
 import { PencilIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useState } from 'react';
-import type { EnvironmentVariable } from '#lib/environment-variables.ts';
+import { awaitsValue, type EnvironmentVariable } from '#lib/environment-variables.ts';
 
 const HIDDEN_VALUE = '••••••••••••';
 
@@ -29,6 +30,7 @@ export function EnvironmentRow({
   const [kept, setKept] = useState<Kept | undefined>(undefined);
   const named = variable.name.trim();
   const hidden = variable.sealed ? SEALED : variable.value.includes('\n') ? MANY_LINES : undefined;
+  const awaiting = awaitsValue(variable);
 
   function replace(): void {
     setKept({ value: variable.value, sealed: variable.sealed });
@@ -65,7 +67,7 @@ export function EnvironmentRow({
             aria-label={named === '' ? 'Variable value' : `Value of ${named}`}
             autoComplete="off"
             spellCheck={false}
-            className="font-mono"
+            className={cn('font-mono', awaiting && 'border-warning/60 ring-3 ring-warning/25')}
           />
         ) : (
           <span className="px-2.5 font-mono text-muted-foreground" title={hidden}>
