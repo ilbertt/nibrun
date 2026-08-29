@@ -14,6 +14,7 @@ import {
   type ArtifactInspection,
   ArtifactTooLargeError,
   boundedTo,
+  digesting,
   inspectArtifact,
   inspectingPassThrough,
   RefusedArtifactError,
@@ -123,12 +124,51 @@ function unreadableArchive(url: string): string {
 }
 
 /**
- * The binary is not the one the caller said would be there. Both digests are named because either
+ * The url is not serving what the caller said it would. Both digests are named because either
  * could be the surprising one: the link may have been written against a release that has since
  * been replaced, or the checksum beside it may simply be the wrong one.
  */
-function wrongDigest({ expected, stored }: { expected: string; stored: string }): string {
-  return `The binary hashes to ${stored}, not the ${expected} that was asked for.`;
+function wrongDigest({ expected, served }: { expected: string; served: string }): string {
+  return `The url served ${served}, not the ${expected} that was asked for.`;
+}
+
+/** A digest somebody said the url would serve, and what it turned out to serve. */
+type DigestCheck = { expected: Sha256Digest; served: Promise<Sha256Digest> };
+
+/**
+ * The source, hashed on its way past where there is something to hold it to. Untouched where
+ * there is not: reading a download to the end is the cost of checking one, and nobody who did not
+ * ask for the check should pay it.
+ */
+function checking({
+  source,
+  sha256,
+}: {
+  source: ReadableStream<Uint8Array>;
+  sha256: Sha256Digest | undefined;
+}): { body: ReadableStream<Uint8Array>; check: DigestCheck | undefined } {
+  if (sha256 === undefined) {
+    return { body: source, check: undefined };
+  }
+  const { body, served } = digesting({ source });
+  return { body, check: { expected: sha256, served } };
+}
+
+/**
+ * The download held to the digest it was promised to be.
+ *
+ * Against the download rather than against the executable unwrapped from it, because a release
+ * publishes a checksum over the file it uploaded — a `checksums.txt` beside a zip is the zip's,
+ * and nobody publishes the digest of one file inside an archive.
+ */
+async function heldToDigest(check: DigestCheck | undefined): Promise<void> {
+  if (check === undefined) {
+    return;
+  }
+  const served = await check.served;
+  if (served !== check.expected) {
+    throw new BadRequestError(wrongDigest({ expected: check.expected, served }));
+  }
 }
 
 function unsupportedInterpreter(interpreter: string): string {
@@ -300,11 +340,10 @@ export class ArtifactsService extends Service {
    * Hashed on that same pass: the bytes are inspected as they are handed to the store, so what is
    * written to the staging key and what decides whether it is an artifact at all are one read.
    *
-   * A caller who knows what the url should be serving may say so, and what their digest is held
-   * against is the artifact's own — the binary that will be deployed, which for an archive is the
-   * executable inside it rather than the download it arrived in. It can only be checked once the
-   * bytes are read, so a url serving something else costs the fetch; what it does not cost is a
-   * deploy of whatever turned up.
+   * A caller who knows what the url should be serving may say so, and what is held to it is the
+   * download itself — the file a release published a checksum for. It can only be checked once
+   * the bytes are read, so a url serving something else costs the fetch; what it does not cost is
+   * a deploy of whatever turned up.
    */
   async createFromUrl({
     appId,
@@ -376,7 +415,8 @@ export class ArtifactsService extends Service {
     // Bounded on the way in whatever the host said about it: a declared length is a courtesy, and
     // a source that declares none is otherwise read for as long as it keeps sending. The bound is
     // on what the url sent rather than on what it came to, which for an archive is not the same.
-    const fetched = boundedTo({ source: source.body, maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES });
+    const bounded = boundedTo({ source: source.body, maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES });
+    const { body: fetched, check } = checking({ source: bounded, sha256 });
     const held = await unwrapped({ source: fetched, named: filename, url: said });
 
     const pending = await this.artifactsRepo.insertPending({
@@ -398,16 +438,10 @@ export class ArtifactsService extends Service {
       staged,
       body: held.body,
       url: said,
+      check,
     });
 
-    return await this.promote({
-      appId,
-      artifactId: pending.id,
-      ownerId,
-      staged,
-      inspection,
-      expected: sha256,
-    });
+    return await this.promote({ appId, artifactId: pending.id, ownerId, staged, inspection });
   }
 
   /**
@@ -424,6 +458,7 @@ export class ArtifactsService extends Service {
     staged,
     body,
     url,
+    check,
   }: {
     appId: AppId;
     artifactId: ArtifactId;
@@ -431,9 +466,12 @@ export class ArtifactsService extends Service {
     staged: ObjectKey;
     body: ReadableStream<Uint8Array>;
     url: string;
+    check: DigestCheck | undefined;
   }): Promise<ArtifactInspection> {
     try {
-      return await this.stage({ staged, body });
+      const inspection = await this.stage({ staged, body });
+      await heldToDigest(check);
+      return inspection;
     } catch (failure) {
       await this.abandon({ appId, artifactId, ownerId });
       if (failure instanceof InterruptedSourceError) {
@@ -489,10 +527,6 @@ export class ArtifactsService extends Service {
    * The staged bytes as the artifact they turned out to be, which is the same last step whether
    * they were uploaded or fetched: what the inspection settled is written down, the bytes are put
    * where their digest says, and the slot they came through is given up.
-   *
-   * A digest that was expected is checked here rather than where it was given, because here is
-   * where there is one to check it against — and it is refused like any other verdict on the
-   * bytes, which is to say the row and the staging slot go with it.
    */
   private async promote({
     appId,
@@ -500,14 +534,12 @@ export class ArtifactsService extends Service {
     ownerId,
     staged,
     inspection,
-    expected,
   }: {
     appId: AppId;
     artifactId: ArtifactId;
     ownerId: OwnerId;
     staged: ObjectKey;
     inspection: ArtifactInspection;
-    expected?: Sha256Digest | undefined;
   }): Promise<Artifact> {
     if (inspection.outcome !== 'stored') {
       await this.abandon({ appId, artifactId, ownerId });
@@ -515,10 +547,6 @@ export class ArtifactsService extends Service {
     }
 
     const { digest, sizeBytes, objectKey } = inspection;
-    if (expected !== undefined && digest !== expected) {
-      await this.abandon({ appId, artifactId, ownerId });
-      throw new BadRequestError(wrongDigest({ expected, stored: digest }));
-    }
     if (!(await this.storageRepo.exists({ objectKey }))) {
       await this.storageRepo.copy({ from: staged, to: objectKey });
     }
