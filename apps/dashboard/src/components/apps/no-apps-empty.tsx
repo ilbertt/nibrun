@@ -7,7 +7,7 @@ import {
 } from '@repo/ui/components/empty';
 import { CopyButton } from '@repo/ui/custom/copy-button';
 import { BoxIcon } from 'lucide-react';
-import { DeployDialog } from '#components/apps/deploy-dialog.tsx';
+import { DeployDialog } from '#components/deploy/deploy-dialog.tsx';
 
 const INSTALL_COMMAND = 'curl -fsSL https://nibrun.com/install.sh | sh';
 

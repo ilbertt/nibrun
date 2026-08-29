@@ -1,6 +1,6 @@
-import { Field, FieldDescription, FieldError } from '@repo/ui/components/field';
-import { EnvFilePicker } from '#components/apps/env-file-picker.tsx';
+import { Field, FieldError } from '@repo/ui/components/field';
 import { EnvironmentTable } from '#components/apps/environment-table.tsx';
+import { EnvFilePicker } from '#components/deploy/env-file-picker.tsx';
 import { storedVariables, withEntries } from '#lib/environment-variables.ts';
 import { type DeployFormApi, validateEnvironment } from '#lib/hooks/use-deploy-form.ts';
 import type { AppSummary } from '#queries/apps.ts';
@@ -33,21 +33,12 @@ export function DeployEnvironmentField({
                 />
               )}
             </EnvironmentTable>
-            {field.state.meta.errors.length > 0 ? (
+            {field.state.meta.errors.length > 0 && (
               <FieldError>{field.state.meta.errors[0]}</FieldError>
-            ) : (
-              <FieldDescription>{describeEnvironment(replacing)}</FieldDescription>
             )}
           </Field>
         );
       }}
     </api.Field>
   );
-}
-
-function describeEnvironment(replacing: AppSummary | undefined): string {
-  if (replacing === undefined) {
-    return 'What the binary runs with.';
-  }
-  return 'What the binary runs with. A value already set can be replaced, and a row removed here is a variable the app stops running with.';
 }

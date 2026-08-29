@@ -71,9 +71,15 @@ type StoredRow = Omit<ArtifactRow, 'digest' | 'size_bytes' | 'object_key'> & {
 class FakeArtifactsRepository implements ArtifactsRepositoryContract {
   readonly rows = new Map<ArtifactId, StoredRow>();
   private readonly ownedBy: OwnerId;
+  private refuses = false;
 
   constructor(ownedBy: OwnerId) {
     this.ownedBy = ownedBy;
+  }
+
+  /** The app went while the fetch was being opened, which is the one way a row fails to begin. */
+  refusesToInsert(): void {
+    this.refuses = true;
   }
 
   insertPending({
@@ -82,7 +88,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
     originalFileName,
     originalFileUrl,
   }: InsertPendingArtifactInput): Promise<PendingArtifactRow | null> {
-    if (ownerId !== this.ownedBy) {
+    if (ownerId !== this.ownedBy || this.refuses) {
       return Promise.resolve(null);
     }
     const row: StoredRow = {
@@ -347,6 +353,22 @@ class FakeBinarySource implements BinarySourceRepositoryContract {
         },
       }),
       declaredSizeBytes,
+    });
+  }
+
+  /** A body with no end to it, which is what a source that has to be let go of looks like. */
+  keepsSending(): void {
+    this.answers({
+      outcome: 'open',
+      body: new ReadableStream<Uint8Array>({
+        pull: (controller) => {
+          controller.enqueue(bytesOf(BINARY_TEXT));
+        },
+        cancel: () => {
+          this.letGo = true;
+        },
+      }),
+      declaredSizeBytes: undefined,
     });
   }
 
@@ -918,6 +940,19 @@ describe('a binary is fetched from the url it was given', () => {
     await expect(
       service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
     ).rejects.toBeInstanceOf(BadRequestError);
+    expect(sourceRepo.wasLetGo).toBe(true);
+  });
+
+  // The bytes reach the row through a cap on how many of them will be read, so what has to be let
+  // go of is a stream with something in front of it rather than the source itself.
+  test('a source still sending against a row that never began is let go of', async () => {
+    const { service, sourceRepo, artifactsRepo } = build();
+    artifactsRepo.refusesToInsert();
+    sourceRepo.keepsSending();
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    ).rejects.toBeInstanceOf(NotFoundError);
     expect(sourceRepo.wasLetGo).toBe(true);
   });
 

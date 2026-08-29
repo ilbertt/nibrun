@@ -348,7 +348,7 @@ export class ArtifactsService extends Service {
     // Bounded on the way in whatever the host said about it: a declared length is a courtesy, and
     // a source that declares none is otherwise read for as long as it keeps sending. The bound is
     // on what the url sent rather than on what it came to, which for an archive is not the same.
-    const fetched = source.body.pipeThrough(boundedTo({ maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES }));
+    const fetched = boundedTo({ source: source.body, maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES });
     const held = await unwrapped({ source: fetched, named: filename, url: said });
 
     const pending = await this.artifactsRepo.insertPending({

@@ -12,6 +12,7 @@ import type { command as appsFilesLsPathCmd } from './commands/apps/files/ls/[pa
 import type { command as appsListCmd } from './commands/apps/list.ts';
 import type { command as appsLogsCmd } from './commands/apps/logs.ts';
 import type { command as appsResumeCmd } from './commands/apps/resume.ts';
+import type { command as appsStatusCmd } from './commands/apps/status.ts';
 import type { command as appsSuspendCmd } from './commands/apps/suspend.ts';
 import type { command as appsUpdateCmd } from './commands/apps/update.ts';
 import type { command as loginCmd } from './commands/login.ts';
@@ -81,6 +82,12 @@ declare module '@parshjs/core' {
       rootOptions: {};
     };
     'apps resume': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: {};
+    };
+    'apps status': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
@@ -196,6 +203,12 @@ export const commandTree: RuntimeNode = {
         'resume': {
           segment: { kind: 'literal', value: 'resume' },
           command: { path: 'apps resume', load: () => import('./commands/apps/resume.ts').then((m) => m.command) },
+          literalChildren: {},
+          paramChild: null,
+        },
+        'status': {
+          segment: { kind: 'literal', value: 'status' },
+          command: { path: 'apps status', load: () => import('./commands/apps/status.ts').then((m) => m.command) },
           literalChildren: {},
           paramChild: null,
         },

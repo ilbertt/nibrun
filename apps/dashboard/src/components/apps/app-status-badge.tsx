@@ -1,3 +1,4 @@
+import { APP_STATUS_LABELS } from '@repo/app-operations';
 import { Badge } from '@repo/ui/components/badge';
 import { Skeleton } from '@repo/ui/components/skeleton';
 import { AppStateBadge } from '#components/apps/app-state-badge.tsx';
@@ -31,6 +32,6 @@ export function AppStatusBadge({ app }: { app: AppSummary }) {
     case 'transition':
       return <Badge variant="outline">{status.status.label}</Badge>;
     case 'never-deployed':
-      return <Badge variant="outline">never deployed</Badge>;
+      return <Badge variant="outline">{APP_STATUS_LABELS['never-deployed']}</Badge>;
   }
 }

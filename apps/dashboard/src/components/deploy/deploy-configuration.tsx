@@ -15,8 +15,8 @@ import {
 } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
-import { DeployEnvironmentField } from '#components/apps/deploy-environment-field.tsx';
-import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
+import { DeployEnvironmentField } from '#components/deploy/deploy-environment-field.tsx';
+import { DeployNameField } from '#components/deploy/deploy-name-field.tsx';
 import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import { filledVariables, storedVariables } from '#lib/environment-variables.ts';
 import { type DeployFormState, tenantArguments, validatePort } from '#lib/hooks/use-deploy-form.ts';
@@ -51,10 +51,8 @@ export function DeployConfiguration({
               autoComplete="off"
               className="font-mono tabular-nums"
             />
-            {field.state.meta.errors.length > 0 ? (
+            {field.state.meta.errors.length > 0 && (
               <FieldError>{field.state.meta.errors[0]}</FieldError>
-            ) : (
-              <FieldDescription>The port the binary listens on inside the guest.</FieldDescription>
             )}
           </Field>
         )}
@@ -140,9 +138,7 @@ export function DeployConfiguration({
                     placeholder={'serve\n--verbose'}
                     className="font-mono"
                   />
-                  <FieldDescription>
-                    One per line. What is here is what the binary runs with — empty runs it bare.
-                  </FieldDescription>
+                  <FieldDescription>One per line.</FieldDescription>
                 </Field>
               )}
             </api.Field>

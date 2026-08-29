@@ -1,39 +1,34 @@
 import { Button } from '@repo/ui/components/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@repo/ui/components/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
 import { Link } from '@tanstack/react-router';
-import { DeployForm } from '#components/apps/deploy-form.tsx';
-import { DeployProgress } from '#components/apps/deploy-progress.tsx';
+import { DeployForm } from '#components/deploy/deploy-form.tsx';
+import { DeployProgress } from '#components/deploy/deploy-progress.tsx';
 import { deploySuggestion } from '#lib/deploy-link.ts';
 import { useDeployLink } from '#lib/hooks/use-deploy-link.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
-import type { DeployPhase } from '#lib/hooks/use-run-app.ts';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 export function HandoffDeploy({ binary }: { binary: File | undefined }) {
   const run = useDeployRun();
   const link = useDeployLink();
+  const minimal = link.minimal ?? false;
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">
-          {binary === undefined ? 'Deploy a binary' : 'Deploy this binary'}
-        </CardTitle>
-        <CardDescription>{describe({ phase: run.phase, binary })}</CardDescription>
-      </CardHeader>
+      {/* A link that asks for less is answered by the drop target alone: it says what to do with
+          itself, and a heading above it would only say it again. */}
+      {!minimal && (
+        <CardHeader>
+          <CardTitle className="text-xl">Deploy your app</CardTitle>
+        </CardHeader>
+      )}
       <CardContent>
         {run.phase === 'idle' ? (
           <DeployForm
             appId={undefined}
             binary={binary}
             suggested={deploySuggestion(link)}
-            minimal={link.minimal ?? false}
+            minimal={minimal}
           />
         ) : (
           // Only ever seen when the deploy failed: a run that lands leaves for the app it made
@@ -45,15 +40,4 @@ export function HandoffDeploy({ binary }: { binary: File | undefined }) {
       </CardContent>
     </Card>
   );
-}
-
-function describe({ phase, binary }: { phase: DeployPhase; binary: File | undefined }): string {
-  if (phase !== 'idle') {
-    return 'The binary is on its way. The dashboard takes over once it lands.';
-  }
-  // Nothing was handed over, so whoever followed the link still has to produce the binary —
-  // and nibrun compiles nothing, so saying where it comes from is the whole instruction.
-  return binary === undefined
-    ? 'Compile it on your own machine, then pick it below.'
-    : 'It is uploaded to the store, then released as what the app runs.';
 }

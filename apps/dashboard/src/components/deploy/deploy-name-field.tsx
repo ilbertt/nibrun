@@ -1,4 +1,4 @@
-import { Field, FieldDescription, FieldLabel } from '@repo/ui/components/field';
+import { Field, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { binaryName } from '#lib/binary-source.ts';
 import type { DeployFormApi } from '#lib/hooks/use-deploy-form.ts';
@@ -18,9 +18,6 @@ export function DeployNameField({ api }: { api: DeployFormApi }) {
                 placeholder={named ?? 'Named after the binary'}
                 autoComplete="off"
               />
-              <FieldDescription>
-                The hostname is derived from this once, and never again.
-              </FieldDescription>
             </Field>
           )}
         </api.Field>

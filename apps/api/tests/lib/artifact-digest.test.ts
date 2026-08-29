@@ -332,26 +332,43 @@ describe('bytes are inspected on their way past', () => {
  */
 describe('a source is read as far as what may be stored and no further', () => {
   test('bytes under the bound pass through unchanged', async () => {
-    const bounded = sending([BINARY]).pipeThrough(boundedTo({ maxSizeBytes: NO_LIMIT }));
+    const bounded = boundedTo({ source: sending([BINARY]), maxSizeBytes: NO_LIMIT });
 
     expect(await readWhole(bounded)).toEqual(bytesOf(BINARY));
   });
 
   test('a source that keeps sending is stopped rather than read to its end', async () => {
-    const bounded = sending([BINARY, OTHER_BINARY]).pipeThrough(
-      boundedTo({ maxSizeBytes: BINARY.length }),
-    );
+    const bounded = boundedTo({
+      source: sending([BINARY, OTHER_BINARY]),
+      maxSizeBytes: BINARY.length,
+    });
 
     await expect(readWhole(bounded)).rejects.toBeInstanceOf(ArtifactTooLargeError);
+  });
+
+  // The connection the bytes were arriving on, which nobody is going to read the rest of.
+  test('and the source is let go of rather than left sending', async () => {
+    let letGo = false;
+    const source = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(bytesOf(BINARY));
+      },
+      cancel() {
+        letGo = true;
+      },
+    });
+
+    await expect(
+      readWhole(boundedTo({ source, maxSizeBytes: BINARY.length })),
+    ).rejects.toBeInstanceOf(ArtifactTooLargeError);
+    expect(letGo).toBe(true);
   });
 
   // Counted across chunks rather than per chunk: a source sending the cap twice in two halves is
   // sending twice the cap.
   test('and is stopped at the byte the bound was reached on', async () => {
     const halved = BINARY.slice(0, Math.floor(BINARY.length / 2));
-    const bounded = sending([halved, halved]).pipeThrough(
-      boundedTo({ maxSizeBytes: halved.length }),
-    );
+    const bounded = boundedTo({ source: sending([halved, halved]), maxSizeBytes: halved.length });
 
     await expect(readWhole(bounded)).rejects.toBeInstanceOf(ArtifactTooLargeError);
   });
