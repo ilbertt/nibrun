@@ -1,5 +1,5 @@
 import type { DeployLink } from '@repo/deploy-link';
-import { RUNTIME_VALUES, writtenRuntimeValue } from '@repo/protocol';
+import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
 
 export const DEPLOY_PRESETS = {
   pocketbase: {
@@ -19,8 +19,8 @@ export const DEPLOY_PRESETS = {
     env: [
       'SHARKORD_DATA_PATH=data',
       'SHARKORD_AUTOUPDATE=false',
-      `SHARKORD_WEBRTC_PORT=${writtenRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name)}`,
-      `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS=${writtenRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}`,
+      `SHARKORD_WEBRTC_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name)}`,
+      `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS=${interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}`,
     ],
     minimal: true,
   },

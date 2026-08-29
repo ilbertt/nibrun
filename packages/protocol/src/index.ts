@@ -81,6 +81,7 @@ export {
   type AppState,
   AppStateSchema,
   EXTRA_PUBLIC_PORT_VALUES,
+  interpolableRuntimeValue,
   MIN_HOSTNAMES,
   namesExtraPublicPortValues,
   namesOfferedRuntimeValues,
@@ -97,7 +98,6 @@ export {
   type TenantEnvironmentPatch,
   TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
-  writtenRuntimeValue,
 } from '#domain/app.ts';
 export {
   type Artifact,

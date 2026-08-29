@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
-import { RUNTIME_VALUES, writtenRuntimeValue } from '@repo/protocol';
+import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
 import { defaultParseSearch, defaultStringifySearch } from '@tanstack/react-router';
 import { type DeployLink, type DeploySuggestion, deployLink, deploySuggestion } from '#link.ts';
 
-const HOSTNAME = writtenRuntimeValue(RUNTIME_VALUES.HOSTNAME.name);
+const HOSTNAME = interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name);
 const CHECKSUM = 'd9403d88cdf0684fbb9d8e97cf3508e9fb4506cf309a34e42653a1c2bc04a298';
 
 const EVERYTHING = `?name=my-app&port=9000&extra-public-port=true&arg=serve&arg=--verbose&env=API_KEY&env=GREETING=hello&env=URL=https://${HOSTNAME}`;

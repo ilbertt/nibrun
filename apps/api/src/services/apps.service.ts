@@ -4,6 +4,7 @@ import {
   type ComputeUsage,
   EXTRA_PUBLIC_PORT_VALUES,
   type FilesystemUsage,
+  interpolableRuntimeValue,
   namesExtraPublicPortValues,
   OWNED_APP_STATES,
   type OwnedAppState,
@@ -12,7 +13,6 @@ import {
   type ReportedInstance,
   type ReportedVolume,
   type TenantEnvironment,
-  writtenRuntimeValue,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
 import {
@@ -546,7 +546,7 @@ function refuseValuesNeedingAPort({
     .map(([name]) => name);
   if (naming.length > 0) {
     throw new BadRequestError(
-      `${EXTRA_PUBLIC_PORT_VALUES.map((value) => writtenRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
+      `${EXTRA_PUBLIC_PORT_VALUES.map((value) => interpolableRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
     );
   }
 }
