@@ -6,6 +6,7 @@ export {
   appBySlug,
   appFor,
   appWithStatus,
+  type ListedApp,
   newestDeployment,
   pinnedArtifact,
 } from '#apps.ts';

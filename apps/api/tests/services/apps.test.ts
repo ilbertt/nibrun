@@ -115,7 +115,7 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly deleted: AppId[] = [];
   readonly trace: string[] = [];
   readonly leftovers = new Map<AppId, Leftovers>();
-  readonly measured: { appId: AppId; usage: FilesystemUsage }[] = [];
+  readonly measured: ReadonlyMap<AppId, FilesystemUsage>[] = [];
   deleting: AppId[] = [];
   purgeable: AppId[] = [];
   deployedApps: AppId[] = [];
@@ -204,8 +204,12 @@ class StubAppsRepository implements AppsRepositoryContract {
     });
   }
 
-  recordVolumeUsage({ appId, usage }: { appId: AppId; usage: FilesystemUsage }): Promise<void> {
-    this.measured.push({ appId, usage });
+  recordVolumeUsage({
+    readings,
+  }: {
+    readings: ReadonlyMap<AppId, FilesystemUsage>;
+  }): Promise<void> {
+    this.measured.push(new Map(readings));
     return Promise.resolve();
   }
 
@@ -888,7 +892,7 @@ describe('how full a filesystem is, as the host that holds it last measured it',
 
     await serviceWith({ appsRepo }).recordVolumeUsage({ volumes: [reportedVolume(MEASURED)] });
 
-    expect(appsRepo.measured).toEqual([{ appId: APP_ID, usage: MEASURED }]);
+    expect(appsRepo.measured).toEqual([new Map([[APP_ID, MEASURED]])]);
   });
 
   // Otherwise every report between two measurements would look like a filesystem emptying and
@@ -899,6 +903,22 @@ describe('how full a filesystem is, as the host that holds it last measured it',
     await serviceWith({ appsRepo }).recordVolumeUsage({ volumes: [reportedVolume()] });
 
     expect(appsRepo.measured).toEqual([]);
+  });
+
+  // `ON CONFLICT DO UPDATE` refuses to touch one row twice in a statement, so a host that
+  // reported two volumes for one app would otherwise take its whole report down with it.
+  test('two volumes naming one app are written once, as the later reading', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const earlier = {
+      ...MEASURED,
+      measuredAt: Value.Parse(TimestampSchema, '2026-08-03T09:00:00Z'),
+    };
+
+    await serviceWith({ appsRepo }).recordVolumeUsage({
+      volumes: [reportedVolume(earlier), reportedVolume(MEASURED)],
+    });
+
+    expect(appsRepo.measured).toEqual([new Map([[APP_ID, MEASURED]])]);
   });
 });
 

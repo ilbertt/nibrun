@@ -63,7 +63,9 @@ export abstract class AppsRepositoryContract {
   }): Promise<CreatedApp>;
   abstract listByOwner(input: { ownerId: OwnerId }): Promise<AppRow[]>;
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
-  abstract recordVolumeUsage(input: { appId: AppId; usage: FilesystemUsage }): Promise<void>;
+  abstract recordVolumeUsage(input: {
+    readings: ReadonlyMap<AppId, FilesystemUsage>;
+  }): Promise<void>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
@@ -204,24 +206,50 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   }
 
   /**
-   * The reading a host just took, replacing whatever was there — one host holds a volume at a
+   * Every reading one report carried, replacing whatever was there — one host holds a volume at a
    * time, so there is no second writer to lose to. `measured_at` guards the exception: a report
    * delayed behind a newer one must not put an older reading back.
    *
-   * Selected from `apps` rather than given the id outright, so that a reading about an app that
-   * has since been purged writes nothing instead of failing the report carrying it.
+   * The fleet's view rather than an owner's, so there is no `ownerId` to scope on: a host reports
+   * the volumes it holds, and which owner each belongs to is this end's to know and not the
+   * host's to be asked about.
+   *
+   * Joined to `apps` rather than given the ids outright, so that a reading about an app that has
+   * since been purged writes nothing instead of failing the report carrying it.
+   *
+   * Untagged for the reason `insertEnvironment` is: `sql.array` is a clause the generator blanks
+   * out before it parses the statement, and `UNNEST(, , , )` is not one. The counts cross as text
+   * and are cast back, because a bigint is wider than the number that carries it on the wire.
    */
   async recordVolumeUsage({
-    appId,
-    usage,
+    readings,
   }: {
-    appId: AppId;
-    usage: FilesystemUsage;
+    readings: ReadonlyMap<AppId, FilesystemUsage>;
   }): Promise<void> {
-    await this.sql.UpsertVolumeUsage`
+    const taken = [...readings];
+    await this.sql`
       INSERT INTO nibrun.volume_usage (app_id, total_bytes, used_bytes, measured_at)
-      SELECT a.id, ${usage.totalBytes}, ${usage.usedBytes}, ${usage.measuredAt}
-      FROM nibrun.apps a WHERE a.id = ${appId}
+      SELECT a.id, reading.total_bytes::bigint, reading.used_bytes::bigint,
+             reading.measured_at::timestamptz
+      FROM UNNEST(
+        ${this.sql.array(
+          taken.map(([appId]) => appId),
+          TEXT_ARRAY,
+        )},
+        ${this.sql.array(
+          taken.map(([, usage]) => String(usage.totalBytes)),
+          TEXT_ARRAY,
+        )},
+        ${this.sql.array(
+          taken.map(([, usage]) => String(usage.usedBytes)),
+          TEXT_ARRAY,
+        )},
+        ${this.sql.array(
+          taken.map(([, usage]) => usage.measuredAt),
+          TEXT_ARRAY,
+        )}
+      ) AS reading(app_id, total_bytes, used_bytes, measured_at)
+      JOIN nibrun.apps a ON a.id = reading.app_id::uuid
       ON CONFLICT ON CONSTRAINT volume_usage_app_id_key DO UPDATE
         SET total_bytes = EXCLUDED.total_bytes,
             used_bytes  = EXCLUDED.used_bytes,

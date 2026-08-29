@@ -537,17 +537,23 @@ static bool take_path(struct cursor *from, char *path, size_t capacity) {
  *
  * `f_frsize` is what block counts are in — `f_bsize` is the size a filesystem would
  * rather be asked for, and multiplying by it is how this reads plausibly wrong on a
- * filesystem where the two differ. */
+ * filesystem where the two differ. POSIX allows it to be 0, and a block size of zero
+ * would answer OK with two zeroes: a full volume and an empty one told apart by
+ * nothing. Refused instead, because a reading nobody can tell is wrong is worse than
+ * one that did not arrive. */
 static enum guest_filesystem_status perform_usage(const struct operation *asked,
                                                   struct writer *into) {
   struct statvfs measured;
   if (statvfs(asked->mount_point, &measured) < 0) {
     return status_for(errno);
   }
+  uint64_t block = measured.f_frsize != 0 ? measured.f_frsize : measured.f_bsize;
+  if (block == 0) {
+    return GUEST_FILESYSTEM_FAILED;
+  }
   if (!room_for(into, GUEST_FILESYSTEM_USAGE_BYTES)) {
     return GUEST_FILESYSTEM_FAILED;
   }
-  uint64_t block = measured.f_frsize;
   put_wide(into, (uint64_t)measured.f_blocks * block, sizeof(uint64_t));
   put_wide(into, (uint64_t)(measured.f_blocks - measured.f_bfree) * block, sizeof(uint64_t));
   return GUEST_FILESYSTEM_OK;

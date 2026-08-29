@@ -5,12 +5,18 @@ const PERCENT_SCALE = 100;
 const FULL = 1;
 
 /**
- * How much of the volume the app's own files are taking.
+ * How much of the volume is spoken for.
  *
  * Measured against the volume rather than against the filesystem's own size, which reads a little
  * under it — ext4 spends part of the device describing the rest, and 8 GiB is the number the app
- * was given. The moment is shown beside it because a reading can only be taken while a guest has
- * the filesystem mounted, so a suspended app's is as old as the app has been stopped.
+ * was given.
+ *
+ * Said as a share as well as a size, because the size alone misleads: what is measured is what
+ * `df` calls used, so it counts the journal ext4 wrote before the tenant existed, and a volume
+ * nothing has been written to still reads as tens of mebibytes. As a percentage that is the 1% it
+ * amounts to; as a byte count on its own it reads as data the owner does not remember putting
+ * there. The moment is shown beside it because a reading can only be taken while a guest has the
+ * filesystem mounted, so a suspended app's is as old as the app has been stopped.
  */
 export function VolumeMeter({
   usage,
@@ -37,7 +43,8 @@ export function VolumeMeter({
         />
       </div>
       <span className="text-muted-foreground text-xs">
-        Measured {dayAndMinute(usage.measuredAt)}
+        {Math.round(share * PERCENT_SCALE)}% used, including what the filesystem itself takes ·
+        measured {dayAndMinute(usage.measuredAt)}
       </span>
     </div>
   );

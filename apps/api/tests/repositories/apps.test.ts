@@ -282,8 +282,7 @@ describe('what a host measured of a filesystem is kept against the app that owns
     const appId = await createApp('measured');
 
     await repo.recordVolumeUsage({
-      appId,
-      usage: reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER }),
+      readings: new Map([[appId, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })]]),
     });
     const app = await readBack(appId);
 
@@ -298,12 +297,10 @@ describe('what a host measured of a filesystem is kept against the app that owns
     const appId = await createApp('refilled');
 
     await repo.recordVolumeUsage({
-      appId,
-      usage: reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER }),
+      readings: new Map([[appId, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })]]),
     });
     await repo.recordVolumeUsage({
-      appId,
-      usage: reading({ usedBytes: EMPTIED_BYTES, measuredAt: LATER }),
+      readings: new Map([[appId, reading({ usedBytes: EMPTIED_BYTES, measuredAt: LATER })]]),
     });
 
     expect(Number((await readBack(appId)).volume_used_bytes)).toBe(EMPTIED_BYTES);
@@ -314,15 +311,45 @@ describe('what a host measured of a filesystem is kept against the app that owns
     const appId = await createApp('reordered');
 
     await repo.recordVolumeUsage({
-      appId,
-      usage: reading({ usedBytes: EMPTIED_BYTES, measuredAt: LATER }),
+      readings: new Map([[appId, reading({ usedBytes: EMPTIED_BYTES, measuredAt: LATER })]]),
     });
     await repo.recordVolumeUsage({
-      appId,
-      usage: reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER }),
+      readings: new Map([[appId, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })]]),
     });
 
     expect(Number((await readBack(appId)).volume_used_bytes)).toBe(EMPTIED_BYTES);
+  });
+
+  // One statement for the whole report is the point of taking a map: a host holding many apps
+  // must not cost the report one round trip each.
+  test('every reading in one report is written by one statement', async () => {
+    const first = await createApp('batched-one');
+    const second = await createApp('batched-two');
+
+    await repo.recordVolumeUsage({
+      readings: new Map([
+        [first, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })],
+        [second, reading({ usedBytes: EMPTIED_BYTES, measuredAt: EARLIER })],
+      ]),
+    });
+
+    expect(Number((await readBack(first)).volume_used_bytes)).toBe(FILLED_BYTES);
+    expect(Number((await readBack(second)).volume_used_bytes)).toBe(EMPTIED_BYTES);
+  });
+
+  // The whole statement must not fail because one of the apps it names has gone.
+  test('a batch naming a purged app still writes the readings beside it', async () => {
+    const surviving = await createApp('survivor');
+    const stranger = Value.Parse(AppIdSchema, '01930000-0000-7000-8000-00000000ffff');
+
+    await repo.recordVolumeUsage({
+      readings: new Map([
+        [stranger, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })],
+        [surviving, reading({ usedBytes: EMPTIED_BYTES, measuredAt: EARLIER })],
+      ]),
+    });
+
+    expect(Number((await readBack(surviving)).volume_used_bytes)).toBe(EMPTIED_BYTES);
   });
 
   // A report can name an app this end has already purged, and a reading about one is not worth
@@ -331,8 +358,7 @@ describe('what a host measured of a filesystem is kept against the app that owns
     const stranger = Value.Parse(AppIdSchema, '01930000-0000-7000-8000-000000000000');
 
     await repo.recordVolumeUsage({
-      appId: stranger,
-      usage: reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER }),
+      readings: new Map([[stranger, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })]]),
     });
 
     expect(await repo.findById({ appId: stranger, ownerId: OWNER_ID })).toBeNull();

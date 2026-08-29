@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  type AppId,
+  AppIdSchema,
   DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
+  type FilesystemUsage,
   type HostPort,
   HostPortSchema,
   HostReportedStateSchema,
@@ -80,6 +83,59 @@ describe('the report always names the host-side port', () => {
 
   test('an exit code of zero is reported rather than dropped as falsy', () => {
     expect(reported({ lastExitCode: 0 }).lastExitCode).toBe(0);
+  });
+});
+
+/**
+ * The one place a reading meets the volume it is about. Measuring happens on a loop of its own,
+ * so what is asserted here is only that the two are matched on the app they name.
+ */
+describe('a volume carries the reading last taken of it', () => {
+  const MEASURED: FilesystemUsage = {
+    totalBytes: 8_455_712_768,
+    usedBytes: 1_503_238_553,
+    measuredAt: OBSERVED_AT,
+  };
+
+  function reportOf(volumeUsage: ReadonlyMap<AppId, FilesystemUsage>) {
+    return buildReportedState({
+      hostId: HOST_ID,
+      reportedAt: OBSERVED_AT,
+      state: 'ready',
+      capacity: HOST_CAPACITY,
+      allocatable: HOST_CAPACITY,
+      versions: { agent: 'sha', guestImage: '6.1', zerofs: '2.2.1', firecracker: '1.16.1' },
+      records: [],
+      reachedAt: new Map(),
+      volumes: [
+        { volumeId: VOLUME_ID, appId: APP_ID, state: 'ready', sizeBytes: VOLUME_SIZE_BYTES },
+      ],
+      volumeUsage,
+      checkpoints: [],
+      exports: [],
+    });
+  }
+
+  test('the reading is matched to the volume by the app both name', () => {
+    const [volume] = reportOf(new Map([[APP_ID, MEASURED]])).volumes;
+
+    expect(volume?.usage).toEqual(MEASURED);
+  });
+
+  // Absent rather than zero: a volume nothing has measured has a size and no reading, and a zero
+  // would be a filesystem somebody had just emptied.
+  test('a volume nothing has measured carries no reading at all', () => {
+    const [volume] = reportOf(new Map()).volumes;
+
+    expect(volume && 'usage' in volume).toBe(false);
+  });
+
+  // Keyed on the app rather than on the volume, which is the mistake the two ids invite.
+  test('a reading about another app is not put on this one', () => {
+    const other = Value.Parse(AppIdSchema, 'app-somebody-else');
+    const [volume] = reportOf(new Map([[other, MEASURED]])).volumes;
+
+    expect(volume && 'usage' in volume).toBe(false);
   });
 });
 

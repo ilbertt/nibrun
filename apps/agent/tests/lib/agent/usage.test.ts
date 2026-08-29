@@ -3,6 +3,7 @@ import {
   type AppId,
   AppIdSchema,
   type FilesystemUsage,
+  type Timestamp,
   TimestampSchema,
   Value,
 } from '@repo/protocol';
@@ -17,7 +18,9 @@ import { platform } from '#tests/support/run.ts';
 const BUSY = Value.Parse(AppIdSchema, 'app-pocketbase');
 const QUIET = Value.Parse(AppIdSchema, 'app-minio');
 
-const AT = (value: string) => Value.Parse(TimestampSchema, value);
+function at(value: string): Timestamp {
+  return Value.Parse(TimestampSchema, value);
+}
 
 /** An 8 GiB volume as ext4 accounts for it, a tenant with data on it, and one with none. */
 const TOTAL_BYTES = 8_455_712_768;
@@ -25,7 +28,7 @@ const FILLED_BYTES = 1_503_238_553;
 const EMPTY_BYTES = 4_096;
 
 function reading(usedBytes: number): FilesystemUsage {
-  return { totalBytes: TOTAL_BYTES, usedBytes, measuredAt: AT('2026-08-03T10:00:00Z') };
+  return { totalBytes: TOTAL_BYTES, usedBytes, measuredAt: at('2026-08-03T10:00:00Z') };
 }
 
 /**

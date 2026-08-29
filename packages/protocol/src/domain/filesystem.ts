@@ -111,6 +111,12 @@ export type DirectoryListing = typeof DirectoryListingSchema.static;
  * the rest of it — which is why both numbers come from the same answer rather than the size being
  * the one the api already knows.
  *
+ * `usedBytes` is what `df` calls used, so it counts the journal and the metadata ext4 wrote
+ * before a tenant existed: a volume nothing has ever been written to measures tens of mebibytes
+ * rather than nothing. Reporting the tenant's own files apart from that would mean walking the
+ * tree, which is the cost this exists to avoid — so whoever shows this figure has to say what it
+ * is, rather than let an owner read a fresh volume as one they have already filled.
+ *
  * `measuredAt` because a reading is only worth what its age says it is: nothing can be measured
  * while no guest has the filesystem mounted, so what a suspended app has is the last reading
  * taken before it stopped, and a number with no moment attached reads as the number now.

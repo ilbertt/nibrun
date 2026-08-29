@@ -18,6 +18,12 @@ export async function appBySlug({ api, slug }: { api: PublicApiClient; slug: str
 }
 
 /**
+ * One app exactly as the api answers with it, for a surface that renders one: every field is the
+ * api's to name, so anything restating the shape here would be a second place for it to be wrong.
+ */
+export type ListedApp = Awaited<ReturnType<typeof appBySlug>>;
+
+/**
  * The app and what it is doing: the row is what its owner asked for and the newest release is what
  * a host has done about it, and no command can tell what it may do from either alone.
  */

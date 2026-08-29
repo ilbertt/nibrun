@@ -244,10 +244,6 @@ export interface ISelectAppsByOwnerResult {
     volume_measured_at: IVolumeUsageColumns["measured_at"] | null;
 }
 
-/** Result of query `UpsertVolumeUsage`. */
-export interface IUpsertVolumeUsageResult {
-}
-
 /** Result of query `SelectAppById`. */
 export interface ISelectAppByIdResult {
     id: IAppsColumns["id"];
@@ -774,7 +770,6 @@ export interface Queries {
     InsertAppHostname: IInsertAppHostnameResult;
     SelectCreatedApp: ISelectCreatedAppResult;
     SelectAppsByOwner: ISelectAppsByOwnerResult;
-    UpsertVolumeUsage: IUpsertVolumeUsageResult;
     SelectAppById: ISelectAppByIdResult;
     SelectAppForConfigUpdate: ISelectAppForConfigUpdateResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;

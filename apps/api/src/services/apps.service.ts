@@ -303,6 +303,31 @@ export class AppsService extends Service {
   }
 
   /**
+   * What the hosts last measured of the filesystems they hold. Only the volumes carrying a
+   * reading: a host reports every volume it has on every report, and most of those reports are
+   * between measurements — so a missing reading means nothing new was taken, never that the
+   * filesystem emptied.
+   *
+   * One statement for the whole report rather than one per volume, because this sits on the path
+   * every host takes every few seconds: a host holding fifty apps would otherwise hold the report
+   * open for fifty round trips before anything after it could run.
+   *
+   * Deduplicated because `ON CONFLICT DO UPDATE` refuses to touch a row twice in one statement,
+   * and a host that reported two volumes for one app would take its whole report down with it.
+   */
+  async recordVolumeUsage({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
+    const readings = new Map<AppId, FilesystemUsage>();
+    for (const volume of volumes) {
+      if (volume.usage) {
+        readings.set(volume.appId, volume.usage);
+      }
+    }
+    if (readings.size > 0) {
+      await this.appsRepo.recordVolumeUsage({ readings });
+    }
+  }
+
+  /**
    * The row stays behind: tearing an app down is the agent's work, the owner follows it through
    * this same state, and the slug must never be handed to a second app whatever happens.
    */
@@ -314,20 +339,6 @@ export class AppsService extends Service {
    * Read off the volumes rather than their absence: a report that lost some would otherwise
    * delete the apps it forgot to mention.
    */
-  /**
-   * What the hosts last measured of the filesystems they hold. Only the volumes carrying a
-   * reading: a host reports every volume it has on every report, and most of those reports are
-   * between measurements — so a missing reading means nothing new was taken, never that the
-   * filesystem emptied.
-   */
-  async recordVolumeUsage({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
-    for (const volume of volumes) {
-      if (volume.usage) {
-        await this.appsRepo.recordVolumeUsage({ appId: volume.appId, usage: volume.usage });
-      }
-    }
-  }
-
   async completeDeletions({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
     for (const volume of volumes) {
       if (volume.state !== 'deleted') {

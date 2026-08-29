@@ -33,14 +33,14 @@ export class FilesystemReader extends Effect.Service<FilesystemReader>()('Filesy
     const allocator = yield* SlotAllocator;
     const config = yield* AgentConfig;
 
-    const asked = <A>({
+    function asked<A>({
       appId,
       of,
     }: {
       appId: AppId;
       of: (guest: GuestFilesystem) => Effect.Effect<A, GuestFilesystemError>;
-    }) =>
-      Effect.gen(function* () {
+    }) {
+      return Effect.gen(function* () {
         if (Option.isNone(yield* allocator.lookup(appId))) {
           return yield* new NoDeviceForApp({ appId });
         }
@@ -48,6 +48,7 @@ export class FilesystemReader extends Effect.Service<FilesystemReader>()('Filesy
           Effect.flatMap(guestFilesystem({ appId, vmDir: config.vmDir }), of),
         );
       });
+    }
 
     const list = Effect.fn('FilesystemReader.list')(function* ({
       appId,
@@ -65,11 +66,17 @@ export class FilesystemReader extends Effect.Service<FilesystemReader>()('Filesy
      * Stamped on this side because the guest has no clock worth reading: it boots without one and
      * nothing tells it the time. What the moment is for is telling a reading taken a minute ago
      * from one taken before the app was suspended last month.
+     *
+     * Read before the guest is asked rather than after it answers, so the moment is one the
+     * reading cannot be older than. A guest taking the whole reply timeout would otherwise have
+     * its reading stamped with the instant it arrived, and the age of a reading is the one thing
+     * that must never be overstated.
      */
     const usage = Effect.fn('FilesystemReader.usage')(function* ({ appId }: { appId: AppId }) {
       yield* Effect.annotateCurrentSpan({ appId });
+      const measuredAt = yield* nowTimestamp;
       const measured = yield* asked({ appId, of: (guest) => guest.usage() });
-      return { ...measured, measuredAt: yield* nowTimestamp } satisfies FilesystemUsage;
+      return { ...measured, measuredAt } satisfies FilesystemUsage;
     });
 
     return { list, usage };

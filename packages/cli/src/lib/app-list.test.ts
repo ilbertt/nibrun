@@ -5,9 +5,13 @@ const VOLUME_SIZE_BYTES = 8_589_934_592;
 const MEASURED_SHARE = 0.17;
 const MEASURED_PERCENT = '17%';
 
+type Overrides = Partial<{
+  [Key in keyof AppListing]: AppListing[Key] | string;
+}>;
+
 // Plain strings rather than the branded ones the wire carries: what is pinned down here is how a
 // row is laid out, and a cast per field would be spelling rather than meaning.
-function app(overrides: Partial<Record<keyof AppListing, unknown>> = {}): AppListing {
+function app(overrides: Overrides = {}): AppListing {
   return {
     slug: 'quiet-otter',
     state: 'active',
@@ -18,12 +22,14 @@ function app(overrides: Partial<Record<keyof AppListing, unknown>> = {}): AppLis
   } as AppListing;
 }
 
-function used(share: number) {
+// Cast once here for the same reason `app` casts once: the branding is the wire's, and what this
+// file is about is the column, not the parsing that produced it.
+function used(share: number): AppListing['volumeUsage'] {
   return {
     totalBytes: VOLUME_SIZE_BYTES,
     usedBytes: VOLUME_SIZE_BYTES * share,
     measuredAt: '2026-08-07T09:40:00.000Z',
-  };
+  } as NonNullable<AppListing['volumeUsage']>;
 }
 
 describe('a listing is read down a column', () => {
