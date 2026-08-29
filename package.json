@@ -39,12 +39,9 @@
     "@commitlint/config-conventional": "^21.2.0",
     "@commitlint/format": "^21.2.0",
     "@commitlint/types": "^21.2.0",
-    "@types/bun": "^1.3.14",
+    "@types/bun": "^1.4.0",
     "typescript": "catalog:",
     "turbo": "^2.10.7"
-  },
-  "overrides": {
-    "bun-types": "^1.4.0"
   },
   "packageManager": "bun@1.4.0"
 }
