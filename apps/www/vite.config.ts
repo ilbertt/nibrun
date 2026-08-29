@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import viteReact from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
-import { DEPLOY_PATHS } from './src/lib/deploy-presets.ts';
+import { DEPLOY_PATHS } from './deploy-presets.ts';
 
 // The landing page is prerendered to static HTML, so a visit is served from the edge and
 // never wakes the worker — `cloudflare` is here to run the same Workers runtime in dev and
