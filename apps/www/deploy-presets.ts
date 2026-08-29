@@ -16,5 +16,3 @@ export type DeploySlug = keyof typeof DEPLOY_PRESETS;
 export function findPreset(slug: string): DeployLink | undefined {
   return Object.hasOwn(DEPLOY_PRESETS, slug) ? DEPLOY_PRESETS[slug as DeploySlug] : undefined;
 }
-
-export const DEPLOY_PATHS = Object.keys(DEPLOY_PRESETS).map((slug) => `/deploy/${slug}`);
