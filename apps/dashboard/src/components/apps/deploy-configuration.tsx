@@ -51,10 +51,8 @@ export function DeployConfiguration({
               autoComplete="off"
               className="font-mono tabular-nums"
             />
-            {field.state.meta.errors.length > 0 ? (
+            {field.state.meta.errors.length > 0 && (
               <FieldError>{field.state.meta.errors[0]}</FieldError>
-            ) : (
-              <FieldDescription>The port the binary listens on inside the guest.</FieldDescription>
             )}
           </Field>
         )}
@@ -140,9 +138,7 @@ export function DeployConfiguration({
                     placeholder={'serve\n--verbose'}
                     className="font-mono"
                   />
-                  <FieldDescription>
-                    One per line. What is here is what the binary runs with — empty runs it bare.
-                  </FieldDescription>
+                  <FieldDescription>One per line.</FieldDescription>
                 </Field>
               )}
             </api.Field>

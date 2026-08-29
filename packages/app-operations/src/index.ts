@@ -33,6 +33,7 @@ export { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations
 export { type RedeployInput, redeploy } from '#redeploy.ts';
 export type { ConfigEdit, Deployed, DeployStep } from '#release.ts';
 export {
+  APP_STATUS_LABELS,
   type AppStatus,
   type AppStatusKey,
   type AppTransition,
