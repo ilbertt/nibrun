@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { gzipSync } from 'node:zlib';
 import {
   type AppId,
   type ArtifactId,
@@ -10,6 +11,7 @@ import {
   type ObjectKey,
   ObjectKeySchema,
   type OwnerId,
+  type Sha256Digest,
   Sha256DigestSchema,
   TimestampSchema,
   Value,
@@ -37,6 +39,8 @@ import {
 } from '#services/artifacts.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 import { archiveOf } from '#tests/support/archives.ts';
+import { incompressible } from '#tests/support/downloads.ts';
+import { gzippedTarballOf } from '#tests/support/tarballs.ts';
 
 // The api refuses anything that is not a Linux executable, so the fixture opens with the ELF
 // magic the way a real upload does.
@@ -55,6 +59,14 @@ const PAST_THE_SWEEP_MS = A_DAY_SECONDS * MS_PER_SECOND + AN_HOUR_MS;
 
 function bytesOf(text: string): Uint8Array {
   return Uint8Array.from(text, (character) => character.charCodeAt(0));
+}
+
+/** What a release would publish beside the file: the digest of the file, whatever is inside it. */
+function digestOf(bytes: Uint8Array): Sha256Digest {
+  return Value.Parse(
+    Sha256DigestSchema,
+    new Bun.CryptoHasher('sha256').update(bytes).digest('hex'),
+  );
 }
 
 type StoredRow = Omit<ArtifactRow, 'digest' | 'size_bytes' | 'object_key'> & {
@@ -337,17 +349,25 @@ class FakeBinarySource implements BinarySourceRepositoryContract {
     this.servesBytes({ bytes: bytesOf(text), declaredSizeBytes });
   }
 
+  /**
+   * `chunkBytes` is what makes a download arrive rather than appear. A body handed over whole is
+   * one whoever reads it has already finished with, which is no way to find out what happens to
+   * the rest of a download somebody stopped reading.
+   */
   servesBytes({
     bytes,
     declaredSizeBytes,
+    chunkBytes,
   }: {
     bytes: Uint8Array;
     declaredSizeBytes?: number;
+    chunkBytes?: number;
   }): void {
     this.answers({
       outcome: 'open',
       body: streamOf({
         bytes,
+        chunkBytes,
         onCancel: () => {
           this.letGo = true;
         },
@@ -394,20 +414,23 @@ class FakeBinarySource implements BinarySourceRepositoryContract {
 
 function streamOf({
   bytes,
+  chunkBytes,
   onCancel,
 }: {
   bytes: Uint8Array;
+  chunkBytes?: number;
   onCancel?: () => void;
 }): ReadableStream<Uint8Array> {
-  let sent = false;
+  const step = chunkBytes ?? bytes.byteLength;
+  let at = 0;
   return new ReadableStream<Uint8Array>({
     pull(controller) {
-      if (sent) {
+      if (at >= bytes.byteLength) {
         controller.close();
         return;
       }
-      sent = true;
-      controller.enqueue(bytes);
+      controller.enqueue(bytes.subarray(at, at + step));
+      at += step;
     },
     cancel() {
       onCancel?.();
@@ -801,7 +824,17 @@ describe('a row becomes the wire shape the dashboard and the agent both read', (
 
 const BINARY_URL = 'https://releases.test/v1/my-server';
 const ARCHIVE_URL = 'https://releases.test/v1/my-server_1.2.3_linux_amd64.zip';
+const TARBALL_URL = 'https://releases.test/v1/my-server_1.2.3_linux_amd64.tar.gz';
+const COMPRESSED_URL = 'https://releases.test/v1/my-server.gz';
 const FETCHED_NAME = Value.Parse(FilenameSchema, 'my-server');
+
+/**
+ * More of a download than a gunzip reads ahead of what it was asked for, arriving in the pieces a
+ * transfer arrives in — so a walk that stops at the entry it wanted stops with the rest of the
+ * download still to come, which is the only state in which reading it to the end costs anything.
+ */
+const A_LONG_DOWNLOAD = 524_288;
+const A_TRANSFER_CHUNK = 65_536;
 
 /**
  * A binary the api fetched itself. Every refusal here is about a url somebody typed, so each one
@@ -823,6 +856,45 @@ describe('a binary is fetched from the url it was given', () => {
     expect(artifact.originalFileName).toBe(FETCHED_NAME);
     expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
     expect(isValidMessage({ schema: ArtifactSchema, value: artifact })).toBe(true);
+  });
+
+  /**
+   * The one thing about the bytes a caller can know before the fetch, and so the one thing worth
+   * taking their word about — as an expectation, checked against what they came to.
+   */
+  test('a checksum the bytes hash to is the fetch going ahead as it would have', async () => {
+    const { service, sourceRepo, storage } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+      sha256: Value.Parse(Sha256DigestSchema, BINARY_DIGEST),
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
+  });
+
+  // Both digests, because either could be the surprising one: the release the link was written
+  // against may have been replaced, or the checksum beside it may never have been this binary's.
+  test('and a checksum they hash to nothing like is refused, leaving nothing behind', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const refusal = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+      sha256: SEEDED_DIGEST,
+    });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+    await expect(refusal).rejects.toThrow(SEEDED_DIGEST);
+    await expect(refusal).rejects.toThrow(BINARY_DIGEST);
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
   });
 
   // Kept where the bytes are described rather than answered with: nothing downstream is told
@@ -1017,6 +1089,112 @@ describe('a binary is fetched from the url it was given', () => {
     expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(ARCHIVE_URL);
   });
 
+  /**
+   * Held against the download rather than against the executable unwrapped from it: a release
+   * publishes a checksum over the file it uploaded, so a `checksums.txt` beside a zip is the
+   * zip's — nobody anywhere publishes the digest of one file inside an archive.
+   *
+   * The walk stops at the entry it wanted, so this is also the one case where checking a checksum
+   * means reading the rest of a download nothing else needed.
+   */
+  test('and a checksum is what the zip hashes to, not the executable inside it', async () => {
+    const { service, sourceRepo } = build();
+    const bytes = archiveOf([
+      { name: 'my-server', content: bytesOf(BINARY_TEXT) },
+      { name: 'CHANGELOG.md', content: bytesOf('# Changelog\n') },
+    ]);
+    sourceRepo.servesBytes({ bytes });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: ARCHIVE_URL,
+      sha256: digestOf(bytes),
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+  });
+
+  /**
+   * The same, with a gunzip in the middle of it. What the walk lets go of is the decompressed
+   * bytes and what a checksum is over is the compressed ones, so the reading-to-the-end that
+   * checking one costs has to travel back through the engine to reach the download.
+   *
+   * The entry is first and the rest of the tarball is longer than a gunzip reads ahead, so the
+   * walk really does stop with most of the download still on its way.
+   */
+  test('and a checksum is what the tarball hashes to, gunzip and all', async () => {
+    const { service, sourceRepo } = build();
+    const bytes = gzippedTarballOf([
+      { name: 'my-server', content: bytesOf(BINARY_TEXT) },
+      { name: 'CHANGELOG.md', content: incompressible(A_LONG_DOWNLOAD) },
+    ]);
+    sourceRepo.servesBytes({ bytes, chunkBytes: A_TRANSFER_CHUNK });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: TARBALL_URL,
+      sha256: digestOf(bytes),
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+  });
+
+  // A walk that gives up part way is the other side of the same thing: what it stopped reading is
+  // still what the checksum was published over.
+  test('and a tarball holding nothing executable is still read to the end of the download', async () => {
+    const { service, sourceRepo } = build();
+    sourceRepo.servesBytes({
+      bytes: gzippedTarballOf([{ name: 'LICENSE.md', content: bytesOf('The MIT Licence.\n') }]),
+    });
+
+    const refusal = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: TARBALL_URL,
+      sha256: Value.Parse(Sha256DigestSchema, BINARY_DIGEST),
+    });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  // A bare gzip is handed on rather than walked, so what reaches the store is already decompressed
+  // — and the digest is still the one a release would publish, over the file it uploaded.
+  test('and a bare gzip is held to what the gzip hashes to, not the binary inside it', async () => {
+    const { service, sourceRepo } = build();
+    const bytes = gzipSync(bytesOf(BINARY_TEXT));
+    sourceRepo.servesBytes({ bytes });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: COMPRESSED_URL,
+      sha256: digestOf(bytes),
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(artifact.originalFileName).toBe(FETCHED_NAME);
+  });
+
+  test('and the digest of that executable is not what the zip is held to', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.servesBytes({
+      bytes: archiveOf([{ name: 'my-server', content: bytesOf(BINARY_TEXT) }]),
+    });
+
+    const refusal = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: ARCHIVE_URL,
+      sha256: Value.Parse(Sha256DigestSchema, BINARY_DIGEST),
+    });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
+  });
+
   // The name an export writes the binary out as, which the url only ever spells `.zip`.
   test('and is named after the entry rather than the archive that carried it', async () => {
     const { service, sourceRepo } = build();
@@ -1031,6 +1209,64 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     expect(artifact.originalFileName).toBe(FETCHED_NAME);
+  });
+
+  /**
+   * Which is how a linux release is published far more often than zipped: the go and rust toolings
+   * both write one, and a url ending `.tar.gz` is the ordinary shape of a release download.
+   */
+  test('a release that ships as a tarball is the executable inside it', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.servesBytes({
+      bytes: gzippedTarballOf([
+        { name: 'CHANGELOG.md', content: bytesOf('# Changelog\n\nAll of it.\n') },
+        { name: 'dist/my-server', content: bytesOf(BINARY_TEXT) },
+      ]),
+    });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: TARBALL_URL,
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(artifact.originalFileName).toBe(FETCHED_NAME);
+    expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
+    expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(TARBALL_URL);
+  });
+
+  /**
+   * A release published as a bare `my-server.gz` is one gunzip away from being deployable, and
+   * what is stored is the executable rather than the download — so the suffix that named the
+   * download is not the name a host writes it back out under.
+   */
+  test('a release that ships as a bare gzip is the executable inside it, unsuffixed', async () => {
+    const { service, sourceRepo, storage } = build();
+    sourceRepo.servesBytes({ bytes: gzipSync(bytesOf(BINARY_TEXT)) });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: COMPRESSED_URL,
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(artifact.originalFileName).toBe(FETCHED_NAME);
+    expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
+  });
+
+  test('a tarball holding nothing executable is refused and leaves nothing behind', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.servesBytes({
+      bytes: gzippedTarballOf([{ name: 'LICENSE.md', content: bytesOf('The MIT Licence.\n') }]),
+    });
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: TARBALL_URL }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
   });
 
   test('a zip holding nothing executable is refused and leaves nothing behind', async () => {

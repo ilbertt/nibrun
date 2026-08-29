@@ -6,9 +6,22 @@
 // is a binary and a couple of text files, so that is a walk of two or three entries.
 
 import { Buffer } from 'node:buffer';
-import { Readable } from 'node:stream';
 import { createInflateRaw } from 'node:zlib';
-import { ArtifactTooLargeError } from '#lib/artifact-digest.ts';
+import {
+  closing,
+  decompressed,
+  drained,
+  ofSize,
+  peeked,
+  type Queued,
+  streamed,
+} from '#lib/archive/bytes.ts';
+import {
+  EntryTooLargeError,
+  MAX_ENTRIES,
+  UnreadableArchiveError,
+  type Unwrapping,
+} from '#lib/archive/walk.ts';
 import { ELF_MAGIC_LENGTH, isElfExecutable } from '#lib/elf.ts';
 
 const LOCAL_HEADER = signature('PK\x03\x04');
@@ -92,98 +105,17 @@ const ZIP64_SIZES_BYTES = 16;
 
 const PATH_SEPARATOR = '/';
 
-/**
- * How many entries a walk will read the headers of.
- *
- * An entry that declares no data costs nothing against `maxSkippedBytes`, so an archive that is
- * headers the whole way down is bounded only by how many of them fit inside the cap on the fetch.
- * Each one pays for a header, a peek and the streams to read it through — tens of microseconds —
- * so it is the count that bounds the work rather than the bytes.
- *
- * A release archive is a binary and a couple of text files. One with hundreds of files in front of
- * the binary is shipping what a deploy does nothing with, and is answered rather than walked.
- */
-export const MAX_ENTRIES = 512;
-
-export type Unwrapping =
-  /** Not a zip at all, handed back with the bytes that were read to tell. */
-  | { outcome: 'not-an-archive'; body: ReadableStream<Uint8Array> }
-  | { outcome: 'unwrapped'; name: string; body: ReadableStream<Uint8Array> }
-  | { outcome: 'no-executable' }
-  | { outcome: 'walked-too-far' }
-  | { outcome: 'entry-too-large' }
-  | { outcome: 'unreadable' };
+/** What a zip opens with, which is the only thing that says it is one before the index at its end. */
+export const ZIP_MAGIC = LOCAL_HEADER;
 
 /**
- * What an archive this cannot follow is raised as, wherever it stops being followable — the walk
- * is also what feeds the executable onward, so one that goes wrong after the entry was found goes
- * wrong inside a stream somebody else is already reading.
+ * The executable inside a zip, walked to from the front.
  *
- * Everything a zip can do to this end arrives as this one error, a source that stopped part way
- * included: from here they are the same event, an archive that ended before it said it would.
+ * It comes back once the entry has been found and its first bytes read, which is a name and a body
+ * rather than the promise of one: everything before the executable has been walked past by then,
+ * and only its own bytes are still to come.
  */
-export class UnreadableArchiveError extends Error {
-  constructor() {
-    super('The zip ended before the entry it was describing.');
-    this.name = 'UnreadableArchiveError';
-  }
-}
-
-/**
- * What an entry too long for its own header to say so is raised as.
- *
- * A size field is four bytes, so a length that does not fit is written as all ones and kept in a
- * zip64 extra field instead. Nothing here reads that field: the length it holds starts at four
- * gibibytes, which is past what could be stored — and an entry whose length is unknown is one
- * there is no way to walk past to reach whatever follows it.
- */
-export class EntryTooLargeError extends Error {
-  constructor() {
-    super('An entry declares a length only a zip64 field could hold.');
-    this.name = 'EntryTooLargeError';
-  }
-}
-
-/**
- * The executable inside a zip, or the bytes back where they are not one.
- *
- * It comes back once the entry has been found and its first bytes read, which is a name and a
- * body rather than the promise of one: everything before the executable has been walked past by
- * then, and only its own bytes are still to come.
- *
- * `maxSkippedBytes` bounds that walk. An archive is a claim about its own contents, and an entry
- * claiming a petabyte of text before the binary would otherwise be read until it ended.
- */
-export async function unwrapExecutable({
-  archive,
-  maxSkippedBytes,
-}: {
-  archive: ReadableStream<Uint8Array>;
-  maxSkippedBytes: number;
-}): Promise<Unwrapping> {
-  const bytes = queued(archive);
-  const opening = await bytes.need(SIGNATURE_BYTES);
-  if (opening === undefined || !opening.equals(LOCAL_HEADER)) {
-    return { outcome: 'not-an-archive', body: bytes.rest() };
-  }
-
-  try {
-    return await executableIn({ bytes, maxSkippedBytes });
-  } catch (failure) {
-    // Whatever went wrong, the archive is not going to be read any further, and a source nobody
-    // is reading holds its connection open until it is let go of.
-    await bytes.cancel();
-    if (failure instanceof UnreadableArchiveError) {
-      return { outcome: 'unreadable' };
-    }
-    if (failure instanceof EntryTooLargeError) {
-      return { outcome: 'entry-too-large' };
-    }
-    throw failure;
-  }
-}
-
-async function executableIn({
+export async function executableInZip({
   bytes,
   maxSkippedBytes,
 }: {
@@ -315,46 +247,7 @@ function readable({
   data: AsyncGenerator<Uint8Array>;
 }): ReadableStream<Uint8Array> {
   const deflated = entry.method === METHOD_DEFLATE && (entry.flags & FLAG_ENCRYPTED) === 0;
-  return streamed(deflated ? inflated(data) : data);
-}
-
-/** Whatever the compressed bytes turn out to be, including that they were not deflate at all. */
-async function* inflated(data: AsyncGenerator<Uint8Array>): AsyncGenerator<Uint8Array> {
-  const engine = createInflateRaw();
-  const compressed = Readable.from(data);
-  // Piping does not carry a failure the other way, and the source failing is the ordinary way
-  // this ends: an archive that stopped part way has to stop the inflate reading it.
-  compressed.on('error', (failure) => engine.destroy(failure));
-  compressed.pipe(engine);
-
-  try {
-    yield* engine;
-  } catch (failure) {
-    // The source running out of what it was allowed to send, and an entry whose length nothing
-    // could read: those are verdicts on the bytes rather than on the archive, and the two this is
-    // not entitled to restate as an archive that ended early.
-    throw failure instanceof ArtifactTooLargeError || failure instanceof EntryTooLargeError
-      ? failure
-      : new UnreadableArchiveError();
-  }
-}
-
-/**
- * The executable's bytes, and the source let go of after the last of them. What follows the entry
- * is the rest of the archive's own bookkeeping, which nothing here reads.
- */
-async function* closing({
-  body,
-  bytes,
-}: {
-  body: ReadableStream<Uint8Array>;
-  bytes: Queued;
-}): AsyncGenerator<Uint8Array> {
-  try {
-    yield* body;
-  } finally {
-    await bytes.cancel();
-  }
+  return streamed(deflated ? decompressed({ engine: createInflateRaw(), data }) : data);
 }
 
 /** The entry's own name, which is the last segment where the archive kept it in a directory. */
@@ -362,13 +255,8 @@ function named(path: string): string {
   return path.split(PATH_SEPARATOR).at(-1) ?? path;
 }
 
-function entryData({ bytes, entry }: { bytes: Queued; entry: Entry }): AsyncGenerator<Uint8Array> {
-  return (entry.flags & FLAG_SIZES_IN_DESCRIPTOR) === 0
-    ? ofDeclaredSize({ bytes, sizeBytes: entry.compressedSizeBytes })
-    : untilDescriptor(bytes);
-}
-
-async function* ofDeclaredSize({
+/** The entry's data, refused where its length was one the header could only point at. */
+function ofDeclaredSize({
   bytes,
   sizeBytes,
 }: {
@@ -378,17 +266,13 @@ async function* ofDeclaredSize({
   if (sizeBytes === SIZE_IN_ZIP64_EXTRA) {
     throw new EntryTooLargeError();
   }
-  let left = sizeBytes;
-  while (left > 0) {
-    const held = await bytes.holding();
-    if (held.length === 0) {
-      throw new UnreadableArchiveError();
-    }
-    const taken = Math.min(left, held.length);
-    yield held.subarray(0, taken);
-    bytes.drop(taken);
-    left -= taken;
-  }
+  return ofSize({ bytes, sizeBytes });
+}
+
+function entryData({ bytes, entry }: { bytes: Queued; entry: Entry }): AsyncGenerator<Uint8Array> {
+  return (entry.flags & FLAG_SIZES_IN_DESCRIPTOR) === 0
+    ? ofDeclaredSize({ bytes, sizeBytes: entry.compressedSizeBytes })
+    : untilDescriptor(bytes);
 }
 
 /**
@@ -505,166 +389,4 @@ function claimedSize({
   return shape.sizeBytes === ZIP64_SIZE_BYTES
     ? Number(held.readBigUInt64LE(size))
     : held.readUInt32LE(size);
-}
-
-/** The stream's first bytes, and the stream itself with them still in front of it. */
-async function peeked({
-  stream,
-  count,
-}: {
-  stream: ReadableStream<Uint8Array>;
-  count: number;
-}): Promise<{ head: Uint8Array; body: ReadableStream<Uint8Array> }> {
-  const rest = stream[Symbol.asyncIterator]();
-  const opening: Uint8Array[] = [];
-  let held = 0;
-
-  while (held < count) {
-    const { done, value } = await rest.next();
-    if (done) {
-      break;
-    }
-    opening.push(value);
-    held += value.byteLength;
-  }
-
-  return { head: Buffer.concat(opening), body: streamed(replayed({ opening, rest })) };
-}
-
-async function* replayed({
-  opening,
-  rest,
-}: {
-  opening: Uint8Array[];
-  rest: AsyncIterator<Uint8Array>;
-}): AsyncGenerator<Uint8Array> {
-  try {
-    yield* opening;
-    while (true) {
-      const { done, value } = await rest.next();
-      if (done) {
-        return;
-      }
-      yield value;
-    }
-  } finally {
-    await rest.return?.();
-  }
-}
-
-/** What the entry came to, stopping at the point reading more of it would prove nothing. */
-async function drained({
-  stream,
-  budget,
-}: {
-  stream: ReadableStream<Uint8Array>;
-  budget: number;
-}): Promise<number> {
-  let read = 0;
-  for await (const chunk of stream) {
-    read += chunk.byteLength;
-    // Leaving the loop cancels the read: an entry already past what will be walked is one nobody
-    // is going to reach the end of.
-    if (read > budget) {
-      break;
-    }
-  }
-  return read;
-}
-
-/**
- * The source as bytes to be read a piece at a time, holding whatever has arrived and not yet been
- * taken. Chunks are joined only where something reaches across two of them — a header, or the
- * window a descriptor could be sitting in — so what is held is a chunk and a remainder rather than
- * the archive.
- */
-type Queued = {
-  /** At least `count` bytes, left where they are; `undefined` where the source ended first. */
-  need(count: number): Promise<Buffer | undefined>;
-  take(count: number): Promise<Buffer | undefined>;
-  /** Whatever is in hand, after pulling once where there is nothing. */
-  holding(): Promise<Buffer>;
-  drop(count: number): void;
-  more(): Promise<boolean>;
-  /** What is left of the source, the bytes in hand first. */
-  rest(): ReadableStream<Uint8Array>;
-  cancel(): Promise<void>;
-};
-
-function queued(source: ReadableStream<Uint8Array>): Queued {
-  const chunks = source[Symbol.asyncIterator]();
-  let held = Buffer.alloc(0);
-  let ended = false;
-
-  async function pull(): Promise<boolean> {
-    if (ended) {
-      return false;
-    }
-    const { done, value } = await chunks.next();
-    if (done) {
-      ended = true;
-      return false;
-    }
-    held = Buffer.concat([held, value]);
-    return true;
-  }
-
-  async function need(count: number): Promise<Buffer | undefined> {
-    while (held.length < count) {
-      if (!(await pull())) {
-        return undefined;
-      }
-    }
-    return held.subarray(0, count);
-  }
-
-  function drop(count: number): void {
-    held = held.subarray(count);
-  }
-
-  return {
-    need,
-    drop,
-    more: pull,
-    async take(count) {
-      const head = await need(count);
-      if (head === undefined) {
-        return undefined;
-      }
-      const taken = Buffer.from(head);
-      drop(count);
-      return taken;
-    },
-    async holding() {
-      while (held.length === 0) {
-        if (!(await pull())) {
-          break;
-        }
-      }
-      return held;
-    },
-    rest() {
-      return streamed(replayed({ opening: [held], rest: chunks }));
-    },
-    async cancel() {
-      await chunks.return?.();
-    },
-  };
-}
-
-/** A generator as the stream everything downstream of here reads, pulled one chunk at a time. */
-function streamed(source: AsyncGenerator<Uint8Array>): ReadableStream<Uint8Array> {
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      const { done, value } = await source.next();
-      if (done) {
-        controller.close();
-        return;
-      }
-      controller.enqueue(value);
-    },
-    async cancel() {
-      await source.return(undefined);
-    },
-  });
 }

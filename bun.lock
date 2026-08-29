@@ -52,6 +52,7 @@
         "@repo/api-client": "workspace:*",
         "@repo/app-operations": "workspace:*",
         "@repo/binary-handoff": "workspace:*",
+        "@repo/deploy-link": "workspace:*",
         "@repo/protocol": "workspace:*",
         "@repo/ui": "workspace:*",
         "@tanstack/react-devtools": "^0.10.9",
@@ -87,6 +88,7 @@
       "name": "@repo/www",
       "dependencies": {
         "@repo/binary-handoff": "workspace:*",
+        "@repo/deploy-link": "workspace:*",
         "@repo/protocol": "workspace:*",
         "@repo/ui": "workspace:*",
         "@tanstack/react-router": "catalog:",
@@ -142,7 +144,7 @@
     },
     "packages/cli": {
       "name": "@repo/cli",
-      "version": "2026.8.28-2",
+      "version": "2026.8.29-2",
       "dependencies": {
         "@clack/prompts": "^1.7.0",
         "@parshjs/core": "^0.0.10",
@@ -157,6 +159,18 @@
       "devDependencies": {
         "@parshjs/codegen": "^0.0.5",
         "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/deploy-link": {
+      "name": "@repo/deploy-link",
+      "dependencies": {
+        "@repo/app-operations": "workspace:*",
+        "@repo/protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "@tanstack/react-router": "catalog:",
         "typescript": "catalog:",
       },
     },
@@ -731,6 +745,8 @@
     "@repo/cli": ["@repo/cli@workspace:packages/cli"],
 
     "@repo/dashboard": ["@repo/dashboard@workspace:apps/dashboard"],
+
+    "@repo/deploy-link": ["@repo/deploy-link@workspace:packages/deploy-link"],
 
     "@repo/internal-scripts": ["@repo/internal-scripts@workspace:packages/internal-scripts"],
 

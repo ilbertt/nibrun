@@ -1,0 +1,24 @@
+{
+  "name": "@repo/deploy-link",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "test": "bun test",
+    "check:types": "bun run --bun tsc"
+  },
+  "dependencies": {
+    "@repo/app-operations": "workspace:*",
+    "@repo/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@tanstack/react-router": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -7,12 +7,16 @@ import {
   type ObjectKey,
   ObjectKeySchema,
   type OwnerId,
+  type Sha256Digest,
   Value,
 } from '@repo/protocol';
+import { unwrapExecutable } from '#lib/archive/unwrap.ts';
+import { MAX_ENTRIES, UnreadableArchiveError, type Unwrapping } from '#lib/archive/walk.ts';
 import {
   type ArtifactInspection,
   ArtifactTooLargeError,
   boundedTo,
+  digesting,
   inspectArtifact,
   inspectingPassThrough,
   RefusedArtifactError,
@@ -20,12 +24,6 @@ import {
 import { filenameFromUrl, withoutCredentials } from '#lib/binary-url.ts';
 import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
-import {
-  MAX_ENTRIES,
-  UnreadableArchiveError,
-  type Unwrapping,
-  unwrapExecutable,
-} from '#lib/zip.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
@@ -111,14 +109,62 @@ function interruptedSource(url: string): string {
   return `The url stopped sending before the binary was whole: ${url}`;
 }
 
-const NOTHING_EXECUTABLE = 'Nothing inside that zip is a Linux executable.';
-const WALKED_TOO_FAR = `nibrun read as far into that zip as it will — ${MAX_ARTIFACT_MEBIBYTES} MB, or ${MAX_ENTRIES} entries — without reaching an executable.`;
+const NOTHING_EXECUTABLE = 'Nothing inside that archive is a Linux executable.';
+const WALKED_TOO_FAR = `nibrun read as far into that archive as it will — ${MAX_ARTIFACT_MEBIBYTES} MB, or ${MAX_ENTRIES} entries — without reaching an executable.`;
 
 const ENTRY_TOO_LARGE =
-  'An entry in that zip is longer than a zip header can say, which is more than nibrun will read past.';
+  'An entry in that archive is longer than its own header can say, which is more than nibrun will read past.';
 
 function unreadableArchive(url: string): string {
-  return `The zip ended before the entry it was describing: ${url}`;
+  return `The archive ended before the entry it was describing: ${url}`;
+}
+
+/**
+ * The url is not serving what the caller said it would. Both digests are named because either
+ * could be the surprising one: the link may have been written against a release that has since
+ * been replaced, or the checksum beside it may simply be the wrong one.
+ */
+function wrongDigest({ expected, served }: { expected: string; served: string }): string {
+  return `The url served ${served}, not the ${expected} that was asked for.`;
+}
+
+/** A digest somebody said the url would serve, and what it turned out to serve. */
+type DigestCheck = { expected: Sha256Digest; served: Promise<Sha256Digest> };
+
+/**
+ * The source, hashed on its way past where there is something to hold it to. Untouched where
+ * there is not: reading a download to the end is the cost of checking one, and nobody who did not
+ * ask for the check should pay it.
+ */
+function checking({
+  source,
+  sha256,
+}: {
+  source: ReadableStream<Uint8Array>;
+  sha256: Sha256Digest | undefined;
+}): { body: ReadableStream<Uint8Array>; check: DigestCheck | undefined } {
+  if (sha256 === undefined) {
+    return { body: source, check: undefined };
+  }
+  const { body, served } = digesting({ source });
+  return { body, check: { expected: sha256, served } };
+}
+
+/**
+ * The download held to the digest it was promised to be.
+ *
+ * Against the download rather than against the executable unwrapped from it, because a release
+ * publishes a checksum over the file it uploaded — a `checksums.txt` beside a zip is the zip's,
+ * and nobody publishes the digest of one file inside an archive.
+ */
+async function heldToDigest(check: DigestCheck | undefined): Promise<void> {
+  if (check === undefined) {
+    return;
+  }
+  const served = await check.served;
+  if (served !== check.expected) {
+    throw new BadRequestError(wrongDigest({ expected: check.expected, served }));
+  }
 }
 
 function unsupportedInterpreter(interpreter: string): string {
@@ -289,15 +335,22 @@ export class ArtifactsService extends Service {
    *
    * Hashed on that same pass: the bytes are inspected as they are handed to the store, so what is
    * written to the staging key and what decides whether it is an artifact at all are one read.
+   *
+   * A caller who knows what the url should be serving may say so, and what is held to it is the
+   * download itself — the file a release published a checksum for. It can only be checked once
+   * the bytes are read, so a url serving something else costs the fetch; what it does not cost is
+   * a deploy of whatever turned up.
    */
   async createFromUrl({
     appId,
     ownerId,
     url,
+    sha256,
   }: {
     appId: AppId;
     ownerId: OwnerId;
     url: string;
+    sha256?: Sha256Digest | undefined;
   }): Promise<Artifact> {
     if (!(await this.appsRepo.isOwnedBy({ appId, ownerId }))) {
       throw new NotFoundError(NO_SUCH_APP);
@@ -315,7 +368,7 @@ export class ArtifactsService extends Service {
 
     this.fetchesInFlight += 1;
     try {
-      return await this.fetchInto({ appId, ownerId, url, filename });
+      return await this.fetchInto({ appId, ownerId, url, filename, sha256 });
     } finally {
       this.fetchesInFlight -= 1;
     }
@@ -333,11 +386,13 @@ export class ArtifactsService extends Service {
     ownerId,
     url,
     filename,
+    sha256,
   }: {
     appId: AppId;
     ownerId: OwnerId;
     url: string;
     filename: Filename;
+    sha256: Sha256Digest | undefined;
   }): Promise<Artifact> {
     const said = withoutCredentials(url);
 
@@ -356,7 +411,8 @@ export class ArtifactsService extends Service {
     // Bounded on the way in whatever the host said about it: a declared length is a courtesy, and
     // a source that declares none is otherwise read for as long as it keeps sending. The bound is
     // on what the url sent rather than on what it came to, which for an archive is not the same.
-    const fetched = boundedTo({ source: source.body, maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES });
+    const bounded = boundedTo({ source: source.body, maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES });
+    const { body: fetched, check } = checking({ source: bounded, sha256 });
     const held = await unwrapped({ source: fetched, named: filename, url: said });
 
     const pending = await this.artifactsRepo.insertPending({
@@ -378,6 +434,7 @@ export class ArtifactsService extends Service {
       staged,
       body: held.body,
       url: said,
+      check,
     });
 
     return await this.promote({ appId, artifactId: pending.id, ownerId, staged, inspection });
@@ -397,6 +454,7 @@ export class ArtifactsService extends Service {
     staged,
     body,
     url,
+    check,
   }: {
     appId: AppId;
     artifactId: ArtifactId;
@@ -404,9 +462,12 @@ export class ArtifactsService extends Service {
     staged: ObjectKey;
     body: ReadableStream<Uint8Array>;
     url: string;
+    check: DigestCheck | undefined;
   }): Promise<ArtifactInspection> {
     try {
-      return await this.stage({ staged, body });
+      const inspection = await this.stage({ staged, body });
+      await heldToDigest(check);
+      return inspection;
     } catch (failure) {
       await this.abandon({ appId, artifactId, ownerId });
       if (failure instanceof InterruptedSourceError) {
@@ -417,7 +478,7 @@ export class ArtifactsService extends Service {
       if (failure instanceof ArtifactTooLargeError) {
         throw new BadRequestError(TOO_LARGE);
       }
-      // The archive was still being walked as the executable inside it was written, so a zip that
+      // The archive was still being walked as the executable inside it was written, so one that
       // turns out not to hold what its headers said reaches this end as the write failing.
       if (failure instanceof UnreadableArchiveError) {
         throw new BadRequestError(unreadableArchive(url));
@@ -614,12 +675,12 @@ function sourceRefusal({
 }
 
 /**
- * The source as the binary it holds: its own bytes, or the executable inside the zip they turn out
- * to be. A project that publishes its build zipped is publishing a url nobody could deploy from
- * otherwise — the alternative is downloading it, unzipping it, and uploading the one file inside.
+ * The source as the binary it holds: its own bytes, or the executable inside the archive they turn
+ * out to be. A project that publishes its build packed is publishing a url nobody could deploy from
+ * otherwise — the alternative is downloading it, unpacking it, and uploading the one file inside.
  *
  * The entry names the artifact where it can, because it is the name the binary actually has: a url
- * ending in `.zip` would otherwise be what an export writes the executable out as.
+ * ending in `.tar.gz` would otherwise be what an export writes the executable out as.
  */
 async function unwrapped({
   source,
@@ -634,9 +695,9 @@ async function unwrapped({
 
   switch (unwrapping.outcome) {
     case 'not-an-archive':
-      return { body: unwrapping.body, filename: named };
+      return { body: unwrapping.body, filename: unpacked(named) };
     case 'unwrapped':
-      return { body: unwrapping.body, filename: entryName(unwrapping.name) ?? named };
+      return { body: unwrapping.body, filename: entryName(unwrapping.name) ?? unpacked(named) };
     case 'no-executable':
       throw new BadRequestError(NOTHING_EXECUTABLE);
     case 'walked-too-far':
@@ -672,6 +733,22 @@ async function walked({
 /** The entry's name where it is one an export could carry, and nothing where it is not. */
 function entryName(name: string): Filename | undefined {
   return Value.Check(FilenameSchema, name) ? name : undefined;
+}
+
+/**
+ * The suffixes that name what the bytes arrived in rather than what they are. Longest first, so a
+ * `.tar.gz` is not read as a `.gz` of something called `.tar`.
+ */
+const CONTAINER_SUFFIXES = ['.tar.gz', '.tgz', '.tar', '.zip', '.gz'];
+
+/**
+ * The url's own name with the container taken off it. What is stored is always the bare executable
+ * — everything else is refused — so a url ending in one of these is describing the download, and an
+ * export that wrote it back out would name a binary after the archive it stopped being.
+ */
+function unpacked(named: Filename): Filename {
+  const suffix = CONTAINER_SUFFIXES.find((candidate) => named.endsWith(candidate));
+  return (suffix === undefined ? undefined : entryName(named.slice(0, -suffix.length))) ?? named;
 }
 
 /** A body nobody is going to read holds its connection open until it is let go of. */

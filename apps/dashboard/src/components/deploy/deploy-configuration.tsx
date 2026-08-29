@@ -1,4 +1,5 @@
-import { EXTRA_PUBLIC_PORT_VALUES, RUNTIME_VALUES, writtenRuntimeValue } from '@repo/protocol';
+import type { DeploySuggestion } from '@repo/deploy-link';
+import { EXTRA_PUBLIC_PORT_VALUES, interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
 import {
   Accordion,
   AccordionContent,
@@ -17,7 +18,6 @@ import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
 import { DeployEnvironmentField } from '#components/deploy/deploy-environment-field.tsx';
 import { DeployNameField } from '#components/deploy/deploy-name-field.tsx';
-import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import {
   type EnvironmentVariable,
   filledVariables,
@@ -107,7 +107,7 @@ export function DeployConfiguration({
                     <FieldDescription>
                       Your own variables may name them — set{' '}
                       <code className="font-mono">
-                        ANNOUNCED_IP={writtenRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}
+                        ANNOUNCED_IP={interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}
                       </code>{' '}
                       and the app reads it under the name it already expects.
                     </FieldDescription>

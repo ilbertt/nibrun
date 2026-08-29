@@ -36,7 +36,12 @@ export const AppsAppIdArtifactsController = new Elysia()
       const ownerId = Value.Parse(OwnerIdSchema, user.id);
       const created =
         'url' in body
-          ? await artifactsService.createFromUrl({ appId, ownerId, url: body.url })
+          ? await artifactsService.createFromUrl({
+              appId,
+              ownerId,
+              url: body.url,
+              sha256: body.sha256,
+            })
           : await artifactsService.create({
               appId,
               ownerId,

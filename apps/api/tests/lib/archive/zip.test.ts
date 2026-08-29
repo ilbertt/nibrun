@@ -1,23 +1,22 @@
 import { describe, expect, test } from 'bun:test';
 import { Buffer } from 'node:buffer';
-import { MAX_ENTRIES, UnreadableArchiveError, unwrapExecutable } from '#lib/zip.ts';
+import { unwrapExecutable } from '#lib/archive/unwrap.ts';
+import { UnreadableArchiveError } from '#lib/archive/walk.ts';
+import {
+  A_SHORT_WALK,
+  BINARY,
+  bytesOf,
+  CHUNK_BYTES,
+  collected,
+  LICENCE,
+  NO_LIMIT,
+  NOTES,
+  NOTHING,
+  PAST_THE_ENTRY_LIMIT,
+  sourceOf,
+  streamOf,
+} from '#tests/lib/archive/support/fixtures.ts';
 import { type ArchiveEntry, archiveOf, LOCAL_HEADER_BYTES } from '#tests/support/archives.ts';
-
-const NOTE_LINES = 8;
-
-// What the api will store, and the only thing a walk of an archive is looking for.
-const BINARY = bytesOf('\x7fELFnibrun-test-binary');
-const NOTES = bytesOf('# Changelog\n\nEverything, all at once.\n'.repeat(NOTE_LINES));
-const LICENCE = bytesOf('The MIT Licence, as every release archive carries it.\n');
-
-// Larger than any fixture here, so a walk only stops early when stopping early is the test.
-const NO_LIMIT = 1_048_576;
-
-/**
- * Small enough to fall inside a header, a name and the window a descriptor is looked for in, so
- * every fixture is read across chunk boundaries rather than out of one buffer.
- */
-const CHUNK_BYTES = 7;
 
 /** The crc and the two sizes a descriptor carries after its signature. */
 const DESCRIPTOR_FIELD_BYTES = 12;
@@ -28,19 +27,11 @@ const A_FEW_BYTES_IN = 4;
 /** Enough of a stored entry for the magic at the front of it to have been handed on. */
 const PAST_THE_MAGIC = 8;
 
-/** Shorter than the notes a release archive opens with, so the walk gives up inside them. */
-const A_SHORT_WALK = 8;
-
 /** More entries than a budget counting only what they hold would ever stop a walk through. */
 const MANY_ENTRIES = 64;
 
 /** Room for a header or two, and nothing like room for all of them. */
 const A_FEW_HEADERS = 100;
-
-const NOTHING = new Uint8Array(0);
-
-/** One past what a walk will read the headers of. */
-const PAST_THE_ENTRY_LIMIT = MAX_ENTRIES + 1;
 
 describe('a zip is walked to the executable inside it', () => {
   test('past the notes and the licence a release ships beside the binary', async () => {
@@ -261,7 +252,7 @@ describe('a zip that holds no executable is not one to fetch from', () => {
       { name: 'CHANGELOG.md', content: NOTES },
       { name: 'my-server', content: BINARY },
     ]);
-    const source = sourceOf(archive);
+    const source = sourceOf({ bytes: archive });
 
     await unwrapExecutable({ archive: source.stream, maxSkippedBytes: A_SHORT_WALK });
 
@@ -342,52 +333,6 @@ describe('bytes that are not an archive are the binary themselves', () => {
   });
 });
 
-function bytesOf(text: string): Uint8Array {
-  return Buffer.from(text, 'utf8');
-}
-
-function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
-  let at = 0;
-  return new ReadableStream<Uint8Array>({
-    pull(controller) {
-      if (at >= bytes.byteLength) {
-        controller.close();
-        return;
-      }
-      controller.enqueue(bytes.subarray(at, at + CHUNK_BYTES));
-      at += CHUNK_BYTES;
-    },
-  });
-}
-
-/** An archive, and whether whoever was reading it let go of it before it ended. */
-function sourceOf(bytes: Uint8Array): {
-  stream: ReadableStream<Uint8Array>;
-  wasLetGo: () => boolean;
-} {
-  let at = 0;
-  let letGo = false;
-
-  function pull(controller: ReadableStreamDefaultController<Uint8Array>): void {
-    if (at >= bytes.byteLength) {
-      controller.close();
-      return;
-    }
-    controller.enqueue(bytes.subarray(at, at + CHUNK_BYTES));
-    at += CHUNK_BYTES;
-  }
-
-  function cancel(): void {
-    letGo = true;
-  }
-
-  function wasLetGo(): boolean {
-    return letGo;
-  }
-
-  return { stream: new ReadableStream<Uint8Array>({ pull, cancel }), wasLetGo };
-}
-
 /** An entry that declares no data at all, which is the whole of what it costs to walk past. */
 function entryOfNothing(index: number): ArchiveEntry {
   return { name: `note-${index}`, content: NOTHING, stored: true, sizesInDescriptor: false };
@@ -412,12 +357,4 @@ function haltingStreamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
       controller.enqueue(NOTHING);
     },
   });
-}
-
-async function collected(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
 }

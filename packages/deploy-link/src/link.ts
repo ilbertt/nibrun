@@ -1,5 +1,5 @@
 import type { ConfigEdit, EnvironmentAssignment } from '@repo/app-operations';
-import { refusedUrl } from '#lib/binary-source.ts';
+import { refusedUrl } from '#binary-url.ts';
 
 const ASSIGNMENT = '=';
 
@@ -38,6 +38,7 @@ type Written = {
 export type DeployLink = Written & {
   name?: string | undefined;
   binary?: string | undefined;
+  sha256?: string | undefined;
   minimal?: boolean | undefined;
 };
 
@@ -45,6 +46,7 @@ export function deployLink(search: Record<string, unknown>): DeployLink {
   return {
     name: asText(search.name),
     binary: asBinaryUrl(search.binary),
+    sha256: asChecksum(search.sha256),
     minimal: asFlag(search.minimal),
     ...written(search),
   };
@@ -55,6 +57,22 @@ export function deployLink(search: Record<string, unknown>): DeployLink {
 function asBinaryUrl(value: unknown): string | undefined {
   const url = asText(value);
   return url !== undefined && refusedUrl(url) === undefined ? url : undefined;
+}
+
+/**
+ * The one parameter carried however it was written rather than dropped where it is wrong: what
+ * this end drops is a deploy that goes ahead unverified, which is the single outcome a checksum
+ * exists to rule out. Whatever it turns out to be, the form refuses it by name.
+ *
+ * Lowercased because a digest is one number however it was printed, and the api takes it in the
+ * spelling `sha256sum` writes.
+ */
+function asChecksum(value: unknown): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const written = String(value).trim().toLowerCase();
+  return written === '' ? undefined : written;
 }
 
 // Read off the parameters rather than the keys: `Object.fromEntries` cannot carry which reader
@@ -78,6 +96,9 @@ export type DeploySuggestion = { [K in keyof typeof CONFIGURED]?: Meant[K] } & {
   // Not part of what a deploy configures — it is what is being deployed. A link carrying one is
   // the difference between a form with one thing left to do and a form with none.
   binary?: string | undefined;
+  // What the url should serve, for the api to hold what it fetches to. Never shown: there is
+  // nothing to decide about it, and the owner is not the one who wrote it down.
+  sha256?: string | undefined;
 };
 
 /** The link as the deploy it describes. A parameter renamed above is a line here that stops compiling. */
@@ -85,6 +106,7 @@ export function deploySuggestion(link: DeployLink): DeploySuggestion {
   return {
     name: link.name,
     binary: link.binary,
+    sha256: link.sha256,
     port: link.port,
     extraPublicPort: link['extra-public-port'],
     args: link.arg,

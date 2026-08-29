@@ -110,7 +110,7 @@ export function namesOfferedRuntimeValues(value: string): boolean {
 }
 
 /** A runtime value as it is named in a tenant value, which is the form worth showing back. */
-export function writtenRuntimeValue(name: string): string {
+export function interpolableRuntimeValue(name: string): string {
   return `\${${name}}`;
 }
 

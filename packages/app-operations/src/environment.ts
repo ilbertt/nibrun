@@ -1,10 +1,10 @@
 import {
+  interpolableRuntimeValue,
   namesOfferedRuntimeValues,
   RUNTIME_VALUE_NAMES,
   type TenantEnvironmentPatch,
   TenantEnvironmentPatchSchema,
   Value,
-  writtenRuntimeValue,
 } from '@repo/protocol';
 import { InvalidEnvironmentError } from '#errors.ts';
 
@@ -59,7 +59,7 @@ export function parseEnvironmentPatch(edits: readonly EnvironmentEdit[]): Tenant
     .map(({ name }) => name);
   if (naming.length > 0) {
     throw new InvalidEnvironmentError(
-      `A value may name a runtime value the guest sets — ${RUNTIME_VALUE_NAMES.map(writtenRuntimeValue).join(', ')} — and nothing else: ${naming.join(', ')}`,
+      `A value may name a runtime value the guest sets — ${RUNTIME_VALUE_NAMES.map(interpolableRuntimeValue).join(', ')} — and nothing else: ${naming.join(', ')}`,
     );
   }
 
