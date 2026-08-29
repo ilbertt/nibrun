@@ -163,6 +163,43 @@ export async function inspectArtifact({
   return read.verdict();
 }
 
+/**
+ * What more bytes than may ever be stored is raised as, on their way in from somewhere this end
+ * cannot hold to a length: an upload is signed for the size it declared, but a url is followed on
+ * the strength of what the host says about it — and a host that says nothing would otherwise be
+ * read until it stopped.
+ */
+export class ArtifactTooLargeError extends Error {
+  constructor() {
+    super('More bytes than may be stored.');
+    this.name = 'ArtifactTooLargeError';
+  }
+}
+
+/**
+ * The bytes as far as the cap, and an error rather than a truncation past it: what is being read
+ * is a binary, and the first half of one is not a smaller binary.
+ */
+export function boundedTo({
+  maxSizeBytes,
+}: {
+  maxSizeBytes: number;
+}): TransformStream<Uint8Array, Uint8Array> {
+  let read = 0;
+
+  return new TransformStream<Uint8Array, Uint8Array>({
+    // biome-ignore lint/complexity/useMaxParams: a transform is handed what to pass it on to
+    transform(chunk, controller) {
+      read += chunk.byteLength;
+      if (read > maxSizeBytes) {
+        controller.error(new ArtifactTooLargeError());
+        return;
+      }
+      controller.enqueue(chunk);
+    },
+  });
+}
+
 /** What a refusal is raised as, so that whoever was writing the bytes stops and says why. */
 export class RefusedArtifactError extends Error {
   readonly inspection: ArtifactInspection;

@@ -10,6 +10,8 @@ import {
 } from '@repo/protocol';
 import {
   type ArtifactInspection,
+  ArtifactTooLargeError,
+  boundedTo,
   inspectArtifact,
   inspectingPassThrough,
   RefusedArtifactError,
@@ -334,6 +336,10 @@ export class ArtifactsService extends Service {
       throw new BadRequestError(TOO_LARGE);
     }
 
+    // Bounded on the way in whatever the host said about it: a declared length is a courtesy, and
+    // a source that declares none is otherwise read for as long as it keeps sending.
+    const fetched = source.body.pipeThrough(boundedTo({ maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES }));
+
     const pending = await this.artifactsRepo.insertPending({
       appId,
       ownerId,
@@ -341,7 +347,7 @@ export class ArtifactsService extends Service {
       originalFileUrl: said,
     });
     if (!pending) {
-      await release(source.body);
+      await release(fetched);
       throw new NotFoundError(NO_SUCH_APP);
     }
 
@@ -351,7 +357,7 @@ export class ArtifactsService extends Service {
       artifactId: pending.id,
       ownerId,
       staged,
-      body: source.body,
+      body: fetched,
       url: said,
     });
 
@@ -386,6 +392,11 @@ export class ArtifactsService extends Service {
       await this.abandon({ appId, artifactId, ownerId });
       if (failure instanceof InterruptedSourceError) {
         throw new BadRequestError(interruptedSource(url));
+      }
+      // A source held to a length it went past, which is the caller's url rather than this api
+      // in exactly the way a 404 from it would be.
+      if (failure instanceof ArtifactTooLargeError) {
+        throw new BadRequestError(TOO_LARGE);
       }
       throw failure;
     }

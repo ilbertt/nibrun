@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { isValidMessage, ObjectKeySchema, Sha256DigestSchema, Value } from '@repo/protocol';
 import {
   type ArtifactInspection,
+  ArtifactTooLargeError,
+  boundedTo,
   inspectArtifact,
   inspectingPassThrough,
   RefusedArtifactError,
@@ -313,8 +315,8 @@ describe('bytes are inspected on their way past', () => {
     });
   });
 
-  // The reason a cap is not needed beside this: a source that keeps sending is cut off by the same
-  // pass, at the byte the store would not have taken anyway.
+  // A cap on what is stored rather than on what was sent: the two are the same bytes here, and
+  // `boundedTo` below is the one that holds a source to a length before they are read at all.
   test('a stream past what could be stored is cut off rather than finished', async () => {
     const { through } = inspectingPassThrough({ maxSizeBytes: BINARY.length });
 
@@ -323,3 +325,53 @@ describe('bytes are inspected on their way past', () => {
     await expect(refused).rejects.toMatchObject({ inspection: { outcome: 'too-large' } });
   });
 });
+
+/**
+ * What is read from a url, bounded before anything downstream sees it: an upload is signed for the
+ * size it declared, and a url is followed on nothing more than what its host chose to say.
+ */
+describe('a source is read as far as what may be stored and no further', () => {
+  test('bytes under the bound pass through unchanged', async () => {
+    const bounded = sending([BINARY]).pipeThrough(boundedTo({ maxSizeBytes: NO_LIMIT }));
+
+    expect(await readWhole(bounded)).toEqual(bytesOf(BINARY));
+  });
+
+  test('a source that keeps sending is stopped rather than read to its end', async () => {
+    const bounded = sending([BINARY, OTHER_BINARY]).pipeThrough(
+      boundedTo({ maxSizeBytes: BINARY.length }),
+    );
+
+    await expect(readWhole(bounded)).rejects.toBeInstanceOf(ArtifactTooLargeError);
+  });
+
+  // Counted across chunks rather than per chunk: a source sending the cap twice in two halves is
+  // sending twice the cap.
+  test('and is stopped at the byte the bound was reached on', async () => {
+    const halved = BINARY.slice(0, Math.floor(BINARY.length / 2));
+    const bounded = sending([halved, halved]).pipeThrough(
+      boundedTo({ maxSizeBytes: halved.length }),
+    );
+
+    await expect(readWhole(bounded)).rejects.toBeInstanceOf(ArtifactTooLargeError);
+  });
+});
+
+function sending(chunks: string[]): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(bytesOf(chunk));
+      }
+      controller.close();
+    },
+  });
+}
+
+async function readWhole(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+  const chunks: number[] = [];
+  for await (const chunk of stream) {
+    chunks.push(...chunk);
+  }
+  return Uint8Array.from(chunks);
+}
