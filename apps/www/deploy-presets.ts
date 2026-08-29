@@ -13,7 +13,7 @@ export const DEPLOY_PRESETS = {
   },
   sharkord: {
     name: 'sharkord',
-    binary: 'https://github.com/sharkord/sharkord/releases/latest/download/sharkord-linux-x64',
+    binary: 'https://github.com/sharkord/sharkord/releases/download/v0.0.24/sharkord-linux-x64',
     sha256: '92c5036ddf1951e14fe8359e03a3a66df9e20cee543837621ad47eccb3090d47',
     port: 4991,
     'extra-public-port': true,
