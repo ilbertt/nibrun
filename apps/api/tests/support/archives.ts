@@ -10,6 +10,8 @@ export type ArchiveEntry = {
   stored?: boolean;
   /** The shape of that descriptor: the format leaves both of these to the writer. */
   descriptor?: DescriptorShape;
+  /** Declares its lengths the way an entry too long for its own header has to. */
+  sizeInZip64Extra?: boolean;
 };
 
 /** Signed as writers conventionally do, and four bytes wide unless the entry declared zip64. */
@@ -35,6 +37,7 @@ const METHOD_AT = 8;
 const COMPRESSED_SIZE_AT = 18;
 const UNCOMPRESSED_SIZE_AT = 22;
 const NAME_LENGTH_AT = 26;
+const SIZE_IN_ZIP64_EXTRA = 0xff_ff_ff_ff;
 
 /**
  * A zip as far as this end reads one: entries, each preceded by its header, and a directory at the
@@ -72,10 +75,33 @@ function headerOf({
   header.writeUInt32LE(LOCAL_HEADER_SIGNATURE, 0);
   header.writeUInt16LE(trailed ? FLAG_SIZES_IN_DESCRIPTOR : 0, FLAGS_AT);
   header.writeUInt16LE(entry.stored === true ? METHOD_STORED : METHOD_DEFLATE, METHOD_AT);
-  header.writeUInt32LE(trailed ? 0 : data.byteLength, COMPRESSED_SIZE_AT);
-  header.writeUInt32LE(trailed ? 0 : entry.content.byteLength, UNCOMPRESSED_SIZE_AT);
+  header.writeUInt32LE(
+    declaredBy({ entry, trailed, sizeBytes: data.byteLength }),
+    COMPRESSED_SIZE_AT,
+  );
+  header.writeUInt32LE(
+    declaredBy({ entry, trailed, sizeBytes: entry.content.byteLength }),
+    UNCOMPRESSED_SIZE_AT,
+  );
   header.writeUInt16LE(Buffer.byteLength(entry.name, 'utf8'), NAME_LENGTH_AT);
   return header;
+}
+
+/** What the header says a length is: nothing where the descriptor will say it, and all ones where
+ *  only a zip64 field could hold it. */
+function declaredBy({
+  entry,
+  trailed,
+  sizeBytes,
+}: {
+  entry: ArchiveEntry;
+  trailed: boolean;
+  sizeBytes: number;
+}): number {
+  if (entry.sizeInZip64Extra === true) {
+    return SIZE_IN_ZIP64_EXTRA;
+  }
+  return trailed ? 0 : sizeBytes;
 }
 
 function descriptorOf({

@@ -85,11 +85,14 @@ const PATH_SEPARATOR = '/';
  * How many entries a walk will read the headers of.
  *
  * An entry that declares no data costs nothing against `maxSkippedBytes`, so an archive that is
- * headers the whole way down is bounded only by how many of them fit inside the cap on the fetch
- * — millions, each paying for a header, a peek and the streams to read it through. A release
- * archive is a binary and a couple of text files; nothing anybody deploys is near this.
+ * headers the whole way down is bounded only by how many of them fit inside the cap on the fetch.
+ * Each one pays for a header, a peek and the streams to read it through — tens of microseconds —
+ * so it is the count that bounds the work rather than the bytes.
+ *
+ * A release archive is a binary and a couple of text files. One with hundreds of files in front of
+ * the binary is shipping what a deploy does nothing with, and is answered rather than walked.
  */
-export const MAX_ENTRIES = 4096;
+export const MAX_ENTRIES = 512;
 
 export type Unwrapping =
   /** Not a zip at all, handed back with the bytes that were read to tell. */
@@ -97,6 +100,7 @@ export type Unwrapping =
   | { outcome: 'unwrapped'; name: string; body: ReadableStream<Uint8Array> }
   | { outcome: 'no-executable' }
   | { outcome: 'walked-too-far' }
+  | { outcome: 'entry-too-large' }
   | { outcome: 'unreadable' };
 
 /**
@@ -111,6 +115,21 @@ export class UnreadableArchiveError extends Error {
   constructor() {
     super('The zip ended before the entry it was describing.');
     this.name = 'UnreadableArchiveError';
+  }
+}
+
+/**
+ * What an entry too long for its own header to say so is raised as.
+ *
+ * A size field is four bytes, so a length that does not fit is written as all ones and kept in a
+ * zip64 extra field instead. Nothing here reads that field: the length it holds starts at four
+ * gibibytes, which is past what could be stored — and an entry whose length is unknown is one
+ * there is no way to walk past to reach whatever follows it.
+ */
+export class EntryTooLargeError extends Error {
+  constructor() {
+    super('An entry declares a length only a zip64 field could hold.');
+    this.name = 'EntryTooLargeError';
   }
 }
 
@@ -145,6 +164,9 @@ export async function unwrapExecutable({
     await bytes.cancel();
     if (failure instanceof UnreadableArchiveError) {
       return { outcome: 'unreadable' };
+    }
+    if (failure instanceof EntryTooLargeError) {
+      return { outcome: 'entry-too-large' };
     }
     throw failure;
   }
@@ -303,7 +325,7 @@ async function* ofDeclaredSize({
   sizeBytes: number;
 }): AsyncGenerator<Uint8Array> {
   if (sizeBytes === SIZE_IN_ZIP64_EXTRA) {
-    throw new UnreadableArchiveError();
+    throw new EntryTooLargeError();
   }
   let left = sizeBytes;
   while (left > 0) {

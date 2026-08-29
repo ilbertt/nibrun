@@ -114,6 +114,9 @@ function interruptedSource(url: string): string {
 const NOTHING_EXECUTABLE = 'Nothing inside that zip is a Linux executable.';
 const WALKED_TOO_FAR = `nibrun read as far into that zip as it will — ${MAX_ARTIFACT_MEBIBYTES} MB, or ${MAX_ENTRIES} entries — without reaching an executable.`;
 
+const ENTRY_TOO_LARGE =
+  'An entry in that zip is longer than a zip header can say, which is more than nibrun will read past.';
+
 function unreadableArchive(url: string): string {
   return `The zip ended before the entry it was describing: ${url}`;
 }
@@ -638,6 +641,8 @@ async function unwrapped({
       throw new BadRequestError(NOTHING_EXECUTABLE);
     case 'walked-too-far':
       throw new BadRequestError(WALKED_TOO_FAR);
+    case 'entry-too-large':
+      throw new BadRequestError(ENTRY_TOO_LARGE);
     case 'unreadable':
       throw new BadRequestError(unreadableArchive(url));
   }

@@ -268,6 +268,28 @@ describe('a zip that holds no executable is not one to fetch from', () => {
     expect(source.wasLetGo()).toBe(true);
   });
 
+  // A size field is four bytes; a length that does not fit is kept in a zip64 field the walk does
+  // not read, and an entry whose length is unknown is one there is no walking past.
+  test('an archive whose entry is longer than its own header can say', async () => {
+    const archive = archiveOf([
+      {
+        name: 'huge.bin',
+        content: NOTES,
+        stored: true,
+        sizesInDescriptor: false,
+        sizeInZip64Extra: true,
+      },
+      { name: 'my-server', content: BINARY },
+    ]);
+
+    const unwrapped = await unwrapExecutable({
+      archive: streamOf(archive),
+      maxSkippedBytes: NO_LIMIT,
+    });
+
+    expect(unwrapped.outcome).toBe('entry-too-large');
+  });
+
   // The headers themselves are the work, and a budget in bytes is no bound on how many of them an
   // archive small enough to fetch can carry.
   test('an archive of more entries than a walk will read the headers of', async () => {
