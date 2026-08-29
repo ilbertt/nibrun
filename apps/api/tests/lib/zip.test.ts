@@ -268,17 +268,32 @@ describe('a zip that holds no executable is not one to fetch from', () => {
     expect(source.wasLetGo()).toBe(true);
   });
 
-  // A size field is four bytes; a length that does not fit is kept in a zip64 field the walk does
-  // not read, and an entry whose length is unknown is one there is no walking past.
-  test('an archive whose entry is longer than its own header can say', async () => {
+  // Some writers reach for zip64 whatever the lengths are, so an entry whose real ones are beside
+  // the header is an ordinary entry to walk past rather than an archive to refuse.
+  test('past an entry that kept its lengths in a zip64 field beside the header', async () => {
     const archive = archiveOf([
       {
-        name: 'huge.bin',
+        name: 'CHANGELOG.md',
         content: NOTES,
-        stored: true,
         sizesInDescriptor: false,
-        sizeInZip64Extra: true,
+        zip64Sizes: 'in-the-extra-field',
       },
+      { name: 'my-server', content: BINARY },
+    ]);
+
+    const unwrapped = await unwrapExecutable({
+      archive: streamOf(archive),
+      maxSkippedBytes: NO_LIMIT,
+    });
+
+    expect(unwrapped.outcome).toBe('unwrapped');
+    expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
+  });
+
+  // The header points at a field the archive never wrote, so the length is one nothing can know.
+  test('an archive whose entry declares a length it then says nowhere', async () => {
+    const archive = archiveOf([
+      { name: 'huge.bin', content: NOTES, sizesInDescriptor: false, zip64Sizes: 'said-nowhere' },
       { name: 'my-server', content: BINARY },
     ]);
 

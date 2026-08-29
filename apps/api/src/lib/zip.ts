@@ -76,8 +76,19 @@ const FLAG_SIZES_IN_DESCRIPTOR = 0x08;
 
 const METHOD_DEFLATE = 8;
 
-/** What a size field says when the real one is in a zip64 extra field, which is past our cap. */
+/** What a size field says when the real one is in a zip64 extra field beside it. */
 const SIZE_IN_ZIP64_EXTRA = 0xff_ff_ff_ff;
+
+const ZIP64_EXTRA_ID = 0x0001;
+const EXTRA_HEADER_BYTES = 4;
+const EXTRA_BYTES_AT = 2;
+/**
+ * Where the compressed length sits in that field. A local header's copy carries both lengths and
+ * carries them in one order — uncompressed, then compressed — so there is nothing to work out:
+ * the two that follow in a directory's copy are the ones a directory has and this does not.
+ */
+const ZIP64_COMPRESSED_SIZE_AT = 8;
+const ZIP64_SIZES_BYTES = 16;
 
 const PATH_SEPARATOR = '/';
 
@@ -248,9 +259,46 @@ async function readHeader(bytes: Queued): Promise<Header> {
       name: name.toString('utf8'),
       flags: fixed.readUInt16LE(FLAGS_AT),
       method: fixed.readUInt16LE(METHOD_AT),
-      compressedSizeBytes: fixed.readUInt32LE(COMPRESSED_SIZE_AT),
+      compressedSizeBytes: compressedSizeOf({ fixed, extra }),
     },
   };
+}
+
+/**
+ * How long the entry's data is, from the zip64 field where the header could only point at one.
+ *
+ * Four bytes cannot hold a length past four gibibytes, so a writer with one — or one that writes
+ * zip64 whatever the length, as some do — leaves all ones in the header and the real number in a
+ * field beside it. Reading it is the difference between walking past such an entry and refusing
+ * the archive that carries it.
+ */
+function compressedSizeOf({ fixed, extra }: { fixed: Buffer; extra: Buffer }): number {
+  const declared = fixed.readUInt32LE(COMPRESSED_SIZE_AT);
+  if (declared !== SIZE_IN_ZIP64_EXTRA) {
+    return declared;
+  }
+  const sizes = zip64SizesIn(extra);
+  // Left as the sentinel where the header pointed at a field that is not there, which is a length
+  // nothing here can know and `ofDeclaredSize` answers as such.
+  return sizes === undefined
+    ? SIZE_IN_ZIP64_EXTRA
+    : Number(sizes.readBigUInt64LE(ZIP64_COMPRESSED_SIZE_AT));
+}
+
+/** The zip64 field among whatever else the header carried, where it is there and holds both sizes. */
+function zip64SizesIn(extra: Buffer): Buffer | undefined {
+  let at = 0;
+
+  while (at + EXTRA_HEADER_BYTES <= extra.length) {
+    const blockBytes = extra.readUInt16LE(at + EXTRA_BYTES_AT);
+    const data = extra.subarray(at + EXTRA_HEADER_BYTES, at + EXTRA_HEADER_BYTES + blockBytes);
+    if (extra.readUInt16LE(at) === ZIP64_EXTRA_ID && data.length >= ZIP64_SIZES_BYTES) {
+      return data;
+    }
+    at += EXTRA_HEADER_BYTES + blockBytes;
+  }
+
+  return undefined;
 }
 
 /**
@@ -282,9 +330,12 @@ async function* inflated(data: AsyncGenerator<Uint8Array>): AsyncGenerator<Uint8
   try {
     yield* engine;
   } catch (failure) {
-    // Everything but the source running out of what it was allowed to send: that is a verdict on
-    // the bytes rather than on the archive, and the only one this is not entitled to restate.
-    throw failure instanceof ArtifactTooLargeError ? failure : new UnreadableArchiveError();
+    // The source running out of what it was allowed to send, and an entry whose length nothing
+    // could read: those are verdicts on the bytes rather than on the archive, and the two this is
+    // not entitled to restate as an archive that ended early.
+    throw failure instanceof ArtifactTooLargeError || failure instanceof EntryTooLargeError
+      ? failure
+      : new UnreadableArchiveError();
   }
 }
 

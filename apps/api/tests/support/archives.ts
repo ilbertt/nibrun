@@ -10,12 +10,15 @@ export type ArchiveEntry = {
   stored?: boolean;
   /** The shape of that descriptor: the format leaves both of these to the writer. */
   descriptor?: DescriptorShape;
-  /** Declares its lengths the way an entry too long for its own header has to. */
-  sizeInZip64Extra?: boolean;
+  /** Where its lengths are, where the header's own four-byte fields could not hold them. */
+  zip64Sizes?: Zip64Sizes;
 };
 
 /** Signed as writers conventionally do, and four bytes wide unless the entry declared zip64. */
 type DescriptorShape = { signed?: boolean; zip64?: boolean };
+
+/** Beside the header as the format says, or nowhere at all, which is a header pointing at nothing. */
+type Zip64Sizes = 'in-the-extra-field' | 'said-nowhere';
 
 export const LOCAL_HEADER_BYTES = 30;
 
@@ -37,7 +40,12 @@ const METHOD_AT = 8;
 const COMPRESSED_SIZE_AT = 18;
 const UNCOMPRESSED_SIZE_AT = 22;
 const NAME_LENGTH_AT = 26;
+const EXTRA_LENGTH_AT = 28;
 const SIZE_IN_ZIP64_EXTRA = 0xff_ff_ff_ff;
+const ZIP64_EXTRA_ID = 0x0001;
+const EXTRA_HEADER_BYTES = 4;
+const ZIP64_SIZES_BYTES = 16;
+const EMPTY = new Uint8Array(0);
 
 /**
  * A zip as far as this end reads one: entries, each preceded by its header, and a directory at the
@@ -51,7 +59,8 @@ export function archiveOf(entries: ArchiveEntry[]): Uint8Array {
   for (const entry of entries) {
     const data = entry.stored === true ? entry.content : deflateRawSync(entry.content);
     const trailed = entry.sizesInDescriptor !== false;
-    written.push(headerOf({ entry, data, trailed }), bytesOf(entry.name), data);
+    const extra = extraOf({ entry, data });
+    written.push(headerOf({ entry, data, trailed, extra }), bytesOf(entry.name), extra, data);
     if (trailed) {
       written.push(descriptorOf({ entry, compressedSizeBytes: data.byteLength }));
     }
@@ -66,10 +75,12 @@ function headerOf({
   entry,
   data,
   trailed,
+  extra,
 }: {
   entry: ArchiveEntry;
   data: Uint8Array;
   trailed: boolean;
+  extra: Uint8Array;
 }): Uint8Array {
   const header = Buffer.alloc(LOCAL_HEADER_BYTES);
   header.writeUInt32LE(LOCAL_HEADER_SIGNATURE, 0);
@@ -84,7 +95,21 @@ function headerOf({
     UNCOMPRESSED_SIZE_AT,
   );
   header.writeUInt16LE(Buffer.byteLength(entry.name, 'utf8'), NAME_LENGTH_AT);
+  header.writeUInt16LE(extra.byteLength, EXTRA_LENGTH_AT);
   return header;
+}
+
+/** The field a zip64 writer puts the real lengths in, uncompressed first as a local header must. */
+function extraOf({ entry, data }: { entry: ArchiveEntry; data: Uint8Array }): Uint8Array {
+  if (entry.zip64Sizes !== 'in-the-extra-field') {
+    return EMPTY;
+  }
+  const extra = Buffer.alloc(EXTRA_HEADER_BYTES + ZIP64_SIZES_BYTES);
+  extra.writeUInt16LE(ZIP64_EXTRA_ID, 0);
+  extra.writeUInt16LE(ZIP64_SIZES_BYTES, 2);
+  extra.writeBigUInt64LE(BigInt(entry.content.byteLength), EXTRA_HEADER_BYTES);
+  extra.writeBigUInt64LE(BigInt(data.byteLength), EXTRA_HEADER_BYTES + ZIP64_SIZE_BYTES);
+  return extra;
 }
 
 /** What the header says a length is: nothing where the descriptor will say it, and all ones where
@@ -98,7 +123,7 @@ function declaredBy({
   trailed: boolean;
   sizeBytes: number;
 }): number {
-  if (entry.sizeInZip64Extra === true) {
+  if (entry.zip64Sizes !== undefined) {
     return SIZE_IN_ZIP64_EXTRA;
   }
   return trailed ? 0 : sizeBytes;
