@@ -1,30 +1,68 @@
+// A zip read the only way a fetch can read one: forwards, once, with a chunk in hand.
+//
+// The index a zip is meant to be opened by sits at its end, which is behind the bytes as they
+// arrive — so nothing here uses it. Each entry is taken from the header that precedes its data
+// instead, and the executable is whichever entry's first bytes say it is one. A release archive
+// is a binary and a couple of text files, so that is a walk of two or three entries.
+
 import { Buffer } from 'node:buffer';
 import { Readable } from 'node:stream';
 import { createInflateRaw } from 'node:zlib';
 import { ArtifactTooLargeError } from '#lib/artifact-digest.ts';
 import { ELF_MAGIC_LENGTH, isElfExecutable } from '#lib/elf.ts';
 
-/**
- * A zip read the only way a fetch can read one: forwards, once, with a chunk in hand.
- *
- * The index a zip is meant to be opened by sits at its end, which is behind the bytes as they
- * arrive — so nothing here uses it. Each entry is taken from the header that precedes its data
- * instead, and the executable is whichever entry's first bytes say it is one. A release archive
- * is a binary and a couple of text files, so that is a walk of two or three entries.
- */
-
 const LOCAL_HEADER = signature('PK\x03\x04');
+const CENTRAL_HEADER = signature('PK\x01\x02');
 const DATA_DESCRIPTOR = signature('PK\x07\x08');
 
 function signature(bytes: string): Buffer {
   return Buffer.from(bytes, 'latin1');
 }
 
+/** What an entry is always followed by: the next one, or the directory the entries end at. */
+const FOLLOWING_RECORDS = [LOCAL_HEADER, CENTRAL_HEADER];
+
 const SIGNATURE_BYTES = LOCAL_HEADER.length;
 const LOCAL_HEADER_BYTES = 30;
-/** The descriptor as writers that stream actually write it: signature, crc, and the two sizes. */
-const DESCRIPTOR_BYTES = 16;
-const DESCRIPTOR_COMPRESSED_SIZE_AT = 8;
+const CRC_BYTES = 4;
+const SIZE_BYTES = 4;
+/** The width a zip64 entry writes both its sizes in, in its descriptor as in its header. */
+const ZIP64_SIZE_BYTES = 8;
+
+type DescriptorShape = {
+  signed: boolean;
+  sizeBytes: number;
+  compressedSizeAt: number;
+  totalBytes: number;
+};
+
+function descriptorShape({
+  signed,
+  sizeBytes,
+}: {
+  signed: boolean;
+  sizeBytes: number;
+}): DescriptorShape {
+  const compressedSizeAt = (signed ? SIGNATURE_BYTES : 0) + CRC_BYTES;
+  return { signed, sizeBytes, compressedSizeAt, totalBytes: compressedSizeAt + 2 * sizeBytes };
+}
+
+/**
+ * The shapes a descriptor is written in. The format never assigned it a signature — that is a
+ * convention writers adopted — and an entry that declared zip64 writes both its sizes eight bytes
+ * wide, so which shape an archive used is read back off the archive rather than assumed. Widest
+ * first, so the shape that has to agree in the most places is the one that gets to.
+ */
+const DESCRIPTOR_SHAPES = [
+  descriptorShape({ signed: true, sizeBytes: ZIP64_SIZE_BYTES }),
+  descriptorShape({ signed: false, sizeBytes: ZIP64_SIZE_BYTES }),
+  descriptorShape({ signed: true, sizeBytes: SIZE_BYTES }),
+  descriptorShape({ signed: false, sizeBytes: SIZE_BYTES }),
+];
+
+/** Nothing is handed on until it is past both a descriptor and the record that would follow it. */
+const HELD_BACK_BYTES =
+  Math.max(...DESCRIPTOR_SHAPES.map((shape) => shape.totalBytes)) + SIGNATURE_BYTES;
 
 const FLAGS_AT = 6;
 const METHOD_AT = 8;
@@ -39,9 +77,19 @@ const FLAG_SIZES_IN_DESCRIPTOR = 0x08;
 const METHOD_DEFLATE = 8;
 
 /** What a size field says when the real one is in a zip64 extra field, which is past our cap. */
-const ZIP64_SIZE = 0xff_ff_ff_ff;
+const SIZE_IN_ZIP64_EXTRA = 0xff_ff_ff_ff;
 
 const PATH_SEPARATOR = '/';
+
+/**
+ * How many entries a walk will read the headers of.
+ *
+ * An entry that declares no data costs nothing against `maxSkippedBytes`, so an archive that is
+ * headers the whole way down is bounded only by how many of them fit inside the cap on the fetch
+ * — millions, each paying for a header, a peek and the streams to read it through. A release
+ * archive is a binary and a couple of text files; nothing anybody deploys is near this.
+ */
+export const MAX_ENTRIES = 4096;
 
 export type Unwrapping =
   /** Not a zip at all, handed back with the bytes that were read to tell. */
@@ -92,8 +140,10 @@ export async function unwrapExecutable({
   try {
     return await executableIn({ bytes, maxSkippedBytes });
   } catch (failure) {
+    // Whatever went wrong, the archive is not going to be read any further, and a source nobody
+    // is reading holds its connection open until it is let go of.
+    await bytes.cancel();
     if (failure instanceof UnreadableArchiveError) {
-      await bytes.cancel();
       return { outcome: 'unreadable' };
     }
     throw failure;
@@ -108,13 +158,19 @@ async function executableIn({
   maxSkippedBytes: number;
 }): Promise<Unwrapping> {
   let skipped = 0;
+  let entries = 0;
 
-  while (skipped <= maxSkippedBytes) {
+  while (skipped <= maxSkippedBytes && entries < MAX_ENTRIES) {
     const header = await readHeader(bytes);
     if (header.outcome !== 'entry') {
       await bytes.cancel();
       return header.outcome === 'end' ? { outcome: 'no-executable' } : { outcome: 'unreadable' };
     }
+
+    // The headers count against the same budget as the data, and against a bound of their own:
+    // an entry that declares nothing costs nothing to skip, so bytes alone never stop a walk.
+    skipped += header.headerBytes;
+    entries += 1;
 
     const data = entryData({ bytes, entry: header.entry });
     const content = readable({ entry: header.entry, data });
@@ -141,7 +197,7 @@ type Entry = {
 };
 
 type Header =
-  | { outcome: 'entry'; entry: Entry }
+  | { outcome: 'entry'; entry: Entry; headerBytes: number }
   /** The central directory, which is where the entries stop and this walk is over. */
   | { outcome: 'end' }
   | { outcome: 'unreadable' };
@@ -155,14 +211,17 @@ async function readHeader(bytes: Queued): Promise<Header> {
     return { outcome: 'end' };
   }
 
-  const name = await bytes.take(fixed.readUInt16LE(NAME_LENGTH_AT));
-  const extra = await bytes.take(fixed.readUInt16LE(EXTRA_LENGTH_AT));
+  const nameBytes = fixed.readUInt16LE(NAME_LENGTH_AT);
+  const extraBytes = fixed.readUInt16LE(EXTRA_LENGTH_AT);
+  const name = await bytes.take(nameBytes);
+  const extra = await bytes.take(extraBytes);
   if (name === undefined || extra === undefined) {
     return { outcome: 'unreadable' };
   }
 
   return {
     outcome: 'entry',
+    headerBytes: LOCAL_HEADER_BYTES + nameBytes + extraBytes,
     entry: {
       name: name.toString('utf8'),
       flags: fixed.readUInt16LE(FLAGS_AT),
@@ -243,7 +302,7 @@ async function* ofDeclaredSize({
   bytes: Queued;
   sizeBytes: number;
 }): AsyncGenerator<Uint8Array> {
-  if (sizeBytes === ZIP64_SIZE) {
+  if (sizeBytes === SIZE_IN_ZIP64_EXTRA) {
     throw new UnreadableArchiveError();
   }
   let left = sizeBytes;
@@ -263,28 +322,29 @@ async function* ofDeclaredSize({
  * The entry's data, up to the descriptor that follows it.
  *
  * The descriptor is found rather than jumped to: an entry written this way says its length only
- * after the data, so the end of the data is the first descriptor whose length field agrees with
- * how far it sits from the start. Compressed bytes that happen to spell the signature do not also
- * happen to spell the distance to themselves.
+ * after the data, and says it in any of four shapes. So it is looked for the other way round —
+ * from the record that follows every entry, back through whichever shape sits in front of that
+ * record and agrees on how far it is from the start. Data that happens to spell a signature does
+ * not also happen to spell the distance to itself.
  *
- * Nothing is handed on until it is past the window a descriptor could still be sitting in, so what
- * comes out is the entry's data and never the descriptor's own bytes.
+ * Nothing is handed on until it is past the window a descriptor and that record could still be
+ * sitting in, so what comes out is the entry's data and never anything written after it.
  */
 async function* untilDescriptor(bytes: Queued): AsyncGenerator<Uint8Array> {
   let emitted = 0;
 
   while (true) {
     const held = await bytes.holding();
-    const ends = descriptorIn({ held, emitted });
-    if (ends !== undefined) {
-      if (ends > 0) {
-        yield held.subarray(0, ends);
+    const ending = endingIn({ held, emitted });
+    if (ending !== undefined) {
+      if (ending.at > 0) {
+        yield held.subarray(0, ending.at);
       }
-      bytes.drop(ends + DESCRIPTOR_BYTES);
+      bytes.drop(ending.at + ending.descriptorBytes);
       return;
     }
 
-    const safe = held.length - DESCRIPTOR_BYTES;
+    const safe = held.length - HELD_BACK_BYTES;
     if (safe > 0) {
       yield held.subarray(0, safe);
       bytes.drop(safe);
@@ -296,22 +356,82 @@ async function* untilDescriptor(bytes: Queued): AsyncGenerator<Uint8Array> {
   }
 }
 
-/** Where the entry's data ends, as the first descriptor in hand that agrees it ends there. */
-function descriptorIn({ held, emitted }: { held: Buffer; emitted: number }): number | undefined {
+/** Where the entry's data ends, and how much the descriptor saying so took to say it. */
+type Ending = { at: number; descriptorBytes: number };
+
+function endingIn({ held, emitted }: { held: Buffer; emitted: number }): Ending | undefined {
   let from = 0;
 
-  while (from + DESCRIPTOR_BYTES <= held.length) {
-    const at = held.indexOf(DATA_DESCRIPTOR, from);
-    if (at < 0 || at + DESCRIPTOR_BYTES > held.length) {
+  while (true) {
+    const follows = followingRecordIn({ held, from });
+    if (follows === undefined) {
       return undefined;
     }
-    if (held.readUInt32LE(at + DESCRIPTOR_COMPRESSED_SIZE_AT) === emitted + at) {
-      return at;
+    const ending = endingBefore({ held, follows, emitted });
+    if (ending !== undefined) {
+      return ending;
     }
-    from = at + 1;
+    from = follows + 1;
   }
+}
 
+/** The first record in hand that an entry could be followed by, which is where to look back from. */
+function followingRecordIn({ held, from }: { held: Buffer; from: number }): number | undefined {
+  const found = FOLLOWING_RECORDS.map((record) => held.indexOf(record, from)).filter(
+    (at) => at >= 0,
+  );
+  return found.length === 0 ? undefined : Math.min(...found);
+}
+
+/** The descriptor immediately in front of `follows`, as the shape that agrees it belongs there. */
+function endingBefore({
+  held,
+  follows,
+  emitted,
+}: {
+  held: Buffer;
+  follows: number;
+  emitted: number;
+}): Ending | undefined {
+  for (const shape of DESCRIPTOR_SHAPES) {
+    const at = follows - shape.totalBytes;
+    if (at < 0 || !isDescriptor({ held, at, shape })) {
+      continue;
+    }
+    if (claimedSize({ held, at, shape }) === emitted + at) {
+      return { at, descriptorBytes: shape.totalBytes };
+    }
+  }
   return undefined;
+}
+
+/** A shape that carries the signature has to be showing it; the other two are read on faith. */
+function isDescriptor({
+  held,
+  at,
+  shape,
+}: {
+  held: Buffer;
+  at: number;
+  shape: DescriptorShape;
+}): boolean {
+  return !shape.signed || held.subarray(at, at + SIGNATURE_BYTES).equals(DATA_DESCRIPTOR);
+}
+
+/** What the descriptor says the data in front of it came to, read at its own shape's width. */
+function claimedSize({
+  held,
+  at,
+  shape,
+}: {
+  held: Buffer;
+  at: number;
+  shape: DescriptorShape;
+}): number {
+  const size = at + shape.compressedSizeAt;
+  return shape.sizeBytes === ZIP64_SIZE_BYTES
+    ? Number(held.readBigUInt64LE(size))
+    : held.readUInt32LE(size);
 }
 
 /** The stream's first bytes, and the stream itself with them still in front of it. */
@@ -443,8 +563,10 @@ function queued(source: ReadableStream<Uint8Array>): Queued {
       return taken;
     },
     async holding() {
-      if (held.length === 0) {
-        await pull();
+      while (held.length === 0) {
+        if (!(await pull())) {
+          break;
+        }
       }
       return held;
     },

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Buffer } from 'node:buffer';
-import { UnreadableArchiveError, unwrapExecutable } from '#lib/zip.ts';
-import { archiveOf, LOCAL_HEADER_BYTES } from '#tests/support/archives.ts';
+import { MAX_ENTRIES, UnreadableArchiveError, unwrapExecutable } from '#lib/zip.ts';
+import { type ArchiveEntry, archiveOf, LOCAL_HEADER_BYTES } from '#tests/support/archives.ts';
 
 const NOTE_LINES = 8;
 
@@ -30,6 +30,17 @@ const PAST_THE_MAGIC = 8;
 
 /** Shorter than the notes a release archive opens with, so the walk gives up inside them. */
 const A_SHORT_WALK = 8;
+
+/** More entries than a budget counting only what they hold would ever stop a walk through. */
+const MANY_ENTRIES = 64;
+
+/** Room for a header or two, and nothing like room for all of them. */
+const A_FEW_HEADERS = 100;
+
+const NOTHING = new Uint8Array(0);
+
+/** One past what a walk will read the headers of. */
+const PAST_THE_ENTRY_LIMIT = MAX_ENTRIES + 1;
 
 describe('a zip is walked to the executable inside it', () => {
   test('past the notes and the licence a release ships beside the binary', async () => {
@@ -113,6 +124,55 @@ describe('a zip is walked to the executable inside it', () => {
 
     expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
   });
+
+  // The signature was never part of the format, only a convention writers settled on, so an entry
+  // ends where a descriptor agrees it does whether or not one is there to find.
+  test('past an entry whose descriptor was written without a signature', async () => {
+    const archive = archiveOf([
+      { name: 'CHANGELOG.md', content: NOTES, descriptor: { signed: false } },
+      { name: 'my-server', content: BINARY },
+    ]);
+
+    const unwrapped = await unwrapExecutable({
+      archive: streamOf(archive),
+      maxSkippedBytes: NO_LIMIT,
+    });
+
+    expect(unwrapped.outcome).toBe('unwrapped');
+    expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
+  });
+
+  // An entry that declared zip64 writes both its sizes eight bytes wide, so its descriptor is
+  // eight bytes longer than the one every other entry carries.
+  test('past an entry that declared its sizes zip64-wide', async () => {
+    const archive = archiveOf([
+      { name: 'CHANGELOG.md', content: NOTES, descriptor: { zip64: true } },
+      { name: 'my-server', content: BINARY },
+    ]);
+
+    const unwrapped = await unwrapExecutable({
+      archive: streamOf(archive),
+      maxSkippedBytes: NO_LIMIT,
+    });
+
+    expect(unwrapped.outcome).toBe('unwrapped');
+    expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
+  });
+
+  // A source is entitled to hand on a chunk with nothing in it, and that is not the source ending.
+  test('where the source hands on a chunk with nothing in it', async () => {
+    const archive = archiveOf([
+      { name: 'my-server', content: BINARY, stored: true, sizesInDescriptor: false },
+    ]);
+
+    const unwrapped = await unwrapExecutable({
+      archive: haltingStreamOf(archive),
+      maxSkippedBytes: NO_LIMIT,
+    });
+
+    expect(unwrapped.outcome).toBe('unwrapped');
+    expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
+  });
 });
 
 describe('a zip that holds no executable is not one to fetch from', () => {
@@ -180,6 +240,46 @@ describe('a zip that holds no executable is not one to fetch from', () => {
 
     expect(unwrapped.outcome).toBe('walked-too-far');
   });
+
+  // Entries that declare nothing cost nothing to skip, so a budget counting only what was skipped
+  // is no bound at all on an archive that is headers the whole way down.
+  test('an archive of headers alone, which holds no data for a budget to count', async () => {
+    const archive = archiveOf(Array.from(Array(MANY_ENTRIES).keys(), entryOfNothing));
+
+    const unwrapped = await unwrapExecutable({
+      archive: streamOf(archive),
+      maxSkippedBytes: A_FEW_HEADERS,
+    });
+
+    expect(unwrapped.outcome).toBe('walked-too-far');
+  });
+
+  // The walk stops with the rest of the archive still on its way, and a source nobody is reading
+  // holds its connection open until it is let go of.
+  test('and the source it stopped part way through is let go of', async () => {
+    const archive = archiveOf([
+      { name: 'CHANGELOG.md', content: NOTES },
+      { name: 'my-server', content: BINARY },
+    ]);
+    const source = sourceOf(archive);
+
+    await unwrapExecutable({ archive: source.stream, maxSkippedBytes: A_SHORT_WALK });
+
+    expect(source.wasLetGo()).toBe(true);
+  });
+
+  // The headers themselves are the work, and a budget in bytes is no bound on how many of them an
+  // archive small enough to fetch can carry.
+  test('an archive of more entries than a walk will read the headers of', async () => {
+    const archive = archiveOf(Array.from(Array(PAST_THE_ENTRY_LIMIT).keys(), entryOfNothing));
+
+    const unwrapped = await unwrapExecutable({
+      archive: streamOf(archive),
+      maxSkippedBytes: NO_LIMIT,
+    });
+
+    expect(unwrapped.outcome).toBe('walked-too-far');
+  });
 });
 
 describe('bytes that are not an archive are the binary themselves', () => {
@@ -219,6 +319,60 @@ function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
       }
       controller.enqueue(bytes.subarray(at, at + CHUNK_BYTES));
       at += CHUNK_BYTES;
+    },
+  });
+}
+
+/** An archive, and whether whoever was reading it let go of it before it ended. */
+function sourceOf(bytes: Uint8Array): {
+  stream: ReadableStream<Uint8Array>;
+  wasLetGo: () => boolean;
+} {
+  let at = 0;
+  let letGo = false;
+
+  function pull(controller: ReadableStreamDefaultController<Uint8Array>): void {
+    if (at >= bytes.byteLength) {
+      controller.close();
+      return;
+    }
+    controller.enqueue(bytes.subarray(at, at + CHUNK_BYTES));
+    at += CHUNK_BYTES;
+  }
+
+  function cancel(): void {
+    letGo = true;
+  }
+
+  function wasLetGo(): boolean {
+    return letGo;
+  }
+
+  return { stream: new ReadableStream<Uint8Array>({ pull, cancel }), wasLetGo };
+}
+
+/** An entry that declares no data at all, which is the whole of what it costs to walk past. */
+function entryOfNothing(index: number): ArchiveEntry {
+  return { name: `note-${index}`, content: NOTHING, stored: true, sizesInDescriptor: false };
+}
+
+/** The same archive, with a chunk of nothing handed on between every chunk that holds something. */
+function haltingStreamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  let at = 0;
+  let holding = true;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (at >= bytes.byteLength) {
+        controller.close();
+        return;
+      }
+      holding = !holding;
+      if (holding) {
+        controller.enqueue(bytes.subarray(at, at + CHUNK_BYTES));
+        at += CHUNK_BYTES;
+        return;
+      }
+      controller.enqueue(NOTHING);
     },
   });
 }

@@ -1,14 +1,19 @@
 import { Buffer } from 'node:buffer';
 import { deflateRawSync } from 'node:zlib';
 
-/** An entry as a release archive carries one, and the two ways a writer can have written it. */
+/** An entry as a release archive carries one, and the ways a writer can have written it. */
 export type ArchiveEntry = {
   name: string;
   content: Uint8Array;
   /** As every writer that streams its output leaves them, which is how a release is built. */
   sizesInDescriptor?: boolean;
   stored?: boolean;
+  /** The shape of that descriptor: the format leaves both of these to the writer. */
+  descriptor?: DescriptorShape;
 };
+
+/** Signed as writers conventionally do, and four bytes wide unless the entry declared zip64. */
+type DescriptorShape = { signed?: boolean; zip64?: boolean };
 
 export const LOCAL_HEADER_BYTES = 30;
 
@@ -18,8 +23,10 @@ const LOCAL_HEADER_SIGNATURE = 0x04034b50;
 const DESCRIPTOR_SIGNATURE = 0x08074b50;
 const CENTRAL_HEADER_SIGNATURE = 0x02014b50;
 const END_OF_DIRECTORY_SIGNATURE = 0x06054b50;
-const DESCRIPTOR_BYTES = 16;
-const DESCRIPTOR_COMPRESSED_SIZE_AT = 8;
+const SIGNATURE_BYTES = 4;
+const CRC_BYTES = 4;
+const SIZE_BYTES = 4;
+const ZIP64_SIZE_BYTES = 8;
 const FLAG_SIZES_IN_DESCRIPTOR = 0x08;
 const METHOD_STORED = 0;
 const METHOD_DEFLATE = 8;
@@ -43,7 +50,7 @@ export function archiveOf(entries: ArchiveEntry[]): Uint8Array {
     const trailed = entry.sizesInDescriptor !== false;
     written.push(headerOf({ entry, data, trailed }), bytesOf(entry.name), data);
     if (trailed) {
-      written.push(descriptorOf(data.byteLength));
+      written.push(descriptorOf({ entry, compressedSizeBytes: data.byteLength }));
     }
   }
 
@@ -67,14 +74,33 @@ function headerOf({
   header.writeUInt16LE(entry.stored === true ? METHOD_STORED : METHOD_DEFLATE, METHOD_AT);
   header.writeUInt32LE(trailed ? 0 : data.byteLength, COMPRESSED_SIZE_AT);
   header.writeUInt32LE(trailed ? 0 : entry.content.byteLength, UNCOMPRESSED_SIZE_AT);
-  header.writeUInt16LE(entry.name.length, NAME_LENGTH_AT);
+  header.writeUInt16LE(Buffer.byteLength(entry.name, 'utf8'), NAME_LENGTH_AT);
   return header;
 }
 
-function descriptorOf(compressedSizeBytes: number): Uint8Array {
-  const descriptor = Buffer.alloc(DESCRIPTOR_BYTES);
-  descriptor.writeUInt32LE(DESCRIPTOR_SIGNATURE, 0);
-  descriptor.writeUInt32LE(compressedSizeBytes, DESCRIPTOR_COMPRESSED_SIZE_AT);
+function descriptorOf({
+  entry,
+  compressedSizeBytes,
+}: {
+  entry: ArchiveEntry;
+  compressedSizeBytes: number;
+}): Uint8Array {
+  const signed = entry.descriptor?.signed !== false;
+  const zip64 = entry.descriptor?.zip64 === true;
+  const sizeBytes = zip64 ? ZIP64_SIZE_BYTES : SIZE_BYTES;
+  const signatureBytes = signed ? SIGNATURE_BYTES : 0;
+  const descriptor = Buffer.alloc(signatureBytes + CRC_BYTES + 2 * sizeBytes);
+
+  if (signed) {
+    descriptor.writeUInt32LE(DESCRIPTOR_SIGNATURE, 0);
+  }
+  const compressedSizeAt = signatureBytes + CRC_BYTES;
+  if (zip64) {
+    descriptor.writeBigUInt64LE(BigInt(compressedSizeBytes), compressedSizeAt);
+  } else {
+    descriptor.writeUInt32LE(compressedSizeBytes, compressedSizeAt);
+  }
+
   return descriptor;
 }
 

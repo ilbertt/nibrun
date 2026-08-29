@@ -20,7 +20,12 @@ import {
 import { filenameFromUrl, withoutCredentials } from '#lib/binary-url.ts';
 import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
-import { UnreadableArchiveError, type Unwrapping, unwrapExecutable } from '#lib/zip.ts';
+import {
+  MAX_ENTRIES,
+  UnreadableArchiveError,
+  type Unwrapping,
+  unwrapExecutable,
+} from '#lib/zip.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
@@ -107,7 +112,7 @@ function interruptedSource(url: string): string {
 }
 
 const NOTHING_EXECUTABLE = 'Nothing inside that zip is a Linux executable.';
-const WALKED_TOO_FAR = `nibrun read ${MAX_ARTIFACT_MEBIBYTES} MB of that zip without reaching an executable.`;
+const WALKED_TOO_FAR = `nibrun read as far into that zip as it will — ${MAX_ARTIFACT_MEBIBYTES} MB, or ${MAX_ENTRIES} entries — without reaching an executable.`;
 
 function unreadableArchive(url: string): string {
   return `The zip ended before the entry it was describing: ${url}`;
@@ -605,7 +610,6 @@ function sourceRefusal({
   }
 }
 
-/** A body nobody is going to read holds its connection open until it is let go of. */
 /**
  * The source as the binary it holds: its own bytes, or the executable inside the zip they turn out
  * to be. A project that publishes its build zipped is publishing a url nobody could deploy from
@@ -665,6 +669,7 @@ function entryName(name: string): Filename | undefined {
   return Value.Check(FilenameSchema, name) ? name : undefined;
 }
 
+/** A body nobody is going to read holds its connection open until it is let go of. */
 async function release(body: ReadableStream<Uint8Array>): Promise<void> {
   try {
     await body.cancel();
