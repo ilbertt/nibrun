@@ -39,10 +39,17 @@ const ELF_MACHINE_AT = 0x12;
 const ELF_TYPE_EXECUTABLE = 2;
 /** What a position-independent executable is, and what a shared library is too. */
 const ELF_TYPE_SHARED = 3;
+const ELF_MACHINE_X86 = 0x03;
+const ELF_MACHINE_ARM = 0x28;
 const ELF_MACHINE_X86_64 = 0x3e;
+const ELF_MACHINE_ARM64 = 0xb7;
+const ELF_MACHINE_RISCV = 0xf3;
 
 /** Through the machine field: the last of what says whether the guest could run this at all. */
 export const ELF_IDENTITY_BYTES = 20;
+
+/** The base a machine nobody named is said in, which is the base every ELF reference lists them in. */
+const HEXADECIMAL = 16;
 
 /**
  * What a machine is called where it has a name worth saying back. Only the ones somebody plausibly
@@ -50,11 +57,11 @@ export const ELF_IDENTITY_BYTES = 20;
  * the point of the name is to be recognised by whoever has to go and rebuild.
  */
 const ARCHITECTURES = new Map([
-  [0x03, 'x86'],
-  [0x28, 'arm'],
-  [0x3e, 'x86-64'],
-  [0xb7, 'arm64'],
-  [0xf3, 'riscv'],
+  [ELF_MACHINE_X86, 'x86'],
+  [ELF_MACHINE_ARM, 'arm'],
+  [ELF_MACHINE_X86_64, 'x86-64'],
+  [ELF_MACHINE_ARM64, 'arm64'],
+  [ELF_MACHINE_RISCV, 'riscv'],
 ]);
 
 export type ElfIdentity =
@@ -102,7 +109,7 @@ export function isGuestExecutable(bytes: Uint8Array): boolean {
 // The width is said only where it is the thing that is wrong: an arm64 build is arm64 whether it
 // was compiled 32-bit or 64-bit, while a 32-bit x86-64 is a name that reads as a contradiction.
 function architectureOf({ machine, bytes }: { machine: number; bytes: Uint8Array }): string {
-  const named = ARCHITECTURES.get(machine) ?? `machine 0x${machine.toString(16)}`;
+  const named = ARCHITECTURES.get(machine) ?? `machine 0x${machine.toString(HEXADECIMAL)}`;
   return machine === ELF_MACHINE_X86_64 || bytes[ELF_CLASS_AT] === ELF_CLASS_64
     ? named
     : `32-bit ${named}`;
