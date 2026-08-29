@@ -203,6 +203,7 @@ export {
   TenantLogStreamSchema,
 } from '#domain/log.ts';
 export {
+  DEFAULT_VOLUME_SIZE_BYTES,
   VOLUME_STATES,
   type Volume,
   VolumeSchema,
