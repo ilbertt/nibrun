@@ -10,10 +10,11 @@ const MACHINE_SPEC = [
   `${DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB} GB disk`,
 ].join(' · ');
 
-const TIERS = [
+const TIERS: { name: string; price: string; detail: string; machine?: string }[] = [
   {
     name: `Your first ${FREE_APP_LIMIT} apps`,
     price: 'Free, forever',
+    machine: MACHINE_SPEC,
     detail: 'No card to start, and no trial clock counting down behind it.',
   },
   {
@@ -25,21 +26,23 @@ const TIERS = [
 
 export function Pricing() {
   return (
-    <section className="flex w-full flex-col gap-10 border-border/60 border-t py-16 sm:py-20">
-      <div className="flex max-w-2xl flex-col gap-4">
-        <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          Your first {FREE_APP_LIMIT} apps are free. Forever.
-        </h2>
-        <p className="text-pretty text-muted-foreground">
-          Every app gets the same machine — <span className="text-foreground">{MACHINE_SPEC}</span>{' '}
-          — so there is only one thing here to price.
-        </p>
-      </div>
+    <section
+      id="pricing"
+      className="flex w-full flex-col gap-10 border-border/60 border-t py-16 sm:py-20"
+    >
+      <h2 className="max-w-2xl font-semibold text-2xl tracking-tight sm:text-3xl">
+        Your first {FREE_APP_LIMIT} apps are free. Forever.
+      </h2>
       <ul className="grid gap-8 sm:grid-cols-2">
-        {TIERS.map(({ name, price, detail }) => (
+        {TIERS.map(({ name, price, machine, detail }) => (
           <li key={name} className="flex flex-col gap-2 border-border/60 border-t pt-4">
             <span className="text-muted-foreground text-sm">{name}</span>
             <span className="font-medium text-lg text-primary">{price}</span>
+            {machine ? (
+              <span className="text-muted-foreground text-sm">
+                Each app gets: <span className="text-foreground">{machine}</span>
+              </span>
+            ) : null}
             <span className="text-pretty text-muted-foreground text-sm">{detail}</span>
           </li>
         ))}
