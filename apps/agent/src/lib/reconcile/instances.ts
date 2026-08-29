@@ -291,6 +291,14 @@ function probed({ record, nowMs }: { record: InstanceRecord; nowMs: number }) {
   });
 }
 
+/**
+ * What this pass measured is merged into the record as it stands, never written over it. A probe
+ * is the longest thing the loop does, and a reconcile landing a start while one runs has already
+ * cleared the `stopRequested` the pass read: writing the whole record back would put that flag on
+ * again, and an instance carrying it is `stopping` for as long as its unit is up — a state nothing
+ * forwards to and no later pass leaves, because the planner lets a running unit be. Merging is
+ * also what keeps an instance dropped mid-pass dropped.
+ */
 function settle({
   record,
   status,
@@ -313,17 +321,26 @@ function settle({
     });
 
     if (state === record.state) {
-      return yield* AgentState.putRecord({ ...record, health });
+      return yield* AgentState.updateRecord({
+        appId: record.appId,
+        change: (latest) => ({ ...latest, health }),
+      });
     }
 
-    yield* AgentState.putRecord({
-      ...record,
-      health,
-      state,
-      ...(status.exitCode !== undefined && !status.active ? { lastExitCode: status.exitCode } : {}),
-      // Cleared as readily as it is written: a message outliving the state it explains is
-      // read as an account of the state that replaced it.
-      message: yield* verdict({ state, status, health, record }),
+    // Cleared as readily as it is written: a message outliving the state it explains is
+    // read as an account of the state that replaced it.
+    const message = yield* verdict({ state, status, health, record });
+    yield* AgentState.updateRecord({
+      appId: record.appId,
+      change: (latest) => ({
+        ...latest,
+        health,
+        state,
+        ...(status.exitCode !== undefined && !status.active
+          ? { lastExitCode: status.exitCode }
+          : {}),
+        message,
+      }),
     });
     yield* Effect.logInfo('instance state changed').pipe(
       Effect.annotateLogs({
