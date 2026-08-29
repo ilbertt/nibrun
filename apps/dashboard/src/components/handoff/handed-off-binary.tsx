@@ -61,7 +61,9 @@ function Waiting({ binary, signedIn }: { binary: File | undefined; signedIn: boo
           <EmptyTitle className={named === undefined ? undefined : 'break-all font-mono'}>
             {named ?? 'Deploy a binary'}
           </EmptyTitle>
-          <EmptyDescription>{describeWaiting({ binary, fetched: link.binary })}</EmptyDescription>
+          {binary !== undefined && (
+            <EmptyDescription>{formatBytes(binary.size)}, waiting to be deployed.</EmptyDescription>
+          )}
         </EmptyHeader>
         <EmptyContent>
           <Button render={<Link to={LoginRoute.to} search={{ redirect: here }} />}>
@@ -77,19 +79,4 @@ function Waiting({ binary, signedIn }: { binary: File | undefined; signedIn: boo
       <HandoffDeploy binary={binary} />
     </DeployRunProvider>
   );
-}
-
-function describeWaiting({
-  binary,
-  fetched,
-}: {
-  binary: File | undefined;
-  fetched: string | undefined;
-}): string {
-  if (binary !== undefined) {
-    return `${formatBytes(binary.size)}, waiting to be deployed.`;
-  }
-  return fetched === undefined
-    ? 'Sign in, then pick the binary you compiled.'
-    : 'Sign in, and nibrun fetches it from the url this link named.';
 }
