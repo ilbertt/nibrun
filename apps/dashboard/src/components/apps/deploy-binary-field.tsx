@@ -1,8 +1,6 @@
-import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
+import { Field, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { BINARY_INPUT_ID } from '#components/apps/binary-drop-zone.tsx';
 import { BinarySourcePicker } from '#components/apps/binary-source-picker.tsx';
-import { type BinarySource, fetchedUrl, pickedFile } from '#lib/binary-source.ts';
-import { formatBytes } from '#lib/format-bytes.ts';
 import {
   type DeployFormApi,
   validateBinary,
@@ -32,35 +30,10 @@ export function DeployBinaryField({
               keeping={replacing !== undefined}
               onChange={field.handleChange}
             />
-            {rejected ? (
-              <FieldError>{field.state.meta.errors[0]}</FieldError>
-            ) : (
-              <FieldDescription>
-                {describeBinary({ binary: field.state.value, replacing })}
-              </FieldDescription>
-            )}
+            {rejected && <FieldError>{field.state.meta.errors[0]}</FieldError>}
           </Field>
         );
       }}
     </api.Field>
   );
-}
-
-function describeBinary({
-  binary,
-  replacing,
-}: {
-  binary: BinarySource | undefined;
-  replacing: AppSummary | undefined;
-}): string {
-  const file = pickedFile(binary);
-  if (file !== undefined) {
-    return `${formatBytes(file.size)}, uploaded straight to the store.`;
-  }
-  if (fetchedUrl(binary) !== undefined) {
-    return 'Fetched by nibrun when you deploy, so nothing crosses this browser.';
-  }
-  return replacing === undefined
-    ? 'The compiled binary to run in the guest.'
-    : 'Leave it empty and the app runs the binary it already has, with what you change here.';
 }
