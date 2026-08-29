@@ -1,0 +1,43 @@
+/* The sixteen colours a program names when it writes to a terminal. A guest picks them for a
+   terminal it cannot see and we show them on a page that has two themes, so neither black nor
+   white is taken literally: each is pulled far enough off the background it lands on to stay
+   readable there. Written as variables rather than utilities, because what selects one is an
+   escape code in the guest's own output. */
+
+:root {
+  --ansi-black: oklch(0.42 0.012 149.2);
+  --ansi-red: oklch(0.53 0.2 27);
+  --ansi-green: oklch(0.52 0.14 149.2);
+  --ansi-yellow: oklch(0.58 0.13 90);
+  --ansi-blue: oklch(0.52 0.19 258);
+  --ansi-magenta: oklch(0.52 0.21 328);
+  --ansi-cyan: oklch(0.55 0.1 200);
+  --ansi-white: oklch(0.32 0.012 149.2);
+  --ansi-bright-black: oklch(0.55 0.012 149.2);
+  --ansi-bright-red: oklch(0.63 0.22 27);
+  --ansi-bright-green: oklch(0.62 0.16 149.2);
+  --ansi-bright-yellow: oklch(0.68 0.15 90);
+  --ansi-bright-blue: oklch(0.62 0.21 258);
+  --ansi-bright-magenta: oklch(0.62 0.23 328);
+  --ansi-bright-cyan: oklch(0.65 0.11 200);
+  --ansi-bright-white: oklch(0.2 0.012 149.2);
+}
+
+.dark {
+  --ansi-black: oklch(0.4 0.012 149.2);
+  --ansi-red: oklch(0.68 0.19 27);
+  --ansi-green: oklch(0.75 0.17 149.2);
+  --ansi-yellow: oklch(0.82 0.15 90);
+  --ansi-blue: oklch(0.7 0.16 258);
+  --ansi-magenta: oklch(0.72 0.19 328);
+  --ansi-cyan: oklch(0.78 0.11 200);
+  --ansi-white: oklch(0.88 0.008 149.2);
+  --ansi-bright-black: oklch(0.58 0.012 149.2);
+  --ansi-bright-red: oklch(0.76 0.19 27);
+  --ansi-bright-green: oklch(0.85 0.19 149.2);
+  --ansi-bright-yellow: oklch(0.9 0.16 90);
+  --ansi-bright-blue: oklch(0.79 0.14 258);
+  --ansi-bright-magenta: oklch(0.81 0.17 328);
+  --ansi-bright-cyan: oklch(0.87 0.1 200);
+  --ansi-bright-white: oklch(0.99 0 0);
+}
