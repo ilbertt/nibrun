@@ -7,14 +7,16 @@
 # whatever machine an owner happens to have, and `sh` is the shell that is always there.
 #
 # Nothing here is nibrun-aware. It resolves a platform to one of the assets `release-cli.yml`
-# publishes, fetches it, and asks the result which version it is. Running it again is how an
-# owner upgrades, so it is written to be run any number of times.
+# publishes, fetches it, checks it against the checksums that release publishes, and asks the
+# result which version it is. Running it again is how an owner upgrades, so it is written to be run
+# any number of times.
 set -eu
 
 REPO="ilbertt/nibrun"
 # The CLI is tagged apart from anything else this repo may come to release, so the newest release
 # is not necessarily the newest *CLI* release.
 TAG_PREFIX="cli-v"
+CHECKSUMS_FILE="checksums.txt"
 DEFAULT_INSTALL_DIR="$HOME/.local/bin"
 
 # Styling is for a terminal to read: a pipe, a log file or NO_COLOR gets the same lines unadorned.
@@ -75,6 +77,8 @@ main() {
   url="https://github.com/$REPO/releases/download/$version/nib-$target"
   curl --fail --silent --show-error --location "$url" --output "$staged" ||
     die "Could not download $url"
+
+  verify_checksum "$staged" "nib-$target" "$version"
 
   # Explicit rather than +x: mktemp creates it 600, so +x would leave a binary nobody but its
   # owner can read — surprising in a shared install dir.
@@ -139,6 +143,51 @@ newest_from_api() {
     grep -o "\"tag_name\": *\"${TAG_PREFIX}[^\"]*\"" |
     head -n 1 |
     sed "s/.*\"\(${TAG_PREFIX}[^\"]*\)\"/\1/"
+}
+
+# The checksum is fetched from the same release over the same TLS as the binary, so what it catches
+# is a download that arrived wrong — truncated, or answered by a cache that had no business
+# answering — rather than a github.com handing out assets someone else put there. The build
+# provenance attestation linked from every release is what speaks to that second question.
+#
+# Only a checksum that is published and disagrees is fatal: releases cut before this file existed
+# publish none, and a machine with no sha256 tool on it still gets an install that works.
+verify_checksum() {
+  downloaded=$1 asset=$2 release=$3
+
+  expected=$(published_checksum "$asset" "$release")
+  if [ -z "$expected" ]; then
+    warn "$release publishes no checksum for $asset, so it was not verified."
+    return 0
+  fi
+
+  actual=$(sha256 "$downloaded")
+  if [ -z "$actual" ]; then
+    warn "This machine has no sha256sum, shasum or openssl, so $asset was not verified."
+    return 0
+  fi
+
+  [ "$actual" = "$expected" ] ||
+    die "$asset is not what $release publishes: expected $expected, got $actual."
+}
+
+# The name is the second field of a `sha256sum` line and the checksum the first, so a release that
+# stops carrying one — or never did — reads as no line rather than as a wrong answer.
+published_checksum() {
+  curl --fail --silent --location "https://github.com/$REPO/releases/download/$2/$CHECKSUMS_FILE" |
+    awk -v asset="$1" '$2 == asset { print $1 }'
+}
+
+# Whichever of the three this machine has: macOS ships shasum and no sha256sum, a Linux ships the
+# reverse, and openssl is what is left on an image too small for either.
+sha256() {
+  if command -v sha256sum > /dev/null 2>&1; then
+    sha256sum "$1" | cut -d ' ' -f 1
+  elif command -v shasum > /dev/null 2>&1; then
+    shasum -a 256 "$1" | cut -d ' ' -f 1
+  elif command -v openssl > /dev/null 2>&1; then
+    openssl dgst -sha256 "$1" | awk '{ print $NF }'
+  fi
 }
 
 # Empty when nothing is installed there yet, which is what tells an install from an upgrade.
