@@ -18,12 +18,19 @@ import { Textarea } from '@repo/ui/components/textarea';
 import { DeployEnvironmentField } from '#components/deploy/deploy-environment-field.tsx';
 import { DeployNameField } from '#components/deploy/deploy-name-field.tsx';
 import type { DeploySuggestion } from '#lib/deploy-link.ts';
-import { filledVariables, storedVariables } from '#lib/environment-variables.ts';
+import {
+  type EnvironmentVariable,
+  filledVariables,
+  storedVariables,
+  unfilledAsked,
+} from '#lib/environment-variables.ts';
 import { type DeployFormState, tenantArguments, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 const ARGUMENTS = 'Arguments';
 const ADDITIONAL_PORTS = 'Additional ports';
 const ENVIRONMENT = 'environment';
+
+const AWAITING = 'Waiting on a value the link asked for.';
 
 /** Everything a deploy is beyond the binary itself, which is everything a link can carry. */
 export function DeployConfiguration({
@@ -164,12 +171,15 @@ export function DeployConfiguration({
             {/* Collapsed, a refused variable would disable the button with nothing on screen
                 saying why, so the section that holds it says so itself. A shut panel keeps its
                 variables validated, which is what leaves anything to say. */}
-            <api.Subscribe selector={(state) => state.fieldMeta.environment?.errors.length ?? 0}>
-              {(refused) =>
-                refused > 0 ? (
-                  <span className="font-normal text-destructive">needs a look</span>
-                ) : null
+            <api.Subscribe
+              selector={(state) =>
+                environmentMark({
+                  variables: state.values.environment,
+                  refused: (state.fieldMeta.environment?.errors.length ?? 0) > 0,
+                })
               }
+            >
+              {(mark) => <EnvironmentMark mark={mark} />}
             </api.Subscribe>
           </AccordionTrigger>
           <AccordionContent keepMounted>
@@ -187,6 +197,41 @@ export function DeployConfiguration({
  */
 export function asksForVariables(suggested: DeploySuggestion | undefined): boolean {
   return suggested?.environment?.some((entry) => entry.value.length === 0) ?? false;
+}
+
+type EnvironmentMarkKind = 'awaiting' | 'refused' | undefined;
+
+/**
+ * A link asks for the variables only the owner holds, and the form waits on them. That is not a
+ * mistake, so the section is marked rather than told off — and it outranks anything else the
+ * table has to say, which is what lets the mark stand for whichever issue the field is showing.
+ */
+function environmentMark({
+  variables,
+  refused,
+}: {
+  variables: EnvironmentVariable[] | undefined;
+  refused: boolean;
+}): EnvironmentMarkKind {
+  if (unfilledAsked(variables ?? []).length > 0) {
+    return 'awaiting';
+  }
+  return refused ? 'refused' : undefined;
+}
+
+function EnvironmentMark({ mark }: { mark: EnvironmentMarkKind }) {
+  if (mark === 'refused') {
+    return <span className="font-normal text-destructive">needs a look</span>;
+  }
+  if (mark === 'awaiting') {
+    return (
+      <span className="flex h-5 shrink-0 items-center" title={AWAITING}>
+        <span className="size-1.5 rounded-full bg-warning motion-safe:animate-pulse" />
+        <span className="sr-only">{AWAITING}</span>
+      </span>
+    );
+  }
+  return null;
 }
 
 /** What the section says while it is shut, in the one word a count would be. */

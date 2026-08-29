@@ -48,11 +48,14 @@ export function askedVariables(entries: readonly EnvironmentAssignment[]): Envir
   }));
 }
 
+/** A row a link asked for and nobody has filled: what a deploy waits on rather than refuses. */
+export function awaitsValue(variable: EnvironmentVariable): boolean {
+  return variable.asked && variable.value.length === 0;
+}
+
 /** The names a link asked for that still hold nothing, which is what a deploy cannot be made of. */
 export function unfilledAsked(variables: readonly EnvironmentVariable[]): string[] {
-  return variables
-    .filter((variable) => variable.asked && variable.value.length === 0)
-    .map((variable) => variable.name.trim());
+  return variables.filter(awaitsValue).map((variable) => variable.name.trim());
 }
 
 /** A row nobody has filled in yet is not a variable, and is not sent as one. */
