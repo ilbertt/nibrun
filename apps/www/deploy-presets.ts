@@ -1,4 +1,5 @@
 import type { DeployLink } from '@repo/deploy-link';
+import { RUNTIME_VALUES, writtenRuntimeValue } from '@repo/protocol';
 
 export const DEPLOY_PRESETS = {
   pocketbase: {
@@ -8,6 +9,19 @@ export const DEPLOY_PRESETS = {
     sha256: '0f3442d2e57b03b56fbff0d09289e4a30b4f561a44338c38d2dcd4a1a0cfa91e',
     port: 8090,
     arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data'],
+    minimal: true,
+  },
+  sharkord: {
+    name: 'sharkord',
+    binary: 'https://github.com/sharkord/sharkord/releases/latest/download/sharkord-linux-x64',
+    port: 4991,
+    'extra-public-port': true,
+    env: [
+      'SHARKORD_DATA_PATH=data',
+      'SHARKORD_AUTOUPDATE=false',
+      `SHARKORD_WEBRTC_PORT=${writtenRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name)}`,
+      `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS=${writtenRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}`,
+    ],
     minimal: true,
   },
 } satisfies Record<string, DeployLink>;
