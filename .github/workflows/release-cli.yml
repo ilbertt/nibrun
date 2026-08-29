@@ -45,4 +45,5 @@ jobs:
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
             --notes-file "$RELEASE_NOTES_FILE" \
-            packages/cli/dist/nib-*
+            packages/cli/dist/nib-* \
+            packages/cli/dist/checksums.txt
