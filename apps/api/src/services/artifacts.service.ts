@@ -3,6 +3,7 @@ import {
   type Artifact,
   type ArtifactId,
   type Filename,
+  FilenameSchema,
   type ObjectKey,
   ObjectKeySchema,
   type OwnerId,
@@ -19,6 +20,12 @@ import {
 import { filenameFromUrl, withoutCredentials } from '#lib/binary-url.ts';
 import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
+import {
+  MAX_ENTRIES,
+  UnreadableArchiveError,
+  type Unwrapping,
+  unwrapExecutable,
+} from '#lib/zip.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
@@ -102,6 +109,16 @@ function privateAddress(host: string): string {
 
 function interruptedSource(url: string): string {
   return `The url stopped sending before the binary was whole: ${url}`;
+}
+
+const NOTHING_EXECUTABLE = 'Nothing inside that zip is a Linux executable.';
+const WALKED_TOO_FAR = `nibrun read as far into that zip as it will — ${MAX_ARTIFACT_MEBIBYTES} MB, or ${MAX_ENTRIES} entries — without reaching an executable.`;
+
+const ENTRY_TOO_LARGE =
+  'An entry in that zip is longer than a zip header can say, which is more than nibrun will read past.';
+
+function unreadableArchive(url: string): string {
+  return `The zip ended before the entry it was describing: ${url}`;
 }
 
 function unsupportedInterpreter(interpreter: string): string {
@@ -337,17 +354,19 @@ export class ArtifactsService extends Service {
     }
 
     // Bounded on the way in whatever the host said about it: a declared length is a courtesy, and
-    // a source that declares none is otherwise read for as long as it keeps sending.
+    // a source that declares none is otherwise read for as long as it keeps sending. The bound is
+    // on what the url sent rather than on what it came to, which for an archive is not the same.
     const fetched = boundedTo({ source: source.body, maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES });
+    const held = await unwrapped({ source: fetched, named: filename, url: said });
 
     const pending = await this.artifactsRepo.insertPending({
       appId,
       ownerId,
-      originalFileName: filename,
+      originalFileName: held.filename,
       originalFileUrl: said,
     });
     if (!pending) {
-      await release(fetched);
+      await release(held.body);
       throw new NotFoundError(NO_SUCH_APP);
     }
 
@@ -357,7 +376,7 @@ export class ArtifactsService extends Service {
       artifactId: pending.id,
       ownerId,
       staged,
-      body: fetched,
+      body: held.body,
       url: said,
     });
 
@@ -397,6 +416,11 @@ export class ArtifactsService extends Service {
       // in exactly the way a 404 from it would be.
       if (failure instanceof ArtifactTooLargeError) {
         throw new BadRequestError(TOO_LARGE);
+      }
+      // The archive was still being walked as the executable inside it was written, so a zip that
+      // turns out not to hold what its headers said reaches this end as the write failing.
+      if (failure instanceof UnreadableArchiveError) {
+        throw new BadRequestError(unreadableArchive(url));
       }
       throw failure;
     }
@@ -587,6 +611,67 @@ function sourceRefusal({
     case 'private-address':
       return privateAddress(source.host);
   }
+}
+
+/**
+ * The source as the binary it holds: its own bytes, or the executable inside the zip they turn out
+ * to be. A project that publishes its build zipped is publishing a url nobody could deploy from
+ * otherwise — the alternative is downloading it, unzipping it, and uploading the one file inside.
+ *
+ * The entry names the artifact where it can, because it is the name the binary actually has: a url
+ * ending in `.zip` would otherwise be what an export writes the executable out as.
+ */
+async function unwrapped({
+  source,
+  named,
+  url,
+}: {
+  source: ReadableStream<Uint8Array>;
+  named: Filename;
+  url: string;
+}): Promise<{ body: ReadableStream<Uint8Array>; filename: Filename }> {
+  const unwrapping = await walked({ source, url });
+
+  switch (unwrapping.outcome) {
+    case 'not-an-archive':
+      return { body: unwrapping.body, filename: named };
+    case 'unwrapped':
+      return { body: unwrapping.body, filename: entryName(unwrapping.name) ?? named };
+    case 'no-executable':
+      throw new BadRequestError(NOTHING_EXECUTABLE);
+    case 'walked-too-far':
+      throw new BadRequestError(WALKED_TOO_FAR);
+    case 'entry-too-large':
+      throw new BadRequestError(ENTRY_TOO_LARGE);
+    case 'unreadable':
+      throw new BadRequestError(unreadableArchive(url));
+  }
+}
+
+/** The walk, with the two ways it can fail said in the caller's terms rather than the walker's. */
+async function walked({
+  source,
+  url,
+}: {
+  source: ReadableStream<Uint8Array>;
+  url: string;
+}): Promise<Unwrapping> {
+  try {
+    return await unwrapExecutable({ archive: source, maxSkippedBytes: MAX_ARTIFACT_SIZE_BYTES });
+  } catch (failure) {
+    if (failure instanceof InterruptedSourceError) {
+      throw new BadRequestError(interruptedSource(url));
+    }
+    if (failure instanceof ArtifactTooLargeError) {
+      throw new BadRequestError(TOO_LARGE);
+    }
+    throw failure;
+  }
+}
+
+/** The entry's name where it is one an export could carry, and nothing where it is not. */
+function entryName(name: string): Filename | undefined {
+  return Value.Check(FilenameSchema, name) ? name : undefined;
 }
 
 /** A body nobody is going to read holds its connection open until it is let go of. */
