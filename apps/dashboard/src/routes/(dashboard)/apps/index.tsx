@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { AppsList } from '#components/apps/apps-list.tsx';
-import { DeployDialog } from '#components/apps/deploy-dialog.tsx';
+import { DeployDialog } from '#components/deploy/deploy-dialog.tsx';
 import { useApps } from '#lib/hooks/use-apps.ts';
 
 export const Route = createFileRoute('/(dashboard)/apps/')({ component: RouteComponent });

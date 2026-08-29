@@ -1,7 +1,7 @@
 import { DeleteAppDialog } from '#components/apps/delete-app-dialog.tsx';
-import { DeployDialog } from '#components/apps/deploy-dialog.tsx';
 import { ExportAppDialog } from '#components/apps/export-app-dialog.tsx';
 import { SuspendAppButton } from '#components/apps/suspend-app-button.tsx';
+import { DeployDialog } from '#components/deploy/deploy-dialog.tsx';
 import { useAppActions } from '#lib/hooks/use-app-actions.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 

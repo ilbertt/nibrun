@@ -1,4 +1,4 @@
-import { DeployDialogContent } from '#components/apps/deploy-dialog-content.tsx';
+import { DeployDialogContent } from '#components/deploy/deploy-dialog-content.tsx';
 import { type AppActionAvailability, ENABLED, greyedReason } from '#lib/app-actions.ts';
 import { DeployRunProvider } from '#lib/providers/deploy-run-provider.tsx';
 

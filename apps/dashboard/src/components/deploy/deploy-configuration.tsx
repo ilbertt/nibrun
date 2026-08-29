@@ -15,8 +15,8 @@ import {
 } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
-import { DeployEnvironmentField } from '#components/apps/deploy-environment-field.tsx';
-import { DeployNameField } from '#components/apps/deploy-name-field.tsx';
+import { DeployEnvironmentField } from '#components/deploy/deploy-environment-field.tsx';
+import { DeployNameField } from '#components/deploy/deploy-name-field.tsx';
 import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import { filledVariables, storedVariables } from '#lib/environment-variables.ts';
 import { type DeployFormState, tenantArguments, validatePort } from '#lib/hooks/use-deploy-form.ts';
