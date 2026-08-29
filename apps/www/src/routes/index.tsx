@@ -5,6 +5,7 @@ import { DeployCta } from '#components/deploy-cta.tsx';
 import { GetStartedHint } from '#components/get-started-hint.tsx';
 import { Hero } from '#components/hero.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
+import { Pricing } from '#components/pricing.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { TryItOut } from '#components/try-it-out.tsx';
 import { WhatItActuallyNeeds } from '#components/what-it-actually-needs.tsx';
@@ -37,6 +38,7 @@ function RouteComponent() {
         </section>
         <WhatItActuallyNeeds />
         <WhatYourAppGets />
+        <Pricing />
         <DeployCta />
       </main>
     </>
