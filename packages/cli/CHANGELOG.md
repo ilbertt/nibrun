@@ -2,6 +2,12 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.29-2]
+
+### 🚀 Features
+
+- *(cli)* Nib apps status says how much of the machine an app is using (#371)
+
 ## [2026.8.29-1]
 
 ### 🚀 Features
