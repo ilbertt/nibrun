@@ -109,15 +109,17 @@ export function validateEnvironment({
   value: EnvironmentVariable[] | undefined;
 }): string | undefined {
   const variables = filledVariables(value ?? []);
-  if (variables.some((variable) => variable.name.trim().length === 0)) {
-    return 'A variable needs a name.';
-  }
 
-  // A link names what the app needs and carries no value for it, so this is the one thing on the
-  // form that nothing else could supply: not the link, not the app, not a default.
+  // First, and not only because it is the one thing on the form that nothing else could supply —
+  // not the link, not the app, not a default. It is also the one the form waits on rather than
+  // refuses, and the field reads it as such by having no other issue to show while it stands.
   const unfilled = unfilledAsked(variables);
   if (unfilled.length > 0) {
     return `Fill in what the link asked for: ${unfilled.join(', ')}.`;
+  }
+
+  if (variables.some((variable) => variable.name.trim().length === 0)) {
+    return 'A variable needs a name.';
   }
 
   // Two rows under one name are one variable by the time they are a record, so the row that lost
