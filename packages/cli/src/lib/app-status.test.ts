@@ -17,7 +17,7 @@ const RESOURCE_COUNT = 3;
 function app(overrides: object = {}): AppStatusView {
   return {
     slug: 'quiet-otter',
-    state: 'active',
+    status: 'running',
     config: {
       volumeSizeBytes: VOLUME_SIZE_BYTES,
       resources: { vcpuCount: VCPU_COUNT, memoryMib: MEMORY_MIB },
@@ -46,7 +46,7 @@ describe('a status says what one app is using of what it was given', () => {
   test('every resource reads as what is spent over what was allocated', () => {
     const lines = renderStatus(measured);
 
-    expect(lines[0]).toBe('quiet-otter  active');
+    expect(lines[0]).toBe('quiet-otter  running');
     expect(lines.join('\n')).toContain('vCPU    0.36 / 2');
     expect(lines.join('\n')).toContain('Memory  393.3 MiB / 1.0 GiB');
     expect(lines.join('\n')).toContain('Volume  1.4 GiB / 8.0 GiB');
@@ -58,7 +58,7 @@ describe('a status says what one app is using of what it was given', () => {
 
     expect(lines).toContain('vCPU    - / 2');
     expect(lines).toContain('Memory  - / 1.0 GiB');
-    expect(lines).not.toContain('measured');
+    expect(lines).not.toContain('(2026-');
   });
 
   /**
@@ -66,9 +66,15 @@ describe('a status says what one app is using of what it was given', () => {
    * other — which is why the moment sits on the line it belongs to rather than under all three.
    */
   test('each line carries the moment its own reading was taken', () => {
-    const lines = renderStatus(measured).filter((line) => line.includes('measured'));
+    const lines = renderStatus(measured).filter((line) => line.includes('(2026-'));
 
     expect(lines).toHaveLength(RESOURCE_COUNT);
+  });
+
+  // The dashboard's badge says this one in two words, and an owner reading both surfaces should
+  // not have to work out that they are the same thing.
+  test('an app nothing has ever deployed is said the way the dashboard says it', () => {
+    expect(renderStatus(app({ status: 'never-deployed' }))[0]).toBe('quiet-otter  never deployed');
   });
 
   // Memory is a level and arrives whole; a share needs a reading behind it and cannot.

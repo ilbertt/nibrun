@@ -1,13 +1,23 @@
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { appBySlug, type ListedApp } from '@repo/app-operations';
+import {
+  APP_STATUS_LABELS,
+  type AppStatusKey,
+  appWithStatus,
+  type ListedApp,
+  statusKey,
+} from '@repo/app-operations';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { dayAndMinute } from '#lib/timestamp.ts';
 
-export type AppStatusView = Pick<
-  ListedApp,
-  'slug' | 'state' | 'config' | 'volumeUsage' | 'computeUsage'
->;
+export type AppStatusView = Pick<ListedApp, 'slug' | 'config' | 'volumeUsage' | 'computeUsage'> & {
+  /**
+   * What the app is doing, not what its row says. An app row is `active` from the moment it is
+   * created, so on its own it says nothing about whether anything is serving — the release
+   * answers that, and `running` is the word an owner is looking for here.
+   */
+  status: AppStatusKey;
+};
 
 const BYTES_PER_MIB = 1_048_576;
 
@@ -76,13 +86,13 @@ export function renderStatus(app: AppStatusView): string[] {
   const spentWidth = Math.max(...resources.map((resource) => resource.spent.length));
 
   return [
-    `${app.slug}  ${app.state}`,
+    `${app.slug}  ${APP_STATUS_LABELS[app.status]}`,
     '',
     ...resources.map((resource) =>
       [
         resource.label.padEnd(LABEL_WIDTH),
         resource.spent.padEnd(spentWidth),
-        resource.measuredAt ? `measured ${dayAndMinute(resource.measuredAt)}` : '',
+        resource.measuredAt ? `(${dayAndMinute(resource.measuredAt)})` : '',
       ]
         .join('  ')
         .trimEnd(),
@@ -99,7 +109,8 @@ export async function showStatus({
   slug: string;
   print: Print;
 }): Promise<void> {
-  for (const line of renderStatus(await appBySlug({ api, slug }))) {
+  const { app, status } = await appWithStatus({ api, slug });
+  for (const line of renderStatus({ ...app, status: statusKey(status) })) {
     print.info(line);
   }
 }

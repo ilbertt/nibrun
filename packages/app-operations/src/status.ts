@@ -76,6 +76,29 @@ export function appStatus({
 }
 
 /**
+ * The one word each status goes by where it is shown to an owner.
+ *
+ * Written out rather than derived from the key, which is very nearly the same string: `AppStatus`
+ * is keyed for switching on and this is read by a person, and the two only agree until a key
+ * arrives that a reader would not recognise. Exhaustive for the same reason `STATE` and
+ * `LIVE_OUTPUT` are — a status added without a word for it is a type error rather than a surface
+ * quietly printing an identifier.
+ */
+export const APP_STATUS_LABELS: Record<AppStatusKey, string> = {
+  'never-deployed': 'never deployed',
+  pending: 'pending',
+  starting: 'starting',
+  running: 'running',
+  failed: 'failed',
+  superseded: 'superseded',
+  suspended: 'suspended',
+  suspending: 'suspending',
+  resuming: 'resuming',
+  deleting: 'deleting',
+  deleted: 'deleted',
+};
+
+/**
  * Whether a microVM is up to write anything. A stream tailing an app in any other state is
  * connected to something that will never say a word, which is not what live means.
  */
