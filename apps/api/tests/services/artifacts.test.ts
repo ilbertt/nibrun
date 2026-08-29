@@ -37,6 +37,7 @@ import {
 } from '#services/artifacts.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 import { archiveOf } from '#tests/support/archives.ts';
+import { gzippedTarballOf } from '#tests/support/tarballs.ts';
 
 // The api refuses anything that is not a Linux executable, so the fixture opens with the ELF
 // magic the way a real upload does.
@@ -801,6 +802,7 @@ describe('a row becomes the wire shape the dashboard and the agent both read', (
 
 const BINARY_URL = 'https://releases.test/v1/my-server';
 const ARCHIVE_URL = 'https://releases.test/v1/my-server_1.2.3_linux_amd64.zip';
+const TARBALL_URL = 'https://releases.test/v1/my-server_1.2.3_linux_amd64.tar.gz';
 const FETCHED_NAME = Value.Parse(FilenameSchema, 'my-server');
 
 /**
@@ -1031,6 +1033,44 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     expect(artifact.originalFileName).toBe(FETCHED_NAME);
+  });
+
+  /**
+   * Which is how a linux release is published far more often than zipped: the go and rust toolings
+   * both write one, and a url ending `.tar.gz` is the ordinary shape of a release download.
+   */
+  test('a release that ships as a tarball is the executable inside it', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.servesBytes({
+      bytes: gzippedTarballOf([
+        { name: 'CHANGELOG.md', content: bytesOf('# Changelog\n\nAll of it.\n') },
+        { name: 'dist/my-server', content: bytesOf(BINARY_TEXT) },
+      ]),
+    });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: TARBALL_URL,
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(artifact.originalFileName).toBe(FETCHED_NAME);
+    expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
+    expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(TARBALL_URL);
+  });
+
+  test('a tarball holding nothing executable is refused and leaves nothing behind', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.servesBytes({
+      bytes: gzippedTarballOf([{ name: 'LICENSE.md', content: bytesOf('The MIT Licence.\n') }]),
+    });
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: TARBALL_URL }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
   });
 
   test('a zip holding nothing executable is refused and leaves nothing behind', async () => {

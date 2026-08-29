@@ -9,6 +9,8 @@ import {
   type OwnerId,
   Value,
 } from '@repo/protocol';
+import { unwrapExecutable } from '#lib/archive/unwrap.ts';
+import { MAX_ENTRIES, UnreadableArchiveError, type Unwrapping } from '#lib/archive/walk.ts';
 import {
   type ArtifactInspection,
   ArtifactTooLargeError,
@@ -20,12 +22,6 @@ import {
 import { filenameFromUrl, withoutCredentials } from '#lib/binary-url.ts';
 import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
-import {
-  MAX_ENTRIES,
-  UnreadableArchiveError,
-  type Unwrapping,
-  unwrapExecutable,
-} from '#lib/zip.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
@@ -111,14 +107,14 @@ function interruptedSource(url: string): string {
   return `The url stopped sending before the binary was whole: ${url}`;
 }
 
-const NOTHING_EXECUTABLE = 'Nothing inside that zip is a Linux executable.';
-const WALKED_TOO_FAR = `nibrun read as far into that zip as it will — ${MAX_ARTIFACT_MEBIBYTES} MB, or ${MAX_ENTRIES} entries — without reaching an executable.`;
+const NOTHING_EXECUTABLE = 'Nothing inside that archive is a Linux executable.';
+const WALKED_TOO_FAR = `nibrun read as far into that archive as it will — ${MAX_ARTIFACT_MEBIBYTES} MB, or ${MAX_ENTRIES} entries — without reaching an executable.`;
 
 const ENTRY_TOO_LARGE =
-  'An entry in that zip is longer than a zip header can say, which is more than nibrun will read past.';
+  'An entry in that archive is longer than its own header can say, which is more than nibrun will read past.';
 
 function unreadableArchive(url: string): string {
-  return `The zip ended before the entry it was describing: ${url}`;
+  return `The archive ended before the entry it was describing: ${url}`;
 }
 
 function unsupportedInterpreter(interpreter: string): string {
@@ -417,7 +413,7 @@ export class ArtifactsService extends Service {
       if (failure instanceof ArtifactTooLargeError) {
         throw new BadRequestError(TOO_LARGE);
       }
-      // The archive was still being walked as the executable inside it was written, so a zip that
+      // The archive was still being walked as the executable inside it was written, so one that
       // turns out not to hold what its headers said reaches this end as the write failing.
       if (failure instanceof UnreadableArchiveError) {
         throw new BadRequestError(unreadableArchive(url));
@@ -614,12 +610,12 @@ function sourceRefusal({
 }
 
 /**
- * The source as the binary it holds: its own bytes, or the executable inside the zip they turn out
- * to be. A project that publishes its build zipped is publishing a url nobody could deploy from
- * otherwise — the alternative is downloading it, unzipping it, and uploading the one file inside.
+ * The source as the binary it holds: its own bytes, or the executable inside the archive they turn
+ * out to be. A project that publishes its build packed is publishing a url nobody could deploy from
+ * otherwise — the alternative is downloading it, unpacking it, and uploading the one file inside.
  *
  * The entry names the artifact where it can, because it is the name the binary actually has: a url
- * ending in `.zip` would otherwise be what an export writes the executable out as.
+ * ending in `.tar.gz` would otherwise be what an export writes the executable out as.
  */
 async function unwrapped({
   source,

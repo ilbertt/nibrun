@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Buffer } from 'node:buffer';
-import { MAX_ENTRIES, UnreadableArchiveError, unwrapExecutable } from '#lib/zip.ts';
+import { unwrapExecutable } from '#lib/archive/unwrap.ts';
+import { MAX_ENTRIES, UnreadableArchiveError } from '#lib/archive/walk.ts';
 import { type ArchiveEntry, archiveOf, LOCAL_HEADER_BYTES } from '#tests/support/archives.ts';
 
 const NOTE_LINES = 8;
