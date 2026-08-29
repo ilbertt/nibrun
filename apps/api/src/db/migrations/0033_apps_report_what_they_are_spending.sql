@@ -37,7 +37,15 @@ ALTER TABLE nibrun.app_usage
   ADD CONSTRAINT app_usage_compute_whole
     CHECK (num_nonnulls(memory_total_bytes, memory_used_bytes, compute_measured_at) IN (0, 3)),
   -- Every vCPU the app was given, busy, is 1. Two saturated vCPUs is not 2.
-  ADD CONSTRAINT app_usage_cpu_share_is_a_share CHECK (cpu_share BETWEEN 0 AND 1);
+  ADD CONSTRAINT app_usage_cpu_share_is_a_share CHECK (cpu_share BETWEEN 0 AND 1),
+  -- What is spent cannot be negative and cannot exceed what there is to spend. Both readings are
+  -- a subtraction on the guest's side — total less free, total less available — and a subtraction
+  -- is the thing that produces a number below zero when the two ends come from different units.
+  -- A comparison against null is null rather than false, so a family nothing has measured passes.
+  ADD CONSTRAINT app_usage_volume_within_itself
+    CHECK (volume_used_bytes BETWEEN 0 AND volume_total_bytes),
+  ADD CONSTRAINT app_usage_memory_within_itself
+    CHECK (memory_used_bytes BETWEEN 0 AND memory_total_bytes);
 
 COMMENT ON TABLE nibrun.app_usage IS 'The last readings a host took of an app. No row until one has been taken.';
 COMMENT ON COLUMN nibrun.app_usage.volume_total_bytes IS 'A Postgres bigint, so it arrives as a string; the wire type is a number.';

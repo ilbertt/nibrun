@@ -1632,8 +1632,10 @@ export const schema = {
             app_usage_app_id_key: { _constraintName: "app_usage_app_id_key" },
             app_usage_compute_whole: { _constraintName: "app_usage_compute_whole" },
             app_usage_cpu_share_is_a_share: { _constraintName: "app_usage_cpu_share_is_a_share" },
+            app_usage_memory_within_itself: { _constraintName: "app_usage_memory_within_itself" },
             app_usage_pkey: { _constraintName: "app_usage_pkey" },
             app_usage_volume_whole: { _constraintName: "app_usage_volume_whole" },
+            app_usage_volume_within_itself: { _constraintName: "app_usage_volume_within_itself" },
             volume_usage_app_id_fkey: { _constraintName: "volume_usage_app_id_fkey" }
         }
     },
