@@ -216,6 +216,66 @@ export function boundedTo({
   });
 }
 
+/**
+ * The source as it was, and the digest of everything it served.
+ *
+ * Read to the end whether or not anyone downstream still wants it: half a download has no digest,
+ * and the walk that finds an executable inside an archive lets go of the rest the moment it has
+ * one. So giving up on these bytes reads them rather than releasing the connection — which is what
+ * checking a published checksum costs, a checksum being over the file that was published and not
+ * over whatever is found inside it.
+ *
+ * Only wrapped around a source somebody said a digest for; nothing else pays that.
+ */
+export function digesting({ source }: { source: ReadableStream<Uint8Array> }): {
+  body: ReadableStream<Uint8Array>;
+  served: Promise<Sha256Digest>;
+} {
+  const reader = source.getReader();
+  const hasher = new Bun.CryptoHasher(DIGEST_ALGORITHM);
+  const { promise, resolve, reject } = Promise.withResolvers<Sha256Digest>();
+  // The source can fail on a path that never asks what it hashed to — a refused binary, an app
+  // that went — and a rejection nobody is waiting on yet is an unhandled one.
+  void promise.catch(() => undefined);
+
+  async function taken(): Promise<Uint8Array | undefined> {
+    const { done, value } = await reader.read();
+    if (done) {
+      resolve(Value.Parse(Sha256DigestSchema, hasher.digest(HEX_ENCODING)));
+      return undefined;
+    }
+    hasher.update(value);
+    return value;
+  }
+
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const chunk = await taken();
+        if (chunk === undefined) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(chunk);
+      } catch (failure) {
+        reject(failure);
+        throw failure;
+      }
+    },
+    async cancel() {
+      try {
+        while ((await taken()) !== undefined) {
+          // The rest of the download, which is not wanted for anything but the digest of it.
+        }
+      } catch (failure) {
+        reject(failure);
+      }
+    },
+  });
+
+  return { body, served: promise };
+}
+
 /** What a refusal is raised as, so that whoever was writing the bytes stops and says why. */
 export class RefusedArtifactError extends Error {
   readonly inspection: ArtifactInspection;

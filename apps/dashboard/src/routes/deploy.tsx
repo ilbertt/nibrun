@@ -1,6 +1,6 @@
+import { deployLink } from '@repo/deploy-link';
 import { createFileRoute } from '@tanstack/react-router';
 import { HandedOffBinary } from '#components/handoff/handed-off-binary.tsx';
-import { deployLink } from '#lib/deploy-link.ts';
 import { useHandoffReceiver } from '#lib/hooks/use-handoff-receiver.ts';
 
 // Outside `(auth)` and `(dashboard)` on purpose: the landing page frames this route, and a

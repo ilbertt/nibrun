@@ -1,6 +1,6 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
-import type { DeploymentState, Filename, TenantArguments } from '@repo/protocol';
+import type { DeploymentState, Filename, Sha256Digest, TenantArguments } from '@repo/protocol';
 import { appFor } from '#apps.ts';
 import {
   type ConfigEdit,
@@ -32,6 +32,9 @@ export type UploadableBinary = {
  */
 export type FetchableBinary = {
   url: string;
+  // What the url should be serving, where whoever wrote it knew: the api hashes the bytes it
+  // fetches either way, and refuses them where they come to anything else.
+  sha256?: Sha256Digest | undefined;
 };
 
 export type DeployableBinary = UploadableBinary | FetchableBinary;
@@ -163,7 +166,9 @@ async function fetchBinary({
   appId: string;
   binary: FetchableBinary;
 }): Promise<StoredArtifact> {
-  const created = unwrap(await api.api.apps({ appId }).artifacts.post({ url: binary.url }));
+  const created = unwrap(
+    await api.api.apps({ appId }).artifacts.post({ url: binary.url, sha256: binary.sha256 }),
+  );
   if (!isStored(created)) {
     throw new ApiError('The api answered a fetched binary with somewhere to upload one.');
   }

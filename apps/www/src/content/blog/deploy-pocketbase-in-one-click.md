@@ -55,16 +55,16 @@ serve
 
 Deploy.
 
-Alternatively, this link is that same screen with all of it already configured, asking for nothing
-but the binary:
+Alternatively, this link is that same screen with all of it already configured, the binary
+included, asking for nothing but the button:
 
-[**Deploy PocketBase on nibrun**](https://app.nibrun.com/deploy?name=pocketbase&port=8090&arg=serve&arg=--http=0.0.0.0:8090&arg=--dir=./data/pb_data&minimal)
+[**Deploy PocketBase on nibrun**](https://nibrun.com/deploy/pocketbase)
 
-Nothing in it is ours to hand out. It is the deploy screen reading its own query string — `name`,
-`port`, `arg` per argument, `env` per variable, `extra-public-port` for a second one, `minimal`
-for the form stripped to what is left to do, and `binary` for a url to fetch the executable from,
-which turns the drop into a click. PocketBase publishes its build zipped, so that last one is the
-one part this link cannot carry.
+Nothing in it is ours to hand out. It is a short address for the deploy screen reading its own
+query string — `name`, `port`, `arg` per argument, `env` per variable, `extra-public-port` for a
+second one, `minimal` for the form stripped to what is left to do, and `binary` for a url to fetch
+the executable from, which turns the drop into a click. PocketBase publishes its build zipped, and
+a url that answers with one is unwrapped to the executable inside it.
 
 A few seconds later PocketBase is answering on `https://<your-app>.nibrun.app`, and the
 admin UI is at `/_/`. There is no certificate to obtain and no OS underneath it that is yours to

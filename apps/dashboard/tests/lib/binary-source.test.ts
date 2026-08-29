@@ -1,15 +1,15 @@
 import { expect, test } from 'bun:test';
 import {
   binaryName,
+  fetchedBinary,
   fetchedUrl,
-  namedByUrl,
   pickedFile,
-  refusedUrl,
   sourceFromUrl,
 } from '#lib/binary-source.ts';
 
 const URL_SOURCE = 'https://github.com/me/app/releases/download/v1/my-server';
 const FILE = new File([], 'my-server');
+const CHECKSUM = 'd9403d88cdf0684fbb9d8e97cf3508e9fb4506cf309a34e42653a1c2bc04a298';
 
 test('a file and a url are both the binary, and each is only itself', () => {
   expect(pickedFile(FILE)).toBe(FILE);
@@ -33,12 +33,11 @@ test('an empty box is not a binary', () => {
 });
 
 /**
- * Said here rather than by the api, because the api is the end that follows the url: a mistake it
- * would answer with is one the owner would otherwise wait through a deploy to hear about.
+ * The checksum belongs to the url it was written beside. Typing over that url is choosing a
+ * different binary, and holding the old checksum against it would refuse the deploy for a reason
+ * nothing on the form could show.
  */
-test('a url nibrun could not fetch a binary from is refused before the deploy', () => {
-  expect(refusedUrl(URL_SOURCE)).toBeUndefined();
-  expect(refusedUrl('http://releases.test/my-server')).toContain('https');
-  expect(refusedUrl('https://releases.test/downloads/')).toContain('name');
-  expect(namedByUrl('https://releases.test/../etc/passwd')).toBe('passwd');
+test('a url typed over the one a link brought carries none of its checksum', () => {
+  expect(fetchedBinary({ url: URL_SOURCE, sha256: CHECKSUM })?.sha256).toBe(CHECKSUM);
+  expect(sourceFromUrl(URL_SOURCE)).toEqual({ url: URL_SOURCE });
 });

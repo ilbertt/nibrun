@@ -1,4 +1,8 @@
-import { EXTRA_PUBLIC_PORT_VALUES, RUNTIME_VALUE_NAMES, writtenRuntimeValue } from '@repo/protocol';
+import {
+  EXTRA_PUBLIC_PORT_VALUES,
+  interpolableRuntimeValue,
+  RUNTIME_VALUE_NAMES,
+} from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import {
   Table,
@@ -16,7 +20,7 @@ import { blankVariable, type EnvironmentVariable } from '#lib/environment-variab
 // Named rather than "the last two": they are second and fifth in the list above, and a reader
 // counting from the wrong end sets a variable the deploy then refuses.
 const PORT_VALUE_NAMES = EXTRA_PUBLIC_PORT_VALUES.map((value) =>
-  writtenRuntimeValue(value.name),
+  interpolableRuntimeValue(value.name),
 ).join(' and ');
 
 function separatorBefore(index: number): string {
@@ -87,7 +91,7 @@ export function EnvironmentTable({
         {[...RUNTIME_VALUE_NAMES.entries()].map(([index, name]) => (
           <Fragment key={name}>
             {index > 0 && separatorBefore(index)}
-            <code className="font-mono">{writtenRuntimeValue(name)}</code>
+            <code className="font-mono">{interpolableRuntimeValue(name)}</code>
           </Fragment>
         ))}
         . {PORT_VALUE_NAMES} only on an app with an additional port.

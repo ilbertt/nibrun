@@ -1,3 +1,4 @@
+import { namedByUrl } from '@repo/deploy-link';
 import { Button } from '@repo/ui/components/button';
 import {
   Empty,
@@ -12,7 +13,6 @@ import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { Link, useLocation } from '@tanstack/react-router';
 import { FileTerminalIcon } from 'lucide-react';
 import { HandoffDeploy } from '#components/handoff/handoff-deploy.tsx';
-import { namedByUrl } from '#lib/binary-source.ts';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { useDeployLink } from '#lib/hooks/use-deploy-link.ts';
 import { useFinishHandoff } from '#lib/hooks/use-finish-handoff.ts';
