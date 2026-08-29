@@ -1,8 +1,14 @@
+import { CpuIcon, GlobeIcon, HardDriveIcon, PackageIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-const OFFERINGS: { name: string; detail: ReactNode }[] = [
-  { name: 'A machine', detail: 'A Firecracker microVM of its own. Nothing else runs in it.' },
+const OFFERINGS: { icon: typeof CpuIcon; name: string; detail: ReactNode }[] = [
   {
+    icon: CpuIcon,
+    name: 'A machine',
+    detail: 'A Firecracker microVM of its own. Nothing else runs in it.',
+  },
+  {
+    icon: HardDriveIcon,
     name: 'A disk',
     detail: (
       <>
@@ -10,8 +16,9 @@ const OFFERINGS: { name: string; detail: ReactNode }[] = [
       </>
     ),
   },
-  { name: 'A URL', detail: 'An HTTPS subdomain, the moment it boots.' },
+  { icon: GlobeIcon, name: 'A URL', detail: 'An HTTPS subdomain, the moment it boots.' },
   {
+    icon: PackageIcon,
     name: 'A way out',
     detail: (
       <>
@@ -28,9 +35,12 @@ export function WhatYourAppGets() {
         What your app gets on nibrun.
       </h2>
       <ul className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-        {OFFERINGS.map(({ name, detail }) => (
+        {OFFERINGS.map(({ icon: Icon, name, detail }) => (
           <li key={name} className="flex flex-col gap-2 border-border/60 border-t pt-4">
-            <span className="font-medium">{name}</span>
+            <span className="flex items-center gap-2 font-medium">
+              <Icon className="size-4 text-primary" />
+              {name}
+            </span>
             <span className="text-pretty text-muted-foreground text-sm">{detail}</span>
           </li>
         ))}
