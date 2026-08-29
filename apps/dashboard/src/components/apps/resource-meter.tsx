@@ -17,8 +17,9 @@ const FULL = 1;
 const NEARLY_FULL = 0.8;
 const CRITICALLY_FULL = 0.9;
 
-const RING_PIXELS = 28;
-const RING_STROKE = 3;
+/** Sized to the line of text beside it, so a row is one line tall rather than the ring's. */
+const RING_PIXELS = 18;
+const RING_STROKE = 2.5;
 const RING_RADIUS = (RING_PIXELS - RING_STROKE) / 2;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
@@ -34,9 +35,6 @@ const SMALLEST_VISIBLE_ARC = 2;
 
 /** No reading rather than none spent, which is what a nought here would be read as. */
 const UNMEASURED = '—';
-
-const NOTHING_MEASURED =
-  'Nothing has measured this yet — a reading is only taken while the app is running.';
 
 /** What the app is using of one resource, and when that was true. */
 export type ResourceReading = {
@@ -57,14 +55,67 @@ function arcLength(share: number): number {
   return share > 0 ? Math.max(drawn, SMALLEST_VISIBLE_ARC) : 0;
 }
 
+function MeterFigure({
+  label,
+  total,
+  reading,
+}: {
+  label: string;
+  total: string;
+  reading: ResourceReading | null;
+}) {
+  return (
+    <span className="flex items-center gap-3">
+      <span className="font-mono tabular-nums">
+        {reading?.used ?? UNMEASURED}
+        <span className="text-muted-foreground"> / {total}</span>
+      </span>
+      <svg
+        className={`shrink-0 -rotate-90 ${reading ? arcColour(reading.share) : ''}`}
+        width={RING_PIXELS}
+        height={RING_PIXELS}
+        viewBox={`0 0 ${RING_PIXELS} ${RING_PIXELS}`}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={PERCENT_SCALE}
+        aria-valuenow={
+          reading ? Math.round(Math.min(reading.share, FULL) * PERCENT_SCALE) : undefined
+        }
+        aria-label={`${label} used`}
+      >
+        <circle
+          className="text-muted"
+          cx={RING_PIXELS / 2}
+          cy={RING_PIXELS / 2}
+          r={RING_RADIUS}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={RING_STROKE}
+        />
+        {reading ? (
+          <circle
+            cx={RING_PIXELS / 2}
+            cy={RING_PIXELS / 2}
+            r={RING_RADIUS}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={RING_STROKE}
+            strokeLinecap="round"
+            strokeDasharray={`${arcLength(reading.share)} ${RING_LENGTH}`}
+          />
+        ) : null}
+      </svg>
+    </span>
+  );
+}
+
 /**
  * One resource the app was given, with a ring of what it is using of it.
  *
- * The figure carries no explanation beside it: none of the three counts quite what its name
- * suggests, and a sentence saying so under every row is three sentences nobody reads. They are on
- * hover instead, with the moment the reading was taken — which is the other thing that cannot be
- * left off, because an app that has stopped keeps the last reading taken while it ran and a bare
- * number reads as now.
+ * The moment the reading was taken is on hover, because an app that has stopped keeps the last
+ * reading taken while it ran and a bare number reads as now — but three of those spelled out down
+ * a card is three lines nobody reads. It opens to the left so that running the pointer up the
+ * column shows each row's in turn rather than covering the row above.
  *
  * The ring is drawn even where nothing has been measured, as an empty track. It is what keeps the
  * three rows in one column when only some of them have a reading, and the dash beside it is what
@@ -74,15 +125,12 @@ export function ResourceMeter({
   icon: Icon,
   label,
   total,
-  note,
   reading,
 }: {
   icon: LucideIcon;
   label: string;
   /** What the app was allocated, which it has whether anything has measured it or not. */
   total: string;
-  /** What this particular figure counts, for whoever wonders why it is not what they expected. */
-  note: string;
   reading: ResourceReading | null;
 }) {
   return (
@@ -91,57 +139,16 @@ export function ResourceMeter({
         <Icon className="size-4 shrink-0" />
         {label}
       </span>
-      <Tooltip>
-        <TooltipTrigger className="flex cursor-help items-center gap-3">
-          <span className="font-mono tabular-nums">
-            {reading?.used ?? UNMEASURED}
-            <span className="text-muted-foreground"> / {total}</span>
-          </span>
-          <svg
-            className={`shrink-0 -rotate-90 ${reading ? arcColour(reading.share) : ''}`}
-            width={RING_PIXELS}
-            height={RING_PIXELS}
-            viewBox={`0 0 ${RING_PIXELS} ${RING_PIXELS}`}
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={PERCENT_SCALE}
-            aria-valuenow={
-              reading ? Math.round(Math.min(reading.share, FULL) * PERCENT_SCALE) : undefined
-            }
-            aria-label={`${label} used`}
-          >
-            <circle
-              className="text-muted"
-              cx={RING_PIXELS / 2}
-              cy={RING_PIXELS / 2}
-              r={RING_RADIUS}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={RING_STROKE}
-            />
-            {reading ? (
-              <circle
-                cx={RING_PIXELS / 2}
-                cy={RING_PIXELS / 2}
-                r={RING_RADIUS}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={RING_STROKE}
-                strokeLinecap="round"
-                strokeDasharray={`${arcLength(reading.share)} ${RING_LENGTH}`}
-              />
-            ) : null}
-          </svg>
-        </TooltipTrigger>
-        <TooltipContent className="flex-col items-start gap-1">
-          <span>{reading ? note : NOTHING_MEASURED}</span>
-          {reading ? (
-            <span className="text-background/70">
-              Last measured {dayAndMinute(reading.measuredAt)}
-            </span>
-          ) : null}
-        </TooltipContent>
-      </Tooltip>
+      {reading ? (
+        <Tooltip>
+          <TooltipTrigger className="cursor-help">
+            <MeterFigure label={label} total={total} reading={reading} />
+          </TooltipTrigger>
+          <TooltipContent side="left">Measured {dayAndMinute(reading.measuredAt)}</TooltipContent>
+        </Tooltip>
+      ) : (
+        <MeterFigure label={label} total={total} reading={null} />
+      )}
     </div>
   );
 }
