@@ -7,7 +7,6 @@ import {
   BINARY,
   bytesOf,
   collected,
-  incompressible,
   LICENCE,
   NO_LIMIT,
   NOTES,
@@ -16,6 +15,7 @@ import {
   sourceOf,
   streamOf,
 } from '#tests/lib/archive/support/fixtures.ts';
+import { incompressible } from '#tests/support/downloads.ts';
 import {
   BLOCK_BYTES,
   gzippedTarballOf,

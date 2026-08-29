@@ -39,6 +39,7 @@ import {
 } from '#services/artifacts.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 import { archiveOf } from '#tests/support/archives.ts';
+import { incompressible } from '#tests/support/downloads.ts';
 import { gzippedTarballOf } from '#tests/support/tarballs.ts';
 
 // The api refuses anything that is not a Linux executable, so the fixture opens with the ELF
@@ -348,17 +349,25 @@ class FakeBinarySource implements BinarySourceRepositoryContract {
     this.servesBytes({ bytes: bytesOf(text), declaredSizeBytes });
   }
 
+  /**
+   * `chunkBytes` is what makes a download arrive rather than appear. A body handed over whole is
+   * one whoever reads it has already finished with, which is no way to find out what happens to
+   * the rest of a download somebody stopped reading.
+   */
   servesBytes({
     bytes,
     declaredSizeBytes,
+    chunkBytes,
   }: {
     bytes: Uint8Array;
     declaredSizeBytes?: number;
+    chunkBytes?: number;
   }): void {
     this.answers({
       outcome: 'open',
       body: streamOf({
         bytes,
+        chunkBytes,
         onCancel: () => {
           this.letGo = true;
         },
@@ -405,20 +414,23 @@ class FakeBinarySource implements BinarySourceRepositoryContract {
 
 function streamOf({
   bytes,
+  chunkBytes,
   onCancel,
 }: {
   bytes: Uint8Array;
+  chunkBytes?: number;
   onCancel?: () => void;
 }): ReadableStream<Uint8Array> {
-  let sent = false;
+  const step = chunkBytes ?? bytes.byteLength;
+  let at = 0;
   return new ReadableStream<Uint8Array>({
     pull(controller) {
-      if (sent) {
+      if (at >= bytes.byteLength) {
         controller.close();
         return;
       }
-      sent = true;
-      controller.enqueue(bytes);
+      controller.enqueue(bytes.subarray(at, at + step));
+      at += step;
     },
     cancel() {
       onCancel?.();
@@ -817,6 +829,14 @@ const COMPRESSED_URL = 'https://releases.test/v1/my-server.gz';
 const FETCHED_NAME = Value.Parse(FilenameSchema, 'my-server');
 
 /**
+ * More of a download than a gunzip reads ahead of what it was asked for, arriving in the pieces a
+ * transfer arrives in — so a walk that stops at the entry it wanted stops with the rest of the
+ * download still to come, which is the only state in which reading it to the end costs anything.
+ */
+const A_LONG_DOWNLOAD = 524_288;
+const A_TRANSFER_CHUNK = 65_536;
+
+/**
  * A binary the api fetched itself. Every refusal here is about a url somebody typed, so each one
  * has to leave the app exactly as it was — an artifact half made is a deploy that cannot be
  * retried by following the same link again.
@@ -1093,6 +1113,68 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+  });
+
+  /**
+   * The same, with a gunzip in the middle of it. What the walk lets go of is the decompressed
+   * bytes and what a checksum is over is the compressed ones, so the reading-to-the-end that
+   * checking one costs has to travel back through the engine to reach the download.
+   *
+   * The entry is first and the rest of the tarball is longer than a gunzip reads ahead, so the
+   * walk really does stop with most of the download still on its way.
+   */
+  test('and a checksum is what the tarball hashes to, gunzip and all', async () => {
+    const { service, sourceRepo } = build();
+    const bytes = gzippedTarballOf([
+      { name: 'my-server', content: bytesOf(BINARY_TEXT) },
+      { name: 'CHANGELOG.md', content: incompressible(A_LONG_DOWNLOAD) },
+    ]);
+    sourceRepo.servesBytes({ bytes, chunkBytes: A_TRANSFER_CHUNK });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: TARBALL_URL,
+      sha256: digestOf(bytes),
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+  });
+
+  // A walk that gives up part way is the other side of the same thing: what it stopped reading is
+  // still what the checksum was published over.
+  test('and a tarball holding nothing executable is still read to the end of the download', async () => {
+    const { service, sourceRepo } = build();
+    sourceRepo.servesBytes({
+      bytes: gzippedTarballOf([{ name: 'LICENSE.md', content: bytesOf('The MIT Licence.\n') }]),
+    });
+
+    const refusal = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: TARBALL_URL,
+      sha256: Value.Parse(Sha256DigestSchema, BINARY_DIGEST),
+    });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  // A bare gzip is handed on rather than walked, so what reaches the store is already decompressed
+  // — and the digest is still the one a release would publish, over the file it uploaded.
+  test('and a bare gzip is held to what the gzip hashes to, not the binary inside it', async () => {
+    const { service, sourceRepo } = build();
+    const bytes = gzipSync(bytesOf(BINARY_TEXT));
+    sourceRepo.servesBytes({ bytes });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: COMPRESSED_URL,
+      sha256: digestOf(bytes),
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(artifact.originalFileName).toBe(FETCHED_NAME);
   });
 
   test('and the digest of that executable is not what the zip is held to', async () => {

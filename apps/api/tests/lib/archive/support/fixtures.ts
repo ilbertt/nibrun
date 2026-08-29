@@ -70,28 +70,6 @@ export function sourceOf({
   return { stream: new ReadableStream<Uint8Array>({ pull, cancel }), wasLetGo };
 }
 
-/**
- * Bytes a compressor cannot shrink, so a fixture built around them is as long on the way in as it
- * is on the way out. A walk that gives up on a source short enough to have already arrived proves
- * nothing about letting go of it: that source was going to end either way.
- */
-export function incompressible(sizeBytes: number): Uint8Array {
-  const bytes = Buffer.alloc(sizeBytes);
-  // Xorshift rather than a linear congruential generator, which gzip finds the shape of and packs
-  // thirty times over however many of its bits are taken. Written out rather than drawn at random
-  // so that a fixture that starts failing is the same fixture it was passing on.
-  let state = 0x9e37_79b9;
-  for (let at = 0; at < sizeBytes; at++) {
-    state ^= state << 13;
-    state >>>= 0;
-    state ^= state >>> 17;
-    state ^= state << 5;
-    state >>>= 0;
-    bytes[at] = state & 0xff;
-  }
-  return bytes;
-}
-
 export async function collected(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
   for await (const chunk of stream) {
