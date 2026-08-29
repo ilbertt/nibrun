@@ -30,7 +30,7 @@ const ARGUMENTS = 'Arguments';
 const ADDITIONAL_PORTS = 'Additional ports';
 const ENVIRONMENT = 'environment';
 
-const AWAITING = 'Waiting on a value the link asked for.';
+const AWAITING = 'Fill these in.';
 
 /** Everything a deploy is beyond the binary itself, which is everything a link can carry. */
 export function DeployConfiguration({
