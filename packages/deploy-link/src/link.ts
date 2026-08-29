@@ -1,5 +1,5 @@
 import type { ConfigEdit, EnvironmentAssignment } from '@repo/app-operations';
-import { refusedUrl } from '#lib/binary-source.ts';
+import { refusedUrl } from '#binary-url.ts';
 
 const ASSIGNMENT = '=';
 

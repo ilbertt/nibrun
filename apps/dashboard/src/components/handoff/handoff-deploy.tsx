@@ -1,9 +1,9 @@
+import { deploySuggestion } from '@repo/deploy-link';
 import { Button } from '@repo/ui/components/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
 import { Link } from '@tanstack/react-router';
 import { DeployForm } from '#components/deploy/deploy-form.tsx';
 import { DeployProgress } from '#components/deploy/deploy-progress.tsx';
-import { deploySuggestion } from '#lib/deploy-link.ts';
 import { useDeployLink } from '#lib/hooks/use-deploy-link.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';

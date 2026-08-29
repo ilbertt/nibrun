@@ -1,7 +1,5 @@
 import type { FetchableBinary } from '@repo/app-operations';
-import { FilenameSchema, Value } from '@repo/protocol';
-
-const SECURE_SCHEME = 'https://';
+import { namedByUrl } from '@repo/deploy-link';
 
 /**
  * Where the binary is coming from: a file on this machine, or a url the api fetches it at.
@@ -24,19 +22,6 @@ export function sourceFromUrl(url: string): BinarySource | undefined {
   return url.trim() === '' ? undefined : { url: url.trim() };
 }
 
-/**
- * What the api would refuse, said here instead — a url is followed by the api rather than by this
- * page, so a mistake in one would otherwise cost a deploy to find out about.
- */
-export function refusedUrl(url: string): string | undefined {
-  if (!url.startsWith(SECURE_SCHEME)) {
-    return 'A binary is fetched over https.';
-  }
-  return namedByUrl(url) === undefined
-    ? 'The url has to end in the binary’s own name, as a release download does.'
-    : undefined;
-}
-
 /** What the binary is called, however it is being delivered: the file, or the file the url ends in. */
 export function binaryName(source: BinarySource | undefined): string | undefined {
   const file = pickedFile(source);
@@ -45,18 +30,4 @@ export function binaryName(source: BinarySource | undefined): string | undefined
   }
   const url = fetchedUrl(source);
   return url === undefined ? undefined : namedByUrl(url);
-}
-
-/** What the binary at a url is called, which is the name an export would carry. */
-export function namedByUrl(url: string): string | undefined {
-  const segment = lastSegment(url);
-  return segment !== undefined && Value.Check(FilenameSchema, segment) ? segment : undefined;
-}
-
-function lastSegment(url: string): string | undefined {
-  try {
-    return decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '');
-  } catch {
-    return undefined;
-  }
 }

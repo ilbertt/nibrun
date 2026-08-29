@@ -1,12 +1,7 @@
 import { expect, test } from 'bun:test';
 import { RUNTIME_VALUES, writtenRuntimeValue } from '@repo/protocol';
 import { defaultParseSearch, defaultStringifySearch } from '@tanstack/react-router';
-import {
-  type DeployLink,
-  type DeploySuggestion,
-  deployLink,
-  deploySuggestion,
-} from '#lib/deploy-link.ts';
+import { type DeployLink, type DeploySuggestion, deployLink, deploySuggestion } from '#link.ts';
 
 const HOSTNAME = writtenRuntimeValue(RUNTIME_VALUES.HOSTNAME.name);
 

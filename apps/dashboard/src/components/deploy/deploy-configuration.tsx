@@ -1,3 +1,4 @@
+import type { DeploySuggestion } from '@repo/deploy-link';
 import { EXTRA_PUBLIC_PORT_VALUES, RUNTIME_VALUES, writtenRuntimeValue } from '@repo/protocol';
 import {
   Accordion,
@@ -17,7 +18,6 @@ import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
 import { DeployEnvironmentField } from '#components/deploy/deploy-environment-field.tsx';
 import { DeployNameField } from '#components/deploy/deploy-name-field.tsx';
-import type { DeploySuggestion } from '#lib/deploy-link.ts';
 import {
   type EnvironmentVariable,
   filledVariables,

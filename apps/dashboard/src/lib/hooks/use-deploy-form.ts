@@ -3,16 +3,10 @@ import {
   InvalidEnvironmentError,
   parseEnvironmentPatch,
 } from '@repo/app-operations';
+import { type DeploySuggestion, namedByUrl, refusedUrl } from '@repo/deploy-link';
 import { DEFAULT_HTTP_PORT, FilenameSchema, Value } from '@repo/protocol';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
-import {
-  type BinarySource,
-  fetchedUrl,
-  namedByUrl,
-  pickedFile,
-  refusedUrl,
-} from '#lib/binary-source.ts';
-import type { DeploySuggestion } from '#lib/deploy-link.ts';
+import { type BinarySource, fetchedUrl, pickedFile } from '#lib/binary-source.ts';
 import {
   askedVariables,
   type EnvironmentVariable,

@@ -1,9 +1,10 @@
+import { namedByUrl } from '@repo/deploy-link';
 import { Field, FieldError } from '@repo/ui/components/field';
 import { BinaryDropTarget } from '@repo/ui/custom/binary-drop-target';
 import { FileTerminalIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BINARY_INPUT_ID } from '#components/deploy/binary-drop-zone.tsx';
-import { fetchedUrl, namedByUrl, pickedFile } from '#lib/binary-source.ts';
+import { fetchedUrl, pickedFile } from '#lib/binary-source.ts';
 import { type DeployFormApi, validateBinary } from '#lib/hooks/use-deploy-form.ts';
 
 /**
