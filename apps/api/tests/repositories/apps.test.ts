@@ -21,6 +21,7 @@ import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { AppsRepository, LIVE_APP_STATES } from '#repositories/apps.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
+import { refusedBy } from '#tests/support/postgres.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
@@ -515,6 +516,79 @@ describe('what a host measured of a guest is kept beside how full its filesystem
 
     expect(Number(both.volume_used_bytes)).toBe(VOLUME_USED_BYTES);
     expect(both.cpu_share).toBe(BUSY_SHARE);
+  });
+
+  /**
+   * The bounds are the one guarantee that outlives every caller. Both readings are a subtraction
+   * on the guest's side — total less free, total less available — and a subtraction is what
+   * produces a number below zero when the two ends come from different units. Nothing upstream
+   * can write one of these today; a constraint is what keeps that true of what is added later.
+   */
+  describe('a reading the guest could not have taken is refused by the table', () => {
+    function writeDirectly({ columns, values }: { columns: string; values: string }) {
+      return () =>
+        sql.unsafe(
+          `INSERT INTO nibrun.app_usage (app_id, ${columns})
+           SELECT id, ${values} FROM nibrun.apps LIMIT 1`,
+        );
+    }
+
+    test('memory spent beyond what the guest has is not a reading', async () => {
+      expect(
+        await refusedBy(
+          writeDirectly({
+            columns: 'memory_total_bytes, memory_used_bytes, compute_measured_at',
+            values: '100, 101, now()',
+          }),
+        ),
+      ).toBe('app_usage_memory_within_itself');
+    });
+
+    test('memory spent below nothing is not a reading either', async () => {
+      expect(
+        await refusedBy(
+          writeDirectly({
+            columns: 'memory_total_bytes, memory_used_bytes, compute_measured_at',
+            values: '100, -1, now()',
+          }),
+        ),
+      ).toBe('app_usage_memory_within_itself');
+    });
+
+    test('a volume fuller than it is holds to the same rule', async () => {
+      expect(
+        await refusedBy(
+          writeDirectly({
+            columns: 'volume_total_bytes, volume_used_bytes, volume_measured_at',
+            values: '100, 101, now()',
+          }),
+        ),
+      ).toBe('app_usage_volume_within_itself');
+    });
+
+    // A rate is a rate: the agent clamps it, and this is what says so where it is stored.
+    test('a share of more than every vCPU is not a share', async () => {
+      expect(
+        await refusedBy(
+          writeDirectly({
+            columns: 'memory_total_bytes, memory_used_bytes, cpu_share, compute_measured_at',
+            values: '100, 10, 1.5, now()',
+          }),
+        ),
+      ).toBe('app_usage_cpu_share_is_a_share');
+    });
+
+    // Half a reading is worse than none, because whoever reads one column reads all three.
+    test('a family written without its moment is half a reading', async () => {
+      expect(
+        await refusedBy(
+          writeDirectly({
+            columns: 'memory_total_bytes, memory_used_bytes',
+            values: '100, 10',
+          }),
+        ),
+      ).toBe('app_usage_compute_whole');
+    });
   });
 
   test('every reading in one report is written by one statement', async () => {

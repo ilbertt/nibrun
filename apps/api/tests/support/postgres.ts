@@ -35,3 +35,21 @@ export function malformedArrayLiteral(): SQL.PostgresError {
 export function uniqueViolation(constraint: string): SQL.PostgresError {
   return postgresError({ sqlstate: UNIQUE_VIOLATION, constraint });
 }
+
+/**
+ * The constraint that refused a statement, named — or what happened instead of a refusal.
+ *
+ * A returned name rather than a thrown assertion, because `expect(query).rejects` on one of these
+ * never settles: a Bun SQL query is a thenable and not a promise, and the matcher waits on it
+ * until the test times out. Five of those wedged every suite behind them once already. Awaiting
+ * the query outright is what makes the rejection ordinary, and the name is what a test asserts on
+ * — a statement refused by the wrong rule is not the rule being proved.
+ */
+export async function refusedBy(attempt: () => Promise<unknown>): Promise<string> {
+  try {
+    await attempt();
+  } catch (error) {
+    return (error as { constraint?: string }).constraint ?? `refused without naming one: ${error}`;
+  }
+  return 'nothing was refused';
+}
