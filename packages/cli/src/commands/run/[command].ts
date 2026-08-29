@@ -22,6 +22,11 @@ export const command = defineCommand('run [command]', {
       schema: z.string().optional(),
       description: 'Name for the new app. Defaults to the binary filename.',
     },
+    sha256: {
+      schema: z.string().optional(),
+      description:
+        'What the binary at the url should hash to, as its release publishes it. nibrun refuses one that hashes to anything else. Only for a url — a file on this machine is not fetched.',
+    },
     [SHARED_OPTIONS.port.name]: SHARED_OPTIONS.port.option,
     [SHARED_OPTIONS.extraPublicPort.name]: SHARED_OPTIONS.extraPublicPort.option,
     [SHARED_OPTIONS.env.name]: SHARED_OPTIONS.env.option,
@@ -32,7 +37,12 @@ export const command = defineCommand('run [command]', {
   handler: async ({ params, options, context, print }) => {
     // parsh names an option as it is typed, so a flag with hyphens in it does not arrive under the
     // name the deploy takes and has to be renamed rather than spread through.
-    const { detach, [SHARED_OPTIONS.extraPublicPort.name]: extraPublicPort, ...flags } = options;
+    const {
+      detach,
+      sha256,
+      [SHARED_OPTIONS.extraPublicPort.name]: extraPublicPort,
+      ...flags
+    } = options;
     const given = { ...flags, extraPublicPort };
     const { binarySource, args } = parseCommandLine(params.command);
     const { api } = context;
@@ -43,7 +53,7 @@ export const command = defineCommand('run [command]', {
     // Before anything is asked, so a path nobody can read costs one line rather than a
     // questionnaire whose answers are then thrown away. A url is not opened here at all: the api
     // is the end that fetches it, and it is the end that says whether it could.
-    const binary = await binaryFrom(binarySource);
+    const binary = await binaryFrom({ source: binarySource, sha256 });
     ui.open('nib run');
 
     const resolved = interactive

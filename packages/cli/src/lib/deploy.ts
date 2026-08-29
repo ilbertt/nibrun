@@ -5,7 +5,14 @@ import {
   deploy as startDeployment,
   type UploadableBinary,
 } from '@repo/app-operations';
-import { type Filename, FilenameSchema, type TenantArguments, Value } from '@repo/protocol';
+import {
+  type Filename,
+  FilenameSchema,
+  type Sha256Digest,
+  Sha256DigestSchema,
+  type TenantArguments,
+  Value,
+} from '@repo/protocol';
 import { environmentEdit } from '#lib/environment.ts';
 import { UsageError } from '#lib/errors.ts';
 import type { RunOptions } from '#lib/plan.ts';
@@ -73,14 +80,42 @@ const INSECURE_SCHEME = 'http://';
  * take is the api's to say — this only refuses the one mistake whose other reading is a file
  * nobody could ever find.
  */
-export async function binaryFrom(source: string): Promise<DeployableBinary> {
+export async function binaryFrom({
+  source,
+  sha256,
+}: {
+  source: string;
+  sha256?: string | undefined;
+}): Promise<DeployableBinary> {
   if (source.startsWith(SECURE_SCHEME)) {
-    return { url: source };
+    return { url: source, sha256: sha256 === undefined ? undefined : asDigest(sha256) };
   }
   if (source.startsWith(INSECURE_SCHEME)) {
     throw new UsageError(`A binary is fetched over https, and this is not: ${source}`);
   }
+  // Said rather than ignored: a checksum that went unchecked is the one outcome passing one has
+  // to rule out. What it would have checked is a fetch, and this deploy is not one.
+  if (sha256 !== undefined) {
+    throw new UsageError(
+      `--sha256 is for a url nibrun fetches, and this is a file on this machine: ${source}`,
+    );
+  }
   return await openBinary(source);
+}
+
+/**
+ * What the url should be serving, in the one spelling the api reads it in. Refused here rather
+ * than sent, so a mistyped digest costs a line rather than the whole transfer it would fail at
+ * the end of.
+ */
+function asDigest(sha256: string): Sha256Digest {
+  try {
+    return Value.Parse(Sha256DigestSchema, sha256.trim().toLowerCase());
+  } catch {
+    throw new UsageError(
+      `A checksum is the 64 hex characters sha256sum prints, and this is not: ${sha256}`,
+    );
+  }
 }
 
 /**
