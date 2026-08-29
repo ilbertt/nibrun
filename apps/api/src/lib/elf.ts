@@ -34,6 +34,80 @@ const SEGMENT_START_AT = 8;
 const SEGMENT_BYTES_AT = 32;
 const LITTLE_ENDIAN = true;
 
+const ELF_TYPE_AT = 0x10;
+const ELF_MACHINE_AT = 0x12;
+const ELF_TYPE_EXECUTABLE = 2;
+/** What a position-independent executable is, and what a shared library is too. */
+const ELF_TYPE_SHARED = 3;
+const ELF_MACHINE_X86_64 = 0x3e;
+
+/** Through the machine field: the last of what says whether the guest could run this at all. */
+export const ELF_IDENTITY_BYTES = 20;
+
+/**
+ * What a machine is called where it has a name worth saying back. Only the ones somebody plausibly
+ * built by accident — a laptop's own architecture, or the wrong job in a release matrix — because
+ * the point of the name is to be recognised by whoever has to go and rebuild.
+ */
+const ARCHITECTURES = new Map([
+  [0x03, 'x86'],
+  [0x28, 'arm'],
+  [0x3e, 'x86-64'],
+  [0xb7, 'arm64'],
+  [0xf3, 'riscv'],
+]);
+
+export type ElfIdentity =
+  | { outcome: 'guest-executable' }
+  | { outcome: 'not-an-executable' }
+  | { outcome: 'foreign-architecture'; architecture: string };
+
+/**
+ * What the head of an ELF says it is, or `undefined` where there is not yet enough of it to say.
+ *
+ * The magic alone is four bytes that a shared object, an object file and a build for another
+ * machine all carry — and each of those reaches a host as a deploy that never converges rather
+ * than as a rejected upload. Sixteen bytes further in, the file says which it is.
+ */
+export function identifyElf(bytes: Uint8Array): ElfIdentity | undefined {
+  if (bytes.length < ELF_IDENTITY_BYTES) {
+    return undefined;
+  }
+  if (!isElfExecutable(bytes)) {
+    return { outcome: 'not-an-executable' };
+  }
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const type = view.getUint16(ELF_TYPE_AT, LITTLE_ENDIAN);
+  if (type !== ELF_TYPE_EXECUTABLE && type !== ELF_TYPE_SHARED) {
+    return { outcome: 'not-an-executable' };
+  }
+
+  const machine = view.getUint16(ELF_MACHINE_AT, LITTLE_ENDIAN);
+  const guests =
+    machine === ELF_MACHINE_X86_64 &&
+    bytes[ELF_CLASS_AT] === ELF_CLASS_64 &&
+    bytes[ELF_ENDIANNESS_AT] === ELF_LITTLE_ENDIAN;
+
+  return guests
+    ? { outcome: 'guest-executable' }
+    : { outcome: 'foreign-architecture', architecture: architectureOf({ machine, bytes }) };
+}
+
+/** Whether the guest could exec this, said of as much of the head as is in hand. */
+export function isGuestExecutable(bytes: Uint8Array): boolean {
+  return identifyElf(bytes)?.outcome === 'guest-executable';
+}
+
+// The width is said only where it is the thing that is wrong: an arm64 build is arm64 whether it
+// was compiled 32-bit or 64-bit, while a 32-bit x86-64 is a name that reads as a contradiction.
+function architectureOf({ machine, bytes }: { machine: number; bytes: Uint8Array }): string {
+  const named = ARCHITECTURES.get(machine) ?? `machine 0x${machine.toString(16)}`;
+  return machine === ELF_MACHINE_X86_64 || bytes[ELF_CLASS_AT] === ELF_CLASS_64
+    ? named
+    : `32-bit ${named}`;
+}
+
 const NUL = '\0';
 
 /**
