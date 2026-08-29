@@ -272,11 +272,12 @@ body {
   }
 }
 
-/* The tooltip is the one popup the CLI inverts — `bg-foreground` — so in dark mode it comes back
-   white while every other floating surface stays dark. Given here the popover the dialogs, menus
-   and popovers already share. Set outside `TooltipContent` because that file is the CLI's output,
-   and outside any layer because a utility class is what it has to outrank. The arrow is reached by
-   position because it is the CLI's own element and carries no slot to aim at. */
+/* shadcn inverts the tooltip on purpose and closed the request to give it the popover surface as
+   not planned, so this is us disagreeing with it rather than patching a bug: inverted, it is a
+   white card among dark ones in dark mode. Here rather than in `TooltipContent` because that file
+   is the CLI's output, and outside any layer because a utility class is what it has to outrank.
+   The arrow is reached by position because it drops the className it is handed — shadcn-ui/ui#9604,
+   open, so the call site cannot do this on its own. */
 [data-slot="tooltip-content"] {
   @apply bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/5 dark:ring-foreground/10;
 }
