@@ -1,58 +1,33 @@
 import { describe, expect, test } from 'bun:test';
-import type { PublicApiClient } from '@repo/api-client/public';
 import { deleteApp, saysDeletePermanently } from '#lib/delete.ts';
-import type { Ui } from '#lib/ui.ts';
+import {
+  apiHolding,
+  deploymentsHolding,
+  type ListedApp,
+  listedApp,
+  RUNNING_DEPLOYMENT,
+} from '#tests/support/api.ts';
+import { APP_ID, HOSTNAME, SLUG } from '#tests/support/app.ts';
+import { uiRecording } from '#tests/support/ui.ts';
 
-const SLUG = 'quiet-otter';
-
-type Listed = { id: string; slug: string; state: string; hostnames: Array<{ hostname: string }> };
-
-function listed(overrides: Partial<Listed> = {}): Listed {
-  return {
-    id: 'app-1',
-    slug: SLUG,
-    state: 'active',
-    hostnames: [{ hostname: `${SLUG}.nibrun.app` }],
-    ...overrides,
-  };
+function listed(overrides: Partial<ListedApp> = {}): ListedApp {
+  return listedApp({ hostnames: [{ hostname: HOSTNAME }], ...overrides });
 }
 
 /** The apps an owner has, and the ids the run asked the api to delete. */
-function apiHolding({ apps, deleted }: { apps: Listed[]; deleted: string[] }): PublicApiClient {
-  function addressed({ appId }: { appId: string }) {
-    return {
+function apiHoldingDeletable({ apps, deleted }: { apps: ListedApp[]; deleted: string[] }) {
+  return apiHolding({
+    apps,
+    underApp: ({ appId }) => ({
       // Read to decide what the app's state allows, which for a delete is everything up to the
       // teardown already under way.
-      deployments: {
-        get: () =>
-          Promise.resolve({
-            data: { deployments: [{ id: 'deployment-1', state: 'running' }] },
-            error: null,
-          }),
-      },
+      deployments: deploymentsHolding([RUNNING_DEPLOYMENT]),
       delete: () => {
         deleted.push(appId);
         return Promise.resolve({ data: { slug: SLUG, state: 'deleting' }, error: null });
       },
-    };
-  }
-  // Eden spells a path segment and its parameter as the same name, so the listing hangs off the
-  // function that addresses one app.
-  const route = Object.assign(addressed, {
-    get: () => Promise.resolve({ data: { apps }, error: null }),
+    }),
   });
-  return { api: { apps: route } } as unknown as PublicApiClient;
-}
-
-function ui(): Ui & { said: string[] } {
-  const said: string[] = [];
-  return {
-    said,
-    open: () => {},
-    step: (message) => said.push(message),
-    done: (message) => said.push(message),
-    waitingFor: ({ task }) => task(() => {}),
-  };
 }
 
 describe('what a run with nobody watching is allowed to delete', () => {
@@ -60,9 +35,9 @@ describe('what a run with nobody watching is allowed to delete', () => {
     const deleted: string[] = [];
 
     const attempt = deleteApp({
-      api: apiHolding({ apps: [listed()], deleted }),
+      api: apiHoldingDeletable({ apps: [listed()], deleted }),
       slug: SLUG,
-      ui: ui(),
+      ui: uiRecording(),
       yes: false,
       interactive: false,
     });
@@ -75,32 +50,32 @@ describe('what a run with nobody watching is allowed to delete', () => {
     const deleted: string[] = [];
 
     await deleteApp({
-      api: apiHolding({ apps: [listed()], deleted }),
+      api: apiHoldingDeletable({ apps: [listed()], deleted }),
       slug: SLUG,
-      ui: ui(),
+      ui: uiRecording(),
       yes: true,
       interactive: false,
     });
 
-    expect(deleted).toEqual(['app-1']);
+    expect(deleted).toEqual([APP_ID]);
   });
 });
 
 // The teardown already running is the answer to the second request, so it is not sent.
 test('an app already being deleted is not deleted again', async () => {
   const deleted: string[] = [];
-  const said = ui();
+  const ui = uiRecording();
 
   await deleteApp({
-    api: apiHolding({ apps: [listed({ state: 'deleting' })], deleted }),
+    api: apiHoldingDeletable({ apps: [listed({ state: 'deleting' })], deleted }),
     slug: SLUG,
-    ui: said,
+    ui,
     yes: true,
     interactive: false,
   });
 
   expect(deleted).toEqual([]);
-  expect(said.said).toEqual([`${SLUG} is already being deleted.`]);
+  expect(ui.said).toEqual([`${SLUG} is already being deleted.`]);
 });
 
 describe('what counts as having typed the phrase', () => {

@@ -167,6 +167,23 @@
           }
         }
       }
+    },
+    {
+      "includes": ["**/src/**/*.test.*", "**/src/**/*.spec.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "bun:test": "Tests live in a sibling `tests/` directory, never under `src/`."
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
