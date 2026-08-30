@@ -1,0 +1,27 @@
+{
+  "name": "@repo/mcp-server",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#*": "./src/*",
+    "#tests/*": "./tests/*"
+  },
+  "scripts": {
+    "test": "bun test",
+    "check:types": "bun run --bun tsc"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@repo/api-client": "workspace:*",
+    "@repo/app-operations": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
