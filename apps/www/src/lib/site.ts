@@ -9,3 +9,5 @@ export function pageTitle(name: string): string {
 
 export const SITE_DESCRIPTION =
   "Small apps don't need to scale. Drop a compiled binary and get a microVM of its own, a filesystem that persists, and an HTTPS URL. Export the binary and the whole disk whenever you want.";
+
+export const REPO_URL = 'https://github.com/ilbertt/nibrun';
