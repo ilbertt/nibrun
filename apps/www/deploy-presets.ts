@@ -4,6 +4,9 @@ import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
 export const DEPLOY_PRESETS = {
   boop: {
     name: 'boop',
+    binary:
+      'https://github.com/chrisgreg/boop/releases/download/v1.3.0/boop_1.3.0_linux_amd64.tar.gz',
+    sha256: 'e68ea6a7dec4bf6f8fe6133735b0b1db4ccb4089d5e6b76e9813a1a63f4797a8',
     port: 8080,
     env: [
       `BOOP_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
