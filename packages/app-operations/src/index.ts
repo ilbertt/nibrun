@@ -31,7 +31,12 @@ export { guestPath, readDirectory } from '#filesystem.ts';
 export { type FollowInput, followLogs } from '#logs.ts';
 export { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
 export { type RedeployInput, redeploy } from '#redeploy.ts';
-export type { ConfigEdit, Deployed, DeployStep } from '#release.ts';
+export {
+  type ConfigEdit,
+  type Deployed,
+  type DeployStep,
+  servingHostname,
+} from '#release.ts';
 export {
   APP_STATUS_LABELS,
   type AppStatus,
