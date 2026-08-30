@@ -1,5 +1,6 @@
 import type { HostDesiredState } from '@repo/protocol';
 import { Effect, Option } from 'effect';
+import { readLastActive } from '#lib/agent/activity.ts';
 import { readExportReports } from '#lib/exports/manager.ts';
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
 import { applyCheckpoints } from '#lib/reconcile/checkpoints.ts';
@@ -45,17 +46,22 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       const deletedVolumes = readDeletedVolumes(
         Option.getOrUndefined(yield* readJsonFile(config.deletedVolumesFile)),
       );
+      const lastActiveAtMs = readLastActive(
+        Option.getOrUndefined(yield* readJsonFile(config.activityFile)),
+      );
       yield* AgentState.modify((current) => ({
         ...current,
         records: new Map(instances.map((record) => [record.appId, record])),
         exportReports: new Map(exports.map((report) => [report.exportId, report])),
         deletedVolumes: new Map(deletedVolumes.map((report) => [report.volumeId, report])),
+        lastActiveAtMs,
       }));
       yield* Effect.logInfo('agent state loaded').pipe(
         Effect.annotateLogs({
           instances: instances.length,
           slots: (yield* allocator.slots).length,
           exports: exports.length,
+          appsWithActivity: lastActiveAtMs.size,
         }),
       );
       // Before the first poll has even been answered: an app this host stopped before the agent
@@ -120,6 +126,12 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       yield* writeJsonFile({
         path: config.exportsFile,
         value: [...current.exportReports.values()],
+      });
+      // Only the moment, never the counts it was derived from: the kernel's counters do not
+      // outlive the agent either, because the first apply after a restart rewrites the table.
+      yield* writeJsonFile({
+        path: config.activityFile,
+        value: [...current.lastActiveAtMs].map(([appId, atMs]) => ({ appId, atMs })),
       });
       yield* writeJsonFile({
         path: config.deletedVolumesFile,

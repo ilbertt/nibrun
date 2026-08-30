@@ -1,4 +1,4 @@
-import type { AppId } from '@repo/protocol';
+import { type AppId, AppIdSchema, isValidMessage, Value } from '@repo/protocol';
 import { Clock, Effect } from 'effect';
 import type { AppTraffic } from '#lib/network/counters.ts';
 import { AgentState } from '#services/agent-state.service.ts';
@@ -9,6 +9,13 @@ export type Activity = {
   readonly traffic: ReadonlyMap<AppId, AppTraffic>;
   readonly lastActiveAtMs: ReadonlyMap<AppId, number>;
 };
+
+/**
+ * Which apps the count actually moved for, which is not the same as which moments equal now: a
+ * first reading starts the clock at now without having observed anything. Returned rather than
+ * inferred, so there is one answer to that question and not a second one that rounds differently.
+ */
+export type Measured = Activity & { readonly moved: ReadonlySet<AppId> };
 
 /**
  * When each app was last reached by something that was not this host.
@@ -31,17 +38,21 @@ export function activityAfter({
   taken: ReadonlyMap<AppId, AppTraffic>;
   previous: Activity;
   nowMs: number;
-}): Activity {
+}): Measured {
   const traffic = new Map<AppId, AppTraffic>();
   const lastActiveAtMs = new Map<AppId, number>();
+  const moved = new Set<AppId>();
 
   for (const [appId, after] of taken) {
     const before = previous.traffic.get(appId);
     const recorded = previous.lastActiveAtMs.get(appId);
     traffic.set(appId, after);
+    if (countMoved({ before, after })) {
+      moved.add(appId);
+    }
     // No interval behind the first reading of a counter, so it starts the clock rather than
     // answering it: an app whose counter has just appeared has not been idle since the epoch.
-    lastActiveAtMs.set(appId, moved({ before, after }) ? nowMs : (recorded ?? nowMs));
+    lastActiveAtMs.set(appId, moved.has(appId) ? nowMs : (recorded ?? nowMs));
   }
 
   for (const [appId, recorded] of previous.lastActiveAtMs) {
@@ -50,11 +61,40 @@ export function activityAfter({
     }
   }
 
-  return { traffic, lastActiveAtMs };
+  return { traffic, lastActiveAtMs, moved };
 }
 
-function moved({ before, after }: { before: AppTraffic | undefined; after: AppTraffic }): boolean {
+function countMoved({
+  before,
+  after,
+}: {
+  before: AppTraffic | undefined;
+  after: AppTraffic;
+}): boolean {
   return before !== undefined && after.bytes > before.bytes;
+}
+
+/**
+ * What survived the last agent restart. The counts are not kept with it: the first firewall apply
+ * after a restart rewrites the table, so every counter is zero by the time this is read and a
+ * baseline carried across would be one the kernel has already contradicted.
+ */
+export function readLastActive(value: unknown): ReadonlyMap<AppId, number> {
+  const lastActiveAtMs = new Map<AppId, number>();
+  if (!Array.isArray(value)) {
+    return lastActiveAtMs;
+  }
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) {
+      continue;
+    }
+    const { appId, atMs } = entry as Record<string, unknown>;
+    if (typeof atMs !== 'number' || !isValidMessage({ schema: AppIdSchema, value: appId })) {
+      continue;
+    }
+    lastActiveAtMs.set(Value.Parse(AppIdSchema, appId), atMs);
+  }
+  return lastActiveAtMs;
 }
 
 /**
@@ -87,8 +127,24 @@ export const recordActivity = Effect.gen(function* () {
 
   // A slot this host no longer holds takes its history with it: the app is somewhere else or
   // nowhere, and either way what it last did here is not something to keep answering about.
-  yield* AgentState.setActivity({
-    traffic: new Map([...next.traffic].filter(([appId]) => held.has(appId))),
-    lastActiveAtMs: new Map([...next.lastActiveAtMs].filter(([appId]) => held.has(appId))),
-  });
+  const traffic = new Map([...next.traffic].filter(([appId]) => held.has(appId)));
+  const lastActiveAtMs = new Map([...next.lastActiveAtMs].filter(([appId]) => held.has(appId)));
+  yield* AgentState.setActivity({ traffic, lastActiveAtMs });
+
+  // One line a tick, at info, because the counts being read at all is the thing worth seeing:
+  // `measured: 0` on a host running apps is a counter that never appeared, which reads the same
+  // as a quiet host in every other respect. The per-app detail is a level down, where a host
+  // packing sixty apps does not write sixty lines a minute into the operator's journal.
+  yield* Effect.logInfo('app activity measured').pipe(
+    Effect.annotateLogs({
+      measured: traffic.size,
+      moved: next.moved.size,
+      tracked: lastActiveAtMs.size,
+    }),
+  );
+  yield* Effect.logDebug('app activity').pipe(
+    Effect.annotateLogs({
+      apps: [...lastActiveAtMs].map(([appId, atMs]) => ({ appId, idleMs: nowMs - atMs })),
+    }),
+  );
 });

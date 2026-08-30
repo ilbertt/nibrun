@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { type AppId, AppIdSchema, Value } from '@repo/protocol';
-import { type Activity, activityAfter } from '#lib/agent/activity.ts';
+import { type Activity, activityAfter, readLastActive } from '#lib/agent/activity.ts';
 import { parseAppTraffic } from '#lib/network/counters.ts';
 import { appCounterName } from '#lib/network/firewall.ts';
 
@@ -26,6 +26,8 @@ const EXPECTED_APPS = 2;
 const TOO_LONG = 64;
 const BEFORE_BYTES = 10;
 const AFTER_BYTES = 20;
+/** Entries no reader should take: a bare number among the records. */
+const NOT_AN_ENTRY = 7;
 
 const empty: Activity = { traffic: new Map(), lastActiveAtMs: new Map() };
 
@@ -160,5 +162,48 @@ describe('what the host stops holding, it stops answering about', () => {
     const first = activityAfter({ taken: reading(BEFORE_BYTES), previous: empty, nowMs: EARLIER });
     const second = activityAfter({ taken: reading(AFTER_BYTES), previous: first, nowMs: NOW });
     expect(second.lastActiveAtMs.get(APP as AppId)).toBe(NOW);
+  });
+});
+
+describe('a first reading is not an app that was just used', () => {
+  test('the clock starts, but nothing is reported as having moved', () => {
+    const after = activityAfter({ taken: reading(FIRST_BYTES), previous: empty, nowMs: NOW });
+    expect(after.lastActiveAtMs.get(APP)).toBe(NOW);
+    expect(after.moved.has(APP)).toBe(false);
+  });
+
+  test('a count that grew is reported as having moved', () => {
+    const after = activityAfter({
+      taken: reading(MORE_BYTES),
+      previous: previously({ bytes: SOME_BYTES, at: EARLIER }),
+      nowMs: NOW,
+    });
+    expect(after.moved.has(APP)).toBe(true);
+  });
+
+  test('a reset is not a move, however far the count fell', () => {
+    const after = activityAfter({
+      taken: reading(AFTER_A_RESET),
+      previous: previously({ bytes: A_LOT_OF_BYTES, at: EARLIER }),
+      nowMs: NOW,
+    });
+    expect(after.moved.has(APP)).toBe(false);
+  });
+});
+
+describe('what an agent restart is allowed to forget', () => {
+  test('a recorded moment is read back', () => {
+    expect(readLastActive([{ appId: APP, atMs: EARLIER }]).get(APP)).toBe(EARLIER);
+  });
+
+  test('an entry that is not one is skipped rather than trusted', () => {
+    expect(readLastActive([{ appId: APP, atMs: 'soon' }]).size).toBe(0);
+    expect(readLastActive([{ appId: 'has.a.dot', atMs: EARLIER }]).size).toBe(0);
+    expect(readLastActive([null, NOT_AN_ENTRY, 'x']).size).toBe(0);
+  });
+
+  test('a file that is not a list reads as nothing remembered', () => {
+    expect(readLastActive(undefined).size).toBe(0);
+    expect(readLastActive({}).size).toBe(0);
   });
 });
