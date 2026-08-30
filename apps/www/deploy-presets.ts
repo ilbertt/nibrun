@@ -2,6 +2,20 @@ import type { DeployLink } from '@repo/deploy-link';
 import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
 
 export const DEPLOY_PRESETS = {
+  boop: {
+    name: 'boop',
+    port: 8080,
+    env: [
+      `BOOP_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+      `BOOP_DATABASE_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/boop.db`,
+      `BOOP_BASE_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
+      // Carried without values: the pair is what stands between the admin api and everyone who
+      // reaches the url, and a link is read by more people than the one who follows it.
+      'BOOP_ADMIN_USER',
+      'BOOP_ADMIN_PASSWORD',
+    ],
+    minimal: true,
+  },
   pocketbase: {
     name: 'pocketbase',
     binary:
