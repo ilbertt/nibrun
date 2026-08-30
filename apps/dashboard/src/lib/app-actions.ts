@@ -90,12 +90,15 @@ const AVAILABILITY: Record<AppStatusKey, AppActions> = {
     suspend: ENABLED,
     delete: ENABLED,
   },
+  // Nothing at all in the seconds between the owner asking and the microVM stopping: what is
+  // being asked of the app is changing under every one of these, and a button that comes back the
+  // moment it has stopped is a better answer than one pressed against an app mid-shutdown.
   suspending: {
     deploy: UNTIL_RESUMED,
     redeploy: HIDDEN,
-    export: ENABLED,
+    export: DISABLED,
     suspend: DISABLED,
-    delete: ENABLED,
+    delete: DISABLED,
   },
   // Deploying is offered back the moment the app row asks to run again, which is what resuming is.
   resuming: {

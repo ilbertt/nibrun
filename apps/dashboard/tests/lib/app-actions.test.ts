@@ -72,6 +72,16 @@ describe('an app the host has not caught up with yet', () => {
     expect(actions({ deploymentState: 'stopped' }).suspend).toEqual(DISABLED);
   });
 
+  test('and one on its way down offers nothing to press at all', () => {
+    expect(actions({ appState: 'suspended', deploymentState: 'running' })).toEqual({
+      deploy: { kind: 'disabled', reason: expect.any(String) },
+      redeploy: HIDDEN,
+      export: DISABLED,
+      suspend: DISABLED,
+      delete: DISABLED,
+    });
+  });
+
   test('and one not read yet offers nothing to press', () => {
     expect(appActions(undefined)).toEqual({
       deploy: DISABLED,
