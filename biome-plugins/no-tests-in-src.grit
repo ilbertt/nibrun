@@ -1,9 +1,0 @@
-language js
-
-`"bun:test"` where {
-  register_diagnostic(
-    span = $match,
-    message = "Tests live in a sibling `tests/` directory, never under `src/`.",
-    severity = "error"
-  )
-}

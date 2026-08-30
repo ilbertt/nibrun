@@ -38,7 +38,7 @@ After finishing an implementation, always run:
 
 Tests are `bun test` files, run through Turbo by `bun run test` — note `bun test` on its own is
 Bun's own runner and bypasses the workspace. They live in a `tests/` directory sibling to `src/`,
-never inside it — a Biome plugin fails any `src/` file importing `bun:test`. `tests/` mirrors
+never inside it — Biome fails any `src/**/*.test.*` that imports `bun:test`. `tests/` mirrors
 `src/` (`apps/agent`) or the package's own layering (`apps/api`), and whatever more than one file
 needs — fixtures, stubs, recorders — belongs in `tests/support/`, reached through the package's
 `#tests/*` mapping. Not every package needs tests; a package whose correctness is only checkable

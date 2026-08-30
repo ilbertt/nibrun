@@ -99,10 +99,6 @@
   },
   "overrides": [
     {
-      "includes": ["**/src/**"],
-      "plugins": ["./biome-plugins/no-tests-in-src.grit"]
-    },
-    {
       "includes": ["**/*.ts", "**/*.tsx"],
       "linter": {
         "rules": {
@@ -166,6 +162,23 @@
                     "message": "Controllers must depend on services, not repositories."
                   }
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/src/**/*.test.*", "**/src/**/*.spec.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "bun:test": "Tests live in a sibling `tests/` directory, never under `src/`."
+                }
               }
             }
           }
