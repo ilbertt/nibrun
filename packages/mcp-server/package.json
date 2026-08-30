@@ -18,7 +18,7 @@
     "@repo/api-client": "workspace:*",
     "@repo/app-operations": "workspace:*",
     "@repo/protocol": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

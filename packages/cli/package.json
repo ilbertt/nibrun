@@ -22,7 +22,7 @@
     "@repo/app-operations": "workspace:*",
     "@repo/protocol": "workspace:*",
     "better-auth": "catalog:",
-    "zod": "^4.4.3"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@parshjs/codegen": "^0.0.5",
