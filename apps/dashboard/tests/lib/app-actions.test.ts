@@ -21,6 +21,7 @@ describe('an app is offered what its state can actually do', () => {
   test('one nobody has deployed has nothing to export and nothing to take offline', () => {
     expect(actions()).toEqual({
       deploy: ENABLED,
+      redeploy: HIDDEN,
       export: HIDDEN,
       suspend: HIDDEN,
       delete: ENABLED,
@@ -33,6 +34,7 @@ describe('an app is offered what its state can actually do', () => {
     test(`one whose release is ${deploymentState} is exportable and has nothing to suspend`, () => {
       expect(actions({ deploymentState })).toEqual({
         deploy: ENABLED,
+        redeploy: deploymentState === 'failed' ? ENABLED : HIDDEN,
         export: ENABLED,
         suspend: HIDDEN,
         delete: ENABLED,
@@ -40,9 +42,10 @@ describe('an app is offered what its state can actually do', () => {
     });
   }
 
-  test('a serving one is offered every button', () => {
+  test('a serving one is offered everything there is to do to a running app', () => {
     expect(actions({ deploymentState: 'running' })).toEqual({
       deploy: ENABLED,
+      redeploy: HIDDEN,
       export: ENABLED,
       suspend: ENABLED,
       delete: ENABLED,
@@ -72,6 +75,7 @@ describe('an app the host has not caught up with yet', () => {
   test('and one not read yet offers nothing to press', () => {
     expect(appActions(undefined)).toEqual({
       deploy: DISABLED,
+      redeploy: HIDDEN,
       export: DISABLED,
       suspend: DISABLED,
       delete: DISABLED,
@@ -99,10 +103,36 @@ describe('a suspended app', () => {
   });
 });
 
+/**
+ * A button for one status, because it is an answer to one: a release that did not come up is the
+ * case where running the same binary again is the whole of what an owner wants. Everywhere else
+ * releasing again is the deploy dialog, which can change what it releases as well.
+ */
+describe('a release that did not come up', () => {
+  test('is the one an app is offered a redeploy on', () => {
+    expect(actions({ deploymentState: 'failed' }).redeploy).toEqual(ENABLED);
+  });
+
+  for (const deploymentState of DEPLOYMENT_STATES.filter((state) => state !== 'failed')) {
+    test(`and a ${deploymentState} one is not`, () => {
+      expect(actions({ deploymentState }).redeploy).toEqual(HIDDEN);
+    });
+  }
+
+  test('nor is an app nobody has ever deployed', () => {
+    expect(actions().redeploy).toEqual(HIDDEN);
+  });
+
+  test('nor a suspended one, which would not start what it released', () => {
+    expect(actions({ appState: 'suspended', deploymentState: 'failed' }).redeploy).toEqual(HIDDEN);
+  });
+});
+
 describe('an app on its way out', () => {
   test('has one button left, and it is the one saying so', () => {
     expect(actions({ appState: 'deleting' })).toEqual({
       deploy: HIDDEN,
+      redeploy: HIDDEN,
       export: HIDDEN,
       suspend: HIDDEN,
       delete: DISABLED,
@@ -112,6 +142,7 @@ describe('an app on its way out', () => {
   test('and once it is gone, none at all', () => {
     expect(actions({ appState: 'deleted' })).toEqual({
       deploy: HIDDEN,
+      redeploy: HIDDEN,
       export: HIDDEN,
       suspend: HIDDEN,
       delete: HIDDEN,

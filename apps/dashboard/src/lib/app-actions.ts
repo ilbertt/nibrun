@@ -1,7 +1,7 @@
 import { type AppStatus, type AppStatusKey, statusKey } from '@repo/app-operations';
 
 /** Every button on an app's action bar, and so every column of the table below. */
-export const APP_ACTIONS = ['deploy', 'export', 'suspend', 'delete'] as const;
+export const APP_ACTIONS = ['deploy', 'redeploy', 'export', 'suspend', 'delete'] as const;
 
 export type AppAction = (typeof APP_ACTIONS)[number];
 
@@ -42,26 +42,82 @@ const UNTIL_RESUMED: AppActionAvailability = {
  * from here, which is a type error rather than a button someone finds behaving oddly weeks later.
  */
 const AVAILABILITY: Record<AppStatusKey, AppActions> = {
-  'never-deployed': { deploy: ENABLED, export: HIDDEN, suspend: HIDDEN, delete: ENABLED },
-  pending: { deploy: ENABLED, export: ENABLED, suspend: ENABLED, delete: ENABLED },
-  starting: { deploy: ENABLED, export: ENABLED, suspend: ENABLED, delete: ENABLED },
-  running: { deploy: ENABLED, export: ENABLED, suspend: ENABLED, delete: ENABLED },
+  'never-deployed': {
+    deploy: ENABLED,
+    redeploy: HIDDEN,
+    export: HIDDEN,
+    suspend: HIDDEN,
+    delete: ENABLED,
+  },
+  pending: {
+    deploy: ENABLED,
+    redeploy: HIDDEN,
+    export: ENABLED,
+    suspend: ENABLED,
+    delete: ENABLED,
+  },
+  starting: {
+    deploy: ENABLED,
+    redeploy: HIDDEN,
+    export: ENABLED,
+    suspend: ENABLED,
+    delete: ENABLED,
+  },
+  running: {
+    deploy: ENABLED,
+    redeploy: HIDDEN,
+    export: ENABLED,
+    suspend: ENABLED,
+    delete: ENABLED,
+  },
   // Nothing is serving under either of these, so there is nothing to take offline — and a bundle
-  // is cut from the volume rather than from a running microVM, so exporting still works.
-  failed: { deploy: ENABLED, export: ENABLED, suspend: HIDDEN, delete: ENABLED },
-  superseded: { deploy: ENABLED, export: ENABLED, suspend: HIDDEN, delete: ENABLED },
-  suspended: { deploy: UNTIL_RESUMED, export: ENABLED, suspend: ENABLED, delete: ENABLED },
-  suspending: { deploy: UNTIL_RESUMED, export: ENABLED, suspend: DISABLED, delete: ENABLED },
+  // is cut from the volume rather than from a running microVM, so exporting still works. Only the
+  // one that failed is offered a redeploy: a release that did not come up is the case where
+  // running the same binary again is the whole of what an owner wants, and everywhere else that
+  // is the deploy dialog, which can change what it releases as well.
+  failed: { deploy: ENABLED, redeploy: ENABLED, export: ENABLED, suspend: HIDDEN, delete: ENABLED },
+  superseded: {
+    deploy: ENABLED,
+    redeploy: HIDDEN,
+    export: ENABLED,
+    suspend: HIDDEN,
+    delete: ENABLED,
+  },
+  suspended: {
+    deploy: UNTIL_RESUMED,
+    redeploy: HIDDEN,
+    export: ENABLED,
+    suspend: ENABLED,
+    delete: ENABLED,
+  },
+  suspending: {
+    deploy: UNTIL_RESUMED,
+    redeploy: HIDDEN,
+    export: ENABLED,
+    suspend: DISABLED,
+    delete: ENABLED,
+  },
   // Deploying is offered back the moment the app row asks to run again, which is what resuming is.
-  resuming: { deploy: ENABLED, export: ENABLED, suspend: DISABLED, delete: ENABLED },
+  resuming: {
+    deploy: ENABLED,
+    redeploy: HIDDEN,
+    export: ENABLED,
+    suspend: DISABLED,
+    delete: ENABLED,
+  },
   // An app on its way out has one thing left to say, and it is the button that says it.
-  deleting: { deploy: HIDDEN, export: HIDDEN, suspend: HIDDEN, delete: DISABLED },
-  deleted: { deploy: HIDDEN, export: HIDDEN, suspend: HIDDEN, delete: HIDDEN },
+  deleting: { deploy: HIDDEN, redeploy: HIDDEN, export: HIDDEN, suspend: HIDDEN, delete: DISABLED },
+  deleted: { deploy: HIDDEN, redeploy: HIDDEN, export: HIDDEN, suspend: HIDDEN, delete: HIDDEN },
 };
 
-/** Nothing may be pressed on an app whose status has not been read yet. */
+/**
+ * Nothing may be pressed on an app whose status has not been read yet. Redeploy is the one that
+ * is gone rather than greyed: it belongs to a single status, so greying it on every app still
+ * being read would mostly be a button that appears and then goes.
+ */
 const WHILE_UNREAD: AppActions = {
   deploy: DISABLED,
+  redeploy: HIDDEN,
   export: DISABLED,
   suspend: DISABLED,
   delete: DISABLED,
