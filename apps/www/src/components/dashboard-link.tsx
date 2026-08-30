@@ -5,8 +5,8 @@ import { APP_ORIGIN } from '#lib/app-origin.ts';
 // opened a second one would leave the two halves of the same journey behaving differently.
 export function DashboardLink() {
   return (
-    <Button variant="ghost" size="sm" render={<a href={APP_ORIGIN} />}>
-      Sign in
+    <Button size="sm" render={<a href={APP_ORIGIN} />}>
+      Deploy
     </Button>
   );
 }
