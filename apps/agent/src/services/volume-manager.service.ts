@@ -12,7 +12,7 @@ import type { AppSlot } from '#lib/network/slot.ts';
 import type { ObservedVolume } from '#lib/reconcile/plan.ts';
 import { devicePathFor, ensureDeviceFile, NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
 import { formatOnce } from '#lib/volumes/ext4.ts';
-import { attach, detach, isAttached } from '#lib/volumes/nbd.ts';
+import { detach, isUsable, reattach } from '#lib/volumes/nbd.ts';
 import type { ZerofsFilesystem } from '#lib/volumes/topology.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -63,7 +63,10 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
         if (Option.isNone(sizeBytes)) {
           return Option.none<ObservedVolume>();
         }
-        const attached = Option.isSome(slot) ? yield* isAttached(slot.value.nbdDevicePath) : false;
+        // Whether the device *works*, not whether it has a client: this is what `planVolumes`
+        // reads to decide a volume needs nothing done to it, so a device that lies here is one
+        // nothing ever repairs.
+        const attached = Option.isSome(slot) ? yield* isUsable(slot.value.nbdDevicePath) : false;
         return Option.some<ObservedVolume>({
           volumeId,
           appId,
@@ -119,8 +122,8 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
         sizeBytes: desired.sizeBytes,
       });
 
-      if (!(yield* isAttached(slot.nbdDevicePath))) {
-        yield* attach({
+      if (!(yield* isUsable(slot.nbdDevicePath))) {
+        yield* reattach({
           socketPath: filesystem.nbdSocketPath,
           devicePath: slot.nbdDevicePath,
           volumeId: desired.volumeId,
