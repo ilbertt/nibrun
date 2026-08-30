@@ -1,5 +1,5 @@
-import { appFor, resumeApp } from '@repo/app-operations';
 import { z } from 'zod';
+import { appFor } from '#lib/mcp/apps.ts';
 import {
   AppSlugSchema,
   AppTransitionResultSchema,
@@ -7,7 +7,7 @@ import {
   type ToolRegistration,
 } from '#lib/mcp/tool.ts';
 
-export function registerResumeAppTool({ server, api }: ToolRegistration): void {
+export function registerResumeAppTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'resume_app',
     {
@@ -21,11 +21,11 @@ export function registerResumeAppTool({ server, api }: ToolRegistration): void {
     ({ app: slug }) =>
       answered({
         produce: async () => {
-          const { app } = await appFor({ api, slug, operation: 'resume' });
+          const { app } = await appFor({ services, ownerId, slug, operation: 'resume' });
           if (app.state === 'active') {
             return { slug: app.slug, state: app.state, detail: `${app.slug} is already running.` };
           }
-          const resumed = await resumeApp({ api, appId: app.id });
+          const resumed = await services.apps.setState({ appId: app.id, ownerId, state: 'active' });
           return {
             slug: resumed.slug,
             state: resumed.state,

@@ -1,5 +1,5 @@
-import { appFor, suspendApp } from '@repo/app-operations';
 import { z } from 'zod';
+import { appFor } from '#lib/mcp/apps.ts';
 import {
   AppSlugSchema,
   AppTransitionResultSchema,
@@ -10,7 +10,7 @@ import {
 const KEPT =
   'Its microVM stops; the volume, everything on it and every hostname stay. `resume_app` puts it back.';
 
-export function registerSuspendAppTool({ server, api }: ToolRegistration): void {
+export function registerSuspendAppTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'suspend_app',
     {
@@ -23,7 +23,7 @@ export function registerSuspendAppTool({ server, api }: ToolRegistration): void 
     ({ app: slug }) =>
       answered({
         produce: async () => {
-          const { app } = await appFor({ api, slug, operation: 'suspend' });
+          const { app } = await appFor({ services, ownerId, slug, operation: 'suspend' });
           if (app.state === 'suspended') {
             return {
               slug: app.slug,
@@ -31,7 +31,11 @@ export function registerSuspendAppTool({ server, api }: ToolRegistration): void 
               detail: `${app.slug} is already suspended.`,
             };
           }
-          const suspended = await suspendApp({ api, appId: app.id });
+          const suspended = await services.apps.setState({
+            appId: app.id,
+            ownerId,
+            state: 'suspended',
+          });
           return {
             slug: suspended.slug,
             state: suspended.state,

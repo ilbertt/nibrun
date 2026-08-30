@@ -120,10 +120,17 @@ export function loggerPlugin(name: string) {
   return new Elysia({ name: `logger.${name}` }).derive({ as: 'scoped' }, () => ({ logger }));
 }
 
-// Reaches the api through its own public routes rather than through the services beside it, so a
-// tool can do exactly what the caller whose token it carries could do, and nothing more. It is
-// handed the assembled server in `createApp`.
-export const mcpService = new McpService();
+// The tools call these services like any controller does, scoped to whoever the route
+// authenticated — so a tool reaches exactly what that caller could reach and nothing else.
+export const mcpService = new McpService({
+  apps: appsService,
+  artifacts: artifactsService,
+  deployments: deploymentsService,
+  exports: exportsService,
+  filesystem: filesystemService,
+  hostnames: hostnamesService,
+  logs: logsService,
+});
 
 export const AssetsServicePlugin = new Elysia({ name: 'service.assets' }).decorate(
   'assetsService',

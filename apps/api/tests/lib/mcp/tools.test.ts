@@ -1,13 +1,19 @@
 import { expect, test } from 'bun:test';
 import { createNibrunMcpHandler } from '#lib/mcp/handler.ts';
-import { anApp, apiHolding, HOSTNAME, SLUG, UPDATED_AT } from '#tests/lib/mcp/support/api.ts';
 import { called, toolCall } from '#tests/lib/mcp/support/call.ts';
+import {
+  anApp,
+  HOSTNAME,
+  SLUG,
+  servicesHolding,
+  UPDATED_AT,
+} from '#tests/lib/mcp/support/services.ts';
 
 // Every file under `tools/` has to be registered in `createNibrunMcpServer` to reach a client, and
 // one that is written but never registered is not a type error anywhere.
 test('every tool file reaches the client', async () => {
   const replied = await called({
-    api: apiHolding({ apps: [] }),
+    services: servicesHolding({ apps: [] }),
     body: { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} },
   });
 
@@ -31,7 +37,7 @@ test('every tool file reaches the client', async () => {
 
 test('a listing answers with the address each app is reached at', async () => {
   const replied = await called({
-    api: apiHolding({ apps: [anApp({ state: 'suspended' })] }),
+    services: servicesHolding({ apps: [anApp({ state: 'suspended' })] }),
     body: toolCall({ name: 'list_apps', args: {} }),
   });
 
@@ -47,7 +53,7 @@ test('a listing answers with the address each app is reached at', async () => {
  */
 test('an operation the app state refuses comes back as the sentence saying why', async () => {
   const replied = await called({
-    api: apiHolding({ apps: [anApp({ state: 'suspended' })] }),
+    services: servicesHolding({ apps: [anApp({ state: 'suspended' })] }),
     body: toolCall({ name: 'list_files', args: { app: SLUG } }),
   });
 
@@ -59,7 +65,7 @@ test('an operation the app state refuses comes back as the sentence saying why',
 
 test('an app nobody has is refused by name rather than by an empty answer', async () => {
   const replied = await called({
-    api: apiHolding({ apps: [] }),
+    services: servicesHolding({ apps: [] }),
     body: toolCall({ name: 'get_app', args: { app: SLUG } }),
   });
 
@@ -68,15 +74,13 @@ test('an app nobody has is refused by name rather than by an empty answer', asyn
 });
 
 /**
- * The auth contract, which is the one thing about this package a reader has to know: the SDK
- * treats `authInfo` as strictly pass-through and verifies nothing, so a mount that forgets to
- * check the bearer would otherwise serve every tool to an anonymous caller.
+ * The auth contract, which is the one thing about this code a reader has to know: the SDK treats
+ * `authInfo` as strictly pass-through and verifies nothing, so a route that forgets to say who it
+ * authenticated would otherwise serve every tool with no owner to scope on.
  */
-test('a caller the mount never verified reaches no tool at all', async () => {
+test('a caller the route never named reaches no tool at all', async () => {
   const handler = createNibrunMcpHandler({
-    apiFor: () => {
-      throw new Error('the api was built for an unverified caller');
-    },
+    services: servicesHolding({ apps: [anApp({ state: 'active' })] }),
   });
 
   const response = await handler.fetch(

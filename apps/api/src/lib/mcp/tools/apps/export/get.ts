@@ -1,10 +1,10 @@
-import { unwrap } from '@repo/api-client/unwrap';
-import { appFor } from '@repo/app-operations';
+import { ExportIdSchema, Value } from '@repo/protocol';
 import { z } from 'zod';
+import { appFor } from '#lib/mcp/apps.ts';
 import { ExportResultSchema } from '#lib/mcp/export.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
-export function registerGetExportTool({ server, api }: ToolRegistration): void {
+export function registerGetExportTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'get_export',
     {
@@ -18,8 +18,12 @@ export function registerGetExportTool({ server, api }: ToolRegistration): void {
     ({ app: slug, exportId }) =>
       answered({
         produce: async () => {
-          const { app } = await appFor({ api, slug, operation: 'export' });
-          const found = unwrap(await api.api.apps({ appId: app.id }).exports({ exportId }).get());
+          const { app } = await appFor({ services, ownerId, slug, operation: 'export' });
+          const found = await services.exports.get({
+            appId: app.id,
+            ownerId,
+            exportId: Value.Parse(ExportIdSchema, exportId),
+          });
           return {
             exportId: found.id,
             state: found.state,

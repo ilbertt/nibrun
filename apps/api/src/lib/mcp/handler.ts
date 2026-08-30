@@ -1,32 +1,27 @@
 import { createMcpHandler, type McpHttpHandler } from '@modelcontextprotocol/server';
-import type { PublicApiClient } from '@repo/api-client/public';
+import { type OwnerId, OwnerIdSchema, Value } from '@repo/protocol';
 import { createNibrunMcpServer } from '#lib/mcp/server.ts';
+import type { McpServices } from '#lib/mcp/services.ts';
 
 const NOT_VERIFIED =
-  'The mcp handler was reached without an authenticated caller. Whatever mounts it verifies the bearer token and passes authInfo.';
+  'The mcp handler was reached without an authenticated caller. Whatever mounts it verifies the request and says which owner it authenticated as.';
 
-/**
- * How a verified caller becomes a client that acts as them.
- *
- * Supplied by whatever mounts this rather than built here: the token is the whole of what this
- * package knows about a caller, and where the api it talks to lives — another origin, or the same
- * process — is the mount's business.
- */
-export type ApiForCaller = (input: { token: string }) => PublicApiClient;
+/** What the route that mounts this has already established about the caller. */
+export type McpCaller = { ownerId: OwnerId };
 
 /**
  * The MCP endpoint as a fetch handler.
  *
  * It verifies nothing. The SDK treats `authInfo` as strictly pass-through — it never reads a
- * header or checks a token — so the mount is what answers an unauthenticated request, and by the
- * time this is called the caller is already known.
+ * header or checks a token — so the route that mounts this is what answers an unauthenticated
+ * request, and by the time this is called the caller is already known.
  */
-export function createNibrunMcpHandler({ apiFor }: { apiFor: ApiForCaller }): McpHttpHandler {
+export function createNibrunMcpHandler({ services }: { services: McpServices }): McpHttpHandler {
   return createMcpHandler((context) => {
-    const token = context.authInfo?.token;
-    if (token === undefined) {
+    const owner = context.authInfo?.extra?.ownerId;
+    if (typeof owner !== 'string') {
       throw new Error(NOT_VERIFIED);
     }
-    return createNibrunMcpServer({ api: apiFor({ token }) });
+    return createNibrunMcpServer({ services, ownerId: Value.Parse(OwnerIdSchema, owner) });
   });
 }

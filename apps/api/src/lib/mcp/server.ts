@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
-import type { PublicApiClient } from '@repo/api-client/public';
+import type { OwnerId } from '@repo/protocol';
+import type { McpServices } from '#lib/mcp/services.ts';
 import { registerDeleteAppTool } from '#lib/mcp/tools/apps/delete.ts';
 import { registerDeployAppTool } from '#lib/mcp/tools/apps/deploy.ts';
 import { registerAddDomainTool } from '#lib/mcp/tools/apps/domains/add.ts';
@@ -31,16 +32,22 @@ so read the refusal rather than retrying it.`;
 /**
  * The tools, over one caller's view of the api.
  *
- * Built per request rather than once: the client it acts through carries the caller's credential,
- * so a server held across requests would be one caller's access handed to the next.
+ * Built per request rather than once: every tool is bound to the owner the request authenticated
+ * as, so a server held across requests would be one caller's reach handed to the next.
  *
  * Every tool is registered here by hand. A file under `tools/` that nothing calls is a tool no
  * client can reach, and nothing else in the package would notice — which is what the tool listing
  * is tested against.
  */
-export function createNibrunMcpServer({ api }: { api: PublicApiClient }): McpServer {
+export function createNibrunMcpServer({
+  services,
+  ownerId,
+}: {
+  services: McpServices;
+  ownerId: OwnerId;
+}): McpServer {
   const server = new McpServer(SERVER_INFO, { instructions: INSTRUCTIONS });
-  const registration = { server, api };
+  const registration = { server, services, ownerId };
 
   registerListAppsTool(registration);
   registerGetAppTool(registration);

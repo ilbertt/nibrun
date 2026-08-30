@@ -1,9 +1,9 @@
-import { appFor, requestExport } from '@repo/app-operations';
 import { z } from 'zod';
+import { appFor } from '#lib/mcp/apps.ts';
 import { ExportResultSchema } from '#lib/mcp/export.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
-export function registerExportAppTool({ server, api }: ToolRegistration): void {
+export function registerExportAppTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'export_app',
     {
@@ -17,8 +17,8 @@ export function registerExportAppTool({ server, api }: ToolRegistration): void {
     ({ app: slug }) =>
       answered({
         produce: async () => {
-          const { app } = await appFor({ api, slug, operation: 'export' });
-          const requested = await requestExport({ api, appId: app.id });
+          const { app } = await appFor({ services, ownerId, slug, operation: 'export' });
+          const requested = await services.exports.request({ appId: app.id, ownerId });
           return {
             exportId: requested.id,
             state: requested.state,

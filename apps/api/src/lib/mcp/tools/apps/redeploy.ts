@@ -1,9 +1,9 @@
-import { redeploy } from '@repo/app-operations';
 import { z } from 'zod';
-import { ConfigInputSchema, configEdit, ReleaseResultSchema, released } from '#lib/mcp/release.ts';
+import { releaseOf } from '#lib/mcp/apps.ts';
+import { ConfigInputSchema, configPatch, ReleaseResultSchema, released } from '#lib/mcp/release.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
-export function registerRedeployAppTool({ server, api }: ToolRegistration): void {
+export function registerRedeployAppTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'redeploy_app',
     {
@@ -23,11 +23,29 @@ export function registerRedeployAppTool({ server, api }: ToolRegistration): void
       outputSchema: ReleaseResultSchema,
       annotations: { openWorldHint: true },
     },
-    ({ app, wait, ...edit }) =>
+    ({ app: slug, wait, ...edit }) =>
       answered({
         produce: async () => {
-          const deployed = await redeploy({ api, app, ...configEdit(edit) });
-          return await released({ api, deployed, wait });
+          // Which artifact is read before the config is written: an app that has never been
+          // deployed has no binary to run again, and finding that out afterwards would leave it
+          // configured for a release nobody made.
+          const { app, newest } = await releaseOf({
+            services,
+            ownerId,
+            slug,
+            operation: 'release',
+          });
+          const configured = await services.apps.updateConfig({
+            appId: app.id,
+            ownerId,
+            patch: configPatch(edit),
+          });
+          const deployment = await services.deployments.createOrRollback({
+            appId: app.id,
+            ownerId,
+            source: { artifactId: newest.artifactId },
+          });
+          return await released({ services, ownerId, app: configured, deployment, wait });
         },
       }),
   );

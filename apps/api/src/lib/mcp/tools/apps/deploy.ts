@@ -1,16 +1,18 @@
-import { deploy } from '@repo/app-operations';
 import { z } from 'zod';
+import { appFor } from '#lib/mcp/apps.ts';
 import {
   ConfigInputSchema,
-  configEdit,
+  configPatch,
   digest,
   fetchable,
+  newAppConfig,
   ReleaseResultSchema,
   released,
 } from '#lib/mcp/release.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
+import type { PublicApp } from '#services/apps.service.ts';
 
-export function registerDeployAppTool({ server, api }: ToolRegistration): void {
+export function registerDeployAppTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'deploy_app',
     {
@@ -47,19 +49,80 @@ export function registerDeployAppTool({ server, api }: ToolRegistration): void {
       outputSchema: ReleaseResultSchema,
       annotations: { openWorldHint: true },
     },
-    ({ url, sha256, app, name, args, wait, ...edit }) =>
+    ({ url, sha256, app: slug, name, args, wait, ...edit }) =>
       answered({
         produce: async () => {
-          const deployed = await deploy({
-            api,
-            binary: { url: fetchable(url), sha256: digest(sha256) },
-            args,
-            ...(app !== undefined && { app }),
-            ...(name !== undefined && { name }),
-            ...configEdit(edit),
+          // Config is written before the deployment rather than sent with it: a deployment
+          // snapshots the app's config as it stands, so this is the only order in which the flags
+          // a caller just gave are the ones that run.
+          const app = await configured({
+            services,
+            ownerId,
+            slug,
+            name,
+            url,
+            edit: { ...edit, args },
           });
-          return await released({ api, deployed, wait });
+          const artifact = await services.artifacts.createFromUrl({
+            appId: app.id,
+            ownerId,
+            url: fetchable(url),
+            sha256: digest(sha256),
+          });
+          const deployment = await services.deployments.createOrRollback({
+            appId: app.id,
+            ownerId,
+            source: { artifactId: artifact.id },
+          });
+          return await released({ services, ownerId, app, deployment, wait });
         },
       }),
   );
+}
+
+/**
+ * The app the release lands on, configured as this call asks.
+ *
+ * Named before anything is fetched rather than by the request that fetches: an app created for a
+ * deploy that cannot go on is one the caller is left to go and delete.
+ */
+async function configured({
+  services,
+  ownerId,
+  slug,
+  name,
+  url,
+  edit,
+}: {
+  services: ToolRegistration['services'];
+  ownerId: ToolRegistration['ownerId'];
+  slug: string | undefined;
+  name: string | undefined;
+  url: string;
+  edit: Parameters<typeof configPatch>[0];
+}): Promise<PublicApp> {
+  if (slug === undefined) {
+    return await services.apps.create({
+      ownerId,
+      name: name ?? lastSegment(url),
+      config: newAppConfig(edit),
+    });
+  }
+  const { app } = await appFor({ services, ownerId, slug, operation: 'release' });
+  return await services.apps.updateConfig({ appId: app.id, ownerId, patch: configPatch(edit) });
+}
+
+/**
+ * What to call the app when the caller named none: the binary, as the url's path spells it.
+ *
+ * Parsed rather than split, because the api names the stored artifact the same way — a name taken
+ * any other way is one it would refuse after this end had already made the app.
+ */
+function lastSegment(url: string): string {
+  try {
+    const segment = decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '');
+    return segment === '' ? url : segment;
+  } catch {
+    return url;
+  }
 }

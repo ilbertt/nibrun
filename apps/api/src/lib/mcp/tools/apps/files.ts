@@ -1,10 +1,14 @@
-import { addressedDeployment, guestPath, readDirectory } from '@repo/app-operations';
+import { guestPath } from '@repo/app-operations';
 import { z } from 'zod';
+import { releaseOf } from '#lib/mcp/apps.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
 const ROOT = '/';
 
-export function registerListFilesTool({ server, api }: ToolRegistration): void {
+/** A directory read waits on a host answering, and nothing else here ends that wait. */
+const READ_TIMEOUT_MS = 30_000;
+
+export function registerListFilesTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'list_files',
     {
@@ -35,13 +39,14 @@ export function registerListFilesTool({ server, api }: ToolRegistration): void {
     ({ app: slug, path }) =>
       answered({
         produce: async () => {
-          const { appId, deploymentId } = await addressedDeployment({
-            api,
-            slug,
-            deploymentId: undefined,
-            operation: 'files',
+          const { app, newest } = await releaseOf({ services, ownerId, slug, operation: 'files' });
+          return await services.filesystem.readDirectory({
+            appId: app.id,
+            deploymentId: newest.id,
+            ownerId,
+            path: guestPath(path),
+            signal: AbortSignal.timeout(READ_TIMEOUT_MS),
           });
-          return await readDirectory({ api, appId, deploymentId, path: guestPath(path) });
         },
       }),
   );

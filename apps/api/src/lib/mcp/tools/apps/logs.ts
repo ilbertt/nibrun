@@ -1,6 +1,6 @@
-import { addressedDeployment, followLogs } from '@repo/app-operations';
 import type { TenantLogRecord } from '@repo/protocol';
 import { z } from 'zod';
+import { releaseOf } from '#lib/mcp/apps.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
 /**
@@ -12,18 +12,18 @@ const MAX_RECORDS = 500;
 /** A backstop on a window that turns out to hold far more than it sounded like. */
 const READ_TIMEOUT_MS = 30_000;
 
-export function registerReadLogsTool({ server, api }: ToolRegistration): void {
+export function registerReadLogsTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'read_logs',
     {
       title: 'Read app output',
-      description: `What the app has written over a window ending now, newest ${MAX_RECORDS} lines at most. Reads to the end of what the api has and returns — it never waits on output the app has not written yet.`,
+      description: `What the app has written over a window ending now, newest ${MAX_RECORDS} lines at most. Reads to the end of what the store has and returns — it never waits on output the app has not written yet.`,
       inputSchema: z.object({
         app: AppSlugSchema,
         timerange: z
           .string()
           .default('1h')
-          .describe('How far back to read, as a duration the api takes: `15m`, `1h`, `7d`.'),
+          .describe('How far back to read, as a duration such as `15m`, `1h`, `7d`.'),
       }),
       outputSchema: z.object({
         records: z.array(
@@ -41,23 +41,17 @@ export function registerReadLogsTool({ server, api }: ToolRegistration): void {
     ({ app: slug, timerange }) =>
       answered({
         produce: async () => {
-          const { appId, deploymentId } = await addressedDeployment({
-            api,
-            slug,
-            deploymentId: undefined,
-            operation: 'logs',
-          });
+          const { app, newest } = await releaseOf({ services, ownerId, slug, operation: 'logs' });
           const signal = AbortSignal.timeout(READ_TIMEOUT_MS);
-          const { records, dropped } = await lastRecords({
-            stream: followLogs({
-              api,
-              appId,
-              deploymentId,
-              timerange,
-              following: false,
-              signal,
-            }),
+          const stream = await services.logs.openStream({
+            appId: app.id,
+            deploymentId: newest.id,
+            ownerId,
+            timerange,
+            follow: false,
+            signal,
           });
+          const { records, dropped } = await lastRecords({ stream });
           return {
             records: records.map(readable),
             // A read the backstop cut short is a truncated one too, and one nothing here would
@@ -80,7 +74,7 @@ export function registerReadLogsTool({ server, api }: ToolRegistration): void {
 async function lastRecords({
   stream,
 }: {
-  stream: AsyncGenerator<TenantLogRecord>;
+  stream: AsyncIterable<TenantLogRecord>;
 }): Promise<{ records: TenantLogRecord[]; dropped: boolean }> {
   const records: TenantLogRecord[] = [];
   let dropped = false;

@@ -1,8 +1,9 @@
-import { APP_STATUS_LABELS, appWithStatus, servingHostname, statusKey } from '@repo/app-operations';
+import { APP_STATUS_LABELS, servingHostname, statusKey } from '@repo/app-operations';
 import { z } from 'zod';
+import { appWithStatus } from '#lib/mcp/apps.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
-export function registerGetAppTool({ server, api }: ToolRegistration): void {
+export function registerGetAppTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'get_app',
     {
@@ -33,7 +34,7 @@ export function registerGetAppTool({ server, api }: ToolRegistration): void {
     ({ app: slug }) =>
       answered({
         produce: async () => {
-          const { app, newest, status } = await appWithStatus({ api, slug });
+          const { app, newest, status } = await appWithStatus({ services, ownerId, slug });
           return {
             slug: app.slug,
             url: `https://${servingHostname(app.hostnames)}`,
@@ -41,8 +42,8 @@ export function registerGetAppTool({ server, api }: ToolRegistration): void {
             args: app.config.args,
             httpPort: app.config.httpPort,
             hasExtraPublicPort: app.config.hasExtraPublicPort,
-            // Names only. The values are sealed on their way to the host and the api answers
-            // every one of them redacted, so there is nothing here that could return one.
+            // Names only. The values are sealed on their way to the host and read back redacted,
+            // so there is nothing here that could return one.
             environmentNames: Object.keys(app.config.environment),
             hostnames: app.hostnames.map(({ hostname, kind, state }) => ({
               hostname,

@@ -1,8 +1,9 @@
-import { appFor, removeDomain } from '@repo/app-operations';
+import { HostnameSchema, Value } from '@repo/protocol';
 import { z } from 'zod';
+import { appFor } from '#lib/mcp/apps.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
-export function registerRemoveDomainTool({ server, api }: ToolRegistration): void {
+export function registerRemoveDomainTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'remove_domain',
     {
@@ -19,8 +20,12 @@ export function registerRemoveDomainTool({ server, api }: ToolRegistration): voi
     ({ app: slug, hostname }) =>
       answered({
         produce: async () => {
-          const { app } = await appFor({ api, slug, operation: 'domains' });
-          await removeDomain({ api, appId: app.id, hostname });
+          const { app } = await appFor({ services, ownerId, slug, operation: 'domains' });
+          await services.hostnames.remove({
+            appId: app.id,
+            ownerId,
+            hostname: Value.Parse(HostnameSchema, hostname),
+          });
           return { hostname, detail: `${app.slug} no longer answers on ${hostname}.` };
         },
       }),

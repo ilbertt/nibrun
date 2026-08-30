@@ -1,9 +1,8 @@
-import { unwrap } from '@repo/api-client/unwrap';
 import { servingHostname } from '@repo/app-operations';
 import { z } from 'zod';
 import { answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
-export function registerListAppsTool({ server, api }: ToolRegistration): void {
+export function registerListAppsTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'list_apps',
     {
@@ -26,9 +25,9 @@ export function registerListAppsTool({ server, api }: ToolRegistration): void {
       answered({
         produce: async () => {
           // The row's own state rather than each app's status: a status is the app read against
-          // its newest release, and asking for one per app turns a listing into two requests an
-          // app. What a reader wants from a list is which app to look at.
-          const { apps } = unwrap(await api.api.apps.get());
+          // its newest release, and asking for one per app turns a listing into a query an app.
+          // What a reader wants from a list is which app to look at.
+          const apps = await services.apps.list({ ownerId });
           return {
             apps: apps.map((app) => ({
               slug: app.slug,

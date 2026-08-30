@@ -1,5 +1,5 @@
-import { appFor, deleteApp } from '@repo/app-operations';
 import { z } from 'zod';
+import { appFor } from '#lib/mcp/apps.ts';
 import {
   AppSlugSchema,
   AppTransitionResultSchema,
@@ -7,7 +7,7 @@ import {
   type ToolRegistration,
 } from '#lib/mcp/tool.ts';
 
-export function registerDeleteAppTool({ server, api }: ToolRegistration): void {
+export function registerDeleteAppTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'delete_app',
     {
@@ -21,8 +21,8 @@ export function registerDeleteAppTool({ server, api }: ToolRegistration): void {
     ({ app: slug }) =>
       answered({
         produce: async () => {
-          const { app } = await appFor({ api, slug, operation: 'delete' });
-          const deleted = await deleteApp({ api, appId: app.id });
+          const { app } = await appFor({ services, ownerId, slug, operation: 'delete' });
+          const deleted = await services.apps.delete({ appId: app.id, ownerId });
           return {
             slug: deleted.slug,
             state: deleted.state,

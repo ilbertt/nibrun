@@ -1,8 +1,9 @@
-import { addDomain, appFor } from '@repo/app-operations';
+import { HostnameSchema, Value } from '@repo/protocol';
 import { z } from 'zod';
+import { appFor } from '#lib/mcp/apps.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
-export function registerAddDomainTool({ server, api }: ToolRegistration): void {
+export function registerAddDomainTool({ server, services, ownerId }: ToolRegistration): void {
   server.registerTool(
     'add_domain',
     {
@@ -24,8 +25,12 @@ export function registerAddDomainTool({ server, api }: ToolRegistration): void {
     ({ app: slug, hostname }) =>
       answered({
         produce: async () => {
-          const { app } = await appFor({ api, slug, operation: 'domains' });
-          const added = await addDomain({ api, appId: app.id, hostname });
+          const { app } = await appFor({ services, ownerId, slug, operation: 'domains' });
+          const added = await services.hostnames.add({
+            appId: app.id,
+            ownerId,
+            hostname: Value.Parse(HostnameSchema, hostname),
+          });
           return {
             hostname: added.hostname,
             kind: added.kind,

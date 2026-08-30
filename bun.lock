@@ -38,7 +38,6 @@
         "@ilbertt/better-auth-bun-sql": "^0.4.0",
         "@ilbertt/bun-sqlgen": "^0.5.0",
         "@modelcontextprotocol/server": "^2.0.0",
-        "@repo/api-client": "workspace:*",
         "@repo/app-operations": "workspace:*",
         "@repo/protocol": "workspace:*",
         "better-auth": "catalog:",

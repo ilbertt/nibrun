@@ -1,12 +1,12 @@
 import { expect, test } from 'bun:test';
+import { called, toolCall } from '#tests/lib/mcp/support/call.ts';
 import {
   anApp,
-  apiHolding,
   aRunningRelease,
   SLUG,
+  servicesHolding,
   someOutput,
-} from '#tests/lib/mcp/support/api.ts';
-import { called, toolCall } from '#tests/lib/mcp/support/call.ts';
+} from '#tests/lib/mcp/support/services.ts';
 
 const MAX_RECORDS = 500;
 
@@ -14,7 +14,7 @@ type Output = { records: { message: string }[]; truncated: boolean };
 
 async function readLogs({ lines }: { lines: number }): Promise<Output> {
   const replied = await called({
-    api: apiHolding({
+    services: servicesHolding({
       apps: [anApp({ state: 'active' })],
       deployments: [aRunningRelease()],
       output: someOutput({ lines }),

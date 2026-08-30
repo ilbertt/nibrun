@@ -1,16 +1,29 @@
-import type { PublicApiClient } from '@repo/api-client/public';
-import { ApiError } from '@repo/api-client/unwrap';
 import {
-  awaitDeploymentSettled,
-  type ConfigEdit,
-  type Deployed,
   describeUnservedDeployment,
   parseEnvironmentPatch,
+  servingHostname,
 } from '@repo/app-operations';
-import { type Sha256Digest, Sha256DigestSchema, Value } from '@repo/protocol';
+import {
+  type DeploymentState,
+  HttpPortSchema,
+  type Sha256Digest,
+  Sha256DigestSchema,
+  type TenantEnvironment,
+  type TenantEnvironmentPatch,
+  Value,
+} from '@repo/protocol';
 import { z } from 'zod';
+import { BadRequestError, GatewayTimeoutError } from '#lib/errors.ts';
+import type { McpServices } from '#lib/mcp/services.ts';
+import { wait } from '#lib/wait.ts';
+import type { PublicApp } from '#services/apps.service.ts';
+import type { PublicDeployment } from '#services/deployments.service.ts';
 
 const SECURE_SCHEME = 'https://';
+
+const SETTLING = new Set<DeploymentState>(['pending', 'starting']);
+const POLL_INTERVAL_MS = 500;
+const SERVING_TIMEOUT_MS = 300_000;
 
 export const ReleaseResultSchema = z.object({
   slug: z.string(),
@@ -47,42 +60,65 @@ export const ConfigInputSchema = {
     ),
 };
 
-type ConfigInput = {
+export type ConfigInput = {
   args?: string[] | undefined;
   port?: number | undefined;
   extraPublicPort?: boolean | undefined;
   environment?: Record<string, string | null> | undefined;
 };
 
-export function configEdit({ args, port, extraPublicPort, environment }: ConfigInput): ConfigEdit {
+/**
+ * An edit to what an app already has, where a variable given `null` is one being removed.
+ *
+ * Every value is parsed into the branded shape the services take. A controller has TypeBox doing
+ * this at the edge; a tool is the edge, so it does it here — and a port outside the range costs a
+ * sentence rather than reaching a repository as a number nothing checked.
+ */
+export function configPatch({ args, port, extraPublicPort, environment }: ConfigInput) {
   return {
     ...(args !== undefined && { args }),
-    ...(port !== undefined && { port }),
-    ...(extraPublicPort !== undefined && { extraPublicPort }),
-    ...(environment !== undefined && {
-      environment: parseEnvironmentPatch(
-        Object.entries(environment).map(([name, value]) => ({ name, value })),
-      ),
-    }),
+    ...(port !== undefined && { httpPort: Value.Parse(HttpPortSchema, port) }),
+    ...(extraPublicPort !== undefined && { hasExtraPublicPort: extraPublicPort }),
+    ...(environment !== undefined && { environment: patched(environment) }),
   };
 }
 
 /**
- * Refused here rather than sent, because the other reading of an http url is one nibrun would
- * fetch a binary over cleartext — and the api is the end that fetches, so nothing on this end
- * would notice.
+ * The same edit for an app being created, which has nothing to leave alone and nothing to remove —
+ * so a variable given `null` is dropped rather than carried as an instruction nothing could follow.
+ */
+export function newAppConfig(input: ConfigInput) {
+  const { environment, ...rest } = configPatch(input);
+  return {
+    ...rest,
+    ...(environment !== undefined && { environment: withoutRemovals(environment) }),
+  };
+}
+
+function patched(environment: Record<string, string | null>): TenantEnvironmentPatch {
+  return parseEnvironmentPatch(
+    Object.entries(environment).map(([name, value]) => ({ name, value })),
+  );
+}
+
+function withoutRemovals(patch: TenantEnvironmentPatch): TenantEnvironment {
+  return Object.fromEntries(
+    Object.entries(patch).flatMap(([name, value]) => (value === null ? [] : [[name, value]])),
+  ) as TenantEnvironment;
+}
+
+/**
+ * Refused here rather than fetched, because the other reading of an http url is one nibrun would
+ * pull a binary over cleartext.
  */
 export function fetchable(url: string): string {
   if (!url.startsWith(SECURE_SCHEME)) {
-    throw new ApiError(`A binary is fetched over https, and this is not: ${url}`);
+    throw new BadRequestError(`A binary is fetched over https, and this is not: ${url}`);
   }
   return url;
 }
 
-/**
- * The digest in the one spelling the api reads it in, so a mistyped one costs a line rather than
- * the whole transfer it would fail at the end of.
- */
+/** The digest in the one spelling the api reads it in, so a mistyped one costs a line rather than a fetch. */
 export function digest(sha256: string | undefined): Sha256Digest | undefined {
   if (sha256 === undefined) {
     return undefined;
@@ -90,42 +126,69 @@ export function digest(sha256: string | undefined): Sha256Digest | undefined {
   try {
     return Value.Parse(Sha256DigestSchema, sha256.trim().toLowerCase());
   } catch {
-    throw new ApiError(
+    throw new BadRequestError(
       `A checksum is the 64 hex characters sha256sum prints, and this is not: ${sha256}`,
     );
   }
 }
 
 /**
- * What the release did, once it has stopped moving. A release that settled anywhere but running
- * is raised rather than returned, so the host account of why reaches the caller as the answer
- * instead of as a field it has to think to read.
+ * What the release did, once it has stopped moving. A release that settled anywhere but running is
+ * raised rather than returned, so the host account of why reaches the caller as the answer instead
+ * of as a field it has to think to read.
  */
 export async function released({
-  api,
-  deployed,
+  services,
+  ownerId,
+  app,
+  deployment,
   wait,
 }: {
-  api: PublicApiClient;
-  deployed: Deployed;
+  services: McpServices;
+  ownerId: PublicApp['ownerId'];
+  app: PublicApp;
+  deployment: PublicDeployment;
   wait: boolean;
 }) {
-  const staged = {
-    slug: deployed.slug,
-    url: deployed.url,
-    deploymentId: deployed.deploymentId,
-  };
+  const url = `https://${servingHostname(app.hostnames)}`;
+  const staged = { slug: app.slug, url, deploymentId: deployment.id };
   if (!wait) {
-    return { ...staged, state: 'pending', detail: `${deployed.url} — the release is starting.` };
+    return { ...staged, state: deployment.state, detail: `${url} — the release is starting.` };
   }
 
-  const settled = await awaitDeploymentSettled({
-    api,
-    appId: deployed.appId,
-    deploymentId: deployed.deploymentId,
-  });
+  const settled = await settledRelease({ services, ownerId, app, deployment });
   if (settled.state !== 'running') {
-    throw new ApiError(describeUnservedDeployment(settled));
+    throw new BadRequestError(describeUnservedDeployment(settled));
   }
-  return { ...staged, state: settled.state, detail: `${deployed.url} is serving.` };
+  return { ...staged, state: settled.state, detail: `${url} is serving.` };
+}
+
+async function settledRelease({
+  services,
+  ownerId,
+  app,
+  deployment,
+}: {
+  services: McpServices;
+  ownerId: PublicApp['ownerId'];
+  app: PublicApp;
+  deployment: PublicDeployment;
+}): Promise<PublicDeployment> {
+  // The ceiling doubles as what ends the pause between polls, so a release that never settles
+  // stops costing a wait the moment it has run out of time rather than one interval later.
+  const signal = AbortSignal.timeout(SERVING_TIMEOUT_MS);
+  while (!signal.aborted) {
+    const found = await services.deployments.get({
+      appId: app.id,
+      deploymentId: deployment.id,
+      ownerId,
+    });
+    if (!SETTLING.has(found.state)) {
+      return found;
+    }
+    await wait({ ms: POLL_INTERVAL_MS, signal });
+  }
+  throw new GatewayTimeoutError(
+    `Deployment ${deployment.id} was still starting after ${SERVING_TIMEOUT_MS}ms.`,
+  );
 }
