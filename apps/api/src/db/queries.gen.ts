@@ -870,6 +870,7 @@ export interface IAccountColumns {
     password: string | null;
     createdAt: Date;
     updatedAt: Date;
+    issuer: string;
 }
 
 /** Schema of `account`. */
@@ -1384,9 +1385,11 @@ export const schema = {
             scope: { _columnName: "scope", _foreignKeys: {} },
             password: { _columnName: "password", _foreignKeys: {} },
             createdAt: { _columnName: "createdAt", _foreignKeys: {} },
-            updatedAt: { _columnName: "updatedAt", _foreignKeys: {} }
+            updatedAt: { _columnName: "updatedAt", _foreignKeys: {} },
+            issuer: { _columnName: "issuer", _foreignKeys: {} }
         },
         _indexes: {
+            account_issuer_accountId_uidx: { _indexName: "account_issuer_accountId_uidx" },
             account_pkey: { _indexName: "account_pkey" },
             account_userId_idx: { _indexName: "account_userId_idx" }
         },
@@ -1411,7 +1414,9 @@ export const schema = {
             scope: { _columnName: "scope", _foreignKeys: {} }
         },
         _indexes: {
-            deviceCode_pkey: { _indexName: "deviceCode_pkey" }
+            deviceCode_deviceCode_uidx: { _indexName: "deviceCode_deviceCode_uidx" },
+            deviceCode_pkey: { _indexName: "deviceCode_pkey" },
+            deviceCode_userCode_uidx: { _indexName: "deviceCode_userCode_uidx" }
         },
         _constraints: {
             deviceCode_pkey: { _constraintName: "deviceCode_pkey" }
