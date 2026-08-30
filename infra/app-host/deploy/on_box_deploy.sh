@@ -13,7 +13,7 @@ cd "$(dirname "$0")"
 
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
-: "${AWS_REGION:?}" "${SSM_SECRET_PREFIX:?}" "${DATA_VOLUME_ID:?}" \
+: "${AWS_REGION:?}" "${SSM_SECRET_PREFIX:?}" \
   "${AGENT_VERSION:?}" "${AGENT_URL:?}" \
   "${ZEROFS_VERSION:?}" "${ZEROFS_URL:?}" "${ZEROFS_SHA256:?}" "${ZEROFS_MEMBER:?}" \
   "${FIRECRACKER_VERSION:?}" "${FIRECRACKER_URL:?}" "${FIRECRACKER_SHA256:?}" \

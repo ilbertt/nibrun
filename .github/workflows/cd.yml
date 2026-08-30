@@ -166,7 +166,6 @@ jobs:
     env:
       DEPLOY_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).deploy_bucket }}
       APP_HOST_DEPLOY_GROUP: ${{ fromJSON(needs.terraform.outputs.values).app_host_deploy_group }}
-      APP_HOST_DATA_VOLUME_IDS: ${{ fromJSON(needs.terraform.outputs.values).app_host_data_volume_ids }}
       SSM_SECRET_PREFIX: ${{ fromJSON(needs.terraform.outputs.values).ssm_secret_prefix }}
       GUEST_IMAGES_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).guest_images_bucket }}
       FILESYSTEMS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).filesystems_bucket }}

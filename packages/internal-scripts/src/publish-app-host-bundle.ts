@@ -19,14 +19,8 @@ const BUNDLE_DIRECTORIES = ['systemd', 'zerofs', 'caddy'];
 // everything relative to itself.
 const ON_BOX_SCRIPTS = ['on_box_deploy.sh', 'ensure_ephemeral_data.sh'];
 
-// Shared with the control plane's bundle. Only the control plane reads it now —
-// an app host's /data is the instance store and `ensure_ephemeral_data.sh` is
-// what mounts it — but it ships here until the EBS volume is removed, so a
-// rollback to a revision that still calls it finds it on the box.
-const SHARED_ON_BOX_SCRIPTS = ['ensure_data_volume.sh'];
-
-// Also shared: Cloudflare's origin-pull CA is one certificate, and both proxies
-// authenticate the same edge against it.
+// Shared with the control plane's bundle: Cloudflare's origin-pull CA is one
+// certificate, and both proxies authenticate the same edge against it.
 const SHARED_CADDY_FILES = ['cloudflare-origin-pull-ca.pem'];
 
 const deployBucket = requiredEnv('DEPLOY_BUCKET');
@@ -35,7 +29,7 @@ const revision = requiredEnv('GITHUB_SHA');
 const appHostDir = join(repoRoot, 'infra/app-host');
 const bundlePath = join(tmpdir(), 'nibrun-app-host-bundle.tar.gz');
 
-await $`tar czf ${bundlePath} -C ${appHostDir} ${BUNDLE_DIRECTORIES} -C ${join(appHostDir, 'deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/deploy')} ${SHARED_ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/caddy')} ${SHARED_CADDY_FILES}`;
+await $`tar czf ${bundlePath} -C ${appHostDir} ${BUNDLE_DIRECTORIES} -C ${join(appHostDir, 'deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/caddy')} ${SHARED_CADDY_FILES}`;
 
 const bundleBytes = Bun.file(bundlePath).size;
 const url = `s3://${deployBucket}/app-host-bundles/${revision}.tar.gz`;

@@ -124,35 +124,3 @@ resource "aws_eip" "app_host" {
     Name = "${local.resource_name_prefix}-app-host-${count.index}-public-ip"
   }
 }
-
-# Nothing mounts this any more: /data is the instance store the m8id carries, and
-# infra/app-host/deploy/ensure_ephemeral_data.sh is what puts it there. It stays
-# attached only so a revert has a disk to go back to, and it keeps its Backup tag,
-# which still bills for a daily snapshot of a cache nothing reads.
-#
-# No prevent_destroy. It was written when this volume held the only copy of
-# something, and a guard that outlives the data it guards buys nothing but a
-# manual step — the plan itself, and the destroy check the deploy runs over it,
-# are what should be read before this goes.
-resource "aws_ebs_volume" "app_host_data" {
-  count = var.app_host_count
-
-  availability_zone = local.availability_zone
-  size              = var.app_host_data_volume_size
-  type              = "gp3"
-  encrypted         = true
-
-  tags = {
-    Name = "${local.resource_name_prefix}-app-host-${count.index}-data"
-    # The DLM snapshot policy targets volumes by this tag.
-    Backup = local.resource_name_prefix
-  }
-}
-
-resource "aws_volume_attachment" "app_host_data" {
-  count = var.app_host_count
-
-  device_name = "/dev/sdf"
-  volume_id   = aws_ebs_volume.app_host_data[count.index].id
-  instance_id = aws_instance.app_host[count.index].id
-}

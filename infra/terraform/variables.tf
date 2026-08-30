@@ -88,12 +88,6 @@ variable "app_host_root_volume_size" {
   description = "Root EBS volume size in GB for an app host. Holds the OS, the versioned binaries under /opt/nibrun and the artifact cache under /var/lib/nibrun."
 }
 
-variable "app_host_data_volume_size" {
-  type        = number
-  default     = 100
-  description = "Per-host data EBS volume size in GB. Nothing mounts it any more — /data is the instance store — and it stays attached only so a revert has a disk to go back to."
-}
-
 variable "export_retention_days" {
   type        = number
   default     = 1

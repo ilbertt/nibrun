@@ -43,32 +43,20 @@ if [ -z "$device" ]; then
 fi
 log "instance store is $device"
 
-# The EBS volume's entry, written by ensure_data_volume.sh on a host deployed
-# before this existed. Left in place it would win the race at boot and take the
-# mount point this needs, so it goes — the volume itself is left attached and
-# untouched, which is what makes rolling back a matter of putting the line back.
-if grep -q "[[:space:]]${MOUNT_POINT}[[:space:]]" /etc/fstab 2>/dev/null; then
-  log "removing the legacy ${MOUNT_POINT} entry from /etc/fstab"
-  sed -i "\\#[[:space:]]${MOUNT_POINT}[[:space:]]#d" /etc/fstab
-fi
-
 mkdir -p "$MOUNT_POINT"
 
-# A host being migrated comes up with the EBS volume already mounted here. At
-# boot nothing has opened it yet, so it can simply be taken back; if something
-# has — a deploy re-running this while ZeroFS holds its cache — the unmount fails
-# and the host keeps the disk it is using until it next boots.
+# A deploy re-runs this while ZeroFS holds the cache underneath it, so finding the
+# disk already mounted is the ordinary case and not an error. Finding anything
+# else there is: nothing mounts /data but this, so mounting over whatever
+# took it would hide a disk something is using rather than replace it.
 if mountpoint -q "$MOUNT_POINT"; then
   current=$(findmnt -no SOURCE "$MOUNT_POINT")
-  if [ "$(readlink -f "$current")" = "$(readlink -f "$device")" ]; then
-    log "already mounted from the instance store"
-    exit 0
+  if [ "$(readlink -f "$current")" != "$(readlink -f "$device")" ]; then
+    log "${MOUNT_POINT} is mounted from ${current}, which is not the instance store"
+    exit 1
   fi
-  log "${MOUNT_POINT} is mounted from ${current}, taking it back"
-  if ! umount "$MOUNT_POINT"; then
-    log "could not unmount ${current} — it is in use, so ${MOUNT_POINT} stays where it is"
-    exit 0
-  fi
+  log "already mounted from the instance store"
+  exit 0
 fi
 
 # Blank on every start, so this is the ordinary path rather than the first-run

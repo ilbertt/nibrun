@@ -125,14 +125,6 @@ output "app_host_public_ips" {
   value       = aws_eip.app_host[*].public_ip
 }
 
-# Not a single DATA_VOLUME_ID like the control plane's, because each host has
-# its own: a deploy fanning out looks the instance it is targeting up here and
-# exports that one value under the usual name.
-output "app_host_data_volume_ids" {
-  description = "Instance id to the id of the volume mounted at /data on it."
-  value       = { for index, host in aws_instance.app_host : host.id => aws_ebs_volume.app_host_data[index].id }
-}
-
 output "exports_bucket" {
   description = "Downloadable app exports. Written by app hosts, read by the api only to sign a download URL."
   value       = aws_s3_bucket.exports.bucket
