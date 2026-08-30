@@ -3,12 +3,17 @@ import type { PublicApiClient } from '@repo/api-client/public';
 import type { Filename } from '@repo/protocol';
 import { deploy, describeUnservedDeployment } from '#deploy.ts';
 import type { DeployStep } from '#release.ts';
+import { answering } from '#tests/support/api.ts';
+import {
+  APP_ID,
+  ARTIFACT_ID,
+  DIGEST,
+  type HostnameRow,
+  PLATFORM,
+  SLUG,
+} from '#tests/support/app.ts';
 import type { UploadProgress } from '#upload.ts';
 
-const SLUG = 'quiet-otter';
-const APP_ID = 'app-1';
-const ARTIFACT_ID = 'artifact-1';
-const DIGEST = 'sha256:abcd';
 const PUT_URL = 'https://store.example/artifact-1?signature=x';
 const PORT = 8080;
 const SIZE_BYTES = 1_048_576;
@@ -16,9 +21,7 @@ const PART_BYTES = 262_144;
 const REFUSED = 403;
 
 type Sent = { what: string; body?: unknown };
-type HostnameRow = { hostname: string; kind: string; state: string };
 
-const PLATFORM: HostnameRow = { hostname: `${SLUG}.nibrun.app`, kind: 'platform', state: 'active' };
 const PENDING_CUSTOM: HostnameRow = {
   hostname: 'not-pointed-here-yet.example',
   kind: 'custom',
@@ -67,7 +70,7 @@ function apiHolding({
       deployments: {
         // What the app is on is read to decide whether it can take a release; nothing is sent by
         // asking, so it is not among what was.
-        get: () => Promise.resolve({ data: { deployments: [] }, error: null }),
+        get: answering({ deployments: [] }),
         post: (body: unknown) => {
           sent.push({ what: 'deployment', body });
           return Promise.resolve({ data: { id: 'deployment-1' }, error: null });
@@ -77,7 +80,7 @@ function apiHolding({
   }
 
   const route = Object.assign(addressed, {
-    get: () => Promise.resolve({ data: { apps }, error: null }),
+    get: answering({ apps }),
     post: (body: unknown) => {
       sent.push({ what: 'create', body });
       return Promise.resolve({ data: app(APP_ID), error: null });

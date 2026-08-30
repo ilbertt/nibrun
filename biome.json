@@ -99,6 +99,10 @@
   },
   "overrides": [
     {
+      "includes": ["**/src/**"],
+      "plugins": ["./biome-plugins/no-tests-in-src.grit"]
+    },
+    {
       "includes": ["**/*.ts", "**/*.tsx"],
       "linter": {
         "rules": {

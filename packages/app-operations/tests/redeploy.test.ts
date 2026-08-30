@@ -1,20 +1,21 @@
 import { expect, test } from 'bun:test';
-import type { PublicApiClient } from '@repo/api-client/public';
 import { parseEnvironmentPatch } from '#environment.ts';
 import { redeploy } from '#redeploy.ts';
 import type { DeployStep } from '#release.ts';
+import { answering, apiHolding as apiWith } from '#tests/support/api.ts';
+import {
+  APP_ID,
+  ARTIFACT_ID,
+  DIGEST,
+  type HostnameRow,
+  PLATFORM,
+  SLUG,
+} from '#tests/support/app.ts';
 
-const SLUG = 'quiet-otter';
-const APP_ID = 'app-1';
-const ARTIFACT_ID = 'artifact-1';
-const DIGEST = 'sha256:abcd';
 const PORT = 8080;
 const TOKEN_SET = parseEnvironmentPatch([{ name: 'TOKEN', value: 'shh' }]);
 
 type Sent = { what: string; body?: unknown };
-type HostnameRow = { hostname: string; kind: string; state: string };
-
-const PLATFORM: HostnameRow = { hostname: `${SLUG}.nibrun.app`, kind: 'platform', state: 'active' };
 
 function apiHolding({
   sent,
@@ -26,7 +27,7 @@ function apiHolding({
   deployments?: Array<{ id: string; artifactId: string }>;
   hostnames?: HostnameRow[];
   state?: string;
-}): PublicApiClient {
+}) {
   function underApp({ appId }: { appId: string }) {
     function artifact({ artifactId }: { artifactId: string }) {
       return {
@@ -52,20 +53,13 @@ function apiHolding({
         },
         post: (body: unknown) => {
           sent.push({ what: 'deployment', body });
-          return Promise.resolve({ data: { id: 'deployment-2' }, error: null });
+          return answering({ id: 'deployment-2' })();
         },
       },
     };
   }
 
-  return {
-    api: {
-      apps: Object.assign(underApp, {
-        get: () =>
-          Promise.resolve({ data: { apps: [{ id: APP_ID, slug: SLUG, state }] }, error: null }),
-      }),
-    },
-  } as unknown as PublicApiClient;
+  return apiWith({ apps: [{ id: APP_ID, slug: SLUG, state }], underApp });
 }
 
 test('the binary the app is running is the one released again', async () => {
