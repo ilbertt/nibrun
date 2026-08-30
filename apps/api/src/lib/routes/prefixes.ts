@@ -5,6 +5,10 @@ export enum RoutePrefix {
   // Answered by the edge with 404 and reached by agents over the VPC, so a
   // route added here is unreachable from the internet the moment it is written.
   Internal = '/internal',
+  // The MCP endpoint, and the RFC 8707 resource an access token is issued for.
+  // Listed here before anything answers it so that a client reaching for it is
+  // told 404 rather than handed the dashboard's index.
+  Mcp = '/mcp',
 }
 
 type PathBelow<

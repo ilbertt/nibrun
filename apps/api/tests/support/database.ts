@@ -6,7 +6,11 @@ const COMPOSE_FILE = resolve(import.meta.dir, '..', '..', '..', '..', 'docker-co
 
 // Fixed rather than discovered, because the compose file publishes it: a test that asked Docker
 // which port it got would be reading back what it already said.
-const DATABASE_URL = 'postgres://nibrun:nibrun@127.0.0.1:55432/nibrun_test';
+//
+// Exported because the controller suite has to name it before it imports the api — the service
+// graph reads its configuration as it is constructed — and a second copy of this string is a
+// second thing to keep in step with the compose file.
+export const TEST_DATABASE_URL = 'postgres://nibrun:nibrun@127.0.0.1:55432/nibrun_test';
 
 // The two the migrations own. Dropped before applying so a run finds the same empty database as
 // the one before it, including after a run that was killed before it could tear anything down.
@@ -22,7 +26,7 @@ const OWNED_SCHEMAS = ['nibrun', 'auth'];
 export async function startTestDatabase(): Promise<SQL> {
   await compose(['up', '-d', '--wait']);
 
-  const sql = new SQL(DATABASE_URL);
+  const sql = new SQL(TEST_DATABASE_URL);
   for (const schema of OWNED_SCHEMAS) {
     await sql.unsafe(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
   }

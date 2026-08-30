@@ -1,6 +1,6 @@
 import { Button } from '@repo/ui/components/button';
 import { Field, FieldError } from '@repo/ui/components/field';
-import { DeviceCard } from '#components/device/device-card.tsx';
+import { AuthCard } from '#components/auth/auth-card.tsx';
 import { useDeviceCode } from '#lib/hooks/use-device-code.ts';
 import { useDeviceDecision } from '#lib/hooks/use-device-decision.ts';
 import { useSession } from '#lib/hooks/use-session.ts';
@@ -11,18 +11,18 @@ export function DeviceApproval({ userCode }: { userCode: string }) {
   const decide = useDeviceDecision(userCode);
 
   if (code.status === 'checking') {
-    return <DeviceCard title="Sign in a terminal" description="Checking that code…" />;
+    return <AuthCard title="Sign in a terminal" description="Checking that code…" />;
   }
 
   if (code.status === 'refused') {
-    return <DeviceCard failed title="Sign in failed" description={code.reason} />;
+    return <AuthCard failed title="Sign in failed" description={code.reason} />;
   }
 
   if (decide.isSuccess) {
     return decide.variables === 'approve' ? (
-      <DeviceCard title="Signed in" description="You can close this page." />
+      <AuthCard title="Signed in" description="You can close this page." />
     ) : (
-      <DeviceCard
+      <AuthCard
         title="Sign in refused"
         description="Nothing was signed in. You can close this page."
       />
@@ -30,7 +30,7 @@ export function DeviceApproval({ userCode }: { userCode: string }) {
   }
 
   return (
-    <DeviceCard
+    <AuthCard
       title="Sign in a terminal"
       description="Check the code matches the one it showed you."
     >
@@ -67,6 +67,6 @@ export function DeviceApproval({ userCode }: { userCode: string }) {
           {decide.isError && <FieldError>{decide.error.message}</FieldError>}
         </Field>
       </div>
-    </DeviceCard>
+    </AuthCard>
   );
 }

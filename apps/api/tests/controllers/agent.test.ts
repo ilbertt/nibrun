@@ -15,7 +15,10 @@ import {
   Value,
 } from '@repo/protocol';
 import { StatusMap } from 'elysia';
-import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
+import { ORIGIN, sendJson, useTestDatabase } from '#tests/controllers/support/api.ts';
+
+// An agent names itself with a session token, which better-auth resolves against the database.
+useTestDatabase();
 
 const A_SERVED_APP_ID = Value.Parse(AppIdSchema, 'app-pocketbase');
 

@@ -3,7 +3,7 @@ import { Field, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { DeviceCard } from '#components/device/device-card.tsx';
+import { AuthCard } from '#components/auth/auth-card.tsx';
 
 /** Shown when nobody followed the link the CLI printed and typed the address themselves. */
 export function DeviceCodeForm() {
@@ -11,7 +11,7 @@ export function DeviceCodeForm() {
   const [code, setCode] = useState('');
 
   return (
-    <DeviceCard title="Sign in a terminal" description="Enter the code it showed you.">
+    <AuthCard title="Sign in a terminal" description="Enter the code it showed you.">
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -35,6 +35,6 @@ export function DeviceCodeForm() {
           Continue
         </Button>
       </form>
-    </DeviceCard>
+    </AuthCard>
   );
 }

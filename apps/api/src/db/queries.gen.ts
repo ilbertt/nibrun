@@ -903,6 +903,209 @@ export interface IDeviceCodeTable {
     constraints: keyof (typeof schema)["deviceCode"]["_constraints"];
 }
 
+/** Columns of `jwks`. */
+export interface IJwksColumns {
+    id: string;
+    publicKey: string;
+    privateKey: string;
+    createdAt: Date;
+    expiresAt: Date | null;
+    alg: string | null;
+    crv: string | null;
+}
+
+/** Schema of `jwks`. */
+export interface IJwksTable {
+    columns: IJwksColumns;
+    relationType: (typeof schema)["jwks"]["_relationType"];
+    indexes: keyof (typeof schema)["jwks"]["_indexes"];
+    constraints: keyof (typeof schema)["jwks"]["_constraints"];
+}
+
+/** Columns of `oauthAccessToken`. */
+export interface IOauthAccessTokenColumns {
+    id: string;
+    token: string;
+    clientId: string;
+    sessionId: string | null;
+    userId: string | null;
+    referenceId: string | null;
+    authorizationCodeId: string | null;
+    resources: string | null;
+    requestedUserInfoClaims: string | null;
+    refreshId: string | null;
+    expiresAt: Date;
+    createdAt: Date;
+    revoked: Date | null;
+    confirmation: string | null;
+    scopes: string;
+}
+
+/** Schema of `oauthAccessToken`. */
+export interface IOauthAccessTokenTable {
+    columns: IOauthAccessTokenColumns;
+    relationType: (typeof schema)["oauthAccessToken"]["_relationType"];
+    indexes: keyof (typeof schema)["oauthAccessToken"]["_indexes"];
+    constraints: keyof (typeof schema)["oauthAccessToken"]["_constraints"];
+}
+
+/** Columns of `oauthClient`. */
+export interface IOauthClientColumns {
+    id: string;
+    clientId: string;
+    clientSecret: string | null;
+    clientDiscoveryId: string | null;
+    disabled: boolean | null;
+    skipConsent: boolean | null;
+    enableEndSession: boolean | null;
+    subjectType: string | null;
+    scopes: string | null;
+    clientCredentialsScopes: string | null;
+    userId: string | null;
+    createdAt: Date | null;
+    updatedAt: Date | null;
+    name: string | null;
+    uri: string | null;
+    icon: string | null;
+    contacts: string | null;
+    tos: string | null;
+    policy: string | null;
+    softwareId: string | null;
+    softwareVersion: string | null;
+    softwareStatement: string | null;
+    redirectUris: string;
+    postLogoutRedirectUris: string | null;
+    backchannelLogoutUri: string | null;
+    backchannelLogoutSessionRequired: boolean | null;
+    tokenEndpointAuthMethod: string | null;
+    applicationType: string | null;
+    jwks: string | null;
+    jwksUri: string | null;
+    grantTypes: string | null;
+    responseTypes: string | null;
+    requirePKCE: boolean | null;
+    dpopBoundAccessTokens: boolean | null;
+    referenceId: string | null;
+    metadata: string | null;
+}
+
+/** Schema of `oauthClient`. */
+export interface IOauthClientTable {
+    columns: IOauthClientColumns;
+    relationType: (typeof schema)["oauthClient"]["_relationType"];
+    indexes: keyof (typeof schema)["oauthClient"]["_indexes"];
+    constraints: keyof (typeof schema)["oauthClient"]["_constraints"];
+}
+
+/** Columns of `oauthClientAssertion`. */
+export interface IOauthClientAssertionColumns {
+    id: string;
+    expiresAt: Date;
+}
+
+/** Schema of `oauthClientAssertion`. */
+export interface IOauthClientAssertionTable {
+    columns: IOauthClientAssertionColumns;
+    relationType: (typeof schema)["oauthClientAssertion"]["_relationType"];
+    indexes: keyof (typeof schema)["oauthClientAssertion"]["_indexes"];
+    constraints: keyof (typeof schema)["oauthClientAssertion"]["_constraints"];
+}
+
+/** Columns of `oauthClientResource`. */
+export interface IOauthClientResourceColumns {
+    id: string;
+    clientId: string;
+    resourceId: string;
+    metadata: string | null;
+    createdAt: Date | null;
+}
+
+/** Schema of `oauthClientResource`. */
+export interface IOauthClientResourceTable {
+    columns: IOauthClientResourceColumns;
+    relationType: (typeof schema)["oauthClientResource"]["_relationType"];
+    indexes: keyof (typeof schema)["oauthClientResource"]["_indexes"];
+    constraints: keyof (typeof schema)["oauthClientResource"]["_constraints"];
+}
+
+/** Columns of `oauthConsent`. */
+export interface IOauthConsentColumns {
+    id: string;
+    clientId: string;
+    userId: string | null;
+    referenceId: string | null;
+    resources: string | null;
+    requestedUserInfoClaims: string | null;
+    scopes: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+/** Schema of `oauthConsent`. */
+export interface IOauthConsentTable {
+    columns: IOauthConsentColumns;
+    relationType: (typeof schema)["oauthConsent"]["_relationType"];
+    indexes: keyof (typeof schema)["oauthConsent"]["_indexes"];
+    constraints: keyof (typeof schema)["oauthConsent"]["_constraints"];
+}
+
+/** Columns of `oauthRefreshToken`. */
+export interface IOauthRefreshTokenColumns {
+    id: string;
+    token: string;
+    clientId: string;
+    sessionId: string | null;
+    userId: string;
+    referenceId: string | null;
+    authorizationCodeId: string | null;
+    resources: string | null;
+    requestedUserInfoClaims: string | null;
+    expiresAt: Date;
+    createdAt: Date;
+    revoked: Date | null;
+    rotatedAt: Date | null;
+    rotationReplayResponse: string | null;
+    rotationReplayExpiresAt: Date | null;
+    authTime: Date | null;
+    confirmation: string | null;
+    scopes: string;
+}
+
+/** Schema of `oauthRefreshToken`. */
+export interface IOauthRefreshTokenTable {
+    columns: IOauthRefreshTokenColumns;
+    relationType: (typeof schema)["oauthRefreshToken"]["_relationType"];
+    indexes: keyof (typeof schema)["oauthRefreshToken"]["_indexes"];
+    constraints: keyof (typeof schema)["oauthRefreshToken"]["_constraints"];
+}
+
+/** Columns of `oauthResource`. */
+export interface IOauthResourceColumns {
+    id: string;
+    identifier: string;
+    name: string;
+    accessTokenTtl: number | null;
+    refreshTokenTtl: number | null;
+    signingAlgorithm: string | null;
+    signingKeyId: string | null;
+    allowedScopes: string | null;
+    customClaims: string | null;
+    dpopBoundAccessTokensRequired: boolean | null;
+    disabled: boolean | null;
+    createdAt: Date | null;
+    updatedAt: Date | null;
+    policyVersion: number | null;
+    metadata: string | null;
+}
+
+/** Schema of `oauthResource`. */
+export interface IOauthResourceTable {
+    columns: IOauthResourceColumns;
+    relationType: (typeof schema)["oauthResource"]["_relationType"];
+    indexes: keyof (typeof schema)["oauthResource"]["_indexes"];
+    constraints: keyof (typeof schema)["oauthResource"]["_constraints"];
+}
+
 /** Columns of `session`. */
 export interface ISessionColumns {
     id: string;
@@ -1422,6 +1625,244 @@ export const schema = {
             deviceCode_pkey: { _constraintName: "deviceCode_pkey" }
         }
     },
+    jwks: {
+        _relationName: "jwks",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            publicKey: { _columnName: "publicKey", _foreignKeys: {} },
+            privateKey: { _columnName: "privateKey", _foreignKeys: {} },
+            createdAt: { _columnName: "createdAt", _foreignKeys: {} },
+            expiresAt: { _columnName: "expiresAt", _foreignKeys: {} },
+            alg: { _columnName: "alg", _foreignKeys: {} },
+            crv: { _columnName: "crv", _foreignKeys: {} }
+        },
+        _indexes: {
+            jwks_pkey: { _indexName: "jwks_pkey" }
+        },
+        _constraints: {
+            jwks_pkey: { _constraintName: "jwks_pkey" }
+        }
+    },
+    oauthAccessToken: {
+        _relationName: "oauthAccessToken",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            token: { _columnName: "token", _foreignKeys: {} },
+            clientId: { _columnName: "clientId", _foreignKeys: { oauthAccessToken_clientId_fkey: { _constraintName: "oauthAccessToken_clientId_fkey", _references: { _relationName: "oauthClient", _columnName: "clientId" } } } },
+            sessionId: { _columnName: "sessionId", _foreignKeys: { oauthAccessToken_sessionId_fkey: { _constraintName: "oauthAccessToken_sessionId_fkey", _references: { _relationName: "session", _columnName: "id" } } } },
+            userId: { _columnName: "userId", _foreignKeys: { oauthAccessToken_userId_fkey: { _constraintName: "oauthAccessToken_userId_fkey", _references: { _relationName: "user", _columnName: "id" } } } },
+            referenceId: { _columnName: "referenceId", _foreignKeys: {} },
+            authorizationCodeId: { _columnName: "authorizationCodeId", _foreignKeys: {} },
+            resources: { _columnName: "resources", _foreignKeys: {} },
+            requestedUserInfoClaims: { _columnName: "requestedUserInfoClaims", _foreignKeys: {} },
+            refreshId: { _columnName: "refreshId", _foreignKeys: { oauthAccessToken_refreshId_fkey: { _constraintName: "oauthAccessToken_refreshId_fkey", _references: { _relationName: "oauthRefreshToken", _columnName: "id" } } } },
+            expiresAt: { _columnName: "expiresAt", _foreignKeys: {} },
+            createdAt: { _columnName: "createdAt", _foreignKeys: {} },
+            revoked: { _columnName: "revoked", _foreignKeys: {} },
+            confirmation: { _columnName: "confirmation", _foreignKeys: {} },
+            scopes: { _columnName: "scopes", _foreignKeys: {} }
+        },
+        _indexes: {
+            oauthAccessToken_authorizationCodeId_idx: { _indexName: "oauthAccessToken_authorizationCodeId_idx" },
+            oauthAccessToken_clientId_idx: { _indexName: "oauthAccessToken_clientId_idx" },
+            oauthAccessToken_pkey: { _indexName: "oauthAccessToken_pkey" },
+            oauthAccessToken_refreshId_idx: { _indexName: "oauthAccessToken_refreshId_idx" },
+            oauthAccessToken_sessionId_idx: { _indexName: "oauthAccessToken_sessionId_idx" },
+            oauthAccessToken_token_key: { _indexName: "oauthAccessToken_token_key" },
+            oauthAccessToken_userId_idx: { _indexName: "oauthAccessToken_userId_idx" }
+        },
+        _constraints: {
+            oauthAccessToken_clientId_fkey: { _constraintName: "oauthAccessToken_clientId_fkey" },
+            oauthAccessToken_pkey: { _constraintName: "oauthAccessToken_pkey" },
+            oauthAccessToken_refreshId_fkey: { _constraintName: "oauthAccessToken_refreshId_fkey" },
+            oauthAccessToken_sessionId_fkey: { _constraintName: "oauthAccessToken_sessionId_fkey" },
+            oauthAccessToken_token_key: { _constraintName: "oauthAccessToken_token_key" },
+            oauthAccessToken_userId_fkey: { _constraintName: "oauthAccessToken_userId_fkey" }
+        }
+    },
+    oauthClient: {
+        _relationName: "oauthClient",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            clientId: { _columnName: "clientId", _foreignKeys: {} },
+            clientSecret: { _columnName: "clientSecret", _foreignKeys: {} },
+            clientDiscoveryId: { _columnName: "clientDiscoveryId", _foreignKeys: {} },
+            disabled: { _columnName: "disabled", _foreignKeys: {} },
+            skipConsent: { _columnName: "skipConsent", _foreignKeys: {} },
+            enableEndSession: { _columnName: "enableEndSession", _foreignKeys: {} },
+            subjectType: { _columnName: "subjectType", _foreignKeys: {} },
+            scopes: { _columnName: "scopes", _foreignKeys: {} },
+            clientCredentialsScopes: { _columnName: "clientCredentialsScopes", _foreignKeys: {} },
+            userId: { _columnName: "userId", _foreignKeys: { oauthClient_userId_fkey: { _constraintName: "oauthClient_userId_fkey", _references: { _relationName: "user", _columnName: "id" } } } },
+            createdAt: { _columnName: "createdAt", _foreignKeys: {} },
+            updatedAt: { _columnName: "updatedAt", _foreignKeys: {} },
+            name: { _columnName: "name", _foreignKeys: {} },
+            uri: { _columnName: "uri", _foreignKeys: {} },
+            icon: { _columnName: "icon", _foreignKeys: {} },
+            contacts: { _columnName: "contacts", _foreignKeys: {} },
+            tos: { _columnName: "tos", _foreignKeys: {} },
+            policy: { _columnName: "policy", _foreignKeys: {} },
+            softwareId: { _columnName: "softwareId", _foreignKeys: {} },
+            softwareVersion: { _columnName: "softwareVersion", _foreignKeys: {} },
+            softwareStatement: { _columnName: "softwareStatement", _foreignKeys: {} },
+            redirectUris: { _columnName: "redirectUris", _foreignKeys: {} },
+            postLogoutRedirectUris: { _columnName: "postLogoutRedirectUris", _foreignKeys: {} },
+            backchannelLogoutUri: { _columnName: "backchannelLogoutUri", _foreignKeys: {} },
+            backchannelLogoutSessionRequired: { _columnName: "backchannelLogoutSessionRequired", _foreignKeys: {} },
+            tokenEndpointAuthMethod: { _columnName: "tokenEndpointAuthMethod", _foreignKeys: {} },
+            applicationType: { _columnName: "applicationType", _foreignKeys: {} },
+            jwks: { _columnName: "jwks", _foreignKeys: {} },
+            jwksUri: { _columnName: "jwksUri", _foreignKeys: {} },
+            grantTypes: { _columnName: "grantTypes", _foreignKeys: {} },
+            responseTypes: { _columnName: "responseTypes", _foreignKeys: {} },
+            requirePKCE: { _columnName: "requirePKCE", _foreignKeys: {} },
+            dpopBoundAccessTokens: { _columnName: "dpopBoundAccessTokens", _foreignKeys: {} },
+            referenceId: { _columnName: "referenceId", _foreignKeys: {} },
+            metadata: { _columnName: "metadata", _foreignKeys: {} }
+        },
+        _indexes: {
+            oauthClient_clientId_key: { _indexName: "oauthClient_clientId_key" },
+            oauthClient_pkey: { _indexName: "oauthClient_pkey" },
+            oauthClient_userId_idx: { _indexName: "oauthClient_userId_idx" }
+        },
+        _constraints: {
+            oauthClient_clientId_key: { _constraintName: "oauthClient_clientId_key" },
+            oauthClient_pkey: { _constraintName: "oauthClient_pkey" },
+            oauthClient_userId_fkey: { _constraintName: "oauthClient_userId_fkey" }
+        }
+    },
+    oauthClientAssertion: {
+        _relationName: "oauthClientAssertion",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            expiresAt: { _columnName: "expiresAt", _foreignKeys: {} }
+        },
+        _indexes: {
+            oauthClientAssertion_pkey: { _indexName: "oauthClientAssertion_pkey" }
+        },
+        _constraints: {
+            oauthClientAssertion_pkey: { _constraintName: "oauthClientAssertion_pkey" }
+        }
+    },
+    oauthClientResource: {
+        _relationName: "oauthClientResource",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            clientId: { _columnName: "clientId", _foreignKeys: { oauthClientResource_clientId_fkey: { _constraintName: "oauthClientResource_clientId_fkey", _references: { _relationName: "oauthClient", _columnName: "clientId" } } } },
+            resourceId: { _columnName: "resourceId", _foreignKeys: { oauthClientResource_resourceId_fkey: { _constraintName: "oauthClientResource_resourceId_fkey", _references: { _relationName: "oauthResource", _columnName: "identifier" } } } },
+            metadata: { _columnName: "metadata", _foreignKeys: {} },
+            createdAt: { _columnName: "createdAt", _foreignKeys: {} }
+        },
+        _indexes: {
+            oauthClientResource_clientId_idx: { _indexName: "oauthClientResource_clientId_idx" },
+            oauthClientResource_clientId_resourceId_uidx: { _indexName: "oauthClientResource_clientId_resourceId_uidx" },
+            oauthClientResource_pkey: { _indexName: "oauthClientResource_pkey" },
+            oauthClientResource_resourceId_idx: { _indexName: "oauthClientResource_resourceId_idx" }
+        },
+        _constraints: {
+            oauthClientResource_clientId_fkey: { _constraintName: "oauthClientResource_clientId_fkey" },
+            oauthClientResource_pkey: { _constraintName: "oauthClientResource_pkey" },
+            oauthClientResource_resourceId_fkey: { _constraintName: "oauthClientResource_resourceId_fkey" }
+        }
+    },
+    oauthConsent: {
+        _relationName: "oauthConsent",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            clientId: { _columnName: "clientId", _foreignKeys: { oauthConsent_clientId_fkey: { _constraintName: "oauthConsent_clientId_fkey", _references: { _relationName: "oauthClient", _columnName: "clientId" } } } },
+            userId: { _columnName: "userId", _foreignKeys: { oauthConsent_userId_fkey: { _constraintName: "oauthConsent_userId_fkey", _references: { _relationName: "user", _columnName: "id" } } } },
+            referenceId: { _columnName: "referenceId", _foreignKeys: {} },
+            resources: { _columnName: "resources", _foreignKeys: {} },
+            requestedUserInfoClaims: { _columnName: "requestedUserInfoClaims", _foreignKeys: {} },
+            scopes: { _columnName: "scopes", _foreignKeys: {} },
+            createdAt: { _columnName: "createdAt", _foreignKeys: {} },
+            updatedAt: { _columnName: "updatedAt", _foreignKeys: {} }
+        },
+        _indexes: {
+            oauthConsent_clientId_idx: { _indexName: "oauthConsent_clientId_idx" },
+            oauthConsent_pkey: { _indexName: "oauthConsent_pkey" },
+            oauthConsent_userId_idx: { _indexName: "oauthConsent_userId_idx" }
+        },
+        _constraints: {
+            oauthConsent_clientId_fkey: { _constraintName: "oauthConsent_clientId_fkey" },
+            oauthConsent_pkey: { _constraintName: "oauthConsent_pkey" },
+            oauthConsent_userId_fkey: { _constraintName: "oauthConsent_userId_fkey" }
+        }
+    },
+    oauthRefreshToken: {
+        _relationName: "oauthRefreshToken",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            token: { _columnName: "token", _foreignKeys: {} },
+            clientId: { _columnName: "clientId", _foreignKeys: { oauthRefreshToken_clientId_fkey: { _constraintName: "oauthRefreshToken_clientId_fkey", _references: { _relationName: "oauthClient", _columnName: "clientId" } } } },
+            sessionId: { _columnName: "sessionId", _foreignKeys: { oauthRefreshToken_sessionId_fkey: { _constraintName: "oauthRefreshToken_sessionId_fkey", _references: { _relationName: "session", _columnName: "id" } } } },
+            userId: { _columnName: "userId", _foreignKeys: { oauthRefreshToken_userId_fkey: { _constraintName: "oauthRefreshToken_userId_fkey", _references: { _relationName: "user", _columnName: "id" } } } },
+            referenceId: { _columnName: "referenceId", _foreignKeys: {} },
+            authorizationCodeId: { _columnName: "authorizationCodeId", _foreignKeys: {} },
+            resources: { _columnName: "resources", _foreignKeys: {} },
+            requestedUserInfoClaims: { _columnName: "requestedUserInfoClaims", _foreignKeys: {} },
+            expiresAt: { _columnName: "expiresAt", _foreignKeys: {} },
+            createdAt: { _columnName: "createdAt", _foreignKeys: {} },
+            revoked: { _columnName: "revoked", _foreignKeys: {} },
+            rotatedAt: { _columnName: "rotatedAt", _foreignKeys: {} },
+            rotationReplayResponse: { _columnName: "rotationReplayResponse", _foreignKeys: {} },
+            rotationReplayExpiresAt: { _columnName: "rotationReplayExpiresAt", _foreignKeys: {} },
+            authTime: { _columnName: "authTime", _foreignKeys: {} },
+            confirmation: { _columnName: "confirmation", _foreignKeys: {} },
+            scopes: { _columnName: "scopes", _foreignKeys: {} }
+        },
+        _indexes: {
+            oauthRefreshToken_authorizationCodeId_idx: { _indexName: "oauthRefreshToken_authorizationCodeId_idx" },
+            oauthRefreshToken_clientId_idx: { _indexName: "oauthRefreshToken_clientId_idx" },
+            oauthRefreshToken_pkey: { _indexName: "oauthRefreshToken_pkey" },
+            oauthRefreshToken_sessionId_idx: { _indexName: "oauthRefreshToken_sessionId_idx" },
+            oauthRefreshToken_token_key: { _indexName: "oauthRefreshToken_token_key" },
+            oauthRefreshToken_userId_idx: { _indexName: "oauthRefreshToken_userId_idx" }
+        },
+        _constraints: {
+            oauthRefreshToken_clientId_fkey: { _constraintName: "oauthRefreshToken_clientId_fkey" },
+            oauthRefreshToken_pkey: { _constraintName: "oauthRefreshToken_pkey" },
+            oauthRefreshToken_sessionId_fkey: { _constraintName: "oauthRefreshToken_sessionId_fkey" },
+            oauthRefreshToken_token_key: { _constraintName: "oauthRefreshToken_token_key" },
+            oauthRefreshToken_userId_fkey: { _constraintName: "oauthRefreshToken_userId_fkey" }
+        }
+    },
+    oauthResource: {
+        _relationName: "oauthResource",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            identifier: { _columnName: "identifier", _foreignKeys: {} },
+            name: { _columnName: "name", _foreignKeys: {} },
+            accessTokenTtl: { _columnName: "accessTokenTtl", _foreignKeys: {} },
+            refreshTokenTtl: { _columnName: "refreshTokenTtl", _foreignKeys: {} },
+            signingAlgorithm: { _columnName: "signingAlgorithm", _foreignKeys: {} },
+            signingKeyId: { _columnName: "signingKeyId", _foreignKeys: {} },
+            allowedScopes: { _columnName: "allowedScopes", _foreignKeys: {} },
+            customClaims: { _columnName: "customClaims", _foreignKeys: {} },
+            dpopBoundAccessTokensRequired: { _columnName: "dpopBoundAccessTokensRequired", _foreignKeys: {} },
+            disabled: { _columnName: "disabled", _foreignKeys: {} },
+            createdAt: { _columnName: "createdAt", _foreignKeys: {} },
+            updatedAt: { _columnName: "updatedAt", _foreignKeys: {} },
+            policyVersion: { _columnName: "policyVersion", _foreignKeys: {} },
+            metadata: { _columnName: "metadata", _foreignKeys: {} }
+        },
+        _indexes: {
+            oauthResource_identifier_key: { _indexName: "oauthResource_identifier_key" },
+            oauthResource_pkey: { _indexName: "oauthResource_pkey" }
+        },
+        _constraints: {
+            oauthResource_identifier_key: { _constraintName: "oauthResource_identifier_key" },
+            oauthResource_pkey: { _constraintName: "oauthResource_pkey" }
+        }
+    },
     session: {
         _relationName: "session",
         _relationType: "table",
@@ -1893,6 +2334,14 @@ export const schema = {
 export interface Tables {
     account: IAccountTable;
     deviceCode: IDeviceCodeTable;
+    jwks: IJwksTable;
+    oauthAccessToken: IOauthAccessTokenTable;
+    oauthClient: IOauthClientTable;
+    oauthClientAssertion: IOauthClientAssertionTable;
+    oauthClientResource: IOauthClientResourceTable;
+    oauthConsent: IOauthConsentTable;
+    oauthRefreshToken: IOauthRefreshTokenTable;
+    oauthResource: IOauthResourceTable;
     session: ISessionTable;
     user: IUserTable;
     verification: IVerificationTable;

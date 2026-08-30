@@ -8,7 +8,7 @@ import {
 import { cn } from '@repo/ui/lib/utils';
 import type { ReactNode } from 'react';
 
-export function DeviceCard({
+export function AuthCard({
   title,
   description,
   failed,

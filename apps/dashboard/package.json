@@ -12,6 +12,7 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
+    "@better-auth/oauth-provider": "^1.7.2",
     "@repo/api-client": "workspace:*",
     "@repo/app-operations": "workspace:*",
     "@repo/binary-handoff": "workspace:*",
