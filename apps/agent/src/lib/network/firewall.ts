@@ -10,6 +10,9 @@ export const INSTANCE_METADATA_ADDRESS_V6 = 'fd00:ec2::254';
 /** nft rejects the name `dstnat` on the output hook, and the whole ruleset with it. */
 const OUTPUT_NAT_PRIORITY = -100;
 
+/** After the isolation chain on the same hook, so only traffic that was allowed is counted. */
+const TRAFFIC_CHAIN_PRIORITY = 'filter + 10';
+
 const PRIVATE_DESTINATIONS_V4 = [
   '10.0.0.0/8',
   '172.16.0.0/12',
@@ -36,10 +39,9 @@ const RULE_INDENT = '    ';
 const DENY = 'reject';
 
 /**
- * A named counter per app rather than one inline on each rule: an app is reached through more than
- * one of them — the loopback port the proxy uses, the host port from outside, and any extra port
- * it asked for — and what an app being used means is all of them together. The name carries the
- * attribution, so reading one back needs no rule to be recognised by its shape.
+ * A named counter per app, referenced from every chain that sees traffic reaching its guest. The
+ * name carries the attribution, so reading one back needs no rule to be recognised by its shape
+ * and no two rules have to be summed to answer for one app.
  *
  * Bare, not quoted: nft takes a declaration name as an identifier and rejects a quoted string
  * there, hyphens in an app id notwithstanding.
@@ -68,6 +70,13 @@ const set = (values: readonly string[]) => `{ ${values.join(', ')} }`;
  * Zeroed whenever the ruleset changes, because the table is replaced rather than edited. Whoever
  * reads these has to treat a count standing below the one before it as a reset and not as an app
  * that has gone quiet — the same hazard a rebooted guest is to a cpu share.
+ *
+ * Deliberately not counted on the nat rules that forward to a guest. A nat hook is traversed for
+ * the packet that creates a conntrack entry and no other, so a count taken there is a count of
+ * connections: measured on a live host, twenty requests over one keep-alive connection moved it
+ * by one, against the tap's own forty-two thousand. An app being read through a pooled connection
+ * or holding a websocket open would have looked idle, and idle is the direction that puts a
+ * microVM down underneath somebody.
  */
 const counterObjects = ({ instances }: FirewallState) =>
   instances.flatMap((instance) => [
@@ -98,6 +107,8 @@ export function renderRuleset(state: FirewallState): string {
     ...inputChainV4(),
     '',
     ...natChainsV4(state),
+    '',
+    ...trafficChainsV4(state),
     '}',
     '',
     `table ip6 ${NFTABLES_TABLE}`,
@@ -109,6 +120,55 @@ export function renderRuleset(state: FirewallState): string {
     ...inputChainV6(),
     '}',
   ].join('\n')}\n`;
+}
+
+/**
+ * Counts, and decides nothing: every rule here is a bare `counter` with no verdict, so traffic
+ * passes through exactly as it would if the chains were absent.
+ *
+ * Two chains because there are two ways in and they meet different hooks. The proxy dials the
+ * loopback port, which is locally generated and reaches `output`; anything from off the box —
+ * which is how a public port an app asked for is served — is forwarded and reaches `forward`.
+ * One counter behind both is what makes "is anybody using this app" a single number rather than
+ * a sum somebody could forget to take.
+ *
+ * A loopback source is what makes the output chain only the proxy's traffic. The nat output hook
+ * has already rewritten the destination by the time this runs, and the postrouting snat that
+ * re-sources it onto the tap has not, so a packet from the proxy is still 127.0.0.1 here. The
+ * agent's own health probes dial the guest address directly and are sourced from the tap, so they
+ * are not counted — being kept awake by the probing of the process deciding to sleep it is the
+ * one way this measurement could be circular.
+ *
+ * The forward chain sits after the isolation rules rather than beside them: those end in a
+ * verdict, so what reaches this has already been allowed, and nothing rejected is counted as use.
+ */
+function trafficChainsV4({ instances }: FirewallState): string[] {
+  if (instances.length === 0) {
+    return [];
+  }
+  return [
+    ...chain({
+      header: 'traffic_output {',
+      rules: [
+        'type filter hook output priority filter; policy accept;',
+        ...instances.map(
+          (instance) =>
+            `ip saddr 127.0.0.0/8 ip daddr ${instance.guestIpv4} tcp dport ${instance.httpPort} counter name ${appCounterName(instance.appId)}`,
+        ),
+      ],
+    }),
+    '',
+    ...chain({
+      header: 'traffic_forward {',
+      rules: [
+        `type filter hook forward priority ${TRAFFIC_CHAIN_PRIORITY}; policy accept;`,
+        ...instances.map(
+          (instance) =>
+            `iifname != ${TAP_MATCH} oifname ${TAP_MATCH} ip daddr ${instance.guestIpv4} counter name ${appCounterName(instance.appId)}`,
+        ),
+      ],
+    }),
+  ];
 }
 
 function forwardChainV4({ controlPlaneCidrsV4 }: FirewallState): string[] {
@@ -176,7 +236,7 @@ function natChainsV4({ instances }: FirewallState): string[] {
         'type nat hook prerouting priority dstnat; policy accept;',
         ...instances.map(
           (instance) =>
-            `iifname != ${TAP_MATCH} tcp dport ${instance.hostPort} counter name ${appCounterName(instance.appId)} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
+            `iifname != ${TAP_MATCH} tcp dport ${instance.hostPort} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
         ),
         // The same port on both sides, and both protocols: what arrives here has already been
         // forwarded once without being renumbered, and rewriting it now would leave a binary
@@ -186,7 +246,7 @@ function natChainsV4({ instances }: FirewallState): string[] {
             ? []
             : (['tcp', 'udp'] as const).map(
                 (protocol) =>
-                  `iifname != ${TAP_MATCH} ${protocol} dport ${instance.extraPublicPort} counter name ${appCounterName(instance.appId)} dnat to ${instance.guestIpv4}:${instance.extraPublicPort}`,
+                  `iifname != ${TAP_MATCH} ${protocol} dport ${instance.extraPublicPort} dnat to ${instance.guestIpv4}:${instance.extraPublicPort}`,
               ),
         ),
       ],
@@ -198,7 +258,7 @@ function natChainsV4({ instances }: FirewallState): string[] {
         `type nat hook output priority ${OUTPUT_NAT_PRIORITY}; policy accept;`,
         ...instances.map(
           (instance) =>
-            `ip daddr 127.0.0.1 tcp dport ${instance.hostPort} counter name ${appCounterName(instance.appId)} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
+            `ip daddr 127.0.0.1 tcp dport ${instance.hostPort} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
         ),
       ],
     }),

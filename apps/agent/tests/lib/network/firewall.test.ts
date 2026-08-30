@@ -241,6 +241,12 @@ describe('the ruleset is a function of state, not a history of edits', () => {
 });
 
 describe('an app is counted wherever it is reached', () => {
+  const linesOf = ({ ruleset, match }: { ruleset: string; match: string }) =>
+    ruleset
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.includes(match));
+
   test('every forwarded app declares a counter of its own', () => {
     const ruleset = renderRuleset(state({ instances: [instance] }));
     expect(ruleset).toContain(`counter ${appCounterName(instance.appId)} {`);
@@ -251,29 +257,70 @@ describe('an app is counted wherever it is reached', () => {
     expect(ruleset).not.toContain(`counter "${appCounterName(instance.appId)}"`);
   });
 
-  test('both ways in are counted against the same app', () => {
-    const rules = renderRuleset(state({ instances: [instance] }))
-      .split('\n')
-      .filter((line) => line.includes('dnat to'));
-    expect(rules).toHaveLength(2);
-    for (const rule of rules) {
-      expect(rule).toContain(`counter name ${appCounterName(instance.appId)}`);
+  // The reason this file has a test about where a counter is *not*: a nat hook is traversed for
+  // the packet that opens a connection and no other, so counting there counts connections. An app
+  // read over a pooled connection would go quiet while it was being used, and quiet is what puts
+  // a microVM down underneath somebody.
+  test('no rule that forwards to a guest carries a counter', () => {
+    const ruleset = renderRuleset(state({ instances: [instance, askedForAPort] }));
+    for (const rule of linesOf({ ruleset, match: 'dnat to' })) {
+      expect(rule).not.toContain('counter');
     }
   });
 
-  test('an extra public port is the same app being used, on both protocols', () => {
-    const rules = renderRuleset(state({ instances: [askedForAPort] }))
-      .split('\n')
-      .filter(
-        (line) => line.includes(String(EXTRA_PUBLIC_PORT_NUMBER)) && line.includes('dnat to'),
-      );
-    expect(rules).toHaveLength(2);
-    for (const rule of rules) {
-      expect(rule).toContain(`counter name ${appCounterName(askedForAPort.appId)}`);
+  test('the proxy reaching a guest over loopback is counted', () => {
+    const rules = linesOf({
+      ruleset: renderRuleset(state({ instances: [instance] })),
+      match: 'ip saddr 127.0.0.0/8',
+    });
+    const counted = rules.filter((rule) => rule.includes('counter name'));
+    expect(counted).toHaveLength(1);
+    expect(counted[0]).toContain(`ip daddr ${instance.guestIpv4}`);
+    expect(counted[0]).toContain(appCounterName(instance.appId));
+  });
+
+  test('traffic arriving from off the box is counted against the same app', () => {
+    const ruleset = renderRuleset(state({ instances: [instance] }));
+    const forwarded = linesOf({ ruleset, match: 'oifname "nbr*" ip daddr' }).filter((rule) =>
+      rule.includes('counter name'),
+    );
+    expect(forwarded).toHaveLength(1);
+    expect(forwarded[0]).toContain(appCounterName(instance.appId));
+  });
+
+  test('both ways in name one counter, so nothing has to be summed to answer for an app', () => {
+    const counted = linesOf({
+      ruleset: renderRuleset(state({ instances: [instance] })),
+      match: 'counter name',
+    });
+    expect(counted).toHaveLength(2);
+    for (const rule of counted) {
+      expect(rule).toContain(appCounterName(instance.appId));
     }
   });
 
-  test('a host with no apps declares no counters', () => {
-    expect(renderRuleset(state())).not.toContain('counter ');
+  // A guest is reachable on a port it asked for without that port being in any rule here: the
+  // forward rule matches the address, so a protocol nobody thought about is counted anyway.
+  test('a port an app asked for needs no counting rule of its own', () => {
+    const withPort = linesOf({
+      ruleset: renderRuleset(state({ instances: [askedForAPort] })),
+      match: 'counter name',
+    });
+    const without = linesOf({
+      ruleset: renderRuleset(state({ instances: [instance] })),
+      match: 'counter name',
+    });
+    expect(withPort).toHaveLength(without.length);
+  });
+
+  test('counting runs after the rules that refuse, so nothing rejected reads as use', () => {
+    const ruleset = renderRuleset(state({ instances: [instance] }));
+    expect(ruleset).toContain('type filter hook forward priority filter + 10;');
+  });
+
+  test('a host with no apps declares no counters and adds no chains', () => {
+    const ruleset = renderRuleset(state());
+    expect(ruleset).not.toContain('counter ');
+    expect(ruleset).not.toContain('traffic_');
   });
 });
