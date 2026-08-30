@@ -58,7 +58,7 @@ variable "app_host_spot" {
 variable "app_host_count" {
   type        = number
   default     = 1
-  description = "Size of the app host fleet. Terraform does not provision hosts dynamically, so scaling is changing this — but scaling down is not a plain decrement, see app_host.tf."
+  description = "Size of the app host fleet. Terraform does not provision hosts dynamically, so scaling is changing this."
 }
 
 variable "port_relay_instance_type" {

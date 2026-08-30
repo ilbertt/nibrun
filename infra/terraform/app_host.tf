@@ -126,18 +126,14 @@ resource "aws_eip" "app_host" {
 }
 
 # Nothing mounts this any more: /data is the instance store the m8id carries, and
-# infra/app-host/deploy/ensure_ephemeral_data.sh is what puts it there. The volume
-# stays only so a revert has a disk to go back to, and goes once that stops being
-# worth keeping — with its Backup tag, which still bills for a daily snapshot of a
-# cache nothing reads. Removing it is not a plan away: prevent_destroy below makes
-# it the same two-step operation scaling down is.
+# infra/app-host/deploy/ensure_ephemeral_data.sh is what puts it there. It stays
+# attached only so a revert has a disk to go back to, and it keeps its Backup tag,
+# which still bills for a daily snapshot of a cache nothing reads.
 #
-# prevent_destroy under count applies to every element, which makes scaling
-# *down* a two-step operation rather than a decrement: lowering
-# var.app_host_count makes Terraform plan a destroy of the highest-index volume,
-# and prevent_destroy turns that into a hard plan error rather than a warning.
-# Drain the host, remove its volume and attachment from state (and delete the
-# volume by hand), then lower the count.
+# No prevent_destroy. It was written when this volume held the only copy of
+# something, and a guard that outlives the data it guards buys nothing but a
+# manual step — the plan itself, and the destroy check the deploy runs over it,
+# are what should be read before this goes.
 resource "aws_ebs_volume" "app_host_data" {
   count = var.app_host_count
 
@@ -150,10 +146,6 @@ resource "aws_ebs_volume" "app_host_data" {
     Name = "${local.resource_name_prefix}-app-host-${count.index}-data"
     # The DLM snapshot policy targets volumes by this tag.
     Backup = local.resource_name_prefix
-  }
-
-  lifecycle {
-    prevent_destroy = true
   }
 }
 
