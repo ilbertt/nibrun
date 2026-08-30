@@ -4,6 +4,7 @@ import { BinaryDrop } from '#components/binary-drop.tsx';
 import { DeployCta } from '#components/deploy-cta.tsx';
 import { GetStartedHint } from '#components/get-started-hint.tsx';
 import { Hero } from '#components/hero.tsx';
+import { OpenSource } from '#components/open-source.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { TryItOut } from '#components/try-it-out.tsx';
@@ -37,6 +38,7 @@ function RouteComponent() {
         </section>
         <WhatItActuallyNeeds />
         <WhatYourAppGets />
+        <OpenSource />
         <DeployCta />
       </main>
     </>
