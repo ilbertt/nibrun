@@ -46,7 +46,7 @@ RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
 # ProtectSystem=strict makes everything else read-only, and the cache lives on
-# the data volume rather than under CacheDirectory.
+# /data rather than under CacheDirectory.
 ReadWritePaths=/data/zerofs
 
 # What this unit is called in the log store. journald attaches this to every

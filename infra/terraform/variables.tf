@@ -27,11 +27,10 @@ variable "data_volume_size" {
 # runs out.
 #
 # m8id rather than m7i because it is the cheaper of the two on spot and carries a
-# 118 GB NVMe instance store. Nothing uses that disk yet: /data is still the EBS
-# volume below, and moving the ZeroFS cache onto ephemeral storage needs a
-# boot-time format that nothing here does — ensure_data_volume.sh runs from the
-# deploy while /data remounts from fstab, so a blank instance store would come back
-# unmounted after every spot stop rather than merely cold.
+# 118 GB NVMe instance store, which is what /data is: see
+# infra/app-host/deploy/ensure_ephemeral_data.sh. That makes the instance store
+# load-bearing rather than a bonus — a type without one has no /data, and
+# nibrun-zerofs.service is ordered behind the unit that would fail to mount it.
 variable "app_host_instance_type" {
   type        = string
   default     = "m8id.large"
@@ -42,8 +41,9 @@ variable "app_host_instance_type" {
 # request is terminated, which would put a replacement host on the same ZeroFS
 # prefix while the old one still held the writer epoch — and infra/app-host/AGENTS.md
 # is explicit that two read-write `zerofs run` against one prefix is an outage
-# rather than an error message. Stopping keeps the instance id, its data volume and
-# its elastic ip, so what comes back is the same host rather than a rival to it.
+# rather than an error message. Stopping keeps the instance id and the elastic ip,
+# so what comes back is the same host rather than a rival to it — with a cold /data,
+# which is an instance store and blank on every start.
 #
 # What this does not buy: `ignore_fsync = true` puts the entire durability
 # guarantee in ZeroFS's five-second flush, so a reclaim loses 5-15 s of writes the
@@ -91,7 +91,7 @@ variable "app_host_root_volume_size" {
 variable "app_host_data_volume_size" {
   type        = number
   default     = 100
-  description = "Per-host data EBS volume size in GB, mounted at /data. Sized for ZeroFS's working set, not for the fleet's data — S3 holds that."
+  description = "Per-host data EBS volume size in GB. Nothing mounts it any more — /data is the instance store — and it stays attached only so a revert has a disk to go back to."
 }
 
 variable "export_retention_days" {

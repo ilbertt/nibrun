@@ -118,11 +118,12 @@ resource "aws_eip" "app_host" {
   }
 }
 
-# ZeroFS's local cache, mounted at /data. Not where tenant data lives — S3 is
-# the source of truth and a host can be rebuilt from it — so the snapshots this
-# picks up are about bringing a replacement host back warm rather than about
-# durability, and prevent_destroy is about a plan never pulling a disk out from
-# under running microVMs.
+# Nothing mounts this any more: /data is the instance store the m8id carries, and
+# infra/app-host/deploy/ensure_ephemeral_data.sh is what puts it there. The volume
+# stays only so a revert has a disk to go back to, and goes once that stops being
+# worth keeping — with its Backup tag, which still bills for a daily snapshot of a
+# cache nothing reads. Removing it is not a plan away: prevent_destroy below makes
+# it the same two-step operation scaling down is.
 #
 # prevent_destroy under count applies to every element, which makes scaling
 # *down* a two-step operation rather than a decrement: lowering
