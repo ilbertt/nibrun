@@ -17,6 +17,7 @@
     "@modelcontextprotocol/server": "^2.0.0",
     "@repo/api-client": "workspace:*",
     "@repo/app-operations": "workspace:*",
+    "@repo/deploy-link": "workspace:*",
     "@repo/protocol": "workspace:*",
     "zod": "catalog:"
   },

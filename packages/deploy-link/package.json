@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@repo/app-operations": "workspace:*",
-    "@repo/protocol": "workspace:*"
+    "@repo/protocol": "workspace:*",
+    "@tanstack/router-core": "^1.171.15"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

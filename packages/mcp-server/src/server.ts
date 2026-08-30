@@ -38,9 +38,17 @@ so read the refusal rather than retrying it.`;
  * client can reach, and nothing else in the package would notice — which is what the tool listing
  * is tested against.
  */
-export function createNibrunMcpServer({ api }: { api: PublicApiClient }): McpServer {
+export function createNibrunMcpServer({
+  api,
+  origin,
+  era,
+}: {
+  api: PublicApiClient;
+  origin: string;
+  era: 'legacy' | 'modern';
+}): McpServer {
   const server = new McpServer(SERVER_INFO, { instructions: INSTRUCTIONS });
-  const registration = { server, api };
+  const registration = { server, api, origin, era };
 
   registerListAppsTool(registration);
   registerGetAppTool(registration);

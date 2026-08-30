@@ -1,4 +1,4 @@
-import { defaultStringifySearch } from '@tanstack/react-router';
+import { deployHref } from '@repo/deploy-link';
 import { findPreset } from '#deploy-presets.ts';
 import { APP_ORIGIN } from '#lib/app-origin.ts';
 
@@ -13,9 +13,8 @@ const MOVED_FOR_NOW = 302;
  * prerendered file could only have carried a redirect a browser performs after rendering it,
  * which is a page nobody asked to see on the way to one they did.
  *
- * The search is written by the router that reads it on the far side: the deploy screen takes it
- * back apart with `JSON.parse`, so a value spelled out here would be a value it read as something
- * other than what the preset holds.
+ * The address is built by `deployHref`, which writes the search the way the screen's own router
+ * reads it back — the reason a preset cannot simply be spelled out as a query here.
  */
 export function deployRedirect(request: Request): Response | undefined {
   const slug = PRESET_PATH.exec(new URL(request.url).pathname)?.[1];
@@ -23,5 +22,5 @@ export function deployRedirect(request: Request): Response | undefined {
 
   return preset === undefined
     ? undefined
-    : Response.redirect(`${APP_ORIGIN}/deploy${defaultStringifySearch(preset)}`, MOVED_FOR_NOW);
+    : Response.redirect(deployHref({ origin: APP_ORIGIN, link: preset }), MOVED_FOR_NOW);
 }

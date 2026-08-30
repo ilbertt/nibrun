@@ -1,6 +1,8 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { createNibrunMcpHandler } from '#index.ts';
 
+export const ORIGIN = 'https://nibrun.test';
+
 export type Replied = {
   result?: {
     content: { text: string }[];
@@ -25,7 +27,7 @@ export async function called({
   api: PublicApiClient;
   body: unknown;
 }): Promise<Replied> {
-  const handler = createNibrunMcpHandler({ apiFor: () => api });
+  const handler = createNibrunMcpHandler({ apiFor: () => api, origin: ORIGIN });
   const response = await handler.fetch(
     new Request('https://nibrun.test/mcp', {
       method: 'POST',

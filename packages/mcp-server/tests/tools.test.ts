@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { createNibrunMcpHandler } from '#index.ts';
 import { anApp, apiHolding, HOSTNAME, SLUG, UPDATED_AT } from '#tests/support/api.ts';
-import { called, toolCall } from '#tests/support/call.ts';
+import { called, ORIGIN, toolCall } from '#tests/support/call.ts';
 
 // Every file under `tools/` has to be registered in `createNibrunMcpServer` to reach a client, and
 // one that is written but never registered is not a type error anywhere.
@@ -74,6 +74,7 @@ test('an app nobody has is refused by name rather than by an empty answer', asyn
  */
 test('a caller the mount never verified reaches no tool at all', async () => {
   const handler = createNibrunMcpHandler({
+    origin: ORIGIN,
     apiFor: () => {
       throw new Error('the api was built for an unverified caller');
     },

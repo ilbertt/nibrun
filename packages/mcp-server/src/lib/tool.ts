@@ -6,6 +6,13 @@ import { z } from 'zod';
 export type ToolRegistration = {
   server: McpServer;
   api: PublicApiClient;
+  /** Where nibrun answers, which is the one origin serving both the api and the dashboard. */
+  origin: string;
+  /**
+   * Which protocol era this request is being served on. Only the deploy tool reads it, and only
+   * because asking the caller to open a page is a round trip the 2025 wire has no shape for.
+   */
+  era: 'legacy' | 'modern';
 };
 
 const JSON_INDENT = 2;

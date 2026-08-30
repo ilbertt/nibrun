@@ -21,12 +21,19 @@ export type ApiForCaller = (input: { token: string }) => PublicApiClient;
  * header or checks a token — so the mount is what answers an unauthenticated request, and by the
  * time this is called the caller is already known.
  */
-export function createNibrunMcpHandler({ apiFor }: { apiFor: ApiForCaller }): McpHttpHandler {
+export function createNibrunMcpHandler({
+  apiFor,
+  origin,
+}: {
+  apiFor: ApiForCaller;
+  /** Where nibrun answers, which is what a tool needs to hand the caller a link back to it. */
+  origin: string;
+}): McpHttpHandler {
   return createMcpHandler((context) => {
     const token = context.authInfo?.token;
     if (token === undefined) {
       throw new Error(NOT_VERIFIED);
     }
-    return createNibrunMcpServer({ api: apiFor({ token }) });
+    return createNibrunMcpServer({ api: apiFor({ token }), origin, era: context.era });
   });
 }
