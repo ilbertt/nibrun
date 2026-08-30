@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { HomeLink } from '#components/home-link.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { formatPostDate, POSTS } from '#lib/blog.ts';
@@ -19,7 +18,7 @@ function RouteComponent() {
     <>
       <PageBackdrop />
       <main className="mx-auto flex w-full max-w-3xl flex-col px-6">
-        <SiteHeader left={<HomeLink />} />
+        <SiteHeader />
         <div className="flex flex-col gap-3 py-12 sm:py-16">
           <h1 className="font-semibold text-4xl tracking-tight">Blog</h1>
           <p className="text-balance text-lg text-muted-foreground">{DESCRIPTION}</p>

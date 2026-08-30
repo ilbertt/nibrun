@@ -1,4 +1,3 @@
-import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { createFileRoute } from '@tanstack/react-router';
 import { BinaryDrop } from '#components/binary-drop.tsx';
 import { DeployCta } from '#components/deploy-cta.tsx';
@@ -26,10 +25,7 @@ function RouteComponent() {
         <SiteHeader />
         {/* Short of the viewport on purpose: the section below has to peek, or nobody scrolls. */}
         <section className="flex min-h-[78svh] w-full max-w-xl flex-col items-center justify-center gap-12 pb-16">
-          <div className="flex flex-col items-center gap-6">
-            <BrandMark />
-            <Hero />
-          </div>
+          <Hero />
           <div className="flex w-full flex-col items-center gap-6">
             <BinaryDrop />
             <TryItOut />

@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CodeCopyButton } from '#components/code-copy-button.tsx';
 import { DeployCta } from '#components/deploy-cta.tsx';
-import { HomeLink } from '#components/home-link.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { type BlogPost, findPost, formatPostDate, renderPost } from '#lib/blog.ts';
@@ -106,7 +105,7 @@ function RouteComponent() {
     <>
       <PageBackdrop />
       <main className="mx-auto flex w-full max-w-3xl flex-col px-6">
-        <SiteHeader left={<HomeLink />} />
+        <SiteHeader />
         <article className="flex flex-col py-12 sm:py-16">
           <Button variant="ghost" size="sm" className="self-start" render={<Link to="/blog" />}>
             <ArrowLeftIcon data-icon="inline-start" />
