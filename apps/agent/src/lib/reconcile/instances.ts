@@ -1,7 +1,8 @@
 import type { AppId, DesiredInstance, InstanceState } from '@repo/protocol';
-import { Clock, Effect } from 'effect';
+import { Clock, Duration, Effect } from 'effect';
 import { isReadyToRetry, nextAttemptWindow } from '#lib/backoff.ts';
 import { nowTimestamp } from '#lib/clock.ts';
+import { frozen } from '#lib/exports/freeze.ts';
 import { reportedMessage } from '#lib/failure.ts';
 import { probeInstance } from '#lib/health/probe.ts';
 import {
@@ -12,6 +13,7 @@ import {
   initialTracker,
   nextProbeDelayMs,
 } from '#lib/health/state.ts';
+import type { AppSlot } from '#lib/network/slot.ts';
 import type { ReconcilePlan } from '#lib/reconcile/plan.ts';
 import {
   graceInputs,
@@ -23,6 +25,7 @@ import { ensureArtifactImage } from '#lib/vm/artifacts.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT, type UnitStatus } from '#lib/vm/unit-status.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -50,6 +53,40 @@ const flushEverything = Effect.gen(function* () {
   );
 });
 
+/**
+ * A stop pulls the plug: the unit signals the VMM, and the guest is not asked to shut down
+ * first. Freezing is what makes that survivable — the guest checkpoints its ext4 journal, so
+ * the writes it had acknowledged are on the device rather than in a page cache that is about to
+ * stop existing. The flush then carries them from ZeroFS to the bucket, and the freeze is held
+ * across both, because a guest that thawed in between could write again behind the flush.
+ *
+ * Bounded and best-effort. A guest too wedged to answer is exactly the one that has to be
+ * stopped, and it would otherwise hold up the deploy replacing it.
+ */
+const FREEZE_TIMEOUT_SECONDS = 5;
+const FREEZE_TIMEOUT = Duration.seconds(FREEZE_TIMEOUT_SECONDS);
+
+const settleAndStop = ({ appId, reason }: { appId: AppId; reason: string }) =>
+  Effect.gen(function* () {
+    const vms = yield* VmManager;
+    const config = yield* AgentConfig;
+    yield* frozen({ appId, vmDir: config.vmDir }).pipe(
+      Effect.asVoid,
+      Effect.timeout(FREEZE_TIMEOUT),
+      Effect.catchAll((error) =>
+        Effect.logWarning('stopping a guest that would not freeze', error).pipe(
+          Effect.annotateLogs({ appId, reason }),
+        ),
+      ),
+    );
+    yield* flushEverything;
+    yield* vms.stop(appId).pipe(
+      Effect.andThen(Effect.logInfo('instance stopped')),
+      Effect.catchAll((error) => Effect.logError('instance stop failed', error)),
+      Effect.annotateLogs({ appId, reason }),
+    );
+  }).pipe(Effect.scoped);
+
 export const stopInstance = Effect.fn('stopInstance')(function* ({
   appId,
   reason,
@@ -58,14 +95,8 @@ export const stopInstance = Effect.fn('stopInstance')(function* ({
   reason: string;
 }) {
   yield* Effect.annotateCurrentSpan({ appId, reason });
-  const vms = yield* VmManager;
   yield* setState({ appId, state: 'stopping', stopRequested: true });
-  yield* flushEverything;
-  yield* vms.stop(appId).pipe(
-    Effect.andThen(Effect.logInfo('instance stopped')),
-    Effect.catchAll((error) => Effect.logError('instance stop failed', error)),
-    Effect.annotateLogs({ appId, reason }),
-  );
+  yield* settleAndStop({ appId, reason });
   // The budget goes back with it: a stop that was asked for is not a failed start, and an app
   // suspended while it was struggling to boot would otherwise be one nothing could resume.
   yield* AgentState.updateRecord({
@@ -158,6 +189,57 @@ export const prefetchArtifacts = Effect.fn('prefetchArtifacts')((plan: Reconcile
   ),
 );
 
+/**
+ * What desired state says about an app, as the record's own fields. Named once because a start
+ * and a sleep write the same ones, and a field only one of them carried would be a record whose
+ * contents depended on how the app happened to come to be here.
+ */
+function recordFields({ desired, slot }: { desired: DesiredInstance; slot: AppSlot }) {
+  return {
+    appId: desired.appId,
+    deploymentId: desired.deploymentId,
+    volumeId: desired.volumeId,
+    hostnames: desired.hostnames,
+    hostPort: slot.hostPort,
+    httpPort: desired.config.httpPort,
+    hasExtraPublicPort: desired.config.hasExtraPublicPort,
+    guestIpv4: slot.guestIpv4,
+    artifactDigest: desired.artifact.digest,
+    healthCheck: desired.config.healthCheck,
+    resources: desired.config.resources,
+    desiredRunning: true,
+    onRequest: desired.desiredState === 'on-request',
+  };
+}
+
+/**
+ * An app that should be reachable with no microVM behind it yet. It takes a slot and a record
+ * like any other instance, because those are what a request has to find: the slot is the port
+ * the proxy is sent to and the activator listens on, and the record is what the routing config
+ * is rendered from. An app nobody has visited is still an app this host answers for.
+ *
+ * The state is left to the health loop, which reads `idle` off the same record. Writing it here
+ * would let a reconcile landing mid-boot overwrite a microVM that is on its way up.
+ */
+export const sleepInstance = Effect.fn('sleepInstance')(function* (desired: DesiredInstance) {
+  yield* Effect.annotateCurrentSpan({ appId: desired.appId });
+  const allocator = yield* SlotAllocator;
+  const slot = yield* allocator.allocate(desired.appId);
+  const existing = (yield* AgentState.snapshot).records.get(desired.appId);
+  const fields = recordFields({ desired, slot });
+
+  yield* AgentState.putRecord(
+    existing
+      ? { ...existing, ...fields }
+      : newInstanceRecord({ ...fields, state: 'idle', health: initialTracker() }),
+  );
+  if (!existing) {
+    yield* Effect.logInfo('app is waiting to be asked for').pipe(
+      Effect.annotateLogs({ appId: desired.appId, hostPort: slot.hostPort }),
+    );
+  }
+});
+
 export const startInstance = Effect.fn('startInstance')(function* (desired: DesiredInstance) {
   yield* Effect.annotateCurrentSpan({ appId: desired.appId });
   const allocator = yield* SlotAllocator;
@@ -172,28 +254,24 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
   const attempted: InstanceRecord = {
     ...(existing ??
       newInstanceRecord({
-        appId: desired.appId,
-        deploymentId: desired.deploymentId,
-        volumeId: desired.volumeId,
-        hostnames: desired.hostnames,
-        hostPort: slot.hostPort,
-        httpPort: desired.config.httpPort,
-        hasExtraPublicPort: desired.config.hasExtraPublicPort,
-        guestIpv4: slot.guestIpv4,
-        artifactDigest: desired.artifact.digest,
+        ...recordFields({ desired, slot }),
         state: 'pending',
         health: initialTracker(),
-        healthCheck: desired.config.healthCheck,
-        resources: desired.config.resources,
-        desiredRunning: true,
       })),
     startAttempts: nextAttemptWindow({
       window: existing?.startAttempts ?? NO_START_ATTEMPTS,
       nowMs,
       resetAfterMs: desired.config.restartPolicy.resetAfterMs,
     }),
+    // Whatever asked for the stop has been overtaken by whatever asked for this: an instance
+    // being started is one nobody is waiting to see go down, and leaving the flag set would have
+    // a wake that failed read as a sleeping app rather than a broken one.
+    stopRequested: false,
   };
   yield* AgentState.putRecord(attempted);
+  // Before the boot rather than after: the clock this starts is the one that decides when the
+  // app may sleep again, and a boot that takes seconds must not spend them.
+  yield* AgentState.markActive({ appId: desired.appId, nowMs });
 
   yield* Effect.matchEffect(vms.boot({ desired, slot, dataDevicePath: slot.nbdDevicePath }), {
     onSuccess: () =>
@@ -202,7 +280,6 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
           ...attempted,
           startedAt: yield* nowTimestamp,
           state: 'starting',
-          stopRequested: false,
           health: initialTracker(),
           restartCount: attempted.restartCount + (restarted(existing) ? ONE_RESTART : NO_RESTART),
           message: undefined,
@@ -316,6 +393,7 @@ function settle({
       unit: status,
       tracker: health,
       desiredRunning: record.desiredRunning,
+      onRequest: record.onRequest,
       stopRequested: record.stopRequested,
       ...graceInputs({ record, nowMs }),
     });

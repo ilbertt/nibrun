@@ -3,6 +3,7 @@ import { type Duration, Effect, Schedule } from 'effect';
 import { recordActivity } from '#lib/agent/activity.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import type { MeasuredCompute } from '#lib/filesystem/protocol.ts';
+import { applySleep } from '#lib/reconcile/idle.ts';
 import { type AgentSnapshot, AgentState } from '#services/agent-state.service.ts';
 import { FilesystemReader, type GuestReading } from '#services/filesystem-reader.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -159,8 +160,11 @@ export const measureUsage = Effect.gen(function* () {
  * carries otherwise is what the control plane converges a deploy on.
  */
 export const usageLoop = supervised({
+  // Deciding straight after measuring, because the measurement is the only thing that moves the
+  // answer: an app is let go to sleep on the reading that found it quiet rather than on a tick
+  // that happened to come later.
   once: Effect.andThen(
-    Effect.andThen(recordActivity, measureUsage),
+    Effect.andThen(recordActivity, Effect.andThen(applySleep, measureUsage)),
     Effect.sleep(MEASUREMENT_INTERVAL),
   ),
   onFailure: (cause) => Effect.logWarning('the usage loop failed', cause),

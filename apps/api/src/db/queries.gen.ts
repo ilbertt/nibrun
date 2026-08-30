@@ -32,6 +32,8 @@ export interface ISelectDesiredDeploymentsResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** The app config version this deployment was launched with. */
     config_id: IDeploymentsColumns["config_id"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
 }
 
 /** Result of query `SelectDesiredVolumes`. */
@@ -1108,6 +1110,8 @@ export interface IAppsColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
+    activation: import("@repo/protocol").AppActivation;
+    idle_timeout_ms: number;
 }
 
 /** Schema of `apps`. */
@@ -1203,6 +1207,8 @@ export interface IDesiredDeploymentsColumns {
     restart_reset_after_ms: number | null;
     config_id: string | null;
     has_extra_public_port: boolean | null;
+    activation: string | null;
+    idle_timeout_ms: number | null;
 }
 
 /** Schema of `desired_deployments`. */
@@ -1653,7 +1659,9 @@ export const schema = {
             slug: { _columnName: "slug", _foreignKeys: {} },
             state: { _columnName: "state", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            activation: { _columnName: "activation", _foreignKeys: {} },
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} }
         },
         _indexes: {
             apps_deleted_idx: { _indexName: "apps_deleted_idx" },
@@ -1662,6 +1670,8 @@ export const schema = {
             apps_slug_key: { _indexName: "apps_slug_key" }
         },
         _constraints: {
+            apps_activation_check: { _constraintName: "apps_activation_check" },
+            apps_idle_timeout_ms_check: { _constraintName: "apps_idle_timeout_ms_check" },
             apps_owner_id_fkey: { _constraintName: "apps_owner_id_fkey" },
             apps_pkey: { _constraintName: "apps_pkey" },
             apps_slug_key: { _constraintName: "apps_slug_key" },
@@ -1759,7 +1769,9 @@ export const schema = {
             restart_backoff_factor: { _columnName: "restart_backoff_factor", _foreignKeys: {} },
             restart_reset_after_ms: { _columnName: "restart_reset_after_ms", _foreignKeys: {} },
             config_id: { _columnName: "config_id", _foreignKeys: {} },
-            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} }
+            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} },
+            activation: { _columnName: "activation", _foreignKeys: {} },
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}

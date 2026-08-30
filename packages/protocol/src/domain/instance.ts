@@ -92,6 +92,11 @@ export const DEFAULT_RESTART_POLICY: RestartPolicy = {
 // `starting` is a booted microVM whose tenant process has not yet accepted a connection, and
 // `running` is one that has. Collapsing the two would let a deploy swap traffic onto a
 // booted-but-dead VM, which is worse than a deploy that fails.
+//
+// `idle` is an on-request app with no microVM because nothing has asked for one. It is not
+// `stopped` and the difference is load-bearing: a stopped instance is one nobody wants running,
+// and one nobody wants running is a release that has finished serving. An idle one is serving —
+// the next request is what it is waiting for — so the two cannot share a name.
 export const INSTANCE_STATES = [
   'pending',
   'starting',
@@ -99,6 +104,7 @@ export const INSTANCE_STATES = [
   'unhealthy',
   'stopping',
   'stopped',
+  'idle',
   'failed',
 ] as const;
 

@@ -223,6 +223,20 @@ export const AppConfigSchema = Type.Object({
 
 export type AppConfig = typeof AppConfigSchema.static;
 
+// Whether the app's microVM is kept up or is brought up by a request for it. `always` is what
+// every app has had until now and what a new one gets: an owner who has said nothing about this
+// has said they want their app up.
+//
+// A property of the app rather than of a release, and so on `apps` beside `state` rather than on
+// the config a deployment pins: it is the same kind of fact as being suspended — how the app is
+// brought up, not what it runs — and a rollback replaying an activation policy from months ago
+// would be the wrong thing every time.
+export const APP_ACTIVATIONS = ['always', 'on-request'] as const;
+
+export const AppActivationSchema = stringEnum(APP_ACTIVATIONS);
+
+export type AppActivation = typeof AppActivationSchema.static;
+
 export const APP_STATES = ['active', 'suspended', 'deleting', 'deleted'] as const;
 
 export const AppStateSchema = stringEnum(APP_STATES);

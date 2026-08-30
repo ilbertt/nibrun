@@ -38,6 +38,13 @@ export type InstanceRecord = {
   readonly healthCheck: HealthCheck;
   readonly resources: InstanceResources;
   readonly desiredRunning: boolean;
+  /**
+   * Whether a request is what brings this app's microVM up. Beside `desiredRunning` rather than
+   * folded into it, because they answer different questions — should this app be reachable, and
+   * what does having it reachable cost while nobody is asking. Never true without it: a suspended
+   * app is `stopped` whatever its activation policy says, so the policy never reaches the host.
+   */
+  readonly onRequest: boolean;
   readonly startAttempts: AttemptWindow;
   readonly restartCount: number;
   readonly stopRequested: boolean;
