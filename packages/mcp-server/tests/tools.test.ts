@@ -3,9 +3,9 @@ import { createNibrunMcpHandler } from '#index.ts';
 import { anApp, apiHolding, HOSTNAME, SLUG, UPDATED_AT } from '#tests/support/api.ts';
 import { called, toolCall } from '#tests/support/call.ts';
 
-// Every tool file has to be registered in `createNibrunMcpServer` to reach a client, and one that
-// is written but never registered is not a type error anywhere.
-test('every tool group reaches the client', async () => {
+// Every file under `tools/` has to be registered in `createNibrunMcpServer` to reach a client, and
+// one that is written but never registered is not a type error anywhere.
+test('every tool file reaches the client', async () => {
   const replied = await called({
     api: apiHolding({ apps: [] }),
     body: { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} },

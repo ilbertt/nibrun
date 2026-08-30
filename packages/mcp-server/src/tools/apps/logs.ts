@@ -1,7 +1,7 @@
 import { addressedDeployment, followLogs } from '@repo/app-operations';
 import type { TenantLogRecord } from '@repo/protocol';
 import { z } from 'zod';
-import { AppSlugSchema, answered, type ToolRegistration } from '#tool.ts';
+import { AppSlugSchema, answered, type ToolRegistration } from '#lib/tool.ts';
 
 /**
  * What one call hands back. A tail is what a reader wants and a whole log is what an app has, and
@@ -12,7 +12,7 @@ const MAX_RECORDS = 500;
 /** A backstop on a window that turns out to hold far more than it sounded like. */
 const READ_TIMEOUT_MS = 30_000;
 
-export function registerLogTools({ server, api }: ToolRegistration): void {
+export function registerReadLogsTool({ server, api }: ToolRegistration): void {
   server.registerTool(
     'read_logs',
     {
