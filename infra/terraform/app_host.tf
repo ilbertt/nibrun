@@ -96,6 +96,13 @@ resource "aws_instance" "app_host" {
 
   lifecycle {
     ignore_changes = [ami]
+
+    # Checked here rather than in a variable validation, which cannot read a data
+    # source and so cannot ask AWS what a type actually has.
+    precondition {
+      condition     = data.aws_ec2_instance_type.app_host.instance_storage_supported
+      error_message = "app_host_instance_type must name a type with an instance store: /data is mounted from it and ZeroFS does not start without it. The `d` families — m8id, r8id, c8id — have one; m7i and m8i do not."
+    }
   }
 
   tags = {
