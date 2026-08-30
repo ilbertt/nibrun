@@ -10,6 +10,7 @@ import type {
 } from '@repo/protocol';
 import { Effect, Ref } from 'effect';
 import type { MeasuredCompute } from '#lib/filesystem/protocol.ts';
+import type { AppTraffic } from '#lib/network/counters.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
 
 export type AgentSnapshot = {
@@ -36,6 +37,16 @@ export type AgentSnapshot = {
    * share is over rather than throwing away the only thing it could be compared to.
    */
   readonly computeTicks: ReadonlyMap<AppId, MeasuredCompute>;
+  /**
+   * The counters the last activity reading was taken from, kept for the same reason the compute
+   * ticks are: the next reading is only meaningful against the one before it.
+   */
+  readonly appTraffic: ReadonlyMap<AppId, AppTraffic>;
+  /**
+   * When each app was last reached from outside this host. Nothing acts on it yet — it is what a
+   * suspend would decide from, recorded from the moment there is anything to record.
+   */
+  readonly lastActiveAtMs: ReadonlyMap<AppId, number>;
   readonly volumeReports: readonly ReportedVolume[];
   readonly checkpointReports: readonly ReportedCheckpoint[];
   readonly converged: boolean;
@@ -53,6 +64,8 @@ const EMPTY: AgentSnapshot = {
   volumeUsage: new Map(),
   computeUsage: new Map(),
   computeTicks: new Map(),
+  appTraffic: new Map(),
+  lastActiveAtMs: new Map(),
   volumeReports: [],
   checkpointReports: [],
   converged: false,
@@ -117,6 +130,20 @@ export class AgentState extends Effect.Service<AgentState>()('AgentState', {
           volumeUsage: new Map(volumes),
           computeUsage: new Map(compute),
           computeTicks: new Map(ticks),
+        })),
+
+      /** A whole pass at once, for the reason `setUsage` is: what it leaves out is what went away. */
+      setActivity: ({
+        traffic,
+        lastActiveAtMs,
+      }: {
+        traffic: ReadonlyMap<AppId, AppTraffic>;
+        lastActiveAtMs: ReadonlyMap<AppId, number>;
+      }) =>
+        modify((current) => ({
+          ...current,
+          appTraffic: new Map(traffic),
+          lastActiveAtMs: new Map(lastActiveAtMs),
         })),
 
       rememberDeletedVolume: (report: ReportedVolume) =>

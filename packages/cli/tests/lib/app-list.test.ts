@@ -1,9 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { type AppListing, render } from '#lib/app-list.ts';
+import { BYTES_PER_MIB, MEMORY_MIB, SLUG, VOLUME_SIZE_BYTES } from '#tests/support/app.ts';
 
-const VOLUME_SIZE_BYTES = 8_589_934_592;
-const MEMORY_MIB = 1_024;
-const BYTES_PER_MIB = 1_048_576;
 const MEASURED_SHARE = 0.17;
 const MEASURED_PERCENT = '17%';
 const CPU_SHARE = 0.42;
@@ -19,7 +17,7 @@ type Overrides = Partial<{
 // row is laid out, and a cast per field would be spelling rather than meaning.
 function app(overrides: Overrides = {}): AppListing {
   return {
-    slug: 'quiet-otter',
+    slug: SLUG,
     state: 'active',
     updatedAt: '2026-08-07T09:41:00.123Z',
     config: { volumeSizeBytes: VOLUME_SIZE_BYTES, resources: { memoryMib: MEMORY_MIB } },

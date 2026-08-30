@@ -1,10 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import { type AppStatusView, renderStatus } from '#lib/app-status.ts';
+import {
+  BYTES_PER_MIB,
+  MEMORY_MIB,
+  SLUG,
+  VCPU_COUNT,
+  VOLUME_SIZE_BYTES,
+} from '#tests/support/app.ts';
 
-const VCPU_COUNT = 2;
-const MEMORY_MIB = 1_024;
-const BYTES_PER_MIB = 1_048_576;
-const VOLUME_SIZE_BYTES = 8_589_934_592;
 const MEMORY_USED_BYTES = 412_401_664;
 const VOLUME_USED_BYTES = 1_503_238_553;
 const CPU_SHARE = 0.18;
@@ -13,7 +16,7 @@ const CPU_SHARE = 0.18;
 // status reads, and a cast per field would be spelling rather than meaning.
 function app(overrides: object = {}): AppStatusView {
   return {
-    slug: 'quiet-otter',
+    slug: SLUG,
     status: 'running',
     config: {
       volumeSizeBytes: VOLUME_SIZE_BYTES,
@@ -43,7 +46,7 @@ describe('a status says what one app is using of what it was given', () => {
   test('every resource reads as what is spent over what was allocated', () => {
     const { lines } = renderStatus(measured);
 
-    expect(lines[0]).toBe('quiet-otter  running');
+    expect(lines[0]).toBe(`${SLUG}  running`);
     expect(lines.join('\n')).toContain('vCPU    0.36 / 2');
     expect(lines.join('\n')).toContain('Memory  393.3 MiB / 1.0 GiB');
     expect(lines.join('\n')).toContain('Volume  1.4 GiB / 8.0 GiB');
@@ -93,7 +96,7 @@ describe('a status says what one app is using of what it was given', () => {
   // not have to work out that they are the same thing.
   test('an app nothing has ever deployed is said the way the dashboard says it', () => {
     expect(renderStatus(app({ status: 'never-deployed' })).lines[0]).toBe(
-      'quiet-otter  never deployed',
+      `${SLUG}  never deployed`,
     );
   });
 

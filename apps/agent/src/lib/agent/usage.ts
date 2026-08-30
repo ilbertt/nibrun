@@ -1,5 +1,6 @@
 import type { AppId, ComputeUsage, FilesystemUsage } from '@repo/protocol';
 import { type Duration, Effect, Schedule } from 'effect';
+import { recordActivity } from '#lib/agent/activity.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import type { MeasuredCompute } from '#lib/filesystem/protocol.ts';
 import { type AgentSnapshot, AgentState } from '#services/agent-state.service.ts';
@@ -158,7 +159,10 @@ export const measureUsage = Effect.gen(function* () {
  * carries otherwise is what the control plane converges a deploy on.
  */
 export const usageLoop = supervised({
-  once: Effect.andThen(measureUsage, Effect.sleep(MEASUREMENT_INTERVAL)),
+  once: Effect.andThen(
+    Effect.andThen(recordActivity, measureUsage),
+    Effect.sleep(MEASUREMENT_INTERVAL),
+  ),
   onFailure: (cause) => Effect.logWarning('the usage loop failed', cause),
   schedule: Schedule.spaced(MEASUREMENT_INTERVAL),
 });

@@ -990,7 +990,7 @@ describe('what a guest is spending, as the host running it last measured it', ()
   });
 });
 
-describe('deleting an app releases every hostname it held', () => {
+describe('an app keeps its hostnames until it is deleted rather than deleting', () => {
   function appHostnames(): DisposableAppHostnameRow[] {
     return [
       {
@@ -1002,17 +1002,39 @@ describe('deleting an app releases every hostname it held', () => {
     ];
   }
 
-  test('the platform name and a custom domain are both free when deletion returns', async () => {
+  // An app with a filesystem to tear down stays `deleting`, which is a state its owner is still
+  // shown it in — and shown with the hostname it holds. Releasing the rows here left the listing
+  // describing an app that had none, which failed the whole listing rather than that one app.
+  test('deletion returns with the rows still there, because the app is still one to show', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const hostnamesRepo = new StubHostnameAccess();
+    const edge = new StubCustomHostnameRemoval();
+    appsRepo.owns = true;
+    appsRepo.deployedApps.push(APP_ID);
+    hostnamesRepo.disposable.set(APP_ID, appHostnames());
+
+    const app = await serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge }).delete({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
+
+    expect(app.state).toBe('deleting');
+    expect(hostnamesRepo.removed).toEqual([]);
+    expect(hostnamesRepo.disposable.get(APP_ID)).toEqual(appHostnames());
+    expect(edge.removed).toEqual([]);
+  });
+
+  test('the platform name and a custom domain are both free once the app is purged', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     const hostnamesRepo = new StubHostnameAccess();
     const edge = new StubCustomHostnameRemoval();
     appsRepo.owns = true;
     hostnamesRepo.disposable.set(APP_ID, appHostnames());
+    const apps = serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge });
 
-    await serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge }).delete({
-      appId: APP_ID,
-      ownerId: OWNER_ID,
-    });
+    await apps.delete({ appId: APP_ID, ownerId: OWNER_ID });
+    appsRepo.purgeable.push(APP_ID);
+    await apps.purgeDeleted();
 
     expect(hostnamesRepo.removed).toEqual([
       Value.Parse(HostnameSchema, `${APP_NAME}.${APP_HOST_DOMAIN}`),
@@ -1021,7 +1043,7 @@ describe('deleting an app releases every hostname it held', () => {
     expect(edge.removed).toEqual([CLOUDFLARE_ID]);
   });
 
-  test('an edge failure keeps its row for the deleted-app sweep to retry', async () => {
+  test('an edge failure keeps its row for the next sweep to retry', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     const hostnamesRepo = new StubHostnameAccess();
     const edge = new StubCustomHostnameRemoval();
@@ -1031,6 +1053,8 @@ describe('deleting an app releases every hostname it held', () => {
     const apps = serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge });
 
     await apps.delete({ appId: APP_ID, ownerId: OWNER_ID });
+    appsRepo.purgeable.push(APP_ID);
+    await apps.purgeDeleted();
 
     expect(hostnamesRepo.disposable.get(APP_ID)).toEqual([
       { hostname: BROUGHT_HOSTNAME, kind: 'custom', cloudflare_id: CLOUDFLARE_ID },

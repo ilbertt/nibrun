@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
-import type { PublicApiClient } from '@repo/api-client/public';
 import { addressedDeployment, appBySlug, appFor, newestDeployment } from '#apps.ts';
+import { answering, apiHolding as apiWith } from '#tests/support/api.ts';
+import { DIGEST } from '#tests/support/app.ts';
 
 function apiHolding({
   apps,
@@ -8,24 +9,16 @@ function apiHolding({
 }: {
   apps: Array<{ id: string; slug: string; state?: string }>;
   deployments?: Array<{ id: string; artifactId?: string; state?: string }>;
-}): PublicApiClient {
-  function underApp() {
-    return {
+}) {
+  return apiWith({
+    apps,
+    underApp: () => ({
       artifacts: ({ artifactId }: { artifactId: string }) => ({
-        get: () =>
-          Promise.resolve({ data: { id: artifactId, digest: 'sha256:abcd' }, error: null }),
+        get: answering({ id: artifactId, digest: DIGEST }),
       }),
-      deployments: { get: () => Promise.resolve({ data: { deployments }, error: null }) },
-    };
-  }
-
-  return {
-    api: {
-      apps: Object.assign(underApp, {
-        get: () => Promise.resolve({ data: { apps }, error: null }),
-      }),
-    },
-  } as unknown as PublicApiClient;
+      deployments: { get: answering({ deployments }) },
+    }),
+  });
 }
 
 test('an app is found by the name its owner calls it', async () => {
