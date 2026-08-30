@@ -1,4 +1,4 @@
-import type { HostPort, HttpPort, Ipv4Address } from '@repo/protocol';
+import type { AppId, HostPort, HttpPort, Ipv4Address } from '@repo/protocol';
 import { GUEST_NETWORK_CIDR, TAP_NAME_PREFIX } from '#lib/network/slot.ts';
 
 export const NFTABLES_TABLE = 'nibrun';
@@ -35,7 +35,19 @@ const RULE_INDENT = '    ';
  */
 const DENY = 'reject';
 
+/**
+ * A named counter per app rather than one inline on each rule: an app is reached through more than
+ * one of them — the loopback port the proxy uses, the host port from outside, and any extra port
+ * it asked for — and what an app being used means is all of them together. The name carries the
+ * attribution, so reading one back needs no rule to be recognised by its shape.
+ *
+ * Bare, not quoted: nft takes a declaration name as an identifier and rejects a quoted string
+ * there, hyphens in an app id notwithstanding.
+ */
+export const appCounterName = (appId: AppId) => `app_${appId}`;
+
 export type ForwardedInstance = {
+  readonly appId: AppId;
   readonly hostPort: HostPort;
   readonly httpPort: HttpPort;
   /** Absent unless the app asked for one, which is what keeps a port off every app that did not. */
@@ -51,6 +63,18 @@ export type FirewallState = {
 };
 
 const set = (values: readonly string[]) => `{ ${values.join(', ')} }`;
+
+/**
+ * Zeroed whenever the ruleset changes, because the table is replaced rather than edited. Whoever
+ * reads these has to treat a count standing below the one before it as a reset and not as an app
+ * that has gone quiet — the same hazard a rebooted guest is to a cpu share.
+ */
+const counterObjects = ({ instances }: FirewallState) =>
+  instances.flatMap((instance) => [
+    `${CHAIN_INDENT}counter ${appCounterName(instance.appId)} {`,
+    `${CHAIN_INDENT}}`,
+    '',
+  ]);
 
 const chain = ({ header, rules }: { header: string; rules: readonly string[] }) => [
   `${CHAIN_INDENT}chain ${header}`,
@@ -68,6 +92,7 @@ export function renderRuleset(state: FirewallState): string {
     `delete table ip ${NFTABLES_TABLE}`,
     '',
     `table ip ${NFTABLES_TABLE} {`,
+    ...counterObjects(state),
     ...forwardChainV4(state),
     '',
     ...inputChainV4(),
@@ -151,7 +176,7 @@ function natChainsV4({ instances }: FirewallState): string[] {
         'type nat hook prerouting priority dstnat; policy accept;',
         ...instances.map(
           (instance) =>
-            `iifname != ${TAP_MATCH} tcp dport ${instance.hostPort} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
+            `iifname != ${TAP_MATCH} tcp dport ${instance.hostPort} counter name ${appCounterName(instance.appId)} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
         ),
         // The same port on both sides, and both protocols: what arrives here has already been
         // forwarded once without being renumbered, and rewriting it now would leave a binary
@@ -161,7 +186,7 @@ function natChainsV4({ instances }: FirewallState): string[] {
             ? []
             : (['tcp', 'udp'] as const).map(
                 (protocol) =>
-                  `iifname != ${TAP_MATCH} ${protocol} dport ${instance.extraPublicPort} dnat to ${instance.guestIpv4}:${instance.extraPublicPort}`,
+                  `iifname != ${TAP_MATCH} ${protocol} dport ${instance.extraPublicPort} counter name ${appCounterName(instance.appId)} dnat to ${instance.guestIpv4}:${instance.extraPublicPort}`,
               ),
         ),
       ],
@@ -173,7 +198,7 @@ function natChainsV4({ instances }: FirewallState): string[] {
         `type nat hook output priority ${OUTPUT_NAT_PRIORITY}; policy accept;`,
         ...instances.map(
           (instance) =>
-            `ip daddr 127.0.0.1 tcp dport ${instance.hostPort} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
+            `ip daddr 127.0.0.1 tcp dport ${instance.hostPort} counter name ${appCounterName(instance.appId)} dnat to ${instance.guestIpv4}:${instance.httpPort}`,
         ),
       ],
     }),

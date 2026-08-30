@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { HostPortSchema, HttpPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
 import {
+  AppIdSchema,
+  HostPortSchema,
+  HttpPortSchema,
+  Ipv4AddressSchema,
+  Value,
+} from '@repo/protocol';
+import {
+  appCounterName,
   type FirewallState,
   INSTANCE_METADATA_ADDRESS_V4,
   INSTANCE_METADATA_ADDRESS_V6,
@@ -15,7 +22,10 @@ const HOST_PORT_NUMBER = 21_000;
 const HTTP_PORT_NUMBER = 3000;
 const EXTRA_PUBLIC_PORT_NUMBER = 22_000;
 
+const APP_ID = '0198f3aa-1c2d-7e4b-9f11-a0b1c2d3e4f5';
+
 const instance = {
+  appId: Value.Parse(AppIdSchema, APP_ID),
   hostPort: Value.Parse(HostPortSchema, HOST_PORT_NUMBER),
   httpPort: Value.Parse(HttpPortSchema, HTTP_PORT_NUMBER),
   hostIpv4: Value.Parse(Ipv4AddressSchema, '10.201.0.1'),
@@ -162,7 +172,7 @@ describe('the same isolation holds over ipv6', () => {
 describe('forwarding', () => {
   test('a host port is forwarded to the HTTP port, not to itself', () => {
     const ruleset = renderRuleset(state({ instances: [instance] }));
-    expect(ruleset).toContain('tcp dport 21000 dnat to 10.201.0.2:3000');
+    expect(ruleset).toMatch(/tcp dport 21000 .*dnat to 10\.201\.0\.2:3000/);
   });
 
   test('nothing is forwarded when nothing is running', () => {
@@ -194,8 +204,8 @@ describe('forwarding', () => {
 describe('the port an app asked for arrives as the port it was sent to', () => {
   test('both protocols reach the guest on the same number', () => {
     const ruleset = renderRuleset(state({ instances: [askedForAPort] }));
-    expect(ruleset).toContain('tcp dport 22000 dnat to 10.201.0.2:22000');
-    expect(ruleset).toContain('udp dport 22000 dnat to 10.201.0.2:22000');
+    expect(ruleset).toMatch(/tcp dport 22000 .*dnat to 10\.201\.0\.2:22000/);
+    expect(ruleset).toMatch(/udp dport 22000 .*dnat to 10\.201\.0\.2:22000/);
   });
 
   test('an app that asked for none is given none', () => {
@@ -227,5 +237,43 @@ describe('the ruleset is a function of state, not a history of edits', () => {
   test('rendering twice from the same state is byte-identical', () => {
     const input = state({ instances: [instance], controlPlaneCidrsV4: ['203.0.113.0/24'] });
     expect(renderRuleset(input)).toBe(renderRuleset(input));
+  });
+});
+
+describe('an app is counted wherever it is reached', () => {
+  test('every forwarded app declares a counter of its own', () => {
+    const ruleset = renderRuleset(state({ instances: [instance] }));
+    expect(ruleset).toContain(`counter ${appCounterName(instance.appId)} {`);
+  });
+
+  test('the name is bare, because nft rejects a quoted one where a declaration names itself', () => {
+    const ruleset = renderRuleset(state({ instances: [instance] }));
+    expect(ruleset).not.toContain(`counter "${appCounterName(instance.appId)}"`);
+  });
+
+  test('both ways in are counted against the same app', () => {
+    const rules = renderRuleset(state({ instances: [instance] }))
+      .split('\n')
+      .filter((line) => line.includes('dnat to'));
+    expect(rules).toHaveLength(2);
+    for (const rule of rules) {
+      expect(rule).toContain(`counter name ${appCounterName(instance.appId)}`);
+    }
+  });
+
+  test('an extra public port is the same app being used, on both protocols', () => {
+    const rules = renderRuleset(state({ instances: [askedForAPort] }))
+      .split('\n')
+      .filter(
+        (line) => line.includes(String(EXTRA_PUBLIC_PORT_NUMBER)) && line.includes('dnat to'),
+      );
+    expect(rules).toHaveLength(2);
+    for (const rule of rules) {
+      expect(rule).toContain(`counter name ${appCounterName(askedForAPort.appId)}`);
+    }
+  });
+
+  test('a host with no apps declares no counters', () => {
+    expect(renderRuleset(state())).not.toContain('counter ');
   });
 });

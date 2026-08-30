@@ -51,6 +51,7 @@ describe('the forward is what decides whether a port reaches the guest', () => {
 
         expect(forwarded).toEqual([
           {
+            appId: APP_ID,
             hostPort: slot.hostPort,
             httpPort: DEFAULT_HTTP_PORT,
             hostIpv4: slot.hostIpv4,
