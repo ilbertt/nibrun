@@ -53,3 +53,13 @@ export async function answered<Structured extends Record<string, unknown>>({
 function refusal(failure: unknown): string {
   return failure instanceof Error ? failure.message : String(failure);
 }
+
+/**
+ * What became of the app, for the tools that change what it is doing rather than what it runs.
+ * `detail` is the sentence a reader gets; `state` is the same answer for something acting on it.
+ */
+export const AppTransitionResultSchema = z.object({
+  slug: z.string(),
+  state: z.string(),
+  detail: z.string(),
+});

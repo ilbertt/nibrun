@@ -1,10 +1,10 @@
 import { addressedDeployment, guestPath, readDirectory } from '@repo/app-operations';
 import { z } from 'zod';
-import { AppSlugSchema, answered, type ToolRegistration } from '#tool.ts';
+import { AppSlugSchema, answered, type ToolRegistration } from '#lib/tool.ts';
 
 const ROOT = '/';
 
-export function registerFilesystemTools({ server, api }: ToolRegistration): void {
+export function registerListFilesTool({ server, api }: ToolRegistration): void {
   server.registerTool(
     'list_files',
     {
