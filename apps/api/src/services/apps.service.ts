@@ -428,6 +428,11 @@ export class AppsService extends Service {
    * After the state change, so it is only ever reached by an owner the app answered to — and
    * while the app is `deleting` rather than once it is `deleted`, which is the last generation of
    * desired state the host is told about it in.
+   *
+   * The hostnames are not released here. An app is still its owner's to see while it is
+   * `deleting`, and an app is shown with the hostname nibrun issued it — so taking the rows away
+   * first leaves one that cannot be described, and the whole listing fails on it rather than that
+   * one app. `purgeApp` releases them once the app is `deleted` and nobody is being shown it.
    */
   async delete({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
     const app = requireApp(
@@ -440,10 +445,7 @@ export class AppsService extends Service {
     );
     await this.exportsRepo.failInFlight({ appId, message: APP_DELETED });
     const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
-    const [torndown] = await Promise.all([
-      this.finishIfNothingToTearDown({ appId }),
-      this.releaseHostnames({ appId }),
-    ]);
+    const torndown = await this.finishIfNothingToTearDown({ appId });
 
     return toPublicApp({ app: torndown ? { ...app, state: 'deleted' } : app, hostnames });
   }
