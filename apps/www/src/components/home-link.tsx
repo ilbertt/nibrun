@@ -1,8 +1,8 @@
 import { NibrunMark } from '@repo/ui/custom/nibrun-mark';
 import { Link } from '@tanstack/react-router';
 
-// Composed here rather than reusing `BrandMark`: below `sm` the name sits directly beside the blog
-// link, where two words of the same size read as one pair rather than as a brand and a nav item.
+// Composed here rather than reusing `BrandMark`: below `sm` the header packs left, and the word
+// costs more of that room than it earns beside a mark that already says it.
 export function HomeLink() {
   return (
     <Link
