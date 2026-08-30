@@ -2,10 +2,9 @@ import { OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia } from 'elysia';
 import { authPlugin } from '#lib/auth/plugin.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
-import { loggerPlugin, McpServicePlugin } from '#services/plugins.ts';
+import { McpServicePlugin } from '#services/plugins.ts';
 
 export const McpController = new Elysia()
-  .use(loggerPlugin('mcpController'))
   .use(authPlugin)
   .use(McpServicePlugin)
   .guard({ auth: true })
