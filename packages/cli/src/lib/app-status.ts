@@ -1,12 +1,7 @@
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
-import {
-  APP_STATUS_LABELS,
-  type AppStatusKey,
-  appWithStatus,
-  type ListedApp,
-  statusKey,
-} from '@repo/app-operations';
+import { appWithStatus, type ListedApp } from '@repo/app-operations';
+import { APP_STATUS_LABELS, type AppStatusKey, statusKey } from '@repo/protocol';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { dayAndMinute } from '#lib/timestamp.ts';
 

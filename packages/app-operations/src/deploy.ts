@@ -1,14 +1,14 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
-import type { DeploymentState, Filename, Sha256Digest, TenantArguments } from '@repo/protocol';
-import { appFor } from '#apps.ts';
 import {
-  type ConfigEdit,
-  configPatch,
-  type Deployed,
-  type DeployStep,
+  type DeploymentState,
+  type Filename,
+  type Sha256Digest,
   servingHostname,
-} from '#release.ts';
+  type TenantArguments,
+} from '@repo/protocol';
+import { appFor } from '#apps.ts';
+import { type ConfigEdit, configPatch, type Deployed, type DeployStep } from '#release.ts';
 import { streamedUpload, type UploadProgress, type UploadTransport } from '#upload.ts';
 import { pause } from '#wait.ts';
 
@@ -293,16 +293,6 @@ export type SettledDeployment = {
   state: DeploymentState;
   message?: string | undefined;
 };
-
-/**
- * Why a release that settled is not serving, in the host's own words where it left any. Shared
- * because a terminal and a browser accounting for the same failure differently is how one of
- * them ends up saying only that it happened.
- */
-export function describeUnservedDeployment(deployment: SettledDeployment): string {
-  const reason = deployment.message === undefined ? '' : ` ${deployment.message}`;
-  return `Deployment ${deployment.id} is ${deployment.state}.${reason}`;
-}
 
 export async function awaitDeploymentSettled({
   api,

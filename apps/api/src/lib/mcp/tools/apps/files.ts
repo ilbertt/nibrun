@@ -1,4 +1,4 @@
-import { guestPath } from '@repo/app-operations';
+import { GuestPathSchema, Value } from '@repo/protocol';
 import { z } from 'zod';
 import { releaseOf } from '#lib/mcp/apps.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
@@ -44,10 +44,22 @@ export function registerListFilesTool({ server, services, ownerId }: ToolRegistr
             appId: app.id,
             deploymentId: newest.id,
             ownerId,
-            path: guestPath(path),
+            path: Value.Parse(GuestPathSchema, absolute(path)),
             signal: AbortSignal.timeout(READ_TIMEOUT_MS),
           });
         },
       }),
   );
+}
+
+/**
+ * The path as the schema will take it. A path here is absolute because there is nothing for it to
+ * be relative to — the volume's root is the only place it can start — so a leading slash is
+ * spelling rather than meaning, and one left off is supplied rather than refused. Nothing else is
+ * repaired: `.` and `..` are refused on purpose, and resolving them is exactly what would put a
+ * caller outside the filesystem they were scoped to.
+ */
+function absolute(typed: string): string {
+  const rooted = typed.startsWith(ROOT) ? typed : `${ROOT}${typed}`;
+  return rooted.length > 1 ? rooted.replace(/\/$/, '') : rooted;
 }

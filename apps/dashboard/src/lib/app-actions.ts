@@ -1,4 +1,4 @@
-import { type AppStatus, type AppStatusKey, statusKey } from '@repo/app-operations';
+import { type AppStatus, type AppStatusKey, statusKey } from '@repo/protocol';
 
 /** Every button on an app's action bar, and so every column of the table below. */
 export const APP_ACTIONS = ['deploy', 'export', 'suspend', 'delete'] as const;

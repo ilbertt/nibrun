@@ -2,9 +2,9 @@ import {
   type AppOperation,
   type AppStatus,
   appStatus,
+  type OwnerId,
   operationRefusal,
-} from '@repo/app-operations';
-import type { OwnerId } from '@repo/protocol';
+} from '@repo/protocol';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type { McpServices } from '#lib/mcp/services.ts';
 import type { PublicApp } from '#services/apps.service.ts';

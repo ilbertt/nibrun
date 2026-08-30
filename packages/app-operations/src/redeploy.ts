@@ -1,13 +1,8 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import { servingHostname } from '@repo/protocol';
 import { appFor, pinnedArtifact } from '#apps.ts';
-import {
-  type ConfigEdit,
-  configPatch,
-  type Deployed,
-  type DeployStep,
-  servingHostname,
-} from '#release.ts';
+import { type ConfigEdit, configPatch, type Deployed, type DeployStep } from '#release.ts';
 
 const NOTHING_TO_RELEASE = 'This app has never been deployed.';
 

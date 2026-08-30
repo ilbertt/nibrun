@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { AppState, DeploymentState } from '@repo/protocol';
-import { type AppStatus, appStatus, hasLiveOutput, isSettling } from '#status.ts';
+import { type AppStatus, appStatus, hasLiveOutput, isSettling } from '#domain/app-status.ts';
 
 function status({
   appState = 'active',

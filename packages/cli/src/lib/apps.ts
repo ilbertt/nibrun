@@ -2,12 +2,8 @@ import { select } from '@clack/prompts';
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import {
-  type AddressedDeployment,
-  type AppOperation,
-  addressedDeployment,
-  hasLiveOutput,
-} from '@repo/app-operations';
+import { type AddressedDeployment, addressedDeployment } from '@repo/app-operations';
+import { type AppOperation, hasLiveOutput } from '@repo/protocol';
 import { SHARED_OPTIONS } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';

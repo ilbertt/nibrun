@@ -47,9 +47,9 @@ test('a listing answers with the address each app is reached at', async () => {
 });
 
 /**
- * The reason this is worth a test of its own: a refusal is the sentence `@repo/app-operations`
- * throws, and a model reading it can act on it. Raising it as a failed request instead would put
- * it somewhere the model never looks.
+ * The reason this is worth a test of its own: a refusal is the sentence `operationRefusal` writes,
+ * and a model reading it can act on it. Raising it as a failed request instead would put it
+ * somewhere the model never looks.
  */
 test('an operation the app state refuses comes back as the sentence saying why', async () => {
   const replied = await called({

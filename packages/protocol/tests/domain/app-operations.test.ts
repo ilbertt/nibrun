@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { APP_STATES, type AppState, DEPLOYMENT_STATES, type DeploymentState } from '@repo/protocol';
-import { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
-import { appStatus } from '#status.ts';
+import { APP_OPERATIONS, type AppOperation, operationRefusal } from '#domain/app-operations.ts';
+import { appStatus } from '#domain/app-status.ts';
 
 const SLUG = 'quiet-otter';
 
@@ -20,7 +20,7 @@ function refusal({
     status: appStatus({ appState, deploymentState }),
     operation,
     slug: SLUG,
-    release: deploymentState && { id: 'deployment-1', state: deploymentState, message },
+    release: deploymentState && { message },
   });
 }
 

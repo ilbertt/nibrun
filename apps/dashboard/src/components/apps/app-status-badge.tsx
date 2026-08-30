@@ -1,4 +1,4 @@
-import { APP_STATUS_LABELS } from '@repo/app-operations';
+import { APP_STATUS_LABELS } from '@repo/protocol';
 import { Badge } from '@repo/ui/components/badge';
 import { Skeleton } from '@repo/ui/components/skeleton';
 import { AppStateBadge } from '#components/apps/app-state-badge.tsx';

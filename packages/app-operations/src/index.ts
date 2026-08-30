@@ -16,7 +16,6 @@ export {
   type DeployableBinary,
   type DeployInput,
   deploy,
-  describeUnservedDeployment,
   type FetchableBinary,
   type SettledDeployment,
   type UploadableBinary,
@@ -29,23 +28,7 @@ export { InvalidEnvironmentError, InvalidPathError } from '#errors.ts';
 export { awaitExportBundle, type ExportBundle, requestExport } from '#exports.ts';
 export { guestPath, readDirectory } from '#filesystem.ts';
 export { type FollowInput, followLogs } from '#logs.ts';
-export { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
 export { type RedeployInput, redeploy } from '#redeploy.ts';
-export {
-  type ConfigEdit,
-  type Deployed,
-  type DeployStep,
-  servingHostname,
-} from '#release.ts';
-export {
-  APP_STATUS_LABELS,
-  type AppStatus,
-  type AppStatusKey,
-  type AppTransition,
-  appStatus,
-  hasLiveOutput,
-  isSettling,
-  statusKey,
-} from '#status.ts';
+export type { ConfigEdit, Deployed, DeployStep } from '#release.ts';
 export { resumeApp, suspendApp } from '#suspend.ts';
 export { streamedUpload, type UploadProgress, type UploadTransport } from '#upload.ts';

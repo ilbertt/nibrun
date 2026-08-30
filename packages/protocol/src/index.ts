@@ -92,6 +92,7 @@ export {
   RUNTIME_VALUES,
   type RuntimeValue,
   type RuntimeValueName,
+  servingHostname,
   type TenantArguments,
   TenantArgumentsSchema,
   type TenantEnvironment,
@@ -99,6 +100,21 @@ export {
   TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
 } from '#domain/app.ts';
+export {
+  APP_OPERATIONS,
+  type AppOperation,
+  operationRefusal,
+} from '#domain/app-operations.ts';
+export {
+  APP_STATUS_LABELS,
+  type AppStatus,
+  type AppStatusKey,
+  type AppTransition,
+  appStatus,
+  hasLiveOutput,
+  isSettling,
+  statusKey,
+} from '#domain/app-status.ts';
 export {
   type Artifact,
   ArtifactSchema,
@@ -117,6 +133,7 @@ export {
   DeploymentSchema,
   type DeploymentState,
   DeploymentStateSchema,
+  describeUnservedDeployment,
 } from '#domain/deployment.ts';
 export {
   EXPORT_STATES,

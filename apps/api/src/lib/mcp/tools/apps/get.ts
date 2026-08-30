@@ -1,4 +1,4 @@
-import { APP_STATUS_LABELS, servingHostname, statusKey } from '@repo/app-operations';
+import { APP_STATUS_LABELS, servingHostname, statusKey } from '@repo/protocol';
 import { z } from 'zod';
 import { appWithStatus } from '#lib/mcp/apps.ts';
 import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';

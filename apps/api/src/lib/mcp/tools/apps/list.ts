@@ -1,4 +1,4 @@
-import { servingHostname } from '@repo/app-operations';
+import { servingHostname } from '@repo/protocol';
 import { z } from 'zod';
 import { answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 

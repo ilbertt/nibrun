@@ -1,8 +1,7 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import { type AppOperation, type AppStatus, appStatus, operationRefusal } from '@repo/protocol';
 import type { SettledDeployment } from '#deploy.ts';
-import { type AppOperation, operationRefusal } from '#operations.ts';
-import { type AppStatus, appStatus } from '#status.ts';
 
 const NO_DEPLOYMENTS = 'This app has never been deployed.';
 

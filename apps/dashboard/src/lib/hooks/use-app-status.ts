@@ -1,4 +1,4 @@
-import { type AppStatus, appStatus, isSettling } from '@repo/app-operations';
+import { type AppStatus, appStatus, isSettling } from '@repo/protocol';
 import { useQuery } from '@tanstack/react-query';
 import type { AppSummary } from '#queries/apps.ts';
 import { type DeploymentSummary, deploymentsQueryOptions } from '#queries/deployments.ts';

@@ -238,6 +238,26 @@ export const OwnedAppStateSchema = stringEnum(OWNED_APP_STATES);
 
 export type OwnedAppState = typeof OwnedAppStateSchema.static;
 
+/**
+ * The address to show for an app, preferring a domain its owner brought: the platform hostname is
+ * what nibrun issued, but a custom one is what they call their app.
+ *
+ * Active only. A brought domain is pending until the edge holds a certificate for it, and a link
+ * that does not resolve yet is worse than the one that does.
+ */
+export function servingHostname(
+  hostnames: ReadonlyArray<{ hostname: string; kind: string; state: string }>,
+): string {
+  const serving =
+    hostnames.find((entry) => entry.kind === 'custom' && entry.state === 'active') ??
+    hostnames.find((entry) => entry.kind === 'platform') ??
+    hostnames[0];
+  if (!serving) {
+    throw new Error('The app was created without a hostname.');
+  }
+  return serving.hostname;
+}
+
 export const AppSchema = Type.Object({
   id: AppIdSchema,
   ownerId: OwnerIdSchema,

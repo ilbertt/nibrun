@@ -4,11 +4,11 @@ import {
   type Deployed,
   type DeployStep,
   deploy,
-  describeUnservedDeployment,
   redeploy,
   type UploadProgress,
 } from '@repo/app-operations';
 import type { TenantArguments, TenantEnvironmentPatch } from '@repo/protocol';
+import { describeUnservedDeployment } from '@repo/protocol';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 import { browserUpload } from '#lib/browser-upload.ts';

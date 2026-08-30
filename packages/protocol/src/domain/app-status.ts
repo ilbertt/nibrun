@@ -1,4 +1,5 @@
-import type { AppState, DeploymentState } from '@repo/protocol';
+import type { AppState } from '#domain/app.ts';
+import type { DeploymentState } from '#domain/deployment.ts';
 
 /**
  * What an app is doing, from the two things that know: the app row, which is what its owner asked

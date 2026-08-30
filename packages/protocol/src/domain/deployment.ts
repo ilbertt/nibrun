@@ -54,3 +54,17 @@ export const DeploymentSchema = Type.Object({
 });
 
 export type Deployment = typeof DeploymentSchema.static;
+
+/**
+ * Why a release that stopped moving is not serving, in the host's own words where it left any.
+ * Shared because a terminal, a browser and a tool accounting for the same failure differently is
+ * how one of them ends up saying only that it happened.
+ */
+export function describeUnservedDeployment(deployment: {
+  id: string;
+  state: DeploymentState;
+  message?: string | undefined;
+}): string {
+  const reason = deployment.message === undefined ? '' : ` ${deployment.message}`;
+  return `Deployment ${deployment.id} is ${deployment.state}.${reason}`;
+}

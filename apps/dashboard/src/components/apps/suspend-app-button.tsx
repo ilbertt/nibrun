@@ -1,4 +1,4 @@
-import type { AppTransition } from '@repo/app-operations';
+import type { AppTransition } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import { Spinner } from '@repo/ui/components/spinner';
 import { PauseIcon, PlayIcon } from 'lucide-react';

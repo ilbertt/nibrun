@@ -1,11 +1,7 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError } from '@repo/api-client/unwrap';
-import {
-  awaitDeploymentSettled,
-  type Deployed,
-  type DeployStep,
-  describeUnservedDeployment,
-} from '@repo/app-operations';
+import { awaitDeploymentSettled, type Deployed, type DeployStep } from '@repo/app-operations';
+import { describeUnservedDeployment } from '@repo/protocol';
 import type { Ui } from '#lib/ui.ts';
 
 const MS_PER_SECOND = 1_000;

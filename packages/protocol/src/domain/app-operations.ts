@@ -1,5 +1,11 @@
-import type { SettledDeployment } from '#deploy.ts';
-import { type AppStatus, type AppStatusKey, statusKey } from '#status.ts';
+import { type AppStatus, type AppStatusKey, statusKey } from '#domain/app-status.ts';
+
+/**
+ * What a refusal needs of the release the app is on: the account a host left of why it never came
+ * up. Named here rather than taken from the deployment record, because every surface that has one
+ * has it in a shape of its own and only this field is read.
+ */
+type UnservedRelease = { message?: string | undefined };
 
 /**
  * Everything an owner asks of an app that its state has an opinion about — not one per command:
@@ -88,7 +94,7 @@ export function operationRefusal({
   operation: AppOperation;
   slug: string;
   /** The release the app is on, which for one that never came up kept the host's account of why. */
-  release?: SettledDeployment | undefined;
+  release?: UnservedRelease | undefined;
 }): string | undefined {
   const state = STATE[statusKey(status)];
   if (!state.refuses.includes(operation)) {

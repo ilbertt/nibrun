@@ -1,4 +1,4 @@
-import { operationRefusal } from '@repo/app-operations';
+import { operationRefusal } from '@repo/protocol';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppStatus } from '#lib/hooks/use-app-status.ts';
 import { useNewestDeployment } from '#lib/hooks/use-newest-deployment.ts';

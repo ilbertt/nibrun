@@ -1,15 +1,13 @@
 import {
-  describeUnservedDeployment,
-  parseEnvironmentPatch,
-  servingHostname,
-} from '@repo/app-operations';
-import {
   type DeploymentState,
+  describeUnservedDeployment,
   HttpPortSchema,
   type Sha256Digest,
   Sha256DigestSchema,
+  servingHostname,
   type TenantEnvironment,
   type TenantEnvironmentPatch,
+  TenantEnvironmentPatchSchema,
   Value,
 } from '@repo/protocol';
 import { z } from 'zod';
@@ -96,9 +94,7 @@ export function newAppConfig(input: ConfigInput) {
 }
 
 function patched(environment: Record<string, string | null>): TenantEnvironmentPatch {
-  return parseEnvironmentPatch(
-    Object.entries(environment).map(([name, value]) => ({ name, value })),
-  );
+  return Value.Parse(TenantEnvironmentPatchSchema, environment);
 }
 
 function withoutRemovals(patch: TenantEnvironmentPatch): TenantEnvironment {

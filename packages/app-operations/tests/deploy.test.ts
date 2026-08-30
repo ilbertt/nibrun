@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
 import type { Filename } from '@repo/protocol';
-import { deploy, describeUnservedDeployment } from '#deploy.ts';
+import { deploy } from '#deploy.ts';
 import type { DeployStep } from '#release.ts';
 import { answering } from '#tests/support/api.ts';
 import {
@@ -369,26 +369,6 @@ describe('what a caller is told as it happens', () => {
     });
 
     expect(asked).toEqual([PUT_URL]);
-  });
-});
-
-describe('a release that settled without serving accounts for itself', () => {
-  test("the host's own words are carried through where it left any", () => {
-    expect(
-      describeUnservedDeployment({
-        id: 'dep-1',
-        state: 'failed',
-        message: 'No host started this deployment in time.',
-      }),
-    ).toBe('Deployment dep-1 is failed. No host started this deployment in time.');
-  });
-
-  // A release can end without the host having said anything about it, and a trailing separator
-  // dangling off the state would read as an account that went missing.
-  test('and one that said nothing still names the state it reached', () => {
-    expect(describeUnservedDeployment({ id: 'dep-1', state: 'superseded' })).toBe(
-      'Deployment dep-1 is superseded.',
-    );
   });
 });
 
