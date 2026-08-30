@@ -106,7 +106,7 @@ function RouteComponent() {
       <PageBackdrop />
       <main className="mx-auto flex w-full max-w-3xl flex-col px-6">
         <SiteHeader />
-        <article className="flex flex-col py-12 sm:py-16">
+        <article className="flex flex-col pb-12 sm:pb-16">
           <Button variant="ghost" size="sm" className="self-start" render={<Link to="/blog" />}>
             <ArrowLeftIcon data-icon="inline-start" />
             All posts

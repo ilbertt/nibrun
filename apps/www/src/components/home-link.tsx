@@ -1,8 +1,8 @@
 import { NibrunMark } from '@repo/ui/custom/nibrun-mark';
 import { Link } from '@tanstack/react-router';
 
-// Composed here rather than reusing `BrandMark`: below 360px the header's five controls overflow,
-// and the word is the one thing in it that the mark beside it already says.
+// Composed here rather than reusing `BrandMark`: below `sm` the name sits directly beside the blog
+// link, where two words of the same size read as one pair rather than as a brand and a nav item.
 export function HomeLink() {
   return (
     <Link
@@ -11,7 +11,7 @@ export function HomeLink() {
       className="flex items-center gap-2 rounded-full font-medium text-sm transition-opacity hover:opacity-80"
     >
       <NibrunMark className="size-6" />
-      <span className="max-[359px]:hidden">nibrun</span>
+      <span className="hidden sm:inline">nibrun</span>
     </Link>
   );
 }
