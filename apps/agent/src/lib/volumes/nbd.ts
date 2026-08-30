@@ -23,6 +23,7 @@ export const isAttached = (devicePath: string) =>
 
 /** One block, at the offset every filesystem on the device keeps something at. */
 const PROBE_BYTES = 4096;
+const NO_BYTES = 0;
 
 /**
  * A dead device answers instantly and a live one answers from cache, so this bounds the case
@@ -44,8 +45,33 @@ const PROBE_TIMEOUT = Duration.seconds(PROBE_TIMEOUT_SECONDS);
  * `iflag=direct` is what makes it a read of the device rather than of the page cache. Without it
  * the host answers out of memory for a device that has been dead for hours, which is the same
  * false yes this replaces.
+ *
+ * The size is checked first, and it is not belt-and-braces. A detached nbd device is zero bytes
+ * long, and reading one block of a zero-length device is not an error: `dd` reports `0+0 records
+ * in` and exits 0. Asking only whether the read succeeded therefore answers yes for a device that
+ * is not attached at all — which is every device on a host that has just rebooted, and a host
+ * whose volumes are then never attached because nothing believes anything is wrong with them.
  */
 export const isUsable = (devicePath: string) =>
+  Effect.gen(function* () {
+    const size = yield* attachedSizeBytes(devicePath);
+    if (size <= NO_BYTES) {
+      return false;
+    }
+    return yield* readsFirstBlock(devicePath);
+  });
+
+/** Zero for a device nothing is attached to, which is the state a reboot leaves every one of them in. */
+const attachedSizeBytes = (devicePath: string) =>
+  run({ command: ['blockdev', '--getsize64', devicePath], timeout: PROBE_TIMEOUT }).pipe(
+    Effect.map((result) =>
+      result.code === CONNECTED_EXIT_CODE ? Number.parseInt(result.stdout.trim(), 10) : NO_BYTES,
+    ),
+    Effect.map((size) => (Number.isFinite(size) ? size : NO_BYTES)),
+    Effect.catchAll(() => Effect.succeed(NO_BYTES)),
+  );
+
+const readsFirstBlock = (devicePath: string) =>
   run({
     command: [
       'dd',
