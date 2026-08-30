@@ -1,35 +1,34 @@
 import { expect, test } from 'bun:test';
-import type { PublicApiClient } from '@repo/api-client/public';
 import { awaitExportBundle, requestExport } from '#exports.ts';
+import { answering, apiHolding as apiWith } from '#tests/support/api.ts';
+import { APP_ID } from '#tests/support/app.ts';
 
-const APP_ID = 'app-1';
 const EXPORT_ID = 'export-1';
 const DOWNLOAD_URL = 'https://bundles.example/export-1?signature=x';
 const SIZE_BYTES = 4096;
 
 type Found = { state: string; downloadUrl?: string; sizeBytes?: number };
 
-function apiHolding({ found, asked }: { found: Found; asked?: string[] }): PublicApiClient {
-  function underApp({ appId }: { appId: string }) {
-    function addressed({ exportId }: { exportId: string }) {
-      return {
-        get: () => {
-          asked?.push(exportId);
-          return Promise.resolve({ data: { id: exportId, ...found }, error: null });
-        },
-      };
-    }
+function apiHolding({ found, asked }: { found: Found; asked?: string[] }) {
+  function addressed({ exportId }: { exportId: string }) {
     return {
-      exports: Object.assign(addressed, {
-        post: () => {
-          asked?.push(appId);
-          return Promise.resolve({ data: { id: EXPORT_ID, state: 'pending' }, error: null });
-        },
-      }),
+      get: () => {
+        asked?.push(exportId);
+        return answering({ id: exportId, ...found })();
+      },
     };
   }
 
-  return { api: { apps: underApp } } as unknown as PublicApiClient;
+  return apiWith({
+    underApp: ({ appId }) => ({
+      exports: Object.assign(addressed, {
+        post: () => {
+          asked?.push(appId);
+          return answering({ id: EXPORT_ID, state: 'pending' })();
+        },
+      }),
+    }),
+  });
 }
 
 test('the app an export is asked for is the app it is asked under', async () => {

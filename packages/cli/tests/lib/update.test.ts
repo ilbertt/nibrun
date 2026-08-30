@@ -1,69 +1,45 @@
 import { expect, test } from 'bun:test';
-import type { PublicApiClient } from '@repo/api-client/public';
-import type { Ui } from '#lib/ui.ts';
 import { updateApp } from '#lib/update.ts';
+import { answering, apiHolding, listedApp } from '#tests/support/api.ts';
+import { HOSTNAME, SLUG } from '#tests/support/app.ts';
+import { uiRecording } from '#tests/support/ui.ts';
 
-const SLUG = 'quiet-otter';
 const ARTIFACT_ID = 'artifact-1';
 
-function apiHolding({ patched }: { patched: unknown[] }): PublicApiClient {
-  function underApp({ appId }: { appId: string }) {
-    return {
+function apiHoldingPatchable({ patched }: { patched: unknown[] }) {
+  return apiHolding({
+    apps: [listedApp()],
+    underApp: ({ appId }) => ({
       patch: (body: unknown) => {
         patched.push(body);
-        return Promise.resolve({
-          data: {
-            id: appId,
-            slug: SLUG,
-            hostnames: [{ hostname: `${SLUG}.nibrun.app`, kind: 'platform', state: 'active' }],
-          },
-          error: null,
-        });
+        return answering({
+          id: appId,
+          slug: SLUG,
+          hostnames: [{ hostname: HOSTNAME, kind: 'platform', state: 'active' }],
+        })();
       },
       artifacts: ({ artifactId }: { artifactId: string }) => ({
-        get: () =>
-          Promise.resolve({ data: { id: artifactId, digest: 'sha256:abcd' }, error: null }),
+        get: answering({ id: artifactId, digest: 'sha256:abcd' }),
       }),
       deployments: Object.assign(
         ({ deploymentId }: { deploymentId: string }) => ({
-          get: () => Promise.resolve({ data: { id: deploymentId, state: 'running' }, error: null }),
+          get: answering({ id: deploymentId, state: 'running' }),
         }),
         {
-          get: () =>
-            Promise.resolve({
-              data: { deployments: [{ id: 'deployment-1', artifactId: ARTIFACT_ID }] },
-              error: null,
-            }),
-          post: () => Promise.resolve({ data: { id: 'deployment-2' }, error: null }),
+          get: answering({ deployments: [{ id: 'deployment-1', artifactId: ARTIFACT_ID }] }),
+          post: answering({ id: 'deployment-2' }),
         },
       ),
-    };
-  }
-
-  return {
-    api: {
-      apps: Object.assign(underApp, {
-        get: () => Promise.resolve({ data: { apps: [{ id: 'app-1', slug: SLUG }] }, error: null }),
-      }),
-    },
-  } as unknown as PublicApiClient;
-}
-
-function uiSaying(said: string[]): Ui {
-  return {
-    open: () => {},
-    step: (message) => said.push(message),
-    done: (message) => said.push(message),
-    waitingFor: ({ task }) => task(() => {}),
-  };
+    }),
+  });
 }
 
 test('the flags that were given are the whole of what the app is asked to change', async () => {
   const patched: unknown[] = [];
 
   await updateApp({
-    api: apiHolding({ patched }),
-    ui: uiSaying([]),
+    api: apiHoldingPatchable({ patched }),
+    ui: uiRecording(),
     slug: SLUG,
     env: ['TOKEN=shh'],
     unset: ['STALE'],
@@ -78,8 +54,8 @@ test('arguments nobody named are not arguments cleared', async () => {
   const patched: unknown[] = [];
 
   await updateApp({
-    api: apiHolding({ patched }),
-    ui: uiSaying([]),
+    api: apiHoldingPatchable({ patched }),
+    ui: uiRecording(),
     slug: SLUG,
     port: 8080,
   });
@@ -91,10 +67,10 @@ test('arguments nobody named are not arguments cleared', async () => {
 // number — and the no has to travel, or there would be no way to give the port up.
 test('asking for a public port sends the answer, and so does giving it up', async () => {
   const patched: unknown[] = [];
-  const api = apiHolding({ patched });
+  const api = apiHoldingPatchable({ patched });
 
-  await updateApp({ api, ui: uiSaying([]), slug: SLUG, extraPublicPort: true });
-  await updateApp({ api, ui: uiSaying([]), slug: SLUG, extraPublicPort: false });
+  await updateApp({ api, ui: uiRecording(), slug: SLUG, extraPublicPort: true });
+  await updateApp({ api, ui: uiRecording(), slug: SLUG, extraPublicPort: false });
 
   expect(patched).toEqual([{ hasExtraPublicPort: true }, { hasExtraPublicPort: false }]);
 });
@@ -102,7 +78,12 @@ test('asking for a public port sends the answer, and so does giving it up', asyn
 test('a flag nobody passed says nothing about the port', async () => {
   const patched: unknown[] = [];
 
-  await updateApp({ api: apiHolding({ patched }), ui: uiSaying([]), slug: SLUG, port: 8080 });
+  await updateApp({
+    api: apiHoldingPatchable({ patched }),
+    ui: uiRecording(),
+    slug: SLUG,
+    port: 8080,
+  });
 
   expect(patched).toEqual([{ httpPort: 8080 }]);
 });
@@ -112,15 +93,20 @@ test('a flag nobody passed says nothing about the port', async () => {
 test('an empty list of arguments is arguments cleared', async () => {
   const patched: unknown[] = [];
 
-  await updateApp({ api: apiHolding({ patched }), ui: uiSaying([]), slug: SLUG, args: [] });
+  await updateApp({
+    api: apiHoldingPatchable({ patched }),
+    ui: uiRecording(),
+    slug: SLUG,
+    args: [],
+  });
 
   expect(patched).toEqual([{ args: [] }]);
 });
 
 test('a name the shell would not accept as a variable is refused in this program own words', () => {
   const attempt = updateApp({
-    api: apiHolding({ patched: [] }),
-    ui: uiSaying([]),
+    api: apiHoldingPatchable({ patched: [] }),
+    ui: uiRecording(),
     slug: SLUG,
     env: ['9LIVES=cat'],
   });
@@ -129,13 +115,18 @@ test('a name the shell would not accept as a variable is refused in this program
 });
 
 test('the binary being run again is named, and so is where it answers', async () => {
-  const said: string[] = [];
+  const ui = uiRecording();
 
-  await updateApp({ api: apiHolding({ patched: [] }), ui: uiSaying(said), slug: SLUG, args: [] });
+  await updateApp({
+    api: apiHoldingPatchable({ patched: [] }),
+    ui,
+    slug: SLUG,
+    args: [],
+  });
 
-  expect(said).toEqual([
+  expect(ui.said).toEqual([
     `app ${SLUG}`,
     'artifact sha256:abcd',
-    expect.stringContaining(`https://${SLUG}.nibrun.app`),
+    expect.stringContaining(`https://${HOSTNAME}`),
   ]);
 });
