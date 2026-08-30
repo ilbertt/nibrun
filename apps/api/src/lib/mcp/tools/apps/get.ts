@@ -1,6 +1,6 @@
 import { APP_STATUS_LABELS, appWithStatus, servingHostname, statusKey } from '@repo/app-operations';
 import { z } from 'zod';
-import { AppSlugSchema, answered, type ToolRegistration } from '#lib/tool.ts';
+import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
 export function registerGetAppTool({ server, api }: ToolRegistration): void {
   server.registerTool(

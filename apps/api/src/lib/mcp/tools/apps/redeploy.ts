@@ -1,7 +1,7 @@
 import { redeploy } from '@repo/app-operations';
 import { z } from 'zod';
-import { ConfigInputSchema, configEdit, ReleaseResultSchema, released } from '#lib/release.ts';
-import { AppSlugSchema, answered, type ToolRegistration } from '#lib/tool.ts';
+import { ConfigInputSchema, configEdit, ReleaseResultSchema, released } from '#lib/mcp/release.ts';
+import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
 export function registerRedeployAppTool({ server, api }: ToolRegistration): void {
   server.registerTool(

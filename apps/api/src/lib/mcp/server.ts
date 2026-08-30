@@ -1,18 +1,18 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { registerDeleteAppTool } from '#tools/apps/delete.ts';
-import { registerDeployAppTool } from '#tools/apps/deploy.ts';
-import { registerAddDomainTool } from '#tools/apps/domains/add.ts';
-import { registerRemoveDomainTool } from '#tools/apps/domains/remove.ts';
-import { registerGetExportTool } from '#tools/apps/export/get.ts';
-import { registerExportAppTool } from '#tools/apps/export/request.ts';
-import { registerListFilesTool } from '#tools/apps/files.ts';
-import { registerGetAppTool } from '#tools/apps/get.ts';
-import { registerListAppsTool } from '#tools/apps/list.ts';
-import { registerReadLogsTool } from '#tools/apps/logs.ts';
-import { registerRedeployAppTool } from '#tools/apps/redeploy.ts';
-import { registerResumeAppTool } from '#tools/apps/resume.ts';
-import { registerSuspendAppTool } from '#tools/apps/suspend.ts';
+import { registerDeleteAppTool } from '#lib/mcp/tools/apps/delete.ts';
+import { registerDeployAppTool } from '#lib/mcp/tools/apps/deploy.ts';
+import { registerAddDomainTool } from '#lib/mcp/tools/apps/domains/add.ts';
+import { registerRemoveDomainTool } from '#lib/mcp/tools/apps/domains/remove.ts';
+import { registerGetExportTool } from '#lib/mcp/tools/apps/export/get.ts';
+import { registerExportAppTool } from '#lib/mcp/tools/apps/export/request.ts';
+import { registerListFilesTool } from '#lib/mcp/tools/apps/files.ts';
+import { registerGetAppTool } from '#lib/mcp/tools/apps/get.ts';
+import { registerListAppsTool } from '#lib/mcp/tools/apps/list.ts';
+import { registerReadLogsTool } from '#lib/mcp/tools/apps/logs.ts';
+import { registerRedeployAppTool } from '#lib/mcp/tools/apps/redeploy.ts';
+import { registerResumeAppTool } from '#lib/mcp/tools/apps/resume.ts';
+import { registerSuspendAppTool } from '#lib/mcp/tools/apps/suspend.ts';
 
 const SERVER_INFO = {
   name: 'nibrun',

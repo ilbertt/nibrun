@@ -1,7 +1,7 @@
 import { unwrap } from '@repo/api-client/unwrap';
 import { servingHostname } from '@repo/app-operations';
 import { z } from 'zod';
-import { answered, type ToolRegistration } from '#lib/tool.ts';
+import { answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
 export function registerListAppsTool({ server, api }: ToolRegistration): void {
   server.registerTool(

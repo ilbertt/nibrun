@@ -5,7 +5,7 @@ import {
   AppTransitionResultSchema,
   answered,
   type ToolRegistration,
-} from '#lib/tool.ts';
+} from '#lib/mcp/tool.ts';
 
 export function registerResumeAppTool({ server, api }: ToolRegistration): void {
   server.registerTool(

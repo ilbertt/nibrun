@@ -1,7 +1,7 @@
 import { addressedDeployment, followLogs } from '@repo/app-operations';
 import type { TenantLogRecord } from '@repo/protocol';
 import { z } from 'zod';
-import { AppSlugSchema, answered, type ToolRegistration } from '#lib/tool.ts';
+import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
 /**
  * What one call hands back. A tail is what a reader wants and a whole log is what an app has, and

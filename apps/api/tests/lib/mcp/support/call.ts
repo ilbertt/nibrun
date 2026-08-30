@@ -1,5 +1,5 @@
 import type { PublicApiClient } from '@repo/api-client/public';
-import { createNibrunMcpHandler } from '#index.ts';
+import { createNibrunMcpHandler } from '#lib/mcp/handler.ts';
 
 export type Replied = {
   result?: {

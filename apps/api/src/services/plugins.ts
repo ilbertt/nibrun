@@ -29,6 +29,7 @@ import { FilesystemService } from '#services/filesystem.service.ts';
 import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { LogsService } from '#services/logs.service.ts';
+import { McpService } from '#services/mcp.service.ts';
 
 // Read once, where every other piece of the environment is read: a key of the wrong length is a
 // deployment that fails to start rather than one that fails on the first secret written.
@@ -119,6 +120,11 @@ export function loggerPlugin(name: string) {
   return new Elysia({ name: `logger.${name}` }).derive({ as: 'scoped' }, () => ({ logger }));
 }
 
+// Reaches the api through its own public routes rather than through the services beside it, so a
+// tool can do exactly what the caller whose token it carries could do, and nothing more. It is
+// handed the assembled server in `createApp`.
+export const mcpService = new McpService();
+
 export const AssetsServicePlugin = new Elysia({ name: 'service.assets' }).decorate(
   'assetsService',
   assetsService,
@@ -167,4 +173,9 @@ export const HostnamesServicePlugin = new Elysia({ name: 'service.hostnames' }).
 export const ExportsServicePlugin = new Elysia({ name: 'service.exports' }).decorate(
   'exportsService',
   exportsService,
+);
+
+export const McpServicePlugin = new Elysia({ name: 'service.mcp' }).decorate(
+  'mcpService',
+  mcpService,
 );

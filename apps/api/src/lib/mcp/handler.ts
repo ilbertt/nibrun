@@ -1,6 +1,6 @@
 import { createMcpHandler, type McpHttpHandler } from '@modelcontextprotocol/server';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { createNibrunMcpServer } from '#server.ts';
+import { createNibrunMcpServer } from '#lib/mcp/server.ts';
 
 const NOT_VERIFIED =
   'The mcp handler was reached without an authenticated caller. Whatever mounts it verifies the bearer token and passes authInfo.';

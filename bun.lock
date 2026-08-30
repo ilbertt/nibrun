@@ -37,9 +37,13 @@
         "@aws-sdk/s3-request-presigner": "^3.1105.0",
         "@ilbertt/better-auth-bun-sql": "^0.4.0",
         "@ilbertt/bun-sqlgen": "^0.5.0",
+        "@modelcontextprotocol/server": "^2.0.0",
+        "@repo/api-client": "workspace:*",
+        "@repo/app-operations": "workspace:*",
         "@repo/protocol": "workspace:*",
         "better-auth": "catalog:",
         "elysia": "^1.4.29",
+        "zod": "catalog:",
       },
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
@@ -182,20 +186,6 @@
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
         "git-cliff": "^2.13.1",
-        "typescript": "catalog:",
-      },
-    },
-    "packages/mcp-server": {
-      "name": "@repo/mcp-server",
-      "dependencies": {
-        "@modelcontextprotocol/server": "^2.0.0",
-        "@repo/api-client": "workspace:*",
-        "@repo/app-operations": "workspace:*",
-        "@repo/protocol": "workspace:*",
-        "zod": "catalog:",
-      },
-      "devDependencies": {
-        "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",
       },
     },
@@ -768,8 +758,6 @@
     "@repo/deploy-link": ["@repo/deploy-link@workspace:packages/deploy-link"],
 
     "@repo/internal-scripts": ["@repo/internal-scripts@workspace:packages/internal-scripts"],
-
-    "@repo/mcp-server": ["@repo/mcp-server@workspace:packages/mcp-server"],
 
     "@repo/pack-utils": ["@repo/pack-utils@workspace:packages/pack-utils"],
 

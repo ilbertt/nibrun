@@ -1,6 +1,6 @@
 import { addressedDeployment, guestPath, readDirectory } from '@repo/app-operations';
 import { z } from 'zod';
-import { AppSlugSchema, answered, type ToolRegistration } from '#lib/tool.ts';
+import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
 const ROOT = '/';
 

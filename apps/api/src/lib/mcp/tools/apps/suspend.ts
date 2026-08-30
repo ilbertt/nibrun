@@ -5,7 +5,7 @@ import {
   AppTransitionResultSchema,
   answered,
   type ToolRegistration,
-} from '#lib/tool.ts';
+} from '#lib/mcp/tool.ts';
 
 const KEPT =
   'Its microVM stops; the volume, everything on it and every hostname stay. `resume_app` puts it back.';

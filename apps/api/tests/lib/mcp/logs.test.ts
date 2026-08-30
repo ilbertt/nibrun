@@ -1,6 +1,12 @@
 import { expect, test } from 'bun:test';
-import { anApp, apiHolding, aRunningRelease, SLUG, someOutput } from '#tests/support/api.ts';
-import { called, toolCall } from '#tests/support/call.ts';
+import {
+  anApp,
+  apiHolding,
+  aRunningRelease,
+  SLUG,
+  someOutput,
+} from '#tests/lib/mcp/support/api.ts';
+import { called, toolCall } from '#tests/lib/mcp/support/call.ts';
 
 const MAX_RECORDS = 500;
 

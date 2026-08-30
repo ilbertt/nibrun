@@ -1,8 +1,8 @@
 import { unwrap } from '@repo/api-client/unwrap';
 import { appFor } from '@repo/app-operations';
 import { z } from 'zod';
-import { ExportResultSchema } from '#lib/export.ts';
-import { AppSlugSchema, answered, type ToolRegistration } from '#lib/tool.ts';
+import { ExportResultSchema } from '#lib/mcp/export.ts';
+import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
 export function registerGetExportTool({ server, api }: ToolRegistration): void {
   server.registerTool(

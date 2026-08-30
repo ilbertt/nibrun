@@ -7,8 +7,8 @@ import {
   fetchable,
   ReleaseResultSchema,
   released,
-} from '#lib/release.ts';
-import { AppSlugSchema, answered, type ToolRegistration } from '#lib/tool.ts';
+} from '#lib/mcp/release.ts';
+import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
 export function registerDeployAppTool({ server, api }: ToolRegistration): void {
   server.registerTool(

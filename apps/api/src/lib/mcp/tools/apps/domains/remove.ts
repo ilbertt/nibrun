@@ -1,6 +1,6 @@
 import { appFor, removeDomain } from '@repo/app-operations';
 import { z } from 'zod';
-import { AppSlugSchema, answered, type ToolRegistration } from '#lib/tool.ts';
+import { AppSlugSchema, answered, type ToolRegistration } from '#lib/mcp/tool.ts';
 
 export function registerRemoveDomainTool({ server, api }: ToolRegistration): void {
   server.registerTool(
