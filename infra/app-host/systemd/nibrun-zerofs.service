@@ -3,6 +3,11 @@ Description=ZeroFS, backing every tenant disk on this host
 Documentation=https://www.zerofs.net
 After=network-online.target
 Wants=network-online.target
+# /data is an ephemeral disk mounted at boot, and ZeroFS is configured for a 70 GB
+# cache against a 50 GB root volume. Starting without it would not fail — it would
+# fill the disk the host runs from.
+Requires=nibrun-data.service
+After=nibrun-data.service
 
 [Service]
 Type=exec

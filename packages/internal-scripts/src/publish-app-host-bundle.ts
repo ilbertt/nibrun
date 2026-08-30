@@ -17,10 +17,12 @@ const BUNDLE_DIRECTORIES = ['systemd', 'zerofs', 'caddy'];
 // Shell, not TypeScript: these run on the box, which has no Bun. Flattened to the
 // bundle root next to the directories above, because the deploy script resolves
 // everything relative to itself.
-const ON_BOX_SCRIPTS = ['on_box_deploy.sh'];
+const ON_BOX_SCRIPTS = ['on_box_deploy.sh', 'ensure_ephemeral_data.sh'];
 
-// Shared with the control plane's bundle — both machine classes have a data
-// volume, and what they keep on it arrives as arguments.
+// Shared with the control plane's bundle. Only the control plane reads it now —
+// an app host's /data is the instance store and `ensure_ephemeral_data.sh` is
+// what mounts it — but it ships here until the EBS volume is removed, so a
+// rollback to a revision that still calls it finds it on the box.
 const SHARED_ON_BOX_SCRIPTS = ['ensure_data_volume.sh'];
 
 // Also shared: Cloudflare's origin-pull CA is one certificate, and both proxies
