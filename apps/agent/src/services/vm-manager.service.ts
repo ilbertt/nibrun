@@ -1,6 +1,6 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { AppId, DeploymentId, DesiredInstance } from '@repo/protocol';
-import { Effect, Either } from 'effect';
+import { Duration, Effect, Either } from 'effect';
 import { writeJsonFile } from '#lib/json-store.ts';
 import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
 import type { AppSlot } from '#lib/network/slot.ts';
@@ -274,23 +274,38 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       yield* fs.makeDirectory(paths.directory, { recursive: true, mode: VM_DIR_MODE });
       yield* zerofs.flushAll;
 
-      yield* Firecracker.pause(socketPath);
-      yield* Effect.onError(
+      // Timed as one window because it is one: the guest is stopped from the pause to the stop,
+      // so this is what sleeping costs a tenant rather than what it costs the host.
+      const [paused] = yield* Effect.timed(
         Effect.gen(function* () {
-          yield* Firecracker.createSnapshot({
-            socketPath,
-            statePath: paths.statePath,
-            memoryPath: paths.memoryPath,
-          });
-          yield* Systemd.stop(appId);
+          yield* Firecracker.pause(socketPath);
+          yield* Effect.onError(
+            Effect.gen(function* () {
+              yield* Firecracker.createSnapshot({
+                socketPath,
+                statePath: paths.statePath,
+                memoryPath: paths.memoryPath,
+              });
+              yield* Systemd.stop(appId);
+            }),
+            // A microVM left paused answers nothing and is never asked to run again.
+            () => Effect.ignore(Firecracker.resume(socketPath)),
+          );
         }),
-        // A microVM left paused answers nothing and is never asked to run again.
-        () => Effect.ignore(Firecracker.resume(socketPath)),
       );
 
       yield* writeJsonFile({ path: paths.stampPath, value: stamp });
+      // `memoryBytes` beside the duration because the two move together — a snapshot is the
+      // guest's whole RAM, so what this costs grows with what an app asked for and not with
+      // anything the host can tune.
+      const captured = yield* Effect.orElseSucceed(fs.stat(paths.memoryPath), () => undefined);
       yield* Effect.logInfo('instance asleep').pipe(
-        Effect.annotateLogs({ appId, slot: slot.slot }),
+        Effect.annotateLogs({
+          appId,
+          slot: slot.slot,
+          snapshotMs: Duration.toMillis(paused),
+          ...(captured && { memoryBytes: Number(captured.size) }),
+        }),
       );
     });
 
@@ -315,36 +330,45 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
         forgetSnapshot(appId),
       );
 
-      yield* Systemd.start(appId);
-      yield* Effect.ensuring(
-        Effect.onError(
-          Effect.gen(function* () {
-            yield* Firecracker.loadSnapshot({
-              socketPath,
-              statePath: paths.statePath,
-              memoryPath: paths.memoryPath,
-            });
-            yield* Firecracker.resume(socketPath);
-            yield* refreshNeighbour({
-              guestIpv4: slot.guestIpv4,
-              guestMac: slot.guestMac,
-              tapName: slot.tapName,
-            });
-          }),
-          // The start already consumed the stamp, so this Firecracker holds no guest and never
-          // will: stopping it is what leaves a cold boot rather than a process in the way of one.
-          () => Effect.ignore(Systemd.stop(appId)),
-        ),
-        // Every way out, so no retry of a restore that failed halfway can find the files it did
-        // not finish with. The stamp is already gone and would stop a second load on its own;
-        // this is what keeps at-most-once from resting on that single fact.
-        //
-        // Unlinking while Firecracker still has the memory file mapped keeps the mapping alive
-        // and hands the disk back the moment the microVM exits, so the successful path pays
-        // nothing for it either.
-        forgetSnapshot(appId),
+      // From the start to the neighbour refresh, which is the whole of what the request that
+      // caused this is waiting on — the stamp check above it happens before anything is asked
+      // of the VMM and costs a file read.
+      const [restoring] = yield* Effect.timed(
+        Effect.gen(function* () {
+          yield* Systemd.start(appId);
+          yield* Effect.ensuring(
+            Effect.onError(
+              Effect.gen(function* () {
+                yield* Firecracker.loadSnapshot({
+                  socketPath,
+                  statePath: paths.statePath,
+                  memoryPath: paths.memoryPath,
+                });
+                yield* Firecracker.resume(socketPath);
+                yield* refreshNeighbour({
+                  guestIpv4: slot.guestIpv4,
+                  guestMac: slot.guestMac,
+                  tapName: slot.tapName,
+                });
+              }),
+              // The start already consumed the stamp, so this Firecracker holds no guest and never
+              // will: stopping it is what leaves a cold boot rather than a process in the way of one.
+              () => Effect.ignore(Systemd.stop(appId)),
+            ),
+            // Every way out, so no retry of a restore that failed halfway can find the files it did
+            // not finish with. The stamp is already gone and would stop a second load on its own;
+            // this is what keeps at-most-once from resting on that single fact.
+            //
+            // Unlinking while Firecracker still has the memory file mapped keeps the mapping alive
+            // and hands the disk back the moment the microVM exits, so the successful path pays
+            // nothing for it either.
+            forgetSnapshot(appId),
+          );
+        }),
       );
-      yield* Effect.logInfo('instance awake').pipe(Effect.annotateLogs({ appId, slot: slot.slot }));
+      yield* Effect.logInfo('instance awake').pipe(
+        Effect.annotateLogs({ appId, slot: slot.slot, restoreMs: Duration.toMillis(restoring) }),
+      );
     });
 
     return {

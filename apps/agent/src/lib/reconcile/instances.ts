@@ -443,6 +443,13 @@ function restored({ appId, startedAt }: { appId: AppId; startedAt: Timestamp }) 
  * with the reason on its record: `VmManager.wake` discards the snapshot on its way out, so the
  * request after this one is the cold boot rather than a second attempt at the same restore.
  */
+/**
+ * Which of the three ways a wake can end. Returned rather than inferred from the record, because
+ * a cold boot and a restore leave the same record behind and only this can tell them apart —
+ * which is the difference between the feature working and it quietly not.
+ */
+export type WakeOutcome = 'restored' | 'already-running' | 'cold-boot';
+
 export const resumeInstance = Effect.fn('resumeInstance')(function* (desired: DesiredInstance) {
   yield* Effect.annotateCurrentSpan({ appId: desired.appId });
   const allocator = yield* SlotAllocator;
@@ -456,7 +463,7 @@ export const resumeInstance = Effect.fn('resumeInstance')(function* (desired: De
   // waiting on this is about to be answered by the guest that is already there.
   const unit = (yield* Systemd.statuses([desired.appId])).get(desired.appId) ?? UNKNOWN_UNIT;
   if (unit.active) {
-    return;
+    return 'already-running' as const;
   }
 
   // For the reason `startInstance` marks one before its boot: the clock this starts is the one
@@ -466,14 +473,16 @@ export const resumeInstance = Effect.fn('resumeInstance')(function* (desired: De
     nowMs: yield* Clock.currentTimeMillis,
   });
 
-  yield* vms.wake({ appId: desired.appId, deploymentId: desired.deploymentId, slot }).pipe(
+  return yield* vms.wake({ appId: desired.appId, deploymentId: desired.deploymentId, slot }).pipe(
     Effect.andThen(
       Effect.flatMap(nowTimestamp, (startedAt) => restored({ appId: desired.appId, startedAt })),
     ),
+    Effect.as('restored' as const),
     Effect.catchTag('SnapshotUnusable', (unusable) =>
       Effect.logInfo('nothing to wake this app from; booting it instead', unusable)
         .pipe(Effect.annotateLogs({ appId: desired.appId }))
-        .pipe(Effect.andThen(startInstance(desired))),
+        .pipe(Effect.andThen(startInstance(desired)))
+        .pipe(Effect.as('cold-boot' as const)),
     ),
     Effect.tapError((error) =>
       AgentState.updateRecord({

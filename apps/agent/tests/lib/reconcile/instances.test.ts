@@ -249,6 +249,53 @@ describe('an app is woken by putting back the microVM it had', () => {
     );
   });
 
+  /**
+   * The three endings are the same record and the same log line otherwise, and telling them
+   * apart is the whole of knowing whether the feature is working: an app that cold-boots every
+   * time is one whose snapshots never load, which is indistinguishable from a fast wake until
+   * somebody reads the outcome.
+   */
+  test('a restore says so', () => {
+    const vms = recordingVms();
+    return withMicroVmDown(vms)(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(instanceRecord({ onRequest: true, state: 'idle' }));
+
+        expect(yield* resumeInstance(desiredInstance({ desiredState: 'on-request' }))).toBe(
+          'restored',
+        );
+      }),
+    );
+  });
+
+  test('a cold boot says so rather than passing for a restore', () => {
+    const vms = recordingVms({
+      onWake: new SnapshotUnusable({ reason: 'the host has rebooted' }),
+    });
+    return withMicroVmDown(vms)(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(instanceRecord({ onRequest: true, state: 'idle' }));
+
+        expect(yield* resumeInstance(desiredInstance({ desiredState: 'on-request' }))).toBe(
+          'cold-boot',
+        );
+      }),
+    );
+  });
+
+  test('a wake that found the microVM already up is neither', () => {
+    const vms = recordingVms();
+    return onHost({ vms, unit: ACTIVE_UNIT })(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(instanceRecord({ onRequest: true, state: 'running' }));
+
+        expect(yield* resumeInstance(desiredInstance({ desiredState: 'on-request' }))).toBe(
+          'already-running',
+        );
+      }),
+    );
+  });
+
   // Firecracker takes a snapshot load only from a process that has configured nothing, and
   // `systemctl start` on a unit already up is the no-op that would have hidden it.
   test('a microVM that is already up is left alone rather than restored onto', () => {
