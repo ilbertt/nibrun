@@ -1,5 +1,5 @@
 import { FileSystem } from '@effect/platform';
-import { Effect } from 'effect';
+import { Data, Duration, Effect } from 'effect';
 import { stdoutOf } from '#services/command-runner.service.ts';
 
 const SUPERBLOCK_MAGIC_OFFSET = 1080;
@@ -29,8 +29,28 @@ export function hasExtMagic(bytes: Uint8Array): boolean {
 }
 
 /**
+ * The same ceiling the liveness probe carries, for the same reason: this opens a block device,
+ * and one whose NBD server has gone answers neither the open nor the read.
+ */
+const SUPERBLOCK_READ_TIMEOUT_SECONDS = 15;
+const SUPERBLOCK_READ_TIMEOUT = Duration.seconds(SUPERBLOCK_READ_TIMEOUT_SECONDS);
+
+export class SuperblockUnreadable extends Data.TaggedError('SuperblockUnreadable')<{
+  readonly devicePath: string;
+}> {
+  override get message() {
+    return `${this.devicePath} did not answer a read of its superblock`;
+  }
+}
+
+/**
  * Comparing a constant, not parsing a filesystem: the host must never let its kernel interpret
  * tenant-controlled metadata, and this is the only thing distinguishing a blank device.
+ *
+ * Raised rather than guessed when the device will not answer. Both guesses are wrong in a way
+ * this is not allowed to be: unformatted destroys a tenant's filesystem, and formatted reports a
+ * volume ready that nothing can read. A failure here is a volume reported failed, which is the
+ * only one of the three an operator can act on.
  */
 export const isFormatted = (devicePath: string) =>
   Effect.gen(function* () {
@@ -42,6 +62,14 @@ export const isFormatted = (devicePath: string) =>
         const buffer = new Uint8Array(MAGIC_BYTE_COUNT);
         yield* file.read(buffer);
         return hasExtMagic(buffer);
+      }),
+    ).pipe(
+      // As in `CommandRunner`: the read is on a thread this side cannot recall, so the deadline
+      // has to be the moment this stops waiting rather than the moment the read gives up.
+      Effect.disconnect,
+      Effect.timeoutFail({
+        duration: SUPERBLOCK_READ_TIMEOUT,
+        onTimeout: () => new SuperblockUnreadable({ devicePath }),
       }),
     );
   });

@@ -19,6 +19,7 @@ import { MissingVersionsError } from '#lib/report/versions.ts';
 import { ArtifactSizeMismatch, DigestMismatch } from '#lib/vm/artifacts.ts';
 import { UnrepresentableEnvironment } from '#lib/vm/instance-env.ts';
 import { VolumeShrinkRefused } from '#lib/volumes/device-file.ts';
+import { SuperblockUnreadable } from '#lib/volumes/ext4.ts';
 import { ArtifactTransferError } from '#services/artifact-store.service.ts';
 import { NoDeviceForApp } from '#services/filesystem-reader.service.ts';
 
@@ -52,6 +53,7 @@ const everyFailure = [
   }),
   new CommandTimedOut({ command: ['debugfs', '-R', 'rdump / /tmp/x', '/dev/nbd7'] }),
   new VolumeShrinkRefused({ current: OTHER_SIZE, requested: SOME_SIZE }),
+  new SuperblockUnreadable({ devicePath: '/dev/nbd3' }),
   new ControlPlaneError({ status: HTTP_UNAUTHORIZED, route: '/desired-state', body: 'expired' }),
   new ProtocolMismatch({ issues: [] }),
   new GuestFilesystemUnreachable({ appId: SOME_APP, cause: new Error('no such file') }),
