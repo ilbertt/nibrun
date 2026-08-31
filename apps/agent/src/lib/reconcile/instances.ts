@@ -12,6 +12,7 @@ import { frozen } from '#lib/exports/freeze.ts';
 import { reportedMessage } from '#lib/failure.ts';
 import { probeInstance } from '#lib/health/probe.ts';
 import {
+  afterRestore,
   applyProbe,
   describeInstanceFailure,
   evaluateInstanceState,
@@ -425,6 +426,11 @@ function restored({ appId, startedAt }: { appId: AppId; startedAt: Timestamp }) 
       startedAt,
       stopRequested: false,
       message: undefined,
+      // The microVM in front of this record is new, whatever the app behind it has done. Without
+      // this it inherits a run of successes the guest it belongs to never had, and the status loop
+      // reads an app that is coming up as one that is already up — ticking for it at the second a
+      // steady app is worth rather than at the grid a first answer lands on.
+      health: afterRestore(record.health),
     }),
   }).pipe(Effect.andThen(probeAtOnce(appId)));
 }

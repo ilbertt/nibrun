@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { DEFAULT_HEALTH_CHECK, DEFAULT_HTTP_PORT, type HealthCheck } from '@repo/protocol';
 import {
+  afterRestore,
   applyProbe,
   describeInstanceFailure,
   evaluateInstanceState,
@@ -139,6 +140,25 @@ describe('how soon a tenant is asked again', () => {
 
   test('past the grace period the startup grid is over, so a slow starter fails as it always did', () => {
     expect(delay({ tracker: initialTracker(), nowMs: PAST_GRACE_MS })).toBe(
+      DEFAULT_HEALTH_CHECK.intervalMs,
+    );
+  });
+
+  /**
+   * The case the grid exists for and the one `everHealthy` alone would miss: a woken app has
+   * served plenty and the guest in front of it has answered nothing, so a request holding on the
+   * wake would otherwise wait out a tick measured for apps that are already up.
+   */
+  test('a microVM restored under an app that has served is back on the startup grid', () => {
+    expect(delay({ tracker: afterRestore(healthyThen(0)), nowMs: WITHIN_GRACE_MS })).toBe(
+      STARTUP_PROBE_INTERVAL_MS,
+    );
+  });
+
+  test('and it leaves the grid again on the answer that says the guest is up', () => {
+    const answered = probe({ tracker: afterRestore(healthyThen(0)), healthy: true });
+
+    expect(delay({ tracker: answered, nowMs: WITHIN_GRACE_MS })).toBe(
       DEFAULT_HEALTH_CHECK.intervalMs,
     );
   });

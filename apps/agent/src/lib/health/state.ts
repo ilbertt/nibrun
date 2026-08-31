@@ -73,13 +73,31 @@ export function isWithinGracePeriod({ healthCheck, startedAtMs, nowMs }: GraceIn
 }
 
 /**
- * Whether this tenant is still being given its first chance to answer.
+ * The same tracker with this microVM's own run of probes cleared and the app's history kept.
  *
- * Bounded by the grace period rather than by the state alone, which is what keeps it — and the
+ * `everHealthy` is a fact about the app — whether it has ever served — and survives, because it is
+ * what later decides whether a run of failures reads as `unhealthy` or as an app that never served
+ * at all. The run of successes is a fact about the microVM in front of it, and one restored from a
+ * snapshot has answered nothing yet however long the app it belongs to has been up.
+ */
+export function afterRestore(tracker: HealthTracker): HealthTracker {
+  return { ...tracker, consecutiveSuccesses: NO_PROBES, consecutiveFailures: NO_PROBES };
+}
+
+/**
+ * Whether this microVM is still being given its first chance to answer.
+ *
+ * A restore is the second way to be owed one, and reading `everHealthy` alone misses it: a woken
+ * app has served plenty and the guest in front of it has answered nothing, so the boot the fast
+ * grid was written for is the one boot it would not have covered — leaving the request that woke
+ * the app waiting out a tick measured for apps that are already up.
+ *
+ * Bounded by the grace period rather than by the tracker alone, which is what keeps it — and the
  * loop that ticks for it — from running for as long as an app that never settles is up.
  */
 export function isOnStartupGrid({ tracker, ...grace }: ProbeInputs): boolean {
-  return !tracker.everHealthy && isWithinGracePeriod(grace);
+  const hasAnswered = tracker.everHealthy && tracker.consecutiveSuccesses > NO_PROBES;
+  return !hasAnswered && isWithinGracePeriod(grace);
 }
 
 /**

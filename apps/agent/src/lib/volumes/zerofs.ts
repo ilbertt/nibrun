@@ -48,39 +48,68 @@ export const listCheckpoints = Effect.fn('zerofs.listCheckpoints')((target: Zero
 
 export class ZerofsCacheUnknown extends Data.TaggedError('ZerofsCacheUnknown')<{
   readonly path: string;
+  readonly setting: CacheSetting;
 }> {
   override get message() {
-    return `${this.path} does not say how much disk ZeroFS may cache on`;
+    return `${this.path} does not say ${this.setting}, which is what ZeroFS may cache with`;
   }
 }
 
 /**
- * How much of the disk ZeroFS is entitled to, read out of the file it is itself started with
- * rather than written down a second time here. It grows into that number lazily, so a disk that
- * looks empty today is one whose free space is already spoken for — and anything else that writes
- * to the same disk has to hold this much back rather than what ZeroFS happens to be holding now.
+ * What ZeroFS is entitled to, read out of the file it is itself started with rather than written
+ * down a second time here. It grows into both numbers lazily, so a disk or a host that looks
+ * empty today is one whose free space is already spoken for — and anything else helping itself
+ * to either has to hold this much back rather than what ZeroFS happens to be holding now.
  */
-export const readCacheDiskBytes = Effect.fn('zerofs.readCacheDiskBytes')(function* (
-  configFile: string,
-) {
-  const configured = Option.flatMap(yield* readTextFile(configFile), cacheDiskGigabytes);
-  if (Option.isNone(configured)) {
-    return yield* new ZerofsCacheUnknown({ path: configFile });
-  }
-  return configured.value * BYTES_PER_CONFIGURED_GB;
-});
+const readCacheBytes = ({ configFile, setting }: { configFile: string; setting: CacheSetting }) =>
+  Effect.gen(function* () {
+    const configured = Option.flatMap(yield* readTextFile(configFile), (config) =>
+      cacheGigabytes({ config, setting }),
+    );
+    if (Option.isNone(configured)) {
+      return yield* new ZerofsCacheUnknown({ path: configFile, setting });
+    }
+    return configured.value * BYTES_PER_CONFIGURED_GB;
+  });
 
-/** `[cache] disk_size_gb`, or nothing at all: a value this cannot read is not one to guess at. */
-export function cacheDiskGigabytes(config: string): Option.Option<number> {
+export const readCacheDiskBytes = Effect.fn('zerofs.readCacheDiskBytes')((configFile: string) =>
+  readCacheBytes({ configFile, setting: 'disk_size_gb' }),
+);
+
+export const readCacheMemoryBytes = Effect.fn('zerofs.readCacheMemoryBytes')((configFile: string) =>
+  readCacheBytes({ configFile, setting: 'memory_size_gb' }),
+);
+
+/** The two `[cache]` sizes the agent holds back for, spelled as ZeroFS spells them. */
+type CacheSetting = 'disk_size_gb' | 'memory_size_gb';
+
+/** The configured number, or nothing at all: a value this cannot read is not one to guess at. */
+function cacheGigabytes({
+  config,
+  setting,
+}: {
+  config: string;
+  setting: CacheSetting;
+}): Option.Option<number> {
   try {
-    const { cache } = Bun.TOML.parse(config) as { cache?: { disk_size_gb?: unknown } };
-    const configured = cache?.disk_size_gb;
+    const { cache } = Bun.TOML.parse(config) as {
+      cache?: Partial<Record<CacheSetting, unknown>>;
+    };
+    const configured = cache?.[setting];
     return typeof configured === 'number' && configured > 0
       ? Option.some(configured)
       : Option.none();
   } catch {
     return Option.none();
   }
+}
+
+export function cacheDiskGigabytes(config: string): Option.Option<number> {
+  return cacheGigabytes({ config, setting: 'disk_size_gb' });
+}
+
+export function cacheMemoryGigabytes(config: string): Option.Option<number> {
+  return cacheGigabytes({ config, setting: 'memory_size_gb' });
 }
 
 export function parseCheckpointNames(output: string): string[] {
