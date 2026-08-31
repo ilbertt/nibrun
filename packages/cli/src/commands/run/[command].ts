@@ -4,8 +4,9 @@ import { SHARED_OPTIONS } from '#config.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { binaryFrom, deploy } from '#lib/deploy.ts';
+import { createOutput } from '#lib/output.ts';
 import { completeOptions } from '#lib/plan.ts';
-import { createUi, isInteractive } from '#lib/ui.ts';
+import { RELEASE_OUTPUT } from '#lib/release.ts';
 
 export const command = defineCommand('run [command]', {
   description:
@@ -34,7 +35,7 @@ export const command = defineCommand('run [command]', {
     [SHARED_OPTIONS.detach.name]: SHARED_OPTIONS.detach.option,
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
-  handler: async ({ params, options, context, print }) => {
+  handler: async ({ params, options, context, print, rootOptions }) => {
     // parsh names an option as it is typed, so a flag with hyphens in it does not arrive under the
     // name the deploy takes and has to be renamed rather than spread through.
     const {
@@ -47,8 +48,11 @@ export const command = defineCommand('run [command]', {
     const { binarySource, args } = parseCommandLine(params.command);
     const { api } = context;
 
-    const interactive = isInteractive();
-    const ui = createUi({ print, interactive });
+    const { interactive, ui, emit } = createOutput({
+      output: RELEASE_OUTPUT,
+      print,
+      json: rootOptions.json,
+    });
 
     // Before anything is asked, so a path nobody can read costs one line rather than a
     // questionnaire whose answers are then thrown away. A url is not opened here at all: the api
@@ -60,6 +64,6 @@ export const command = defineCommand('run [command]', {
       ? await completeOptions({ api, options: given, binarySource, args })
       : given;
 
-    await deploy({ ...resolved, api, ui, binary, args, detach });
+    emit(await deploy({ ...resolved, api, ui, binary, args, detach }));
   },
 });

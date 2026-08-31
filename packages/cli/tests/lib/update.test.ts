@@ -114,19 +114,19 @@ test('a name the shell would not accept as a variable is refused in this program
   return expect(attempt).rejects.toThrow('9LIVES');
 });
 
-test('the binary being run again is named, and so is where it answers', async () => {
+// The steps are said as they happen and the address is answered with, so what a caller reading
+// this with a program gets is the release rather than the narration of it.
+test('the binary being run again is named, and the release says where it answers', async () => {
   const ui = uiRecording();
 
-  await updateApp({
+  const release = await updateApp({
     api: apiHoldingPatchable({ patched: [] }),
     ui,
     slug: SLUG,
     args: [],
   });
 
-  expect(ui.said).toEqual([
-    `app ${SLUG}`,
-    'artifact sha256:abcd',
-    expect.stringContaining(`https://${HOSTNAME}`),
-  ]);
+  expect(ui.said).toEqual([`app ${SLUG}`, 'artifact sha256:abcd']);
+  expect(release.url).toContain(`https://${HOSTNAME}`);
+  expect(release.readyInMs).not.toBeNull();
 });

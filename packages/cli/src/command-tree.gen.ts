@@ -16,109 +16,110 @@ import type { command as appsStatusCmd } from './commands/apps/status.ts';
 import type { command as appsSuspendCmd } from './commands/apps/suspend.ts';
 import type { command as appsUpdateCmd } from './commands/apps/update.ts';
 import type { command as loginCmd } from './commands/login.ts';
+import type { command as rootCmd } from './commands/_root.ts';
 import type { command as runCommandCmd } from './commands/run/[command].ts';
 
 declare module '@parshjs/core' {
   interface CommandRegistry {
     'apps': {
       parents: {};
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps delete': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps domains': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps domains add [hostname]': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
         'apps domains': { options: InferForwardedOptions<typeof appsDomainsCmd.options>; params: InferParams<typeof appsDomainsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps domains remove [hostname]': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
         'apps domains': { options: InferForwardedOptions<typeof appsDomainsCmd.options>; params: InferParams<typeof appsDomainsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps export [destination]': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps files ls': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps files ls [path]': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
         'apps files ls': { options: InferForwardedOptions<typeof appsFilesLsCmd.options>; params: InferParams<typeof appsFilesLsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps list': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps logs': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps resume': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps status': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps suspend': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps update': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'login': {
       parents: {};
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'run [command]': {
       parents: {};
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
   }
 }
 
 export const commandTree: RuntimeNode = {
   segment: null,
-  command: null,
+  command: { path: '', load: () => import('./commands/_root.ts').then((m) => m.command) },
   literalChildren: {
     'apps': {
       segment: { kind: 'literal', value: 'apps' },

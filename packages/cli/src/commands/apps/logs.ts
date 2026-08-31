@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { SHARED_OPTIONS } from '#config.ts';
 import { announcedDeployment, selectApp, stillWriting } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { follow, untilInterrupted } from '#lib/logs.ts';
-import { isInteractive } from '#lib/ui.ts';
+import { follow, LOG_RECORD_OUTPUT, untilInterrupted } from '#lib/logs.ts';
+import { createOutput } from '#lib/output.ts';
 
 export const command = defineCommand('apps logs', {
   description: 'Print an app output and keep printing it. Ends when you do.',
@@ -23,19 +23,20 @@ export const command = defineCommand('apps logs', {
     [SHARED_OPTIONS.deploymentId.name]: SHARED_OPTIONS.deploymentId.option,
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
-  handler: async ({ options, parents, context, print }) => {
-    const { api } = context;
-    const slug = await selectApp({
-      api,
-      slug: parents.apps.options.app,
-      interactive: isInteractive(),
+  handler: async ({ options, parents, context, print, rootOptions }) => {
+    const { interactive, aside, emit } = createOutput({
+      output: LOG_RECORD_OUTPUT,
+      print,
+      json: rootOptions.json,
     });
+    const { api } = context;
+    const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
     const addressed = await announcedDeployment({
       api,
       slug,
       deploymentId: options[SHARED_OPTIONS.deploymentId.name],
       operation: 'logs',
-      print,
+      print: aside,
     });
 
     await follow({
@@ -44,7 +45,8 @@ export const command = defineCommand('apps logs', {
       deploymentId: addressed.deploymentId,
       timerange: options.timerange,
       following: stillWriting(addressed),
-      print,
+      emit,
+      print: aside,
       signal: untilInterrupted(),
     });
   },

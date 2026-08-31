@@ -2,7 +2,7 @@ import type { PublicApiClient } from '@repo/api-client/public';
 import { redeploy } from '@repo/app-operations';
 import type { TenantArguments } from '@repo/protocol';
 import { environmentEdit } from '#lib/environment.ts';
-import { announce, awaitServing } from '#lib/release.ts';
+import { announce, awaitServing, type Release } from '#lib/release.ts';
 import type { Ui } from '#lib/ui.ts';
 
 export type UpdateInput = {
@@ -34,7 +34,7 @@ export async function updateApp({
   env,
   unset,
   detach,
-}: UpdateInput): Promise<void> {
+}: UpdateInput): Promise<Release> {
   const deployed = await redeploy({
     api,
     app: slug,
@@ -45,5 +45,5 @@ export async function updateApp({
     onStep: (step) => announce({ step, ui }),
   });
 
-  await awaitServing({ api, ui, deployed, detach });
+  return await awaitServing({ api, ui, deployed, detach });
 }
