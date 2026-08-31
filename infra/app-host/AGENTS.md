@@ -8,7 +8,10 @@ hand back every privilege it removed.
 
 - **Re-running a deploy on a healthy host changes nothing**, and a new host reaches a working
   state with nobody connecting to it. Every restart is conditional on something having actually
-  moved, so a step that runs unconditionally breaks the first half.
+  moved, so a step that runs unconditionally breaks the first half. What counts as moved is the
+  settings a process reads, not the bytes of the file they arrive in — `zerofs/config.toml`
+  carries paragraphs about a disk every app on the host shares, and improving one may not be
+  able to restart ZeroFS, which is that disk.
 - **A version is chosen only in `versions.json`.** Nothing may ask S3 what the newest one is — see
   `packages/internal-scripts/src/shared/app-host-versions.ts`.
 - **Exactly one read-write `zerofs run` per storage prefix, fleet-wide.** ZeroFS does not reject a
