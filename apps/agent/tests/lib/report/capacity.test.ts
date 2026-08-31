@@ -50,8 +50,11 @@ describe('a host has room for one more microVM until it does not', () => {
 });
 
 const A_GIB_IN_MIB = 1024;
+/** What an m8id.large reports once the kernel has taken its own share of the 8 GiB it is sold as. */
 const HOST_MIB = 7779;
 const ZEROFS_CACHE_MIB = 2 * A_GIB_IN_MIB;
+/** `HOST_BASELINE_MIB`, restated so that moving it has to be a deliberate edit in two places. */
+const HOST_BASELINE_MIB = 640;
 
 /**
  * The host's own needs come off the top before anything is placed. Reporting the whole of an
@@ -62,7 +65,7 @@ const ZEROFS_CACHE_MIB = 2 * A_GIB_IN_MIB;
 describe('memory the host needs is not memory a guest may be given', () => {
   test('what is left is the total less what ZeroFS will grow into, less the host itself', () => {
     expect(guestMemoryMib({ hostMemoryMib: HOST_MIB, zerofsCacheMib: ZEROFS_CACHE_MIB })).toBe(
-      HOST_MIB - ZEROFS_CACHE_MIB - A_GIB_IN_MIB,
+      HOST_MIB - ZEROFS_CACHE_MIB - HOST_BASELINE_MIB,
     );
   });
 

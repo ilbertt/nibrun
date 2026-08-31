@@ -22,15 +22,19 @@ export function readHostMemoryMib(): number {
 }
 
 /**
- * Host memory that is nobody's guest to take: the kernel, this agent, Caddy, and the Firecracker
- * process standing in front of each microVM, which costs a few MiB over and above the RAM its
- * guest was configured with.
+ * Host memory that is nobody's guest to take: this agent, Caddy, journald, and what systemd and
+ * the SSM agent hold — about 420 MiB together on a live app host.
  *
- * Rounder than a measurement of any of them, because it is a floor and not a reading. What it
- * buys is that the host stays answerable once it is full — an agent that has sold the last of its
- * memory to tenants cannot report, cannot converge and cannot be asked to give any of it back.
+ * Not the Firecracker processes, which is the tempting mistake to make here. A VMM's resident
+ * size *is* its guest's memory rather than an overhead on top of it — four 256 MiB guests measure
+ * between 216 and 257 MiB each — so counting them would reserve every guest a second time.
+ *
+ * Headroom over that reading rather than the reading itself, because this is a floor and the
+ * things behind it grow. What it buys is that the host stays answerable once it is full: an agent
+ * that has sold the last of its memory to tenants cannot report, cannot converge, and cannot be
+ * asked to give any of it back.
  */
-const HOST_BASELINE_MIB = 1024;
+const HOST_BASELINE_MIB = 640;
 
 /**
  * What ZeroFS is assumed to want when its own config cannot be read, which is the number that
