@@ -15,8 +15,12 @@ dir = "/data/zerofs-checkpoint/${NIBRUN_CHECKPOINT}"
 # only earns its size on bytes that are read twice, which here is the metadata
 # `debugfs` walks — inode tables, bitmaps, directory blocks — and not the file data
 # it copies out. Four gigabytes covers that for a filesystem far larger than any
-# one this host serves, and is small enough that an export cannot eat into the
-# headroom the live cache deliberately leaves on this disk.
+# one this host serves.
+#
+# The headroom the live cache leaves on this disk is no longer this server's alone —
+# microVM snapshots are written to it too — so an export keeps its room by the agent
+# holding it back rather than by nothing else wanting it. Growing this number means
+# growing DISK_RESERVE_GIB in apps/agent/src/lib/vm/snapshot.ts with it.
 disk_size_gb = 4.0
 # The default, written down because 2.0 sits in the file next to this one and
 # silence would read as an oversight rather than a decision.

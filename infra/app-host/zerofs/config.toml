@@ -6,9 +6,18 @@
 # substitution is a string one.
 
 [cache]
-# The instance store, mounted at /data by nibrun-data.service. Sized well under the
-# disk so a full cache cannot fill it out from under the segments being written, and
-# so a checkpoint server's cache has room beside it.
+# The instance store, mounted at /data by nibrun-data.service — about 110 GiB on the
+# m8id.large this fleet runs. Sized well under the disk so a full cache cannot fill it
+# out from under the segments being written, and so the two other things on that disk
+# have room beside it: a checkpoint server's cache while an export reads, and the
+# microVM snapshots the agent writes under /data/nibrun-vm.
+#
+# This is the number that wins, and the agent reads it out of this file rather than
+# repeating it. What is left after it and the 8 GiB the agent holds back for the
+# checkpoint cache is the whole budget snapshots get; a sleep is refused once they
+# would exceed it. That asymmetry is the point — a snapshot lost costs one cold boot,
+# where a full /data breaks the filesystem every app on the host runs from, asleep or
+# not.
 dir = "/data/zerofs"
 disk_size_gb = 70.0
 memory_size_gb = 2.0

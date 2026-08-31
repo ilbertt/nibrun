@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DeploymentIdSchema, Value } from '@repo/protocol';
 import { Effect, Option } from 'effect';
@@ -6,10 +7,15 @@ import { writeJsonFile } from '#lib/json-store.ts';
 import {
   driftFrom,
   ensureLoadable,
+  readSnapshotBytes,
   readStamp,
+  refusalForDisk,
   refusalToSleep,
   SNAPSHOT_STAMP_FILENAME,
+  type SnapshotDisk,
   type SnapshotStamp,
+  snapshotBudget,
+  snapshotBytesFor,
   snapshotPaths,
 } from '#lib/vm/snapshot.ts';
 import { APP_ID, DEPLOYMENT_ID } from '#tests/support/fixtures.ts';
@@ -119,6 +125,110 @@ describe('the moments a microVM must not be snapshotted', () => {
 
   test('an app this host holds no record of is refused rather than assumed healthy', () => {
     expect(refusalToSleep(undefined)).toBeDefined();
+  });
+});
+
+const GIB = 1_073_741_824;
+const DEFAULT_MEMORY_MIB = 256;
+const A_GENEROUS_MEMORY_MIB = 4_096;
+const SLOTS = 63;
+const NOTHING = 0;
+
+/** An app host as the fleet runs it: 110 GiB of instance store, 70 GiB of it ZeroFS's. */
+const INSTANCE_STORE_GIB = 110;
+const ZEROFS_CACHE_GIB = 70;
+const WARM_HOST_FREE_GIB = 38;
+
+const hostDisk: SnapshotDisk = {
+  totalBytes: INSTANCE_STORE_GIB * GIB,
+  availableBytes: WARM_HOST_FREE_GIB * GIB,
+  zerofsCacheBytes: ZEROFS_CACHE_GIB * GIB,
+  snapshotBytes: NOTHING,
+};
+
+const NEARLY_SPENT_GIB = 30;
+/** A cache ZeroFS has not grown into yet, so the disk looks emptier than it is. */
+const COLD_CACHE_FREE_GIB = 105;
+/** A checkpoint server reading an export, and the disk down to the reserve. */
+const CROWDED_FREE_GIB = 8;
+
+const ONE_MEMORY_FILE_BYTES = 1_024;
+const ANOTHER_MEMORY_FILE_BYTES = 512;
+
+// The bound exists for the disk rather than for the snapshots: /data is where ZeroFS caches, so a
+// disk snapshots filled is every app on the host losing the filesystem it runs from — including
+// every app that never sleeps.
+describe('what snapshots may hold on a host', () => {
+  test('a host asleep in every slot at the default memory size is nowhere near the bound', () => {
+    const asleep = SLOTS * snapshotBytesFor(DEFAULT_MEMORY_MIB);
+    expect(asleep).toBeLessThan(snapshotBudget(hostDisk));
+    expect(
+      refusalForDisk({
+        disk: { ...hostDisk, snapshotBytes: asleep },
+        wantedBytes: snapshotBytesFor(DEFAULT_MEMORY_MIB),
+      }),
+    ).toBeUndefined();
+  });
+
+  // A snapshot is the size of the app's configured memory and not of the default, which is what
+  // makes a bound necessary at all: a few of these are the disk.
+  test('an app that asked for gigabytes is refused once they would not fit', () => {
+    expect(
+      refusalForDisk({
+        disk: { ...hostDisk, snapshotBytes: NEARLY_SPENT_GIB * GIB },
+        wantedBytes: snapshotBytesFor(A_GENEROUS_MEMORY_MIB),
+      }),
+    ).toContain('already hold');
+  });
+
+  // ZeroFS grows into its cache lazily, so the free space on a fresh host is already spoken for.
+  test('the budget is against the size of the disk, not what is free on it today', () => {
+    expect(
+      refusalForDisk({
+        disk: {
+          ...hostDisk,
+          availableBytes: COLD_CACHE_FREE_GIB * GIB,
+          snapshotBytes: NEARLY_SPENT_GIB * GIB,
+        },
+        wantedBytes: snapshotBytesFor(A_GENEROUS_MEMORY_MIB),
+      }),
+    ).toBeDefined();
+  });
+
+  // And the other way: the budget is untouched and the disk is gone anyway — a checkpoint server
+  // reading an export, or a cache that overshot.
+  test('a disk something else has eaten refuses a snapshot the budget would allow', () => {
+    expect(
+      refusalForDisk({
+        disk: { ...hostDisk, availableBytes: CROWDED_FREE_GIB * GIB, snapshotBytes: GIB },
+        wantedBytes: snapshotBytesFor(DEFAULT_MEMORY_MIB),
+      }),
+    ).toContain('every app');
+  });
+
+  test('a disk that cannot hold the cache alone has no budget rather than a negative one', () => {
+    expect(snapshotBudget({ ...hostDisk, totalBytes: NOTHING })).toBe(NOTHING);
+  });
+
+  // Read off the disk rather than from the agent's record of which apps are asleep: a snapshot
+  // some earlier agent left behind occupies the disk exactly as one this agent wrote does.
+  test('what snapshots hold is measured from the directory they are in', async () => {
+    const held = await run(
+      Effect.gen(function* () {
+        const snapshotDir = yield* temporaryDirectory;
+        yield* Effect.promise(async () => {
+          await mkdir(join(snapshotDir, 'inst-1'), { recursive: true });
+          await writeFile(join(snapshotDir, 'inst-1', 'memory'), 'x'.repeat(ONE_MEMORY_FILE_BYTES));
+          await mkdir(join(snapshotDir, 'inst-2'), { recursive: true });
+          await writeFile(
+            join(snapshotDir, 'inst-2', 'memory'),
+            'x'.repeat(ANOTHER_MEMORY_FILE_BYTES),
+          );
+        });
+        return yield* readSnapshotBytes(snapshotDir);
+      }),
+    );
+    expect(held).toBe(ONE_MEMORY_FILE_BYTES + ANOTHER_MEMORY_FILE_BYTES);
   });
 });
 
