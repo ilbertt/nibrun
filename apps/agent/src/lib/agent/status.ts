@@ -4,6 +4,7 @@ import { isOnStartupGrid, STARTUP_PROBE_INTERVAL_MS } from '#lib/health/state.ts
 import { graceInputs } from '#lib/report/instance-record.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
+import { RefreshSignal } from '#services/refresh-signal.service.ts';
 
 const TICK = Duration.seconds(1);
 /** A probe cannot land sooner than the tick that runs it, so the two share one cadence. */
@@ -20,7 +21,11 @@ const untilNextRefresh = Effect.gen(function* () {
   const settling = records.some((record) =>
     isOnStartupGrid({ tracker: record.health, ...graceInputs({ record, nowMs }) }),
   );
-  yield* Effect.sleep(settling ? SETTLING_TICK : TICK);
+  // Raced rather than slept, because the length is chosen from the state as it stands now: a
+  // microVM that comes up during it is one this decision could not have known about, and the app
+  // is reached through the activator rather than through its forward rule until the refresh that
+  // renders one. The signal is what makes that wait as long as the wake and no longer.
+  yield* Effect.race(Effect.sleep(settling ? SETTLING_TICK : TICK), RefreshSignal.awaited);
 });
 
 export const statusLoop = Effect.gen(function* () {

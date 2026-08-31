@@ -19,6 +19,7 @@ import { FilesystemReader } from '#services/filesystem-reader.service.ts';
 import { HostFirewall } from '#services/host-firewall.service.ts';
 import { LogStore } from '#services/log-store.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
+import { RefreshSignal } from '#services/refresh-signal.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
@@ -38,6 +39,7 @@ const agent = Layer.mergeAll(
   AgentConfig.Default,
   AgentState.Default,
   ReportSignal.Default,
+  RefreshSignal.Default,
   CommandRunner.Default,
   ControlPlane.Default,
   LogStore.Default,
