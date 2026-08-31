@@ -56,8 +56,8 @@ type ApiCall = {
   readonly body: unknown;
 };
 
-const call = ({ socketPath, method, path, body }: ApiCall) =>
-  Effect.gen(function* () {
+function call({ socketPath, method, path, body }: ApiCall) {
+  return Effect.gen(function* () {
     const response = yield* Effect.tryPromise({
       try: (signal) =>
         fetch(`${API_ORIGIN}${path}`, {
@@ -94,17 +94,19 @@ const call = ({ socketPath, method, path, body }: ApiCall) =>
     }),
     Effect.withSpan('firecracker', { attributes: { path } }),
   );
+}
 
 /**
  * A call to a Firecracker that has only just been started has to be prepared to find nothing
  * listening yet. Only a connection that never completed is repeated: a refusal is the VMM's
  * answer, and asking again does not change it.
  */
-const untilBound = <A>(effect: Effect.Effect<A, FirecrackerApiError>) =>
-  Effect.retry(effect, {
+function untilBound<A>(effect: Effect.Effect<A, FirecrackerApiError>) {
+  return Effect.retry(effect, {
     while: (error: FirecrackerApiError) => error._tag === 'FirecrackerUnreachable',
     schedule: Schedule.spaced(BIND_POLL_INTERVAL).pipe(Schedule.upTo(BIND_TIMEOUT)),
   });
+}
 
 export const pause = Effect.fn('firecracker.pause')((socketPath: string) =>
   call({ socketPath, method: 'PATCH', path: VM_PATH, body: { state: 'Paused' } }),

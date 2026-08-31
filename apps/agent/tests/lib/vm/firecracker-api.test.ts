@@ -49,11 +49,13 @@ function servingApi({ socketPath, fault }: { socketPath: string; fault?: string 
   );
 }
 
-const files = ({ socketPath }: { socketPath: string }) => ({
-  socketPath,
-  statePath: '/data/nibrun-vm/app/vmstate',
-  memoryPath: '/data/nibrun-vm/app/memory',
-});
+function files({ socketPath }: { socketPath: string }) {
+  return {
+    socketPath,
+    statePath: '/data/nibrun-vm/app/vmstate',
+    memoryPath: '/data/nibrun-vm/app/memory',
+  };
+}
 
 function against({
   fault,

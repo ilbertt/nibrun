@@ -27,7 +27,9 @@ const stamp: SnapshotStamp = {
   slot: SLOT,
 };
 
-const stampedIn = (directory: string) => join(directory, SNAPSHOT_STAMP_FILENAME);
+function stampedIn(directory: string) {
+  return join(directory, SNAPSHOT_STAMP_FILENAME);
+}
 
 test('a snapshot is three files under the app it belongs to', () => {
   const paths = snapshotPaths({ snapshotDir: '/data/nibrun-vm', appId: APP_ID });

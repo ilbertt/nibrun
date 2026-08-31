@@ -49,10 +49,12 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     const agentState = yield* AgentState;
 
     const workingDir = (appId: AppId) => vmWorkingDir({ vmDir: config.vmDir, appId });
-    const snapshotFor = (appId: AppId) =>
-      snapshotPaths({ snapshotDir: config.vmSnapshotDir, appId });
-    const apiSocket = (appId: AppId) =>
-      Systemd.vmApiSocketPath({ runtimeDir: config.runtimeDir, appId });
+    function snapshotFor(appId: AppId) {
+      return snapshotPaths({ snapshotDir: config.vmSnapshotDir, appId });
+    }
+    function apiSocket(appId: AppId) {
+      return Systemd.vmApiSocketPath({ runtimeDir: config.runtimeDir, appId });
+    }
 
     /**
      * The stamp a snapshot taken now would carry, and the one a stored snapshot has to match to
@@ -83,14 +85,15 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     });
 
     /** Where the caller has a failure of its own to report and a leaked snapshot is the lesser one. */
-    const forgetSnapshot = (appId: AppId) =>
-      discardSnapshot(appId).pipe(
+    function forgetSnapshot(appId: AppId) {
+      return discardSnapshot(appId).pipe(
         Effect.catchAll((error) =>
           Effect.logWarning('snapshot could not be discarded', error).pipe(
             Effect.annotateLogs({ appId }),
           ),
         ),
       );
+    }
 
     /**
      * The agent never becomes the VM's parent: it stages the files, asks init to start the unit,

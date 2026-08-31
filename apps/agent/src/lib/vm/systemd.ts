@@ -26,8 +26,15 @@ export const vmUnitName = (appId: AppId) => `${VM_UNIT_TEMPLATE}${appId}${UNIT_S
  * spellings, so moving one is moving the other — and the unit's runtime directory outlives the
  * agent on purpose, which is what leaves a VM started by an earlier agent still reachable here.
  */
-export const vmApiSocketPath = ({ runtimeDir, appId }: { runtimeDir: string; appId: AppId }) =>
-  join(runtimeDir, `vm-${appId}.sock`);
+export function vmApiSocketPath({
+  runtimeDir,
+  appId,
+}: {
+  runtimeDir: string;
+  appId: AppId;
+}): string {
+  return join(runtimeDir, `vm-${appId}.sock`);
+}
 
 export function appIdFromUnit(unitName: string): AppId | undefined {
   if (!unitName.startsWith(VM_UNIT_TEMPLATE) || !unitName.endsWith(UNIT_SUFFIX)) {
