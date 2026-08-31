@@ -31,7 +31,12 @@ function statusOf({
   app: AppSummary;
   deployments: DeploymentSummary[] | undefined;
 }): AppStatus {
-  return appStatus({ appState: app.state, deploymentState: deployments?.[0]?.state });
+  const newest = deployments?.[0];
+  return appStatus({
+    appState: app.state,
+    deploymentState: newest?.state,
+    instanceState: newest?.instanceState,
+  });
 }
 
 /**

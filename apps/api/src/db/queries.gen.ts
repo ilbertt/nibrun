@@ -32,6 +32,8 @@ export interface ISelectDesiredDeploymentsResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** The app config version this deployment was launched with. */
     config_id: IDeploymentsColumns["config_id"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
 }
 
 /** Result of query `SelectDesiredVolumes`. */
@@ -579,6 +581,7 @@ export interface ISelectDeploymentsByAppResult {
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
     state: IDeploymentsColumns["state"];
+    instance_state: IDeploymentsColumns["instance_state"];
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -616,6 +619,7 @@ export interface ISelectDeploymentByIdResult {
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
     state: IDeploymentsColumns["state"];
+    instance_state: IDeploymentsColumns["instance_state"];
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -679,6 +683,7 @@ export interface ISelectInsertedDeploymentResult {
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
     state: IDeploymentsColumns["state"];
+    instance_state: IDeploymentsColumns["instance_state"];
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -1108,6 +1113,8 @@ export interface IAppsColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
+    activation: import("@repo/protocol").AppActivation;
+    idle_timeout_ms: number;
 }
 
 /** Schema of `apps`. */
@@ -1167,6 +1174,7 @@ export interface IDeploymentsColumns {
     updated_at: Date;
     public_ipv4: import("@repo/protocol").Ipv4Address | null;
     extra_public_port: import("@repo/protocol").HostPort | null;
+    instance_state: import("@repo/protocol").InstanceState | null;
 }
 
 /** Schema of `deployments`. */
@@ -1203,6 +1211,8 @@ export interface IDesiredDeploymentsColumns {
     restart_reset_after_ms: number | null;
     config_id: string | null;
     has_extra_public_port: boolean | null;
+    activation: string | null;
+    idle_timeout_ms: number | null;
 }
 
 /** Schema of `desired_deployments`. */
@@ -1653,7 +1663,9 @@ export const schema = {
             slug: { _columnName: "slug", _foreignKeys: {} },
             state: { _columnName: "state", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            activation: { _columnName: "activation", _foreignKeys: {} },
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} }
         },
         _indexes: {
             apps_deleted_idx: { _indexName: "apps_deleted_idx" },
@@ -1662,6 +1674,8 @@ export const schema = {
             apps_slug_key: { _indexName: "apps_slug_key" }
         },
         _constraints: {
+            apps_activation_check: { _constraintName: "apps_activation_check" },
+            apps_idle_timeout_ms_check: { _constraintName: "apps_idle_timeout_ms_check" },
             apps_owner_id_fkey: { _constraintName: "apps_owner_id_fkey" },
             apps_pkey: { _constraintName: "apps_pkey" },
             apps_slug_key: { _constraintName: "apps_slug_key" },
@@ -1712,7 +1726,8 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             public_ipv4: { _columnName: "public_ipv4", _foreignKeys: {} },
-            extra_public_port: { _columnName: "extra_public_port", _foreignKeys: {} }
+            extra_public_port: { _columnName: "extra_public_port", _foreignKeys: {} },
+            instance_state: { _columnName: "instance_state", _foreignKeys: {} }
         },
         _indexes: {
             deployments_app_id_idx: { _indexName: "deployments_app_id_idx" },
@@ -1727,6 +1742,7 @@ export const schema = {
             deployments_artifact_id_fkey: { _constraintName: "deployments_artifact_id_fkey" },
             deployments_config_id_fkey: { _constraintName: "deployments_config_id_fkey" },
             deployments_extra_public_port_check: { _constraintName: "deployments_extra_public_port_check" },
+            deployments_instance_state_check: { _constraintName: "deployments_instance_state_check" },
             deployments_pkey: { _constraintName: "deployments_pkey" },
             deployments_rollback_of_deployment_id_fkey: { _constraintName: "deployments_rollback_of_deployment_id_fkey" },
             deployments_state_check: { _constraintName: "deployments_state_check" }
@@ -1759,7 +1775,9 @@ export const schema = {
             restart_backoff_factor: { _columnName: "restart_backoff_factor", _foreignKeys: {} },
             restart_reset_after_ms: { _columnName: "restart_reset_after_ms", _foreignKeys: {} },
             config_id: { _columnName: "config_id", _foreignKeys: {} },
-            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} }
+            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} },
+            activation: { _columnName: "activation", _foreignKeys: {} },
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}

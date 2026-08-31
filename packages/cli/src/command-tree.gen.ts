@@ -18,6 +18,7 @@ import type { command as appsUpdateCmd } from './commands/apps/update.ts';
 import type { command as loginCmd } from './commands/login.ts';
 import type { command as rootCmd } from './commands/_root.ts';
 import type { command as runCommandCmd } from './commands/run/[command].ts';
+import type { command as upgradeCmd } from './commands/upgrade.ts';
 
 declare module '@parshjs/core' {
   interface CommandRegistry {
@@ -113,6 +114,10 @@ declare module '@parshjs/core' {
     'run [command]': {
       parents: {};
       rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'upgrade': {
+      parents: {};
+      rootOptions: {};
     };
   }
 }
@@ -244,6 +249,12 @@ export const commandTree: RuntimeNode = {
         literalChildren: {},
         paramChild: null,
       },
+    },
+    'upgrade': {
+      segment: { kind: 'literal', value: 'upgrade' },
+      command: { path: 'upgrade', load: () => import('./commands/upgrade.ts').then((m) => m.command) },
+      literalChildren: {},
+      paramChild: null,
     },
   },
   paramChild: null,

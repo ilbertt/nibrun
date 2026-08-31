@@ -1,6 +1,9 @@
 import type { AppId, HostPort } from '@repo/protocol';
-import { Effect, Ref } from 'effect';
+import { Clock, Effect, Ref, Runtime } from 'effect';
 import type { AppSlot } from '#lib/network/slot.ts';
+import { forwardToGuest } from '#lib/proxy/forward.ts';
+import { AgentState } from '#services/agent-state.service.ts';
+import { AppWaker } from '#services/app-waker.service.ts';
 
 const LOOPBACK = '127.0.0.1';
 const HTTP_UNAVAILABLE = 503;
@@ -16,8 +19,8 @@ const HTTP_UNAVAILABLE = 503;
  * that connection is answered by this until it retires it. Refusing to be reused is what bounds
  * that to the one request already in flight.
  */
-function sayAppIsDown(): Response {
-  return new Response('This app is not running.\n', {
+function say(message: string): Response {
+  return new Response(`${message}\n`, {
     status: HTTP_UNAVAILABLE,
     headers: {
       'content-type': 'text/plain; charset=utf-8',
@@ -26,6 +29,34 @@ function sayAppIsDown(): Response {
     },
   });
 }
+
+const sayAppIsDown = () => say('This app is not running.');
+const sayAppWouldNotStart = () => say('This app could not be started.');
+
+/**
+ * Its own sentence rather than the one above. An app that could not be woken because its host had
+ * no memory left is not a broken app, and telling its visitor otherwise would have its owner
+ * reading a binary that is fine — while the repair, moving the app, is not something either of
+ * them can bring about by asking again.
+ */
+const sayHostIsFull = () => say('This app could not be started: its machine is out of memory.');
+
+/**
+ * A connection the proxy wants to upgrade cannot be carried across: what comes back from the
+ * guest here is one HTTP message, and a websocket is the opposite of that. The wake still
+ * happens, so the client that reconnects finds the app up and reaches it through the forward
+ * rule rather than through this.
+ */
+const sayToComeBack = () =>
+  new Response('This app is starting. Please reconnect.\n', {
+    status: HTTP_UNAVAILABLE,
+    headers: {
+      'content-type': 'text/plain; charset=utf-8',
+      'cache-control': 'no-store',
+      'retry-after': '2',
+      connection: 'close',
+    },
+  });
 
 type Listener = {
   readonly hostPort: HostPort;
@@ -40,12 +71,60 @@ type Listener = {
  * Bound for the life of the slot rather than the life of the microVM: the rule is what switches
  * between the two, so there is no bind to race the reconciler and no window the port is nobody's.
  *
- * The 503 is where a wake will go: a request for a sleeping microVM is the thing that has a
- * reason to start one.
+ * For an app that runs on request this is the front door: the request that finds no microVM is
+ * what starts one, and it is held here and answered from the guest once that guest is up. For
+ * every other app a stopped microVM is somebody's decision or somebody's bug, and a request is
+ * not the thing that resolves either — so it is told so.
  */
 export class AppActivator extends Effect.Service<AppActivator>()('AppActivator', {
   scoped: Effect.gen(function* () {
+    const waker = yield* AppWaker;
     const listeners = yield* Ref.make(new Map<AppId, Listener>());
+
+    /**
+     * A request that finds no microVM. For an app that runs on request it is the thing that
+     * brings one back, and it waits here until the guest answers — which is a snapshot restore
+     * where there is one to restore and a cold boot where there is not, and the second is the
+     * reason the request is held rather than refused.
+     *
+     * The record is read again after the wake because the wake is what wrote it: the port and
+     * address to forward to are the ones the microVM that just came up is on.
+     */
+    const handle = ({ appId, request }: { appId: AppId; request: Request }) =>
+      Effect.gen(function* () {
+        const record = (yield* AgentState.snapshot).records.get(appId);
+        if (!record?.onRequest || !record.desiredRunning) {
+          return sayAppIsDown();
+        }
+        yield* AgentState.markActive({ appId, nowMs: yield* Clock.currentTimeMillis });
+        yield* waker.wake(appId);
+
+        const woken = (yield* AgentState.snapshot).records.get(appId);
+        if (!woken) {
+          return sayAppWouldNotStart();
+        }
+        if (request.headers.get('upgrade') !== null) {
+          return sayToComeBack();
+        }
+        return yield* forwardToGuest({
+          request,
+          guestIpv4: woken.guestIpv4,
+          httpPort: woken.httpPort,
+        });
+      }).pipe(
+        Effect.catchTag('HostHasNoRoom', (error) =>
+          Effect.logWarning('a request could not be given an app', error)
+            .pipe(Effect.annotateLogs({ appId }))
+            .pipe(Effect.as(sayHostIsFull())),
+        ),
+        Effect.catchAll((error) =>
+          Effect.logWarning('a request could not be given an app', error)
+            .pipe(Effect.annotateLogs({ appId }))
+            .pipe(Effect.as(sayAppWouldNotStart())),
+        ),
+      );
+
+    type Handler = (input: { appId: AppId; request: Request }) => Promise<Response>;
 
     const close = (appId: AppId) =>
       Effect.gen(function* () {
@@ -63,8 +142,25 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
         yield* Effect.asVoid(Effect.sync(() => listener.server.stop(true)));
       });
 
-    const listen = ({ appId, hostPort }: { appId: AppId; hostPort: HostPort }) =>
-      Effect.try(() => Bun.serve({ hostname: LOOPBACK, port: hostPort, fetch: sayAppIsDown })).pipe(
+    const listen = ({
+      appId,
+      hostPort,
+      answer,
+    }: {
+      appId: AppId;
+      hostPort: HostPort;
+      answer: Handler;
+    }) =>
+      Effect.try(() =>
+        Bun.serve({
+          hostname: LOOPBACK,
+          port: hostPort,
+          // A cold boot outlasts Bun's own idle ceiling, and a request abandoned while the
+          // microVM it asked for is still coming up is the one thing this must not do.
+          idleTimeout: 0,
+          fetch: (request) => answer({ appId, request }),
+        }),
+      ).pipe(
         Effect.tap((server) =>
           Ref.update(listeners, (current) => new Map(current).set(appId, { hostPort, server })),
         ),
@@ -83,6 +179,14 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
       serve: Effect.fn('AppActivator.serve')(function* (
         slots: readonly Pick<AppSlot, 'appId' | 'hostPort'>[],
       ) {
+        // Bun hands the handler a request and wants a promise, so the fiber's own runtime is
+        // what carries the agent's services across that boundary. Taken here rather than when
+        // this service is built: asking for it in the constructor would put every service a
+        // wake touches into this layer's requirements, and each would then be built again.
+        const runPromise = Runtime.runPromise(
+          yield* Effect.runtime<Effect.Effect.Context<ReturnType<typeof handle>>>(),
+        );
+        const answer: Handler = (input) => runPromise(handle(input));
         const current = yield* Ref.get(listeners);
         const wanted = new Map(slots.map((slot) => [slot.appId, slot.hostPort] as const));
         for (const [appId, listener] of current) {
@@ -92,10 +196,11 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
         }
         yield* Effect.forEach(
           slots.filter((slot) => current.get(slot.appId)?.hostPort !== slot.hostPort),
-          listen,
+          (slot) => listen({ ...slot, answer }),
           { discard: true },
         );
       }),
     };
   }),
+  dependencies: [AppWaker.Default],
 }) {}

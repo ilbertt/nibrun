@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { APP_STATES, type AppState, DEPLOYMENT_STATES, type DeploymentState } from '@repo/protocol';
+import {
+  APP_STATES,
+  type AppState,
+  DEPLOYMENT_STATES,
+  type DeploymentState,
+  INSTANCE_STATES,
+  type InstanceState,
+} from '@repo/protocol';
 import { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
 import { appStatus } from '#status.ts';
 
@@ -9,15 +16,17 @@ function refusal({
   operation,
   appState = 'active',
   deploymentState,
+  instanceState,
   message,
 }: {
   operation: AppOperation;
   appState?: AppState;
   deploymentState?: DeploymentState;
+  instanceState?: InstanceState;
   message?: string;
 }): string | undefined {
   return operationRefusal({
-    status: appStatus({ appState, deploymentState }),
+    status: appStatus({ appState, deploymentState, instanceState }),
     operation,
     slug: SLUG,
     release: deploymentState && { id: 'deployment-1', state: deploymentState, message },
@@ -106,6 +115,26 @@ describe('an app on its way out', () => {
   });
 });
 
+describe('an app asleep between requests', () => {
+  const asleep = { deploymentState: 'running', instanceState: 'idle' } as const;
+
+  // The one thing that has to reach inside a microVM, and there is none until a visitor causes
+  // one — which a browse is not.
+  test('has no microVM mounting its filesystem, and says what would make one', () => {
+    expect(refusal({ operation: 'files', ...asleep })).toBe(
+      'App quiet-otter is asleep until something asks for it, so nothing is mounting its filesystem to read. Open it to wake it.',
+    );
+  });
+
+  const still: AppOperation[] = ['release', 'logs', 'export', 'suspend', 'delete', 'domains'];
+
+  for (const operation of still) {
+    test(`is still an app to ${operation}`, () => {
+      expect(refusal({ operation, ...asleep })).toBeUndefined();
+    });
+  }
+});
+
 test('a serving app refuses nothing', () => {
   for (const operation of APP_OPERATIONS) {
     expect(refusal({ operation, deploymentState: 'running' })).toBeUndefined();
@@ -116,11 +145,16 @@ test('a serving app refuses nothing', () => {
 // command someone finds hanging on an app that was never going to answer.
 test('every app and release the api can report is answered for, command by command', () => {
   const releases: (DeploymentState | undefined)[] = [...DEPLOYMENT_STATES, undefined];
+  const microVms: (InstanceState | undefined)[] = [...INSTANCE_STATES, undefined];
 
   for (const appState of APP_STATES) {
     for (const deploymentState of releases) {
-      for (const operation of APP_OPERATIONS) {
-        expect(() => refusal({ operation, appState, deploymentState })).not.toThrow();
+      for (const instanceState of microVms) {
+        for (const operation of APP_OPERATIONS) {
+          expect(() =>
+            refusal({ operation, appState, deploymentState, instanceState }),
+          ).not.toThrow();
+        }
       }
     }
   }

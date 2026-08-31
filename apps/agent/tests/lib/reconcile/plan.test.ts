@@ -119,6 +119,52 @@ describe('instances are authoritative', () => {
   });
 });
 
+/**
+ * Nothing here boots. What the plan has to produce for an app that runs on request is the part a
+ * request arrives to — the slot and the record — and the microVM is left to whoever visits.
+ */
+describe('an app that runs on request is prepared rather than started', () => {
+  const onRequest = desiredInstance({ desiredState: 'on-request' });
+
+  test('one nothing is running is put to sleep rather than started', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [onRequest] }),
+      observed: observedState(),
+    });
+    expect(plan.instances).toEqual([{ action: 'sleep', desired: onRequest }]);
+  });
+
+  test('one already sleeping stays that way, however many times this runs', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [onRequest] }),
+      observed: observedState({
+        instances: [observedInstance({ running: false, exited: false })],
+      }),
+    });
+    expect(plan.instances).toEqual([{ action: 'sleep', desired: onRequest }]);
+  });
+
+  test('one that is up and serving the release it should be is left alone', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [onRequest] }),
+      observed: observedState({ instances: [observedInstance()] }),
+    });
+    expect(plan.instances).toEqual([{ action: 'none', appId: APP_ID }]);
+  });
+
+  // New bytes must not go on being served by the release they replaced, and a deploy is the one
+  // moment somebody is watching — so the replacement comes up rather than waiting to be asked for.
+  test('one that is up on an older release is replaced', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [onRequest] }),
+      observed: observedState({
+        instances: [observedInstance({ deploymentId: Value.Parse(DeploymentIdSchema, 'dep-0') })],
+      }),
+    });
+    expect(plan.instances).toEqual([{ action: 'replace', desired: onRequest }]);
+  });
+});
+
 describe('volumes are not authoritative', () => {
   const absent = desiredVolume({ desiredState: 'absent' });
 

@@ -1,6 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import { AppConfigSchema } from '#domain/app.ts';
 import { AppIdSchema, ArtifactIdSchema, DeploymentIdSchema } from '#domain/identifiers.ts';
+import { InstanceStateSchema } from '#domain/instance.ts';
 import { stringEnum } from '#lib/string-enum.ts';
 import {
   HostPortSchema,
@@ -32,6 +33,11 @@ export const DeploymentSchema = Type.Object({
   artifactId: ArtifactIdSchema,
   config: AppConfigSchema,
   state: DeploymentStateSchema,
+  // What the microVM is doing, which the release's own state stopped answering when an app could
+  // start waiting for a request: one that sleeps between visitors keeps a `running` release with
+  // nothing running behind it, and this is the half that says so. Absent until a host has
+  // reported on it, which is every release for as long as it takes the first report to arrive.
+  instanceState: Type.Optional(InstanceStateSchema),
   createdAt: TimestampSchema,
   // What a host observed of the microVM this release is, as against when the release was asked
   // for. Each is absent until the moment it names has happened: a release still being staged has

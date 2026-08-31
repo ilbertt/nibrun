@@ -336,6 +336,11 @@ export class AppsService extends Service {
    *
    * Deduplicated for the same reason, and by the same rule — an app has one instance on a host,
    * and a report naming it twice must not take the whole report down with it.
+   *
+   * An app reported asleep is cleared rather than left alone. A host stops sending a reading for
+   * one, and doing nothing about that would leave the last figure standing — so an app that is
+   * holding nothing would go on being shown spending what it spent before it went to sleep, for
+   * as long as it slept.
    */
   async recordComputeUsage({
     instances,
@@ -343,13 +348,19 @@ export class AppsService extends Service {
     instances: readonly ReportedInstance[];
   }): Promise<void> {
     const readings = new Map<AppId, ComputeUsage>();
+    const asleep = new Set<AppId>();
     for (const instance of instances) {
       if (instance.compute) {
         readings.set(instance.appId, instance.compute);
+      } else if (instance.state === 'idle') {
+        asleep.add(instance.appId);
       }
     }
     if (readings.size > 0) {
       await this.appsRepo.recordComputeUsage({ readings });
+    }
+    if (asleep.size > 0) {
+      await this.appsRepo.clearComputeUsage({ appIds: [...asleep] });
     }
   }
 

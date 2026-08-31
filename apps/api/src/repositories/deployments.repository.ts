@@ -5,6 +5,7 @@ import type {
   DeploymentId,
   DeploymentState,
   HostPort,
+  InstanceState,
   Ipv4Address,
   OwnerId,
 } from '@repo/protocol';
@@ -42,6 +43,8 @@ export type LiveDeploymentRow = Queries['SelectLiveDeployments'];
 export type ReportedDeployment = {
   deploymentId: DeploymentId;
   state: DeploymentState;
+  /** The microVM's own state, which the release's no longer answers: a running one can be asleep. */
+  instanceState: InstanceState;
   hostPort: HostPort | null;
   guestIpv4: Ipv4Address | null;
   publicIpv4: Ipv4Address | null;
@@ -158,7 +161,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   listByApp({ appId, ownerId }: DeploymentsByAppInput): Promise<DeploymentRow[]> {
     return this.sql.SelectDeploymentsByApp`
       /* @notNull environment_names */
-      SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
+      SELECT d.id, d.app_id, d.artifact_id, d.state, d.instance_state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
@@ -183,7 +186,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   }: DeploymentByIdInput): Promise<DeploymentRow | null> {
     const [row] = await this.sql.SelectDeploymentById`
       /* @notNull environment_names */
-      SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
+      SELECT d.id, d.app_id, d.artifact_id, d.state, d.instance_state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
@@ -234,6 +237,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
         await tx.ApplyReportedDeployment`
           UPDATE nibrun.deployments SET
             state = ${instance.state},
+            instance_state = ${instance.instanceState},
             host_port = ${instance.hostPort},
             guest_ipv4 = ${instance.guestIpv4},
             public_ipv4 = ${instance.publicIpv4},
@@ -307,7 +311,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   }): Promise<DeploymentRow | null> {
     const [row] = await tx.SelectInsertedDeployment`
       /* @notNull environment_names */
-      SELECT d.id, d.app_id, d.artifact_id, d.state, d.activated_at,
+      SELECT d.id, d.app_id, d.artifact_id, d.state, d.instance_state, d.activated_at,
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,

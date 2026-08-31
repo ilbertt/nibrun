@@ -38,6 +38,13 @@ export type InstanceRecord = {
   readonly healthCheck: HealthCheck;
   readonly resources: InstanceResources;
   readonly desiredRunning: boolean;
+  /**
+   * Whether a request is what brings this app's microVM up. Beside `desiredRunning` rather than
+   * folded into it, because they answer different questions — should this app be reachable, and
+   * what does having it reachable cost while nobody is asking. Never true without it: a suspended
+   * app is `stopped` whatever its activation policy says, so the policy never reaches the host.
+   */
+  readonly onRequest: boolean;
   readonly startAttempts: AttemptWindow;
   readonly restartCount: number;
   readonly stopRequested: boolean;
@@ -61,6 +68,15 @@ export const newInstanceRecord = (
   startAttempts: NO_START_ATTEMPTS,
   stopRequested: false,
 });
+
+/**
+ * Whether this app is asleep between requests: a record holding its slot and its hostnames with
+ * no microVM behind them. Asked wherever a loop would otherwise treat the absence as a failure or
+ * as a guest it can still reach.
+ */
+export function isIdle(record: InstanceRecord | undefined): boolean {
+  return record?.state === 'idle';
+}
 
 /**
  * What every health decision about a record needs, in the one place that knows `startedAt` is a

@@ -68,6 +68,7 @@ export abstract class AppsRepositoryContract {
     readings: ReadonlyMap<AppId, FilesystemUsage>;
   }): Promise<void>;
   abstract recordComputeUsage(input: { readings: ReadonlyMap<AppId, ComputeUsage> }): Promise<void>;
+  abstract clearComputeUsage(input: { appIds: readonly AppId[] }): Promise<void>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
@@ -315,6 +316,25 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
             compute_measured_at = EXCLUDED.compute_measured_at
         WHERE nibrun.app_usage.compute_measured_at IS NULL
            OR EXCLUDED.compute_measured_at > nibrun.app_usage.compute_measured_at
+    `;
+  }
+
+  /**
+   * Forgets what an app was last measured spending, for one whose microVM has gone on purpose.
+   *
+   * Not the same as a reading that failed to arrive, which is why it is a statement of its own:
+   * a guest that could not be asked this minute still has a last known figure worth keeping, and
+   * one that is not there has nothing left to be the answer about. Cleared rather than zeroed —
+   * nought is a reading somebody would act on, and absent is how this end writes unknown.
+   *
+   * The volume half is untouched: a filesystem is still there when the microVM holding it is not.
+   */
+  async clearComputeUsage({ appIds }: { appIds: readonly AppId[] }): Promise<void> {
+    await this.sql`
+      UPDATE nibrun.app_usage
+      SET memory_total_bytes = NULL, memory_used_bytes = NULL, cpu_share = NULL,
+          compute_measured_at = NULL
+      WHERE app_id = ANY(${this.sql.array([...appIds], TEXT_ARRAY)}::uuid[])
     `;
   }
 

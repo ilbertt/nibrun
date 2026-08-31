@@ -87,6 +87,7 @@ function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
     app_id: APP_ID,
     artifact_id: ARTIFACT_ID,
     state: 'pending',
+    instance_state: null,
     activated_at: null,
     rollback_of_deployment_id: null,
     created_at: CREATED_AT,

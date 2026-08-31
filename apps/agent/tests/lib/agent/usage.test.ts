@@ -18,6 +18,7 @@ import {
 } from '#services/filesystem-reader.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
+import { instanceRecord } from '#tests/support/fixtures.ts';
 import { platform } from '#tests/support/run.ts';
 
 const BUSY = Value.Parse(AppIdSchema, 'app-pocketbase');
@@ -142,6 +143,36 @@ describe('every guest this host holds is measured on a pass of its own', () => {
 
     expect(snapshot.volumeUsage.get(BUSY)).toEqual(filesystem(FILLED_BYTES));
     expect(snapshot.computeUsage.get(BUSY)?.memoryUsedBytes).toBe(MEMORY_USED_BYTES);
+  });
+
+  /**
+   * The exception, and the difference is whether there is a microVM at all. A suspended app was
+   * taken offline by an owner who may want to know what it was doing; an `on-request` app sleeps
+   * and wakes on its own, and a figure carried across every sleep would have one holding nothing
+   * go on reporting what it held when it last ran.
+   */
+  test('an app asleep between requests forgets what it was spending', async () => {
+    const snapshot = await run({
+      readings: new Map([
+        [BUSY, reading({ filesystem: filesystem(FILLED_BYTES), compute: FIRST_PASS })],
+      ]),
+      program: Effect.gen(function* () {
+        const allocator = yield* SlotAllocator;
+        yield* allocator.allocate(BUSY);
+        yield* measureUsage;
+        yield* AgentState.putRecord(
+          instanceRecord({ appId: BUSY, onRequest: true, state: 'idle' }),
+        );
+        // The same pass again, with the guest gone the way a sleeping app's is.
+        yield* Effect.provide(measureUsage, measuring(new Map()));
+        return yield* AgentState.snapshot;
+      }),
+    });
+
+    expect(snapshot.computeUsage.has(BUSY)).toBe(false);
+    expect(snapshot.computeTicks.has(BUSY)).toBe(false);
+    // The volume is untouched: a filesystem is still there when the microVM holding it is not.
+    expect(snapshot.volumeUsage.get(BUSY)).toEqual(filesystem(FILLED_BYTES));
   });
 
   // The slot goes when the control plane says the volume is absent, which is the one moment the
