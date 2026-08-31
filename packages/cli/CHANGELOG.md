@@ -2,11 +2,18 @@
 
 All notable changes to `nib` are documented in this file.
 
-## [2026.8.29-2]
+## [2026.8.31-1]
 
 ### 🚀 Features
 
+- *(www)* Sharkord is a deploy the app already knows how to configure (#384)
+- A deploy link may say what the binary should hash to (#382)
 - *(cli)* Nib apps status says how much of the machine an app is using (#371)
+
+### 🚜 Refactor
+
+- Tests sit beside src, never inside it (#396)
+- *(protocol)* The default volume size moves next to the volume it sizes (#380)
 
 ## [2026.8.29-1]
 
