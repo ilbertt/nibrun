@@ -70,7 +70,7 @@ const AVAILABILITY: Record<AppStatusKey, AppActions> = {
     suspend: ENABLED,
     delete: ENABLED,
   },
-  // Everything a running app offers: an app asleep between requests is one that is up as far as
+  // Everything a running app offers: an app idle between requests is one that is up as far as
   // its owner is concerned, and suspend is still what takes it offline for good rather than
   // until the next visitor. Redeploy stays hidden — nothing has failed to run again.
   idle: {

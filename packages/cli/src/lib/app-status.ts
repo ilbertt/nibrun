@@ -127,7 +127,7 @@ export function renderStatus(app: AppStatusReport): RenderedStatus {
   return {
     lines: [
       `${app.slug}  ${APP_STATUS_LABELS[app.status]}`,
-      // Under the status rather than in the table: `asleep` is only an answer beside the setting
+      // Under the status rather than in the table: `idle` is only an answer beside the setting
       // that put it there, and neither is something the app is spending.
       activationSummary(app),
       '',

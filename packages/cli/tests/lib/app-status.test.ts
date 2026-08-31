@@ -93,19 +93,19 @@ describe('a status says what one app is using of what it was given', () => {
   });
 
   /**
-   * `asleep` on its own reads as something that went wrong. Beside the setting that put it there
-   * it reads as the app doing what it was configured to do, which is why the two are one block.
+   * `idle` on its own reads as something that went wrong. Beside the setting that put it there it
+   * reads as the app doing what it was configured to do, which is why the two are one block.
    */
-  test('an app that is asleep says what put it there', () => {
+  test('an app that is idle says what put it there', () => {
     const lines = renderStatus(
       app({ status: 'idle', activation: 'on-request', idleTimeoutMs: A_QUARTER_HOUR_MS }),
     ).lines;
 
-    expect(lines[0]).toBe(`${SLUG}  asleep`);
+    expect(lines[0]).toBe(`${SLUG}  idle`);
     expect(lines[1]).toBe('On request, stopped after 15m of quiet');
   });
 
-  test('an app that is always on says so where the sleeping one says its wait', () => {
+  test('an app that is always on says so where the idle one says its wait', () => {
     expect(renderStatus(app()).lines[1]).toBe('Always on');
   });
 

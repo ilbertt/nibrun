@@ -21,7 +21,7 @@ export type AppStatus =
   | { readonly kind: 'deployment'; readonly state: Exclude<DeploymentState, 'stopped'> }
   // The one thing the release cannot say about itself. An `on-request` app between visitors has a
   // running release and no microVM, and the two are not the same news: the release is serving, and
-  // the app is asleep until somebody asks for it.
+  // the app is idle until somebody asks for it.
   | { readonly kind: 'instance'; readonly state: Extract<InstanceState, 'idle'> }
   | { readonly kind: 'transition'; readonly label: AppTransition }
   | { readonly kind: 'never-deployed' };
@@ -48,7 +48,7 @@ export function statusKey(status: AppStatus): AppStatusKey {
   }
 }
 
-const ASLEEP: AppStatus = { kind: 'instance', state: 'idle' };
+const IDLE: AppStatus = { kind: 'instance', state: 'idle' };
 const SUSPENDED: AppStatus = { kind: 'app', state: 'suspended' };
 const SUSPENDING: AppStatus = { kind: 'transition', label: 'suspending' };
 const RESUMING: AppStatus = { kind: 'transition', label: 'resuming' };
@@ -83,7 +83,7 @@ export function appStatus({
   // that sleeps between requests has a running release with no microVM behind it, and telling the
   // owner it is running would have them reading a page about an app that is not there.
   if (deploymentState === 'running' && instanceState === 'idle') {
-    return ASLEEP;
+    return IDLE;
   }
   // The one state the release holds only because the app was suspended. Asking for the app back
   // is not the host having started it, so this is the gap between the two said out loud.
@@ -104,9 +104,7 @@ export const APP_STATUS_LABELS: Record<AppStatusKey, string> = {
   pending: 'pending',
   starting: 'starting',
   running: 'running',
-  // Not the key: `idle` is a word for a machine doing nothing, and this is an app doing exactly
-  // what its owner configured — waiting to be asked, at no cost, until somebody visits it.
-  idle: 'asleep',
+  idle: 'idle',
   failed: 'failed',
   superseded: 'superseded',
   suspended: 'suspended',

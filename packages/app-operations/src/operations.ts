@@ -44,7 +44,7 @@ const STATE: Record<AppStatusKey, AppState> = {
   // and a browse is not a visit. Everything else is asked of the app rather than of the guest,
   // and an app waiting to be asked for is one an owner may still release, export or suspend.
   idle: {
-    because: 'is asleep until something asks for it',
+    because: 'is idle until something asks for it',
     hint: 'Open it to wake it.',
     refuses: ['files'],
   },
