@@ -4,6 +4,9 @@ import { RefreshSignal } from '#services/refresh-signal.service.ts';
 
 const A_TICK = Duration.seconds(1);
 
+/** Long enough that a second raise would have arrived, short enough not to pad the suite. */
+const LONG_ENOUGH_FOR_A_SECOND: Duration.DurationInput = '50 millis';
+
 function withSignal<A>(body: Effect.Effect<A, never, RefreshSignal>): Promise<A> {
   return Effect.runPromise(body.pipe(Effect.provide(RefreshSignal.Default)));
 }
@@ -59,7 +62,7 @@ describe('a raise ends the wait it was raised for', () => {
         yield* RefreshSignal.raise;
         yield* RefreshSignal.awaited;
         return yield* Effect.race(
-          Effect.sleep(Duration.millis(50)).pipe(Effect.as('slept')),
+          Effect.sleep(LONG_ENOUGH_FOR_A_SECOND).pipe(Effect.as('slept')),
           RefreshSignal.awaited.pipe(Effect.as('raised')),
         );
       }),
