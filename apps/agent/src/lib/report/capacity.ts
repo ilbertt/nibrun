@@ -22,12 +22,17 @@ const filesystemBytes = ({
 export const readAvailableCacheBytes = (cacheDir: string) =>
   filesystemBytes({ cacheDir, of: (stats) => Number(stats.bavail) * Number(stats.bsize) });
 
+/** Read rather than remembered: a host is resized by being replaced, but the agent outlives less. */
+export function readHostMemoryMib(): number {
+  return Math.floor(totalmem() / BYTES_PER_MIB);
+}
+
 export const readHostCapacity = (cacheDir: string): Effect.Effect<HostCapacity> =>
   Effect.map(
     filesystemBytes({ cacheDir, of: (stats) => Number(stats.blocks) * Number(stats.bsize) }),
     (cacheBytes) => ({
       vcpuCount: availableParallelism(),
-      memoryMib: Math.floor(totalmem() / BYTES_PER_MIB),
+      memoryMib: readHostMemoryMib(),
       cacheBytes,
     }),
   );
@@ -38,8 +43,8 @@ export const readHostCapacity = (cacheDir: string): Effect.Effect<HostCapacity> 
  * `idle` belongs here for the reason the whole of `on-request` does: the memory a sleeping app is
  * not using is the saving, and a host that went on reserving it would pay for every sleep and
  * collect on none of them. What that costs is that the request waking an app can find the host
- * full in the meantime — a real failure mode, and one for the waker to answer rather than one to
- * hide by reserving memory nothing is using.
+ * full in the meantime — a real failure mode, and one the waker answers with `memoryShortfallMib`
+ * rather than one to hide by reserving memory nothing is using.
  */
 const HOLDS_NOTHING: readonly InstanceState[] = ['idle', 'stopped', 'failed'];
 
@@ -60,6 +65,10 @@ const sum = (values: readonly number[]) => {
   return total;
 };
 
+function committedMemoryMib(committed: readonly InstanceResources[]): number {
+  return sum(committed.map((entry) => entry.memoryMib));
+}
+
 /** Floored at zero: an oversubscribed host is a fact to report, not a number to do arithmetic with. */
 export function allocatableCapacity({
   capacity,
@@ -71,10 +80,32 @@ export function allocatableCapacity({
   availableCacheBytes: number;
 }): HostCapacity {
   const usedVcpu = sum(committed.map((entry) => entry.vcpuCount));
-  const usedMemory = sum(committed.map((entry) => entry.memoryMib));
   return {
     vcpuCount: Math.max(capacity.vcpuCount - usedVcpu, NONE),
-    memoryMib: Math.max(capacity.memoryMib - usedMemory, NONE),
+    memoryMib: Math.max(capacity.memoryMib - committedMemoryMib(committed), NONE),
     cacheBytes: Math.max(Math.min(availableCacheBytes, capacity.cacheBytes), NONE),
   };
+}
+
+/**
+ * How much more memory this host would need to carry one more microVM, and zero when it has room.
+ *
+ * Memory alone. vCPUs are time-shared, so a host that has sold more of them than it has runs
+ * everything on it more slowly; memory is the one it cannot divide, and a guest that does not fit
+ * is not refused but killed — along with whichever neighbour the kernel picks instead.
+ *
+ * The arithmetic `allocatableCapacity` reports, deliberately and not by coincidence: a host that
+ * refused wakes by one measure while telling the control plane it had room by another would go on
+ * being placed onto for exactly as long as it went on refusing.
+ */
+export function memoryShortfallMib({
+  hostMemoryMib,
+  committed,
+  wanted,
+}: {
+  hostMemoryMib: number;
+  committed: readonly InstanceResources[];
+  wanted: InstanceResources;
+}): number {
+  return Math.max(committedMemoryMib(committed) + wanted.memoryMib - hostMemoryMib, NONE);
 }

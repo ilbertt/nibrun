@@ -12,12 +12,13 @@ import {
 import { Duration, Effect, Either, Layer } from 'effect';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppActivator } from '#services/app-activator.service.ts';
-import { AppWaker, WakeFailed } from '#services/app-waker.service.ts';
+import { AppWaker, HostHasNoRoom, WakeFailed } from '#services/app-waker.service.ts';
 import { APP_ID, instanceRecord } from '#tests/support/fixtures.ts';
 import { provided } from '#tests/support/run.ts';
 import { HTTP_OK, HTTP_UNAVAILABLE, serving } from '#tests/support/server.ts';
 
 const OTHER_APP_ID = Value.Parse(AppIdSchema, 'app-2');
+const SHORT_BY_MIB = 256;
 const LOOPBACK = '127.0.0.1';
 
 /** Nothing here has a microVM to be woken, so a waker that would boot one is not the subject. */
@@ -219,6 +220,33 @@ describe('an app that runs on request is started by the request that wanted it',
 
         expect(response.status).toBe(HTTP_UNAVAILABLE);
         expect(yield* Effect.promise(() => response.text())).toContain('could not be started');
+      }),
+    );
+  });
+
+  /**
+   * A host with no memory left is not a broken app, and the visitor is not told it is one: an
+   * owner sent to read a binary that is fine would find nothing, because the repair is to move
+   * the app and neither of them can bring that about by asking again.
+   */
+  test('a wake refused for want of memory says so rather than blaming the app', () => {
+    const full = Layer.succeed(
+      AppWaker,
+      AppWaker.make({
+        wake: (appId: AppId) => new HostHasNoRoom({ appId, shortfallMib: SHORT_BY_MIB }),
+      }),
+    );
+    return activator(full)(
+      Effect.gen(function* () {
+        const app = yield* AppActivator;
+        yield* AgentState.putRecord(instanceRecord({ onRequest: true, state: 'idle' }));
+        const hostPort = unusedPort();
+        yield* app.serve([{ appId: APP_ID, hostPort }]);
+
+        const response = yield* get(hostPort);
+
+        expect(response.status).toBe(HTTP_UNAVAILABLE);
+        expect(yield* Effect.promise(() => response.text())).toContain('out of memory');
       }),
     );
   });

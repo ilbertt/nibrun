@@ -1,6 +1,6 @@
 import type { AppId } from '@repo/protocol';
 import { Clock, Effect, Option } from 'effect';
-import { stopInstance } from '#lib/reconcile/instances.ts';
+import { suspendInstance } from '#lib/reconcile/instances.ts';
 import { applyNetwork } from '#lib/reconcile/network.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
 import { AgentState } from '#services/agent-state.service.ts';
@@ -68,12 +68,12 @@ const idleTimeouts = Effect.gen(function* () {
 });
 
 /**
- * Stops the `on-request` apps nobody has asked for in a while.
+ * Puts the `on-request` apps nobody has asked for in a while to sleep.
  *
  * Runs on the measurement tick rather than the status one: the moment it reads is only written
- * there, so asking sixty times more often would be sixty readings of the same answer — and a stop
- * freezes a filesystem and waits on systemd, which is not work to put in front of the health
- * probes of every other app on the host.
+ * there, so asking sixty times more often would be sixty readings of the same answer — and a
+ * sleep freezes a filesystem, snapshots a microVM and waits on systemd, which is not work to put
+ * in front of the health probes of every other app on the host.
  */
 export const applySleep = Effect.gen(function* () {
   const timeouts = yield* idleTimeouts;
@@ -102,11 +102,20 @@ export const applySleep = Effect.gen(function* () {
             quietForMs: nowMs - (current.lastActiveAtMs.get(record.appId) ?? nowMs),
           }),
         )
-        .pipe(Effect.andThen(stopInstance({ appId: record.appId, reason: 'idle' }))),
+        .pipe(
+          Effect.andThen(
+            suspendInstance({
+              appId: record.appId,
+              deploymentId: record.deploymentId,
+              reason: 'idle',
+            }),
+          ),
+        ),
     { discard: true },
   );
   // Here rather than on the next status tick: the record already says the app is not running, so
   // until this runs the forward rule points at a guest that has gone, and a request arriving in
-  // that second is refused rather than answered by the activator.
+  // that second is refused rather than answered by the activator. A sleep that was refused leaves
+  // the record saying `running`, so this renders the forward it already had.
   yield* applyNetwork;
 });

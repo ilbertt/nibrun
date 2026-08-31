@@ -34,6 +34,14 @@ const sayAppIsDown = () => say('This app is not running.');
 const sayAppWouldNotStart = () => say('This app could not be started.');
 
 /**
+ * Its own sentence rather than the one above. An app that could not be woken because its host had
+ * no memory left is not a broken app, and telling its visitor otherwise would have its owner
+ * reading a binary that is fine — while the repair, moving the app, is not something either of
+ * them can bring about by asking again.
+ */
+const sayHostIsFull = () => say('This app could not be started: its machine is out of memory.');
+
+/**
  * A connection the proxy wants to upgrade cannot be carried across: what comes back from the
  * guest here is one HTTP message, and a websocket is the opposite of that. The wake still
  * happens, so the client that reconnects finds the app up and reaches it through the forward
@@ -75,8 +83,9 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
 
     /**
      * A request that finds no microVM. For an app that runs on request it is the thing that
-     * starts one, and it waits here until the guest answers — which is a cold boot, seconds
-     * rather than milliseconds, and the whole reason the request is held rather than refused.
+     * brings one back, and it waits here until the guest answers — which is a snapshot restore
+     * where there is one to restore and a cold boot where there is not, and the second is the
+     * reason the request is held rather than refused.
      *
      * The record is read again after the wake because the wake is what wrote it: the port and
      * address to forward to are the ones the microVM that just came up is on.
@@ -103,6 +112,11 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
           httpPort: woken.httpPort,
         });
       }).pipe(
+        Effect.catchTag('HostHasNoRoom', (error) =>
+          Effect.logWarning('a request could not be given an app', error)
+            .pipe(Effect.annotateLogs({ appId }))
+            .pipe(Effect.as(sayHostIsFull())),
+        ),
         Effect.catchAll((error) =>
           Effect.logWarning('a request could not be given an app', error)
             .pipe(Effect.annotateLogs({ appId }))
