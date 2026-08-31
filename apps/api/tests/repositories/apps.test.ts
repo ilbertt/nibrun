@@ -6,6 +6,7 @@ import {
   type ComputeUsage,
   DnsLabelSchema,
   HostnameSchema,
+  MIN_IDLE_TIMEOUT_MS,
   OWNED_APP_STATES,
   type OwnerId,
   OwnerIdSchema,
@@ -32,6 +33,9 @@ const APP_SLUG = Value.Parse(DnsLabelSchema, 'pocketbase');
 const PLATFORM = Value.Parse(HostnameSchema, 'pocketbase.apps.example.com');
 
 const FIRST_TOKEN = 'sk-sealed-once';
+
+/** Under the floor by three orders of magnitude, which is what the column is there to refuse. */
+const A_SECOND_MS = 1000;
 
 // One database for the file, because bringing a container up and migrating it is the expensive
 // part and every describe below wants the same empty schema.
@@ -249,6 +253,80 @@ describe('an owner moves their app between the two states they own', () => {
       }),
     ).toBeNull();
     expect(await storedState(appId)).toBe('active');
+  });
+});
+
+/**
+ * `activation` and `idle_timeout_ms` are columns on `nibrun.apps`, and every statement resolving
+ * an app for its owner reads `nibrun.live_apps` — a view that names its columns rather than
+ * selecting `*`. Both halves are SQL: whether the view carries them at all, and whether an edit
+ * leaves alone what it did not name.
+ */
+describe('an owner changes how their app comes up without deploying anything', () => {
+  const owned = { ownerId: OWNER_ID, from: OWNED_APP_STATES };
+
+  test('an app nobody has said anything about is kept up, and reads back saying so', async () => {
+    const appId = await createApp('eager');
+
+    expect(await repo.findById({ appId, ownerId: OWNER_ID })).toMatchObject({
+      activation: 'always',
+      idle_timeout_ms: expect.any(Number),
+    });
+  });
+
+  test('turning the saving on is one write and the row that comes back is the one that moved', async () => {
+    const appId = await createApp('sleepy');
+
+    const app = await repo.updateActivation({
+      ...owned,
+      appId,
+      patch: { activation: 'on-request', idleTimeoutMs: MIN_IDLE_TIMEOUT_MS },
+    });
+
+    expect(app).toMatchObject({
+      activation: 'on-request',
+      idle_timeout_ms: MIN_IDLE_TIMEOUT_MS,
+    });
+  });
+
+  // What `COALESCE` is there for: an owner turning the saving off has said nothing about the
+  // timeout, and giving them back the default instead of what they chose is a silent edit.
+  test('an edit leaves alone whatever it did not name', async () => {
+    const appId = await createApp('forgetful');
+    await repo.updateActivation({
+      ...owned,
+      appId,
+      patch: { activation: 'on-request', idleTimeoutMs: MIN_IDLE_TIMEOUT_MS },
+    });
+
+    const app = await repo.updateActivation({ ...owned, appId, patch: { activation: 'always' } });
+
+    expect(app).toMatchObject({ activation: 'always', idle_timeout_ms: MIN_IDLE_TIMEOUT_MS });
+  });
+
+  // The floor is the cadence a host decides on, so anything shorter is a timeout it would accept
+  // and could not keep. The column's CHECK is the last thing standing between the two.
+  test('a timeout the host could not keep is refused by the column', async () => {
+    const appId = await createApp('impatient');
+
+    expect(
+      await refusedBy(() =>
+        repo.updateActivation({ ...owned, appId, patch: { idleTimeoutMs: A_SECOND_MS } }),
+      ),
+    ).toBe('apps_idle_timeout_ms_check');
+  });
+
+  test('and an app belonging to somebody else is not one to reconfigure', async () => {
+    const appId = await createApp('not-yours');
+
+    expect(
+      await repo.updateActivation({
+        appId,
+        ownerId: STRANGER_ID,
+        from: OWNED_APP_STATES,
+        patch: { activation: 'on-request' },
+      }),
+    ).toBeNull();
   });
 });
 

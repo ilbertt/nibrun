@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
+import { AppsAppIdActivationController } from '#routes/api/apps/[appId]/activation/controller.ts';
 import { AppsAppIdArtifactsArtifactIdController } from '#routes/api/apps/[appId]/artifacts/[artifactId]/controller.ts';
 import { AppsAppIdArtifactsController } from '#routes/api/apps/[appId]/artifacts/controller.ts';
 import { AppsAppIdController } from '#routes/api/apps/[appId]/controller.ts';
@@ -20,6 +21,7 @@ export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(HealthController)
   .use(AppsController)
   .use(AppsAppIdController)
+  .use(AppsAppIdActivationController)
   .use(AppsAppIdArtifactsController)
   .use(AppsAppIdArtifactsArtifactIdController)
   .use(AppsAppIdDeploymentsController)

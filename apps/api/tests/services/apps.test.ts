@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  type AppActivation,
   type AppId,
   AppIdSchema,
   type AppState,
@@ -41,6 +42,7 @@ import type {
   OwnedAppHostnameRow,
 } from '#repositories/app-hostnames.repository.ts';
 import type {
+  ActivationChange,
   AppRow,
   AppsRepositoryContract,
   CreatedApp,
@@ -92,6 +94,9 @@ function distinct(slugs: readonly DnsLabel[]): number {
   return new Set(slugs).size;
 }
 
+// What the column defaults to, which is what every app that has never been told otherwise has.
+const STORED_IDLE_TIMEOUT_MS = 900_000;
+
 function appRow(slug: DnsLabel): AppRow {
   return {
     id: APP_ID,
@@ -99,7 +104,7 @@ function appRow(slug: DnsLabel): AppRow {
     slug,
     state: 'active',
     activation: 'always',
-    idle_timeout_ms: MIN_IDLE_TIMEOUT_MS,
+    idle_timeout_ms: STORED_IDLE_TIMEOUT_MS,
     created_at: new Date(),
     updated_at: new Date(),
     volume_total_bytes: null,
@@ -261,6 +266,24 @@ class StubAppsRepository implements AppsRepositoryContract {
       this.deleting.push(appId);
     }
     return Promise.resolve({ ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)), state });
+  }
+
+  /** How the app comes up now, which a patch edits rather than replaces. */
+  activation: AppActivation = 'always';
+  idleTimeoutMs = STORED_IDLE_TIMEOUT_MS;
+
+  updateActivation({ appId, patch, from }: ActivationChange): Promise<AppRow | null> {
+    if (!this.owns || !from.includes(this.#stateOf(appId))) {
+      return Promise.resolve(null);
+    }
+    // `COALESCE` said the same way: a field the patch is silent about keeps what it had.
+    this.activation = patch.activation ?? this.activation;
+    this.idleTimeoutMs = patch.idleTimeoutMs ?? this.idleTimeoutMs;
+    return Promise.resolve({
+      ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)),
+      activation: this.activation,
+      idle_timeout_ms: this.idleTimeoutMs,
+    });
   }
 
   #stateOf(appId: AppId): AppState {
@@ -764,6 +787,60 @@ describe('an app the caller does not own is one that does not exist', () => {
     await expect(service.setState({ ...owned, state: 'suspended' })).rejects.toBeInstanceOf(
       NotFoundError,
     );
+    await expect(service.setActivation({ ...owned, patch: {} })).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+});
+
+/**
+ * On the app rather than on the config a deployment pins, so this is one write and the next poll:
+ * nothing is deployed, no release is replaced, and a rollback cannot replay a policy from months
+ * ago. What this has to get right is the row and what an edit leaves alone.
+ */
+describe('how an app comes up is changed without deploying anything', () => {
+  const owned = { appId: APP_ID, ownerId: OWNER_ID };
+
+  test('an owner turns the saving on and says how long a quiet spell is', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    const app = await serviceWith({ appsRepo }).setActivation({
+      ...owned,
+      patch: { activation: 'on-request', idleTimeoutMs: MIN_IDLE_TIMEOUT_MS },
+    });
+
+    expect(app).toMatchObject({
+      activation: 'on-request',
+      idleTimeoutMs: MIN_IDLE_TIMEOUT_MS,
+    });
+  });
+
+  // The timeout is kept for every app, so turning the saving off is not a way to lose it.
+  test('turning it off again leaves the timeout the owner chose', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    const service = serviceWith({ appsRepo });
+
+    await service.setActivation({
+      ...owned,
+      patch: { activation: 'on-request', idleTimeoutMs: MIN_IDLE_TIMEOUT_MS },
+    });
+    const app = await service.setActivation({ ...owned, patch: { activation: 'always' } });
+
+    expect(app).toMatchObject({ activation: 'always', idleTimeoutMs: MIN_IDLE_TIMEOUT_MS });
+  });
+
+  // A teardown is not something a policy change can call off, and an app on its way out has no
+  // activation worth having.
+  test('an app being deleted is refused rather than reconfigured', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    appsRepo.deleting = [APP_ID];
+
+    await expect(
+      serviceWith({ appsRepo }).setActivation({ ...owned, patch: { activation: 'on-request' } }),
+    ).rejects.toBeInstanceOf(ConflictError);
   });
 });
 

@@ -1,4 +1,5 @@
 import { activationSummary } from '@repo/app-operations';
+import { AppActivationDialog } from '#components/apps/app-activation-dialog.tsx';
 import type { AppSummary } from '#queries/apps.ts';
 
 /**
@@ -10,8 +11,11 @@ import type { AppSummary } from '#queries/apps.ts';
  */
 export function AppActivation({ app }: { app: AppSummary }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-muted-foreground">Activation</span>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-muted-foreground">Activation</span>
+        <AppActivationDialog app={app} />
+      </div>
       <span>{activationSummary(app)}</span>
     </div>
   );

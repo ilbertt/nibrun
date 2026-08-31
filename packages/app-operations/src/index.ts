@@ -2,9 +2,14 @@
 
 export {
   type ActivatedApp,
-  APP_ACTIVATION_LABELS,
+  type ActivationEdit,
+  APP_ACTIVATIONS_EXPLAINED,
   activationSummary,
+  IDLE_TIMEOUT_CHOICES,
   idleTimeoutLabel,
+  ON_REQUEST_LIMITS,
+  parseIdleTimeout,
+  setActivation,
 } from '#activation.ts';
 export {
   type AddressedDeployment,
@@ -31,7 +36,7 @@ export {
 export { type AddDomainInput, addDomain, type RemoveDomainInput, removeDomain } from '#domains.ts';
 export { type EnvironmentAssignment, parseEnvFile } from '#env-file.ts';
 export { type EnvironmentEdit, parseEnvironment, parseEnvironmentPatch } from '#environment.ts';
-export { InvalidEnvironmentError, InvalidPathError } from '#errors.ts';
+export { InvalidEnvironmentError, InvalidIdleTimeoutError, InvalidPathError } from '#errors.ts';
 export { awaitExportBundle, type ExportBundle, requestExport } from '#exports.ts';
 export { guestPath, readDirectory } from '#filesystem.ts';
 export { type FollowInput, followLogs } from '#logs.ts';

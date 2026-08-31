@@ -35,6 +35,7 @@ import type {
   AppHostnamesRepositoryContract,
 } from '#repositories/app-hostnames.repository.ts';
 import {
+  type AppActivationPatch,
   type AppRow,
   type AppsRepositoryContract,
   LIVE_APP_STATES,
@@ -301,6 +302,43 @@ export class AppsService extends Service {
     // The row is the whole of what this does, and it is what a host reads to decide whether to
     // run the app — so an app that stopped serving has one line here saying who asked for it.
     this.logger.info('app state changed', { appId, state });
+
+    return toPublicApp({ app, hostnames });
+  }
+
+  /**
+   * Whether the app's microVM is kept up or is brought up by a request for it, and how long it may
+   * then go unasked-for. Two columns and the next poll — a host reads how to bring an app up from
+   * the app row, so there is nothing to deploy and no release to replace.
+   *
+   * Shaped like `setState` rather than like `updateConfig` for that reason: this is what the owner
+   * wants of the app, not what a release runs, and a rollback must never replay it.
+   */
+  async setActivation({
+    appId,
+    ownerId,
+    patch,
+  }: OwnedApp & { patch: AppActivationPatch }): Promise<PublicApp> {
+    const app = await this.appsRepo.updateActivation({
+      appId,
+      ownerId,
+      patch,
+      from: OWNED_APP_STATES,
+    });
+    if (!app) {
+      if (await this.appsRepo.isOwnedBy({ appId, ownerId })) {
+        throw new ConflictError('The app is being deleted.');
+      }
+      throw new NotFoundError('App not found.');
+    }
+    const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
+    // What this costs is a cold boot for whoever arrives after a gap, so the moment an owner
+    // accepted that is worth having beside the reports of apps that were slow to answer.
+    this.logger.info('app activation changed', {
+      appId,
+      activation: app.activation,
+      idleTimeoutMs: app.idle_timeout_ms,
+    });
 
     return toPublicApp({ app, hostnames });
   }

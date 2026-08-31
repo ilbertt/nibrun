@@ -1,6 +1,7 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
 import {
   APP_STATES,
+  type App,
   type AppHostnameKind,
   type AppHostnameState,
   type AppId,
@@ -50,6 +51,19 @@ type OwnedApp = { appId: AppId; ownerId: OwnerId };
  */
 export type StateChange = OwnedApp & { state: AppState; from: readonly AppState[] };
 
+/**
+ * An edit to how the app comes up: a field named is set, and one left out keeps what it had.
+ * Derived from the app itself, so a policy field added to the protocol is one this can carry
+ * without being told about it twice.
+ */
+export type AppActivationPatch = Partial<Pick<App, 'activation' | 'idleTimeoutMs'>>;
+
+/** The same `from` as a state change, and for the same reason. */
+export type ActivationChange = OwnedApp & {
+  patch: AppActivationPatch;
+  from: readonly AppState[];
+};
+
 /** Everything but `deleted`, which is a host's word for a filesystem that is gone. */
 export const LIVE_APP_STATES: readonly AppState[] = APP_STATES.filter(
   (state) => state !== 'deleted',
@@ -71,6 +85,7 @@ export abstract class AppsRepositoryContract {
   abstract clearComputeUsage(input: { appIds: readonly AppId[] }): Promise<void>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
+  abstract updateActivation(input: ActivationChange): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
   abstract isDeletionFinishable(input: { appId: AppId }): Promise<boolean>;
   abstract listFinishableDeletions(input: { limit: number }): Promise<AppId[]>;
@@ -573,19 +588,47 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           AND state = ANY(${tx.array([...from], TEXT_ARRAY)})
         RETURNING id
       `;
-      return updated ? await appAfterStateChange({ tx, appId, ownerId }) : null;
+      return updated ? await appAfterChange({ tx, appId, ownerId }) : null;
+    });
+  }
+
+  /**
+   * How the app comes up, changed without deploying anything — which is the whole reason these
+   * two columns are on `apps` rather than on the config a deployment pins.
+   *
+   * `COALESCE` is the patch: a field the owner said nothing about keeps what it had, so turning
+   * the saving off and on again gives back the timeout they chose rather than the default. The
+   * floor is the column's own CHECK and the schema at the edge — nothing here restates it.
+   *
+   * Scoped to the states an owner moves an app between, like `updateState`: an app already being
+   * torn down has no activation policy worth changing, and the teardown is not something a write
+   * here should look like it called off.
+   */
+  updateActivation({ appId, ownerId, patch, from }: ActivationChange) {
+    return this.sql.begin(async (tx) => {
+      // Untagged for the reason `updateState` is: `state = ANY()` is not a predicate the
+      // generator can parse, and the only column read is the id.
+      const [updated] = await tx`
+        UPDATE nibrun.apps
+        SET activation = COALESCE(${patch.activation ?? null}, activation),
+            idle_timeout_ms = COALESCE(${patch.idleTimeoutMs ?? null}, idle_timeout_ms)
+        WHERE id = ${appId} AND owner_id = ${ownerId}
+          AND state = ANY(${tx.array([...from], TEXT_ARRAY)})
+        RETURNING id
+      `;
+      return updated ? await appAfterChange({ tx, appId, ownerId }) : null;
     });
   }
 }
 
 /**
- * The app as the transaction that just moved it can see it, which is the state it is now in.
+ * The app as the transaction that just wrote it can see it, which is what it is now.
  *
- * A row that moved and cannot be read back is an app with no config version, which nothing can
- * produce: raised rather than returned as `null`, because a caller reading that `null` as "the
- * state did not move" would report a change that did happen as one that was refused.
+ * A row that changed and cannot be read back is an app with no config version, which nothing can
+ * produce: raised rather than returned as `null`, because a caller reading that `null` as "nothing
+ * moved" would report a change that did happen as one that was refused.
  */
-async function appAfterStateChange({
+async function appAfterChange({
   tx,
   appId,
   ownerId,
@@ -594,7 +637,7 @@ async function appAfterStateChange({
   appId: AppId;
   ownerId: OwnerId;
 }): Promise<AppRow> {
-  const [app] = await tx.SelectAppAfterStateChange`
+  const [app] = await tx.SelectAppAfterChange`
     /* @notNull environment_names */
     SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
            a.created_at, a.updated_at,

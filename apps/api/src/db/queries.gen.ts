@@ -434,8 +434,8 @@ export interface IDeleteArtifactsByAppResult {
 export interface IDeleteAppUsageByAppResult {
 }
 
-/** Result of query `SelectAppAfterStateChange`. */
-export interface ISelectAppAfterStateChangeResult {
+/** Result of query `SelectAppAfterChange`. */
+export interface ISelectAppAfterChangeResult {
     id: IAppsColumns["id"];
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
@@ -840,7 +840,7 @@ export interface Queries {
     DeleteDeploymentsByApp: IDeleteDeploymentsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
-    SelectAppAfterStateChange: ISelectAppAfterStateChangeResult;
+    SelectAppAfterChange: ISelectAppAfterChangeResult;
     InsertPendingArtifact: IInsertPendingArtifactResult;
     CompleteArtifact: ICompleteArtifactResult;
     DeleteArtifact: IDeleteArtifactResult;

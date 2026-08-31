@@ -11,3 +11,10 @@ export class InvalidEnvironmentError extends Error {
     this.name = 'InvalidEnvironmentError';
   }
 }
+
+export class InvalidIdleTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidIdleTimeoutError';
+  }
+}
