@@ -1,6 +1,7 @@
 import { ObjectKeySchema, Value } from '@repo/protocol';
 import { Effect } from 'effect';
 import type { ZerofsFilesystem } from '#lib/volumes/topology.ts';
+import { flush } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
 /**
@@ -32,7 +33,28 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
         admin: { binary: config.zerofsBinary, configFile: config.zerofsConfigFile },
       },
     ];
-    return { place: () => filesystems[0], all: filesystems };
+    /**
+     * Every filesystem on the host brought to a durability point. Under `ignore_fsync` the guest's
+     * own flushes are a no-op, so this is the whole of what stands between a microVM going down —
+     * stopped or asleep — and the loss of everything since the last periodic flush.
+     *
+     * Best-effort per filesystem, and deliberately: a microVM nothing could take down because a
+     * flush failed is worse than one taken down having lost what the flush would have saved.
+     */
+    const flushAll = Effect.forEach(
+      filesystems,
+      (filesystem) =>
+        flush(filesystem.admin).pipe(
+          Effect.catchAll((error) =>
+            Effect.logWarning('zerofs flush failed', error).pipe(
+              Effect.annotateLogs({ storagePrefix: filesystem.storagePrefix }),
+            ),
+          ),
+        ),
+      { discard: true },
+    ).pipe(Effect.withSpan('ZerofsTopology.flushAll'));
+
+    return { place: () => filesystems[0], all: filesystems, flushAll };
   }),
   dependencies: [AgentConfig.Default],
 }) {}
