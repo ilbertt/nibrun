@@ -5,6 +5,7 @@ import { CheckpointIdSchema, Value } from '@repo/protocol';
 import { Effect, Option } from 'effect';
 import {
   cacheDiskGigabytes,
+  cacheMemoryGigabytes,
   createCheckpoint,
   deleteCheckpoint,
   flush,
@@ -16,6 +17,8 @@ import { recordingCommands } from '#tests/support/commands.ts';
 const BINARY = '/opt/nibrun/bin/zerofs/zerofs';
 /** What `infra/app-host/zerofs/config.toml` and `checkpoint.toml` hold this host's disk at. */
 const DEPLOYED_CACHE_GIB = 70;
+/** And what the same file lets it hold in memory, which is memory no guest may be given. */
+const DEPLOYED_MEMORY_GIB = 2;
 const CHECKPOINT_CACHE_GIB = 4;
 const target = { binary: BINARY, configFile: '/etc/z.toml' };
 const checkpointId = Value.Parse(CheckpointIdSchema, 'cp-1');
@@ -73,5 +76,25 @@ describe('the disk ZeroFS is entitled to is read out of its own config', () => {
   test('a file that is not a config, or a config without the key, reads as nothing', () => {
     expect(cacheDiskGigabytes('not a config at all {')).toEqual(Option.none());
     expect(cacheDiskGigabytes('[cache]\ndir = "/data/zerofs"\n')).toEqual(Option.none());
+  });
+});
+
+/**
+ * Read for the same reason the disk is, against the same file: ZeroFS grows into this lazily, so
+ * a host with memory free is not a host with memory to spare. A renamed key or a moved section is
+ * this reading silently going missing, and a host then selling ZeroFS's cache to tenants.
+ */
+describe('the memory ZeroFS is entitled to is read out of its own config', () => {
+  test('the config an app host is deployed with says what it says', async () => {
+    const config = await readFile(
+      join(import.meta.dir, '../../../../../infra/app-host/zerofs/config.toml'),
+      'utf8',
+    );
+
+    expect(cacheMemoryGigabytes(config)).toEqual(Option.some(DEPLOYED_MEMORY_GIB));
+  });
+
+  test('a config naming only the disk says nothing about the memory', () => {
+    expect(cacheMemoryGigabytes('[cache]\ndisk_size_gb = 70.0\n')).toEqual(Option.none());
   });
 });

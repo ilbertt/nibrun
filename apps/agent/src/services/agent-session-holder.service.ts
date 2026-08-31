@@ -22,7 +22,10 @@ export class AgentSessionHolder extends Effect.Service<AgentSessionHolder>()('Ag
         if (Option.isSome(existing) && !isSessionExpiring({ session: existing.value, nowMs })) {
           return [existing.value, existing] as const;
         }
-        const capacity = yield* readHostCapacity(config.stateDir);
+        const capacity = yield* readHostCapacity({
+          cacheDir: config.stateDir,
+          zerofsConfigFile: config.zerofsConfigFile,
+        });
         const session = yield* openSession({ versions, capacity });
         yield* Effect.logInfo('session opened').pipe(
           Effect.annotateLogs({ hostId: session.hostId, expiresAt: session.expiresAt }),

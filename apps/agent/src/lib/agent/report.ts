@@ -55,7 +55,10 @@ const report = Effect.gen(function* () {
   const session = yield* sessions.current;
   const current = yield* AgentState.snapshot;
   const records = [...current.records.values()];
-  const capacity = yield* readHostCapacity(config.stateDir);
+  const capacity = yield* readHostCapacity({
+    cacheDir: config.stateDir,
+    zerofsConfigFile: config.zerofsConfigFile,
+  });
   const reachedAt = yield* publicAddresses(records);
 
   yield* control.sendReportedState({
