@@ -17,9 +17,11 @@ WorkingDirectory=/var/lib/nibrun/vm/%i
 # a unit at a time, so nothing can be listening on it when this runs.
 ExecStartPre=-/bin/rm -f /run/nibrun/vm-%i.sock
 ExecStartPre=-/bin/rm -f /var/lib/nibrun/vm/%i/logs.vsock
-ExecStart=/opt/nibrun/bin/firecracker/firecracker \
-  --api-sock /run/nibrun/vm-%i.sock \
-  --config-file /var/lib/nibrun/vm/%i/firecracker.json
+# A launcher rather than the binary, because a start is one of two things and only
+# one of them may name a config file: a fresh boot, or a restore of the snapshot
+# the agent left when it put this microVM to sleep. It `exec`s Firecracker, so
+# what Type=exec waits for and what KillSignal reaches are still the VMM itself.
+ExecStart=/opt/nibrun/bundle/vm_launch.sh %i
 
 # No restart here on purpose. The guest's own init supervises the tenant process
 # with backoff and powers the VM off once that budget is exhausted, and the agent

@@ -52,3 +52,36 @@ export const ensureTap = Effect.fn('ensureTap')(function* (tap: TapInterface) {
   // the nftables SNAT can rewrite them — and the local proxy reaches every app that way.
   yield* stdoutOf({ command: [SYSCTL, '-w', `net.ipv4.conf.${tap.tapName}.route_localnet=1`] });
 });
+
+/**
+ * The host's neighbour entry for a guest goes stale while its microVM is down, and the first
+ * connection after a wake then pays ARP re-resolution: 1.1s against the 112ms a refreshed entry
+ * costs, which is most of what makes waking cheaper than the ~1035ms of a cold boot. A guest
+ * keeps its address and its MAC across a sleep, so this writes back the pairing that was already
+ * there rather than announcing a new one.
+ */
+export const refreshNeighbour = Effect.fn('refreshNeighbour')(
+  ({
+    guestIpv4,
+    guestMac,
+    tapName,
+  }: {
+    guestIpv4: Ipv4Address;
+    guestMac: string;
+    tapName: string;
+  }) =>
+    stdoutOf({
+      command: [
+        IP,
+        'neigh',
+        'replace',
+        guestIpv4,
+        'lladdr',
+        guestMac,
+        'dev',
+        tapName,
+        'nud',
+        'reachable',
+      ],
+    }),
+);

@@ -1,17 +1,29 @@
 import { FileSystem, Path } from '@effect/platform';
-import type { AppId, DesiredInstance } from '@repo/protocol';
+import type { AppId, DeploymentId, DesiredInstance } from '@repo/protocol';
 import { Effect } from 'effect';
 import { writeJsonFile } from '#lib/json-store.ts';
 import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
 import type { AppSlot } from '#lib/network/slot.ts';
-import { ensureTap } from '#lib/network/tap.ts';
+import { ensureTap, refreshNeighbour } from '#lib/network/tap.ts';
+import { readHostVersions } from '#lib/report/versions.ts';
 import * as Artifacts from '#lib/vm/artifacts.ts';
+import * as Firecracker from '#lib/vm/firecracker-api.ts';
 import { renderFirecrackerConfig } from '#lib/vm/firecracker-config.ts';
 import { buildInstanceConfigImage } from '#lib/vm/instance-env.ts';
+import {
+  ensureLoadable,
+  readHostBootId,
+  refusalToSleep,
+  SleepRefused,
+  type SnapshotStamp,
+  snapshotPaths,
+} from '#lib/vm/snapshot.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { GUEST_VSOCK_FILENAME, vmWorkingDir } from '#lib/vm/vsock.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
+import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
 export const FIRECRACKER_CONFIG_FILENAME = 'firecracker.json';
 export const GUEST_KERNEL_FILENAME = 'vmlinux';
@@ -20,14 +32,68 @@ export const GUEST_ROOTFS_FILENAME = 'rootfs.ext4';
 const VM_DIR_MODE = 0o700;
 const FIRST_GUEST_CID = 3;
 
+/** What both halves of a suspend need to name the microVM they are acting on. */
+type SuspendRequest = {
+  readonly appId: AppId;
+  readonly deploymentId: DeploymentId;
+  readonly slot: AppSlot;
+};
+
 export class VmManager extends Effect.Service<VmManager>()('VmManager', {
   effect: Effect.gen(function* () {
     const config = yield* AgentConfig;
     const path = yield* Path.Path;
     const fs = yield* FileSystem.FileSystem;
     const logs = yield* TenantLogReceiver;
+    const zerofs = yield* ZerofsTopology;
+    const agentState = yield* AgentState;
 
     const workingDir = (appId: AppId) => vmWorkingDir({ vmDir: config.vmDir, appId });
+    function snapshotFor(appId: AppId) {
+      return snapshotPaths({ snapshotDir: config.vmSnapshotDir, appId });
+    }
+    function apiSocket(appId: AppId) {
+      return Systemd.vmApiSocketPath({ runtimeDir: config.runtimeDir, appId });
+    }
+
+    /**
+     * The stamp a snapshot taken now would carry, and the one a stored snapshot has to match to
+     * be loadable. Both readings are of the host as it is at this moment rather than as it was
+     * when the agent started, because a deploy moves the guest image under a running agent.
+     */
+    const currentStamp = Effect.fn('VmManager.currentStamp')(function* ({
+      deploymentId,
+      slot,
+    }: Omit<SuspendRequest, 'appId'>) {
+      const versions = yield* readHostVersions(config.versionsFile);
+      return {
+        deploymentId,
+        guestImageVersion: versions.guestImage,
+        hostBootId: yield* readHostBootId,
+        slot: slot.slot,
+      } satisfies SnapshotStamp;
+    });
+
+    /**
+     * The stamp first and on its own: while it is there a start takes the snapshot beside it as
+     * an instruction, and once it is gone none of what remains is loadable by anything.
+     */
+    const discardSnapshot = Effect.fn('VmManager.discardSnapshot')(function* (appId: AppId) {
+      const paths = snapshotFor(appId);
+      yield* fs.remove(paths.stampPath, { force: true });
+      yield* fs.remove(paths.directory, { recursive: true, force: true });
+    });
+
+    /** Where the caller has a failure of its own to report and a leaked snapshot is the lesser one. */
+    function forgetSnapshot(appId: AppId) {
+      return discardSnapshot(appId).pipe(
+        Effect.catchAll((error) =>
+          Effect.logWarning('snapshot could not be discarded', error).pipe(
+            Effect.annotateLogs({ appId }),
+          ),
+        ),
+      );
+    }
 
     /**
      * The agent never becomes the VM's parent: it stages the files, asks init to start the unit,
@@ -45,6 +111,10 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       yield* Effect.annotateCurrentSpan({
         appId: desired.appId,
       });
+      // Ahead of everything, because everything below replaces what a snapshot of this app was
+      // taken against — and a start that still found a stamp would restore the old guest onto
+      // the new deployment's disk rather than boot the new one.
+      yield* discardSnapshot(desired.appId);
       const artifactImagePath = yield* Artifacts.ensureArtifactImage(desired.artifact);
       yield* ensureTap({
         tapName: slot.tapName,
@@ -103,17 +173,146 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       );
     });
 
+    /**
+     * A microVM taken down at a point it can be put back on, rather than one taken down.
+     *
+     * The two states a snapshot must never be taken in are read from this agent's own record of
+     * the instance rather than accepted from the caller, because they are the preconditions of
+     * the operation and not an opinion about it: a caller that could supply them could also
+     * forget to. `refusalToSleep` is where each one is spelled out.
+     *
+     * The flush comes before the pause on purpose: one that hangs then leaves a microVM that is
+     * still serving, where a pause first would freeze the tenant for the whole of it. It is what
+     * makes this a durability point at all — `ignore_fsync` has already made the guest's own
+     * fsync a no-op — and it has to hold even for the snapshot that is later discarded, because
+     * that app cold-boots off its disk and finds only what was flushed.
+     *
+     * The stamp is written last, once the microVM is down and the files beside it are complete.
+     * Nothing before that point is loadable, which is what makes every way this can fail leave a
+     * cold boot rather than a half-restore.
+     */
+    const sleep = Effect.fn('VmManager.sleep')(function* ({
+      appId,
+      deploymentId,
+      slot,
+    }: SuspendRequest) {
+      yield* Effect.annotateCurrentSpan({ appId });
+      const record = (yield* agentState.snapshot).records.get(appId);
+      const refusal = refusalToSleep(
+        record && {
+          stopRequested: record.stopRequested,
+          desiredRunning: record.desiredRunning,
+          everHealthy: record.health.everHealthy,
+        },
+      );
+      if (refusal !== undefined) {
+        return yield* new SleepRefused({ reason: refusal });
+      }
+
+      const paths = snapshotFor(appId);
+      const socketPath = apiSocket(appId);
+      const stamp = yield* currentStamp({ deploymentId, slot });
+
+      yield* discardSnapshot(appId);
+      yield* fs.makeDirectory(paths.directory, { recursive: true, mode: VM_DIR_MODE });
+      yield* zerofs.flushAll;
+
+      yield* Firecracker.pause(socketPath);
+      yield* Effect.onError(
+        Effect.gen(function* () {
+          yield* Firecracker.createSnapshot({
+            socketPath,
+            statePath: paths.statePath,
+            memoryPath: paths.memoryPath,
+          });
+          yield* Systemd.stop(appId);
+        }),
+        // A microVM left paused answers nothing and is never asked to run again.
+        () => Effect.ignore(Firecracker.resume(socketPath)),
+      );
+
+      yield* writeJsonFile({ path: paths.stampPath, value: stamp });
+      yield* Effect.logInfo('instance asleep').pipe(
+        Effect.annotateLogs({ appId, slot: slot.slot }),
+      );
+    });
+
+    /**
+     * The microVM that went to sleep, back where it was.
+     *
+     * The stamp is checked before anything starts, and a snapshot that fails the check is thrown
+     * away rather than left: it is unloadable from here on, and a stamp on disk is what a start
+     * reads to decide it is a restore. The start itself consumes the stamp, so every way this can
+     * fail past that point leaves the next start a cold boot.
+     */
+    const wake = Effect.fn('VmManager.wake')(function* ({
+      appId,
+      deploymentId,
+      slot,
+    }: SuspendRequest) {
+      yield* Effect.annotateCurrentSpan({ appId });
+      const paths = snapshotFor(appId);
+      const socketPath = apiSocket(appId);
+      const expected = yield* currentStamp({ deploymentId, slot });
+      yield* Effect.onError(ensureLoadable({ stampPath: paths.stampPath, expected }), () =>
+        forgetSnapshot(appId),
+      );
+
+      yield* Systemd.start(appId);
+      yield* Effect.ensuring(
+        Effect.onError(
+          Effect.gen(function* () {
+            yield* Firecracker.loadSnapshot({
+              socketPath,
+              statePath: paths.statePath,
+              memoryPath: paths.memoryPath,
+            });
+            yield* Firecracker.resume(socketPath);
+            yield* refreshNeighbour({
+              guestIpv4: slot.guestIpv4,
+              guestMac: slot.guestMac,
+              tapName: slot.tapName,
+            });
+          }),
+          // The start already consumed the stamp, so this Firecracker holds no guest and never
+          // will: stopping it is what leaves a cold boot rather than a process in the way of one.
+          () => Effect.ignore(Systemd.stop(appId)),
+        ),
+        // Every way out, so no retry of a restore that failed halfway can find the files it did
+        // not finish with. The stamp is already gone and would stop a second load on its own;
+        // this is what keeps at-most-once from resting on that single fact.
+        //
+        // Unlinking while Firecracker still has the memory file mapped keeps the mapping alive
+        // and hands the disk back the moment the microVM exits, so the successful path pays
+        // nothing for it either.
+        forgetSnapshot(appId),
+      );
+      yield* Effect.logInfo('instance awake').pipe(Effect.annotateLogs({ appId, slot: slot.slot }));
+    });
+
     return {
       workingDir,
       boot,
-      stop: Systemd.stop,
+      sleep,
+      wake,
+      /** Before the stop, so a stop that fails leaves a running microVM and never a stale snapshot. */
+      stop: Effect.fn('VmManager.stop')(function* (appId: AppId) {
+        yield* discardSnapshot(appId);
+        yield* Systemd.stop(appId);
+      }),
       discard: Effect.fn('VmManager.discard')(function* (appId: AppId) {
         yield* Effect.annotateCurrentSpan({ appId });
+        yield* discardSnapshot(appId);
         yield* Systemd.forget(appId);
         yield* logs.detach(appId);
         yield* fs.remove(workingDir(appId), { recursive: true, force: true });
       }),
     };
   }),
-  dependencies: [AgentConfig.Default, TenantLogReceiver.Default],
+  dependencies: [
+    AgentConfig.Default,
+    AgentState.Default,
+    TenantLogReceiver.Default,
+    ZerofsTopology.Default,
+  ],
 }) {}
