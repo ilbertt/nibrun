@@ -179,6 +179,7 @@ function toReportedDeployment({
   return {
     deploymentId: instance.deploymentId,
     state,
+    instanceState: instance.state,
     hostPort: instance.hostPort ?? null,
     guestIpv4: instance.guestIpv4 ?? null,
     publicIpv4: instance.publicIpv4 ?? null,
@@ -199,6 +200,7 @@ function toPublicDeployment(row: DeploymentRow): PublicDeployment {
     state: row.state,
     createdAt: toTimestamp(row.created_at),
     restartCount: row.restart_count,
+    ...(row.instance_state && { instanceState: row.instance_state }),
     ...(row.public_ipv4 && { publicIpv4: row.public_ipv4 }),
     ...(row.extra_public_port && { extraPublicPort: row.extra_public_port }),
     ...(row.started_at && { startedAt: toTimestamp(row.started_at) }),

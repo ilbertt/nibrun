@@ -581,6 +581,7 @@ export interface ISelectDeploymentsByAppResult {
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
     state: IDeploymentsColumns["state"];
+    instance_state: IDeploymentsColumns["instance_state"];
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -618,6 +619,7 @@ export interface ISelectDeploymentByIdResult {
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
     state: IDeploymentsColumns["state"];
+    instance_state: IDeploymentsColumns["instance_state"];
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -681,6 +683,7 @@ export interface ISelectInsertedDeploymentResult {
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
     state: IDeploymentsColumns["state"];
+    instance_state: IDeploymentsColumns["instance_state"];
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -1171,6 +1174,7 @@ export interface IDeploymentsColumns {
     updated_at: Date;
     public_ipv4: import("@repo/protocol").Ipv4Address | null;
     extra_public_port: import("@repo/protocol").HostPort | null;
+    instance_state: import("@repo/protocol").InstanceState | null;
 }
 
 /** Schema of `deployments`. */
@@ -1722,7 +1726,8 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             public_ipv4: { _columnName: "public_ipv4", _foreignKeys: {} },
-            extra_public_port: { _columnName: "extra_public_port", _foreignKeys: {} }
+            extra_public_port: { _columnName: "extra_public_port", _foreignKeys: {} },
+            instance_state: { _columnName: "instance_state", _foreignKeys: {} }
         },
         _indexes: {
             deployments_app_id_idx: { _indexName: "deployments_app_id_idx" },
@@ -1737,6 +1742,7 @@ export const schema = {
             deployments_artifact_id_fkey: { _constraintName: "deployments_artifact_id_fkey" },
             deployments_config_id_fkey: { _constraintName: "deployments_config_id_fkey" },
             deployments_extra_public_port_check: { _constraintName: "deployments_extra_public_port_check" },
+            deployments_instance_state_check: { _constraintName: "deployments_instance_state_check" },
             deployments_pkey: { _constraintName: "deployments_pkey" },
             deployments_rollback_of_deployment_id_fkey: { _constraintName: "deployments_rollback_of_deployment_id_fkey" },
             deployments_state_check: { _constraintName: "deployments_state_check" }
