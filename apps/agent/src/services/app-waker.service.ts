@@ -1,6 +1,6 @@
 import type { HttpClient } from '@effect/platform';
 import type { AppId, DesiredInstance } from '@repo/protocol';
-import { Data, Deferred, Duration, Effect, Option, Ref, Schedule } from 'effect';
+import { Clock, Data, Deferred, Duration, Effect, Option, Ref, Schedule } from 'effect';
 import { reportedMessage } from '#lib/failure.ts';
 import { probeInstance } from '#lib/health/probe.ts';
 import { resumeInstance } from '#lib/reconcile/instances.ts';
@@ -31,6 +31,11 @@ const NO_SHORTFALL = 0;
  * the whole agent, named again at that boundary and built a second time behind it.
  */
 type WakeContext = Effect.Effect.Context<ReturnType<typeof resumeInstance>> | HttpClient.HttpClient;
+
+type Claim = {
+  readonly deferred: Deferred.Deferred<void, WakeFailed | HostHasNoRoom>;
+  readonly joined: Ref.Ref<number>;
+};
 
 export class WakeFailed extends Data.TaggedError('WakeFailed')<{
   readonly appId: AppId;
@@ -76,9 +81,12 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
   effect: Effect.gen(function* () {
     const cache = yield* DesiredStateCache;
     const context = yield* Effect.context<WakeContext>();
-    const inFlight = yield* Ref.make(
-      new Map<AppId, Deferred.Deferred<void, WakeFailed | HostHasNoRoom>>(),
-    );
+    /**
+     * The joiners are counted beside the deferred rather than derived afterwards: a cold page
+     * load is one wake and a burst of requests, and without the count every reading of how often
+     * apps wake is really a reading of how many requests arrived while one was waking.
+     */
+    const inFlight = yield* Ref.make(new Map<AppId, Claim>());
 
     /**
      * The grace period is the deadline: past it the health loop would call the instance failed
@@ -124,7 +132,14 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
         : undefined;
     });
 
-    const boot = Effect.fn('AppWaker.boot')(function* (appId: AppId) {
+    const boot = Effect.fn('AppWaker.boot')(function* ({
+      appId,
+      joined,
+    }: {
+      appId: AppId;
+      joined: Ref.Ref<number>;
+    }) {
+      const startedMs = yield* Clock.currentTimeMillis;
       const desired = yield* cache.latest;
       const wanted = Option.getOrUndefined(desired)?.instances.find(
         (instance) => instance.appId === appId,
@@ -155,7 +170,7 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
       // A slot table with nothing free is the one start failure a request can cause, and it is
       // this host's problem rather than this app's — so it is said in the same breath as any
       // other reason the microVM is not there.
-      yield* resumeInstance(wanted).pipe(
+      const outcome = yield* resumeInstance(wanted).pipe(
         Effect.catchAll((error) => new WakeFailed({ appId, reason: reportedMessage(error) })),
       );
 
@@ -169,28 +184,40 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
         });
       }
       yield* untilAnswering(record);
-      yield* Effect.logInfo('app woken by a request').pipe(Effect.annotateLogs({ appId }));
+      // `waitedMs` is the whole of what the visitor paid, `outcome` is what they paid it for:
+      // a restore and a cold boot are the same line otherwise, and the difference between them
+      // is the feature. `coalesced` is how many more requests waited on this same wake, so a
+      // count of these lines is a count of wakes rather than of requests.
+      yield* Effect.logInfo('app woken by a request').pipe(
+        Effect.annotateLogs({
+          appId,
+          outcome,
+          waitedMs: (yield* Clock.currentTimeMillis) - startedMs,
+          coalesced: yield* Ref.get(joined),
+        }),
+      );
     });
 
     return {
       wake: Effect.fn('AppWaker.wake')(function* (appId: AppId) {
-        const claim = yield* Deferred.make<void, WakeFailed | HostHasNoRoom>();
+        const claim: Claim = {
+          deferred: yield* Deferred.make<void, WakeFailed | HostHasNoRoom>(),
+          joined: yield* Ref.make(0),
+        };
         const held = yield* Ref.modify(inFlight, (current) => {
           const existing = current.get(appId);
           return existing
             ? ([Option.some(existing), current] as const)
-            : ([
-                Option.none<Deferred.Deferred<void, WakeFailed | HostHasNoRoom>>(),
-                new Map(current).set(appId, claim),
-              ] as const);
+            : ([Option.none<Claim>(), new Map(current).set(appId, claim)] as const);
         });
         if (Option.isSome(held)) {
-          return yield* Deferred.await(held.value);
+          yield* Ref.update(held.value.joined, (count) => count + 1);
+          return yield* Deferred.await(held.value.deferred);
         }
-        return yield* boot(appId).pipe(
+        return yield* boot({ appId, joined: claim.joined }).pipe(
           Effect.provide(context),
           Effect.onExit((exit) =>
-            Deferred.done(claim, exit).pipe(
+            Deferred.done(claim.deferred, exit).pipe(
               Effect.andThen(
                 Ref.update(inFlight, (current) => {
                   const remaining = new Map(current);
