@@ -1,7 +1,9 @@
 import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { followLogs } from '@repo/app-operations';
-import type { TenantLogRecord, TenantLogStream } from '@repo/protocol';
+import { TENANT_LOG_STREAMS, type TenantLogRecord, type TenantLogStream } from '@repo/protocol';
+import { z } from 'zod';
+import { defineOutput } from '#lib/output.ts';
 
 /**
  * Ctrl-C, as something a loop can read rather than something that kills it mid-line.
@@ -16,6 +18,43 @@ export function untilInterrupted(): AbortSignal {
   return stopping.signal;
 }
 
+/**
+ * One record, as much of it as a reader has any use for. The keys the store needs to tell a
+ * second copy from a second record are not among them: they are how the stream is assembled, and
+ * what arrives here is already assembled.
+ */
+const LogRecordSchema = z.object({
+  time: z.string(),
+  stream: z.enum(TENANT_LOG_STREAMS),
+  message: z.string(),
+  /** How much output the host had to drop, for a record that stands for a gap rather than a line. */
+  droppedBytes: z.number().nullable(),
+});
+
+export type LogRecord = z.infer<typeof LogRecordSchema>;
+
+/**
+ * Which stream a record came out of decides which one it goes back into, the way `docker logs`
+ * does it: the app's error output is this program's error output, so `2>` and `>` separate them
+ * again downstream. Under `--json` they arrive together and `stream` is what separates them,
+ * which is the same distinction said in a way a program can read.
+ */
+export const LOG_RECORD_OUTPUT = defineOutput({
+  schema: LogRecordSchema,
+  render: ({ value, out }) => {
+    const line = render(value);
+    if (value.droppedBytes !== null) {
+      out.warn(line);
+      return;
+    }
+    if (value.stream === 'stderr') {
+      out.error(line);
+      return;
+    }
+    out.info(line);
+  },
+});
+
 export type FollowInput = {
   api: PublicApiClient;
   appId: string;
@@ -23,15 +62,16 @@ export type FollowInput = {
   timerange: string;
   /** Whether there is a microVM to write anything more, which is what makes this a wait at all. */
   following: boolean;
+  emit: (record: LogRecord) => void;
   print: Print;
   signal: AbortSignal;
 };
 
 /**
- * Print what a deployment has written, and keep printing what it writes until stopped.
+ * Hand over what a deployment has written, and keep handing over what it writes until stopped.
  *
  * An app with nothing running is not waited on: what it wrote is printed and that is the end of
- * it, said in the last line so a log that stops is not read as one that was cut off.
+ * it, said beside the output so a log that stops is not read as one that was cut off.
  */
 export async function follow({
   api,
@@ -39,6 +79,7 @@ export async function follow({
   deploymentId,
   timerange,
   following,
+  emit,
   print,
   signal,
 }: FollowInput): Promise<void> {
@@ -50,29 +91,20 @@ export async function follow({
     following,
     signal,
   })) {
-    show({ record, print });
+    emit(asRecord(record));
   }
   if (!following) {
     print.dim('nothing is running, so that is everything it wrote');
   }
 }
 
-/**
- * Which stream a record came out of decides which one it goes back into, the way `docker logs`
- * does it: the app's error output is this program's error output, so `2>` and `>` separate them
- * again downstream. `print` colours by level, which is the same distinction said in colour.
- */
-export function show({ record, print }: { record: TenantLogRecord; print: Print }): void {
-  const line = render(record);
-  if (record.droppedBytes !== undefined) {
-    print.warn(line);
-    return;
-  }
-  if (record.stream === 'stderr') {
-    print.error(line);
-    return;
-  }
-  print.info(line);
+function asRecord(record: TenantLogRecord): LogRecord {
+  return {
+    time: record._time,
+    stream: record.stream,
+    message: record._msg,
+    droppedBytes: record.droppedBytes ?? null,
+  };
 }
 
 /** Wide enough that a column still reads as one against a message that begins with a space. */
@@ -87,14 +119,14 @@ const COLUMN_GAP = '  ';
 const TERMINATOR = /\r?\n$/;
 
 /** One record, one line: what the app wrote, behind a dimmed column saying when and from where. */
-export function render(record: TenantLogRecord): string {
-  const gap = record.droppedBytes === undefined ? '' : ` (${record.droppedBytes} bytes)`;
+export function render(record: LogRecord): string {
+  const gap = record.droppedBytes === null ? '' : ` (${record.droppedBytes} bytes)`;
   const mark = record.stream === 'stderr' ? 'err' : 'out';
   const column = dimmed({
-    text: `${stampOf(record._time)}${COLUMN_GAP}${mark}`,
+    text: `${stampOf(record.time)}${COLUMN_GAP}${mark}`,
     stream: record.stream,
   });
-  return `${column}${COLUMN_GAP}${record._msg.replace(TERMINATOR, '')}${gap}`;
+  return `${column}${COLUMN_GAP}${record.message.replace(TERMINATOR, '')}${gap}`;
 }
 
 const MS_PER_MINUTE = 60_000;

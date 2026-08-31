@@ -1,7 +1,9 @@
 import { ApiError } from '@repo/api-client/unwrap';
 import { createAuthClient } from 'better-auth/client';
 import { deviceAuthorizationClient } from 'better-auth/client/plugins';
+import { z } from 'zod';
 import { UsageError } from '#lib/errors.ts';
+import { defineOutput } from '#lib/output.ts';
 
 // Sent so the record of a pending login says what asked for it. Not a secret and not a
 // credential: a public client has nothing to prove, which is the whole reason this flow exists.
@@ -14,6 +16,17 @@ const MS_PER_SECOND = 1_000;
 const SLOW_DOWN_SECONDS = 5;
 
 const EXPIRED = 'That code expired. Run `nib login` again.';
+
+/**
+ * The api the terminal is now signed in to. Which one is the whole of what a login leaves behind
+ * that anything else can read — the token itself is on disk and belongs nowhere near stdout.
+ */
+const SignedInSchema = z.object({ apiUrl: z.string() });
+
+export const SIGNED_IN_OUTPUT = defineOutput({
+  schema: SignedInSchema,
+  render: ({ value, out }) => out.done(`Signed in to ${value.apiUrl}.`),
+});
 
 type DeviceClient = ReturnType<typeof createDeviceClient>;
 type StartedLogin = NonNullable<Awaited<ReturnType<DeviceClient['device']['code']>>['data']>;

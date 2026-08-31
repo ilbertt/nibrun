@@ -1,6 +1,7 @@
 import { defineCommand } from '@parshjs/core';
-import { listApps } from '#lib/app-list.ts';
+import { APP_LIST_OUTPUT, listApps } from '#lib/app-list.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
+import { createOutput } from '#lib/output.ts';
 
 /**
  * The one command under `apps` that names no app, so `--app` is the one thing forwarded here that
@@ -12,7 +13,9 @@ export const command = defineCommand('apps list', {
     'List your apps: what each is called, what state it is in, and when it last changed.',
   options: {},
   beforeHandler: ({ context }) => requireSignedIn(context),
-  handler: async ({ context, print }) => {
-    await listApps({ api: context.api, print });
+  handler: async ({ context, print, rootOptions }) => {
+    const { emit } = createOutput({ output: APP_LIST_OUTPUT, print, json: rootOptions.json });
+
+    emit(await listApps({ api: context.api }));
   },
 });

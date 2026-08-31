@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { type AppStatusView, renderStatus } from '#lib/app-status.ts';
+import { type AppStatusReport, renderStatus } from '#lib/app-status.ts';
 import {
   BYTES_PER_MIB,
   MEMORY_MIB,
@@ -11,35 +11,27 @@ import {
 const MEMORY_USED_BYTES = 412_401_664;
 const VOLUME_USED_BYTES = 1_503_238_553;
 const CPU_SHARE = 0.18;
+const MEASURED_AT = '2026-08-29T11:01:00.000Z';
 
-// Plain strings rather than the branded ones the wire carries: what is pinned down here is how a
-// status reads, and a cast per field would be spelling rather than meaning.
-function app(overrides: object = {}): AppStatusView {
+function app(overrides: Partial<AppStatusReport> = {}): AppStatusReport {
   return {
     slug: SLUG,
     status: 'running',
-    config: {
-      volumeSizeBytes: VOLUME_SIZE_BYTES,
-      resources: { vcpuCount: VCPU_COUNT, memoryMib: MEMORY_MIB },
-    },
-    volumeUsage: null,
-    computeUsage: null,
+    vcpu: { used: null, total: VCPU_COUNT, measuredAt: null },
+    memory: { used: null, total: MEMORY_MIB * BYTES_PER_MIB, measuredAt: null },
+    volume: { used: null, total: VOLUME_SIZE_BYTES, measuredAt: null },
     ...overrides,
-  } as AppStatusView;
+  };
 }
 
 const measured = app({
-  volumeUsage: {
-    totalBytes: VOLUME_SIZE_BYTES,
-    usedBytes: VOLUME_USED_BYTES,
-    measuredAt: '2026-08-29T11:01:00.000Z',
+  vcpu: { used: CPU_SHARE * VCPU_COUNT, total: VCPU_COUNT, measuredAt: MEASURED_AT },
+  memory: {
+    used: MEMORY_USED_BYTES,
+    total: MEMORY_MIB * BYTES_PER_MIB,
+    measuredAt: MEASURED_AT,
   },
-  computeUsage: {
-    memoryTotalBytes: MEMORY_MIB * BYTES_PER_MIB,
-    memoryUsedBytes: MEMORY_USED_BYTES,
-    cpuShare: CPU_SHARE,
-    measuredAt: '2026-08-29T11:01:00.000Z',
-  },
+  volume: { used: VOLUME_USED_BYTES, total: VOLUME_SIZE_BYTES, measuredAt: MEASURED_AT },
 });
 
 describe('a status says what one app is using of what it was given', () => {
@@ -76,14 +68,10 @@ describe('a status says what one app is using of what it was given', () => {
   test('two readings taken apart are summarised by the older of them', () => {
     const { measured } = renderStatus(
       app({
-        volumeUsage: {
-          totalBytes: VOLUME_SIZE_BYTES,
-          usedBytes: VOLUME_USED_BYTES,
-          measuredAt: '2026-08-29T11:01:00.000Z',
-        },
-        computeUsage: {
-          memoryTotalBytes: MEMORY_MIB * BYTES_PER_MIB,
-          memoryUsedBytes: MEMORY_USED_BYTES,
+        volume: { used: VOLUME_USED_BYTES, total: VOLUME_SIZE_BYTES, measuredAt: MEASURED_AT },
+        memory: {
+          used: MEMORY_USED_BYTES,
+          total: MEMORY_MIB * BYTES_PER_MIB,
           measuredAt: '2026-08-27T09:12:00.000Z',
         },
       }),
@@ -104,10 +92,10 @@ describe('a status says what one app is using of what it was given', () => {
   test('a guest measured before it had a cpu share still reads its memory', () => {
     const lines = renderStatus(
       app({
-        computeUsage: {
-          memoryTotalBytes: MEMORY_MIB * BYTES_PER_MIB,
-          memoryUsedBytes: MEMORY_USED_BYTES,
-          measuredAt: '2026-08-29T11:01:00.000Z',
+        memory: {
+          used: MEMORY_USED_BYTES,
+          total: MEMORY_MIB * BYTES_PER_MIB,
+          measuredAt: MEASURED_AT,
         },
       }),
     ).lines.join('\n');

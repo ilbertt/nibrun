@@ -2,8 +2,8 @@ import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { addAppDomain } from '#lib/domains.ts';
-import { createUi, isInteractive } from '#lib/ui.ts';
+import { addAppDomain, DOMAIN_ADDED_OUTPUT } from '#lib/domains.ts';
+import { createOutput } from '#lib/output.ts';
 
 export const command = defineCommand('apps domains add [hostname]', {
   description:
@@ -15,14 +15,17 @@ export const command = defineCommand('apps domains add [hostname]', {
     },
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
-  handler: async ({ params, parents, context, print }) => {
+  handler: async ({ params, parents, context, print, rootOptions }) => {
+    const { interactive, ui, emit } = createOutput({
+      output: DOMAIN_ADDED_OUTPUT,
+      print,
+      json: rootOptions.json,
+    });
     const { api } = context;
-    const interactive = isInteractive();
-    const ui = createUi({ print, interactive });
 
     ui.open('nib apps domains add');
     const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
 
-    await addAppDomain({ api, slug, hostname: params.hostname, ui });
+    emit(await addAppDomain({ api, slug, hostname: params.hostname }));
   },
 });

@@ -3,8 +3,8 @@ import { GUEST_PATH_ROOT } from '@repo/protocol';
 import { SHARED_OPTIONS } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { listDirectory } from '#lib/filesystem.ts';
-import { isInteractive } from '#lib/ui.ts';
+import { DIRECTORY_OUTPUT, listDirectory } from '#lib/filesystem.ts';
+import { createOutput } from '#lib/output.ts';
 
 /**
  * A command and the parent of `apps files ls [path]` at once, which is how an optional positional
@@ -21,20 +21,23 @@ export const command = defineCommand('apps files ls', {
     },
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
-  handler: async ({ options, parents, context, print }) => {
-    const { api } = context;
-    const slug = await selectApp({
-      api,
-      slug: parents.apps.options.app,
-      interactive: isInteractive(),
-    });
-
-    await listDirectory({
-      api,
-      slug,
-      deploymentId: options[SHARED_OPTIONS.deploymentId.name],
-      path: GUEST_PATH_ROOT,
+  handler: async ({ options, parents, context, print, rootOptions }) => {
+    const { interactive, aside, emit } = createOutput({
+      output: DIRECTORY_OUTPUT,
       print,
+      json: rootOptions.json,
     });
+    const { api } = context;
+    const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
+
+    emit(
+      await listDirectory({
+        api,
+        slug,
+        deploymentId: options[SHARED_OPTIONS.deploymentId.name],
+        path: GUEST_PATH_ROOT,
+        print: aside,
+      }),
+    );
   },
 });

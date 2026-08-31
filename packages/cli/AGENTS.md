@@ -31,6 +31,20 @@ the layout under `src/commands/` is the command tree.
   literals and `parents['<path>'].options` stays typed. The `satisfies` on
   `SHARED_OPTIONS` is what makes a mistyped field an error where it is written
   rather than an overload failure at every command taking it.
+- **A flag every command takes lives on the root command**, `src/commands/_root.ts`,
+  forwarded like any other and read as `rootOptions`. `--json` is the one there is:
+  it is what decides which surface a command's answer reaches.
+- **What a command answers with is declared once**, as an `Output` — a zod schema and a
+  renderer over that same value — beside the code that produces it, so the two spellings
+  of `apps files ls` share one and the layout helpers stay testable on their own. `--json`
+  prints the schema's parse of the value, one line per value, and the renderer never runs;
+  without it the renderer is the only thing that says anything. A field reaches both
+  surfaces or neither, which is the whole point. A handler builds `createOutput` from
+  `rootOptions.json` and gets back `emit`, the `ui`, whether there is anybody to put a
+  question to, and an `aside` print that moves to stderr under `--json` so nothing said in
+  passing corrupts the payload. This is a stopgap for parsh's own `output` and
+  `renderOutput` — ilbertt/parsh#8 — so keep an output a schema and a pure renderer, and
+  migrating is moving the pair onto `defineCommand`.
 - A positional is a path segment, so a command taking one lives at
   `commands/<…>/[name].ts` and its path string ends in `[name]`. Leaving it out
   prints the parent's usage rather than a missing-argument error, because the

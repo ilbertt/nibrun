@@ -1,36 +1,17 @@
 import { describe, expect, test } from 'bun:test';
-import type { Print } from '@parshjs/core';
-import type { TenantLogRecord } from '@repo/protocol';
-import { render, show } from '#lib/logs.ts';
+import { LOG_RECORD_OUTPUT, type LogRecord, render } from '#lib/logs.ts';
+import { writerRecording } from '#tests/support/output.ts';
 
 const DROPPED_BYTES = 4096;
 const ESCAPE_CODE = 27;
 
-function record(overrides: Partial<TenantLogRecord> = {}): TenantLogRecord {
+function record(overrides: Partial<LogRecord> = {}): LogRecord {
   return {
-    _time: '2026-08-06T09:41:00.123Z',
-    _msg: 'listening on 0.0.0.0:8090',
-    hostId: 'host-1',
-    SOURCE: 'tenant',
-    appId: 'app-1',
-    deploymentId: 'deployment-1',
+    time: '2026-08-06T09:41:00.123Z',
+    message: 'listening on 0.0.0.0:8090',
     stream: 'stdout',
-    sourceId: 'source-1',
-    sequence: 0,
+    droppedBytes: null,
     ...overrides,
-  } as TenantLogRecord;
-}
-
-/** Which level a record went out at is the whole of what `show` decides. */
-function printer(): Print & { at: string[] } {
-  const at: string[] = [];
-  return {
-    at,
-    info: () => at.push('info'),
-    success: () => at.push('success'),
-    warn: () => at.push('warn'),
-    error: () => at.push('error'),
-    dim: () => at.push('dim'),
   };
 }
 
@@ -92,7 +73,7 @@ describe('a record is one line of what the app wrote', () => {
   // The store keeps the newline the guest wrote and printing supplies another, which is a blank
   // line between every two records.
   test('the newline that ended the message is not printed a second time', () => {
-    const line = render(record({ _msg: 'listening on 0.0.0.0:8090\n' }));
+    const line = render(record({ message: 'listening on 0.0.0.0:8090\n' }));
 
     expect(line).not.toInclude('\n');
     expect(columns(line).message).toBe('listening on 0.0.0.0:8090');
@@ -100,7 +81,7 @@ describe('a record is one line of what the app wrote', () => {
 
   // Trailing spaces are the app's own, and only the terminator is this program's to remove.
   test('what the app wrote is otherwise left alone', () => {
-    expect(columns(render(record({ _msg: 'waiting...  ' }))).message).toBe('waiting...  ');
+    expect(columns(render(record({ message: 'waiting...  ' }))).message).toBe('waiting...  ');
   });
 
   // A gap stands for output the host had to drop, and how much is the whole of what it says.
@@ -127,27 +108,30 @@ describe('only the part of a line the app did not write is dimmed', () => {
 
 describe('the stream a record came out of is the stream it goes back into', () => {
   test('ordinary output is written plainly to ours', () => {
-    const print = printer();
+    const out = writerRecording();
 
-    show({ record: record(), print });
+    LOG_RECORD_OUTPUT.render({ value: record(), out });
 
-    expect(print.at).toEqual(['info']);
+    expect(out.at).toEqual(['info']);
   });
 
   test('what the app wrote to its error stream goes to ours', () => {
-    const print = printer();
+    const out = writerRecording();
 
-    show({ record: record({ stream: 'stderr' }), print });
+    LOG_RECORD_OUTPUT.render({ value: record({ stream: 'stderr' }), out });
 
-    expect(print.at).toEqual(['error']);
+    expect(out.at).toEqual(['error']);
   });
 
   // A gap is the host speaking, not the app, so it is not dressed as the app's own error output.
   test('a gap is a warning rather than the app error output', () => {
-    const print = printer();
+    const out = writerRecording();
 
-    show({ record: record({ stream: 'stderr', droppedBytes: DROPPED_BYTES }), print });
+    LOG_RECORD_OUTPUT.render({
+      value: record({ stream: 'stderr', droppedBytes: DROPPED_BYTES }),
+      out,
+    });
 
-    expect(print.at).toEqual(['warn']);
+    expect(out.at).toEqual(['warn']);
   });
 });

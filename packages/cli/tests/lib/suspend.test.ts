@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
-import { resumeApp, suspendApp } from '#lib/suspend.ts';
+import { describe, expect, test } from 'bun:test';
+import { RESUMED_OUTPUT, resumeApp, SUSPENDED_OUTPUT, suspendApp } from '#lib/suspend.ts';
 import {
   apiHolding,
   deploymentsHolding,
@@ -7,7 +7,7 @@ import {
   RUNNING_DEPLOYMENT,
 } from '#tests/support/api.ts';
 import { APP_ID, SLUG } from '#tests/support/app.ts';
-import { uiRecording } from '#tests/support/ui.ts';
+import { writerRecording } from '#tests/support/output.ts';
 
 type Asked = { appId: string; state: string };
 
@@ -40,43 +40,42 @@ function apiInState({
 
 test('suspending a running app asks the api for it', async () => {
   const asked: Asked[] = [];
-  const ui = uiRecording();
 
-  await suspendApp({ api: apiInState({ state: 'active', asked }), slug: SLUG, ui });
+  const suspended = await suspendApp({ api: apiInState({ state: 'active', asked }), slug: SLUG });
 
   expect(asked).toEqual([{ appId: APP_ID, state: 'suspended' }]);
-  expect(ui.said[0]).toContain('is suspended');
+  expect(suspended).toEqual({ slug: SLUG, state: 'suspended', changed: true });
 });
 
 // Asking twice is asking once, and the second is answered by the state the first left it in.
 test('suspending one that already is says so and sends nothing', async () => {
   const asked: Asked[] = [];
-  const ui = uiRecording();
 
-  await suspendApp({ api: apiInState({ state: 'suspended', asked }), slug: SLUG, ui });
+  const suspended = await suspendApp({
+    api: apiInState({ state: 'suspended', asked }),
+    slug: SLUG,
+  });
 
   expect(asked).toEqual([]);
-  expect(ui.said).toEqual([`${SLUG} is already suspended.`]);
+  expect(suspended).toEqual({ slug: SLUG, state: 'suspended', changed: false });
 });
 
 test('resuming a suspended app puts it back', async () => {
   const asked: Asked[] = [];
-  const ui = uiRecording();
 
-  await resumeApp({ api: apiInState({ state: 'suspended', asked }), slug: SLUG, ui });
+  const resumed = await resumeApp({ api: apiInState({ state: 'suspended', asked }), slug: SLUG });
 
   expect(asked).toEqual([{ appId: APP_ID, state: 'active' }]);
-  expect(ui.said[0]).toContain('is active');
+  expect(resumed).toEqual({ slug: SLUG, state: 'active', changed: true });
 });
 
 test('and resuming one that is already running sends nothing either', async () => {
   const asked: Asked[] = [];
-  const ui = uiRecording();
 
-  await resumeApp({ api: apiInState({ state: 'active', asked }), slug: SLUG, ui });
+  const resumed = await resumeApp({ api: apiInState({ state: 'active', asked }), slug: SLUG });
 
   expect(asked).toEqual([]);
-  expect(ui.said).toEqual([`${SLUG} is already running.`]);
+  expect(resumed).toEqual({ slug: SLUG, state: 'active', changed: false });
 });
 
 // The api refuses this too. Said here because the read that turns a slug into an id has already
@@ -85,11 +84,40 @@ test('an app being deleted is refused rather than sent', async () => {
   const asked: Asked[] = [];
 
   await expect(
-    resumeApp({
-      api: apiInState({ state: 'deleting', asked }),
-      slug: SLUG,
-      ui: uiRecording(),
-    }),
+    resumeApp({ api: apiInState({ state: 'deleting', asked }), slug: SLUG }),
   ).rejects.toThrow('App quiet-otter is being deleted, so there is nothing left to bring back.');
   expect(asked).toEqual([]);
+});
+
+describe('what the same answer reads as to a person', () => {
+  test('an app this run suspended is told what it kept', () => {
+    const out = writerRecording();
+
+    SUSPENDED_OUTPUT.render({
+      value: { slug: SLUG, state: 'suspended', changed: true },
+      out,
+    });
+
+    expect(out.at).toEqual(['done']);
+    expect(out.said[0]).toContain('is suspended');
+  });
+
+  test('and one that already was is told only that', () => {
+    const out = writerRecording();
+
+    SUSPENDED_OUTPUT.render({
+      value: { slug: SLUG, state: 'suspended', changed: false },
+      out,
+    });
+
+    expect(out.said).toEqual([`${SLUG} is already suspended.`]);
+  });
+
+  test('a resume reads the same way round', () => {
+    const out = writerRecording();
+
+    RESUMED_OUTPUT.render({ value: { slug: SLUG, state: 'active', changed: false }, out });
+
+    expect(out.said).toEqual([`${SLUG} is already running.`]);
+  });
 });

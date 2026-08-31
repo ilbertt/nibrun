@@ -1,9 +1,11 @@
 import { note, text } from '@clack/prompts';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { appFor, deleteApp as requestDeletion } from '@repo/app-operations';
+import { APP_STATES } from '@repo/protocol';
+import { z } from 'zod';
 import { UsageError } from '#lib/errors.ts';
+import { defineOutput } from '#lib/output.ts';
 import { answered } from '#lib/prompts.ts';
-import type { Ui } from '#lib/ui.ts';
 
 /**
  * A phrase rather than a y/n, because a y/n is answered by the muscle that has answered every
@@ -12,10 +14,28 @@ import type { Ui } from '#lib/ui.ts';
  */
 const CONFIRMATION_PHRASE = 'delete permanently';
 
+const DeletedSchema = z.object({
+  slug: z.string(),
+  state: z.enum(APP_STATES),
+  /** Whether this run is what started the teardown, rather than finding one already under way. */
+  changed: z.boolean(),
+});
+
+export type Deleted = z.infer<typeof DeletedSchema>;
+
+export const DELETED_OUTPUT = defineOutput({
+  schema: DeletedSchema,
+  render: ({ value, out }) =>
+    out.done(
+      value.changed
+        ? `${value.slug} is ${value.state}. What is on the volume goes when the host holding it says so.`
+        : `${value.slug} is already being deleted.`,
+    ),
+});
+
 export type DeleteInput = {
   api: PublicApiClient;
   slug: string;
-  ui: Ui;
   yes: boolean;
   interactive: boolean;
 };
@@ -28,12 +48,11 @@ export type DeleteInput = {
  * The app is looked up before anything is asked, so a slug that names nothing costs one line
  * rather than a phrase typed out for an app that was never there.
  */
-export async function deleteApp({ api, slug, ui, yes, interactive }: DeleteInput): Promise<void> {
+export async function deleteApp({ api, slug, yes, interactive }: DeleteInput): Promise<Deleted> {
   const { app } = await appFor({ api, slug, operation: 'delete' });
   // Asking twice is asking once: the teardown already running is the answer to the second.
   if (app.state === 'deleting') {
-    ui.done(`${app.slug} is already being deleted.`);
-    return;
+    return { slug: app.slug, state: app.state, changed: false };
   }
 
   if (!yes) {
@@ -45,9 +64,7 @@ export async function deleteApp({ api, slug, ui, yes, interactive }: DeleteInput
   }
 
   const deleting = await requestDeletion({ api, appId: app.id });
-  ui.done(
-    `${deleting.slug} is ${deleting.state}. What is on the volume goes when the host holding it says so.`,
-  );
+  return { slug: deleting.slug, state: deleting.state, changed: true };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { deleteApp, saysDeletePermanently } from '#lib/delete.ts';
+import { DELETED_OUTPUT, deleteApp, saysDeletePermanently } from '#lib/delete.ts';
 import {
   apiHolding,
   deploymentsHolding,
@@ -8,7 +8,7 @@ import {
   RUNNING_DEPLOYMENT,
 } from '#tests/support/api.ts';
 import { APP_ID, HOSTNAME, SLUG } from '#tests/support/app.ts';
-import { uiRecording } from '#tests/support/ui.ts';
+import { writerRecording } from '#tests/support/output.ts';
 
 function listed(overrides: Partial<ListedApp> = {}): ListedApp {
   return listedApp({ hostnames: [{ hostname: HOSTNAME }], ...overrides });
@@ -37,7 +37,6 @@ describe('what a run with nobody watching is allowed to delete', () => {
     const attempt = deleteApp({
       api: apiHoldingDeletable({ apps: [listed()], deleted }),
       slug: SLUG,
-      ui: uiRecording(),
       yes: false,
       interactive: false,
     });
@@ -52,7 +51,6 @@ describe('what a run with nobody watching is allowed to delete', () => {
     await deleteApp({
       api: apiHoldingDeletable({ apps: [listed()], deleted }),
       slug: SLUG,
-      ui: uiRecording(),
       yes: true,
       interactive: false,
     });
@@ -64,18 +62,24 @@ describe('what a run with nobody watching is allowed to delete', () => {
 // The teardown already running is the answer to the second request, so it is not sent.
 test('an app already being deleted is not deleted again', async () => {
   const deleted: string[] = [];
-  const ui = uiRecording();
 
-  await deleteApp({
+  const deleting = await deleteApp({
     api: apiHoldingDeletable({ apps: [listed({ state: 'deleting' })], deleted }),
     slug: SLUG,
-    ui,
     yes: true,
     interactive: false,
   });
 
   expect(deleted).toEqual([]);
-  expect(ui.said).toEqual([`${SLUG} is already being deleted.`]);
+  expect(deleting).toEqual({ slug: SLUG, state: 'deleting', changed: false });
+});
+
+test('and the teardown already under way is what a reader is told about', () => {
+  const out = writerRecording();
+
+  DELETED_OUTPUT.render({ value: { slug: SLUG, state: 'deleting', changed: false }, out });
+
+  expect(out.said).toEqual([`${SLUG} is already being deleted.`]);
 });
 
 describe('what counts as having typed the phrase', () => {

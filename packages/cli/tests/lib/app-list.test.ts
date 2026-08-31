@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { type AppListing, render } from '#lib/app-list.ts';
+import { APP_LIST_OUTPUT, type AppRow, render } from '#lib/app-list.ts';
 import { BYTES_PER_MIB, MEMORY_MIB, SLUG, VOLUME_SIZE_BYTES } from '#tests/support/app.ts';
+import { writerRecording } from '#tests/support/output.ts';
 
 const MEASURED_SHARE = 0.17;
 const MEASURED_PERCENT = '17%';
@@ -9,47 +10,22 @@ const CPU_PERCENT = '42%';
 const MEMORY_SHARE = 0.5;
 const MEMORY_PERCENT = '50%';
 
-type Overrides = Partial<{
-  [Key in keyof AppListing]: AppListing[Key] | string;
-}>;
+const MEMORY_BYTES = MEMORY_MIB * BYTES_PER_MIB;
 
-// Plain strings rather than the branded ones the wire carries: what is pinned down here is how a
-// row is laid out, and a cast per field would be spelling rather than meaning.
-function app(overrides: Overrides = {}): AppListing {
+function app(overrides: Partial<AppRow> = {}): AppRow {
   return {
     slug: SLUG,
     state: 'active',
     updatedAt: '2026-08-07T09:41:00.123Z',
-    config: { volumeSizeBytes: VOLUME_SIZE_BYTES, resources: { memoryMib: MEMORY_MIB } },
-    volumeUsage: null,
-    computeUsage: null,
+    cpuShare: null,
+    memory: { usedBytes: null, totalBytes: MEMORY_BYTES },
+    volume: { usedBytes: null, totalBytes: VOLUME_SIZE_BYTES },
     ...overrides,
-  } as AppListing;
+  };
 }
 
-// Cast once here for the same reason `app` casts once: the branding is the wire's, and what this
-// file is about is the column, not the parsing that produced it.
-function used(share: number): AppListing['volumeUsage'] {
-  return {
-    totalBytes: VOLUME_SIZE_BYTES,
-    usedBytes: VOLUME_SIZE_BYTES * share,
-    measuredAt: '2026-08-07T09:40:00.000Z',
-  } as NonNullable<AppListing['volumeUsage']>;
-}
-
-function spending({
-  memoryShare,
-  cpuShare,
-}: {
-  memoryShare: number;
-  cpuShare?: number;
-}): AppListing['computeUsage'] {
-  return {
-    memoryTotalBytes: MEMORY_MIB * BYTES_PER_MIB,
-    memoryUsedBytes: MEMORY_MIB * BYTES_PER_MIB * memoryShare,
-    ...(cpuShare === undefined ? {} : { cpuShare }),
-    measuredAt: '2026-08-07T09:40:00.000Z',
-  } as NonNullable<AppListing['computeUsage']>;
+function used({ share, of }: { share: number; of: number }) {
+  return { usedBytes: of * share, totalBytes: of };
 }
 
 describe('a listing is read down a column', () => {
@@ -87,12 +63,19 @@ describe('a listing is read down a column', () => {
 
 describe('the share columns say what an app is using of what it was given', () => {
   test('a measured app shows what share of its volume it is using', () => {
-    expect(render([app({ volumeUsage: used(MEASURED_SHARE) })]).at(-1)).toContain(MEASURED_PERCENT);
+    const line = render([
+      app({ volume: used({ share: MEASURED_SHARE, of: VOLUME_SIZE_BYTES }) }),
+    ]).at(-1);
+
+    expect(line).toContain(MEASURED_PERCENT);
   });
 
   test('a measured guest shows what share of its cpu and memory it is using', () => {
     const line = render([
-      app({ computeUsage: spending({ memoryShare: MEMORY_SHARE, cpuShare: CPU_SHARE }) }),
+      app({
+        cpuShare: CPU_SHARE,
+        memory: used({ share: MEMORY_SHARE, of: MEMORY_BYTES }),
+      }),
     ]).at(-1);
 
     expect(line).toContain(CPU_PERCENT);
@@ -102,7 +85,7 @@ describe('the share columns say what an app is using of what it was given', () =
   // A share is a rate, so the first reading taken of a guest has none — while the memory beside
   // it is a level and arrives whole. One column empty must not empty the other.
   test('a guest measured before it had a rate still shows its memory', () => {
-    const line = render([app({ computeUsage: spending({ memoryShare: MEMORY_SHARE }) })]).at(-1);
+    const line = render([app({ memory: used({ share: MEMORY_SHARE, of: MEMORY_BYTES }) })]).at(-1);
 
     expect(line).toContain(MEMORY_PERCENT);
     expect(line).toContain(`-   ${MEMORY_PERCENT}`);
@@ -121,4 +104,14 @@ test('the order the api answered with is the order that is printed', () => {
   const lines = render([app({ slug: 'newest' }), app({ slug: 'oldest' })]);
 
   expect(lines.map((line) => line.split(' ')[0])).toEqual(['SLUG', 'newest', 'oldest']);
+});
+
+// A heading over nothing reads as a listing that failed rather than an account with nothing in it.
+test('an owner with no apps is told what makes one instead of shown a heading', () => {
+  const out = writerRecording();
+
+  APP_LIST_OUTPUT.render({ value: { apps: [] }, out });
+
+  expect(out.at).toEqual(['dim']);
+  expect(out.said[0]).toContain('`nib run`');
 });

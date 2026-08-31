@@ -3,7 +3,9 @@ import { dirname, join } from 'node:path';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError } from '@repo/api-client/unwrap';
 import { appFor, awaitExportBundle, requestExport } from '@repo/app-operations';
+import { z } from 'zod';
 import { UsageError } from '#lib/errors.ts';
+import { defineOutput } from '#lib/output.ts';
 import type { Ui } from '#lib/ui.ts';
 
 /** What the host writes, so what the file is called when the caller left the naming to us. */
@@ -17,6 +19,19 @@ const PARTIAL_SUFFIX = '.partial';
 
 const BYTES_PER_MIB = 1_048_576;
 const MIB_DECIMALS = 1;
+
+const ExportSchema = z.object({
+  slug: z.string(),
+  exportId: z.string(),
+  /** Where the bundle was written, which is the whole of what this command is asked for. */
+  path: z.string(),
+  sizeBytes: z.number().nullable(),
+});
+
+export const EXPORT_OUTPUT = defineOutput({
+  schema: ExportSchema,
+  render: ({ value, out }) => out.done(value.path),
+});
 
 export type ExportInput = {
   api: PublicApiClient;
@@ -33,7 +48,12 @@ export type ExportInput = {
  * filesystem is the most expensive thing the platform does on an owner's behalf: a path that
  * cannot be written is worth one line now rather than one line several minutes from now.
  */
-export async function exportApp({ api, slug, destination, ui }: ExportInput): Promise<void> {
+export async function exportApp({
+  api,
+  slug,
+  destination,
+  ui,
+}: ExportInput): Promise<z.input<typeof ExportSchema>> {
   const path = await bundlePath({ destination, slug });
   const { app } = await appFor({ api, slug, operation: 'export' });
 
@@ -49,7 +69,7 @@ export async function exportApp({ api, slug, destination, ui }: ExportInput): Pr
     task: () => download({ url: bundle.downloadUrl, path }),
   });
 
-  ui.done(path);
+  return { slug: app.slug, exportId: requested.id, path, sizeBytes: bundle.sizeBytes ?? null };
 }
 
 /**

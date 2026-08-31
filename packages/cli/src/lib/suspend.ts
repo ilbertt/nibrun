@@ -4,34 +4,61 @@ import {
   resumeApp as requestResume,
   suspendApp as requestSuspension,
 } from '@repo/app-operations';
-import type { Ui } from '#lib/ui.ts';
+import { APP_STATES } from '@repo/protocol';
+import { z } from 'zod';
+import { defineOutput } from '#lib/output.ts';
 
-export type SuspendInput = { api: PublicApiClient; slug: string; ui: Ui };
+/** Where the app was left, and whether this run is what put it there. */
+const AppStateChangeSchema = z.object({
+  slug: z.string(),
+  state: z.enum(APP_STATES),
+  changed: z.boolean(),
+});
+
+export type AppStateChange = z.infer<typeof AppStateChangeSchema>;
+
+export const SUSPENDED_OUTPUT = defineOutput({
+  schema: AppStateChangeSchema,
+  render: ({ value, out }) =>
+    out.done(
+      value.changed
+        ? `${value.slug} is suspended. Its microVM stops; the volume, everything on it and every hostname stay.`
+        : `${value.slug} is already suspended.`,
+    ),
+});
+
+export const RESUMED_OUTPUT = defineOutput({
+  schema: AppStateChangeSchema,
+  render: ({ value, out }) =>
+    out.done(
+      value.changed
+        ? `${value.slug} is active. The host boots the deployment it was suspended on.`
+        : `${value.slug} is already running.`,
+    ),
+});
+
+export type SuspendInput = { api: PublicApiClient; slug: string };
 
 /**
  * Take an app offline without giving anything of it up. Nothing here is destructive and there is
  * nothing to confirm: what a suspended app costs is its uptime, and resuming is the undo.
  */
-export async function suspendApp({ api, slug, ui }: SuspendInput): Promise<void> {
+export async function suspendApp({ api, slug }: SuspendInput): Promise<AppStateChange> {
   const { app } = await appFor({ api, slug, operation: 'suspend' });
   if (app.state === 'suspended') {
-    ui.done(`${app.slug} is already suspended.`);
-    return;
+    return { slug: app.slug, state: app.state, changed: false };
   }
 
   const suspended = await requestSuspension({ api, appId: app.id });
-  ui.done(
-    `${suspended.slug} is suspended. Its microVM stops; the volume, everything on it and every hostname stay.`,
-  );
+  return { slug: suspended.slug, state: suspended.state, changed: true };
 }
 
-export async function resumeApp({ api, slug, ui }: SuspendInput): Promise<void> {
+export async function resumeApp({ api, slug }: SuspendInput): Promise<AppStateChange> {
   const { app } = await appFor({ api, slug, operation: 'resume' });
   if (app.state === 'active') {
-    ui.done(`${app.slug} is already running.`);
-    return;
+    return { slug: app.slug, state: app.state, changed: false };
   }
 
   const resumed = await requestResume({ api, appId: app.id });
-  ui.done(`${resumed.slug} is active. The host boots the deployment it was suspended on.`);
+  return { slug: resumed.slug, state: resumed.state, changed: true };
 }

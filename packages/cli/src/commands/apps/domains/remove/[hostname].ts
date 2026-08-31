@@ -2,8 +2,8 @@ import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { removeAppDomain } from '#lib/domains.ts';
-import { createUi, isInteractive } from '#lib/ui.ts';
+import { DOMAIN_REMOVED_OUTPUT, removeAppDomain } from '#lib/domains.ts';
+import { createOutput } from '#lib/output.ts';
 
 // Unasked, unlike `apps delete`: the app keeps running on every other hostname, and re-adding
 // this one costs the same two records it cost the first time.
@@ -16,14 +16,17 @@ export const command = defineCommand('apps domains remove [hostname]', {
     },
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
-  handler: async ({ params, parents, context, print }) => {
+  handler: async ({ params, parents, context, print, rootOptions }) => {
+    const { interactive, ui, emit } = createOutput({
+      output: DOMAIN_REMOVED_OUTPUT,
+      print,
+      json: rootOptions.json,
+    });
     const { api } = context;
-    const interactive = isInteractive();
-    const ui = createUi({ print, interactive });
 
     ui.open('nib apps domains remove');
     const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
 
-    await removeAppDomain({ api, slug, hostname: params.hostname, ui });
+    emit(await removeAppDomain({ api, slug, hostname: params.hostname }));
   },
 });

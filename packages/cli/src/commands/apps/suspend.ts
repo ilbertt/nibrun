@@ -1,22 +1,25 @@
 import { defineCommand } from '@parshjs/core';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { suspendApp } from '#lib/suspend.ts';
-import { createUi, isInteractive } from '#lib/ui.ts';
+import { createOutput } from '#lib/output.ts';
+import { SUSPENDED_OUTPUT, suspendApp } from '#lib/suspend.ts';
 
 export const command = defineCommand('apps suspend', {
   description:
     'Take the app offline. Its microVM stops; the volume, everything on it and every hostname stay. `nib apps resume` puts it back.',
   options: {},
   beforeHandler: ({ context }) => requireSignedIn(context),
-  handler: async ({ parents, context, print }) => {
+  handler: async ({ parents, context, print, rootOptions }) => {
+    const { interactive, ui, emit } = createOutput({
+      output: SUSPENDED_OUTPUT,
+      print,
+      json: rootOptions.json,
+    });
     const { api } = context;
-    const interactive = isInteractive();
-    const ui = createUi({ print, interactive });
 
     ui.open('nib apps suspend');
     const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
 
-    await suspendApp({ api, slug, ui });
+    emit(await suspendApp({ api, slug }));
   },
 });

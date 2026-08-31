@@ -1,15 +1,41 @@
-import type { Print } from '@parshjs/core';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
 import type { ListedApp } from '@repo/app-operations';
 import { APP_STATES } from '@repo/protocol';
+import { z } from 'zod';
 import { NO_APPS } from '#lib/apps.ts';
+import { defineOutput } from '#lib/output.ts';
 import { dayAndMinute } from '#lib/timestamp.ts';
 
-export type AppListing = Pick<
+/**
+ * What is spent of one resource and what there is of it, in bytes. Both figures rather than the
+ * share the column shows: a share is what a listing is read down, and the bytes behind it are
+ * what anything reading this with a program would have had to reconstruct.
+ */
+const MeasuredSchema = z.object({
+  /** `null` for an app nothing has measured, which is every app that has not yet run. */
+  usedBytes: z.number().nullable(),
+  totalBytes: z.number(),
+});
+
+const AppRowSchema = z.object({
+  slug: z.string(),
+  state: z.enum(APP_STATES),
+  updatedAt: z.string(),
+  cpuShare: z.number().nullable(),
+  memory: MeasuredSchema,
+  volume: MeasuredSchema,
+});
+
+export type AppRow = z.infer<typeof AppRowSchema>;
+
+/** The half of the api's answer a row is read off. */
+type AppListing = Pick<
   ListedApp,
   'slug' | 'state' | 'updatedAt' | 'config' | 'volumeUsage' | 'computeUsage'
 >;
+
+const AppListSchema = z.object({ apps: z.array(AppRowSchema) });
 
 // `LAST CHANGE` rather than `UPDATED`, which reads as the owner having done it: the row moves on
 // a config patch or a state change, and a deploy leaves it alone entirely.
@@ -48,29 +74,54 @@ function shareWidth(heading: string): number {
  * looking for is the app that is filling up or pinning a core, and the bytes behind it are a line
  * on that app's own page.
  */
-function share(measured: number | undefined): string {
-  return measured === undefined
+function share(measured: number | null): string {
+  return measured === null
     ? UNMEASURED
     : `${Math.round(Math.min(measured, FULL) * PERCENT_SCALE)}%`;
 }
 
-/** Print what the owner has, one app to a line. */
+function ratio({ usedBytes, totalBytes }: z.infer<typeof MeasuredSchema>): number | null {
+  return usedBytes === null ? null : usedBytes / totalBytes;
+}
+
+export const APP_LIST_OUTPUT = defineOutput({
+  schema: AppListSchema,
+  render: ({ value, out }) => {
+    if (value.apps.length === 0) {
+      out.dim(NO_APPS);
+      return;
+    }
+    for (const line of render(value.apps)) {
+      out.info(line);
+    }
+  },
+});
+
+/** What the owner has, one app to a row. */
 export async function listApps({
   api,
-  print,
 }: {
   api: PublicApiClient;
-  print: Print;
-}): Promise<void> {
+}): Promise<z.input<typeof AppListSchema>> {
   const { apps } = unwrap(await api.api.apps.get());
-  if (apps.length === 0) {
-    print.dim(NO_APPS);
-    return;
-  }
+  return { apps: apps.map(toRow) };
+}
 
-  for (const line of render(apps)) {
-    print.info(line);
-  }
+function toRow(app: AppListing): AppRow {
+  return {
+    slug: app.slug,
+    state: app.state,
+    updatedAt: app.updatedAt,
+    cpuShare: app.computeUsage?.cpuShare ?? null,
+    memory: {
+      usedBytes: app.computeUsage?.memoryUsedBytes ?? null,
+      totalBytes: app.config.resources.memoryMib * BYTES_PER_MIB,
+    },
+    volume: {
+      usedBytes: app.volumeUsage?.usedBytes ?? null,
+      totalBytes: app.config.volumeSizeBytes,
+    },
+  };
 }
 
 /**
@@ -81,8 +132,8 @@ export async function listApps({
  * A heading, unlike the filesystem listing: there a name and a size say what they are, and here
  * every column but one is a number that would read as any of the others.
  */
-export function render(apps: readonly AppListing[]): string[] {
-  const rows = [HEADINGS, ...apps.map(toRow)];
+export function render(apps: readonly AppRow[]): string[] {
+  const rows = [HEADINGS, ...apps.map(toColumns)];
   const slugWidth = Math.max(...rows.map((row) => row.slug.length));
 
   return rows.map((row) =>
@@ -97,20 +148,13 @@ export function render(apps: readonly AppListing[]): string[] {
   );
 }
 
-function toRow(app: AppListing) {
-  const compute = app.computeUsage;
+function toColumns(app: AppRow) {
   return {
     slug: app.slug,
     state: app.state,
-    cpu: share(compute?.cpuShare),
-    memory: share(
-      compute
-        ? compute.memoryUsedBytes / (app.config.resources.memoryMib * BYTES_PER_MIB)
-        : undefined,
-    ),
-    volume: share(
-      app.volumeUsage ? app.volumeUsage.usedBytes / app.config.volumeSizeBytes : undefined,
-    ),
+    cpu: share(app.cpuShare),
+    memory: share(ratio(app.memory)),
+    volume: share(ratio(app.volume)),
     updated: dayAndMinute(app.updatedAt),
   };
 }
