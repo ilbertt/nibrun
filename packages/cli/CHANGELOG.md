@@ -2,6 +2,14 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.31-2]
+
+### 🚀 Features
+
+- *(cli)* A command answers with a typed value, and --json prints it (#419)
+- *(cli)* Nib upgrade runs the install against the nib that ran it (#415)
+- *(agent)* An app can wait for a request instead of running (#390)
+
 ## [2026.8.31-1]
 
 ### 🚀 Features
