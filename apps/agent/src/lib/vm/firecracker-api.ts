@@ -141,6 +141,14 @@ export const createSnapshot = Effect.fn('firecracker.createSnapshot')(
  *
  * `mem_backend` rather than the `mem_file_path` beside it: that spelling is deprecated upstream
  * and the two are mutually exclusive, so sending both is a rejection rather than a preference.
+ *
+ * `clock_realtime` is not a refinement. Firecracker emulates no RTC on x86_64, so kvmclock is the
+ * guest's only source of wall time — `infra/guest-image/kernel/nibrun.config` builds a kernel with
+ * `CONFIG_PARAVIRT_CLOCK` and nothing else to fall back on. Its default of `false` resumes the
+ * clock where the snapshot left it, so a guest that slept an hour wakes an hour in the past and
+ * its first outbound TLS handshake fails on a certificate that is not yet valid — a wrong answer
+ * from a healthy-looking app rather than a microVM that visibly did not come up. This one field
+ * is what makes a sleep invisible to the guest, and it is why waking needs no new guest image.
  */
 export const loadSnapshot = Effect.fn('firecracker.loadSnapshot')(
   ({ socketPath, statePath, memoryPath }: SnapshotFiles) =>
@@ -152,6 +160,7 @@ export const loadSnapshot = Effect.fn('firecracker.loadSnapshot')(
         body: {
           snapshot_path: statePath,
           mem_backend: { backend_type: 'File', backend_path: memoryPath },
+          clock_realtime: true,
         },
       }),
     ),

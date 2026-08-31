@@ -112,8 +112,19 @@ describe('the requests are the ones Firecracker 1.16.1 answers', () => {
       body: {
         snapshot_path: '/data/nibrun-vm/app/vmstate',
         mem_backend: { backend_type: 'File', backend_path: '/data/nibrun-vm/app/memory' },
+        clock_realtime: true,
       },
     });
+  });
+
+  // Asserted on its own because the default is silent breakage: kvmclock is the guest's only
+  // wall clock, so a load that omitted this would restore a guest as far in the past as it slept
+  // and every certificate it checked would read as not yet valid.
+  test('a load advances the guest clock by the time it was asleep', async () => {
+    const { received } = await against({
+      call: (socketPath) => loadSnapshot(files({ socketPath })),
+    });
+    expect(received[0]?.body).toHaveProperty('clock_realtime', true);
   });
 });
 
