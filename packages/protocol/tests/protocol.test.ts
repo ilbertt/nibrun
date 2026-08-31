@@ -19,7 +19,10 @@ import {
   HostnameSchema,
   type HostPort,
   type HttpPort,
+  IdleTimeoutMsSchema,
   isValidMessage,
+  MAX_IDLE_TIMEOUT_MS,
+  MIN_IDLE_TIMEOUT_MS,
   namesExtraPublicPortValues,
   ObjectKeySchema,
   ProtocolValidationError,
@@ -595,5 +598,28 @@ describe('a record read twice is handed over once', () => {
     seen.admit(logRecord({ _time: A_LATER_INSTANT, sequence: 1 }));
 
     expect(seen.admit(logRecord({ _time: A_LATER_INSTANT, sequence: 1 }))).toBe(false);
+  });
+});
+
+describe('how long an app may wait before it sleeps', () => {
+  const accepts = (value: number) => isValidMessage({ schema: IdleTimeoutMsSchema, value });
+
+  // The floor is the cadence the host measures traffic on, so anything under it is a promise
+  // the host cannot keep rather than an aggressive setting.
+  test('below the measurement tick is refused', () => {
+    expect(accepts(MIN_IDLE_TIMEOUT_MS)).toBe(true);
+    expect(accepts(MIN_IDLE_TIMEOUT_MS - 1)).toBe(false);
+  });
+
+  // The ceiling is not a view about how long is sensible — `always` is how an owner says never
+  // sleep. It only catches the slipped zero, so it has to accept every wait somebody could mean.
+  test('a day is accepted and a typo past it is not', () => {
+    expect(accepts(MAX_IDLE_TIMEOUT_MS)).toBe(true);
+    expect(accepts(MAX_IDLE_TIMEOUT_MS + 1)).toBe(false);
+  });
+
+  test('the hours an app visited twice a day would want are legal', () => {
+    const sixHours = 21_600_000;
+    expect(accepts(sixHours)).toBe(true);
   });
 });

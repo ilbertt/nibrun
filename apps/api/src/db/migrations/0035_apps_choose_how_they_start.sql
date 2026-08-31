@@ -14,12 +14,17 @@
 -- almost none of it at an hour, and rather than seconds because whoever arrives after the gap
 -- pays a cold boot for it. It is read only for `on-request`, and kept for every app so that
 -- flipping the activation is one column rather than two. The floor repeats MIN_IDLE_TIMEOUT_MS
--- from @repo/protocol, which is the cadence the host measures traffic on.
+-- from @repo/protocol, which is the cadence the host measures traffic on: a shorter timeout
+-- would be one the host accepts and cannot keep. The ceiling is a different kind of rule and
+-- deliberately loose — `always` is how an owner says never sleep, so a long wait is a legal
+-- preference rather than a wrong one. A day only ever refuses the slipped zero that turns
+-- fifteen minutes into two and a half hours and stops the saving without saying so.
 ALTER TABLE nibrun.apps
   ADD COLUMN activation text NOT NULL DEFAULT 'always',
   ADD COLUMN idle_timeout_ms integer NOT NULL DEFAULT 900000,
   ADD CONSTRAINT apps_activation_check CHECK (activation IN ('always', 'on-request')),
-  ADD CONSTRAINT apps_idle_timeout_ms_check CHECK (idle_timeout_ms >= 60000);
+  ADD CONSTRAINT apps_idle_timeout_ms_check
+    CHECK (idle_timeout_ms >= 60000 AND idle_timeout_ms <= 86400000);
 
 COMMENT ON COLUMN nibrun.apps.activation IS $c$@type import('@repo/protocol').AppActivation$c$;
 

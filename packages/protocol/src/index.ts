@@ -23,6 +23,7 @@ export {
   type HostDesiredState,
   HostDesiredStateSchema,
   IdleTimeoutMsSchema,
+  MAX_IDLE_TIMEOUT_MS,
   MIN_IDLE_TIMEOUT_MS,
 } from '#control/desired-state.ts';
 export {
