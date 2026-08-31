@@ -33,8 +33,8 @@ const PLATFORM = Value.Parse(HostnameSchema, 'pocketbase.apps.example.com');
 
 const FIRST_TOKEN = 'sk-sealed-once';
 
-// `0035`'s column default, which nothing in the protocol names — a quarter of an hour.
-const DEFAULT_IDLE_TIMEOUT_MS = 900_000;
+// The column default, which nothing in the protocol names — five minutes.
+const DEFAULT_IDLE_TIMEOUT_MS = 300_000;
 
 // One database for the file, because bringing a container up and migrating it is the expensive
 // part and every describe below wants the same empty schema.

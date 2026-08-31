@@ -11,7 +11,7 @@ import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
  * that predates the field, or one that could not read it. Long enough not to stop an app out
  * from under somebody reading a page, short enough that most of a quiet day is reclaimed.
  */
-export const DEFAULT_IDLE_TIMEOUT_MS = 900_000;
+export const DEFAULT_IDLE_TIMEOUT_MS = 300_000;
 
 /**
  * Only a microVM that is up can be put down, and only one that is not on its way up.
