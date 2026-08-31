@@ -124,6 +124,7 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly leftovers = new Map<AppId, Leftovers>();
   readonly measured: ReadonlyMap<AppId, FilesystemUsage>[] = [];
   readonly spending: ReadonlyMap<AppId, ComputeUsage>[] = [];
+  readonly forgotten: AppId[][] = [];
   deleting: AppId[] = [];
   purgeable: AppId[] = [];
   deployedApps: AppId[] = [];
@@ -223,6 +224,11 @@ class StubAppsRepository implements AppsRepositoryContract {
 
   recordComputeUsage({ readings }: { readings: ReadonlyMap<AppId, ComputeUsage> }): Promise<void> {
     this.spending.push(new Map(readings));
+    return Promise.resolve();
+  }
+
+  clearComputeUsage({ appIds }: { appIds: readonly AppId[] }): Promise<void> {
+    this.forgotten.push([...appIds]);
     return Promise.resolve();
   }
 
@@ -957,6 +963,14 @@ describe('what a guest is spending, as the host running it last measured it', ()
     };
   }
 
+  /** An app asleep between requests, which is a host reporting no reading and saying why. */
+  const ASLEEP: ReportedInstance = {
+    appId: APP_ID,
+    deploymentId: DEPLOYMENT_ID,
+    state: 'idle',
+    restartCount: 0,
+  };
+
   test('a reading a host took is recorded against the app it is running', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
@@ -973,6 +987,28 @@ describe('what a guest is spending, as the host running it last measured it', ()
     await serviceWith({ appsRepo }).recordComputeUsage({ instances: [reportedInstance()] });
 
     expect(appsRepo.spending).toEqual([]);
+  });
+
+  /**
+   * The difference between a reading that did not arrive and a guest that is not there. Leaving
+   * the last figure standing would have an app holding nothing go on being shown spending what it
+   * spent before it slept, for as long as it slept.
+   */
+  test('an app reported asleep is forgotten rather than left as it was', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).recordComputeUsage({ instances: [ASLEEP] });
+
+    expect(appsRepo.forgotten).toEqual([[APP_ID]]);
+    expect(appsRepo.spending).toEqual([]);
+  });
+
+  test('and a running app that simply was not measured is left exactly as it was', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).recordComputeUsage({ instances: [reportedInstance()] });
+
+    expect(appsRepo.forgotten).toEqual([]);
   });
 
   test('two instances naming one app are written once, as the later reading', async () => {

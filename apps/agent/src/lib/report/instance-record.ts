@@ -70,6 +70,15 @@ export const newInstanceRecord = (
 });
 
 /**
+ * Whether this app is asleep between requests: a record holding its slot and its hostnames with
+ * no microVM behind them. Asked wherever a loop would otherwise treat the absence as a failure or
+ * as a guest it can still reach.
+ */
+export function isIdle(record: InstanceRecord | undefined): boolean {
+  return record?.state === 'idle';
+}
+
+/**
  * What every health decision about a record needs, in the one place that knows `startedAt` is a
  * wire timestamp here and a clock reading there — and that a record this agent never started has
  * no start time at all.

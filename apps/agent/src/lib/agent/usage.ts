@@ -4,6 +4,7 @@ import { recordActivity } from '#lib/agent/activity.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import type { MeasuredCompute } from '#lib/filesystem/protocol.ts';
 import { applySleep } from '#lib/reconcile/idle.ts';
+import { isIdle } from '#lib/report/instance-record.ts';
 import { type AgentSnapshot, AgentState } from '#services/agent-state.service.ts';
 import { FilesystemReader, type GuestReading } from '#services/filesystem-reader.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -100,6 +101,12 @@ function computeUsageAfter({
   const compute = new Map<AppId, ComputeUsage>();
   const ticks = new Map<AppId, MeasuredCompute>();
   for (const { appId, reading } of taken) {
+    // A guest that is not there is not a guest that failed to answer. The counters go with the
+    // microVM too: a wake is a cold boot, so the next reading is of a guest that started counting
+    // again and has nothing behind it to subtract.
+    if (isIdle(previous.records.get(appId))) {
+      continue;
+    }
     const before = previous.computeTicks.get(appId);
     const measured = reading?.compute;
     if (measured === undefined) {
@@ -126,6 +133,12 @@ function computeUsageAfter({
  * went with it, and the honest answer about it is what was true when it was last running rather
  * than nothing at all. Each reading carries the moment it was taken, which is what lets whoever
  * reads it tell the two apart.
+ *
+ * An app asleep between requests forgets instead. What a suspended app last spent answers a
+ * question its owner asked by taking it offline; an `on-request` app sleeps and wakes on its own
+ * all day, and a figure carried across every sleep would have an app that is holding nothing go
+ * on reporting what it held when it last ran. Not costing anything while asleep is the whole of
+ * the policy, so the reading goes with the microVM.
  */
 export const measureUsage = Effect.gen(function* () {
   const allocator = yield* SlotAllocator;
