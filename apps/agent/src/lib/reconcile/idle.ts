@@ -13,8 +13,15 @@ import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
  */
 export const DEFAULT_IDLE_TIMEOUT_MS = 900_000;
 
-/** Only a microVM that is up can be put down, and only one that is not on its way up. */
-const SLEEPABLE_STATES = new Set(['running', 'unhealthy']);
+/**
+ * Only a microVM that is up can be put down, and only one that is not on its way up.
+ *
+ * `unhealthy` is not among them, though it is up: an app failing its probes has gone quiet
+ * *because* it is broken, so the silence is a symptom of the fault rather than evidence nobody
+ * wants it. Sleeping it would turn a failure the owner can see into one they cannot, and take it
+ * out of the restart and backoff machinery that exists to answer exactly this.
+ */
+const SLEEPABLE_STATES = new Set(['running']);
 
 /**
  * An app with no activity recorded is never quiet: it is one this agent has not watched long

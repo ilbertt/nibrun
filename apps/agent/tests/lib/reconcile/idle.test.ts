@@ -8,8 +8,11 @@ const NOW_MS = 10_000_000;
 const QUIET_SINCE_MS = NOW_MS - TIMEOUT_MS;
 const BUSY_SINCE_MS = NOW_MS - TIMEOUT_MS + 1;
 
-/** The two an app can be stopped from: up and serving, or up and not answering. */
-const AWAKE_STATES: InstanceState[] = ['running', 'unhealthy'];
+/** The one an app can be let go to sleep from: up, and answering the probes that say so. */
+const SLEEPABLE: InstanceState = 'running';
+
+/** Up, so there is a microVM to stop — and not one this may stop. */
+const UNHEALTHY: InstanceState = 'unhealthy';
 
 function quiet(overrides: Partial<Parameters<typeof hasGoneQuiet>[0]>) {
   return hasGoneQuiet({
@@ -22,8 +25,17 @@ function quiet(overrides: Partial<Parameters<typeof hasGoneQuiet>[0]>) {
 }
 
 describe('an app is only let go to sleep once it is certain nobody wants it', () => {
-  test.each(AWAKE_STATES)('a quiet %s app has gone quiet', (state) => {
-    expect(quiet({ record: instanceRecord({ onRequest: true, state }) })).toBe(true);
+  test('a quiet serving app has gone quiet', () => {
+    expect(quiet({ record: instanceRecord({ onRequest: true, state: SLEEPABLE }) })).toBe(true);
+  });
+
+  /**
+   * An app failing its probes has gone quiet because it is broken, so the silence is a symptom of
+   * the fault rather than evidence nobody wants it. Sleeping it would turn a failure its owner can
+   * see into one they cannot, and take it out of the machinery that exists to answer this.
+   */
+  test('but an unhealthy app is not a quiet one, however long nobody has asked for it', () => {
+    expect(quiet({ record: instanceRecord({ onRequest: true, state: UNHEALTHY }) })).toBe(false);
   });
 
   test('one asked for a moment ago has not', () => {
@@ -42,7 +54,7 @@ describe('an app is only let go to sleep once it is certain nobody wants it', ()
     ).toBe(false);
   });
 
-  test.each(INSTANCE_STATES.filter((state) => !AWAKE_STATES.includes(state)))(
+  test.each(INSTANCE_STATES.filter((state) => state !== SLEEPABLE && state !== UNHEALTHY))(
     'a %s app has no microVM to stop',
     (state) => {
       expect(quiet({ record: instanceRecord({ onRequest: true, state }) })).toBe(false);
