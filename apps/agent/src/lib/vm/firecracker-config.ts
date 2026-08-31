@@ -12,9 +12,16 @@ const NO_BITS = 0;
  * `i8042.nopnp` is deliberately absent: it breaks SendCtrlAltDel on an ACPI-enabled guest, so a
  * graceful stop would silently become a kill. The static `ip=` form is why the guest ships no
  * DHCP client, and `quiet` only raises the printk threshold — panics and init writes are untouched.
+ *
+ * `clocksource=kvm-clock` is what makes waking from a snapshot safe, and it is not a preference.
+ * Firecracker's `clock_realtime` on `/snapshot/load` advances kvmclock by the wall time a guest
+ * slept through, and advances nothing else — so a guest that selected any other clocksource
+ * resumes at the instant it was paused and reads a wall clock hours behind. Measured on a host:
+ * without this, a 60s sleep left the guest 64s in the past; with it, 1s. The call still returns
+ * 204 either way, which is what makes the default worth naming here rather than trusting.
  */
 const BASE_KERNEL_ARGS =
-  'console=ttyS0 quiet reboot=k panic=1 pci=off i8042.noaux i8042.nomux i8042.dumbkbd root=/dev/vda ro init=/init';
+  'console=ttyS0 quiet reboot=k panic=1 pci=off i8042.noaux i8042.nomux i8042.dumbkbd clocksource=kvm-clock root=/dev/vda ro init=/init';
 
 export function netmaskFor(prefixLength: number): string {
   const octets: number[] = [];
