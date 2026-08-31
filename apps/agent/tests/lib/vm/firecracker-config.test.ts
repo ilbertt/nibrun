@@ -91,6 +91,14 @@ describe('the kernel command line', () => {
   // The fourth flag breaks SendCtrlAltDel on an ACPI-enabled guest, and the failure is silent:
   // the API answers 204 and the VMM reports success whether or not the guest can hear it, so a
   // graceful stop degrades to killing the VMM with the tenant mid-write.
+  // Measured on a host: without this a 60s sleep left the guest 64s in the past, with it 1s.
+  // `clock_realtime` on snapshot load advances kvmclock and nothing else, and the load returns
+  // 204 either way — so a guest that picked another clocksource wakes with a wrong wall clock and
+  // no failure to notice it by, which is a tenant's TLS handshakes failing on a valid certificate.
+  test('the guest reads the one clock a snapshot restore can advance', () => {
+    expect(renderKernelArgs(network)).toContain('clocksource=kvm-clock');
+  });
+
   test('it does not carry i8042.nopnp, which would break a graceful stop', () => {
     expect(renderKernelArgs(network)).not.toContain('i8042.nopnp');
   });
