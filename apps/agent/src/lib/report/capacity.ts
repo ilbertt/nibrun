@@ -1,7 +1,8 @@
 import { statfs } from 'node:fs/promises';
 import { availableParallelism, totalmem } from 'node:os';
-import type { HostCapacity, InstanceResources } from '@repo/protocol';
+import type { HostCapacity, InstanceResources, InstanceState } from '@repo/protocol';
 import { Effect } from 'effect';
+import type { InstanceRecord } from '#lib/report/instance-record.ts';
 
 const BYTES_PER_MIB = 1_048_576;
 const NONE = 0;
@@ -30,6 +31,26 @@ export const readHostCapacity = (cacheDir: string): Effect.Effect<HostCapacity> 
       cacheBytes,
     }),
   );
+
+/**
+ * The states in which an app has no microVM, and so is holding nothing of the host.
+ *
+ * `idle` belongs here for the reason the whole of `on-request` does: the memory a sleeping app is
+ * not using is the saving, and a host that went on reserving it would pay for every sleep and
+ * collect on none of them. What that costs is that the request waking an app can find the host
+ * full in the meantime — a real failure mode, and one for the waker to answer rather than one to
+ * hide by reserving memory nothing is using.
+ */
+const HOLDS_NOTHING: readonly InstanceState[] = ['idle', 'stopped', 'failed'];
+
+/** What the apps on this host are holding of it, which is what `allocatable` is the remainder of. */
+export function committedResources(
+  records: readonly InstanceRecord[],
+): readonly InstanceResources[] {
+  return records
+    .filter((record) => !HOLDS_NOTHING.includes(record.state))
+    .map((record) => record.resources);
+}
 
 const sum = (values: readonly number[]) => {
   let total = NONE;

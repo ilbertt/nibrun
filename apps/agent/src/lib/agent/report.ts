@@ -6,6 +6,7 @@ import { nowTimestamp } from '#lib/clock.ts';
 import { buildReportedState } from '#lib/report/build-report.ts';
 import {
   allocatableCapacity,
+  committedResources,
   readAvailableCacheBytes,
   readHostCapacity,
 } from '#lib/report/capacity.ts';
@@ -66,9 +67,7 @@ const report = Effect.gen(function* () {
       capacity,
       allocatable: allocatableCapacity({
         capacity,
-        committed: records
-          .filter((record) => record.state !== 'stopped' && record.state !== 'failed')
-          .map((record) => record.resources),
+        committed: committedResources(records),
         availableCacheBytes: yield* readAvailableCacheBytes(config.stateDir),
       }),
       versions: sessions.versions,
