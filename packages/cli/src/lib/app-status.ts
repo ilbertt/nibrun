@@ -2,9 +2,11 @@ import type { PublicApiClient } from '@repo/api-client/public';
 import {
   APP_STATUS_LABELS,
   type AppStatusKey,
+  activationSummary,
   appWithStatus,
   statusKey,
 } from '@repo/app-operations';
+import { APP_ACTIVATIONS } from '@repo/protocol';
 import { z } from 'zod';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { defineOutput } from '#lib/output.ts';
@@ -36,6 +38,13 @@ const AppStatusSchema = z.object({
    * answers that, and `running` is the word an owner is looking for here.
    */
   status: z.enum(STATUS_KEYS),
+  /**
+   * How the app comes up, as the two fields rather than the sentence they are rendered into: a
+   * caller reading `--json` is deciding something, and a timeout it would have to parse back out
+   * of `stopped after 15m of quiet` is one this has taken away from it.
+   */
+  activation: z.enum(APP_ACTIVATIONS),
+  idleTimeoutMs: z.number(),
   /** In vCPUs, so it is read against the count beside it rather than as a share of it. */
   vcpu: SpentSchema,
   memory: SpentSchema,
@@ -118,6 +127,9 @@ export function renderStatus(app: AppStatusReport): RenderedStatus {
   return {
     lines: [
       `${app.slug}  ${APP_STATUS_LABELS[app.status]}`,
+      // Under the status rather than in the table: `asleep` is only an answer beside the setting
+      // that put it there, and neither is something the app is spending.
+      activationSummary(app),
       '',
       ...resources.map((resource) =>
         `${resource.label.padEnd(LABEL_WIDTH)}  ${resource.spent}`.trimEnd(),
@@ -160,6 +172,8 @@ export async function readStatus({
   return {
     slug: app.slug,
     status: statusKey(status),
+    activation: app.activation,
+    idleTimeoutMs: app.idleTimeoutMs,
     vcpu: {
       used: cpuShare === undefined ? null : cpuShare * vcpuCount,
       total: vcpuCount,

@@ -6,7 +6,7 @@ import { createOutput } from '#lib/output.ts';
 
 export const command = defineCommand('apps status', {
   description:
-    'What one app is using of the machine it was given: vCPU, memory and volume, as the host last measured them.',
+    'How one app comes up, and what it is using of the machine it was given: vCPU, memory and volume, as the host last measured them.',
   options: {},
   beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ parents, context, print, rootOptions }) => {

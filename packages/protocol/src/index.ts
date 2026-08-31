@@ -22,9 +22,6 @@ export {
   DesiredVolumeSchema,
   type HostDesiredState,
   HostDesiredStateSchema,
-  IdleTimeoutMsSchema,
-  MAX_IDLE_TIMEOUT_MS,
-  MIN_IDLE_TIMEOUT_MS,
 } from '#control/desired-state.ts';
 export {
   type FilesystemQuery,
@@ -87,8 +84,11 @@ export {
   type AppState,
   AppStateSchema,
   EXTRA_PUBLIC_PORT_VALUES,
+  IdleTimeoutMsSchema,
   interpolableRuntimeValue,
+  MAX_IDLE_TIMEOUT_MS,
   MIN_HOSTNAMES,
+  MIN_IDLE_TIMEOUT_MS,
   namesExtraPublicPortValues,
   namesOfferedRuntimeValues,
   OWNED_APP_STATES,

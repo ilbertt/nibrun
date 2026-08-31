@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
 import { CopyButton } from '@repo/ui/custom/copy-button';
+import { AppActivation } from '#components/apps/app-activation.tsx';
 import { AppEnvironment } from '#components/apps/app-environment.tsx';
 import { AppRunCommand } from '#components/apps/app-run-command.tsx';
 import { useNewestDeployment } from '#lib/hooks/use-newest-deployment.ts';
@@ -18,6 +19,7 @@ export function AppConfigCard({ app }: { app: AppSummary }) {
         </div>
         {app.config.hasExtraPublicPort && <ReachedOnItsOwnPort appId={app.id} />}
         <AppRunCommand app={app} />
+        <AppActivation app={app} />
         <AppEnvironment app={app} />
       </CardContent>
     </Card>

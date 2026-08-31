@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { MIN_IDLE_TIMEOUT_MS } from '@repo/protocol';
 import { type AppStatusReport, renderStatus } from '#lib/app-status.ts';
 import {
   BYTES_PER_MIB,
@@ -12,11 +13,14 @@ const MEMORY_USED_BYTES = 412_401_664;
 const VOLUME_USED_BYTES = 1_503_238_553;
 const CPU_SHARE = 0.18;
 const MEASURED_AT = '2026-08-29T11:01:00.000Z';
+const A_QUARTER_HOUR_MS = 900_000;
 
 function app(overrides: Partial<AppStatusReport> = {}): AppStatusReport {
   return {
     slug: SLUG,
     status: 'running',
+    activation: 'always',
+    idleTimeoutMs: MIN_IDLE_TIMEOUT_MS,
     vcpu: { used: null, total: VCPU_COUNT, measuredAt: null },
     memory: { used: null, total: MEMORY_MIB * BYTES_PER_MIB, measuredAt: null },
     volume: { used: null, total: VOLUME_SIZE_BYTES, measuredAt: null },
@@ -86,6 +90,23 @@ describe('a status says what one app is using of what it was given', () => {
     expect(renderStatus(app({ status: 'never-deployed' })).lines[0]).toBe(
       `${SLUG}  never deployed`,
     );
+  });
+
+  /**
+   * `asleep` on its own reads as something that went wrong. Beside the setting that put it there
+   * it reads as the app doing what it was configured to do, which is why the two are one block.
+   */
+  test('an app that is asleep says what put it there', () => {
+    const lines = renderStatus(
+      app({ status: 'idle', activation: 'on-request', idleTimeoutMs: A_QUARTER_HOUR_MS }),
+    ).lines;
+
+    expect(lines[0]).toBe(`${SLUG}  asleep`);
+    expect(lines[1]).toBe('On request, stopped after 15m of quiet');
+  });
+
+  test('an app that is always on says so where the sleeping one says its wait', () => {
+    expect(renderStatus(app()).lines[1]).toBe('Always on');
   });
 
   // Memory is a level and arrives whole; a share needs a reading behind it and cannot.

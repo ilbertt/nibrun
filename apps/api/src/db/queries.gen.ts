@@ -184,6 +184,8 @@ export interface ISelectCreatedAppResult {
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -226,6 +228,8 @@ export interface ISelectAppsByOwnerResult {
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -268,6 +272,8 @@ export interface ISelectAppByIdResult {
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -342,6 +348,8 @@ export interface ITouchAppAfterConfigPatchResult {
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -432,6 +440,8 @@ export interface ISelectAppAfterStateChangeResult {
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -1355,6 +1365,8 @@ export interface ILiveAppsColumns {
     state: string | null;
     created_at: Date | null;
     updated_at: Date | null;
+    activation: string | null;
+    idle_timeout_ms: number | null;
 }
 
 /** Schema of `live_apps`. */
@@ -1892,7 +1904,9 @@ export const schema = {
             slug: { _columnName: "slug", _foreignKeys: {} },
             state: { _columnName: "state", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            activation: { _columnName: "activation", _foreignKeys: {} },
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}

@@ -160,7 +160,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const [app] = await tx.SelectCreatedApp`
         /* @notNull environment_names */
-        SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+        SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+               a.created_at, a.updated_at,
                c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -188,7 +189,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   listByOwner({ ownerId }: { ownerId: OwnerId }): Promise<AppRow[]> {
     return this.sql.SelectAppsByOwner`
       /* @notNull environment_names */
-      SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+      SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+             a.created_at, a.updated_at,
              c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -341,7 +343,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   async findById({ appId, ownerId }: OwnedApp): Promise<AppRow | null> {
     const [app] = await this.sql.SelectAppById`
       /* @notNull environment_names */
-      SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+      SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+             a.created_at, a.updated_at,
              c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -443,7 +446,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         FROM nibrun.app_configs_with_environment c
         LEFT JOIN nibrun.app_usage u ON u.app_id = c.app_id
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND c.id = ${inserted.id}
-        RETURNING a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+        RETURNING a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+                  a.created_at, a.updated_at,
                   c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                   c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                   c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -592,7 +596,8 @@ async function appAfterStateChange({
 }): Promise<AppRow> {
   const [app] = await tx.SelectAppAfterStateChange`
     /* @notNull environment_names */
-    SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+    SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+           a.created_at, a.updated_at,
            c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
            c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
            c.health_check_grace_period_ms, c.health_check_healthy_threshold,

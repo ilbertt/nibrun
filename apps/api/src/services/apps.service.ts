@@ -622,6 +622,8 @@ function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
     volumeUsage: toVolumeUsage(app),
     computeUsage: toComputeUsage(app),
     state: app.state,
+    activation: app.activation,
+    idleTimeoutMs: app.idle_timeout_ms,
     createdAt: toTimestamp(app.created_at),
     updatedAt: toTimestamp(app.updated_at),
   };

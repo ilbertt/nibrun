@@ -117,7 +117,7 @@ declare module '@parshjs/core' {
     };
     'upgrade': {
       parents: {};
-      rootOptions: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
   }
 }

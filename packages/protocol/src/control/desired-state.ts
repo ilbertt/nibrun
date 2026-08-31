@@ -1,5 +1,10 @@
 import { Type } from '@sinclair/typebox';
-import { AppConfigSchema, AppHostnameSchema, TenantEnvironmentSchema } from '#domain/app.ts';
+import {
+  AppConfigSchema,
+  AppHostnameSchema,
+  IdleTimeoutMsSchema,
+  TenantEnvironmentSchema,
+} from '#domain/app.ts';
 import {
   AppIdSchema,
   CheckpointIdSchema,
@@ -55,34 +60,6 @@ export const DesiredArtifactSchema = Type.Object({
 });
 
 export type DesiredArtifact = typeof DesiredArtifactSchema.static;
-
-/**
- * How long an `on-request` app goes unasked-for before its microVM is stopped.
- *
- * The whole of what scale-to-zero saves is memory a sleeping app is not holding, so this is the
- * dial the saving is on: an app visited three times a day sleeps for most of it at fifteen
- * minutes and for almost none of it at an hour. What it costs is a cold boot for whoever arrives
- * after the gap, which is why it is not seconds.
- *
- * The floor is the cadence the decision is made on rather than a round number: whether an app has
- * gone quiet is only asked when its traffic is measured, so a shorter timeout than that would be
- * one the host accepts and cannot keep.
- */
-export const MIN_IDLE_TIMEOUT_MS = 60_000;
-
-/**
- * A day, which is not a judgement about how long an app should wait — `always` is how an owner
- * says never sleep, so any value here is a legal preference and an app visited twice a day may
- * reasonably want hours. It is there to catch the slipped zero: fifteen minutes and two and a
- * half hours are one keystroke apart, and the wrong one costs nothing visible, it just quietly
- * stops saving. Generous enough that it can only ever refuse a typo.
- */
-export const MAX_IDLE_TIMEOUT_MS = 86_400_000;
-
-export const IdleTimeoutMsSchema = Type.Integer({
-  minimum: MIN_IDLE_TIMEOUT_MS,
-  maximum: MAX_IDLE_TIMEOUT_MS,
-});
 
 export const DesiredInstanceSchema = Type.Object({
   appId: AppIdSchema,
