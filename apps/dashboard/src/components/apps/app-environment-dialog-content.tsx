@@ -18,6 +18,7 @@ import { greyedReason } from '#lib/app-actions.ts';
 import { useAppActions } from '#lib/hooks/use-app-actions.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import { useEnvironmentForm } from '#lib/hooks/use-environment-form.ts';
+import { isReleasing } from '#lib/hooks/use-run-app.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
@@ -26,7 +27,7 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
   const form = useEnvironmentForm(app);
   // Saving is a release, so it is offered exactly where the deploy button is.
   const deploy = useAppActions(app.id).deploy;
-  const releasing = run.phase === 'releasing' || run.phase === 'settling';
+  const releasing = isReleasing(run.phase);
 
   function handleOpenChange(next: boolean): void {
     if (next && !releasing) {

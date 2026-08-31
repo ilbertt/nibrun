@@ -672,12 +672,61 @@ describe('what the store accepted, this api still has to agree to', () => {
     expect(artifactsRepo.rows.size).toBe(1);
   });
 
-  test('an artifact nobody is waiting on cannot be completed twice', async () => {
+  // A completion slow enough to be sent twice is how the first one comes back, so the repeat
+  // answers with the binary that landed rather than a failure the caller has to redo. One row
+  // either way: a second artifact here would be a second release of the same bytes.
+  test('a completion said twice is the artifact it already stored', async () => {
+    const { service, storage, artifactsRepo } = build();
+    const artifact = await upload({ service, storage });
+
+    const again = await service.completeUpload({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      artifactId: artifact.id,
+    });
+
+    expect(again).toEqual(artifact);
+    expect(artifactsRepo.rows.size).toBe(1);
+    expect(await service.list({ appId: APP_ID, ownerId: OWNER_ID })).toEqual([artifact]);
+  });
+
+  // Both reads land before either write does, so the loser's update matches nothing. It is
+  // looking at the winner's artifact rather than a missing one, and says so.
+  test('two completions racing settle on the one artifact', async () => {
+    const { service, storage, artifactsRepo } = build();
+    const { artifactId } = await service.create({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      filename: UPLOADED_NAME,
+      sizeBytes: BINARY_TEXT.length,
+    });
+    storage.put({
+      objectKey: (storage.signed.at(-1) as { objectKey: ObjectKey }).objectKey,
+      text: BINARY_TEXT,
+    });
+
+    const [first, second] = await Promise.all([
+      service.completeUpload({ appId: APP_ID, ownerId: OWNER_ID, artifactId }),
+      service.completeUpload({ appId: APP_ID, ownerId: OWNER_ID, artifactId }),
+    ]);
+
+    expect(second).toEqual(first);
+    expect(artifactsRepo.rows.size).toBe(1);
+  });
+
+  test("an id naming no upload of the caller's is still not found", async () => {
     const { service, storage } = build();
     const artifact = await upload({ service, storage });
 
     await expect(
-      service.completeUpload({ appId: APP_ID, ownerId: OWNER_ID, artifactId: artifact.id }),
+      service.completeUpload({ appId: APP_ID, ownerId: OTHER_OWNER_ID, artifactId: artifact.id }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      service.completeUpload({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        artifactId: Value.Parse(ArtifactIdSchema, 'artifact-never-created'),
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 

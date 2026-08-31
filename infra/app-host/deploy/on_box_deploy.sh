@@ -13,7 +13,7 @@ cd "$(dirname "$0")"
 
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
-: "${AWS_REGION:?}" "${SSM_SECRET_PREFIX:?}" "${DATA_VOLUME_ID:?}" \
+: "${AWS_REGION:?}" "${SSM_SECRET_PREFIX:?}" \
   "${AGENT_VERSION:?}" "${AGENT_URL:?}" \
   "${ZEROFS_VERSION:?}" "${ZEROFS_URL:?}" "${ZEROFS_SHA256:?}" "${ZEROFS_MEMBER:?}" \
   "${FIRECRACKER_VERSION:?}" "${FIRECRACKER_URL:?}" "${FIRECRACKER_SHA256:?}" \
@@ -75,10 +75,13 @@ if [ ! -f /usr/lib/systemd/system/systemd-journal-upload.service ]; then
   dnf install -y systemd-journal-remote
 fi
 
-log "Ensuring the data volume is mounted"
-bash ensure_data_volume.sh zerofs
-
 id -u zerofs >/dev/null 2>&1 || useradd --system --no-create-home --shell /sbin/nologin zerofs
+
+# Before the mount, because the mount is what chowns the directories on it and it
+# can only do that once the user exists.
+log "Ensuring /data is the instance store"
+bash ensure_ephemeral_data.sh zerofs zerofs zerofs-checkpoint
+
 chown -R zerofs:zerofs /data/zerofs
 
 # Where a checkpoint server keeps its own cache, one directory per checkpoint,
@@ -432,7 +435,7 @@ if [ "$units_changed" = "1" ]; then
   systemctl daemon-reload
 fi
 
-systemctl enable nibrun-zerofs.service nibrun-zerofs-mount.service \
+systemctl enable nibrun-data.service nibrun-zerofs.service nibrun-zerofs-mount.service \
   nibrun-caddy.service nibrun-agent.service systemd-journal-upload.service >/dev/null
 
 # --- Restarting --------------------------------------------------------------

@@ -6,8 +6,9 @@
 # substitution is a string one.
 
 [cache]
-# The EBS data volume, and the only thing on it. Sized well under the volume so a
-# full cache cannot fill the disk out from under the segments being written.
+# The instance store, mounted at /data by nibrun-data.service. Sized well under the
+# disk so a full cache cannot fill it out from under the segments being written, and
+# so a checkpoint server's cache has room beside it.
 dir = "/data/zerofs"
 disk_size_gb = 70.0
 memory_size_gb = 2.0

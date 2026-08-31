@@ -29,7 +29,7 @@ EnvironmentFile=/etc/zerofs/zerofs.env
 
 # Scratch for one pass over one filesystem, not a working set to keep warm, so it is
 # made on the way in and removed on the way out rather than accumulating a directory
-# per export on the data volume.
+# per export on /data.
 ExecStartPre=/usr/bin/mkdir -p /data/zerofs-checkpoint/%i
 ExecStart=/opt/nibrun/bin/zerofs/zerofs run --config /etc/zerofs/checkpoint.toml --checkpoint %i
 # Type=exec calls the unit started the moment the process execs, which for ZeroFS is
@@ -60,8 +60,8 @@ ProtectControlGroups=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
-# ProtectSystem=strict makes everything else read-only, and the cache lives on the
-# data volume rather than under CacheDirectory. Its own directory, never
+# ProtectSystem=strict makes everything else read-only, and the cache lives on
+# /data rather than under CacheDirectory. Its own directory, never
 # /data/zerofs: that one belongs to the live server, which is its only writer.
 ReadWritePaths=/data/zerofs-checkpoint
 

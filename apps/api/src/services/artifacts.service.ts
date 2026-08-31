@@ -324,7 +324,7 @@ export class ArtifactsService extends Service {
   }): Promise<Artifact> {
     const pending = await this.artifactsRepo.findPending({ appId, artifactId, ownerId });
     if (!pending) {
-      throw new NotFoundError(NO_SUCH_UPLOAD);
+      return await this.alreadyStored({ appId, artifactId, ownerId });
     }
 
     const staged = stagingKey({ appId, artifactId });
@@ -573,12 +573,36 @@ export class ArtifactsService extends Service {
       sizeBytes,
       objectKey,
     });
-    if (!stored) {
-      throw new NotFoundError(NO_SUCH_UPLOAD);
-    }
 
     await this.discard({ objectKey: staged });
 
+    // The write is what settles a race between two completions of the same row: the one whose
+    // update matched nothing is looking at the other's artifact, not at a missing one.
+    return stored ? toArtifact(stored) : await this.alreadyStored({ appId, artifactId, ownerId });
+  }
+
+  /**
+   * A completion for a row that is no longer waiting for one. The digest is what makes a row an
+   * artifact, so a row that has one is an upload that landed, and a caller repeating itself is
+   * asking for the state the row is already in — answered with the artifact rather than refused,
+   * because a retry is how a completion that was slow enough to be sent twice comes back.
+   *
+   * Still not found where no such row is theirs at all: an id naming no upload of the caller's is
+   * the one case where nothing was stored under it.
+   */
+  private async alreadyStored({
+    appId,
+    artifactId,
+    ownerId,
+  }: {
+    appId: AppId;
+    artifactId: ArtifactId;
+    ownerId: OwnerId;
+  }): Promise<Artifact> {
+    const stored = await this.artifactsRepo.findById({ appId, artifactId, ownerId });
+    if (!stored) {
+      throw new NotFoundError(NO_SUCH_UPLOAD);
+    }
     return toArtifact(stored);
   }
 

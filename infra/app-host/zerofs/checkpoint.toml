@@ -16,7 +16,7 @@ dir = "/data/zerofs-checkpoint/${NIBRUN_CHECKPOINT}"
 # `debugfs` walks — inode tables, bitmaps, directory blocks — and not the file data
 # it copies out. Four gigabytes covers that for a filesystem far larger than any
 # one this host serves, and is small enough that an export cannot eat into the
-# headroom the live cache deliberately leaves on this volume.
+# headroom the live cache deliberately leaves on this disk.
 disk_size_gb = 4.0
 # The default, written down because 2.0 sits in the file next to this one and
 # silence would read as an oversight rather than a decision.

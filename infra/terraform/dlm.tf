@@ -24,7 +24,8 @@ resource "aws_iam_role_policy_attachment" "dlm" {
 
 # Block-level counterpart to pg-backup's nightly logical dump, and the only
 # backup anything on the control plane's volume other than Postgres has. Tag-
-# driven, so an app host's cache volume opts in by carrying the same tag.
+# driven, and the control plane's volume is the only thing wearing the tag: an
+# app host's /data is the instance store, whose whole content S3 already holds.
 resource "aws_dlm_lifecycle_policy" "data" {
   description        = "Daily snapshots of the nibrun data volumes"
   execution_role_arn = aws_iam_role.dlm.arn
