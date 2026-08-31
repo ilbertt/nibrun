@@ -1,28 +1,61 @@
+import { basename } from 'node:path';
+import { FileSystem } from '@effect/platform';
 import type { VolumeId } from '@repo/protocol';
 import { Duration, Effect } from 'effect';
 import { run, stdoutOf } from '#services/command-runner.service.ts';
 
 const NBD_CLIENT = 'nbd-client';
-const CONNECTED_EXIT_CODE = 0;
 
 const NBD_CONNECTIONS = 4;
 const NBD_BLOCK_SIZE_BYTES = 4096;
-/** S3 round trips under load turn a short timeout into an EIO the guest's ext4 answers by
- * remounting read-only. */
+/**
+ * S3 round trips under load turn a short timeout into an EIO the guest's ext4 answers by
+ * remounting read-only.
+ *
+ * It is also the only ceiling anything on this host has over a dead export. A request the kernel
+ * has accepted cannot be taken back by a signal — the process waiting on it sleeps
+ * uninterruptibly, past SIGKILL and past systemd — so this number, and not any timeout in
+ * userspace, is what eventually frees a waiter. Nothing below waits on one, which is what lets
+ * this stay long enough to be safe for the guest.
+ */
 const NBD_TIMEOUT_SECONDS = 600;
+
+const SYSFS_BLOCK_DIRECTORY = '/sys/block';
+/** The unit the kernel publishes capacity in, whatever logical block size the device negotiated. */
+const SYSFS_SECTOR_BYTES = 512;
+
+/**
+ * The kernel's own record of a device, which is the only part of it that answers while its server
+ * does not.
+ *
+ * Opening `/dev/nbdN` is what blocks: a ZeroFS restart leaves the kernel holding a device whose
+ * socket is gone, and every read queues behind requests that will not complete until the timeout
+ * above. `blockdev --getsize64` on such a device sits in uninterruptible sleep for as long as
+ * that takes, and no signal shortens it. These files are ordinary sysfs attributes on the gendisk
+ * — they are answered from memory and cannot queue behind anything.
+ */
+const readAttribute = ({ devicePath, attribute }: { devicePath: string; attribute: string }) =>
+  Effect.flatMap(FileSystem.FileSystem, (fs) =>
+    fs.readFileString(`${SYSFS_BLOCK_DIRECTORY}/${basename(devicePath)}/${attribute}`),
+  );
 
 /**
  * Whether a device has a client, which is a different question from whether it has a working one.
  * Kept because a detach is only worth attempting against a device somebody is holding.
+ *
+ * The kernel creates `pid` when a client takes the device and removes it when one lets go, so the
+ * file being there is the whole answer. It is the same file `nbd-client -check` reads, reached
+ * without a process this host would then have to be able to kill.
  */
 export const isAttached = (devicePath: string) =>
-  Effect.map(
-    run({ command: [NBD_CLIENT, '-check', devicePath] }),
-    (result) => result.code === CONNECTED_EXIT_CODE,
+  readAttribute({ devicePath, attribute: 'pid' }).pipe(
+    Effect.as(true),
+    Effect.orElseSucceed(() => false),
   );
 
 /** One block, at the offset every filesystem on the device keeps something at. */
 const PROBE_BYTES = 4096;
+const READ_SUCCEEDED = 0;
 const NO_BYTES = 0;
 
 /**
@@ -34,13 +67,12 @@ const PROBE_TIMEOUT_SECONDS = 15;
 const PROBE_TIMEOUT = Duration.seconds(PROBE_TIMEOUT_SECONDS);
 
 /**
- * Whether the device answers, which is what `-check` does not ask.
+ * Whether the device answers, which is what the kernel's own record of it does not say.
  *
  * A ZeroFS restart leaves the kernel holding a device that reports its size and names its client
- * and fails every read: `-check` exits 0, `blockdev --getsize64` is right, and the guest's ext4
- * cannot read its own superblock. Observed on a live host, on both ZeroFS versions, so it is the
- * reconnect and not the release. Liveness has to be a read, because a read is the thing that is
- * broken.
+ * and fails every read: sysfs is right about both, and the guest's ext4 cannot read its own
+ * superblock. Observed on a live host, on both ZeroFS versions, so it is the reconnect and not
+ * the release. Liveness has to be a read, because a read is the thing that is broken.
  *
  * `iflag=direct` is what makes it a read of the device rather than of the page cache. Without it
  * the host answers out of memory for a device that has been dead for hours, which is the same
@@ -51,6 +83,10 @@ const PROBE_TIMEOUT = Duration.seconds(PROBE_TIMEOUT_SECONDS);
  * in` and exits 0. Asking only whether the read succeeded therefore answers yes for a device that
  * is not attached at all — which is every device on a host that has just rebooted, and a host
  * whose volumes are then never attached because nothing believes anything is wrong with them.
+ *
+ * Doing it from sysfs is what keeps the common case off the device: a host whose volumes are
+ * detached spawns nothing at all, and only a device the kernel says is carrying data is ever
+ * opened.
  */
 export const isUsable = (devicePath: string) =>
   Effect.gen(function* () {
@@ -61,16 +97,29 @@ export const isUsable = (devicePath: string) =>
     return yield* readsFirstBlock(devicePath);
   });
 
-/** Zero for a device nothing is attached to, which is the state a reboot leaves every one of them in. */
+/**
+ * Zero for a device nothing is attached to, which is the state a reboot leaves every one of them
+ * in — and the state `nbd-client -d` puts one back into, so a device this host has given up on
+ * stops being probed from the pass after it gave up.
+ */
 const attachedSizeBytes = (devicePath: string) =>
-  run({ command: ['blockdev', '--getsize64', devicePath], timeout: PROBE_TIMEOUT }).pipe(
-    Effect.map((result) =>
-      result.code === CONNECTED_EXIT_CODE ? Number.parseInt(result.stdout.trim(), 10) : NO_BYTES,
-    ),
+  readAttribute({ devicePath, attribute: 'size' }).pipe(
+    Effect.map((sectors) => Number.parseInt(sectors.trim(), 10) * SYSFS_SECTOR_BYTES),
     Effect.map((size) => (Number.isFinite(size) ? size : NO_BYTES)),
-    Effect.catchAll(() => Effect.succeed(NO_BYTES)),
+    Effect.orElseSucceed(() => NO_BYTES),
   );
 
+/**
+ * The one thing here that opens the device, and so the one thing that can be left behind.
+ *
+ * `CommandRunner` gives up on the process rather than waiting for it to die, so a `dd` the kernel
+ * will not let go of stops being this agent's problem the moment the timeout fires. What bounds
+ * the ones left behind is the repair the `false` triggers: a device judged unusable is
+ * reattached, and the `nbd-client -d` that starts the reattach errors every queued request on
+ * that device, which frees the `dd` waiting on one. After that its size reads zero and nothing
+ * probes it again until an attach succeeds — so the count is bounded by the devices on the host,
+ * not by how often the reconcile runs.
+ */
 const readsFirstBlock = (devicePath: string) =>
   run({
     command: [
@@ -83,7 +132,7 @@ const readsFirstBlock = (devicePath: string) =>
     ],
     timeout: PROBE_TIMEOUT,
   }).pipe(
-    Effect.map((result) => result.code === CONNECTED_EXIT_CODE),
+    Effect.map((result) => result.code === READ_SUCCEEDED),
     // A probe that could not be run is not evidence the device is well, and the repair it leads
     // to costs a detach and an attach against a device nobody is using yet.
     Effect.catchAll(() => Effect.succeed(false)),
@@ -147,6 +196,12 @@ export const attachCheckpoint = Effect.fn('nbd.attachCheckpoint')(
     connect({ ...target, extraArgs: [] }),
 );
 
+/**
+ * Two ioctls on a device somebody already has open, which is why this works where a read does
+ * not: `NBD_DISCONNECT` and `NBD_CLEAR_SOCK` error every request the kernel is holding rather
+ * than joining the queue behind them. It is what frees a process sleeping on a dead device, and
+ * the reason a wedged host recovers instead of waiting out the request timeout.
+ */
 export const detach = Effect.fn('nbd.detach')((devicePath: string) =>
   run({ command: [NBD_CLIENT, '-d', devicePath] }),
 );
