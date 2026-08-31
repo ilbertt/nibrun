@@ -8,6 +8,11 @@
 --
 -- The CHECK repeats INSTANCE_STATES from @repo/protocol and nothing compares the two, so adding
 -- a state there is also a migration here.
+--
+-- This release adds `idle` to that enum, which makes it one the api has to be deployed *before*
+-- the agents. An unknown value in a known field fails the schema check and rejects the whole
+-- report, so an agent that has put one app to sleep against an api that predates this loses
+-- everything it was saying about every app on that host — not just the sleeping one.
 
 ALTER TABLE nibrun.deployments
   ADD COLUMN instance_state text,
