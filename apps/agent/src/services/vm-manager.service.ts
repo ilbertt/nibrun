@@ -1,10 +1,11 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { AppId, DeploymentId, DesiredInstance } from '@repo/protocol';
-import { Effect } from 'effect';
+import { Effect, Either } from 'effect';
 import { writeJsonFile } from '#lib/json-store.ts';
 import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
 import type { AppSlot } from '#lib/network/slot.ts';
 import { ensureTap, refreshNeighbour } from '#lib/network/tap.ts';
+import { readFilesystemSpace } from '#lib/report/capacity.ts';
 import { readHostVersions } from '#lib/report/versions.ts';
 import * as Artifacts from '#lib/vm/artifacts.ts';
 import * as Firecracker from '#lib/vm/firecracker-api.ts';
@@ -13,13 +14,19 @@ import { buildInstanceConfigImage } from '#lib/vm/instance-env.ts';
 import {
   ensureLoadable,
   readHostBootId,
+  readSnapshotBytes,
+  refusalForDisk,
   refusalToSleep,
   SleepRefused,
+  type SnapshotDisk,
   type SnapshotStamp,
+  snapshotBudget,
+  snapshotBytesFor,
   snapshotPaths,
 } from '#lib/vm/snapshot.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { GUEST_VSOCK_FILENAME, vmWorkingDir } from '#lib/vm/vsock.ts';
+import { readCacheDiskBytes } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
@@ -174,12 +181,69 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     });
 
     /**
-     * A microVM taken down at a point it can be put back on, rather than one taken down.
+     * The disk this host's snapshots are on, as the decision to write another one needs it. The
+     * directory is made first so a host that has never slept an app still measures the instance
+     * store rather than failing to stat a path that is not there yet.
+     */
+    const readSnapshotDisk = Effect.fn('VmManager.readSnapshotDisk')(function* () {
+      yield* fs.makeDirectory(config.vmSnapshotDir, { recursive: true, mode: VM_DIR_MODE });
+      const space = yield* readFilesystemSpace(config.vmSnapshotDir);
+      return {
+        ...space,
+        zerofsCacheBytes: yield* readCacheDiskBytes(config.zerofsConfigFile),
+        snapshotBytes: yield* readSnapshotBytes(config.vmSnapshotDir),
+      } satisfies SnapshotDisk;
+    });
+
+    /**
+     * Every reason this microVM must not be snapshotted now, or `undefined`.
      *
-     * The two states a snapshot must never be taken in are read from this agent's own record of
-     * the instance rather than accepted from the caller, because they are the preconditions of
-     * the operation and not an opinion about it: a caller that could supply them could also
-     * forget to. `refusalToSleep` is where each one is spelled out.
+     * The states a snapshot must never be taken in are read from this agent's own record of the
+     * instance rather than accepted from the caller, because they are the preconditions of the
+     * operation and not an opinion about it: a caller that could supply them could also forget
+     * to. `refusalToSleep` is where each one is spelled out, and `refusalForDisk` is what keeps a
+     * host's sleeping apps from filling the disk its running ones read and write through.
+     *
+     * A disk that cannot be measured refuses too. Sleeping is an optimisation and refusing it
+     * costs an app nothing it notices, so every doubt here resolves the same way.
+     */
+    const refusalToSnapshot = Effect.fn('VmManager.refusalToSnapshot')(function* (appId: AppId) {
+      const record = (yield* agentState.snapshot).records.get(appId);
+      if (record === undefined) {
+        return refusalToSleep(undefined);
+      }
+      const refusal = refusalToSleep({
+        stopRequested: record.stopRequested,
+        desiredRunning: record.desiredRunning,
+        everHealthy: record.health.everHealthy,
+      });
+      if (refusal !== undefined) {
+        return refusal;
+      }
+      const disk = yield* Effect.either(readSnapshotDisk());
+      if (Either.isLeft(disk)) {
+        yield* Effect.logWarning('snapshot disk could not be measured', disk.left).pipe(
+          Effect.annotateLogs({ appId }),
+        );
+        return 'the disk it would be written to cannot be measured';
+      }
+      // The one place these numbers exist. Nothing else on the fleet can be asked what snapshots
+      // are holding, so a sleep says it on the way past whether or not it is allowed to proceed.
+      yield* Effect.logInfo('snapshot disk measured').pipe(
+        Effect.annotateLogs({
+          appId,
+          ...disk.right,
+          budgetBytes: snapshotBudget(disk.right),
+        }),
+      );
+      return refusalForDisk({
+        disk: disk.right,
+        wantedBytes: snapshotBytesFor(record.resources.memoryMib),
+      });
+    });
+
+    /**
+     * A microVM taken down at a point it can be put back on, rather than one taken down.
      *
      * The flush comes before the pause on purpose: one that hangs then leaves a microVM that is
      * still serving, where a pause first would freeze the tenant for the whole of it. It is what
@@ -197,14 +261,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       slot,
     }: SuspendRequest) {
       yield* Effect.annotateCurrentSpan({ appId });
-      const record = (yield* agentState.snapshot).records.get(appId);
-      const refusal = refusalToSleep(
-        record && {
-          stopRequested: record.stopRequested,
-          desiredRunning: record.desiredRunning,
-          everHealthy: record.health.everHealthy,
-        },
-      );
+      const refusal = yield* refusalToSnapshot(appId);
       if (refusal !== undefined) {
         return yield* new SleepRefused({ reason: refusal });
       }

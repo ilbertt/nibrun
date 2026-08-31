@@ -11,7 +11,9 @@ const DEFAULT_ZEROFS_NBD_SOCKET = '/run/zerofs/nbd.sock';
 const DEFAULT_ZEROFS_CHECKPOINT_RUNTIME_DIR = '/run/zerofs-checkpoint';
 /**
  * On the instance store, because a snapshot is a cache: losing one costs a cold boot and nothing
- * else. It budgets ~256 MiB a slot against a disk ZeroFS already keeps a 70 GB cache on.
+ * else. It shares that disk with the ZeroFS cache every app on the host reads and writes through,
+ * so what may accumulate here is bounded — `refusalForDisk` in `lib/vm/snapshot.ts` is the bound,
+ * and it is why an app's memory being far larger than the default cannot fill the disk.
  *
  * `vm_launch.sh` spells this path too, and nothing compares the two — a start reads the directory
  * to decide whether it is a restore or a cold boot, so moving one is moving both.

@@ -113,6 +113,107 @@ export function refusalToSleep(
   return undefined;
 }
 
+/**
+ * What the disk a snapshot goes on has to keep free for everything on it that is not one: a
+ * checkpoint server's four gigabytes while an export reads
+ * (`infra/app-host/zerofs/checkpoint.toml`), and slack for a filesystem nobody wants at 100%.
+ *
+ * Snapshots are the only consumer of that disk with a number to obey, so this is where the others
+ * get their room. It is held free *beyond* ZeroFS's configured cache rather than out of it —
+ * running out of instance store breaks ZeroFS, and ZeroFS is every app's disk on the host,
+ * sleeping or not.
+ */
+const DISK_RESERVE_GIB = 8;
+
+const BYTES_PER_MIB = 1_048_576;
+const BYTES_PER_GIB = 1_073_741_824;
+const DISK_RESERVE_BYTES = DISK_RESERVE_GIB * BYTES_PER_GIB;
+const GIB_DECIMALS = 1;
+const NONE = 0;
+
+/** The disk `snapshotDir` is on, as the decision to write another snapshot to it needs it. */
+export type SnapshotDisk = {
+  readonly totalBytes: number;
+  readonly availableBytes: number;
+  /** What ZeroFS may cache here, which is disk it has not taken yet rather than disk it is using. */
+  readonly zerofsCacheBytes: number;
+  /** What the snapshots already here hold. */
+  readonly snapshotBytes: number;
+};
+
+/** A memory file is exactly the guest's RAM. The vmstate beside it is kilobytes, and is slack. */
+export function snapshotBytesFor(memoryMib: number): number {
+  return memoryMib * BYTES_PER_MIB;
+}
+
+/** All the disk snapshots may ever hold together, floored at none for a host with no room at all. */
+export function snapshotBudget(disk: SnapshotDisk): number {
+  return Math.max(disk.totalBytes - disk.zerofsCacheBytes - DISK_RESERVE_BYTES, NONE);
+}
+
+function gibibytes(bytes: number): string {
+  return `${(bytes / BYTES_PER_GIB).toFixed(GIB_DECIMALS)} GiB`;
+}
+
+/**
+ * Why this host will not keep another snapshot, or `undefined` when it will.
+ *
+ * A snapshot is the size of the app's configured memory rather than of the default, so a host
+ * carrying a few multi-gigabyte apps runs out of instance store on its own. What that costs is
+ * not the sleeping apps: `/data` is where ZeroFS caches, and ZeroFS is the disk **every** app on
+ * the host is running from. A cost optimisation nobody opted into would be taking down apps that
+ * never sleep — so the two bounds below are what stands between it and them, and a refusal here
+ * costs one app one cold start it was not going to take anyway.
+ *
+ * Both bounds are needed and neither implies the other. The budget is against the disk's *size*,
+ * because ZeroFS fills its cache lazily: free space on a fresh host is space already promised.
+ * The floor is against what is *actually* free, because the promise is not the only claim — a
+ * checkpoint server's cache, an overshoot, anything else that arrived on this disk — and at the
+ * moment those have eaten it, adding a snapshot is the thing that must not happen.
+ */
+export function refusalForDisk({
+  disk,
+  wantedBytes,
+}: {
+  disk: SnapshotDisk;
+  wantedBytes: number;
+}): string | undefined {
+  const budget = snapshotBudget(disk);
+  if (disk.snapshotBytes + wantedBytes > budget) {
+    return `snapshots on this host may hold ${gibibytes(budget)} and already hold ${gibibytes(disk.snapshotBytes)}`;
+  }
+  if (disk.availableBytes - wantedBytes < DISK_RESERVE_BYTES) {
+    return `the disk it would be written to has ${gibibytes(disk.availableBytes)} left, which the filesystem every app runs from needs more than it does`;
+  }
+  return undefined;
+}
+
+/**
+ * What the snapshots on this host hold, measured rather than derived from the agent's own record
+ * of which apps are asleep: one an earlier agent left behind occupies the same disk as one this
+ * agent wrote, and the disk is what is running out.
+ */
+export const readSnapshotBytes = Effect.fn('snapshot.readSnapshotBytes')(function* (
+  snapshotDir: string,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const entries = yield* fs.readDirectory(snapshotDir, { recursive: true });
+  let held = NONE;
+  for (const entry of entries) {
+    held += yield* fileBytes(join(snapshotDir, entry));
+  }
+  return held;
+});
+
+/** A file gone between the listing and the stat is a snapshot being discarded — disk given back. */
+function fileBytes(path: string) {
+  return FileSystem.FileSystem.pipe(
+    Effect.flatMap((fs) => fs.stat(path)),
+    Effect.map((info) => (info.type === 'File' ? Number(info.size) : NONE)),
+    Effect.orElseSucceed(() => NONE),
+  );
+}
+
 export type SnapshotPaths = {
   readonly directory: string;
   readonly statePath: string;
