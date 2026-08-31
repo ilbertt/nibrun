@@ -11,6 +11,7 @@ import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
+import { RefreshSignal } from '#services/refresh-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 
@@ -80,6 +81,7 @@ export class HostHasNoRoom extends Data.TaggedError('HostHasNoRoom')<{
 export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
   effect: Effect.gen(function* () {
     const cache = yield* DesiredStateCache;
+    const refresh = yield* RefreshSignal;
     const context = yield* Effect.context<WakeContext>();
     /**
      * The joiners are counted beside the deferred rather than derived afterwards: a cold page
@@ -184,6 +186,10 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
         });
       }
       yield* untilAnswering(record);
+      // The guest is answering, which is the one thing the forward rule waits on — so the loop is
+      // told now rather than on its next tick. Until it refreshes, the record still says this app
+      // is coming up and every request behind this one is answered by the activator.
+      yield* refresh.raise;
       // `waitedMs` is the whole of what the visitor paid, `outcome` is what they paid it for:
       // a restore and a cold boot are the same line otherwise, and the difference between them
       // is the feature. `coalesced` is how many more requests waited on this same wake, so a
@@ -237,6 +243,7 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
     ArtifactStore.Default,
     CommandRunner.Default,
     DesiredStateCache.Default,
+    RefreshSignal.Default,
     SlotAllocator.Default,
     VmManager.Default,
   ],
