@@ -2,6 +2,17 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.8.31-3]
+
+### 🚀 Features
+
+- *(api)* A new app waits for its first request (#424)
+- *(api)* An owner can see how their app comes up (#422)
+
+### 🚜 Refactor
+
+- *(app-operations)* An app between requests is idle, in that word (#423)
+
 ## [2026.8.31-2]
 
 ### 🚀 Features

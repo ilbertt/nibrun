@@ -120,18 +120,21 @@ describe('instances are authoritative', () => {
 });
 
 /**
- * Nothing here boots. What the plan has to produce for an app that runs on request is the part a
- * request arrives to — the slot and the record — and the microVM is left to whoever visits.
+ * A release comes up once so that somebody watches it come up, and sleeps from then on. What the
+ * plan has to produce for the sleeping part is what a request arrives to — the slot and the
+ * record — and the microVM after that is left to whoever visits.
  */
-describe('an app that runs on request is prepared rather than started', () => {
+describe('an app that runs on request comes up once and sleeps after', () => {
   const onRequest = desiredInstance({ desiredState: 'on-request' });
 
-  test('one nothing is running is put to sleep rather than started', () => {
+  // Where the health check happens: a release nothing has ever run is one nothing has ever
+  // checked, and leaving the first boot to a visitor reports a broken binary to them.
+  test('one this host has never served is started rather than put to sleep', () => {
     const plan = planReconcile({
       desired: desiredState({ instances: [onRequest] }),
       observed: observedState(),
     });
-    expect(plan.instances).toEqual([{ action: 'sleep', desired: onRequest }]);
+    expect(plan.instances).toEqual([{ action: 'start', desired: onRequest }]);
   });
 
   test('one already sleeping stays that way, however many times this runs', () => {
@@ -142,6 +145,24 @@ describe('an app that runs on request is prepared rather than started', () => {
       }),
     });
     expect(plan.instances).toEqual([{ action: 'sleep', desired: onRequest }]);
+  });
+
+  // Replaced rather than started: a start keeps the record it found, so the release the host
+  // reports would stay the one this deploy supersedes.
+  test('a deploy onto one that is asleep replaces it rather than leaving it asleep', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [onRequest] }),
+      observed: observedState({
+        instances: [
+          observedInstance({
+            running: false,
+            exited: false,
+            deploymentId: Value.Parse(DeploymentIdSchema, 'dep-0'),
+          }),
+        ],
+      }),
+    });
+    expect(plan.instances).toEqual([{ action: 'replace', desired: onRequest }]);
   });
 
   test('one that is up and serving the release it should be is left alone', () => {
