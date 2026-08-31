@@ -85,3 +85,12 @@ the layout under `src/commands/` is the command tree.
   the tag that PR names is what builds the binaries and cuts the release.
   `cliff.toml` scopes both to commits touching this package, which is why the
   release commit has to touch it — a tag outside that filter is not a release.
+- **`nib upgrade` runs `install.sh`**, fetched from nibrun.com and piped to `sh`
+  exactly as the documented `curl … | sh` pipes it — `apps/www/public/install.sh`
+  is a symlink to this package's copy, so the two are one file. Which release is
+  newest, the checksum and the rename into place are all the script's and are not
+  written a second time in TypeScript; what the command decides is the one thing
+  the script cannot know — which nib is running, handed over as
+  `NIB_INSTALL_DIR`. Fetched rather than compiled in, because the nib running an
+  upgrade is by definition the old one: a fix to the script then reaches every nib
+  ever shipped.
