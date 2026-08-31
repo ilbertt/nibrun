@@ -155,17 +155,21 @@ function planInstance({
       ? { action: 'stop', appId: wanted.appId, reason: 'desired-stopped' }
       : { action: 'none', appId: wanted.appId };
   }
-  // A microVM already up is reconciled the way any other is — new bytes must not go on being
-  // served by the release they replaced, and a deploy is the one moment an owner is watching, so
-  // the replacement comes up rather than waiting to be asked for. Everything else sleeps: the
-  // boot belongs to whoever visits next.
+  // An app that runs on request is reconciled like any other up to the last line: a release this
+  // host has not served yet comes up rather than waiting to be asked for, because a deploy is the
+  // one moment an owner is watching and the only one where the health check runs at all — an app
+  // first booted by a visitor reports a broken binary to them. Sleep is what a release that has
+  // already had its microVM does between requests.
   if (wanted.desiredState === 'on-request') {
-    if (!current?.running) {
-      return { action: 'sleep', desired: wanted };
+    if (!current?.present) {
+      return { action: 'start', desired: wanted };
     }
-    return current.deploymentId === wanted.deploymentId
+    if (current.deploymentId !== wanted.deploymentId) {
+      return { action: 'replace', desired: wanted };
+    }
+    return current.running
       ? { action: 'none', appId: wanted.appId }
-      : { action: 'replace', desired: wanted };
+      : { action: 'sleep', desired: wanted };
   }
   if (!current?.present) {
     return { action: 'start', desired: wanted };
