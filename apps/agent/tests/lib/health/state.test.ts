@@ -83,6 +83,7 @@ function evaluate({
   healthCheck = check(),
   stopRequested = false,
   desiredRunning = true,
+  onRequest = false,
   startedAtMs = STARTED_AT_MS as number | undefined,
 }: {
   unit: UnitStatus;
@@ -91,6 +92,7 @@ function evaluate({
   healthCheck?: HealthCheck;
   stopRequested?: boolean;
   desiredRunning?: boolean;
+  onRequest?: boolean;
   startedAtMs?: number | undefined;
 }) {
   return evaluateInstanceState({
@@ -98,6 +100,7 @@ function evaluate({
     tracker,
     healthCheck,
     desiredRunning,
+    onRequest,
     stopRequested,
     ...(startedAtMs === undefined ? {} : { startedAtMs }),
     nowMs,
@@ -252,6 +255,7 @@ describe('what the VM itself is doing', () => {
         tracker: initialTracker(),
         healthCheck: check(),
         desiredRunning: true,
+        onRequest: false,
         stopRequested: false,
         nowMs: STARTED_AT_MS,
       }),
@@ -265,10 +269,67 @@ describe('what the VM itself is doing', () => {
         tracker: initialTracker(),
         healthCheck: check(),
         desiredRunning: true,
+        onRequest: false,
         stopRequested: false,
         nowMs: STARTED_AT_MS,
       }),
     ).toBe('pending');
+  });
+
+  /**
+   * The two states a microVM can be absent in, and they are not the same news. One says the
+   * release is over; the other says it is between requests. An owner reading `stopped` for an app
+   * working exactly as configured would have nothing to tell it from a broken one.
+   */
+  describe('an app that runs on request is idle rather than stopped', () => {
+    test('one nobody has ever asked for is idle, not pending', () => {
+      expect(
+        evaluateInstanceState({
+          unit: absent,
+          tracker: initialTracker(),
+          healthCheck: check(),
+          desiredRunning: true,
+          onRequest: true,
+          stopRequested: false,
+          nowMs: STARTED_AT_MS,
+        }),
+      ).toBe('idle');
+    });
+
+    test('one stopped for being quiet is idle', () => {
+      expect(
+        evaluate({
+          unit: exited,
+          tracker: initialTracker(),
+          onRequest: true,
+          stopRequested: true,
+          nowMs: PAST_GRACE_MS,
+        }),
+      ).toBe('idle');
+    });
+
+    test('but a microVM that went down unasked is failed, whatever the policy', () => {
+      expect(
+        evaluate({
+          unit: exited,
+          tracker: initialTracker(),
+          onRequest: true,
+          nowMs: PAST_GRACE_MS,
+        }),
+      ).toBe('failed');
+    });
+
+    test('and a suspended one is stopped: the owner asked for that, not the request pattern', () => {
+      expect(
+        evaluate({
+          unit: absent,
+          tracker: initialTracker(),
+          onRequest: true,
+          desiredRunning: false,
+          nowMs: PAST_GRACE_MS,
+        }),
+      ).toBe('stopped');
+    });
   });
 
   test('an instance the control plane wants stopped reads as stopped once the unit is down', () => {

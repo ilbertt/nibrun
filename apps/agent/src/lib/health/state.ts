@@ -133,10 +133,42 @@ export type LifecycleInputs = {
   tracker: HealthTracker;
   healthCheck: HealthCheck;
   desiredRunning: boolean;
+  onRequest: boolean;
   stopRequested: boolean;
   startedAtMs?: number;
   nowMs: number;
 };
+
+/**
+ * What a microVM that is not up means, which is four different things.
+ *
+ * `stopped` and `idle` are the same absence read against who is waiting: one is the end of the
+ * release, the other is the release between requests. `pending` is a start still in flight, and
+ * only a start this agent saw through records a time — systemd keeps a template instance loaded
+ * after it stops, so being loaded is not having been started.
+ *
+ * A boot that did happen rules out `idle` whatever the activation policy says: a microVM a
+ * request brought up and that then went down unasked is a crash, and calling that idle would
+ * wait for another request to find out.
+ */
+function evaluateStoppedState({
+  desiredRunning,
+  onRequest,
+  stopRequested,
+  startedAtMs,
+}: Pick<
+  LifecycleInputs,
+  'desiredRunning' | 'onRequest' | 'stopRequested' | 'startedAtMs'
+>): InstanceState {
+  const down = onRequest && desiredRunning ? 'idle' : 'stopped';
+  if (stopRequested || !desiredRunning) {
+    return down;
+  }
+  if (startedAtMs !== undefined) {
+    return 'failed';
+  }
+  return onRequest ? down : 'pending';
+}
 
 /**
  * A booted microVM is not a running app: `starting` has not accepted a connection and `running`
@@ -150,6 +182,7 @@ export function evaluateInstanceState({
   tracker,
   healthCheck,
   desiredRunning,
+  onRequest,
   stopRequested,
   startedAtMs,
   nowMs,
@@ -158,14 +191,7 @@ export function evaluateInstanceState({
     return 'failed';
   }
   if (!unit.active) {
-    if (stopRequested || !desiredRunning) {
-      return 'stopped';
-    }
-    // Being loaded is not having been started: systemd keeps a template instance loaded after
-    // it stops, so the unit a replace has just torn down is still loaded while the next one is
-    // being staged. Only a start this agent saw through records a time, which is what separates
-    // a boot still in flight from one that died.
-    return startedAtMs !== undefined ? 'failed' : 'pending';
+    return evaluateStoppedState({ desiredRunning, onRequest, stopRequested, startedAtMs });
   }
   if (stopRequested) {
     return 'stopping';

@@ -43,8 +43,8 @@ export type AgentSnapshot = {
    */
   readonly appTraffic: ReadonlyMap<AppId, AppTraffic>;
   /**
-   * When each app was last reached from outside this host. Nothing acts on it yet — it is what a
-   * suspend would decide from, recorded from the moment there is anything to record.
+   * When each app was last reached by something that was not this host, which is what decides
+   * whether an `on-request` app may sleep.
    */
   readonly lastActiveAtMs: ReadonlyMap<AppId, number>;
   readonly volumeReports: readonly ReportedVolume[];
@@ -87,6 +87,17 @@ export class AgentState extends Effect.Service<AgentState>()('AgentState', {
       snapshot,
       modify,
       records,
+
+      /**
+       * A request is evidence of use before any counter has seen it. The counters are read on
+       * their own cadence and a woken app's is new, which `activityAfter` reads as no evidence
+       * rather than as use — so without this a wake would leave the moment that had it sleeping.
+       */
+      markActive: ({ appId, nowMs }: { appId: AppId; nowMs: number }) =>
+        modify((current) => ({
+          ...current,
+          lastActiveAtMs: new Map(current.lastActiveAtMs).set(appId, nowMs),
+        })),
 
       putRecord: (record: InstanceRecord) =>
         modify((current) => ({

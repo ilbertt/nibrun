@@ -70,6 +70,16 @@ const AVAILABILITY: Record<AppStatusKey, AppActions> = {
     suspend: ENABLED,
     delete: ENABLED,
   },
+  // Everything a running app offers: an app asleep between requests is one that is up as far as
+  // its owner is concerned, and suspend is still what takes it offline for good rather than
+  // until the next visitor. Redeploy stays hidden — nothing has failed to run again.
+  idle: {
+    deploy: ENABLED,
+    redeploy: HIDDEN,
+    export: ENABLED,
+    suspend: ENABLED,
+    delete: ENABLED,
+  },
   // Nothing is serving under either of these, so there is nothing to take offline — and a bundle
   // is cut from the volume rather than from a running microVM, so exporting still works. Only the
   // one that failed is offered a redeploy: a release that did not come up is the case where

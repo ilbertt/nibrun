@@ -34,7 +34,11 @@ export async function appWithStatus({ api, slug }: { api: PublicApiClient; slug:
   return {
     app,
     newest,
-    status: appStatus({ appState: app.state, deploymentState: newest?.state }),
+    status: appStatus({
+      appState: app.state,
+      deploymentState: newest?.state,
+      instanceState: newest?.instanceState,
+    }),
   };
 }
 

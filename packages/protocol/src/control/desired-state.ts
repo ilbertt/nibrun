@@ -16,7 +16,17 @@ import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } f
 // message, an agent restart and a control-plane restart are all non-events — the next poll
 // re-reads the truth.
 
-export const DESIRED_INSTANCE_STATES = ['running', 'stopped'] as const;
+/**
+ * `on-request` is `running` with the microVM left out until something asks for it: the app is
+ * reachable, its host answers for its hostnames, and the guest is brought up by the first request
+ * that needs one. A world rather than a command, like the other two — what differs is only how
+ * much of it is standing at any moment.
+ *
+ * A third value rather than a flag beside these, because it is the same question: what should be
+ * true of this app. A suspended app is `stopped` whatever its activation policy says, which is
+ * why that policy never has to travel separately.
+ */
+export const DESIRED_INSTANCE_STATES = ['running', 'on-request', 'stopped'] as const;
 
 export const DesiredInstanceStateSchema = stringEnum(DESIRED_INSTANCE_STATES);
 
@@ -46,11 +56,43 @@ export const DesiredArtifactSchema = Type.Object({
 
 export type DesiredArtifact = typeof DesiredArtifactSchema.static;
 
+/**
+ * How long an `on-request` app goes unasked-for before its microVM is stopped.
+ *
+ * The whole of what scale-to-zero saves is memory a sleeping app is not holding, so this is the
+ * dial the saving is on: an app visited three times a day sleeps for most of it at fifteen
+ * minutes and for almost none of it at an hour. What it costs is a cold boot for whoever arrives
+ * after the gap, which is why it is not seconds.
+ *
+ * The floor is the cadence the decision is made on rather than a round number: whether an app has
+ * gone quiet is only asked when its traffic is measured, so a shorter timeout than that would be
+ * one the host accepts and cannot keep.
+ */
+export const MIN_IDLE_TIMEOUT_MS = 60_000;
+
+/**
+ * A day, which is not a judgement about how long an app should wait — `always` is how an owner
+ * says never sleep, so any value here is a legal preference and an app visited twice a day may
+ * reasonably want hours. It is there to catch the slipped zero: fifteen minutes and two and a
+ * half hours are one keystroke apart, and the wrong one costs nothing visible, it just quietly
+ * stops saving. Generous enough that it can only ever refuse a typo.
+ */
+export const MAX_IDLE_TIMEOUT_MS = 86_400_000;
+
+export const IdleTimeoutMsSchema = Type.Integer({
+  minimum: MIN_IDLE_TIMEOUT_MS,
+  maximum: MAX_IDLE_TIMEOUT_MS,
+});
+
 export const DesiredInstanceSchema = Type.Object({
   appId: AppIdSchema,
   deploymentId: DeploymentIdSchema,
   volumeId: VolumeIdSchema,
   desiredState: DesiredInstanceStateSchema,
+  // Only ever read for an `on-request` instance, and optional so a host is told nothing about
+  // one it cannot act on — and so an api that predates this leaves a host on its own default
+  // rather than stopping it converging.
+  idleTimeoutMs: Type.Optional(IdleTimeoutMsSchema),
   artifact: DesiredArtifactSchema,
   config: AppConfigSchema,
   // Carried down so the host can render its own routing config from the same state it boots

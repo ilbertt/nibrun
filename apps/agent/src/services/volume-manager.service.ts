@@ -97,16 +97,26 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
             // A device file with no app is one this agent has lost its record of. Reporting it
             // under a guessed app would be worse than leaving it out: the control plane reads
             // these to decide a tenant's filesystem is gone.
-            const observed = yield* Effect.forEach(names, (name) =>
-              Effect.gen(function* () {
-                const volumeId = Value.Parse(VolumeIdSchema, name);
-                const appId = appIdByVolume.get(volumeId);
-                if (appId === undefined) {
-                  return Option.none<ObservedVolume>();
-                }
-                const slot = yield* slotFor({ volumeId, appIdByVolume });
-                return yield* observeFile({ filesystem, volumeId, appId, slot });
-              }),
+            //
+            // Concurrently, because what takes any time here is the liveness probe, and the
+            // failure that makes it slow is one ZeroFS having gone — which is every volume on
+            // this filesystem at once. Sequentially that is one probe ceiling per volume before
+            // the host reports anything, and a host that reports nothing is a host the control
+            // plane cannot see. The list is one device file per slot, so it is bounded by the
+            // minors the kernel was given.
+            const observed = yield* Effect.forEach(
+              names,
+              (name) =>
+                Effect.gen(function* () {
+                  const volumeId = Value.Parse(VolumeIdSchema, name);
+                  const appId = appIdByVolume.get(volumeId);
+                  if (appId === undefined) {
+                    return Option.none<ObservedVolume>();
+                  }
+                  const slot = yield* slotFor({ volumeId, appIdByVolume });
+                  return yield* observeFile({ filesystem, volumeId, appId, slot });
+                }),
+              { concurrency: 'unbounded' },
             );
             return Arr.getSomes(observed);
           }),

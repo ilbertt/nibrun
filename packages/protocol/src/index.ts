@@ -22,6 +22,9 @@ export {
   DesiredVolumeSchema,
   type HostDesiredState,
   HostDesiredStateSchema,
+  IdleTimeoutMsSchema,
+  MAX_IDLE_TIMEOUT_MS,
+  MIN_IDLE_TIMEOUT_MS,
 } from '#control/desired-state.ts';
 export {
   type FilesystemQuery,
@@ -65,10 +68,13 @@ export {
   PROTOCOL_VERSION_HEADER,
 } from '#control/transport.ts';
 export {
+  APP_ACTIVATIONS,
   APP_HOSTNAME_KINDS,
   APP_HOSTNAME_STATES,
   APP_STATES,
   type App,
+  type AppActivation,
+  AppActivationSchema,
   type AppConfig,
   AppConfigSchema,
   type AppHostname,
