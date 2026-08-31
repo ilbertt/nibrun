@@ -223,9 +223,14 @@ export const AppConfigSchema = Type.Object({
 
 export type AppConfig = typeof AppConfigSchema.static;
 
-// Whether the app's microVM is kept up or is brought up by a request for it. `always` is what
-// every app has had until now and what a new one gets: an owner who has said nothing about this
-// has said they want their app up.
+// Whether the app's microVM is kept up or is brought up by a request for it. `on-request` is what
+// a new app gets: an app nobody is visiting holds no memory, and the visitor who ends a quiet
+// spell waits for a restore rather than for a boot.
+//
+// `always` is the answer to the two things a request cannot stand in for. A connection that is the
+// first one to a stopped app cannot be carried across the wake, so a websocket is asked to
+// reconnect; and only requests reaching the app count as activity, so one that does nothing but
+// outbound work reads as quiet and is stopped.
 //
 // A property of the app rather than of a release, and so on `apps` beside `state` rather than on
 // the config a deployment pins: it is the same kind of fact as being suspended — how the app is

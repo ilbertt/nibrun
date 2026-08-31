@@ -33,6 +33,9 @@ const PLATFORM = Value.Parse(HostnameSchema, 'pocketbase.apps.example.com');
 
 const FIRST_TOKEN = 'sk-sealed-once';
 
+// `0035`'s column default, which nothing in the protocol names — a quarter of an hour.
+const DEFAULT_IDLE_TIMEOUT_MS = 900_000;
+
 // One database for the file, because bringing a container up and migrating it is the expensive
 // part and every describe below wants the same empty schema.
 let sql: SQL;
@@ -83,6 +86,21 @@ async function storedState(appId: AppId): Promise<string | undefined> {
   }>;
   return row?.state;
 }
+
+/**
+ * The column's own default and nothing else: `create` names `owner_id` and `slug`, so what a new
+ * app comes up as is decided by the migration rather than by anything a caller could pass.
+ */
+describe('an app nobody has said anything about waits to be asked for', () => {
+  test('a new app runs on request, at the wait the column defaults to', async () => {
+    const appId = await createApp('fresh-heron');
+
+    expect(await repo.findById({ appId, ownerId: OWNER_ID })).toMatchObject({
+      activation: 'on-request',
+      idle_timeout_ms: DEFAULT_IDLE_TIMEOUT_MS,
+    });
+  });
+});
 
 /**
  * A config version is what a deployment pins and its variables are part of that version, so a
