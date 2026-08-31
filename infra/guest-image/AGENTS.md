@@ -75,9 +75,16 @@ pay for it by naming every divergence in `kernel/config-drift.allow`.
 
 That file is enforced: every assignment in the base config must survive into the generated
 `.config` unless listed there or deliberately overridden. The whole measured divergence is
-thirteen lines. The only one worth knowing: `CONFIG_SYSGENID`, which tells userspace to reseed
-its RNG after a snapshot restore. **nibrun takes no Firecracker snapshots — if it ever does,
-this is the missing symbol and the reason to move onto the Amazon Linux source tree.**
+fifteen lines. The only one worth knowing: `CONFIG_SYSGENID`, the generation counter userspace
+watches to reseed a PRNG of its own after a snapshot restore. The kernel's half is already
+covered by `CONFIG_VMGENID=y`, so `getrandom()` comes back fresh; what is missing duplicates
+nothing unless **one snapshot is restored more than once**, which is an invariant to hold rather
+than a symbol to chase.
+
+Enforcement runs the other way too, which is worth knowing before generating a `.config` to
+settle an argument: a symbol the base config sets and `config-drift.allow` does not list is
+already guaranteed to be in the built kernel. `CONFIG_PTP_1588_CLOCK_KVM=y` is one of those —
+the guest has `/dev/ptp0` without `nibrun.config` asking for it.
 
 `assert-config.sh` exists because kconfig drops a symbol whose dependencies are unmet **without
 failing**. A fragment is a request, not a guarantee, and the classic way to lose virtio-blk is

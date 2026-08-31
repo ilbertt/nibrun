@@ -17,7 +17,7 @@ const BUNDLE_DIRECTORIES = ['systemd', 'zerofs', 'caddy'];
 // Shell, not TypeScript: these run on the box, which has no Bun. Flattened to the
 // bundle root next to the directories above, because the deploy script resolves
 // everything relative to itself.
-const ON_BOX_SCRIPTS = ['on_box_deploy.sh', 'ensure_ephemeral_data.sh'];
+const ON_BOX_SCRIPTS = ['on_box_deploy.sh', 'ensure_ephemeral_data.sh', 'vm_launch.sh'];
 
 // Shared with the control plane's bundle: Cloudflare's origin-pull CA is one
 // certificate, and both proxies authenticate the same edge against it.

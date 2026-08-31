@@ -24,7 +24,6 @@ import {
 import { ensureArtifactImage } from '#lib/vm/artifacts.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT, type UnitStatus } from '#lib/vm/unit-status.ts';
-import { flush } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
@@ -34,24 +33,6 @@ import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
 const ONE_RESTART = 1;
 const NO_RESTART = 0;
-
-/** Under `ignore_fsync` this is the only thing between a stop and the loss of everything since
- * the last periodic flush. */
-const flushEverything = Effect.gen(function* () {
-  const topology = yield* ZerofsTopology;
-  yield* Effect.forEach(
-    topology.all,
-    (filesystem) =>
-      flush(filesystem.admin).pipe(
-        Effect.catchAll((error) =>
-          Effect.logWarning('zerofs flush failed', error).pipe(
-            Effect.annotateLogs({ storagePrefix: filesystem.storagePrefix }),
-          ),
-        ),
-      ),
-    { discard: true },
-  );
-});
 
 /**
  * A stop pulls the plug: the unit signals the VMM, and the guest is not asked to shut down
@@ -79,7 +60,7 @@ const settleAndStop = ({ appId, reason }: { appId: AppId; reason: string }) =>
         ),
       ),
     );
-    yield* flushEverything;
+    yield* (yield* ZerofsTopology).flushAll;
     yield* vms.stop(appId).pipe(
       Effect.andThen(Effect.logInfo('instance stopped')),
       Effect.catchAll((error) => Effect.logError('instance stop failed', error)),

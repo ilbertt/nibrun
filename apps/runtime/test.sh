@@ -43,6 +43,10 @@ require() {
 }
 
 contains() { grep -qF "$2" <<<"$1"; }
+# Not `bash -c "! grep ... <<<'$haystack'"`: that reopens the captured output as
+# shell source, so one apostrophe in a tenant's log line ends the run as a syntax
+# error rather than as a result.
+lacks() { ! contains "$1" "$2"; }
 
 echo '=== unit tests ==='
 # Never cached: a test whose result was reused is a test that did not run, and these
@@ -82,8 +86,7 @@ mounts=$(docker exec "$container" cat /proc/1/mounts)
 require 'the artifact is read-only and the data filesystem is not' \
   contains "$mounts" '/mnt/artifact squashfs ro,nosuid,nodev'
 require 'the tenant volume is mounted noatime' contains "$mounts" '/app/data ext4 rw,nosuid,nodev,noatime'
-require 'the config drive, which carries the secrets, is gone' \
-  bash -c "! grep -q /run/config <<<'$mounts'"
+require 'the config drive, which carries the secrets, is gone' lacks "$mounts" /run/config
 
 echo "PID 1 memory: $(docker exec "$container" grep VmRSS /proc/1/status)"
 
@@ -93,7 +96,7 @@ require 'the guest ends the machine rather than lingering' [ "$exit_code" = 129 
 
 logs=$(docker logs "$container" 2>&1)
 require 'the tenant was asked to stop and did' contains "$logs" 'the tenant has stopped'
-require 'no tenant had to be killed' bash -c "! grep -q 'killing it' <<<'$logs'"
+require 'no tenant had to be killed' lacks "$logs" 'killing it'
 
 image=$(mktemp "${TMPDIR:-/tmp}/nibrun-data.XXXXXX")
 docker cp "$container:/images/data.ext4" "$image" >/dev/null
