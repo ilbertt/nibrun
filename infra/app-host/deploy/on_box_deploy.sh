@@ -235,6 +235,36 @@ changed_file() {
   return 0
 }
 
+# What is left of a config once everything only a person reads is gone: whole-line
+# comments, blank lines, trailing whitespace. A multi-line string would make all
+# three unsafe to drop — inside one a `#` is data and a blank line is content — so
+# a file that could hold one is compared exactly as it stands.
+settings_only() {
+  if grep -q -e '"""' -e "'''" "$1"; then
+    cat "$1"
+  else
+    sed -e 's/[[:space:]]*$//' -e '/^[[:space:]]*#/d' -e '/^$/d' "$1"
+  fi
+}
+
+# For a config whose reader ignores comments. The file lands on the box either
+# way, so what is installed is still what the repo says word for word — but the
+# restart is decided on the settings alone. ZeroFS restarting severs the NBD
+# device behind every guest disk on this host, and rewording the paragraph above
+# a value has to be unable to cause that.
+changed_settings() {
+  local path=$1
+  local before=''
+  if [ -f "$path" ]; then
+    before=$(settings_only "$path")
+  fi
+  local after
+  after=$(settings_only "$path.new")
+
+  changed_file "$path" || return 1
+  [ "$before" != "$after" ]
+}
+
 # A guest reaches the internet through this host: its default route is the tap,
 # and the agent's ruleset masquerades what leaves. Without forwarding the kernel
 # discards those packets before a single rule is consulted, and discards them
@@ -296,7 +326,7 @@ NIBRUN_FILESYSTEMS_PASSWORD=$(secret filesystems_encryption_password)
 AWS_REGION=${AWS_REGION}
 EOF
 chmod 0600 /etc/zerofs/zerofs.env.new
-changed_file /etc/zerofs/zerofs.env && NEEDS_RESTART+=(zerofs) || true
+changed_settings /etc/zerofs/zerofs.env && NEEDS_RESTART+=(zerofs) || true
 
 # What the agent reports this host as running, validated against the protocol's
 # HostVersions — four version strings, and nothing like the pin file CI resolved
@@ -324,14 +354,14 @@ cat > /etc/systemd/journal-upload.conf.new <<EOF
 URL=${LOG_INGEST_URL}/insert/journald
 EOF
 chmod 0644 /etc/systemd/journal-upload.conf.new
-changed_file /etc/systemd/journal-upload.conf && NEEDS_RESTART+=(journal-upload) || true
+changed_settings /etc/systemd/journal-upload.conf && NEEDS_RESTART+=(journal-upload) || true
 
 cp zerofs/config.toml /etc/zerofs/config.toml.new
 # Read by ZeroFS itself, which runs as its own user, so it cannot inherit the
 # 0600 the umask above gives the secrets around it. It holds no secret: every
 # value that is one arrives through zerofs.env.
 chmod 0644 /etc/zerofs/config.toml.new
-changed_file /etc/zerofs/config.toml && NEEDS_RESTART+=(zerofs) || true
+changed_settings /etc/zerofs/config.toml && NEEDS_RESTART+=(zerofs) || true
 
 # What a checkpoint server reads. Nothing restarts on a change: no instance of it
 # outlives the export it was started for, so the next one picks this up by being
@@ -370,7 +400,7 @@ AGENT_ZEROFS_STORAGE_PREFIX=${NIBRUN_FILESYSTEMS_URL}
 AWS_REGION=${AWS_REGION}
 EOF
 chmod 0600 /etc/nibrun/agent.env.new
-changed_file /etc/nibrun/agent.env && NEEDS_RESTART+=(agent) || true
+changed_settings /etc/nibrun/agent.env && NEEDS_RESTART+=(agent) || true
 
 # The origin certificate Caddy serves. Held base64-encoded in SSM because a PEM
 # is multi-line and `--output text` mangles that, with no jq here to read the
@@ -399,7 +429,7 @@ cat > /etc/caddy/caddy.env.new <<EOF
 APP_HOST_DOMAIN=${APP_HOST_DOMAIN}
 WWW_HOSTNAME=${WWW_HOSTNAME}
 EOF
-changed_file /etc/caddy/caddy.env && NEEDS_RESTART+=(caddy) || true
+changed_settings /etc/caddy/caddy.env && NEEDS_RESTART+=(caddy) || true
 
 # Modes are set rather than inherited: none of this is secret, all of it is read
 # by a user that is not the one writing it, and the umask this script runs under
