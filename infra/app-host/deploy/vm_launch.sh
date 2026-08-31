@@ -26,6 +26,14 @@ SNAPSHOT_DIR="/data/nibrun-vm/${instance}"
 # something to load; removing it here means an agent that dies between this exec
 # and the load leaves a microVM that cold-boots off its disk, rather than one
 # that resumes into a guest whose disk has since moved on without it.
+#
+# At most once is also a security invariant, so this `rm` is not tidying up. The
+# guest kernel has CONFIG_VMGENID=y and Linux reseeds its own CRNG on a restore,
+# but nothing reseeds the PRNG state already sitting in tenant memory — an
+# OpenSSL RAND buffer, a runtime's generator, a nonce already drawn. Loading one
+# snapshot into two microVMs is the same randomness live in both, which is key
+# reuse that nothing shows up as. Anyone turning this into a reusable warm-start
+# template is trading that away, and should be doing it on purpose.
 if [ -f "$SNAPSHOT_DIR/stamp.json" ]; then
   rm -f "$SNAPSHOT_DIR/stamp.json"
   exec "$FIRECRACKER" --api-sock "$API_SOCK"

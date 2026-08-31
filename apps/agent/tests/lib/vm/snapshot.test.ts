@@ -7,6 +7,7 @@ import {
   driftFrom,
   ensureLoadable,
   readStamp,
+  refusalToSleep,
   SNAPSHOT_STAMP_FILENAME,
   type SnapshotStamp,
   snapshotPaths,
@@ -82,6 +83,40 @@ describe('every way a snapshot stops being loadable is named', () => {
     expect(driftFrom({ stored: { ...stamp, slot: SLOT + 1 }, expected: stamp })).toContain(
       'another slot',
     );
+  });
+});
+
+// Both refusals are about surviving the wake, not about whether sleeping is a good idea — and
+// both are enforced against the agent's own record rather than asked of the caller, because the
+// caller is the part that changes.
+describe('the moments a microVM must not be snapshotted', () => {
+  const sleepable = { stopRequested: false, desiredRunning: true, everHealthy: true };
+
+  // The bar is having answered, not being well now: the dangerous window closed the first time
+  // the tenant accepted a connection, and going unhealthy since does not reopen it.
+  test('an app that has answered at least once is sleepable', () => {
+    expect(refusalToSleep(sleepable)).toBeUndefined();
+  });
+
+  // `clock_realtime` moves CLOCK_MONOTONIC forward with the clocksource, so the guest
+  // supervisor's SIGTERM-to-SIGKILL deadline would land in the past on the first poll after a
+  // wake and kill a tenant that was shutting down cleanly.
+  test('one already asked to stop is refused', () => {
+    expect(refusalToSleep({ ...sleepable, stopRequested: true })).toContain('asked to stop');
+  });
+
+  test('so is one the control plane no longer wants running', () => {
+    expect(refusalToSleep({ ...sleepable, desiredRunning: false })).toContain('asked to stop');
+  });
+
+  // Firecracker injects the VMGenID interrupt before vCPUs resume, and a kernel snapshotted
+  // before its interrupt handling was in place can crash taking it — fatally, under `panic=1`.
+  test('one that has never answered may not have finished booting', () => {
+    expect(refusalToSleep({ ...sleepable, everHealthy: false })).toContain('finished booting');
+  });
+
+  test('an app this host holds no record of is refused rather than assumed healthy', () => {
+    expect(refusalToSleep(undefined)).toBeDefined();
   });
 });
 

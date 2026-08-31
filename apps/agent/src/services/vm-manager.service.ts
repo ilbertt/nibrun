@@ -13,12 +13,15 @@ import { buildInstanceConfigImage } from '#lib/vm/instance-env.ts';
 import {
   ensureLoadable,
   readHostBootId,
+  refusalToSleep,
+  SleepRefused,
   type SnapshotStamp,
   snapshotPaths,
 } from '#lib/vm/snapshot.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { GUEST_VSOCK_FILENAME, vmWorkingDir } from '#lib/vm/vsock.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
+import { AgentState } from '#services/agent-state.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -43,6 +46,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     const fs = yield* FileSystem.FileSystem;
     const logs = yield* TenantLogReceiver;
     const zerofs = yield* ZerofsTopology;
+    const agentState = yield* AgentState;
 
     const workingDir = (appId: AppId) => vmWorkingDir({ vmDir: config.vmDir, appId });
     const snapshotFor = (appId: AppId) =>
@@ -77,6 +81,16 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       yield* fs.remove(paths.stampPath, { force: true });
       yield* fs.remove(paths.directory, { recursive: true, force: true });
     });
+
+    /** Where the caller has a failure of its own to report and a leaked snapshot is the lesser one. */
+    const forgetSnapshot = (appId: AppId) =>
+      discardSnapshot(appId).pipe(
+        Effect.catchAll((error) =>
+          Effect.logWarning('snapshot could not be discarded', error).pipe(
+            Effect.annotateLogs({ appId }),
+          ),
+        ),
+      );
 
     /**
      * The agent never becomes the VM's parent: it stages the files, asks init to start the unit,
@@ -159,6 +173,11 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     /**
      * A microVM taken down at a point it can be put back on, rather than one taken down.
      *
+     * The two states a snapshot must never be taken in are read from this agent's own record of
+     * the instance rather than accepted from the caller, because they are the preconditions of
+     * the operation and not an opinion about it: a caller that could supply them could also
+     * forget to. `refusalToSleep` is where each one is spelled out.
+     *
      * The flush comes before the pause on purpose: one that hangs then leaves a microVM that is
      * still serving, where a pause first would freeze the tenant for the whole of it. It is what
      * makes this a durability point at all — `ignore_fsync` has already made the guest's own
@@ -175,6 +194,18 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       slot,
     }: SuspendRequest) {
       yield* Effect.annotateCurrentSpan({ appId });
+      const record = (yield* agentState.snapshot).records.get(appId);
+      const refusal = refusalToSleep(
+        record && {
+          stopRequested: record.stopRequested,
+          desiredRunning: record.desiredRunning,
+          everHealthy: record.health.everHealthy,
+        },
+      );
+      if (refusal !== undefined) {
+        return yield* new SleepRefused({ reason: refusal });
+      }
+
       const paths = snapshotFor(appId);
       const socketPath = apiSocket(appId);
       const stamp = yield* currentStamp({ deploymentId, slot });
@@ -221,39 +252,38 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       const socketPath = apiSocket(appId);
       const expected = yield* currentStamp({ deploymentId, slot });
       yield* Effect.onError(ensureLoadable({ stampPath: paths.stampPath, expected }), () =>
-        discardSnapshot(appId).pipe(
-          Effect.catchAll((error) =>
-            Effect.logWarning('stale snapshot could not be discarded', error).pipe(
-              Effect.annotateLogs({ appId }),
-            ),
-          ),
-        ),
+        forgetSnapshot(appId),
       );
 
       yield* Systemd.start(appId);
-      yield* Effect.onError(
-        Effect.gen(function* () {
-          yield* Firecracker.loadSnapshot({
-            socketPath,
-            statePath: paths.statePath,
-            memoryPath: paths.memoryPath,
-          });
-          yield* Firecracker.resume(socketPath);
-          yield* refreshNeighbour({
-            guestIpv4: slot.guestIpv4,
-            guestMac: slot.guestMac,
-            tapName: slot.tapName,
-          });
-        }),
-        // The start already consumed the stamp, so this Firecracker holds no guest and never
-        // will: stopping it is what leaves a cold boot rather than a process in the way of one.
-        () => Effect.ignore(Systemd.stop(appId)),
+      yield* Effect.ensuring(
+        Effect.onError(
+          Effect.gen(function* () {
+            yield* Firecracker.loadSnapshot({
+              socketPath,
+              statePath: paths.statePath,
+              memoryPath: paths.memoryPath,
+            });
+            yield* Firecracker.resume(socketPath);
+            yield* refreshNeighbour({
+              guestIpv4: slot.guestIpv4,
+              guestMac: slot.guestMac,
+              tapName: slot.tapName,
+            });
+          }),
+          // The start already consumed the stamp, so this Firecracker holds no guest and never
+          // will: stopping it is what leaves a cold boot rather than a process in the way of one.
+          () => Effect.ignore(Systemd.stop(appId)),
+        ),
+        // Every way out, so no retry of a restore that failed halfway can find the files it did
+        // not finish with. The stamp is already gone and would stop a second load on its own;
+        // this is what keeps at-most-once from resting on that single fact.
+        //
+        // Unlinking while Firecracker still has the memory file mapped keeps the mapping alive
+        // and hands the disk back the moment the microVM exits, so the successful path pays
+        // nothing for it either.
+        forgetSnapshot(appId),
       );
-
-      // Unlinked while Firecracker still has the memory file mapped, which keeps the mapping
-      // alive and hands the disk back the moment the microVM exits. Leaving the files would put
-      // the burden of removing them on every path that stops a VM instead.
-      yield* discardSnapshot(appId);
       yield* Effect.logInfo('instance awake').pipe(Effect.annotateLogs({ appId, slot: slot.slot }));
     });
 
@@ -276,5 +306,10 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       }),
     };
   }),
-  dependencies: [AgentConfig.Default, TenantLogReceiver.Default, ZerofsTopology.Default],
+  dependencies: [
+    AgentConfig.Default,
+    AgentState.Default,
+    TenantLogReceiver.Default,
+    ZerofsTopology.Default,
+  ],
 }) {}

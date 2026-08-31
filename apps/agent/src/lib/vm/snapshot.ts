@@ -8,11 +8,21 @@ export const SNAPSHOT_STATE_FILENAME = 'vmstate';
 export const SNAPSHOT_MEMORY_FILENAME = 'memory';
 
 /**
- * Written last and consumed first, which is what makes a restore happen at most once: the agent
- * writes it only once the two files beside it are complete, and the launcher deletes it before it
- * execs the Firecracker that will load them. A start that finds no stamp is a cold boot — so an
- * agent that died between the load and the cleanup leaves a microVM that boots off its disk
- * rather than one that resumes from a snapshot the disk has since moved past.
+ * Written last and consumed first, which is what makes a restore happen **at most once**: the
+ * agent writes it only once the two files beside it are complete, and `vm_launch.sh` deletes it
+ * before it execs the Firecracker that will load them. A start that finds no stamp is a cold boot
+ * — so an agent that died between the load and the cleanup leaves a microVM that boots off its
+ * disk rather than one that resumes from a snapshot the disk has since moved past.
+ *
+ * **At most once is a security invariant and not only a crash-safety one.** The guest kernel is
+ * built with `CONFIG_VMGENID=y`, so Firecracker updates the generation id and injects its
+ * interrupt before vCPUs resume, and Linux reseeds the kernel CRNG off it — `getrandom()` and
+ * `/dev/urandom` are fresh on the far side of a wake. Nothing reseeds the PRNG state already
+ * resident in tenant memory: OpenSSL's `RAND` buffer, a runtime's per-thread generator, a nonce
+ * already drawn. One snapshot restored twice is therefore the same randomness in two live VMs,
+ * which is key reuse with no symptom to notice it by. That is what is being traded away by
+ * anyone who makes a snapshot into a reusable warm-start template, and it is a trade to make
+ * deliberately rather than to discover.
  */
 export const SNAPSHOT_STAMP_FILENAME = 'stamp.json';
 
@@ -51,6 +61,56 @@ export class SnapshotUnusable extends Data.TaggedError('SnapshotUnusable')<{
   override get message() {
     return `the saved microVM state cannot be restored: ${this.reason}`;
   }
+}
+
+export class SleepRefused extends Data.TaggedError('SleepRefused')<{
+  readonly reason: string;
+}> {
+  override get message() {
+    return `this microVM must not be snapshotted: ${this.reason}`;
+  }
+}
+
+/**
+ * The two moments a microVM survives being snapshotted and its tenant does not survive being
+ * woken. Enforced here rather than left to whatever decides an app should sleep, because a
+ * policy is the thing that changes: the obvious next idea is to snapshot an app right after
+ * creating it to make cold starts cheap, and that idea has to fail here rather than in
+ * production.
+ *
+ * **A stop already in flight.** `clock_realtime` advances the clocksource rather than applying a
+ * wall-clock offset, so `CLOCK_MONOTONIC` moves forward with it. The SIGTERM-to-SIGKILL deadline
+ * the guest's supervisor holds in `PHASE_TERM_SENT` (`apps/runtime/src/supervise.c`) is a
+ * monotonic instant, so it lands in the past on the first poll after a wake and the tenant is
+ * killed for a shutdown it was in the middle of handling gracefully.
+ *
+ * **A guest that has not finished booting.** Firecracker injects the VMGenID interrupt before
+ * vCPUs resume, and a kernel snapshotted before its interrupt handling was in place can crash
+ * taking it. This guest boots with `panic=1 reboot=k` and `CONFIG_PANIC_ON_OOPS=y`, so that
+ * crash is the end of the microVM rather than a line on its console. `everHealthy` is the bar
+ * because it is the host's only first-hand evidence: the tenant accepted a connection, which is
+ * far past the window that is dangerous, and it stays true for a guest that has since gone
+ * unhealthy — being unwell is not the same as never having booted.
+ */
+export function refusalToSleep(
+  subject:
+    | {
+        readonly stopRequested: boolean;
+        readonly desiredRunning: boolean;
+        readonly everHealthy: boolean;
+      }
+    | undefined,
+): string | undefined {
+  if (subject === undefined) {
+    return 'this host holds no record of it';
+  }
+  if (subject.stopRequested || !subject.desiredRunning) {
+    return 'it has already been asked to stop';
+  }
+  if (!subject.everHealthy) {
+    return 'it has never answered, so it may not have finished booting';
+  }
+  return undefined;
 }
 
 export type SnapshotPaths = {
