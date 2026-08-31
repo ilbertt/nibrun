@@ -574,6 +574,7 @@ function settle({
       desiredRunning: record.desiredRunning,
       onRequest: record.onRequest,
       stopRequested: record.stopRequested,
+      current: record.state,
       ...graceInputs({ record, nowMs }),
     });
 
