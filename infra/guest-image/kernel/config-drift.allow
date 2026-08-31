@@ -23,11 +23,15 @@ CONFIG_DMA_PAGE_TOUCHING
 # asserts.
 CONFIG_PTP_1588_CLOCK_VMCLOCK
 
-# Amazon Linux out-of-tree driver: /dev/sysgenid tells userspace to reseed its
-# RNG after a snapshot restore, because a restored VM replays entropy the
-# original already used. nibrun takes no Firecracker snapshots, so nothing reads
-# it. **If snapshots are ever adopted, this is the missing symbol and the reason
-# to move the build onto the Amazon Linux source tree.**
+# Amazon Linux out-of-tree driver: /dev/sysgenid is the generation counter
+# userspace watches to know a snapshot was restored and reseed a PRNG of its own.
+# The kernel's half of that is already covered — CONFIG_VMGENID=y is in the base
+# config and asserted by nibrun.config, so Firecracker's generation-id interrupt
+# reseeds the CRNG before the vCPUs run and getrandom() comes back fresh. What is
+# left is a tenant that seeded its own PRNG and never asks the kernel again, and
+# that duplicates nothing unless one snapshot is restored more than once.
+# **Restore-once is the invariant that keeps this line cheap; giving it up is what
+# would make moving the build onto the Amazon Linux source tree worth it.**
 CONFIG_SYSGENID
 
 # Oversampling rate for the jitter entropy RNG; the symbol does not exist in
