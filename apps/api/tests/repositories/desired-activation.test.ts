@@ -37,17 +37,19 @@ describe('how an app comes up travels with what it should be doing', () => {
     return row;
   }
 
-  test('an app nobody has said anything about is kept up, as every app was before', async () => {
-    expect(await desired()).toMatchObject({ state: 'active', activation: 'always' });
+  test('an app nobody has said anything about waits to be asked for', async () => {
+    expect(await desired()).toMatchObject({ state: 'active', activation: 'on-request' });
   });
 
-  test('one column is the whole of turning it on', async () => {
+  // The direction that is now the edit: waiting to be asked is what an app gets, and being kept
+  // up is what its owner goes and says.
+  test('one column is the whole of turning it off', async () => {
     await sql.unsafe('UPDATE nibrun.apps SET activation = $1 WHERE slug = $2', [
-      'on-request',
+      'always',
       APP_SLUG,
     ]);
 
-    expect(await desired()).toMatchObject({ state: 'active', activation: 'on-request' });
+    expect(await desired()).toMatchObject({ state: 'active', activation: 'always' });
   });
 
   test('and how long it may go unasked-for rides beside it', async () => {
@@ -84,7 +86,14 @@ describe('how an app comes up travels with what it should be doing', () => {
   // Suspending is the stricter answer and has to win: the host reads one field, and an app told
   // it runs on request would be started again by whoever found its hostname next.
   test('a suspended app keeps its policy and is stopped anyway', async () => {
-    await sql.unsafe('UPDATE nibrun.apps SET state = $1 WHERE slug = $2', ['suspended', APP_SLUG]);
+    // Both columns rather than the state alone: the policy this has to win over is the one a
+    // visitor could act on, so the app is put back on request here instead of inheriting whatever
+    // the test above left.
+    await sql.unsafe('UPDATE nibrun.apps SET state = $1, activation = $2 WHERE slug = $3', [
+      'suspended',
+      'on-request',
+      APP_SLUG,
+    ]);
 
     expect(await desired()).toMatchObject({ state: 'suspended', activation: 'on-request' });
   });
