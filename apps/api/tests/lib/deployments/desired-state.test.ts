@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { AppActivation, AppState } from '@repo/protocol';
+import type { AppActivation, AppState, DeploymentState } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import { environmentByDeployment, toDesiredInstance } from '#lib/deployments/desired-state.ts';
 import { sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
@@ -120,6 +120,22 @@ describe('how the app comes up is folded into the same answer', () => {
     );
   });
 
+  /**
+   * A release that did not come up is stopped the way a suspended app is, and for a different
+   * reason: it stays in the list so the host goes on answering for the hostnames, and `on-request`
+   * would have every visitor pay for a boot the last one already proved would not work.
+   */
+  test('a failed release is stopped whatever the app says it wants', () => {
+    expect(
+      desiredInstance({ state: 'active', activation: 'on-request', deploymentState: 'failed' })
+        .desiredState,
+    ).toBe('stopped');
+    expect(
+      desiredInstance({ state: 'active', activation: 'always', deploymentState: 'failed' })
+        .desiredState,
+    ).toBe('stopped');
+  });
+
   test('the timeout rides along only where there is something to time', () => {
     expect(desiredInstance({ state: 'active', activation: 'on-request' }).idleTimeoutMs).toBe(
       IDLE_TIMEOUT_MS,
@@ -136,12 +152,14 @@ describe('how the app comes up is folded into the same answer', () => {
 function desiredInstance({
   state,
   activation = 'always',
+  deploymentState = 'running',
 }: {
   state: AppState;
   activation?: AppActivation;
+  deploymentState?: DeploymentState;
 }) {
   return toDesiredInstance({
-    row: { ...deploymentRow(), state, activation },
+    row: { ...deploymentRow(), state, activation, deployment_state: deploymentState },
     hostnames: new Map(),
     environments: new Map(),
     secretsKey: TEST_SECRETS_KEY,
@@ -175,5 +193,6 @@ function deploymentRow() {
     config_id: 'config-1',
     activation: 'always',
     idle_timeout_ms: IDLE_TIMEOUT_MS,
+    deployment_state: 'running',
   } as unknown as Parameters<typeof toDesiredInstance>[0]['row'];
 }
