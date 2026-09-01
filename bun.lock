@@ -84,7 +84,8 @@
     "apps/justfuckingusenibrun": {
       "name": "@repo/justfuckingusenibrun",
       "devDependencies": {
-        "wrangler": "^4.123.0",
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
       },
     },
     "apps/runtime": {

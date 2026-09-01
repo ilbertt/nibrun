@@ -2,12 +2,17 @@
   "name": "@repo/justfuckingusenibrun",
   "private": true,
   "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  },
   "scripts": {
-    "dev": "wrangler dev --port 3003",
-    "cf:deploy": "wrangler deploy",
-    "cf:deploy:preview": "wrangler versions upload"
+    "dev": "PORT=3003 bun run src/server.ts",
+    "build": "bun build --compile --target=bun-linux-x64 --outfile dist/justfuckingusenibrun src/server.ts",
+    "check:types": "bun run --bun tsc",
+    "deploy": "bun run build && nib run ./dist/justfuckingusenibrun --app justfuckingusenibrun"
   },
   "devDependencies": {
-    "wrangler": "^4.123.0"
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
   }
 }
