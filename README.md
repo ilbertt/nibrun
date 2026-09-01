@@ -12,15 +12,11 @@ Small apps don't need to scale. They need a machine and a disk.
 
 ## Why
 
-PocketBase is one file with a database, auth, file storage and an admin UI in it. So is a lot of
-good open source. Then you go to host it.
+A compiled binary is already a whole application in one file. Whatever language produced it,
+nothing has to be installed on the other side. The only two things it still needs are somewhere
+to run and somewhere to read and write files.
 
-The "batteries included" platforms hand you Postgres and object storage but nowhere to run your
-own binary. The ones that will run your code run it as a function, on a filesystem that resets
-between requests, so a SQLite file is gone the moment the request ends. And a VM means ssh, a
-firewall to open, TLS to renew, and an OS to keep updated.
-
-Self-hostable projects are great until you have to host them.
+For an app that five people use, most of the rest is ceremony:
 
 | What it usually gets | What it actually needs |
 | --- | --- |
