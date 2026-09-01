@@ -34,6 +34,7 @@ export interface ISelectDesiredDeploymentsResult {
     config_id: IDeploymentsColumns["config_id"];
     activation: IAppsColumns["activation"];
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    deployment_state: IDeploymentsColumns["state"];
 }
 
 /** Result of query `SelectDesiredVolumes`. */
@@ -1223,6 +1224,8 @@ export interface IDesiredDeploymentsColumns {
     has_extra_public_port: boolean | null;
     activation: string | null;
     idle_timeout_ms: number | null;
+    /** The release's own state, beside the app's. A host reads it to tell a release it should run from one it is only answering for. */
+    deployment_state: string | null;
 }
 
 /** Schema of `desired_deployments`. */
@@ -1789,7 +1792,8 @@ export const schema = {
             config_id: { _columnName: "config_id", _foreignKeys: {} },
             has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} },
             activation: { _columnName: "activation", _foreignKeys: {} },
-            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} }
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} },
+            deployment_state: { _columnName: "deployment_state", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}

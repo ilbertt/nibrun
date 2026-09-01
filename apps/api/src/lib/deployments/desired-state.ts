@@ -93,9 +93,15 @@ export function toDesiredInstance({
  * Suspended wins over any activation policy: an owner who has stopped their app has said the
  * microVM should be down, and `on-request` would have the next stranger to find the hostname
  * start it again.
+ *
+ * A failed release is `stopped` for the same reason and not the same one: nobody asked for it to
+ * be down, but there is nothing here that running it again would fix, and `on-request` would have
+ * every visitor pay for a boot the last one already proved. It stays in this list only so the
+ * host goes on answering for the hostnames — the activator's 503 is the honest answer to a
+ * release that did not come up, and it is the owner's redeploy that ends it.
  */
 function desiredInstanceState(row: DesiredDeploymentRow): DesiredInstanceState {
-  if (row.state !== 'active') {
+  if (row.deployment_state === 'failed' || row.state !== 'active') {
     return 'stopped';
   }
   return row.activation === 'on-request' ? 'on-request' : 'running';
