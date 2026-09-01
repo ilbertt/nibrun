@@ -2,6 +2,6 @@
 // `*.svg` at all, and no import attribute can tell TypeScript otherwise.
 
 declare module '*.svg' {
-  const source: string;
-  export default source;
+  const path: string;
+  export default path;
 }
