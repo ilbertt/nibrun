@@ -22,9 +22,10 @@ firewall to open, TLS to renew, and an OS to keep updated.
 
 | What it usually gets | What it actually needs |
 | --- | --- |
-| ❌ ~~A container image, around a single file~~ | ✅ **A machine to run on** |
+| ❌ ~~A container image~~ | ✅ **A machine to run on** |
 | ❌ ~~A managed Postgres~~ | ✅ **A disk to write to** |
 | ❌ ~~An object storage bucket~~ | |
+| ❌ ~~A load balancer, for one instance~~ | |
 | ❌ ~~A VM to ssh into~~ | |
 | ❌ ~~A firewall to open~~ | |
 | ❌ ~~TLS to renew~~ | |

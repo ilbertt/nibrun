@@ -1,7 +1,8 @@
 const CEREMONY = [
-  'A container image, around a single file',
+  'A container image',
   'A managed Postgres',
   'An object storage bucket',
+  'A load balancer, for one instance',
   'A VM to ssh into',
   'A firewall to open',
   'TLS to renew',
