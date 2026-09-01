@@ -30,6 +30,13 @@ export type AppRow = Queries['SelectAppById'];
 
 export type CreatedApp = { app: AppRow; hostnames: AppHostnameRow[] };
 
+export type NewApp = {
+  ownerId: OwnerId;
+  slug: DnsLabel;
+  hostname: Hostname;
+  config: StoredAppConfig;
+};
+
 /**
  * The objects a deleted app still has behind it, ready to be removed before the rows naming them
  * are.
@@ -56,12 +63,8 @@ export const LIVE_APP_STATES: readonly AppState[] = APP_STATES.filter(
 );
 
 export abstract class AppsRepositoryContract {
-  abstract create(input: {
-    ownerId: OwnerId;
-    slug: DnsLabel;
-    hostname: Hostname;
-    config: StoredAppConfig;
-  }): Promise<CreatedApp>;
+  abstract create(input: NewApp): Promise<CreatedApp | null>;
+  abstract appsAllowed(input: { ownerId: OwnerId }): Promise<number | null>;
   abstract listByOwner(input: { ownerId: OwnerId }): Promise<AppRow[]>;
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
   abstract recordVolumeUsage(input: {
@@ -84,6 +87,9 @@ export const PLATFORM_KIND: AppHostnameKind = 'platform';
 
 const ACTIVE_STATE: AppHostnameState = 'active';
 
+/** `apps_left` is floored at zero by the view, so this is the whole of "no room". */
+const NONE_LEFT = 0;
+
 export class AppsRepository extends Repository implements AppsRepositoryContract {
   async isOwnedBy({ appId, ownerId }: OwnedApp): Promise<boolean> {
     const [row] = await this.sql.SelectAppOwnership`
@@ -94,18 +100,64 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return row !== undefined;
   }
 
-  create({
-    ownerId,
-    slug,
-    hostname,
-    config,
-  }: {
-    ownerId: OwnerId;
-    slug: DnsLabel;
-    hostname: Hostname;
-    config: StoredAppConfig;
-  }): Promise<CreatedApp> {
+  /**
+   * How many apps this owner may have, or `null` for an owner with no profile to read it off.
+   * Asked only where `create` has already declined, so the usual path is the one write it was and
+   * this is what turns that refusal into a sentence naming the number.
+   */
+  async appsAllowed({ ownerId }: { ownerId: OwnerId }): Promise<number | null> {
+    const [row] = await this.sql.SelectAppsAllowed`
+      /* @notNull apps_allowed */
+      SELECT q.apps_allowed
+      FROM nibrun.app_quotas q
+      WHERE q.owner_id = ${ownerId}
+    `;
+    return row?.apps_allowed ?? null;
+  }
+
+  /**
+   * `null` where the owner already has every app they are allowed, which is the only reason this
+   * declines — a slug already taken raises, because it is a re-roll rather than an answer.
+   *
+   * The count and the insert are one decision, so they are one transaction and the owner's profile
+   * is locked across it. Without that, requests arriving together each read the same count and
+   * each find room for the app the others are making — so a quota of three is however many an
+   * owner can send at once.
+   *
+   * The profile rather than the apps, because the rows that must not appear underneath the count
+   * are the ones that do not exist yet, and an owner at none has no app of their own to lock. The
+   * profile rather than `auth."user"`, because that table is better-auth's and writes its own rows
+   * on every sign-in — this is nibrun's row about the same person, and it is the one carrying the
+   * number being decided against.
+   */
+  create({ ownerId, slug, hostname, config }: NewApp): Promise<CreatedApp | null> {
     return this.sql.begin(async (tx) => {
+      const [locked] = await tx.SelectProfileForAppCreate`
+        SELECT p.owner_id
+        FROM nibrun.profiles p
+        WHERE p.owner_id = ${ownerId}
+        FOR UPDATE
+      `;
+      // Raised rather than returned as `null`: every owner has a profile, so one that is missing
+      // is a database disagreeing with the session — and read as a refusal it would tell somebody
+      // their account was full.
+      if (!locked) {
+        throw new Error('The owner creating an app has no profile.');
+      }
+
+      const [room] = await tx.SelectAppsLeft`
+        /* @notNull apps_left */
+        SELECT q.apps_left
+        FROM nibrun.app_quotas q
+        WHERE q.owner_id = ${ownerId}
+      `;
+      if (!room) {
+        throw new Error('An owner with a profile has no quota.');
+      }
+      if (room.apps_left === NONE_LEFT) {
+        return null;
+      }
+
       const [inserted] = await tx.InsertApp`
         INSERT INTO nibrun.apps (owner_id, slug)
         VALUES (${ownerId}, ${slug})

@@ -33,7 +33,7 @@ import type {
   SealedConfigPatch,
   StoredAppConfig,
 } from '#lib/app-config.ts';
-import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import type {
   AppHostnameRow,
@@ -45,6 +45,7 @@ import type {
   AppsRepositoryContract,
   CreatedApp,
   Leftovers,
+  NewApp,
   StateChange,
 } from '#repositories/apps.repository.ts';
 import {
@@ -132,6 +133,10 @@ class StubAppsRepository implements AppsRepositoryContract {
   purgeable: AppId[] = [];
   deployedApps: AppId[] = [];
   owns = false;
+  /** How many apps this owner is holding, which only a test that creates several ever moves. */
+  held = 0;
+  /** More than any test makes, except the ones that lower it because they are about the limit. */
+  allowed = 100;
   #remainingFailures: number;
   readonly #failure: unknown;
 
@@ -165,26 +170,28 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve(true);
   }
 
-  create({
-    slug,
-    hostname,
-    config,
-  }: {
-    ownerId: OwnerId;
-    slug: DnsLabel;
-    hostname: Hostname;
-    config: StoredAppConfig;
-  }): Promise<CreatedApp> {
+  create({ slug, hostname, config }: NewApp): Promise<CreatedApp | null> {
     this.offeredSlugs.push(slug);
     this.offeredConfigs.push(config);
     if (this.#remainingFailures > 0) {
       this.#remainingFailures--;
       return Promise.reject(this.#failure);
     }
+    // The real one counts inside the transaction it inserts in, against a view that carries the
+    // default; this counts what it has handed back, which is the same question asked of a stub
+    // that never deletes anything.
+    if (this.held >= this.allowed) {
+      return Promise.resolve(null);
+    }
+    this.held++;
     return Promise.resolve({
       app: { ...appRow(slug), ...configColumns(config) },
       hostnames: [{ hostname, kind: 'platform', state: 'active', dcv_target: null }],
     });
+  }
+
+  appsAllowed(): Promise<number | null> {
+    return Promise.resolve(this.allowed);
   }
 
   isOwnedBy(): Promise<boolean> {
@@ -1301,5 +1308,32 @@ describe('a deletion left stuck before any of this existed is finished when one 
     await serviceWith({ appsRepo }).finishDeletions();
 
     expect(appsRepo.deleted).toEqual([]);
+  });
+});
+
+/**
+ * The refusal, rather than the counting — which is SQL and is exercised against a database in
+ * `tests/repositories/apps.test.ts`. What matters here is that a decline is not read as a slug
+ * collision: one is retried with fresh entropy and the other cannot come out differently.
+ */
+describe('an owner at their limit is told so rather than retried', () => {
+  test('a decline is a 403 naming the number, not a re-roll', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.allowed = 1;
+    await createApp({ appsRepo });
+
+    const refused = createApp({ appsRepo });
+
+    await expect(refused).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(refused).rejects.toThrow('can have 1 app');
+    // One offer and no second: nothing about a full account changes on the next roll of the dice.
+    expect(appsRepo.offeredSlugs).toHaveLength(2);
+  });
+
+  test('an account allowed none is told that rather than given a number to read as room', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.allowed = 0;
+
+    await expect(createApp({ appsRepo })).rejects.toThrow('cannot create apps');
   });
 });

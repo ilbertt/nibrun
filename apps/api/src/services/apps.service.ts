@@ -25,8 +25,9 @@ import {
   toAppConfig,
 } from '#lib/app-config.ts';
 import { type PublicAppHostname, platformHostname, toAppHostname } from '#lib/app-hostname.ts';
+import { overAppQuota } from '#lib/app-quota.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
-import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -174,6 +175,15 @@ export class AppsService extends Service {
           hostname: platformHostname({ slug, appHostDomain: this.appHostDomain }),
           config: appConfig,
         });
+        // Nothing was written, so there is no re-roll to make and no later attempt that would go
+        // any differently: the owner has every app they are allowed until they delete one.
+        if (!created) {
+          const allowed = await this.appsRepo.appsAllowed({ ownerId });
+          if (allowed === null) {
+            throw new Error('The owner refused an app has no quota.');
+          }
+          throw new ForbiddenError(overAppQuota(allowed));
+        }
         return toPublicApp(created);
       } catch (error) {
         if (!SLUG_CONSTRAINTS.some((constraint) => isUniqueViolation({ error, constraint }))) {

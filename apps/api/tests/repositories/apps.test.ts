@@ -19,7 +19,7 @@ import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
-import { AppsRepository, LIVE_APP_STATES } from '#repositories/apps.repository.ts';
+import { AppsRepository, type CreatedApp, LIVE_APP_STATES } from '#repositories/apps.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { refusedBy } from '#tests/support/postgres.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
@@ -50,6 +50,11 @@ beforeAll(async () => {
        VALUES ($1, $1, $2, true, now(), now())`,
       [id, `${id}@example.com`],
     );
+    // The trigger on `auth."user"` has already made the profile, so this only sets the column.
+    await sql.unsafe('UPDATE nibrun.profiles SET quota_apps_max_count = $2 WHERE owner_id = $1', [
+      id,
+      AMPLE,
+    ]);
   }
   repo = new AppsRepository(withTypes<Queries>(sql));
 }, DATABASE_START_TIMEOUT_MS);
@@ -66,15 +71,32 @@ function sealed(entries: Record<string, string>) {
   return sealEnvironment({ key: TEST_SECRETS_KEY, environment: environment(entries) });
 }
 
+/**
+ * More apps than the suite makes, granted to the owners it shares, so that a file whose apps
+ * accumulate against one of them is not quietly testing the quota — the tests that are about it
+ * bring owners of their own.
+ */
+const AMPLE = 100;
+
+/** Every test creating an app wants one, so the quota refusal is the caller's to ask for. */
+function requireCreated(created: CreatedApp | null): CreatedApp {
+  if (!created) {
+    throw new Error('The owner had no room for another app.');
+  }
+  return created;
+}
+
 /** An app of its own for whoever asks, so no test is holding a row another test is moving. */
 async function createApp(slug: string): Promise<AppId> {
   const label = Value.Parse(DnsLabelSchema, slug);
-  const created = await repo.create({
-    ownerId: OWNER_ID,
-    slug: label,
-    hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
-    config: { ...configWithDefaults(), environment: {} },
-  });
+  const created = requireCreated(
+    await repo.create({
+      ownerId: OWNER_ID,
+      slug: label,
+      hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+      config: { ...configWithDefaults(), environment: {} },
+    }),
+  );
   return created.app.id;
 }
 
@@ -113,15 +135,17 @@ describe('a config patch carries forward every variable it says nothing about', 
   let ownerId: OwnerId;
 
   beforeAll(async () => {
-    const created = await repo.create({
-      ownerId: OWNER_ID,
-      slug: APP_SLUG,
-      hostname: PLATFORM,
-      config: {
-        ...configWithDefaults(),
-        environment: sealed({ TOKEN: FIRST_TOKEN, LOG_LEVEL: 'debug' }),
-      },
-    });
+    const created = requireCreated(
+      await repo.create({
+        ownerId: OWNER_ID,
+        slug: APP_SLUG,
+        hostname: PLATFORM,
+        config: {
+          ...configWithDefaults(),
+          environment: sealed({ TOKEN: FIRST_TOKEN, LOG_LEVEL: 'debug' }),
+        },
+      }),
+    );
     appId = created.app.id;
     ownerId = created.app.owner_id;
   });
@@ -628,5 +652,116 @@ describe('what a host measured of a guest is kept beside how full its filesystem
 
     expect(Number((await readBack(first)).memory_used_bytes)).toBe(BUSY_BYTES);
     expect(Number((await readBack(second)).memory_used_bytes)).toBe(IDLE_BYTES);
+  });
+});
+
+/**
+ * The count and the insert are one transaction against a real database, and the quota comes from
+ * a view over a profile a trigger made — neither is a thing a fake would answer the same way, so
+ * this is exercised against Postgres.
+ *
+ * Owners of their own, because the ones the rest of the file shares are granted `AMPLE` so that
+ * their apps can accumulate without the quota having an opinion.
+ */
+describe('an owner may have the apps they were given and no more', () => {
+  const HOARDER_ID = Value.Parse(OwnerIdSchema, 'hoarder');
+  const FRIEND_ID = Value.Parse(OwnerIdSchema, 'friend');
+
+  /** What an owner nobody has said anything about gets, which is the free tier. */
+  const BY_DEFAULT = 3;
+  const GRANTED = 5;
+
+  function makeApp({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
+    const label = Value.Parse(DnsLabelSchema, slug);
+    return repo.create({
+      ownerId,
+      slug: label,
+      hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+      config: { ...configWithDefaults(), environment: {} },
+    });
+  }
+
+  beforeAll(async () => {
+    for (const id of [HOARDER_ID, FRIEND_ID]) {
+      await sql.unsafe(
+        `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+         VALUES ($1, $1, $2, true, now(), now())`,
+        [id, `${id}@example.com`],
+      );
+    }
+  });
+
+  /** The column's default, reaching a create through the view rather than being read off the row. */
+  test('an owner nobody has said anything about is on the free tier', async () => {
+    expect(await repo.appsAllowed({ ownerId: HOARDER_ID })).toBe(BY_DEFAULT);
+  });
+
+  test('the app past the quota is declined rather than written', async () => {
+    for (let made = 0; made < BY_DEFAULT; made++) {
+      expect(await makeApp({ ownerId: HOARDER_ID, slug: `hoard-${made}` })).not.toBeNull();
+    }
+
+    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-over' })).toBeNull();
+    expect(await repo.listByOwner({ ownerId: HOARDER_ID })).toHaveLength(BY_DEFAULT);
+  });
+
+  test('a deleted app gives its place back', async () => {
+    const [first] = await repo.listByOwner({ ownerId: HOARDER_ID });
+    if (!first) {
+      throw new Error('The owner from the test above has no apps.');
+    }
+    await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [first.id]);
+
+    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-again' })).not.toBeNull();
+  });
+
+  /** A suspended app is one its owner can bring back, so it is one they are still holding. */
+  test('a suspended app keeps its place', async () => {
+    const [first] = await repo.listByOwner({ ownerId: HOARDER_ID });
+    if (!first) {
+      throw new Error('The owner from the test above has no apps.');
+    }
+    await sql.unsafe(`UPDATE nibrun.apps SET state = 'suspended' WHERE id = $1`, [first.id]);
+
+    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-suspended' })).toBeNull();
+  });
+
+  /**
+   * What the row lock in `create` is for, and the only thing that can show it: the count and the
+   * insert are one decision, so requests arriving together must not each read the same count and
+   * each find room for the app the others are making. Without the lock this owner ends up with
+   * every app they asked for, whatever their quota says.
+   */
+  test('apps asked for at the same time cannot each take the same place', async () => {
+    const RACER_ID = Value.Parse(OwnerIdSchema, 'racer');
+    await sql.unsafe(
+      `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+       VALUES ($1, $1, $2, true, now(), now())`,
+      [RACER_ID, `${RACER_ID}@example.com`],
+    );
+
+    const attempts = [...Array(BY_DEFAULT * 2).keys()];
+    const asked = await Promise.all(
+      attempts.map((index) => makeApp({ ownerId: RACER_ID, slug: `racer-${index}` })),
+    );
+
+    expect(asked.filter((made) => made !== null)).toHaveLength(BY_DEFAULT);
+    expect(await repo.listByOwner({ ownerId: RACER_ID })).toHaveLength(BY_DEFAULT);
+  });
+
+  /** The whole point of the column: one owner is given more without moving anybody else. */
+  test('a grant raises the number for the owner it names and nobody else', async () => {
+    await sql.unsafe('UPDATE nibrun.profiles SET quota_apps_max_count = $2 WHERE owner_id = $1', [
+      FRIEND_ID,
+      GRANTED,
+    ]);
+
+    for (let made = 0; made < GRANTED; made++) {
+      expect(await makeApp({ ownerId: FRIEND_ID, slug: `friend-${made}` })).not.toBeNull();
+    }
+    expect(await makeApp({ ownerId: FRIEND_ID, slug: 'friend-over' })).toBeNull();
+
+    expect(await repo.appsAllowed({ ownerId: FRIEND_ID })).toBe(GRANTED);
+    expect(await repo.appsAllowed({ ownerId: HOARDER_ID })).toBe(BY_DEFAULT);
   });
 });
