@@ -8,7 +8,7 @@
 
 </div>
 
-Self-hostable projects are great until you have to host them.
+Small apps don't need to scale. They need a machine and a disk.
 
 ## Why
 
@@ -19,6 +19,8 @@ The "batteries included" platforms hand you Postgres and object storage but nowh
 own binary. The ones that will run your code run it as a function, on a filesystem that resets
 between requests, so a SQLite file is gone the moment the request ends. And a VM means ssh, a
 firewall to open, TLS to renew, and an OS to keep updated.
+
+Self-hostable projects are great until you have to host them.
 
 | What it usually gets | What it actually needs |
 | --- | --- |
