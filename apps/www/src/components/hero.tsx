@@ -5,7 +5,7 @@ export function Hero() {
         One-click deployment for any single-binary app.
       </h1>
       <p className="text-balance text-lg text-muted-foreground">
-        Self-hostable projects are great until you have to host them.
+        Small apps don&apos;t need to scale. They need a binary and a disk.
       </p>
     </div>
   );
