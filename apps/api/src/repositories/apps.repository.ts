@@ -145,6 +145,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('The owner creating an app has no profile.');
       }
 
+      // A second statement rather than a CTE holding the lock, which parses and reads better: a
+      // statement's snapshot is taken before it blocks, so a merged query counts apps as they were
+      // before the transaction it waited for committed — six through a quota of three.
       const [room] = await tx.SelectAppsLeft`
         /* @notNull apps_left */
         SELECT q.apps_left
