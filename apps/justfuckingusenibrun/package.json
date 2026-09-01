@@ -9,7 +9,7 @@
     "dev": "PORT=3003 bun run src/server.ts",
     "build": "bun build --compile --target=bun-linux-x64 --outfile dist/justfuckingusenibrun src/server.ts",
     "check:types": "bun run --bun tsc",
-    "deploy": "bun run build && nib run ./dist/justfuckingusenibrun --app justfuckingusenibrun"
+    "deploy": "bun run build && bun run ../../packages/cli/src/main.ts run ./dist/justfuckingusenibrun --app justfuckingusenibrun"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
