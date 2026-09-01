@@ -1384,6 +1384,7 @@ export interface IProfilesColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
+    quota_apps_max_count: number;
 }
 
 /** Schema of `profiles`. */
@@ -1935,7 +1936,8 @@ export const schema = {
             id: { _columnName: "id", _foreignKeys: {} },
             owner_id: { _columnName: "owner_id", _foreignKeys: { profiles_owner_id_fkey: { _constraintName: "profiles_owner_id_fkey", _references: { _relationName: "user", _columnName: "id" } } } },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            quota_apps_max_count: { _columnName: "quota_apps_max_count", _foreignKeys: {} }
         },
         _indexes: {
             profiles_owner_id_key: { _indexName: "profiles_owner_id_key" },
@@ -1944,7 +1946,8 @@ export const schema = {
         _constraints: {
             profiles_owner_id_fkey: { _constraintName: "profiles_owner_id_fkey" },
             profiles_owner_id_key: { _constraintName: "profiles_owner_id_key" },
-            profiles_pkey: { _constraintName: "profiles_pkey" }
+            profiles_pkey: { _constraintName: "profiles_pkey" },
+            profiles_quota_apps_max_count_check: { _constraintName: "profiles_quota_apps_max_count_check" }
         }
     },
     purgeable_apps: {
