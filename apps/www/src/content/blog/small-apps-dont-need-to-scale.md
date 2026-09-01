@@ -36,6 +36,7 @@ Unzip it on any Linux box, run the binary, and you have the same app back with t
 it.
 
 The catch is that this only works for apps that fit on one machine. There's no horizontal scaling,
-a deploy means a few seconds of downtime while the old VM stops and the new one starts, and the
-disk isn't replicated, so that export is also your backup. If your app needs to be more than one
-machine, nibrun is the wrong tool. Most small apps never do.
+and a deploy means a few seconds of downtime while the old VM stops and the new one starts. The
+volume is backed by S3 rather than by the host it runs on, so the export is how you leave rather
+than the only copy you have. If your app needs to be more than one machine, nibrun is the wrong
+tool. Most small apps never do.

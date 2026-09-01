@@ -1,6 +1,7 @@
 import type { DeployLink } from '@repo/deploy-link';
 import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
 
+// Update the root README when changing any entry here.
 export const DEPLOY_PRESETS = {
   boop: {
     name: 'boop',
