@@ -1,5 +1,5 @@
-import favicon from '#favicon.svg' with { type: 'file' };
-import page from '#index.html' with { type: 'file' };
+import favicon from './favicon.svg' with { type: 'file' };
+import page from './index.html' with { type: 'file' };
 
 const DEFAULT_PORT = 3000;
 

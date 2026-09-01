@@ -5,7 +5,7 @@
 
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
+    <meta name="color-scheme" content="dark">
     <meta
       name="description"
       content="You compiled a binary. It is already the whole app. Stop building it a datacenter."
@@ -30,6 +30,95 @@
 
     <link rel="canonical" href="https://justfuckingusenibrun.com">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <style>
+    :root {
+      --bg: #0b0b0c;
+      --fg: #ededef;
+      --muted: #a0a0a8;
+      --accent: #83fd9e;
+      --rule: #26262b;
+      --panel: #141417;
+    }
+
+    body {
+      margin: 0 auto;
+      max-width: 44rem;
+      padding: 4rem 1.25rem 3rem;
+      background: var(--bg);
+      color: var(--muted);
+      font:
+        1.0625rem / 1.7 ui-sans-serif,
+        system-ui,
+        -apple-system,
+        sans-serif;
+    }
+
+    h1,
+    h2 {
+      color: var(--fg);
+      line-height: 1.1;
+      text-transform: uppercase;
+      letter-spacing: -0.02em;
+    }
+
+    h1 {
+      margin: 0 0 2rem;
+      font-size: clamp(2.25rem, 8vw, 3.5rem);
+    }
+
+    h2 {
+      margin: 3.5rem 0 1.25rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 1px solid var(--rule);
+      font-size: 1.375rem;
+    }
+
+    strong {
+      color: var(--fg);
+    }
+
+    a {
+      color: var(--accent);
+      text-underline-offset: 3px;
+    }
+
+    code,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.9375em;
+    }
+
+    code {
+      color: var(--fg);
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 1.5rem 0;
+      padding: 1rem 1.25rem;
+      border-left: 2px solid var(--accent);
+      background: var(--panel);
+    }
+
+    ul,
+    ol {
+      padding-left: 1.25rem;
+    }
+
+    li {
+      margin-bottom: 0.75rem;
+    }
+
+    hr {
+      margin: 3.5rem 0 1.5rem;
+      border: 0;
+      border-top: 1px solid var(--rule);
+    }
+
+    footer small {
+      font-size: 0.875rem;
+    }
+    </style>
   </head>
   <body>
     <header>
@@ -174,15 +263,18 @@ nib run ./my-server</code></pre>
           &middot;
           <a href="https://app.nibrun.com">dashboard</a>
           &middot;
-          <a href="https://github.com/ilbertt/nibrun">source</a>
+          <a href="https://github.com/ilbertt/nibrun"
+            >github.com/ilbertt/nibrun</a
+          >
         </small>
       </p>
       <p>
         <small>
-          Yes, this page is raw HTML with no stylesheet, and it is one compiled
-          binary sitting on nibrun, because we are not going to stand here
-          telling you to do something we would not do. It loaded before you
-          finished reading the headline. Think about that for a second.
+          Yes, this page is one HTML file with its stylesheet in the head and
+          not one byte of JavaScript, and it is a compiled binary sitting on
+          nibrun, because we are not going to stand here telling you to do
+          something we would not do. It loaded before you finished reading the
+          headline. Think about that for a second.
         </small>
       </p>
       <p>
