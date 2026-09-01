@@ -1,5 +1,6 @@
 import type { HostDesiredState } from '@repo/protocol';
 import { Effect, Option } from 'effect';
+import { readLastActive } from '#lib/agent/activity.ts';
 import { readExportReports } from '#lib/exports/manager.ts';
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
 import { applyCheckpoints } from '#lib/reconcile/checkpoints.ts';
@@ -7,6 +8,7 @@ import { applyExports } from '#lib/reconcile/exports.ts';
 import {
   prefetchArtifacts,
   refreshStates,
+  sleepInstance,
   startInstance,
   stopInstance,
 } from '#lib/reconcile/instances.ts';
@@ -45,17 +47,22 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       const deletedVolumes = readDeletedVolumes(
         Option.getOrUndefined(yield* readJsonFile(config.deletedVolumesFile)),
       );
+      const lastActiveAtMs = readLastActive(
+        Option.getOrUndefined(yield* readJsonFile(config.activityFile)),
+      );
       yield* AgentState.modify((current) => ({
         ...current,
         records: new Map(instances.map((record) => [record.appId, record])),
         exportReports: new Map(exports.map((report) => [report.exportId, report])),
         deletedVolumes: new Map(deletedVolumes.map((report) => [report.volumeId, report])),
+        lastActiveAtMs,
       }));
       yield* Effect.logInfo('agent state loaded').pipe(
         Effect.annotateLogs({
           instances: instances.length,
           slots: (yield* allocator.slots).length,
           exports: exports.length,
+          appsWithActivity: lastActiveAtMs.size,
         }),
       );
       // Before the first poll has even been answered: an app this host stopped before the agent
@@ -121,6 +128,12 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
         path: config.exportsFile,
         value: [...current.exportReports.values()],
       });
+      // Only the moment, never the counts it was derived from: the kernel's counters do not
+      // outlive the agent either, because the first apply after a restart rewrites the table.
+      yield* writeJsonFile({
+        path: config.activityFile,
+        value: [...current.lastActiveAtMs].map(([appId, atMs]) => ({ appId, atMs })),
+      });
       yield* writeJsonFile({
         path: config.deletedVolumesFile,
         value: [...current.deletedVolumes.values()],
@@ -142,7 +155,8 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
               hostnames: wanted.hostnames,
               healthCheck: wanted.config.healthCheck,
               resources: wanted.config.resources,
-              desiredRunning: wanted.desiredState === 'running',
+              desiredRunning: wanted.desiredState !== 'stopped',
+              onRequest: wanted.desiredState === 'on-request',
               httpPort: wanted.config.httpPort,
               hasExtraPublicPort: wanted.config.hasExtraPublicPort,
             }),
@@ -173,6 +187,18 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
           }
           return Effect.void;
         },
+        { discard: true },
+      );
+
+    /**
+     * The apps this host answers for without running anything. Nothing boots here — that is what
+     * makes them cheap — but the slot and the record are what a request has to arrive to, so
+     * they are made before the activators bind and before routing is rendered.
+     */
+    const applySleeps = (plan: ReturnType<typeof planReconcile>) =>
+      Effect.forEach(
+        plan.instances,
+        (action) => (action.action === 'sleep' ? sleepInstance(action.desired) : Effect.void),
         { discard: true },
       );
 
@@ -217,6 +243,8 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
         { concurrency: 'unbounded', discard: true },
       );
       yield* applyVolumes({ plan, observed, desired }).pipe(Effect.withSpan('reconcile.volumes'));
+      // Before the activators below, because the slot one binds on is allocated here.
+      yield* applySleeps(plan).pipe(Effect.withSpan('reconcile.sleeps'));
       // Before the forwards below are withdrawn from a tenant that has just stopped, so the port
       // it was reached on is answered rather than closed.
       yield* applyActivators.pipe(Effect.withSpan('reconcile.activators'));

@@ -133,10 +133,61 @@ export type LifecycleInputs = {
   tracker: HealthTracker;
   healthCheck: HealthCheck;
   desiredRunning: boolean;
+  onRequest: boolean;
   stopRequested: boolean;
+  snapshotting: boolean;
   startedAtMs?: number;
   nowMs: number;
+  /**
+   * What the record already says, which is the only thing that tells a start in flight from an
+   * app waiting to be asked for: both are `on-request` instances with no microVM behind them yet,
+   * and the planner has already decided which by writing `pending` or `idle`.
+   */
+  current: InstanceState;
 };
+
+/**
+ * What a microVM that is not up means, which is four different things.
+ *
+ * `stopped` and `idle` are the same absence read against who is waiting: one is the end of the
+ * release, the other is the release between requests. `pending` is a start still in flight, and
+ * only a start this agent saw through records a time — systemd keeps a template instance loaded
+ * after it stops, so being loaded is not having been started.
+ *
+ * A boot that did happen rules out `idle` whatever the activation policy says: a microVM a
+ * request brought up and that then went down unasked is a crash, and calling that idle would
+ * wait for another request to find out.
+ *
+ * Unasked is the whole of it, and a snapshot in flight is the one absence that is asked for
+ * without `stopRequested` saying so: the capture ends with the VMM gone and the flag is only
+ * written once it has finished, so a pass landing in between would read a sleep as that crash.
+ */
+function evaluateStoppedState({
+  desiredRunning,
+  onRequest,
+  stopRequested,
+  snapshotting,
+  startedAtMs,
+  current,
+}: Pick<
+  LifecycleInputs,
+  'desiredRunning' | 'onRequest' | 'stopRequested' | 'snapshotting' | 'startedAtMs' | 'current'
+>): InstanceState {
+  const down = onRequest && desiredRunning ? 'idle' : 'stopped';
+  if (stopRequested || snapshotting || !desiredRunning) {
+    return down;
+  }
+  if (startedAtMs !== undefined) {
+    return 'failed';
+  }
+  // A start this agent asked for and has not seen through is not an app waiting to be asked for.
+  // `startInstance` writes `pending` before a boot that has an artifact to fetch, `sleepInstance`
+  // writes `idle`, and until the unit is up those two look identical from here. Reading a release
+  // that is coming up as `idle` tells the control plane it is as up as it will ever get: the
+  // startup deadline stops, the deployment turns `running` before a probe has run, and the memory
+  // the boot is about to take is left out of what this host counts as committed.
+  return onRequest && current !== 'pending' ? down : 'pending';
+}
 
 /**
  * A booted microVM is not a running app: `starting` has not accepted a connection and `running`
@@ -150,22 +201,25 @@ export function evaluateInstanceState({
   tracker,
   healthCheck,
   desiredRunning,
+  onRequest,
   stopRequested,
+  snapshotting,
   startedAtMs,
   nowMs,
+  current,
 }: LifecycleInputs): InstanceState {
   if (unit.failed) {
     return 'failed';
   }
   if (!unit.active) {
-    if (stopRequested || !desiredRunning) {
-      return 'stopped';
-    }
-    // Being loaded is not having been started: systemd keeps a template instance loaded after
-    // it stops, so the unit a replace has just torn down is still loaded while the next one is
-    // being staged. Only a start this agent saw through records a time, which is what separates
-    // a boot still in flight from one that died.
-    return startedAtMs !== undefined ? 'failed' : 'pending';
+    return evaluateStoppedState({
+      desiredRunning,
+      onRequest,
+      stopRequested,
+      snapshotting,
+      startedAtMs,
+      current,
+    });
   }
   if (stopRequested) {
     return 'stopping';

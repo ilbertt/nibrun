@@ -9,6 +9,7 @@ import {
   type FilesystemUsage,
   type Hostname,
   HostnameSchema,
+  MIN_IDLE_TIMEOUT_MS,
   type ObjectKey,
   ObjectKeySchema,
   OWNED_APP_STATES,
@@ -32,7 +33,7 @@ import type {
   SealedConfigPatch,
   StoredAppConfig,
 } from '#lib/app-config.ts';
-import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import type {
   AppHostnameRow,
@@ -44,6 +45,7 @@ import type {
   AppsRepositoryContract,
   CreatedApp,
   Leftovers,
+  NewApp,
   StateChange,
 } from '#repositories/apps.repository.ts';
 import {
@@ -97,6 +99,8 @@ function appRow(slug: DnsLabel): AppRow {
     owner_id: OWNER_ID,
     slug,
     state: 'active',
+    activation: 'always',
+    idle_timeout_ms: MIN_IDLE_TIMEOUT_MS,
     created_at: new Date(),
     updated_at: new Date(),
     volume_total_bytes: null,
@@ -124,10 +128,15 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly leftovers = new Map<AppId, Leftovers>();
   readonly measured: ReadonlyMap<AppId, FilesystemUsage>[] = [];
   readonly spending: ReadonlyMap<AppId, ComputeUsage>[] = [];
+  readonly forgotten: AppId[][] = [];
   deleting: AppId[] = [];
   purgeable: AppId[] = [];
   deployedApps: AppId[] = [];
   owns = false;
+  /** How many apps this owner is holding, which only a test that creates several ever moves. */
+  held = 0;
+  /** More than any test makes, except the ones that lower it because they are about the limit. */
+  allowed = 100;
   #remainingFailures: number;
   readonly #failure: unknown;
 
@@ -161,26 +170,28 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve(true);
   }
 
-  create({
-    slug,
-    hostname,
-    config,
-  }: {
-    ownerId: OwnerId;
-    slug: DnsLabel;
-    hostname: Hostname;
-    config: StoredAppConfig;
-  }): Promise<CreatedApp> {
+  create({ slug, hostname, config }: NewApp): Promise<CreatedApp | null> {
     this.offeredSlugs.push(slug);
     this.offeredConfigs.push(config);
     if (this.#remainingFailures > 0) {
       this.#remainingFailures--;
       return Promise.reject(this.#failure);
     }
+    // The real one counts inside the transaction it inserts in, against a view that carries the
+    // default; this counts what it has handed back, which is the same question asked of a stub
+    // that never deletes anything.
+    if (this.held >= this.allowed) {
+      return Promise.resolve(null);
+    }
+    this.held++;
     return Promise.resolve({
       app: { ...appRow(slug), ...configColumns(config) },
       hostnames: [{ hostname, kind: 'platform', state: 'active', dcv_target: null }],
     });
+  }
+
+  appsAllowed(): Promise<number | null> {
+    return Promise.resolve(this.allowed);
   }
 
   isOwnedBy(): Promise<boolean> {
@@ -223,6 +234,11 @@ class StubAppsRepository implements AppsRepositoryContract {
 
   recordComputeUsage({ readings }: { readings: ReadonlyMap<AppId, ComputeUsage> }): Promise<void> {
     this.spending.push(new Map(readings));
+    return Promise.resolve();
+  }
+
+  clearComputeUsage({ appIds }: { appIds: readonly AppId[] }): Promise<void> {
+    this.forgotten.push([...appIds]);
     return Promise.resolve();
   }
 
@@ -957,6 +973,14 @@ describe('what a guest is spending, as the host running it last measured it', ()
     };
   }
 
+  /** An app asleep between requests, which is a host reporting no reading and saying why. */
+  const ASLEEP: ReportedInstance = {
+    appId: APP_ID,
+    deploymentId: DEPLOYMENT_ID,
+    state: 'idle',
+    restartCount: 0,
+  };
+
   test('a reading a host took is recorded against the app it is running', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
@@ -975,6 +999,28 @@ describe('what a guest is spending, as the host running it last measured it', ()
     expect(appsRepo.spending).toEqual([]);
   });
 
+  /**
+   * The difference between a reading that did not arrive and a guest that is not there. Leaving
+   * the last figure standing would have an app holding nothing go on being shown spending what it
+   * spent before it slept, for as long as it slept.
+   */
+  test('an app reported asleep is forgotten rather than left as it was', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).recordComputeUsage({ instances: [ASLEEP] });
+
+    expect(appsRepo.forgotten).toEqual([[APP_ID]]);
+    expect(appsRepo.spending).toEqual([]);
+  });
+
+  test('and a running app that simply was not measured is left exactly as it was', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).recordComputeUsage({ instances: [reportedInstance()] });
+
+    expect(appsRepo.forgotten).toEqual([]);
+  });
+
   test('two instances naming one app are written once, as the later reading', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     const earlier = {
@@ -990,7 +1036,7 @@ describe('what a guest is spending, as the host running it last measured it', ()
   });
 });
 
-describe('deleting an app releases every hostname it held', () => {
+describe('an app keeps its hostnames until it is deleted rather than deleting', () => {
   function appHostnames(): DisposableAppHostnameRow[] {
     return [
       {
@@ -1002,17 +1048,39 @@ describe('deleting an app releases every hostname it held', () => {
     ];
   }
 
-  test('the platform name and a custom domain are both free when deletion returns', async () => {
+  // An app with a filesystem to tear down stays `deleting`, which is a state its owner is still
+  // shown it in — and shown with the hostname it holds. Releasing the rows here left the listing
+  // describing an app that had none, which failed the whole listing rather than that one app.
+  test('deletion returns with the rows still there, because the app is still one to show', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const hostnamesRepo = new StubHostnameAccess();
+    const edge = new StubCustomHostnameRemoval();
+    appsRepo.owns = true;
+    appsRepo.deployedApps.push(APP_ID);
+    hostnamesRepo.disposable.set(APP_ID, appHostnames());
+
+    const app = await serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge }).delete({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
+
+    expect(app.state).toBe('deleting');
+    expect(hostnamesRepo.removed).toEqual([]);
+    expect(hostnamesRepo.disposable.get(APP_ID)).toEqual(appHostnames());
+    expect(edge.removed).toEqual([]);
+  });
+
+  test('the platform name and a custom domain are both free once the app is purged', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     const hostnamesRepo = new StubHostnameAccess();
     const edge = new StubCustomHostnameRemoval();
     appsRepo.owns = true;
     hostnamesRepo.disposable.set(APP_ID, appHostnames());
+    const apps = serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge });
 
-    await serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge }).delete({
-      appId: APP_ID,
-      ownerId: OWNER_ID,
-    });
+    await apps.delete({ appId: APP_ID, ownerId: OWNER_ID });
+    appsRepo.purgeable.push(APP_ID);
+    await apps.purgeDeleted();
 
     expect(hostnamesRepo.removed).toEqual([
       Value.Parse(HostnameSchema, `${APP_NAME}.${APP_HOST_DOMAIN}`),
@@ -1021,7 +1089,7 @@ describe('deleting an app releases every hostname it held', () => {
     expect(edge.removed).toEqual([CLOUDFLARE_ID]);
   });
 
-  test('an edge failure keeps its row for the deleted-app sweep to retry', async () => {
+  test('an edge failure keeps its row for the next sweep to retry', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     const hostnamesRepo = new StubHostnameAccess();
     const edge = new StubCustomHostnameRemoval();
@@ -1031,6 +1099,8 @@ describe('deleting an app releases every hostname it held', () => {
     const apps = serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge });
 
     await apps.delete({ appId: APP_ID, ownerId: OWNER_ID });
+    appsRepo.purgeable.push(APP_ID);
+    await apps.purgeDeleted();
 
     expect(hostnamesRepo.disposable.get(APP_ID)).toEqual([
       { hostname: BROUGHT_HOSTNAME, kind: 'custom', cloudflare_id: CLOUDFLARE_ID },
@@ -1238,5 +1308,32 @@ describe('a deletion left stuck before any of this existed is finished when one 
     await serviceWith({ appsRepo }).finishDeletions();
 
     expect(appsRepo.deleted).toEqual([]);
+  });
+});
+
+/**
+ * The refusal, rather than the counting — which is SQL and is exercised against a database in
+ * `tests/repositories/apps.test.ts`. What matters here is that a decline is not read as a slug
+ * collision: one is retried with fresh entropy and the other cannot come out differently.
+ */
+describe('an owner at their limit is told so rather than retried', () => {
+  test('a decline is a 403 naming the number, not a re-roll', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.allowed = 1;
+    await createApp({ appsRepo });
+
+    const refused = createApp({ appsRepo });
+
+    await expect(refused).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(refused).rejects.toThrow('can have 1 app');
+    // One offer and no second: nothing about a full account changes on the next roll of the dice.
+    expect(appsRepo.offeredSlugs).toHaveLength(2);
+  });
+
+  test('an account allowed none is told that rather than given a number to read as room', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.allowed = 0;
+
+    await expect(createApp({ appsRepo })).rejects.toThrow('cannot create apps');
   });
 });

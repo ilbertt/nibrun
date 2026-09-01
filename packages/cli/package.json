@@ -1,10 +1,11 @@
 {
   "name": "@repo/cli",
-  "version": "2026.8.29-2",
+  "version": "2026.8.31-3",
   "private": true,
   "type": "module",
   "imports": {
-    "#*": "./src/*"
+    "#*": "./src/*",
+    "#tests/*": "./tests/*"
   },
   "scripts": {
     "build": "bun run scripts/build.ts",

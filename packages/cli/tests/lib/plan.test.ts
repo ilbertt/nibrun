@@ -1,44 +1,13 @@
-import { beforeEach, expect, mock, test } from 'bun:test';
-import type { PublicApiClient } from '@repo/api-client/public';
+import { beforeEach, expect, test } from 'bun:test';
+import { apiHolding, deploymentsHolding, listedApp } from '#tests/support/api.ts';
+import { recordingPrompts } from '#tests/support/prompts.ts';
 
-const asked: string[] = [];
-const notes: string[] = [];
-let chosenApp: unknown = null;
-let confirmed: boolean = true;
-
-const clack = await import('@clack/prompts');
-
-// Stubbed at the module rather than behind an injected port: what is being pinned down is which
-// questions get asked and in what order, and a port would only let this file answer that about
-// itself. The rest of clack is spread back in because `mock.module` outlives this file.
-mock.module('@clack/prompts', () => ({
-  ...clack,
-  isCancel: (value: unknown) => typeof value === 'symbol',
-  select(opts: { message: string; options: Array<{ label: string }> }) {
-    asked.push(`select:${opts.message} [${opts.options.map((option) => option.label).join('|')}]`);
-    return Promise.resolve(chosenApp);
-  },
-  text(opts: { message: string; initialValue?: string }) {
-    asked.push(`text:${opts.message} (${opts.initialValue})`);
-    return Promise.resolve(opts.initialValue);
-  },
-  confirm(opts: { message: string }) {
-    asked.push(`confirm:${opts.message}`);
-    return Promise.resolve(confirmed);
-  },
-  // biome-ignore lint/complexity/useMaxParams: mirrors clack's own (message, title) signature
-  note(message: string, title: string) {
-    notes.push(`${title}\n${message}`);
-  },
-}));
+const prompts = await recordingPrompts();
 
 const { completeOptions } = await import('#lib/plan.ts');
 
 beforeEach(() => {
-  asked.length = 0;
-  notes.length = 0;
-  chosenApp = null;
-  confirmed = true;
+  prompts.reset();
 });
 
 // A slug typed rather than chosen is read against the listing and the release the app is on,
@@ -49,20 +18,13 @@ function apiListing({
 }: {
   apps: Array<{ slug: string; state: string }>;
   release?: string;
-}): PublicApiClient {
-  const route = Object.assign(
-    () => ({
-      deployments: {
-        get: () =>
-          Promise.resolve({
-            data: { deployments: [{ id: 'deployment-1', state: release }] },
-            error: null,
-          }),
-      },
+}) {
+  return apiHolding({
+    apps: apps.map((app) => listedApp(app)),
+    underApp: () => ({
+      deployments: deploymentsHolding([{ id: 'deployment-1', state: release }]),
     }),
-    { get: () => Promise.resolve({ data: { apps }, error: null }) },
-  );
-  return { api: { apps: route } } as unknown as PublicApiClient;
+  });
 }
 
 test('an owner with no apps is asked what to call one, not which to use', async () => {
@@ -74,7 +36,7 @@ test('an owner with no apps is asked what to call one, not which to use', async 
   });
 
   expect(resolved).toEqual({ name: 'my-server', port: 3000 });
-  expect(asked).toEqual([
+  expect(prompts.transcript()).toEqual([
     'text:Name the app (my-server)',
     'text:Which HTTP port does the binary listen on? (3000)',
     'confirm:Create my-server and deploy?',
@@ -93,7 +55,7 @@ test('a url suggests the same name the path to the same binary would', async () 
 });
 
 test('an app the owner cannot deploy onto is not offered', async () => {
-  chosenApp = 'demo-abc123';
+  prompts.answers.chosen = 'demo-abc123';
 
   const resolved = await completeOptions({
     api: apiListing({
@@ -108,7 +70,7 @@ test('an app the owner cannot deploy onto is not offered', async () => {
   });
 
   expect(resolved).toEqual({ app: 'demo-abc123' });
-  expect(asked).toEqual([
+  expect(prompts.transcript()).toEqual([
     'select:Deploy onto which app? [A new app|demo-abc123]',
     'confirm:Deploy onto demo-abc123? This replaces what it is running.',
   ]);
@@ -123,7 +85,7 @@ test('a flag already given is not asked about again', async () => {
   });
 
   expect(resolved).toEqual({ name: 'my-app', port: 8080 });
-  expect(asked).toEqual(['confirm:Create my-app and deploy?']);
+  expect(prompts.transcript()).toEqual(['confirm:Create my-app and deploy?']);
 });
 
 test('what the binary will be run with is shown before anything is uploaded', async () => {
@@ -134,8 +96,8 @@ test('what the binary will be run with is shown before anything is uploaded', as
     args: ['serve', '--verbose'],
   });
 
-  expect(notes.at(-1)).toContain('args: serve --verbose');
-  expect(notes.at(-1)).toContain('binary: /tmp/my-server');
+  expect(prompts.notes.at(-1)).toContain('args: serve --verbose');
+  expect(prompts.notes.at(-1)).toContain('binary: /tmp/my-server');
 });
 
 // Both halves of the summary are wrong for a suspended app: nothing is running for the deploy to
@@ -151,12 +113,12 @@ test('a named app that cannot be deployed onto is refused before anything is ask
   await expect(attempt).rejects.toThrow(
     'App demo-abc123 is suspended, so a new release would never start. Resume it first.',
   );
-  expect(asked).toEqual([]);
-  expect(notes).toEqual([]);
+  expect(prompts.asked).toEqual([]);
+  expect(prompts.notes).toEqual([]);
 });
 
 test('declining the confirmation cancels rather than deploying', async () => {
-  confirmed = false;
+  prompts.answers.confirmed = false;
 
   const attempt = completeOptions({
     api: apiListing({ apps: [] }),

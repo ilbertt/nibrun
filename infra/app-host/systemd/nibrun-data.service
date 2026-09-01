@@ -1,0 +1,26 @@
+[Unit]
+Description=nibrun ephemeral /data
+# The disk is blank every time the instance starts, so this is boot-time work
+# rather than deploy-time work: a filesystem made once by a deploy is gone by the
+# next start, and a spot reclaim is a stop.
+DefaultDependencies=no
+After=local-fs.target systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+Before=nibrun-zerofs.service
+
+[Service]
+Type=oneshot
+# The mount is the result, and it outlives the process that made it. Without this
+# systemd would call the unit inactive the moment the script exits, and anything
+# ordered after it would be ordered after nothing.
+RemainAfterExit=yes
+# The owner first, then every directory on the disk. Both belong to ZeroFS: the
+# live server's cache, and the one a checkpoint server keeps while an export reads.
+ExecStart=/opt/nibrun/bundle/ensure_ephemeral_data.sh zerofs zerofs zerofs-checkpoint
+
+# No Restart=. A host that cannot find its instance store is not one a retry
+# fixes, and failing is what keeps ZeroFS from starting and writing a 70 GB cache
+# onto the 50 GB root volume.
+
+[Install]
+WantedBy=multi-user.target

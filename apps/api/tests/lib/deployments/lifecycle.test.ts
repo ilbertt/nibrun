@@ -47,6 +47,11 @@ describe('a release follows the microVM running it', () => {
     ['pending', 'starting'],
     ['starting', 'starting'],
     ['running', 'running'],
+    // An app that runs on request comes up no further than this on its own, so an `idle` report
+    // is the host saying it has the release and is waiting to be asked. Anything short of running
+    // would leave it reading as mid-deploy until a stranger happened to load it — and, past the
+    // startup deadline, as one that failed to come up.
+    ['idle', 'running'],
     ['failed', 'failed'],
   ];
 
@@ -212,4 +217,14 @@ describe('a terminal deployment is not something a report can reopen', () => {
       expect(advance({ from, instance: 'running' })).toBe(from);
     });
   }
+});
+
+describe('a release that runs on request is live between requests', () => {
+  test('an idle report past the startup deadline is not a release that never came up', () => {
+    expect(advance({ instance: 'idle', afterMs: STARTUP_DEADLINE_MS + 1 })).toBe('running');
+  });
+
+  test('resuming a suspended one is live again before anything has visited it', () => {
+    expect(advance({ from: 'stopped', instance: 'idle' })).toBe('running');
+  });
 });

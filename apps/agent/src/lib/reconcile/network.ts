@@ -37,6 +37,7 @@ export const forwardedInstances = Effect.gen(function* () {
     const slot = yield* allocator.lookup(record.appId);
     if (Option.isSome(slot)) {
       forwarded.push({
+        appId: record.appId,
         hostPort: slot.value.hostPort,
         httpPort: record.httpPort,
         ...(record.hasExtraPublicPort && { extraPublicPort: slot.value.extraPublicPort }),

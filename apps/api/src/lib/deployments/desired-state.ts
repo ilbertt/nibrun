@@ -4,6 +4,7 @@ import {
   type AppId,
   DEFAULT_VOLUME_SIZE_BYTES,
   type DesiredInstance,
+  type DesiredInstanceState,
   type DesiredVolume,
   Value,
   type VolumeId,
@@ -64,11 +65,15 @@ export function toDesiredInstance({
   environments: Map<string, SealedEnvironment>;
   secretsKey: TenantSecretsKey;
 }): DesiredInstance {
+  const desiredState = desiredInstanceState(row);
   return {
     appId: row.app_id,
     deploymentId: row.id,
     volumeId: volumeIdOf(row.app_id),
-    desiredState: row.state === 'active' ? 'running' : 'stopped',
+    desiredState,
+    // Left out for an app whose microVM is kept up either way, so a host is never handed a
+    // timeout it would be wrong to act on.
+    ...(desiredState === 'on-request' ? { idleTimeoutMs: row.idle_timeout_ms } : {}),
     artifact: {
       digest: row.digest,
       sizeBytes: Number(row.size_bytes),
@@ -82,6 +87,24 @@ export function toDesiredInstance({
     }),
     hostnames: hostnames.get(row.app_id) ?? [],
   };
+}
+
+/**
+ * Suspended wins over any activation policy: an owner who has stopped their app has said the
+ * microVM should be down, and `on-request` would have the next stranger to find the hostname
+ * start it again.
+ *
+ * A failed release is `stopped` for the same reason and not the same one: nobody asked for it to
+ * be down, but there is nothing here that running it again would fix, and `on-request` would have
+ * every visitor pay for a boot the last one already proved. It stays in this list only so the
+ * host goes on answering for the hostnames — the activator's 503 is the honest answer to a
+ * release that did not come up, and it is the owner's redeploy that ends it.
+ */
+function desiredInstanceState(row: DesiredDeploymentRow): DesiredInstanceState {
+  if (row.deployment_state === 'failed' || row.state !== 'active') {
+    return 'stopped';
+  }
+  return row.activation === 'on-request' ? 'on-request' : 'running';
 }
 
 export type DesiredEnvironmentRow = Queries['SelectDesiredEnvironment'];

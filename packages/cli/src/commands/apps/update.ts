@@ -4,7 +4,8 @@ import { SHARED_OPTIONS } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { parseArguments } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { createUi, isInteractive } from '#lib/ui.ts';
+import { createOutput } from '#lib/output.ts';
+import { RELEASE_OUTPUT } from '#lib/release.ts';
 import { updateApp } from '#lib/update.ts';
 
 export const command = defineCommand('apps update', {
@@ -23,25 +24,30 @@ export const command = defineCommand('apps update', {
     [SHARED_OPTIONS.detach.name]: SHARED_OPTIONS.detach.option,
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
-  handler: async ({ options, parents, context, print }) => {
+  handler: async ({ options, parents, context, print, rootOptions }) => {
     const { args, ...given } = options;
+    const { interactive, ui, emit } = createOutput({
+      output: RELEASE_OUTPUT,
+      print,
+      json: rootOptions.json,
+    });
     const { api } = context;
-    const interactive = isInteractive();
-    const ui = createUi({ print, interactive });
 
     ui.open('nib apps update');
     const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
 
-    await updateApp({
-      api,
-      ui,
-      slug,
-      args: args === undefined ? undefined : parseArguments(args),
-      port: given[SHARED_OPTIONS.port.name],
-      extraPublicPort: given[SHARED_OPTIONS.extraPublicPort.name],
-      env: given[SHARED_OPTIONS.env.name],
-      unset: given[SHARED_OPTIONS.unset.name],
-      detach: given[SHARED_OPTIONS.detach.name],
-    });
+    emit(
+      await updateApp({
+        api,
+        ui,
+        slug,
+        args: args === undefined ? undefined : parseArguments(args),
+        port: given[SHARED_OPTIONS.port.name],
+        extraPublicPort: given[SHARED_OPTIONS.extraPublicPort.name],
+        env: given[SHARED_OPTIONS.env.name],
+        unset: given[SHARED_OPTIONS.unset.name],
+        detach: given[SHARED_OPTIONS.detach.name],
+      }),
+    );
   },
 });

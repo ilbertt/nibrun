@@ -30,6 +30,13 @@ export type AppRow = Queries['SelectAppById'];
 
 export type CreatedApp = { app: AppRow; hostnames: AppHostnameRow[] };
 
+export type NewApp = {
+  ownerId: OwnerId;
+  slug: DnsLabel;
+  hostname: Hostname;
+  config: StoredAppConfig;
+};
+
 /**
  * The objects a deleted app still has behind it, ready to be removed before the rows naming them
  * are.
@@ -56,18 +63,15 @@ export const LIVE_APP_STATES: readonly AppState[] = APP_STATES.filter(
 );
 
 export abstract class AppsRepositoryContract {
-  abstract create(input: {
-    ownerId: OwnerId;
-    slug: DnsLabel;
-    hostname: Hostname;
-    config: StoredAppConfig;
-  }): Promise<CreatedApp>;
+  abstract create(input: NewApp): Promise<CreatedApp | null>;
+  abstract appsAllowed(input: { ownerId: OwnerId }): Promise<number | null>;
   abstract listByOwner(input: { ownerId: OwnerId }): Promise<AppRow[]>;
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
   abstract recordVolumeUsage(input: {
     readings: ReadonlyMap<AppId, FilesystemUsage>;
   }): Promise<void>;
   abstract recordComputeUsage(input: { readings: ReadonlyMap<AppId, ComputeUsage> }): Promise<void>;
+  abstract clearComputeUsage(input: { appIds: readonly AppId[] }): Promise<void>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
@@ -83,6 +87,9 @@ export const PLATFORM_KIND: AppHostnameKind = 'platform';
 
 const ACTIVE_STATE: AppHostnameState = 'active';
 
+/** `apps_left` is floored at zero by the view, so this is the whole of "no room". */
+const NONE_LEFT = 0;
+
 export class AppsRepository extends Repository implements AppsRepositoryContract {
   async isOwnedBy({ appId, ownerId }: OwnedApp): Promise<boolean> {
     const [row] = await this.sql.SelectAppOwnership`
@@ -93,18 +100,67 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return row !== undefined;
   }
 
-  create({
-    ownerId,
-    slug,
-    hostname,
-    config,
-  }: {
-    ownerId: OwnerId;
-    slug: DnsLabel;
-    hostname: Hostname;
-    config: StoredAppConfig;
-  }): Promise<CreatedApp> {
+  /**
+   * How many apps this owner may have, or `null` for an owner with no profile to read it off.
+   * Asked only where `create` has already declined, so the usual path is the one write it was and
+   * this is what turns that refusal into a sentence naming the number.
+   */
+  async appsAllowed({ ownerId }: { ownerId: OwnerId }): Promise<number | null> {
+    const [row] = await this.sql.SelectAppsAllowed`
+      /* @notNull apps_allowed */
+      SELECT q.apps_allowed
+      FROM nibrun.app_quotas q
+      WHERE q.owner_id = ${ownerId}
+    `;
+    return row?.apps_allowed ?? null;
+  }
+
+  /**
+   * `null` where the owner already has every app they are allowed, which is the only reason this
+   * declines — a slug already taken raises, because it is a re-roll rather than an answer.
+   *
+   * The count and the insert are one decision, so they are one transaction and the owner's profile
+   * is locked across it. Without that, requests arriving together each read the same count and
+   * each find room for the app the others are making — so a quota of three is however many an
+   * owner can send at once.
+   *
+   * The profile rather than the apps, because the rows that must not appear underneath the count
+   * are the ones that do not exist yet, and an owner at none has no app of their own to lock. The
+   * profile rather than `auth."user"`, because that table is better-auth's and writes its own rows
+   * on every sign-in — this is nibrun's row about the same person, and it is the one carrying the
+   * number being decided against.
+   */
+  create({ ownerId, slug, hostname, config }: NewApp): Promise<CreatedApp | null> {
     return this.sql.begin(async (tx) => {
+      const [locked] = await tx.SelectProfileForAppCreate`
+        SELECT p.owner_id
+        FROM nibrun.profiles p
+        WHERE p.owner_id = ${ownerId}
+        FOR UPDATE
+      `;
+      // Raised rather than returned as `null`: every owner has a profile, so one that is missing
+      // is a database disagreeing with the session — and read as a refusal it would tell somebody
+      // their account was full.
+      if (!locked) {
+        throw new Error('The owner creating an app has no profile.');
+      }
+
+      // A second statement rather than a CTE holding the lock, which parses and reads better: a
+      // statement's snapshot is taken before it blocks, so a merged query counts apps as they were
+      // before the transaction it waited for committed — six through a quota of three.
+      const [room] = await tx.SelectAppsLeft`
+        /* @notNull apps_left */
+        SELECT q.apps_left
+        FROM nibrun.app_quotas q
+        WHERE q.owner_id = ${ownerId}
+      `;
+      if (!room) {
+        throw new Error('An owner with a profile has no quota.');
+      }
+      if (room.apps_left === NONE_LEFT) {
+        return null;
+      }
+
       const [inserted] = await tx.InsertApp`
         INSERT INTO nibrun.apps (owner_id, slug)
         VALUES (${ownerId}, ${slug})
@@ -159,7 +215,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const [app] = await tx.SelectCreatedApp`
         /* @notNull environment_names */
-        SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+        SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+               a.created_at, a.updated_at,
                c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -187,7 +244,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   listByOwner({ ownerId }: { ownerId: OwnerId }): Promise<AppRow[]> {
     return this.sql.SelectAppsByOwner`
       /* @notNull environment_names */
-      SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+      SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+             a.created_at, a.updated_at,
              c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -318,10 +376,30 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     `;
   }
 
+  /**
+   * Forgets what an app was last measured spending, for one whose microVM has gone on purpose.
+   *
+   * Not the same as a reading that failed to arrive, which is why it is a statement of its own:
+   * a guest that could not be asked this minute still has a last known figure worth keeping, and
+   * one that is not there has nothing left to be the answer about. Cleared rather than zeroed —
+   * nought is a reading somebody would act on, and absent is how this end writes unknown.
+   *
+   * The volume half is untouched: a filesystem is still there when the microVM holding it is not.
+   */
+  async clearComputeUsage({ appIds }: { appIds: readonly AppId[] }): Promise<void> {
+    await this.sql`
+      UPDATE nibrun.app_usage
+      SET memory_total_bytes = NULL, memory_used_bytes = NULL, cpu_share = NULL,
+          compute_measured_at = NULL
+      WHERE app_id = ANY(${this.sql.array([...appIds], TEXT_ARRAY)}::uuid[])
+    `;
+  }
+
   async findById({ appId, ownerId }: OwnedApp): Promise<AppRow | null> {
     const [app] = await this.sql.SelectAppById`
       /* @notNull environment_names */
-      SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+      SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+             a.created_at, a.updated_at,
              c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -423,7 +501,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         FROM nibrun.app_configs_with_environment c
         LEFT JOIN nibrun.app_usage u ON u.app_id = c.app_id
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND c.id = ${inserted.id}
-        RETURNING a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+        RETURNING a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+                  a.created_at, a.updated_at,
                   c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                   c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                   c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -572,7 +651,8 @@ async function appAfterStateChange({
 }): Promise<AppRow> {
   const [app] = await tx.SelectAppAfterStateChange`
     /* @notNull environment_names */
-    SELECT a.id, a.owner_id, a.slug, a.state, a.created_at, a.updated_at,
+    SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+           a.created_at, a.updated_at,
            c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
            c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
            c.health_check_grace_period_ms, c.health_check_healthy_threshold,

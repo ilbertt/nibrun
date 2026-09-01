@@ -95,6 +95,10 @@ export class DeploymentLifecycle {
   #whileStopped(reported: ReportedInstance | undefined): DeploymentState {
     switch (reported?.state) {
       case 'running':
+      // An on-request app that has been resumed: no microVM yet, and the release is nonetheless
+      // the one the next request reaches. Waiting for a boot that only a visitor can cause would
+      // leave it reading as stopped until someone happened to load it.
+      case 'idle':
         return 'running';
       case 'failed':
         return 'failed';
@@ -121,6 +125,10 @@ export class DeploymentLifecycle {
       case 'starting':
         return 'starting';
       case 'running':
+      // The host has taken the release on and is waiting to be asked for a microVM, which is as
+      // far as an on-request app comes up on its own. Nothing is late, so this is where it stops
+      // being measured against the startup deadline.
+      case 'idle':
         return 'running';
       case 'failed':
         return 'failed';

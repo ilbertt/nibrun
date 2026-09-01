@@ -10,6 +10,7 @@ import type {
 } from '@repo/protocol';
 import { Effect, Ref } from 'effect';
 import type { MeasuredCompute } from '#lib/filesystem/protocol.ts';
+import type { AppTraffic } from '#lib/network/counters.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
 
 export type AgentSnapshot = {
@@ -21,6 +22,13 @@ export type AgentSnapshot = {
    */
   readonly deletedVolumes: ReadonlyMap<VolumeId, ReportedVolume>;
   readonly nextProbeAtMs: ReadonlyMap<AppId, number>;
+  /**
+   * The apps a snapshot is being taken of right now. Here rather than on the record because it
+   * may not outlive the agent that set it: one that died mid-capture comes back with this empty,
+   * and the microVM it left behind reads as the crash it is rather than as a sleep nobody
+   * finished.
+   */
+  readonly snapshotting: ReadonlySet<AppId>;
   /**
    * The last reading taken of each volume this host holds a slot for, which is not the same as
    * each volume a guest can currently be asked about: a suspended app keeps its slot, so its last
@@ -36,6 +44,16 @@ export type AgentSnapshot = {
    * share is over rather than throwing away the only thing it could be compared to.
    */
   readonly computeTicks: ReadonlyMap<AppId, MeasuredCompute>;
+  /**
+   * The counters the last activity reading was taken from, kept for the same reason the compute
+   * ticks are: the next reading is only meaningful against the one before it.
+   */
+  readonly appTraffic: ReadonlyMap<AppId, AppTraffic>;
+  /**
+   * When each app was last reached by something that was not this host, which is what decides
+   * whether an `on-request` app may sleep.
+   */
+  readonly lastActiveAtMs: ReadonlyMap<AppId, number>;
   readonly volumeReports: readonly ReportedVolume[];
   readonly checkpointReports: readonly ReportedCheckpoint[];
   readonly converged: boolean;
@@ -50,9 +68,12 @@ const EMPTY: AgentSnapshot = {
   exportReports: new Map(),
   deletedVolumes: new Map(),
   nextProbeAtMs: new Map(),
+  snapshotting: new Set(),
   volumeUsage: new Map(),
   computeUsage: new Map(),
   computeTicks: new Map(),
+  appTraffic: new Map(),
+  lastActiveAtMs: new Map(),
   volumeReports: [],
   checkpointReports: [],
   converged: false,
@@ -74,6 +95,34 @@ export class AgentState extends Effect.Service<AgentState>()('AgentState', {
       snapshot,
       modify,
       records,
+
+      /**
+       * A request is evidence of use before any counter has seen it. The counters are read on
+       * their own cadence and a woken app's is new, which `activityAfter` reads as no evidence
+       * rather than as use — so without this a wake would leave the moment that had it sleeping.
+       */
+      markActive: ({ appId, nowMs }: { appId: AppId; nowMs: number }) =>
+        modify((current) => ({
+          ...current,
+          lastActiveAtMs: new Map(current.lastActiveAtMs).set(appId, nowMs),
+        })),
+
+      /**
+       * Taking a snapshot ends with the VMM gone, so while one is in flight a microVM that is not
+       * there is expected rather than lost. `stopRequested` cannot carry this: `refusalToSleep`
+       * reads it as a stop already asked for and would refuse the very sleep it was marking, which
+       * is why the flag is written after the capture and this before it.
+       */
+      markSnapshotting: ({ appId, active }: { appId: AppId; active: boolean }) =>
+        modify((current) => {
+          const snapshotting = new Set(current.snapshotting);
+          if (active) {
+            snapshotting.add(appId);
+          } else {
+            snapshotting.delete(appId);
+          }
+          return { ...current, snapshotting };
+        }),
 
       putRecord: (record: InstanceRecord) =>
         modify((current) => ({
@@ -117,6 +166,20 @@ export class AgentState extends Effect.Service<AgentState>()('AgentState', {
           volumeUsage: new Map(volumes),
           computeUsage: new Map(compute),
           computeTicks: new Map(ticks),
+        })),
+
+      /** A whole pass at once, for the reason `setUsage` is: what it leaves out is what went away. */
+      setActivity: ({
+        traffic,
+        lastActiveAtMs,
+      }: {
+        traffic: ReadonlyMap<AppId, AppTraffic>;
+        lastActiveAtMs: ReadonlyMap<AppId, number>;
+      }) =>
+        modify((current) => ({
+          ...current,
+          appTraffic: new Map(traffic),
+          lastActiveAtMs: new Map(lastActiveAtMs),
         })),
 
       rememberDeletedVolume: (report: ReportedVolume) =>

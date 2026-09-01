@@ -40,6 +40,14 @@ const STATE: Record<AppStatusKey, AppState> = {
   pending: { because: 'is staging a release', refuses: [] },
   starting: { because: 'is starting', refuses: [] },
   running: { because: 'is running', refuses: [] },
+  // Refuses only what has to reach inside a microVM: there is none until a visitor causes one,
+  // and a browse is not a visit. Everything else is asked of the app rather than of the guest,
+  // and an app waiting to be asked for is one an owner may still release, export or suspend.
+  idle: {
+    because: 'is idle until something asks for it',
+    hint: 'Open it to wake it.',
+    refuses: ['files'],
+  },
   // The volume outlives the release that failed on it, so everything but reading it from inside
   // a microVM still works — including the export that is how you get at it instead.
   failed: { because: 'is on a release that failed', refuses: ['files'] },

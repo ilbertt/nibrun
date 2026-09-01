@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_HEALTH_CHECK, DEFAULT_HTTP_PORT, type HealthCheck } from '@repo/protocol';
+import {
+  DEFAULT_HEALTH_CHECK,
+  DEFAULT_HTTP_PORT,
+  type HealthCheck,
+  type InstanceState,
+} from '@repo/protocol';
 import {
   applyProbe,
   describeInstanceFailure,
@@ -83,7 +88,10 @@ function evaluate({
   healthCheck = check(),
   stopRequested = false,
   desiredRunning = true,
+  onRequest = false,
+  snapshotting = false,
   startedAtMs = STARTED_AT_MS as number | undefined,
+  current = 'pending' as InstanceState,
 }: {
   unit: UnitStatus;
   tracker: Tracker;
@@ -91,14 +99,20 @@ function evaluate({
   healthCheck?: HealthCheck;
   stopRequested?: boolean;
   desiredRunning?: boolean;
+  onRequest?: boolean;
+  snapshotting?: boolean;
   startedAtMs?: number | undefined;
+  current?: InstanceState;
 }) {
   return evaluateInstanceState({
     unit,
     tracker,
     healthCheck,
     desiredRunning,
+    onRequest,
     stopRequested,
+    snapshotting,
+    current,
     ...(startedAtMs === undefined ? {} : { startedAtMs }),
     nowMs,
   });
@@ -252,7 +266,10 @@ describe('what the VM itself is doing', () => {
         tracker: initialTracker(),
         healthCheck: check(),
         desiredRunning: true,
+        onRequest: false,
         stopRequested: false,
+        snapshotting: false,
+        current: 'pending',
         nowMs: STARTED_AT_MS,
       }),
     ).toBe('pending');
@@ -265,10 +282,111 @@ describe('what the VM itself is doing', () => {
         tracker: initialTracker(),
         healthCheck: check(),
         desiredRunning: true,
+        onRequest: false,
         stopRequested: false,
+        snapshotting: false,
+        current: 'pending',
         nowMs: STARTED_AT_MS,
       }),
     ).toBe('pending');
+  });
+
+  /**
+   * The two states a microVM can be absent in, and they are not the same news. One says the
+   * release is over; the other says it is between requests. An owner reading `stopped` for an app
+   * working exactly as configured would have nothing to tell it from a broken one.
+   */
+  describe('an app that runs on request is idle rather than stopped', () => {
+    test('one nobody has ever asked for is idle, not pending', () => {
+      expect(
+        evaluateInstanceState({
+          unit: absent,
+          tracker: initialTracker(),
+          healthCheck: check(),
+          desiredRunning: true,
+          onRequest: true,
+          stopRequested: false,
+          snapshotting: false,
+          current: 'idle',
+          nowMs: STARTED_AT_MS,
+        }),
+      ).toBe('idle');
+    });
+
+    /**
+     * The two look identical from the unit alone — an `on-request` instance with no microVM — and
+     * the record is what tells them apart. Calling a boot `idle` stops the startup deadline, turns
+     * the deployment `running` before a probe has run, and leaves the memory it is about to take
+     * out of what the host counts as committed.
+     */
+    test('but one whose start is still in flight is pending, not idle', () => {
+      expect(
+        evaluateInstanceState({
+          unit: absent,
+          tracker: initialTracker(),
+          healthCheck: check(),
+          desiredRunning: true,
+          onRequest: true,
+          stopRequested: false,
+          snapshotting: false,
+          current: 'pending',
+          nowMs: STARTED_AT_MS,
+        }),
+      ).toBe('pending');
+    });
+
+    test('one stopped for being quiet is idle', () => {
+      expect(
+        evaluate({
+          unit: exited,
+          tracker: initialTracker(),
+          onRequest: true,
+          stopRequested: true,
+          nowMs: PAST_GRACE_MS,
+        }),
+      ).toBe('idle');
+    });
+
+    test('but a microVM that went down unasked is failed, whatever the policy', () => {
+      expect(
+        evaluate({
+          unit: exited,
+          tracker: initialTracker(),
+          onRequest: true,
+          nowMs: PAST_GRACE_MS,
+        }),
+      ).toBe('failed');
+    });
+
+    /**
+     * The snapshot is what takes the VMM down, and `stopRequested` is only written once it has
+     * been taken — so between the two the microVM is gone with nothing yet saying it was asked
+     * for. Reading that as a crash fails the deployment, which drops the app out of desired
+     * state and takes its hostnames off the proxy with it.
+     */
+    test('and one whose snapshot is still being taken is idle, not failed', () => {
+      expect(
+        evaluate({
+          unit: exited,
+          tracker: initialTracker(),
+          onRequest: true,
+          snapshotting: true,
+          nowMs: PAST_GRACE_MS,
+        }),
+      ).toBe('idle');
+    });
+
+    test('and a suspended one is stopped: the owner asked for that, not the request pattern', () => {
+      expect(
+        evaluate({
+          unit: absent,
+          tracker: initialTracker(),
+          onRequest: true,
+          desiredRunning: false,
+          nowMs: PAST_GRACE_MS,
+        }),
+      ).toBe('stopped');
+    });
   });
 
   test('an instance the control plane wants stopped reads as stopped once the unit is down', () => {

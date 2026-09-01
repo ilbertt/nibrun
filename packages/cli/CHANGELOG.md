@@ -2,11 +2,37 @@
 
 All notable changes to `nib` are documented in this file.
 
-## [2026.8.29-2]
+## [2026.8.31-3]
 
 ### 🚀 Features
 
+- *(api)* A new app waits for its first request (#424)
+- *(api)* An owner can see how their app comes up (#422)
+
+### 🚜 Refactor
+
+- *(app-operations)* An app between requests is idle, in that word (#423)
+
+## [2026.8.31-2]
+
+### 🚀 Features
+
+- *(cli)* A command answers with a typed value, and --json prints it (#419)
+- *(cli)* Nib upgrade runs the install against the nib that ran it (#415)
+- *(agent)* An app can wait for a request instead of running (#390)
+
+## [2026.8.31-1]
+
+### 🚀 Features
+
+- *(www)* Sharkord is a deploy the app already knows how to configure (#384)
+- A deploy link may say what the binary should hash to (#382)
 - *(cli)* Nib apps status says how much of the machine an app is using (#371)
+
+### 🚜 Refactor
+
+- Tests sit beside src, never inside it (#396)
+- *(protocol)* The default volume size moves next to the volume it sizes (#380)
 
 ## [2026.8.29-1]
 

@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { type AppId, AppIdSchema, Value } from '@repo/protocol';
 import { Effect } from 'effect';
 import {
@@ -19,6 +20,21 @@ const UNIT_SUFFIX = '.service';
 const UNIT_PATTERN = `${VM_UNIT_TEMPLATE}*${UNIT_SUFFIX}`;
 
 export const vmUnitName = (appId: AppId) => `${VM_UNIT_TEMPLATE}${appId}${UNIT_SUFFIX}`;
+
+/**
+ * Where `nibrun-vm@.service` tells Firecracker to bind its API socket. Nothing compares the two
+ * spellings, so moving one is moving the other — and the unit's runtime directory outlives the
+ * agent on purpose, which is what leaves a VM started by an earlier agent still reachable here.
+ */
+export function vmApiSocketPath({
+  runtimeDir,
+  appId,
+}: {
+  runtimeDir: string;
+  appId: AppId;
+}): string {
+  return join(runtimeDir, `vm-${appId}.sock`);
+}
 
 export function appIdFromUnit(unitName: string): AppId | undefined {
   if (!unitName.startsWith(VM_UNIT_TEMPLATE) || !unitName.endsWith(UNIT_SUFFIX)) {

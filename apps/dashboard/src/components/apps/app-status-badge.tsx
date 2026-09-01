@@ -29,6 +29,11 @@ export function AppStatusBadge({ app }: { app: AppSummary }) {
       return <AppStateBadge state={status.status.state} />;
     case 'deployment':
       return <DeploymentStateBadge state={status.status.state} />;
+    // Outline rather than destructive or muted: an app waiting for its first visitor is doing
+    // what it was configured to do, and a badge that reads as trouble would have owners
+    // switching the saving off to make it go away.
+    case 'instance':
+      return <Badge variant="outline">{APP_STATUS_LABELS[status.status.state]}</Badge>;
     case 'transition':
       return <Badge variant="outline">{status.status.label}</Badge>;
     case 'never-deployed':

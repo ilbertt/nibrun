@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { AppState } from '@repo/protocol';
+import type { AppActivation, AppState, DeploymentState } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import { environmentByDeployment, toDesiredInstance } from '#lib/deployments/desired-state.ts';
 import { sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
@@ -10,6 +10,7 @@ type EnvironmentRow = Queries['SelectDesiredEnvironment'];
 const DEPLOYMENT = 'deployment-1';
 const OTHER_DEPLOYMENT = 'deployment-2';
 const SECRET = '/app/data/.openclaw';
+const IDLE_TIMEOUT_MS = 900_000;
 
 function rowsFor(entries: Array<[string, string, string]>): EnvironmentRow[] {
   return entries.map(
@@ -91,19 +92,74 @@ describe('what a host is told to run with', () => {
  */
 describe('whether a host runs it is the state of the app, not of the release', () => {
   test('an active app is the one that runs', () => {
-    expect(desiredInstance('active').desiredState).toBe('running');
+    expect(desiredInstance({ state: 'active' }).desiredState).toBe('running');
   });
 
   // `deleting` is here because the app stays in desired state until its filesystem is gone, and
   // a microVM still serving out of one being torn down is the thing that must not happen.
   test.each(['suspended', 'deleting'] as const)('a %s app is one the host stops', (state) => {
-    expect(desiredInstance(state).desiredState).toBe('stopped');
+    expect(desiredInstance({ state }).desiredState).toBe('stopped');
   });
 });
 
-function desiredInstance(state: AppState) {
+/**
+ * Two columns, one answer. A host is told what should be true of the app rather than the policy
+ * behind it, which is why suspending an `on-request` app produces the same `stopped` as
+ * suspending any other: whichever is stricter is what the host has to act on.
+ */
+describe('how the app comes up is folded into the same answer', () => {
+  test('an active app that runs on request is neither running nor stopped', () => {
+    expect(desiredInstance({ state: 'active', activation: 'on-request' }).desiredState).toBe(
+      'on-request',
+    );
+  });
+
+  test('suspending it wins over its activation policy', () => {
+    expect(desiredInstance({ state: 'suspended', activation: 'on-request' }).desiredState).toBe(
+      'stopped',
+    );
+  });
+
+  /**
+   * A release that did not come up is stopped the way a suspended app is, and for a different
+   * reason: it stays in the list so the host goes on answering for the hostnames, and `on-request`
+   * would have every visitor pay for a boot the last one already proved would not work.
+   */
+  test('a failed release is stopped whatever the app says it wants', () => {
+    expect(
+      desiredInstance({ state: 'active', activation: 'on-request', deploymentState: 'failed' })
+        .desiredState,
+    ).toBe('stopped');
+    expect(
+      desiredInstance({ state: 'active', activation: 'always', deploymentState: 'failed' })
+        .desiredState,
+    ).toBe('stopped');
+  });
+
+  test('the timeout rides along only where there is something to time', () => {
+    expect(desiredInstance({ state: 'active', activation: 'on-request' }).idleTimeoutMs).toBe(
+      IDLE_TIMEOUT_MS,
+    );
+    expect(
+      desiredInstance({ state: 'active', activation: 'always' }).idleTimeoutMs,
+    ).toBeUndefined();
+    expect(
+      desiredInstance({ state: 'suspended', activation: 'on-request' }).idleTimeoutMs,
+    ).toBeUndefined();
+  });
+});
+
+function desiredInstance({
+  state,
+  activation = 'always',
+  deploymentState = 'running',
+}: {
+  state: AppState;
+  activation?: AppActivation;
+  deploymentState?: DeploymentState;
+}) {
   return toDesiredInstance({
-    row: { ...deploymentRow(), state },
+    row: { ...deploymentRow(), state, activation, deployment_state: deploymentState },
     hostnames: new Map(),
     environments: new Map(),
     secretsKey: TEST_SECRETS_KEY,
@@ -135,5 +191,8 @@ function deploymentRow() {
     restart_backoff_factor: 2,
     restart_reset_after_ms: 1000,
     config_id: 'config-1',
+    activation: 'always',
+    idle_timeout_ms: IDLE_TIMEOUT_MS,
+    deployment_state: 'running',
   } as unknown as Parameters<typeof toDesiredInstance>[0]['row'];
 }

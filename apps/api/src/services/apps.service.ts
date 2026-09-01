@@ -25,8 +25,9 @@ import {
   toAppConfig,
 } from '#lib/app-config.ts';
 import { type PublicAppHostname, platformHostname, toAppHostname } from '#lib/app-hostname.ts';
+import { overAppQuota } from '#lib/app-quota.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
-import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -174,6 +175,15 @@ export class AppsService extends Service {
           hostname: platformHostname({ slug, appHostDomain: this.appHostDomain }),
           config: appConfig,
         });
+        // Nothing was written, so there is no re-roll to make and no later attempt that would go
+        // any differently: the owner has every app they are allowed until they delete one.
+        if (!created) {
+          const allowed = await this.appsRepo.appsAllowed({ ownerId });
+          if (allowed === null) {
+            throw new Error('The owner refused an app has no quota.');
+          }
+          throw new ForbiddenError(overAppQuota(allowed));
+        }
         return toPublicApp(created);
       } catch (error) {
         if (!SLUG_CONSTRAINTS.some((constraint) => isUniqueViolation({ error, constraint }))) {
@@ -336,6 +346,11 @@ export class AppsService extends Service {
    *
    * Deduplicated for the same reason, and by the same rule — an app has one instance on a host,
    * and a report naming it twice must not take the whole report down with it.
+   *
+   * An app reported asleep is cleared rather than left alone. A host stops sending a reading for
+   * one, and doing nothing about that would leave the last figure standing — so an app that is
+   * holding nothing would go on being shown spending what it spent before it went to sleep, for
+   * as long as it slept.
    */
   async recordComputeUsage({
     instances,
@@ -343,13 +358,19 @@ export class AppsService extends Service {
     instances: readonly ReportedInstance[];
   }): Promise<void> {
     const readings = new Map<AppId, ComputeUsage>();
+    const asleep = new Set<AppId>();
     for (const instance of instances) {
       if (instance.compute) {
         readings.set(instance.appId, instance.compute);
+      } else if (instance.state === 'idle') {
+        asleep.add(instance.appId);
       }
     }
     if (readings.size > 0) {
       await this.appsRepo.recordComputeUsage({ readings });
+    }
+    if (asleep.size > 0) {
+      await this.appsRepo.clearComputeUsage({ appIds: [...asleep] });
     }
   }
 
@@ -428,6 +449,11 @@ export class AppsService extends Service {
    * After the state change, so it is only ever reached by an owner the app answered to — and
    * while the app is `deleting` rather than once it is `deleted`, which is the last generation of
    * desired state the host is told about it in.
+   *
+   * The hostnames are not released here. An app is still its owner's to see while it is
+   * `deleting`, and an app is shown with the hostname nibrun issued it — so taking the rows away
+   * first leaves one that cannot be described, and the whole listing fails on it rather than that
+   * one app. `purgeApp` releases them once the app is `deleted` and nobody is being shown it.
    */
   async delete({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
     const app = requireApp(
@@ -440,10 +466,7 @@ export class AppsService extends Service {
     );
     await this.exportsRepo.failInFlight({ appId, message: APP_DELETED });
     const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
-    const [torndown] = await Promise.all([
-      this.finishIfNothingToTearDown({ appId }),
-      this.releaseHostnames({ appId }),
-    ]);
+    const torndown = await this.finishIfNothingToTearDown({ appId });
 
     return toPublicApp({ app: torndown ? { ...app, state: 'deleted' } : app, hostnames });
   }
@@ -609,6 +632,8 @@ function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
     volumeUsage: toVolumeUsage(app),
     computeUsage: toComputeUsage(app),
     state: app.state,
+    activation: app.activation,
+    idleTimeoutMs: app.idle_timeout_ms,
     createdAt: toTimestamp(app.created_at),
     updatedAt: toTimestamp(app.updated_at),
   };

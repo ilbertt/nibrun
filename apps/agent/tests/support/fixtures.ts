@@ -143,6 +143,7 @@ export function instanceRecord(overrides: Partial<InstanceRecord> = {}): Instanc
       guestIpv4: describeSlot({ slot: FIRST_SLOT, appId: APP_ID }).guestIpv4,
       artifactDigest: ARTIFACT_DIGEST,
       state: 'running',
+      onRequest: false,
       health: initialTracker(),
       healthCheck: DEFAULT_HEALTH_CHECK,
       resources: DEFAULT_INSTANCE_RESOURCES,

@@ -40,6 +40,17 @@ const execute = (request: CommandRequest) =>
     return { code, stdout, stderr };
   }).pipe(
     Effect.scoped,
+    // The timeout is only worth what this makes it worth. Closing the scope kills the process and
+    // then waits for it to exit, and that wait is a finalizer — uninterruptible, so a timeout
+    // fires and then blocks on it anyway. A process the kernel will not let go of is exactly the
+    // case: a read of a block device whose server is gone sleeps past SIGKILL, and one of those
+    // held an entire agent through its reconcile and its shutdown.
+    //
+    // `disconnect` hands that wait to a background fiber, so the deadline is when this caller
+    // stops waiting rather than when the process finally goes. The process is still signalled
+    // first, so the only ones that outlive being given up on are the ones that could not have
+    // been killed by waiting either.
+    Effect.disconnect,
     Effect.timeoutFail({
       duration: request.timeout ?? DEFAULT_TIMEOUT,
       onTimeout: () => new CommandTimedOut({ command: request.command }),

@@ -1,49 +1,48 @@
 import { describe, expect, test } from 'bun:test';
-import { type AppStatusView, renderStatus } from '#lib/app-status.ts';
+import { MIN_IDLE_TIMEOUT_MS } from '@repo/protocol';
+import { type AppStatusReport, renderStatus } from '#lib/app-status.ts';
+import {
+  BYTES_PER_MIB,
+  MEMORY_MIB,
+  SLUG,
+  VCPU_COUNT,
+  VOLUME_SIZE_BYTES,
+} from '#tests/support/app.ts';
 
-const VCPU_COUNT = 2;
-const MEMORY_MIB = 1_024;
-const BYTES_PER_MIB = 1_048_576;
-const VOLUME_SIZE_BYTES = 8_589_934_592;
 const MEMORY_USED_BYTES = 412_401_664;
 const VOLUME_USED_BYTES = 1_503_238_553;
 const CPU_SHARE = 0.18;
+const MEASURED_AT = '2026-08-29T11:01:00.000Z';
+const A_QUARTER_HOUR_MS = 900_000;
 
-// Plain strings rather than the branded ones the wire carries: what is pinned down here is how a
-// status reads, and a cast per field would be spelling rather than meaning.
-function app(overrides: object = {}): AppStatusView {
+function app(overrides: Partial<AppStatusReport> = {}): AppStatusReport {
   return {
-    slug: 'quiet-otter',
+    slug: SLUG,
     status: 'running',
-    config: {
-      volumeSizeBytes: VOLUME_SIZE_BYTES,
-      resources: { vcpuCount: VCPU_COUNT, memoryMib: MEMORY_MIB },
-    },
-    volumeUsage: null,
-    computeUsage: null,
+    activation: 'always',
+    idleTimeoutMs: MIN_IDLE_TIMEOUT_MS,
+    vcpu: { used: null, total: VCPU_COUNT, measuredAt: null },
+    memory: { used: null, total: MEMORY_MIB * BYTES_PER_MIB, measuredAt: null },
+    volume: { used: null, total: VOLUME_SIZE_BYTES, measuredAt: null },
     ...overrides,
-  } as AppStatusView;
+  };
 }
 
 const measured = app({
-  volumeUsage: {
-    totalBytes: VOLUME_SIZE_BYTES,
-    usedBytes: VOLUME_USED_BYTES,
-    measuredAt: '2026-08-29T11:01:00.000Z',
+  vcpu: { used: CPU_SHARE * VCPU_COUNT, total: VCPU_COUNT, measuredAt: MEASURED_AT },
+  memory: {
+    used: MEMORY_USED_BYTES,
+    total: MEMORY_MIB * BYTES_PER_MIB,
+    measuredAt: MEASURED_AT,
   },
-  computeUsage: {
-    memoryTotalBytes: MEMORY_MIB * BYTES_PER_MIB,
-    memoryUsedBytes: MEMORY_USED_BYTES,
-    cpuShare: CPU_SHARE,
-    measuredAt: '2026-08-29T11:01:00.000Z',
-  },
+  volume: { used: VOLUME_USED_BYTES, total: VOLUME_SIZE_BYTES, measuredAt: MEASURED_AT },
 });
 
 describe('a status says what one app is using of what it was given', () => {
   test('every resource reads as what is spent over what was allocated', () => {
     const { lines } = renderStatus(measured);
 
-    expect(lines[0]).toBe('quiet-otter  running');
+    expect(lines[0]).toBe(`${SLUG}  running`);
     expect(lines.join('\n')).toContain('vCPU    0.36 / 2');
     expect(lines.join('\n')).toContain('Memory  393.3 MiB / 1.0 GiB');
     expect(lines.join('\n')).toContain('Volume  1.4 GiB / 8.0 GiB');
@@ -73,14 +72,10 @@ describe('a status says what one app is using of what it was given', () => {
   test('two readings taken apart are summarised by the older of them', () => {
     const { measured } = renderStatus(
       app({
-        volumeUsage: {
-          totalBytes: VOLUME_SIZE_BYTES,
-          usedBytes: VOLUME_USED_BYTES,
-          measuredAt: '2026-08-29T11:01:00.000Z',
-        },
-        computeUsage: {
-          memoryTotalBytes: MEMORY_MIB * BYTES_PER_MIB,
-          memoryUsedBytes: MEMORY_USED_BYTES,
+        volume: { used: VOLUME_USED_BYTES, total: VOLUME_SIZE_BYTES, measuredAt: MEASURED_AT },
+        memory: {
+          used: MEMORY_USED_BYTES,
+          total: MEMORY_MIB * BYTES_PER_MIB,
           measuredAt: '2026-08-27T09:12:00.000Z',
         },
       }),
@@ -93,18 +88,35 @@ describe('a status says what one app is using of what it was given', () => {
   // not have to work out that they are the same thing.
   test('an app nothing has ever deployed is said the way the dashboard says it', () => {
     expect(renderStatus(app({ status: 'never-deployed' })).lines[0]).toBe(
-      'quiet-otter  never deployed',
+      `${SLUG}  never deployed`,
     );
+  });
+
+  /**
+   * `idle` on its own reads as something that went wrong. Beside the setting that put it there it
+   * reads as the app doing what it was configured to do, which is why the two are one block.
+   */
+  test('an app that is idle says what put it there', () => {
+    const lines = renderStatus(
+      app({ status: 'idle', activation: 'on-request', idleTimeoutMs: A_QUARTER_HOUR_MS }),
+    ).lines;
+
+    expect(lines[0]).toBe(`${SLUG}  idle`);
+    expect(lines[1]).toBe('On request, stopped after 15m of quiet');
+  });
+
+  test('an app that is always on says so where the idle one says its wait', () => {
+    expect(renderStatus(app()).lines[1]).toBe('Always on');
   });
 
   // Memory is a level and arrives whole; a share needs a reading behind it and cannot.
   test('a guest measured before it had a cpu share still reads its memory', () => {
     const lines = renderStatus(
       app({
-        computeUsage: {
-          memoryTotalBytes: MEMORY_MIB * BYTES_PER_MIB,
-          memoryUsedBytes: MEMORY_USED_BYTES,
-          measuredAt: '2026-08-29T11:01:00.000Z',
+        memory: {
+          used: MEMORY_USED_BYTES,
+          total: MEMORY_MIB * BYTES_PER_MIB,
+          measuredAt: MEASURED_AT,
         },
       }),
     ).lines.join('\n');

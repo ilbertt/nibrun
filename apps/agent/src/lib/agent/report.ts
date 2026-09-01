@@ -6,6 +6,7 @@ import { nowTimestamp } from '#lib/clock.ts';
 import { buildReportedState } from '#lib/report/build-report.ts';
 import {
   allocatableCapacity,
+  committedResources,
   readAvailableCacheBytes,
   readHostCapacity,
 } from '#lib/report/capacity.ts';
@@ -54,7 +55,10 @@ const report = Effect.gen(function* () {
   const session = yield* sessions.current;
   const current = yield* AgentState.snapshot;
   const records = [...current.records.values()];
-  const capacity = yield* readHostCapacity(config.stateDir);
+  const capacity = yield* readHostCapacity({
+    cacheDir: config.stateDir,
+    zerofsConfigFile: config.zerofsConfigFile,
+  });
   const reachedAt = yield* publicAddresses(records);
 
   yield* control.sendReportedState({
@@ -66,9 +70,7 @@ const report = Effect.gen(function* () {
       capacity,
       allocatable: allocatableCapacity({
         capacity,
-        committed: records
-          .filter((record) => record.state !== 'stopped' && record.state !== 'failed')
-          .map((record) => record.resources),
+        committed: committedResources(records),
         availableCacheBytes: yield* readAvailableCacheBytes(config.stateDir),
       }),
       versions: sessions.versions,

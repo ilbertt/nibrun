@@ -16,6 +16,11 @@ export type DeployPhase =
   | 'done'
   | 'failed';
 
+/** The phases where the release is in flight and nothing is left for this end to send. */
+export function isReleasing(phase: DeployPhase): boolean {
+  return phase === 'releasing' || phase === 'settling';
+}
+
 export type DeployRun = {
   phase: DeployPhase;
   steps: readonly DeployStep[];

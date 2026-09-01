@@ -9,6 +9,7 @@ export type Unwrapping =
   | { outcome: 'no-executable' }
   | { outcome: 'walked-too-far' }
   | { outcome: 'entry-too-large' }
+  | { outcome: 'expands-too-far' }
   | { outcome: 'unreadable' };
 
 /**
@@ -23,6 +24,30 @@ export type Unwrapping =
  * the binary is shipping what a deploy does nothing with, and is answered rather than walked.
  */
 export const MAX_ENTRIES = 512;
+
+/**
+ * How much more a compressed source may turn out to hold than it took to send.
+ *
+ * The cap on a fetch is on what the url sent, and what an archive expands to is decided after it.
+ * So the two are not the same bound at all: a quarter of a gibibyte of zeros is a 255 KB download,
+ * and reading it costs this end the whole of that quarter to decompress, hash and write to the
+ * store before the size it came to refuses it.
+ *
+ * A hundred is far above anything published: measured over real binaries and the archives they
+ * ship in, a release expands by two or three — `bun` by 2.5, a kernel by 2.7 — and the most
+ * compressible thing anyone actually ships, a binary carrying embedded text, reaches fifteen.
+ * A file of zeros reaches a thousand.
+ */
+export const MAX_EXPANSION = 100;
+
+/**
+ * How far a source is read before that ratio is asked about at all.
+ *
+ * Below this the ratio says nothing: a tarball of one small file is mostly the padding tar rounds
+ * every entry up to, and expands by twenty. It is also not worth asking — what an archive this
+ * side of the floor can cost is the floor.
+ */
+export const EXPANSION_FLOOR_BYTES = 8_388_608;
 
 /**
  * What an archive this cannot follow is raised as, wherever it stops being followable — a walk is
@@ -51,5 +76,19 @@ export class EntryTooLargeError extends Error {
   constructor() {
     super('An entry declares a length its own header could not hold.');
     this.name = 'EntryTooLargeError';
+  }
+}
+
+/**
+ * What a source holding far more than it took to send is raised as.
+ *
+ * Refused rather than read to the end and refused there: the length that would stop it is the one
+ * on the artifact, and reaching that means having already done the decompressing, the hashing and
+ * the writing that the bytes were sent to buy.
+ */
+export class ExpandsTooFarError extends Error {
+  constructor() {
+    super(`A compressed source holds more than ${MAX_EXPANSION} times what it took to send.`);
+    this.name = 'ExpandsTooFarError';
   }
 }

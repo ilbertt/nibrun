@@ -13,7 +13,7 @@ cd "$(dirname "$0")"
 
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
-: "${AWS_REGION:?}" "${SSM_SECRET_PREFIX:?}" "${DATA_VOLUME_ID:?}" \
+: "${AWS_REGION:?}" "${SSM_SECRET_PREFIX:?}" \
   "${AGENT_VERSION:?}" "${AGENT_URL:?}" \
   "${ZEROFS_VERSION:?}" "${ZEROFS_URL:?}" "${ZEROFS_SHA256:?}" "${ZEROFS_MEMBER:?}" \
   "${FIRECRACKER_VERSION:?}" "${FIRECRACKER_URL:?}" "${FIRECRACKER_SHA256:?}" \
@@ -75,10 +75,13 @@ if [ ! -f /usr/lib/systemd/system/systemd-journal-upload.service ]; then
   dnf install -y systemd-journal-remote
 fi
 
-log "Ensuring the data volume is mounted"
-bash ensure_data_volume.sh zerofs
-
 id -u zerofs >/dev/null 2>&1 || useradd --system --no-create-home --shell /sbin/nologin zerofs
+
+# Before the mount, because the mount is what chowns the directories on it and it
+# can only do that once the user exists.
+log "Ensuring /data is the instance store"
+bash ensure_ephemeral_data.sh zerofs zerofs zerofs-checkpoint
+
 chown -R zerofs:zerofs /data/zerofs
 
 # Where a checkpoint server keeps its own cache, one directory per checkpoint,
@@ -232,6 +235,41 @@ changed_file() {
   return 0
 }
 
+# What is left of a config once everything only a person reads is gone: whole-line
+# comments, blank lines, trailing whitespace. A multi-line string would make all
+# three unsafe to drop — inside one a `#` is data and a blank line is content — so
+# a file that could hold one is compared exactly as it stands.
+settings_only() {
+  if grep -q -e '"""' -e "'''" "$1"; then
+    cat "$1"
+  else
+    sed -e 's/[[:space:]]*$//' -e '/^[[:space:]]*#/d' -e '/^$/d' "$1"
+  fi
+}
+
+# For a config this repo writes as prose and a process reads as settings. The file
+# lands on the box either way, so what is installed is still what the repo says
+# word for word — but the restart is decided on the settings alone. ZeroFS
+# restarting severs the NBD device behind every guest disk on this host, and
+# rewording the paragraph above a value has to be unable to cause that.
+#
+# Only for a config copied from the repo. Everything else here is written by a
+# heredoc below, which cannot emit a comment or a blank line — so normalising one
+# would strip nothing a person wrote and could only equate two values that differ
+# by trailing space, which is a restart missed on a rotated secret.
+changed_settings() {
+  local path=$1
+  local before=''
+  if [ -f "$path" ]; then
+    before=$(settings_only "$path")
+  fi
+  local after
+  after=$(settings_only "$path.new")
+
+  changed_file "$path" || return 1
+  [ "$before" != "$after" ]
+}
+
 # A guest reaches the internet through this host: its default route is the tap,
 # and the agent's ruleset masquerades what leaves. Without forwarding the kernel
 # discards those packets before a single rule is consulted, and discards them
@@ -328,7 +366,7 @@ cp zerofs/config.toml /etc/zerofs/config.toml.new
 # 0600 the umask above gives the secrets around it. It holds no secret: every
 # value that is one arrives through zerofs.env.
 chmod 0644 /etc/zerofs/config.toml.new
-changed_file /etc/zerofs/config.toml && NEEDS_RESTART+=(zerofs) || true
+changed_settings /etc/zerofs/config.toml && NEEDS_RESTART+=(zerofs) || true
 
 # What a checkpoint server reads. Nothing restarts on a change: no instance of it
 # outlives the export it was started for, so the next one picks this up by being
@@ -432,7 +470,7 @@ if [ "$units_changed" = "1" ]; then
   systemctl daemon-reload
 fi
 
-systemctl enable nibrun-zerofs.service nibrun-zerofs-mount.service \
+systemctl enable nibrun-data.service nibrun-zerofs.service nibrun-zerofs-mount.service \
   nibrun-caddy.service nibrun-agent.service systemd-journal-upload.service >/dev/null
 
 # --- Restarting --------------------------------------------------------------

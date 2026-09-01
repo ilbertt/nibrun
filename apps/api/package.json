@@ -13,14 +13,14 @@
     "build": "bun run scripts/build.ts",
     "check:types": "bun codegen:sql:check && bun run --bun tsc",
     "codegen:sql": "bun bun-sqlgen generate 'src/repositories/*.repository.ts' --migrations src/db/migrations --out src/db/queries.gen.ts",
-    "codegen:sql:check": "bun bun-sqlgen generate 'src/repositories/*.repository.ts' --migrations src/db/migrations --out src/db/queries.gen.ts --check",
+    "codegen:sql:check": "bun codegen:sql --check",
     "test": "bun test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1105.0",
     "@aws-sdk/s3-request-presigner": "^3.1105.0",
-    "@ilbertt/better-auth-bun-sql": "^0.2.0",
-    "@ilbertt/bun-sqlgen": "^0.5.0",
+    "@ilbertt/better-auth-bun-sql": "^0.4.0",
+    "@ilbertt/bun-sqlgen": "^0.6.0",
     "@repo/protocol": "workspace:*",
     "better-auth": "catalog:",
     "elysia": "^1.4.29"

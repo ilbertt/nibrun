@@ -7,6 +7,7 @@ import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppActivator } from '#services/app-activator.service.ts';
+import { AppWaker } from '#services/app-waker.service.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { CaddyProxy } from '#services/caddy-proxy.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
@@ -18,6 +19,7 @@ import { FilesystemReader } from '#services/filesystem-reader.service.ts';
 import { HostFirewall } from '#services/host-firewall.service.ts';
 import { LogStore } from '#services/log-store.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
+import { RefreshSignal } from '#services/refresh-signal.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
@@ -37,6 +39,7 @@ const agent = Layer.mergeAll(
   AgentConfig.Default,
   AgentState.Default,
   ReportSignal.Default,
+  RefreshSignal.Default,
   CommandRunner.Default,
   ControlPlane.Default,
   LogStore.Default,
@@ -44,6 +47,7 @@ const agent = Layer.mergeAll(
   SlotAllocator.Default,
   ZerofsTopology.Default,
   HostFirewall.Default,
+  AppWaker.Default,
   AppActivator.Default,
   CaddyProxy.Default,
   TenantLogQueue.Default,

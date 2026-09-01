@@ -115,5 +115,11 @@ credentials, and the gap is wider than the test count suggests.
   microseconds of the cut being recorded would get past this.
 - The Firecracker drive-on-`/dev/nbdN` path is upstream-undocumented — mechanically sound, never
   run here.
+- **No microVM has been slept or woken.** The API client is asserted against a listening unix
+  socket, so the request shapes are the ones 1.16.1's swagger describes; that Firecracker accepts
+  them, that a bare process restores a guest whose NBD drive was reattached under it, and that
+  `vm_launch.sh` picks the right mode under systemd are all questions only a host can answer. The
+  disk bound a sleep is refused by is arithmetic here; what `statfs` reports for a real `/data`,
+  and whether ZeroFS reads its own `disk_size_gb` as GiB or GB, are not.
 - **No test builds the full layer graph**, so a service wired wrong in `index.ts` is caught by
   `tsc` and by starting the binary, not by `bun test`.

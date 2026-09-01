@@ -53,13 +53,24 @@ export type ObservedState = {
   readonly exports: readonly ObservedExport[];
 };
 
-export const INSTANCE_STOP_REASONS = ['desired-stopped', 'not-desired', 'superseded'] as const;
+export const INSTANCE_STOP_REASONS = [
+  'desired-stopped',
+  'not-desired',
+  'superseded',
+  'idle',
+] as const;
 
 export type InstanceStopReason = (typeof INSTANCE_STOP_REASONS)[number];
 
+/**
+ * `sleep` is not `stop`: it says this app should be here, holding its port and its hostnames,
+ * with no microVM until something asks for one. What it produces is the record and the slot a
+ * request needs to find, which is why an app nobody has ever visited still has to be planned.
+ */
 export type InstancePlan =
   | { readonly action: 'start'; readonly desired: DesiredInstance }
   | { readonly action: 'replace'; readonly desired: DesiredInstance }
+  | { readonly action: 'sleep'; readonly desired: DesiredInstance }
   | {
       readonly action: 'stop';
       readonly appId: AppId;
@@ -143,6 +154,22 @@ function planInstance({
     return current?.running
       ? { action: 'stop', appId: wanted.appId, reason: 'desired-stopped' }
       : { action: 'none', appId: wanted.appId };
+  }
+  // An app that runs on request is reconciled like any other up to the last line: a release this
+  // host has not served yet comes up rather than waiting to be asked for, because a deploy is the
+  // one moment an owner is watching and the only one where the health check runs at all — an app
+  // first booted by a visitor reports a broken binary to them. Sleep is what a release that has
+  // already had its microVM does between requests.
+  if (wanted.desiredState === 'on-request') {
+    if (!current?.present) {
+      return { action: 'start', desired: wanted };
+    }
+    if (current.deploymentId !== wanted.deploymentId) {
+      return { action: 'replace', desired: wanted };
+    }
+    return current.running
+      ? { action: 'none', appId: wanted.appId }
+      : { action: 'sleep', desired: wanted };
   }
   if (!current?.present) {
     return { action: 'start', desired: wanted };

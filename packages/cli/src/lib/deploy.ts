@@ -16,7 +16,7 @@ import {
 import { environmentEdit } from '#lib/environment.ts';
 import { UsageError } from '#lib/errors.ts';
 import type { RunOptions } from '#lib/plan.ts';
-import { announce, awaitServing } from '#lib/release.ts';
+import { announce, awaitServing, type Release } from '#lib/release.ts';
 import type { Ui } from '#lib/ui.ts';
 import { describeProgress } from '#lib/upload-progress.ts';
 
@@ -40,7 +40,7 @@ export async function deploy({
   env,
   unset,
   detach,
-}: DeployInput): Promise<void> {
+}: DeployInput): Promise<Release> {
   const environment = environmentEdit({ env, unset });
   const deployed = await startDeployment({
     api,
@@ -66,7 +66,7 @@ export async function deploy({
     },
   });
 
-  await awaitServing({ api, ui, deployed, detach });
+  return await awaitServing({ api, ui, deployed, detach });
 }
 
 const SECURE_SCHEME = 'https://';

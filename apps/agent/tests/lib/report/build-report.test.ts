@@ -15,7 +15,7 @@ import {
   Value,
 } from '@repo/protocol';
 import { buildReportedState, toReportedInstance } from '#lib/report/build-report.ts';
-import { allocatableCapacity } from '#lib/report/capacity.ts';
+import { allocatableCapacity, committedResources } from '#lib/report/capacity.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
 import {
   APP_ID,
@@ -40,6 +40,13 @@ const HOST_CAPACITY = {
   cacheBytes: HOST_CACHE_BYTES,
 };
 const BOOTED = [DEFAULT_INSTANCE_RESOURCES, DEFAULT_INSTANCE_RESOURCES];
+/** The four states below with a microVM behind them, which is what the four of them hold. */
+const BOOTED_AND_SETTLING = [
+  DEFAULT_INSTANCE_RESOURCES,
+  DEFAULT_INSTANCE_RESOURCES,
+  DEFAULT_INSTANCE_RESOURCES,
+  DEFAULT_INSTANCE_RESOURCES,
+];
 const DEFAULT_INSTANCE_RESOURCES_AS_CAPACITY = {
   ...DEFAULT_INSTANCE_RESOURCES,
   cacheBytes: HOST_CACHE_BYTES,
@@ -226,6 +233,26 @@ describe('allocatable capacity', () => {
       memoryMib: HOST_MEMORY_MIB - DEFAULT_INSTANCE_RESOURCES.memoryMib * BOOTED.length,
       cacheBytes: FREE_CACHE_BYTES,
     });
+  });
+
+  // The whole of what `on-request` saves: a host still reserving a sleeping app's memory would
+  // pay for every sleep and collect on none of them.
+  test('an idle app is holding none of the host', () => {
+    expect(committedResources([instanceRecord({ state: 'idle', onRequest: true })])).toEqual([]);
+  });
+
+  test('every state with a microVM behind it still holds what it was given', () => {
+    expect(
+      committedResources([
+        instanceRecord({ state: 'running' }),
+        instanceRecord({ state: 'starting' }),
+        instanceRecord({ state: 'unhealthy' }),
+        instanceRecord({ state: 'stopping' }),
+        instanceRecord({ state: 'idle' }),
+        instanceRecord({ state: 'stopped' }),
+        instanceRecord({ state: 'failed' }),
+      ]),
+    ).toEqual(BOOTED_AND_SETTLING);
   });
 
   test('an oversubscribed host reports zero rather than a negative', () => {

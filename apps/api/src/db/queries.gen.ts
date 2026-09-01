@@ -32,6 +32,9 @@ export interface ISelectDesiredDeploymentsResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** The app config version this deployment was launched with. */
     config_id: IDeploymentsColumns["config_id"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    deployment_state: IDeploymentsColumns["state"];
 }
 
 /** Result of query `SelectDesiredVolumes`. */
@@ -157,6 +160,21 @@ export interface ISelectAppOwnershipResult {
     id: IAppsColumns["id"];
 }
 
+/** Result of query `SelectAppsAllowed`. */
+export interface ISelectAppsAllowedResult {
+    apps_allowed: IProfilesColumns["quota_apps_max_count"];
+}
+
+/** Result of query `SelectProfileForAppCreate`. */
+export interface ISelectProfileForAppCreateResult {
+    owner_id: IProfilesColumns["owner_id"];
+}
+
+/** Result of query `SelectAppsLeft`. */
+export interface ISelectAppsLeftResult {
+    apps_left: number;
+}
+
 /** Result of query `InsertApp`. */
 export interface IInsertAppResult {
     id: IAppsColumns["id"];
@@ -182,6 +200,8 @@ export interface ISelectCreatedAppResult {
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -224,6 +244,8 @@ export interface ISelectAppsByOwnerResult {
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -266,6 +288,8 @@ export interface ISelectAppByIdResult {
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -340,6 +364,8 @@ export interface ITouchAppAfterConfigPatchResult {
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -430,6 +456,8 @@ export interface ISelectAppAfterStateChangeResult {
     owner_id: IAppsColumns["owner_id"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
+    activation: IAppsColumns["activation"];
+    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -579,6 +607,7 @@ export interface ISelectDeploymentsByAppResult {
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
     state: IDeploymentsColumns["state"];
+    instance_state: IDeploymentsColumns["instance_state"];
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -616,6 +645,7 @@ export interface ISelectDeploymentByIdResult {
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
     state: IDeploymentsColumns["state"];
+    instance_state: IDeploymentsColumns["instance_state"];
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -679,6 +709,7 @@ export interface ISelectInsertedDeploymentResult {
     app_id: IDeploymentsColumns["app_id"];
     artifact_id: IDeploymentsColumns["artifact_id"];
     state: IDeploymentsColumns["state"];
+    instance_state: IDeploymentsColumns["instance_state"];
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
@@ -805,6 +836,9 @@ export interface Queries {
     SelectDisposableAppHostnames: ISelectDisposableAppHostnamesResult;
     DeleteDisposableAppHostname: IDeleteDisposableAppHostnameResult;
     SelectAppOwnership: ISelectAppOwnershipResult;
+    SelectAppsAllowed: ISelectAppsAllowedResult;
+    SelectProfileForAppCreate: ISelectProfileForAppCreateResult;
+    SelectAppsLeft: ISelectAppsLeftResult;
     InsertApp: IInsertAppResult;
     InsertAppConfig: IInsertAppConfigResult;
     InsertAppHostname: IInsertAppHostnameResult;
@@ -870,6 +904,7 @@ export interface IAccountColumns {
     password: string | null;
     createdAt: Date;
     updatedAt: Date;
+    issuer: string;
 }
 
 /** Schema of `account`. */
@@ -1067,6 +1102,22 @@ export interface IAppHostnamesTable {
     constraints: keyof (typeof schema)["app_hostnames"]["_constraints"];
 }
 
+/** Columns of `app_quotas`. */
+export interface IAppQuotasColumns {
+    owner_id: string | null;
+    apps_held: number | null;
+    apps_allowed: number | null;
+    apps_left: number | null;
+}
+
+/** Schema of `app_quotas`. */
+export interface IAppQuotasTable {
+    columns: IAppQuotasColumns;
+    relationType: (typeof schema)["app_quotas"]["_relationType"];
+    indexes: keyof (typeof schema)["app_quotas"]["_indexes"];
+    constraints: keyof (typeof schema)["app_quotas"]["_constraints"];
+}
+
 /** Columns of `app_usage`. */
 export interface IAppUsageColumns {
     id: string;
@@ -1107,6 +1158,8 @@ export interface IAppsColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
+    activation: import("@repo/protocol").AppActivation;
+    idle_timeout_ms: number;
 }
 
 /** Schema of `apps`. */
@@ -1166,6 +1219,7 @@ export interface IDeploymentsColumns {
     updated_at: Date;
     public_ipv4: import("@repo/protocol").Ipv4Address | null;
     extra_public_port: import("@repo/protocol").HostPort | null;
+    instance_state: import("@repo/protocol").InstanceState | null;
 }
 
 /** Schema of `deployments`. */
@@ -1202,6 +1256,10 @@ export interface IDesiredDeploymentsColumns {
     restart_reset_after_ms: number | null;
     config_id: string | null;
     has_extra_public_port: boolean | null;
+    activation: string | null;
+    idle_timeout_ms: number | null;
+    /** The release's own state, beside the app's. A host reads it to tell a release it should run from one it is only answering for. */
+    deployment_state: string | null;
 }
 
 /** Schema of `desired_deployments`. */
@@ -1344,6 +1402,8 @@ export interface ILiveAppsColumns {
     state: string | null;
     created_at: Date | null;
     updated_at: Date | null;
+    activation: string | null;
+    idle_timeout_ms: number | null;
 }
 
 /** Schema of `live_apps`. */
@@ -1352,6 +1412,24 @@ export interface ILiveAppsTable {
     relationType: (typeof schema)["live_apps"]["_relationType"];
     indexes: keyof (typeof schema)["live_apps"]["_indexes"];
     constraints: keyof (typeof schema)["live_apps"]["_constraints"];
+}
+
+/** Columns of `profiles`. */
+export interface IProfilesColumns {
+    id: string;
+    owner_id: import("@repo/protocol").OwnerId;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+    quota_apps_max_count: number;
+}
+
+/** Schema of `profiles`. */
+export interface IProfilesTable {
+    columns: IProfilesColumns;
+    relationType: (typeof schema)["profiles"]["_relationType"];
+    indexes: keyof (typeof schema)["profiles"]["_indexes"];
+    constraints: keyof (typeof schema)["profiles"]["_constraints"];
 }
 
 /** Columns of `purgeable_apps`. */
@@ -1384,9 +1462,11 @@ export const schema = {
             scope: { _columnName: "scope", _foreignKeys: {} },
             password: { _columnName: "password", _foreignKeys: {} },
             createdAt: { _columnName: "createdAt", _foreignKeys: {} },
-            updatedAt: { _columnName: "updatedAt", _foreignKeys: {} }
+            updatedAt: { _columnName: "updatedAt", _foreignKeys: {} },
+            issuer: { _columnName: "issuer", _foreignKeys: {} }
         },
         _indexes: {
+            account_issuer_accountId_uidx: { _indexName: "account_issuer_accountId_uidx" },
             account_pkey: { _indexName: "account_pkey" },
             account_userId_idx: { _indexName: "account_userId_idx" }
         },
@@ -1411,7 +1491,9 @@ export const schema = {
             scope: { _columnName: "scope", _foreignKeys: {} }
         },
         _indexes: {
-            deviceCode_pkey: { _indexName: "deviceCode_pkey" }
+            deviceCode_deviceCode_uidx: { _indexName: "deviceCode_deviceCode_uidx" },
+            deviceCode_pkey: { _indexName: "deviceCode_pkey" },
+            deviceCode_userCode_uidx: { _indexName: "deviceCode_userCode_uidx" }
         },
         _constraints: {
             deviceCode_pkey: { _constraintName: "deviceCode_pkey" }
@@ -1608,6 +1690,18 @@ export const schema = {
             app_hostnames_state_check: { _constraintName: "app_hostnames_state_check" }
         }
     },
+    app_quotas: {
+        _relationName: "app_quotas",
+        _relationType: "view",
+        _columns: {
+            owner_id: { _columnName: "owner_id", _foreignKeys: {} },
+            apps_held: { _columnName: "apps_held", _foreignKeys: {} },
+            apps_allowed: { _columnName: "apps_allowed", _foreignKeys: {} },
+            apps_left: { _columnName: "apps_left", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
     app_usage: {
         _relationName: "app_usage",
         _relationType: "table",
@@ -1648,7 +1742,9 @@ export const schema = {
             slug: { _columnName: "slug", _foreignKeys: {} },
             state: { _columnName: "state", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            activation: { _columnName: "activation", _foreignKeys: {} },
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} }
         },
         _indexes: {
             apps_deleted_idx: { _indexName: "apps_deleted_idx" },
@@ -1657,6 +1753,8 @@ export const schema = {
             apps_slug_key: { _indexName: "apps_slug_key" }
         },
         _constraints: {
+            apps_activation_check: { _constraintName: "apps_activation_check" },
+            apps_idle_timeout_ms_check: { _constraintName: "apps_idle_timeout_ms_check" },
             apps_owner_id_fkey: { _constraintName: "apps_owner_id_fkey" },
             apps_pkey: { _constraintName: "apps_pkey" },
             apps_slug_key: { _constraintName: "apps_slug_key" },
@@ -1707,7 +1805,8 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             public_ipv4: { _columnName: "public_ipv4", _foreignKeys: {} },
-            extra_public_port: { _columnName: "extra_public_port", _foreignKeys: {} }
+            extra_public_port: { _columnName: "extra_public_port", _foreignKeys: {} },
+            instance_state: { _columnName: "instance_state", _foreignKeys: {} }
         },
         _indexes: {
             deployments_app_id_idx: { _indexName: "deployments_app_id_idx" },
@@ -1722,6 +1821,7 @@ export const schema = {
             deployments_artifact_id_fkey: { _constraintName: "deployments_artifact_id_fkey" },
             deployments_config_id_fkey: { _constraintName: "deployments_config_id_fkey" },
             deployments_extra_public_port_check: { _constraintName: "deployments_extra_public_port_check" },
+            deployments_instance_state_check: { _constraintName: "deployments_instance_state_check" },
             deployments_pkey: { _constraintName: "deployments_pkey" },
             deployments_rollback_of_deployment_id_fkey: { _constraintName: "deployments_rollback_of_deployment_id_fkey" },
             deployments_state_check: { _constraintName: "deployments_state_check" }
@@ -1754,7 +1854,10 @@ export const schema = {
             restart_backoff_factor: { _columnName: "restart_backoff_factor", _foreignKeys: {} },
             restart_reset_after_ms: { _columnName: "restart_reset_after_ms", _foreignKeys: {} },
             config_id: { _columnName: "config_id", _foreignKeys: {} },
-            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} }
+            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} },
+            activation: { _columnName: "activation", _foreignKeys: {} },
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} },
+            deployment_state: { _columnName: "deployment_state", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -1869,10 +1972,33 @@ export const schema = {
             slug: { _columnName: "slug", _foreignKeys: {} },
             state: { _columnName: "state", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            activation: { _columnName: "activation", _foreignKeys: {} },
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
+    },
+    profiles: {
+        _relationName: "profiles",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            owner_id: { _columnName: "owner_id", _foreignKeys: { profiles_owner_id_fkey: { _constraintName: "profiles_owner_id_fkey", _references: { _relationName: "user", _columnName: "id" } } } },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            quota_apps_max_count: { _columnName: "quota_apps_max_count", _foreignKeys: {} }
+        },
+        _indexes: {
+            profiles_owner_id_key: { _indexName: "profiles_owner_id_key" },
+            profiles_pkey: { _indexName: "profiles_pkey" }
+        },
+        _constraints: {
+            profiles_owner_id_fkey: { _constraintName: "profiles_owner_id_fkey" },
+            profiles_owner_id_key: { _constraintName: "profiles_owner_id_key" },
+            profiles_pkey: { _constraintName: "profiles_pkey" },
+            profiles_quota_apps_max_count_check: { _constraintName: "profiles_quota_apps_max_count_check" }
+        }
     },
     purgeable_apps: {
         _relationName: "purgeable_apps",
@@ -1895,6 +2021,7 @@ export interface Tables {
     app_configs: IAppConfigsTable;
     app_configs_with_environment: IAppConfigsWithEnvironmentTable;
     app_hostnames: IAppHostnamesTable;
+    app_quotas: IAppQuotasTable;
     app_usage: IAppUsageTable;
     apps: IAppsTable;
     artifacts: IArtifactsTable;
@@ -1908,6 +2035,7 @@ export interface Tables {
     exports: IExportsTable;
     finishable_deletions: IFinishableDeletionsTable;
     live_apps: ILiveAppsTable;
+    profiles: IProfilesTable;
     purgeable_apps: IPurgeableAppsTable;
 }
 

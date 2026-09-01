@@ -96,6 +96,13 @@ resource "aws_instance" "app_host" {
 
   lifecycle {
     ignore_changes = [ami]
+
+    # Checked here rather than in a variable validation, which cannot read a data
+    # source and so cannot ask AWS what a type actually has.
+    precondition {
+      condition     = data.aws_ec2_instance_type.app_host.instance_storage_supported
+      error_message = "app_host_instance_type must name a type with an instance store: /data is mounted from it and ZeroFS does not start without it. The `d` families — m8id, r8id, c8id — have one; m7i and m8i do not."
+    }
   }
 
   tags = {
@@ -116,43 +123,4 @@ resource "aws_eip" "app_host" {
   tags = {
     Name = "${local.resource_name_prefix}-app-host-${count.index}-public-ip"
   }
-}
-
-# ZeroFS's local cache, mounted at /data. Not where tenant data lives — S3 is
-# the source of truth and a host can be rebuilt from it — so the snapshots this
-# picks up are about bringing a replacement host back warm rather than about
-# durability, and prevent_destroy is about a plan never pulling a disk out from
-# under running microVMs.
-#
-# prevent_destroy under count applies to every element, which makes scaling
-# *down* a two-step operation rather than a decrement: lowering
-# var.app_host_count makes Terraform plan a destroy of the highest-index volume,
-# and prevent_destroy turns that into a hard plan error rather than a warning.
-# Drain the host, remove its volume and attachment from state (and delete the
-# volume by hand), then lower the count.
-resource "aws_ebs_volume" "app_host_data" {
-  count = var.app_host_count
-
-  availability_zone = local.availability_zone
-  size              = var.app_host_data_volume_size
-  type              = "gp3"
-  encrypted         = true
-
-  tags = {
-    Name = "${local.resource_name_prefix}-app-host-${count.index}-data"
-    # The DLM snapshot policy targets volumes by this tag.
-    Backup = local.resource_name_prefix
-  }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
-resource "aws_volume_attachment" "app_host_data" {
-  count = var.app_host_count
-
-  device_name = "/dev/sdf"
-  volume_id   = aws_ebs_volume.app_host_data[count.index].id
-  instance_id = aws_instance.app_host[count.index].id
 }

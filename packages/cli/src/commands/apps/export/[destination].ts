@@ -2,8 +2,8 @@ import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { exportApp } from '#lib/exports.ts';
-import { createUi, isInteractive } from '#lib/ui.ts';
+import { EXPORT_OUTPUT, exportApp } from '#lib/exports.ts';
+import { createOutput } from '#lib/output.ts';
 
 export const command = defineCommand('apps export [destination]', {
   description:
@@ -15,14 +15,17 @@ export const command = defineCommand('apps export [destination]', {
     },
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
-  handler: async ({ params, parents, context, print }) => {
+  handler: async ({ params, parents, context, print, rootOptions }) => {
+    const { interactive, ui, emit } = createOutput({
+      output: EXPORT_OUTPUT,
+      print,
+      json: rootOptions.json,
+    });
     const { api } = context;
-    const interactive = isInteractive();
-    const ui = createUi({ print, interactive });
 
     ui.open('nib apps export');
     const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
 
-    await exportApp({ api, slug, destination: params.destination, ui });
+    emit(await exportApp({ api, slug, destination: params.destination, ui }));
   },
 });

@@ -12,10 +12,11 @@ import {
   NOTES,
   NOTHING,
   PAST_THE_ENTRY_LIMIT,
+  PAST_THE_EXPANSION_FLOOR,
   sourceOf,
   streamOf,
 } from '#tests/lib/archive/support/fixtures.ts';
-import { incompressible } from '#tests/support/downloads.ts';
+import { expandsTooFar, incompressible } from '#tests/support/downloads.ts';
 import {
   BLOCK_BYTES,
   gzippedTarballOf,
@@ -237,6 +238,33 @@ describe('a tarball that holds no executable is not one to fetch from', () => {
     });
 
     expect(unwrapped.outcome).toBe('unreadable');
+  });
+
+  /**
+   * The bound on a fetch is on what the url sent, and what a gzip holds is decided after it — so
+   * a download of a few kilobytes otherwise buys a quarter of a gibibyte of decompressing at this
+   * end. Refused where the expansion shows rather than where the size finally does, which is past
+   * everything the bytes were sent to buy.
+   */
+  test('an archive holding far more than the download it arrived as', async () => {
+    const unwrapped = await walk({
+      entries: [
+        { name: 'pad.bin', content: expandsTooFar() },
+        { name: 'my-server', content: BINARY },
+      ],
+      maxSkippedBytes: PAST_THE_EXPANSION_FLOOR,
+    });
+
+    expect(unwrapped.outcome).toBe('expands-too-far');
+  });
+
+  // The ratio says nothing about a small archive: a tarball of one short file is mostly the
+  // padding tar rounds every entry up to, and expands by twenty without holding anything.
+  test('and a tarball too small for that ratio to mean anything is not one of them', async () => {
+    const unwrapped = await walk({ entries: [{ name: 'my-server', content: BINARY }] });
+
+    expect(unwrapped.outcome).toBe('unwrapped');
+    expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
   });
 
   /**

@@ -12,7 +12,7 @@ import type { AppSlot } from '#lib/network/slot.ts';
 import type { ObservedVolume } from '#lib/reconcile/plan.ts';
 import { devicePathFor, ensureDeviceFile, NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
 import { formatOnce } from '#lib/volumes/ext4.ts';
-import { attach, detach, isAttached } from '#lib/volumes/nbd.ts';
+import { detach, isUsable, reattach } from '#lib/volumes/nbd.ts';
 import type { ZerofsFilesystem } from '#lib/volumes/topology.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -63,7 +63,10 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
         if (Option.isNone(sizeBytes)) {
           return Option.none<ObservedVolume>();
         }
-        const attached = Option.isSome(slot) ? yield* isAttached(slot.value.nbdDevicePath) : false;
+        // Whether the device *works*, not whether it has a client: this is what `planVolumes`
+        // reads to decide a volume needs nothing done to it, so a device that lies here is one
+        // nothing ever repairs.
+        const attached = Option.isSome(slot) ? yield* isUsable(slot.value.nbdDevicePath) : false;
         return Option.some<ObservedVolume>({
           volumeId,
           appId,
@@ -94,16 +97,26 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
             // A device file with no app is one this agent has lost its record of. Reporting it
             // under a guessed app would be worse than leaving it out: the control plane reads
             // these to decide a tenant's filesystem is gone.
-            const observed = yield* Effect.forEach(names, (name) =>
-              Effect.gen(function* () {
-                const volumeId = Value.Parse(VolumeIdSchema, name);
-                const appId = appIdByVolume.get(volumeId);
-                if (appId === undefined) {
-                  return Option.none<ObservedVolume>();
-                }
-                const slot = yield* slotFor({ volumeId, appIdByVolume });
-                return yield* observeFile({ filesystem, volumeId, appId, slot });
-              }),
+            //
+            // Concurrently, because what takes any time here is the liveness probe, and the
+            // failure that makes it slow is one ZeroFS having gone — which is every volume on
+            // this filesystem at once. Sequentially that is one probe ceiling per volume before
+            // the host reports anything, and a host that reports nothing is a host the control
+            // plane cannot see. The list is one device file per slot, so it is bounded by the
+            // minors the kernel was given.
+            const observed = yield* Effect.forEach(
+              names,
+              (name) =>
+                Effect.gen(function* () {
+                  const volumeId = Value.Parse(VolumeIdSchema, name);
+                  const appId = appIdByVolume.get(volumeId);
+                  if (appId === undefined) {
+                    return Option.none<ObservedVolume>();
+                  }
+                  const slot = yield* slotFor({ volumeId, appIdByVolume });
+                  return yield* observeFile({ filesystem, volumeId, appId, slot });
+                }),
+              { concurrency: 'unbounded' },
             );
             return Arr.getSomes(observed);
           }),
@@ -119,8 +132,8 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
         sizeBytes: desired.sizeBytes,
       });
 
-      if (!(yield* isAttached(slot.nbdDevicePath))) {
-        yield* attach({
+      if (!(yield* isUsable(slot.nbdDevicePath))) {
+        yield* reattach({
           socketPath: filesystem.nbdSocketPath,
           devicePath: slot.nbdDevicePath,
           volumeId: desired.volumeId,

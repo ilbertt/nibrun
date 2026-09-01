@@ -119,6 +119,73 @@ describe('instances are authoritative', () => {
   });
 });
 
+/**
+ * A release comes up once so that somebody watches it come up, and sleeps from then on. What the
+ * plan has to produce for the sleeping part is what a request arrives to — the slot and the
+ * record — and the microVM after that is left to whoever visits.
+ */
+describe('an app that runs on request comes up once and sleeps after', () => {
+  const onRequest = desiredInstance({ desiredState: 'on-request' });
+
+  // Where the health check happens: a release nothing has ever run is one nothing has ever
+  // checked, and leaving the first boot to a visitor reports a broken binary to them.
+  test('one this host has never served is started rather than put to sleep', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [onRequest] }),
+      observed: observedState(),
+    });
+    expect(plan.instances).toEqual([{ action: 'start', desired: onRequest }]);
+  });
+
+  test('one already sleeping stays that way, however many times this runs', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [onRequest] }),
+      observed: observedState({
+        instances: [observedInstance({ running: false, exited: false })],
+      }),
+    });
+    expect(plan.instances).toEqual([{ action: 'sleep', desired: onRequest }]);
+  });
+
+  // Replaced rather than started: a start keeps the record it found, so the release the host
+  // reports would stay the one this deploy supersedes.
+  test('a deploy onto one that is asleep replaces it rather than leaving it asleep', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [onRequest] }),
+      observed: observedState({
+        instances: [
+          observedInstance({
+            running: false,
+            exited: false,
+            deploymentId: Value.Parse(DeploymentIdSchema, 'dep-0'),
+          }),
+        ],
+      }),
+    });
+    expect(plan.instances).toEqual([{ action: 'replace', desired: onRequest }]);
+  });
+
+  test('one that is up and serving the release it should be is left alone', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [onRequest] }),
+      observed: observedState({ instances: [observedInstance()] }),
+    });
+    expect(plan.instances).toEqual([{ action: 'none', appId: APP_ID }]);
+  });
+
+  // New bytes must not go on being served by the release they replaced, and a deploy is the one
+  // moment somebody is watching — so the replacement comes up rather than waiting to be asked for.
+  test('one that is up on an older release is replaced', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [onRequest] }),
+      observed: observedState({
+        instances: [observedInstance({ deploymentId: Value.Parse(DeploymentIdSchema, 'dep-0') })],
+      }),
+    });
+    expect(plan.instances).toEqual([{ action: 'replace', desired: onRequest }]);
+  });
+});
+
 describe('volumes are not authoritative', () => {
   const absent = desiredVolume({ desiredState: 'absent' });
 

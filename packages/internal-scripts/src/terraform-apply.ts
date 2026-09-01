@@ -59,9 +59,9 @@ const outputs = (await terraform(['output', '-json']).quiet().json()) as Record<
   { value: unknown; sensitive: boolean }
 >;
 
-// Not every output is a string — the per-host volume map is an object, and the
-// step that reads it parses it back — so everything is rendered to a string here
-// and the published object is flat.
+// Not every output is a string — the app host addresses are a list, and the step
+// that reads them parses it back — so everything is rendered to a string here and
+// the published object is flat.
 const render = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));
 
 console.log(green(bold('\n✓ applied')));

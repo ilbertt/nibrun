@@ -16,6 +16,7 @@ import {
   TimestampSchema,
   Value,
 } from '@repo/protocol';
+import { MAX_EXPANSION } from '#lib/archive/walk.ts';
 import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
@@ -39,7 +40,7 @@ import {
 } from '#services/artifacts.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 import { archiveOf } from '#tests/support/archives.ts';
-import { incompressible } from '#tests/support/downloads.ts';
+import { expandsTooFar, incompressible } from '#tests/support/downloads.ts';
 import { gzippedTarballOf } from '#tests/support/tarballs.ts';
 
 // The api refuses anything that is not a Linux executable, so the fixture opens with the ELF
@@ -671,12 +672,61 @@ describe('what the store accepted, this api still has to agree to', () => {
     expect(artifactsRepo.rows.size).toBe(1);
   });
 
-  test('an artifact nobody is waiting on cannot be completed twice', async () => {
+  // A completion slow enough to be sent twice is how the first one comes back, so the repeat
+  // answers with the binary that landed rather than a failure the caller has to redo. One row
+  // either way: a second artifact here would be a second release of the same bytes.
+  test('a completion said twice is the artifact it already stored', async () => {
+    const { service, storage, artifactsRepo } = build();
+    const artifact = await upload({ service, storage });
+
+    const again = await service.completeUpload({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      artifactId: artifact.id,
+    });
+
+    expect(again).toEqual(artifact);
+    expect(artifactsRepo.rows.size).toBe(1);
+    expect(await service.list({ appId: APP_ID, ownerId: OWNER_ID })).toEqual([artifact]);
+  });
+
+  // Both reads land before either write does, so the loser's update matches nothing. It is
+  // looking at the winner's artifact rather than a missing one, and says so.
+  test('two completions racing settle on the one artifact', async () => {
+    const { service, storage, artifactsRepo } = build();
+    const { artifactId } = await service.create({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      filename: UPLOADED_NAME,
+      sizeBytes: BINARY_TEXT.length,
+    });
+    storage.put({
+      objectKey: (storage.signed.at(-1) as { objectKey: ObjectKey }).objectKey,
+      text: BINARY_TEXT,
+    });
+
+    const [first, second] = await Promise.all([
+      service.completeUpload({ appId: APP_ID, ownerId: OWNER_ID, artifactId }),
+      service.completeUpload({ appId: APP_ID, ownerId: OWNER_ID, artifactId }),
+    ]);
+
+    expect(second).toEqual(first);
+    expect(artifactsRepo.rows.size).toBe(1);
+  });
+
+  test("an id naming no upload of the caller's is still not found", async () => {
     const { service, storage } = build();
     const artifact = await upload({ service, storage });
 
     await expect(
-      service.completeUpload({ appId: APP_ID, ownerId: OWNER_ID, artifactId: artifact.id }),
+      service.completeUpload({ appId: APP_ID, ownerId: OTHER_OWNER_ID, artifactId: artifact.id }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      service.completeUpload({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        artifactId: Value.Parse(ArtifactIdSchema, 'artifact-never-created'),
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -1254,6 +1304,32 @@ describe('a binary is fetched from the url it was given', () => {
     expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
     expect(artifact.originalFileName).toBe(FETCHED_NAME);
     expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
+  });
+
+  /**
+   * A bare gzip is handed on rather than walked, so nothing has looked inside it by the time it is
+   * being written — which makes this the one path where a download holding far more than it sent
+   * is found while the store is already taking it. It still has to leave nothing behind.
+   *
+   * Opening with the ELF magic is what makes it worth refusing: without that it is turned away on
+   * its first chunk for not being an executable, and never expands into anything.
+   */
+  test('a download holding far more than it sent is refused and leaves nothing behind', async () => {
+    const { service, sourceRepo, artifactsRepo, storage } = build();
+    sourceRepo.servesBytes({ bytes: gzipSync(expandsTooFar({ asExecutable: true })) });
+
+    const refusal = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: COMPRESSED_URL,
+    });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+    // Said as the expansion rather than as bytes that turned out not to be an executable, which
+    // is what the same download refused at the far end would have come back as.
+    await expect(refusal).rejects.toThrow(String(MAX_EXPANSION));
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
   });
 
   test('a tarball holding nothing executable is refused and leaves nothing behind', async () => {

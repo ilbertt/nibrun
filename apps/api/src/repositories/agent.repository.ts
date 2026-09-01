@@ -108,7 +108,8 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
                  health_check_grace_period_ms, health_check_healthy_threshold,
                  health_check_unhealthy_threshold,
                  restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-                 restart_backoff_factor, restart_reset_after_ms, config_id
+                 restart_backoff_factor, restart_reset_after_ms, config_id,
+                 activation, idle_timeout_ms, deployment_state
           FROM nibrun.desired_deployments
         `,
         this.sql.SelectDesiredVolumes`

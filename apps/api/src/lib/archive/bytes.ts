@@ -7,7 +7,13 @@
 import { Buffer } from 'node:buffer';
 import type { Duplex } from 'node:stream';
 import { Readable } from 'node:stream';
-import { EntryTooLargeError, UnreadableArchiveError } from '#lib/archive/walk.ts';
+import {
+  EntryTooLargeError,
+  EXPANSION_FLOOR_BYTES,
+  ExpandsTooFarError,
+  MAX_EXPANSION,
+  UnreadableArchiveError,
+} from '#lib/archive/walk.ts';
 import { ArtifactTooLargeError } from '#lib/artifact-digest.ts';
 
 /** The stream's first bytes, and the stream itself with them still in front of it. */
@@ -193,6 +199,10 @@ export async function* closing({
 /**
  * A source read through a zlib engine — whatever the compressed bytes turn out to be, including
  * that they were never in that compression at all.
+ *
+ * Held to what it expands to as it expands, rather than to the length of what comes out: the size
+ * an artifact may be is checked at the far end of this, and a source that only fails there has
+ * already been paid for in full.
  */
 export async function* decompressed({
   engine,
@@ -201,19 +211,32 @@ export async function* decompressed({
   engine: Duplex;
   data: AsyncIterable<Uint8Array>;
 }): AsyncGenerator<Uint8Array> {
-  const compressed = Readable.from(data);
+  const sent = counted(data);
+  const compressed = Readable.from(sent);
   // Piping does not carry a failure the other way, and the source failing is the ordinary way
   // this ends: an archive that stopped part way has to stop the inflate reading it.
   compressed.on('error', (failure) => engine.destroy(failure));
   compressed.pipe(engine);
 
+  let produced = 0;
   try {
-    yield* engine;
+    for await (const chunk of engine) {
+      produced += chunk.byteLength;
+      // What has been pulled from the source rather than what the engine has consumed of it,
+      // which is the same number or a larger one — so the expansion this reads is never more than
+      // the expansion there is.
+      if (expandsTooFar({ produced, sent: sent.read() })) {
+        throw new ExpandsTooFarError();
+      }
+      yield chunk;
+    }
   } catch (failure) {
-    // The source running out of what it was allowed to send, and an entry whose length nothing
-    // could read: those are verdicts on the bytes rather than on the archive, and the two this is
-    // not entitled to restate as an archive that ended early.
-    throw failure instanceof ArtifactTooLargeError || failure instanceof EntryTooLargeError
+    // The source running out of what it was allowed to send, an entry whose length nothing could
+    // read, and a source holding more than it sent: those are verdicts on the bytes rather than on
+    // the archive, and the three this is not entitled to restate as an archive that ended early.
+    throw failure instanceof ArtifactTooLargeError ||
+      failure instanceof EntryTooLargeError ||
+      failure instanceof ExpandsTooFarError
       ? failure
       : new UnreadableArchiveError();
   } finally {
@@ -222,6 +245,26 @@ export async function* decompressed({
     // source sitting on a connection nobody is ever going to read again.
     compressed.destroy();
   }
+}
+
+function expandsTooFar({ produced, sent }: { produced: number; sent: number }): boolean {
+  return produced > EXPANSION_FLOOR_BYTES && produced > sent * MAX_EXPANSION;
+}
+
+/** The same bytes, and how many of them have been taken so far. */
+type Counted = AsyncIterable<Uint8Array> & { read(): number };
+
+function counted(data: AsyncIterable<Uint8Array>): Counted {
+  let read = 0;
+
+  async function* passing(): AsyncGenerator<Uint8Array> {
+    for await (const chunk of data) {
+      read += chunk.byteLength;
+      yield chunk;
+    }
+  }
+
+  return { [Symbol.asyncIterator]: passing, read: () => read };
 }
 
 /** Exactly the length the entry said, and an archive that ended early where it is not there. */

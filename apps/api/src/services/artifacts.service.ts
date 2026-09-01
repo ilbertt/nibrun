@@ -11,7 +11,13 @@ import {
   Value,
 } from '@repo/protocol';
 import { unwrapExecutable } from '#lib/archive/unwrap.ts';
-import { MAX_ENTRIES, UnreadableArchiveError, type Unwrapping } from '#lib/archive/walk.ts';
+import {
+  ExpandsTooFarError,
+  MAX_ENTRIES,
+  MAX_EXPANSION,
+  UnreadableArchiveError,
+  type Unwrapping,
+} from '#lib/archive/walk.ts';
 import {
   type ArtifactInspection,
   ArtifactTooLargeError,
@@ -114,6 +120,13 @@ const WALKED_TOO_FAR = `nibrun read as far into that archive as it will — ${MA
 
 const ENTRY_TOO_LARGE =
   'An entry in that archive is longer than its own header can say, which is more than nibrun will read past.';
+
+/**
+ * Said as what the url served rather than as what nibrun refused to do: whoever followed the link
+ * is being told their download is not the shape a release is, and the way past it is the upload
+ * that was always there.
+ */
+const EXPANDS_TOO_FAR = `That download holds more than ${MAX_EXPANSION} times the bytes it sent, which is past anything a release is published as. Upload the binary instead.`;
 
 function unreadableArchive(url: string): string {
   return `The archive ended before the entry it was describing: ${url}`;
@@ -311,7 +324,7 @@ export class ArtifactsService extends Service {
   }): Promise<Artifact> {
     const pending = await this.artifactsRepo.findPending({ appId, artifactId, ownerId });
     if (!pending) {
-      throw new NotFoundError(NO_SUCH_UPLOAD);
+      return await this.alreadyStored({ appId, artifactId, ownerId });
     }
 
     const staged = stagingKey({ appId, artifactId });
@@ -483,6 +496,11 @@ export class ArtifactsService extends Service {
       if (failure instanceof UnreadableArchiveError) {
         throw new BadRequestError(unreadableArchive(url));
       }
+      // A gzip handed on rather than walked is decompressed as it is written, so one holding far
+      // more than it sent is found here rather than by the walk that never looked inside it.
+      if (failure instanceof ExpandsTooFarError) {
+        throw new BadRequestError(EXPANDS_TOO_FAR);
+      }
       throw failure;
     }
   }
@@ -555,12 +573,36 @@ export class ArtifactsService extends Service {
       sizeBytes,
       objectKey,
     });
-    if (!stored) {
-      throw new NotFoundError(NO_SUCH_UPLOAD);
-    }
 
     await this.discard({ objectKey: staged });
 
+    // The write is what settles a race between two completions of the same row: the one whose
+    // update matched nothing is looking at the other's artifact, not at a missing one.
+    return stored ? toArtifact(stored) : await this.alreadyStored({ appId, artifactId, ownerId });
+  }
+
+  /**
+   * A completion for a row that is no longer waiting for one. The digest is what makes a row an
+   * artifact, so a row that has one is an upload that landed, and a caller repeating itself is
+   * asking for the state the row is already in — answered with the artifact rather than refused,
+   * because a retry is how a completion that was slow enough to be sent twice comes back.
+   *
+   * Still not found where no such row is theirs at all: an id naming no upload of the caller's is
+   * the one case where nothing was stored under it.
+   */
+  private async alreadyStored({
+    appId,
+    artifactId,
+    ownerId,
+  }: {
+    appId: AppId;
+    artifactId: ArtifactId;
+    ownerId: OwnerId;
+  }): Promise<Artifact> {
+    const stored = await this.artifactsRepo.findById({ appId, artifactId, ownerId });
+    if (!stored) {
+      throw new NotFoundError(NO_SUCH_UPLOAD);
+    }
     return toArtifact(stored);
   }
 
@@ -704,6 +746,8 @@ async function unwrapped({
       throw new BadRequestError(WALKED_TOO_FAR);
     case 'entry-too-large':
       throw new BadRequestError(ENTRY_TOO_LARGE);
+    case 'expands-too-far':
+      throw new BadRequestError(EXPANDS_TOO_FAR);
     case 'unreadable':
       throw new BadRequestError(unreadableArchive(url));
   }
