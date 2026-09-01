@@ -35,7 +35,7 @@ firewall to open, TLS to renew, and an OS to keep updated.
 
 nibrun is those two things and nothing else: a Firecracker microVM of its own (1 vCPU, 256 MiB)
 and a `data/` directory that survives every redeploy. It answers on an HTTPS subdomain the moment
-it boots, sleeps after five minutes idle, and wakes on the next request in ~114 ms.
+it boots, sleeps after five minutes idle, and wakes on the next request in ~120 ms.
 
 If your app needs to be more than one machine, it has outgrown this — and that is not a roadmap,
 it is the design.
