@@ -135,6 +135,7 @@ export type LifecycleInputs = {
   desiredRunning: boolean;
   onRequest: boolean;
   stopRequested: boolean;
+  snapshotting: boolean;
   startedAtMs?: number;
   nowMs: number;
   /**
@@ -156,19 +157,24 @@ export type LifecycleInputs = {
  * A boot that did happen rules out `idle` whatever the activation policy says: a microVM a
  * request brought up and that then went down unasked is a crash, and calling that idle would
  * wait for another request to find out.
+ *
+ * Unasked is the whole of it, and a snapshot in flight is the one absence that is asked for
+ * without `stopRequested` saying so: the capture ends with the VMM gone and the flag is only
+ * written once it has finished, so a pass landing in between would read a sleep as that crash.
  */
 function evaluateStoppedState({
   desiredRunning,
   onRequest,
   stopRequested,
+  snapshotting,
   startedAtMs,
   current,
 }: Pick<
   LifecycleInputs,
-  'desiredRunning' | 'onRequest' | 'stopRequested' | 'startedAtMs' | 'current'
+  'desiredRunning' | 'onRequest' | 'stopRequested' | 'snapshotting' | 'startedAtMs' | 'current'
 >): InstanceState {
   const down = onRequest && desiredRunning ? 'idle' : 'stopped';
-  if (stopRequested || !desiredRunning) {
+  if (stopRequested || snapshotting || !desiredRunning) {
     return down;
   }
   if (startedAtMs !== undefined) {
@@ -197,6 +203,7 @@ export function evaluateInstanceState({
   desiredRunning,
   onRequest,
   stopRequested,
+  snapshotting,
   startedAtMs,
   nowMs,
   current,
@@ -205,7 +212,14 @@ export function evaluateInstanceState({
     return 'failed';
   }
   if (!unit.active) {
-    return evaluateStoppedState({ desiredRunning, onRequest, stopRequested, startedAtMs, current });
+    return evaluateStoppedState({
+      desiredRunning,
+      onRequest,
+      stopRequested,
+      snapshotting,
+      startedAtMs,
+      current,
+    });
   }
   if (stopRequested) {
     return 'stopping';
