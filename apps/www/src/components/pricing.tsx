@@ -12,10 +12,10 @@ const MACHINE_SPEC = [
 
 const TIERS: { name: string; price: string; detail: string; machine?: string }[] = [
   {
-    name: `Your first ${FREE_APP_LIMIT} apps`,
+    name: `First ${FREE_APP_LIMIT} apps`,
     price: 'Free, forever',
     machine: MACHINE_SPEC,
-    detail: 'No card to start, and no trial clock counting down behind it.',
+    detail: 'No card to start, no trial clock.',
   },
   {
     name: 'Every app after that',
@@ -38,11 +38,7 @@ export function Pricing() {
           <li key={name} className="flex flex-col gap-2 border-border/60 border-t pt-4">
             <span className="text-muted-foreground text-sm">{name}</span>
             <span className="font-medium text-lg text-primary">{price}</span>
-            {machine ? (
-              <span className="text-muted-foreground text-sm">
-                Each app gets: <span className="text-foreground">{machine}</span>
-              </span>
-            ) : null}
+            {machine && <span className="text-foreground">{machine}</span>}
             <span className="text-pretty text-muted-foreground text-sm">{detail}</span>
           </li>
         ))}
