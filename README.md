@@ -1,44 +1,53 @@
 <div align="center">
   <img src="apps/www/public/favicon.svg" alt="nibrun logo" width="128" />
   <h1>nibrun</h1>
-  <p><em>Drop a binary. Get a server.</em></p>
+  <p><em>One-click deployment for any single-binary app.</em></p>
 
 [![runtime](https://img.shields.io/github/package-json/packageManager/ilbertt/nibrun?label=runtime&logo=bun&logoColor=fbf0df&color=fbf0df)](https://bun.com)
 [![skills.sh](https://skills.sh/b/ilbertt/nibrun)](https://skills.sh/ilbertt/nibrun)
 
 </div>
 
-Small apps don't need to scale. They need a machine and a disk.
+Self-hostable projects are great until you have to host them.
 
 ## Why
 
-A compiled binary is already a whole application in one file. Whatever language produced it,
-nothing has to be installed on the other side. The only two things it still needs are somewhere
-to run and somewhere to read and write files.
+PocketBase is one file with a database, auth, file storage and an admin UI in it. So is a lot of
+good open source. Then you go to host it.
 
-For an app that five people use, most of the rest is ceremony:
+The "batteries included" platforms hand you Postgres and object storage but nowhere to run your
+own binary. The ones that will run your code run it as a function, on a filesystem that resets
+between requests, so a SQLite file is gone the moment the request ends. And a VM means ssh, a
+firewall to open, TLS to renew, and an OS to keep updated.
 
 | What it usually gets | What it actually needs |
 | --- | --- |
-| ❌ ~~A container image~~ | ✅ **A machine to run on** |
+| ❌ ~~A container image, around a single file~~ | ✅ **A machine to run on** |
 | ❌ ~~A managed Postgres~~ | ✅ **A disk to write to** |
 | ❌ ~~An object storage bucket~~ | |
-| ❌ ~~A load balancer, for one instance~~ | |
-| ❌ ~~A build pipeline~~ | |
-| ❌ ~~A YAML file you copied~~ | |
+| ❌ ~~A VM to ssh into~~ | |
+| ❌ ~~A firewall to open~~ | |
+| ❌ ~~TLS to renew~~ | |
+| ❌ ~~An OS to keep updated~~ | |
 
 ## What it is
 
-nibrun is those two things and nothing else: a Firecracker microVM of its own, and a `data/`
-directory that survives every redeploy. It answers on an HTTPS subdomain the moment it boots.
+nibrun is those two things and nothing else: a Firecracker microVM of its own (1 vCPU, 256 MiB)
+and a `data/` directory that survives every redeploy. It answers on an HTTPS subdomain the moment
+it boots, sleeps after five minutes idle, and wakes on the next request in ~114 ms.
 
 If your app needs to be more than one machine, it has outgrown this — and that is not a roadmap,
 it is the design.
 
 ## Get started
 
-Create an HTTP app (use the [bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter)
-template) and compile it to a single Linux x86_64 binary. Then deploy it:
+Already a single binary? Deploy it:
+
+**[Deploy PocketBase on nibrun](https://nibrun.com/deploy/pocketbase)** — preconfigured, one click.
+
+Or bring your own. Create an HTTP app (use the
+[bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter) template) and compile
+it to a single Linux x86_64 binary. Then deploy it:
 
 ### For Agents
 

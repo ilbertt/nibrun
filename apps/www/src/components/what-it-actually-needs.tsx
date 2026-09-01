@@ -1,10 +1,11 @@
 const CEREMONY = [
-  'A container image',
+  'A container image, around a single file',
   'A managed Postgres',
   'An object storage bucket',
-  'A load balancer, for one instance',
-  'A build pipeline',
-  'A YAML file you copied',
+  'A VM to ssh into',
+  'A firewall to open',
+  'TLS to renew',
+  'An OS to keep updated',
 ];
 
 const ESSENTIALS = ['A machine to run on', 'A disk to write to'];

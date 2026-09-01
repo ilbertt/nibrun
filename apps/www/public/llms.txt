@@ -1,7 +1,7 @@
 # nibrun
 
-> Drop a binary. Get a server. Each compiled binary gets a microVM of its own, a persistent
-> filesystem, and an HTTPS URL. No Dockerfile, no YAML, no cluster.
+> One-click deployment for any single-binary app. Each compiled binary gets a microVM of its own,
+> a persistent filesystem, and an HTTPS URL. No Dockerfile, no YAML, no cluster.
 
 ## What you get
 
@@ -32,9 +32,9 @@ listen on it, on `0.0.0.0`.
 ## The tradeoffs
 
 One microVM per app: no horizontal scaling, no load balancing. A deploy stops the old VM before
-starting the new one, so it is a few seconds of downtime rather than blue/green. The disk is local
-and unreplicated, so `nib apps export` is the backup. It fits a single-binary app that owns its own
-state; it does not fit anything that has to be several machines.
+starting the new one, so it is a few seconds of downtime rather than blue/green. An app sleeps
+after five minutes idle and wakes on the next request in ~114 ms. It fits a single-binary app that
+owns its own state; it does not fit anything that has to be several machines.
 
 ## Links
 
