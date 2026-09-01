@@ -81,6 +81,12 @@
         "vite": "catalog:",
       },
     },
+    "apps/justfuckingusenibrun": {
+      "name": "@repo/justfuckingusenibrun",
+      "devDependencies": {
+        "wrangler": "^4.123.0",
+      },
+    },
     "apps/runtime": {
       "name": "@repo/runtime",
     },
@@ -144,7 +150,7 @@
     },
     "packages/cli": {
       "name": "@repo/cli",
-      "version": "2026.8.29-2",
+      "version": "2026.8.31-3",
       "dependencies": {
         "@clack/prompts": "^1.7.0",
         "@parshjs/core": "^0.0.10",
@@ -749,6 +755,8 @@
     "@repo/deploy-link": ["@repo/deploy-link@workspace:packages/deploy-link"],
 
     "@repo/internal-scripts": ["@repo/internal-scripts@workspace:packages/internal-scripts"],
+
+    "@repo/justfuckingusenibrun": ["@repo/justfuckingusenibrun@workspace:apps/justfuckingusenibrun"],
 
     "@repo/pack-utils": ["@repo/pack-utils@workspace:packages/pack-utils"],
 

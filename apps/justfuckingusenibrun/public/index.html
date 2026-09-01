@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Just fucking use nibrun</title>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta
+      name="description"
+      content="You compiled a binary. It is already the whole app. Stop building it a datacenter."
+    >
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:site_name" content="Just fucking use nibrun">
+    <meta property="og:title" content="Just fucking use nibrun">
+    <meta
+      property="og:description"
+      content="You compiled a binary. It is already the whole app. Stop building it a datacenter."
+    >
+    <meta property="og:url" content="https://justfuckingusenibrun.com">
+    <meta property="og:type" content="website">
+
+    <meta name="twitter:title" content="Just fucking use nibrun">
+    <meta
+      name="twitter:description"
+      content="You compiled a binary. It is already the whole app. Stop building it a datacenter."
+    >
+    <meta name="twitter:card" content="summary">
+
+    <link rel="canonical" href="https://justfuckingusenibrun.com">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  </head>
+  <body>
+    <header>
+      <h1>Just fucking use nibrun</h1>
+
+      <p>
+        Congratulations, champ. You compiled a binary. One file. It has your
+        HTTP server in it, your templates in it, your SQLite driver in it. It
+        runs on a laptop with the wifi off. And then you looked at that one
+        perfect file and thought: <em>you know what this needs? A cluster.</em>
+      </p>
+
+      <p>
+        So now there's a Dockerfile that installs a runtime your binary doesn't
+        fucking need. There's a registry. There's a YAML file you copied from a
+        blog post in 2021 and have never once understood. There's a load
+        balancer, balancing load across the one instance you have. There's a
+        managed Postgres with a connection pooler in front of it, for the four
+        hundred rows your app will ever hold. Your app has eleven users,
+        asshole. Six of them are you, logged in on different browsers.
+      </p>
+    </header>
+
+    <section>
+      <h2>Your app needs two things. You are buying nine.</h2>
+
+      <p>
+        Here is the entire list of what a compiled binary requires to be a real,
+        working, on-the-internet application:
+      </p>
+
+      <ol>
+        <li>Somewhere to run.</li>
+        <li>Somewhere to put files.</li>
+      </ol>
+
+      <p>
+        That's it. That's the list. Everything else on your invoice is ceremony
+        you performed to feel like a Serious Engineer. You didn't need object
+        storage, you needed a directory. You didn't need a build pipeline, you
+        have a binary — the build already fucking happened. You didn't need
+        horizontal scaling, you needed to stop lying to yourself about the
+        traffic.
+      </p>
+    </section>
+
+    <section>
+      <h2>So here's the whole product, you overthinking bastard</h2>
+
+      <p>
+        Drop the binary. Get a machine and a disk. Done. No, there is no step
+        three. Stop looking for step three.
+      </p>
+
+      <ul>
+        <li>
+          <strong>A microVM of its very own.</strong>
+          A real Firecracker machine, 1 vCPU and 256 MiB, and nothing else lives
+          in it. Not a container squatting next to forty strangers. Your app,
+          alone, like it wanted.
+        </li>
+        <li>
+          <strong
+            >A <code>data/</code> directory that doesn't fucking vanish.</strong
+          >
+          8 GiB. Write a SQLite file to it. Write uploads to it. Write a text
+          file called
+          <code>notes.txt</code>
+          to it. It survives every redeploy, because it's a disk, and that is
+          what disks have always done.
+        </li>
+        <li>
+          <strong>An HTTPS URL the moment it boots.</strong>
+          <code>https://your-app.nibrun.app</code>. No certificate ritual. No
+          DNS spelunking. No ingress controller with opinions.
+        </li>
+        <li>
+          <strong>Your shit back, whenever you want it.</strong>
+          One command and you get a tarball: the exact binary you uploaded, the
+          entire disk as it sits, and the env vars it ran with. There is no
+          managed database to migrate off, because there was never a managed
+          database.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>The deploy, in full, in its entirety</h2>
+
+      <pre><code>curl -fsSL https://nibrun.com/install.sh | sh
+nib login
+nib run ./my-server</code></pre>
+
+      <p>
+        Read it again. That's the deploy. Not the quickstart, not the toy
+        example, not the "simplified for illustration" version — that is the
+        actual thing you type to put your actual app on the actual internet.
+        Shipping a new version is the same command again.
+      </p>
+
+      <p>
+        Can't be bothered to open a terminal? Fine, princess. Drag the binary
+        onto
+        <a href="https://app.nibrun.com">app.nibrun.com</a>
+        with your mouse, like an animal. It works exactly the same.
+      </p>
+
+      <p>
+        All your binary has to do in return: be Linux x86_64, and listen on the
+        port we hand you in <code>PORT</code>, on <code>0.0.0.0</code>. That's
+        the whole contract. It fits in a sentence because it <em>is</em> one.
+      </p>
+    </section>
+
+    <section>
+      <h2>
+        When not to use it, since apparently we're the only honest ones here
+      </h2>
+
+      <p>
+        One app, one machine. That means no horizontal scaling and no blue/green
+        — a deploy stops the old VM and starts the new one, so there's a few
+        seconds where your eleven users see nothing. The disk is local and
+        unreplicated, so the export <em>is</em> the backup, and you should
+        actually run it.
+      </p>
+
+      <p>
+        If your app genuinely has to be several machines at once, then
+        congratulations, you have outgrown this, and you should go back to your
+        YAML with our blessing. That's not a missing feature we're shipping next
+        quarter. That's the fucking design. Small apps don't need to scale. They
+        need a machine and a disk.
+      </p>
+    </section>
+
+    <footer>
+      <hr>
+      <p>
+        <small>
+          <a href="https://nibrun.com">nibrun.com</a>
+          &middot;
+          <a href="https://app.nibrun.com">dashboard</a>
+          &middot;
+          <a href="https://github.com/ilbertt/nibrun">source</a>
+        </small>
+      </p>
+      <p>
+        <small>
+          Yes, this page is raw HTML with no stylesheet. It loaded before you
+          finished reading the headline. Think about that for a second.
+        </small>
+      </p>
+      <p>
+        <small>
+          One of many &rarr;
+          <a href="https://justfuckinguse.com" rel="noopener noreferrer"
+            >JUST FUCKING USE&hellip;</a
+          >
+        </small>
+      </p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "justfuckingusenibrun",
+  "compatibility_date": "2026-08-18",
+  "assets": {
+    "directory": "./public"
+  },
+  "env": {
+    // As in nibrun-www: without this, wrangler would derive `justfuckingusenibrun-preview` and
+    // deploy a second worker instead of uploading a version of this one.
+    "preview": {
+      "name": "justfuckingusenibrun"
+    }
+  }
+}

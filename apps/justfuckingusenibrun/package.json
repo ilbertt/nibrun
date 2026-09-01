@@ -1,0 +1,13 @@
+{
+  "name": "@repo/justfuckingusenibrun",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 3003",
+    "cf:deploy": "wrangler deploy",
+    "cf:deploy:preview": "wrangler versions upload"
+  },
+  "devDependencies": {
+    "wrangler": "^4.123.0"
+  }
+}
