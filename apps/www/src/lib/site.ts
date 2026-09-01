@@ -8,6 +8,6 @@ export function pageTitle(name: string): string {
 }
 
 export const SITE_DESCRIPTION =
-  'Upload a compiled binary and it gets a Firecracker microVM of its own, 8 GiB of persistent disk, and an HTTPS URL. No Dockerfile, no YAML, no database to provision, and no machine of yours to keep patched.';
+  "Small apps don't need to scale. Drop a compiled binary and get a microVM of its own, a persistent filesystem, and an HTTPS URL. Export the binary and the whole disk whenever you want.";
 
 export const REPO_URL = 'https://github.com/ilbertt/nibrun';
