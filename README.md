@@ -42,13 +42,19 @@ it boots, sleeps after five minutes idle, and wakes on the next request in ~120 
 If your app needs to be more than one machine, it has outgrown this — and that is not a roadmap,
 it is the design.
 
-## Get started
+## Preconfigured deployments
 
-Already a single binary? Deploy it:
+Open source that already ships as a single binary. One click, nothing to fill in:
 
-**[Deploy PocketBase on nibrun](https://nibrun.com/deploy/pocketbase)** — preconfigured, one click.
+- **[PocketBase](https://nibrun.com/deploy/pocketbase)** — a database, auth, file storage and an
+  admin UI, in one file.
+- **[Sharkord](https://nibrun.com/deploy/sharkord)** — a self-hosted chat server with voice,
+  video and screen sharing.
+- **[Boop](https://nibrun.com/deploy/boop)** — a self-hosted notification inbox for your own apps.
 
-Or bring your own. Create an HTTP app (use the
+## Deploy your own app
+
+Create an HTTP app (use the
 [bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter) template) and compile
 it to a single Linux x86_64 binary. Then deploy it:
 
