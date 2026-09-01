@@ -1,10 +1,7 @@
 import type { DeployLink } from '@repo/deploy-link';
 import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
 
-/**
- * The root README names these one by one, and nothing here reaches it: a preset added, renamed or
- * dropped is carried over by hand or not at all.
- */
+// Update the root README when changing any entry here.
 export const DEPLOY_PRESETS = {
   boop: {
     name: 'boop',
