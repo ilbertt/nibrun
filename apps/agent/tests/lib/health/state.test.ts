@@ -84,6 +84,7 @@ function evaluate({
   stopRequested = false,
   desiredRunning = true,
   onRequest = false,
+  snapshotting = false,
   startedAtMs = STARTED_AT_MS as number | undefined,
 }: {
   unit: UnitStatus;
@@ -93,6 +94,7 @@ function evaluate({
   stopRequested?: boolean;
   desiredRunning?: boolean;
   onRequest?: boolean;
+  snapshotting?: boolean;
   startedAtMs?: number | undefined;
 }) {
   return evaluateInstanceState({
@@ -102,6 +104,7 @@ function evaluate({
     desiredRunning,
     onRequest,
     stopRequested,
+    snapshotting,
     ...(startedAtMs === undefined ? {} : { startedAtMs }),
     nowMs,
   });
@@ -257,6 +260,7 @@ describe('what the VM itself is doing', () => {
         desiredRunning: true,
         onRequest: false,
         stopRequested: false,
+        snapshotting: false,
         nowMs: STARTED_AT_MS,
       }),
     ).toBe('pending');
@@ -271,6 +275,7 @@ describe('what the VM itself is doing', () => {
         desiredRunning: true,
         onRequest: false,
         stopRequested: false,
+        snapshotting: false,
         nowMs: STARTED_AT_MS,
       }),
     ).toBe('pending');
@@ -291,6 +296,7 @@ describe('what the VM itself is doing', () => {
           desiredRunning: true,
           onRequest: true,
           stopRequested: false,
+          snapshotting: false,
           nowMs: STARTED_AT_MS,
         }),
       ).toBe('idle');
@@ -317,6 +323,24 @@ describe('what the VM itself is doing', () => {
           nowMs: PAST_GRACE_MS,
         }),
       ).toBe('failed');
+    });
+
+    /**
+     * The snapshot is what takes the VMM down, and `stopRequested` is only written once it has
+     * been taken — so between the two the microVM is gone with nothing yet saying it was asked
+     * for. Reading that as a crash fails the deployment, which drops the app out of desired
+     * state and takes its hostnames off the proxy with it.
+     */
+    test('and one whose snapshot is still being taken is idle, not failed', () => {
+      expect(
+        evaluate({
+          unit: exited,
+          tracker: initialTracker(),
+          onRequest: true,
+          snapshotting: true,
+          nowMs: PAST_GRACE_MS,
+        }),
+      ).toBe('idle');
     });
 
     test('and a suspended one is stopped: the owner asked for that, not the request pattern', () => {

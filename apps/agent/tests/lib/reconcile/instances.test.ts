@@ -12,7 +12,13 @@ import { VmManager } from '#services/vm-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
-import { APP_ID, DEPLOYMENT_ID, desiredInstance, instanceRecord } from '#tests/support/fixtures.ts';
+import {
+  APP_ID,
+  DEPLOYMENT_ID,
+  desiredInstance,
+  instanceRecord,
+  OBSERVED_AT,
+} from '#tests/support/fixtures.ts';
 import { platform, provided } from '#tests/support/run.ts';
 
 /** What `systemctl show` says about a microVM that is up, which is all a pass reads off it. */
@@ -61,6 +67,47 @@ function passHeldOpen() {
 }
 
 const recordOf = Effect.map(AgentState.snapshot, (current) => current.records.get(APP_ID));
+
+/** `systemctl show` answering the same way for every unit a pass asks about. */
+const reporting = (unit: string) =>
+  Layer.succeed(CommandRunner, CommandRunner.make({ run: () => succeeding({ stdout: unit }) }));
+
+/**
+ * The window from the far side, which is the outage this closes: the capture has taken the VMM
+ * down and `stopRequested` is not written until it returns, so a pass landing in between finds a
+ * microVM that is gone with nothing yet saying it was asked for. Calling that failed drops the
+ * app out of desired state, and its hostnames off the proxy with it.
+ */
+describe('a pass that lands while a snapshot is being taken', () => {
+  test('reads the microVM as asleep rather than crashed', () =>
+    run(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(
+          instanceRecord({ onRequest: true, state: 'running', startedAt: OBSERVED_AT }),
+        );
+        yield* AgentState.markSnapshotting({ appId: APP_ID, active: true });
+
+        yield* refreshStates.pipe(Effect.provide(reporting(INACTIVE_UNIT)));
+
+        const record = yield* recordOf;
+        expect(record?.state).toBe('idle');
+        expect(record?.message).toBeUndefined();
+      }),
+    ));
+
+  test('and fails it once the snapshot is no longer in flight', () =>
+    run(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(
+          instanceRecord({ onRequest: true, state: 'running', startedAt: OBSERVED_AT }),
+        );
+
+        yield* refreshStates.pipe(Effect.provide(reporting(INACTIVE_UNIT)));
+
+        expect((yield* recordOf)?.state).toBe('failed');
+      }),
+    ));
+});
 
 describe('a settle writes back only what it measured', () => {
   test('a start that lands mid-pass keeps the stop it cleared', () =>
@@ -351,6 +398,41 @@ describe('an app that has gone quiet is put down where it can be picked up', () 
         yield* suspend;
 
         expect((yield* recordOf)?.state).toBe('running');
+      }),
+    );
+  });
+
+  /**
+   * The mark is what the health loop reads while the capture is in flight, so a sleep that has
+   * returned must leave none behind: an app still marked when nothing is snapshotting it is one
+   * whose next real crash reads as a sleep and is never failed at all.
+   */
+  test('the snapshot mark is not left behind, however the sleep ended', () => {
+    const vms = recordingVms();
+    return withMicroVmDown(vms)(
+      Effect.gen(function* () {
+        yield* (yield* SlotAllocator).allocate(APP_ID);
+        yield* AgentState.putRecord(instanceRecord({ onRequest: true, state: 'running' }));
+
+        yield* suspend;
+
+        expect((yield* AgentState.snapshot).snapshotting.has(APP_ID)).toBe(false);
+      }),
+    );
+  });
+
+  test('and a refusal clears it too, though it never took one', () => {
+    const vms = recordingVms({
+      onSleep: new SleepRefused({ reason: 'it has already been asked to stop' }),
+    });
+    return withMicroVmDown(vms)(
+      Effect.gen(function* () {
+        yield* (yield* SlotAllocator).allocate(APP_ID);
+        yield* AgentState.putRecord(instanceRecord({ onRequest: true, state: 'running' }));
+
+        yield* suspend;
+
+        expect((yield* AgentState.snapshot).snapshotting.has(APP_ID)).toBe(false);
       }),
     );
   });

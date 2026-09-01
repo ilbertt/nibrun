@@ -137,6 +137,12 @@ export const stopInstance = Effect.fn('stopInstance')(function* ({
  * microVM that is gone is asleep rather than crashed, and what keeps the boot that follows a
  * discarded snapshot from being counted as a restart.
  *
+ * Which leaves the capture itself, at the end of which the VMM is gone and the flag is not yet
+ * written. `markSnapshotting` spans exactly that, because the health loop runs on its own tick
+ * and one landing in there would read the sleep as the crash `stopRequested` exists to rule out.
+ * It is cleared however this ends: a refusal leaves the microVM up, and an app marked as being
+ * captured when nothing is capturing it is one whose next real crash reads as a sleep.
+ *
  * The state stays `running` for the whole of it rather than going to `stopping` the way a stop
  * does. That keeps the forward rule pointing at the guest while it is being captured, which is
  * what the requests still arriving want: withdrawing it would hand them to the activator, which
@@ -164,6 +170,7 @@ export const suspendInstance = Effect.fn('suspendInstance')(function* ({
     return yield* stopInstance({ appId, reason });
   }
 
+  yield* AgentState.markSnapshotting({ appId, active: true });
   yield* settleAndSleep({ appId, deploymentId, slot: slot.value, reason }).pipe(
     Effect.andThen(
       AgentState.updateRecord({
@@ -191,6 +198,7 @@ export const suspendInstance = Effect.fn('suspendInstance')(function* ({
         Effect.annotateLogs({ appId, reason }),
       ),
     ),
+    Effect.ensuring(AgentState.markSnapshotting({ appId, active: false })),
   );
 });
 
@@ -559,11 +567,13 @@ function settle({
   record,
   status,
   due,
+  snapshotting,
   nowMs,
 }: {
   record: InstanceRecord;
   status: UnitStatus;
   due: boolean;
+  snapshotting: boolean;
   nowMs: number;
 }) {
   return Effect.gen(function* () {
@@ -574,6 +584,7 @@ function settle({
       desiredRunning: record.desiredRunning,
       onRequest: record.onRequest,
       stopRequested: record.stopRequested,
+      snapshotting,
       ...graceInputs({ record, nowMs }),
     });
 
@@ -623,6 +634,7 @@ export const refreshStates = Effect.gen(function* () {
         record,
         status: statuses.get(record.appId) ?? UNKNOWN_UNIT,
         due: nowMs >= (current.nextProbeAtMs.get(record.appId) ?? 0),
+        snapshotting: current.snapshotting.has(record.appId),
         nowMs,
       }),
     { discard: true },
