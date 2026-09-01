@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_HEALTH_CHECK, DEFAULT_HTTP_PORT, type HealthCheck } from '@repo/protocol';
+import {
+  DEFAULT_HEALTH_CHECK,
+  DEFAULT_HTTP_PORT,
+  type HealthCheck,
+  type InstanceState,
+} from '@repo/protocol';
 import {
   applyProbe,
   describeInstanceFailure,
@@ -86,6 +91,7 @@ function evaluate({
   onRequest = false,
   snapshotting = false,
   startedAtMs = STARTED_AT_MS as number | undefined,
+  current = 'pending' as InstanceState,
 }: {
   unit: UnitStatus;
   tracker: Tracker;
@@ -96,6 +102,7 @@ function evaluate({
   onRequest?: boolean;
   snapshotting?: boolean;
   startedAtMs?: number | undefined;
+  current?: InstanceState;
 }) {
   return evaluateInstanceState({
     unit,
@@ -105,6 +112,7 @@ function evaluate({
     onRequest,
     stopRequested,
     snapshotting,
+    current,
     ...(startedAtMs === undefined ? {} : { startedAtMs }),
     nowMs,
   });
@@ -261,6 +269,7 @@ describe('what the VM itself is doing', () => {
         onRequest: false,
         stopRequested: false,
         snapshotting: false,
+        current: 'pending',
         nowMs: STARTED_AT_MS,
       }),
     ).toBe('pending');
@@ -276,6 +285,7 @@ describe('what the VM itself is doing', () => {
         onRequest: false,
         stopRequested: false,
         snapshotting: false,
+        current: 'pending',
         nowMs: STARTED_AT_MS,
       }),
     ).toBe('pending');
@@ -297,9 +307,32 @@ describe('what the VM itself is doing', () => {
           onRequest: true,
           stopRequested: false,
           snapshotting: false,
+          current: 'idle',
           nowMs: STARTED_AT_MS,
         }),
       ).toBe('idle');
+    });
+
+    /**
+     * The two look identical from the unit alone — an `on-request` instance with no microVM — and
+     * the record is what tells them apart. Calling a boot `idle` stops the startup deadline, turns
+     * the deployment `running` before a probe has run, and leaves the memory it is about to take
+     * out of what the host counts as committed.
+     */
+    test('but one whose start is still in flight is pending, not idle', () => {
+      expect(
+        evaluateInstanceState({
+          unit: absent,
+          tracker: initialTracker(),
+          healthCheck: check(),
+          desiredRunning: true,
+          onRequest: true,
+          stopRequested: false,
+          snapshotting: false,
+          current: 'pending',
+          nowMs: STARTED_AT_MS,
+        }),
+      ).toBe('pending');
     });
 
     test('one stopped for being quiet is idle', () => {

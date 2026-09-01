@@ -1,8 +1,10 @@
 import { statfs } from 'node:fs/promises';
 import { availableParallelism, totalmem } from 'node:os';
+import type { FileSystem } from '@effect/platform';
 import type { HostCapacity, InstanceResources, InstanceState } from '@repo/protocol';
-import { Effect } from 'effect';
+import { Effect, Either } from 'effect';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
+import { readCacheMemoryBytes } from '#lib/volumes/zerofs.ts';
 
 const BYTES_PER_MIB = 1_048_576;
 const NONE = 0;
@@ -18,6 +20,71 @@ const UNMEASURED: FilesystemSpace = { totalBytes: NONE, availableBytes: NONE };
 export function readHostMemoryMib(): number {
   return Math.floor(totalmem() / BYTES_PER_MIB);
 }
+
+/**
+ * Host memory that is nobody's guest to take: this agent, Caddy, journald, and what systemd and
+ * the SSM agent hold — about 420 MiB together on a live app host.
+ *
+ * Not the Firecracker processes, which is the tempting mistake to make here. A VMM's resident
+ * size *is* its guest's memory rather than an overhead on top of it — four 256 MiB guests measure
+ * between 216 and 257 MiB each — so counting them would reserve every guest a second time.
+ *
+ * Headroom over that reading rather than the reading itself, because this is a floor and the
+ * things behind it grow. What it buys is that the host stays answerable once it is full: an agent
+ * that has sold the last of its memory to tenants cannot report, cannot converge, and cannot be
+ * asked to give any of it back.
+ */
+const HOST_BASELINE_MIB = 640;
+
+/**
+ * What ZeroFS is assumed to want when its own config cannot be read, which is the number that
+ * config holds today.
+ *
+ * Guessed rather than raised into a failure, because the two ways of being wrong are not
+ * symmetrical: a host that reports no capacity is one nothing is ever placed on, where a host
+ * that reports memory it does not have kills a tenant — and, ZeroFS being the disk every app on
+ * the host runs through, most likely several of them.
+ */
+const ASSUMED_ZEROFS_CACHE_MIB = 2048;
+
+/**
+ * The memory a guest may actually be given, which is the host's total less what is already spoken
+ * for. ZeroFS fills its cache lazily, exactly as it fills the disk one, so free memory on a host
+ * that has just booted is not memory that is going spare.
+ *
+ * **The one number both the report and a wake are made on.** They have to agree by construction
+ * rather than by coincidence: a host that refused wakes by one measure while telling the control
+ * plane it had room by another would go on being placed onto for as long as it went on refusing.
+ */
+export function guestMemoryMib({
+  hostMemoryMib,
+  zerofsCacheMib,
+}: {
+  hostMemoryMib: number;
+  zerofsCacheMib: number;
+}): number {
+  return Math.max(hostMemoryMib - zerofsCacheMib - HOST_BASELINE_MIB, NONE);
+}
+
+export const readGuestMemoryMib = Effect.fn('capacity.readGuestMemoryMib')(function* (
+  zerofsConfigFile: string,
+) {
+  const configured = yield* Effect.either(readCacheMemoryBytes(zerofsConfigFile));
+  if (Either.isLeft(configured)) {
+    yield* Effect.logWarning('zerofs memory cache could not be read').pipe(
+      Effect.annotateLogs({
+        assumedMib: ASSUMED_ZEROFS_CACHE_MIB,
+        reason: configured.left.message,
+      }),
+    );
+  }
+  return guestMemoryMib({
+    hostMemoryMib: readHostMemoryMib(),
+    zerofsCacheMib: Either.isLeft(configured)
+      ? ASSUMED_ZEROFS_CACHE_MIB
+      : Math.ceil(configured.right / BYTES_PER_MIB),
+  });
+});
 
 /**
  * Fails where the path cannot be stat'd, which a report can shrug off and a decision about what
@@ -39,12 +106,28 @@ const spaceOrUnmeasured = (directory: string) =>
 export const readAvailableCacheBytes = (cacheDir: string) =>
   Effect.map(spaceOrUnmeasured(cacheDir), (space) => space.availableBytes);
 
-export const readHostCapacity = (cacheDir: string): Effect.Effect<HostCapacity> =>
-  Effect.map(spaceOrUnmeasured(cacheDir), (space) => ({
-    vcpuCount: availableParallelism(),
-    memoryMib: readHostMemoryMib(),
-    cacheBytes: space.totalBytes,
-  }));
+/**
+ * `memoryMib` is what may be given to guests rather than what the instance was sold with — the
+ * host's own needs are not capacity, and reporting them as capacity is what fills a host past
+ * what it can carry.
+ */
+export const readHostCapacity = ({
+  cacheDir,
+  zerofsConfigFile,
+}: {
+  cacheDir: string;
+  zerofsConfigFile: string;
+}): Effect.Effect<HostCapacity, never, FileSystem.FileSystem> =>
+  Effect.all({
+    space: spaceOrUnmeasured(cacheDir),
+    memoryMib: readGuestMemoryMib(zerofsConfigFile),
+  }).pipe(
+    Effect.map(({ space, memoryMib }) => ({
+      vcpuCount: availableParallelism(),
+      memoryMib,
+      cacheBytes: space.totalBytes,
+    })),
+  );
 
 /**
  * The states in which an app has no microVM, and so is holding nothing of the host.

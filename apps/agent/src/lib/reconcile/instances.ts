@@ -585,6 +585,7 @@ function settle({
       onRequest: record.onRequest,
       stopRequested: record.stopRequested,
       snapshotting,
+      current: record.state,
       ...graceInputs({ record, nowMs }),
     });
 

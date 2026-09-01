@@ -138,6 +138,12 @@ export type LifecycleInputs = {
   snapshotting: boolean;
   startedAtMs?: number;
   nowMs: number;
+  /**
+   * What the record already says, which is the only thing that tells a start in flight from an
+   * app waiting to be asked for: both are `on-request` instances with no microVM behind them yet,
+   * and the planner has already decided which by writing `pending` or `idle`.
+   */
+  current: InstanceState;
 };
 
 /**
@@ -162,9 +168,10 @@ function evaluateStoppedState({
   stopRequested,
   snapshotting,
   startedAtMs,
+  current,
 }: Pick<
   LifecycleInputs,
-  'desiredRunning' | 'onRequest' | 'stopRequested' | 'snapshotting' | 'startedAtMs'
+  'desiredRunning' | 'onRequest' | 'stopRequested' | 'snapshotting' | 'startedAtMs' | 'current'
 >): InstanceState {
   const down = onRequest && desiredRunning ? 'idle' : 'stopped';
   if (stopRequested || snapshotting || !desiredRunning) {
@@ -173,7 +180,13 @@ function evaluateStoppedState({
   if (startedAtMs !== undefined) {
     return 'failed';
   }
-  return onRequest ? down : 'pending';
+  // A start this agent asked for and has not seen through is not an app waiting to be asked for.
+  // `startInstance` writes `pending` before a boot that has an artifact to fetch, `sleepInstance`
+  // writes `idle`, and until the unit is up those two look identical from here. Reading a release
+  // that is coming up as `idle` tells the control plane it is as up as it will ever get: the
+  // startup deadline stops, the deployment turns `running` before a probe has run, and the memory
+  // the boot is about to take is left out of what this host counts as committed.
+  return onRequest && current !== 'pending' ? down : 'pending';
 }
 
 /**
@@ -193,6 +206,7 @@ export function evaluateInstanceState({
   snapshotting,
   startedAtMs,
   nowMs,
+  current,
 }: LifecycleInputs): InstanceState {
   if (unit.failed) {
     return 'failed';
@@ -204,6 +218,7 @@ export function evaluateInstanceState({
       stopRequested,
       snapshotting,
       startedAtMs,
+      current,
     });
   }
   if (stopRequested) {
