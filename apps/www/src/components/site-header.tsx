@@ -11,14 +11,19 @@ export function SiteHeader() {
   return (
     <header className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-1 pt-5 pb-16 sm:grid-cols-[1fr_auto_1fr]">
       <HomeLink />
-      <div className="flex items-center">
-        <DashboardLink />
-      </div>
-      <div className="flex items-center justify-end gap-1">
-        <GithubStarLink />
+      <div className="flex items-center justify-center gap-1">
+        {/* Routed to the page rather than the fragment alone: this header is on the blog too, and
+            a bare `#pricing` there is a link to nothing. */}
+        <Button variant="ghost" size="sm" render={<Link to="/" hash="pricing" />}>
+          Pricing
+        </Button>
         <Button variant="ghost" size="sm" render={<Link to="/blog" />}>
           Blog
         </Button>
+      </div>
+      <div className="flex items-center justify-end gap-1">
+        <GithubStarLink />
+        <DashboardLink />
       </div>
     </header>
   );
