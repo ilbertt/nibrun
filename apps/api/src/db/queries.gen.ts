@@ -1380,6 +1380,24 @@ export interface ILiveAppsTable {
     constraints: keyof (typeof schema)["live_apps"]["_constraints"];
 }
 
+/** Columns of `profiles`. */
+export interface IProfilesColumns {
+    id: string;
+    owner_id: import("@repo/protocol").OwnerId;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+    quota_apps_max_count: number;
+}
+
+/** Schema of `profiles`. */
+export interface IProfilesTable {
+    columns: IProfilesColumns;
+    relationType: (typeof schema)["profiles"]["_relationType"];
+    indexes: keyof (typeof schema)["profiles"]["_indexes"];
+    constraints: keyof (typeof schema)["profiles"]["_constraints"];
+}
+
 /** Columns of `purgeable_apps`. */
 export interface IPurgeableAppsColumns {
     app_id: string | null;
@@ -1915,6 +1933,27 @@ export const schema = {
         _indexes: {},
         _constraints: {}
     },
+    profiles: {
+        _relationName: "profiles",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            owner_id: { _columnName: "owner_id", _foreignKeys: { profiles_owner_id_fkey: { _constraintName: "profiles_owner_id_fkey", _references: { _relationName: "user", _columnName: "id" } } } },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            quota_apps_max_count: { _columnName: "quota_apps_max_count", _foreignKeys: {} }
+        },
+        _indexes: {
+            profiles_owner_id_key: { _indexName: "profiles_owner_id_key" },
+            profiles_pkey: { _indexName: "profiles_pkey" }
+        },
+        _constraints: {
+            profiles_owner_id_fkey: { _constraintName: "profiles_owner_id_fkey" },
+            profiles_owner_id_key: { _constraintName: "profiles_owner_id_key" },
+            profiles_pkey: { _constraintName: "profiles_pkey" },
+            profiles_quota_apps_max_count_check: { _constraintName: "profiles_quota_apps_max_count_check" }
+        }
+    },
     purgeable_apps: {
         _relationName: "purgeable_apps",
         _relationType: "view",
@@ -1949,6 +1988,7 @@ export interface Tables {
     exports: IExportsTable;
     finishable_deletions: IFinishableDeletionsTable;
     live_apps: ILiveAppsTable;
+    profiles: IProfilesTable;
     purgeable_apps: IPurgeableAppsTable;
 }
 
