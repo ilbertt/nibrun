@@ -41,6 +41,10 @@ import {
   type BinarySourceRepositoryContract,
   InterruptedSourceError,
 } from '#repositories/binary-source.repository.ts';
+import type {
+  CachedBinariesRepositoryContract,
+  CachedBinaryRow,
+} from '#repositories/cached-binaries.repository.ts';
 import { Service } from '#services/service.ts';
 
 // An app the caller does not own has to be indistinguishable from one that does not exist: a
@@ -231,6 +235,7 @@ export class ArtifactsService extends Service {
   private readonly artifactsRepo: ArtifactsRepositoryContract;
   private readonly storageRepo: ArtifactStorageRepositoryContract;
   private readonly sourceRepo: BinarySourceRepositoryContract;
+  private readonly cachedRepo: CachedBinariesRepositoryContract;
   private readonly appsRepo: AppOwnership;
   private fetchesInFlight = 0;
 
@@ -238,17 +243,20 @@ export class ArtifactsService extends Service {
     artifactsRepo,
     storageRepo,
     sourceRepo,
+    cachedRepo,
     appsRepo,
   }: {
     artifactsRepo: ArtifactsRepositoryContract;
     storageRepo: ArtifactStorageRepositoryContract;
     sourceRepo: BinarySourceRepositoryContract;
+    cachedRepo: CachedBinariesRepositoryContract;
     appsRepo: AppOwnership;
   }) {
     super();
     this.artifactsRepo = artifactsRepo;
     this.storageRepo = storageRepo;
     this.sourceRepo = sourceRepo;
+    this.cachedRepo = cachedRepo;
     this.appsRepo = appsRepo;
   }
 
@@ -376,16 +384,109 @@ export class ArtifactsService extends Service {
     if (filename === undefined) {
       throw new BadRequestError(UNNAMED_BINARY);
     }
+    const said = withoutCredentials(url);
+    // Written down only where the bytes are this api's to hand on. A download reached with a
+    // password is the caller's own, and a digest is all anybody would need to ask for it by.
+    const sourceDigest = sha256 !== undefined && !carriesCredentials(url) ? sha256 : null;
+
+    const reused = await this.reuse({ appId, ownerId, url: said, sourceDigest });
+    if (reused) {
+      return reused;
+    }
+
+    // Counted only against a fetch that is going to happen. A release everyone is deploying would
+    // otherwise spend the slots it no longer needs, and turn its own popularity into the one
+    // answer nobody can act on.
     if (this.fetchesInFlight >= MAX_CONCURRENT_FETCHES) {
       throw new TooManyRequestsError(TOO_MANY_FETCHES);
     }
 
     this.fetchesInFlight += 1;
     try {
-      return await this.fetchInto({ appId, ownerId, url, filename, sha256 });
+      return await this.fetchInto({ appId, ownerId, url, said, filename, sha256, sourceDigest });
     } finally {
       this.fetchesInFlight -= 1;
     }
+  }
+
+  /**
+   * The artifact a url does not have to be followed for, where this api already holds what it
+   * serves and has watched it run.
+   *
+   * Only ever reached with a digest the caller brought, which is what makes the answer exact: the
+   * bytes are named by what they hash to rather than by where they were found, so this cannot
+   * hand back yesterday's release to a url that has since been rebuilt. A url nobody vouched for
+   * is fetched, every time — see `cached_binaries` for what it takes to get into it.
+   *
+   * The object is asked after because the view is a row and the bytes are not: an app purged
+   * between the two leaves a key nothing answers, and a deploy pointed at one would fail on the
+   * host rather than here. A miss costs one HEAD and the download that was going to happen anyway.
+   */
+  private async reuse({
+    appId,
+    ownerId,
+    url,
+    sourceDigest,
+  }: {
+    appId: AppId;
+    ownerId: OwnerId;
+    url: string;
+    sourceDigest: Sha256Digest | null;
+  }): Promise<Artifact | undefined> {
+    if (sourceDigest === null) {
+      return undefined;
+    }
+    const cached = await this.cachedRepo.findBySourceDigest({ sourceDigest });
+    if (!cached || !(await this.storageRepo.exists({ objectKey: cached.object_key }))) {
+      return undefined;
+    }
+
+    this.logger.info('a url was served from what nibrun already holds', { url, sourceDigest });
+    return await this.stored({ appId, ownerId, url, cached });
+  }
+
+  /**
+   * The cached binary written down as this app's own artifact. A row per app either way: what is
+   * shared is the object, which is what being content-addressed has always meant here.
+   *
+   * The name comes from the cached row rather than from the url, because it is the name the
+   * binary actually has — an executable unwrapped from an archive is only ever named by the walk
+   * that found it, and the same download unwraps the same way every time.
+   */
+  private async stored({
+    appId,
+    ownerId,
+    url,
+    cached,
+  }: {
+    appId: AppId;
+    ownerId: OwnerId;
+    url: string;
+    cached: CachedBinaryRow;
+  }): Promise<Artifact> {
+    const pending = await this.artifactsRepo.insertPending({
+      appId,
+      ownerId,
+      originalFileName: cached.original_file_name,
+      originalFileUrl: url,
+      sourceDigest: cached.source_digest,
+    });
+    if (!pending) {
+      throw new NotFoundError(NO_SUCH_APP);
+    }
+
+    const stored = await this.artifactsRepo.complete({
+      appId,
+      artifactId: pending.id,
+      ownerId,
+      digest: cached.digest,
+      sizeBytes: Number(cached.size_bytes),
+      objectKey: cached.object_key,
+    });
+
+    return stored
+      ? toArtifact(stored)
+      : await this.alreadyStored({ appId, artifactId: pending.id, ownerId });
   }
 
   /**
@@ -399,20 +500,19 @@ export class ArtifactsService extends Service {
     appId,
     ownerId,
     url,
+    said,
     filename,
     sha256,
+    sourceDigest,
   }: {
     appId: AppId;
     ownerId: OwnerId;
     url: string;
+    said: string;
     filename: Filename;
     sha256: Sha256Digest | undefined;
+    sourceDigest: Sha256Digest | null;
   }): Promise<Artifact> {
-    const said = withoutCredentials(url);
-    // Written down only where the bytes are this api's to hand on. A download reached with a
-    // password is the caller's own, and a digest is all anybody would need to ask for it by.
-    const sourceDigest = sha256 !== undefined && !carriesCredentials(url) ? sha256 : null;
-
     const source = await this.sourceRepo.open({ url });
     if (source.outcome !== 'open') {
       throw new BadRequestError(sourceRefusal({ url: said, source }));

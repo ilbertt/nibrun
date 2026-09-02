@@ -32,6 +32,10 @@ import {
   type BinarySourceRepositoryContract,
   InterruptedSourceError,
 } from '#repositories/binary-source.repository.ts';
+import type {
+  CachedBinariesRepositoryContract,
+  CachedBinaryRow,
+} from '#repositories/cached-binaries.repository.ts';
 import {
   type AppOwnership,
   ArtifactsService,
@@ -74,6 +78,9 @@ type StoredRow = Omit<ArtifactRow, 'digest' | 'size_bytes' | 'object_key'> & {
   digest: ArtifactRow['digest'] | null;
   size_bytes: ArtifactRow['size_bytes'] | null;
   object_key: ArtifactRow['object_key'] | null;
+  // Not on `ArtifactRow`, which is what a caller is shown: where the bytes were found is the
+  // control plane's own record, and the digest they were held to is read only by the view.
+  source_digest: Sha256Digest | null;
 };
 
 /**
@@ -100,6 +107,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
     ownerId,
     originalFileName,
     originalFileUrl,
+    sourceDigest,
   }: InsertPendingArtifactInput): Promise<PendingArtifactRow | null> {
     if (ownerId !== this.ownedBy || this.refuses) {
       return Promise.resolve(null);
@@ -112,6 +120,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
       object_key: null,
       original_file_name: originalFileName,
       original_file_url: originalFileUrl,
+      source_digest: sourceDigest,
       created_at: SEEDED_CREATED_AT,
     };
     this.rows.set(row.id, row);
@@ -240,6 +249,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
       object_key: Value.Parse(ObjectKeySchema, SEEDED_DIGEST),
       original_file_name: UPLOADED_NAME,
       original_file_url: null,
+      source_digest: null,
       created_at: SEEDED_CREATED_AT,
     };
     this.rows.set(row.id, row);
@@ -453,14 +463,45 @@ function stoppingPartWay(): ReadableStream<Uint8Array> {
   });
 }
 
+/**
+ * What `nibrun.cached_binaries` answers, as a map. Empty unless a test puts something in it: a
+ * download nobody has deployed is the ordinary case, and every other test here expects the fetch
+ * to happen.
+ */
+class FakeCachedBinaries implements CachedBinariesRepositoryContract {
+  readonly rows = new Map<Sha256Digest, CachedBinaryRow>();
+  readonly asked: Sha256Digest[] = [];
+
+  remember(row: CachedBinaryRow): void {
+    this.rows.set(row.source_digest, row);
+  }
+
+  findBySourceDigest({
+    sourceDigest,
+  }: {
+    sourceDigest: Sha256Digest;
+  }): Promise<CachedBinaryRow | null> {
+    this.asked.push(sourceDigest);
+    return Promise.resolve(this.rows.get(sourceDigest) ?? null);
+  }
+}
+
 function build(storageRepo: FakeStorage = new FakeStorage()) {
   const artifactsRepo = new FakeArtifactsRepository(OWNER_ID);
   const sourceRepo = new FakeBinarySource();
+  const cachedRepo = new FakeCachedBinaries();
   return {
     storage: storageRepo,
     artifactsRepo,
     sourceRepo,
-    service: new ArtifactsService({ artifactsRepo, storageRepo, sourceRepo, appsRepo }),
+    cachedRepo,
+    service: new ArtifactsService({
+      artifactsRepo,
+      storageRepo,
+      sourceRepo,
+      cachedRepo,
+      appsRepo,
+    }),
   };
 }
 
@@ -891,6 +932,176 @@ const A_TRANSFER_CHUNK = 65_536;
  * has to leave the app exactly as it was — an artifact half made is a deploy that cannot be
  * retried by following the same link again.
  */
+const CACHED_URL = 'https://releases.test/v1/my-server.tar.gz';
+const CREDENTIALLED_URL = 'https://someone:secret@releases.test/v1/my-server';
+const UNWRAPPED_NAME = Value.Parse(FilenameSchema, 'app');
+const CACHED_SIZE_BYTES = 128;
+
+/** A release this api has already fetched, stored and watched come up. */
+function alreadyDeployed(sourceDigest: Sha256Digest): CachedBinaryRow {
+  return {
+    source_digest: sourceDigest,
+    digest: Value.Parse(Sha256DigestSchema, BINARY_DIGEST),
+    size_bytes: String(CACHED_SIZE_BYTES),
+    object_key: Value.Parse(ObjectKeySchema, BINARY_DIGEST),
+    original_file_name: UNWRAPPED_NAME,
+  };
+}
+
+/**
+ * The whole point of the digest a link carries: the second person to follow it gets the binary
+ * without anybody going back to the release host for it.
+ */
+describe('a release nibrun already holds is not fetched twice', () => {
+  const SERVED_DIGEST = Value.Parse(Sha256DigestSchema, BINARY_DIGEST);
+
+  function readyToReuse() {
+    const built = build();
+    built.cachedRepo.remember(alreadyDeployed(SERVED_DIGEST));
+    built.storage.put({
+      objectKey: Value.Parse(ObjectKeySchema, BINARY_DIGEST),
+      text: BINARY_TEXT,
+    });
+    return built;
+  }
+
+  test('the url is never opened, and the artifact points at the bytes already stored', async () => {
+    const { service, sourceRepo, storage } = readyToReuse();
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: CACHED_URL,
+      sha256: SERVED_DIGEST,
+    });
+
+    expect(sourceRepo.opened).toEqual([]);
+    expect(artifact.digest).toBe(SERVED_DIGEST);
+    expect(artifact.objectKey).toBe(Value.Parse(ObjectKeySchema, BINARY_DIGEST));
+    expect(storage.objects.size).toBe(1);
+    expect(isValidMessage({ schema: ArtifactSchema, value: artifact })).toBe(true);
+  });
+
+  /**
+   * The name the binary has rather than the one the url has. An executable inside an archive is
+   * only ever named by the walk that found it, and a hit skips the walk — so the name has to come
+   * from the row, or every reuse of a packed release would be exported as `my-server.tar.gz`.
+   */
+  test('it carries the name the archive gave it, not the one the url did', async () => {
+    const { service } = readyToReuse();
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: CACHED_URL,
+      sha256: SERVED_DIGEST,
+    });
+
+    expect(artifact.originalFileName).toBe(UNWRAPPED_NAME);
+  });
+
+  // The row is per app, as it is for an upload: what two owners share is the object, which is
+  // what content addressing has always meant here.
+  test('the app gets an artifact of its own, addressed by the url it asked for', async () => {
+    const { service, artifactsRepo } = readyToReuse();
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: CACHED_URL,
+      sha256: SERVED_DIGEST,
+    });
+
+    expect(artifactsRepo.rows.get(artifact.id)?.app_id).toBe(APP_ID);
+    expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(CACHED_URL);
+  });
+
+  /**
+   * The view is a row and the bytes are not. An app purged between the two leaves a key nothing
+   * answers, and an artifact pointed at one would fail on the host — where it costs a deployment
+   * that never converges rather than the download it was avoiding.
+   */
+  test('a row whose object has since gone is fetched again rather than handed on', async () => {
+    const { service, sourceRepo, cachedRepo } = build();
+    cachedRepo.remember(alreadyDeployed(SERVED_DIGEST));
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+      sha256: SERVED_DIGEST,
+    });
+
+    expect(sourceRepo.opened).toEqual([BINARY_URL]);
+    expect(artifact.digest).toBe(SERVED_DIGEST);
+  });
+
+  // The digest is the whole of what makes reuse exact, so a link without one is a link that has
+  // said nothing about what the url should be serving.
+  test('a url nobody said a digest for is followed every time', async () => {
+    const { service, sourceRepo, cachedRepo } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    await service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+
+    expect(cachedRepo.asked).toEqual([]);
+    expect(sourceRepo.opened).toEqual([BINARY_URL]);
+  });
+
+  /**
+   * The url is written down without whatever a caller authenticated by, so a digest taken from
+   * one would stand for bytes anybody naming that digest could then ask for. Neither remembered
+   * nor answered from: the download belongs to whoever had the password.
+   */
+  test('a download reached with a password is neither reused nor remembered', async () => {
+    const { service, sourceRepo, cachedRepo, artifactsRepo } = build();
+    cachedRepo.remember(alreadyDeployed(SERVED_DIGEST));
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: CREDENTIALLED_URL,
+      sha256: SERVED_DIGEST,
+    });
+
+    expect(cachedRepo.asked).toEqual([]);
+    expect(sourceRepo.opened).toEqual([CREDENTIALLED_URL]);
+    expect(artifactsRepo.rows.get(artifact.id)?.source_digest).toBeNull();
+  });
+
+  /**
+   * The slots exist because a fetch passes through this process, and a hit does not — so a
+   * release everyone is deploying stops competing for them. Without this, a link going round
+   * would answer the ninth person with the one thing they cannot act on.
+   */
+  test('a hit costs no fetch slot, so a popular link cannot throttle itself', async () => {
+    const { service, sourceRepo, cachedRepo, storage } = build();
+    cachedRepo.remember(alreadyDeployed(SERVED_DIGEST));
+    storage.put({ objectKey: Value.Parse(ObjectKeySchema, BINARY_DIGEST), text: BINARY_TEXT });
+    sourceRepo.answers({ outcome: 'unreachable' });
+    const letThemGo = sourceRepo.holdsOpen();
+
+    const held = Array.from({ length: MAX_CONCURRENT_FETCHES }, () =>
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    );
+    await Bun.sleep(0);
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: CACHED_URL,
+      sha256: SERVED_DIGEST,
+    });
+
+    expect(artifact.digest).toBe(SERVED_DIGEST);
+
+    letThemGo();
+    await Promise.allSettled(held);
+  });
+});
+
 describe('a binary is fetched from the url it was given', () => {
   test('the bytes are stored under their digest, named and addressed by the url', async () => {
     const { service, sourceRepo, storage } = build();

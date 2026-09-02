@@ -13,6 +13,7 @@ import { ArtifactStorageRepository } from '#repositories/artifact-storage.reposi
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { BinarySourceRepository } from '#repositories/binary-source.repository.ts';
+import { CachedBinariesRepository } from '#repositories/cached-binaries.repository.ts';
 import { CustomHostnamesRepository } from '#repositories/custom-hostnames.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { ExportStorageRepository } from '#repositories/export-storage.repository.ts';
@@ -61,6 +62,7 @@ const artifactStorageRepository = new ArtifactStorageRepository({
   bucket: env.ARTIFACTS_BUCKET,
 });
 const binarySourceRepository = new BinarySourceRepository();
+const cachedBinariesRepository = new CachedBinariesRepository(sql);
 const exportsRepository = new ExportsRepository(sql);
 const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient);
@@ -99,6 +101,7 @@ const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,
   sourceRepo: binarySourceRepository,
+  cachedRepo: cachedBinariesRepository,
   appsRepo: appsRepository,
 });
 const agentService = new AgentService({

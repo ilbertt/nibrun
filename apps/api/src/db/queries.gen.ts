@@ -581,6 +581,20 @@ export interface ISelectArtifactByIdResult {
     created_at: Date;
 }
 
+/** Result of query `SelectCachedBinary`. */
+export interface ISelectCachedBinaryResult {
+    /** The digest the url's own download was held to, which for an archive is the archive's. */
+    source_digest: NonNullable<IArtifactsColumns["source_digest"]>;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
+    digest: NonNullable<IArtifactsColumns["digest"]>;
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    size_bytes: NonNullable<IArtifactsColumns["size_bytes"]>;
+    /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    object_key: NonNullable<IArtifactsColumns["object_key"]>;
+    /** The name the binary was uploaded under; a content-addressed key carries none. */
+    original_file_name: IArtifactsColumns["original_file_name"];
+}
+
 /** Result of query `SelectDeployableArtifact`. */
 export interface ISelectDeployableArtifactResult {
     id: IArtifactsColumns["id"];
@@ -868,6 +882,7 @@ export interface Queries {
     DeleteAbandonedArtifact: IDeleteAbandonedArtifactResult;
     SelectArtifactsByApp: ISelectArtifactsByAppResult;
     SelectArtifactById: ISelectArtifactByIdResult;
+    SelectCachedBinary: ISelectCachedBinaryResult;
     SelectDeployableArtifact: ISelectDeployableArtifactResult;
     InsertDeployment: IInsertDeploymentResult;
     SelectDeploymentToReplay: ISelectDeploymentToReplayResult;
