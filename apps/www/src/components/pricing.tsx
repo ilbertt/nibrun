@@ -4,9 +4,7 @@ const BYTES_PER_GIB = 1_073_741_824;
 
 const FREE_APP_LIMIT = 3;
 
-const APPS_PER_BLOCK = 10;
-
-const PRICE_PER_BLOCK_USD = 10;
+const PRICE_PER_APP_USD = 1;
 
 const MACHINE_SPEC = [
   `${DEFAULT_INSTANCE_RESOURCES.vcpuCount} vCPU`,
@@ -22,8 +20,8 @@ const TIERS: { name: string; price: string; period: string; machine?: string }[]
     machine: MACHINE_SPEC,
   },
   {
-    name: `Every ${APPS_PER_BLOCK} after that`,
-    price: `$${PRICE_PER_BLOCK_USD}`,
+    name: 'Every app after that',
+    price: `$${PRICE_PER_APP_USD}`,
     period: 'a month',
   },
 ];
