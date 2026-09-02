@@ -1,13 +1,6 @@
 import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
-import {
-  CpuIcon,
-  HardDriveIcon,
-  MemoryStickIcon,
-  MinusIcon,
-  PlusIcon,
-  ServerIcon,
-} from 'lucide-react';
+import { CpuIcon, HardDriveIcon, MemoryStickIcon, MinusIcon, PlusIcon } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 const BYTES_PER_GIB = 1_073_741_824;
@@ -51,39 +44,32 @@ const BIGGER_RESOURCES: MachineResource[] = [
 ];
 
 function MachineCard({
-  icon: Icon,
   title,
   resources,
   note,
   action,
 }: {
-  icon: typeof ServerIcon;
   title: string;
   resources: MachineResource[];
   note?: string;
   action: ReactNode;
 }) {
   return (
-    <div className="grid gap-8 rounded-2xl border border-border/60 p-6 sm:grid-cols-[auto_1fr] sm:gap-10 sm:p-8">
-      <div className="flex h-32 w-full items-center justify-center rounded-xl bg-muted/40 sm:size-44">
-        <Icon className="size-16 text-primary" strokeWidth={1.25} />
+    <div className="flex h-full flex-col gap-6 rounded-2xl border border-border/60 p-6 sm:p-8">
+      <div className="flex flex-col gap-3">
+        <span className="font-medium text-lg">{title}</span>
+        <ul className="flex flex-col gap-2">
+          {resources.map(({ icon: ResourceIcon, label }) => (
+            <li key={label} className="flex items-center gap-2 text-muted-foreground text-sm">
+              <ResourceIcon className="size-4 text-primary" />
+              {label}
+            </li>
+          ))}
+        </ul>
+        {note && <span className="text-muted-foreground text-sm">{note}</span>}
       </div>
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-3">
-          <span className="font-medium text-lg">{title}</span>
-          <ul className="flex flex-wrap gap-x-6 gap-y-2">
-            {resources.map(({ icon: ResourceIcon, label }) => (
-              <li key={label} className="flex items-center gap-2 text-muted-foreground text-sm">
-                <ResourceIcon className="size-4 text-primary" />
-                {label}
-              </li>
-            ))}
-          </ul>
-          {note && <span className="text-muted-foreground text-sm">{note}</span>}
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-4 border-border/60 border-t pt-6">
-          {action}
-        </div>
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-4 border-border/60 border-t pt-6">
+        {action}
       </div>
     </div>
   );
@@ -112,9 +98,8 @@ export function Pricing() {
         </h2>
         <span className="text-muted-foreground">Then ${PRICE_PER_APP_USD}/app, per month.</span>
       </div>
-      <div className="flex flex-col gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <MachineCard
-          icon={ServerIcon}
           title="One machine per app"
           resources={STANDARD_RESOURCES}
           note="Managed. Isolated. Persistent disk. Unlimited exports."
@@ -134,12 +119,12 @@ export function Pricing() {
               {appCount > BULK_APP_THRESHOLD ? (
                 <a
                   href={contactUrl(`Volume pricing for ${appCount} apps`)}
-                  className="font-medium text-primary text-sm underline underline-offset-4"
+                  className="flex h-9 items-center font-medium text-primary text-sm underline underline-offset-4"
                 >
                   Contact us for a volume price
                 </a>
               ) : (
-                <span className="flex items-baseline gap-1.5">
+                <span className="flex h-9 items-baseline gap-1.5">
                   <span className="font-semibold text-3xl text-primary tabular-nums tracking-tight">
                     {monthly === 0 ? 'Free' : `$${monthly}`}
                   </span>
@@ -152,11 +137,14 @@ export function Pricing() {
           }
         />
         <MachineCard
-          icon={ServerIcon}
           title="Need a bigger machine?"
           resources={BIGGER_RESOURCES}
           action={
-            <Button variant="outline" render={<a href={contactUrl('A bigger machine')} />}>
+            <Button
+              variant="outline"
+              className="ml-auto h-9"
+              render={<a href={contactUrl('A bigger machine')} />}
+            >
               Contact us
             </Button>
           }
