@@ -36,7 +36,10 @@ import type {
   CachedBinariesRepositoryContract,
   CachedBinaryRow,
 } from '#repositories/cached-binaries.repository.ts';
-import type { ReleaseDigestRepositoryContract } from '#repositories/release-digest.repository.ts';
+import type {
+  PublishedDigest,
+  ReleaseDigestRepositoryContract,
+} from '#repositories/release-digest.repository.ts';
 import {
   type AppOwnership,
   ArtifactsService,
@@ -493,15 +496,19 @@ class FakeCachedBinaries implements CachedBinariesRepositoryContract {
  */
 class FakeReleaseDigests implements ReleaseDigestRepositoryContract {
   readonly asked: string[] = [];
-  private published: Sha256Digest | undefined;
+  private answer: PublishedDigest = { outcome: 'not-a-release' };
 
   publishes(digest: Sha256Digest): void {
-    this.published = digest;
+    this.answer = { outcome: 'published', digest };
   }
 
-  publishedDigest({ url }: { url: string }): Promise<Sha256Digest | undefined> {
+  answers(answer: PublishedDigest): void {
+    this.answer = answer;
+  }
+
+  publishedDigest({ url }: { url: string }): Promise<PublishedDigest> {
     this.asked.push(url);
-    return Promise.resolve(this.published);
+    return Promise.resolve(this.answer);
   }
 }
 
@@ -1213,6 +1220,27 @@ describe('a release that publishes its own digest is taken at its word', () => {
       url: BINARY_URL,
     });
 
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(artifactsRepo.rows.get(artifact.id)?.source_digest).toBeNull();
+  });
+
+  /**
+   * The quota is sixty an hour for a caller with no token, so this is not the exceptional path —
+   * it is where nibrun spends most of its time. The deploy has to go through regardless: being
+   * unable to look a digest up is not a reason to refuse a url that was always fetchable.
+   */
+  test('a quota that has run out still deploys, by fetching the url as before', async () => {
+    const { service, sourceRepo, releaseRepo, artifactsRepo } = build();
+    releaseRepo.answers({ outcome: 'rate-limited', until: undefined });
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+    });
+
+    expect(sourceRepo.opened).toEqual([BINARY_URL]);
     expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
     expect(artifactsRepo.rows.get(artifact.id)?.source_digest).toBeNull();
   });

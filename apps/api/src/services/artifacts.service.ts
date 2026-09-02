@@ -45,7 +45,10 @@ import type {
   CachedBinariesRepositoryContract,
   CachedBinaryRow,
 } from '#repositories/cached-binaries.repository.ts';
-import type { ReleaseDigestRepositoryContract } from '#repositories/release-digest.repository.ts';
+import type {
+  PublishedDigest,
+  ReleaseDigestRepositoryContract,
+} from '#repositories/release-digest.repository.ts';
 import { Service } from '#services/service.ts';
 
 // An app the caller does not own has to be indistinguishable from one that does not exist: a
@@ -453,7 +456,35 @@ export class ArtifactsService extends Service {
       return { digest: sha256, saidBy: 'caller' };
     }
     const published = await this.releaseRepo.publishedDigest({ url });
-    return published === undefined ? undefined : { digest: published, saidBy: 'release' };
+    if (published.outcome === 'published') {
+      return { digest: published.digest, saidBy: 'release' };
+    }
+
+    this.saidNothing({ url, published });
+    return undefined;
+  }
+
+  /**
+   * A release that gave no digest, said out loud only where somebody could act on it.
+   *
+   * Being rate limited is this whole feature switched off — every hashless link goes back to being
+   * fetched unverified — and it is indistinguishable from a quiet afternoon unless it is said. The
+   * quota is sixty an hour for a caller with no token, so the sentence names the way out of it.
+   *
+   * The other two outcomes are the ordinary shape of the world: most urls are not releases, and
+   * every release published before GitHub began computing digests has none.
+   */
+  private saidNothing({ url, published }: { url: string; published: PublishedDigest }): void {
+    if (published.outcome === 'rate-limited') {
+      this.logger.warn(
+        'the release api is rate limiting nibrun, so binaries fetched from it go unverified and are not reused. A GitHub token raises the quota from 60 an hour to 5000.',
+        { url, until: published.until },
+      );
+      return;
+    }
+    if (published.outcome === 'unavailable') {
+      this.logger.info('the release api said nothing about this url', { url });
+    }
   }
 
   /**

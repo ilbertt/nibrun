@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { Sha256DigestSchema, Value } from '@repo/protocol';
 import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
 
@@ -17,8 +17,21 @@ const PUBLISHED = Value.Parse(
 let releases: ReturnType<typeof Bun.serve>;
 let asked: string[] = [];
 
+/** What the api is doing with the caller's quota, which every path below answers through. */
+type Quota = 'available' | 'exhausted' | 'exhausted-without-reset' | 'refused';
+let quota: Quota = 'available';
+
+const RESETS_AT = 1_788_350_550;
+const MS_PER_SECOND = 1000;
+const REFUSED = 403;
+const REMAINING_WHEN_REFUSED = '59';
+
 beforeAll(() => {
   releases = Bun.serve({ port: 0, fetch: answer });
+});
+
+beforeEach(() => {
+  quota = 'available';
 });
 
 afterAll(() => {
@@ -53,15 +66,36 @@ const RELEASES: Record<string, unknown> = {
 function answer(request: Request): Response {
   const { pathname } = new URL(request.url);
   asked.push(pathname);
+  if (quota !== 'available') {
+    return refusal();
+  }
   const release = RELEASES[pathname];
   return release === undefined
     ? new Response('no such release', { status: 404 })
     : Response.json(release);
 }
 
+/** A 403, spent the two ways GitHub spends one: on an empty quota, and on anything else. */
+function refusal(): Response {
+  if (quota === 'refused') {
+    return new Response('forbidden', {
+      status: REFUSED,
+      headers: { 'x-ratelimit-remaining': REMAINING_WHEN_REFUSED },
+    });
+  }
+  const headers: Record<string, string> = { 'x-ratelimit-remaining': '0' };
+  if (quota === 'exhausted') {
+    headers['x-ratelimit-reset'] = String(RESETS_AT);
+  }
+  return new Response('rate limit exceeded', { status: REFUSED, headers });
+}
+
 describe('a release is asked what its own asset hashes to', () => {
   test('the asset is found by name and its digest read off the release', async () => {
-    expect(await repo().publishedDigest({ url: downloadOf(ASSET) })).toBe(PUBLISHED);
+    expect(await repo().publishedDigest({ url: downloadOf(ASSET) })).toEqual({
+      outcome: 'published',
+      digest: PUBLISHED,
+    });
   });
 
   test('a moving download asks which release is current', async () => {
@@ -71,7 +105,7 @@ describe('a release is asked what its own asset hashes to', () => {
       url: `https://github.com/pocketbase/pocketbase/releases/latest/download/${ASSET}`,
     });
 
-    expect(digest).toBe(PUBLISHED);
+    expect(digest).toEqual({ outcome: 'published', digest: PUBLISHED });
     expect(asked).toEqual(['/repos/pocketbase/pocketbase/releases/latest']);
   });
 
@@ -83,23 +117,19 @@ describe('a release is asked what its own asset hashes to', () => {
     const url =
       'https://github.com/pocketbase/pocketbase/releases/download/v0.22.0/pocketbase_linux_amd64.zip';
 
-    expect(await repo().publishedDigest({ url })).toBeUndefined();
+    expect(await repo().publishedDigest({ url })).toEqual({ outcome: 'undigested' });
   });
 
   test('an asset the release does not list is not guessed at', async () => {
-    expect(await repo().publishedDigest({ url: downloadOf('pocketbase_windows.zip') })).toBe(
-      undefined,
-    );
+    expect(await repo().publishedDigest({ url: downloadOf('pocketbase_windows.zip') })).toEqual({
+      outcome: 'undigested',
+    });
   });
 
-  /**
-   * Sixty an hour unauthenticated, so this is the ordinary answer rather than the exceptional
-   * one — and it has to be indistinguishable from not knowing, because that is what it is.
-   */
-  test('a release api that refuses is the same answer as one that never had a digest', async () => {
+  test('a release the api does not have is unavailable rather than undigested', async () => {
     const url = 'https://github.com/pocketbase/pocketbase/releases/download/v9.9.9/app';
 
-    expect(await repo().publishedDigest({ url })).toBeUndefined();
+    expect(await repo().publishedDigest({ url })).toEqual({ outcome: 'unavailable' });
   });
 
   test('a url that names no release asset is never asked about', async () => {
@@ -107,7 +137,44 @@ describe('a release is asked what its own asset hashes to', () => {
 
     expect(
       await repo().publishedDigest({ url: 'https://releases.example.com/v1/my-server' }),
-    ).toBeUndefined();
+    ).toEqual({ outcome: 'not-a-release' });
     expect(asked).toEqual([]);
+  });
+});
+
+/**
+ * Sixty an hour is what an unauthenticated caller gets, so this is the state nibrun spends most of
+ * its time in — and the one outcome anybody can act on. It has to be told apart from a quiet
+ * afternoon, which is the whole of why the outcome is not just `undefined`.
+ */
+describe('a quota that has run out says so rather than going quiet', () => {
+  test('an exhausted quota is named, with when it comes back', async () => {
+    quota = 'exhausted';
+
+    expect(await repo().publishedDigest({ url: downloadOf(ASSET) })).toEqual({
+      outcome: 'rate-limited',
+      until: new Date(RESETS_AT * MS_PER_SECOND),
+    });
+  });
+
+  /**
+   * GitHub spends 403 on an exhausted quota and on a request it will not answer, so the status
+   * alone would report the actionable one every time anything at all went wrong.
+   */
+  test('a refusal that is not the quota is not reported as one', async () => {
+    quota = 'refused';
+
+    expect(await repo().publishedDigest({ url: downloadOf(ASSET) })).toEqual({
+      outcome: 'unavailable',
+    });
+  });
+
+  test('a quota that is exhausted without saying when says only that much', async () => {
+    quota = 'exhausted-without-reset';
+
+    expect(await repo().publishedDigest({ url: downloadOf(ASSET) })).toEqual({
+      outcome: 'rate-limited',
+      until: undefined,
+    });
   });
 });
