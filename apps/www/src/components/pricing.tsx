@@ -1,4 +1,5 @@
 import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/protocol';
+import { PlusIcon, ServerIcon } from 'lucide-react';
 import { REPO_URL } from '#lib/site.ts';
 
 const BYTES_PER_GIB = 1_073_741_824;
@@ -15,10 +16,9 @@ const MACHINE_SPEC = [
   `${DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB} GB disk`,
 ].join(' · ');
 
-const TIERS = [
-  { name: `First ${FREE_APP_LIMIT} apps`, price: 'Free', period: 'forever' },
-  { name: 'Every app after that', price: `$${PRICE_PER_APP_USD}`, period: 'a month' },
-];
+const FREE_MACHINES = [...Array(FREE_APP_LIMIT).keys()].map((index) => `machine-${index + 1}`);
+
+const MACHINE_BOX = 'flex size-20 items-center justify-center rounded-xl border border-border/60';
 
 export function Pricing() {
   return (
@@ -26,27 +26,30 @@ export function Pricing() {
       id="pricing"
       className="flex w-full flex-col gap-10 border-border/60 border-t py-16 sm:py-20"
     >
-      <div className="flex max-w-2xl flex-col gap-3">
-        <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          Your first {FREE_APP_LIMIT} apps are free. Forever.
-        </h2>
-        <span className="text-muted-foreground text-sm">
-          Every app, free or paid: <span className="text-foreground">{MACHINE_SPEC}</span>
-        </span>
+      <h2 className="max-w-2xl font-semibold text-2xl tracking-tight sm:text-3xl">
+        Your first {FREE_APP_LIMIT} apps are free. Forever.
+      </h2>
+      <div className="flex flex-wrap items-end gap-x-10 gap-y-6">
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-3">
+            {FREE_MACHINES.map((machine) => (
+              <div key={machine} className={`${MACHINE_BOX} bg-card`}>
+                <ServerIcon className="size-6 text-primary" />
+              </div>
+            ))}
+          </div>
+          <span className="font-medium text-lg text-primary">Free forever</span>
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className={`${MACHINE_BOX} border-dashed`}>
+            <PlusIcon className="size-6 text-muted-foreground" />
+          </div>
+          <span className="font-medium text-lg">${PRICE_PER_APP_USD} a month</span>
+        </div>
       </div>
-      <ul className="grid gap-8 sm:grid-cols-2">
-        {TIERS.map(({ name, price, period }) => (
-          <li key={name} className="flex flex-col gap-2 border-border/60 border-t pt-4">
-            <span className="text-muted-foreground text-sm">{name}</span>
-            <span className="flex items-baseline gap-2">
-              <span className="font-semibold text-4xl text-primary tracking-tight">{price}</span>
-              <span className="text-muted-foreground text-sm">{period}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
       <span className="text-muted-foreground text-sm">
-        Need more resources?{' '}
+        One box is one app, on a machine of its own:{' '}
+        <span className="text-foreground">{MACHINE_SPEC}</span>. Need more?{' '}
         <a
           href={CONTACT_URL}
           target="_blank"
