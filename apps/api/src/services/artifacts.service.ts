@@ -45,6 +45,7 @@ import type {
   CachedBinariesRepositoryContract,
   CachedBinaryRow,
 } from '#repositories/cached-binaries.repository.ts';
+import type { ReleaseDigestRepositoryContract } from '#repositories/release-digest.repository.ts';
 import { Service } from '#services/service.ts';
 
 // An app the caller does not own has to be indistinguishable from one that does not exist: a
@@ -145,8 +146,20 @@ function wrongDigest({ expected, served }: { expected: string; served: string })
   return `The url served ${served}, not the ${expected} that was asked for.`;
 }
 
+/**
+ * The same surprise, where nobody asked for anything. Said as what the release publishes rather
+ * than as what was expected, because the caller never named a digest and would otherwise be shown
+ * two numbers they have never seen and no way to tell which of them is theirs.
+ */
+function wrongPublishedDigest({ expected, served }: { expected: string; served: string }): string {
+  return `The release publishes ${expected} for that asset and the url served ${served}, so what it is serving is not what was released.`;
+}
+
+/** A digest the download should come to, and who is in a position to have said so. */
+type Expectation = { digest: Sha256Digest; saidBy: 'caller' | 'release' };
+
 /** A digest somebody said the url would serve, and what it turned out to serve. */
-type DigestCheck = { expected: Sha256Digest; served: Promise<Sha256Digest> };
+type DigestCheck = { expected: Expectation; served: Promise<Sha256Digest> };
 
 /**
  * The source, hashed on its way past where there is something to hold it to. Untouched where
@@ -155,16 +168,16 @@ type DigestCheck = { expected: Sha256Digest; served: Promise<Sha256Digest> };
  */
 function checking({
   source,
-  sha256,
+  expected,
 }: {
   source: ReadableStream<Uint8Array>;
-  sha256: Sha256Digest | undefined;
+  expected: Expectation | undefined;
 }): { body: ReadableStream<Uint8Array>; check: DigestCheck | undefined } {
-  if (sha256 === undefined) {
+  if (expected === undefined) {
     return { body: source, check: undefined };
   }
   const { body, served } = digesting({ source });
-  return { body, check: { expected: sha256, served } };
+  return { body, check: { expected, served } };
 }
 
 /**
@@ -179,9 +192,12 @@ async function heldToDigest(check: DigestCheck | undefined): Promise<void> {
     return;
   }
   const served = await check.served;
-  if (served !== check.expected) {
-    throw new BadRequestError(wrongDigest({ expected: check.expected, served }));
+  const { digest, saidBy } = check.expected;
+  if (served === digest) {
+    return;
   }
+  const refusal = saidBy === 'caller' ? wrongDigest : wrongPublishedDigest;
+  throw new BadRequestError(refusal({ expected: digest, served }));
 }
 
 function unsupportedInterpreter(interpreter: string): string {
@@ -236,6 +252,7 @@ export class ArtifactsService extends Service {
   private readonly storageRepo: ArtifactStorageRepositoryContract;
   private readonly sourceRepo: BinarySourceRepositoryContract;
   private readonly cachedRepo: CachedBinariesRepositoryContract;
+  private readonly releaseRepo: ReleaseDigestRepositoryContract;
   private readonly appsRepo: AppOwnership;
   private fetchesInFlight = 0;
 
@@ -244,12 +261,14 @@ export class ArtifactsService extends Service {
     storageRepo,
     sourceRepo,
     cachedRepo,
+    releaseRepo,
     appsRepo,
   }: {
     artifactsRepo: ArtifactsRepositoryContract;
     storageRepo: ArtifactStorageRepositoryContract;
     sourceRepo: BinarySourceRepositoryContract;
     cachedRepo: CachedBinariesRepositoryContract;
+    releaseRepo: ReleaseDigestRepositoryContract;
     appsRepo: AppOwnership;
   }) {
     super();
@@ -257,6 +276,7 @@ export class ArtifactsService extends Service {
     this.storageRepo = storageRepo;
     this.sourceRepo = sourceRepo;
     this.cachedRepo = cachedRepo;
+    this.releaseRepo = releaseRepo;
     this.appsRepo = appsRepo;
   }
 
@@ -385,9 +405,11 @@ export class ArtifactsService extends Service {
       throw new BadRequestError(UNNAMED_BINARY);
     }
     const said = withoutCredentials(url);
+    const expected = await this.expected({ url, sha256 });
     // Written down only where the bytes are this api's to hand on. A download reached with a
     // password is the caller's own, and a digest is all anybody would need to ask for it by.
-    const sourceDigest = sha256 !== undefined && !carriesCredentials(url) ? sha256 : null;
+    const sourceDigest =
+      expected !== undefined && !carriesCredentials(url) ? expected.digest : null;
 
     const reused = await this.reuse({ appId, ownerId, url: said, sourceDigest });
     if (reused) {
@@ -403,10 +425,35 @@ export class ArtifactsService extends Service {
 
     this.fetchesInFlight += 1;
     try {
-      return await this.fetchInto({ appId, ownerId, url, said, filename, sha256, sourceDigest });
+      return await this.fetchInto({ appId, ownerId, url, said, filename, expected, sourceDigest });
     } finally {
       this.fetchesInFlight -= 1;
     }
+  }
+
+  /**
+   * What the download should come to, from whoever is in a position to say.
+   *
+   * The caller first, always: a checksum in a link was put there by somebody who knows what they
+   * published, and going and asking elsewhere would be second-guessing them. Where they said
+   * nothing, the release host's own word about its asset — which is what makes a link nobody wrote
+   * a checksum into exact anyway, and exact is the whole of what lets one be reused.
+   *
+   * It is also the difference between a hashless link being deployed unverified and being held to
+   * something: until now there was nothing to check such a download against.
+   */
+  private async expected({
+    url,
+    sha256,
+  }: {
+    url: string;
+    sha256: Sha256Digest | undefined;
+  }): Promise<Expectation | undefined> {
+    if (sha256 !== undefined) {
+      return { digest: sha256, saidBy: 'caller' };
+    }
+    const published = await this.releaseRepo.publishedDigest({ url });
+    return published === undefined ? undefined : { digest: published, saidBy: 'release' };
   }
 
   /**
@@ -502,7 +549,7 @@ export class ArtifactsService extends Service {
     url,
     said,
     filename,
-    sha256,
+    expected,
     sourceDigest,
   }: {
     appId: AppId;
@@ -510,7 +557,7 @@ export class ArtifactsService extends Service {
     url: string;
     said: string;
     filename: Filename;
-    sha256: Sha256Digest | undefined;
+    expected: Expectation | undefined;
     sourceDigest: Sha256Digest | null;
   }): Promise<Artifact> {
     const source = await this.sourceRepo.open({ url });
@@ -529,7 +576,7 @@ export class ArtifactsService extends Service {
     // a source that declares none is otherwise read for as long as it keeps sending. The bound is
     // on what the url sent rather than on what it came to, which for an archive is not the same.
     const bounded = boundedTo({ source: source.body, maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES });
-    const { body: fetched, check } = checking({ source: bounded, sha256 });
+    const { body: fetched, check } = checking({ source: bounded, expected });
     const held = await unwrapped({ source: fetched, named: filename, url: said });
 
     const pending = await this.artifactsRepo.insertPending({

@@ -20,6 +20,7 @@ import { ExportStorageRepository } from '#repositories/export-storage.repository
 import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
+import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
 import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
@@ -63,6 +64,7 @@ const artifactStorageRepository = new ArtifactStorageRepository({
 });
 const binarySourceRepository = new BinarySourceRepository();
 const cachedBinariesRepository = new CachedBinariesRepository(sql);
+const releaseDigestRepository = new ReleaseDigestRepository();
 const exportsRepository = new ExportsRepository(sql);
 const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient);
@@ -102,6 +104,7 @@ const artifactsService = new ArtifactsService({
   storageRepo: artifactStorageRepository,
   sourceRepo: binarySourceRepository,
   cachedRepo: cachedBinariesRepository,
+  releaseRepo: releaseDigestRepository,
   appsRepo: appsRepository,
 });
 const agentService = new AgentService({

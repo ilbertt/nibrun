@@ -36,6 +36,7 @@ import type {
   CachedBinariesRepositoryContract,
   CachedBinaryRow,
 } from '#repositories/cached-binaries.repository.ts';
+import type { ReleaseDigestRepositoryContract } from '#repositories/release-digest.repository.ts';
 import {
   type AppOwnership,
   ArtifactsService,
@@ -486,20 +487,41 @@ class FakeCachedBinaries implements CachedBinariesRepositoryContract {
   }
 }
 
+/**
+ * What a release host says about its own asset. Says nothing unless a test gives it something,
+ * which is also what an unreachable or rate-limited api answers with.
+ */
+class FakeReleaseDigests implements ReleaseDigestRepositoryContract {
+  readonly asked: string[] = [];
+  private published: Sha256Digest | undefined;
+
+  publishes(digest: Sha256Digest): void {
+    this.published = digest;
+  }
+
+  publishedDigest({ url }: { url: string }): Promise<Sha256Digest | undefined> {
+    this.asked.push(url);
+    return Promise.resolve(this.published);
+  }
+}
+
 function build(storageRepo: FakeStorage = new FakeStorage()) {
   const artifactsRepo = new FakeArtifactsRepository(OWNER_ID);
   const sourceRepo = new FakeBinarySource();
   const cachedRepo = new FakeCachedBinaries();
+  const releaseRepo = new FakeReleaseDigests();
   return {
     storage: storageRepo,
     artifactsRepo,
     sourceRepo,
     cachedRepo,
+    releaseRepo,
     service: new ArtifactsService({
       artifactsRepo,
       storageRepo,
       sourceRepo,
       cachedRepo,
+      releaseRepo,
       appsRepo,
     }),
   };
@@ -1099,6 +1121,124 @@ describe('a release nibrun already holds is not fetched twice', () => {
 
     letThemGo();
     await Promise.allSettled(held);
+  });
+});
+
+/**
+ * The half of the deploy button nobody writes a checksum into. A release says what its own asset
+ * hashes to, which is the only thing that turns such a url into a key exact enough to reuse — and
+ * the only thing a download from one was ever going to be checked against.
+ */
+describe('a release that publishes its own digest is taken at its word', () => {
+  const PUBLISHED = Value.Parse(Sha256DigestSchema, BINARY_DIGEST);
+
+  test('a link with no checksum is held to what the release publishes', async () => {
+    const { service, sourceRepo, releaseRepo } = build();
+    releaseRepo.publishes(PUBLISHED);
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+    });
+
+    expect(releaseRepo.asked).toEqual([BINARY_URL]);
+    expect(artifact.digest).toBe(PUBLISHED);
+  });
+
+  // Which is what makes the next one free: the digest is written down, so the same release asked
+  // for again is answered out of what is already stored.
+  test('and the digest it published is what the next deploy finds it by', async () => {
+    const { service, sourceRepo, artifactsRepo, releaseRepo } = build();
+    releaseRepo.publishes(PUBLISHED);
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+    });
+
+    expect(artifactsRepo.rows.get(artifact.id)?.source_digest).toBe(PUBLISHED);
+  });
+
+  test('a release nibrun already holds is not downloaded to find that out', async () => {
+    const { service, sourceRepo, cachedRepo, releaseRepo, storage } = build();
+    releaseRepo.publishes(PUBLISHED);
+    cachedRepo.remember(alreadyDeployed(PUBLISHED));
+    storage.put({ objectKey: Value.Parse(ObjectKeySchema, BINARY_DIGEST), text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+    });
+
+    expect(sourceRepo.opened).toEqual([]);
+    expect(artifact.digest).toBe(PUBLISHED);
+  });
+
+  /**
+   * The caller published the release. Going and asking the host what it thinks would be
+   * second-guessing the one person who knows, and would cost a round trip to be told the same
+   * thing — or, worse, something else.
+   */
+  test('a checksum in the link is used without asking anybody', async () => {
+    const { service, sourceRepo, releaseRepo } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+      sha256: PUBLISHED,
+    });
+
+    expect(releaseRepo.asked).toEqual([]);
+  });
+
+  /**
+   * Sixty an hour is what an unauthenticated caller gets, so being told nothing is the ordinary
+   * answer rather than the exceptional one. It has to cost exactly what it cost before any of
+   * this existed: the download, unverified, the way a link with no checksum always was.
+   */
+  test('a release that says nothing leaves the fetch exactly as it was', async () => {
+    const { service, sourceRepo, artifactsRepo } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+    });
+
+    expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
+    expect(artifactsRepo.rows.get(artifact.id)?.source_digest).toBeNull();
+  });
+
+  /**
+   * Said as what the release publishes rather than as what was asked for: nobody asked. A caller
+   * who wrote no checksum would otherwise be shown two numbers they have never seen, with nothing
+   * to say which of them was supposed to be theirs.
+   */
+  test('a url serving something other than what was released is refused, and says whose digest it was', async () => {
+    const { service, sourceRepo, releaseRepo, artifactsRepo, storage } = build();
+    releaseRepo.publishes(SEEDED_DIGEST);
+    sourceRepo.serves({ text: BINARY_TEXT });
+
+    const refusal = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: BINARY_URL,
+    });
+
+    await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
+    await expect(refusal).rejects.toThrow('The release publishes');
+    await expect(refusal).rejects.toThrow(SEEDED_DIGEST);
+    await expect(refusal).rejects.toThrow(BINARY_DIGEST);
+    expect(artifactsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
   });
 });
 
