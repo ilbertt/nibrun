@@ -125,7 +125,7 @@ static bool prepare_tenant_filesystem(void) {
   }
   /* The tenant's working directory is a tmpfs it does not own: the only path it
    * can write is the data filesystem mounted inside it. */
-  if (!mounts_tmpfs(APP_DIR, "mode=0755")) {
+  if (!mounts_tmpfs(APP_DIR, "mode=0755," RUNTIME_TMPFS_SIZE)) {
     return false;
   }
   return mounts_tenant_data(&(struct tenant_data_mount){

@@ -88,6 +88,16 @@ require 'the artifact is read-only and the data filesystem is not' \
 require 'the tenant volume is mounted noatime' contains "$mounts" '/app/data ext4 rw,nosuid,nodev,noatime'
 require 'the config drive, which carries the secrets, is gone' lacks "$mounts" /run/config
 
+# The percentage resolves against this container's memory and against the microVM's in
+# production, so the number here is not the guest's. What is worth asserting is that a
+# ceiling arrived at all: a tmpfs mounted without one gets half the machine, which is
+# what turns a tenant filling TMPDIR into an OOM kill instead of an ENOSPC it can read.
+require 'the filesystems the tenant can write are capped' \
+  contains "$mounts" '/tmp tmpfs rw,nosuid,nodev,relatime,size='
+require 'and so is its shared memory' contains "$mounts" '/dev/shm tmpfs rw,nosuid,nodev,relatime,size='
+require 'the two the runtime owns are held to what the runtime puts on them' \
+  contains "$mounts" '/app tmpfs rw,nosuid,nodev,relatime,size=1024k'
+
 echo "PID 1 memory: $(docker exec "$container" grep VmRSS /proc/1/status)"
 
 docker kill --signal TERM "$container" >/dev/null

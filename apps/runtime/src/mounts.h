@@ -14,6 +14,32 @@ bool mounts_dev(void);
  * VM, so every writable path in the guest is one of these. */
 bool mounts_pseudo_filesystems(void);
 
+/* A tmpfs is guest memory wearing a filesystem, and one mounted without a size gets
+ * half of it. That default is why a tenant filling /tmp is OOM-killed rather than told
+ * ENOSPC: the pages are unevictable with no swap, so the write competes with the heap
+ * of the process making it and the killer arrives before the filesystem is full.
+ *
+ * A percentage because guest memory is configurable from 128 MiB to 16 GiB and the
+ * kernel resolves the fraction itself; a byte count here would mean reading
+ * /proc/meminfo to arrive at the same number. Whole ones only — it parses the figure
+ * with memparse and refuses size=12.5%.
+ *
+ * A quarter each — 64 MiB apiece at the 256 MiB default, and the two of them full still
+ * leave the tenant half its memory. Room deliberately left: a ceiling low enough to stop
+ * a leak early is also low enough to break an app writing honestly to the TMPDIR it was
+ * handed, and only one of those two is a fault of ours.
+ *
+ * What the room costs is worth knowing, because nothing here is ever emptied. A snapshot
+ * is exactly the guest's RAM, so what a tenant leaves in /tmp is restored with it on
+ * every wake and outlives everything short of a redeploy: memory spent rather than
+ * scratch returned, and an app can take months of sleeps to reach a ceiling it would
+ * have met in an afternoon. */
+#define TENANT_TMPFS_SIZE "size=25%"
+
+/* /app and /run are mode 0755 owned by root, and hold two mount points and a
+ * resolv.conf. Nothing a tenant does grows them, so they do not scale with the guest. */
+#define RUNTIME_TMPFS_SIZE "size=1M"
+
 bool mounts_tmpfs(const char *target, const char *options);
 
 /* The instance config drive: squashfs, read-only, and nothing on it is ever run. */
