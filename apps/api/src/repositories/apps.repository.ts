@@ -107,7 +107,6 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    */
   async appsAllowed({ ownerId }: { ownerId: OwnerId }): Promise<number | null> {
     const [row] = await this.sql.SelectAppsAllowed`
-      /* @notNull apps_allowed */
       SELECT q.apps_allowed
       FROM nibrun.app_quotas q
       WHERE q.owner_id = ${ownerId}
