@@ -9,7 +9,7 @@ import {
   ServerCogIcon,
   ServerIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { REPO_URL } from '#lib/site.ts';
 
 const BYTES_PER_GIB = 1_073_741_824;
@@ -24,19 +24,68 @@ const MAX_APPS = 20;
 /** Past this many, the per-app price stops being the answer and a conversation is. */
 const BULK_APP_THRESHOLD = 10;
 
+/** What "bigger" starts at, so the second card moves with the machine rather than beside it. */
+const BIGGER_MACHINE_FACTOR = 2;
+
 const CONTACT_URL = `${REPO_URL}/issues/new`;
 
-const CARD =
-  'grid gap-8 rounded-2xl border border-border/60 p-6 sm:grid-cols-[auto_1fr] sm:gap-10 sm:p-8';
+const VOLUME_GIB = DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB;
 
-const CARD_VISUAL =
-  'flex h-32 w-full items-center justify-center rounded-xl bg-muted/40 sm:size-44';
+type MachineResource = { icon: typeof CpuIcon; label: string };
 
-const RESOURCES = [
+const STANDARD_RESOURCES: MachineResource[] = [
   { icon: CpuIcon, label: `${DEFAULT_INSTANCE_RESOURCES.vcpuCount} vCPU` },
   { icon: MemoryStickIcon, label: `${DEFAULT_INSTANCE_RESOURCES.memoryMib} MB memory` },
-  { icon: HardDriveIcon, label: `${DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB} GB disk` },
+  { icon: HardDriveIcon, label: `${VOLUME_GIB} GB disk` },
 ];
+
+const BIGGER_RESOURCES: MachineResource[] = [
+  { icon: CpuIcon, label: `${DEFAULT_INSTANCE_RESOURCES.vcpuCount * BIGGER_MACHINE_FACTOR}+ vCPU` },
+  {
+    icon: MemoryStickIcon,
+    label: `${DEFAULT_INSTANCE_RESOURCES.memoryMib * BIGGER_MACHINE_FACTOR}+ MB memory`,
+  },
+  { icon: HardDriveIcon, label: `${VOLUME_GIB * BIGGER_MACHINE_FACTOR}+ GB disk` },
+];
+
+function MachineCard({
+  icon: Icon,
+  title,
+  resources,
+  note,
+  action,
+}: {
+  icon: typeof ServerIcon;
+  title: string;
+  resources: MachineResource[];
+  note?: string;
+  action: ReactNode;
+}) {
+  return (
+    <div className="grid gap-8 rounded-2xl border border-border/60 p-6 sm:grid-cols-[auto_1fr] sm:gap-10 sm:p-8">
+      <div className="flex h-32 w-full items-center justify-center rounded-xl bg-muted/40 sm:size-44">
+        <Icon className="size-16 text-primary" strokeWidth={1.25} />
+      </div>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <span className="font-medium text-lg">{title}</span>
+          <ul className="flex flex-wrap gap-x-6 gap-y-2">
+            {resources.map(({ icon: ResourceIcon, label }) => (
+              <li key={label} className="flex items-center gap-2 text-muted-foreground text-sm">
+                <ResourceIcon className="size-4 text-primary" />
+                {label}
+              </li>
+            ))}
+          </ul>
+          {note && <span className="text-muted-foreground text-sm">{note}</span>}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-border/60 border-t pt-6">
+          {action}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function Pricing() {
   const [appCount, setAppCount] = useState(FREE_APP_LIMIT);
@@ -62,23 +111,13 @@ export function Pricing() {
         <span className="text-muted-foreground">Then ${PRICE_PER_APP_USD}/app, per month.</span>
       </div>
       <div className="flex flex-col gap-4">
-        <div className={CARD}>
-          <div className={CARD_VISUAL}>
-            <ServerIcon className="size-16 text-primary" strokeWidth={1.25} />
-          </div>
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-3">
-              <span className="font-medium text-lg">One app, on a machine of its own</span>
-              <ul className="flex flex-wrap gap-x-6 gap-y-2">
-                {RESOURCES.map(({ icon: Icon, label }) => (
-                  <li key={label} className="flex items-center gap-2 text-muted-foreground text-sm">
-                    <Icon className="size-4 text-primary" />
-                    {label}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-4 border-border/60 border-t pt-6">
+        <MachineCard
+          icon={ServerIcon}
+          title="One app, on a machine of its own"
+          resources={STANDARD_RESOURCES}
+          note="Isolated, and the disk survives every redeploy — nothing to back up."
+          action={
+            <>
               <div className="flex items-center gap-3">
                 <Button variant="outline" size="icon-sm" onClick={fewer} aria-label="One app fewer">
                   <MinusIcon />
@@ -109,23 +148,22 @@ export function Pricing() {
                   </span>
                 </span>
               )}
-            </div>
-          </div>
-        </div>
-        <div className={CARD}>
-          <div className={CARD_VISUAL}>
-            <ServerCogIcon className="size-16 text-muted-foreground" strokeWidth={1.25} />
-          </div>
-          <div className="flex flex-col items-start justify-center gap-4">
-            <span className="font-medium text-lg">Need a bigger machine?</span>
+            </>
+          }
+        />
+        <MachineCard
+          icon={ServerCogIcon}
+          title="Need a bigger machine?"
+          resources={BIGGER_RESOURCES}
+          action={
             <Button
               variant="outline"
               render={<a href={CONTACT_URL} target="_blank" rel="noreferrer" />}
             >
               Contact us
             </Button>
-          </div>
-        </div>
+          }
+        />
       </div>
     </section>
   );
