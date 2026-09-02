@@ -9,7 +9,6 @@ import {
   ServerIcon,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { REPO_URL } from '#lib/site.ts';
 
 const BYTES_PER_GIB = 1_073_741_824;
 
@@ -26,7 +25,7 @@ const BULK_APP_THRESHOLD = 10;
 /** What "bigger" starts at, so the second card moves with the machine rather than beside it. */
 const BIGGER_MACHINE_FACTOR = 2;
 
-const CONTACT_URL = `${REPO_URL}/issues/new`;
+const CONTACT_URL = 'mailto:hello@nibrun.com';
 
 const VOLUME_GIB = DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB;
 
@@ -131,8 +130,6 @@ export function Pricing() {
               {appCount > BULK_APP_THRESHOLD ? (
                 <a
                   href={CONTACT_URL}
-                  target="_blank"
-                  rel="noreferrer"
                   className="font-medium text-primary text-sm underline underline-offset-4"
                 >
                   Contact us for a volume price
@@ -155,10 +152,7 @@ export function Pricing() {
           title="Need a bigger machine?"
           resources={BIGGER_RESOURCES}
           action={
-            <Button
-              variant="outline"
-              render={<a href={CONTACT_URL} target="_blank" rel="noreferrer" />}
-            >
+            <Button variant="outline" render={<a href={CONTACT_URL} />}>
               Contact us
             </Button>
           }
