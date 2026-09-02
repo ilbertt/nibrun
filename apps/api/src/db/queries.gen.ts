@@ -1186,6 +1186,8 @@ export interface IArtifactsColumns {
     created_at: Date;
     updated_at: Date;
     original_file_url: string | null;
+    /** The digest the url's own download was held to, which for an archive is the archive's. */
+    source_digest: import("@repo/protocol").Sha256Digest | null;
 }
 
 /** Schema of `artifacts`. */
@@ -1194,6 +1196,24 @@ export interface IArtifactsTable {
     relationType: (typeof schema)["artifacts"]["_relationType"];
     indexes: keyof (typeof schema)["artifacts"]["_indexes"];
     constraints: keyof (typeof schema)["artifacts"]["_constraints"];
+}
+
+/** Columns of `cached_binaries`. */
+export interface ICachedBinariesColumns {
+    source_digest: import("@repo/protocol").Sha256Digest;
+    digest: import("@repo/protocol").Sha256Digest;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    size_bytes: string;
+    object_key: import("@repo/protocol").ObjectKey;
+    original_file_name: import("@repo/protocol").Filename;
+}
+
+/** Schema of `cached_binaries`. */
+export interface ICachedBinariesTable {
+    columns: ICachedBinariesColumns;
+    relationType: (typeof schema)["cached_binaries"]["_relationType"];
+    indexes: keyof (typeof schema)["cached_binaries"]["_indexes"];
+    constraints: keyof (typeof schema)["cached_binaries"]["_constraints"];
 }
 
 /** Columns of `deployments`. */
@@ -1773,17 +1793,32 @@ export const schema = {
             original_file_name: { _columnName: "original_file_name", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
-            original_file_url: { _columnName: "original_file_url", _foreignKeys: {} }
+            original_file_url: { _columnName: "original_file_url", _foreignKeys: {} },
+            source_digest: { _columnName: "source_digest", _foreignKeys: {} }
         },
         _indexes: {
             artifacts_app_id_idx: { _indexName: "artifacts_app_id_idx" },
             artifacts_pending_idx: { _indexName: "artifacts_pending_idx" },
-            artifacts_pkey: { _indexName: "artifacts_pkey" }
+            artifacts_pkey: { _indexName: "artifacts_pkey" },
+            artifacts_source_digest_idx: { _indexName: "artifacts_source_digest_idx" }
         },
         _constraints: {
             artifacts_app_id_fkey: { _constraintName: "artifacts_app_id_fkey" },
             artifacts_pkey: { _constraintName: "artifacts_pkey" }
         }
+    },
+    cached_binaries: {
+        _relationName: "cached_binaries",
+        _relationType: "view",
+        _columns: {
+            source_digest: { _columnName: "source_digest", _foreignKeys: {} },
+            digest: { _columnName: "digest", _foreignKeys: {} },
+            size_bytes: { _columnName: "size_bytes", _foreignKeys: {} },
+            object_key: { _columnName: "object_key", _foreignKeys: {} },
+            original_file_name: { _columnName: "original_file_name", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
     },
     deployments: {
         _relationName: "deployments",
@@ -1809,6 +1844,7 @@ export const schema = {
             instance_state: { _columnName: "instance_state", _foreignKeys: {} }
         },
         _indexes: {
+            deployments_activated_artifact_idx: { _indexName: "deployments_activated_artifact_idx" },
             deployments_app_id_idx: { _indexName: "deployments_app_id_idx" },
             deployments_artifact_id_idx: { _indexName: "deployments_artifact_id_idx" },
             deployments_config_id_idx: { _indexName: "deployments_config_id_idx" },
@@ -2025,6 +2061,7 @@ export interface Tables {
     app_usage: IAppUsageTable;
     apps: IAppsTable;
     artifacts: IArtifactsTable;
+    cached_binaries: ICachedBinariesTable;
     deployments: IDeploymentsTable;
     desired_deployments: IDesiredDeploymentsTable;
     desired_environment: IDesiredEnvironmentTable;

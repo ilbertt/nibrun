@@ -31,6 +31,20 @@ export function filenameFromUrl(url: string): Filename | undefined {
 }
 
 /**
+ * Whether the url reached its bytes with a password.
+ *
+ * What such a download has to stay out of is the cache, which is addressed by digest and shared by
+ * everyone: a binary in it is handed to whoever names the right number, without their having to
+ * reach the url it came from. The caller was entitled to those bytes and the next person naming
+ * the digest may not be — and the digest is nobody's secret when a checksum published beside a
+ * download that is gated is the ordinary arrangement.
+ */
+export function carriesCredentials(url: string): boolean {
+  const parsed = parse(url);
+  return parsed !== undefined && (parsed.username !== '' || parsed.password !== '');
+}
+
+/**
  * The url with whatever a caller authenticated by taken out of it. This is the form that is written
  * down and read back in errors, and a password kept forever in a row — or answered to a browser —
  * is one nobody chose to store.

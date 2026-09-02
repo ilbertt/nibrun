@@ -13,6 +13,9 @@ export type InsertPendingArtifactInput = {
   // Only an artifact the api fetched has one, so the column it lands in is nullable and this is
   // how a caller says the bytes were sent instead.
   originalFileUrl: string | null;
+  // What the download was held to, where anybody said. Null is every upload, every url nobody
+  // vouched for, and every url whose bytes are not this api's to hand on.
+  sourceDigest: Sha256Digest | null;
 };
 
 export type CompleteArtifactInput = {
@@ -53,10 +56,11 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     ownerId,
     originalFileName,
     originalFileUrl,
+    sourceDigest,
   }: InsertPendingArtifactInput): Promise<PendingArtifactRow | null> {
     const [row] = await this.sql.InsertPendingArtifact`
-      INSERT INTO nibrun.artifacts (app_id, original_file_name, original_file_url)
-      SELECT a.id, ${originalFileName}, ${originalFileUrl}
+      INSERT INTO nibrun.artifacts (app_id, original_file_name, original_file_url, source_digest)
+      SELECT a.id, ${originalFileName}, ${originalFileUrl}, ${sourceDigest}
       FROM nibrun.live_apps a
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
       RETURNING id, app_id, original_file_name, original_file_url, created_at

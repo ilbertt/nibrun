@@ -27,7 +27,7 @@ import {
   inspectingPassThrough,
   RefusedArtifactError,
 } from '#lib/artifact-digest.ts';
-import { filenameFromUrl, withoutCredentials } from '#lib/binary-url.ts';
+import { carriesCredentials, filenameFromUrl, withoutCredentials } from '#lib/binary-url.ts';
 import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
@@ -286,6 +286,7 @@ export class ArtifactsService extends Service {
       ownerId,
       originalFileName: filename,
       originalFileUrl: null,
+      sourceDigest: null,
     });
     if (!pending) {
       throw new NotFoundError(NO_SUCH_APP);
@@ -408,6 +409,9 @@ export class ArtifactsService extends Service {
     sha256: Sha256Digest | undefined;
   }): Promise<Artifact> {
     const said = withoutCredentials(url);
+    // Written down only where the bytes are this api's to hand on. A download reached with a
+    // password is the caller's own, and a digest is all anybody would need to ask for it by.
+    const sourceDigest = sha256 !== undefined && !carriesCredentials(url) ? sha256 : null;
 
     const source = await this.sourceRepo.open({ url });
     if (source.outcome !== 'open') {
@@ -433,6 +437,7 @@ export class ArtifactsService extends Service {
       ownerId,
       originalFileName: held.filename,
       originalFileUrl: said,
+      sourceDigest,
     });
     if (!pending) {
       await release(held.body);
