@@ -34,11 +34,6 @@ export class CachedBinariesRepository
     sourceDigest: Sha256Digest;
   }): Promise<CachedBinaryRow | null> {
     const [row] = await this.sql.SelectCachedBinary`
-      /* @notNull source_digest */
-      /* @notNull digest */
-      /* @notNull size_bytes */
-      /* @notNull object_key */
-      /* @notNull original_file_name */
       SELECT source_digest, digest, size_bytes, object_key, original_file_name
       FROM nibrun.cached_binaries
       WHERE source_digest = ${sourceDigest}
