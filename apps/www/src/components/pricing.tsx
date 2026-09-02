@@ -105,7 +105,7 @@ export function Pricing() {
     >
       <div className="flex max-w-2xl flex-col gap-3">
         <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          Your first {FREE_APP_LIMIT} apps are free. Forever.
+          First {FREE_APP_LIMIT} apps free. Forever.
         </h2>
         <span className="text-muted-foreground">Then ${PRICE_PER_APP_USD}/app, per month.</span>
       </div>
