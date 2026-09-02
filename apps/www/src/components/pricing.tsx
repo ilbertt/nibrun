@@ -20,8 +20,13 @@ const BIGGER_MACHINE_FACTOR = 2;
 
 const CONTACT_EMAIL = 'hello@nibrun.com';
 
+const CONTACT_BODY = "Hi,\n\nI'd like to know more.\n\nThanks!";
+
+// Percent-encoded rather than form-encoded: a mail client reads `+` in these as a plus sign
+// rather than a space, so `URLSearchParams` would put one in every subject it wrote.
 function contactUrl(subject: string) {
-  return `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}`;
+  const query = `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(CONTACT_BODY)}`;
+  return `mailto:${CONTACT_EMAIL}?${query}`;
 }
 
 const VOLUME_GIB = DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB;
@@ -43,19 +48,21 @@ const BIGGER_RESOURCES: MachineResource[] = [
   { icon: HardDriveIcon, label: `${VOLUME_GIB * BIGGER_MACHINE_FACTOR}+ GB disk` },
 ];
 
-function MachineCard({
+function MachineColumn({
   title,
   resources,
   note,
   action,
+  className,
 }: {
   title: string;
   resources: MachineResource[];
   note?: string;
   action: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex h-full flex-col gap-6 rounded-2xl border border-border/60 p-6 sm:p-8">
+    <div className={`flex h-full flex-col gap-6 ${className}`}>
       <div className="flex flex-col gap-3">
         <span className="font-medium text-lg">{title}</span>
         <ul className="flex flex-col gap-2">
@@ -98,9 +105,10 @@ export function Pricing() {
         </h2>
         <span className="text-muted-foreground">Then ${PRICE_PER_APP_USD}/app, per month.</span>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <MachineCard
-          title="One machine per app"
+      <div className="grid gap-10 sm:grid-cols-2 sm:gap-0">
+        <MachineColumn
+          className="sm:pr-10"
+          title="Your binary runs on"
           resources={STANDARD_RESOURCES}
           note="Managed. Isolated. Persistent disk. Unlimited exports."
           action={
@@ -129,14 +137,15 @@ export function Pricing() {
                     {monthly === 0 ? 'Free' : `$${monthly}`}
                   </span>
                   <span className="text-muted-foreground text-sm">
-                    {monthly === 0 ? 'forever' : 'a month'}
+                    {monthly === 0 ? 'forever' : '/month'}
                   </span>
                 </span>
               )}
             </>
           }
         />
-        <MachineCard
+        <MachineColumn
+          className="sm:border-border/60 sm:border-l sm:pl-10 lg:pl-16"
           title="Need a bigger machine?"
           resources={BIGGER_RESOURCES}
           action={
