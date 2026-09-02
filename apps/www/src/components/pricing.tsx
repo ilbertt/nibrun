@@ -25,7 +25,11 @@ const BULK_APP_THRESHOLD = 10;
 /** What "bigger" starts at, so the second card moves with the machine rather than beside it. */
 const BIGGER_MACHINE_FACTOR = 2;
 
-const CONTACT_URL = 'mailto:hello@nibrun.com';
+const CONTACT_EMAIL = 'hello@nibrun.com';
+
+function contactUrl(subject: string) {
+  return `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}`;
+}
 
 const VOLUME_GIB = DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB;
 
@@ -129,7 +133,7 @@ export function Pricing() {
               </div>
               {appCount > BULK_APP_THRESHOLD ? (
                 <a
-                  href={CONTACT_URL}
+                  href={contactUrl(`Volume pricing for ${appCount} apps`)}
                   className="font-medium text-primary text-sm underline underline-offset-4"
                 >
                   Contact us for a volume price
@@ -152,7 +156,7 @@ export function Pricing() {
           title="Need a bigger machine?"
           resources={BIGGER_RESOURCES}
           action={
-            <Button variant="outline" render={<a href={CONTACT_URL} />}>
+            <Button variant="outline" render={<a href={contactUrl('A bigger machine')} />}>
               Contact us
             </Button>
           }

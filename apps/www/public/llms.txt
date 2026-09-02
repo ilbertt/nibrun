@@ -13,7 +13,7 @@
 ## Pricing
 
 The first 3 apps are free forever, and each app after that is $1/month. Every app gets the same
-machine either way — 1 vCPU, 256 MiB, 8 GiB disk. Past 10 apps, ask about a volume price.
+machine either way — 1 vCPU, 256 MiB, 8 GiB disk. Past 10 apps, or for a bigger machine, email hello@nibrun.com.
 
 ## Deploying
 
