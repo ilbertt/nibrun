@@ -9,7 +9,7 @@ import {
   Ipv4AddressSchema,
   Value,
 } from '@repo/protocol';
-import { Duration, Effect, Either, Layer } from 'effect';
+import { Duration, Effect, Either, Layer, Logger } from 'effect';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppActivator } from '#services/app-activator.service.ts';
 import { AppWaker, HostHasNoRoom, WakeFailed } from '#services/app-waker.service.ts';
@@ -180,6 +180,38 @@ describe('an app that runs on request is started by the request that wanted it',
         expect(yield* Effect.promise(() => response.text())).toBe('served by the tenant');
         expect(waker.woken).toEqual([APP_ID]);
       }),
+    );
+  });
+
+  /**
+   * A wake finishes at the guest's first TCP accept, and a guest accepts well before it answers.
+   * Without the second number the larger half of what a visitor waited is not recorded anywhere,
+   * which is how a wake came to be reported as the cost of its restore alone.
+   */
+  test('what the guest spent answering is recorded beside what the wake spent', () => {
+    const answered: Record<string, unknown>[] = [];
+    const capturing = Logger.replace(
+      Logger.defaultLogger,
+      Logger.make(({ annotations, message }) => {
+        if (String(message).includes('app answered the request that woke it')) {
+          answered.push(Object.fromEntries(annotations));
+        }
+      }),
+    );
+    return activator(wakes().layer)(
+      Effect.gen(function* () {
+        const app = yield* AppActivator;
+        yield* guest(() => new Response('served by the tenant', { status: HTTP_OK }));
+        const hostPort = unusedPort();
+        yield* app.serve([{ appId: APP_ID, hostPort }]);
+
+        yield* get(hostPort);
+
+        expect(answered).toHaveLength(1);
+        expect(answered[0]?.appId).toBe(APP_ID);
+        expect(typeof answered[0]?.wokeMs).toBe('number');
+        expect(typeof answered[0]?.answeredMs).toBe('number');
+      }).pipe(Effect.provide(capturing)),
     );
   });
 

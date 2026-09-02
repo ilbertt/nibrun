@@ -1,5 +1,5 @@
 import type { AppId, HostPort } from '@repo/protocol';
-import { Clock, Effect, Ref, Runtime } from 'effect';
+import { Clock, Duration, Effect, Ref, Runtime } from 'effect';
 import type { AppSlot } from '#lib/network/slot.ts';
 import { forwardToGuest } from '#lib/proxy/forward.ts';
 import { AgentState } from '#services/agent-state.service.ts';
@@ -97,7 +97,7 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
           return sayAppIsDown();
         }
         yield* AgentState.markActive({ appId, nowMs: yield* Clock.currentTimeMillis });
-        yield* waker.wake(appId);
+        const [woke] = yield* Effect.timed(waker.wake(appId));
 
         const woken = (yield* AgentState.snapshot).records.get(appId);
         if (!woken) {
@@ -106,11 +106,27 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
         if (request.headers.get('upgrade') !== null) {
           return sayToComeBack();
         }
-        return yield* forwardToGuest({
-          request,
-          guestIpv4: woken.guestIpv4,
-          httpPort: woken.httpPort,
-        });
+        const [answered, response] = yield* Effect.timed(
+          forwardToGuest({
+            request,
+            guestIpv4: woken.guestIpv4,
+            httpPort: woken.httpPort,
+          }),
+        );
+        /**
+         * Both halves, because a wake ends at the guest's first TCP accept and a guest accepts
+         * long before it answers: `wokeMs` alone reads as the whole cost and is the smaller part
+         * of it. What the visitor paid is the two added together, and which half moved is the
+         * only way to tell a slower host from a tenant that takes longer to come back.
+         */
+        yield* Effect.logInfo('app answered the request that woke it').pipe(
+          Effect.annotateLogs({
+            appId,
+            wokeMs: Duration.toMillis(woke),
+            answeredMs: Duration.toMillis(answered),
+          }),
+        );
+        return response;
       }).pipe(
         Effect.catchTag('HostHasNoRoom', (error) =>
           Effect.logWarning('a request could not be given an app', error)
