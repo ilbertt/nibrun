@@ -53,19 +53,17 @@ function MachineCard({
   resources,
   note,
   action,
-  bigger,
 }: {
   icon: typeof ServerIcon;
   title: string;
   resources: MachineResource[];
   note?: string;
   action: ReactNode;
-  bigger?: boolean;
 }) {
   return (
     <div className="grid gap-8 rounded-2xl border border-border/60 p-6 sm:grid-cols-[auto_1fr] sm:gap-10 sm:p-8">
       <div className="flex h-32 w-full items-center justify-center rounded-xl bg-muted/40 sm:size-44">
-        <Icon className={`${bigger ? 'size-24' : 'size-16'} text-primary`} strokeWidth={1.25} />
+        <Icon className="size-16 text-primary" strokeWidth={1.25} />
       </div>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-3">
@@ -116,7 +114,7 @@ export function Pricing() {
           icon={ServerIcon}
           title="One machine per app"
           resources={STANDARD_RESOURCES}
-          note="Isolated. Persistent disk, nothing to back up."
+          note="Managed. Isolated. Persistent disk. ∞ exports."
           action={
             <>
               <div className="flex items-center gap-3">
@@ -154,7 +152,6 @@ export function Pricing() {
         />
         <MachineCard
           icon={ServerIcon}
-          bigger
           title="Need a bigger machine?"
           resources={BIGGER_RESOURCES}
           action={
