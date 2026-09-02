@@ -8,14 +8,24 @@ const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
 const SQUASHFS_FILENAME = 'artifact.squashfs';
 /**
- * The image is built once per digest on the path a deploy waits on, and read back off a local
- * disk by one guest — so the compressor's job here is to finish, not to be small. On a 57 MiB
- * release binary this measures 0.56s against 2.6s at the default level, for an image 8% larger.
+ * Stored rather than compressed. The image is built once per digest on the path a deploy waits
+ * on and is read back off a local disk by one guest, so nothing here crosses a network and the
+ * compressor was only ever spending a deploy's seconds to save a host's disk.
  *
- * gzip rather than something faster because that is the choice: `squashfs-tools` on the host
- * image is built with gzip, lzma and lzo only, and lzo measures slower than gzip at every level.
+ * Level 1 was already the fastest setting worth having — `squashfs-tools` on the host image
+ * carries gzip, lzma and lzo only, lzo measures slower than gzip at every level, and a larger
+ * block size moves neither. There is nothing left to tune, only the compression itself to drop:
+ * on a 78.7 MiB release binary level 1 measured 718ms of the 3.8s that deploy took.
+ *
+ * What it costs is the image, which roughly doubles — a 78.7 MiB binary goes from 39.8 MiB to
+ * 80.8 MiB — and `artifactCacheDir` is never swept, so a long-lived host accumulates twice what
+ * it did. Bounding that is worth doing on its own; the cache is only ever a copy of what the
+ * bucket still holds, so anything evicted costs a re-fetch and nothing else.
+ *
+ * The superblock still names gzip, because nothing here is what makes it uncompressed: a guest
+ * mounts one of these exactly as it mounts the ones every host already holds.
  */
-const SQUASHFS_COMPRESSION_LEVEL = '1';
+const SQUASHFS_STORE_UNCOMPRESSED = ['-noI', '-noD', '-noF', '-noX'];
 /** The path the guest's init execs, fixed by the boot contract. */
 const GUEST_BINARY_NAME = 'server';
 /** What a binary has to be to be one, wherever it lands — the guest's squashfs or an export. */
@@ -143,8 +153,7 @@ export const ensureArtifactImage = Effect.fn('ensureArtifactImage')(function* (
               stagedImage,
               '-no-progress',
               '-noappend',
-              '-Xcompression-level',
-              SQUASHFS_COMPRESSION_LEVEL,
+              ...SQUASHFS_STORE_UNCOMPRESSED,
             ],
           }),
         );
