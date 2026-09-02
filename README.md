@@ -47,6 +47,8 @@ Open source that already ships as a single binary. One click, nothing to fill in
 - **[Sharkord](https://nibrun.com/deploy/sharkord)** — a self-hosted chat server with voice,
   video and screen sharing.
 - **[Boop](https://nibrun.com/deploy/boop)** — a self-hosted notification inbox for your own apps.
+- **[Gogs](https://nibrun.com/deploy/gogs)** — a self-hosted Git service with repositories, issues
+  and pull requests.
 
 ## Deploy your own app
 

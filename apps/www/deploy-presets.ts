@@ -20,6 +20,18 @@ export const DEPLOY_PRESETS = {
     ],
     minimal: true,
   },
+  // Gogs shells out to git for every repository operation and the guest carries none, so
+  // this build bundles a static one and unpacks it onto the volume. `nibrun` is the
+  // subcommand that does that and then serves.
+  gogs: {
+    name: 'gogs',
+    binary:
+      'https://github.com/ilbertt/gogs/releases/download/v0.15.0-nibrun.2/gogs-nibrun-linux-amd64',
+    sha256: '2ccc30e5f0626239a1814d2b17244bfee366fbb3324025577e8fd77d81fea794',
+    port: 3000,
+    arg: ['nibrun'],
+    minimal: true,
+  },
   pocketbase: {
     name: 'pocketbase',
     binary:
