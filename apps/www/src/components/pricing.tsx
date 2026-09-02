@@ -22,7 +22,7 @@ const TIERS: { name: string; price: string; detail: string; machine?: string }[]
   {
     name: 'Every app after that',
     price: `$${PRICE_PER_APP_USD} a month`,
-    detail: 'Per app rather than per request, and the same machine the free ones run on.',
+    detail: 'Per app, not per request. The same machine.',
   },
 ];
 
