@@ -337,6 +337,28 @@ export const sleepInstance = Effect.fn('sleepInstance')(function* (desired: Desi
   }
 });
 
+/**
+ * How long the guest took to answer, on the pass that first finds it answering.
+ *
+ * The other half of what a cold start costs, and the half no host-side timing can see:
+ * `startedAt` is written when the VMM was asked to start, so this is the kernel, the guest's init
+ * and the tenant's own startup together. `VmManager.boot` accounts for everything before it, and
+ * a start that grew is one or the other.
+ */
+function answeredAfter({
+  record,
+  state,
+  nowMs,
+}: {
+  record: InstanceRecord;
+  state: InstanceState;
+  nowMs: number;
+}) {
+  return state === 'running' && record.startedAt !== undefined
+    ? { answeredMs: nowMs - Date.parse(record.startedAt) }
+    : {};
+}
+
 /** A microVM that has just come up is not left waiting on a delay measured for the one before it. */
 function probeAtOnce(appId: AppId) {
   return AgentState.modify((current) => {
@@ -616,6 +638,7 @@ function settle({
         appId: record.appId,
         from: record.state,
         to: state,
+        ...answeredAfter({ record, state, nowMs }),
       }),
     );
     yield* ReportSignal.raise;

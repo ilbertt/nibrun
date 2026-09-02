@@ -1,6 +1,6 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact, Sha256Digest } from '@repo/protocol';
-import { Data, Effect, Ref, Stream } from 'effect';
+import { Data, Duration, Effect, Ref, Stream } from 'effect';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { stdoutOf } from '#services/command-runner.service.ts';
 
@@ -130,25 +130,41 @@ export const ensureArtifactImage = Effect.fn('ensureArtifactImage')(function* (
     () =>
       Effect.gen(function* () {
         const binaryPath = path.join(stagingDir, GUEST_BINARY_NAME);
-        yield* downloadAndVerify({ artifact, destination: binaryPath });
+        const [fetching] = yield* Effect.timed(
+          downloadAndVerify({ artifact, destination: binaryPath }),
+        );
         yield* fs.chmod(binaryPath, BINARY_MODE);
         yield* fs.remove(stagedImage, { force: true });
-        yield* stdoutOf({
-          command: [
-            'mksquashfs',
-            stagingDir,
-            stagedImage,
-            '-no-progress',
-            '-noappend',
-            '-Xcompression-level',
-            SQUASHFS_COMPRESSION_LEVEL,
-          ],
-        });
+        const [packing] = yield* Effect.timed(
+          stdoutOf({
+            command: [
+              'mksquashfs',
+              stagingDir,
+              stagedImage,
+              '-no-progress',
+              '-noappend',
+              '-Xcompression-level',
+              SQUASHFS_COMPRESSION_LEVEL,
+            ],
+          }),
+        );
         yield* fs.makeDirectory(path.dirname(imagePath), {
           recursive: true,
           mode: CACHE_DIR_MODE,
         });
         yield* fs.rename(stagedImage, imagePath);
+        // Only where the image was built, which is the only time it cost anything: a host that
+        // already holds the digest returns above and has nothing to say. The two halves are
+        // apart because they answer to different things — the transfer to the bucket and the
+        // size of the release, the compression to what this host's CPU is doing.
+        yield* Effect.logInfo('artifact image built').pipe(
+          Effect.annotateLogs({
+            digest: artifact.digest,
+            sizeBytes: artifact.sizeBytes,
+            fetchMs: Duration.toMillis(fetching),
+            packMs: Duration.toMillis(packing),
+          }),
+        );
         return imagePath;
       }),
     () => fs.remove(stagingDir, { recursive: true, force: true }).pipe(Effect.ignore),

@@ -103,30 +103,38 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     }
 
     /**
-     * The agent never becomes the VM's parent: it stages the files, asks init to start the unit,
-     * and stops caring.
+     * Everything a cold boot puts on disk and in the kernel before the VMM is asked for anything:
+     * the tap, the host's view of the guest behind it, the config drive and the machine
+     * description Firecracker reads.
+     *
+     * Apart from the start it precedes because the two are paid by different things. This is the
+     * host's own work and shortening it is this end's to do; what follows is the guest's kernel
+     * and the tenant's own startup, which is not.
      */
-    const boot = Effect.fn('VmManager.boot')(function* ({
+    const stage = Effect.fn('VmManager.stage')(function* ({
       desired,
       slot,
       dataDevicePath,
+      artifactImagePath,
     }: {
       desired: DesiredInstance;
       slot: AppSlot;
       dataDevicePath: string;
+      artifactImagePath: string;
     }) {
-      yield* Effect.annotateCurrentSpan({
-        appId: desired.appId,
-      });
-      // Ahead of everything, because everything below replaces what a snapshot of this app was
-      // taken against — and a start that still found a stamp would restore the old guest onto
-      // the new deployment's disk rather than boot the new one.
-      yield* discardSnapshot(desired.appId);
-      const artifactImagePath = yield* Artifacts.ensureArtifactImage(desired.artifact);
       yield* ensureTap({
         tapName: slot.tapName,
         hostIpv4: slot.hostIpv4,
         subnetPrefixLength: slot.subnetPrefixLength,
+      });
+      // Written before the guest exists rather than after it answers, because nothing has to ask
+      // the guest for it: the MAC is the slot's, and the config below is what hands it over. Left
+      // to ARP, the host's first probe of a new guest pays the resolution `refreshNeighbour`
+      // documents — the same second a wake already knows not to spend.
+      yield* refreshNeighbour({
+        guestIpv4: slot.guestIpv4,
+        guestMac: slot.guestMac,
+        tapName: slot.tapName,
       });
 
       const directory = workingDir(desired.appId);
@@ -175,8 +183,53 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
         },
         socketPath: tenantLogSocketPath({ workingDir: directory }),
       });
-      yield* Effect.onError(Systemd.start(desired.appId), () =>
-        Effect.ignore(logs.detach(desired.appId)),
+    });
+
+    /**
+     * The agent never becomes the VM's parent: it stages the files, asks init to start the unit,
+     * and stops caring.
+     *
+     * The three costs are timed apart because a cold start is the one thing here with no other
+     * account of itself: what the control plane records is the whole of it, and a deploy that
+     * grew by a second says nothing about which of these grew. `artifactMs` is nearly nothing
+     * where the prefetch already built the image and the whole download where it did not, which
+     * is the difference between a host that has seen these bytes and one that has not.
+     */
+    const boot = Effect.fn('VmManager.boot')(function* ({
+      desired,
+      slot,
+      dataDevicePath,
+    }: {
+      desired: DesiredInstance;
+      slot: AppSlot;
+      dataDevicePath: string;
+    }) {
+      yield* Effect.annotateCurrentSpan({
+        appId: desired.appId,
+      });
+      // Ahead of everything, because everything below replaces what a snapshot of this app was
+      // taken against — and a start that still found a stamp would restore the old guest onto
+      // the new deployment's disk rather than boot the new one.
+      yield* discardSnapshot(desired.appId);
+      const [fetching, artifactImagePath] = yield* Effect.timed(
+        Artifacts.ensureArtifactImage(desired.artifact),
+      );
+      const [staging] = yield* Effect.timed(
+        stage({ desired, slot, dataDevicePath, artifactImagePath }),
+      );
+      const [starting] = yield* Effect.timed(
+        Effect.onError(Systemd.start(desired.appId), () =>
+          Effect.ignore(logs.detach(desired.appId)),
+        ),
+      );
+      yield* Effect.logInfo('instance booting').pipe(
+        Effect.annotateLogs({
+          appId: desired.appId,
+          slot: slot.slot,
+          artifactMs: Duration.toMillis(fetching),
+          stagedMs: Duration.toMillis(staging),
+          vmmMs: Duration.toMillis(starting),
+        }),
       );
     });
 
