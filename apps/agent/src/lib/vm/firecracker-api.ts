@@ -23,8 +23,13 @@ const MAX_DETAIL_LENGTH = 200;
 /** A 256 MiB guest measures ~1.7s to snapshot, and is paused for every millisecond of it. */
 const CALL_TIMEOUT = Duration.seconds(60);
 
-/** Firecracker binds its API socket after `exec`, and systemd calls a `Type=exec` unit started at it. */
-const BIND_POLL_INTERVAL = Duration.millis(10);
+/**
+ * Firecracker binds its API socket after `exec`, and systemd calls a `Type=exec` unit started at
+ * it — so the first call always races the bind, and whatever is left of an interval when the
+ * socket appears is added to the wake. Measured against the guest console, the socket is up ~3ms
+ * after the unit starts and a 10ms grid spent ~8ms of the wake waiting to ask again.
+ */
+const BIND_POLL_INTERVAL = Duration.millis(2);
 const BIND_TIMEOUT = Duration.seconds(10);
 
 export class FirecrackerUnreachable extends Data.TaggedError('FirecrackerUnreachable')<{

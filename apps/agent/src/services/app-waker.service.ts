@@ -21,10 +21,12 @@ import { VmManager } from '#services/vm-manager.service.ts';
 
 /**
  * Tighter than the startup grid the status loop probes on, because somebody is holding a browser
- * tab open on this one. The difference between finding out at 25ms and at 250ms is a quarter of
- * a second added to every cold start.
+ * tab open on this one — and tighter than it needs to be to find out, because on average half an
+ * interval is added to every wake purely by asking on a grid. A restore reaches its first accept
+ * in ~90ms, so 25ms spent a measured ~12ms of that on nothing; the probe is one loopback connect
+ * to a guest that either has the port open or does not, which is cheap enough to ask for often.
  */
-const PROBE_INTERVAL_MS = 25;
+const PROBE_INTERVAL_MS = 5;
 const PROBE_INTERVAL = Duration.millis(PROBE_INTERVAL_MS);
 
 const NO_SHORTFALL = 0;
