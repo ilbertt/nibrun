@@ -113,9 +113,9 @@ export function Pricing() {
       <div className="flex flex-col gap-4">
         <MachineCard
           icon={ServerIcon}
-          title="One app, on a machine of its own"
+          title="One machine per app"
           resources={STANDARD_RESOURCES}
-          note="Isolated, and the disk survives every redeploy — nothing to back up."
+          note="Isolated. Persistent disk, nothing to back up."
           action={
             <>
               <div className="flex items-center gap-3">
