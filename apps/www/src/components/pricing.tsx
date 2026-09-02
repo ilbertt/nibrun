@@ -100,7 +100,7 @@ export function Pricing() {
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <MachineCard
-          title="One machine per app"
+          title="Your binary runs on"
           resources={STANDARD_RESOURCES}
           note="Managed. Isolated. Persistent disk. Unlimited exports."
           action={
@@ -129,7 +129,7 @@ export function Pricing() {
                     {monthly === 0 ? 'Free' : `$${monthly}`}
                   </span>
                   <span className="text-muted-foreground text-sm">
-                    {monthly === 0 ? 'forever' : 'a month'}
+                    {monthly === 0 ? 'forever' : '/month'}
                   </span>
                 </span>
               )}
