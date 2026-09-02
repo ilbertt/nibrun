@@ -14,17 +14,17 @@ const MACHINE_SPEC = [
   `${DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB} GB disk`,
 ].join(' · ');
 
-const TIERS: { name: string; price: string; detail: string; machine?: string }[] = [
+const TIERS: { name: string; price: string; period: string; machine?: string }[] = [
   {
     name: `First ${FREE_APP_LIMIT} apps`,
-    price: 'Free, forever',
+    price: 'Free',
+    period: 'forever',
     machine: MACHINE_SPEC,
-    detail: 'No card to start, no trial clock.',
   },
   {
     name: `Every ${APPS_PER_BLOCK} after that`,
-    price: `$${PRICE_PER_BLOCK_USD} a month`,
-    detail: 'Not per request. The same machine.',
+    price: `$${PRICE_PER_BLOCK_USD}`,
+    period: 'a month',
   },
 ];
 
@@ -38,12 +38,14 @@ export function Pricing() {
         Your first {FREE_APP_LIMIT} apps are free. Forever.
       </h2>
       <ul className="grid gap-8 sm:grid-cols-2">
-        {TIERS.map(({ name, price, machine, detail }) => (
+        {TIERS.map(({ name, price, period, machine }) => (
           <li key={name} className="flex flex-col gap-2 border-border/60 border-t pt-4">
             <span className="text-muted-foreground text-sm">{name}</span>
-            <span className="font-medium text-lg text-primary">{price}</span>
+            <span className="flex items-baseline gap-2">
+              <span className="font-semibold text-4xl text-primary tracking-tight">{price}</span>
+              <span className="text-muted-foreground text-sm">{period}</span>
+            </span>
             {machine && <span className="text-foreground">{machine}</span>}
-            <span className="text-pretty text-muted-foreground text-sm">{detail}</span>
           </li>
         ))}
       </ul>
