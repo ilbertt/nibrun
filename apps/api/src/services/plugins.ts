@@ -1,8 +1,10 @@
-import { Elysia } from 'elysia';
+import { Elysia, StatusMap } from 'elysia';
 import { sql } from '#db/client.ts';
+import { DesiredStateNews } from '#lib/agent/desired-state-news.ts';
 import { CloudflareClient } from '#lib/cloudflare/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
+import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { artifactsS3, artifactsSigner, exportsS3 } from '#lib/s3/client.ts';
 import { readSecretsKey } from '#lib/tenant-secrets.ts';
 import { VictoriaLogsClient } from '#lib/victorialogs/client.ts';
@@ -107,8 +109,14 @@ const artifactsService = new ArtifactsService({
   releaseRepo: releaseDigestRepository,
   appsRepo: appsRepository,
 });
+/**
+ * One for the process, because the hosts waiting on it and the requests moving it are both here.
+ */
+const desiredStateNews = new DesiredStateNews();
+
 const agentService = new AgentService({
   agentRepo: agentRepository,
+  news: desiredStateNews,
   deploymentsService,
   appsService,
   exportsService,
@@ -119,6 +127,39 @@ const logsService = new LogsService({
   logsRepo: logsRepository,
   deploymentsRepo: deploymentsRepository,
 });
+
+/** A request that only reads cannot have changed what a host should be running. */
+const MUTATING_METHODS: ReadonlySet<string> = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
+
+/**
+ * Every owner-driven change, counted in one place rather than at each write that makes one.
+ *
+ * At the edge because the alternative is a call beside every statement that touches a table
+ * desired state is read from, and the failure of that alternative is silent: a write that forgot
+ * to say so leaves a host holding a poll for the full hold with the news already in the database.
+ * Here there is nothing to forget — an owner changed something or they did not.
+ *
+ * It over-counts, and that is the direction to be wrong in. A request that changed nothing a host
+ * cares about still answers its poll, and the agent's own comparison finds the state it already
+ * holds and converges on nothing. What it costs is one round trip; what the other way costs is
+ * the latency this exists to remove.
+ *
+ * Public routes only. A host's own report is not an owner asking for something, and counting one
+ * would have every report wake the poll that the same host is holding open.
+ */
+export const desiredStateNewsPlugin = new Elysia({ name: 'desired-state-news' })
+  .onAfterResponse(({ request, set }) => {
+    const status =
+      typeof set.status === 'string' ? StatusMap[set.status] : (set.status ?? StatusMap.OK);
+    if (
+      status < StatusMap['Bad Request'] &&
+      MUTATING_METHODS.has(request.method) &&
+      new URL(request.url).pathname.startsWith(RoutePrefix.Api)
+    ) {
+      desiredStateNews.changed();
+    }
+  })
+  .as('global');
 
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);

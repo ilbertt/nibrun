@@ -10,6 +10,7 @@ import {
   TimestampSchema,
   Value,
 } from '@repo/protocol';
+import type { DesiredStateNews } from '#lib/agent/desired-state-news.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
 import type { AppsService } from '#services/apps.service.ts';
@@ -36,6 +37,7 @@ export class AgentService extends Service {
   private readonly exportsService: ExportsService;
   private readonly artifactsService: UploadSweep;
   private readonly hostnamesService: HostnameReconcile;
+  private readonly news: DesiredStateNews;
 
   constructor({
     agentRepo,
@@ -44,6 +46,7 @@ export class AgentService extends Service {
     exportsService,
     artifactsService,
     hostnamesService,
+    news,
   }: {
     agentRepo: AgentRepositoryContract;
     deploymentsService: DeploymentsService;
@@ -51,6 +54,7 @@ export class AgentService extends Service {
     exportsService: ExportsService;
     artifactsService: UploadSweep;
     hostnamesService: HostnameReconcile;
+    news: DesiredStateNews;
   }) {
     super();
     this.agentRepo = agentRepo;
@@ -59,6 +63,7 @@ export class AgentService extends Service {
     this.exportsService = exportsService;
     this.artifactsService = artifactsService;
     this.hostnamesService = hostnamesService;
+    this.news = news;
   }
 
   /**
@@ -105,8 +110,28 @@ export class AgentService extends Service {
     return hostId;
   }
 
-  desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
-    return this.agentRepo.desiredState({ hostId });
+  /**
+   * What the host should be running, held until there is something it has not been told.
+   *
+   * `signal` is what ends the hold — the request going away, or the caller's own ceiling — so a
+   * host with nothing owed to it is answered with the state it already has rather than an error.
+   * A caller that passes an already-fired signal is answered at once, which is what an agent that
+   * asked for no hold at all gets.
+   */
+  async desiredState({
+    hostId,
+    sessionToken,
+    signal,
+  }: {
+    hostId: HostId;
+    sessionToken: string;
+    signal: AbortSignal;
+  }): Promise<HostDesiredState> {
+    await this.news.awaited({ sessionToken, signal });
+    const generation = this.news.generation;
+    const state = await this.agentRepo.desiredState({ hostId });
+    this.news.served({ sessionToken, generation });
+    return state;
   }
 
   /**

@@ -29,6 +29,16 @@ const logRejectedState = (error: ProtocolMismatch) =>
     Effect.annotateLogs({ issues: error.issues }),
   );
 
+/**
+ * How long the control plane is asked to hold a poll that has nothing to answer.
+ *
+ * The api holds for less where its own ceiling is lower, so this is a request rather than an
+ * arrangement — which is what lets the two sides be deployed in either order. What it buys is the
+ * whole of `minIntervalMs`: a change landing while this is held is answered in the instant it
+ * lands, where before it waited out whatever was left of the interval.
+ */
+const HOLD_SECONDS = 25;
+
 export const pollLoop = Effect.gen(function* () {
   const control = yield* ControlPlane;
   const sessions = yield* AgentSessionHolder;
@@ -38,7 +48,7 @@ export const pollLoop = Effect.gen(function* () {
     const session = yield* sessions.current;
     const desired = yield* control.fetchDesiredState({
       sessionToken: session.sessionToken,
-      request: {},
+      request: { waitSeconds: HOLD_SECONDS },
     });
 
     if (yield* cache.accept(desired)) {

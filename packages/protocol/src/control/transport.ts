@@ -15,6 +15,14 @@ import { HostDesiredStateSchema } from '#control/desired-state.ts';
  */
 export const PROTOCOL_VERSION = 1;
 
+/**
+ * The range a host may ask to be held for. The ceiling is not the control plane's own — that one
+ * is lower and belongs where the thing closing the connection is known — it is only the widest
+ * request that is worth writing down rather than reading as a mistake.
+ */
+const MIN_HOLD_SECONDS = 1;
+const MAX_HOLD_SECONDS = 60;
+
 export const PROTOCOL_VERSION_HEADER = 'x-nibrun-protocol-version';
 
 // Under /internal, not /api: the public edge answers 404 for that whole
@@ -49,14 +57,28 @@ export const AGENT_ROUTES = {
  * for itself whether the one that arrived differs. The comparison belongs to the only party that
  * knows what it converged on.
  *
- * No `waitSeconds` yet, which is a deferral rather than a decision against long-polling. Holding
- * the request is what stops notice-latency and request rate being the same dial — `minIntervalMs`
- * is currently both, so buying a faster deploy means paying for it in polls from every host. What
- * it needs is something able to wake a held request, so it arrives with the `NOTIFY` beside the
- * write that changes desired state, and not before: until then it would register a waiter nothing
- * exists to notify.
+ * `waitSeconds` is what stops notice-latency and request rate being the same dial. Without it
+ * `minIntervalMs` is both, so a deploy noticed sooner is paid for in polls from every host; with
+ * it a host asks once and is answered the moment there is something to say.
  */
-export const DesiredStateRequestSchema = Type.Object({});
+export const DesiredStateRequestSchema = Type.Object({
+  /**
+   * How long the control plane may hold this open with nothing to say, or absent to be answered
+   * at once.
+   *
+   * Optional because that absence is the whole of the rollout. An agent that predates this sends
+   * nothing and is answered immediately, exactly as it is today, so the api may go out first the
+   * way it has to; and an agent asking a control plane that predates it has the field ignored and
+   * falls back to the same. Neither half has to know what the other is running.
+   *
+   * The control plane holds it for less where its own ceiling is lower — a request held past what
+   * closes it from outside comes back as an error, and an error is something a host backs off
+   * from rather than reopens.
+   */
+  waitSeconds: Type.Optional(
+    Type.Integer({ minimum: MIN_HOLD_SECONDS, maximum: MAX_HOLD_SECONDS }),
+  ),
+});
 
 export type DesiredStateRequest = typeof DesiredStateRequestSchema.static;
 

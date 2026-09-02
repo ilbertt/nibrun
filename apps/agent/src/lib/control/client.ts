@@ -27,6 +27,9 @@ const REQUEST_TIMEOUT_MS = 30_000;
  * loses every read handed to a host on the way out.
  */
 const FILESYSTEM_QUERY_TIMEOUT_MS = 45_000;
+
+/** Desired state is held the same way and for the same reasons, so it is given the same room. */
+const DESIRED_STATE_TIMEOUT_MS = FILESYSTEM_QUERY_TIMEOUT_MS;
 const HTTP_UNAUTHORIZED = 401;
 const NOT_DELIVERED = 0;
 const MAX_BODY = 256;
@@ -131,7 +134,11 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
     }) =>
       call({
         route: AGENT_ROUTES.desiredState,
-        send: () => api.internal.agent['desired-state'].post(request, options({ sessionToken })),
+        send: () =>
+          api.internal.agent['desired-state'].post(
+            request,
+            options({ sessionToken, timeoutMs: DESIRED_STATE_TIMEOUT_MS }),
+          ),
       }).pipe(
         Effect.flatMap((value) =>
           decode(() => parseMessage({ schema: DesiredStateResponseSchema, value })),

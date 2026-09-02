@@ -9,6 +9,7 @@ import {
   type SecretString,
   Value,
 } from '@repo/protocol';
+import { DesiredStateNews } from '#lib/agent/desired-state-news.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
 import { AgentService, type HostnameReconcile, type UploadSweep } from '#services/agent.service.ts';
@@ -139,12 +140,14 @@ function build() {
   const exports = new FakeExportsService();
   const artifacts = new FakeUploadSweep();
   const hostnames = new FakeHostnameReconcile();
+  const news = new DesiredStateNews();
   return {
     apps,
     deployments,
     exports,
     artifacts,
     hostnames,
+    news,
     service: new AgentService({
       agentRepo: new FakeAgentRepository(),
       deploymentsService: deployments as unknown as DeploymentsService,
@@ -152,9 +155,13 @@ function build() {
       exportsService: exports as unknown as ExportsService,
       artifactsService: artifacts,
       hostnamesService: hostnames,
+      news,
     }),
   };
 }
+
+/** A session nobody has served yet is owed a read, so nothing here ever waits on the signal. */
+const ANSWERED_AT_ONCE = { sessionToken: 'session-of-record', signal: AbortSignal.abort() };
 
 describe('a session is the identity a host is answered as', () => {
   test('a host presenting its own id keeps it across a reinstall', async () => {
@@ -186,7 +193,7 @@ describe('a host is told the whole of what it should be running', () => {
     const { service } = build();
     const hostId = Value.Parse(HostIdSchema, 'host-1');
 
-    expect(await service.desiredState({ hostId })).toEqual({
+    expect(await service.desiredState({ hostId, ...ANSWERED_AT_ONCE })).toEqual({
       hostId,
       volumes: [],
       instances: [],
