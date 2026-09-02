@@ -4,6 +4,8 @@ const BYTES_PER_GIB = 1_073_741_824;
 
 const FREE_APP_LIMIT = 3;
 
+const PRICE_PER_APP_USD = 5;
+
 const MACHINE_SPEC = [
   `${DEFAULT_INSTANCE_RESOURCES.vcpuCount} vCPU`,
   `${DEFAULT_INSTANCE_RESOURCES.memoryMib} MB`,
@@ -19,8 +21,8 @@ const TIERS: { name: string; price: string; detail: string; machine?: string }[]
   },
   {
     name: 'Every app after that',
-    price: 'A flat monthly price',
-    detail: "We haven't settled the number yet. It lands here before anyone is charged.",
+    price: `$${PRICE_PER_APP_USD} a month`,
+    detail: 'Per app rather than per request, and the same machine the free ones run on.',
   },
 ];
 
