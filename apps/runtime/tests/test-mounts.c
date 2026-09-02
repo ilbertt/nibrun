@@ -11,12 +11,14 @@
 #include <fcntl.h>
 #include <sched.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mount.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/sysinfo.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -27,8 +29,12 @@
 
 #define SQUASHFS_MOUNT "/run/test-artifact"
 #define DATA_MOUNT "/run/test-data"
+#define TENANT_TMPFS_MOUNT "/run/test-tenant-tmpfs"
 #define FREEZE_HOLD_TEST_MS 200
 #define GRANT_BYTES 8
+#define KIBIBYTE_BYTES 1024
+#define MEBIBYTE_BYTES (1024 * 1024)
+#define UNBOUNDED_SHARE 2
 
 /**
  * Drives the real control-channel loop over a socketpair, standing in for the vsock a
@@ -92,6 +98,49 @@ static bool mounted_with(const char *target, const char *option) {
   }
   fclose(table);
   return found;
+}
+
+/**
+ * The ceiling tmpfs actually applied, which it reports as `size=<n>k` already resolved
+ * from whatever the mount asked for. Reading it back is the only way to see what a
+ * percentage came out as — and 0, the answer for a mount carrying no size at all, is
+ * the unbounded default this exists to keep off the tenant-writable ones.
+ */
+static uint64_t mounted_size_bytes(const char *target) {
+  FILE *table = fopen("/proc/self/mounts", "r");
+  if (table == NULL) {
+    return 0;
+  }
+  char line[1024];
+  uint64_t bytes = 0;
+  while (fgets(line, sizeof(line), table) != NULL) {
+    char device[256];
+    char point[256];
+    char type[64];
+    char options[256];
+    if (sscanf(line, "%255s %255s %63s %255s", device, point, type, options) != 4) {
+      continue;
+    }
+    if (strcmp(point, target) != 0) {
+      continue;
+    }
+    for (char *cursor = strtok(options, ","); cursor != NULL; cursor = strtok(NULL, ",")) {
+      unsigned long long kilobytes = 0;
+      if (sscanf(cursor, "size=%lluk", &kilobytes) == 1) {
+        bytes = (uint64_t)kilobytes * KIBIBYTE_BYTES;
+      }
+    }
+  }
+  fclose(table);
+  return bytes;
+}
+
+static uint64_t total_memory_bytes(void) {
+  struct sysinfo information;
+  if (sysinfo(&information) < 0) {
+    return 0;
+  }
+  return (uint64_t)information.totalram * information.mem_unit;
 }
 
 static bool is_of_type(const char *target, const char *filesystem) {
@@ -168,10 +217,22 @@ int main(int argc, char **argv) {
     return 64;
   }
 
-  EXPECT(mounts_tmpfs("/run", "mode=0755"));
+  EXPECT(mounts_tmpfs("/run", "mode=0755," RUNTIME_TMPFS_SIZE));
   EXPECT(is_of_type("/run", "tmpfs"));
   EXPECT(mounted_with("/run", "nosuid"));
   EXPECT(mounted_with("/run", "nodev"));
+  EXPECT(mounted_size_bytes("/run") == MEBIBYTE_BYTES);
+
+  /* The percentage form, resolved by the kernel and not by anything here. The way this
+   * fails silently is a size= the kernel does not parse: the mount still succeeds, and
+   * what it gets is the unbounded default this exists to keep off a tenant's /tmp. So
+   * what is asserted is a ceiling that arrived and came in under that default. */
+  EXPECT(mkdir(TENANT_TMPFS_MOUNT, 0755) == 0);
+  EXPECT(mounts_tmpfs(TENANT_TMPFS_MOUNT, "mode=1777," TENANT_TMPFS_SIZE));
+  EXPECT(mounted_size_bytes(TENANT_TMPFS_MOUNT) > 0);
+  EXPECT(mounted_size_bytes(TENANT_TMPFS_MOUNT) < total_memory_bytes() / UNBOUNDED_SHARE);
+  /* Unlike /app and /run: /tmp is the tenant's, and a ceiling on it is not a lock. */
+  EXPECT(can_write_as_tenant(TENANT_TMPFS_MOUNT));
 
   EXPECT(mounts_artifact(squashfs_device, SQUASHFS_MOUNT));
   EXPECT(is_of_type(SQUASHFS_MOUNT, "squashfs"));

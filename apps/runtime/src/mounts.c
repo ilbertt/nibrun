@@ -86,17 +86,17 @@ bool mounts_pseudo_filesystems(void) {
        .target = "/run",
        .filesystem = "tmpfs",
        .flags = MS_NOSUID | MS_NODEV,
-       .options = "mode=0755"},
+       .options = "mode=0755," RUNTIME_TMPFS_SIZE},
       {.source = "tmpfs",
        .target = "/tmp",
        .filesystem = "tmpfs",
        .flags = MS_NOSUID | MS_NODEV,
-       .options = "mode=1777"},
+       .options = "mode=1777," TENANT_TMPFS_SIZE},
       {.source = "tmpfs",
        .target = "/dev/shm",
        .filesystem = "tmpfs",
        .flags = MS_NOSUID | MS_NODEV,
-       .options = "mode=1777"},
+       .options = "mode=1777," TENANT_TMPFS_SIZE},
   };
 
   /* Every other mount point here is a directory the image carries. /dev is a
