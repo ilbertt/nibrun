@@ -7,11 +7,15 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@repo/ui/components/breadcrumb';
+import { buttonVariants } from '@repo/ui/components/button';
 import { Link } from '@tanstack/react-router';
+import { FolderRootIcon } from 'lucide-react';
 import { Fragment } from 'react';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDirectoryPath } from '#lib/hooks/use-directory-path.ts';
 import { Route as FilesRoute } from '#routes/(dashboard)/apps/$appId/files.tsx';
+
+const ROOT_LABEL = 'Root directory';
 
 type PathStep = {
   name: string;
@@ -28,14 +32,31 @@ export function PathBreadcrumb() {
       <BreadcrumbList className="font-mono">
         <BreadcrumbItem>
           {steps.length === 0 ? (
-            <BreadcrumbPage>{GUEST_PATH_ROOT}</BreadcrumbPage>
+            <BreadcrumbPage
+              aria-label={ROOT_LABEL}
+              className="-ml-1.5 flex size-7 items-center justify-center"
+              title={ROOT_LABEL}
+            >
+              <FolderRootIcon className="size-4" />
+            </BreadcrumbPage>
           ) : (
             <BreadcrumbLink
+              className={buttonVariants({
+                className: '-ml-1.5',
+                size: 'icon-sm',
+                variant: 'ghost',
+              })}
               render={
-                <Link to={FilesRoute.to} params={{ appId }} search={{ path: GUEST_PATH_ROOT }} />
+                <Link
+                  aria-label={ROOT_LABEL}
+                  params={{ appId }}
+                  search={{ path: GUEST_PATH_ROOT }}
+                  title={ROOT_LABEL}
+                  to={FilesRoute.to}
+                />
               }
             >
-              {GUEST_PATH_ROOT}
+              <FolderRootIcon className="size-4" />
             </BreadcrumbLink>
           )}
         </BreadcrumbItem>
