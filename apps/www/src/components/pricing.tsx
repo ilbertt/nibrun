@@ -114,7 +114,7 @@ export function Pricing() {
           icon={ServerIcon}
           title="One machine per app"
           resources={STANDARD_RESOURCES}
-          note="Managed. Isolated. Persistent disk. ∞ exports."
+          note="Managed. Isolated. Persistent disk. Unlimited exports."
           action={
             <>
               <div className="flex items-center gap-3">
