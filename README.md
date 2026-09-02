@@ -49,6 +49,8 @@ Open source that already ships as a single binary. One click, nothing to fill in
 - **[Boop](https://nibrun.com/deploy/boop)** — a self-hosted notification inbox for your own apps.
 - **[Gogs](https://nibrun.com/deploy/gogs)** — a self-hosted Git service with repositories, issues
   and pull requests.
+- **[Gitea](https://nibrun.com/deploy/gitea)** — a self-hosted Git service with repositories,
+  issues, pull requests, packages and CI.
 
 ## Deploy your own app
 

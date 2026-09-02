@@ -20,6 +20,18 @@ export const DEPLOY_PRESETS = {
     ],
     minimal: true,
   },
+  // Gitea, like Gogs, shells out to git and writes its hooks as bash scripts. This build
+  // carries a static git and native hooks inside the binary, which `nibrun` unpacks before
+  // serving. It comes up with an administrator whose password is printed to the log.
+  gitea: {
+    name: 'gitea',
+    binary:
+      'https://github.com/ilbertt/gitea/releases/download/v1.28.0-dev-nibrun.2/gitea-nibrun-linux-amd64',
+    sha256: 'e74bef3081a046c6a3964dee49ca68b94316a69f0709a148ee6234c543a93bb5',
+    port: 3000,
+    arg: ['nibrun'],
+    minimal: true,
+  },
   // Gogs shells out to git for every repository operation and the guest carries none, so
   // this build bundles a static one and unpacks it onto the volume. `nibrun` is the
   // subcommand that does that and then serves.
