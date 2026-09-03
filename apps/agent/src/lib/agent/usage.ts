@@ -1,11 +1,14 @@
 import type { AppId, ComputeUsage, FilesystemUsage } from '@repo/protocol';
-import { type Duration, Effect, Schedule } from 'effect';
+import { type Duration, Effect, Option, Schedule } from 'effect';
 import { recordActivity } from '#lib/agent/activity.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import type { MeasuredCompute } from '#lib/filesystem/protocol.ts';
 import { applySleep } from '#lib/reconcile/idle.ts';
 import { isIdle } from '#lib/report/instance-record.ts';
+import { referencedDigests, sweepArtifactCache } from '#lib/vm/artifact-cache.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
 import { type AgentSnapshot, AgentState } from '#services/agent-state.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { FilesystemReader, type GuestReading } from '#services/filesystem-reader.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
@@ -167,6 +170,31 @@ export const measureUsage = Effect.gen(function* () {
 });
 
 /**
+ * Lets go of the artifact images this host is holding and no longer needs.
+ *
+ * Here rather than in the reconcile for the reason `applySleep` is: it stats a directory and
+ * unlinks from a disk, and neither belongs in front of the health probes of every app on the
+ * host. A minute is also far finer than the thing it is bounding — a cache grows by a deploy,
+ * not by a tick.
+ *
+ * Failure is logged and nothing else. A sweep that could not run leaves a host holding more than
+ * it should, which is the same place it was before this existed.
+ */
+const sweepCache = Effect.gen(function* () {
+  const config = yield* AgentConfig;
+  const desired = yield* (yield* DesiredStateCache).latest;
+  yield* sweepArtifactCache({
+    cacheDir: config.artifactCacheDir,
+    referenced: referencedDigests({
+      desired: Option.getOrUndefined(desired)?.instances ?? [],
+      records: yield* AgentState.records,
+    }),
+  });
+}).pipe(
+  Effect.catchAll((error) => Effect.logWarning('the artifact cache could not be swept', error)),
+);
+
+/**
  * The sixth loop, and separate from the report it feeds for the reason the filesystem loop is
  * separate from the reconcile: measuring means a round trip into every guest on the host, and a
  * report that waited for those would be a report a hung tenant could stop — while what the report
@@ -176,8 +204,14 @@ export const usageLoop = supervised({
   // Deciding straight after measuring, because the measurement is the only thing that moves the
   // answer: an app is let go to sleep on the reading that found it quiet rather than on a tick
   // that happened to come later.
+  //
+  // The sweep is last, so it reads the records a sleep has already written: an app that has just
+  // been suspended still holds its image, and one dropped from desired state has already let go.
   once: Effect.andThen(
-    Effect.andThen(recordActivity, Effect.andThen(applySleep, measureUsage)),
+    Effect.andThen(
+      recordActivity,
+      Effect.andThen(applySleep, Effect.andThen(measureUsage, sweepCache)),
+    ),
     Effect.sleep(MEASUREMENT_INTERVAL),
   ),
   onFailure: (cause) => Effect.logWarning('the usage loop failed', cause),

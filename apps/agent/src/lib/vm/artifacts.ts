@@ -126,6 +126,11 @@ export const ensureArtifactImage = Effect.fn('ensureArtifactImage')(function* (
   const cacheDir = config.artifactCacheDir;
   const imagePath = artifactImagePath({ cacheDir, digest: artifact.digest, path });
   if (yield* fs.exists(imagePath)) {
+    // Marks it used, which is the whole of what `sweepArtifactCache` orders by. Left alone the
+    // timestamp says when the image was *built*, so the digest this host starts every day would
+    // be evicted ahead of one fetched once last week and never wanted again. Ignored on failure:
+    // a cache entry that cannot be touched is one that ages, not one that fails a deploy.
+    yield* Effect.ignore(fs.utimes(imagePath, new Date(), new Date()));
     return imagePath;
   }
 

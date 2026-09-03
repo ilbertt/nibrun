@@ -122,7 +122,6 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
           SELECT deployment_id, name, value FROM nibrun.desired_environment
         `,
         this.sql.SelectDesiredExports`
-          /* @notNull object_key */
           /* @notNull artifact_object_key */
           /* @notNull digest */
           /* @notNull size_bytes */
