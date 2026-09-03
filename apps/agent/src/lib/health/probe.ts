@@ -32,6 +32,12 @@ const unhealthyUnless = ({
   timeoutMs: number;
 }) =>
   probe.pipe(
+    // As in `CommandRunner` and `isFormatted`: the connect is a promise this side cannot recall,
+    // so without this the deadline is the moment the *socket* gives up rather than the moment this
+    // stops waiting — an address nothing answers on is bounded by the kernel's connect timeout,
+    // not by `timeoutMs`. A guest whose tap has gone is exactly that address, and a pass waiting
+    // on one is a pass reporting nothing about any app on the host.
+    Effect.disconnect,
     Effect.timeoutTo({
       duration: Duration.millis(timeoutMs),
       onSuccess: (healthy: boolean) => healthy,
