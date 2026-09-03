@@ -25,4 +25,4 @@ export const DASHBOARD_SITE: Site = {
     'One click deployment of your app. Drop the compiled binary or point at its url, and it gets a microVM of its own, a filesystem that persists, and an HTTPS URL.',
 };
 
-export const CONTACT_EMAIL = `hello@${BASE_DOMAIN}`;
+export const HELLO_EMAIL = `hello@${BASE_DOMAIN}`;
