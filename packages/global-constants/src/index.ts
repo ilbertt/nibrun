@@ -12,8 +12,8 @@ export { FREE_APPS_COUNT, PRICE_PER_APP_USD } from '#pricing.ts';
 export {
   BASE_DOMAIN,
   CONTACT_EMAIL,
-  DASHBOARD_SITE_DEV_URL,
-  DASHBOARD_SITE_URL,
-  WWW_SITE_DEV_URL,
-  WWW_SITE_URL,
+  DASHBOARD_SITE,
+  PRODUCT_NAME,
+  type Site,
+  WWW_SITE,
 } from '#sites.ts';

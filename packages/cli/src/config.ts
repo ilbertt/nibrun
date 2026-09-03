@@ -1,5 +1,5 @@
 import type { CommandOption } from '@parshjs/core';
-import { DASHBOARD_SITE_URL } from '@repo/global-constants';
+import { DASHBOARD_SITE } from '@repo/global-constants';
 import { EXTRA_PUBLIC_PORT_VALUES, RUNTIME_VALUE_NAMES } from '@repo/protocol';
 import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };
@@ -8,7 +8,7 @@ export const PROGRAM_NAME = 'nib';
 
 export const PROGRAM_VERSION = packageJson.version;
 
-export const DEFAULT_API_URL = DASHBOARD_SITE_URL;
+export const DEFAULT_API_URL = DASHBOARD_SITE.url;
 
 /**
  * A flag more than one command takes, held as both the name parsh spells it by and the declaration

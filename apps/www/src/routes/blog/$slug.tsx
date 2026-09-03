@@ -1,4 +1,4 @@
-import { WWW_SITE_URL } from '@repo/global-constants';
+import { WWW_SITE } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileTextIcon } from 'lucide-react';
@@ -10,7 +10,7 @@ import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { type BlogPost, findPost, formatPostDate, renderPost } from '#lib/blog.ts';
 import { pageHead } from '#lib/page-head.ts';
-import { pageTitle } from '#lib/site.ts';
+import { pageTitle } from '#lib/page-title.ts';
 import '#styles/prose.css';
 
 export const Route = createFileRoute('/blog/$slug')({
@@ -92,7 +92,7 @@ function ArticleBody({ post }: { post: BlogPost }) {
 }
 
 function markdownPath(post: BlogPost): string {
-  return `${WWW_SITE_URL}/blog/${post.slug}.md`;
+  return `${WWW_SITE.url}/blog/${post.slug}.md`;
 }
 
 function RouteComponent() {

@@ -1,3 +1,4 @@
+import { WWW_SITE } from '@repo/global-constants';
 import { createFileRoute } from '@tanstack/react-router';
 import { BinaryDrop } from '#components/binary-drop.tsx';
 import { DeployCta } from '#components/deploy-cta.tsx';
@@ -11,10 +12,9 @@ import { TryItOut } from '#components/try-it-out.tsx';
 import { WhatItActuallyNeeds } from '#components/what-it-actually-needs.tsx';
 import { WhatYourAppGets } from '#components/what-your-app-gets.tsx';
 import { pageHead } from '#lib/page-head.ts';
-import { SITE_DESCRIPTION, SITE_TITLE } from '#lib/site.ts';
 
 export const Route = createFileRoute('/')({
-  head: () => pageHead({ path: '/', title: SITE_TITLE, description: SITE_DESCRIPTION }),
+  head: () => pageHead({ path: '/', title: WWW_SITE.title, description: WWW_SITE.description }),
   component: RouteComponent,
 });
 
