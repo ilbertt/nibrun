@@ -106,7 +106,7 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
         if (request.headers.get('upgrade') !== null) {
           return sayToComeBack();
         }
-        const [answered, response] = yield* Effect.timed(
+        const [served, response] = yield* Effect.timed(
           forwardToGuest({
             request,
             guestIpv4: woken.guestIpv4,
@@ -118,12 +118,16 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
          * long before it answers: `wokeMs` alone reads as the whole cost and is the smaller part
          * of it. What the visitor paid is the two added together, and which half moved is the
          * only way to tell a slower host from a tenant that takes longer to come back.
+         *
+         * `servedMs` and not `answeredMs`: a state change already annotates that name with the
+         * time from a start to the first probe it passed, which is a different quantity on a
+         * different scale — sharing the name makes any reading of either a mix of the two.
          */
         yield* Effect.logInfo('app answered the request that woke it').pipe(
           Effect.annotateLogs({
             appId,
             wokeMs: Duration.toMillis(woke),
-            answeredMs: Duration.toMillis(answered),
+            servedMs: Duration.toMillis(served),
           }),
         );
         return response;

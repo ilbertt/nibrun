@@ -210,7 +210,10 @@ describe('an app that runs on request is started by the request that wanted it',
         expect(answered).toHaveLength(1);
         expect(answered[0]?.appId).toBe(APP_ID);
         expect(typeof answered[0]?.wokeMs).toBe('number');
-        expect(typeof answered[0]?.answeredMs).toBe('number');
+        expect(typeof answered[0]?.servedMs).toBe('number');
+        // A state change annotates `answeredMs` with a different quantity on a different scale,
+        // and one log stream carrying both under one name is unreadable either way round.
+        expect(answered[0]?.answeredMs).toBeUndefined();
       }).pipe(Effect.provide(capturing)),
     );
   });
