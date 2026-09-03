@@ -2,6 +2,12 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.9.3-1]
+
+### ⚡ Performance
+
+- *(protocol)* A host asks for its desired state four times a second (#458)
+
 ## [2026.8.31-3]
 
 ### 🚀 Features
