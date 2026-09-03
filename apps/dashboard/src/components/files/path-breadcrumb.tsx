@@ -34,7 +34,7 @@ export function PathBreadcrumb() {
           {steps.length === 0 ? (
             <BreadcrumbPage
               aria-label={ROOT_LABEL}
-              className="-ml-1.5 flex size-7 items-center justify-center"
+              className="flex size-7 items-center justify-center"
               title={ROOT_LABEL}
             >
               <FolderRootIcon className="size-4" />
@@ -42,7 +42,6 @@ export function PathBreadcrumb() {
           ) : (
             <BreadcrumbLink
               className={buttonVariants({
-                className: '-ml-1.5',
                 size: 'icon-sm',
                 variant: 'ghost',
               })}
