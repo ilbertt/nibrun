@@ -1,6 +1,6 @@
 import { defaultStringifySearch } from '@tanstack/react-router';
 import { findPreset } from '#deploy-presets.ts';
-import { APP_ORIGIN } from '#lib/app-origin.ts';
+import { DASHBOARD_ORIGIN } from '#lib/dashboard-origin.ts';
 
 const DEPLOY_PATH = /^\/deploy(?:\/([a-z0-9-]+))?\/?$/;
 
@@ -27,12 +27,15 @@ export function deployRedirect(request: Request): Response | undefined {
   const slug = match[1];
 
   if (slug === undefined) {
-    return Response.redirect(`${APP_ORIGIN}/deploy`, MOVED_FOR_NOW);
+    return Response.redirect(`${DASHBOARD_ORIGIN}/deploy`, MOVED_FOR_NOW);
   }
 
   const preset = findPreset(slug);
 
   return preset === undefined
     ? undefined
-    : Response.redirect(`${APP_ORIGIN}/deploy${defaultStringifySearch(preset)}`, MOVED_FOR_NOW);
+    : Response.redirect(
+        `${DASHBOARD_ORIGIN}/deploy${defaultStringifySearch(preset)}`,
+        MOVED_FOR_NOW,
+      );
 }

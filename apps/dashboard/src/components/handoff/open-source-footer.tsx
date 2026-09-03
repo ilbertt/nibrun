@@ -1,6 +1,6 @@
 import { GITHUB_REPO_URL } from '@repo/global-constants';
 import { GithubIcon } from '#icons/github-icon.tsx';
-import { LANDING_ORIGIN } from '#lib/site.ts';
+import { WWW_ORIGIN } from '#lib/www-origin.ts';
 
 // A new tab for the repository and the same one for home: whoever is mid-deploy here has a
 // binary in storage that only this tab knows about, and only home is worth losing it for.
@@ -17,7 +17,7 @@ export function OpenSourceFooter() {
         nibrun is fully open source
       </a>
       <span aria-hidden="true">·</span>
-      <a className="hover:underline" href={LANDING_ORIGIN}>
+      <a className="hover:underline" href={WWW_ORIGIN}>
         Home
       </a>
     </footer>

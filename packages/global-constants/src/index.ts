@@ -10,10 +10,10 @@ export {
 export { CLI_INSTALL_COMMAND, CLI_INSTALL_SCRIPT_URL } from '#install.ts';
 export { FREE_APPS_COUNT, PRICE_PER_APP_USD } from '#pricing.ts';
 export {
+  BASE_DOMAIN,
   CONTACT_EMAIL,
-  DASHBOARD_DEV_URL,
-  DASHBOARD_URL,
-  SITE_DEV_URL,
-  SITE_DOMAIN,
-  SITE_URL,
-} from '#site.ts';
+  DASHBOARD_SITE_DEV_URL,
+  DASHBOARD_SITE_URL,
+  WWW_SITE_DEV_URL,
+  WWW_SITE_URL,
+} from '#sites.ts';

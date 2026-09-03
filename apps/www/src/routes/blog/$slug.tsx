@@ -1,4 +1,4 @@
-import { SITE_URL } from '@repo/global-constants';
+import { WWW_SITE_URL } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileTextIcon } from 'lucide-react';
@@ -92,7 +92,7 @@ function ArticleBody({ post }: { post: BlogPost }) {
 }
 
 function markdownPath(post: BlogPost): string {
-  return `${SITE_URL}/blog/${post.slug}.md`;
+  return `${WWW_SITE_URL}/blog/${post.slug}.md`;
 }
 
 function RouteComponent() {

@@ -1,7 +1,7 @@
 import { HANDOFF_READY, HANDOFF_STORED, isHandoffOffer } from '@repo/binary-handoff';
 import { useEffect, useState } from 'react';
 import { storeHandedOffBinary } from '#lib/handoff-store.ts';
-import { LANDING_ORIGIN } from '#lib/site.ts';
+import { WWW_ORIGIN } from '#lib/www-origin.ts';
 
 function framedByLandingPage(): boolean {
   return window.parent !== window;
@@ -24,7 +24,7 @@ export function useHandoffReceiver(): boolean {
     function onMessage(event: MessageEvent): void {
       // Anything else on the landing origin could post here too, so the parent being the
       // sender is as much a part of trusting this as the origin is.
-      if (event.origin !== LANDING_ORIGIN || event.source !== parent) {
+      if (event.origin !== WWW_ORIGIN || event.source !== parent) {
         return;
       }
       if (!isHandoffOffer(event.data)) {
@@ -32,7 +32,7 @@ export function useHandoffReceiver(): boolean {
       }
       storeHandedOffBinary(event.data.binary)
         .then(function acknowledge() {
-          parent.postMessage({ kind: HANDOFF_STORED }, LANDING_ORIGIN);
+          parent.postMessage({ kind: HANDOFF_STORED }, WWW_ORIGIN);
         })
         .catch(function staySilent() {
           // No ack: the landing page times out and says so, which is the only thing it could
@@ -41,7 +41,7 @@ export function useHandoffReceiver(): boolean {
     }
 
     window.addEventListener('message', onMessage);
-    parent.postMessage({ kind: HANDOFF_READY }, LANDING_ORIGIN);
+    parent.postMessage({ kind: HANDOFF_READY }, WWW_ORIGIN);
 
     return () => window.removeEventListener('message', onMessage);
   }, [framed]);

@@ -1,4 +1,4 @@
-import { SITE_URL } from '@repo/global-constants';
+import { WWW_SITE_URL } from '@repo/global-constants';
 import { Toaster } from '@repo/ui/components/sonner';
 import appCss from '@repo/ui/globals.css?url';
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router';
@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { SITE_TITLE } from '#lib/site.ts';
 import { themeScript } from '#lib/theme-script.ts';
 
-const OG_IMAGE = `${SITE_URL}/og.png`;
+const OG_IMAGE = `${WWW_SITE_URL}/og.png`;
 
 export const Route = createRootRoute({
   head: () => ({
@@ -30,7 +30,7 @@ export const Route = createRootRoute({
       {
         rel: 'alternate',
         type: 'text/markdown',
-        href: `${SITE_URL}/llms.txt`,
+        href: `${WWW_SITE_URL}/llms.txt`,
         title: 'nibrun for agents',
       },
       { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },

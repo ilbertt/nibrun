@@ -1,5 +1,5 @@
 import type { CommandOption } from '@parshjs/core';
-import { DASHBOARD_URL } from '@repo/global-constants';
+import { DASHBOARD_SITE_URL } from '@repo/global-constants';
 import { EXTRA_PUBLIC_PORT_VALUES, RUNTIME_VALUE_NAMES } from '@repo/protocol';
 import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };
@@ -8,8 +8,7 @@ export const PROGRAM_NAME = 'nib';
 
 export const PROGRAM_VERSION = packageJson.version;
 
-/** The dashboard's origin, because the api is what serves it: one host answers both. */
-export const DEFAULT_API_URL = DASHBOARD_URL;
+export const DEFAULT_API_URL = DASHBOARD_SITE_URL;
 
 /**
  * A flag more than one command takes, held as both the name parsh spells it by and the declaration

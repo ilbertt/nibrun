@@ -1,4 +1,4 @@
-import { SITE_URL } from '@repo/global-constants';
+import { WWW_SITE_URL } from '@repo/global-constants';
 
 /**
  * The tags that differ per page, kept in one place because one of them cannot be repeated:
@@ -19,14 +19,14 @@ export function pageHead({
   /** Root-relative, and 1200x630 to match the dimensions the root route declares. */
   image?: string;
 }) {
-  const url = `${SITE_URL}${path}`;
+  const url = `${WWW_SITE_URL}${path}`;
   const card =
     image === undefined
       ? []
       : [
-          { property: 'og:image', content: `${SITE_URL}${image}` },
+          { property: 'og:image', content: `${WWW_SITE_URL}${image}` },
           { property: 'og:image:alt', content: title },
-          { name: 'twitter:image', content: `${SITE_URL}${image}` },
+          { name: 'twitter:image', content: `${WWW_SITE_URL}${image}` },
           { name: 'twitter:image:alt', content: title },
         ];
 

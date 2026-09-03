@@ -4,13 +4,13 @@ import {
   isHandoffReady,
   isHandoffStored,
 } from '@repo/binary-handoff';
-import { APP_ORIGIN } from '#lib/app-origin.ts';
+import { DASHBOARD_ORIGIN } from '#lib/dashboard-origin.ts';
 
 // A frame that never answers would otherwise leave the page spinning for good.
 const REPLY_TIMEOUT_MS = 15_000;
 
 export function appDestination(): string {
-  return `${APP_ORIGIN}${HANDOFF_FRAME_PATH}`;
+  return `${DASHBOARD_ORIGIN}${HANDOFF_FRAME_PATH}`;
 }
 
 // The app is a different origin, so its storage is only reachable from a document it serves
@@ -42,11 +42,11 @@ export function handOffBinary(binary: File): Promise<void> {
   function onMessage(event: MessageEvent): void {
     // The frame is the only thing worth hearing from — origin alone would still let any other
     // document on the app's origin talk to this page.
-    if (event.origin !== APP_ORIGIN || event.source !== frame.contentWindow) {
+    if (event.origin !== DASHBOARD_ORIGIN || event.source !== frame.contentWindow) {
       return;
     }
     if (isHandoffReady(event.data)) {
-      frame.contentWindow?.postMessage({ kind: HANDOFF_OFFER, binary }, APP_ORIGIN);
+      frame.contentWindow?.postMessage({ kind: HANDOFF_OFFER, binary }, DASHBOARD_ORIGIN);
       return;
     }
     if (isHandoffStored(event.data)) {
