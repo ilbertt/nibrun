@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/performance/noBarrelFile: index is the only allowed file where we can export other files */
 
 export { CLI_INSTALL_COMMAND, CLI_INSTALL_SCRIPT_URL } from '#cli.ts';
-export { DEPLOY_PATH } from '#deployment.ts';
+export { DASHBOARD_DEPLOY_PATH, WWW_DEPLOY_PATH } from '#deployment.ts';
 export {
   GITHUB_PACKAGES_URL,
   GITHUB_REPO_NAME,
