@@ -20,6 +20,7 @@ import { useFinishHandoff } from '#lib/hooks/use-finish-handoff.ts';
 import { useHandedOffBinary } from '#lib/hooks/use-handed-off-binary.ts';
 import { useSession } from '#lib/hooks/use-session.ts';
 import { DeployRunProvider } from '#lib/providers/deploy-run-provider.tsx';
+import { WWW_ORIGIN } from '#lib/www-origin.ts';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
 
 export function HandedOffBinary() {
@@ -28,7 +29,9 @@ export function HandedOffBinary() {
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
-      <BrandMark />
+      <a className="transition-opacity hover:opacity-80" href={WWW_ORIGIN}>
+        <BrandMark />
+      </a>
       <div className="flex w-full max-w-lg flex-col gap-6 lg:max-w-3xl">
         {loading ? <Spinner /> : <Waiting binary={binary} signedIn={session !== null} />}
       </div>
