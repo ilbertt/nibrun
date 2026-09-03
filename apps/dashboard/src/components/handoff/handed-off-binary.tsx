@@ -13,6 +13,7 @@ import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { Link, useLocation } from '@tanstack/react-router';
 import { FileTerminalIcon } from 'lucide-react';
 import { HandoffDeploy } from '#components/handoff/handoff-deploy.tsx';
+import { OpenSourceFooter } from '#components/handoff/open-source-footer.tsx';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { useDeployLink } from '#lib/hooks/use-deploy-link.ts';
 import { useFinishHandoff } from '#lib/hooks/use-finish-handoff.ts';
@@ -31,6 +32,7 @@ export function HandedOffBinary() {
       <div className="flex w-full max-w-lg flex-col gap-6 lg:max-w-3xl">
         {loading ? <Spinner /> : <Waiting binary={binary} signedIn={session !== null} />}
       </div>
+      <OpenSourceFooter />
     </div>
   );
 }

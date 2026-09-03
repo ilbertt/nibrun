@@ -1,9 +1,7 @@
 import { HANDOFF_READY, HANDOFF_STORED, isHandoffOffer } from '@repo/binary-handoff';
-import { SITE_DEV_URL, SITE_URL } from '@repo/global-constants';
 import { useEffect, useState } from 'react';
 import { storeHandedOffBinary } from '#lib/handoff-store.ts';
-
-const LANDING_ORIGIN = import.meta.env.DEV ? SITE_DEV_URL : SITE_URL;
+import { LANDING_ORIGIN } from '#lib/site.ts';
 
 function framedByLandingPage(): boolean {
   return window.parent !== window;
