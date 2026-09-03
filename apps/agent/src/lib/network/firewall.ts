@@ -2,6 +2,12 @@ import type { AppId, HostPort, HttpPort, Ipv4Address } from '@repo/protocol';
 import { GUEST_NETWORK_CIDR, TAP_NAME_PREFIX } from '#lib/network/slot.ts';
 
 export const NFTABLES_TABLE = 'nibrun';
+
+/** The families `renderRuleset` writes, and so the ones a kernel still holding it answers with. */
+export const NFTABLES_FAMILIES = ['ip', 'ip6'] as const;
+
+export type NftablesFamily = (typeof NFTABLES_FAMILIES)[number];
+
 const TAP_MATCH = `"${TAP_NAME_PREFIX}*"`;
 
 export const INSTANCE_METADATA_ADDRESS_V4 = '169.254.169.254';
@@ -92,33 +98,43 @@ const chain = ({ header, rules }: { header: string; rules: readonly string[] }) 
 ];
 
 /**
+ * Declared and deleted before being written, which is what makes the same text apply to a host
+ * that has the table and one that does not. `nft -f` runs the three as one transaction, so there
+ * is no instant at which the table is missing.
+ */
+const table = ({ family, body }: { family: NftablesFamily; body: readonly string[] }) => [
+  `table ${family} ${NFTABLES_TABLE}`,
+  `delete table ${family} ${NFTABLES_TABLE}`,
+  '',
+  `table ${family} ${NFTABLES_TABLE} {`,
+  ...body,
+  '}',
+];
+
+/**
  * Rendered whole and applied with `nft -f`, so the rules are a function of state rather than a
  * history of edits: no incremental add can be missed and a rerun converges.
  */
 export function renderRuleset(state: FirewallState): string {
   return `${[
-    `table ip ${NFTABLES_TABLE}`,
-    `delete table ip ${NFTABLES_TABLE}`,
+    ...table({
+      family: 'ip',
+      body: [
+        ...counterObjects(state),
+        ...forwardChainV4(state),
+        '',
+        ...inputChainV4(),
+        '',
+        ...natChainsV4(state),
+        '',
+        ...trafficChainsV4(state),
+      ],
+    }),
     '',
-    `table ip ${NFTABLES_TABLE} {`,
-    ...counterObjects(state),
-    ...forwardChainV4(state),
-    '',
-    ...inputChainV4(),
-    '',
-    ...natChainsV4(state),
-    '',
-    ...trafficChainsV4(state),
-    '}',
-    '',
-    `table ip6 ${NFTABLES_TABLE}`,
-    `delete table ip6 ${NFTABLES_TABLE}`,
-    '',
-    `table ip6 ${NFTABLES_TABLE} {`,
-    ...forwardChainV6(state),
-    '',
-    ...inputChainV6(),
-    '}',
+    ...table({
+      family: 'ip6',
+      body: [...forwardChainV6(state), '', ...inputChainV6()],
+    }),
   ].join('\n')}\n`;
 }
 
