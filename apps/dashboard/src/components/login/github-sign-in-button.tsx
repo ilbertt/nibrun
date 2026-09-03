@@ -1,6 +1,6 @@
 import { Button } from '@repo/ui/components/button';
 import { Field, FieldError } from '@repo/ui/components/field';
-import { GithubIcon } from '#icons/github-icon.tsx';
+import { GithubMark } from '@repo/ui/custom/github-mark';
 import { useSignIn } from '#lib/hooks/use-sign-in.ts';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
@@ -18,7 +18,7 @@ export function GithubSignInButton() {
         onClick={() => signIn.mutate()}
         disabled={signIn.isPending}
       >
-        <GithubIcon />
+        <GithubMark />
         {signIn.isPending ? 'Redirecting…' : 'Continue with GitHub'}
       </Button>
       {signIn.isError && <FieldError>Could not start sign-in. Please try again.</FieldError>}
