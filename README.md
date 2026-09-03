@@ -4,6 +4,7 @@
   <p><em>One-click deployment for any single-binary app.</em></p>
 
 [![runtime](https://img.shields.io/github/package-json/packageManager/ilbertt/nibrun?label=runtime&logo=bun&logoColor=fbf0df&color=fbf0df)](https://bun.com)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![skills.sh](https://skills.sh/b/ilbertt/nibrun)](https://skills.sh/ilbertt/nibrun)
 
 </div>
