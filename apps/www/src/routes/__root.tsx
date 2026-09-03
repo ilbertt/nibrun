@@ -5,8 +5,6 @@ import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { themeScript } from '#lib/theme-script.ts';
 
-const OG_IMAGE = `${WWW_SITE.url}/og.png`;
-
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -15,13 +13,13 @@ export const Route = createRootRoute({
       { name: 'theme-color', media: '(prefers-color-scheme: dark)', content: '#0a1410' },
       { property: 'og:site_name', content: PRODUCT_NAME },
       { property: 'og:locale', content: 'en_US' },
-      { property: 'og:image', content: OG_IMAGE },
-      { property: 'og:image:type', content: 'image/png' },
-      { property: 'og:image:width', content: '1200' },
-      { property: 'og:image:height', content: '630' },
+      { property: 'og:image', content: WWW_SITE.ogImage.url },
+      { property: 'og:image:type', content: WWW_SITE.ogImage.type },
+      { property: 'og:image:width', content: `${WWW_SITE.ogImage.width}` },
+      { property: 'og:image:height', content: `${WWW_SITE.ogImage.height}` },
       { property: 'og:image:alt', content: WWW_SITE.title },
       { name: 'twitter:card', content: 'summary_large_image' },
-      { name: 'twitter:image', content: OG_IMAGE },
+      { name: 'twitter:image', content: WWW_SITE.ogImage.url },
       { name: 'twitter:image:alt', content: WWW_SITE.title },
     ],
     links: [

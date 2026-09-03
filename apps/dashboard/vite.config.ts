@@ -12,7 +12,10 @@ const HEAD_TOKENS = {
   '%PRODUCT_NAME%': PRODUCT_NAME,
   '%SITE_TITLE%': DASHBOARD_SITE.title,
   '%SITE_DESCRIPTION%': DASHBOARD_SITE.description,
-  '%SITE_URL%': DASHBOARD_SITE.url,
+  '%OG_IMAGE_URL%': DASHBOARD_SITE.ogImage.url,
+  '%OG_IMAGE_TYPE%': DASHBOARD_SITE.ogImage.type,
+  '%OG_IMAGE_WIDTH%': `${DASHBOARD_SITE.ogImage.width}`,
+  '%OG_IMAGE_HEIGHT%': `${DASHBOARD_SITE.ogImage.height}`,
 };
 
 function siteHead(): Plugin {
