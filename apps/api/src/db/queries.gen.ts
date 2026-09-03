@@ -34,6 +34,7 @@ export interface ISelectDesiredDeploymentsResult {
     config_id: IDeploymentsColumns["config_id"];
     activation: IAppsColumns["activation"];
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    /** The release's own state, beside the app's. A host reads it to tell a release it should run from one it is only answering for. */
     deployment_state: IDeploymentsColumns["state"];
 }
 
@@ -221,6 +222,7 @@ export interface ISelectCreatedAppResult {
     restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
+    /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
@@ -265,6 +267,7 @@ export interface ISelectAppsByOwnerResult {
     restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
+    /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
@@ -309,6 +312,7 @@ export interface ISelectAppByIdResult {
     restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
+    /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
@@ -350,6 +354,7 @@ export interface ISelectCurrentAppConfigResult {
     restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
+    /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
 }
 
@@ -385,6 +390,7 @@ export interface ITouchAppAfterConfigPatchResult {
     restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
+    /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
@@ -477,6 +483,7 @@ export interface ISelectAppAfterStateChangeResult {
     restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
+    /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
@@ -584,15 +591,15 @@ export interface ISelectArtifactByIdResult {
 /** Result of query `SelectCachedBinary`. */
 export interface ISelectCachedBinaryResult {
     /** The digest the url's own download was held to, which for an archive is the archive's. */
-    source_digest: NonNullable<IArtifactsColumns["source_digest"]>;
+    source_digest: ICachedBinariesColumns["source_digest"];
     /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
-    digest: NonNullable<IArtifactsColumns["digest"]>;
-    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    digest: ICachedBinariesColumns["digest"];
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     size_bytes: NonNullable<IArtifactsColumns["size_bytes"]>;
     /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
-    object_key: NonNullable<IArtifactsColumns["object_key"]>;
+    object_key: ICachedBinariesColumns["object_key"];
     /** The name the binary was uploaded under; a content-addressed key carries none. */
-    original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_name: ICachedBinariesColumns["original_file_name"];
 }
 
 /** Result of query `SelectDeployableArtifact`. */
@@ -650,6 +657,7 @@ export interface ISelectDeploymentsByAppResult {
     restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
+    /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
 }
 
@@ -688,6 +696,7 @@ export interface ISelectDeploymentByIdResult {
     restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
+    /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
 }
 
@@ -752,6 +761,7 @@ export interface ISelectInsertedDeploymentResult {
     restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
     restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
+    /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
 }
 
@@ -1063,8 +1073,8 @@ export interface IAppConfigsTable {
 /** Columns of `app_configs_with_environment`. */
 export interface IAppConfigsWithEnvironmentColumns {
     id: string | null;
-    app_id: string | null;
-    http_port: number | null;
+    app_id: import("@repo/protocol").AppId | null;
+    http_port: import("@repo/protocol").HttpPort | null;
     args: string[] | null;
     vcpu_count: number | null;
     memory_mib: number | null;
@@ -1119,7 +1129,7 @@ export interface IAppHostnamesTable {
 
 /** Columns of `app_quotas`. */
 export interface IAppQuotasColumns {
-    owner_id: string | null;
+    owner_id: import("@repo/protocol").OwnerId | null;
     apps_held: number | null;
     apps_allowed: number | null;
     apps_left: number | null;
@@ -1215,11 +1225,15 @@ export interface IArtifactsTable {
 
 /** Columns of `cached_binaries`. */
 export interface ICachedBinariesColumns {
+    /** The digest the url's own download was held to, which for an archive is the archive's. */
     source_digest: import("@repo/protocol").Sha256Digest;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: import("@repo/protocol").Sha256Digest;
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     size_bytes: string;
+    /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     object_key: import("@repo/protocol").ObjectKey;
+    /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: import("@repo/protocol").Filename;
 }
 
@@ -1267,14 +1281,18 @@ export interface IDeploymentsTable {
 
 /** Columns of `desired_deployments`. */
 export interface IDesiredDeploymentsColumns {
-    id: string | null;
-    app_id: string | null;
-    state: string | null;
-    digest: string | null;
+    id: import("@repo/protocol").DeploymentId | null;
+    app_id: import("@repo/protocol").AppId | null;
+    state: import("@repo/protocol").AppState | null;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
+    digest: import("@repo/protocol").Sha256Digest | null;
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
     size_bytes: string | null;
-    object_key: string | null;
-    original_file_name: string | null;
-    http_port: number | null;
+    /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    object_key: import("@repo/protocol").ObjectKey | null;
+    /** The name the binary was uploaded under; a content-addressed key carries none. */
+    original_file_name: import("@repo/protocol").Filename | null;
+    http_port: import("@repo/protocol").HttpPort | null;
     args: string[] | null;
     vcpu_count: number | null;
     memory_mib: number | null;
@@ -1289,12 +1307,13 @@ export interface IDesiredDeploymentsColumns {
     restart_max_backoff_ms: number | null;
     restart_backoff_factor: number | null;
     restart_reset_after_ms: number | null;
+    /** The app config version this deployment was launched with. */
     config_id: string | null;
     has_extra_public_port: boolean | null;
-    activation: string | null;
+    activation: import("@repo/protocol").AppActivation | null;
     idle_timeout_ms: number | null;
     /** The release's own state, beside the app's. A host reads it to tell a release it should run from one it is only answering for. */
-    deployment_state: string | null;
+    deployment_state: import("@repo/protocol").DeploymentState | null;
 }
 
 /** Schema of `desired_deployments`. */
@@ -1307,8 +1326,9 @@ export interface IDesiredDeploymentsTable {
 
 /** Columns of `desired_environment`. */
 export interface IDesiredEnvironmentColumns {
-    deployment_id: string | null;
+    deployment_id: import("@repo/protocol").DeploymentId | null;
     name: string | null;
+    /** Sealed by the api before it arrives. Never written or read in the clear. */
     value: string | null;
 }
 
@@ -1322,8 +1342,9 @@ export interface IDesiredEnvironmentTable {
 
 /** Columns of `desired_export_environment`. */
 export interface IDesiredExportEnvironmentColumns {
-    export_id: string | null;
+    export_id: import("@repo/protocol").ExportId | null;
     name: string | null;
+    /** Sealed by the api before it arrives. Never written or read in the clear. */
     value: string | null;
 }
 
@@ -1337,14 +1358,20 @@ export interface IDesiredExportEnvironmentTable {
 
 /** Columns of `desired_exports`. */
 export interface IDesiredExportsColumns {
-    id: string | null;
-    app_id: string | null;
-    object_key: string | null;
-    state: string | null;
-    digest: string | null;
+    id: import("@repo/protocol").ExportId | null;
+    app_id: import("@repo/protocol").AppId | null;
+    /** Where the host writes the bundle and the api signs its download URL. */
+    object_key: import("@repo/protocol").ObjectKey | null;
+    state: import("@repo/protocol").ExportState | null;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
+    digest: import("@repo/protocol").Sha256Digest | null;
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
     size_bytes: string | null;
-    artifact_object_key: string | null;
-    original_file_name: string | null;
+    /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
+    artifact_object_key: import("@repo/protocol").ObjectKey | null;
+    /** The name the binary was uploaded under; a content-addressed key carries none. */
+    original_file_name: import("@repo/protocol").Filename | null;
+    /** The config version whose environment belongs in the bundle, pinned when the export was asked for. */
     config_id: string | null;
 }
 
@@ -1358,9 +1385,9 @@ export interface IDesiredExportsTable {
 
 /** Columns of `desired_hostnames`. */
 export interface IDesiredHostnamesColumns {
-    app_id: string | null;
-    hostname: string | null;
-    kind: string | null;
+    app_id: import("@repo/protocol").AppId | null;
+    hostname: import("@repo/protocol").Hostname | null;
+    kind: import("@repo/protocol").AppHostnameKind | null;
 }
 
 /** Schema of `desired_hostnames`. */
@@ -1373,8 +1400,8 @@ export interface IDesiredHostnamesTable {
 
 /** Columns of `desired_volumes`. */
 export interface IDesiredVolumesColumns {
-    app_id: string | null;
-    state: string | null;
+    app_id: import("@repo/protocol").AppId | null;
+    state: import("@repo/protocol").AppState | null;
 }
 
 /** Schema of `desired_volumes`. */
@@ -1418,7 +1445,7 @@ export interface IExportsTable {
 
 /** Columns of `finishable_deletions`. */
 export interface IFinishableDeletionsColumns {
-    app_id: string | null;
+    app_id: import("@repo/protocol").AppId | null;
 }
 
 /** Schema of `finishable_deletions`. */
@@ -1431,13 +1458,13 @@ export interface IFinishableDeletionsTable {
 
 /** Columns of `live_apps`. */
 export interface ILiveAppsColumns {
-    id: string | null;
-    owner_id: string | null;
-    slug: string | null;
-    state: string | null;
+    id: import("@repo/protocol").AppId | null;
+    owner_id: import("@repo/protocol").OwnerId | null;
+    slug: import("@repo/protocol").DnsLabel | null;
+    state: import("@repo/protocol").AppState | null;
     created_at: Date | null;
     updated_at: Date | null;
-    activation: string | null;
+    activation: import("@repo/protocol").AppActivation | null;
     idle_timeout_ms: number | null;
 }
 
@@ -1469,7 +1496,7 @@ export interface IProfilesTable {
 
 /** Columns of `purgeable_apps`. */
 export interface IPurgeableAppsColumns {
-    app_id: string | null;
+    app_id: import("@repo/protocol").AppId | null;
 }
 
 /** Schema of `purgeable_apps`. */
