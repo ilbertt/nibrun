@@ -12,7 +12,7 @@ Small apps don't need to scale. They need a machine and a disk.
 
 ## Try it out
 
-Open source that already ships as a single binary. One click, nothing to fill in:
+Open source that already ships as a single binary. One click to deploy:
 
 | App | What you get |
 | --- | --- |
