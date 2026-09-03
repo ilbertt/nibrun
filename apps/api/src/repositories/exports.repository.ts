@@ -76,8 +76,6 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
 
   listByApp({ appId, ownerId }: ExportsByAppInput): Promise<ExportRow[]> {
     return this.sql.SelectExportsByApp`
-      /* @notNull object_key */
-      /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
              e.checkpoint_id, e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
       FROM nibrun.exports e
@@ -89,8 +87,6 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
 
   async findById({ appId, exportId, ownerId }: ExportByIdInput): Promise<ExportRow | null> {
     const [row] = await this.sql.SelectExportById`
-      /* @notNull object_key */
-      /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
              e.checkpoint_id, e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
       FROM nibrun.exports e
@@ -136,8 +132,6 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
 
   private async findInFlight({ appId, ownerId }: ExportsByAppInput): Promise<ExportRow | null> {
     const [row] = await this.sql.SelectInFlightExport`
-      /* @notNull object_key */
-      /* @notNull app_slug */
       SELECT e.id, e.app_id, e.state, e.object_key, e.size_bytes, e.message,
              e.checkpoint_id, e.ready_at, e.expires_at, e.created_at, a.slug AS app_slug
       FROM nibrun.exports e
