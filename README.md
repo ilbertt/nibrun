@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="apps/www/public/favicon.svg" alt="nibrun logo" width="128" />
+  <img src="brand/logo-256.png" alt="nibrun logo" width="128" />
   <h1>nibrun</h1>
   <p><em>One-click deployment for any single-binary app.</em></p>
 

@@ -17,6 +17,9 @@ COPY --from=install /temp/deps ./
 COPY tsconfig.json turbo.json ./
 COPY packages packages
 COPY apps apps
+# The dashboard's public/favicon.svg is a symlink into it, and vite resolves it while
+# copying the public dir.
+COPY brand brand
 ENV NODE_ENV=production
 RUN bun run build --filter=@repo/api
 
