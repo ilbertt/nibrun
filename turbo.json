@@ -6,7 +6,7 @@
       "outputs": ["dist/**"]
     },
     "check:types": {
-      "dependsOn": []
+      "dependsOn": ["^check:types"]
     },
     "test": {
       "dependsOn": []
