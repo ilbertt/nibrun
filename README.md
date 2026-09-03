@@ -10,6 +10,17 @@
 
 Small apps don't need to scale. They need a machine and a disk.
 
+## Try it out
+
+Open source that already ships as a single binary. One click, nothing to fill in:
+
+| App | What you get |
+| --- | --- |
+| **[PocketBase](https://nibrun.com/deploy/pocketbase)** | A database, auth, file storage and an admin UI, in one file. |
+| **[Sharkord](https://nibrun.com/deploy/sharkord)** | A self-hosted chat server with voice, video and screen sharing. |
+| **[Boop](https://nibrun.com/deploy/boop)** | A self-hosted notification inbox for your own apps. |
+| **[Gitea](https://nibrun.com/deploy/gitea)** | A self-hosted Git service with repositories, issues, pull requests, packages and CI. |
+
 ## Why
 
 A compiled binary is already a whole application in one file. Whatever language produced it,
@@ -37,18 +48,6 @@ it boots, sleeps after five minutes idle, and wakes on the next request in ~120 
 
 If your app needs to be more than one machine, it has outgrown this — and that is not a roadmap,
 it is the design.
-
-## Preconfigured deployments
-
-Open source that already ships as a single binary. One click, nothing to fill in:
-
-- **[PocketBase](https://nibrun.com/deploy/pocketbase)** — a database, auth, file storage and an
-  admin UI, in one file.
-- **[Sharkord](https://nibrun.com/deploy/sharkord)** — a self-hosted chat server with voice,
-  video and screen sharing.
-- **[Boop](https://nibrun.com/deploy/boop)** — a self-hosted notification inbox for your own apps.
-- **[Gitea](https://nibrun.com/deploy/gitea)** — a self-hosted Git service with repositories,
-  issues, pull requests, packages and CI.
 
 ## Deploy your own app
 
