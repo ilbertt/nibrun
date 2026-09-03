@@ -1,8 +1,9 @@
 import { HANDOFF_READY, HANDOFF_STORED, isHandoffOffer } from '@repo/binary-handoff';
+import { SITE_DEV_URL, SITE_URL } from '@repo/global-constants';
 import { useEffect, useState } from 'react';
 import { storeHandedOffBinary } from '#lib/handoff-store.ts';
 
-const LANDING_ORIGIN = import.meta.env.DEV ? 'http://localhost:3002' : 'https://nibrun.com';
+const LANDING_ORIGIN = import.meta.env.DEV ? SITE_DEV_URL : SITE_URL;
 
 function framedByLandingPage(): boolean {
   return window.parent !== window;

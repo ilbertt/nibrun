@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as core from '@actions/core';
+import { GITHUB_PACKAGES_URL } from '@repo/global-constants';
 import { $ } from 'bun';
 import { requiredEnv } from '#shared/env.ts';
 
@@ -51,7 +52,7 @@ try {
 
   if (failed.length > 0) {
     core.setFailed(
-      'nibrun release images must be public because the box pulls them without registry credentials. Set each nibrun container package to Public under https://github.com/ilbertt?tab=packages',
+      `nibrun release images must be public because the box pulls them without registry credentials. Set each nibrun container package to Public under ${GITHUB_PACKAGES_URL}`,
     );
     process.exit(1);
   }

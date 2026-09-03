@@ -1,4 +1,4 @@
-import { SITE_URL } from '#lib/site.ts';
+import { SITE_URL } from '@repo/global-constants';
 
 /**
  * The tags that differ per page, kept in one place because one of them cannot be repeated:

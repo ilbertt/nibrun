@@ -1,4 +1,5 @@
 import * as core from '@actions/core';
+import { CLI_INSTALL_COMMAND } from '@repo/global-constants';
 import { CLI_TAG_PREFIX, cliVersion, readCliCliff } from '#shared/cli-release.ts';
 import { optionalEnv } from '#shared/env.ts';
 
@@ -47,7 +48,7 @@ function installSection() {
 ## Install or update
 
 \`\`\`sh
-curl -fsSL https://nibrun.com/install.sh | sh
+${CLI_INSTALL_COMMAND}
 \`\`\`
 `;
 }

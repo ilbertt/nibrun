@@ -1,3 +1,4 @@
+import { CLI_INSTALL_COMMAND } from '@repo/global-constants';
 import {
   Empty,
   EmptyContent,
@@ -8,8 +9,6 @@ import {
 import { CopyButton } from '@repo/ui/custom/copy-button';
 import { BoxIcon } from 'lucide-react';
 import { DeployDialog } from '#components/deploy/deploy-dialog.tsx';
-
-const INSTALL_COMMAND = 'curl -fsSL https://nibrun.com/install.sh | sh';
 
 export function NoAppsEmpty() {
   return (
@@ -26,9 +25,9 @@ export function NoAppsEmpty() {
           <p className="text-muted-foreground">Alternatively, use the CLI:</p>
           <div className="flex items-center gap-1 rounded-lg border bg-muted/40 py-1 pr-1 pl-3">
             <code className="flex-1 select-all break-words text-left font-mono text-xs">
-              {INSTALL_COMMAND}
+              {CLI_INSTALL_COMMAND}
             </code>
-            <CopyButton value={INSTALL_COMMAND} />
+            <CopyButton value={CLI_INSTALL_COMMAND} />
           </div>
         </div>
       </EmptyContent>

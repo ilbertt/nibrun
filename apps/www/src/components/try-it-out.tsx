@@ -1,3 +1,4 @@
+import { SITE_DOMAIN } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { useClipboardCopy } from '@repo/ui/hooks/use-clipboard-copy';
 import { CheckIcon, ChevronDownIcon, CopyIcon } from 'lucide-react';
@@ -5,7 +6,7 @@ import { useState } from 'react';
 import { ClaudeMark, CodexMark, CursorMark } from '#components/agent-marks.tsx';
 
 const STARTER_REPO_URL = 'https://github.com/ilbertt/bun-full-stack-starter';
-const TRY_IT_PROMPT = `Create my personal drive using ${STARTER_REPO_URL} and deploy it on nibrun.com`;
+const TRY_IT_PROMPT = `Create my personal drive using ${STARTER_REPO_URL} and deploy it on ${SITE_DOMAIN}`;
 const PROMPT_PANEL_ID = 'starter-prompt';
 
 export function TryItOut() {

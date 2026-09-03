@@ -1,19 +1,9 @@
 import { access, constants } from 'node:fs/promises';
 import { basename, dirname } from 'node:path';
 import { ApiError } from '@repo/api-client/unwrap';
+import { CLI_INSTALL_SCRIPT_URL } from '@repo/global-constants';
 import { PROGRAM_NAME } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
-
-/**
- * The script an owner installs with is the script an owner upgrades with. Resolving the newest
- * `cli-v*` release, checking what arrives against the checksum that release publishes and renaming
- * it into place are all its, and none of it is worth saying a second time here.
- *
- * Fetched rather than compiled in, because the nib running an upgrade is by definition the old one:
- * a github that moves its release feed is then a fix every nib ever shipped picks up, rather than
- * one only a nib built after it can.
- */
-const INSTALL_SCRIPT_URL = 'https://nibrun.com/install.sh';
 
 /** Where the script installs what it downloads, and the whole of what this tells it. */
 const INSTALL_DIR_VAR = 'NIB_INSTALL_DIR';
@@ -74,10 +64,19 @@ async function requireWritable(dir: string): Promise<void> {
   }
 }
 
+/**
+ * The script an owner installs with is the script an owner upgrades with. Resolving the newest
+ * `cli-v*` release, checking what arrives against the checksum that release publishes and renaming
+ * it into place are all its, and none of it is worth saying a second time here.
+ *
+ * Fetched rather than compiled in, because the nib running an upgrade is by definition the old one:
+ * a github that moves its release feed is then a fix every nib ever shipped picks up, rather than
+ * one only a nib built after it can.
+ */
 async function installScript(): Promise<string> {
-  const response = await fetch(INSTALL_SCRIPT_URL);
+  const response = await fetch(CLI_INSTALL_SCRIPT_URL);
   if (!response.ok) {
-    throw new ApiError(`${INSTALL_SCRIPT_URL} could not be read: ${response.status}.`);
+    throw new ApiError(`${CLI_INSTALL_SCRIPT_URL} could not be read: ${response.status}.`);
   }
   return response.text();
 }

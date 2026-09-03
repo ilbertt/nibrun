@@ -1,6 +1,7 @@
+import { GITHUB_REPO_SLUG } from '@repo/global-constants';
 import { CopyButton } from '@repo/ui/custom/copy-button';
 
-const SKILL_COMMAND = 'npx skills add ilbertt/nibrun';
+const SKILL_COMMAND = `npx skills add ${GITHUB_REPO_SLUG}`;
 
 export function GetStartedHint() {
   return (

@@ -1,3 +1,4 @@
+import { SITE_URL } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileTextIcon } from 'lucide-react';
@@ -9,7 +10,7 @@ import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { type BlogPost, findPost, formatPostDate, renderPost } from '#lib/blog.ts';
 import { pageHead } from '#lib/page-head.ts';
-import { pageTitle, SITE_URL } from '#lib/site.ts';
+import { pageTitle } from '#lib/site.ts';
 import '#styles/prose.css';
 
 export const Route = createFileRoute('/blog/$slug')({

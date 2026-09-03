@@ -53,6 +53,7 @@
         "@repo/app-operations": "workspace:*",
         "@repo/binary-handoff": "workspace:*",
         "@repo/deploy-link": "workspace:*",
+        "@repo/global-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
         "@repo/ui": "workspace:*",
         "@tanstack/react-devtools": "^0.10.9",
@@ -89,6 +90,7 @@
       "dependencies": {
         "@repo/binary-handoff": "workspace:*",
         "@repo/deploy-link": "workspace:*",
+        "@repo/global-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
         "@repo/ui": "workspace:*",
         "@tanstack/react-router": "catalog:",
@@ -144,7 +146,7 @@
     },
     "packages/cli": {
       "name": "@repo/cli",
-      "version": "2026.8.31-3",
+      "version": "2026.9.3-1",
       "dependencies": {
         "@clack/prompts": "^1.7.0",
         "@parshjs/core": "^0.0.10",
@@ -152,6 +154,7 @@
         "@parshjs/files": "^0.0.4",
         "@repo/api-client": "workspace:*",
         "@repo/app-operations": "workspace:*",
+        "@repo/global-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
         "better-auth": "catalog:",
         "zod": "^4.4.3",
@@ -174,10 +177,18 @@
         "typescript": "catalog:",
       },
     },
+    "packages/global-constants": {
+      "name": "@repo/global-constants",
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "packages/internal-scripts": {
       "name": "@repo/internal-scripts",
       "dependencies": {
         "@actions/core": "^3.0.1",
+        "@repo/global-constants": "workspace:*",
       },
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
@@ -747,6 +758,8 @@
     "@repo/dashboard": ["@repo/dashboard@workspace:apps/dashboard"],
 
     "@repo/deploy-link": ["@repo/deploy-link@workspace:packages/deploy-link"],
+
+    "@repo/global-constants": ["@repo/global-constants@workspace:packages/global-constants"],
 
     "@repo/internal-scripts": ["@repo/internal-scripts@workspace:packages/internal-scripts"],
 

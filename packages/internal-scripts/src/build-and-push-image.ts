@@ -1,4 +1,5 @@
 import * as core from '@actions/core';
+import { GITHUB_REPO_URL } from '@repo/global-constants';
 import { $ } from 'bun';
 import { writeSummary } from '#shared/actions.ts';
 import { optionalEnv, requiredEnv } from '#shared/env.ts';
@@ -10,7 +11,7 @@ const buildContext = requiredEnv('BUILD_CONTEXT');
 
 // The box is x86_64; a build on an arm runner would push an image it cannot run.
 const platform = optionalEnv('PLATFORM') ?? 'linux/amd64';
-const sourceLabel = optionalEnv('SOURCE_LABEL') ?? 'https://github.com/ilbertt/nibrun';
+const sourceLabel = optionalEnv('SOURCE_LABEL') ?? GITHUB_REPO_URL;
 const cacheFrom = optionalEnv('CACHE_FROM');
 const cacheTo = optionalEnv('CACHE_TO');
 

@@ -21,6 +21,7 @@
     "@parshjs/files": "^0.0.4",
     "@repo/api-client": "workspace:*",
     "@repo/app-operations": "workspace:*",
+    "@repo/global-constants": "workspace:*",
     "@repo/protocol": "workspace:*",
     "better-auth": "catalog:",
     "zod": "^4.4.3"

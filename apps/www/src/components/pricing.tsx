@@ -1,13 +1,10 @@
+import { CONTACT_EMAIL, FREE_APPS_COUNT, PRICE_PER_APP_USD } from '@repo/global-constants';
 import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import { CpuIcon, HardDriveIcon, MemoryStickIcon, MinusIcon, PlusIcon } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 const BYTES_PER_GIB = 1_073_741_824;
-
-const FREE_APP_LIMIT = 3;
-
-const PRICE_PER_APP_USD = 1;
 
 const MIN_APPS = 1;
 const MAX_APPS = 20;
@@ -17,8 +14,6 @@ const BULK_APP_THRESHOLD = 10;
 
 /** What "bigger" starts at, so the second card moves with the machine rather than beside it. */
 const BIGGER_MACHINE_FACTOR = 2;
-
-const CONTACT_EMAIL = 'hello@nibrun.com';
 
 const CONTACT_BODY = "Hi,\n\nI'd like to know more.\n\nThanks!";
 
@@ -83,8 +78,8 @@ function MachineColumn({
 }
 
 export function Pricing() {
-  const [appCount, setAppCount] = useState(FREE_APP_LIMIT);
-  const monthly = Math.max(0, appCount - FREE_APP_LIMIT) * PRICE_PER_APP_USD;
+  const [appCount, setAppCount] = useState(FREE_APPS_COUNT);
+  const monthly = Math.max(0, appCount - FREE_APPS_COUNT) * PRICE_PER_APP_USD;
 
   function fewer() {
     setAppCount((count) => Math.max(MIN_APPS, count - 1));
@@ -101,7 +96,7 @@ export function Pricing() {
     >
       <div className="flex max-w-2xl flex-col gap-3">
         <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
-          First {FREE_APP_LIMIT} apps free. Forever.
+          First {FREE_APPS_COUNT} apps free. Forever.
         </h2>
         <span className="text-muted-foreground">Then ${PRICE_PER_APP_USD}/app, per month.</span>
       </div>

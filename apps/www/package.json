@@ -19,6 +19,7 @@
   "dependencies": {
     "@repo/binary-handoff": "workspace:*",
     "@repo/deploy-link": "workspace:*",
+    "@repo/global-constants": "workspace:*",
     "@repo/protocol": "workspace:*",
     "@repo/ui": "workspace:*",
     "@tanstack/react-router": "catalog:",

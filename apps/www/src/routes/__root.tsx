@@ -1,8 +1,9 @@
+import { SITE_URL } from '@repo/global-constants';
 import { Toaster } from '@repo/ui/components/sonner';
 import appCss from '@repo/ui/globals.css?url';
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
-import { SITE_TITLE, SITE_URL } from '#lib/site.ts';
+import { SITE_TITLE } from '#lib/site.ts';
 import { themeScript } from '#lib/theme-script.ts';
 
 const OG_IMAGE = `${SITE_URL}/og.png`;

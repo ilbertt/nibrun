@@ -28,6 +28,7 @@
     "typescript": "catalog:"
   },
   "dependencies": {
-    "@actions/core": "^3.0.1"
+    "@actions/core": "^3.0.1",
+    "@repo/global-constants": "workspace:*"
   }
 }
