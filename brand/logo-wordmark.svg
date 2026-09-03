@@ -14,10 +14,14 @@
     </linearGradient>
   </defs>
   <style>
-    .nibrun-logotype { fill: #0a0a0a; }
-    @media (prefers-color-scheme: dark) {
-      .nibrun-logotype { fill: #fafafa; }
+  .nibrun-logotype {
+    fill: #0a0a0a;
+  }
+  @media (prefers-color-scheme: dark) {
+    .nibrun-logotype {
+      fill: #fafafa;
     }
+  }
   </style>
   <rect width="48" height="48" fill="url(#nibrunLockupMark)" />
   <g
