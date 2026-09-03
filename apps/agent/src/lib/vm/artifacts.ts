@@ -26,6 +26,18 @@ const SQUASHFS_FILENAME = 'artifact.squashfs';
  * mounts one of these exactly as it mounts the ones every host already holds.
  */
 const SQUASHFS_STORE_UNCOMPRESSED = ['-noI', '-noD', '-noF', '-noX'];
+/**
+ * What gets squashed, one level inside the staging directory rather than being it.
+ *
+ * mksquashfs writes its output beside its input and never into it, so the two cannot be the same
+ * directory — and while the image was a *sibling* of the staging directory, the release below
+ * removed the directory and left the image. Every way a build can end between mksquashfs and the
+ * rename then leaked one, and only a later build of the same digest ever cleared it.
+ *
+ * Nesting both under one directory is what makes that unleakable rather than remembered: there is
+ * a single path to remove, and it is the one already being removed.
+ */
+const STAGED_SOURCE_DIRNAME = 'source';
 /** The path the guest's init execs, fixed by the boot contract. */
 const GUEST_BINARY_NAME = 'server';
 /** What a binary has to be to be one, wherever it lands — the guest's squashfs or an export. */
@@ -135,26 +147,26 @@ export const ensureArtifactImage = Effect.fn('ensureArtifactImage')(function* (
   }
 
   const stagingDir = path.join(cacheDir, `.staging-${artifact.digest}`);
-  const stagedImage = `${stagingDir}.squashfs`;
+  const stagedSource = path.join(stagingDir, STAGED_SOURCE_DIRNAME);
+  const stagedImage = path.join(stagingDir, SQUASHFS_FILENAME);
   return yield* Effect.acquireUseRelease(
     fs
       .remove(stagingDir, { recursive: true, force: true })
       .pipe(
-        Effect.andThen(fs.makeDirectory(stagingDir, { recursive: true, mode: CACHE_DIR_MODE })),
+        Effect.andThen(fs.makeDirectory(stagedSource, { recursive: true, mode: CACHE_DIR_MODE })),
       ),
     () =>
       Effect.gen(function* () {
-        const binaryPath = path.join(stagingDir, GUEST_BINARY_NAME);
+        const binaryPath = path.join(stagedSource, GUEST_BINARY_NAME);
         const [fetching] = yield* Effect.timed(
           downloadAndVerify({ artifact, destination: binaryPath }),
         );
         yield* fs.chmod(binaryPath, BINARY_MODE);
-        yield* fs.remove(stagedImage, { force: true });
         const [packing] = yield* Effect.timed(
           stdoutOf({
             command: [
               'mksquashfs',
-              stagingDir,
+              stagedSource,
               stagedImage,
               '-no-progress',
               '-noappend',
