@@ -123,22 +123,24 @@ function AppCard({
 
 function RoomMeters({ apps }: { apps: AppSpec[] }) {
   return (
-    <div className="flex flex-col gap-2.5 border-border/60 border-t pt-5">
-      <span className="text-muted-foreground text-xs">What the room holds</span>
+    <div className="flex flex-col gap-3 border-border/60 border-t pt-5">
+      <span className="text-muted-foreground text-xs">Max allowed</span>
       {AXIS_KEYS.map((axisKey) => {
         const axis = AXES[axisKey];
         const used = usedOn({ apps, axisKey });
         return (
-          <div key={axisKey} className="flex items-center gap-3">
-            <span className="w-10 shrink-0 text-muted-foreground text-xs">{axis.name}</span>
-            <span className="h-1.5 grow overflow-hidden rounded-full bg-muted">
+          <div key={axisKey} className="flex flex-col gap-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-muted-foreground text-xs">{axis.name}</span>
+              <span className="text-muted-foreground text-xs tabular-nums">
+                {axis.format(used)} / {axis.format(axis.fleetLimit)}
+              </span>
+            </div>
+            <span className="block h-1.5 w-full overflow-hidden rounded-full bg-muted">
               <span
                 className="block h-full rounded-full bg-primary transition-[width] duration-200"
                 style={{ width: `${(used / axis.fleetLimit) * FULL_PERCENT}%` }}
               />
-            </span>
-            <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
-              {axis.format(used)} / {axis.format(axis.fleetLimit)}
             </span>
           </div>
         );

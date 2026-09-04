@@ -147,46 +147,73 @@ function findSupport({
   return best;
 }
 
-// Boxes pack flush against each other, biggest first: along the back wall while the row has
-// width, then on top of something that can carry them, and only then into a new row.
+type Row = { placements: Placement[]; back: number; depth: number };
+type Stack = { placement: Placement; support: Placement };
+
+// Every box in a row is pulled onto the row's front line. Back-aligning them instead leaves a
+// wedge of floor in front of each shallower box, which is what reads as a gap between them.
+function alignToFront(row: Row): void {
+  for (const placement of row.placements) {
+    placement.origin.z = row.back + row.depth - placement.size.z;
+  }
+}
+
+// Boxes pack flush against each other, biggest first: across the row while it has width, then
+// on top of something that can carry them, and only then into a new row.
 function packRoom(apps: AppSpec[]): Room {
-  const placements: Placement[] = [];
+  const rows: Row[] = [{ placements: [], back: 0, depth: 0 }];
+  const stacks: Stack[] = [];
+  const placed: Placement[] = [];
   const taken = new Set<Placement>();
   let rowX = 0;
-  let rowZ = 0;
-  let rowDepth = 0;
 
   for (const app of [...apps].sort(byBiggestFirst)) {
     const size = extentsOf(app);
-    const support = rowX + size.x <= ROW_WIDTH ? null : findSupport({ placements, taken, size });
+    const support =
+      rowX + size.x <= ROW_WIDTH ? null : findSupport({ placements: placed, taken, size });
 
     if (support !== null) {
       taken.add(support);
-      const origin = {
-        x: support.origin.x,
-        y: support.origin.y + support.size.y,
-        z: support.origin.z,
+      const placement: Placement = {
+        app,
+        origin: { x: 0, y: support.origin.y + support.size.y, z: 0 },
+        size,
       };
-      placements.push({ app, origin, size });
+      stacks.push({ placement, support });
+      placed.push(placement);
       continue;
     }
 
     if (rowX + size.x > ROW_WIDTH) {
-      rowZ += rowDepth;
+      const closed = rows[rows.length - 1]!;
+      alignToFront(closed);
+      rows.push({ placements: [], back: closed.back + closed.depth, depth: 0 });
       rowX = 0;
-      rowDepth = 0;
     }
-    placements.push({ app, origin: { x: rowX, y: 0, z: rowZ }, size });
+
+    const row = rows[rows.length - 1]!;
+    const placement: Placement = { app, origin: { x: rowX, y: 0, z: row.back }, size };
+    row.placements.push(placement);
+    row.depth = Math.max(row.depth, size.z);
+    placed.push(placement);
     rowX += size.x;
-    rowDepth = Math.max(rowDepth, size.z);
+  }
+
+  alignToFront(rows[rows.length - 1]!);
+
+  // Resolved last, and in the order they were stacked, so a box resting on a stacked box reads
+  // a support that has already been settled.
+  for (const { placement, support } of stacks) {
+    placement.origin.x = support.origin.x;
+    placement.origin.z = support.origin.z + support.size.z - placement.size.z;
   }
 
   return {
-    placements,
+    placements: placed,
     size: {
-      x: Math.max(MIN_ROOM.x, ...placements.map((one) => one.origin.x + one.size.x)),
-      y: Math.max(MIN_ROOM.y, ...placements.map((one) => one.origin.y + one.size.y)),
-      z: Math.max(MIN_ROOM.z, ...placements.map((one) => one.origin.z + one.size.z)),
+      x: Math.max(MIN_ROOM.x, ...placed.map((one) => one.origin.x + one.size.x)),
+      y: Math.max(MIN_ROOM.y, ...placed.map((one) => one.origin.y + one.size.y)),
+      z: Math.max(MIN_ROOM.z, ...placed.map((one) => one.origin.z + one.size.z)),
     },
   };
 }
@@ -547,7 +574,7 @@ function useEasedVec3(target: Vec3): Vec3 {
   return current;
 }
 
-const NEUTRAL_FILL_OPACITY = 0.82;
+const NEUTRAL_FILL_OPACITY = 1;
 const ACTIVE_FILL_OPACITY = 1;
 const DIMMED_FILL_OPACITY = 0.25;
 const NEUTRAL_STROKE_OPACITY = 0.9;
