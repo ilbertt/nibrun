@@ -6,10 +6,10 @@ import {
   AXES,
   AXIS_KEYS,
   type AxisKey,
-  allowancesFor,
   appName,
   appPrice,
   formatUsd,
+  pickableSteps,
   stepValue,
   usedOn,
 } from '#lib/calculator.ts';
@@ -20,13 +20,13 @@ function StepPicker({
   axisKey,
   step,
   tint,
-  allowance,
+  pickable,
   onPick,
 }: {
   axisKey: AxisKey;
   step: number;
   tint: string;
-  allowance: number;
+  pickable: boolean[];
   onPick: (step: number) => void;
 }) {
   const axis = AXES[axisKey];
@@ -43,7 +43,7 @@ function StepPicker({
           <button
             key={value}
             type="button"
-            disabled={value > allowance}
+            disabled={!pickable[index]}
             aria-label={`${axis.name} ${axis.format(value)}`}
             aria-pressed={index === step}
             onClick={() => onPick(index)}
@@ -80,7 +80,6 @@ function AppCard({
 }) {
   const price = appPrice({ app, index });
   const name = appName(index);
-  const allowances = allowancesFor({ apps, app });
   return (
     <li
       onMouseEnter={() => onHighlight(true)}
@@ -115,7 +114,7 @@ function AppCard({
           axisKey={axisKey}
           step={app.steps[axisKey]}
           tint={app.tint}
-          allowance={allowances[axisKey]}
+          pickable={pickableSteps({ apps, app, axisKey })}
           onPick={(step) => onPick({ axisKey, step })}
         />
       ))}

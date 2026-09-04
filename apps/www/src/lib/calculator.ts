@@ -126,6 +126,39 @@ export function stepValue({ axisKey, step }: { axisKey: AxisKey; step: number })
   return AXES[axisKey].steps[step]!;
 }
 
+/**
+ * Cores are useless without the memory to feed them, so every machine holds at least the ratio
+ * the default one has. Disk is nobody's business but its own.
+ */
+const MIN_MIB_PER_VCPU =
+  DEFAULT_INSTANCE_RESOURCES.memoryMib / DEFAULT_INSTANCE_RESOURCES.vcpuCount;
+
+export function memoryFloorFor(vcpuStep: number): number {
+  const needed = stepValue({ axisKey: 'vcpu', step: vcpuStep }) * MIN_MIB_PER_VCPU;
+  const floor = AXES.memory.steps.findIndex((mib) => mib >= needed);
+  return floor === -1 ? AXES.memory.steps.length - 1 : floor;
+}
+
+/** Taking cores drags memory up with them; nothing else moves on its own. */
+export function withStep({
+  app,
+  axisKey,
+  step,
+}: {
+  app: AppSpec;
+  axisKey: AxisKey;
+  step: number;
+}): AppSpec {
+  const steps = { ...app.steps, [axisKey]: step };
+  return {
+    ...app,
+    steps:
+      axisKey === 'vcpu'
+        ? { ...steps, memory: Math.max(steps.memory, memoryFloorFor(step)) }
+        : steps,
+  };
+}
+
 export function upgradesPrice(app: AppSpec): number {
   return sum(AXIS_KEYS.map((key) => app.steps[key] * AXES[key].pricePerStep));
 }
@@ -158,18 +191,52 @@ function allowanceOn({
 }
 
 /** The largest value this app may still take on each axis, with the rest of the room deducted. */
-export function allowancesFor({
-  apps,
-  app,
-}: {
-  apps: AppSpec[];
-  app: AppSpec;
-}): Record<AxisKey, number> {
+function allowancesFor({ apps, app }: { apps: AppSpec[]; app: AppSpec }): Record<AxisKey, number> {
   return {
     vcpu: allowanceOn({ apps, app, axisKey: 'vcpu' }),
     memory: allowanceOn({ apps, app, axisKey: 'memory' }),
     volume: allowanceOn({ apps, app, axisKey: 'volume' }),
   };
+}
+
+function isPickable({
+  app,
+  axisKey,
+  step,
+  allowances,
+}: {
+  app: AppSpec;
+  axisKey: AxisKey;
+  step: number;
+  allowances: Record<AxisKey, number>;
+}): boolean {
+  if (stepValue({ axisKey, step }) > allowances[axisKey]) {
+    return false;
+  }
+  if (axisKey === 'memory') {
+    return step >= memoryFloorFor(app.steps.vcpu);
+  }
+  if (axisKey === 'vcpu') {
+    const memory = Math.max(app.steps.memory, memoryFloorFor(step));
+    return stepValue({ axisKey: 'memory', step: memory }) <= allowances.memory;
+  }
+  return true;
+}
+
+/** What the room and the machine between them still leave open on one axis of one app. */
+export function pickableSteps({
+  apps,
+  app,
+  axisKey,
+}: {
+  apps: AppSpec[];
+  app: AppSpec;
+  axisKey: AxisKey;
+}): boolean[] {
+  const allowances = allowancesFor({ apps, app });
+  return [...AXES[axisKey].steps.keys()].map((step) =>
+    isPickable({ app, axisKey, step, allowances }),
+  );
 }
 
 export function formatUsd(amount: number): string {
@@ -253,11 +320,15 @@ function clampedStep({ axisKey, step }: { axisKey: AxisKey; step: number }): num
 // The store is the reader's own file and may be anything by the time it comes back, so a box is
 // rebuilt from nothing but its ordinal and three clamped steps, and dropped if the room is full.
 function restoreApp({ stored, sofar }: { stored: StoredApp; sofar: AppSpec[] }): AppSpec | null {
+  const vcpu = clampedStep({ axisKey: 'vcpu', step: stored.steps.vcpu });
   const app = createApp({
     ordinal: stored.ordinal,
     steps: {
-      vcpu: clampedStep({ axisKey: 'vcpu', step: stored.steps.vcpu }),
-      memory: clampedStep({ axisKey: 'memory', step: stored.steps.memory }),
+      vcpu,
+      memory: Math.max(
+        clampedStep({ axisKey: 'memory', step: stored.steps.memory }),
+        memoryFloorFor(vcpu),
+      ),
       volume: clampedStep({ axisKey: 'volume', step: stored.steps.volume }),
     },
   });

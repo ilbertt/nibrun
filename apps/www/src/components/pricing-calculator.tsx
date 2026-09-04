@@ -13,6 +13,7 @@ import {
   MAX_APPS,
   nextOrdinalAfter,
   readStoredApps,
+  withStep,
   writeStoredApps,
 } from '#lib/calculator.ts';
 
@@ -39,9 +40,7 @@ export function PricingCalculator() {
 
   function pick({ ordinal, axisKey, step }: { ordinal: number; axisKey: AxisKey; step: number }) {
     setApps((current) =>
-      current.map((app) =>
-        app.ordinal === ordinal ? { ...app, steps: { ...app.steps, [axisKey]: step } } : app,
-      ),
+      current.map((app) => (app.ordinal === ordinal ? withStep({ app, axisKey, step }) : app)),
     );
   }
 
