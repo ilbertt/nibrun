@@ -22,6 +22,7 @@ import {
   storedNames,
   unfilledAsked,
 } from '#lib/environment-variables.ts';
+import { discardHandedOffBinary } from '#lib/handoff-store.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
@@ -51,8 +52,12 @@ export type DeployFormApi = ReactFormExtendedApi<
   undefined
 >;
 
+/** What a change to the binary field does besides changing it. */
+export type BinaryFieldListeners = { onChange?: () => void };
+
 export type DeployFormState = {
   api: DeployFormApi;
+  binaryListeners: BinaryFieldListeners;
   locked: boolean;
   replacing: AppSummary | undefined;
   targetResolved: boolean;
@@ -167,6 +172,7 @@ export function useDeployForm({
 
   return {
     api,
+    binaryListeners: spendsHandoff(binary),
     locked,
     replacing,
     targetResolved,
@@ -174,6 +180,16 @@ export function useDeployForm({
     defaultExtraPublicPort: replacing?.config.hasExtraPublicPort ?? false,
     defaultArgs: replacing?.config.args.join('\n') ?? '',
   };
+}
+
+/**
+ * Storage keeps a dropped binary so that signing in and reloading do not lose it, which is the
+ * same property that would offer it again on a visit that never chose it. So the drop is spent
+ * the moment this form holds anything else — cleared with the x, replaced by another file, given
+ * up for a url — and a form that was never handed one has nothing to spend.
+ */
+function spendsHandoff(binary: File | undefined): BinaryFieldListeners {
+  return binary === undefined ? {} : { onChange: discardHandedOffBinary };
 }
 
 /**

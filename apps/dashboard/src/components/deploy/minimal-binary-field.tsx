@@ -5,7 +5,7 @@ import { FileTerminalIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BINARY_INPUT_ID } from '#components/deploy/binary-drop-zone.tsx';
 import { fetchedUrl, pickedFile } from '#lib/binary-source.ts';
-import { type DeployFormApi, validateBinary } from '#lib/hooks/use-deploy-form.ts';
+import { type DeployFormState, validateBinary } from '#lib/hooks/use-deploy-form.ts';
 
 /**
  * The binary, asked for the way the landing page asks: a link carries everything else, so the one
@@ -15,14 +15,20 @@ import { type DeployFormApi, validateBinary } from '#lib/hooks/use-deploy-form.t
  * for — the binary is named rather than dropped, and the button below is the whole of it.
  */
 export function MinimalBinaryField({
-  api,
+  form,
   appName,
 }: {
-  api: DeployFormApi;
+  form: DeployFormState;
   appName: string | undefined;
 }) {
+  const { api, binaryListeners } = form;
+
   return (
-    <api.Field name="binary" validators={{ onMount: validateBinary, onChange: validateBinary }}>
+    <api.Field
+      name="binary"
+      validators={{ onMount: validateBinary, onChange: validateBinary }}
+      listeners={binaryListeners}
+    >
       {(field) => {
         const rejected = field.state.value !== undefined && field.state.meta.errors.length > 0;
         const file = pickedFile(field.state.value);
