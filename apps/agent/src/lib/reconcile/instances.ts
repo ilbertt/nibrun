@@ -338,24 +338,30 @@ export const sleepInstance = Effect.fn('sleepInstance')(function* (desired: Desi
 });
 
 /**
- * How long the guest took to answer, on the pass that first finds it answering.
+ * How long the guest took to answer, measured to the moment that is written down.
  *
  * The other half of what a cold start costs, and the half no host-side timing can see:
  * `startedAt` is written when the VMM was asked to start, so this is the kernel, the guest's init
  * and the tenant's own startup together. `VmManager.boot` accounts for everything before it, and
  * a start that grew is one or the other.
+ *
+ * `atMs` is read here rather than taken from the pass, and the difference is the whole point. A
+ * guest is not up as far as anything else is concerned until this record says so — the report goes
+ * out on it, and the deploy ends on the report. Measured from the pass's own clock it read 69ms
+ * for a start that took 1145ms to be written down, which is a number that hides exactly the delay
+ * it exists to find.
  */
 function answeredAfter({
   record,
   state,
-  nowMs,
+  atMs,
 }: {
   record: InstanceRecord;
   state: InstanceState;
-  nowMs: number;
+  atMs: number;
 }) {
   return state === 'running' && record.startedAt !== undefined
-    ? { answeredMs: nowMs - Date.parse(record.startedAt) }
+    ? { answeredMs: atMs - Date.parse(record.startedAt) }
     : {};
 }
 
@@ -638,14 +644,28 @@ function settle({
         appId: record.appId,
         from: record.state,
         to: state,
-        ...answeredAfter({ record, state, nowMs }),
+        ...answeredAfter({ record, state, atMs: yield* Clock.currentTimeMillis }),
       }),
     );
     yield* ReportSignal.raise;
   });
 }
 
-/** Probes the tenants that are due, then settles each state from systemd and the probe together. */
+/**
+ * Probes the tenants that are due, then settles each state from systemd and the probe together.
+ *
+ * Concurrently, because what takes any time here is the probe, and sequentially that is one probe
+ * ceiling per instance in front of every instance behind it — including the one that has just
+ * booted and is waiting to be called `running`. Nothing reports a start until this pass reaches
+ * it, and the deploy ends on that report, so an app's own boot time is only half of what its owner
+ * waits: measured on this host, a guest that answered 69ms after its VMM started was written down
+ * 1145ms after it, the whole of the difference spent settling other apps first.
+ *
+ * The reasoning `VolumeManager.observe` already gives for its own probes, and the same bound makes
+ * it safe: the records are one per slot, so the fan-out is what the kernel's NBD minors allow.
+ * Every write below merges into the record as it stands rather than replacing it, which is what
+ * lets two of these land at once.
+ */
 export const refreshStates = Effect.gen(function* () {
   const current = yield* AgentState.snapshot;
   const statuses = yield* Systemd.statuses([...current.records.keys()]);
@@ -661,6 +681,6 @@ export const refreshStates = Effect.gen(function* () {
         snapshotting: current.snapshotting.has(record.appId),
         nowMs,
       }),
-    { discard: true },
+    { discard: true, concurrency: 'unbounded' },
   );
 });
