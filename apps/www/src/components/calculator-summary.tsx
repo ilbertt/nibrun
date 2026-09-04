@@ -3,30 +3,34 @@ import { type AppSpec, AXES, AXIS_KEYS, fleetPrice, formatUsd, usedOn } from '#l
 
 const FULL_PERCENT = 100;
 
+// Three across rather than three stacked: under the chart a full-width bar is a long thin line
+// with nothing to say, and the column has the room to put them beside each other.
 function RoomMeters({ apps }: { apps: AppSpec[] }) {
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2">
       <span className="text-muted-foreground text-xs">Max allowed</span>
-      {AXIS_KEYS.map((axisKey) => {
-        const axis = AXES[axisKey];
-        const used = usedOn({ apps, axisKey });
-        return (
-          <div key={axisKey} className="flex flex-col gap-1">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-muted-foreground text-xs">{axis.name}</span>
-              <span className="text-muted-foreground text-xs tabular-nums">
-                {axis.format(used)} / {axis.format(axis.fleetLimit)}
+      <div className="grid gap-3 sm:grid-cols-3 sm:gap-6">
+        {AXIS_KEYS.map((axisKey) => {
+          const axis = AXES[axisKey];
+          const used = usedOn({ apps, axisKey });
+          return (
+            <div key={axisKey} className="flex flex-col gap-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-muted-foreground text-xs">{axis.name}</span>
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {axis.format(used)} / {axis.format(axis.fleetLimit)}
+                </span>
+              </div>
+              <span className="block h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <span
+                  className="block h-full rounded-full bg-primary transition-[width] duration-200"
+                  style={{ width: `${(used / axis.fleetLimit) * FULL_PERCENT}%` }}
+                />
               </span>
             </div>
-            <span className="block h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <span
-                className="block h-full rounded-full bg-primary transition-[width] duration-200"
-                style={{ width: `${(used / axis.fleetLimit) * FULL_PERCENT}%` }}
-              />
-            </span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
