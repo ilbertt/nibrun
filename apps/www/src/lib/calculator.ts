@@ -254,9 +254,18 @@ const BOX_TINTS = [
   'oklch(0.48 0.12 160)',
   'oklch(0.61 0.14 181)',
   'oklch(0.56 0.16 141)',
+  'oklch(0.72 0.16 134)',
+  'oklch(0.5 0.11 174)',
+  'oklch(0.68 0.12 156)',
+  'oklch(0.58 0.15 122)',
 ];
 
-export const MAX_APPS = 8;
+/**
+ * Nothing caps the number of apps but the room itself, and the smallest one still takes a core —
+ * which is the most rooms there can ever be. Only the stored file, which may say anything, is
+ * read against it.
+ */
+const MOST_APPS_POSSIBLE = Math.floor(AXES.vcpu.fleetLimit / AXES.vcpu.steps[0]!);
 
 /** Named by where it sits, so the list always reads app-1 to app-N however it was edited. */
 export function appName(index: number): string {
@@ -350,7 +359,7 @@ export function readStoredApps(): AppSpec[] | null {
       return null;
     }
     const apps: AppSpec[] = [];
-    for (const stored of parsed.slice(0, MAX_APPS)) {
+    for (const stored of parsed.slice(0, MOST_APPS_POSSIBLE)) {
       const app = isStoredApp(stored) ? restoreApp({ stored, sofar: apps }) : null;
       if (app !== null) {
         apps.push(app);

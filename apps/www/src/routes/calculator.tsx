@@ -19,9 +19,9 @@ function RouteComponent() {
   return (
     <>
       <PageBackdrop />
-      <main className="mx-auto flex w-full max-w-5xl flex-col px-6 pb-24">
+      <main className="mx-auto flex w-full max-w-5xl flex-col px-6 lg:h-dvh lg:overflow-hidden">
         <SiteHeader />
-        <div className="flex max-w-2xl flex-col gap-3 pb-12">
+        <div className="flex max-w-2xl shrink-0 flex-col gap-3 pb-10">
           <h1 className="font-semibold text-4xl tracking-tight">Calculator</h1>
           <p className="text-pretty text-lg text-muted-foreground">{SUBTITLE}</p>
         </div>

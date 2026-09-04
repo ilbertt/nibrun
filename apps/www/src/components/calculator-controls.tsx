@@ -11,10 +11,7 @@ import {
   formatUsd,
   pickableSteps,
   stepValue,
-  usedOn,
 } from '#lib/calculator.ts';
-
-const FULL_PERCENT = 100;
 
 function StepPicker({
   axisKey,
@@ -122,34 +119,6 @@ function AppCard({
   );
 }
 
-function RoomMeters({ apps }: { apps: AppSpec[] }) {
-  return (
-    <div className="flex flex-col gap-3 border-border/60 border-t pt-5">
-      <span className="text-muted-foreground text-xs">Max allowed</span>
-      {AXIS_KEYS.map((axisKey) => {
-        const axis = AXES[axisKey];
-        const used = usedOn({ apps, axisKey });
-        return (
-          <div key={axisKey} className="flex flex-col gap-1">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-muted-foreground text-xs">{axis.name}</span>
-              <span className="text-muted-foreground text-xs tabular-nums">
-                {axis.format(used)} / {axis.format(axis.fleetLimit)}
-              </span>
-            </div>
-            <span className="block h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <span
-                className="block h-full rounded-full bg-primary transition-[width] duration-200"
-                style={{ width: `${(used / axis.fleetLimit) * FULL_PERCENT}%` }}
-              />
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export function CalculatorControls({
   apps,
   highlighted,
@@ -169,7 +138,7 @@ export function CalculatorControls({
 }) {
   return (
     <>
-      <ul className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
         {[...apps.entries()].map(([index, app]) => (
           <AppCard
             key={app.ordinal}
@@ -184,11 +153,10 @@ export function CalculatorControls({
           />
         ))}
       </ul>
-      <Button variant="outline" className="w-full" disabled={!canAdd} onClick={onAdd}>
+      <Button variant="outline" className="w-full shrink-0" disabled={!canAdd} onClick={onAdd}>
         <PlusIcon />
         Add an app
       </Button>
-      <RoomMeters apps={apps} />
     </>
   );
 }

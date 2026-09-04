@@ -22,17 +22,20 @@ const UNIT_PX = 44;
 // The view is fitted to the room, so anything meant to look the same on screen at every room
 // size — gaps, hairlines — is a fraction of the frame rather than a length.
 const PAD_RATIO = 0.11;
-const TITLE_GAP_RATIO = 0.045;
+const FONT_RATIO = 0.019;
+const TITLE_GAP_RATIO = 0.038;
 const GRID_STROKE_RATIO = 0.0013;
 const BOX_STROKE_RATIO = 0.0018;
-
-const FULL_PERCENT = 100;
 
 /** Held fixed so the drawing keeps its shape as the room fills up. */
 const VIEW_ASPECT = 1.35;
 
-/** Fixed, so the drawing holds still and what is left of it is space you can actually take. */
-const ROOM: Vec3 = { x: 8, y: 6, z: 7 };
+/**
+ * Fixed, so the drawing holds still and what is left of it is space you can actually take. Deep
+ * enough that the widest fleet the limits allow — three boxes grown all the way — still stands
+ * on the floor rather than pushing the walls out.
+ */
+const ROOM: Vec3 = { x: 8, y: 6, z: 10 };
 
 const STACK_LIMIT = ROOM.y;
 
@@ -318,6 +321,7 @@ type Frame = {
   top: number;
   width: number;
   height: number;
+  fontSize: number;
   titleGap: number;
   gridStroke: number;
   boxStroke: number;
@@ -345,6 +349,7 @@ function frameFor(room: Vec3): Frame {
     top: (minY + maxY) * HALF - height * HALF,
     width,
     height,
+    fontSize: width * FONT_RATIO,
     titleGap: width * TITLE_GAP_RATIO,
     gridStroke: width * GRID_STROKE_RATIO,
     boxStroke: width * BOX_STROKE_RATIO,
@@ -494,50 +499,45 @@ export function CalculatorScene({
     .sort(byNearestLast);
 
   return (
-    <div className="relative">
-      <svg
-        viewBox={`${frame.left} ${frame.top} ${frame.width} ${frame.height}`}
-        aria-hidden="true"
-        className="h-auto w-full select-none"
-        preserveAspectRatio="xMidYMid meet"
-      >
-        <g className="fill-muted/60">
-          {roomSurfaces(room).map((surface) => (
-            <polygon key={polygonPoints(surface)} points={polygonPoints(surface)} />
-          ))}
-        </g>
-        <g className="stroke-border" strokeWidth={frame.gridStroke}>
-          {roomGrid(room).map((segment) => {
-            const from = project(segment.from);
-            const to = project(segment.to);
-            return (
-              <line key={segmentKey(segment)} x1={from.px} y1={from.py} x2={to.px} y2={to.py} />
-            );
-          })}
-        </g>
-        {ordered.map(({ placement }) => (
-          <AppBox
-            key={placement.app.ordinal}
-            placement={placement}
-            emphasis={emphasisFor({ ordinal: placement.app.ordinal, highlighted })}
-            stroke={frame.boxStroke}
-          />
+    <svg
+      viewBox={`${frame.left} ${frame.top} ${frame.width} ${frame.height}`}
+      aria-hidden="true"
+      className="h-auto w-full select-none lg:h-full"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <g className="fill-muted/60">
+        {roomSurfaces(room).map((surface) => (
+          <polygon key={polygonPoints(surface)} points={polygonPoints(surface)} />
         ))}
-      </svg>
-      {/* Placed over the drawing rather than drawn in it, so the text keeps one size on screen. */}
-      {axisLabels({ room, gap: frame.titleGap }).map((label) => (
-        <span
-          key={label.axisKey}
-          style={{
-            left: `${((label.at.px - frame.left) / frame.width) * FULL_PERCENT}%`,
-            top: `${((label.at.py - frame.top) / frame.height) * FULL_PERCENT}%`,
-            transform: `translate(-50%, -50%) rotate(${label.rotate}deg)`,
-          }}
-          className="absolute text-muted-foreground text-xs"
-        >
-          {label.text}
-        </span>
+      </g>
+      <g className="stroke-border" strokeWidth={frame.gridStroke}>
+        {roomGrid(room).map((segment) => {
+          const from = project(segment.from);
+          const to = project(segment.to);
+          return <line key={segmentKey(segment)} x1={from.px} y1={from.py} x2={to.px} y2={to.py} />;
+        })}
+      </g>
+      {ordered.map(({ placement }) => (
+        <AppBox
+          key={placement.app.ordinal}
+          placement={placement}
+          emphasis={emphasisFor({ ordinal: placement.app.ordinal, highlighted })}
+          stroke={frame.boxStroke}
+        />
       ))}
-    </div>
+      <g className="fill-muted-foreground" fontSize={frame.fontSize} textAnchor="middle">
+        {axisLabels({ room, gap: frame.titleGap }).map((label) => (
+          <text
+            key={label.axisKey}
+            x={label.at.px}
+            y={label.at.py}
+            dominantBaseline="middle"
+            transform={`rotate(${label.rotate} ${label.at.px} ${label.at.py})`}
+          >
+            {label.text}
+          </text>
+        ))}
+      </g>
+    </svg>
   );
 }
