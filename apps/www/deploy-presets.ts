@@ -20,6 +20,16 @@ export const DEPLOY_PRESETS = {
     ],
     minimal: true,
   },
+  'context-use': {
+    name: 'context-use',
+    // The only release is a rolling tag whose asset is replaced on every build, so a checksum
+    // written here would refuse the next one. Left out, the download is still held to something:
+    // the digest the release publishes for whatever the asset currently is.
+    binary:
+      'https://github.com/massimoalbarello/context-use/releases/download/nibrun-latest/context-use',
+    port: 3000,
+    minimal: true,
+  },
   gitea: {
     name: 'gitea',
     binary:
