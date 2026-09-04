@@ -35,11 +35,10 @@ const FULL_PERCENT = 100;
 /** Held fixed so the drawing keeps its shape as the room grows under it. */
 const VIEW_ASPECT = 1.35;
 
-/** The room a single default box stands in, so one box is never the whole room. */
-const MIN_ROOM: Vec3 = { x: 8, y: 6, z: 6 };
+/** Fixed, so the drawing holds still and what is left of it is space you can actually take. */
+const ROOM: Vec3 = { x: 8, y: 6, z: 7 };
 
-const ROW_WIDTH = MIN_ROOM.x;
-const STACK_LIMIT = 10;
+const STACK_LIMIT = ROOM.y;
 
 const AXIS_COORD: Record<AxisKey, keyof Vec3> = { vcpu: 'x', memory: 'y', volume: 'z' };
 
@@ -147,73 +146,59 @@ function findSupport({
   return best;
 }
 
-type Row = { placements: Placement[]; back: number; depth: number };
-type Stack = { placement: Placement; support: Placement };
-
-// Every box in a row is pulled onto the row's front line. Back-aligning them instead leaves a
-// wedge of floor in front of each shallower box, which is what reads as a gap between them.
-function alignToFront(row: Row): void {
-  for (const placement of row.placements) {
-    placement.origin.z = row.back + row.depth - placement.size.z;
+/** The shallowest place on the floor this box fits, and the leftmost of those. */
+function bestSpot({ front, size }: { front: number[]; size: Vec3 }): Vec3 | null {
+  let best: Vec3 | null = null;
+  for (let x = 0; x + size.x <= front.length; x += 1) {
+    const z = Math.max(...front.slice(x, x + size.x));
+    if (z + size.z <= ROOM.z && (best === null || z < best.z)) {
+      best = { x, y: 0, z };
+    }
   }
+  return best;
 }
 
-// Boxes pack flush against each other, biggest first: across the row while it has width, then
-// on top of something that can carry them, and only then into a new row.
+// Boxes tile the floor rather than lining up along the back wall: each one takes the shallowest
+// place it fits, which is what makes the floor in front of a shallow box somewhere the next box
+// can go. Only when nothing on the floor will hold it does it go on top of something.
 function packRoom(apps: AppSpec[]): Room {
-  const rows: Row[] = [{ placements: [], back: 0, depth: 0 }];
-  const stacks: Stack[] = [];
+  const front = new Array<number>(ROOM.x).fill(0);
   const placed: Placement[] = [];
   const taken = new Set<Placement>();
-  let rowX = 0;
 
   for (const app of [...apps].sort(byBiggestFirst)) {
     const size = extentsOf(app);
-    const support =
-      rowX + size.x <= ROW_WIDTH ? null : findSupport({ placements: placed, taken, size });
+    const spot = bestSpot({ front, size });
+    const support = spot === null ? findSupport({ placements: placed, taken, size }) : null;
 
     if (support !== null) {
       taken.add(support);
-      const placement: Placement = {
+      placed.push({
         app,
-        origin: { x: 0, y: support.origin.y + support.size.y, z: 0 },
+        origin: {
+          x: support.origin.x,
+          y: support.origin.y + support.size.y,
+          z: support.origin.z + support.size.z - size.z,
+        },
         size,
-      };
-      stacks.push({ placement, support });
-      placed.push(placement);
+      });
       continue;
     }
 
-    if (rowX + size.x > ROW_WIDTH) {
-      const closed = rows[rows.length - 1]!;
-      alignToFront(closed);
-      rows.push({ placements: [], back: closed.back + closed.depth, depth: 0 });
-      rowX = 0;
+    // Nothing fits anywhere: the room takes the overflow rather than the box going missing.
+    const at = spot ?? { x: 0, y: 0, z: Math.max(...front) };
+    placed.push({ app, origin: at, size });
+    for (let column = at.x; column < at.x + size.x; column += 1) {
+      front[column] = at.z + size.z;
     }
-
-    const row = rows[rows.length - 1]!;
-    const placement: Placement = { app, origin: { x: rowX, y: 0, z: row.back }, size };
-    row.placements.push(placement);
-    row.depth = Math.max(row.depth, size.z);
-    placed.push(placement);
-    rowX += size.x;
-  }
-
-  alignToFront(rows[rows.length - 1]!);
-
-  // Resolved last, and in the order they were stacked, so a box resting on a stacked box reads
-  // a support that has already been settled.
-  for (const { placement, support } of stacks) {
-    placement.origin.x = support.origin.x;
-    placement.origin.z = support.origin.z + support.size.z - placement.size.z;
   }
 
   return {
     placements: placed,
     size: {
-      x: Math.max(MIN_ROOM.x, ...placed.map((one) => one.origin.x + one.size.x)),
-      y: Math.max(MIN_ROOM.y, ...placed.map((one) => one.origin.y + one.size.y)),
-      z: Math.max(MIN_ROOM.z, ...placed.map((one) => one.origin.z + one.size.z)),
+      x: Math.max(ROOM.x, ...placed.map((one) => one.origin.x + one.size.x)),
+      y: Math.max(ROOM.y, ...placed.map((one) => one.origin.y + one.size.y)),
+      z: Math.max(ROOM.z, ...placed.map((one) => one.origin.z + one.size.z)),
     },
   };
 }

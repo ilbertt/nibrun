@@ -116,9 +116,8 @@ export type AxisKey = keyof typeof AXES;
 export const AXIS_KEYS = Object.keys(AXES) as AxisKey[];
 
 export type AppSpec = {
-  /** Identity and seed for the name and the tint, so a box keeps both for as long as it lives. */
+  /** Identity, and the seed for the tint, so a box keeps its colour for as long as it lives. */
   ordinal: number;
-  name: string;
   tint: string;
   steps: Record<AxisKey, number>;
 };
@@ -177,17 +176,6 @@ export function formatUsd(amount: number): string {
   return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(USD_DECIMALS)}`;
 }
 
-const APP_NAMES = [
-  'hello-world',
-  'todo-final',
-  'todo-final-2',
-  'sqlite-empire',
-  'weekend-project',
-  'definitely-temporary',
-  'the-cron-job',
-  'pocketbase-again',
-];
-
 // Flavours of the brand green rather than a categorical palette: close enough to stay one family,
 // far enough apart to tell two boxes standing next to each other apart.
 const BOX_TINTS = [
@@ -201,7 +189,12 @@ const BOX_TINTS = [
   'oklch(0.56 0.16 141)',
 ];
 
-export const MAX_APPS = APP_NAMES.length;
+export const MAX_APPS = 8;
+
+/** Named by where it sits, so the list always reads app-1 to app-N however it was edited. */
+export function appName(index: number): string {
+  return `app-${index + 1}`;
+}
 
 const DEFAULT_STEPS: Record<AxisKey, number> = { vcpu: 0, memory: 0, volume: 0 };
 
@@ -212,11 +205,8 @@ export function createApp({
   ordinal: number;
   steps?: Record<AxisKey, number>;
 }): AppSpec {
-  const name = APP_NAMES[ordinal % APP_NAMES.length]!;
-  const round = Math.floor(ordinal / APP_NAMES.length);
   return {
     ordinal,
-    name: round === 0 ? name : `${name}-${round + 1}`,
     tint: BOX_TINTS[ordinal % BOX_TINTS.length]!,
     steps,
   };

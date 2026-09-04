@@ -7,6 +7,7 @@ import {
   AXIS_KEYS,
   type AxisKey,
   allowancesFor,
+  appName,
   appPrice,
   formatUsd,
   stepValue,
@@ -78,6 +79,7 @@ function AppCard({
   onHighlight: (highlighted: boolean) => void;
 }) {
   const price = appPrice({ app, index });
+  const name = appName(index);
   const allowances = allowancesFor({ apps, app });
   return (
     <li
@@ -93,7 +95,7 @@ function AppCard({
     >
       <div className="flex items-center gap-2">
         <span className="size-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: app.tint }} />
-        <span className="truncate font-medium text-sm">{app.name}</span>
+        <span className="truncate font-medium text-sm">{name}</span>
         <span className="ml-auto shrink-0 font-medium text-primary text-sm tabular-nums">
           {price === 0 ? 'free' : `${formatUsd(price)}/mo`}
         </span>
@@ -102,7 +104,7 @@ function AppCard({
           size="icon-xs"
           disabled={!removable}
           onClick={onRemove}
-          aria-label={`Delete ${app.name}`}
+          aria-label={`Delete ${name}`}
         >
           <XIcon />
         </Button>

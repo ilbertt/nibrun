@@ -78,7 +78,7 @@ export function PricingCalculator() {
         <div className="flex flex-col gap-2 border-border/60 border-t pt-5">
           <div className="flex items-baseline justify-between gap-3">
             <span className="font-medium">
-              {apps.length} box{apps.length === 1 ? '' : 'es'}
+              {apps.length} app{apps.length === 1 ? '' : 's'}
             </span>
             <span className="flex items-baseline gap-1.5">
               <span className="font-semibold text-3xl text-primary tabular-nums tracking-tight">
@@ -90,7 +90,7 @@ export function PricingCalculator() {
             </span>
           </div>
           <p className="text-muted-foreground text-xs">
-            The first {FREE_APPS_COUNT} boxes have their ${PRICE_PER_APP_USD} base on us. What you
+            The first {FREE_APPS_COUNT} apps have their ${PRICE_PER_APP_USD} base on us. What you
             grew them into, sadly, is not on us.
           </p>
         </div>
