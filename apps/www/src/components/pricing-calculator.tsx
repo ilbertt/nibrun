@@ -1,5 +1,5 @@
 import { FREE_APPS_COUNT, PRICE_PER_APP_USD } from '@repo/global-constants';
-import { useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CalculatorControls } from '#components/calculator-controls.tsx';
 import { CalculatorScene } from '#components/calculator-scene.tsx';
 import {
@@ -9,37 +9,52 @@ import {
   fitsAnotherApp,
   fleetPrice,
   formatUsd,
-  INITIAL_APP_COUNT,
   initialApps,
   MAX_APPS,
+  nextOrdinalAfter,
+  readStoredApps,
+  writeStoredApps,
 } from '#lib/calculator.ts';
 
 export function PricingCalculator() {
   const [apps, setApps] = useState<AppSpec[]>(initialApps);
-  const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  const nextOrdinal = useRef(INITIAL_APP_COUNT);
+  const [highlighted, setHighlighted] = useState<number | null>(null);
+  // The page is prerendered, so what the reader last built cannot be the first render — it is
+  // read once the client is running, and only then does saving start.
+  const [restored, setRestored] = useState(false);
 
-  function pick({ id, axisKey, step }: { id: string; axisKey: AxisKey; step: number }) {
+  useEffect(() => {
+    const stored = readStoredApps();
+    if (stored !== null) {
+      setApps(stored);
+    }
+    setRestored(true);
+  }, []);
+
+  useEffect(() => {
+    if (restored) {
+      writeStoredApps(apps);
+    }
+  }, [apps, restored]);
+
+  function pick({ ordinal, axisKey, step }: { ordinal: number; axisKey: AxisKey; step: number }) {
     setApps((current) =>
       current.map((app) =>
-        app.id === id ? { ...app, steps: { ...app.steps, [axisKey]: step } } : app,
+        app.ordinal === ordinal ? { ...app, steps: { ...app.steps, [axisKey]: step } } : app,
       ),
     );
   }
 
-  function remove(id: string) {
-    setApps((current) => current.filter((app) => app.id !== id));
-    setHighlightedId(null);
+  function remove(ordinal: number) {
+    setApps((current) => current.filter((app) => app.ordinal !== ordinal));
+    setHighlighted(null);
   }
 
-  // The ordinal is read outside the updater — React may defer it, and two adds in one tick
-  // would then both see the same one and mint the same id. The cap has to be inside it, for
-  // the same reason: `apps.length` out here is a render old.
   function add() {
-    const ordinal = nextOrdinal.current;
-    nextOrdinal.current += 1;
     setApps((current) =>
-      current.length < MAX_APPS ? [...current, createApp({ ordinal })] : current,
+      current.length < MAX_APPS
+        ? [...current, createApp({ ordinal: nextOrdinalAfter(current) })]
+        : current,
     );
   }
 
@@ -48,15 +63,15 @@ export function PricingCalculator() {
   return (
     <div className="grid w-full gap-10 lg:grid-cols-[1fr_19rem] lg:gap-14">
       <div className="min-w-0 self-start lg:sticky lg:top-8">
-        <CalculatorScene apps={apps} highlightedId={highlightedId} />
+        <CalculatorScene apps={apps} highlighted={highlighted} />
       </div>
       <div className="flex flex-col gap-4">
         <CalculatorControls
           apps={apps}
-          highlightedId={highlightedId}
+          highlighted={highlighted}
           onPick={pick}
           onRemove={remove}
-          onHighlight={setHighlightedId}
+          onHighlight={setHighlighted}
           onAdd={add}
           canAdd={apps.length < MAX_APPS && fitsAnotherApp(apps)}
         />

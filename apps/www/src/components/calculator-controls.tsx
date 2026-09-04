@@ -149,7 +149,7 @@ function RoomMeters({ apps }: { apps: AppSpec[] }) {
 
 export function CalculatorControls({
   apps,
-  highlightedId,
+  highlighted,
   onPick,
   onRemove,
   onHighlight,
@@ -157,10 +157,10 @@ export function CalculatorControls({
   canAdd,
 }: {
   apps: AppSpec[];
-  highlightedId: string | null;
-  onPick: (picked: { id: string; axisKey: AxisKey; step: number }) => void;
-  onRemove: (id: string) => void;
-  onHighlight: (id: string | null) => void;
+  highlighted: number | null;
+  onPick: (picked: { ordinal: number; axisKey: AxisKey; step: number }) => void;
+  onRemove: (ordinal: number) => void;
+  onHighlight: (ordinal: number | null) => void;
   onAdd: () => void;
   canAdd: boolean;
 }) {
@@ -169,15 +169,15 @@ export function CalculatorControls({
       <ul className="flex flex-col gap-3">
         {[...apps.entries()].map(([index, app]) => (
           <AppCard
-            key={app.id}
+            key={app.ordinal}
             app={app}
             index={index}
             apps={apps}
-            active={app.id === highlightedId}
+            active={app.ordinal === highlighted}
             removable={apps.length > 1}
-            onPick={(picked) => onPick({ id: app.id, ...picked })}
-            onRemove={() => onRemove(app.id)}
-            onHighlight={(highlighted) => onHighlight(highlighted ? app.id : null)}
+            onPick={(picked) => onPick({ ordinal: app.ordinal, ...picked })}
+            onRemove={() => onRemove(app.ordinal)}
+            onHighlight={(on) => onHighlight(on ? app.ordinal : null)}
           />
         ))}
       </ul>

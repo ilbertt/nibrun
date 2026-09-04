@@ -116,7 +116,8 @@ export type AxisKey = keyof typeof AXES;
 export const AXIS_KEYS = Object.keys(AXES) as AxisKey[];
 
 export type AppSpec = {
-  id: string;
+  /** Identity and seed for the name and the tint, so a box keeps both for as long as it lives. */
+  ordinal: number;
   name: string;
   tint: string;
   steps: Record<AxisKey, number>;
@@ -153,7 +154,7 @@ function allowanceOn({
   app: AppSpec;
   axisKey: AxisKey;
 }): number {
-  const others = apps.filter((other) => other.id !== app.id);
+  const others = apps.filter((other) => other.ordinal !== app.ordinal);
   return AXES[axisKey].fleetLimit - usedOn({ apps: others, axisKey });
 }
 
@@ -214,7 +215,7 @@ export function createApp({
   const name = APP_NAMES[ordinal % APP_NAMES.length]!;
   const round = Math.floor(ordinal / APP_NAMES.length);
   return {
-    id: `app-${ordinal}`,
+    ordinal,
     name: round === 0 ? name : `${name}-${round + 1}`,
     tint: BOX_TINTS[ordinal % BOX_TINTS.length]!,
     steps,
@@ -233,4 +234,78 @@ export function initialApps(): AppSpec[] {
   return [createApp({ ordinal: 0 })];
 }
 
-export const INITIAL_APP_COUNT = initialApps().length;
+export function nextOrdinalAfter(apps: AppSpec[]): number {
+  return Math.max(-1, ...apps.map((app) => app.ordinal)) + 1;
+}
+
+const STORAGE_KEY = 'nibrun:calculator';
+
+type StoredApp = { ordinal: number; steps: Record<AxisKey, number> };
+
+function isStoredApp(value: unknown): value is StoredApp {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const { ordinal, steps } = value as Partial<StoredApp>;
+  return (
+    Number.isInteger(ordinal) &&
+    (ordinal as number) >= 0 &&
+    typeof steps === 'object' &&
+    steps !== null &&
+    AXIS_KEYS.every((axisKey) => Number.isInteger(steps[axisKey]))
+  );
+}
+
+function clampedStep({ axisKey, step }: { axisKey: AxisKey; step: number }): number {
+  return Math.min(Math.max(step, 0), AXES[axisKey].steps.length - 1);
+}
+
+// The store is the reader's own file and may be anything by the time it comes back, so a box is
+// rebuilt from nothing but its ordinal and three clamped steps, and dropped if the room is full.
+function restoreApp({ stored, sofar }: { stored: StoredApp; sofar: AppSpec[] }): AppSpec | null {
+  const app = createApp({
+    ordinal: stored.ordinal,
+    steps: {
+      vcpu: clampedStep({ axisKey: 'vcpu', step: stored.steps.vcpu }),
+      memory: clampedStep({ axisKey: 'memory', step: stored.steps.memory }),
+      volume: clampedStep({ axisKey: 'volume', step: stored.steps.volume }),
+    },
+  });
+  const room = [...sofar, app];
+  const fits = AXIS_KEYS.every(
+    (axisKey) => usedOn({ apps: room, axisKey }) <= AXES[axisKey].fleetLimit,
+  );
+  return fits ? app : null;
+}
+
+export function readStoredApps(): AppSpec[] | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw === null) {
+      return null;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    const apps: AppSpec[] = [];
+    for (const stored of parsed.slice(0, MAX_APPS)) {
+      const app = isStoredApp(stored) ? restoreApp({ stored, sofar: apps }) : null;
+      if (app !== null) {
+        apps.push(app);
+      }
+    }
+    return apps.length > 0 ? apps : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredApps(apps: AppSpec[]): void {
+  const stored: StoredApp[] = apps.map((app) => ({ ordinal: app.ordinal, steps: app.steps }));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+  } catch {
+    // A browser refusing to store is not worth telling anyone about.
+  }
+}
