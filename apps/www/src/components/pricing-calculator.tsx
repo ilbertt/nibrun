@@ -6,6 +6,7 @@ import {
   type AppSpec,
   type AxisKey,
   createApp,
+  fitsAnotherApp,
   fleetPrice,
   formatUsd,
   INITIAL_APP_COUNT,
@@ -57,7 +58,7 @@ export function PricingCalculator() {
           onRemove={remove}
           onHighlight={setHighlightedId}
           onAdd={add}
-          canAdd={apps.length < MAX_APPS}
+          canAdd={apps.length < MAX_APPS && fitsAnotherApp(apps)}
         />
         <div className="flex flex-col gap-2 border-border/60 border-t pt-5">
           <div className="flex items-baseline justify-between gap-3">

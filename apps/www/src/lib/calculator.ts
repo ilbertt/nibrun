@@ -14,6 +14,12 @@ const PRICE_PER_EXTRA_VCPU_USD = 2;
 const PRICE_PER_MEMORY_DOUBLING_USD = 1;
 const PRICE_PER_VOLUME_DOUBLING_USD = 0.5;
 
+// What the room holds in total. Eight default apps fit with headroom to grow a few of them,
+// which is the tradeoff worth making rather than a wall nobody ever reaches.
+const FLEET_VCPU_LIMIT = 12;
+const FLEET_MEMORY_MIB_LIMIT = 8192;
+const FLEET_VOLUME_GIB_LIMIT = 384;
+
 const USD_DECIMALS = 2;
 
 function stepsFrom({
@@ -65,6 +71,7 @@ type Axis = {
   steps: number[];
   format: (value: number) => string;
   pricePerStep: number;
+  fleetLimit: number;
 };
 
 /** Every axis starts at what an app is given today, so the first tick is the machine we ship. */
@@ -78,6 +85,7 @@ export const AXES = {
     }),
     format: formatCount,
     pricePerStep: PRICE_PER_EXTRA_VCPU_USD,
+    fleetLimit: FLEET_VCPU_LIMIT,
   },
   memory: {
     name: 'RAM',
@@ -88,6 +96,7 @@ export const AXES = {
     }),
     format: formatMemory,
     pricePerStep: PRICE_PER_MEMORY_DOUBLING_USD,
+    fleetLimit: FLEET_MEMORY_MIB_LIMIT,
   },
   volume: {
     name: 'disk',
@@ -98,6 +107,7 @@ export const AXES = {
     }),
     format: formatVolume,
     pricePerStep: PRICE_PER_VOLUME_DOUBLING_USD,
+    fleetLimit: FLEET_VOLUME_GIB_LIMIT,
   },
 } satisfies Record<string, Axis>;
 
@@ -108,6 +118,7 @@ export const AXIS_KEYS = Object.keys(AXES) as AxisKey[];
 export type AppSpec = {
   id: string;
   name: string;
+  tint: string;
   steps: Record<AxisKey, number>;
 };
 
@@ -129,6 +140,38 @@ export function fleetPrice(apps: AppSpec[]): number {
   return sum([...apps.entries()].map(([index, app]) => appPrice({ app, index })));
 }
 
+export function usedOn({ apps, axisKey }: { apps: AppSpec[]; axisKey: AxisKey }): number {
+  return sum(apps.map((app) => stepValue({ axisKey, step: app.steps[axisKey] })));
+}
+
+function allowanceOn({
+  apps,
+  app,
+  axisKey,
+}: {
+  apps: AppSpec[];
+  app: AppSpec;
+  axisKey: AxisKey;
+}): number {
+  const others = apps.filter((other) => other.id !== app.id);
+  return AXES[axisKey].fleetLimit - usedOn({ apps: others, axisKey });
+}
+
+/** The largest value this app may still take on each axis, with the rest of the room deducted. */
+export function allowancesFor({
+  apps,
+  app,
+}: {
+  apps: AppSpec[];
+  app: AppSpec;
+}): Record<AxisKey, number> {
+  return {
+    vcpu: allowanceOn({ apps, app, axisKey: 'vcpu' }),
+    memory: allowanceOn({ apps, app, axisKey: 'memory' }),
+    volume: allowanceOn({ apps, app, axisKey: 'volume' }),
+  };
+}
+
 export function formatUsd(amount: number): string {
   return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(USD_DECIMALS)}`;
 }
@@ -142,6 +185,19 @@ const APP_NAMES = [
   'definitely-temporary',
   'the-cron-job',
   'pocketbase-again',
+];
+
+// Flavours of the brand green rather than a categorical palette: close enough to stay one family,
+// far enough apart to tell two boxes standing next to each other apart.
+const BOX_TINTS = [
+  'var(--primary)',
+  'oklch(0.7 0.15 168)',
+  'oklch(0.52 0.13 136)',
+  'oklch(0.66 0.18 127)',
+  'oklch(0.75 0.13 152)',
+  'oklch(0.48 0.12 160)',
+  'oklch(0.61 0.14 181)',
+  'oklch(0.56 0.16 141)',
 ];
 
 export const MAX_APPS = APP_NAMES.length;
@@ -160,17 +216,21 @@ export function createApp({
   return {
     id: `app-${ordinal}`,
     name: round === 0 ? name : `${name}-${round + 1}`,
+    tint: BOX_TINTS[ordinal % BOX_TINTS.length]!,
     steps,
   };
 }
 
-/** Seeded with a spread rather than three identical cubes, so the axes read on first paint. */
+export function fitsAnotherApp(apps: AppSpec[]): boolean {
+  return AXIS_KEYS.every(
+    (axisKey) =>
+      usedOn({ apps, axisKey }) + stepValue({ axisKey, step: 0 }) <= AXES[axisKey].fleetLimit,
+  );
+}
+
+/** One box at what an app actually ships with, which is also what it costs nothing to run. */
 export function initialApps(): AppSpec[] {
-  return [
-    createApp({ ordinal: 0 }),
-    createApp({ ordinal: 1, steps: { vcpu: 1, memory: 2, volume: 2 } }),
-    createApp({ ordinal: 2, steps: { vcpu: 2, memory: 3, volume: 3 } }),
-  ];
+  return [createApp({ ordinal: 0 })];
 }
 
 export const INITIAL_APP_COUNT = initialApps().length;

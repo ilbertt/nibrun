@@ -6,18 +6,26 @@ import {
   AXES,
   AXIS_KEYS,
   type AxisKey,
+  allowancesFor,
   appPrice,
   formatUsd,
   stepValue,
+  usedOn,
 } from '#lib/calculator.ts';
+
+const FULL_PERCENT = 100;
 
 function StepPicker({
   axisKey,
   step,
+  tint,
+  allowance,
   onPick,
 }: {
   axisKey: AxisKey;
   step: number;
+  tint: string;
+  allowance: number;
   onPick: (step: number) => void;
 }) {
   const axis = AXES[axisKey];
@@ -34,15 +42,15 @@ function StepPicker({
           <button
             key={value}
             type="button"
+            disabled={value > allowance}
             aria-label={`${axis.name} ${axis.format(value)}`}
             aria-pressed={index === step}
             onClick={() => onPick(index)}
             className={cn(
-              'h-4 flex-1 rounded-sm border transition-colors',
-              index <= step
-                ? 'border-primary bg-primary'
-                : 'border-border bg-transparent hover:bg-muted',
+              'h-4 flex-1 rounded-sm border transition-colors disabled:opacity-40',
+              index > step && 'border-border bg-transparent enabled:hover:bg-muted',
             )}
+            style={index <= step ? { backgroundColor: tint, borderColor: tint } : undefined}
           />
         ))}
       </div>
@@ -53,6 +61,7 @@ function StepPicker({
 function AppCard({
   app,
   index,
+  apps,
   active,
   removable,
   onPick,
@@ -61,6 +70,7 @@ function AppCard({
 }: {
   app: AppSpec;
   index: number;
+  apps: AppSpec[];
   active: boolean;
   removable: boolean;
   onPick: (picked: { axisKey: AxisKey; step: number }) => void;
@@ -68,6 +78,7 @@ function AppCard({
   onHighlight: (highlighted: boolean) => void;
 }) {
   const price = appPrice({ app, index });
+  const allowances = allowancesFor({ apps, app });
   return (
     <li
       onMouseEnter={() => onHighlight(true)}
@@ -76,11 +87,12 @@ function AppCard({
       onBlurCapture={() => onHighlight(false)}
       className={cn(
         'flex flex-col gap-3 rounded-2xl border p-4 transition-colors',
-        active ? 'border-primary bg-primary/5' : 'border-border/60',
+        active ? 'bg-muted/50' : 'border-border/60',
       )}
+      style={active ? { borderColor: app.tint } : undefined}
     >
       <div className="flex items-center gap-2">
-        <span className="size-2.5 shrink-0 rounded-[3px] bg-primary" />
+        <span className="size-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: app.tint }} />
         <span className="truncate font-medium text-sm">{app.name}</span>
         <span className="ml-auto shrink-0 font-medium text-primary text-sm tabular-nums">
           {price === 0 ? 'free' : `${formatUsd(price)}/mo`}
@@ -100,10 +112,38 @@ function AppCard({
           key={axisKey}
           axisKey={axisKey}
           step={app.steps[axisKey]}
+          tint={app.tint}
+          allowance={allowances[axisKey]}
           onPick={(step) => onPick({ axisKey, step })}
         />
       ))}
     </li>
+  );
+}
+
+function RoomMeters({ apps }: { apps: AppSpec[] }) {
+  return (
+    <div className="flex flex-col gap-2.5 border-border/60 border-t pt-5">
+      <span className="text-muted-foreground text-xs">What the room holds</span>
+      {AXIS_KEYS.map((axisKey) => {
+        const axis = AXES[axisKey];
+        const used = usedOn({ apps, axisKey });
+        return (
+          <div key={axisKey} className="flex items-center gap-3">
+            <span className="w-10 shrink-0 text-muted-foreground text-xs">{axis.name}</span>
+            <span className="h-1.5 grow overflow-hidden rounded-full bg-muted">
+              <span
+                className="block h-full rounded-full bg-primary transition-[width] duration-200"
+                style={{ width: `${(used / axis.fleetLimit) * FULL_PERCENT}%` }}
+              />
+            </span>
+            <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
+              {axis.format(used)} / {axis.format(axis.fleetLimit)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -132,6 +172,7 @@ export function CalculatorControls({
             key={app.id}
             app={app}
             index={index}
+            apps={apps}
             active={app.id === highlightedId}
             removable={apps.length > 1}
             onPick={(picked) => onPick({ id: app.id, ...picked })}
@@ -144,6 +185,7 @@ export function CalculatorControls({
         <PlusIcon />
         Add an app
       </Button>
+      <RoomMeters apps={apps} />
     </>
   );
 }
