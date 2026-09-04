@@ -1,13 +1,9 @@
-import { cn } from '@repo/ui/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { type AppSpec, AXES, AXIS_KEYS, type AxisKey } from '#lib/calculator.ts';
 
 type Vec3 = { x: number; y: number; z: number };
 type Point = { px: number; py: number };
 type Segment = { from: Vec3; to: Vec3 };
-
-type FlatMode = AxisKey;
-type ViewMode = 'iso' | FlatMode;
 
 const EDGE_ANGLE_DEG = 30;
 const RIGHT_ANGLE_DEG = 90;
@@ -24,7 +20,7 @@ const EDGE_SIN = Math.sin(radians(EDGE_ANGLE_DEG));
 const UNIT_PX = 44;
 
 // The view is fitted to the room, so anything meant to look the same on screen at every room
-// size — text, gaps, hairlines — is a fraction of the frame rather than a length.
+// size — gaps, hairlines — is a fraction of the frame rather than a length.
 const PAD_RATIO = 0.11;
 const TITLE_GAP_RATIO = 0.045;
 const GRID_STROKE_RATIO = 0.0013;
@@ -32,7 +28,7 @@ const BOX_STROKE_RATIO = 0.0018;
 
 const FULL_PERCENT = 100;
 
-/** Held fixed so the drawing keeps its shape as the room grows under it. */
+/** Held fixed so the drawing keeps its shape as the room fills up. */
 const VIEW_ASPECT = 1.35;
 
 /** Fixed, so the drawing holds still and what is left of it is space you can actually take. */
@@ -40,64 +36,17 @@ const ROOM: Vec3 = { x: 8, y: 6, z: 7 };
 
 const STACK_LIMIT = ROOM.y;
 
-const AXIS_COORD: Record<AxisKey, keyof Vec3> = { vcpu: 'x', memory: 'y', volume: 'z' };
-
-type Projection = { x: Point; y: Point; z: Point };
-
-// Each view is the contribution one unit of each axis makes to the screen. A flat view simply
-// contributes nothing on the axis it looks along.
-const VIEWS: Record<ViewMode, Projection> = {
-  iso: {
-    x: { px: EDGE_COS * UNIT_PX, py: EDGE_SIN * UNIT_PX },
-    y: { px: 0, py: -UNIT_PX },
-    z: { px: -EDGE_COS * UNIT_PX, py: EDGE_SIN * UNIT_PX },
-  },
-  vcpu: {
-    x: { px: 0, py: 0 },
-    y: { px: 0, py: -UNIT_PX },
-    z: { px: UNIT_PX, py: 0 },
-  },
-  memory: {
-    x: { px: UNIT_PX, py: 0 },
-    y: { px: 0, py: 0 },
-    z: { px: 0, py: UNIT_PX },
-  },
-  volume: {
-    x: { px: UNIT_PX, py: 0 },
-    y: { px: 0, py: -UNIT_PX },
-    z: { px: 0, py: 0 },
-  },
-};
-
-type FlatPair = { across: AxisKey; up: AxisKey };
-
-const FLAT_PAIRS: Record<FlatMode, FlatPair> = {
-  vcpu: { across: 'volume', up: 'memory' },
-  memory: { across: 'vcpu', up: 'volume' },
-  volume: { across: 'vcpu', up: 'memory' },
-};
-
-function project({ point, view }: { point: Vec3; view: Projection }): Point {
-  return {
-    px: point.x * view.x.px + point.y * view.y.px + point.z * view.z.px,
-    py: point.x * view.x.py + point.y * view.y.py + point.z * view.z.py,
-  };
+function project({ x, y, z }: Vec3): Point {
+  return { px: (x - z) * EDGE_COS * UNIT_PX, py: ((x + z) * EDGE_SIN - y) * UNIT_PX };
 }
 
-function polygonPoints({ vertices, view }: { vertices: Vec3[]; view: Projection }): string {
+function polygonPoints(vertices: Vec3[]): string {
   return vertices
-    .map((point) => {
-      const { px, py } = project({ point, view });
+    .map((vertex) => {
+      const { px, py } = project(vertex);
       return `${px.toFixed(2)},${py.toFixed(2)}`;
     })
     .join(' ');
-}
-
-function planePoint({ pair, across, up }: { pair: FlatPair; across: number; up: number }): Vec3 {
-  const point: Vec3 = { x: 0, y: 0, z: 0 };
-  point[AXIS_COORD[pair.across]] = across;
-  point[AXIS_COORD[pair.up]] = up;
-  return point;
 }
 
 function ticksUpTo(count: number): number[] {
@@ -203,14 +152,6 @@ function packRoom(apps: AppSpec[]): Room {
   };
 }
 
-/** How near the eye a box is: along a flat view that is only its depth on the dropped axis. */
-function depthOf({ placement, mode }: { placement: Placement; mode: ViewMode }): number {
-  if (mode === 'iso') {
-    return placement.origin.x + placement.origin.y + placement.origin.z;
-  }
-  return placement.origin[AXIS_COORD[mode]];
-}
-
 type Sorted = { placement: Placement; depth: number };
 
 // biome-ignore lint/complexity/useMaxParams: a comparator compares two placements
@@ -218,20 +159,7 @@ function byNearestLast(a: Sorted, b: Sorted): number {
   return a.depth - b.depth;
 }
 
-function roomSurfaces({ room, mode }: { room: Vec3; mode: ViewMode }): Vec3[][] {
-  if (mode !== 'iso') {
-    const pair = FLAT_PAIRS[mode];
-    const across = room[AXIS_COORD[pair.across]];
-    const up = room[AXIS_COORD[pair.up]];
-    return [
-      [
-        planePoint({ pair, across: 0, up: 0 }),
-        planePoint({ pair, across, up: 0 }),
-        planePoint({ pair, across, up }),
-        planePoint({ pair, across: 0, up }),
-      ],
-    ];
-  }
+function roomSurfaces(room: Vec3): Vec3[][] {
   return [
     [
       { x: 0, y: 0, z: 0 },
@@ -272,23 +200,7 @@ function withoutSharedEdges(segments: Segment[]): Segment[] {
   });
 }
 
-function flatGrid({ room, mode }: { room: Vec3; mode: FlatMode }): Segment[] {
-  const pair = FLAT_PAIRS[mode];
-  const across = room[AXIS_COORD[pair.across]];
-  const up = room[AXIS_COORD[pair.up]];
-  return [
-    ...ticksUpTo(across).map((at) => ({
-      from: planePoint({ pair, across: at, up: 0 }),
-      to: planePoint({ pair, across: at, up }),
-    })),
-    ...ticksUpTo(up).map((at) => ({
-      from: planePoint({ pair, across: 0, up: at }),
-      to: planePoint({ pair, across, up: at }),
-    })),
-  ];
-}
-
-function isoGrid(room: Vec3): Segment[] {
+function roomGrid(room: Vec3): Segment[] {
   const xs = ticksUpTo(room.x);
   const ys = ticksUpTo(room.y);
   const zs = ticksUpTo(room.z);
@@ -302,16 +214,12 @@ function isoGrid(room: Vec3): Segment[] {
   ]);
 }
 
-function roomGrid({ room, mode }: { room: Vec3; mode: ViewMode }): Segment[] {
-  return mode === 'iso' ? isoGrid(room) : flatGrid({ room, mode });
-}
-
 const TOP_MIX = 'white 18%';
 const LEFT_MIX = 'black 20%';
 
 type Face = { id: string; mix: string | null; vertices: Vec3[] };
 
-function isoFaces({ origin, size }: { origin: Vec3; size: Vec3 }): Face[] {
+function boxFaces({ origin, size }: { origin: Vec3; size: Vec3 }): Face[] {
   const x0 = origin.x;
   const x1 = origin.x + size.x;
   const y0 = origin.y;
@@ -352,30 +260,6 @@ function isoFaces({ origin, size }: { origin: Vec3; size: Vec3 }): Face[] {
   ];
 }
 
-function flatFace({ origin, size, mode }: { origin: Vec3; size: Vec3; mode: FlatMode }): Face {
-  const pair = FLAT_PAIRS[mode];
-  const across = AXIS_COORD[pair.across];
-  const up = AXIS_COORD[pair.up];
-  const a0 = origin[across];
-  const a1 = a0 + size[across];
-  const u0 = origin[up];
-  const u1 = u0 + size[up];
-  return {
-    id: 'flat',
-    mix: null,
-    vertices: [
-      planePoint({ pair, across: a0, up: u0 }),
-      planePoint({ pair, across: a1, up: u0 }),
-      planePoint({ pair, across: a1, up: u1 }),
-      planePoint({ pair, across: a0, up: u1 }),
-    ],
-  };
-}
-
-function boxShapes({ origin, size, mode }: { origin: Vec3; size: Vec3; mode: ViewMode }): Face[] {
-  return mode === 'iso' ? isoFaces({ origin, size }) : [flatFace({ origin, size, mode })];
-}
-
 function shaded({ tint, mix }: { tint: string; mix: string | null }): string {
   if (mix === null) {
     return tint;
@@ -392,20 +276,20 @@ function scaled({ direction, by }: { direction: Point; by: number }): Point {
 }
 
 // A title sits on the outward normal of the edge it names, so it clears the room at the same
-// distance whatever the projection does to that edge on screen.
-const ISO_NORMALS: Record<AxisKey, Point> = {
+// distance whatever the isometric skew does to that edge on screen.
+const AXIS_NORMALS: Record<AxisKey, Point> = {
   vcpu: { px: -EDGE_SIN, py: EDGE_COS },
   volume: { px: EDGE_SIN, py: EDGE_COS },
   memory: { px: -1, py: 0 },
 };
 
-const ISO_ROTATIONS: Record<AxisKey, number> = {
+const AXIS_ROTATIONS: Record<AxisKey, number> = {
   vcpu: EDGE_ANGLE_DEG,
   volume: -EDGE_ANGLE_DEG,
   memory: -RIGHT_ANGLE_DEG,
 };
 
-function isoTitleAnchor({ axisKey, room }: { axisKey: AxisKey; room: Vec3 }): Vec3 {
+function titleAnchor({ axisKey, room }: { axisKey: AxisKey; room: Vec3 }): Vec3 {
   if (axisKey === 'vcpu') {
     return { x: room.x * HALF, y: 0, z: room.z };
   }
@@ -417,55 +301,16 @@ function isoTitleAnchor({ axisKey, room }: { axisKey: AxisKey; room: Vec3 }): Ve
 
 type Label = { axisKey: AxisKey; at: Point; rotate: number; text: string };
 
-function isoLabels({ room, gap }: { room: Vec3; gap: number }): Label[] {
+function axisLabels({ room, gap }: { room: Vec3; gap: number }): Label[] {
   return AXIS_KEYS.map((axisKey) => ({
     axisKey,
     at: offsetBy({
-      point: project({ point: isoTitleAnchor({ axisKey, room }), view: VIEWS.iso }),
-      by: scaled({ direction: ISO_NORMALS[axisKey], by: gap }),
+      point: project(titleAnchor({ axisKey, room })),
+      by: scaled({ direction: AXIS_NORMALS[axisKey], by: gap }),
     }),
-    rotate: ISO_ROTATIONS[axisKey],
+    rotate: AXIS_ROTATIONS[axisKey],
     text: AXES[axisKey].name,
   }));
-}
-
-// Which way is up on screen depends on the projection, so a flat view's labels are hung off the
-// drawing's own bounds: the axis looked along above it, the other two below and to its left.
-function flatLabels({ room, mode, gap }: { room: Vec3; mode: FlatMode; gap: number }): Label[] {
-  const pair = FLAT_PAIRS[mode];
-  const view = VIEWS[mode];
-  const corners = [0, room.x].flatMap((x) =>
-    [0, room.y].flatMap((y) => [0, room.z].map((z) => project({ point: { x, y, z }, view }))),
-  );
-  const xs = corners.map((corner) => corner.px);
-  const ys = corners.map((corner) => corner.py);
-  const midX = (Math.min(...xs) + Math.max(...xs)) * HALF;
-  const midY = (Math.min(...ys) + Math.max(...ys)) * HALF;
-
-  return [
-    {
-      axisKey: mode,
-      at: { px: midX, py: Math.min(...ys) - gap },
-      rotate: 0,
-      text: AXES[mode].name,
-    },
-    {
-      axisKey: pair.across,
-      at: { px: midX, py: Math.max(...ys) + gap },
-      rotate: 0,
-      text: AXES[pair.across].name,
-    },
-    {
-      axisKey: pair.up,
-      at: { px: Math.min(...xs) - gap, py: midY },
-      rotate: -RIGHT_ANGLE_DEG,
-      text: AXES[pair.up].name,
-    },
-  ];
-}
-
-function labelsFor({ room, mode, gap }: { room: Vec3; mode: ViewMode; gap: number }): Label[] {
-  return mode === 'iso' ? isoLabels({ room, gap }) : flatLabels({ room, mode, gap });
 }
 
 type Frame = {
@@ -478,16 +323,14 @@ type Frame = {
   boxStroke: number;
 };
 
-function frameFor({ room, mode }: { room: Vec3; mode: ViewMode }): Frame {
-  const view = VIEWS[mode];
+function frameFor(room: Vec3): Frame {
   const corners = [0, room.x].flatMap((x) =>
-    [0, room.y].flatMap((y) => [0, room.z].map((z) => project({ point: { x, y, z }, view }))),
+    [0, room.y].flatMap((y) => [0, room.z].map((z) => project({ x, y, z }))),
   );
   const xs = corners.map((corner) => corner.px);
   const ys = corners.map((corner) => corner.py);
-  const spanX = Math.max(...xs) - Math.min(...xs);
-  const spanY = Math.max(...ys) - Math.min(...ys);
-  const pad = Math.max(spanX, spanY) * PAD_RATIO;
+  const pad =
+    Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * PAD_RATIO;
 
   const minX = Math.min(...xs) - pad;
   const maxX = Math.max(...xs) + pad;
@@ -583,19 +426,16 @@ const STROKE_OPACITY: Record<Emphasis, number> = {
 function AppBox({
   placement,
   emphasis,
-  mode,
   stroke,
 }: {
   placement: Placement;
   emphasis: Emphasis;
-  mode: ViewMode;
   stroke: number;
 }) {
   const origin = useEasedVec3(placement.origin);
   const size = useEasedVec3(placement.size);
   const { tint } = placement.app;
-  const view = VIEWS[mode];
-  const faces = boxShapes({ origin, size, mode });
+  const faces = boxFaces({ origin, size });
 
   return (
     <g className="transition-[fill-opacity,stroke-opacity] duration-200">
@@ -603,7 +443,7 @@ function AppBox({
         {faces.map((face) => (
           <polygon
             key={face.id}
-            points={polygonPoints({ vertices: face.vertices, view })}
+            points={polygonPoints(face.vertices)}
             fill={shaded({ tint, mix: face.mix })}
           />
         ))}
@@ -616,7 +456,7 @@ function AppBox({
         strokeLinejoin="round"
       >
         {faces.map((face) => (
-          <polygon key={face.id} points={polygonPoints({ vertices: face.vertices, view })} />
+          <polygon key={face.id} points={polygonPoints(face.vertices)} />
         ))}
       </g>
     </g>
@@ -636,43 +476,6 @@ function emphasisFor({
   return highlighted === ordinal ? 'active' : 'dimmed';
 }
 
-// A real button rather than SVG text: the drawing is decorative, and the label is placed over it
-// by mapping its position in the frame onto the box the SVG is drawn in.
-function AxisLabel({
-  label,
-  frame,
-  active,
-  onSelect,
-}: {
-  label: Label;
-  frame: Frame;
-  active: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={active}
-      title={active ? 'Back to the room' : `Look along ${label.text}`}
-      style={{
-        left: `${((label.at.px - frame.left) / frame.width) * FULL_PERCENT}%`,
-        top: `${((label.at.py - frame.top) / frame.height) * FULL_PERCENT}%`,
-        transform: `translate(-50%, -50%) rotate(${label.rotate}deg)`,
-      }}
-      className={cn(
-        'absolute rounded-md px-1.5 py-0.5 text-xs underline decoration-dotted underline-offset-4 transition-colors',
-        'focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2',
-        active
-          ? 'bg-muted font-medium text-foreground decoration-solid'
-          : 'text-muted-foreground hover:text-foreground',
-      )}
-    >
-      {label.text}
-    </button>
-  );
-}
-
 export function CalculatorScene({
   apps,
   highlighted,
@@ -680,13 +483,14 @@ export function CalculatorScene({
   apps: AppSpec[];
   highlighted: number | null;
 }) {
-  const [mode, setMode] = useState<ViewMode>('iso');
   const { placements, size: room } = packRoom(apps);
-  const frame = frameFor({ room, mode });
-  const view = VIEWS[mode];
+  const frame = frameFor(room);
 
   const ordered = placements
-    .map((placement) => ({ placement, depth: depthOf({ placement, mode }) }))
+    .map((placement) => ({
+      placement,
+      depth: placement.origin.x + placement.origin.y + placement.origin.z,
+    }))
     .sort(byNearestLast);
 
   return (
@@ -698,17 +502,14 @@ export function CalculatorScene({
         preserveAspectRatio="xMidYMid meet"
       >
         <g className="fill-muted/60">
-          {roomSurfaces({ room, mode }).map((surface) => (
-            <polygon
-              key={polygonPoints({ vertices: surface, view })}
-              points={polygonPoints({ vertices: surface, view })}
-            />
+          {roomSurfaces(room).map((surface) => (
+            <polygon key={polygonPoints(surface)} points={polygonPoints(surface)} />
           ))}
         </g>
         <g className="stroke-border" strokeWidth={frame.gridStroke}>
-          {roomGrid({ room, mode }).map((segment) => {
-            const from = project({ point: segment.from, view });
-            const to = project({ point: segment.to, view });
+          {roomGrid(room).map((segment) => {
+            const from = project(segment.from);
+            const to = project(segment.to);
             return (
               <line key={segmentKey(segment)} x1={from.px} y1={from.py} x2={to.px} y2={to.py} />
             );
@@ -719,19 +520,23 @@ export function CalculatorScene({
             key={placement.app.ordinal}
             placement={placement}
             emphasis={emphasisFor({ ordinal: placement.app.ordinal, highlighted })}
-            mode={mode}
             stroke={frame.boxStroke}
           />
         ))}
       </svg>
-      {labelsFor({ room, mode, gap: frame.titleGap }).map((label) => (
-        <AxisLabel
+      {/* Placed over the drawing rather than drawn in it, so the text keeps one size on screen. */}
+      {axisLabels({ room, gap: frame.titleGap }).map((label) => (
+        <span
           key={label.axisKey}
-          label={label}
-          frame={frame}
-          active={mode === label.axisKey}
-          onSelect={() => setMode(mode === label.axisKey ? 'iso' : label.axisKey)}
-        />
+          style={{
+            left: `${((label.at.px - frame.left) / frame.width) * FULL_PERCENT}%`,
+            top: `${((label.at.py - frame.top) / frame.height) * FULL_PERCENT}%`,
+            transform: `translate(-50%, -50%) rotate(${label.rotate}deg)`,
+          }}
+          className="absolute text-muted-foreground text-xs"
+        >
+          {label.text}
+        </span>
       ))}
     </div>
   );
