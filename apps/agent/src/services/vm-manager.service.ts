@@ -366,8 +366,9 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
      *
      * The stamp is checked before anything starts, and a snapshot that fails the check is thrown
      * away rather than left: it is unloadable from here on, and a stamp on disk is what a start
-     * reads to decide it is a restore. The start itself consumes the stamp, so every way this can
-     * fail past that point leaves the next start a cold boot.
+     * reads to decide it is a restore. Past the check, every way this can fail leaves the next
+     * start a cold boot — the start consumes the stamp where it runs, and the snapshot is
+     * discarded below where it does not.
      */
     const wake = Effect.fn('VmManager.wake')(function* ({
       appId,
@@ -386,10 +387,10 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       // caused this is waiting on — the stamp check above it happens before anything is asked
       // of the VMM and costs a file read.
       const [restoring] = yield* Effect.timed(
-        Effect.gen(function* () {
-          yield* Systemd.start(appId);
-          yield* Effect.ensuring(
-            Effect.onError(
+        Effect.ensuring(
+          Effect.gen(function* () {
+            yield* Systemd.start(appId);
+            yield* Effect.onError(
               Effect.gen(function* () {
                 yield* Firecracker.loadSnapshot({
                   socketPath,
@@ -406,17 +407,21 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
               // The start already consumed the stamp, so this Firecracker holds no guest and never
               // will: stopping it is what leaves a cold boot rather than a process in the way of one.
               () => Effect.ignore(Systemd.stop(appId)),
-            ),
-            // Every way out, so no retry of a restore that failed halfway can find the files it did
-            // not finish with. The stamp is already gone and would stop a second load on its own;
-            // this is what keeps at-most-once from resting on that single fact.
-            //
-            // Unlinking while Firecracker still has the memory file mapped keeps the mapping alive
-            // and hands the disk back the moment the microVM exits, so the successful path pays
-            // nothing for it either.
-            forgetSnapshot(appId),
-          );
-        }),
+            );
+          }),
+          // Every way out, the start included. A unit systemd would not start — its burst limit
+          // hit, its runtime directory gone — never reached the stamp, so nothing consumed it: left
+          // there, the next wake reads the same stamp and retries the same start, with no way down
+          // to a cold boot because the failure is not `SnapshotUnusable`, while the files beside it
+          // count against every other app's budget. Past the start the stamp is already gone and
+          // would stop a second load on its own; this is what keeps at-most-once from resting on
+          // that single fact.
+          //
+          // Unlinking while Firecracker still has the memory file mapped keeps the mapping alive
+          // and hands the disk back the moment the microVM exits, so the successful path pays
+          // nothing for it either.
+          forgetSnapshot(appId),
+        ),
       );
       yield* Effect.logInfo('instance awake').pipe(
         Effect.annotateLogs({ appId, slot: slot.slot, restoreMs: Duration.toMillis(restoring) }),

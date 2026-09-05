@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { gzipSync } from 'node:zlib';
 import {
   type AppId,
+  AppIdSchema,
   type ArtifactId,
   ArtifactIdSchema,
   ArtifactSchema,
@@ -11,6 +12,7 @@ import {
   type ObjectKey,
   ObjectKeySchema,
   type OwnerId,
+  OwnerIdSchema,
   type Sha256Digest,
   Sha256DigestSchema,
   TimestampSchema,
@@ -45,6 +47,7 @@ import {
   ArtifactsService,
   MAX_ARTIFACT_SIZE_BYTES,
   MAX_CONCURRENT_FETCHES,
+  MAX_CONCURRENT_FETCHES_PER_OWNER,
 } from '#services/artifacts.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 import { archiveOf } from '#tests/support/archives.ts';
@@ -56,6 +59,9 @@ import { gzippedTarballOf } from '#tests/support/tarballs.ts';
 const BINARY_TEXT = '\x7fELFnibrun-test-binary';
 const BINARY_DIGEST = 'd9403d88cdf0684fbb9d8e97cf3508e9fb4506cf309a34e42653a1c2bc04a298';
 const UPLOADED_NAME = Value.Parse(FilenameSchema, 'pocketbase');
+
+/** A second app of the caller's own, which is the obvious way round a cap counted per app. */
+const OTHER_APP_ID = Value.Parse(AppIdSchema, 'app-2');
 
 const SEEDED_DIGEST = Value.Parse(Sha256DigestSchema, 'a'.repeat(BINARY_DIGEST.length));
 const SEEDED_SIZE_BYTES = 4096;
@@ -343,6 +349,18 @@ const appsRepo: AppOwnership = {
   isOwnedBy: ({ ownerId }) => Promise.resolve(ownerId === OWNER_ID),
 };
 
+/** Whoever is asking has an app, which is what it takes to watch tenants compete for the slots. */
+const everyOwner: AppOwnership = { isOwnedBy: () => Promise.resolve(true) };
+
+/** One owner per slot, so the global ceiling fills with nobody near their own cap. */
+function ownersFillingTheCeiling(): OwnerId[] {
+  const owners: OwnerId[] = [];
+  while (owners.length < MAX_CONCURRENT_FETCHES) {
+    owners.push(Value.Parse(OwnerIdSchema, `filling-owner-${owners.length}`));
+  }
+  return owners;
+}
+
 /** The url as whatever it answers with, so what a fetch runs into is set by the test asking. */
 class FakeBinarySource implements BinarySourceRepositoryContract {
   readonly opened: string[] = [];
@@ -512,7 +530,13 @@ class FakeReleaseDigests implements ReleaseDigestRepositoryContract {
   }
 }
 
-function build(storageRepo: FakeStorage = new FakeStorage()) {
+function build({
+  storageRepo = new FakeStorage(),
+  ownership = appsRepo,
+}: {
+  storageRepo?: FakeStorage;
+  ownership?: AppOwnership;
+} = {}) {
   const artifactsRepo = new FakeArtifactsRepository(OWNER_ID);
   const sourceRepo = new FakeBinarySource();
   const cachedRepo = new FakeCachedBinaries();
@@ -529,7 +553,7 @@ function build(storageRepo: FakeStorage = new FakeStorage()) {
       sourceRepo,
       cachedRepo,
       releaseRepo,
-      appsRepo,
+      appsRepo: ownership,
     }),
   };
 }
@@ -802,7 +826,7 @@ describe('what the store accepted, this api still has to agree to', () => {
 
   // The row is what says the bytes are there, so it must not become an artifact when they are not.
   test('one that never reached its resting place stays pending', async () => {
-    const { service, storage, artifactsRepo } = build(new RefusingStorage());
+    const { service, storage, artifactsRepo } = build({ storageRepo: new RefusingStorage() });
 
     await expect(upload({ service, storage })).rejects.toThrow(BUCKET_REFUSED);
 
@@ -1106,14 +1130,14 @@ describe('a release nibrun already holds is not fetched twice', () => {
    * would answer the ninth person with the one thing they cannot act on.
    */
   test('a hit costs no fetch slot, so a popular link cannot throttle itself', async () => {
-    const { service, sourceRepo, cachedRepo, storage } = build();
+    const { service, sourceRepo, cachedRepo, storage } = build({ ownership: everyOwner });
     cachedRepo.remember(alreadyDeployed(SERVED_DIGEST));
     storage.put({ objectKey: Value.Parse(ObjectKeySchema, BINARY_DIGEST), text: BINARY_TEXT });
     sourceRepo.answers({ outcome: 'unreachable' });
     const letThemGo = sourceRepo.holdsOpen();
 
-    const held = Array.from({ length: MAX_CONCURRENT_FETCHES }, () =>
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    const held = ownersFillingTheCeiling().map((ownerId) =>
+      service.createFromUrl({ appId: APP_ID, ownerId, url: BINARY_URL }),
     );
     await Bun.sleep(0);
 
@@ -1743,12 +1767,12 @@ describe('a binary is fetched from the url it was given', () => {
    * caller told to come back has a request that ended rather than one still being held.
    */
   test('only so many binaries are fetched through this end at once', async () => {
-    const { service, sourceRepo } = build();
+    const { service, sourceRepo } = build({ ownership: everyOwner });
     sourceRepo.answers({ outcome: 'unreachable' });
     const letThemGo = sourceRepo.holdsOpen();
 
-    const held = Array.from({ length: MAX_CONCURRENT_FETCHES }, () =>
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    const held = ownersFillingTheCeiling().map((ownerId) =>
+      service.createFromUrl({ appId: APP_ID, ownerId, url: BINARY_URL }),
     );
     await Bun.sleep(0);
 
@@ -1763,5 +1787,60 @@ describe('a binary is fetched from the url it was given', () => {
     await expect(
       service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
     ).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  /**
+   * The ceiling above is the platform's, so one account reaching it is every other tenant refused
+   * for as long as that account keeps a slow url open — and nothing in the refusal says whose
+   * doing it was. The per-owner cap is what leaves the ceiling where it is and stops one caller
+   * being the whole of it.
+   */
+  test('one owner cannot hold every slot, so another owner still gets one', async () => {
+    const { service, sourceRepo } = build({ ownership: everyOwner });
+    sourceRepo.answers({ outcome: 'unreachable' });
+    const letThemGo = sourceRepo.holdsOpen();
+
+    const held = Array.from({ length: MAX_CONCURRENT_FETCHES_PER_OWNER }, () =>
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    );
+    await Bun.sleep(0);
+
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    ).rejects.toBeInstanceOf(TooManyRequestsError);
+
+    const theirs = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OTHER_OWNER_ID,
+      url: BINARY_URL,
+    });
+    const outcomes = Promise.allSettled([...held, theirs]);
+    await Bun.sleep(0);
+
+    letThemGo();
+    await outcomes;
+
+    // Reached the url rather than being refused, which is the whole of what they were owed.
+    await expect(theirs).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  // Counted per account rather than per app: the apps are the caller's own, and one of them being
+  // a second name for the same person is not a second allowance.
+  test('and cannot get around it by spreading the fetches over their apps', async () => {
+    const { service, sourceRepo } = build({ ownership: everyOwner });
+    sourceRepo.answers({ outcome: 'unreachable' });
+    const letThemGo = sourceRepo.holdsOpen();
+
+    const held = Array.from({ length: MAX_CONCURRENT_FETCHES_PER_OWNER }, () =>
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    );
+    await Bun.sleep(0);
+
+    await expect(
+      service.createFromUrl({ appId: OTHER_APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+    ).rejects.toBeInstanceOf(TooManyRequestsError);
+
+    letThemGo();
+    await Promise.allSettled(held);
   });
 });
