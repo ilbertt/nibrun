@@ -7,6 +7,7 @@ import { Effect, Either, Layer } from 'effect';
 import { bundleBinaryName, dumpVolume, renderDotenv, writeBundle } from '#lib/exports/bundle.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
+import { agentConfig } from '#tests/support/config.ts';
 import { artifact, tenantEnvironment } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
@@ -16,7 +17,7 @@ const PERMISSION_BITS = 0o777;
 const RUNNABLE_MODE = 0o755;
 const PRIVATE_MODE = 0o600;
 
-const run = provided(Layer.merge(artifactStore(), platform));
+const run = provided(Layer.mergeAll(artifactStore(), agentConfig(), platform));
 
 /** `lost+found` is written by `mkfs.ext4`, so a real `rdump` of any root always produces it. */
 const DUMPS = {

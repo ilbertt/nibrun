@@ -96,6 +96,12 @@ credentials, and the gap is wider than the test count suggests.
   are tested, and the export path, where the order the commands come in is the guarantee. In
   particular nothing has confirmed that a `truncate` onto a `zerofs` mount produces a device file
   ZeroFS then exports, which is the one step the whole volume path rests on.
+- **`mkfs.ext4 -d` has never written a seeded filesystem onto a real device.** The unpack is
+  exercised against a temp directory — every refusal, both ceilings, and who the tree ends up
+  belonging to — but who it belongs to is only provable as "whoever the caller said", because only
+  root may give a file away and none of this was run as root. That the tenant can then write to
+  their own `data/`, and that mke2fs is content with a tree behind an NBD device, are a host's
+  questions.
 - **S3 and IMDS** are tested against stubs; nothing has spoken to AWS. `ExportUploader` is the
   seam the export tests stand in front of, so what happens to a bundle's bytes after `writeBundle`
   is a recorded call and nothing more.

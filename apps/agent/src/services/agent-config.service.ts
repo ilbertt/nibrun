@@ -96,6 +96,9 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
       activityFile: inStateDir('activity.json'),
       desiredStateFile: inStateDir('desired-state.json'),
       exportStagingDir: inStateDir('exports'),
+      // Beside the export staging tree and reaped the same way, because it is the same thing:
+      // one tenant's dataset in the clear on a host they share with others.
+      seedStagingDir: inStateDir('seeds'),
       artifactCacheDir: inStateDir('artifacts'),
       vmDir: inStateDir('vm'),
       vmSnapshotDir: yield* optional({
@@ -140,6 +143,9 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
       zerofsStoragePrefix: yield* required('AGENT_ZEROFS_STORAGE_PREFIX'),
       artifactBucket: yield* required('AGENT_ARTIFACT_BUCKET'),
       exportBucket: yield* required('AGENT_EXPORT_BUCKET'),
+      // Read-only here, and read at most once per app: what an archive held is the tenant's
+      // filesystem from the format onwards, and nothing goes back for it.
+      importBucket: yield* required('AGENT_IMPORT_BUCKET'),
       awsRegion: yield* required('AGENT_AWS_REGION'),
       controlPlaneCidrsV4: yield* requiredList('AGENT_CONTROL_PLANE_CIDRS_V4'),
       controlPlaneCidrsV6: yield* requiredList('AGENT_CONTROL_PLANE_CIDRS_V6'),
