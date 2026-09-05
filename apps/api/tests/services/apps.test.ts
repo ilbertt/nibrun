@@ -161,6 +161,15 @@ class StubAppsRepository implements AppsRepositoryContract {
     );
   }
 
+  /** Every app a host has ever said `ready` about, in the order the stamps were asked for. */
+  readonly initialized: AppId[] = [];
+
+  stampDataInitialized({ appIds }: { appIds: readonly AppId[] }): Promise<void> {
+    // `IS NULL` in the statement, so an app already stamped is not stamped again.
+    this.initialized.push(...appIds.filter((appId) => !this.initialized.includes(appId)));
+    return Promise.resolve();
+  }
+
   finishDeleting({ appId }: { appId: AppId }): Promise<boolean> {
     if (!this.deleting.includes(appId)) {
       return Promise.resolve(false);
@@ -951,6 +960,49 @@ describe('how full a filesystem is, as the host that holds it last measured it',
     });
 
     expect(appsRepo.measured).toEqual([new Map([[APP_ID, MEASURED]])]);
+  });
+});
+
+/**
+ * The one thing on this end that can learn a filesystem exists is a host saying so, and the moment
+ * it does is the moment naming an archive to create it from stops being a request anybody can make.
+ */
+describe('an app records the moment its filesystem stopped being creatable', () => {
+  function reportedVolume(state: ReportedVolume['state']): ReportedVolume {
+    return { volumeId: VOLUME_ID, appId: APP_ID, state, sizeBytes: NO_BYTES };
+  }
+
+  test('a volume reported ready stamps the app it belongs to', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).recordDataInitialized({ volumes: [reportedVolume('ready')] });
+
+    expect(appsRepo.initialized).toEqual([APP_ID]);
+  });
+
+  // A volume this host is not serving says nothing about whether the filesystem exists, and one
+  // that failed to provision says the opposite.
+  test.each(['pending', 'detached', 'failed', 'deleted'] as const)(
+    'a volume reported %s stamps nothing',
+    async (state) => {
+      const appsRepo = new StubAppsRepository({ failures: 0 });
+
+      await serviceWith({ appsRepo }).recordDataInitialized({ volumes: [reportedVolume(state)] });
+
+      expect(appsRepo.initialized).toEqual([]);
+    },
+  );
+
+  // A volume reports ready on every pass, and `apps` carries a `set_updated_at` trigger — so an
+  // app stamped twice would look to its owner like somebody had just changed it.
+  test('an app already stamped is not stamped again', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const apps = serviceWith({ appsRepo });
+
+    await apps.recordDataInitialized({ volumes: [reportedVolume('ready')] });
+    await apps.recordDataInitialized({ volumes: [reportedVolume('ready')] });
+
+    expect(appsRepo.initialized).toEqual([APP_ID]);
   });
 });
 

@@ -5,6 +5,7 @@ import type {
   DeploymentId,
   DeploymentState,
   HostPort,
+  ImportId,
   InstanceState,
   Ipv4Address,
   OwnerId,
@@ -16,7 +17,28 @@ export type DeploymentRow = Queries['SelectDeploymentById'];
 
 export type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
-export type CreateDeploymentInput = OwnedApp & { artifactId: ArtifactId };
+/**
+ * `resetDataFrom` is the archive the app's filesystem should be created holding, where one was
+ * named. Null is the ordinary case and the only one an app that has ever run can be in.
+ */
+export type CreateDeploymentInput = OwnedApp & {
+  artifactId: ArtifactId;
+  resetDataFrom: ImportId | null;
+};
+
+/**
+ * Why a deployment was not written, where "not found" would not be the truth.
+ *
+ * A rollback answers `null` because there is only one way it can fail — nothing of the caller's to
+ * replay — while this one can fail three, and two of them are about an archive rather than about
+ * anything being missing. An owner told "not found" about a filesystem that exists has been told
+ * the wrong thing.
+ */
+export type CreatedDeployment =
+  | { outcome: 'created'; row: DeploymentRow }
+  | { outcome: 'no-artifact' }
+  | { outcome: 'no-import' }
+  | { outcome: 'data-exists' };
 
 /**
  * Going back to a release is a new row naming the one it replays, rather than that one revived:
@@ -56,7 +78,7 @@ export type ReportedDeployment = {
 };
 
 export abstract class DeploymentsRepositoryContract {
-  abstract insert(input: CreateDeploymentInput): Promise<DeploymentRow | null>;
+  abstract insert(input: CreateDeploymentInput): Promise<CreatedDeployment>;
   abstract insertRollback(input: RollbackDeploymentInput): Promise<DeploymentRow | null>;
   abstract listByApp(input: DeploymentsByAppInput): Promise<DeploymentRow[]>;
   abstract findById(input: DeploymentByIdInput): Promise<DeploymentRow | null>;
@@ -82,8 +104,13 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
    * the app was running is superseded first. `deployments_live_idx` admits one live row per app,
    * so it has to leave in this same transaction or the insert meets it.
    */
-  insert({ appId, ownerId, artifactId }: CreateDeploymentInput): Promise<DeploymentRow | null> {
-    return this.sql.begin(async (tx) => {
+  insert({
+    appId,
+    ownerId,
+    artifactId,
+    resetDataFrom,
+  }: CreateDeploymentInput): Promise<CreatedDeployment> {
+    return this.sql.begin(async (tx): Promise<CreatedDeployment> => {
       // Asked before anything is superseded: returning from this callback commits, so an
       // artifact this owner does not have must leave the running deployment alone rather than
       // stand it down on behalf of a request that goes on to write nothing.
@@ -97,15 +124,22 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
           AND ar.digest IS NOT NULL
       `;
       if (!deployable) {
-        return null;
+        return { outcome: 'no-artifact' };
+      }
+      const refusal =
+        resetDataFrom === null
+          ? undefined
+          : await seedRefusal({ tx, appId, ownerId, resetDataFrom });
+      if (refusal) {
+        return refusal;
       }
       await this.supersedeLive({ tx, appId, ownerId });
 
       // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one
       // the row is written through rather than one checked beside it.
       const [inserted] = await tx.InsertDeployment`
-        INSERT INTO nibrun.deployments (app_id, artifact_id, config_id)
-        SELECT a.id, ar.id, c.id
+        INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, reset_data_from_import_id)
+        SELECT a.id, ar.id, c.id, ${resetDataFrom}
         FROM nibrun.live_apps a
         JOIN nibrun.artifacts ar ON ar.app_id = a.id
         JOIN LATERAL (
@@ -116,7 +150,11 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
           AND ar.digest IS NOT NULL
         RETURNING id
       `;
-      return inserted ? await this.selectDeployment({ tx, deploymentId: inserted.id }) : null;
+      if (!inserted) {
+        return { outcome: 'no-artifact' };
+      }
+      const row = await this.selectDeployment({ tx, deploymentId: inserted.id });
+      return row ? { outcome: 'created', row } : { outcome: 'no-artifact' };
     });
   }
 
@@ -327,4 +365,40 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     `;
     return row ?? null;
   }
+}
+
+/**
+ * Whether the archive named may create this app's filesystem, asked inside the transaction that
+ * would write the row: both answers can change between a read and a write, and one of them is a
+ * host reporting a volume ready.
+ *
+ * `digest IS NOT NULL` is what makes an upload an archive, and `data_initialized_at IS NULL` is
+ * the whole of "the filesystem does not exist yet". Refused rather than accepted and ignored: a
+ * host skips a device that already carries a filesystem, so a deployment written past this would
+ * be an owner told their data was replaced when nothing read the archive at all.
+ */
+async function seedRefusal({
+  tx,
+  appId,
+  ownerId,
+  resetDataFrom,
+}: OwnedApp & { tx: Transaction; resetDataFrom: ImportId }): Promise<
+  CreatedDeployment | undefined
+> {
+  const [app] = await tx.SelectAppAwaitingData`
+    SELECT a.id
+    FROM nibrun.live_apps a
+    WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND a.data_initialized_at IS NULL
+  `;
+  if (!app) {
+    return { outcome: 'data-exists' };
+  }
+  const [usable] = await tx.SelectUsableImport`
+    SELECT im.id
+    FROM nibrun.imports im
+    JOIN nibrun.live_apps a ON a.id = im.app_id
+    WHERE im.id = ${resetDataFrom} AND im.app_id = ${appId} AND a.owner_id = ${ownerId}
+      AND im.digest IS NOT NULL
+  `;
+  return usable ? undefined : { outcome: 'no-import' };
 }
