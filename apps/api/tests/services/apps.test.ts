@@ -282,7 +282,7 @@ class StubAppsRepository implements AppsRepositoryContract {
   }
 
   listLeftovers({ appId }: { appId: AppId }): Promise<Leftovers> {
-    return Promise.resolve(this.leftovers.get(appId) ?? { artifacts: [], exports: [] });
+    return Promise.resolve(this.leftovers.get(appId) ?? NOTHING_LEFT);
   }
 
   // An app leaves the purgeable list by having nothing left, which is how the real view answers.
@@ -386,6 +386,7 @@ function serviceWith({
   exportsRepo = new StubExportCancellation(),
   artifactStorageRepo = new StubObjectStorage({ trace: [] }),
   exportStorageRepo = new StubObjectStorage({ trace: [] }),
+  importStorageRepo = new StubObjectStorage({ trace: [] }),
 }: {
   appsRepo: AppsRepositoryContract;
   hostnamesRepo?: AppHostnameAccess;
@@ -393,6 +394,7 @@ function serviceWith({
   exportsRepo?: ExportCancellation;
   artifactStorageRepo?: ObjectRemoval;
   exportStorageRepo?: ObjectRemoval;
+  importStorageRepo?: ObjectRemoval;
 }) {
   return new AppsService({
     appsRepo,
@@ -401,6 +403,7 @@ function serviceWith({
     exportsRepo,
     artifactStorageRepo,
     exportStorageRepo,
+    importStorageRepo,
     appHostDomain: APP_HOST_DOMAIN,
     secretsKey: TEST_SECRETS_KEY,
   });
@@ -1119,7 +1122,11 @@ const SECOND_APP_ID = Value.Parse(AppIdSchema, '01927e3a-0000-7000-8000-00000000
 
 const SOLO_BINARY = objectKey('solo-binary-digest');
 const BUNDLE = objectKey('exports/app/bundle.tar.gz');
+const ARCHIVE = objectKey('imports/app/archive');
 
+const NOTHING_LEFT: Leftovers = { artifacts: [], exports: [], imports: [] };
+
+/** Whatever kind the test is about; every other kind is what an app that had none of it leaves. */
 function purgeableApp({
   appsRepo,
   appId,
@@ -1127,31 +1134,34 @@ function purgeableApp({
 }: {
   appsRepo: StubAppsRepository;
   appId: AppId;
-  leftovers: Leftovers;
+  leftovers: Partial<Leftovers>;
 }): void {
   appsRepo.purgeable.push(appId);
-  appsRepo.leftovers.set(appId, leftovers);
+  appsRepo.leftovers.set(appId, { ...NOTHING_LEFT, ...leftovers });
 }
 
 describe('what a deleted app leaves behind is removed after it', () => {
-  test('the binaries and the bundles both go', async () => {
+  test('the binaries, the bundles and the uploaded archives all go', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     const artifacts = new StubObjectStorage({ trace: appsRepo.trace });
     const exports = new StubObjectStorage({ trace: appsRepo.trace });
+    const imports = new StubObjectStorage({ trace: appsRepo.trace });
     purgeableApp({
       appsRepo,
       appId: APP_ID,
-      leftovers: { artifacts: [SOLO_BINARY], exports: [BUNDLE] },
+      leftovers: { artifacts: [SOLO_BINARY], exports: [BUNDLE], imports: [ARCHIVE] },
     });
 
     await serviceWith({
       appsRepo,
       artifactStorageRepo: artifacts,
       exportStorageRepo: exports,
+      importStorageRepo: imports,
     }).purgeDeleted();
 
     expect(artifacts.removed).toEqual([SOLO_BINARY]);
     expect(exports.removed).toEqual([BUNDLE]);
+    expect(imports.removed).toEqual([ARCHIVE]);
   });
 
   // A row deleted before its object is bytes nothing names; an object deleted before its row is
