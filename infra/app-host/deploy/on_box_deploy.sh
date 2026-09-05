@@ -22,7 +22,7 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${APP_HOST_DOMAIN:?}" "${WWW_HOSTNAME:?}" \
   "${CONTROL_PLANE_INTERNAL_URL:?}" "${LOG_INGEST_URL:?}" "${PORT_RELAY_PUBLIC_IPV4:?}" \
   "${VPC_IPV4_CIDR_BLOCK:?}" "${VPC_IPV6_CIDR_BLOCK:?}" \
-  "${GUEST_IMAGES_BUCKET:?}" "${ARTIFACTS_BUCKET:?}"
+  "${GUEST_IMAGES_BUCKET:?}" "${ARTIFACTS_BUCKET:?}" "${IMPORTS_BUCKET:?}"
 
 # Empty until a guest image is adopted in infra/app-host/versions.json. A host
 # with none deploys fine; it simply has no image to boot microVMs from, which is
@@ -387,6 +387,7 @@ AGENT_LOG_INGEST_URL=${LOG_INGEST_URL}
 AGENT_PORT_RELAY_PUBLIC_IPV4=${PORT_RELAY_PUBLIC_IPV4}
 AGENT_ARTIFACT_BUCKET=${ARTIFACTS_BUCKET}
 AGENT_EXPORT_BUCKET=${EXPORTS_BUCKET}
+AGENT_IMPORT_BUCKET=${IMPORTS_BUCKET}
 # A tenant microVM reaching the api's internal port would be reaching it as the
 # host, with the host's standing. Named here rather than left to the blanket
 # private-address rule, so the ruleset on the box says why.

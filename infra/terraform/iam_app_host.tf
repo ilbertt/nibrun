@@ -73,6 +73,16 @@ data "aws_iam_policy_document" "app_host" {
     resources = ["${aws_s3_bucket.exports.arn}/*"]
   }
 
+  # The archive an owner uploaded to seed an app's data, read once by the host
+  # that formats the volume. Shaped like the exports statement above rather than
+  # the artifacts one: `GetObject` on the objects and no `ListBucket`, because a
+  # host is told the one key it needs and has no reason to discover the rest.
+  statement {
+    sid       = "ImportsRead"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.imports.arn}/*"]
+  }
+
   # Read deployment secrets.
   statement {
     sid       = "SsmRead"

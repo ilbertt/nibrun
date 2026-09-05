@@ -345,3 +345,80 @@ resource "aws_s3_bucket_lifecycle_configuration" "exports" {
     }
   }
 }
+
+# --- Imports ---
+#
+# The archives an owner uploads to give an app its starting data. Read once, by
+# the host that formats the app's volume, and never again: what the archive held
+# is the tenant's filesystem from then on, and this copy is only how it got
+# there.
+#
+# Every posture here is the opposite of the artifacts bucket's, which is why it
+# is not a prefix inside it. Not versioned — a version of an expired import is an
+# expired import that still exists, the same sentence the exports bucket is
+# written under. Expired unconditionally rather than under a prefix, because
+# every object here is one owner's dataset in the clear and none of them is live
+# data. And force-destroyable is deliberately absent: an archive an owner
+# uploaded is theirs until the rule reaches it.
+#
+# Keys are not content-addressed. One key per row, so two owners uploading
+# identical bytes never share an object — and so expiring one can never take
+# another's away with it.
+resource "aws_s3_bucket" "imports" {
+  bucket = "${local.resource_name_prefix}-imports-${local.bucket_suffix}"
+
+  tags = {
+    Name = "${local.resource_name_prefix}-imports"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "imports" {
+  bucket                  = aws_s3_bucket.imports.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "imports" {
+  bucket = aws_s3_bucket.imports.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+# The dashboard uploads the archive from the browser straight to the URL the api
+# signs, exactly as it uploads a binary — see the artifacts rule for why a
+# browser needs this and the CLI does not.
+resource "aws_s3_bucket_cors_configuration" "imports" {
+  bucket = aws_s3_bucket.imports.id
+
+  cors_rule {
+    allowed_methods = ["PUT"]
+    allowed_origins = ["https://${var.api_hostname}"]
+    allowed_headers = ["*"]
+    max_age_seconds = 3600
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "imports" {
+  bucket = aws_s3_bucket.imports.id
+
+  rule {
+    id     = "expire-imports"
+    status = "Enabled"
+    filter {}
+    expiration {
+      days = var.import_retention_days
+    }
+
+    # An archive abandoned part-way still holds whatever of the dataset was
+    # sent, and an incomplete upload is invisible to the expiry rule above.
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+}
