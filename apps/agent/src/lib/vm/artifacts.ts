@@ -46,13 +46,16 @@ export const artifactImagePath = ({
 export const downloadAndVerify = Effect.fn('downloadAndVerify')(function* ({
   artifact,
   destination,
+  bucket,
 }: {
   artifact: DesiredArtifact;
   destination: string;
+  bucket: string;
 }) {
   yield* Effect.annotateCurrentSpan({
     objectKey: artifact.objectKey,
     digest: artifact.digest,
+    bucket,
   });
   const fs = yield* FileSystem.FileSystem;
   const store = yield* ArtifactStore;
@@ -60,7 +63,7 @@ export const downloadAndVerify = Effect.fn('downloadAndVerify')(function* ({
   const written = yield* Ref.make(0);
 
   yield* Stream.unwrap(
-    Effect.map(store.open(artifact.objectKey), (readable) =>
+    Effect.map(store.open({ bucket, objectKey: artifact.objectKey }), (readable) =>
       Stream.fromReadableStream({
         evaluate: () => readable,
         onError: (cause) => new ArtifactTransferError({ cause }),

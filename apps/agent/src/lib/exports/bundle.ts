@@ -4,6 +4,7 @@ import type { DesiredArtifact, TenantEnvironment } from '@repo/protocol';
 import { Data, Duration, Effect, Either } from 'effect';
 import { BINARY_MODE, downloadAndVerify } from '#lib/vm/artifacts.ts';
 import { MKFS_ROOT_ENTRIES } from '#lib/volumes/ext4.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
 import { stdoutOf } from '#services/command-runner.service.ts';
 
 const STAGING_MODE = 0o700;
@@ -139,10 +140,11 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  const config = yield* AgentConfig;
   const binaryName = yield* bundleBinaryName(artifact);
 
   const binaryPath = path.join(stagingDir, binaryName);
-  yield* downloadAndVerify({ artifact, destination: binaryPath });
+  yield* downloadAndVerify({ artifact, destination: binaryPath, bucket: config.artifactBucket });
   // A transfer writes what a transfer writes, and `tar` records the mode it finds. Without this
   // the bundle carries a binary the owner has to chmod before the copy they were handed will run.
   yield* fs.chmod(binaryPath, BINARY_MODE);

@@ -75,7 +75,7 @@ const imageFor = Effect.fn('ArtifactImages.imageFor')(function* (artifact: Desir
       Effect.gen(function* () {
         const binaryPath = path.join(stagedSource, GUEST_BINARY_NAME);
         const [fetching] = yield* Effect.timed(
-          downloadAndVerify({ artifact, destination: binaryPath }),
+          downloadAndVerify({ artifact, destination: binaryPath, bucket: config.artifactBucket }),
         );
         yield* fs.chmod(binaryPath, BINARY_MODE);
         const [packing] = yield* Effect.timed(
