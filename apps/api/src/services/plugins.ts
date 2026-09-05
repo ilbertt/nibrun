@@ -3,7 +3,7 @@ import { sql } from '#db/client.ts';
 import { CloudflareClient } from '#lib/cloudflare/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
-import { artifactsS3, artifactsSigner, exportsS3 } from '#lib/s3/client.ts';
+import { artifactsS3, exportsS3, importsS3, uploadSigner } from '#lib/s3/client.ts';
 import { readSecretsKey } from '#lib/tenant-secrets.ts';
 import { VictoriaLogsClient } from '#lib/victorialogs/client.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
@@ -19,6 +19,7 @@ import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { ExportStorageRepository } from '#repositories/export-storage.repository.ts';
 import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
+import { ImportsRepository } from '#repositories/imports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
 import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
@@ -30,6 +31,7 @@ import { ExportsService } from '#services/exports.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
 import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
+import { ImportsService } from '#services/imports.service.ts';
 import { LogsService } from '#services/logs.service.ts';
 
 // Read once, where every other piece of the environment is read: a key of the wrong length is a
@@ -59,13 +61,22 @@ const artifactsRepository = new ArtifactsRepository(sql);
 const deploymentsRepository = new DeploymentsRepository(sql);
 const artifactStorageRepository = new ArtifactStorageRepository({
   client: artifactsS3,
-  signer: artifactsSigner,
+  signer: uploadSigner,
   bucket: env.ARTIFACTS_BUCKET,
+});
+// The same repository against a different bucket: it takes one as a constructor parameter and
+// knows nothing about artifacts, and what an import needs of a store — sign, read back, remove —
+// is exactly what it already does.
+const importStorageRepository = new ArtifactStorageRepository({
+  client: importsS3,
+  signer: uploadSigner,
+  bucket: env.IMPORTS_BUCKET,
 });
 const binarySourceRepository = new BinarySourceRepository();
 const cachedBinariesRepository = new CachedBinariesRepository(sql);
 const releaseDigestRepository = new ReleaseDigestRepository();
 const exportsRepository = new ExportsRepository(sql);
+const importsRepository = new ImportsRepository(sql);
 const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient);
 const logsRepository = new LogsRepository(victoriaLogsClient);
@@ -78,6 +89,7 @@ const appsService = new AppsService({
   exportsRepo: exportsRepository,
   artifactStorageRepo: artifactStorageRepository,
   exportStorageRepo: exportStorageRepository,
+  importStorageRepo: importStorageRepository,
   appHostDomain: env.APP_HOST_DOMAIN,
   secretsKey,
 });
@@ -107,12 +119,18 @@ const artifactsService = new ArtifactsService({
   releaseRepo: releaseDigestRepository,
   appsRepo: appsRepository,
 });
+const importsService = new ImportsService({
+  importsRepo: importsRepository,
+  storageRepo: importStorageRepository,
+  appsRepo: appsRepository,
+});
 const agentService = new AgentService({
   agentRepo: agentRepository,
   deploymentsService,
   appsService,
   exportsService,
   artifactsService,
+  importsService,
   hostnamesService,
 });
 const logsService = new LogsService({
@@ -173,4 +191,9 @@ export const HostnamesServicePlugin = new Elysia({ name: 'service.hostnames' }).
 export const ExportsServicePlugin = new Elysia({ name: 'service.exports' }).decorate(
   'exportsService',
   exportsService,
+);
+
+export const ImportsServicePlugin = new Elysia({ name: 'service.imports' }).decorate(
+  'importsService',
+  importsService,
 );
