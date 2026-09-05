@@ -8,6 +8,7 @@ import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppActivator } from '#services/app-activator.service.ts';
 import { AppWaker } from '#services/app-waker.service.ts';
+import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { CaddyProxy } from '#services/caddy-proxy.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
@@ -44,6 +45,7 @@ const agent = Layer.mergeAll(
   ControlPlane.Default,
   LogStore.Default,
   ArtifactStore.Default,
+  ArtifactImages.Default,
   SlotAllocator.Default,
   ZerofsTopology.Default,
   HostFirewall.Default,

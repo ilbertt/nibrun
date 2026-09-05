@@ -1,12 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { FileSystem, Path } from '@effect/platform';
+import { Path } from '@effect/platform';
 import { BunPath } from '@effect/platform-bun';
 import { type DesiredArtifact, Sha256DigestSchema, Value } from '@repo/protocol';
-import { Effect, Either, Layer } from 'effect';
-import { artifactImagePath, downloadAndVerify, ensureArtifactImage } from '#lib/vm/artifacts.ts';
+import { Effect, Either } from 'effect';
+import { artifactImagePath, downloadAndVerify } from '#lib/vm/artifacts.ts';
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST, artifactStore } from '#tests/support/artifacts.ts';
-import { recordingCommands } from '#tests/support/commands.ts';
-import { agentConfig } from '#tests/support/config.ts';
 import { artifact } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
@@ -90,58 +88,4 @@ test('the cache path depends only on the digest, so a redeploy of the same bytes
   expect(artifactImagePath({ cacheDir: CACHE_DIR, digest: ARTIFACT_DIGEST, path })).toBe(
     `${CACHE_DIR}/${ARTIFACT_DIGEST}/artifact.squashfs`,
   );
-});
-
-/**
- * mksquashfs as it behaves when it fails: the output file exists by the time it gives up, which
- * is what used to be left in the cache. `command[2]` is the destination it was asked to write.
- */
-const DESTINATION_ARGUMENT = 2;
-
-function mksquashfsThat({ code }: { code: number }) {
-  return recordingCommands((request) =>
-    Effect.promise(async () => {
-      await Bun.write(request.command[DESTINATION_ARGUMENT] ?? '', 'a squashfs image');
-      return { code, stdout: '', stderr: '' };
-    }),
-  );
-}
-
-function buildingInto({ code }: { code: number }) {
-  return Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const cacheDir = yield* temporaryDirectory;
-    const result = yield* Effect.either(
-      Effect.provide(
-        ensureArtifactImage(artifact()),
-        Layer.mergeAll(
-          agentConfig({ artifactCacheDir: cacheDir }),
-          artifactStore(),
-          mksquashfsThat({ code }).layer,
-        ),
-      ),
-    );
-    return { result, entries: yield* fs.readDirectory(cacheDir) };
-  });
-}
-
-const MKFS_FAILED = 1;
-const MKFS_OK = 0;
-
-describe('a build leaves the cache holding finished images and nothing else', () => {
-  // Every way a build can end between mksquashfs and the rename used to leave the image behind,
-  // and only a later build of the same digest ever cleared it.
-  test('one that fails after writing its image leaves nothing at all', async () => {
-    const { result, entries } = await run(buildingInto({ code: MKFS_FAILED }));
-
-    expect(Either.isLeft(result)).toBe(true);
-    expect(entries).toEqual([]);
-  });
-
-  test('one that succeeds leaves the image under its digest and no staging beside it', async () => {
-    const { result, entries } = await run(buildingInto({ code: MKFS_OK }));
-
-    expect(Either.isRight(result)).toBe(true);
-    expect(entries).toEqual([ARTIFACT_DIGEST]);
-  });
 });
