@@ -1,5 +1,27 @@
 import type { HttpPort, Ipv4Address } from '@repo/protocol';
-import { Effect } from 'effect';
+import { Data, Duration, Effect } from 'effect';
+
+/**
+ * How long the guest has to begin answering. The answer itself is not under it: what comes back
+ * is streamed on to whoever asked, and a download or an event stream takes as long as the tenant
+ * takes. What is bounded is a guest that accepted the connection and then said nothing — `fetch`
+ * has no deadline of its own, so without this the visitor waits on it forever and so does the
+ * proxy connection they are holding.
+ *
+ * Long, because this is the one request that found no microVM: everything the tenant does lazily
+ * on its first request happens under it, and answering a working app with an error page is worse
+ * than the wait.
+ */
+const ANSWER_TIMEOUT = Duration.seconds(60);
+
+export class GuestDidNotAnswer extends Data.TaggedError('GuestDidNotAnswer')<{
+  readonly guestIpv4: Ipv4Address;
+  readonly httpPort: HttpPort;
+}> {
+  override get message() {
+    return `${this.guestIpv4}:${this.httpPort} took the request that woke it and did not answer within ${Duration.toSeconds(ANSWER_TIMEOUT)}s`;
+  }
+}
 
 /**
  * Headers describing one hop of a connection rather than the message travelling on it. Copying
@@ -51,7 +73,7 @@ export const forwardToGuest = Effect.fn('forwardToGuest')(
     guestIpv4: Ipv4Address;
     httpPort: HttpPort;
   }) =>
-    Effect.tryPromise(async () => {
+    Effect.tryPromise(async (signal) => {
       const target = new URL(request.url);
       target.protocol = 'http:';
       target.hostname = guestIpv4;
@@ -63,6 +85,9 @@ export const forwardToGuest = Effect.fn('forwardToGuest')(
         body: request.body,
         redirect: 'manual',
         duplex: 'half',
+        // Giving up here has to reach the socket too, or the guest goes on being asked for an
+        // answer nobody is waiting for and the connection to it is never released.
+        signal,
       } as RequestInit);
 
       const headers = without({
@@ -71,5 +96,10 @@ export const forwardToGuest = Effect.fn('forwardToGuest')(
       });
       headers.set('connection', 'close');
       return new Response(upstream.body, { status: upstream.status, headers });
-    }),
+    }).pipe(
+      Effect.timeoutFail({
+        duration: ANSWER_TIMEOUT,
+        onTimeout: () => new GuestDidNotAnswer({ guestIpv4, httpPort }),
+      }),
+    ),
 );
