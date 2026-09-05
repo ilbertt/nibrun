@@ -49,6 +49,17 @@ data "aws_iam_policy_document" "api_s3" {
     actions   = ["s3:GetObject", "s3:DeleteObject"]
     resources = ["${aws_s3_bucket.exports.arn}/*"]
   }
+
+  # The api signs the upload, reads the object back to hash it, and writes it to
+  # the key the row names — the same three the artifacts bucket needs, for the
+  # same upload flow. Delete is how an archive goes when the app it was uploaded
+  # for is deleted, ahead of the lifecycle rule that would otherwise hold one
+  # owner's dataset for the whole retention window.
+  statement {
+    sid       = "ImportsObjects"
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.imports.arn}/*"]
+  }
 }
 
 resource "aws_iam_user_policy" "api" {

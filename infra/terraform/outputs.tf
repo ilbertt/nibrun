@@ -138,6 +138,11 @@ output "export_retention_days" {
   value       = var.export_retention_days
 }
 
+output "imports_bucket" {
+  description = "Archives an owner uploads to seed an app's data. Written and signed by the api, read once by the app host that formats the volume."
+  value       = aws_s3_bucket.imports.bucket
+}
+
 output "filesystems_bucket" {
   description = "ZeroFS's backing store. Read-write from app hosts, read-only from the control plane."
   value       = aws_s3_bucket.filesystems.bucket

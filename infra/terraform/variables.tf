@@ -94,6 +94,12 @@ variable "export_retention_days" {
   description = "How long a downloadable export survives. A security bound rather than a retention policy: the bundle carries the tenant's environment variables and their whole dataset. S3 lifecycle expiry runs daily, so 1 is the smallest meaningful value."
 }
 
+variable "import_retention_days" {
+  type        = number
+  default     = 30
+  description = "How long an uploaded import archive survives. Longer than an export's, because this is bytes an owner sent rather than bytes nibrun produced: the archive has to outlive whatever delay there is between uploading it and deploying the app it seeds. A security bound all the same — it is one owner's dataset in the clear — so it expires rather than being kept."
+}
+
 variable "internal_port" {
   type        = number
   default     = 19080
