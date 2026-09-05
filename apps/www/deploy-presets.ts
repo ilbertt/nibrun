@@ -61,16 +61,16 @@ export const DEPLOY_PRESETS = {
   pocketbase: {
     name: 'pocketbase',
     binary:
-      'https://github.com/pocketbase/pocketbase/releases/download/v0.40.1/pocketbase_0.40.1_linux_amd64.zip',
-    sha256: '0f3442d2e57b03b56fbff0d09289e4a30b4f561a44338c38d2dcd4a1a0cfa91e',
+      'https://github.com/pocketbase/pocketbase/releases/download/v0.40.2/pocketbase_0.40.2_linux_amd64.zip',
+    sha256: 'dd86b424a07f2bb5ac2b8ba8cdf013a37400a9cf56bd1f92e560981f7dd24244',
     port: 8090,
     arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data'],
     minimal: true,
   },
   sharkord: {
     name: 'sharkord',
-    binary: 'https://github.com/sharkord/sharkord/releases/download/v0.0.24/sharkord-linux-x64',
-    sha256: '92c5036ddf1951e14fe8359e03a3a66df9e20cee543837621ad47eccb3090d47',
+    binary: 'https://github.com/sharkord/sharkord/releases/download/v0.0.25/sharkord-linux-x64',
+    sha256: 'e381198decf43efe92b1b1e947dc220939a98ae3fb578f4d59b99b80a968fc58',
     port: 4991,
     'extra-public-port': true,
     env: [
