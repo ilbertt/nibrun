@@ -74,7 +74,8 @@ export class AgentService extends Service {
     // identity across a reinstall. Nothing allocates one yet, so its own is honoured.
     const hostId = request.hostId ?? Value.Parse(HostIdSchema, crypto.randomUUID());
     const sessionToken = Value.Parse(SecretStringSchema, crypto.randomUUID());
-    await this.agentRepo.saveSession({ sessionToken, hostId });
+    const expiresAt = new Date(Date.now() + SESSION_LIFETIME_MS);
+    await this.agentRepo.saveSession({ sessionToken, hostId, expiresAt });
 
     this.logger.info('agent session opened', {
       hostId,
@@ -85,10 +86,7 @@ export class AgentService extends Service {
     return {
       hostId,
       sessionToken,
-      expiresAt: Value.Parse(
-        TimestampSchema,
-        new Date(Date.now() + SESSION_LIFETIME_MS).toISOString(),
-      ),
+      expiresAt: Value.Parse(TimestampSchema, expiresAt.toISOString()),
       poll: DEFAULT_AGENT_POLL_SETTINGS,
     };
   }
