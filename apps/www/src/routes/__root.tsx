@@ -24,12 +24,6 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
-      {
-        rel: 'alternate',
-        type: 'text/markdown',
-        href: `${WWW_SITE.url}/llms.txt`,
-        title: `${PRODUCT_NAME} for agents`,
-      },
       { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
     ],
   }),
