@@ -120,7 +120,9 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
           FROM nibrun.desired_deployments
         `,
         this.sql.SelectDesiredVolumes`
-          SELECT app_id, state FROM nibrun.desired_volumes
+          SELECT app_id, state,
+                 seed_digest, seed_size_bytes, seed_object_key, seed_original_file_name
+          FROM nibrun.desired_volumes
         `,
         this.sql.SelectDesiredHostnames`
           SELECT app_id, hostname, kind FROM nibrun.desired_hostnames

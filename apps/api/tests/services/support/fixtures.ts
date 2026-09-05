@@ -7,6 +7,7 @@ import {
   DEFAULT_RESTART_POLICY,
   DEFAULT_VOLUME_SIZE_BYTES,
   DeploymentIdSchema,
+  ImportIdSchema,
   OwnerIdSchema,
   Value,
 } from '@repo/protocol';
@@ -21,6 +22,7 @@ export const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-1');
 export const OTHER_OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-2');
 export const APP_ID = Value.Parse(AppIdSchema, 'app-1');
 export const ARTIFACT_ID = Value.Parse(ArtifactIdSchema, 'artifact-1');
+export const IMPORT_ID = Value.Parse(ImportIdSchema, 'import-1');
 export const DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'deployment-1');
 
 export const APP_HOST_DOMAIN = 'apps.test';

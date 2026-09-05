@@ -4,6 +4,7 @@ import type {
   DeploymentId,
   DeploymentState,
   HostReportedState,
+  ImportId,
   ReportedInstance,
   Timestamp,
 } from '@repo/protocol';
@@ -14,6 +15,7 @@ import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {
+  CreatedDeployment,
   DeploymentByIdInput,
   DeploymentRow,
   DeploymentsByAppInput,
@@ -27,6 +29,15 @@ import { Service } from '#services/service.ts';
 const LIVE_DEPLOYMENT_CONSTRAINT = schema.deployments._indexes.deployments_live_idx._indexName;
 
 const NEVER_STARTED = 'No host started this deployment in time.';
+const ANOTHER_DEPLOYMENT = 'Another deployment for this app is being started.';
+const NOTHING_TO_DEPLOY = 'App, artifact or deployment not found.';
+const NO_SUCH_IMPORT = 'No uploaded import of that name is ready to be used.';
+/**
+ * Said as the app rather than as the request: nothing was wrong with what they asked for, it is
+ * simply too late to ask it. An app's filesystem is created once, and after that what replaces
+ * what is in it is the app's own business.
+ */
+const DATA_EXISTS = "This app's data already exists, so it cannot be created from an import.";
 
 export type PublicDeployment = Omit<Deployment, 'config'> & { config: PublicAppConfig };
 
@@ -35,7 +46,7 @@ export type PublicDeployment = Omit<Deployment, 'config'> & { config: PublicAppC
  * where the artifact and the config come from, and nothing else about it differs.
  */
 export type DeploymentSource =
-  | { artifactId: ArtifactId }
+  | { artifactId: ArtifactId; resetDataFrom?: ImportId }
   | Pick<RollbackDeploymentInput, 'rollbackOf'>;
 
 export class DeploymentsService extends Service {
@@ -62,7 +73,13 @@ export class DeploymentsService extends Service {
         this.deploymentsRepo.insertRollback({ ...owned, rollbackOf: source.rollbackOf }),
       );
     }
-    return this.published(this.deploymentsRepo.insert({ ...owned, artifactId: source.artifactId }));
+    return this.created(
+      this.deploymentsRepo.insert({
+        ...owned,
+        artifactId: source.artifactId,
+        resetDataFrom: source.resetDataFrom ?? null,
+      }),
+    );
   }
 
   async list(input: DeploymentsByAppInput): Promise<PublicDeployment[]> {
@@ -140,15 +157,38 @@ export class DeploymentsService extends Service {
    * callers racing meet `deployments_live_idx` rather than each other, so the loser is told to
    * retry instead of leaving the app with two live deployments.
    */
+  /**
+   * The same conflict handling as a rollback's, and three ways to be refused rather than one. An
+   * archive that cannot create the filesystem is said as what is wrong with it, because the caller
+   * has something to do about each: wait for the upload, or accept that the data is already there.
+   */
+  private async created(write: Promise<CreatedDeployment>): Promise<PublicDeployment> {
+    const outcome = await write.catch((error: unknown) => {
+      if (isUniqueViolation({ error, constraint: LIVE_DEPLOYMENT_CONSTRAINT })) {
+        throw new ConflictError(ANOTHER_DEPLOYMENT);
+      }
+      throw error;
+    });
+    if (outcome.outcome === 'created') {
+      return toPublicDeployment(outcome.row);
+    }
+    if (outcome.outcome === 'no-artifact') {
+      throw new NotFoundError(NOTHING_TO_DEPLOY);
+    }
+    throw outcome.outcome === 'no-import'
+      ? new NotFoundError(NO_SUCH_IMPORT)
+      : new ConflictError(DATA_EXISTS);
+  }
+
   private async published(write: Promise<DeploymentRow | null>): Promise<PublicDeployment> {
     const row = await write.catch((error: unknown) => {
       if (isUniqueViolation({ error, constraint: LIVE_DEPLOYMENT_CONSTRAINT })) {
-        throw new ConflictError('Another deployment for this app is being started.');
+        throw new ConflictError(ANOTHER_DEPLOYMENT);
       }
       throw error;
     });
     if (!row) {
-      throw new NotFoundError('App, artifact or deployment not found.');
+      throw new NotFoundError(NOTHING_TO_DEPLOY);
     }
     return toPublicDeployment(row);
   }

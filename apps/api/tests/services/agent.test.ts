@@ -12,7 +12,7 @@ import {
 import { AgentSessions } from '#lib/agent/sessions.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
-import { AgentService, type HostnameReconcile, type UploadSweep } from '#services/agent.service.ts';
+import { AgentService, type HostnameReconcile, type ImportSweep } from '#services/agent.service.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { ExportsService } from '#services/exports.service.ts';
@@ -83,6 +83,11 @@ class FakeAppsService {
     return Promise.resolve();
   }
 
+  recordDataInitialized(): Promise<void> {
+    this.trace.push('recordDataInitialized');
+    return Promise.resolve();
+  }
+
   completeDeletions({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
     this.volumes.push([...volumes]);
     this.trace.push('completeDeletions');
@@ -119,11 +124,17 @@ class FakeExportsService {
 }
 
 /** A report is the only clock this process has, so the sweep rides along on one. */
-class FakeUploadSweep implements UploadSweep {
+class FakeUploadSweep implements ImportSweep {
   swept = 0;
+  sweptSpent = 0;
 
   sweepAbandoned(): Promise<void> {
     this.swept += 1;
+    return Promise.resolve();
+  }
+
+  sweepSpent(): Promise<void> {
+    this.sweptSpent += 1;
     return Promise.resolve();
   }
 }
@@ -249,6 +260,7 @@ describe('a report is read by whatever owns what it talks about', () => {
 
     expect(apps.trace).toEqual([
       'recordVolumeUsage',
+      'recordDataInitialized',
       'recordComputeUsage',
       'completeDeletions',
       'finishDeletions',
@@ -271,6 +283,8 @@ describe('a report is read by whatever owns what it talks about', () => {
 
     expect(artifacts.swept).toBe(1);
     expect(imports.swept).toBe(1);
+    // The archives this report's own `ready` volumes just made unusable go on the same pass.
+    expect(imports.sweptSpent).toBe(1);
     expect(hostnames.reconciled).toBe(1);
   });
 });

@@ -74,6 +74,7 @@ export abstract class AppsRepositoryContract {
   abstract clearComputeUsage(input: { appIds: readonly AppId[] }): Promise<void>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
+  abstract stampDataInitialized(input: { appIds: readonly AppId[] }): Promise<void>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
   abstract isDeletionFinishable(input: { appId: AppId }): Promise<boolean>;
   abstract listFinishableDeletions(input: { limit: number }): Promise<AppId[]>;
@@ -541,6 +542,25 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       SELECT f.app_id FROM nibrun.finishable_deletions f LIMIT ${limit}
     `;
     return rows.map((row) => row.app_id);
+  }
+
+  /**
+   * The moment a host first said the filesystem exists, which is the moment it stops being
+   * creatable — and after which naming an archive to create it from is a refused request.
+   *
+   * `IS NULL` is what makes it once and what keeps it off the `set_updated_at` trigger. A volume
+   * reports `ready` on every pass, and an app whose `updated_at` moved every time a host spoke
+   * would look to its owner like somebody had just changed it.
+   */
+  async stampDataInitialized({ appIds }: { appIds: readonly AppId[] }): Promise<void> {
+    // Untagged, as `updateState` is: `sql.array` is a clause the generator blanks out before it
+    // parses the statement, and there is no row type to lose — this returns nothing.
+    await this.sql`
+      UPDATE nibrun.apps
+      SET data_initialized_at = now()
+      WHERE id = ANY(${this.sql.array([...appIds], TEXT_ARRAY)}::uuid[])
+        AND data_initialized_at IS NULL
+    `;
   }
 
   async finishDeleting({ appId }: { appId: AppId }): Promise<boolean> {

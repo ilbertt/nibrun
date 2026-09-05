@@ -5,6 +5,7 @@ import { Repository } from '#repositories/repository.ts';
 export type ImportRow = Queries['SelectImportById'];
 export type PendingImportRow = Queries['SelectPendingImport'];
 export type AbandonedImportRow = Queries['SelectAbandonedImports'];
+export type SpentImportRow = Queries['SelectSpentImports'];
 
 export type CompleteImportInput = {
   appId: AppId;
@@ -35,6 +36,8 @@ export abstract class ImportsRepositoryContract {
   }): Promise<ImportRow | null>;
   abstract listAbandoned(input: { olderThanSeconds: number }): Promise<AbandonedImportRow[]>;
   abstract removeAbandoned(input: { importId: ImportId }): Promise<void>;
+  abstract listSpent(input: { limit: number }): Promise<SpentImportRow[]>;
+  abstract forgetObject(input: { importId: ImportId }): Promise<void>;
 }
 
 /**
@@ -165,6 +168,43 @@ export class ImportsRepository extends Repository implements ImportsRepositoryCo
     await this.sql.DeleteAbandonedImport`
       DELETE FROM nibrun.imports im
       WHERE im.id = ${importId} AND im.digest IS NULL
+    `;
+  }
+
+  /**
+   * Archives still holding an object that can no longer create a filesystem, because the app's
+   * already exists.
+   *
+   * Not only the ones that were used: an archive nobody ever deployed against an app whose data is
+   * now there is one `resetDataFrom` would refuse, so what it is holding is storage nothing can
+   * ever spend. Both are the same sentence — the archive can no longer be applied — which is why
+   * this asks that rather than asking which deployment named what.
+   *
+   * `object_key IS NOT NULL` is the whole of "there is still something to remove", so a row leaves
+   * this listing by having had it removed. That is what makes running it again the same code path
+   * as running it the first time.
+   */
+  listSpent({ limit }: { limit: number }): Promise<SpentImportRow[]> {
+    return this.sql.SelectSpentImports`
+      /* @notNull object_key */
+      SELECT im.id, im.object_key
+      FROM nibrun.imports im
+      JOIN nibrun.apps a ON a.id = im.app_id
+      WHERE im.object_key IS NOT NULL AND a.data_initialized_at IS NOT NULL
+      LIMIT ${limit}
+    `;
+  }
+
+  /**
+   * The row stops naming an object because there is no longer one to name. The digest stays: what
+   * the owner uploaded and what it hashed to is the app's history, and only where the bytes were
+   * has stopped being true.
+   */
+  async forgetObject({ importId }: { importId: ImportId }): Promise<void> {
+    await this.sql.ForgetImportObject`
+      UPDATE nibrun.imports im
+      SET object_key = NULL
+      WHERE im.id = ${importId} AND im.object_key IS NOT NULL
     `;
   }
 }

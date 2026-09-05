@@ -21,6 +21,7 @@ import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
   CreateDeploymentInput,
+  CreatedDeployment,
   DeploymentByIdInput,
   DeploymentRow,
   DeploymentsByAppInput,
@@ -36,6 +37,7 @@ import {
   configColumns,
   DEFAULT_CONFIG,
   DEPLOYMENT_ID,
+  IMPORT_ID,
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
@@ -107,6 +109,8 @@ type FakeBehaviour = {
   row?: DeploymentRow | null;
   live?: LiveDeploymentRow[];
   runError?: unknown;
+  /** What the insert decided, where a case is about a refusal rather than about the row. */
+  refusal?: Exclude<CreatedDeployment, { outcome: 'created' }>;
 };
 
 class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
@@ -139,12 +143,16 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
     return Promise.resolve();
   }
 
-  insert(input: CreateDeploymentInput): Promise<DeploymentRow | null> {
+  insert(input: CreateDeploymentInput): Promise<CreatedDeployment> {
     this.calls.push(input);
     if (this.#behaviour.runError) {
       return Promise.reject(this.#behaviour.runError);
     }
-    return Promise.resolve(this.#behaviour.row ?? null);
+    if (this.#behaviour.refusal) {
+      return Promise.resolve(this.#behaviour.refusal);
+    }
+    const row = this.#behaviour.row;
+    return Promise.resolve(row ? { outcome: 'created', row } : { outcome: 'no-artifact' });
   }
 
   listByApp(input: DeploymentsByAppInput): Promise<DeploymentRow[]> {
@@ -572,5 +580,76 @@ describe('going back to a release is a new deployment, not an old one revived', 
     const { service } = serviceWith({ runError: boom });
 
     await expect(service.createOrRollback(ROLLBACK_REQUEST)).rejects.toBe(boom);
+  });
+});
+
+/**
+ * The archive an app's filesystem is created from is named on the deployment, and refused where it
+ * could not be honoured. Every one of these is a refusal an owner has something to do about, which
+ * is why they are not all "not found".
+ */
+describe('a deployment can say what the app starts with, once', () => {
+  test('the archive named reaches the row that is written', async () => {
+    const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
+
+    await service.createOrRollback({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      source: { artifactId: ARTIFACT_ID, resetDataFrom: IMPORT_ID },
+    });
+
+    expect(deploymentsRepo.calls[0]).toMatchObject({ resetDataFrom: IMPORT_ID });
+  });
+
+  test('a deployment that names none says so rather than leaving it unsaid', async () => {
+    const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
+
+    await service.createOrRollback({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      source: { artifactId: ARTIFACT_ID },
+    });
+
+    expect(deploymentsRepo.calls[0]).toMatchObject({ resetDataFrom: null });
+  });
+
+  // Said as a conflict rather than a refusal of the request: nothing was wrong with what they
+  // asked for, it is simply too late to ask it.
+  test('an app whose filesystem already exists is a conflict', async () => {
+    const { service } = serviceWith({ refusal: { outcome: 'data-exists' } });
+
+    await expect(
+      service.createOrRollback({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        source: { artifactId: ARTIFACT_ID, resetDataFrom: IMPORT_ID },
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  test('an archive still awaiting its upload is not one this can be given', async () => {
+    const { service } = serviceWith({ refusal: { outcome: 'no-import' } });
+
+    await expect(
+      service.createOrRollback({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        source: { artifactId: ARTIFACT_ID, resetDataFrom: IMPORT_ID },
+      }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  // A rollback replays a release exactly as it ran, and creating the filesystem is not something
+  // that happened then. The body says so as a schema, so the service never sees the two together.
+  test('a rollback is written with no archive at all', async () => {
+    const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
+
+    await service.createOrRollback({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      source: { rollbackOf: DEPLOYMENT_ID },
+    });
+
+    expect(deploymentsRepo.calls[0]).not.toHaveProperty('resetDataFrom');
   });
 });

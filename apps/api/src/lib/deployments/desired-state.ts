@@ -37,6 +37,10 @@ export function volumeIdOf(appId: AppId): VolumeId {
  * A suspended app keeps its filesystem — that is what suspending it means — so deleting the app
  * is the only thing that asks for one to go, and it asks by saying so. A volume is never removed
  * by falling out of a list.
+ *
+ * The seed rides along only while the view still offers one, which is until a host has said the
+ * filesystem exists. A host that already has one ignores it, so this is about what crosses the
+ * wire rather than about what would happen if it did.
  */
 export function toDesiredVolume(row: DesiredVolumeRow): DesiredVolume {
   return {
@@ -44,6 +48,30 @@ export function toDesiredVolume(row: DesiredVolumeRow): DesiredVolume {
     appId: row.app_id,
     sizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
     desiredState: row.state === 'deleting' ? 'absent' : 'present',
+    ...seedOf(row),
+  };
+}
+
+/**
+ * All four columns or none: the view fills them from one row of `imports` and leaves them all null
+ * where there is none, so a partly filled seed is not a state this can be handed.
+ */
+function seedOf(row: DesiredVolumeRow): Pick<DesiredVolume, 'seed'> {
+  if (
+    row.seed_digest === null ||
+    row.seed_size_bytes === null ||
+    row.seed_object_key === null ||
+    row.seed_original_file_name === null
+  ) {
+    return {};
+  }
+  return {
+    seed: {
+      digest: row.seed_digest,
+      sizeBytes: Number(row.seed_size_bytes),
+      objectKey: row.seed_object_key,
+      filename: row.seed_original_file_name,
+    },
   };
 }
 
