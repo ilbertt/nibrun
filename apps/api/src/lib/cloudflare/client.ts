@@ -4,6 +4,16 @@ const MAX_ERROR_BODY = 256;
 const HTTP_NOT_FOUND = 404;
 
 /**
+ * How long the edge has to answer one call. `fetch` has no deadline of its own, so an edge that
+ * takes the connection and never answers holds whoever is waiting on it — and somebody is: adding
+ * a hostname makes two of these before its owner is handed the record they have to go and place.
+ *
+ * A call given up on is the case the reconcile pass already finishes, which is why the number can
+ * be this short: a row written with no `cloudflare_id` is attached to the edge on a later pass.
+ */
+const REQUEST_DEADLINE_MS = 10_000;
+
+/**
  * Where Cloudflare answers the challenge on the owner's behalf. They point `_acme-challenge` at
  * this once and the edge renews against it forever, which is the whole reason to prefer it over
  * handing them a TXT value that changes on every issuance.
@@ -117,6 +127,7 @@ export class CloudflareClient {
         ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal: AbortSignal.timeout(REQUEST_DEADLINE_MS),
     });
 
     const text = await response.text();

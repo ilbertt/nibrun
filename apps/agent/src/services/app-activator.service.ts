@@ -34,6 +34,13 @@ const sayAppIsDown = () => say('This app is not running.');
 const sayAppWouldNotStart = () => say('This app could not be started.');
 
 /**
+ * Not the sentence above, because the microVM did come up: it took the request and then said
+ * nothing for as long as the forward is willing to wait. An owner told their app would not start
+ * would go and read a boot that worked.
+ */
+const sayAppDidNotAnswer = () => say('This app started but did not answer.');
+
+/**
  * Its own sentence rather than the one above. An app that could not be woken because its host had
  * no memory left is not a broken app, and telling its visitor otherwise would have its owner
  * reading a binary that is fine — while the repair, moving the app, is not something either of
@@ -132,6 +139,11 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
         );
         return response;
       }).pipe(
+        Effect.catchTag('GuestDidNotAnswer', (error) =>
+          Effect.logWarning('an app did not answer the request that woke it', error)
+            .pipe(Effect.annotateLogs({ appId }))
+            .pipe(Effect.as(sayAppDidNotAnswer())),
+        ),
         Effect.catchTag('HostHasNoRoom', (error) =>
           Effect.logWarning('a request could not be given an app', error)
             .pipe(Effect.annotateLogs({ appId }))

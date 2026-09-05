@@ -8,6 +8,16 @@ const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 
 const MAX_ERROR_BODY = 256;
 
+/**
+ * How long the store has to answer one request. `fetch` has no deadline of its own, so a store
+ * that takes the connection and never answers holds the reader waiting on it — and the log stream
+ * asks again every second, so it is a wait nobody is watching for.
+ *
+ * The whole exchange rather than the first byte: what is read after the headers is one window,
+ * capped by its own `limit`, and not something anyone follows.
+ */
+const REQUEST_DEADLINE_MS = 10_000;
+
 export class VictoriaLogsError extends Error {
   constructor({ status, body }: { status: number; body: string }) {
     super(`the log store answered ${status}: ${body}`);
@@ -30,7 +40,10 @@ abstract class VictoriaLogsEndpoint {
   }
 
   protected async send(init: RequestInit): Promise<Response> {
-    const response = await fetch(this.url, init);
+    const response = await fetch(this.url, {
+      ...init,
+      signal: AbortSignal.timeout(REQUEST_DEADLINE_MS),
+    });
     if (!response.ok) {
       throw new VictoriaLogsError({
         status: response.status,
@@ -63,10 +76,12 @@ export type QueryRequest = {
 /**
  * One window of the store, read and finished with.
  *
- * An ordinary request, and nothing here can cancel one. The endpoint that follows a stream instead
- * exists and would need that — it is held open for as long as someone is reading, so abandoning
- * one without saying so leaks it. A window is bounded by its own `limit` and answers in the time a
- * query takes, which is short enough that a reader who has left costs a reply nobody reads.
+ * An ordinary request, and no reader here can cancel one. The endpoint that follows a stream
+ * instead exists and would need that — it is held open for as long as someone is reading, so
+ * abandoning one without saying so leaks it. A window is bounded by its own `limit` and answers in
+ * the time a query takes, which is short enough that a reader who has left costs a reply nobody
+ * reads. A store that answers nothing at all is the other question, and `send`'s deadline is what
+ * bounds that one.
  */
 export class VictoriaLogsQuery extends VictoriaLogsEndpoint {
   constructor(baseUrl: URL) {
