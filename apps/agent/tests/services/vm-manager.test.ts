@@ -6,6 +6,8 @@ import { writeJsonFile } from '#lib/json-store.ts';
 import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import { type SnapshotStamp, snapshotPaths } from '#lib/vm/snapshot.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { ArtifactImages } from '#services/artifact-images.service.ts';
+import { ArtifactTransferError } from '#services/artifact-store.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -50,6 +52,14 @@ function hostBooted(bootId: string) {
   );
 }
 
+/** A wake restores what is already on the host, so reaching the image builder is the failure. */
+const noArtifactImages = Layer.succeed(
+  ArtifactImages,
+  ArtifactImages.make({
+    ensure: () => new ArtifactTransferError({ cause: 'no artifact images in a test' }),
+  }),
+);
+
 const VERB_ARGUMENT = 1;
 const START_REFUSED = 1;
 
@@ -91,6 +101,7 @@ function hostAsleepAndRefusing() {
       Layer.provide(
         Layer.mergeAll(
           AgentState.Default,
+          noArtifactImages,
           TenantLogReceiver.Default,
           ZerofsTopology.DefaultWithoutDependencies,
         ),
