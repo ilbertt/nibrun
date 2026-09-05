@@ -33,8 +33,8 @@ export const DEPLOY_PRESETS = {
   gitea: {
     name: 'gitea',
     binary:
-      'https://github.com/ilbertt/gitea/releases/download/v1.28.0-dev-nibrun.2/gitea-nibrun-linux-amd64',
-    sha256: 'e74bef3081a046c6a3964dee49ca68b94316a69f0709a148ee6234c543a93bb5',
+      'https://github.com/ilbertt/gitea/releases/download/v1.28.0-dev-nibrun.3/gitea-nibrun-linux-amd64',
+    sha256: 'f7a3b71523a60be16772b82240a74e4fead1a5e7162008d6e5cf85cdd97ceff6',
     port: 3000,
     arg: ['nibrun'],
     minimal: true,
