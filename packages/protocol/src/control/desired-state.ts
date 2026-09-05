@@ -80,11 +80,26 @@ export const DesiredInstanceSchema = Type.Object({
 
 export type DesiredInstance = typeof DesiredInstanceSchema.static;
 
+/**
+ * `seed` is the archive the filesystem is created from, and it is read at exactly one moment: the
+ * format. A host that finds the device already formatted does nothing with it, which is what
+ * makes this once-only without a second fact anywhere saying whether it has been applied.
+ *
+ * `DesiredArtifact` rather than a shape of its own, because a host needs the same four things of
+ * any object it pulls — where it is, how large, what it hashes to, and what it was called — and
+ * `downloadAndVerify` already takes exactly that. What it is *for* is the difference, and that is
+ * said by which field it arrives in.
+ *
+ * Optional, and absent is the ordinary case: a volume is created empty unless somebody uploaded
+ * something to create it from. Absent is also what an api that predates this sends, which leaves
+ * a host that has already adopted it converging.
+ */
 export const DesiredVolumeSchema = Type.Object({
   volumeId: VolumeIdSchema,
   appId: AppIdSchema,
   sizeBytes: ByteSizeSchema,
   desiredState: DesiredPresenceSchema,
+  seed: Type.Optional(DesiredArtifactSchema),
 });
 
 export type DesiredVolume = typeof DesiredVolumeSchema.static;
