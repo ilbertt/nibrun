@@ -144,6 +144,7 @@ function build() {
   const apps = new FakeAppsService();
   const exports = new FakeExportsService();
   const artifacts = new FakeUploadSweep();
+  const imports = new FakeUploadSweep();
   const hostnames = new FakeHostnameReconcile();
   return {
     agentRepo,
@@ -151,6 +152,7 @@ function build() {
     deployments,
     exports,
     artifacts,
+    imports,
     hostnames,
     service: new AgentService({
       agentRepo,
@@ -158,6 +160,7 @@ function build() {
       appsService: apps as unknown as AppsService,
       exportsService: exports as unknown as ExportsService,
       artifactsService: artifacts,
+      importsService: imports,
       hostnamesService: hostnames,
     }),
   };
@@ -256,7 +259,7 @@ describe('a report is read by whatever owns what it talks about', () => {
   // Nothing in the report says anything about hostnames. It is borrowed as a clock, because
   // whether an owner has pointed their domain at us happens in DNS with nobody to announce it.
   test('and the clock it lends is what advances a custom hostname nobody announced', async () => {
-    const { artifacts, hostnames, service } = build();
+    const { artifacts, imports, hostnames, service } = build();
     const reported = {
       hostId: Value.Parse(HostIdSchema, 'host-1'),
       instances: [],
@@ -267,6 +270,7 @@ describe('a report is read by whatever owns what it talks about', () => {
     await service.acceptReport({ reported });
 
     expect(artifacts.swept).toBe(1);
+    expect(imports.swept).toBe(1);
     expect(hostnames.reconciled).toBe(1);
   });
 });

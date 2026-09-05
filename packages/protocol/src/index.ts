@@ -180,6 +180,7 @@ export {
   type VolumeId,
   VolumeIdSchema,
 } from '#domain/identifiers.ts';
+export { type Import, ImportSchema } from '#domain/import.ts';
 export {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,

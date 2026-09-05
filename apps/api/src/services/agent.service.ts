@@ -23,7 +23,7 @@ const MS_PER_SECOND = 1000;
 const SECONDS_PER_HOUR = 60 * 60;
 const SESSION_LIFETIME_MS = SECONDS_PER_HOUR * MS_PER_SECOND;
 
-/** What a report is borrowed for, and nothing else artifacts can do. */
+/** What a report is borrowed for, and nothing else an upload's own service can do. */
 export type UploadSweep = Pick<ArtifactsService, 'sweepAbandoned'>;
 
 /** Likewise for hostnames: a report is the clock, not permission to add or remove one. */
@@ -35,6 +35,7 @@ export class AgentService extends Service {
   private readonly appsService: AppsService;
   private readonly exportsService: ExportsService;
   private readonly artifactsService: UploadSweep;
+  private readonly importsService: UploadSweep;
   private readonly hostnamesService: HostnameReconcile;
 
   constructor({
@@ -43,6 +44,7 @@ export class AgentService extends Service {
     appsService,
     exportsService,
     artifactsService,
+    importsService,
     hostnamesService,
   }: {
     agentRepo: AgentRepositoryContract;
@@ -50,6 +52,7 @@ export class AgentService extends Service {
     appsService: AppsService;
     exportsService: ExportsService;
     artifactsService: UploadSweep;
+    importsService: UploadSweep;
     hostnamesService: HostnameReconcile;
   }) {
     super();
@@ -58,6 +61,7 @@ export class AgentService extends Service {
     this.appsService = appsService;
     this.exportsService = exportsService;
     this.artifactsService = artifactsService;
+    this.importsService = importsService;
     this.hostnamesService = hostnamesService;
   }
 
@@ -139,6 +143,7 @@ export class AgentService extends Service {
     // Nothing to do with this report. A report is simply the clock this process has, and an
     // upload nobody ever came back about is work that needs one.
     await this.artifactsService.sweepAbandoned();
+    await this.importsService.sweepAbandoned();
     // The same clock, for the same reason: whether a custom hostname has been pointed at us is
     // decided in somebody else's DNS, so there is no moment to act on but a passing one.
     await this.hostnamesService.reconcile();

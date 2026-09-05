@@ -11,6 +11,7 @@ interface CustomProcessEnv {
   readonly VICTORIALOGS_ENDPOINT: string;
   readonly ARTIFACTS_BUCKET: string;
   readonly EXPORTS_BUCKET: string;
+  readonly IMPORTS_BUCKET: string;
   readonly EXPORT_RETENTION_DAYS?: string;
   readonly S3_ACCESS_KEY_ID: string;
   readonly S3_SECRET_ACCESS_KEY: string;
@@ -58,6 +59,7 @@ type Env = {
   VICTORIALOGS_ENDPOINT: URL;
   ARTIFACTS_BUCKET: string;
   EXPORTS_BUCKET: string;
+  IMPORTS_BUCKET: string;
   EXPORT_RETENTION_DAYS: number;
   S3_ACCESS_KEY_ID: string;
   S3_SECRET_ACCESS_KEY: string;
@@ -80,6 +82,7 @@ function loadEnv(): Env {
     VICTORIALOGS_ENDPOINT: new URL(required('VICTORIALOGS_ENDPOINT')),
     ARTIFACTS_BUCKET: required('ARTIFACTS_BUCKET'),
     EXPORTS_BUCKET: required('EXPORTS_BUCKET'),
+    IMPORTS_BUCKET: required('IMPORTS_BUCKET'),
     EXPORT_RETENTION_DAYS: Number(
       optional({ name: 'EXPORT_RETENTION_DAYS', defaultValue: DEFAULT_EXPORT_RETENTION_DAYS }),
     ),
