@@ -40,9 +40,9 @@
     "@commitlint/config-conventional": "^21.2.0",
     "@commitlint/format": "^21.2.0",
     "@commitlint/types": "^21.2.0",
-    "@types/bun": "^1.4.0",
+    "@types/bun": "^1.4.1",
     "typescript": "catalog:",
     "turbo": "^2.10.7"
   },
-  "packageManager": "bun@1.4.0"
+  "packageManager": "bun@1.4.2"
 }
