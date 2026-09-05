@@ -9,14 +9,22 @@ const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 const MAX_ERROR_BODY = 256;
 
 /**
- * How long the store has to answer one request. `fetch` has no deadline of its own, so a store
- * that takes the connection and never answers holds the reader waiting on it — and the log stream
- * asks again every second, so it is a wait nobody is watching for.
+ * How long a window has to come back. `fetch` has no deadline of its own, so a store that takes
+ * the connection and never answers holds the reader waiting on it — and the log stream asks again
+ * every second, so it is a wait nobody is watching for.
  *
  * The whole exchange rather than the first byte: what is read after the headers is one window,
  * capped by its own `limit`, and not something anyone follows.
  */
-const REQUEST_DEADLINE_MS = 10_000;
+const QUERY_DEADLINE_MS = 10_000;
+
+/**
+ * Shorter, because the answer is only ever wanted inside a budget that is shorter: health gives
+ * every probe 2s and calls the component down when one overruns it. Left on the window's
+ * deadline the socket would outlive that verdict by the rest of it — on every probe, on every
+ * poll of every open dashboard — which is the wait that budget exists to not have.
+ */
+const HEALTH_DEADLINE_MS = 2_000;
 
 export class VictoriaLogsError extends Error {
   constructor({ status, body }: { status: number; body: string }) {
@@ -30,19 +38,22 @@ export class VictoriaLogsError extends Error {
  *
  * Subclassed per endpoint rather than switched on a path, so what a caller may ask for is what
  * the type offers: `query.run(…)` names the endpoint and what it does in the same phrase,
- * and an endpoint added later inherits the base URL rather than re-deriving it.
+ * and an endpoint added later inherits the base URL rather than re-deriving it. How long it may
+ * take is the endpoint's too — what waits on a window is not what waits on a health probe.
  */
 abstract class VictoriaLogsEndpoint {
   private readonly url: string;
+  private readonly deadlineMs: number;
 
-  constructor({ baseUrl, path }: { baseUrl: URL; path: string }) {
+  constructor({ baseUrl, path, deadlineMs }: { baseUrl: URL; path: string; deadlineMs: number }) {
     this.url = new URL(path, baseUrl).toString();
+    this.deadlineMs = deadlineMs;
   }
 
   protected async send(init: RequestInit): Promise<Response> {
     const response = await fetch(this.url, {
       ...init,
-      signal: AbortSignal.timeout(REQUEST_DEADLINE_MS),
+      signal: AbortSignal.timeout(this.deadlineMs),
     });
     if (!response.ok) {
       throw new VictoriaLogsError({
@@ -85,7 +96,7 @@ export type QueryRequest = {
  */
 export class VictoriaLogsQuery extends VictoriaLogsEndpoint {
   constructor(baseUrl: URL) {
-    super({ baseUrl, path: QUERY_PATH });
+    super({ baseUrl, path: QUERY_PATH, deadlineMs: QUERY_DEADLINE_MS });
   }
 
   async run({ query, start }: QueryRequest): Promise<LogRow[]> {
@@ -110,7 +121,7 @@ export class VictoriaLogsQuery extends VictoriaLogsEndpoint {
  */
 export class VictoriaLogsHealth extends VictoriaLogsEndpoint {
   constructor(baseUrl: URL) {
-    super({ baseUrl, path: HEALTH_PATH });
+    super({ baseUrl, path: HEALTH_PATH, deadlineMs: HEALTH_DEADLINE_MS });
   }
 
   async check(): Promise<void> {

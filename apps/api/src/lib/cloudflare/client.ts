@@ -5,13 +5,18 @@ const HTTP_NOT_FOUND = 404;
 
 /**
  * How long the edge has to answer one call. `fetch` has no deadline of its own, so an edge that
- * takes the connection and never answers holds whoever is waiting on it — and somebody is: adding
- * a hostname makes two of these before its owner is handed the record they have to go and place.
+ * takes the connection and never answers holds whoever is waiting on it open forever.
  *
- * A call given up on is the case the reconcile pass already finishes, which is why the number can
- * be this short: a row written with no `cloudflare_id` is attached to the edge on a later pass.
+ * It has to expire far enough below the ceiling that adding a hostname fits under it twice over:
+ * that path makes one call to create the hostname and one to read the zone's delegation uuid,
+ * with the owner waiting on the pair, and Bun drops a connection nothing has travelled on for 30s.
+ * A deadline that outlived the connection it answers on would leave them the dropped connection
+ * and no reason for it.
+ *
+ * Short is affordable because a call given up on is the case the reconcile pass already finishes:
+ * a row written with no `cloudflare_id` is attached to the edge on a later one.
  */
-const REQUEST_DEADLINE_MS = 10_000;
+const REQUEST_DEADLINE_MS = 5_000;
 
 /**
  * Where Cloudflare answers the challenge on the owner's behalf. They point `_acme-challenge` at
