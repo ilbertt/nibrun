@@ -3,7 +3,7 @@
 # Build context must be the monorepo root. Build from the monorepo root with:
 #   docker build -f apps/api/Dockerfile -t nibrun-api .
 
-FROM oven/bun:1.4.1-slim AS base
+FROM oven/bun:1.4.2-slim AS base
 WORKDIR /monorepo
 
 FROM base AS install
