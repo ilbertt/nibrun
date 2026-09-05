@@ -7,7 +7,6 @@ import type { AppSlot } from '#lib/network/slot.ts';
 import { ensureTap, refreshNeighbour } from '#lib/network/tap.ts';
 import { readFilesystemSpace } from '#lib/report/capacity.ts';
 import { readHostVersions } from '#lib/report/versions.ts';
-import * as Artifacts from '#lib/vm/artifacts.ts';
 import * as Firecracker from '#lib/vm/firecracker-api.ts';
 import { renderFirecrackerConfig } from '#lib/vm/firecracker-config.ts';
 import { buildInstanceConfigImage } from '#lib/vm/instance-env.ts';
@@ -29,6 +28,7 @@ import { GUEST_VSOCK_FILENAME, vmWorkingDir } from '#lib/vm/vsock.ts';
 import { readCacheDiskBytes } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -51,6 +51,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     const config = yield* AgentConfig;
     const path = yield* Path.Path;
     const fs = yield* FileSystem.FileSystem;
+    const images = yield* ArtifactImages;
     const logs = yield* TenantLogReceiver;
     const zerofs = yield* ZerofsTopology;
     const agentState = yield* AgentState;
@@ -211,9 +212,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       // taken against — and a start that still found a stamp would restore the old guest onto
       // the new deployment's disk rather than boot the new one.
       yield* discardSnapshot(desired.appId);
-      const [fetching, artifactImagePath] = yield* Effect.timed(
-        Artifacts.ensureArtifactImage(desired.artifact),
-      );
+      const [fetching, artifactImagePath] = yield* Effect.timed(images.ensure(desired.artifact));
       const [staging] = yield* Effect.timed(
         stage({ desired, slot, dataDevicePath, artifactImagePath }),
       );
@@ -451,6 +450,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
   dependencies: [
     AgentConfig.Default,
     AgentState.Default,
+    ArtifactImages.Default,
     TenantLogReceiver.Default,
     ZerofsTopology.Default,
   ],
