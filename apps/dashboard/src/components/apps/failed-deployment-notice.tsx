@@ -21,7 +21,7 @@ export function FailedDeploymentNotice({ deployment }: { deployment: DeploymentS
           search={{ timerange: DEFAULT_LOG_TIMERANGE }}
           className="font-medium underline underline-offset-4"
         >
-          The logs say more
+          Your logs may have more details
         </Link>
         .
       </span>
