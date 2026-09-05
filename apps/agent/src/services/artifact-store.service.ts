@@ -17,13 +17,21 @@ export class ArtifactStore extends Effect.Service<ArtifactStore>()('ArtifactStor
     const config = yield* AgentConfig;
     const credentials = yield* AwsCredentialProvider;
     return {
-      open: (objectKey: string): Effect.Effect<ReadableStream<Uint8Array>, ArtifactTransferError> =>
+      // The bucket is named by the caller rather than fixed here: a host pulls binaries from one
+      // and seed archives from another, and which it is asking for is the caller's fact.
+      open: ({
+        bucket,
+        objectKey,
+      }: {
+        bucket: string;
+        objectKey: string;
+      }): Effect.Effect<ReadableStream<Uint8Array>, ArtifactTransferError> =>
         credentials.resolve.pipe(
           Effect.flatMap((resolved) =>
             Effect.try(
               () =>
                 new Bun.S3Client({
-                  bucket: config.artifactBucket,
+                  bucket,
                   region: config.awsRegion,
                   ...s3Credentials(resolved),
                 })
