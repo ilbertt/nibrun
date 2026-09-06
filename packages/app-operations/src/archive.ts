@@ -54,11 +54,13 @@ export type OfferedArchive = {
 export async function refusedArchiveBody({
   name,
   body,
-}: OfferedArchive): Promise<string | undefined> {
+  // Named by the caller so a bound can be reached without staging a gibibyte to reach it.
+  limitBytes = MAX_IMPORT_SIZE_BYTES,
+}: OfferedArchive & { limitBytes?: number }): Promise<string | undefined> {
   if (body.size === 0) {
     return `There is nothing in ${name} to give the app as its data.`;
   }
-  if (body.size > MAX_IMPORT_SIZE_BYTES) {
+  if (body.size > limitBytes) {
     return `An app is created with at most ${MAX_IMPORT_GIBIBYTES} GiB of data, and ${name} is more than that.`;
   }
   const opening = await heldFrom({ stream: body.stream(), count: OPENING_BYTES });
