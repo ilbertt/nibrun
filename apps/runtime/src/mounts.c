@@ -1,6 +1,8 @@
 #include "mounts.h"
 
 #include <errno.h>
+#include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mount.h>
@@ -130,6 +132,27 @@ bool mounts_artifact(const char *device, const char *target) {
   return mount_squashfs(device, target, 0);
 }
 
+/* mkfs.ext4 makes this on every volume and keeps it for root at 0700, so it is the one
+ * thing in the tenant's own data/ they cannot read — and a recursive walk of their own
+ * directory, which is the first thing anything does with it, dies on it.
+ *
+ * Given away rather than hidden: whatever fsck ever puts here is the tenant's own data
+ * recovered, and the host cannot do this itself without mounting a tenant filesystem,
+ * which is the invariant the export path exists to keep.
+ *
+ * Never fatal. A volume that came from somewhere without one is still a volume, and
+ * failing the boot over a directory nobody has written to yet would be trading the
+ * papercut for an app that does not start. */
+static void give_away_lost_found(const struct tenant_data_mount *request) {
+  char path[PATH_MAX];
+  if (snprintf(path, sizeof(path), "%s/lost+found", request->target) >= (int)sizeof(path)) {
+    return;
+  }
+  if (chown(path, request->uid, request->gid) < 0 && errno != ENOENT) {
+    log_errno("could not give %s to uid %u", path, request->uid);
+  }
+}
+
 bool mounts_tenant_data(const struct tenant_data_mount *request) {
   if (!mounts_wait_for_device(request->device, DEVICE_WAIT_TIMEOUT_MS) ||
       !ensure_directory(request->target, 0755)) {
@@ -147,6 +170,7 @@ bool mounts_tenant_data(const struct tenant_data_mount *request) {
     log_errno("could not give %s to uid %u", request->target, request->uid);
     return false;
   }
+  give_away_lost_found(request);
   return true;
 }
 
