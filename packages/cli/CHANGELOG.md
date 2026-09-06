@@ -2,6 +2,24 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.9.6-1]
+
+### 🚀 Features
+
+- *(cli)* Nib run can say what folder an app's data starts as (#512)
+- *(api)* An owner can upload an archive an app can be given as its data (#502)
+- *(protocol)* A desired volume can name the archive it is created from (#500)
+
+### 🐛 Bug Fixes
+
+- *(cli)* An export starts a partial over rather than writing into the one a killed run left (#482)
+- *(cli)* The port prompt asks for a whole number above zero and means it (#485)
+- *(cli)* A backslash inside double quotes is an escape only where a shell would make it one (#483)
+
+### 🚜 Refactor
+
+- Constants two workspaces share live in one package (#463)
+
 ## [2026.9.3-1]
 
 ### ⚡ Performance
