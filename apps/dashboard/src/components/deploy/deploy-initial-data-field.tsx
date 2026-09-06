@@ -28,14 +28,9 @@ export function DeployInitialDataField({ api }: { api: DeployFormApi }) {
               onPick={field.handleChange}
             />
             <FieldDescription>
-              What the app finds in <code className="font-mono">data/</code> the first time it runs.
-              nibrun unpacks the archive before the app starts, so what is inside it becomes the
-              root of <code className="font-mono">data/</code> — the folder you packed is not a
-              directory inside it.
-            </FieldDescription>
-            <FieldDescription>
-              One <code className="font-mono">.tar.gz</code>, up to{' '}
-              {formatBytes(MAX_IMPORT_SIZE_BYTES)}.
+              Unpacked into <code className="font-mono">data/</code> before the app starts. One{' '}
+              <code className="font-mono">.tar.gz</code>, up to {formatBytes(MAX_IMPORT_SIZE_BYTES)}
+              .
             </FieldDescription>
             {issue !== undefined && <FieldError>{issue}</FieldError>}
           </Field>
