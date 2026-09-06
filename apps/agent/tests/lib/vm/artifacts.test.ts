@@ -11,6 +11,7 @@ import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 const DIGEST_HEX_LENGTH = 64;
 const WRONG_DIGEST = Value.Parse(Sha256DigestSchema, 'b'.repeat(DIGEST_HEX_LENGTH));
 const CACHE_DIR = '/var/lib/nibrun/artifacts';
+const ARTIFACT_BUCKET = 'nibrun-artifacts';
 const HALF = Math.floor(ARTIFACT_BYTES.byteLength / 2);
 const SPLIT_CHUNKS = [ARTIFACT_BYTES.slice(0, HALF), ARTIFACT_BYTES.slice(HALF)];
 
@@ -33,7 +34,7 @@ function downloading({
     const destination = `${yield* temporaryDirectory}/server`;
     const result = yield* Effect.either(
       Effect.provide(
-        downloadAndVerify({ artifact: artifact(overrides), destination }),
+        downloadAndVerify({ artifact: artifact(overrides), destination, bucket: ARTIFACT_BUCKET }),
         artifactStore(chunks),
       ),
     );
