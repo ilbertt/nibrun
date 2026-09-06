@@ -3,6 +3,8 @@ import {
   type FetchableBinary,
   InvalidEnvironmentError,
   parseEnvironmentPatch,
+  refusedArchive,
+  type UploadableArchive,
 } from '@repo/app-operations';
 import { type DeploySuggestion, namedByUrl, refusedChecksum, refusedUrl } from '@repo/deploy-link';
 import { DEFAULT_HTTP_PORT, FilenameSchema, Sha256DigestSchema, Value } from '@repo/protocol';
@@ -35,6 +37,7 @@ export type DeployFormValues = {
   extraPublicPort: boolean | undefined;
   args: string | undefined;
   environment: EnvironmentVariable[] | undefined;
+  initialData: File | undefined;
 };
 
 export type DeployFormApi = ReactFormExtendedApi<
@@ -73,6 +76,7 @@ const UNTOUCHED: DeployFormValues = {
   extraPublicPort: undefined,
   args: undefined,
   environment: undefined,
+  initialData: undefined,
 };
 
 export function validateBinary({ value }: { value: BinarySource | undefined }): string | undefined {
@@ -100,6 +104,20 @@ function validateBinarySource(source: BinarySource): string | undefined {
   return file !== undefined && !Value.Check(FilenameSchema, file.name)
     ? 'That file cannot be named inside an export. Rename it and pick it again.'
     : undefined;
+}
+
+/**
+ * Whether the archive is one an app could be created from, read from the front of the file.
+ *
+ * The api is the authority, but it only reads the object once the whole of it has arrived — so the
+ * one thing this end can do for an owner who picked the wrong file is say so before the gibibyte.
+ */
+export async function validateInitialData({
+  value,
+}: {
+  value: File | undefined;
+}): Promise<string | undefined> {
+  return value === undefined ? undefined : await refusedArchive({ name: value.name, body: value });
 }
 
 export function validatePort({ value }: { value: string | undefined }): string | undefined {
@@ -265,7 +283,26 @@ function asReleaseRequest({
         binary,
         app: replacing?.slug,
         name: replacing === undefined ? value.name.trim() || undefined : undefined,
+        initialData: initialDataFrom({ file: value.initialData, replacing }),
       };
+}
+
+/**
+ * The archive as the deploy sends it. Nothing at all for an app that already exists: its data was
+ * created with it, and the form does not offer this there — but the values outlive the field, and
+ * a release is made of what they hold rather than of what was on screen.
+ */
+function initialDataFrom({
+  file,
+  replacing,
+}: {
+  file: File | undefined;
+  replacing: AppSummary | undefined;
+}): UploadableArchive | undefined {
+  if (file === undefined || replacing !== undefined) {
+    return undefined;
+  }
+  return Value.Check(FilenameSchema, file.name) ? { name: file.name, body: file } : undefined;
 }
 
 /**
