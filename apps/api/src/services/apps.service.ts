@@ -345,6 +345,21 @@ export class AppsService extends Service {
   }
 
   /**
+   * The first `ready` a host reports for an app's filesystem, which is the moment it stops being
+   * creatable — and the only moment anything on this end can learn it.
+   *
+   * Every `ready` in the report rather than the ones that just changed, because there is no such
+   * thing here: a host reports what it observes, and which of those is the first is the column's
+   * own question. `stampDataInitialized` answers it, and writes nothing for an app already stamped.
+   */
+  async recordDataInitialized({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
+    const ready = volumes.filter((volume) => volume.state === 'ready').map((one) => one.appId);
+    if (ready.length > 0) {
+      await this.appsRepo.stampDataInitialized({ appIds: ready });
+    }
+  }
+
+  /**
    * The compute half, taken off the instances rather than the volumes: what a guest is spending
    * belongs to the microVM running the app, and a volume outlives every microVM that mounts it.
    *

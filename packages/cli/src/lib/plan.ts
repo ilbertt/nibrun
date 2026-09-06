@@ -14,6 +14,7 @@ export type RunOptions = {
   extraPublicPort?: boolean | undefined;
   env?: string[] | undefined;
   unset?: string[] | undefined;
+  dataFolder?: string | undefined;
 };
 
 type Plan = {
@@ -50,7 +51,9 @@ async function fillGaps({
     await appFor({ api, slug: options.app, operation: 'release' });
     return options;
   }
-  const app = await chooseApp({ api });
+  // Not asked when a folder was given: an app's data is created as the app is, so naming one has
+  // already answered which app this lands on.
+  const app = options.dataFolder === undefined ? await chooseApp({ api }) : undefined;
   if (app !== undefined) {
     return { ...options, app };
   }
@@ -125,6 +128,7 @@ function summary({ options, binarySource, args }: Plan): string {
     ['binary', binarySource],
     ['app', options.app ?? options.name],
     ['port', options.port],
+    ['data', options.dataFolder],
     // Only when it was asked for: a row saying no on every run is one nobody reads.
     ['extra public port', options.extraPublicPort ? 'yes' : undefined],
     ['args', args.length === 0 ? undefined : args.join(' ')],

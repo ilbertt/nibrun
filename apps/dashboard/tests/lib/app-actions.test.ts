@@ -72,6 +72,13 @@ describe('an app the host has not caught up with yet', () => {
     expect(actions({ deploymentState: 'stopped' }).suspend).toEqual(DISABLED);
   });
 
+  test('nor offered a release while it is coming back, and says why', () => {
+    expect(actions({ deploymentState: 'stopped' }).deploy).toEqual({
+      kind: 'disabled',
+      reason: expect.any(String),
+    });
+  });
+
   test('and one on its way down offers nothing to press at all', () => {
     expect(actions({ appState: 'suspended', deploymentState: 'running' })).toEqual({
       deploy: { kind: 'disabled', reason: expect.any(String) },
@@ -108,8 +115,8 @@ describe('a suspended app', () => {
     });
   }
 
-  test('is offered one again the moment it is asked to run, before the host has started it', () => {
-    expect(actions({ deploymentState: 'stopped' }).deploy).toEqual(ENABLED);
+  test('is offered one again once the host has it running', () => {
+    expect(actions({ deploymentState: 'running' }).deploy).toEqual(ENABLED);
   });
 });
 
