@@ -14,6 +14,7 @@ Object.assign(process.env, {
   VICTORIALOGS_ENDPOINT: 'http://127.0.0.1:1',
   ARTIFACTS_BUCKET: 'test',
   EXPORTS_BUCKET: 'test-exports',
+  IMPORTS_BUCKET: 'test-imports',
   S3_ACCESS_KEY_ID: 'test',
   S3_SECRET_ACCESS_KEY: 'test',
   S3_REGION: 'test',

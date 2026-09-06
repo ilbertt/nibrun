@@ -12,12 +12,17 @@ export const artifactsS3 = new Bun.S3Client({ bucket: env.ARTIFACTS_BUCKET, ...c
 
 export const exportsS3 = new Bun.S3Client({ bucket: env.EXPORTS_BUCKET, ...credentials });
 
+export const importsS3 = new Bun.S3Client({ bucket: env.IMPORTS_BUCKET, ...credentials });
+
 /**
  * A client from another library for one thing Bun's cannot do: name `content-length` among the
  * headers a signature covers, which is what holds an upload to a size when the api is not the one
- * receiving it. Everything else still goes through the client above — see `signUpload`.
+ * receiving it. Everything else still goes through the clients above — see `signUpload`.
+ *
+ * Not bound to a bucket, unlike those: a `PutObjectCommand` names its own, so one signer serves
+ * every bucket this api hands an upload url out for.
  */
-export const artifactsSigner = new S3Client({
+export const uploadSigner = new S3Client({
   region: env.S3_REGION,
   endpoint: env.S3_ENDPOINT.origin,
   credentials: {
