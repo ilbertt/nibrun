@@ -23,7 +23,7 @@
     "@repo/protocol": "workspace:*",
     "@repo/ui": "workspace:*",
     "@tanstack/react-router": "catalog:",
-    "@tanstack/react-start": "^1.168.46",
+    "@tanstack/react-start": "^1.168.49",
     "lucide-react": "catalog:",
     "marked": "^18.0.11",
     "react": "catalog:",
@@ -31,16 +31,16 @@
     "tailwindcss": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.52.1",
+    "@cloudflare/vite-plugin": "^1.54.4",
     "@repo/typescript-config": "workspace:*",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/router-plugin": "catalog:",
-    "@types/node": "^26.1.0",
+    "@types/node": "^26.4.1",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "wrangler": "^4.123.0"
+    "wrangler": "^4.129.0"
   }
 }
