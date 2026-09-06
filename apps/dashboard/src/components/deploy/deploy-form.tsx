@@ -36,9 +36,9 @@ export function DeployForm({
       }}
     >
       {stripped ? (
-        <MinimalBinaryField api={api} appName={suggested?.name} />
+        <MinimalBinaryField form={form} appName={suggested?.name} />
       ) : (
-        <DeployBinaryField api={api} replacing={replacing} />
+        <DeployBinaryField form={form} />
       )}
 
       {!stripped && <DeployConfiguration form={form} suggested={suggested} />}

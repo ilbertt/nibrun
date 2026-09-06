@@ -9,6 +9,7 @@ import {
 import { Skeleton } from '@repo/ui/components/skeleton';
 import { PackageIcon } from 'lucide-react';
 import { DeploymentsTable } from '#components/apps/deployments-table.tsx';
+import { FailedDeploymentNotice } from '#components/apps/failed-deployment-notice.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDeployments } from '#lib/hooks/use-deployments.ts';
@@ -25,7 +26,8 @@ export function DeploymentHistory() {
       <FailureEmpty title="Could not read the deployments" reason={deployments.error.message} />
     );
   }
-  if (deployments.data.length === 0) {
+  const newest = deployments.data[0];
+  if (newest === undefined) {
     return (
       <Empty className="border">
         <EmptyHeader>
@@ -47,6 +49,11 @@ export function DeploymentHistory() {
         <CardTitle>Deployments</CardTitle>
       </CardHeader>
       <CardContent className="px-0 pb-0">
+        {newest.state === 'failed' && (
+          <div className="px-4 pb-4">
+            <FailedDeploymentNotice deployment={newest} />
+          </div>
+        )}
         <DeploymentsTable deployments={deployments.data} />
       </CardContent>
     </Card>

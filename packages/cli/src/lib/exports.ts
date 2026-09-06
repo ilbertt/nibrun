@@ -126,6 +126,10 @@ async function download({ url, path }: { url: string; path: string }): Promise<v
  * download waits for good. A body that arrives at once is fine, which is why a local server does
  * not show it and every real transfer does. Reading the stream is the same thing said in a way
  * that finishes.
+ *
+ * Whatever is already at the path is removed first: a writer opened on an existing file writes
+ * over its head and keeps its tail, so a partial left by a run that was killed would otherwise
+ * outlive the run that finishes, longer than the bundle and renamed into place as if it were one.
  */
 export async function writeStream({
   stream,
@@ -134,6 +138,7 @@ export async function writeStream({
   stream: ReadableStream<Uint8Array>;
   path: string;
 }): Promise<void> {
+  await rm(path, { force: true });
   const sink = Bun.file(path).writer();
   try {
     for await (const chunk of stream) {

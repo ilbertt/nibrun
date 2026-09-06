@@ -9,6 +9,7 @@ import {
   type SecretString,
   Value,
 } from '@repo/protocol';
+import { AgentSessions } from '#lib/agent/sessions.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
 import { AgentService, type HostnameReconcile, type UploadSweep } from '#services/agent.service.ts';
@@ -22,22 +23,26 @@ const SESSION_REQUEST = {
 } as unknown as AgentSessionRequest;
 
 class FakeAgentRepository implements AgentRepositoryContract {
-  readonly #hostBySession = new Map<string, HostId>();
+  readonly #sessions = new AgentSessions();
   observed: HostObservation | undefined;
+  sessionExpiresAt: Date | undefined;
 
   saveSession({
     sessionToken,
     hostId,
+    expiresAt,
   }: {
     sessionToken: SecretString;
     hostId: HostId;
+    expiresAt: Date;
   }): Promise<void> {
-    this.#hostBySession.set(sessionToken, hostId);
+    this.sessionExpiresAt = expiresAt;
+    this.#sessions.open({ sessionToken, hostId, expiresAt });
     return Promise.resolve();
   }
 
   hostForSession({ sessionToken }: { sessionToken: string }): Promise<HostId | undefined> {
-    return Promise.resolve(this.#hostBySession.get(sessionToken));
+    return Promise.resolve(this.#sessions.hostFor({ sessionToken, now: new Date() }));
   }
 
   desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
@@ -134,23 +139,28 @@ class FakeHostnameReconcile implements HostnameReconcile {
 }
 
 function build() {
+  const agentRepo = new FakeAgentRepository();
   const deployments = new FakeDeploymentsService();
   const apps = new FakeAppsService();
   const exports = new FakeExportsService();
   const artifacts = new FakeUploadSweep();
+  const imports = new FakeUploadSweep();
   const hostnames = new FakeHostnameReconcile();
   return {
+    agentRepo,
     apps,
     deployments,
     exports,
     artifacts,
+    imports,
     hostnames,
     service: new AgentService({
-      agentRepo: new FakeAgentRepository(),
+      agentRepo,
       deploymentsService: deployments as unknown as DeploymentsService,
       appsService: apps as unknown as AppsService,
       exportsService: exports as unknown as ExportsService,
       artifactsService: artifacts,
+      importsService: imports,
       hostnamesService: hostnames,
     }),
   };
@@ -177,6 +187,17 @@ describe('a session is the identity a host is answered as', () => {
     await expect(service.hostForSession({ sessionToken: 'not-a-session' })).rejects.toBeInstanceOf(
       UnauthorizedError,
     );
+  });
+});
+
+describe('a session is held for the lifetime its host was told about', () => {
+  // The lifetime used to be announced and never recorded, so nothing held the session to it.
+  test('the expiry the host is given is the one the session is saved under', async () => {
+    const { service, agentRepo } = build();
+
+    const session = await service.openSession(SESSION_REQUEST);
+
+    expect(agentRepo.sessionExpiresAt?.toISOString()).toBe(session.expiresAt);
   });
 });
 
@@ -238,7 +259,7 @@ describe('a report is read by whatever owns what it talks about', () => {
   // Nothing in the report says anything about hostnames. It is borrowed as a clock, because
   // whether an owner has pointed their domain at us happens in DNS with nobody to announce it.
   test('and the clock it lends is what advances a custom hostname nobody announced', async () => {
-    const { artifacts, hostnames, service } = build();
+    const { artifacts, imports, hostnames, service } = build();
     const reported = {
       hostId: Value.Parse(HostIdSchema, 'host-1'),
       instances: [],
@@ -249,6 +270,7 @@ describe('a report is read by whatever owns what it talks about', () => {
     await service.acceptReport({ reported });
 
     expect(artifacts.swept).toBe(1);
+    expect(imports.swept).toBe(1);
     expect(hostnames.reconciled).toBe(1);
   });
 });

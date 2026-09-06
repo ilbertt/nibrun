@@ -34,6 +34,10 @@ jobs:
         run: bun run --filter @repo/internal-scripts terraform-check
 
   terraform-plan:
+    # A pull request from a fork is handed neither repository variables nor an OIDC token, so the
+    # role arn arrives empty and there is nothing to assume. `terraform-fork-guard` is what keeps
+    # this skip from being silent on the pull requests where the plan was the point.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -78,10 +82,34 @@ jobs:
           TF_VAR_cloudflare_zone_id: ${{ vars.CLOUDFLARE_ZONE_ID }}
         run: bun run --filter @repo/internal-scripts terraform-plan
 
+  terraform-fork-guard:
+    # The other half of that skip. `failOnUnexpectedDestroys` runs inside the plan, so a fork that
+    # changed infra/terraform would merge on a green required check with nothing having read the
+    # change. Spelled out here rather than in internal-scripts deliberately: a pull_request workflow
+    # is taken from the base branch, so this is the one check a fork's own diff cannot edit.
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Diffed against the base branch, as the plan itself is.
+          fetch-depth: 0
+
+      - name: Refuse terraform changes no plan can review
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE_SHA"...HEAD -- infra/terraform; then
+            echo "No changes under infra/terraform."
+            exit 0
+          fi
+          echo "::error::This pull request changes infra/terraform from a fork, where the plan cannot run. Reopen it from a branch in this repository so the plan reports before it is merged."
+          exit 1
+
   infra-passed:
     if: always()
     name: infra:required
-    needs: [terraform-check, terraform-plan]
+    needs: [terraform-check, terraform-plan, terraform-fork-guard]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed

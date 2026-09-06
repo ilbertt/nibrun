@@ -3,7 +3,7 @@
 # runs against a newer server — bump both together. supercronic instead of
 # busybox crond: it passes the container environment to jobs and logs them to
 # stdout.
-FROM alpine:3.23
+FROM alpine:3.24
 
 RUN apk add --no-cache postgresql18-client aws-cli supercronic
 

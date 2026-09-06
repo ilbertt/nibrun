@@ -4,7 +4,6 @@ import { Deferred, Effect, Fiber, Layer } from 'effect';
 import { refreshStates, resumeInstance, suspendInstance } from '#lib/reconcile/instances.ts';
 import { SleepRefused, SnapshotUnusable } from '#lib/vm/snapshot.ts';
 import { AgentState } from '#services/agent-state.service.ts';
-import { ArtifactStore, ArtifactTransferError } from '#services/artifact-store.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -206,17 +205,6 @@ function recordingVms({
   };
 }
 
-/**
- * A stubbed `VmManager` still asks for what a real boot would fetch, so this stands in for the
- * bucket the artifact would come from. Reaching it is the failure: nothing here boots anything.
- */
-const noArtifacts = Layer.succeed(
-  ArtifactStore,
-  ArtifactStore.make({
-    open: () => new ArtifactTransferError({ cause: 'no artifact store in a test' }),
-  }),
-);
-
 function onHost({ vms, unit }: { vms: ReturnType<typeof recordingVms>; unit: string }) {
   const host = Layer.mergeAll(
     agentConfig({ vmDir: VM_DIR }),
@@ -228,7 +216,6 @@ function onHost({ vms, unit }: { vms: ReturnType<typeof recordingVms>; unit: str
       ReportSignal.Default,
       SlotAllocator.DefaultWithoutDependencies,
       ZerofsTopology.DefaultWithoutDependencies,
-      noArtifacts,
       vms.layer,
     ).pipe(Layer.provideMerge(host), Layer.provideMerge(platform)),
   );

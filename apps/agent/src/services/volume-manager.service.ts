@@ -11,8 +11,9 @@ import { Array as Arr, Effect, Option } from 'effect';
 import type { AppSlot } from '#lib/network/slot.ts';
 import type { ObservedVolume } from '#lib/reconcile/plan.ts';
 import { devicePathFor, ensureDeviceFile, NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
-import { formatOnce } from '#lib/volumes/ext4.ts';
+import { format } from '#lib/volumes/ext4.ts';
 import { detach, isUsable, reattach } from '#lib/volumes/nbd.ts';
+import { formatFromSeed } from '#lib/volumes/seed.ts';
 import type { ZerofsFilesystem } from '#lib/volumes/topology.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -140,9 +141,22 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
         });
       }
 
-      if (yield* formatOnce(slot.nbdDevicePath)) {
+      // The archive is only ever read on the way to creating the filesystem, so which of these
+      // runs is decided by desired state and the guard inside both is what makes it once.
+      const formatted = yield* desired.seed
+        ? formatFromSeed({
+            devicePath: slot.nbdDevicePath,
+            volumeId: desired.volumeId,
+            seed: desired.seed,
+          })
+        : format({ devicePath: slot.nbdDevicePath, seedDir: Option.none() });
+      if (formatted) {
         yield* Effect.logInfo('volume formatted').pipe(
-          Effect.annotateLogs({ volumeId: desired.volumeId, device: slot.nbdDevicePath }),
+          Effect.annotateLogs({
+            volumeId: desired.volumeId,
+            device: slot.nbdDevicePath,
+            seeded: desired.seed !== undefined,
+          }),
         );
       }
 

@@ -2,23 +2,21 @@ import { Field, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { BINARY_INPUT_ID } from '#components/deploy/binary-drop-zone.tsx';
 import { BinarySourcePicker } from '#components/deploy/binary-source-picker.tsx';
 import {
-  type DeployFormApi,
+  type DeployFormState,
   validateBinary,
   validateKeptBinary,
 } from '#lib/hooks/use-deploy-form.ts';
-import type { AppSummary } from '#queries/apps.ts';
 
-export function DeployBinaryField({
-  api,
-  replacing,
-}: {
-  api: DeployFormApi;
-  replacing: AppSummary | undefined;
-}) {
+export function DeployBinaryField({ form }: { form: DeployFormState }) {
+  const { api, binaryListeners, replacing } = form;
   const validate = replacing === undefined ? validateBinary : validateKeptBinary;
 
   return (
-    <api.Field name="binary" validators={{ onMount: validate, onChange: validate }}>
+    <api.Field
+      name="binary"
+      validators={{ onMount: validate, onChange: validate }}
+      listeners={binaryListeners}
+    >
       {(field) => {
         const rejected = field.state.value !== undefined && field.state.meta.errors.length > 0;
         return (

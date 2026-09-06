@@ -19,6 +19,7 @@ import { readInstanceRecords } from '#lib/report/instance-record.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
 import { readDeletedVolumes } from '#lib/volumes/manager.ts';
+import { reapSeedStaging } from '#lib/volumes/seed.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
@@ -68,6 +69,9 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       // Before the first poll has even been answered: an app this host stopped before the agent
       // restarted has no forward, so until something is listening its port refuses connections.
       yield* applyActivators;
+      // And before the first volume is provisioned: an unpacked seed the last agent was killed
+      // holding is a tenant's dataset in the clear, and nothing after this would go looking for it.
+      yield* reapSeedStaging;
     }).pipe(Effect.withSpan('Reconciler.load'));
 
     /**

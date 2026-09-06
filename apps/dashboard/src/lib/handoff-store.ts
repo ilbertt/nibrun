@@ -7,6 +7,15 @@ const DB_VERSION = 1;
 const STORE_NAME = 'binaries';
 const BINARY_KEY = 'dropped';
 
+const MS_PER_HOUR = 3_600_000;
+const HOURS_OFFERED = 12;
+
+/**
+ * A drop, and when it happened. Nothing here consumes the binary, so without the second half a
+ * visit weeks later would be answered by whatever the last one left behind.
+ */
+type HandedOff = { binary: File; storedAt: number };
+
 function openDatabase(): Promise<IDBDatabase> {
   const { promise, resolve, reject } = Promise.withResolvers<IDBDatabase>();
   const open = indexedDB.open(DB_NAME, DB_VERSION);
@@ -45,15 +54,80 @@ async function commitWrite(change: (binaries: IDBObjectStore) => void): Promise<
 }
 
 export function storeHandedOffBinary(binary: File): Promise<void> {
-  return commitWrite((binaries) => binaries.put(binary, BINARY_KEY));
+  const handedOff: HandedOff = { binary, storedAt: Date.now() };
+  return commitWrite((binaries) => binaries.put(handedOff, BINARY_KEY));
 }
 
-/** A binary is spent once it has been deployed; left here it would be offered again. */
-export function forgetHandedOffBinary(): Promise<void> {
+/**
+ * Throws the drop away without waiting to hear whether it worked.
+ *
+ * Which is all any caller wants: a binary is spent once it has been deployed, given up once the
+ * form holds something else, and beside the point once the link being followed names its own —
+ * and in none of the three is there anything to do about a browser that says no.
+ */
+export function discardHandedOffBinary(): void {
+  void forgetHandedOffBinary().catch(ignoreRefusal);
+}
+
+/**
+ * The drop still waiting, if there is one this visit would have made itself.
+ *
+ * A browser that will not open storage — a private window, a blocked origin — is answered as
+ * none, since there is nothing here that could tell the difference or act on it.
+ */
+export async function readHandedOffBinary(): Promise<File | undefined> {
+  try {
+    return await stillWaiting();
+  } catch {
+    return undefined;
+  }
+}
+
+async function stillWaiting(): Promise<File | undefined> {
+  const stored = await readStored();
+  if (stored === undefined) {
+    return undefined;
+  }
+
+  const offered = offeredBinary(stored);
+  if (offered !== undefined) {
+    return offered;
+  }
+
+  // Nobody is going to be offered it, and it is megabytes of somebody's quota.
+  await forgetHandedOffBinary();
+  return undefined;
+}
+
+function forgetHandedOffBinary(): Promise<void> {
   return commitWrite((binaries) => binaries.delete(BINARY_KEY));
 }
 
-export async function readHandedOffBinary(): Promise<File | undefined> {
+function ignoreRefusal(): void {}
+
+/**
+ * What a stored record still offers. Nothing where the drop has gone stale, and nothing where it
+ * was written in the shape a past release used — which is the same answer for the same reason,
+ * since neither is a binary anyone standing here today asked for.
+ */
+export function offeredBinary(stored: unknown): File | undefined {
+  const handedOff = asHandedOff(stored);
+  if (handedOff === undefined) {
+    return undefined;
+  }
+  const age = Date.now() - handedOff.storedAt;
+  return age < HOURS_OFFERED * MS_PER_HOUR ? handedOff.binary : undefined;
+}
+
+function asHandedOff(stored: unknown): HandedOff | undefined {
+  if (typeof stored !== 'object' || stored === null) {
+    return undefined;
+  }
+  const { binary, storedAt } = stored as Partial<HandedOff>;
+  return binary instanceof File && typeof storedAt === 'number' ? { binary, storedAt } : undefined;
+}
+
+async function readStored(): Promise<unknown> {
   const database = await openDatabase();
   const { promise, resolve, reject } = Promise.withResolvers<unknown>();
 
@@ -66,8 +140,7 @@ export async function readHandedOffBinary(): Promise<File | undefined> {
     read.onsuccess = () => resolve(read.result);
     read.onerror = () => reject(read.error ?? new Error('The browser refused the read.'));
 
-    const stored = await promise;
-    return stored instanceof File ? stored : undefined;
+    return await promise;
   } finally {
     database.close();
   }

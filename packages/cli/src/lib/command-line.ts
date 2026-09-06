@@ -6,6 +6,14 @@ const ESCAPE = '\\';
 const SINGLE = "'";
 const DOUBLE = '"';
 
+const DOUBLE_QUOTED_ESCAPES: Record<string, string> = {
+  $: '$',
+  '`': '`',
+  '"': '"',
+  '\\': '\\',
+  '\n': '',
+};
+
 export type CommandLine = {
   // A path on this machine or a url the api fetches; what it is, is decided where it is opened.
   binarySource: string;
@@ -47,9 +55,11 @@ function opensQuote({ char, quote }: { char: string; quote: string | null }): bo
 }
 
 /**
- * The character a backslash stands for, or `undefined` where it is only itself — as it is inside
- * single quotes, where nothing is special, which is what makes them the way to hand a Windows
- * path or a regex through untouched.
+ * The character a backslash stands for, or `undefined` where it is only itself. Inside single
+ * quotes nothing is special, which is what makes them the way to hand a Windows path or a regex
+ * through untouched. Inside double quotes only what the shell itself would escape is, so
+ * `"C:\Users"` keeps its backslash while `"\""` gives one up; before a newline it continues the
+ * line, and both are gone.
  */
 function escapedAt({
   line,
@@ -60,7 +70,11 @@ function escapedAt({
   index: number;
   quote: string | null;
 }): string | undefined {
-  return line[index] === ESCAPE && quote !== SINGLE ? line[index + 1] : undefined;
+  const next = line[index + 1];
+  if (line[index] !== ESCAPE || quote === SINGLE || next === undefined) {
+    return undefined;
+  }
+  return quote === DOUBLE ? DOUBLE_QUOTED_ESCAPES[next] : next;
 }
 
 /** `''` between two quotes is a token; never having started one is not. */

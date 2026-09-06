@@ -1,6 +1,6 @@
 import { HostnameSchema, Value } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
-import { Field, FieldError, FieldLabel } from '@repo/ui/components/field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Spinner } from '@repo/ui/components/spinner';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
@@ -52,6 +52,9 @@ export function AddDomainForm() {
                   {addition.isPending ? <Spinner /> : 'Add'}
                 </Button>
               </div>
+              <FieldDescription>
+                Free for now, and likely to become part of a paid plan later.
+              </FieldDescription>
               {refused === undefined ? null : <FieldError>{refused}</FieldError>}
             </Field>
           );

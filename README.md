@@ -22,6 +22,7 @@ Open source projects that already ship a single binary. One click to deploy:
 | **[Boop](https://nibrun.com/deploy/boop)** | A self-hosted notification inbox for your own apps. |
 | **[Gitea](https://nibrun.com/deploy/gitea)** | A self-hosted Git service with repositories, issues, pull requests, packages and CI. |
 | **[OpenConnector](https://nibrun.com/deploy/open-connector)** | One OAuth hub for 1,000+ providers, with prebuilt actions your agents can call. |
+| **[Context Use](https://nibrun.com/deploy/context-use)** | A personal knowledge base your agents read and write over MCP, behind a passkey. |
 
 ## Why
 

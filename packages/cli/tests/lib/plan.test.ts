@@ -4,7 +4,7 @@ import { recordingPrompts } from '#tests/support/prompts.ts';
 
 const prompts = await recordingPrompts();
 
-const { completeOptions } = await import('#lib/plan.ts');
+const { completeOptions, validatePort } = await import('#lib/plan.ts');
 
 beforeEach(() => {
   prompts.reset();
@@ -128,4 +128,17 @@ test('declining the confirmation cancels rather than deploying', async () => {
   });
 
   await expect(attempt).rejects.toThrow('Cancelled.');
+});
+
+test('a port is a whole number above zero, so nothing, zero and a negative are refused', () => {
+  const refused = 'Ports are whole numbers above zero.';
+
+  expect(validatePort('')).toBe(refused);
+  expect(validatePort(' ')).toBe(refused);
+  expect(validatePort('0')).toBe(refused);
+  expect(validatePort('-5')).toBe(refused);
+});
+
+test('a port typed as one is passed', () => {
+  expect(validatePort('8080')).toBeUndefined();
 });

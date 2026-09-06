@@ -98,9 +98,14 @@ async function askPort(): Promise<number> {
   const answer = await text({
     message: 'Which HTTP port does the binary listen on?',
     initialValue: String(DEFAULT_HTTP_PORT),
-    validate: (value) => (Number.isInteger(Number(value)) ? undefined : 'Ports are whole numbers.'),
+    validate: validatePort,
   });
   return Number(answered(answer));
+}
+
+export function validatePort(value: string | undefined): string | undefined {
+  const port = Number(value);
+  return Number.isInteger(port) && port > 0 ? undefined : 'Ports are whole numbers above zero.';
 }
 
 async function confirmPlan({ options, binarySource, args }: Plan): Promise<void> {

@@ -8,6 +8,7 @@ import type {
   Timestamp,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import { AgentSessions } from '#lib/agent/sessions.ts';
 import {
   environmentByDeployment,
   hostnamesByApp,
@@ -30,7 +31,11 @@ export type HostObservation = {
 };
 
 export abstract class AgentRepositoryContract {
-  abstract saveSession(input: { sessionToken: SecretString; hostId: HostId }): Promise<void>;
+  abstract saveSession(input: {
+    sessionToken: SecretString;
+    hostId: HostId;
+    expiresAt: Date;
+  }): Promise<void>;
   abstract hostForSession(input: { sessionToken: string }): Promise<HostId | undefined>;
   abstract desiredState(input: { hostId: HostId }): Promise<HostDesiredState>;
   abstract observeReport(input: { reported: HostReportedState }): Promise<void>;
@@ -38,7 +43,7 @@ export abstract class AgentRepositoryContract {
 }
 
 export class AgentRepository extends Repository implements AgentRepositoryContract {
-  readonly #hostBySession = new Map<string, HostId>();
+  readonly #sessions = new AgentSessions();
   readonly #secretsKey: TenantSecretsKey;
   #lastObservation: HostObservation | undefined;
 
@@ -50,16 +55,18 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
   saveSession({
     sessionToken,
     hostId,
+    expiresAt,
   }: {
     sessionToken: SecretString;
     hostId: HostId;
+    expiresAt: Date;
   }): Promise<void> {
-    this.#hostBySession.set(sessionToken, hostId);
+    this.#sessions.open({ sessionToken, hostId, expiresAt });
     return Promise.resolve();
   }
 
   hostForSession({ sessionToken }: { sessionToken: string }): Promise<HostId | undefined> {
-    return Promise.resolve(this.#hostBySession.get(sessionToken));
+    return Promise.resolve(this.#sessions.hostFor({ sessionToken, now: new Date() }));
   }
 
   /**

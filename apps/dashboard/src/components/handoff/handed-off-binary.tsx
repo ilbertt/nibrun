@@ -8,7 +8,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@repo/ui/components/empty';
-import { Spinner } from '@repo/ui/components/spinner';
 import { BrandMark } from '@repo/ui/custom/brand-mark';
 import { Link, useLocation } from '@tanstack/react-router';
 import { FileTerminalIcon } from 'lucide-react';
@@ -24,7 +23,7 @@ import { WWW_ORIGIN } from '#lib/www-origin.ts';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
 
 export function HandedOffBinary() {
-  const { binary, loading } = useHandedOffBinary();
+  const binary = useHandedOffBinary();
   const session = useSession();
 
   return (
@@ -33,7 +32,7 @@ export function HandedOffBinary() {
         <BrandMark />
       </a>
       <div className="flex w-full max-w-lg flex-col gap-6 lg:max-w-3xl">
-        {loading ? <Spinner /> : <Waiting binary={binary} signedIn={session !== null} />}
+        <Waiting binary={binary} signedIn={session !== null} />
       </div>
       <OpenSourceFooter />
     </div>

@@ -73,6 +73,15 @@ export const MAX_CONCURRENT_FETCHES = 8;
 const TOO_MANY_FETCHES =
   'nibrun is fetching as many binaries as it will at once. Try again in a moment.';
 
+/**
+ * And how many of those one account may be holding, because the ceiling above is the platform's
+ * and a single caller pointing eight deploys at a url that dribbles bytes is otherwise the whole
+ * of it. What every other tenant sees then is their own deploy refused, with nothing in the answer
+ * to say it was somebody else's doing.
+ */
+export const MAX_CONCURRENT_FETCHES_PER_OWNER = 3;
+const TOO_MANY_OWN_FETCHES = `This account is already fetching ${MAX_CONCURRENT_FETCHES_PER_OWNER} binaries. Wait for one to finish, then try again.`;
+
 const BYTES_PER_MEBIBYTE = 1_048_576;
 const MAX_ARTIFACT_MEBIBYTES = 256;
 
@@ -223,6 +232,12 @@ function refusalMessage(inspection: Exclude<ArtifactInspection, { outcome: 'stor
  * Long enough that no upload is still on its way to a row this old — the signed policy expires
  * far sooner — and no longer than the bucket rule that expires the staged object, so a row and
  * the bytes it was waiting for are not left outliving each other.
+ *
+ * That rule is `expire-staged-uploads` in `infra/terraform/s3.tf`, one day over the `uploads/`
+ * prefix, and nothing compares the two — so shortening it there is shortening this here. Which way
+ * they may differ is not symmetric: this sweep is what removes the object and the row together,
+ * and the rule is the backstop for an object whose delete was refused, so a rule longer than this
+ * costs nothing and a rule shorter than it is what leaves a row waiting on bytes already gone.
  */
 const ABANDONED_AFTER_SECONDS = 86_400;
 
@@ -258,6 +273,7 @@ export class ArtifactsService extends Service {
   private readonly releaseRepo: ReleaseDigestRepositoryContract;
   private readonly appsRepo: AppOwnership;
   private fetchesInFlight = 0;
+  private readonly fetchesInFlightByOwner = new Map<OwnerId, number>();
 
   constructor({
     artifactsRepo,
@@ -422,16 +438,42 @@ export class ArtifactsService extends Service {
     // Counted only against a fetch that is going to happen. A release everyone is deploying would
     // otherwise spend the slots it no longer needs, and turn its own popularity into the one
     // answer nobody can act on.
+    this.takeFetchSlot(ownerId);
+    try {
+      return await this.fetchInto({ appId, ownerId, url, said, filename, expected, sourceDigest });
+    } finally {
+      this.releaseFetchSlot(ownerId);
+    }
+  }
+
+  /**
+   * The caller's own cap is read first, because it is the one refusal they can do something about:
+   * a platform that is busy is somebody else's afternoon, while being told to wait for one of
+   * your own downloads names the thing they are waiting on.
+   */
+  private takeFetchSlot(ownerId: OwnerId): void {
+    const own = this.fetchesInFlightByOwner.get(ownerId) ?? 0;
+    if (own >= MAX_CONCURRENT_FETCHES_PER_OWNER) {
+      throw new TooManyRequestsError(TOO_MANY_OWN_FETCHES);
+    }
     if (this.fetchesInFlight >= MAX_CONCURRENT_FETCHES) {
       throw new TooManyRequestsError(TOO_MANY_FETCHES);
     }
 
     this.fetchesInFlight += 1;
-    try {
-      return await this.fetchInto({ appId, ownerId, url, said, filename, expected, sourceDigest });
-    } finally {
-      this.fetchesInFlight -= 1;
+    this.fetchesInFlightByOwner.set(ownerId, own + 1);
+  }
+
+  // Dropped at nothing rather than left at zero, so what this holds is the owners fetching now
+  // and not every owner who ever has.
+  private releaseFetchSlot(ownerId: OwnerId): void {
+    this.fetchesInFlight -= 1;
+    const own = (this.fetchesInFlightByOwner.get(ownerId) ?? 1) - 1;
+    if (own <= 0) {
+      this.fetchesInFlightByOwner.delete(ownerId);
+      return;
     }
+    this.fetchesInFlightByOwner.set(ownerId, own);
   }
 
   /**
