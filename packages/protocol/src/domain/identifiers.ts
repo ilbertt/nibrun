@@ -30,6 +30,11 @@ export const CheckpointIdSchema = identifierSchema<CheckpointId>(
   'A point-in-time view of a volume, readable while the owning host still has it open.',
 );
 
+export type ImportId = Identifier<'ImportId'>;
+export const ImportIdSchema = identifierSchema<ImportId>(
+  'One uploaded archive an app can be given as its starting data.',
+);
+
 export type ExportId = Identifier<'ExportId'>;
 export const ExportIdSchema = identifierSchema<ExportId>(
   'One request for a downloadable copy of an app.',

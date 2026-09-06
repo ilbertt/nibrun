@@ -173,6 +173,8 @@ export {
   FilesystemQueryIdSchema,
   type HostId,
   HostIdSchema,
+  type ImportId,
+  ImportIdSchema,
   type OwnerId,
   OwnerIdSchema,
   type VolumeId,
