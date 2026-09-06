@@ -5,7 +5,7 @@ import { CheckIcon, TriangleAlertIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { UploadMeter } from '#components/deploy/upload-meter.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
-import type { DeployPhase } from '#lib/hooks/use-run-app.ts';
+import { type DeployPhase, isUploading } from '#lib/hooks/use-run-app.ts';
 
 // `done` is the caller's: a dialog closes itself where a page of its own has somewhere to go,
 // and this view has no way to know which of those it is inside.
@@ -28,7 +28,7 @@ export function DeployProgress({ done }: { done: ReactNode }) {
               <Spinner className="shrink-0" />
               <span>{waiting}</span>
             </div>
-            {run.progress !== undefined && run.phase === 'uploading' && (
+            {run.progress !== undefined && isUploading(run.phase) && (
               <UploadMeter progress={run.progress} />
             )}
           </li>
@@ -73,6 +73,9 @@ export function DeployProgress({ done }: { done: ReactNode }) {
 function waitingOn(phase: DeployPhase): string | undefined {
   if (phase === 'uploading') {
     return 'uploading the binary';
+  }
+  if (phase === 'uploading-data') {
+    return 'uploading the data the app starts with';
   }
   // No meter under this one: the bytes are moving between the url and nibrun, and this end is
   // only waiting to be told how it went.

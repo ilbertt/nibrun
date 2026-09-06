@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dataFolderFor, packDataFolder } from '#lib/data-folder.ts';
@@ -92,3 +92,30 @@ test('the archive is a file on disk, and is gone once it has been sent', async (
   // Asked again rather than of the same handle: a `BunFile` answers from the stat it already took.
   expect(await Bun.file(written).exists()).toBe(false);
 });
+
+/**
+ * `uploadImport` refuses the same archive, but only once an app has been created and a binary
+ * uploaded against it — so a folder that packs past the cap has to be answered here, before any of
+ * that. What it packs to is knowable no earlier: compression is what decides it.
+ */
+test('a folder that packs past the cap is refused before an app is created', async () => {
+  const folder = await folderHolding({ 'notes.txt': 'hello' });
+  const packing = packDataFolder({ folder, ui: uiRecording(), limitBytes: 1 });
+
+  await expect(packing).rejects.toThrow('at most');
+});
+
+test('and the archive it packed does not stay on the machine', async () => {
+  const folder = await folderHolding({ 'notes.txt': 'hello' });
+  const staging = await stagingDirectories();
+
+  await packDataFolder({ folder, ui: uiRecording(), limitBytes: 1 }).catch(() => undefined);
+
+  expect(await stagingDirectories()).toEqual(staging);
+});
+
+/** The temporary directories `packDataFolder` makes, so a leaked one is visible as a new name. */
+async function stagingDirectories(): Promise<string[]> {
+  const entries = await readdir(tmpdir());
+  return entries.filter((entry) => entry.startsWith('nib-data-')).sort();
+}

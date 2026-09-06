@@ -6,6 +6,7 @@ import {
   deploy,
   describeUnservedDeployment,
   redeploy,
+  type UploadableArchive,
   type UploadProgress,
 } from '@repo/app-operations';
 import type { TenantArguments, TenantEnvironmentPatch } from '@repo/protocol';
@@ -23,6 +24,7 @@ export type DeployRequest = Configured & {
   binary: DeployableBinary;
   app: string | undefined;
   name: string | undefined;
+  initialData: UploadableArchive | undefined;
 };
 
 /** The same release without a binary to upload, which only an app already running one can ask for. */
@@ -32,6 +34,11 @@ export type ReleaseRequest = DeployRequest | RedeployRequest;
 
 export function carriesBinary(request: ReleaseRequest): request is DeployRequest {
   return 'binary' in request;
+}
+
+/** Whether an archive follows the binary, which is a second upload and leaves no step of its own. */
+export function carriesInitialData(request: ReleaseRequest): boolean {
+  return carriesBinary(request) && request.initialData !== undefined;
 }
 
 export type BinaryDelivery = 'upload' | 'fetch' | 'none';

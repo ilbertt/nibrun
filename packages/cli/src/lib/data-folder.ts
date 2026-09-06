@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
-import type { UploadableArchive } from '@repo/app-operations';
+import { refusedArchiveBody, type UploadableArchive } from '@repo/app-operations';
 import { type Filename, FilenameSchema, Value } from '@repo/protocol';
 import { UsageError } from '#lib/errors.ts';
 import type { Ui } from '#lib/ui.ts';
@@ -73,9 +73,11 @@ export type PackedFolder = {
 export async function packDataFolder({
   folder,
   ui,
+  limitBytes,
 }: {
   folder: string;
   ui: Ui;
+  limitBytes?: number;
 }): Promise<PackedFolder> {
   const staging = await mkdtemp(join(tmpdir(), STAGING_PREFIX));
   const name = archiveName(folder);
@@ -90,12 +92,20 @@ export async function packDataFolder({
       message: `packing ${folder}`,
       task: () => pack({ folder, into: path }),
     });
+    const archive = { name, body: Bun.file(path) };
+    // `uploadImport` asks this too, but only once an app has been created and a binary uploaded
+    // against it — so asking here is the difference between a sentence and an app the owner has to
+    // go and delete. What it packed to is knowable no earlier than this: compression is what
+    // decides it, so no reading of the folder could have said.
+    const refusal = await refusedArchiveBody({ ...archive, ...(limitBytes && { limitBytes }) });
+    if (refusal) {
+      throw new UsageError(refusal);
+    }
+    return { archive, discard };
   } catch (failure) {
     await discard();
     throw failure;
   }
-
-  return { archive: { name, body: Bun.file(path) }, discard };
 }
 
 /**
