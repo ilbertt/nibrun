@@ -19,6 +19,8 @@ export const TYPE_SYMLINK = '2';
 export const TYPE_HARDLINK = '1';
 export const TYPE_CHAR_DEVICE = '3';
 export const TYPE_LONG_NAME = 'L';
+export const TYPE_PAX_EXTENDED = 'x';
+export const TYPE_PAX_GLOBAL = 'g';
 
 export type TarballEntry = {
   path: string;
@@ -92,6 +94,31 @@ export function tarballOf(entries: readonly TarballEntry[]): Uint8Array {
 
 export function gzippedTarball(entries: readonly TarballEntry[]): Uint8Array {
   return Bun.gzipSync(new Uint8Array(tarballOf(entries)));
+}
+
+/**
+ * A pax header entry carrying the given records, as bsdtar writes one in front of the entry it
+ * describes. Each record is `<length> <key>=<value>\\n`, where the length counts itself — so it is
+ * computed by trying, since the digits are part of what they measure.
+ */
+export function paxHeaderOf({
+  records,
+  type = TYPE_PAX_EXTENDED,
+}: {
+  records: Readonly<Record<string, string>>;
+  type?: string;
+}): TarballEntry {
+  const body = Object.entries(records).map(paxRecord).join('');
+  return { path: 'PaxHeader/entry', type, body };
+}
+
+function paxRecord([key, value]: [string, string]): string {
+  const withoutDigits = ` ${key}=${value}\n`.length;
+  let length = withoutDigits + 1;
+  while (String(length).length + withoutDigits !== length) {
+    length += 1;
+  }
+  return `${length} ${key}=${value}\n`;
 }
 
 /** A file whose content is `size` bytes of nothing, which is what an expansion bomb is made of. */
