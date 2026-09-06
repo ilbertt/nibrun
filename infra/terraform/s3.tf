@@ -166,6 +166,13 @@ resource "aws_s3_bucket_cors_configuration" "artifacts" {
 # the ones where it never happens: an upload nobody registers is bytes no row will
 # ever name, and without a rule they would sit here at full size forever.
 #
+# The api sweeps those rows on the same schedule and deletes the object itself as
+# it goes — `ABANDONED_AFTER_SECONDS` in apps/api/src/services/artifacts.service.ts,
+# one day, and nothing compares the two numbers. So this is the backstop for an
+# object whose delete was refused rather than the thing that usually removes one,
+# and shortening it below that number is what leaves rows waiting on bytes already
+# gone.
+#
 # Scoped to the prefix, because everything outside it is what users deployed.
 #
 # Noncurrent versions too: the bucket is versioned, so deleting a staging object

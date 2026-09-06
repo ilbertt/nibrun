@@ -232,6 +232,12 @@ function refusalMessage(inspection: Exclude<ArtifactInspection, { outcome: 'stor
  * Long enough that no upload is still on its way to a row this old — the signed policy expires
  * far sooner — and no longer than the bucket rule that expires the staged object, so a row and
  * the bytes it was waiting for are not left outliving each other.
+ *
+ * That rule is `expire-staged-uploads` in `infra/terraform/s3.tf`, one day over the `uploads/`
+ * prefix, and nothing compares the two — so shortening it there is shortening this here. Which way
+ * they may differ is not symmetric: this sweep is what removes the object and the row together,
+ * and the rule is the backstop for an object whose delete was refused, so a rule longer than this
+ * costs nothing and a rule shorter than it is what leaves a row waiting on bytes already gone.
  */
 const ABANDONED_AFTER_SECONDS = 86_400;
 
