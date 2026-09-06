@@ -80,11 +80,20 @@ export const DesiredInstanceSchema = Type.Object({
 
 export type DesiredInstance = typeof DesiredInstanceSchema.static;
 
+/**
+ * `seed` is the archive the filesystem is created from, read at exactly one moment: the format. A
+ * host that finds the device already formatted does nothing with it, which is what makes this
+ * once-only without a second fact anywhere saying whether it has been applied.
+ *
+ * Absent is the ordinary case — a volume is created empty unless somebody uploaded something to
+ * create it from.
+ */
 export const DesiredVolumeSchema = Type.Object({
   volumeId: VolumeIdSchema,
   appId: AppIdSchema,
   sizeBytes: ByteSizeSchema,
   desiredState: DesiredPresenceSchema,
+  seed: Type.Optional(DesiredArtifactSchema),
 });
 
 export type DesiredVolume = typeof DesiredVolumeSchema.static;

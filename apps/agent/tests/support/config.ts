@@ -14,6 +14,9 @@ export const AGENT_CONFIG = {
   zerofsCheckpointRuntimeDir: '/run/zerofs-checkpoint',
   zerofsBinary: '/opt/nibrun/bin/zerofs/zerofs',
   zerofsConfigFile: '/etc/zerofs/config.toml',
+  artifactBucket: 'nibrun-artifacts',
+  importBucket: 'nibrun-imports',
+  exportBucket: 'nibrun-exports',
 } as const;
 
 export function agentConfig(overrides: Partial<AgentConfig> = {}) {
