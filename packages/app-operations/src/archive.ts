@@ -42,28 +42,44 @@ export type OfferedArchive = {
 };
 
 /**
- * Why this file cannot be the data an app is created holding, or nothing where it can be.
+ * Why these bytes cannot be the data an app is created holding, or nothing where they can be.
  *
  * The api is the authority and reads the object it was sent for itself — but it can only do that
- * once the upload has finished, so a `.zip` picked here would cost a gibibyte before anybody said a
- * word about it. Answered from the front of the file, which is where the answer is.
+ * once the upload has finished, so a `.zip` would cost a gibibyte before anybody said a word about
+ * it. Answered from the front of the file, which is where the answer is.
+ *
+ * Held apart from the name because only one of the two is ever a caller's own doing: `uploadImport`
+ * asks this of everything it sends, where a name is checked by whoever took one from a person.
  */
-export async function refusedArchive({ name, body }: OfferedArchive): Promise<string | undefined> {
+export async function refusedArchiveBody({
+  name,
+  body,
+}: OfferedArchive): Promise<string | undefined> {
   if (body.size === 0) {
     return `There is nothing in ${name} to give the app as its data.`;
   }
   if (body.size > MAX_IMPORT_SIZE_BYTES) {
     return `An app is created with at most ${MAX_IMPORT_GIBIBYTES} GiB of data, and ${name} is more than that.`;
   }
-  // The name travels with the archive and is what the api records the upload as, so one it would
-  // refuse costs a line here rather than the upload that preceded the refusal.
-  if (!Value.Check(FilenameSchema, name)) {
-    return `${name} is not a name nibrun takes: it must start with a letter or digit and hold only letters, digits, dots, dashes or underscores.`;
-  }
   const opening = await heldFrom({ stream: body.stream(), count: OPENING_BYTES });
   return (await isGzippedTarball(opening))
     ? undefined
     : `${name} is not a .tar.gz. An app's data is created from one archive, whose root becomes the root of data/.`;
+}
+
+/**
+ * The same, of a file somebody picked — which is the one case where the name is theirs too.
+ *
+ * The name travels with the archive and is what the api records the upload as, so one it would
+ * refuse costs a line here rather than the upload that preceded the refusal. Nothing asks this of
+ * a name the caller generated: `UploadableArchive` takes a `Filename`, so one that got that far
+ * was already held to it.
+ */
+export async function refusedArchive({ name, body }: OfferedArchive): Promise<string | undefined> {
+  if (!Value.Check(FilenameSchema, name)) {
+    return `${name} is not a name nibrun takes: it must start with a letter or digit and hold only letters, digits, dots, dashes or underscores.`;
+  }
+  return await refusedArchiveBody({ name, body });
 }
 
 async function isGzippedTarball(opening: Uint8Array): Promise<boolean> {

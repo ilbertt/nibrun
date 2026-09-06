@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
 import type { Filename } from '@repo/protocol';
+import { MAX_IMPORT_SIZE_BYTES } from '#archive.ts';
 import { deploy, describeUnservedDeployment } from '#deploy.ts';
 import type { DeployStep } from '#release.ts';
 import { answering } from '#tests/support/api.ts';
@@ -12,6 +13,7 @@ import {
   PLATFORM,
   SLUG,
 } from '#tests/support/app.ts';
+import { gzippedTarball } from '#tests/support/archives.ts';
 import type { UploadProgress } from '#upload.ts';
 
 const PUT_URL = 'https://store.example/artifact-1?signature=x';
@@ -19,7 +21,6 @@ const IMPORT_PUT_URL = 'https://store.example/import-1?signature=x';
 const IMPORT_ID = 'import-1';
 const PORT = 8080;
 const SIZE_BYTES = 1_048_576;
-const ARCHIVE_BYTES = 4_096;
 const PART_BYTES = 262_144;
 const REFUSED = 403;
 
@@ -113,9 +114,13 @@ function binary() {
   return { name: 'my-server' as Filename, body: new Blob([new Uint8Array(SIZE_BYTES)]) };
 }
 
+/** A real one, because a send now reads the front of what it is given before it sends it. */
 function archive() {
-  return { name: 'data.tar.gz' as Filename, body: new Blob([new Uint8Array(ARCHIVE_BYTES)]) };
+  return { name: 'data.tar.gz' as Filename, body: new Blob([gzippedTarball()]) };
 }
+
+/** Enough that nothing refuses it for being empty, and nothing like an archive. */
+const NOT_AN_ARCHIVE_BYTES = 64;
 
 const REAL_FETCH = globalThis.fetch;
 
@@ -339,7 +344,7 @@ describe("an archive the app's data is created from", () => {
     ]);
     expect(sent[4]).toEqual({
       what: 'import',
-      body: { filename: 'data.tar.gz', sizeBytes: ARCHIVE_BYTES },
+      body: { filename: 'data.tar.gz', sizeBytes: archive().body.size },
     });
     expect(sent[5]).toEqual({ what: 'put', body: IMPORT_PUT_URL });
     expect(sent[6]).toEqual({ what: 'import patch', body: { upload: 'complete' } });
@@ -364,6 +369,51 @@ describe("an archive the app's data is created from", () => {
 
     await expect(attempt).rejects.toThrow('the length is not what was signed');
     expect(sent.at(-1)).toEqual({ what: 'import patch', body: { upload: 'failed' } });
+  });
+
+  /**
+   * The api refuses the same bytes for the same reasons, but only once every one of them has
+   * arrived — so what this spares a caller is the upload, and every caller gets it rather than
+   * each remembering to ask. The CLI packs its own archive and never asked.
+   */
+  test('more data than the api would sign for is refused before anything is created', async () => {
+    const sent: Sent[] = [];
+    storeAnswering({ sent });
+    const oversized = archive();
+
+    const attempt = deploy({
+      api: apiHolding({ apps: [], sent }),
+      binary: binary(),
+      args: [],
+      initialData: {
+        ...oversized,
+        body: {
+          size: MAX_IMPORT_SIZE_BYTES + 1,
+          stream: oversized.body.stream.bind(oversized.body),
+        } as Blob,
+      },
+    });
+
+    await expect(attempt).rejects.toThrow('at most 1 GiB of data');
+    expect(sent.some((one) => one.what === 'import')).toBe(false);
+  });
+
+  test('and bytes that are not an archive at all, before the store is asked for a url', async () => {
+    const sent: Sent[] = [];
+    storeAnswering({ sent });
+
+    const attempt = deploy({
+      api: apiHolding({ apps: [], sent }),
+      binary: binary(),
+      args: [],
+      initialData: {
+        name: 'data.tar.gz' as Filename,
+        body: new Blob([new Uint8Array(NOT_AN_ARCHIVE_BYTES)]),
+      },
+    });
+
+    await expect(attempt).rejects.toThrow('is not a .tar.gz');
+    expect(sent.some((one) => one.what === 'import')).toBe(false);
   });
 
   test('a deployment nobody gave one to names none', async () => {

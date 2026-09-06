@@ -1,6 +1,7 @@
 import type { PublicApiClient } from '@repo/api-client/public';
-import { unwrap } from '@repo/api-client/unwrap';
+import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import type { Filename, ImportId } from '@repo/protocol';
+import { refusedArchiveBody } from '#archive.ts';
 import { mebibytes, putObject, type UploadTransport, type UploadWait } from '#upload.ts';
 
 /**
@@ -25,6 +26,10 @@ export type UploadableArchive = {
  * It is told either way. Only this end watched the upload happen, so an import whose bytes never
  * arrived is one nothing else can ever find out about — and the row and the object it names would
  * both sit there until they were swept.
+ *
+ * What is being sent is read before any of that. The api refuses the same bytes for the same
+ * reasons, but only once they have all arrived — so asking here is the difference between a
+ * sentence and a gibibyte, and every caller gets the same one rather than remembering to ask.
  */
 export async function uploadImport({
   api,
@@ -39,6 +44,10 @@ export async function uploadImport({
   whileUploading: UploadWait;
   upload: UploadTransport;
 }): Promise<ImportId> {
+  const refusal = await refusedArchiveBody(archive);
+  if (refusal) {
+    throw new ApiError(refusal);
+  }
   const { importId, url } = unwrap(
     await api.api.apps({ appId }).imports.post({
       filename: archive.name,

@@ -1,19 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { MAX_IMPORT_SIZE_BYTES, refusedArchive } from '#archive.ts';
+import { gzippedTarball } from '#tests/support/archives.ts';
 
-const BLOCK_BYTES = 512;
-const TAR_MAGIC_AT = 257;
 const NAME = 'data.tar.gz';
 
 const encoder = new TextEncoder();
-
-/** A tar's first header, which is the only part of one that says a stream of bytes is a tar. */
-function tarball(): Uint8Array<ArrayBuffer> {
-  const block = new Uint8Array(BLOCK_BYTES);
-  block.set(encoder.encode('data.db'));
-  block.set(encoder.encode('ustar'), TAR_MAGIC_AT);
-  return block;
-}
 
 function offered({ name = NAME, bytes }: { name?: string; bytes: Uint8Array }) {
   return { name, body: new Blob([new Uint8Array(bytes)]) };
@@ -24,13 +15,13 @@ function offered({ name = NAME, bytes }: { name?: string; bytes: Uint8Array }) {
  * to be refused for being a gibibyte is the one thing this check exists to spare anybody.
  */
 function claiming(sizeBytes: number) {
-  const { body } = offered({ bytes: Bun.gzipSync(tarball()) });
+  const { body } = offered({ bytes: gzippedTarball() });
   return { name: NAME, body: { size: sizeBytes, stream: body.stream.bind(body) } as Blob };
 }
 
 describe('an archive an app can be created from', () => {
   test('a gzipped tarball is what one is', async () => {
-    expect(await refusedArchive(offered({ bytes: Bun.gzipSync(tarball()) }))).toBeUndefined();
+    expect(await refusedArchive(offered({ bytes: gzippedTarball() }))).toBeUndefined();
   });
 
   test('a zip is named as the shape it is not, rather than as what was found', async () => {
@@ -63,7 +54,7 @@ describe('an archive an app can be created from', () => {
   });
 
   test('a name the api would refuse costs a line rather than the upload before it', async () => {
-    const named = { ...offered({ bytes: Bun.gzipSync(tarball()) }), name: 'my data.tar.gz' };
+    const named = { ...offered({ bytes: gzippedTarball() }), name: 'my data.tar.gz' };
 
     expect(await refusedArchive(named)).toContain('is not a name nibrun takes');
   });
