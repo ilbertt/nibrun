@@ -5,9 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type TarEntry, tarEntries, UnreadableTarball } from '#lib/volumes/tar.ts';
 import {
+  paxHeaderOf,
   TYPE_CHAR_DEVICE,
   TYPE_DIRECTORY,
   TYPE_LONG_NAME,
+  TYPE_PAX_GLOBAL,
   TYPE_SYMLINK,
   tarballOf,
 } from '#tests/support/tarball.ts';
@@ -25,6 +27,8 @@ const ROWS_BYTES = 4;
 const LONG_DIRECTORY_BYTES = 120;
 const NAME_FIELD_BYTES = 99;
 const SIZE_FIELD_AT = 124;
+/** Past the bound a pax header is read to, so it is walked past instead. */
+const OVERSIZED_PAX_BYTES = 9000;
 /** The high bit that says the rest of a numeric field is base 256 rather than octal text. */
 const BASE_256_MARKER = 0x80;
 const TRUNCATED_AT = 1024;
@@ -145,6 +149,81 @@ describe('a path a header cannot hold still arrives whole', () => {
 
     expect(entries).toHaveLength(1);
     expect(entries[0]?.path).toBe(long);
+  });
+
+  /**
+   * bsdtar is what macOS ships, so this is the shape an owner packing a folder there produces. It
+   * writes a long path into a pax record and leaves a truncation in the ustar header behind it —
+   * reading the header alone lands the entry under the wrong name.
+   */
+  test("pax's path record names the entry after it", async () => {
+    const long = `${'d'.repeat(LONG_DIRECTORY_BYTES)}/data.db`;
+    const entries = await entriesOf({
+      bytes: tarballOf([
+        paxHeaderOf({ records: { path: long, mtime: '1767225600.0' } }),
+        { path: long.slice(0, NAME_FIELD_BYTES), body: 'rows' },
+      ]),
+    });
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ path: long, body: 'rows' });
+  });
+
+  test('and its linkpath record names where a symlink points', async () => {
+    const target = `${'t'.repeat(LONG_DIRECTORY_BYTES)}/data.db`;
+    const entries = await entriesOf({
+      bytes: tarballOf([
+        paxHeaderOf({ records: { linkpath: target } }),
+        { path: 'latest', type: TYPE_SYMLINK, linkTarget: target.slice(0, NAME_FIELD_BYTES) },
+      ]),
+    });
+
+    expect(entries[0]?.linkTarget).toBe(target);
+  });
+
+  /**
+   * The record decides where the next header begins as well as how much to read, so taking the
+   * octal field's word for it would walk the rest of the archive out of step.
+   */
+  test("pax's size record is what the entry is read to", async () => {
+    const entries = await entriesOf({
+      bytes: tarballOf([
+        paxHeaderOf({ records: { size: '4' } }),
+        { path: 'data.db', body: 'rows', declaredSize: 0 },
+        { path: 'after', body: 'here' },
+      ]),
+    });
+
+    expect(entries.map((entry) => entry.path)).toEqual(['data.db', 'after']);
+    expect(entries[0]).toMatchObject({ sizeBytes: 4, body: 'rows' });
+    expect(entries[1]?.body).toBe('here');
+  });
+
+  // Defaults for every entry after it rather than a path for the one behind it.
+  test('a global header is walked past, and the entry after it still lines up', async () => {
+    const entries = await entriesOf({
+      bytes: tarballOf([
+        paxHeaderOf({ records: { comment: 'written by a tool' }, type: TYPE_PAX_GLOBAL }),
+        { path: 'data.db', body: 'rows' },
+      ]),
+    });
+
+    expect(entries.map((entry) => entry.path)).toEqual(['data.db']);
+    expect(entries[0]?.body).toBe('rows');
+  });
+
+  // A header that big is carrying something other than a path, and the entry behind it still has a
+  // usable name — so it is walked past rather than taking the archive down.
+  test('a pax header too large to read leaves the header behind it standing', async () => {
+    const entries = await entriesOf({
+      bytes: tarballOf([
+        paxHeaderOf({ records: { comment: 'x'.repeat(OVERSIZED_PAX_BYTES) } }),
+        { path: 'data.db', body: 'rows' },
+      ]),
+    });
+
+    expect(entries.map((entry) => entry.path)).toEqual(['data.db']);
+    expect(entries[0]?.body).toBe('rows');
   });
 
   test('a ustar prefix is joined back onto the name', async () => {

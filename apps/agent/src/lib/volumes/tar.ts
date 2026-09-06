@@ -30,8 +30,23 @@ const TYPE_SYMLINK = '2';
 /** GNU's entries carrying the path, and the link target, of the one after them. */
 const TYPE_LONG_NAME = 'L';
 const TYPE_LONG_LINK = 'K';
-/** pax's own metadata, which annotates the header after it rather than describing a file. */
-const PAX_TYPES = new Set(['x', 'g']);
+/** pax's metadata for the entry after it, and its defaults for every entry after it. */
+const TYPE_PAX_EXTENDED = 'x';
+const TYPE_PAX_GLOBAL = 'g';
+
+/**
+ * The records a pax header is read for. `path` is the one that matters: bsdtar — which is what
+ * macOS ships and what an owner packing a folder there uses — writes a path over about 255 bytes
+ * into one of these and leaves a truncation in the ustar header behind it, so an entry read from
+ * the header alone would land under the wrong name.
+ *
+ * `size` is read for a different reason: it is how a length past what an octal field can hold is
+ * written, and it decides where the next header begins as well as how much to read. Taking the
+ * header's word for that would walk the rest of the archive out of step.
+ */
+const PAX_PATH = 'path';
+const PAX_LINK_PATH = 'linkpath';
+const PAX_SIZE = 'size';
 
 /**
  * As much of a long-name entry as will be held to read a path out of. Far longer than any path a
@@ -40,11 +55,23 @@ const PAX_TYPES = new Set(['x', 'g']);
  */
 const MAX_LONG_FIELD_BYTES = 4096;
 
+/**
+ * As much of a pax header as will be held to read those records out of. Larger than the long-name
+ * bound because a pax header carries every attribute of its entry rather than one path.
+ *
+ * One past this is walked past rather than refused, which is what this did with every pax header
+ * before it read any: an archive whose metadata is that large is carrying something other than a
+ * path, and the entry behind it still has a usable header for every path short enough to fit one.
+ */
+const MAX_PAX_HEADER_BYTES = 8192;
+
 const OCTAL = 8;
 const OCTAL_DIGITS = /^[0-7]+$/;
 /** A number too wide for octal text sets the high bit and uses the rest of the field as base 256. */
 const BASE_256_MARKER = 0x80;
 const NUL = 0;
+const SPACE = 0x20;
+const EQUALS = 0x3d;
 const PATH_SEPARATOR = '/';
 const MODE_BITS = 0o777;
 
@@ -83,8 +110,8 @@ type Header = {
   readonly linkTarget: string;
 };
 
-/** What a long-name entry said about the entry after it, until that entry has taken it. */
-type Announced = { path?: string; linkTarget?: string };
+/** What a long-name or pax header said about the entry after it, until that entry has taken it. */
+type Announced = { path?: string; linkTarget?: string; sizeBytes?: number };
 
 /**
  * Every entry in the archive, in the order it was written.
@@ -174,6 +201,47 @@ export async function* tarEntries(source: ReadableStream<Uint8Array>): AsyncGene
     return textIn(Buffer.concat(pieces));
   }
 
+  /** What a pax header says about the entry after it, or nothing where it is too large to read. */
+  async function paxAnnouncementIn(sizeBytes: number): Promise<Announced> {
+    unread = sizeBytes;
+    if (sizeBytes > MAX_PAX_HEADER_BYTES) {
+      await walkPast(paddingAfter(sizeBytes));
+      return {};
+    }
+    const pieces: Buffer[] = [];
+    let piece = await pieceOfEntry();
+    while (piece !== undefined) {
+      pieces.push(piece);
+      piece = await pieceOfEntry();
+    }
+    await walkPast(paddingAfter(sizeBytes));
+    return announcedBy(paxRecords(Buffer.concat(pieces)));
+  }
+
+  /**
+   * What a header that describes the entry after it rather than a file said about that entry, or
+   * nothing where the header describes a file and the walk should yield it.
+   */
+  async function announcementIn(header: Header): Promise<Announced | undefined> {
+    if (header.type === TYPE_LONG_NAME) {
+      return { path: await longFieldIn(header.sizeBytes) };
+    }
+    if (header.type === TYPE_LONG_LINK) {
+      return { linkTarget: await longFieldIn(header.sizeBytes) };
+    }
+    if (header.type === TYPE_PAX_EXTENDED) {
+      return await paxAnnouncementIn(header.sizeBytes);
+    }
+    // A global header sets defaults for every entry after it, and none of what it may set is one
+    // entry's own path. Walked past, like the file it is not.
+    if (header.type === TYPE_PAX_GLOBAL) {
+      unread = header.sizeBytes;
+      await walkPast(paddingAfter(header.sizeBytes));
+      return {};
+    }
+    return undefined;
+  }
+
   let announced: Announced = {};
 
   try {
@@ -189,29 +257,19 @@ export async function* tarEntries(source: ReadableStream<Uint8Array>): AsyncGene
       }
 
       const header = headerIn(block);
-      if (header.type === TYPE_LONG_NAME || header.type === TYPE_LONG_LINK) {
-        const carried = await longFieldIn(header.sizeBytes);
-        announced =
-          header.type === TYPE_LONG_NAME
-            ? { ...announced, path: carried }
-            : { ...announced, linkTarget: carried };
+      const announcement = await announcementIn(header);
+      if (announcement !== undefined) {
+        announced = { ...announced, ...announcement };
         continue;
       }
 
-      unread = header.sizeBytes;
-      const padding = paddingAfter(header.sizeBytes);
-
-      // pax's records annotate the entry after this one rather than describing a file, and what
-      // this reads out of a header — the path, the mode, the length — a pax archive still writes
-      // in the header. So they are walked past, and the entry they annotate arrives next.
-      if (PAX_TYPES.has(header.type)) {
-        await walkPast(padding);
-        continue;
-      }
-
-      yield entryFrom({ header, announced, content });
+      // pax's `size` record is how a length past what an octal field can hold is written, and it
+      // decides where the next header begins as well as how much of this entry to read.
+      const sizeBytes = announced.sizeBytes ?? header.sizeBytes;
+      unread = sizeBytes;
+      yield entryFrom({ header, announced, sizeBytes, content });
       announced = {};
-      await walkPast(padding);
+      await walkPast(paddingAfter(sizeBytes));
     }
   } finally {
     await chunks.return?.();
@@ -221,19 +279,65 @@ export async function* tarEntries(source: ReadableStream<Uint8Array>): AsyncGene
 function entryFrom({
   header,
   announced,
+  sizeBytes,
   content,
 }: {
   header: Header;
   announced: Announced;
+  sizeBytes: number;
   content: () => AsyncGenerator<Uint8Array>;
 }): TarEntry {
   return {
     path: announced.path ?? header.path,
     kind: kindOf(header.type),
     mode: header.mode & MODE_BITS,
-    sizeBytes: header.sizeBytes,
+    sizeBytes,
     linkTarget: announced.linkTarget ?? header.linkTarget,
     content,
+  };
+}
+
+/**
+ * A pax header's records, which are `<length> <key>=<value>\n` with the length counting itself.
+ *
+ * Anything that does not parse ends the read rather than being guessed at: what follows a record
+ * whose length is wrong is not a record, and reading on would be reading the entry's attributes out
+ * of its own file data.
+ */
+function paxRecords(data: Buffer): Map<string, string> {
+  const records = new Map<string, string>();
+  let at = 0;
+  while (at < data.length) {
+    const space = data.indexOf(SPACE, at);
+    if (space < 0) {
+      return records;
+    }
+    const length = Number(data.subarray(at, space).toString('latin1'));
+    if (!Number.isSafeInteger(length) || length <= 0 || at + length > data.length) {
+      return records;
+    }
+    // The record ends with a newline, which is part of the length and not part of the value.
+    const body = data.subarray(space + 1, at + length - 1);
+    const equals = body.indexOf(EQUALS);
+    if (equals > 0) {
+      records.set(
+        body.subarray(0, equals).toString('utf8'),
+        body.subarray(equals + 1).toString('utf8'),
+      );
+    }
+    at += length;
+  }
+  return records;
+}
+
+function announcedBy(records: Map<string, string>): Announced {
+  const path = records.get(PAX_PATH);
+  const linkTarget = records.get(PAX_LINK_PATH);
+  const sizeBytes = Number(records.get(PAX_SIZE));
+  return {
+    ...(path === undefined ? {} : { path }),
+    ...(linkTarget === undefined ? {} : { linkTarget }),
+    ...(Number.isSafeInteger(sizeBytes) && sizeBytes >= 0 ? { sizeBytes } : {}),
   };
 }
 
