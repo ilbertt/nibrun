@@ -131,6 +131,7 @@ jobs:
       API_CLOUDFLARE_ZONE_ID: ${{ fromJSON(needs.terraform.outputs.values).api_cloudflare_zone_id }}
       ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
       EXPORTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).exports_bucket }}
+      IMPORTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).imports_bucket }}
       EXPORT_RETENTION_DAYS: ${{ fromJSON(needs.terraform.outputs.values).export_retention_days }}
       API_S3_ENDPOINT: ${{ fromJSON(needs.terraform.outputs.values).api_s3_endpoint }}
       PG_BACKUP_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).pg_backup_bucket }}
@@ -171,6 +172,7 @@ jobs:
       FILESYSTEMS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).filesystems_bucket }}
       ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
       EXPORTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).exports_bucket }}
+      IMPORTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).imports_bucket }}
       API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
       APP_HOST_DOMAIN: ${{ fromJSON(needs.terraform.outputs.values).app_host_domain }}
       WWW_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).www_hostname }}
