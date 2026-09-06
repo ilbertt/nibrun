@@ -176,7 +176,7 @@ services:
   # SSM port-forward, which already costs AWS credentials. The change that gives
   # it a public route is the change that has to give it DOZZLE_AUTH_PROVIDER.
   dozzle:
-    image: amir20/dozzle:v10.6
+    image: amir20/dozzle:v10.10
     container_name: dozzle
     environment:
       - DOZZLE_NO_ANALYTICS=true

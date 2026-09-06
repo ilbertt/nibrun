@@ -1,6 +1,6 @@
 {
   "name": "@repo/cli",
-  "version": "2026.9.3-1",
+  "version": "2026.9.6-1",
   "private": true,
   "type": "module",
   "imports": {
@@ -24,7 +24,7 @@
     "@repo/global-constants": "workspace:*",
     "@repo/protocol": "workspace:*",
     "better-auth": "catalog:",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@parshjs/codegen": "^0.0.5",
