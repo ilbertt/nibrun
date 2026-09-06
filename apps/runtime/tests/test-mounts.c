@@ -7,6 +7,7 @@
  * Argument 1 is a loop device holding a squashfs, argument 2 one holding an ext4
  * filesystem. tests/mounts.sh builds both. */
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
@@ -183,6 +184,47 @@ static size_t count_mounts_at(const char *target) {
   return mounts;
 }
 
+/* Every entry of the directory read as the tenant, which is what an app does to its own
+ * data/ before it does anything else. mkfs.ext4's lost+found is the one thing in there
+ * they did not put there, and for a walk it is indistinguishable from their own. */
+static bool can_walk_as_tenant(const char *directory) {
+  pid_t child = fork();
+  if (child == 0) {
+    if (setgid(TENANT_GID) < 0 || setuid(TENANT_UID) < 0) {
+      _exit(1);
+    }
+    DIR *opened = opendir(directory);
+    if (opened == NULL) {
+      _exit(1);
+    }
+    /* Relative to the directory's own descriptor, so no entry name has to be pasted onto
+     * a path — which is also how a walk that does not race a rename would do it. */
+    int at = dirfd(opened);
+    for (struct dirent *entry = readdir(opened); entry != NULL; entry = readdir(opened)) {
+      if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+        continue;
+      }
+      struct stat details;
+      if (fstatat(at, entry->d_name, &details, 0) < 0) {
+        _exit(1);
+      }
+      if (!S_ISDIR(details.st_mode)) {
+        continue;
+      }
+      int below = openat(at, entry->d_name, O_RDONLY | O_DIRECTORY);
+      if (below < 0) {
+        _exit(1);
+      }
+      close(below);
+    }
+    closedir(opened);
+    _exit(0);
+  }
+  int status = 0;
+  waitpid(child, &status, 0);
+  return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
 static bool can_write_as_tenant(const char *directory) {
   pid_t child = fork();
   if (child == 0) {
@@ -254,6 +296,9 @@ int main(int argc, char **argv) {
   /* Its own directory and nothing above it: /run stands in for the tmpfs the guest
    * mounts at /app, which the tenant must not be able to write. */
   EXPECT(!can_write_as_tenant("/run"));
+  /* mkfs.ext4 leaves lost+found to root at 0700, so without this the first recursive
+   * walk an app makes of its own data/ ends in EACCES on a directory it never made. */
+  EXPECT(can_walk_as_tenant(DATA_MOUNT));
 
   /* A frozen filesystem cannot be asked whether it is frozen, and a write that proved
    * it would be a write that never returns. What answers instead is the pair of
