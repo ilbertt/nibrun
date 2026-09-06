@@ -76,6 +76,24 @@ test('an app the owner cannot deploy onto is not offered', async () => {
   ]);
 });
 
+// An app's data is created as the app is, so a folder has already said this is a new app — and
+// the api would refuse the archive against any of the ones the question would have offered.
+test('a folder to start the data from is not a question about which app', async () => {
+  const resolved = await completeOptions({
+    api: apiListing({ apps: [{ slug: 'demo-abc123', state: 'active' }] }),
+    options: { dataFolder: '/tmp/seed' },
+    binarySource: '/tmp/my-server',
+    args: [],
+  });
+
+  expect(resolved).toEqual({ dataFolder: '/tmp/seed', name: 'my-server', port: 3000 });
+  expect(prompts.transcript()).toEqual([
+    'text:Name the app (my-server)',
+    'text:Which HTTP port does the binary listen on? (3000)',
+    'confirm:Create my-server and deploy?',
+  ]);
+});
+
 test('a flag already given is not asked about again', async () => {
   const resolved = await completeOptions({
     api: apiListing({ apps: [] }),

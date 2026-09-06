@@ -2,6 +2,7 @@ import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import type { DeploymentState, Filename, Sha256Digest, TenantArguments } from '@repo/protocol';
 import { appFor } from '#apps.ts';
+import { type UploadableArchive, uploadImport } from '#imports.ts';
 import {
   type ConfigEdit,
   configPatch,
@@ -9,7 +10,14 @@ import {
   type DeployStep,
   servingHostname,
 } from '#release.ts';
-import { streamedUpload, type UploadProgress, type UploadTransport } from '#upload.ts';
+import {
+  mebibytes,
+  putObject,
+  streamedUpload,
+  type UploadTransport,
+  type UploadWait,
+  unwatched,
+} from '#upload.ts';
 import { pause } from '#wait.ts';
 
 const SETTLING_STATES = new Set<DeploymentState>(['pending', 'starting']);
@@ -17,8 +25,6 @@ const SETTLING_STATES = new Set<DeploymentState>(['pending', 'starting']);
 // is what stands between that and the owner being told — and the whole wait is a few seconds.
 const POLL_INTERVAL_MS = 500;
 const SERVING_TIMEOUT_MS = 300_000;
-const SIZE_DECIMALS = 1;
-const BYTES_PER_MEBIBYTE = 1_048_576;
 
 export type UploadableBinary = {
   name: Filename;
@@ -67,15 +73,6 @@ function lastSegment(url: string): string | undefined {
   }
 }
 
-/**
- * The wait around the upload, given what the upload is doing rather than a line to print: how far
- * along it is reads as a spinner in one place and a meter in another, and neither belongs here.
- */
-export type UploadWait = (input: {
-  message: string;
-  task: (report: (progress: UploadProgress) => void) => Promise<void>;
-}) => Promise<void>;
-
 export type DeployInput = ConfigEdit & {
   api: PublicApiClient;
   binary: DeployableBinary;
@@ -85,6 +82,9 @@ export type DeployInput = ConfigEdit & {
   args: TenantArguments;
   app?: string | undefined;
   name?: string | undefined;
+  // What the app's `data/` is created holding. Nameable on any deployment and accepted on one
+  // only while the app's filesystem does not exist yet, which the api is the end that knows.
+  initialData?: UploadableArchive | undefined;
   onStep?: ((step: DeployStep) => void) | undefined;
   whileUploading?: UploadWait | undefined;
   upload?: UploadTransport | undefined;
@@ -102,6 +102,7 @@ export async function deploy({
   binary,
   app: slug,
   name,
+  initialData,
   onStep,
   whileUploading = unwatched,
   upload = streamedUpload,
@@ -121,8 +122,18 @@ export async function deploy({
     : await uploadBinary({ api, appId: app.id, binary, whileUploading, upload });
   onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest });
 
+  // After the binary and not before it: an archive is the larger of the two by far, and a binary
+  // the api refuses is the failure worth reaching first.
+  const initialDataFrom =
+    initialData === undefined
+      ? undefined
+      : await uploadImport({ api, appId: app.id, archive: initialData, whileUploading, upload });
+
   const deployment = unwrap(
-    await api.api.apps({ appId: app.id }).deployments.post({ artifactId: artifact.id }),
+    await api.api.apps({ appId: app.id }).deployments.post({
+      artifactId: artifact.id,
+      ...(initialDataFrom !== undefined && { initialDataFrom }),
+    }),
   );
   onStep?.({ kind: 'deployment', deploymentId: deployment.id });
 
@@ -226,7 +237,7 @@ async function uploadBinary({
   try {
     await whileUploading({
       message: `uploading ${binary.name} (${mebibytes(binary.body.size)})`,
-      task: (report) => putBinary({ url, body: binary.body, upload, onProgress: report }),
+      task: (report) => putObject({ url, body: binary.body, upload, onProgress: report }),
     });
   } catch (failure) {
     await artifact.patch({ upload: 'failed' });
@@ -240,51 +251,6 @@ async function uploadBinary({
     throw new ApiError('The api accepted the upload without saying what it stored.');
   }
   return completed;
-}
-
-/**
- * The whole binary as the body, never held here: something that has to hold a binary to send it
- * is something that cannot send a large one.
- *
- * The url was signed for this exact length, so the store refuses anything else — which is also
- * why a file that changed since it was measured comes back as a signature that does not match.
- */
-async function putBinary({
-  url,
-  body,
-  upload,
-  onProgress,
-}: {
-  url: string;
-  body: Blob;
-  upload: UploadTransport;
-  onProgress: (progress: UploadProgress) => void;
-}): Promise<void> {
-  const response = await upload({ url, body, onProgress });
-  if (!response.ok) {
-    throw new ApiError(
-      `The store refused the upload: ${response.status} ${await storeError(response)}`,
-    );
-  }
-}
-
-// S3 answers in XML, and the one part of it worth repeating is the sentence it puts in Message.
-async function storeError(response: Response): Promise<string> {
-  const body = await response.text();
-  return /<Message>(?<message>[^<]*)<\/Message>/.exec(body)?.groups?.message ?? response.statusText;
-}
-
-function unwatched({
-  task,
-}: {
-  message: string;
-  task: (report: (progress: UploadProgress) => void) => Promise<void>;
-}): Promise<void> {
-  return task(() => {});
-}
-
-function mebibytes(bytes: number): string {
-  return `${(bytes / BYTES_PER_MEBIBYTE).toFixed(SIZE_DECIMALS)} MB`;
 }
 
 /** What a caller needs of a release that has stopped moving: which end it reached, and why. */
