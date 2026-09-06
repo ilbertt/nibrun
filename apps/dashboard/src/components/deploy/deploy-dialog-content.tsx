@@ -19,6 +19,7 @@ export function DeployDialogContent({ appId, disabled }: { appId?: string; disab
   const [open, setOpen] = useState(false);
   const run = useDeployRun();
   const running = run.phase === 'uploading' || run.phase === 'settling';
+  const newApp = appId === undefined;
 
   function handleOpenChange(next: boolean): void {
     if (next && !running) {
@@ -30,19 +31,17 @@ export function DeployDialogContent({ appId, disabled }: { appId?: string; disab
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
-        render={
-          <Button variant={appId === undefined ? 'default' : 'outline'} disabled={disabled} />
-        }
+        render={<Button variant={newApp ? 'default' : 'outline'} disabled={disabled} />}
       >
         <RocketIcon data-icon="inline-start" />
-        Deploy
+        {newApp ? 'Deploy' : 'Update'}
       </DialogTrigger>
       <DialogContent showCloseButton={!running} className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{appId === undefined ? 'Deploy a binary' : 'Deploy'}</DialogTitle>
+          <DialogTitle>{newApp ? 'Deploy a binary' : 'Update'}</DialogTitle>
           <DialogDescription>
             {run.phase === 'idle'
-              ? describeDeploy(appId)
+              ? describeDeploy(newApp)
               : 'The release is on its way. Closing this does not stop it.'}
           </DialogDescription>
         </DialogHeader>
@@ -58,8 +57,8 @@ export function DeployDialogContent({ appId, disabled }: { appId?: string; disab
   );
 }
 
-function describeDeploy(appId: string | undefined): string {
-  return appId === undefined
+function describeDeploy(newApp: boolean): string {
+  return newApp
     ? 'The binary is uploaded to the store, then released as what the app runs.'
     : 'The app is released again with whatever this leaves it set to. A binary replaces the one it runs; without one, it keeps it.';
 }
