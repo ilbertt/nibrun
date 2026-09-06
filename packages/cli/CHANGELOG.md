@@ -2,6 +2,12 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.9.6-2]
+
+### 🚀 Features
+
+- *(dashboard)* An app can be created holding the data its owner uploads (#518)
+
 ## [2026.9.6-1]
 
 ### 🚀 Features
