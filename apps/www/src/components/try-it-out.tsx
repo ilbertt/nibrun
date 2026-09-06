@@ -20,14 +20,9 @@ export function TryItOut() {
         <h2 className="text-muted-foreground text-sm">Try it out</h2>
         <span aria-hidden="true" className="h-px flex-1 bg-border" />
       </div>
-      <div className="flex items-center rounded-full border bg-card/70 shadow-sm backdrop-blur-sm">
-        <Button
-          variant="ghost"
-          size="lg"
-          onClick={copy}
-          className="rounded-r-none rounded-l-full pr-3"
-        >
-          {/* Both labels are the same nineteen characters, and the face is monospaced, so the pill
+      <div className="flex items-center border bg-card/70 shadow-sm backdrop-blur-sm">
+        <Button variant="ghost" size="lg" onClick={copy} data-box="none" className="pr-3">
+          {/* Both labels are the same nineteen characters, and the face is monospaced, so the control
               does not resize under the cursor for the second and a half the confirmation lasts. */}
           {copied ? 'Copied to clipboard' : 'Start with an agent'}
           <span className="flex items-center gap-1.5 text-muted-foreground transition-colors group-hover/button:text-foreground">
@@ -44,7 +39,7 @@ export function TryItOut() {
           aria-expanded={reading}
           aria-controls={PROMPT_PANEL_ID}
           aria-label={reading ? 'Hide the prompt' : 'Read the prompt first'}
-          className="rounded-r-full rounded-l-none"
+          data-box="none"
         >
           <ChevronDownIcon
             className={`transition-transform duration-200 ${reading ? 'rotate-180' : ''}`}

@@ -11,6 +11,7 @@ export function CopyButton({ value }: { value: string }) {
       size="icon-xs"
       aria-label={copied ? `Copied ${value}` : `Copy ${value}`}
       onClick={copy}
+      data-box="none"
     >
       {copied ? <CheckIcon /> : <CopyIcon />}
     </Button>
