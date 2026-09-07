@@ -146,7 +146,7 @@
     },
     "packages/cli": {
       "name": "@repo/cli",
-      "version": "2026.9.7-1",
+      "version": "2026.9.7-2",
       "dependencies": {
         "@clack/prompts": "^1.7.0",
         "@parshjs/core": "^0.0.10",
