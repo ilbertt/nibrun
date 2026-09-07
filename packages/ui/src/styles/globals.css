@@ -56,8 +56,6 @@ body {
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --color-shell: var(--shell);
-  --color-shell-foreground: var(--shell-foreground);
   --radius-sm: calc(var(--radius) / 4);
   --radius-md: calc(var(--radius) / 3);
   --radius-lg: calc(var(--radius) * 5 / 12);
@@ -129,11 +127,8 @@ body {
   --border: oklch(0.22 0.028 158);
   --input: oklch(0.96 0.004 160);
   --ring: oklch(0.22 0.028 158);
-  --shell: oklch(0.22 0.028 158);
-  --shell-foreground: oklch(0.97 0.004 160);
   --well: inset 0 1px 2px 0 rgb(0 0 0 / 0.06);
   --raise: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --lift: 0 4px 12px -2px rgb(0 0 0 / 0.12);
   --chart-1: oklch(0.25 0.17 149.2);
   --chart-2: oklch(0.35 0.17 149.2);
   --chart-3: oklch(0.55 0.17 149.2);
@@ -201,11 +196,8 @@ body {
   --border: oklch(0.42 0.018 150);
   --input: oklch(0.24 0.014 150);
   --ring: oklch(0.85 0.02 150);
-  --shell: oklch(0.11 0.012 150);
-  --shell-foreground: oklch(0.93 0.012 100);
   --well: inset 0 1px 3px 0 rgb(0 0 0 / 0.3);
   --raise: 0 1px 3px 0 rgb(0 0 0 / 0.3);
-  --lift: 0 6px 18px -4px rgb(0 0 0 / 0.6);
   --chart-1: oklch(0.35 0.17 149.2);
   --chart-2: oklch(0.55 0.17 149.2);
   --chart-3: oklch(0.75 0.17 149.2);
@@ -252,42 +244,15 @@ body {
   --shadow-2xl: 0 1px 3px 0 oklch(0.08 0.01 120 / 0.5);
 }
 
-/* Depth here is the least that still reads. A control sits a touch above the page, a readout a
-   touch below it — no bevel on either, because a bright top edge is what dates this look rather
-   than what makes it physical. */
+/* Depth here is the least that still reads: a control sits a touch above the page, a readout a
+   touch below it, and neither has a bevel — a bright top edge is what dates this look rather than
+   what makes it physical.
 
-/* The chassis: opaque, bolted at four corners, standing just off the page. */
-@utility panel-face {
-  --rivet-inset: 7px;
-  --rivet: radial-gradient(circle, var(--border) 0 1.5px, transparent 1.6px);
-
-  background-image: var(--rivet), var(--rivet), var(--rivet), var(--rivet);
-  background-size: 4px 4px;
-  background-repeat: no-repeat;
-  background-position:
-    var(--rivet-inset) var(--rivet-inset),
-    calc(100% - var(--rivet-inset)) var(--rivet-inset),
-    var(--rivet-inset) calc(100% - var(--rivet-inset)),
-    calc(100% - var(--rivet-inset)) calc(100% - var(--rivet-inset));
-  box-shadow: var(--raise);
-}
-
-/* A track something is dragged along, which is the one thing left that is genuinely set into the
-   panel. A border and a shadow around every figure inside a panel is what makes it read as
-   equipment: the outline belongs to the chassis, and what sits inside it gets a fill at most. */
+   A track something is dragged along is the one thing genuinely set into the surface around it.
+   The outline belongs to the panel; what sits inside gets a fill at most, so nothing else here
+   needs a well of its own. */
 @utility inset-well {
   box-shadow: var(--well);
-}
-
-/* Anything that opens over the page — a menu, a tooltip, a dialog. It is not part of the chassis,
-   so it casts rather than sits. */
-@utility floats-above {
-  box-shadow: var(--lift);
-}
-
-@utility hint-underline {
-  text-decoration: underline dotted var(--muted-foreground);
-  text-underline-offset: 4px;
 }
 
 /* The one control on a dialog that is not about the dialog's content. The CLI reaches for
