@@ -1,5 +1,6 @@
 import type { DeploySuggestion } from '@repo/deploy-link';
 import { Button } from '@repo/ui/components/button';
+import { cn } from '@repo/ui/lib/utils';
 import { useStore } from '@tanstack/react-form';
 import { AdvancedConfiguration } from '#components/deploy/advanced-configuration.tsx';
 import { DeployBinaryField } from '#components/deploy/deploy-binary-field.tsx';
@@ -14,11 +15,18 @@ export function DeployForm({
   binary,
   suggested,
   minimal = false,
+  pinnedAction = false,
 }: {
   appId: string | undefined;
   binary: File | undefined;
   suggested?: DeploySuggestion | undefined;
   minimal?: boolean | undefined;
+  /**
+   * Whether the fields scroll past the button rather than the button scrolling away with them.
+   * The dialog's body is a scroll region and a long configuration would push the button out of
+   * reach; the handoff page has the whole form on it and nothing to scroll under.
+   */
+  pinnedAction?: boolean | undefined;
 }) {
   const form = useDeployForm({ appId, binary, suggested });
   const { api, replacing, targetResolved } = form;
@@ -51,7 +59,16 @@ export function DeployForm({
         </p>
       )}
 
-      <div className="flex min-w-0 flex-col gap-1.5">
+      {/* Pinned, the bar spans the scroll region rather than the form, so fields pass behind it
+          rather than beside it, and it reaches a step past the scrollport's content edge to cover
+          the bleed `DialogBody` keeps below that — otherwise a field goes on showing through it.
+          Its own bottom padding is what the button's base is drawn on. */}
+      <div
+        className={cn(
+          'flex min-w-0 flex-col gap-1.5',
+          pinnedAction && 'sticky -bottom-1 -mx-6 bg-popover px-6 pt-3 pb-1',
+        )}
+      >
         <api.Subscribe selector={(state) => state.canSubmit}>
           {(canSubmit) => (
             <Button type="submit" size="lg" disabled={!canSubmit || !targetResolved}>
