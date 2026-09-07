@@ -5,6 +5,7 @@ import { unwrap } from '@repo/api-client/unwrap';
 import { appFor } from '@repo/app-operations';
 import { DEFAULT_HTTP_PORT, type TenantArguments } from '@repo/protocol';
 import { CancelledError } from '#lib/errors.ts';
+import type { InitialData } from '#lib/initial-data.ts';
 import { answered } from '#lib/prompts.ts';
 
 export type RunOptions = {
@@ -14,7 +15,7 @@ export type RunOptions = {
   extraPublicPort?: boolean | undefined;
   env?: string[] | undefined;
   unset?: string[] | undefined;
-  dataFolder?: string | undefined;
+  dataFolder?: InitialData | undefined;
 };
 
 type Plan = {
@@ -128,7 +129,7 @@ function summary({ options, binarySource, args }: Plan): string {
     ['binary', binarySource],
     ['app', options.app ?? options.name],
     ['port', options.port],
-    ['data', options.dataFolder],
+    ['data', options.dataFolder?.path],
     // Only when it was asked for: a row saying no on every run is one nobody reads.
     ['extra public port', options.extraPublicPort ? 'yes' : undefined],
     ['args', args.length === 0 ? undefined : args.join(' ')],

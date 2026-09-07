@@ -1,11 +1,14 @@
+import { Buffer } from 'node:buffer';
 import { posix } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
 import type { PlatformError } from '@effect/platform/Error';
 import type { DesiredArtifact, VolumeId } from '@repo/protocol';
 import { Data, Effect, Option, Ref, Stream } from 'effect';
 import { downloadAndVerify } from '#lib/vm/artifacts.ts';
+import { type ArchiveEntry, UnreadableArchive } from '#lib/volumes/archive.ts';
 import { format, isFormatted } from '#lib/volumes/ext4.ts';
-import { type TarEntry, tarEntries } from '#lib/volumes/tar.ts';
+import { tarEntries } from '#lib/volumes/tar.ts';
+import { ZIP_MAGIC, zipEntries } from '#lib/volumes/zip.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
 /**
@@ -90,7 +93,11 @@ export class SeedUnreadable extends Data.TaggedError('SeedUnreadable')<{
   readonly cause: unknown;
 }> {
   override get message() {
-    return 'the archive could not be read as a gzipped tarball';
+    // The reader's own sentence where there is one: it names what the archive did, which is the
+    // difference between an operator seeing a password-protected entry and seeing "unreadable".
+    return this.cause instanceof UnreadableArchive
+      ? this.cause.message
+      : 'the archive could not be read as a .tar.gz or a .zip';
   }
 }
 
@@ -114,9 +121,25 @@ type Unpacked = {
   readonly bytes: number;
   readonly entries: number;
   readonly symlinks: ReadonlySet<string>;
+  readonly roots: Roots;
 };
 
-const EMPTY: Unpacked = { bytes: 0, entries: 0, symlinks: new Set() };
+/**
+ * What sits directly at the archive's root, which is what says whether the whole archive is a
+ * folder somebody packed rather than the contents of one.
+ */
+type Roots = {
+  readonly names: ReadonlySet<string>;
+  /** Those of them that are not directories, any one of which is a root somebody meant. */
+  readonly files: ReadonlySet<string>;
+};
+
+const EMPTY: Unpacked = {
+  bytes: 0,
+  entries: 0,
+  symlinks: new Set(),
+  roots: { names: new Set(), files: new Set() },
+};
 
 /**
  * The archive's path as the segments of it that mean anything, or nothing where it is one the
@@ -165,6 +188,20 @@ function refuse(reason: string) {
 }
 
 /**
+ * The archive as its entries, read by whichever of the two readers its opening says it needs.
+ *
+ * Decided from the bytes rather than from the name: the name reached the host from whoever uploaded
+ * the archive, and these four bytes did not.
+ */
+async function archiveEntries(archivePath: string): Promise<AsyncIterable<ArchiveEntry>> {
+  const file = Bun.file(archivePath);
+  const opening = Buffer.from(await file.slice(0, ZIP_MAGIC.length).arrayBuffer());
+  return opening.equals(ZIP_MAGIC)
+    ? zipEntries(archivePath)
+    : tarEntries(file.stream().pipeThrough(new DecompressionStream(GZIP)));
+}
+
+/**
  * Owned by the tenant as it is written, rather than chowned in a second pass.
  *
  * `mkfs.ext4 -d` copies what it finds, and the guest chowns only the mount root — so an unchowned
@@ -185,7 +222,7 @@ const madeDirectory = ({ path, mode, owner }: { path: string; mode: number; owne
  * A file's own bytes, written straight through rather than held: an entry is as large as the
  * ceiling allows, and buffering one would be the whole of it in the agent's memory.
  */
-const wroteFile = ({ entry, path, owner }: { entry: TarEntry; path: string; owner: Owner }) =>
+const wroteFile = ({ entry, path, owner }: { entry: ArchiveEntry; path: string; owner: Owner }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     yield* madeDirectory({ path: posix.dirname(path), mode: DIRECTORY_MODE, owner });
@@ -202,7 +239,15 @@ const wroteFile = ({ entry, path, owner }: { entry: TarEntry; path: string; owne
  * A symlink is created rather than followed, and its ownership left alone: what a symlink permits
  * is decided by what it points at, and chowning one would chown that instead.
  */
-const wroteSymlink = ({ entry, path, owner }: { entry: TarEntry; path: string; owner: Owner }) =>
+const wroteSymlink = ({
+  entry,
+  path,
+  owner,
+}: {
+  entry: ArchiveEntry;
+  path: string;
+  owner: Owner;
+}) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     yield* madeDirectory({ path: posix.dirname(path), mode: DIRECTORY_MODE, owner });
@@ -215,7 +260,7 @@ const wroteEntry = ({
   destination,
   owner,
 }: {
-  entry: TarEntry;
+  entry: ArchiveEntry;
   segments: readonly string[];
   destination: string;
   owner: Owner;
@@ -235,7 +280,7 @@ const advanced = ({
   segments,
 }: {
   unpacked: Unpacked;
-  entry: TarEntry;
+  entry: ArchiveEntry;
   segments: readonly string[];
 }): Unpacked => ({
   bytes: unpacked.bytes + entry.sizeBytes,
@@ -244,7 +289,77 @@ const advanced = ({
     entry.kind === 'symlink'
       ? new Set([...unpacked.symlinks, segments.join('/')])
       : unpacked.symlinks,
+  roots: rootsWith({ roots: unpacked.roots, entry, segments }),
 });
+
+/** An AppleDouble sidecar, which macOS writes beside the file whose metadata it carries. */
+const APPLE_DOUBLE_PREFIX = '._';
+const ARCHIVER_LITTER: ReadonlySet<string> = new Set(['.DS_Store', '__MACOSX']);
+
+/**
+ * Whether the archiver wrote this name rather than the owner, in which case it is not a root
+ * anybody meant.
+ *
+ * macOS is the one that decides this rule works at all: `tar czf data.tar.gz data/` there writes an
+ * AppleDouble `._data` beside the folder, and Finder's zip adds a `__MACOSX` tree — so the very
+ * archives the stripping exists to rescue are the ones a second name at the root would veto.
+ *
+ * Ignored for the decision and nothing else. They are still unpacked, and stripping is what leaves
+ * them behind: they sit at the tree's root, which is no longer where the filesystem is written from.
+ */
+function addedByAnArchiver(name: string): boolean {
+  return name.startsWith(APPLE_DOUBLE_PREFIX) || ARCHIVER_LITTER.has(name);
+}
+
+/**
+ * What this entry says about the archive's root. Anything below the root proves the name above it
+ * is a directory whether or not the archive bothered to write one, and anything at the root that is
+ * not a directory is a root somebody meant: no packing of a folder puts a file beside it.
+ */
+function rootsWith({
+  roots,
+  entry,
+  segments,
+}: {
+  roots: Roots;
+  entry: ArchiveEntry;
+  segments: readonly string[];
+}): Roots {
+  const [name] = segments;
+  if (name === undefined || addedByAnArchiver(name)) {
+    return roots;
+  }
+  const directory = segments.length > 1 || entry.kind === 'directory';
+  return {
+    names: new Set([...roots.names, name]),
+    files: directory ? roots.files : new Set([...roots.files, name]),
+  };
+}
+
+/**
+ * Where the tree really begins.
+ *
+ * The archive's root is the root of `data/` — but the two commonest ways of making one put the
+ * folder in the archive rather than the contents of it. `tar czf data.tar.gz data/` writes every
+ * path under `data/`, and a desktop archiver does the same with whatever folder it was pointed at.
+ * Both land the files one directory below where the app goes looking, and what the owner gets is an
+ * app that started with an empty `data/` and nothing anywhere saying why.
+ *
+ * So a tree that is a single directory and nothing beside it is read as one of those. It is a
+ * guess, and a dataset that genuinely is one directory is the case it guesses wrong: an app whose
+ * `data/` holds only `uploads/` is seeded with what was inside it. Both readings fail the same way
+ * and only one of them is common, which is the whole of why it reads in this direction.
+ *
+ * A lone symlink is not stripped into, which is the reason this is decided from the walk rather
+ * than from the tree afterwards: what it points at is a directory to anything that asks the
+ * filesystem, and `mkfs.ext4 -d` would follow it back out of the tree it was given.
+ */
+function strippedRoot({ tree, roots }: { tree: string; roots: Roots }): string {
+  const [only] = roots.names;
+  return only !== undefined && roots.names.size === 1 && roots.files.size === 0
+    ? posix.join(tree, only)
+    : tree;
+}
 
 /**
  * One entry, refused or written.
@@ -261,7 +376,7 @@ const unpackedEntry = ({
   limits,
 }: {
   unpacked: Unpacked;
-  entry: TarEntry;
+  entry: ArchiveEntry;
   destination: string;
   owner: Owner;
   limits: SeedLimits;
@@ -303,9 +418,11 @@ function refusalFor(path: string): string {
 }
 
 /**
- * The archive's root becomes the root of `data/`, so nothing is stripped and no leading directory
- * is looked for. An export bundle nests its dataset under `data/` beside the binary, which is why
- * one does not round-trip through here — restoring from an export is its own thing.
+ * The archive unpacked, and the directory a filesystem should be written from — the tree itself,
+ * unless it turns out to hold a folder rather than the contents of one.
+ *
+ * An export bundle nests its dataset under `data/` beside the binary, which is why one does not
+ * round-trip through here — restoring from an export is its own thing.
  */
 export const unpackSeed = Effect.fn('unpackSeed')(function* ({
   archivePath,
@@ -322,9 +439,8 @@ export const unpackSeed = Effect.fn('unpackSeed')(function* ({
   yield* fs.makeDirectory(destination, { recursive: true, mode: STAGING_MODE });
   yield* owned({ path: destination, owner });
 
-  const entries = yield* Effect.try({
-    try: () =>
-      tarEntries(Bun.file(archivePath).stream().pipeThrough(new DecompressionStream(GZIP))),
+  const entries = yield* Effect.tryPromise({
+    try: () => archiveEntries(archivePath),
     catch: (cause) => new SeedUnreadable({ cause }),
   });
 
@@ -341,8 +457,13 @@ export const unpackSeed = Effect.fn('unpackSeed')(function* ({
   );
 
   const unpacked = yield* Ref.get(progress);
-  yield* Effect.annotateCurrentSpan({ entries: unpacked.entries, bytes: unpacked.bytes });
-  return unpacked;
+  const root = strippedRoot({ tree: destination, roots: unpacked.roots });
+  yield* Effect.annotateCurrentSpan({
+    entries: unpacked.entries,
+    bytes: unpacked.bytes,
+    stripped: root !== destination,
+  });
+  return { bytes: unpacked.bytes, entries: unpacked.entries, root };
 });
 
 /**
@@ -397,9 +518,14 @@ export const formatFromSeed = Effect.fn('formatFromSeed')(function* ({
       // not also holding the copy it was written from.
       yield* fs.remove(archivePath, { force: true });
       yield* Effect.logInfo('volume seed unpacked').pipe(
-        Effect.annotateLogs({ volumeId, entries: unpacked.entries, bytes: unpacked.bytes }),
+        Effect.annotateLogs({
+          volumeId,
+          entries: unpacked.entries,
+          bytes: unpacked.bytes,
+          stripped: unpacked.root !== tree,
+        }),
       );
-      return yield* format({ devicePath, seedDir: Option.some(tree) });
+      return yield* format({ devicePath, seedDir: Option.some(unpacked.root) });
     }),
     fs.remove(stagingDir, { recursive: true, force: true }).pipe(Effect.ignore),
   );

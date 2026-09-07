@@ -28,6 +28,7 @@ import {
   RefusedArtifactError,
 } from '#lib/artifact-digest.ts';
 import { carriesCredentials, filenameFromUrl, withoutCredentials } from '#lib/binary-url.ts';
+import { describeMachine } from '#lib/elf.ts';
 import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
@@ -216,11 +217,17 @@ function unsupportedInterpreter(interpreter: string): string {
   return `The artifact needs the dynamic loader at ${interpreter}, which the guest does not have. Link it against /lib64/ld-linux-x86-64.so.2, or compile it static.`;
 }
 
+function unsupportedMachine(machine: number): string {
+  return `The artifact is built for ${describeMachine(machine)}, and apps run on x86_64. Rebuild it for linux-x64.`;
+}
+
 /** Why the bytes were refused, in the uploader's terms rather than the inspection's. */
 function refusalMessage(inspection: Exclude<ArtifactInspection, { outcome: 'stored' }>): string {
   switch (inspection.outcome) {
     case 'too-large':
       return TOO_LARGE;
+    case 'unsupported-machine':
+      return unsupportedMachine(inspection.machine);
     case 'unsupported-interpreter':
       return unsupportedInterpreter(inspection.interpreter);
     case 'not-executable':
