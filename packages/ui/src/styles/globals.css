@@ -131,22 +131,10 @@ body {
   --ring: oklch(0.22 0.028 158);
   --shell: oklch(0.22 0.028 158);
   --shell-foreground: oklch(0.97 0.004 160);
-  --well:
-    inset 0 2px 4px 0 rgb(0 0 0 / 0.14), inset 0 -1px 0 0 rgb(255 255 255 / 0.7);
-  --raise:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.9), 0 2px 5px -1px rgb(0 0 0 / 0.09);
-  --face-sheen: linear-gradient(
-    180deg,
-    rgb(255 255 255 / 0.7) 0,
-    transparent 34%
-  );
-  --glass-tint: rgb(255 255 255 / 0.55);
-  --glass-specular: linear-gradient(
-    148deg,
-    rgb(255 255 255 / 0.75) 0,
-    rgb(255 255 255 / 0.15) 26%,
-    transparent 46%
-  );
+  --well: inset 0 1px 2px 0 rgb(0 0 0 / 0.06);
+  --raise: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --lift: 0 4px 12px -2px rgb(0 0 0 / 0.12);
+  --glass-tint: rgb(255 255 255 / 0.5);
   --chart-1: oklch(0.25 0.17 149.2);
   --chart-2: oklch(0.35 0.17 149.2);
   --chart-3: oklch(0.55 0.17 149.2);
@@ -216,23 +204,10 @@ body {
   --ring: oklch(0.85 0.02 150);
   --shell: oklch(0.11 0.012 150);
   --shell-foreground: oklch(0.93 0.012 100);
-  --well:
-    inset 0 2px 5px 0 rgb(0 0 0 / 0.55),
-    inset 0 -1px 0 0 rgb(255 255 255 / 0.07);
-  --raise:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.08), 0 2px 6px -1px rgb(0 0 0 / 0.5);
-  --face-sheen: linear-gradient(
-    180deg,
-    rgb(255 255 255 / 0.06) 0,
-    transparent 34%
-  );
-  --glass-tint: rgb(0 0 0 / 0.35);
-  --glass-specular: linear-gradient(
-    148deg,
-    rgb(255 255 255 / 0.14) 0,
-    rgb(255 255 255 / 0.04) 26%,
-    transparent 46%
-  );
+  --well: inset 0 1px 3px 0 rgb(0 0 0 / 0.3);
+  --raise: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+  --lift: 0 6px 18px -4px rgb(0 0 0 / 0.6);
+  --glass-tint: rgb(0 0 0 / 0.28);
   --chart-1: oklch(0.35 0.17 149.2);
   --chart-2: oklch(0.55 0.17 149.2);
   --chart-3: oklch(0.75 0.17 149.2);
@@ -279,58 +254,43 @@ body {
   --shadow-2xl: 0 1px 3px 0 oklch(0.08 0.01 120 / 0.5);
 }
 
-/* One light source decides everything here, and it is above and slightly left. A thing you press
-   is raised: bright along its top edge, casting downward. A thing you read is sunk into the panel:
-   dark along its top edge, catching light at the bottom. Getting those two the wrong way round is
-   the whole difference between a machine and a sticker. */
+/* Depth here is the least that still reads. A control sits a touch above the page, a readout a
+   touch below it — no bevel on either, because a bright top edge is what dates this look rather
+   than what makes it physical. */
 
-/* The chassis: opaque, bolted at four corners, lit from above, standing off the page. */
+/* The chassis: opaque, bolted at four corners, standing just off the page. */
 @utility panel-face {
   --rivet-inset: 7px;
   --rivet: radial-gradient(circle, var(--border) 0 1.5px, transparent 1.6px);
 
-  background-image:
-    var(--rivet), var(--rivet), var(--rivet), var(--rivet), var(--face-sheen);
-  background-size:
-    4px 4px,
-    4px 4px,
-    4px 4px,
-    4px 4px,
-    100% 100%;
+  background-image: var(--rivet), var(--rivet), var(--rivet), var(--rivet);
+  background-size: 4px 4px;
   background-repeat: no-repeat;
   background-position:
     var(--rivet-inset) var(--rivet-inset),
     calc(100% - var(--rivet-inset)) var(--rivet-inset),
     var(--rivet-inset) calc(100% - var(--rivet-inset)),
-    calc(100% - var(--rivet-inset)) calc(100% - var(--rivet-inset)),
-    0 0;
+    calc(100% - var(--rivet-inset)) calc(100% - var(--rivet-inset));
   box-shadow: var(--raise);
 }
 
-/* What the chassis holds a readout behind: a pane, set into the face and catching the same light
-   across one corner. Glass belongs on an instrument in exactly one place — over the part you read,
-   never over the part you grip — which is what keeps it a material here rather than a filter over
-   the whole page. */
+/* The pane a lamp sits behind — a meter, a readout that lights up. Tinted rather than glossed:
+   a specular streak across it is the part that reads as a period piece. */
 @utility display-glass {
   background-color: var(--glass-tint);
-  background-image: var(--glass-specular);
   backdrop-filter: blur(6px);
   box-shadow: var(--well);
 }
 
-/* A panel's name interrupts its top border and nothing else. A solid background behind the word
-   would do it, but that paints a patch of card colour out over the page too, which shows up the
-   moment the panel casts a shadow — so only a band the thickness of the border is painted. */
-@utility legend-notch {
-  background-image: linear-gradient(var(--card), var(--card));
-  background-repeat: no-repeat;
-  background-size: 100% 5px;
-  background-position: center 11px;
-}
-
-/* A readout with no glass over it — a meter track, a field you type into. */
+/* A readout set into the face: a code line, a field you type into. */
 @utility inset-well {
   box-shadow: var(--well);
+}
+
+/* Anything that opens over the page — a menu, a tooltip, a dialog. It is not part of the chassis,
+   so it casts rather than sits. */
+@utility floats-above {
+  box-shadow: var(--lift);
 }
 
 @utility hint-underline {

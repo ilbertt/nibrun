@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@repo/ui/components/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
-import { ExternalLinkIcon, FileIcon, FolderIcon } from 'lucide-react';
+import { ChevronDownIcon, ExternalLinkIcon, FileIcon, FolderIcon } from 'lucide-react';
 import { useState } from 'react';
 import { Gauge, InstrumentPanel, Reading } from '#components/instrument-panel.tsx';
 
@@ -117,7 +117,10 @@ function Overview() {
         <InstrumentPanel name="Configuration">
           <Reading label="HTTP port">8090</Reading>
           <Reading label="Region">eu-central-1</Reading>
-          <Reading label="Sleeps after" hint>
+          <Reading
+            label="Sleeps after"
+            hint="Nothing runs while it sleeps, and nothing is billed. The next request wakes it in about 112 ms."
+          >
             5 min idle
           </Reading>
           <Separator />
@@ -170,15 +173,7 @@ function Overview() {
 
 function LogsView() {
   return (
-    <InstrumentPanel
-      name="Output"
-      action={
-        <span className="flex items-center gap-2 font-mono text-muted-foreground text-xs">
-          <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-          following
-        </span>
-      }
-    >
+    <InstrumentPanel name="Output" action={<TimerangeMenu />}>
       <div className="display-glass flex flex-col gap-0.5 border-2 border-border p-3 font-mono text-xs">
         {LOG_LINES.map((line) => (
           <span key={line.at} className="flex gap-3">
@@ -188,6 +183,47 @@ function LogsView() {
         ))}
       </div>
     </InstrumentPanel>
+  );
+}
+
+const TIMERANGES = ['Last 15 minutes', 'Last hour', 'Last 24 hours', 'Last 7 days'];
+
+/**
+ * The one menu here, so a surface that opens over the page can be judged beside the tooltip.
+ *
+ * Hand-rolled for the same reason as the dialog: the shared primitive resolves a second copy of
+ * React inside the Workers runtime this site prerenders through.
+ */
+function TimerangeMenu() {
+  const [open, setOpen] = useState(false);
+  const [chosen, setChosen] = useState(TIMERANGES[1]);
+
+  return (
+    <span className="relative">
+      <Button size="xs" variant="outline" onClick={() => setOpen(!open)} aria-expanded={open}>
+        {chosen}
+        <ChevronDownIcon data-icon="inline-end" />
+      </Button>
+      {open && (
+        <span className="floats-above absolute right-0 z-20 mt-1 flex w-max flex-col border-2 border-border bg-popover p-1 text-popover-foreground">
+          {TIMERANGES.map((range) => (
+            <button
+              key={range}
+              type="button"
+              onClick={() => {
+                setChosen(range);
+                setOpen(false);
+              }}
+              className={`px-2.5 py-1.5 text-left text-sm hover:bg-accent ${
+                range === chosen ? 'text-primary' : ''
+              }`}
+            >
+              {range}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
   );
 }
 
