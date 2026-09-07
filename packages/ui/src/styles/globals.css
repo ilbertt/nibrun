@@ -260,16 +260,15 @@ body {
   background: color-mix(in oklch, var(--muted) 40%, transparent);
 }
 
-/* A key with a throw: a darker strip of its own face along the bottom, taken away when it is
-   pressed while the face drops by the same amount.
+/* A key with a throw: it stands on a base the height of that throw, and pressing drops the face by
+   exactly the same and takes the base away.
 
-   Drawn inside the edge rather than cast below it. A cast shadow needs a ground lighter than
-   itself, and in dark mode there is almost none left below the page, so it disappeared exactly
-   where it was needed. Inside, it is the side of the key, which reads on any ground.
+   The base is a solid side in the border colour rather than something the key casts. A shadow
+   needs a ground lighter than itself and dark mode leaves almost none below the page, where
+   `--border` is chosen to read against it.
 
-   The darkened strip is the whole of it — there is no lit top edge to go with it. A highlight
-   needs a face to sit on, and `outline` has none in dark, where it is transparent: the strip
-   below would darken nothing and the highlight above would be the only thing drawn, which reads
+   There is no lit top edge to go with it. A highlight needs a face to sit on, and `outline` has
+   none in dark, where it is transparent — the highlight would be the only thing drawn, which reads
    as a key lit from underneath.
 
    Which controls wear this is `button.tsx`'s to say — `ghost` and `link` have no face at all. */
@@ -278,7 +277,7 @@ body {
 
   box-shadow:
     var(--tw-ring-shadow, 0 0 #0000),
-    inset 0 calc(-1 * var(--key-throw)) 0 0 rgb(0 0 0 / 0.3);
+    0 var(--key-throw) 0 0 var(--border);
 
   &:active:not(:disabled) {
     translate: 0 var(--key-throw);
