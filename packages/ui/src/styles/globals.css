@@ -318,6 +318,11 @@ body {
 /* A key with a throw, rather than a rectangle that changes colour: it stands on a base, and
    pressing drops the face by exactly the depth of that base and takes the base away.
 
+   The base is drawn inside the key's own bottom edge rather than cast below it. A cast shadow
+   needs a ground lighter than itself, and in dark mode there is almost none left below the page —
+   so it disappeared exactly where it was needed. Inside, it is a darker strip of whatever the key
+   is made of, which reads on any ground and is what the side of a key actually is.
+
    Matched on the background utility each variant carries rather than on a variant name, which cva
    does not put in the DOM: a button with a surface of its own is precisely the one that can sit on
    a base, and `ghost` and `link`, which have none, would otherwise get a shelf under nothing.
@@ -335,7 +340,7 @@ body {
   box-shadow:
     var(--tw-ring-shadow, 0 0 #0000),
     var(--key-bevel),
-    0 var(--key-throw) 0 0 var(--border);
+    inset 0 calc(-1 * var(--key-throw)) 0 0 rgb(0 0 0 / 0.3);
 }
 
 [data-slot="button"]:is(
