@@ -15,7 +15,7 @@ const DATA_FOLDER_FLAG = 'data-folder';
 
 export const command = defineCommand('run [command]', {
   description:
-    'Deploy a compiled binary and run it, from this machine or from an https url nibrun fetches it at. Quote the binary with its arguments to pass them on: nib run "./my-server serve --port 8080".',
+    'Deploy a compiled binary and run it, from this machine or from an https url nibrun fetches it at. Quote the binary with its arguments to pass them on: nib run "./my-server serve --port 8080". Every option a deploy takes is listed by nib run x --help, x standing for the binary they would be passed with.',
   params: {
     command: { schema: z.string().min(1) },
   },

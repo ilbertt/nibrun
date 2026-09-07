@@ -79,13 +79,10 @@ fixtures a first run would otherwise have to write:
 nib run ./my-server --name my-app --data-folder ./seed
 ```
 
-`--data-folder` takes a folder, whose *contents* become the root of `data/` rather than a directory
-inside it, or a `.tar.gz` or `.zip` that already holds them — the one Finder or Explorer made goes
-as it stands. Up to 1 GiB. A zip made anywhere but unix carries no permissions, so an executable
-bit does not survive one.
-
-This is the only way data arrives other than the app writing it, and it happens as the app is
-created: passing it with `--app` is refused, since that app's data was created when it was.
+It takes a folder, or a `.tar.gz` or `.zip` that already holds one — the zip Finder or Explorer
+made goes as it stands. Up to 1 GiB, and only as the app is created: this and the app writing its
+own files are the whole of how anything gets onto the volume. A zip made anywhere but unix carries
+no permissions, so an executable bit does not survive one.
 
 **Every deploy after that must name the app**, or a non-interactive shell creates a second one.
 `nib apps list` finds the slug again when a later session has to redeploy:
@@ -98,8 +95,7 @@ Environment variables are an **edit**, not a replacement — anything a deploy d
 alone, so secrets are set once:
 
 ```sh
-nib run ./my-server --app my-app --env STRIPE_SECRET_KEY=sk_live_... --env LOG_LEVEL=debug
-nib run ./my-server --app my-app --unset LOG_LEVEL
+nib run ./my-server --app my-app --env STRIPE_SECRET_KEY=sk_live_...
 ```
 
 Arguments for the binary go inside the quotes, not after them:
@@ -123,9 +119,12 @@ nib apps update --app my-app --env LOG_LEVEL=debug
 nib apps update --app my-app --args "serve --verbose"
 ```
 
-`nib run` waits until the deployment is actually serving and prints the URL. Add `--detach` to
-return as soon as it is created. Or drag the binary onto [app.nibrun.com](https://app.nibrun.com) —
-same thing, no CLI.
+`nib run` waits until the deployment is actually serving and prints the URL. Or drag the binary
+onto [app.nibrun.com](https://app.nibrun.com) — same thing, no CLI.
+
+Every option a deploy takes is listed by `nib run x --help`, `x` standing in for the binary they
+would be passed with — `nib run --help` on its own answers with the subcommand rather than the
+options. What is below is what `--help` does not say.
 
 ## 4. Verify
 
@@ -146,20 +145,21 @@ Everything the binary can count on, and nothing else:
 | | |
 | --- | --- |
 | Platform | Linux **x86_64**, glibc (Debian rootfs) |
-| Working directory | `/app` |
+| Working directory | `/app` — a tmpfs the app does not own |
 | Persistent volume | `/app/data` — 8 GiB, survives every redeploy. `NIBRUN_DATA_DIR` names it |
 | Port | `NIBRUN_HTTP_PORT`, and `PORT` beside it; the app **must** listen on it, on `0.0.0.0` |
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
 | Second port | Only with `--extra-public-port`: `NIBRUN_EXTRA_PUBLIC_PORT` on `NIBRUN_PUBLIC_IPV4`, TCP and UDP, assigned rather than chosen, and reached at that number and no other |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs and is lost on restart. So is everything outside `/app/data` |
 | Resources | 1 vCPU, 256 MiB RAM |
-| `HOME` | `/app` |
+| `HOME` | `/app`, which the app cannot write: a binary that puts a cache or a config file under `~` dies of `EACCES` before it ever serves. `/app/data` is the only path it can write |
 | URL | `https://<slug>.nibrun.app`, live as soon as it boots |
 
 The guest sets three names of its own — `NIBRUN_HTTP_PORT`, `NIBRUN_HOSTNAME`, `NIBRUN_DATA_DIR` —
 and any of them you set yourself is ignored, as is `PORT`, which carries the same number as
 `NIBRUN_HTTP_PORT` under the name every other host uses. `HOME` and `TMPDIR` are defaults rather
-than owned, so one you set yourself is what the binary reads.
+than fixed, so one you set yourself is what the binary reads — `HOME=${NIBRUN_DATA_DIR}` is how a
+binary that insists on writing under `~` is given a home it owns.
 
 A binary that needs its own absolute URL — an OAuth redirect, a webhook it registers, a link in
 an email — builds it from `NIBRUN_HOSTNAME` rather than being told it, and falls back to whatever
@@ -167,32 +167,25 @@ it uses when it is not on nibrun.
 
 ## Naming a runtime value
 
-A binary that insists on a variable name of its own reaches the same values through it: a value may
-name a runtime one — `APP_BASE_URL=https://${NIBRUN_HOSTNAME}`,
-`DATABASE_URL=file:${NIBRUN_DATA_DIR}/app.db` — and the guest expands it before exec. Only that
-prefix expands, so a secret holding a `$` arrives untouched, and `NIBRUN_HTTP_PORT`,
-`NIBRUN_HOSTNAME`, `NIBRUN_DATA_DIR`, `NIBRUN_PUBLIC_IPV4` and `NIBRUN_EXTRA_PUBLIC_PORT` are the
-whole of what may be named — `${PORT}` is not one of them — with anything else refused when you
-deploy it.
-
-The last two are set only for an app that asked for [a second port](#a-second-public-port), and
-naming one the app was not given is refused when you deploy it.
+A binary that insists on a variable name of its own reaches the same values through it —
+`APP_BASE_URL=https://${NIBRUN_HOSTNAME}`, `DATABASE_URL=file:${NIBRUN_DATA_DIR}/app.db` — and the
+guest expands it before exec. Only the `NIBRUN_` names above expand, and only those: a secret
+holding a `$` arrives untouched, `${PORT}` is not one of them, and anything else is refused when
+you deploy it.
 
 ## A second public port
 
 An app needing a port HTTP cannot carry — WebRTC media, a game server, anything on UDP — asks for
-one with `--extra-public-port`, and is then set two more: `NIBRUN_PUBLIC_IPV4` and
-`NIBRUN_EXTRA_PUBLIC_PORT`. You do not pick the number; nibrun assigns it. Bind that port
-and announce that pair; it is the same number end to end, which is what makes announcing it
-correct. Neither is discoverable from inside the guest.
+one with `--extra-public-port`, and is told where it landed as `NIBRUN_PUBLIC_IPV4` and
+`NIBRUN_EXTRA_PUBLIC_PORT`. Neither is discoverable from inside the guest, so an app that tells a
+peer where to reach it announces that pair: it is the same number end to end, which is what makes
+announcing it correct.
 
 Ask for the port in the same change that names it:
 
 ```sh
 nib apps update --app my-app --extra-public-port --env 'ANNOUNCED_IP=${NIBRUN_PUBLIC_IPV4}'
 ```
-
-`--extra-public-port=false` gives the port up. Saying nothing about it leaves it as it is.
 
 ## Tradeoffs
 
