@@ -92,20 +92,6 @@ body {
 }
 
 @theme {
-  /* Stepped rather than eased, because a terminal caret does not fade — it is on or it is off. */
-  --animate-caret: caret 1.1s steps(1, end) infinite;
-
-  @keyframes caret {
-    0%,
-    50% {
-      opacity: 1;
-    }
-    50.01%,
-    100% {
-      opacity: 0;
-    }
-  }
-
   --animate-live-halo: live-halo 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
 
   @keyframes live-halo {
