@@ -1,25 +1,34 @@
+import { Button } from '@repo/ui/components/button';
 import { CellBar } from '@repo/ui/custom/cell-bar';
 import { ArrowUpRightIcon, FileTerminalIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { InstrumentPanel } from '#components/instrument-panel.tsx';
 
 /**
- * What nibrun does, in one panel: a binary goes in, a URL comes out.
+ * What nibrun does, in one panel: a binary goes in, a URL comes out — and then the part no other
+ * dashboard has to show, which is the app going to sleep and coming back.
  *
- * Runs once on its own, because a visitor who has not scrolled yet has not agreed to press
- * anything — and then stays pressable, because the fastest way to believe deploying is one action
- * is to do it.
+ * The bar means whatever the app is doing at the time: how far the upload has got, then how much
+ * memory is in use, then nothing at all. Draining it is what makes sleeping legible as a state
+ * rather than a word, and filling it in one beat is the whole argument for the wake being fast.
  */
 const BINARY = { name: 'pocketbase', size: '14.2 MB' } as const;
 const ADDRESS = 'pocketbase.nibrun.app';
 
-/** What it is using once it is up: the figures an app actually gets, which is the whole claim. */
-const RUNNING = '1 vCPU · 87 MiB / 256 MiB · 61 MiB / 1 GiB';
+const MEMORY_SHARE = 0.34;
+const MEMORY_USED = '87 MiB';
+const MEMORY_TOTAL = '256 MiB';
+
+/** The real figure: a snapshot restore, measured with the ARP refresh that makes it reachable. */
+const WAKE_MS = 112;
+
+/** Long enough to read that it is running, short enough that nobody waits five real minutes. */
+const IDLE_MS = 3800;
 
 const STEPS = [
-  { name: 'Uploading', ms: 1000 },
-  { name: 'Unpacking', ms: 650 },
-  { name: 'Booting', ms: 850 },
+  { name: 'Uploading', ms: 900 },
+  { name: 'Unpacking', ms: 600 },
+  { name: 'Booting', ms: 800 },
 ] as const;
 
 const STEP_MS = STEPS.map((step) => step.ms);
@@ -33,11 +42,13 @@ function sumOf(values: readonly number[]): number {
   return total;
 }
 
+type Phase = 'deploying' | 'live' | 'sleeping' | 'waking';
+
 export function BootDemo() {
-  const { step, live, start } = useDeployRun();
+  const run = useAppLifecycle();
 
   return (
-    <InstrumentPanel name="Deploy" action={<Indicator live={live} />}>
+    <InstrumentPanel name="Deploy" action={<Indicator phase={run.phase} />}>
       <Row label="Binary">
         <FileTerminalIcon className="size-3.5 shrink-0 text-muted-foreground" />
         <span>{BINARY.name}</span>
@@ -45,43 +56,75 @@ export function BootDemo() {
       </Row>
 
       <div className="flex flex-col gap-1.5">
-        <CellBar share={live ? 1 : progressOf(step)} tone="bg-primary text-primary" />
-        <span className="text-muted-foreground text-xs">
-          {live ? 'Answering on HTTPS, one machine of its own.' : `${STEPS[step]?.name ?? ''}…`}
+        <CellBar share={barShare(run)} tone={barTone(run.phase)} />
+        <span className="flex items-baseline justify-between gap-3 text-xs">
+          <span className="text-muted-foreground">{caption(run)}</span>
+          {run.wokeIn !== undefined && (
+            <span className="font-mono text-primary tabular-nums">woke in {WAKE_MS} ms</span>
+          )}
         </span>
       </div>
 
       <Row label="URL">
-        {live ? (
-          <>
-            <a
-              href={`https://${ADDRESS}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-w-0 items-center gap-1 truncate text-primary hover:underline"
-            >
-              {ADDRESS}
-              <ArrowUpRightIcon className="size-3 shrink-0" />
-            </a>
-            <button
-              type="button"
-              onClick={start}
-              className="ml-auto shrink-0 text-muted-foreground text-xs hover:text-foreground"
-            >
-              Run again
-            </button>
-          </>
-        ) : (
+        {run.phase === 'deploying' ? (
           <span className="text-muted-foreground">waiting for it to boot…</span>
+        ) : (
+          <a
+            href={`https://${ADDRESS}`}
+            target="_blank"
+            rel="noreferrer"
+            className={`inline-flex min-w-0 items-center gap-1 truncate hover:underline ${
+              run.phase === 'sleeping' ? 'text-muted-foreground' : 'text-primary'
+            }`}
+          >
+            {ADDRESS}
+            <ArrowUpRightIcon className="size-3 shrink-0" />
+          </a>
         )}
       </Row>
 
-      {live && <p className="font-mono text-[11px] text-muted-foreground">{RUNNING}</p>}
+      {run.phase === 'sleeping' && (
+        <Button onClick={run.wake} className="w-full">
+          Send it a request
+        </Button>
+      )}
     </InstrumentPanel>
   );
 }
 
-/** A labelled readout, set into the face like everything else you read rather than press. */
+function barShare(run: AppLifecycle): number {
+  if (run.phase === 'deploying') {
+    return sumOf(STEP_MS.slice(0, run.step)) / TOTAL_MS;
+  }
+  return run.phase === 'sleeping' ? 0 : MEMORY_SHARE;
+}
+
+function barTone(phase: Phase): string {
+  return phase === 'sleeping' ? 'bg-border/30' : 'bg-primary';
+}
+
+function caption(run: AppLifecycle): string {
+  if (run.phase === 'deploying') {
+    return `${STEPS[run.step]?.name ?? ''}…`;
+  }
+  if (run.phase === 'sleeping') {
+    return 'Asleep. Nothing running, nothing billed.';
+  }
+  return `Using ${MEMORY_USED} of ${MEMORY_TOTAL}`;
+}
+
+function Indicator({ phase }: { phase: Phase }) {
+  const lamp = phase === 'live' || phase === 'waking' ? 'bg-primary' : 'animate-pulse bg-warning';
+
+  return (
+    <span className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground uppercase tracking-[0.16em]">
+      <span className={`size-1.5 rounded-full ${phase === 'sleeping' ? 'bg-border' : lamp}`} />
+      {phase === 'deploying' ? 'working' : phase}
+    </span>
+  );
+}
+
+/** A labelled readout, which is what everything here is other than the one thing you press. */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
@@ -93,41 +136,53 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function Indicator({ live }: { live: boolean }) {
-  return (
-    <span className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground uppercase tracking-[0.16em]">
-      <span
-        className={`size-1.5 rounded-full ${live ? 'bg-primary' : 'animate-pulse bg-warning'}`}
-      />
-      {live ? 'live' : 'working'}
-    </span>
-  );
-}
-
-/** How far through the whole run the current step has got, so one bar covers all of it. */
-function progressOf(step: number): number {
-  return sumOf(STEP_MS.slice(0, step)) / TOTAL_MS;
-}
-
-type DeployRun = { step: number; live: boolean; start: () => void };
+type AppLifecycle = {
+  phase: Phase;
+  step: number;
+  wokeIn: number | undefined;
+  wake: () => void;
+};
 
 /**
- * Walks the steps once and stops.
+ * Deploys once, runs, falls asleep, and waits to be woken.
  *
- * One timer re-armed per step rather than an interval: the steps are not the same length, and an
- * interval would have to be the shortest of them with a counter on top.
+ * One timer re-armed per phase rather than an interval: the phases are not the same length — the
+ * wake is a tenth of a second and the idle is thousands — and an interval would have to be the
+ * shortest of them with a counter on top.
  */
-function useDeployRun(): DeployRun {
+function useAppLifecycle(): AppLifecycle {
+  const [phase, setPhase] = useState<Phase>('deploying');
   const [step, setStep] = useState(0);
-  const live = step >= STEPS.length;
+  const [wokeIn, setWokeIn] = useState<number>();
 
   useEffect(() => {
-    if (live) {
-      return;
+    if (phase === 'deploying') {
+      const last = step === STEPS.length - 1;
+      const timer = setTimeout(
+        () => (last ? setPhase('live') : setStep((current) => current + 1)),
+        STEP_MS[step],
+      );
+      return () => clearTimeout(timer);
     }
-    const timer = setTimeout(() => setStep((current) => current + 1), STEPS[step]?.ms);
-    return () => clearTimeout(timer);
-  }, [live, step]);
+    if (phase === 'live') {
+      // The wake time belongs to the run that woke it, so it goes when the app does.
+      const timer = setTimeout(() => {
+        setWokeIn(undefined);
+        setPhase('sleeping');
+      }, IDLE_MS);
+      return () => clearTimeout(timer);
+    }
+    if (phase === 'waking') {
+      const timer = setTimeout(() => setPhase('live'), WAKE_MS);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [phase, step]);
 
-  return { step, live, start: () => setStep(0) };
+  function wake(): void {
+    setWokeIn(WAKE_MS);
+    setPhase('waking');
+  }
+
+  return { phase, step, wokeIn, wake };
 }
