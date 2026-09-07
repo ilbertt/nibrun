@@ -26,18 +26,18 @@ function RouteComponent() {
       <main className="mx-auto flex w-full max-w-5xl flex-col items-center px-6">
         <SiteHeader />
         {/* Short of the viewport on purpose: the section below has to peek, or nobody scrolls. */}
-        <section className="flex min-h-[78svh] w-full max-w-xl flex-col items-center justify-center gap-12 pb-16">
-          <Hero />
-          <div className="flex w-full flex-col items-center gap-6">
+        <section className="flex w-full flex-col justify-center gap-12 pt-10 pb-16">
+          {/* The demo sits beside the claim rather than under it: what the product does is the
+              argument, and it makes it before anyone scrolls. */}
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <Hero />
+            <BootDemo />
+          </div>
+          <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-6">
             <BinaryDrop />
             <TryItOut />
             <GetStartedHint />
           </div>
-        </section>
-        {/* What the drop above turns into, played on a loop so the page shows it rather than
-            promising it. */}
-        <section className="w-full pb-16">
-          <BootDemo />
         </section>
         <WhatItActuallyNeeds />
         <WhatYourAppGets />

@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react';
 import { Gauge, InstrumentPanel, Reading } from '#components/instrument-panel.tsx';
 
 /**
- * A deploy you run yourself, beside the panel it produces.
+ * A deploy demonstrating itself, above the panel it produces.
  *
- * Pressed rather than played on a loop: the whole claim is that deploying here is one action, and
- * a visitor who has done it once on the landing page already knows the product.
+ * Runs once on its own, because a visitor who has not scrolled yet has not agreed to press
+ * anything — and then stays pressable, because the claim is that deploying here is one action and
+ * the fastest way to believe it is to do it.
  *
  * The figures are the ones an app actually gets — 1 vCPU, 256 MiB, a gigabyte of disk — because
  * the point is that the whole thing is this small.
@@ -33,7 +34,7 @@ export function BootDemo() {
   const { step, running, live, start } = useDeployRun();
 
   return (
-    <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2">
+    <div className="flex w-full flex-col gap-5">
       <InstrumentPanel name="Deploy" action={<Indicator running={running} live={live} />}>
         <ol className="flex flex-col gap-3">
           {[...STEPS.entries()].map(([index, entry]) => (
@@ -169,7 +170,7 @@ type DeployRun = {
  */
 function useDeployRun(): DeployRun {
   const [step, setStep] = useState(0);
-  const [running, setRunning] = useState(false);
+  const [running, setRunning] = useState(true);
 
   useEffect(() => {
     if (!running) {
@@ -183,7 +184,7 @@ function useDeployRun(): DeployRun {
     return () => clearTimeout(timer);
   }, [running, step]);
 
-  const [everRan, setEverRan] = useState(false);
+  const [everRan, setEverRan] = useState(true);
 
   function start(): void {
     setEverRan(true);
