@@ -12,7 +12,9 @@ import {
   TableRow,
 } from '@repo/ui/components/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
+import { SlideToDelete } from '@repo/ui/custom/slide-to-delete';
 import { ChevronDownIcon, ExternalLinkIcon, FileIcon, FolderIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Gauge, InstrumentPanel, Reading } from '#components/instrument-panel.tsx';
 
@@ -58,6 +60,7 @@ export function PreviewDashboard() {
         </span>
         <span className="flex items-center gap-2">
           <ExportDialog />
+          <DeleteDialog />
           <Button size="sm" variant="outline">
             Suspend
           </Button>
@@ -290,13 +293,93 @@ function DomainsView() {
   );
 }
 
+/** Deleting, which is the one thing here that cannot be undone and so is the one that is slid. */
+function DeleteDialog() {
+  const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  return (
+    <>
+      <Button size="sm" variant="destructive" onClick={() => setOpen(true)}>
+        Delete
+      </Button>
+      {open && (
+        <Shade
+          onClose={() => {
+            setOpen(false);
+            setDeleting(false);
+          }}
+          title="Delete pocketbase"
+          badge="permanent"
+        >
+          <p className="text-muted-foreground">
+            The machine, the disk and everything on it. There is no undo and no copy kept.
+          </p>
+          <dl className="inset-well flex flex-col gap-2 border-2 border-border bg-input p-3">
+            <Reading label="volume">964 MiB, erased</Reading>
+            <Reading label="binaries">every one ever uploaded</Reading>
+            <Reading label="exports">every bundle ever taken</Reading>
+          </dl>
+          <SlideToDelete
+            label="Slide to delete"
+            pendingLabel="Deleting…"
+            pending={deleting}
+            onDelete={() => setDeleting(true)}
+          />
+        </Shade>
+      )}
+    </>
+  );
+}
+
 /**
- * The one modal here, so the overlay and the panel can be judged beside the page.
+ * The overlay and chassis every dialog here is drawn in.
  *
  * Hand-rolled rather than the shared `Dialog`: that primitive resolves a second copy of React
  * inside the Workers runtime this site prerenders through, and reads its hooks off a null one.
  * Nothing about the styling depends on the primitive, and this page exists to show the styling.
  */
+function Shade({
+  title,
+  badge,
+  onClose,
+  children,
+}: {
+  title: string;
+  badge: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-6 backdrop-blur-sm">
+      <button
+        type="button"
+        aria-label="Close"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="panel-face floats-above relative flex w-full max-w-md flex-col border-2 border-border bg-card"
+      >
+        {/* A bar across the top rather than a name set into the border: a panel's legend works
+            because the border runs on to either side of it, and a dialog floating over a dimmed
+            page has nothing there for it to interrupt. */}
+        <header className="flex items-center justify-between gap-3 border-border border-b-2 px-5 py-3">
+          <h2 className="font-heading text-base">{title}</h2>
+          <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.16em]">
+            {badge}
+          </span>
+        </header>
+        <div className="flex flex-col gap-4 p-5 text-sm">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Exporting, so a form inside a dialog can be judged beside the page. */
 function ExportDialog() {
   const [open, setOpen] = useState(false);
 
@@ -306,53 +389,27 @@ function ExportDialog() {
         Export
       </Button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-6 backdrop-blur-sm">
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 cursor-default"
-            onClick={() => setOpen(false)}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="preview-export-title"
-            className="panel-face relative flex w-full max-w-md flex-col border-2 border-border bg-card"
-          >
-            {/* A bar across the top rather than a name set into the border: a panel's legend works
-                because the border runs on to either side of it, and a dialog floating over a
-                dimmed page has nothing there for it to interrupt. */}
-            <header className="flex items-center justify-between gap-3 border-border border-b-2 px-5 py-3">
-              <h2 id="preview-export-title" className="font-heading text-base">
-                Export this app
-              </h2>
-              <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.16em]">
-                archive
-              </span>
-            </header>
-            <div className="flex flex-col gap-4 p-5 text-sm">
-              <p className="text-muted-foreground">
-                One archive: the binary, everything under <span className="font-mono">data/</span>,
-                and its environment. Ready in a minute or two.
-              </p>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="preview-export-name">Name the archive</Label>
-                <Input id="preview-export-name" defaultValue="pocketbase-2026-09-07" />
-              </div>
-              <div className="inset-well flex flex-col gap-3 border-2 border-border bg-input p-3">
-                <Reading label="Binary">14.2 MB</Reading>
-                <Reading label="Volume">964 MiB</Reading>
-                <Reading label="Environment">6 variables</Reading>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => setOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => setOpen(false)}>Start export</Button>
-              </div>
-            </div>
+        <Shade title="Export this app" badge="archive" onClose={() => setOpen(false)}>
+          <p className="text-muted-foreground">
+            One archive: the binary, everything under <span className="font-mono">data/</span>, and
+            its environment. Ready in a minute or two.
+          </p>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="preview-export-name">Name the archive</Label>
+            <Input id="preview-export-name" defaultValue="pocketbase-2026-09-07" />
           </div>
-        </div>
+          <div className="inset-well flex flex-col gap-3 border-2 border-border bg-input p-3">
+            <Reading label="Binary">14.2 MB</Reading>
+            <Reading label="Volume">964 MiB</Reading>
+            <Reading label="Environment">6 variables</Reading>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => setOpen(false)}>Start export</Button>
+          </div>
+        </Shade>
       )}
     </>
   );
