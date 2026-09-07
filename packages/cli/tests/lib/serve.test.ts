@@ -32,8 +32,6 @@ async function scratchDir(): Promise<string> {
 }
 
 describe('a folder is served on what the guest assigned, or it is not served at all', () => {
-  // Every interface, because that is the only address nibrun reaches a guest on; and the app's own
-  // name, because the port bound here is behind the edge and is in no URL anybody can type.
   test('the port it was given, on every interface, under the name it is reached by', () => {
     expect(guestAddress(IN_A_GUEST)).toEqual({
       hostname: '0.0.0.0',
@@ -85,7 +83,6 @@ describe('a request reaches a path under the folder or it reaches nothing', () =
     expect(requestedPath({ root, pathname: '/a/../../etc/passwd' })).toBeNull();
   });
 
-  // A prefix is not a parent: the folder beside the one being served is still outside it.
   test('a sibling whose name starts with the folder is outside it', () => {
     expect(requestedPath({ root, pathname: '/../site-backup/db' })).toBeNull();
   });
@@ -96,10 +93,8 @@ describe('a request reaches a path under the folder or it reaches nothing', () =
   });
 });
 
-/** A file sitting beside the served folder, which no spelling of a path should ever reach. */
 const OUTSIDE_FILE = 'secret.txt';
 
-/** A site with a page at the root, one in a directory, and an asset beside them. */
 async function siteServedWith({
   singlePage,
   notFoundPage = false,
@@ -150,16 +145,12 @@ describe('what the server answers with', () => {
     expect((await fetch(`${origin}/missing.html`)).status).toBe(NOT_FOUND);
   });
 
-  // The default, and the whole reason the fallback below is asked for rather than assumed: a link
-  // nobody wrote a page for is a link that is wrong, and saying so is the only way anybody finds out.
   test('a route with no file behind it is a 404 too, until somebody asks for otherwise', async () => {
     expect((await fetch(`${origin}/projects/nibrun`)).status).toBe(NOT_FOUND);
   });
 
-  // No spelling of an escape reaches `requestedPath` over HTTP: the URL parser resolves `..` —
-  // and `%2e%2e`, which it reads as that same segment — before a pathname is anything this can
-  // look at. So what is pinned here is the end of it, that nothing beside the folder is ever
-  // handed over. The check itself is exercised directly, above.
+  // The URL parser resolves `..`, and `%2e%2e` as that same segment, before the handler sees a
+  // pathname — so no escape reaches `requestedPath` here. That check is exercised directly above.
   test('a file next door is never handed over, however the path is spelled', async () => {
     for (const spelling of [
       `/../${OUTSIDE_FILE}`,
@@ -194,16 +185,13 @@ describe('a single-page app is routed in the browser, so the shell answers for i
     expect(await (await fetch(`${origin}/docs/index.html`)).text()).toBe('<h1>docs</h1>');
   });
 
-  // What `serve`'s `--single` does, and the one place it differs from serving the folder plainly:
-  // the rewrite to the root index.html is applied before a directory is ever looked inside, so a
-  // real folder with a real index.html in it is answered by the shell all the same.
+  // `serve`'s `--single` rewrites to the root before it looks inside a directory, so a real
+  // folder with a real index.html in it is answered by the shell all the same.
   test('a directory with an index of its own is a route like any other', async () => {
     expect(await (await fetch(`${origin}/docs`)).text()).toBe('<h1>home</h1>');
     expect(await (await fetch(`${origin}/docs/`)).text()).toBe('<h1>home</h1>');
   });
 
-  // The cost of asking for this, pinned down rather than left to be discovered: a stale bundle url
-  // answers with the page, and the app reports a syntax error rather than a missing file.
   test('an asset that is gone answers with the page as well, which is what the flag buys', async () => {
     const response = await fetch(`${origin}/assets/app-a1b2c3.js`);
 
@@ -243,8 +231,6 @@ describe("a folder's own 404.html is what its misses are answered with", () => {
 
   afterAll(() => server.stop(true));
 
-  // The status, not just the page: a browser, a crawler and a `curl -f` all read that rather than
-  // the body, and `serve` writes the code it was answering rather than a 200 for the same reason.
   test('the page is served, and it is served as the 404 it is', async () => {
     const response = await fetch(`${origin}/missing.html`);
 
