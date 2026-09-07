@@ -6,7 +6,7 @@ const SKILL_COMMAND = `npx skills add ${GITHUB_REPO_SLUG}`;
 export function GetStartedHint() {
   return (
     <div className="flex w-full flex-col items-center gap-2 text-muted-foreground text-xs">
-      <p>Alternatively, deploy your own app</p>
+      <p>Or deploy your existing app</p>
       <CopyableLine value={SKILL_COMMAND} prompt />
     </div>
   );
