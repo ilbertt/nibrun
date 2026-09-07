@@ -100,6 +100,15 @@ the layout under `src/commands/` is the command tree.
   value may name, and `PORT` deliberately is not one. `cli.main()` exits the
   moment a handler returns, so serving has to *be* the handler: `untilStopped` is
   what keeps it there until a signal takes it down.
+- **The single-page fallback is asked for rather than assumed**, which is what
+  `serve`, sirv, Caddy and Netlify all settle on: answering every miss with the
+  shell makes a stale asset url a `200 text/html`, so the app reports a syntax
+  error instead of a missing file, and a docs site answers a bad link with its
+  homepage. A path that resolved outside the folder is never given the shell
+  either — the fallback is for paths that were asked for honestly. Note that a
+  traversal cannot reach `requestedPath` over HTTP at all: the URL parser
+  resolves `..` and `%2e%2e` alike before a pathname is anything the handler can
+  read, so that check is tested on its own rather than through a request.
 - Run it with `bun run --filter @repo/cli nib …`. A package script runs from the
   package directory, so relative paths resolve against `packages/cli` rather than
   the caller's shell — pass absolute ones until the CLI ships as a real `bin`.

@@ -153,16 +153,18 @@ export function serveDirectory({
   root,
   hostname,
   port,
+  singlePage,
 }: {
   root: string;
   hostname: string;
   port: number;
+  singlePage: boolean;
 }): FileServer {
   return Bun.serve({
     hostname,
     port,
     fetch: async (request) => {
-      const file = await fileAt({ root, pathname: new URL(request.url).pathname });
+      const file = await fileAt({ root, pathname: new URL(request.url).pathname, singlePage });
       return file === null
         ? new Response(NOT_FOUND_BODY, { status: NOT_FOUND })
         : new Response(file);
@@ -173,11 +175,15 @@ export function serveDirectory({
 async function fileAt({
   root,
   pathname,
+  singlePage,
 }: {
   root: string;
   pathname: string;
+  singlePage: boolean;
 }): Promise<Bun.BunFile | null> {
   const target = requestedPath({ root, pathname });
+  // A path that resolved outside the folder is not a route of anybody's app, so it is answered as
+  // what it is rather than handed the page: the shell is for paths that were asked for honestly.
   if (target === null) {
     return null;
   }
@@ -189,7 +195,16 @@ async function fileAt({
   // A directory is not a file Bun reads, so falling through to its index is also what answers `/`
   // and every path a browser arrives at with a trailing slash.
   const index = Bun.file(join(target, INDEX_FILE));
-  return (await index.exists()) ? index : null;
+  if (await index.exists()) {
+    return index;
+  }
+
+  return singlePage ? await existingFile(join(root, INDEX_FILE)) : null;
+}
+
+async function existingFile(path: string): Promise<Bun.BunFile | null> {
+  const file = Bun.file(path);
+  return (await file.exists()) ? file : null;
 }
 
 /**
@@ -210,13 +225,19 @@ const ServingSchema = z.object({
   url: z.string(),
   hostname: z.string(),
   port: z.number(),
+  singlePage: z.boolean(),
 });
 
 /**
  * The address bound as well as the URL to visit, because on a host those are two different
- * answers and a folder nobody can reach is usually the first of them.
+ * answers and a folder nobody can reach is usually the first of them. Whether the shell is
+ * answering for everything is said out loud for the same reason: it is what a 404 that came back
+ * 200 turns out to have been.
  */
 export const SERVING_OUTPUT = defineOutput({
   schema: ServingSchema,
-  render: ({ value, out }) => out.success(`${value.url} — serving ${value.directory}`),
+  render: ({ value, out }) =>
+    out.success(
+      `${value.url} — serving ${value.directory}${value.singlePage ? ' as a single-page app' : ''}`,
+    ),
 });

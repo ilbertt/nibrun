@@ -16,6 +16,7 @@ import {
 const ASSIGNED_PORT = 8080;
 const CHOSEN_PORT = 4321;
 const ANY_FREE_PORT = 0;
+const OK = 200;
 const NOT_FOUND = 404;
 
 const ALONE: HostEnvironment = { httpPort: null, port: null, hostname: null };
@@ -124,18 +125,29 @@ describe('a request reaches a path under the folder or it reaches nothing', () =
   });
 });
 
+/** A file sitting beside the served folder, which no spelling of a path should ever reach. */
+const OUTSIDE_FILE = 'secret.txt';
+
+/** A site with a page at the root, one in a directory, and an asset beside them. */
+async function siteServedWith({ singlePage }: { singlePage: boolean }): Promise<FileServer> {
+  const scratch = await scratchDir();
+  const root = join(scratch, 'site');
+
+  await mkdir(join(root, 'docs'), { recursive: true });
+  await writeFile(join(scratch, OUTSIDE_FILE), 'not yours');
+  await writeFile(join(root, 'index.html'), '<h1>home</h1>');
+  await writeFile(join(root, 'app.css'), 'body{}');
+  await writeFile(join(root, 'docs', 'index.html'), '<h1>docs</h1>');
+
+  return serveDirectory({ root, hostname: '127.0.0.1', port: ANY_FREE_PORT, singlePage });
+}
+
 describe('what the server answers with', () => {
   let server: FileServer;
   let origin: string;
 
   beforeAll(async () => {
-    const root = await scratchDir();
-    await writeFile(join(root, 'index.html'), '<h1>home</h1>');
-    await writeFile(join(root, 'app.css'), 'body{}');
-    await mkdir(join(root, 'docs'));
-    await writeFile(join(root, 'docs', 'index.html'), '<h1>docs</h1>');
-
-    server = serveDirectory({ root, hostname: '127.0.0.1', port: ANY_FREE_PORT });
+    server = await siteServedWith({ singlePage: false });
     origin = server.url.origin;
   });
 
@@ -158,9 +170,76 @@ describe('what the server answers with', () => {
     expect((await fetch(`${origin}/missing.html`)).status).toBe(NOT_FOUND);
   });
 
-  // Encoded, because a client that normalises `../` away never gets to ask this — and one that
-  // does not normalise it is exactly the client this is defended against.
-  test('a path out of the folder is answered the same way as one that is simply not there', async () => {
-    expect((await fetch(`${origin}/%2e%2e/%2e%2e/etc/passwd`)).status).toBe(NOT_FOUND);
+  // The default, and the whole reason the fallback below is asked for rather than assumed: a link
+  // nobody wrote a page for is a link that is wrong, and saying so is the only way anybody finds out.
+  test('a route with no file behind it is a 404 too, until somebody asks for otherwise', async () => {
+    expect((await fetch(`${origin}/projects/nibrun`)).status).toBe(NOT_FOUND);
+  });
+
+  // No spelling of an escape reaches `requestedPath` over HTTP: the URL parser resolves `..` —
+  // and `%2e%2e`, which it reads as that same segment — before a pathname is anything this can
+  // look at. So what is pinned here is the end of it, that nothing beside the folder is ever
+  // handed over. The check itself is exercised directly, above.
+  test('a file next door is never handed over, however the path is spelled', async () => {
+    for (const spelling of [
+      `/../${OUTSIDE_FILE}`,
+      `/%2e%2e/${OUTSIDE_FILE}`,
+      `/docs/../../${OUTSIDE_FILE}`,
+    ]) {
+      expect((await fetch(`${origin}${spelling}`)).status).toBe(NOT_FOUND);
+    }
+  });
+});
+
+describe('a single-page app is routed in the browser, so the shell answers for its routes', () => {
+  let server: FileServer;
+  let origin: string;
+
+  beforeAll(async () => {
+    server = await siteServedWith({ singlePage: true });
+    origin = server.url.origin;
+  });
+
+  afterAll(() => server.stop(true));
+
+  test('a route with no file behind it is the page, and a page is a 200', async () => {
+    const response = await fetch(`${origin}/projects/nibrun`);
+
+    expect(response.status).toBe(OK);
+    expect(await response.text()).toBe('<h1>home</h1>');
+  });
+
+  test('a file that is there still wins, so assets are not shadowed by the shell', async () => {
+    expect(await (await fetch(`${origin}/app.css`)).text()).toBe('body{}');
+    expect(await (await fetch(`${origin}/docs`)).text()).toBe('<h1>docs</h1>');
+  });
+
+  // The cost of asking for this, pinned down rather than left to be discovered: a stale bundle url
+  // answers with the page, and the app reports a syntax error rather than a missing file.
+  test('an asset that is gone answers with the page as well, which is what the flag buys', async () => {
+    const response = await fetch(`${origin}/assets/app-a1b2c3.js`);
+
+    expect(response.status).toBe(OK);
+    expect(await response.text()).toBe('<h1>home</h1>');
+  });
+
+  test('a path reaching out of the folder gets the shell rather than what is out there', async () => {
+    const response = await fetch(`${origin}/%2e%2e/${OUTSIDE_FILE}`);
+
+    expect(await response.text()).toBe('<h1>home</h1>');
+  });
+
+  test('a folder with no index.html to fall back on has nothing to answer with', async () => {
+    const root = await scratchDir();
+    await writeFile(join(root, 'app.css'), 'body{}');
+    const bare = serveDirectory({
+      root,
+      hostname: '127.0.0.1',
+      port: ANY_FREE_PORT,
+      singlePage: true,
+    });
+
+    expect((await fetch(`${bare.url.origin}/anywhere`)).status).toBe(NOT_FOUND);
+    await bare.stop(true);
   });
 });
