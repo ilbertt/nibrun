@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@repo/ui/components/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
 import { SlideToDelete } from '@repo/ui/custom/slide-to-delete';
 import { ChevronDownIcon, ExternalLinkIcon, FileIcon, FolderIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -50,7 +50,29 @@ const LOG_LINES = [
  * The dashboard's app page, rebuilt to be looked at rather than used. Every figure is made up and
  * nothing is wired to anything — the point is the styling around it.
  */
+const TABS = ['overview', 'logs', 'files', 'domains'] as const;
+type Tab = (typeof TABS)[number];
+
+const LABELS: Record<Tab, string> = {
+  overview: 'Overview',
+  logs: 'Logs',
+  files: 'Files',
+  domains: 'Domains',
+};
+
+function View({ tab }: { tab: Tab }) {
+  if (tab === 'logs') {
+    return <LogsView />;
+  }
+  if (tab === 'files') {
+    return <FilesView />;
+  }
+  return tab === 'domains' ? <DomainsView /> : <Overview />;
+}
+
 export function PreviewDashboard() {
+  const [tab, setTab] = useState<Tab>('overview');
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -68,34 +90,25 @@ export function PreviewDashboard() {
         </span>
       </header>
 
-      <Tabs defaultValue="overview">
+      {/* The list drives the styling, the view is rendered here: `TabsContent` leaves the panel it
+          switched away from mounted and visible, so two views stack. */}
+      <Tabs value={tab} onValueChange={(next) => setTab(next as Tab)}>
         <TabsList variant="line">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="logs">Logs</TabsTrigger>
-          <TabsTrigger value="files">Files</TabsTrigger>
-          <TabsTrigger value="domains">Domains</TabsTrigger>
+          {TABS.map((entry) => (
+            <TabsTrigger key={entry} value={entry}>
+              {LABELS[entry]}
+            </TabsTrigger>
+          ))}
         </TabsList>
-
-        <TabsContent value="overview" className="flex flex-col gap-6 pt-6">
-          <Overview />
-        </TabsContent>
-        <TabsContent value="logs" className="pt-6">
-          <LogsView />
-        </TabsContent>
-        <TabsContent value="files" className="pt-6">
-          <FilesView />
-        </TabsContent>
-        <TabsContent value="domains" className="pt-6">
-          <DomainsView />
-        </TabsContent>
       </Tabs>
+      <View tab={tab} />
     </div>
   );
 }
 
 function Overview() {
   return (
-    <>
+    <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <InstrumentPanel name="App">
           <Reading label="State">
@@ -170,7 +183,7 @@ function Overview() {
           </TableBody>
         </Table>
       </InstrumentPanel>
-    </>
+    </div>
   );
 }
 
