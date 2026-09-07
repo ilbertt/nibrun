@@ -88,7 +88,8 @@ the layout under `src/commands/` is the command tree.
   anywhere shared. The terminal question is a typed phrase, not a y/n, which is
   answered by the muscle that answers every other one — see `src/lib/delete.ts`.
 - **`nib serve` runs only inside a guest**, being the thing being hosted rather
-  than the thing that deploys it: it talks to no api, and refuses anywhere the
+  than the thing that deploys it: it takes nothing from the cli context — the
+  two guest variables are declared in the command — and refuses anywhere the
   guest set no `NIBRUN_HTTP_PORT` rather than picking a port nothing probes.
   `cli.main()` exits the moment a handler returns, so serving has to *be* the
   handler — that is what `untilStopped` is for.
