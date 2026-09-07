@@ -264,6 +264,41 @@ body {
   box-shadow: var(--well);
 }
 
+/* The CLI draws a control's shape with a fill and leaves its border transparent, which worked
+   while `input` sat well clear of the surface behind it. This palette moved them close together,
+   so a checkbox nobody has ticked and a field nobody has typed in both read as a faint smudge
+   rather than as somewhere to click.
+
+   Only where nothing else is speaking for the border: focus, invalid and checked all set their own
+   and each says more than "this is a control". Set here rather than in the components, which the
+   CLI owns and will overwrite. */
+:is([data-slot="checkbox"], [data-slot="input"], [data-slot="textarea"]):not(
+  [data-checked],
+  :focus-visible,
+  [aria-invalid="true"]
+) {
+  border-color: var(--border);
+}
+
+/* A card is the panel everything in this dashboard sits in, so it is drawn rather than floated: a
+   real outline and four bolts, where the CLI leaves it a tinted rectangle on a soft ring. The name
+   still sits inside it rather than breaking the border — that is markup, and `card.tsx` is the
+   CLI's. */
+[data-slot="card"] {
+  --rivet-inset: 7px;
+  --rivet: radial-gradient(circle, var(--border) 0 1.5px, transparent 1.6px);
+
+  border: 2px solid var(--border);
+  background-image: var(--rivet), var(--rivet), var(--rivet), var(--rivet);
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+  background-position:
+    var(--rivet-inset) var(--rivet-inset),
+    calc(100% - var(--rivet-inset)) var(--rivet-inset),
+    var(--rivet-inset) calc(100% - var(--rivet-inset)),
+    calc(100% - var(--rivet-inset)) calc(100% - var(--rivet-inset));
+}
+
 /* The one control on a dialog that is not about the dialog's content. The CLI reaches for
    `bg-secondary`, which here is the brand green — so a dismiss ends up looking like the action
    worth taking, and it is the brightest thing in the corner of every dialog. Neutralised here
