@@ -298,6 +298,22 @@ body {
   text-underline-offset: 4px;
 }
 
+/* The one control on a dialog that is not about the dialog's content. The CLI reaches for
+   `bg-secondary`, which here is the brand green — so a dismiss ends up looking like the action
+   worth taking, and it is the brightest thing in the corner of every dialog. Neutralised here
+   rather than in `dialog.tsx`, which the CLI owns and will overwrite. It stays a key: it is still
+   something you press. */
+[data-slot="dialog-close"] {
+  background-color: var(--card);
+  border-color: var(--border);
+  color: var(--muted-foreground);
+}
+
+[data-slot="dialog-close"]:hover {
+  background-color: var(--accent);
+  color: var(--foreground);
+}
+
 /* A key with a throw, rather than a rectangle that changes colour: it stands on a base, and
    pressing drops the face by exactly the depth of that base and takes the base away.
 
