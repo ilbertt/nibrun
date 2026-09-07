@@ -505,12 +505,12 @@ export function CalculatorScene({
       className="h-auto w-full select-none lg:h-full"
       preserveAspectRatio="xMidYMid meet"
     >
-      <g className="fill-muted/60">
+      <g className="fill-accent/50">
         {roomSurfaces(room).map((surface) => (
           <polygon key={polygonPoints(surface)} points={polygonPoints(surface)} />
         ))}
       </g>
-      <g className="stroke-border" strokeWidth={frame.gridStroke}>
+      <g className="stroke-muted-foreground/20" strokeWidth={frame.gridStroke}>
         {roomGrid(room).map((segment) => {
           const from = project(segment.from);
           const to = project(segment.to);

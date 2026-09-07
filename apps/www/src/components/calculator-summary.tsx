@@ -1,7 +1,6 @@
 import { FREE_APPS_COUNT, PRICE_PER_APP_USD } from '@repo/global-constants';
+import { CellBar } from '@repo/ui/custom/cell-bar';
 import { type AppSpec, AXES, AXIS_KEYS, fleetPrice, formatUsd, usedOn } from '#lib/calculator.ts';
-
-const FULL_PERCENT = 100;
 
 // Three across rather than three stacked: under the chart a full-width bar is a long thin line
 // with nothing to say, and the column has the room to put them beside each other.
@@ -14,19 +13,16 @@ function RoomMeters({ apps }: { apps: AppSpec[] }) {
           const axis = AXES[axisKey];
           const used = usedOn({ apps, axisKey });
           return (
-            <div key={axisKey} className="flex flex-col gap-1">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-muted-foreground text-xs">{axis.name}</span>
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {axis.format(used)} / {axis.format(axis.fleetLimit)}
+            <div key={axisKey} className="flex flex-col gap-1.5">
+              <div className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">{axis.name}</span>
+                <span className="font-mono tabular-nums">
+                  {axis.format(used)}
+                  <span className="text-muted-foreground"> / {axis.format(axis.fleetLimit)}</span>
                 </span>
               </div>
-              <span className="block h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <span
-                  className="block h-full rounded-full bg-primary transition-[width] duration-200"
-                  style={{ width: `${(used / axis.fleetLimit) * FULL_PERCENT}%` }}
-                />
-              </span>
+              {/* No label: the figures beside it are the reading, so the cells are decoration. */}
+              <CellBar share={used / axis.fleetLimit} rounded />
             </div>
           );
         })}

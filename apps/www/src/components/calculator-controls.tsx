@@ -31,7 +31,7 @@ function StepPicker({
     <div className="flex flex-col gap-1">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-muted-foreground text-xs">{axis.name}</span>
-        <span className="font-medium text-xs tabular-nums">
+        <span className="font-mono text-xs tabular-nums">
           {axis.format(stepValue({ axisKey, step }))}
         </span>
       </div>
@@ -45,10 +45,10 @@ function StepPicker({
             aria-pressed={index === step}
             onClick={() => onPick(index)}
             className={cn(
-              'h-4 flex-1 rounded-sm border transition-colors disabled:opacity-40',
-              index > step && 'border-border bg-transparent enabled:hover:bg-muted',
+              'h-4 flex-1 rounded-sm transition-colors disabled:opacity-40',
+              index > step && 'bg-border/30 enabled:hover:bg-border/50',
             )}
-            style={index <= step ? { backgroundColor: tint, borderColor: tint } : undefined}
+            style={index <= step ? { backgroundColor: tint } : undefined}
           />
         ))}
       </div>
@@ -90,9 +90,9 @@ function AppCard({
       style={active ? { borderColor: app.tint } : undefined}
     >
       <div className="flex items-center gap-2">
-        <span className="size-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: app.tint }} />
-        <span className="truncate font-medium text-sm">{name}</span>
-        <span className="ml-auto shrink-0 font-medium text-primary text-sm tabular-nums">
+        <span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: app.tint }} />
+        <span className="truncate font-mono text-sm">{name}</span>
+        <span className="ml-auto shrink-0 font-mono text-primary text-sm tabular-nums">
           {price === 0 ? 'free' : `${formatUsd(price)}/mo`}
         </span>
         <Button
