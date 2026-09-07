@@ -143,8 +143,6 @@ async function fileAt({
   if (await asked.exists()) {
     return asked;
   }
-  // A directory's own index is skipped rather than missed: `serve`'s `--single` rewrites to the
-  // root before it looks inside a directory, so a route naming a real folder is still a route.
   if (singlePage) {
     return await existingFile(join(root, INDEX_FILE));
   }
