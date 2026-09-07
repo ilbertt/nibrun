@@ -72,6 +72,21 @@ nib run ./my-server --name my-app --port 8080
 than carrying a number over from an example. It is the number the guest hands back as
 `NIBRUN_HTTP_PORT` and `PORT`, and it defaults to `3000`.
 
+An app can be created with its `data/` already holding something — a seeded SQLite file, a corpus,
+fixtures a first run would otherwise have to write:
+
+```sh
+nib run ./my-server --name my-app --data-folder ./seed
+```
+
+`--data-folder` takes a folder, whose *contents* become the root of `data/` rather than a directory
+inside it, or a `.tar.gz` or `.zip` that already holds them — the one Finder or Explorer made goes
+as it stands. Up to 1 GiB. A zip made anywhere but unix carries no permissions, so an executable
+bit does not survive one.
+
+This is the only way data arrives other than the app writing it, and it happens as the app is
+created: passing it with `--app` is refused, since that app's data was created when it was.
+
 **Every deploy after that must name the app**, or a non-interactive shell creates a second one.
 `nib apps list` finds the slug again when a later session has to redeploy:
 
