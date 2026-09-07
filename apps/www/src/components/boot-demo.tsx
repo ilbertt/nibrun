@@ -1,196 +1,132 @@
-import { Button } from '@repo/ui/components/button';
+import { ArrowUpRightIcon, FileTerminalIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Gauge, InstrumentPanel, Reading } from '#components/instrument-panel.tsx';
+import { CellBar, InstrumentPanel } from '#components/instrument-panel.tsx';
 
 /**
- * A deploy demonstrating itself, above the panel it produces.
+ * What nibrun does, in one panel: a binary goes in, a URL comes out.
  *
  * Runs once on its own, because a visitor who has not scrolled yet has not agreed to press
- * anything — and then stays pressable, because the claim is that deploying here is one action and
- * the fastest way to believe it is to do it.
- *
- * The figures are the ones an app actually gets — 1 vCPU, 256 MiB, a gigabyte of disk — because
- * the point is that the whole thing is this small.
+ * anything — and then stays pressable, because the fastest way to believe deploying is one action
+ * is to do it.
  */
+const BINARY = { name: 'pocketbase', size: '14.2 MB' } as const;
+const ADDRESS = 'pocketbase.nibrun.app';
+
+/** What it is using once it is up: the figures an app actually gets, which is the whole claim. */
+const RUNNING = '1 vCPU · 87 MiB / 256 MiB · 61 MiB / 1 GiB';
+
 const STEPS = [
-  { name: 'Uploading', detail: 'pocketbase · 14.2 MB', ms: 1100 },
-  { name: 'Unpacking', detail: 'into a machine of its own', ms: 700 },
-  { name: 'Booting', detail: 'Firecracker microVM · 112 ms', ms: 900 },
-  { name: 'Active', detail: 'pocketbase.nibrun.app', ms: 0 },
+  { name: 'Uploading', ms: 1000 },
+  { name: 'Unpacking', ms: 650 },
+  { name: 'Booting', ms: 850 },
 ] as const;
 
-const LAST_STEP = STEPS.length - 1;
-const FIRST_STEP = STEPS[0];
+const STEP_MS = STEPS.map((step) => step.ms);
+const TOTAL_MS = sumOf(STEP_MS);
 
-/** Total, so a step read by a number the state happens to hold is still a step. */
-function stepAt(index: number): (typeof STEPS)[number] {
-  return STEPS[index] ?? FIRST_STEP;
+function sumOf(values: readonly number[]): number {
+  let total = 0;
+  for (const value of values) {
+    total += value;
+  }
+  return total;
 }
 
-/** What the app is using once it is up. */
-const RUNNING = { cpu: 0.09, memory: 0.34, volume: 0.06 } as const;
-
 export function BootDemo() {
-  const { step, running, live, start } = useDeployRun();
+  const { step, live, start } = useDeployRun();
 
   return (
-    <div className="flex w-full flex-col gap-5">
-      <InstrumentPanel name="Deploy" action={<Indicator running={running} live={live} />}>
-        <ol className="flex flex-col gap-3">
-          {[...STEPS.entries()].map(([index, entry]) => (
-            <li key={entry.name} className="flex items-start gap-3">
-              <Lamp state={lampState({ index, step, running, live })} />
-              <span className="flex min-w-0 flex-col">
-                <span
-                  className={reached({ index, step, running, live }) ? '' : 'text-muted-foreground'}
-                >
-                  {entry.name}
-                </span>
-                <span className="truncate font-mono text-muted-foreground text-xs">
-                  {reached({ index, step, running, live }) ? entry.detail : '—'}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ol>
-        <Button onClick={start} disabled={running} className="w-full">
-          {startLabel({ running, live })}
-        </Button>
-      </InstrumentPanel>
+    <InstrumentPanel name="Deploy" action={<Indicator live={live} />}>
+      <Row label="Binary">
+        <FileTerminalIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        <span>{BINARY.name}</span>
+        <span className="ml-auto text-muted-foreground">{BINARY.size}</span>
+      </Row>
 
-      <InstrumentPanel name="pocketbase">
-        <Reading label="State">
-          <span className={live ? 'text-primary' : 'text-muted-foreground'}>
-            {live ? 'active' : running ? stepAt(step).name.toLowerCase() : 'no app yet'}
-          </span>
-        </Reading>
-        <Gauge label="vCPU" used={live ? '0.09' : '—'} total="1" share={live ? RUNNING.cpu : 0} />
-        <Gauge
-          label="Memory"
-          used={live ? '87 MiB' : '—'}
-          total="256 MiB"
-          share={live ? RUNNING.memory : 0}
-        />
-        <Gauge
-          label="Volume"
-          used={live ? '61 MiB' : '—'}
-          total="1.0 GiB"
-          share={live ? RUNNING.volume : 0}
-        />
-      </InstrumentPanel>
+      <div className="flex flex-col gap-1.5">
+        <CellBar share={live ? 1 : progressOf(step)} tone="bg-primary text-primary" />
+        <span className="text-muted-foreground text-xs">
+          {live ? 'Answering on HTTPS, one machine of its own.' : `${STEPS[step]?.name ?? ''}…`}
+        </span>
+      </div>
+
+      <Row label="URL">
+        {live ? (
+          <>
+            <a
+              href={`https://${ADDRESS}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-w-0 items-center gap-1 truncate text-primary hover:underline"
+            >
+              {ADDRESS}
+              <ArrowUpRightIcon className="size-3 shrink-0" />
+            </a>
+            <button
+              type="button"
+              onClick={start}
+              className="ml-auto shrink-0 text-muted-foreground text-xs hover:text-foreground"
+            >
+              Run again
+            </button>
+          </>
+        ) : (
+          <span className="text-muted-foreground">waiting for it to boot…</span>
+        )}
+      </Row>
+
+      {live && <p className="font-mono text-[11px] text-muted-foreground">{RUNNING}</p>}
+    </InstrumentPanel>
+  );
+}
+
+/** A labelled readout, set into the face like everything else you read rather than press. */
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className="inset-well flex items-center gap-2 border-2 border-border bg-input px-2.5 py-1.5 font-mono text-xs">
+        {children}
+      </span>
     </div>
   );
 }
 
-function startLabel({ running, live }: { running: boolean; live: boolean }): string {
-  if (running) {
-    return 'Deploying…';
-  }
-  return live ? 'Deploy it again' : 'Deploy it';
-}
-
-function reached({
-  index,
-  step,
-  running,
-  live,
-}: {
-  index: number;
-  step: number;
-  running: boolean;
-  live: boolean;
-}): boolean {
-  if (live) {
-    return true;
-  }
-  return running && index <= step;
-}
-
-function lampState({
-  index,
-  step,
-  running,
-  live,
-}: {
-  index: number;
-  step: number;
-  running: boolean;
-  live: boolean;
-}): 'done' | 'current' | 'waiting' {
-  if (live) {
-    return 'done';
-  }
-  if (!running || index > step) {
-    return 'waiting';
-  }
-  return index < step ? 'done' : 'current';
-}
-
-function Indicator({ running, live }: { running: boolean; live: boolean }) {
-  const lamp = live ? 'bg-primary' : running ? 'animate-pulse bg-warning' : 'bg-border';
-
+function Indicator({ live }: { live: boolean }) {
   return (
     <span className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground uppercase tracking-[0.16em]">
-      <span className={`size-1.5 rounded-full ${lamp}`} />
-      {live ? 'live' : running ? 'working' : 'idle'}
+      <span
+        className={`size-1.5 rounded-full ${live ? 'bg-primary' : 'animate-pulse bg-warning'}`}
+      />
+      {live ? 'live' : 'working'}
     </span>
   );
 }
 
-function Lamp({ state }: { state: 'done' | 'current' | 'waiting' }) {
-  const fill =
-    state === 'done'
-      ? 'bg-primary'
-      : state === 'current'
-        ? 'animate-pulse bg-warning'
-        : 'bg-border';
-
-  return (
-    <span
-      aria-hidden="true"
-      className="mt-1.5 flex size-3 shrink-0 items-center justify-center border-2 border-border"
-    >
-      <span className={`size-1 ${fill}`} />
-    </span>
-  );
+/** How far through the whole run the current step has got, so one bar covers all of it. */
+function progressOf(step: number): number {
+  return sumOf(STEP_MS.slice(0, step)) / TOTAL_MS;
 }
 
-type DeployRun = {
-  step: number;
-  running: boolean;
-  live: boolean;
-  start: () => void;
-};
+type DeployRun = { step: number; live: boolean; start: () => void };
 
 /**
- * Walks the steps once when started and stops on the last one.
+ * Walks the steps once and stops.
  *
  * One timer re-armed per step rather than an interval: the steps are not the same length, and an
  * interval would have to be the shortest of them with a counter on top.
  */
 function useDeployRun(): DeployRun {
   const [step, setStep] = useState(0);
-  const [running, setRunning] = useState(true);
+  const live = step >= STEPS.length;
 
   useEffect(() => {
-    if (!running) {
+    if (live) {
       return;
     }
-    if (step === LAST_STEP) {
-      setRunning(false);
-      return;
-    }
-    const timer = setTimeout(() => setStep((current) => current + 1), stepAt(step).ms);
+    const timer = setTimeout(() => setStep((current) => current + 1), STEPS[step]?.ms);
     return () => clearTimeout(timer);
-  }, [running, step]);
+  }, [live, step]);
 
-  const [everRan, setEverRan] = useState(true);
-
-  function start(): void {
-    setEverRan(true);
-    setStep(0);
-    setRunning(true);
-  }
-
-  return { step, running, live: everRan && !running && step === LAST_STEP, start };
+  return { step, live, start: () => setStep(0) };
 }
