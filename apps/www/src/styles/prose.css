@@ -1,3 +1,7 @@
+/* `@apply` needs the theme this file is not part of: it is imported on its own by the post
+   route rather than through the stylesheet Tailwind builds. */
+@reference "@repo/ui/globals.css";
+
 /* Tailwind's reset strips every default the browser gives an article — heading sizes, list
    markers, paragraph margins. Markdown emits exactly those bare tags, so without this a post
    renders as one undifferentiated block of body text. Written against the shadcn variables
@@ -93,10 +97,11 @@
   padding-inline-end: 3.5rem;
 }
 
+/* The same surface a copyable line sits on, so a command in a post and a command in the product
+   are the same object. Only what a block needs beyond a line is set here. */
 .prose pre {
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) / 2);
-  background: var(--muted);
+  @apply code-surface;
+
   padding: 1rem 1.25rem;
   overflow-x: auto;
   line-height: 1.6;

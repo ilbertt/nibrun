@@ -25,10 +25,12 @@ export function TryItOut() {
           variant="ghost"
           size="lg"
           onClick={copy}
-          className="rounded-r-none rounded-l-full pr-3"
+          className="rounded-r-none rounded-l-full pr-3 font-mono"
         >
-          {/* Both labels are the same nineteen characters, and the face is monospaced, so the pill
-              does not resize under the cursor for the second and a half the confirmation lasts. */}
+          {/* Both labels are the same nineteen characters, and this one control stays monospaced so
+              that keeps them the same width — the pill does not resize under the cursor for the
+              second and a half the confirmation lasts. The page's face is proportional, where
+              nineteen characters says nothing about how wide they are. */}
           {copied ? 'Copied to clipboard' : 'Start with an agent'}
           <span className="flex items-center gap-1.5 text-muted-foreground transition-colors group-hover/button:text-foreground">
             <ClaudeMark />

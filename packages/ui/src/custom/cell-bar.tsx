@@ -1,0 +1,84 @@
+const FULL = 1;
+const PERCENT_SCALE = 100;
+
+/**
+ * Cells rather than a bar, and twelve of them.
+ *
+ * Everything this product measures is a share of something fixed and small — 256 MiB, one vCPU,
+ * one disk, one binary on its way up — so a reading that lands between two cells claims a
+ * precision it does not have. Twelve still divides into halves, thirds and quarters, which are the
+ * fractions anyone reads off a meter, and at twice the width each they are counted at a glance
+ * rather than scanned.
+ */
+const CELL_COUNT = 12;
+const CELLS = Array.from(Array(CELL_COUNT).keys());
+
+/**
+ * A row of cells lit up to a share, behind glass.
+ *
+ * Without a `label` it is decoration for figures printed beside it and hidden from a screen
+ * reader; with one it is the reading itself and says so.
+ */
+/**
+ * A share too small to fill a cell still lights one.
+ *
+ * An app using half a percent of a gigabyte rounds to nothing, and an empty bar reads as the one
+ * thing that is not true — that nothing has been written. The figure beside it is exact and
+ * `aria-valuenow` carries the real share; this is only so that a little and none do not look the
+ * same.
+ */
+function litCells(share: number | null): number {
+  if (share === null || share <= 0) {
+    return 0;
+  }
+  return Math.max(Math.round(Math.min(share, FULL) * CELL_COUNT), 1);
+}
+
+export function CellBar({
+  share,
+  tone = 'bg-primary text-primary',
+  label,
+  rounded = false,
+}: {
+  /** `null` where nothing has been measured, which is not the same claim as nought. */
+  share: number | null;
+  /** Background and text colour together: a lit cell blooms in its own colour via `currentColor`. */
+  tone?: string;
+  label?: string;
+  /**
+   * For a reading that mostly sits near empty — a few percent of a vCPU or a disk — where a lone
+   * square cell reads as something broken rather than as a small figure. A bar that fills, like a
+   * transfer, keeps its square segments: they butt up into a bar as it goes.
+   */
+  rounded?: boolean;
+}) {
+  const lit = litCells(share);
+  // An empty track and a track at nought look the same and mean different things, so where there is
+  // no reading the bar carries no value rather than a nought that would be read as one.
+  const meter =
+    label === undefined
+      ? ({ 'aria-hidden': true } as const)
+      : ({
+          role: 'progressbar',
+          'aria-label': label,
+          'aria-valuemin': 0,
+          'aria-valuemax': PERCENT_SCALE,
+          'aria-valuenow':
+            share === null ? undefined : Math.round(Math.min(share, FULL) * PERCENT_SCALE),
+        } as const);
+
+  // No frame around it and no bloom on the lit cells: the cells are the reading, and a box drawn
+  // around every figure on a page of figures is what makes a panel look like equipment.
+  return (
+    <span {...meter} className="flex h-1.5 gap-1">
+      {CELLS.map((cell) => (
+        <span
+          key={cell}
+          className={`flex-1 transition-colors ${rounded ? 'rounded-full' : ''} ${
+            cell < lit ? tone : 'bg-border/30'
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
