@@ -1,6 +1,7 @@
+import { CellBar } from '@repo/ui/custom/cell-bar';
 import { ArrowUpRightIcon, FileTerminalIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { CellBar, InstrumentPanel } from '#components/instrument-panel.tsx';
+import { InstrumentPanel } from '#components/instrument-panel.tsx';
 
 /**
  * What nibrun does, in one panel: a binary goes in, a URL comes out.

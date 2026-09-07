@@ -1,3 +1,4 @@
+import { CellBar } from '@repo/ui/custom/cell-bar';
 import type { ReactNode } from 'react';
 
 const PERCENT_SCALE = 100;
@@ -6,17 +7,6 @@ const FULL = 1;
 /** The same thresholds the dashboard's own meters use, so a preview does not invent its own. */
 const NEARLY_FULL = 0.8;
 const CRITICALLY_FULL = 0.9;
-
-/**
- * Cells rather than a bar, and twenty-four of them.
- *
- * A share this product cares about is a share of something fixed and small — 256 MiB, one vCPU,
- * one disk — so a reading that lands between two cells is a reading claiming a precision a
- * once-a-minute sample does not have. Twenty-four divides into halves, thirds and quarters, which
- * are the fractions an owner actually reads off it.
- */
-const CELL_COUNT = 24;
-const CELLS = Array.from(Array(CELL_COUNT).keys());
 
 /**
  * A panel whose name sits in a break in its own top border, bolted down at the corners.
@@ -55,30 +45,6 @@ function litColour(share: number): string {
     return 'bg-destructive text-destructive';
   }
   return share >= NEARLY_FULL ? 'bg-warning text-warning' : 'bg-primary text-primary';
-}
-
-/**
- * A row of cells lit up to a share, behind glass. The one piece of this style that carries a
- * number, so both a resource here and a deploy running on the landing page read off the same bar.
- */
-export function CellBar({ share, tone }: { share: number; tone: string }) {
-  const lit = Math.round(Math.min(share, FULL) * CELL_COUNT);
-
-  return (
-    <span
-      aria-hidden="true"
-      className="display-glass flex h-4 gap-[3px] border-2 border-border p-[3px]"
-    >
-      {CELLS.map((cell) => (
-        <span
-          key={cell}
-          className={
-            cell < lit ? `flex-1 shadow-[0_0_5px_-1px_currentColor] ${tone}` : 'flex-1 bg-border/20'
-          }
-        />
-      ))}
-    </span>
-  );
 }
 
 /**
