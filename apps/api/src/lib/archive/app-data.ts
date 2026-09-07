@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { isTarball, TAR_IDENTITY_BYTES } from '#lib/archive/tar.ts';
+import { ZIP_MAGIC } from '#lib/archive/zip.ts';
 
 /** What a gzip opens with, whatever it turns out to be wrapped around. */
 const GZIP_MAGIC = Buffer.from('\x1f\x8b', 'latin1');
@@ -17,19 +18,46 @@ const GZIP = 'gzip';
 export const OPENING_BYTES = 4096;
 
 /**
- * Whether the bytes open as a gzipped tarball, read from the front and no further.
+ * How much of a zip is read before it is taken for one.
+ *
+ * A local header, and the name of the entry it introduces. The index that makes a zip a zip is at
+ * the *end* of the object, which this end does not have: it holds the front of the upload because
+ * the front went past on the way to the digest, and fetching the tail would be a second request
+ * for a question the host answers properly anyway. So this is the shape of the first record and no
+ * more — enough that `zip data.db` is told apart from `gzip data.db`, and not a claim that the
+ * archive is sound.
+ */
+const LOCAL_HEADER_BYTES = 30;
+const NAME_LENGTH_AT = 26;
+
+/**
+ * Whether the bytes open as one of the two archives an app's data may be created from, read from
+ * the front and no further.
  *
  * The envelope only. What is inside is the owner's business, and how much of it there is belongs to
  * the host that unpacks it — this answers the one question the api is in a position to answer
  * cheaply, so that sending the wrong kind of file is a refused upload rather than a filesystem that
  * fails to provision later, where the reason reaches its owner as a broken app.
  */
-export async function isGzippedTarball(opening: Uint8Array): Promise<boolean> {
-  if (!Buffer.from(opening).subarray(0, GZIP_MAGIC.length).equals(GZIP_MAGIC)) {
+export async function isAppDataArchive(opening: Uint8Array): Promise<boolean> {
+  const held = Buffer.from(opening);
+  if (held.subarray(0, ZIP_MAGIC.length).equals(ZIP_MAGIC)) {
+    return opensAsZip(held);
+  }
+  if (!held.subarray(0, GZIP_MAGIC.length).equals(GZIP_MAGIC)) {
     return false;
   }
   const header = await inflatedOpening(opening);
   return header !== undefined && isTarball(header);
+}
+
+/** A first record whose own fields agree with each other, which random bytes behind a magic do not. */
+function opensAsZip(held: Buffer): boolean {
+  if (held.length < LOCAL_HEADER_BYTES) {
+    return false;
+  }
+  const nameBytes = held.readUInt16LE(NAME_LENGTH_AT);
+  return nameBytes > 0 && LOCAL_HEADER_BYTES + nameBytes <= held.length;
 }
 
 /**

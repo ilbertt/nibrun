@@ -58,6 +58,7 @@ describe('what a deploy is beyond the binary itself', () => {
 
     expect(markup).toContain(INITIAL_DATA);
     expect(markup).toContain('.tar.gz');
+    expect(markup).toContain('.zip');
   });
 
   /**

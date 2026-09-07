@@ -26,6 +26,7 @@ import type {
 } from '#repositories/imports.repository.ts';
 import { ImportsService, importKey, MAX_IMPORT_SIZE_BYTES } from '#services/imports.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
+import { archiveOf } from '#tests/support/archives.ts';
 import { gzippedTarballOf, tarballOf } from '#tests/support/tarballs.ts';
 
 const ARCHIVE = gzippedTarballOf([{ name: 'pb_data/data.db', content: bytesOf('rows') }]);
@@ -498,7 +499,7 @@ describe('the bytes are read back rather than taken on trust', () => {
  * a deployment that is accepted, and a filesystem that fails to provision — where the reason
  * reaches its owner as a broken app rather than as a refused upload.
  */
-describe('an upload that is not a .tar.gz is refused where the owner can see it', () => {
+describe('what an upload may be is decided from its bytes, where the owner can see it', () => {
   async function sending(bytes: Uint8Array) {
     const { service, storage } = build();
     const begun = await service.create({
@@ -516,11 +517,26 @@ describe('an upload that is not a .tar.gz is refused where the owner can see it'
     return { refusal, storage, objectKey };
   }
 
+  test('a gzipped tarball is one of the two an app may be created from', async () => {
+    const { refusal } = await sending(
+      gzippedTarballOf([{ name: 'data.db', content: bytesOf('rows') }]),
+    );
+
+    expect(refusal).toBeNull();
+  });
+
+  // The other, and the one an owner with no terminal can actually make.
+  test('and so is a zip', async () => {
+    const { refusal } = await sending(archiveOf([{ name: 'data.db', content: bytesOf('rows') }]));
+
+    expect(refusal).toBeNull();
+  });
+
   test('something that is not compressed at all', async () => {
     const { refusal } = await sending(bytesOf('#!/bin/sh\necho hi\n'));
 
     expect(refusal).toBeInstanceOf(BadRequestError);
-    expect(refusal?.message).toContain('.tar.gz');
+    expect(refusal?.message).toContain('.tar.gz or a .zip');
   });
 
   // `gzip data.db` rather than `tar czf`, which is the mistake the magic bytes alone would miss.

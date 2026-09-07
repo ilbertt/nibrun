@@ -7,6 +7,11 @@
 // data, and the data is padded out to the next block, so a walk is counting rather than seeking.
 
 import { Buffer } from 'node:buffer';
+import {
+  type ArchiveEntry,
+  type ArchiveEntryKind,
+  UnreadableArchive,
+} from '#lib/volumes/archive.ts';
 
 const BLOCK_BYTES = 512;
 
@@ -75,33 +80,6 @@ const EQUALS = 0x3d;
 const PATH_SEPARATOR = '/';
 const MODE_BITS = 0o777;
 
-/**
- * What an unpack does with an entry. Everything that is not one of the first three is a refusal —
- * a device node, a fifo, a hard link — so they are not told apart here: what a caller does with
- * any of them is refuse the archive and name the entry.
- */
-export type TarEntryKind = 'file' | 'directory' | 'symlink' | 'unsupported';
-
-export type TarEntry = {
-  readonly path: string;
-  readonly kind: TarEntryKind;
-  /** Permissions only. The bits above them say setuid, and nothing here carries those. */
-  readonly mode: number;
-  readonly sizeBytes: number;
-  /** Where a symlink points, as the archive wrote it; empty for everything else. */
-  readonly linkTarget: string;
-  /** The entry's own bytes, readable until the next entry is asked for. */
-  content(): AsyncGenerator<Uint8Array>;
-};
-
-/** What an archive that stops being followable is raised as, wherever it stops being one. */
-export class UnreadableTarball extends Error {
-  constructor(reason: string) {
-    super(`the archive ${reason}`);
-    this.name = 'UnreadableTarball';
-  }
-}
-
 type Header = {
   readonly path: string;
   readonly type: string;
@@ -120,7 +98,9 @@ type Announced = { path?: string; linkTarget?: string; sizeBytes?: number };
  * stream, and the bytes behind it are gone once walked past. Whatever a caller leaves unread is
  * walked past for it, so an entry it refuses costs it nothing to abandon.
  */
-export async function* tarEntries(source: ReadableStream<Uint8Array>): AsyncGenerator<TarEntry> {
+export async function* tarEntries(
+  source: ReadableStream<Uint8Array>,
+): AsyncGenerator<ArchiveEntry> {
   const chunks = source[Symbol.asyncIterator]();
   let held = Buffer.alloc(0);
   let ended = false;
@@ -157,7 +137,7 @@ export async function* tarEntries(source: ReadableStream<Uint8Array>): AsyncGene
     }
     while (held.length === 0) {
       if (!(await pull())) {
-        throw new UnreadableTarball('ended inside the entry it was describing');
+        throw new UnreadableArchive('ended inside the entry it was describing');
       }
     }
     const piece = held.subarray(0, Math.min(unread, held.length));
@@ -181,14 +161,14 @@ export async function* tarEntries(source: ReadableStream<Uint8Array>): AsyncGene
       piece = await pieceOfEntry();
     }
     if (padding > 0 && (await take(padding)) === undefined) {
-      throw new UnreadableTarball('ended inside the padding after an entry');
+      throw new UnreadableArchive('ended inside the padding after an entry');
     }
   }
 
   /** The whole of a long-name entry, which is the one thing here read into memory. */
   async function longFieldIn(sizeBytes: number): Promise<string> {
     if (sizeBytes > MAX_LONG_FIELD_BYTES) {
-      throw new UnreadableTarball('carries a path longer than any filesystem would take');
+      throw new UnreadableArchive('carries a path longer than any filesystem would take');
     }
     unread = sizeBytes;
     const pieces: Buffer[] = [];
@@ -248,7 +228,7 @@ export async function* tarEntries(source: ReadableStream<Uint8Array>): AsyncGene
     while (true) {
       const block = await take(BLOCK_BYTES);
       if (block === undefined) {
-        throw new UnreadableTarball('ended before it said its entries had');
+        throw new UnreadableArchive('ended before it said its entries had');
       }
       // A block of nothing is how a tar says its entries have stopped. What follows is padding
       // out to a tape length, which nothing here reads.
@@ -286,7 +266,7 @@ function entryFrom({
   announced: Announced;
   sizeBytes: number;
   content: () => AsyncGenerator<Uint8Array>;
-}): TarEntry {
+}): ArchiveEntry {
   return {
     path: announced.path ?? header.path,
     kind: kindOf(header.type),
@@ -341,7 +321,7 @@ function announcedBy(records: Map<string, string>): Announced {
   };
 }
 
-function kindOf(type: string): TarEntryKind {
+function kindOf(type: string): ArchiveEntryKind {
   if (type === TYPE_FILE || type === TYPE_FILE_UNSET) {
     return 'file';
   }
@@ -375,14 +355,14 @@ function headerIn(block: Buffer): Header {
 function octalAt({ block, at, bytes }: { block: Buffer; at: number; bytes: number }): number {
   const field = block.subarray(at, at + bytes);
   if (((field[0] ?? NUL) & BASE_256_MARKER) !== 0) {
-    throw new UnreadableTarball('has a header field written in a form nibrun does not read');
+    throw new UnreadableArchive('has a header field written in a form nibrun does not read');
   }
   const digits = field.toString('latin1').replaceAll('\0', ' ').trim();
   if (digits.length === 0) {
     return 0;
   }
   if (!OCTAL_DIGITS.test(digits)) {
-    throw new UnreadableTarball('has a header field that is not a number');
+    throw new UnreadableArchive('has a header field that is not a number');
   }
   return Number.parseInt(digits, OCTAL);
 }
