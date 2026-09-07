@@ -27,9 +27,11 @@ const CELLS = Array.from(Array(CELL_COUNT).keys());
  * `aria-valuenow` carries the real share; this is only so that a little and none do not look the
  * same.
  */
-function litCells(share: number): number {
-  const filled = Math.round(Math.min(share, FULL) * CELL_COUNT);
-  return share > 0 ? Math.max(filled, 1) : 0;
+function litCells(share: number | null): number {
+  if (share === null || share <= 0) {
+    return 0;
+  }
+  return Math.max(Math.round(Math.min(share, FULL) * CELL_COUNT), 1);
 }
 
 export function CellBar({
@@ -37,12 +39,15 @@ export function CellBar({
   tone = 'bg-primary text-primary',
   label,
 }: {
-  share: number;
+  /** `null` where nothing has been measured, which is not the same claim as nought. */
+  share: number | null;
   /** Background and text colour together: a lit cell blooms in its own colour via `currentColor`. */
   tone?: string;
   label?: string;
 }) {
   const lit = litCells(share);
+  // An empty track and a track at nought look the same and mean different things, so where there is
+  // no reading the bar carries no value rather than a nought that would be read as one.
   const meter =
     label === undefined
       ? ({ 'aria-hidden': true } as const)
@@ -51,7 +56,8 @@ export function CellBar({
           'aria-label': label,
           'aria-valuemin': 0,
           'aria-valuemax': PERCENT_SCALE,
-          'aria-valuenow': Math.round(Math.min(share, FULL) * PERCENT_SCALE),
+          'aria-valuenow':
+            share === null ? undefined : Math.round(Math.min(share, FULL) * PERCENT_SCALE),
         } as const);
 
   return (

@@ -95,7 +95,7 @@ export function ResourceMeter({
         </span>
       </div>
       <CellBar
-        share={reading?.share ?? 0}
+        share={reading?.share ?? null}
         tone={reading ? fillColour(reading.share) : 'bg-border/30'}
         label={readingLabel({ label, reading })}
       />
