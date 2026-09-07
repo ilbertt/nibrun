@@ -283,15 +283,18 @@ function ExportDialog() {
             aria-labelledby="preview-export-title"
             className="panel-face relative flex w-full max-w-md flex-col border-2 border-border bg-card"
           >
-            <header className="-mt-[13px] px-5">
-              <h2
-                id="preview-export-title"
-                className="legend-notch w-fit px-2 font-heading text-base"
-              >
+            {/* A bar across the top rather than a name set into the border: a panel's legend works
+                because the border runs on to either side of it, and a dialog floating over a
+                dimmed page has nothing there for it to interrupt. */}
+            <header className="flex items-center justify-between gap-3 border-border border-b-2 px-5 py-3">
+              <h2 id="preview-export-title" className="font-heading text-base">
                 Export this app
               </h2>
+              <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.16em]">
+                archive
+              </span>
             </header>
-            <div className="flex flex-col gap-4 p-6 pt-4 text-sm">
+            <div className="flex flex-col gap-4 p-5 text-sm">
               <p className="text-muted-foreground">
                 One archive: the binary, everything under <span className="font-mono">data/</span>,
                 and its environment. Ready in a minute or two.
