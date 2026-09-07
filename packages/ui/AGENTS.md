@@ -4,10 +4,20 @@ The monorepo's shadcn components and theme. The **only** workspace with a
 `components.json` — apps consume `@repo/ui` and never run shadcn themselves, so the
 two apps cannot drift.
 
-`components/` is the CLI's output, kept as it writes it so `shadcn add` can overwrite a
-component without a merge. Biome skips it for the same reason. Restyle from
-`src/styles/globals.css`, never by editing these files. Anything hand-written goes in
-`custom/` instead, where the CLI can't reach it.
+`components/` is what the CLI wrote, and editing it is allowed — that is the point of
+shadcn, which distributes code rather than a dependency. Re-running `shadcn add` for a
+component that is already here means a merge, which is a fair price: the CLI has been
+run a handful of times in this project's life, and styling a component from a distance
+costs more. Biome lints these files like any other.
+
+Put a component's own look and behaviour in the component. `globals.css` holds what is
+genuinely the theme — the palette, the radius, the type, and utilities more than one
+component wears — and stops there. A rule in the stylesheet that reaches for a component
+by the utility classes its variants happen to carry will break silently the day those
+classes change, and cannot be turned off from a call site, which is how it ends up
+growing data attributes nobody can find.
+
+Anything hand-written still goes in `custom/`, where the CLI has no file to overwrite.
 
 Files import each other through the package's own `@repo/ui/*` specifiers rather than
 relative paths, because that is what `components.json` aims the CLI at — a regenerated
