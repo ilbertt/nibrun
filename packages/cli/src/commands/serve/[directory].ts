@@ -13,7 +13,7 @@ import {
 } from '#lib/serve.ts';
 
 /** Getters, so the environment is not read until a handler asks. */
-const GUEST: GuestEnvironment = createEnvContext({
+const GUEST_ENV: GuestEnvironment = createEnvContext({
   vars: {
     httpPort: {
       name: RUNTIME_VALUES.HTTP_PORT.name,
@@ -46,7 +46,7 @@ export const command = defineCommand('serve [directory]', {
   },
   handler: async ({ params, options, print, rootOptions }) => {
     // First, so that a nib outside a guest says so rather than reading a folder it cannot serve.
-    const { hostname, port, url } = guestAddress(GUEST);
+    const { hostname, port, url } = guestAddress(GUEST_ENV);
     const { emit } = createOutput({ output: SERVING_OUTPUT, print, json: rootOptions.json });
     const singlePage = options['single-page'] ?? false;
 
