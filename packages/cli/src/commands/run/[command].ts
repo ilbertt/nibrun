@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { SHARED_OPTIONS } from '#config.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { dataFolderFor } from '#lib/data-folder.ts';
 import { binaryFrom, deploy } from '#lib/deploy.ts';
+import { initialDataFrom } from '#lib/initial-data.ts';
 import { createOutput } from '#lib/output.ts';
 import { completeOptions } from '#lib/plan.ts';
 import { RELEASE_OUTPUT } from '#lib/release.ts';
@@ -36,7 +36,7 @@ export const command = defineCommand('run [command]', {
     [DATA_FOLDER_FLAG]: {
       schema: z.string().optional(),
       description:
-        "A folder on this machine the app's data/ is created holding. Packed into an archive here and unpacked by the host, so what is in the folder is what the app finds at the root of data/ — the folder itself is not a directory inside it. Only for an app being created: the data of one that already exists was created when it was.",
+        "A folder on this machine the app's data/ is created holding, or a .tar.gz or .zip already holding it. A folder is packed here; either way it is the root of the archive that becomes the root of data/, so a folder is not itself a directory inside it. Only for an app being created: the data of one that already exists was created when it was.",
     },
     [SHARED_OPTIONS.port.name]: SHARED_OPTIONS.port.option,
     [SHARED_OPTIONS.extraPublicPort.name]: SHARED_OPTIONS.extraPublicPort.option,
@@ -68,7 +68,7 @@ export const command = defineCommand('run [command]', {
     // questionnaire whose answers are then thrown away. A url is not opened here at all: the api
     // is the end that fetches it, and it is the end that says whether it could.
     const binary = await binaryFrom({ source: binarySource, sha256 });
-    const dataFolder = await dataFolderFor({ path: dataFolderPath, app: flags.app });
+    const dataFolder = await initialDataFrom({ path: dataFolderPath, app: flags.app });
     const given = { ...flags, extraPublicPort, dataFolder };
     ui.open('nib run');
 

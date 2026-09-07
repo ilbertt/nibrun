@@ -11,7 +11,7 @@ import {
   Sha256DigestSchema,
   Value,
 } from '@repo/protocol';
-import { isGzippedTarball, OPENING_BYTES } from '#lib/archive/gzipped-tarball.ts';
+import { isAppDataArchive, OPENING_BYTES } from '#lib/archive/app-data.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
@@ -26,10 +26,10 @@ const NOTHING_UPLOADED = 'Nothing was uploaded against that import.';
 /**
  * Said as the shape rather than as what was found: the upload happened between the caller and the
  * store, so what they sent is a thing they can look at, and naming the format is what tells them
- * `gzip data.db` is not `tar czf`.
+ * `gzip data.db` is neither of them.
  */
 const NOT_AN_ARCHIVE =
-  "That upload is not a .tar.gz. An app's data is created from one archive, whose root becomes the root of data/.";
+  "That upload is not a .tar.gz or a .zip. An app's data is created from one archive, whose root becomes the root of data/.";
 
 const BYTES_PER_GIBIBYTE = 1_073_741_824;
 const MAX_IMPORT_GIBIBYTES = 1;
@@ -172,7 +172,7 @@ export class ImportsService extends Service {
     // The envelope, not the contents: a host has to be able to unpack this, and the front of the
     // upload already went past on the way to the digest, so asking costs nothing that was not
     // already spent. Everything else about the archive is the host's to refuse.
-    if (!(await isGzippedTarball(uploaded.opening))) {
+    if (!(await isAppDataArchive(uploaded.opening))) {
       await this.discard({ objectKey });
       throw new BadRequestError(NOT_AN_ARCHIVE);
     }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { MAX_IMPORT_SIZE_BYTES, refusedArchive } from '#archive.ts';
-import { gzippedTarball } from '#tests/support/archives.ts';
+import { gzippedTarball, zip } from '#tests/support/archives.ts';
 
 const NAME = 'data.tar.gz';
 
@@ -24,17 +24,30 @@ describe('an archive an app can be created from', () => {
     expect(await refusedArchive(offered({ bytes: gzippedTarball() }))).toBeUndefined();
   });
 
-  test('a zip is named as the shape it is not, rather than as what was found', async () => {
-    const zip = encoder.encode('PK and the rest of an ordinary zip');
+  test('and so is a zip, which is what a desktop archiver makes', async () => {
+    expect(await refusedArchive(offered({ name: 'data.zip', bytes: zip() }))).toBeUndefined();
+  });
 
-    expect(await refusedArchive(offered({ bytes: zip }))).toContain('is not a .tar.gz');
+  /**
+   * A zip says what it is in the index at its *end*, which is past the gibibyte this exists not
+   * to read. So the first record has to hold together: a magic on its own is four bytes that
+   * anything at all can open with.
+   */
+  test('bytes that only open like a zip are refused as the shape they are not', async () => {
+    const opening = encoder.encode('PK and the rest of an ordinary zip');
+
+    expect(await refusedArchive(offered({ bytes: opening }))).toContain(
+      'is not a .tar.gz or a .zip',
+    );
   });
 
   // `gzip data.db` opens exactly as `tar czf` does, and only the bytes inside tell them apart.
   test('a gzip wrapped around anything else is refused for what it holds', async () => {
     const gzipped = Bun.gzipSync(encoder.encode('SQLite format 3'));
 
-    expect(await refusedArchive(offered({ bytes: gzipped }))).toContain('is not a .tar.gz');
+    expect(await refusedArchive(offered({ bytes: gzipped }))).toContain(
+      'is not a .tar.gz or a .zip',
+    );
   });
 
   test('nothing at all is refused as nothing to give the app', async () => {
