@@ -87,6 +87,19 @@ the layout under `src/commands/` is the command tree.
   it from a script — and that is why `--yes` lives on such a command rather than
   anywhere shared. The terminal question is a typed phrase, not a y/n, which is
   answered by the muscle that answers every other one — see `src/lib/delete.ts`.
+- **`nib serve` is the one command that is the thing being hosted** rather than the
+  thing that deploys it — the same nib serves a folder here and, deployed as an
+  app's binary, serves that app's volume. So it talks to no api and needs no
+  token; what it reads instead is what the host handed the process, through the
+  `runtime` group in `src/context.ts`. Which interface it binds follows from
+  whether anything assigned the port: nothing did means somebody's own machine
+  and the loopback, and anything did means a host reaching it across a network,
+  which on nibrun is `0.0.0.0` and no other address. `PORT` is read beside
+  `NIBRUN_HTTP_PORT` and is spelled here rather than imported, being the name
+  every host uses rather than one of ours — `RUNTIME_VALUES` is what a tenant
+  value may name, and `PORT` deliberately is not one. `cli.main()` exits the
+  moment a handler returns, so serving has to *be* the handler: `untilStopped` is
+  what keeps it there until a signal takes it down.
 - Run it with `bun run --filter @repo/cli nib …`. A package script runs from the
   package directory, so relative paths resolve against `packages/cli` rather than
   the caller's shell — pass absolute ones until the CLI ships as a real `bin`.
