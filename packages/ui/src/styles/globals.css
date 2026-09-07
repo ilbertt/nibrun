@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/source-code-pro";
-@import "@fontsource-variable/space-grotesk";
+@import "@fontsource/space-mono";
 
 @custom-variant dark (&:is(.dark *));
 @source "../../../../apps/**/*.{ts,tsx}";
@@ -22,7 +22,7 @@ body {
 }
 
 @theme inline {
-  --font-heading: Space Grotesk Variable, ui-sans-serif, system-ui, sans-serif;
+  --font-heading: Space Mono, ui-monospace, monospace;
   --font-sans: Source Code Pro Variable, ui-monospace, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -246,41 +246,23 @@ body {
   --shadow-2xl: 0 1px 3px 0 oklch(0.08 0.01 120 / 0.5);
 }
 
-/* The offset frame this style is built on, dithered rather than blurred — a shadow drawn the way a
-   display with no alpha channel would have had to draw one. Opt-in rather than applied to every
-   surface: the CLI's `card` clips its own overflow, which would swallow it. */
-@utility dither-frame {
-  position: relative;
+/* Four bolts holding the panel to whatever is behind it. Drawn rather than bordered because the
+   border already says where the panel ends; these say it is a fixed thing that was fitted, which
+   is the difference between a card and an instrument. */
+@utility panel-rivets {
+  --rivet-inset: 7px;
+  --rivet: radial-gradient(circle, var(--border) 0 1.5px, transparent 1.6px);
 
-  &::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    translate: 6px 6px;
-    z-index: -1;
-    pointer-events: none;
-    background-image:
-      linear-gradient(
-        45deg,
-        var(--border) 25%,
-        transparent 25% 75%,
-        var(--border) 75%
-      ),
-      linear-gradient(
-        45deg,
-        var(--border) 25%,
-        transparent 25% 75%,
-        var(--border) 75%
-      );
-    background-size: 4px 4px;
-    background-position:
-      0 0,
-      2px 2px;
-  }
+  background-image: var(--rivet), var(--rivet), var(--rivet), var(--rivet);
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+  background-position:
+    var(--rivet-inset) var(--rivet-inset),
+    calc(100% - var(--rivet-inset)) var(--rivet-inset),
+    var(--rivet-inset) calc(100% - var(--rivet-inset)),
+    calc(100% - var(--rivet-inset)) calc(100% - var(--rivet-inset));
 }
 
-/* A word that answers if you look at it, borrowed from the reference: the dots say there is more
-   here without spending a colour or an icon on saying so. */
 @utility hint-underline {
   text-decoration: underline dotted var(--muted-foreground);
   text-underline-offset: 4px;
