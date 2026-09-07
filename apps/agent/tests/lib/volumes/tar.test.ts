@@ -3,7 +3,8 @@ import { Buffer } from 'node:buffer';
 import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type TarEntry, tarEntries, UnreadableTarball } from '#lib/volumes/tar.ts';
+import { type ArchiveEntry, UnreadableArchive } from '#lib/volumes/archive.ts';
+import { tarEntries } from '#lib/volumes/tar.ts';
 import {
   paxHeaderOf,
   TYPE_CHAR_DEVICE,
@@ -33,7 +34,7 @@ const OVERSIZED_PAX_BYTES = 9000;
 const BASE_256_MARKER = 0x80;
 const TRUNCATED_AT = 1024;
 
-type ReadEntry = Pick<TarEntry, 'path' | 'kind' | 'mode' | 'sizeBytes' | 'linkTarget'> & {
+type ReadEntry = Pick<ArchiveEntry, 'path' | 'kind' | 'mode' | 'sizeBytes' | 'linkTarget'> & {
   body: string;
 };
 
@@ -47,7 +48,7 @@ async function entriesOf({
 }: {
   bytes: Uint8Array;
   /** Whether this entry's content is read, so that abandoning one can be exercised too. */
-  reading?: (entry: TarEntry) => boolean;
+  reading?: (entry: ArchiveEntry) => boolean;
 }): Promise<ReadEntry[]> {
   const read: ReadEntry[] = [];
   for await (const entry of tarEntries(streamOf(bytes))) {
@@ -240,7 +241,7 @@ describe('an archive that stops being followable ends the walk', () => {
     const whole = tarballOf([{ path: 'data.db', body: 'x'.repeat(SPANNING_BODY_BYTES) }]);
 
     await expect(entriesOf({ bytes: whole.slice(0, TRUNCATED_AT) })).rejects.toBeInstanceOf(
-      UnreadableTarball,
+      UnreadableArchive,
     );
   });
 
@@ -248,14 +249,14 @@ describe('an archive that stops being followable ends the walk', () => {
     const bytes = tarballOf([{ path: 'data.db', body: 'rows' }]);
     bytes.set(new TextEncoder().encode('99z99999999'), SIZE_FIELD_AT);
 
-    await expect(entriesOf({ bytes })).rejects.toBeInstanceOf(UnreadableTarball);
+    await expect(entriesOf({ bytes })).rejects.toBeInstanceOf(UnreadableArchive);
   });
 
   test('a length too wide for its own field is refused', async () => {
     const bytes = tarballOf([{ path: 'data.db', body: 'rows' }]);
     bytes.set([BASE_256_MARKER], SIZE_FIELD_AT);
 
-    await expect(entriesOf({ bytes })).rejects.toBeInstanceOf(UnreadableTarball);
+    await expect(entriesOf({ bytes })).rejects.toBeInstanceOf(UnreadableArchive);
   });
 });
 
