@@ -21,7 +21,7 @@ export function CopyableLine({
   prompt?: boolean;
 }) {
   return (
-    <span className="flex items-center gap-2 rounded-md border bg-muted/40 py-1 pr-1 pl-2.5">
+    <span className="code-surface flex items-center gap-2 py-1 pr-1 pl-2.5">
       {prompt && (
         <span aria-hidden="true" className="select-none font-mono text-primary text-xs">
           $

@@ -251,6 +251,15 @@ body {
    A track something is dragged along is the one thing genuinely set into the surface around it.
    The outline belongs to the panel; what sits inside gets a fill at most, so nothing else here
    needs a well of its own. */
+/* The surface any machine text sits on, wherever it appears. Two things render it — a line React
+   owns, and a block compiled out of markdown that it can only portal into — so the look is defined
+   once here rather than agreed twice. Padding is each caller's: a line is not a block. */
+@utility code-surface {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--muted) 40%, transparent);
+}
+
 @utility inset-well {
   box-shadow: var(--well);
 }
