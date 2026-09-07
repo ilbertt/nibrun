@@ -268,6 +268,39 @@ body {
   text-underline-offset: 4px;
 }
 
+/* A key with a throw, rather than a rectangle that changes colour: it stands on a base, and
+   pressing drops the face by exactly the depth of that base and takes the base away.
+
+   Matched on the background utility each variant carries rather than on a variant name, which cva
+   does not put in the DOM: a button with a surface of its own is precisely the one that can sit on
+   a base, and `ghost` and `link`, which have none, would otherwise get a shelf under nothing.
+   Written here rather than in `button.tsx` because that file is the CLI's output, and outside any
+   layer because a utility class is what it has to outrank. */
+[data-slot="button"]:is(
+  .bg-primary,
+  .bg-secondary,
+  .bg-background,
+  [class*="bg-destructive"]
+):not(:disabled, [data-key="none"]) {
+  --key-throw: 3px;
+  --key-bevel: inset 0 1px 0 0 rgb(255 255 255 / 0.18);
+
+  box-shadow:
+    var(--tw-ring-shadow, 0 0 #0000),
+    var(--key-bevel),
+    0 var(--key-throw) 0 0 var(--border);
+}
+
+[data-slot="button"]:is(
+  .bg-primary,
+  .bg-secondary,
+  .bg-background,
+  [class*="bg-destructive"]
+):not(:disabled, [data-key="none"]):active {
+  translate: 0 var(--key-throw);
+  box-shadow: var(--tw-ring-shadow, 0 0 #0000), var(--key-bevel);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -1,6 +1,7 @@
 import { WWW_SITE } from '@repo/global-constants';
 import { createFileRoute } from '@tanstack/react-router';
 import { BinaryDrop } from '#components/binary-drop.tsx';
+import { BootDemo } from '#components/boot-demo.tsx';
 import { DeployCta } from '#components/deploy-cta.tsx';
 import { GetStartedHint } from '#components/get-started-hint.tsx';
 import { Hero } from '#components/hero.tsx';
@@ -32,6 +33,11 @@ function RouteComponent() {
             <TryItOut />
             <GetStartedHint />
           </div>
+        </section>
+        {/* What the drop above turns into, played on a loop so the page shows it rather than
+            promising it. */}
+        <section className="w-full pb-16">
+          <BootDemo />
         </section>
         <WhatItActuallyNeeds />
         <WhatYourAppGets />
