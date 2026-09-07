@@ -5,7 +5,14 @@ import {
   Sha256DigestSchema,
   Value,
 } from '@repo/protocol';
-import { ELF_MAGIC_LENGTH, interpreterOf, isElfExecutable, isGuestInterpreter } from '#lib/elf.ts';
+import {
+  ELF_MAGIC_LENGTH,
+  interpreterOf,
+  isElfExecutable,
+  isGuestInterpreter,
+  isGuestMachine,
+  machineOf,
+} from '#lib/elf.ts';
 
 const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
@@ -29,8 +36,17 @@ export type ArtifactIdentity = {
 export type ArtifactInspection =
   | ({ outcome: 'stored' } & ArtifactIdentity)
   | { outcome: 'not-executable' }
+  | { outcome: 'unsupported-machine'; machine: number }
   | { outcome: 'unsupported-interpreter'; interpreter: string }
   | { outcome: 'too-large' };
+
+/** Only ever a verdict on a machine actually read; see `machineOf`. */
+function refuseMachine(bytes: Uint8Array): ArtifactInspection | undefined {
+  const machine = machineOf(bytes);
+  return machine !== undefined && !isGuestMachine(machine)
+    ? { outcome: 'unsupported-machine', machine }
+    : undefined;
+}
 
 /** Only ever a verdict on a loader path actually read; see `interpreterOf`. */
 function refuseInterpreter(bytes: Uint8Array): ArtifactInspection | undefined {
@@ -38,6 +54,15 @@ function refuseInterpreter(bytes: Uint8Array): ArtifactInspection | undefined {
   return interpreter !== undefined && !isGuestInterpreter(interpreter)
     ? { outcome: 'unsupported-interpreter', interpreter }
     : undefined;
+}
+
+/**
+ * Both verdicts the ELF header carries, machine first: a binary cross-compiled for another
+ * architecture names that architecture's loader too, and being told to link against the guest's
+ * is advice that cannot be followed on the machine it was built for.
+ */
+function refuseHeader(bytes: Uint8Array): ArtifactInspection | undefined {
+  return refuseMachine(bytes) ?? refuseInterpreter(bytes);
 }
 
 /** Whatever the bytes read so far already settle; `undefined` while the rest could still change it. */
@@ -59,7 +84,7 @@ function refuseChunk({
   }
   // Only on the chunk that completes the header, so parsing the segments costs one pass rather
   // than one per chunk.
-  const refusal = headerJustFilled ? refuseInterpreter(header) : undefined;
+  const refusal = headerJustFilled ? refuseHeader(header) : undefined;
   if (refusal) {
     return refusal;
   }
@@ -113,7 +138,7 @@ function reading({ maxSizeBytes }: { maxSizeBytes: number }) {
         return { outcome: 'not-executable' };
       }
       if (headerLength < HEADER_BYTES) {
-        const refusal = refuseInterpreter(read);
+        const refusal = refuseHeader(read);
         if (refusal) {
           return refusal;
         }
@@ -138,9 +163,9 @@ function reading({ maxSizeBytes }: { maxSizeBytes: number }) {
  * that never converges rather than a rejected upload — so the bytes are read back and hashed
  * here even though the api never had them in hand.
  *
- * Executability, the loader it asks for, and size are settled in the same pass because the pass
- * is the expensive part: the object is a whole binary, and reading it four times to answer four
- * questions about it would cost four times the bandwidth to reach the same verdict.
+ * Executability, the machine it was built for, the loader it asks for, and size are settled in the
+ * same pass because the pass is the expensive part: the object is a whole binary, and reading it
+ * once per question would cost that many times the bandwidth to reach the same verdict.
  */
 export async function inspectArtifact({
   stream,
