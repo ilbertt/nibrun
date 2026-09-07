@@ -15,7 +15,7 @@ export function DeployForm({
   binary,
   suggested,
   minimal = false,
-  pinnedAction = false,
+  pinnedAction,
 }: {
   appId: string | undefined;
   binary: File | undefined;
@@ -23,10 +23,11 @@ export function DeployForm({
   minimal?: boolean | undefined;
   /**
    * Whether the fields scroll past the button rather than the button scrolling away with them.
-   * The dialog's body is a scroll region and a long configuration would push the button out of
-   * reach; the handoff page has the whole form on it and nothing to scroll under.
+   * Only a caller that puts the form in a scroll region of its own can answer, so both are made
+   * to: the dialog's body is one and a long configuration would push the button out of reach,
+   * while the handoff card is not and the page carries it.
    */
-  pinnedAction?: boolean | undefined;
+  pinnedAction: boolean;
 }) {
   const form = useDeployForm({ appId, binary, suggested });
   const { api, replacing, targetResolved } = form;

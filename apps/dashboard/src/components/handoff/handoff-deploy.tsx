@@ -29,6 +29,7 @@ export function HandoffDeploy({ binary }: { binary: File | undefined }) {
             binary={binary}
             suggested={deploySuggestion(link)}
             minimal={minimal}
+            pinnedAction={false}
           />
         ) : (
           // Only ever seen when the deploy failed: a run that lands leaves for the app it made
