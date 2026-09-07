@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/source-code-pro";
+@import "@fontsource-variable/space-grotesk";
 
 @custom-variant dark (&:is(.dark *));
 @source "../../../../apps/**/*.{ts,tsx}";
@@ -21,7 +22,7 @@ body {
 }
 
 @theme inline {
-  --font-heading: var(--font-sans);
+  --font-heading: Space Grotesk Variable, ui-sans-serif, system-ui, sans-serif;
   --font-sans: Source Code Pro Variable, ui-monospace, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -66,7 +67,7 @@ body {
   --radius-4xl: var(--radius);
   --font-mono: Source Code Pro Variable, ui-monospace, monospace;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --radius: 1.5rem;
+  --radius: 0.375rem;
   --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
   --tracking-tight: calc(var(--tracking-normal) - 0.025em);
   --tracking-wide: calc(var(--tracking-normal) + 0.025em);
@@ -109,41 +110,41 @@ body {
 }
 
 :root {
-  --background: oklch(0.945 0.021 106);
-  --foreground: oklch(0.25 0.03 145);
-  --card: oklch(0.985 0.008 106);
-  --card-foreground: oklch(0.25 0.03 145);
-  --popover: oklch(0.985 0.008 106);
-  --popover-foreground: oklch(0.25 0.03 145);
+  --background: oklch(0.975 0.004 160);
+  --foreground: oklch(0.22 0.028 158);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.028 158);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.028 158);
   --primary: oklch(0.627 0.17 149.2);
-  --primary-foreground: oklch(0.99 0.006 106);
-  --secondary: oklch(0.915 0.026 106);
-  --secondary-foreground: oklch(0.28 0.05 145);
-  --muted: oklch(0.925 0.02 106);
-  --muted-foreground: oklch(0.5 0.025 132);
-  --accent: oklch(0.895 0.034 106);
-  --accent-foreground: oklch(0.25 0.03 145);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.945 0.006 160);
+  --secondary-foreground: oklch(0.26 0.04 158);
+  --muted: oklch(0.955 0.005 160);
+  --muted-foreground: oklch(0.52 0.02 158);
+  --accent: oklch(0.93 0.008 160);
+  --accent-foreground: oklch(0.22 0.028 158);
   --destructive: oklch(0.584 0.239 28.5);
   --warning: oklch(0.769 0.163 70.1);
-  --border: oklch(0.865 0.026 104);
-  --input: oklch(0.895 0.024 104);
-  --ring: oklch(0.627 0.17 149.2 / 0.6);
-  --shell: oklch(0.24 0.018 92);
-  --shell-foreground: oklch(0.93 0.016 100);
+  --border: oklch(0.22 0.028 158);
+  --input: oklch(0.96 0.004 160);
+  --ring: oklch(0.22 0.028 158);
+  --shell: oklch(0.22 0.028 158);
+  --shell-foreground: oklch(0.97 0.004 160);
   --chart-1: oklch(0.25 0.17 149.2);
   --chart-2: oklch(0.35 0.17 149.2);
   --chart-3: oklch(0.55 0.17 149.2);
   --chart-4: oklch(0.75 0.17 149.2);
   --chart-5: oklch(0.85 0.13 149.2);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.965 0.014 106);
-  --sidebar-foreground: oklch(0.25 0.03 145);
+  --radius: 0.375rem;
+  --sidebar: oklch(0.985 0.003 160);
+  --sidebar-foreground: oklch(0.22 0.028 158);
   --sidebar-primary: oklch(0.627 0.17 149.2);
   --sidebar-primary-foreground: oklch(0.99 0.006 106);
-  --sidebar-accent: oklch(0.905 0.03 106);
-  --sidebar-accent-foreground: oklch(0.25 0.03 145);
-  --sidebar-border: oklch(0.865 0.026 104);
-  --sidebar-ring: oklch(0.865 0.026 104);
+  --sidebar-accent: oklch(0.93 0.008 160);
+  --sidebar-accent-foreground: oklch(0.22 0.028 158);
+  --sidebar-border: oklch(0.22 0.028 158);
+  --sidebar-ring: oklch(0.22 0.028 158);
   --destructive-foreground: oklch(0.99 0.006 106);
   --font-sans: Source Code Pro Variable, ui-monospace, monospace;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
@@ -194,10 +195,10 @@ body {
   --accent-foreground: oklch(0.965 0.005 100);
   --destructive: oklch(0.69 0.2 23.9);
   --warning: oklch(0.828 0.155 76.4);
-  --border: oklch(0.295 0.014 140);
-  --input: oklch(0.295 0.014 140);
-  --ring: oklch(0.707 0.17 149.2);
-  --shell: oklch(0.125 0.012 120);
+  --border: oklch(0.42 0.018 150);
+  --input: oklch(0.24 0.014 150);
+  --ring: oklch(0.85 0.02 150);
+  --shell: oklch(0.11 0.012 150);
   --shell-foreground: oklch(0.93 0.012 100);
   --chart-1: oklch(0.35 0.17 149.2);
   --chart-2: oklch(0.55 0.17 149.2);
@@ -213,7 +214,7 @@ body {
   --sidebar-border: oklch(0.285 0.014 140);
   --sidebar-ring: oklch(0.707 0.17 149.2);
   --destructive-foreground: oklch(0.165 0.016 140);
-  --radius: 0.625rem;
+  --radius: 0.375rem;
   --font-sans: Source Code Pro Variable, ui-monospace, monospace;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: Source Code Pro Variable, ui-monospace, monospace;
@@ -245,6 +246,46 @@ body {
   --shadow-2xl: 0 1px 3px 0 oklch(0.08 0.01 120 / 0.5);
 }
 
+/* The offset frame this style is built on, dithered rather than blurred — a shadow drawn the way a
+   display with no alpha channel would have had to draw one. Opt-in rather than applied to every
+   surface: the CLI's `card` clips its own overflow, which would swallow it. */
+@utility dither-frame {
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    translate: 6px 6px;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(
+        45deg,
+        var(--border) 25%,
+        transparent 25% 75%,
+        var(--border) 75%
+      ),
+      linear-gradient(
+        45deg,
+        var(--border) 25%,
+        transparent 25% 75%,
+        var(--border) 75%
+      );
+    background-size: 4px 4px;
+    background-position:
+      0 0,
+      2px 2px;
+  }
+}
+
+/* A word that answers if you look at it, borrowed from the reference: the dots say there is more
+   here without spending a colour or an icon on saying so. */
+@utility hint-underline {
+  text-decoration: underline dotted var(--muted-foreground);
+  text-underline-offset: 4px;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -255,6 +296,10 @@ body {
   }
   html {
     @apply font-sans;
+  }
+  :is(h1, h2, h3, h4, h5, h6) {
+    @apply font-heading;
+    letter-spacing: -0.015em;
   }
 }
 
