@@ -20,7 +20,10 @@ export function TryItOut() {
         <h2 className="text-muted-foreground text-sm">Try it out</h2>
         <span aria-hidden="true" className="h-px flex-1 bg-border" />
       </div>
-      <div className="flex items-center rounded-full border bg-card/70 shadow-sm backdrop-blur-sm">
+      {/* The pill is the key, not the two controls inside it: they are `ghost` and have no face of
+          their own, and two keys butted together would read as two things to press rather than one
+          split in half. `:active` reaches here from whichever half is pressed. */}
+      <div className="key-face flex items-center rounded-full border bg-card/70 backdrop-blur-sm">
         <Button
           variant="ghost"
           size="lg"
