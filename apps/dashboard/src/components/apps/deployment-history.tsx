@@ -43,12 +43,16 @@ export function DeploymentHistory() {
     );
   }
 
+  // A card that happens to hold a table, rather than a table in a card: the title is the card's and
+  // the rows are one thing it shows. It keeps its own padding above and below, so the rows stop
+  // short of the edges and the rivets have face to sit on; only the sides are given over, so a row
+  // still runs the full width.
   return (
-    <Card className="overflow-hidden p-0">
-      <CardHeader className="px-4 pt-4">
+    <Card>
+      <CardHeader className="px-4">
         <CardTitle>Deployments</CardTitle>
       </CardHeader>
-      <CardContent className="px-0 pb-0">
+      <CardContent className="px-0">
         {newest.state === 'failed' && (
           <div className="px-4 pb-4">
             <FailedDeploymentNotice deployment={newest} />

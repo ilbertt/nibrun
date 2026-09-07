@@ -1,5 +1,5 @@
-import { Card } from '@repo/ui/components/card';
 import { Skeleton } from '@repo/ui/components/skeleton';
+import { TableContainer } from '@repo/ui/custom/table-container';
 import { AppsTable } from '#components/apps/apps-table.tsx';
 import { NoAppsEmpty } from '#components/apps/no-apps-empty.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
@@ -19,8 +19,8 @@ export function AppsList() {
   }
 
   return (
-    <Card className="overflow-hidden p-0">
+    <TableContainer>
       <AppsTable apps={apps.data} />
-    </Card>
+    </TableContainer>
   );
 }
