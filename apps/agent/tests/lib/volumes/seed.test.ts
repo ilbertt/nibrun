@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { lstat, mkdir, readdir, readFile, readlink, symlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { Effect, Either } from 'effect';
 import { type Owner, type SeedLimits, unpackSeed } from '#lib/volumes/seed.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
@@ -93,12 +93,16 @@ function unpacking({
     );
     return {
       refusal: refusalOf(result),
+      root: Either.isRight(result) ? relative(destination, result.right.root) : undefined,
       written: yield* Effect.promise(() => surveyed(destination)),
     };
   });
 }
 
 const NOTHING_REFUSED = 'nothing was refused';
+
+/** Where the unpack said the tree begins, as a name under it — empty where that is the tree. */
+const NOT_STRIPPED = '';
 
 /** The refusal as an operator reads it, which is the message rather than the tag. */
 function refusalOf(result: Either.Either<unknown, { message: string }>): string {
@@ -158,6 +162,109 @@ describe("the archive's root becomes the root of the tree", () => {
 
     // Masked to every mode bit when it was read back, so this is also "and nothing above them".
     expect(written.modes.helper).toBe(RUNNABLE_MODE);
+  });
+});
+
+/**
+ * The archive's root is the root of `data/`, and the two commonest ways of making one put the
+ * folder in the archive instead. What that costs an owner is an app that started with an empty
+ * `data/`, so a tree that is a single directory and nothing beside it is read as the folder.
+ */
+describe('an archive holding one folder is read as the folder somebody packed', () => {
+  test('the tree begins at the folder rather than above it', async () => {
+    const { refusal, root, written } = await run(
+      unpacking({
+        entries: [
+          { path: 'data/', type: TYPE_DIRECTORY },
+          { path: 'data/pb_data/data.db', body: 'rows' },
+        ],
+      }),
+    );
+
+    expect(refusal).toBe(NOTHING_REFUSED);
+    expect(root).toBe('data');
+    // Written where the archive put it: what moves is where the filesystem is written from.
+    expect(written.content['data/pb_data/data.db']).toBe('rows');
+  });
+
+  test('a folder the archive never declared is still the one it begins at', async () => {
+    const { root } = await run(
+      unpacking({ entries: [{ path: 'myapp/pb_data/data.db', body: 'rows' }] }),
+    );
+
+    expect(root).toBe('myapp');
+  });
+
+  test('a second name at the root is a root somebody meant', async () => {
+    const { root } = await run(
+      unpacking({
+        entries: [
+          { path: 'pb_data/', type: TYPE_DIRECTORY },
+          { path: 'pb_migrations/', type: TYPE_DIRECTORY },
+        ],
+      }),
+    );
+
+    expect(root).toBe(NOT_STRIPPED);
+  });
+
+  test('a file beside the folder is a root somebody meant', async () => {
+    const { root } = await run(
+      unpacking({
+        entries: [
+          { path: 'data/', type: TYPE_DIRECTORY },
+          { path: 'data/data.db', body: 'rows' },
+          { path: 'README', body: 'read me' },
+        ],
+      }),
+    );
+
+    expect(root).toBe(NOT_STRIPPED);
+  });
+
+  /**
+   * What decides whether this rule ever fires on a real archive: macOS writes `._data` beside the
+   * folder `tar` was pointed at, so without this the archives likeliest to need stripping are
+   * exactly the ones that would never get it.
+   */
+  test('names the archiver wrote are not roots somebody meant', async () => {
+    const { root } = await run(
+      unpacking({
+        entries: [
+          { path: '._data', body: 'apple double' },
+          { path: '.DS_Store', body: 'finder' },
+          { path: '__MACOSX/', type: TYPE_DIRECTORY },
+          { path: 'data/', type: TYPE_DIRECTORY },
+          { path: 'data/data.db', body: 'rows' },
+        ],
+      }),
+    );
+
+    expect(root).toBe('data');
+  });
+
+  test('a lone file is not a folder to begin at', async () => {
+    const { root } = await run(unpacking({ entries: [{ path: 'data.db', body: 'rows' }] }));
+
+    expect(root).toBe(NOT_STRIPPED);
+  });
+
+  /**
+   * The one a look at the tree afterwards would get wrong: what it points at is a directory to
+   * anything that asks the filesystem, and beginning there hands `mkfs.ext4 -d` a way back out.
+   */
+  test('a lone symlink is not a folder to begin at', async () => {
+    const { root } = await run(
+      unpacking({ entries: [{ path: 'latest', type: TYPE_SYMLINK, linkTarget: '.' }] }),
+    );
+
+    expect(root).toBe(NOT_STRIPPED);
+  });
+
+  test('an archive holding nothing begins where it always did', async () => {
+    const { root } = await run(unpacking({ entries: [] }));
+
+    expect(root).toBe(NOT_STRIPPED);
   });
 });
 
@@ -304,7 +411,7 @@ test('bytes that are not a gzipped tarball are refused rather than half unpacked
  * this is also the one test that proves the walk against a real tar's output end to end.
  */
 test('an archive a real tar wrote from the tree root unpacks whole', async () => {
-  const { refusal, written } = await run(
+  const { refusal, root, written } = await run(
     Effect.gen(function* () {
       const directory = yield* temporaryDirectory;
       const source = join(directory, 'source');
@@ -321,12 +428,41 @@ test('an archive a real tar wrote from the tree root unpacks whole', async () =>
       );
       return {
         refusal: refusalOf(result),
+        root: Either.isRight(result) ? relative(destination, result.right.root) : undefined,
         written: yield* Effect.promise(() => surveyed(destination)),
       };
     }),
   );
 
   expect(refusal).toBe(NOTHING_REFUSED);
+  expect(root).toBe(NOT_STRIPPED);
   expect(written.content['pb_data/data.db']).toBe('rows');
   expect(written.links.latest).toBe('pb_data/data.db');
+});
+
+/** And the mistake itself, as a real `tar` writes it: the folder it was named, not the inside. */
+test('an archive a real tar wrote from the folder above begins at the folder', async () => {
+  const { refusal, root } = await run(
+    Effect.gen(function* () {
+      const directory = yield* temporaryDirectory;
+      const source = join(directory, 'source');
+      yield* Effect.promise(async () => {
+        await mkdir(join(source, 'data', 'pb_data'), { recursive: true });
+        await writeFile(join(source, 'data', 'pb_data', 'data.db'), 'rows');
+      });
+      const archivePath = join(directory, 'archive.tar.gz');
+      yield* Effect.promise(() => Bun.$`tar czf ${archivePath} -C ${source} data`.quiet());
+      const destination = join(directory, 'tree');
+      const result = yield* Effect.either(
+        unpackSeed({ archivePath, destination, owner: OWNER, limits: ROOMY }),
+      );
+      return {
+        refusal: refusalOf(result),
+        root: Either.isRight(result) ? relative(destination, result.right.root) : undefined,
+      };
+    }),
+  );
+
+  expect(refusal).toBe(NOTHING_REFUSED);
+  expect(root).toBe('data');
 });
