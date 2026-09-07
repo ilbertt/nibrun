@@ -27,11 +27,11 @@ import {
   NO_START_ATTEMPTS,
   newInstanceRecord,
 } from '#lib/report/instance-record.ts';
-import { ensureArtifactImage } from '#lib/vm/artifacts.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT, type UnitStatus } from '#lib/vm/unit-status.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
@@ -250,8 +250,8 @@ function isStartable({
 }
 
 /**
- * One entry per digest: two apps deploying the same bytes share the image, and fetching it
- * twice at once would have them race for the same staging directory.
+ * One entry per digest: two apps deploying the same bytes share the image, so a batch that named
+ * it twice would only be two fibers joining one build and two warnings for one failed fetch.
  */
 function artifactsToStart(plan: ReconcilePlan) {
   return new Map(
@@ -271,20 +271,19 @@ function artifactsToStart(plan: ReconcilePlan) {
  * Best-effort: `startInstance` asks for the same image and is the one that reports a fetch that
  * could not be made, so a failure here is only a head start that was not taken.
  */
-export const prefetchArtifacts = Effect.fn('prefetchArtifacts')((plan: ReconcilePlan) =>
-  Effect.forEach(
+export const prefetchArtifacts = Effect.fn('prefetchArtifacts')(function* (plan: ReconcilePlan) {
+  const images = yield* ArtifactImages;
+  yield* Effect.forEach(
     artifactsToStart(plan),
     (artifact) =>
-      ensureArtifactImage(artifact).pipe(
-        Effect.catchAll((error) =>
-          Effect.logWarning('artifact prefetch failed', error).pipe(
-            Effect.annotateLogs({ digest: artifact.digest }),
-          ),
+      Effect.catchAll(images.ensure(artifact), (error) =>
+        Effect.logWarning('artifact prefetch failed', error).pipe(
+          Effect.annotateLogs({ digest: artifact.digest }),
         ),
       ),
     { discard: true, concurrency: 'unbounded' },
-  ),
-);
+  );
+});
 
 /**
  * What desired state says about an app, as the record's own fields. Named once because a start

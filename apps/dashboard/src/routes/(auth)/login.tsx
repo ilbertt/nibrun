@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { LoginForm } from '#components/login/login-form.tsx';
+import { sameOriginPath } from '#lib/same-origin-path.ts';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 type LoginSearch = {
@@ -8,7 +9,7 @@ type LoginSearch = {
 
 export const Route = createFileRoute('/(auth)/login')({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
-    redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
+    redirect: sameOriginPath(search.redirect),
   }),
   beforeLoad: ({ context, search }) => {
     if (context.session) {

@@ -108,6 +108,7 @@ export class AppsService extends Service {
   private readonly exportsRepo: ExportCancellation;
   private readonly artifactStorageRepo: ObjectRemoval;
   private readonly exportStorageRepo: ObjectRemoval;
+  private readonly importStorageRepo: ObjectRemoval;
   private readonly appHostDomain: string;
   private readonly secretsKey: TenantSecretsKey;
 
@@ -118,6 +119,7 @@ export class AppsService extends Service {
     exportsRepo,
     artifactStorageRepo,
     exportStorageRepo,
+    importStorageRepo,
     appHostDomain,
     secretsKey,
   }: {
@@ -127,6 +129,7 @@ export class AppsService extends Service {
     exportsRepo: ExportCancellation;
     artifactStorageRepo: ObjectRemoval;
     exportStorageRepo: ObjectRemoval;
+    importStorageRepo: ObjectRemoval;
     appHostDomain: string;
     secretsKey: TenantSecretsKey;
   }) {
@@ -137,6 +140,7 @@ export class AppsService extends Service {
     this.exportsRepo = exportsRepo;
     this.artifactStorageRepo = artifactStorageRepo;
     this.exportStorageRepo = exportStorageRepo;
+    this.importStorageRepo = importStorageRepo;
     this.appHostDomain = appHostDomain;
     this.secretsKey = secretsKey;
   }
@@ -341,6 +345,21 @@ export class AppsService extends Service {
   }
 
   /**
+   * The first `ready` a host reports for an app's filesystem, which is the moment it stops being
+   * creatable — and the only moment anything on this end can learn it.
+   *
+   * Every `ready` in the report rather than the ones that just changed, because there is no such
+   * thing here: a host reports what it observes, and which of those is the first is the column's
+   * own question. `stampDataInitialized` answers it, and writes nothing for an app already stamped.
+   */
+  async recordDataInitialized({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
+    const ready = volumes.filter((volume) => volume.state === 'ready').map((one) => one.appId);
+    if (ready.length > 0) {
+      await this.appsRepo.stampDataInitialized({ appIds: ready });
+    }
+  }
+
+  /**
    * The compute half, taken off the instances rather than the volumes: what a guest is spending
    * belongs to the microVM running the app, and a volume outlives every microVM that mounts it.
    *
@@ -399,8 +418,9 @@ export class AppsService extends Service {
 
   /**
    * Remove what a deleted app left behind: the binaries it was deployed from, the bundles it was
-   * exported into, and the rows naming them. The filesystem went with the host; these did not,
-   * and between them they are the tenant's code and every byte of their data.
+   * exported into, the archives it was given as starting data, and the rows naming them. The
+   * filesystem went with the host; these did not, and between them they are the tenant's code and
+   * every byte of their data.
    *
    * Driven off what is still there rather than off the moment an app became `deleted`, so a pass
    * that fails part way is retried by the next host report finding the same app still listed —
@@ -428,6 +448,7 @@ export class AppsService extends Service {
       await Promise.all([
         ...leftovers.exports.map((objectKey) => this.exportStorageRepo.remove({ objectKey })),
         ...leftovers.artifacts.map((objectKey) => this.artifactStorageRepo.remove({ objectKey })),
+        ...leftovers.imports.map((objectKey) => this.importStorageRepo.remove({ objectKey })),
       ]);
       await this.appsRepo.purge({ appId });
 
@@ -435,6 +456,7 @@ export class AppsService extends Service {
         appId,
         artifacts: leftovers.artifacts.length,
         exports: leftovers.exports.length,
+        imports: leftovers.imports.length,
       });
     } catch (error) {
       this.logger.error('purging a deleted app failed', { appId, error });

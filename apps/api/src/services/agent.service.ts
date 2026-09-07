@@ -17,14 +17,18 @@ import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { ExportsService } from '#services/exports.service.ts';
 import type { HostnamesService } from '#services/hostnames.service.ts';
+import type { ImportsService } from '#services/imports.service.ts';
 import { Service } from '#services/service.ts';
 
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_HOUR = 60 * 60;
 const SESSION_LIFETIME_MS = SECONDS_PER_HOUR * MS_PER_SECOND;
 
-/** What a report is borrowed for, and nothing else artifacts can do. */
+/** What a report is borrowed for, and nothing else an upload's own service can do. */
 export type UploadSweep = Pick<ArtifactsService, 'sweepAbandoned'>;
+
+/** The same, plus the archives this report's own volume states have just made unusable. */
+export type ImportSweep = UploadSweep & Pick<ImportsService, 'sweepSpent'>;
 
 /** Likewise for hostnames: a report is the clock, not permission to add or remove one. */
 export type HostnameReconcile = Pick<HostnamesService, 'reconcile'>;
@@ -35,6 +39,7 @@ export class AgentService extends Service {
   private readonly appsService: AppsService;
   private readonly exportsService: ExportsService;
   private readonly artifactsService: UploadSweep;
+  private readonly importsService: ImportSweep;
   private readonly hostnamesService: HostnameReconcile;
 
   constructor({
@@ -43,6 +48,7 @@ export class AgentService extends Service {
     appsService,
     exportsService,
     artifactsService,
+    importsService,
     hostnamesService,
   }: {
     agentRepo: AgentRepositoryContract;
@@ -50,6 +56,7 @@ export class AgentService extends Service {
     appsService: AppsService;
     exportsService: ExportsService;
     artifactsService: UploadSweep;
+    importsService: ImportSweep;
     hostnamesService: HostnameReconcile;
   }) {
     super();
@@ -58,6 +65,7 @@ export class AgentService extends Service {
     this.appsService = appsService;
     this.exportsService = exportsService;
     this.artifactsService = artifactsService;
+    this.importsService = importsService;
     this.hostnamesService = hostnamesService;
   }
 
@@ -74,7 +82,8 @@ export class AgentService extends Service {
     // identity across a reinstall. Nothing allocates one yet, so its own is honoured.
     const hostId = request.hostId ?? Value.Parse(HostIdSchema, crypto.randomUUID());
     const sessionToken = Value.Parse(SecretStringSchema, crypto.randomUUID());
-    await this.agentRepo.saveSession({ sessionToken, hostId });
+    const expiresAt = new Date(Date.now() + SESSION_LIFETIME_MS);
+    await this.agentRepo.saveSession({ sessionToken, hostId, expiresAt });
 
     this.logger.info('agent session opened', {
       hostId,
@@ -85,10 +94,7 @@ export class AgentService extends Service {
     return {
       hostId,
       sessionToken,
-      expiresAt: Value.Parse(
-        TimestampSchema,
-        new Date(Date.now() + SESSION_LIFETIME_MS).toISOString(),
-      ),
+      expiresAt: Value.Parse(TimestampSchema, expiresAt.toISOString()),
       poll: DEFAULT_AGENT_POLL_SETTINGS,
     };
   }
@@ -131,6 +137,11 @@ export class AgentService extends Service {
     await this.agentRepo.observeReport({ reported });
     await this.deploymentsService.applyHostReport({ reported });
     await this.appsService.recordVolumeUsage({ volumes: reported.volumes });
+    // Before the deletions below, which read the same list for `deleted`: a filesystem that is
+    // ready and one that is gone are different volumes, so the order between them carries nothing
+    // — but a stamp is what stops the next deployment offering to create data that already exists,
+    // and the sooner it lands the smaller that window is.
+    await this.appsService.recordDataInitialized({ volumes: reported.volumes });
     await this.appsService.recordComputeUsage({ instances: reported.instances });
     await this.appsService.completeDeletions({ volumes: reported.volumes });
     await this.exportsService.applyHostReport({ reported });
@@ -141,6 +152,10 @@ export class AgentService extends Service {
     // Nothing to do with this report. A report is simply the clock this process has, and an
     // upload nobody ever came back about is work that needs one.
     await this.artifactsService.sweepAbandoned();
+    await this.importsService.sweepAbandoned();
+    // Not the same clock at all: this one reads what the report just wrote, because
+    // `recordDataInitialized` above is what makes an archive spent.
+    await this.importsService.sweepSpent();
     // The same clock, for the same reason: whether a custom hostname has been pointed at us is
     // decided in somebody else's DNS, so there is no moment to act on but a passing one.
     await this.hostnamesService.reconcile();

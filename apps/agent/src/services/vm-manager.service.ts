@@ -7,7 +7,6 @@ import type { AppSlot } from '#lib/network/slot.ts';
 import { ensureTap, refreshNeighbour } from '#lib/network/tap.ts';
 import { readFilesystemSpace } from '#lib/report/capacity.ts';
 import { readHostVersions } from '#lib/report/versions.ts';
-import * as Artifacts from '#lib/vm/artifacts.ts';
 import * as Firecracker from '#lib/vm/firecracker-api.ts';
 import { renderFirecrackerConfig } from '#lib/vm/firecracker-config.ts';
 import { buildInstanceConfigImage } from '#lib/vm/instance-env.ts';
@@ -29,6 +28,7 @@ import { GUEST_VSOCK_FILENAME, vmWorkingDir } from '#lib/vm/vsock.ts';
 import { readCacheDiskBytes } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -51,6 +51,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     const config = yield* AgentConfig;
     const path = yield* Path.Path;
     const fs = yield* FileSystem.FileSystem;
+    const images = yield* ArtifactImages;
     const logs = yield* TenantLogReceiver;
     const zerofs = yield* ZerofsTopology;
     const agentState = yield* AgentState;
@@ -211,9 +212,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       // taken against — and a start that still found a stamp would restore the old guest onto
       // the new deployment's disk rather than boot the new one.
       yield* discardSnapshot(desired.appId);
-      const [fetching, artifactImagePath] = yield* Effect.timed(
-        Artifacts.ensureArtifactImage(desired.artifact),
-      );
+      const [fetching, artifactImagePath] = yield* Effect.timed(images.ensure(desired.artifact));
       const [staging] = yield* Effect.timed(
         stage({ desired, slot, dataDevicePath, artifactImagePath }),
       );
@@ -367,8 +366,9 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
      *
      * The stamp is checked before anything starts, and a snapshot that fails the check is thrown
      * away rather than left: it is unloadable from here on, and a stamp on disk is what a start
-     * reads to decide it is a restore. The start itself consumes the stamp, so every way this can
-     * fail past that point leaves the next start a cold boot.
+     * reads to decide it is a restore. Past the check, every way this can fail leaves the next
+     * start a cold boot — the start consumes the stamp where it runs, and the snapshot is
+     * discarded below where it does not.
      */
     const wake = Effect.fn('VmManager.wake')(function* ({
       appId,
@@ -387,10 +387,10 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       // caused this is waiting on — the stamp check above it happens before anything is asked
       // of the VMM and costs a file read.
       const [restoring] = yield* Effect.timed(
-        Effect.gen(function* () {
-          yield* Systemd.start(appId);
-          yield* Effect.ensuring(
-            Effect.onError(
+        Effect.ensuring(
+          Effect.gen(function* () {
+            yield* Systemd.start(appId);
+            yield* Effect.onError(
               Effect.gen(function* () {
                 yield* Firecracker.loadSnapshot({
                   socketPath,
@@ -407,17 +407,21 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
               // The start already consumed the stamp, so this Firecracker holds no guest and never
               // will: stopping it is what leaves a cold boot rather than a process in the way of one.
               () => Effect.ignore(Systemd.stop(appId)),
-            ),
-            // Every way out, so no retry of a restore that failed halfway can find the files it did
-            // not finish with. The stamp is already gone and would stop a second load on its own;
-            // this is what keeps at-most-once from resting on that single fact.
-            //
-            // Unlinking while Firecracker still has the memory file mapped keeps the mapping alive
-            // and hands the disk back the moment the microVM exits, so the successful path pays
-            // nothing for it either.
-            forgetSnapshot(appId),
-          );
-        }),
+            );
+          }),
+          // Every way out, the start included. A unit systemd would not start — its burst limit
+          // hit, its runtime directory gone — never reached the stamp, so nothing consumed it: left
+          // there, the next wake reads the same stamp and retries the same start, with no way down
+          // to a cold boot because the failure is not `SnapshotUnusable`, while the files beside it
+          // count against every other app's budget. Past the start the stamp is already gone and
+          // would stop a second load on its own; this is what keeps at-most-once from resting on
+          // that single fact.
+          //
+          // Unlinking while Firecracker still has the memory file mapped keeps the mapping alive
+          // and hands the disk back the moment the microVM exits, so the successful path pays
+          // nothing for it either.
+          forgetSnapshot(appId),
+        ),
       );
       yield* Effect.logInfo('instance awake').pipe(
         Effect.annotateLogs({ appId, slot: slot.slot, restoreMs: Duration.toMillis(restoring) }),
@@ -446,6 +450,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
   dependencies: [
     AgentConfig.Default,
     AgentState.Default,
+    ArtifactImages.Default,
     TenantLogReceiver.Default,
     ZerofsTopology.Default,
   ],

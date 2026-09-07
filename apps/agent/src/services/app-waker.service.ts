@@ -12,7 +12,6 @@ import {
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
-import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { RefreshSignal } from '#services/refresh-signal.service.ts';
@@ -247,7 +246,6 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
   dependencies: [
     AgentConfig.Default,
     AgentState.Default,
-    ArtifactStore.Default,
     CommandRunner.Default,
     DesiredStateCache.Default,
     RefreshSignal.Default,

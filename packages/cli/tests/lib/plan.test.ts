@@ -1,10 +1,11 @@
 import { beforeEach, expect, test } from 'bun:test';
+import type { InitialData } from '#lib/initial-data.ts';
 import { apiHolding, deploymentsHolding, listedApp } from '#tests/support/api.ts';
 import { recordingPrompts } from '#tests/support/prompts.ts';
 
 const prompts = await recordingPrompts();
 
-const { completeOptions } = await import('#lib/plan.ts');
+const { completeOptions, validatePort } = await import('#lib/plan.ts');
 
 beforeEach(() => {
   prompts.reset();
@@ -76,6 +77,26 @@ test('an app the owner cannot deploy onto is not offered', async () => {
   ]);
 });
 
+const SEED_FOLDER: InitialData = { kind: 'folder', path: '/tmp/seed' };
+
+// An app's data is created as the app is, so a folder has already said this is a new app — and
+// the api would refuse the archive against any of the ones the question would have offered.
+test('a folder to start the data from is not a question about which app', async () => {
+  const resolved = await completeOptions({
+    api: apiListing({ apps: [{ slug: 'demo-abc123', state: 'active' }] }),
+    options: { dataFolder: SEED_FOLDER },
+    binarySource: '/tmp/my-server',
+    args: [],
+  });
+
+  expect(resolved).toEqual({ dataFolder: SEED_FOLDER, name: 'my-server', port: 3000 });
+  expect(prompts.transcript()).toEqual([
+    'text:Name the app (my-server)',
+    'text:Which HTTP port does the binary listen on? (3000)',
+    'confirm:Create my-server and deploy?',
+  ]);
+});
+
 test('a flag already given is not asked about again', async () => {
   const resolved = await completeOptions({
     api: apiListing({ apps: [] }),
@@ -128,4 +149,17 @@ test('declining the confirmation cancels rather than deploying', async () => {
   });
 
   await expect(attempt).rejects.toThrow('Cancelled.');
+});
+
+test('a port is a whole number above zero, so nothing, zero and a negative are refused', () => {
+  const refused = 'Ports are whole numbers above zero.';
+
+  expect(validatePort('')).toBe(refused);
+  expect(validatePort(' ')).toBe(refused);
+  expect(validatePort('0')).toBe(refused);
+  expect(validatePort('-5')).toBe(refused);
+});
+
+test('a port typed as one is passed', () => {
+  expect(validatePort('8080')).toBeUndefined();
 });

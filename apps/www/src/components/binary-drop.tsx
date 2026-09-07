@@ -11,7 +11,7 @@ export function BinaryDrop() {
       <BinaryDropTarget
         inputId={BINARY_INPUT_ID}
         binary={handoff.binary}
-        title="Drop it here"
+        title="Drop your binary here"
         caption={sending(handoff)}
         busy={handoff.sending}
         invalid={handoff.failure !== undefined}

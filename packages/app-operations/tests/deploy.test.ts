@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
 import type { Filename } from '@repo/protocol';
+import { MAX_IMPORT_SIZE_BYTES } from '#archive.ts';
 import { deploy, describeUnservedDeployment } from '#deploy.ts';
 import type { DeployStep } from '#release.ts';
 import { answering } from '#tests/support/api.ts';
@@ -12,9 +13,12 @@ import {
   PLATFORM,
   SLUG,
 } from '#tests/support/app.ts';
+import { gzippedTarball } from '#tests/support/archives.ts';
 import type { UploadProgress } from '#upload.ts';
 
 const PUT_URL = 'https://store.example/artifact-1?signature=x';
+const IMPORT_PUT_URL = 'https://store.example/import-1?signature=x';
+const IMPORT_ID = 'import-1';
 const PORT = 8080;
 const SIZE_BYTES = 1_048_576;
 const PART_BYTES = 262_144;
@@ -56,6 +60,14 @@ function apiHolding({
         },
       };
     }
+    function pendingImport() {
+      return {
+        patch: (body: unknown) => {
+          sent.push({ what: 'import patch', body });
+          return Promise.resolve({ data: { id: IMPORT_ID }, error: null });
+        },
+      };
+    }
     return {
       patch: (body: unknown) => {
         sent.push({ what: 'app patch', body });
@@ -65,6 +77,15 @@ function apiHolding({
         post: (body: unknown) => {
           sent.push({ what: 'artifact', body });
           return Promise.resolve({ data: created, error: null });
+        },
+      }),
+      imports: Object.assign(pendingImport, {
+        post: (body: unknown) => {
+          sent.push({ what: 'import', body });
+          return Promise.resolve({
+            data: { importId: IMPORT_ID, url: IMPORT_PUT_URL },
+            error: null,
+          });
         },
       }),
       deployments: {
@@ -93,13 +114,21 @@ function binary() {
   return { name: 'my-server' as Filename, body: new Blob([new Uint8Array(SIZE_BYTES)]) };
 }
 
+/** A real one, because a send now reads the front of what it is given before it sends it. */
+function archive() {
+  return { name: 'data.tar.gz' as Filename, body: new Blob([gzippedTarball()]) };
+}
+
+/** Enough that nothing refuses it for being empty, and nothing like an archive. */
+const NOT_AN_ARCHIVE_BYTES = 64;
+
 const REAL_FETCH = globalThis.fetch;
 
 /** The object store the presigned url points at, and what every request to it is answered with. */
-function storeAnswering({ refuses, sent }: { refuses?: boolean; sent: Sent[] }): void {
+function storeAnswering({ refuses, sent }: { refuses?: string; sent: Sent[] }): void {
   globalThis.fetch = ((url: string) => {
     sent.push({ what: 'put', body: url });
-    if (refuses === true) {
+    if (refuses === url) {
       return Promise.resolve(
         new Response('<Error><Message>the length is not what was signed</Message></Error>', {
           status: REFUSED,
@@ -261,7 +290,7 @@ describe('the bytes go to the store, and the api is told how that went', () => {
   // nothing else can find out about.
   test('a refused upload is reported as failed and still raised', async () => {
     const sent: Sent[] = [];
-    storeAnswering({ refuses: true, sent });
+    storeAnswering({ refuses: PUT_URL, sent });
 
     const attempt = deploy({
       api: apiHolding({ apps: [{ id: APP_ID, slug: SLUG }], sent }),
@@ -288,6 +317,112 @@ describe('the bytes go to the store, and the api is told how that went', () => {
     await expect(attempt).rejects.toThrow(
       'The api accepted the upload without saying what it stored.',
     );
+  });
+});
+
+describe("an archive the app's data is created from", () => {
+  test('travels the same way the binary does, and is named on the deployment', async () => {
+    const sent: Sent[] = [];
+    storeAnswering({ sent });
+
+    await deploy({
+      api: apiHolding({ apps: [], sent }),
+      binary: binary(),
+      args: [],
+      initialData: archive(),
+    });
+
+    expect(sent.map((each) => each.what)).toEqual([
+      'create',
+      'artifact',
+      'put',
+      'artifact patch',
+      'import',
+      'put',
+      'import patch',
+      'deployment',
+    ]);
+    expect(sent[4]).toEqual({
+      what: 'import',
+      body: { filename: 'data.tar.gz', sizeBytes: archive().body.size },
+    });
+    expect(sent[5]).toEqual({ what: 'put', body: IMPORT_PUT_URL });
+    expect(sent[6]).toEqual({ what: 'import patch', body: { upload: 'complete' } });
+    expect(sent[7]).toEqual({
+      what: 'deployment',
+      body: { artifactId: ARTIFACT_ID, initialDataFrom: IMPORT_ID },
+    });
+  });
+
+  // The row names an object nothing else knows is empty, and the same end that saw the upload fail
+  // is the only one that can say so.
+  test('a refused upload is reported as failed and still raised', async () => {
+    const sent: Sent[] = [];
+    storeAnswering({ refuses: IMPORT_PUT_URL, sent });
+
+    const attempt = deploy({
+      api: apiHolding({ apps: [], sent }),
+      binary: binary(),
+      args: [],
+      initialData: archive(),
+    });
+
+    await expect(attempt).rejects.toThrow('the length is not what was signed');
+    expect(sent.at(-1)).toEqual({ what: 'import patch', body: { upload: 'failed' } });
+  });
+
+  /**
+   * The api refuses the same bytes for the same reasons, but only once every one of them has
+   * arrived — so what this spares a caller is the upload, and every caller gets it rather than
+   * each remembering to ask. The CLI packs its own archive and never asked.
+   */
+  test('more data than the api would sign for is refused before anything is created', async () => {
+    const sent: Sent[] = [];
+    storeAnswering({ sent });
+    const oversized = archive();
+
+    const attempt = deploy({
+      api: apiHolding({ apps: [], sent }),
+      binary: binary(),
+      args: [],
+      initialData: {
+        ...oversized,
+        body: {
+          size: MAX_IMPORT_SIZE_BYTES + 1,
+          stream: oversized.body.stream.bind(oversized.body),
+        } as Blob,
+      },
+    });
+
+    await expect(attempt).rejects.toThrow('at most 1 GiB of data');
+    expect(sent.some((one) => one.what === 'import')).toBe(false);
+  });
+
+  test('and bytes that are not an archive at all, before the store is asked for a url', async () => {
+    const sent: Sent[] = [];
+    storeAnswering({ sent });
+
+    const attempt = deploy({
+      api: apiHolding({ apps: [], sent }),
+      binary: binary(),
+      args: [],
+      initialData: {
+        name: 'data.tar.gz' as Filename,
+        body: new Blob([new Uint8Array(NOT_AN_ARCHIVE_BYTES)]),
+      },
+    });
+
+    await expect(attempt).rejects.toThrow('is not a .tar.gz');
+    expect(sent.some((one) => one.what === 'import')).toBe(false);
+  });
+
+  test('a deployment nobody gave one to names none', async () => {
+    const sent: Sent[] = [];
+    storeAnswering({ sent });
+
+    await deploy({ api: apiHolding({ apps: [], sent }), binary: binary(), args: [] });
+
+    expect(sent.at(-1)).toEqual({ what: 'deployment', body: { artifactId: ARTIFACT_ID } });
   });
 });
 

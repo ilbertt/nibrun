@@ -18,6 +18,7 @@ import type { command as appsUpdateCmd } from './commands/apps/update.ts';
 import type { command as loginCmd } from './commands/login.ts';
 import type { command as rootCmd } from './commands/_root.ts';
 import type { command as runCommandCmd } from './commands/run/[command].ts';
+import type { command as serveDirectoryCmd } from './commands/serve/[directory].ts';
 import type { command as upgradeCmd } from './commands/upgrade.ts';
 
 declare module '@parshjs/core' {
@@ -112,6 +113,10 @@ declare module '@parshjs/core' {
       rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'run [command]': {
+      parents: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'serve [directory]': {
       parents: {};
       rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
@@ -246,6 +251,17 @@ export const commandTree: RuntimeNode = {
       paramChild: {
         segment: { kind: 'param', name: 'command' },
         command: { path: 'run [command]', load: () => import('./commands/run/[command].ts').then((m) => m.command) },
+        literalChildren: {},
+        paramChild: null,
+      },
+    },
+    'serve': {
+      segment: { kind: 'literal', value: 'serve' },
+      command: null,
+      literalChildren: {},
+      paramChild: {
+        segment: { kind: 'param', name: 'directory' },
+        command: { path: 'serve [directory]', load: () => import('./commands/serve/[directory].ts').then((m) => m.command) },
         literalChildren: {},
         paramChild: null,
       },

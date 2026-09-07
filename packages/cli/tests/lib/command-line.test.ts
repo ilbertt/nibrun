@@ -37,8 +37,26 @@ test('single quotes pass their contents through untouched', () => {
   ]);
 });
 
-test('a backslash outside single quotes escapes what follows it', () => {
+test('a backslash outside quotes escapes what follows it', () => {
   expect(parseCommandLine('./my-server --name foo\\ bar').args).toEqual(['--name', 'foo bar']);
+});
+
+test('inside double quotes a backslash before what the shell would not escape is kept', () => {
+  expect(parseCommandLine('"C:\\Users\\foo\\bin.exe" --port 8080')).toEqual({
+    binarySource: 'C:\\Users\\foo\\bin.exe',
+    args: ['--port', '8080'],
+  });
+});
+
+test('a regex inside double quotes arrives with its backslashes', () => {
+  expect(parseCommandLine('./my-server --match "\\d+\\s"').args).toEqual(['--match', '\\d+\\s']);
+});
+
+test('inside double quotes a backslash still escapes a quote or another backslash', () => {
+  expect(parseCommandLine('./my-server --name "say \\"hi\\" \\\\ done"').args).toEqual([
+    '--name',
+    'say "hi" \\ done',
+  ]);
 });
 
 test('an argument may be deliberately empty', () => {

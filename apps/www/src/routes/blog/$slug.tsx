@@ -1,4 +1,3 @@
-import { WWW_SITE } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileTextIcon } from 'lucide-react';
@@ -26,26 +25,14 @@ export const Route = createFileRoute('/blog/$slug')({
     if (post === undefined) {
       return {};
     }
-    const head = pageHead({
+    return pageHead({
       path: `/blog/${post.slug}`,
       title: pageTitle(post.title),
       description: post.description,
       publishedAt: post.date,
       image: post.image,
+      markdown: { path: markdownPath(post), title: 'This post in Markdown' },
     });
-
-    return {
-      ...head,
-      links: [
-        ...head.links,
-        {
-          rel: 'alternate',
-          type: 'text/markdown',
-          href: markdownPath(post),
-          title: 'This post in Markdown',
-        },
-      ],
-    };
   },
   component: RouteComponent,
 });
@@ -92,7 +79,7 @@ function ArticleBody({ post }: { post: BlogPost }) {
 }
 
 function markdownPath(post: BlogPost): string {
-  return `${WWW_SITE.url}/blog/${post.slug}.md`;
+  return `/blog/${post.slug}.md`;
 }
 
 function RouteComponent() {
@@ -123,7 +110,7 @@ function RouteComponent() {
               variant="outline"
               size="sm"
               className="self-start"
-              render={<a href={`/blog/${post.slug}.md`} />}
+              render={<a href={markdownPath(post)} />}
             >
               <FileTextIcon data-icon="inline-start" />
               View markdown

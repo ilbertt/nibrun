@@ -1,3 +1,4 @@
+import { CellBar } from '@repo/ui/custom/cell-bar';
 import type { LucideIcon } from 'lucide-react';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 
@@ -16,22 +17,6 @@ const FULL = 1;
 const NEARLY_FULL = 0.8;
 const CRITICALLY_FULL = 0.9;
 
-/** Sized to the line of text beside it, so a row is one line tall rather than the ring's. */
-const RING_PIXELS = 18;
-const RING_STROKE = 2.5;
-const RING_RADIUS = (RING_PIXELS - RING_STROKE) / 2;
-const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
-
-/**
- * What a share too small to draw is drawn as anyway.
- *
- * A tenant using half a percent of an 8 GiB volume rounds to a ring with nothing on it, which
- * reads as the one thing that is not true — that nothing has been written. The figure beside it
- * is exact and `aria-valuenow` carries the real share; this is only so that a little and none do
- * not look the same.
- */
-const SMALLEST_VISIBLE_ARC = 2;
-
 /** No reading rather than none spent, which is what a nought here would be read as. */
 const UNMEASURED = '—';
 
@@ -42,11 +27,11 @@ export type ResourceReading = {
   measuredAt: string;
 };
 
-function arcColour(share: number): string {
+function fillColour(share: number): string {
   if (share >= CRITICALLY_FULL) {
-    return 'text-destructive';
+    return 'bg-destructive';
   }
-  return share >= NEARLY_FULL ? 'text-warning' : 'text-primary';
+  return share >= NEARLY_FULL ? 'bg-warning' : 'bg-primary';
 }
 
 /**
@@ -57,12 +42,13 @@ function percentOf(share: number): number {
   return Math.round(Math.min(share, FULL) * PERCENT_SCALE);
 }
 
-function arcLength(share: number): number {
-  const drawn = Math.min(share, FULL) * RING_LENGTH;
-  return share > 0 ? Math.max(drawn, SMALLEST_VISIBLE_ARC) : 0;
-}
-
-function ringLabel({ label, reading }: { label: string; reading: ResourceReading | null }): string {
+function readingLabel({
+  label,
+  reading,
+}: {
+  label: string;
+  reading: ResourceReading | null;
+}): string {
   return reading
     ? `${label} used, measured ${dayAndMinute(reading.measuredAt)}`
     : `${label} not measured yet`;
@@ -95,52 +81,25 @@ export function ResourceMeter({
   showsPercent?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="size-4 shrink-0" />
-        {label}
-      </span>
-      <span className="flex items-center gap-3">
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-4">
+        <span className="flex items-center gap-2 text-muted-foreground">
+          <Icon className="size-4 shrink-0" />
+          {label}
+        </span>
         <span className="font-mono tabular-nums">
           {reading?.used ?? UNMEASURED}
           <span className="text-muted-foreground">
             {reading && showsPercent ? ` (${percentOf(reading.share)}%)` : ''} / {total}
           </span>
         </span>
-        <svg
-          className={`shrink-0 -rotate-90 ${reading ? arcColour(reading.share) : ''}`}
-          width={RING_PIXELS}
-          height={RING_PIXELS}
-          viewBox={`0 0 ${RING_PIXELS} ${RING_PIXELS}`}
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={PERCENT_SCALE}
-          aria-valuenow={reading ? percentOf(reading.share) : undefined}
-          aria-label={ringLabel({ label, reading })}
-        >
-          <circle
-            className="text-muted"
-            cx={RING_PIXELS / 2}
-            cy={RING_PIXELS / 2}
-            r={RING_RADIUS}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={RING_STROKE}
-          />
-          {reading ? (
-            <circle
-              cx={RING_PIXELS / 2}
-              cy={RING_PIXELS / 2}
-              r={RING_RADIUS}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={RING_STROKE}
-              strokeLinecap="round"
-              strokeDasharray={`${arcLength(reading.share)} ${RING_LENGTH}`}
-            />
-          ) : null}
-        </svg>
-      </span>
+      </div>
+      <CellBar
+        share={reading?.share ?? null}
+        tone={reading ? fillColour(reading.share) : 'bg-border/30'}
+        label={readingLabel({ label, reading })}
+        rounded
+      />
     </div>
   );
 }

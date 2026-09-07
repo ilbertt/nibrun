@@ -18,8 +18,7 @@
       "!apps/dashboard/src/routeTree.gen.ts",
       "!apps/www/src/routeTree.gen.ts",
       "!apps/www/worker-configuration.d.ts",
-      "!packages/cli/src/command-tree.gen.ts",
-      "!packages/ui/src/components/*.tsx"
+      "!packages/cli/src/command-tree.gen.ts"
     ]
   },
   "formatter": {
@@ -181,6 +180,21 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/ui/src/components/*.tsx"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noLabelWithoutControl": "off",
+            "useFocusableInteractive": "off",
+            "useSemanticElements": "off"
+          },
+          "complexity": {
+            "useMaxParams": "off"
           }
         }
       }

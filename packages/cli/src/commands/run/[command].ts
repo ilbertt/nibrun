@@ -4,13 +4,18 @@ import { SHARED_OPTIONS } from '#config.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { binaryFrom, deploy } from '#lib/deploy.ts';
+import { initialDataFrom } from '#lib/initial-data.ts';
 import { createOutput } from '#lib/output.ts';
 import { completeOptions } from '#lib/plan.ts';
 import { RELEASE_OUTPUT } from '#lib/release.ts';
 
+// parsh spells a flag exactly as its key, and this one is read back out of the options it was
+// declared in — so the two halves are one name rather than two spellings of it.
+const DATA_FOLDER_FLAG = 'data-folder';
+
 export const command = defineCommand('run [command]', {
   description:
-    'Deploy a compiled binary and run it, from this machine or from an https url nibrun fetches it at. Quote the binary with its arguments to pass them on: nib run "./my-server serve --port 8080".',
+    'Deploy a compiled binary and run it, from this machine or from an https url nibrun fetches it at. Quote the binary with its arguments to pass them on: nib run "./my-server serve --port 8080". Every option a deploy takes is listed by nib run anything --help — any word will do in place of the binary, because the help does not read it.',
   params: {
     command: { schema: z.string().min(1) },
   },
@@ -28,6 +33,11 @@ export const command = defineCommand('run [command]', {
       description:
         'What the file at the url should hash to, as its release publishes it — for an archive, the archive rather than the executable inside it. nibrun refuses a download that hashes to anything else. Only for a url: a file on this machine is not fetched.',
     },
+    [DATA_FOLDER_FLAG]: {
+      schema: z.string().optional(),
+      description:
+        "A folder on this machine the app's data/ is created holding, or a .tar.gz or .zip already holding it. A folder is packed here; either way it is the root of the archive that becomes the root of data/, so a folder is not itself a directory inside it. Only for an app being created: the data of one that already exists was created when it was.",
+    },
     [SHARED_OPTIONS.port.name]: SHARED_OPTIONS.port.option,
     [SHARED_OPTIONS.extraPublicPort.name]: SHARED_OPTIONS.extraPublicPort.option,
     [SHARED_OPTIONS.env.name]: SHARED_OPTIONS.env.option,
@@ -42,9 +52,9 @@ export const command = defineCommand('run [command]', {
       detach,
       sha256,
       [SHARED_OPTIONS.extraPublicPort.name]: extraPublicPort,
+      [DATA_FOLDER_FLAG]: dataFolderPath,
       ...flags
     } = options;
-    const given = { ...flags, extraPublicPort };
     const { binarySource, args } = parseCommandLine(params.command);
     const { api } = context;
 
@@ -58,6 +68,8 @@ export const command = defineCommand('run [command]', {
     // questionnaire whose answers are then thrown away. A url is not opened here at all: the api
     // is the end that fetches it, and it is the end that says whether it could.
     const binary = await binaryFrom({ source: binarySource, sha256 });
+    const dataFolder = await initialDataFrom({ path: dataFolderPath, app: flags.app });
+    const given = { ...flags, extraPublicPort, dataFolder };
     ui.open('nib run');
 
     const resolved = interactive

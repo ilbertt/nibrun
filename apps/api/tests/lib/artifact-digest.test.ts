@@ -160,6 +160,9 @@ const ELF_CLASS_AT = 4;
 const ELF_CLASS_64 = 2;
 const ELF_ENDIANNESS_AT = 5;
 const ELF_LITTLE_ENDIAN = 1;
+const MACHINE_AT = 0x12;
+const MACHINE_X86_64 = 62;
+const MACHINE_AARCH64 = 183;
 const SEGMENT_TABLE_START_AT = 0x20;
 const SEGMENT_ENTRY_BYTES_AT = 0x36;
 const SEGMENT_COUNT_AT = 0x38;
@@ -172,6 +175,7 @@ const NO_SEGMENTS = 0;
 const LITTLE_ENDIAN = true;
 
 const GUEST_LOADER = '/lib64/ld-linux-x86-64.so.2';
+const AARCH64_LOADER = '/lib/ld-linux-aarch64.so.1';
 const NIX_LOADER =
   '/nix/store/xx7cm72qy2c0643cm1ipngd87aqwkcdp-glibc-2.40-66/lib/ld-linux-x86-64.so.2';
 const MUSL_LOADER = '/lib/ld-musl-x86_64.so.1';
@@ -180,13 +184,19 @@ const MUSL_LOADER = '/lib/ld-musl-x86_64.so.1';
 const PAST_THE_HEADER_BYTES = 131_072;
 
 /**
- * A 64-bit ELF whose only segment names a loader — or, given none, one that names no loader at
- * all, which is what a static binary looks like here.
+ * A 64-bit ELF for the machine given, whose only segment names a loader — or, given none, one
+ * that names no loader at all, which is what a static binary looks like here.
  *
  * The layout is spelled out rather than taken from `#lib/elf.ts`, so that a test asserting how
  * an ELF is read cannot be satisfied by the reader agreeing with itself.
  */
-function elfNaming(interpreter?: string): Uint8Array {
+function elfNaming({
+  interpreter,
+  machine = MACHINE_X86_64,
+}: {
+  interpreter?: string;
+  machine?: number;
+} = {}): Uint8Array {
   const path = interpreter === undefined ? new Uint8Array() : bytesOf(`${interpreter}\0`);
   const pathStart = ELF_HEADER_BYTES + SEGMENT_ENTRY_BYTES;
   const bytes = new Uint8Array(pathStart + path.length);
@@ -195,6 +205,7 @@ function elfNaming(interpreter?: string): Uint8Array {
   bytes.set(bytesOf('\x7fELF'));
   bytes[ELF_CLASS_AT] = ELF_CLASS_64;
   bytes[ELF_ENDIANNESS_AT] = ELF_LITTLE_ENDIAN;
+  view.setUint16(MACHINE_AT, machine, LITTLE_ENDIAN);
   view.setBigUint64(SEGMENT_TABLE_START_AT, BigInt(ELF_HEADER_BYTES), LITTLE_ENDIAN);
   view.setUint16(SEGMENT_ENTRY_BYTES_AT, SEGMENT_ENTRY_BYTES, LITTLE_ENDIAN);
   view.setUint16(
@@ -214,23 +225,55 @@ function inspectBytes(chunks: Uint8Array[]): Promise<ArtifactInspection> {
   return inspectArtifact({ stream: streamOf(chunks).stream, maxSizeBytes: PAST_THE_HEADER_BYTES });
 }
 
+describe('a binary built for another machine is refused before a host ever sees it', () => {
+  // The hole this closes: a static cross-compile names no loader, so nothing else here has
+  // anything to refuse it on, and it reaches a host that cannot exec it.
+  test('a static arm64 binary is refused, naming what it was built for', async () => {
+    expect(await inspectBytes([elfNaming({ machine: MACHINE_AARCH64 })])).toEqual({
+      outcome: 'unsupported-machine',
+      machine: MACHINE_AARCH64,
+    });
+  });
+
+  // Its loader is unsupported too, and being told to link against the guest's would be advice
+  // nobody building for arm64 can follow.
+  test('a dynamic one is refused for its machine rather than for its loader', async () => {
+    expect(
+      await inspectBytes([elfNaming({ interpreter: AARCH64_LOADER, machine: MACHINE_AARCH64 })]),
+    ).toEqual({ outcome: 'unsupported-machine', machine: MACHINE_AARCH64 });
+  });
+
+  test('the machine every app host runs is stored', async () => {
+    expect((await inspectBytes([elfNaming({ machine: MACHINE_X86_64 })])).outcome).toBe('stored');
+  });
+
+  test('where the chunks fall makes no difference to the verdict', async () => {
+    const split = [...elfNaming({ machine: MACHINE_AARCH64 })].map((byte) => Uint8Array.of(byte));
+
+    expect(await inspectBytes(split)).toEqual({
+      outcome: 'unsupported-machine',
+      machine: MACHINE_AARCH64,
+    });
+  });
+});
+
 describe('a loader the guest does not have is refused before a host ever sees it', () => {
   test('a binary built against a Nix toolchain is refused, naming the loader it asked for', async () => {
-    expect(await inspectBytes([elfNaming(NIX_LOADER)])).toEqual({
+    expect(await inspectBytes([elfNaming({ interpreter: NIX_LOADER })])).toEqual({
       outcome: 'unsupported-interpreter',
       interpreter: NIX_LOADER,
     });
   });
 
   test('a binary built against musl is refused the same way', async () => {
-    expect(await inspectBytes([elfNaming(MUSL_LOADER)])).toEqual({
+    expect(await inspectBytes([elfNaming({ interpreter: MUSL_LOADER })])).toEqual({
       outcome: 'unsupported-interpreter',
       interpreter: MUSL_LOADER,
     });
   });
 
   test('the loader the image actually ships is stored', async () => {
-    expect((await inspectBytes([elfNaming(GUEST_LOADER)])).outcome).toBe('stored');
+    expect((await inspectBytes([elfNaming({ interpreter: GUEST_LOADER })])).outcome).toBe('stored');
   });
 
   // The guest execs it directly, so naming no loader is the one case that needs nothing from
@@ -246,7 +289,7 @@ describe('a loader the guest does not have is refused before a host ever sees it
   });
 
   test('where the chunks fall makes no difference to the verdict', async () => {
-    const split = [...elfNaming(NIX_LOADER)].map((byte) => Uint8Array.of(byte));
+    const split = [...elfNaming({ interpreter: NIX_LOADER })].map((byte) => Uint8Array.of(byte));
 
     expect(await inspectBytes(split)).toEqual({
       outcome: 'unsupported-interpreter',
@@ -258,7 +301,7 @@ describe('a loader the guest does not have is refused before a host ever sees it
   // than at the end of an object that may be hundreds of megabytes.
   test('the rest of it is never pulled', async () => {
     const head = new Uint8Array(PAST_THE_HEADER_BYTES);
-    head.set(elfNaming(NIX_LOADER));
+    head.set(elfNaming({ interpreter: NIX_LOADER }));
     const chunks = [head, bytesOf('and a great deal more')];
     const { stream, delivered } = streamOf(chunks);
 

@@ -46,7 +46,7 @@ export type NewApp = {
  * one object — and deleting it for the app that is going would take the binary out from under the
  * one that stays. The last of them to be deleted is the one that finds it unreferenced.
  */
-export type Leftovers = { artifacts: ObjectKey[]; exports: ObjectKey[] };
+export type Leftovers = { artifacts: ObjectKey[]; exports: ObjectKey[]; imports: ObjectKey[] };
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
@@ -74,6 +74,7 @@ export abstract class AppsRepositoryContract {
   abstract clearComputeUsage(input: { appIds: readonly AppId[] }): Promise<void>;
   abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
+  abstract stampDataInitialized(input: { appIds: readonly AppId[] }): Promise<void>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
   abstract isDeletionFinishable(input: { appId: AppId }): Promise<boolean>;
   abstract listFinishableDeletions(input: { limit: number }): Promise<AppId[]>;
@@ -543,6 +544,25 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return rows.map((row) => row.app_id);
   }
 
+  /**
+   * The moment a host first said the filesystem exists, which is the moment it stops being
+   * creatable — and after which naming an archive to create it from is a refused request.
+   *
+   * `IS NULL` is what makes it once and what keeps it off the `set_updated_at` trigger. A volume
+   * reports `ready` on every pass, and an app whose `updated_at` moved every time a host spoke
+   * would look to its owner like somebody had just changed it.
+   */
+  async stampDataInitialized({ appIds }: { appIds: readonly AppId[] }): Promise<void> {
+    // Untagged, as `updateState` is: `sql.array` is a clause the generator blanks out before it
+    // parses the statement, and there is no row type to lose — this returns nothing.
+    await this.sql`
+      UPDATE nibrun.apps
+      SET data_initialized_at = now()
+      WHERE id = ANY(${this.sql.array([...appIds], TEXT_ARRAY)}::uuid[])
+        AND data_initialized_at IS NULL
+    `;
+  }
+
   async finishDeleting({ appId }: { appId: AppId }): Promise<boolean> {
     const rows = await this.sql.FinishDeletingApp`
       UPDATE nibrun.apps SET state = 'deleted'
@@ -570,7 +590,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * an app deployed a hundred times is a hundred rows over far fewer objects.
    */
   async listLeftovers({ appId }: { appId: AppId }): Promise<Leftovers> {
-    const [artifacts, exports] = await Promise.all([
+    const [artifacts, exports, imports] = await Promise.all([
       this.sql.SelectUnsharedArtifactKeys`
         /* @notNull object_key */
         SELECT DISTINCT ar.object_key
@@ -586,10 +606,19 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       this.sql.SelectExportKeysByApp`
         SELECT e.object_key FROM nibrun.exports e WHERE e.app_id = ${appId}
       `,
+      // No `DISTINCT` and no shared-key check, unlike the artifacts above: a key here is one row's
+      // and no other's, which is what not content-addressing them buys.
+      this.sql.SelectImportKeysByApp`
+        /* @notNull object_key */
+        SELECT im.object_key
+        FROM nibrun.imports im
+        WHERE im.app_id = ${appId} AND im.object_key IS NOT NULL
+      `,
     ]);
     return {
       artifacts: artifacts.map((row) => row.object_key),
       exports: exports.map((row) => row.object_key),
+      imports: imports.map((row) => row.object_key),
     };
   }
 
@@ -609,6 +638,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return this.sql.begin(async (tx) => {
       await tx.DeleteExportsByApp`DELETE FROM nibrun.exports WHERE app_id = ${appId}`;
       await tx.DeleteDeploymentsByApp`DELETE FROM nibrun.deployments WHERE app_id = ${appId}`;
+      await tx.DeleteImportsByApp`DELETE FROM nibrun.imports WHERE app_id = ${appId}`;
       await tx.DeleteArtifactsByApp`DELETE FROM nibrun.artifacts WHERE app_id = ${appId}`;
       await tx.DeleteAppUsageByApp`DELETE FROM nibrun.app_usage WHERE app_id = ${appId}`;
     });

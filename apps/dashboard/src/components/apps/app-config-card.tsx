@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
-import { CopyButton } from '@repo/ui/custom/copy-button';
+import { CopyableLine } from '@repo/ui/custom/copyable-line';
 import { AppActivation } from '#components/apps/app-activation.tsx';
 import { AppEnvironment } from '#components/apps/app-environment.tsx';
 import { AppRunCommand } from '#components/apps/app-run-command.tsx';
@@ -44,23 +44,12 @@ function ReachedOnItsOwnPort({ appId }: { appId: string }) {
       {publicIpv4 && extraPublicPort ? (
         // Nothing here links anywhere: it is not a URL, and what an owner does with it is paste it
         // into whatever is dialling the app. Same line as the run command for that reason.
-        <ReachedAt address={`${publicIpv4}:${extraPublicPort}`} />
+        <CopyableLine value={`${publicIpv4}:${extraPublicPort}`} />
       ) : (
         // Asked for and not yet answered for: the host says where it is on its first report, so
         // this is a release that has not started rather than an address that failed to arrive.
         <span className="text-muted-foreground">assigned when it starts</span>
       )}
-    </div>
-  );
-}
-
-function ReachedAt({ address }: { address: string }) {
-  return (
-    <div className="flex items-center gap-1 rounded-lg border bg-muted/40 py-1 pr-1 pl-3">
-      <code className="min-w-0 flex-1 select-all break-words font-mono text-xs tabular-nums">
-        {address}
-      </code>
-      <CopyButton value={address} />
     </div>
   );
 }

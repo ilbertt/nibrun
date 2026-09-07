@@ -113,10 +113,10 @@ export function SlideToDelete({
   return (
     <div
       ref={trackRef}
-      className="relative h-(--slide-handle-size) w-full touch-none select-none rounded-full bg-muted [--slide-handle-size:2.75rem]"
+      className="relative inset-well h-(--slide-handle-size) w-full touch-none select-none border-2 border-border bg-input [--slide-handle-size:2.5rem]"
     >
       <div
-        className="absolute inset-y-0 left-0 rounded-full bg-destructive/15"
+        className="absolute inset-y-0 left-0 bg-destructive/20"
         style={{ width: `calc(${travelled} + var(--slide-handle-size))` }}
       />
       <span
@@ -145,10 +145,11 @@ export function SlideToDelete({
         onPointerCancel={abandonSlide}
         onKeyDown={stepHandle}
         className={cn(
-          'absolute top-0 flex size-(--slide-handle-size) items-center justify-center rounded-full bg-destructive text-destructive-foreground outline-none focus-visible:ring-3 focus-visible:ring-destructive/30',
+          // The one thing on this track you grip, so it is raised where everything around it is sunk.
+          'absolute top-[-2px] bottom-[-2px] flex w-(--slide-handle-size) items-center justify-center border-2 border-border bg-destructive text-destructive-foreground outline-none focus-visible:ring-3 focus-visible:ring-destructive/30',
           pending ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing',
         )}
-        style={{ left: travelled }}
+        style={{ left: travelled, boxShadow: 'var(--raise)' }}
       >
         <Trash2Icon />
       </div>

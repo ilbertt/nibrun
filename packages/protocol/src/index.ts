@@ -173,11 +173,14 @@ export {
   FilesystemQueryIdSchema,
   type HostId,
   HostIdSchema,
+  type ImportId,
+  ImportIdSchema,
   type OwnerId,
   OwnerIdSchema,
   type VolumeId,
   VolumeIdSchema,
 } from '#domain/identifiers.ts';
+export { type Import, ImportSchema } from '#domain/import.ts';
 export {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,

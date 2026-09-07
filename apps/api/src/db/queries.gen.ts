@@ -42,6 +42,14 @@ export interface ISelectDesiredDeploymentsResult {
 export interface ISelectDesiredVolumesResult {
     app_id: IAppsColumns["id"];
     state: IAppsColumns["state"];
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row usable. */
+    seed_digest: IDesiredVolumesColumns["seed_digest"];
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    seed_size_bytes: IImportsColumns["size_bytes"];
+    /** Where the bytes are, present exactly while they are: absent before the upload has been read back, and absent again once the archive can no longer be used. Key within IMPORTS_BUCKET; which bucket is deploy configuration. */
+    seed_object_key: IDesiredVolumesColumns["seed_object_key"];
+    /** The name the archive was uploaded under; the key it lands under carries none. */
+    seed_original_file_name: IDesiredVolumesColumns["seed_original_file_name"];
 }
 
 /** Result of query `SelectDesiredHostnames`. */
@@ -440,12 +448,22 @@ export interface ISelectExportKeysByAppResult {
     object_key: IExportsColumns["object_key"];
 }
 
+/** Result of query `SelectImportKeysByApp`. */
+export interface ISelectImportKeysByAppResult {
+    /** Where the bytes are, present exactly while they are: absent before the upload has been read back, and absent again once the archive can no longer be used. Key within IMPORTS_BUCKET; which bucket is deploy configuration. */
+    object_key: NonNullable<IImportsColumns["object_key"]>;
+}
+
 /** Result of query `DeleteExportsByApp`. */
 export interface IDeleteExportsByAppResult {
 }
 
 /** Result of query `DeleteDeploymentsByApp`. */
 export interface IDeleteDeploymentsByAppResult {
+}
+
+/** Result of query `DeleteImportsByApp`. */
+export interface IDeleteImportsByAppResult {
 }
 
 /** Result of query `DeleteArtifactsByApp`. */
@@ -765,6 +783,16 @@ export interface ISelectInsertedDeploymentResult {
     environment_names: string[];
 }
 
+/** Result of query `SelectAppAwaitingData`. */
+export interface ISelectAppAwaitingDataResult {
+    id: IAppsColumns["id"];
+}
+
+/** Result of query `SelectUsableImport`. */
+export interface ISelectUsableImportResult {
+    id: IImportsColumns["id"];
+}
+
 /** Result of query `InsertExport`. */
 export interface IInsertExportResult {
     id: IExportsColumns["id"];
@@ -843,6 +871,79 @@ export interface ISelectHealthPingResult {
     ok: number | null;
 }
 
+/** Result of query `InsertPendingImport`. */
+export interface IInsertPendingImportResult {
+    id: IImportsColumns["id"];
+    app_id: IImportsColumns["app_id"];
+    /** The name the archive was uploaded under; the key it lands under carries none. */
+    original_file_name: IImportsColumns["original_file_name"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `CompleteImport`. */
+export interface ICompleteImportResult {
+    id: IImportsColumns["id"];
+    app_id: IImportsColumns["app_id"];
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row usable. */
+    digest: NonNullable<IImportsColumns["digest"]>;
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    size_bytes: NonNullable<IImportsColumns["size_bytes"]>;
+    /** The name the archive was uploaded under; the key it lands under carries none. */
+    original_file_name: IImportsColumns["original_file_name"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `DeleteImport`. */
+export interface IDeleteImportResult {
+}
+
+/** Result of query `SelectPendingImport`. */
+export interface ISelectPendingImportResult {
+    id: IImportsColumns["id"];
+    app_id: IImportsColumns["app_id"];
+    /** The name the archive was uploaded under; the key it lands under carries none. */
+    original_file_name: IImportsColumns["original_file_name"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `SelectImportById`. */
+export interface ISelectImportByIdResult {
+    id: IImportsColumns["id"];
+    app_id: IImportsColumns["app_id"];
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row usable. */
+    digest: NonNullable<IImportsColumns["digest"]>;
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    size_bytes: NonNullable<IImportsColumns["size_bytes"]>;
+    /** The name the archive was uploaded under; the key it lands under carries none. */
+    original_file_name: IImportsColumns["original_file_name"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `SelectAbandonedImports`. */
+export interface ISelectAbandonedImportsResult {
+    id: IImportsColumns["id"];
+    app_id: IImportsColumns["app_id"];
+}
+
+/** Result of query `DeleteAbandonedImport`. */
+export interface IDeleteAbandonedImportResult {
+}
+
+/** Result of query `SelectSpentImports`. */
+export interface ISelectSpentImportsResult {
+    id: IImportsColumns["id"];
+    /** Where the bytes are, present exactly while they are: absent before the upload has been read back, and absent again once the archive can no longer be used. Key within IMPORTS_BUCKET; which bucket is deploy configuration. */
+    object_key: NonNullable<IImportsColumns["object_key"]>;
+}
+
+/** Result of query `ForgetImportObject`. */
+export interface IForgetImportObjectResult {
+}
+
 export interface Queries {
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
@@ -879,8 +980,10 @@ export interface Queries {
     SelectPurgeableApps: ISelectPurgeableAppsResult;
     SelectUnsharedArtifactKeys: ISelectUnsharedArtifactKeysResult;
     SelectExportKeysByApp: ISelectExportKeysByAppResult;
+    SelectImportKeysByApp: ISelectImportKeysByAppResult;
     DeleteExportsByApp: IDeleteExportsByAppResult;
     DeleteDeploymentsByApp: IDeleteDeploymentsByAppResult;
+    DeleteImportsByApp: IDeleteImportsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
     SelectAppAfterStateChange: ISelectAppAfterStateChangeResult;
@@ -905,6 +1008,8 @@ export interface Queries {
     FailDeployment: IFailDeploymentResult;
     SupersedeLiveDeployment: ISupersedeLiveDeploymentResult;
     SelectInsertedDeployment: ISelectInsertedDeploymentResult;
+    SelectAppAwaitingData: ISelectAppAwaitingDataResult;
+    SelectUsableImport: ISelectUsableImportResult;
     InsertExport: IInsertExportResult;
     SelectExportsByApp: ISelectExportsByAppResult;
     SelectExportById: ISelectExportByIdResult;
@@ -912,6 +1017,15 @@ export interface Queries {
     FailInFlightExports: IFailInFlightExportsResult;
     SelectInFlightExport: ISelectInFlightExportResult;
     SelectHealthPing: ISelectHealthPingResult;
+    InsertPendingImport: IInsertPendingImportResult;
+    CompleteImport: ICompleteImportResult;
+    DeleteImport: IDeleteImportResult;
+    SelectPendingImport: ISelectPendingImportResult;
+    SelectImportById: ISelectImportByIdResult;
+    SelectAbandonedImports: ISelectAbandonedImportsResult;
+    DeleteAbandonedImport: IDeleteAbandonedImportResult;
+    SelectSpentImports: ISelectSpentImportsResult;
+    ForgetImportObject: IForgetImportObjectResult;
 }
 
 /** Columns of `account`. */
@@ -1185,6 +1299,8 @@ export interface IAppsColumns {
     updated_at: Date;
     activation: import("@repo/protocol").AppActivation;
     idle_timeout_ms: number;
+    /** When a host first reported this app's filesystem ready. Its presence is what makes the data no longer creatable. */
+    data_initialized_at: Date | null;
 }
 
 /** Schema of `apps`. */
@@ -1269,6 +1385,8 @@ export interface IDeploymentsColumns {
     public_ipv4: import("@repo/protocol").Ipv4Address | null;
     extra_public_port: import("@repo/protocol").HostPort | null;
     instance_state: import("@repo/protocol").InstanceState | null;
+    /** The uploaded archive this release's filesystem is created from, where one was named. */
+    initial_data_import_id: import("@repo/protocol").ImportId | null;
 }
 
 /** Schema of `deployments`. */
@@ -1402,6 +1520,14 @@ export interface IDesiredHostnamesTable {
 export interface IDesiredVolumesColumns {
     app_id: import("@repo/protocol").AppId | null;
     state: import("@repo/protocol").AppState | null;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row usable. */
+    seed_digest: import("@repo/protocol").Sha256Digest | null;
+    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    seed_size_bytes: string | null;
+    /** Where the bytes are, present exactly while they are: absent before the upload has been read back, and absent again once the archive can no longer be used. Key within IMPORTS_BUCKET; which bucket is deploy configuration. */
+    seed_object_key: import("@repo/protocol").ObjectKey | null;
+    /** The name the archive was uploaded under; the key it lands under carries none. */
+    seed_original_file_name: import("@repo/protocol").Filename | null;
 }
 
 /** Schema of `desired_volumes`. */
@@ -1456,6 +1582,31 @@ export interface IFinishableDeletionsTable {
     constraints: keyof (typeof schema)["finishable_deletions"]["_constraints"];
 }
 
+/** Columns of `imports`. */
+export interface IImportsColumns {
+    id: import("@repo/protocol").ImportId;
+    app_id: import("@repo/protocol").AppId;
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row usable. */
+    digest: import("@repo/protocol").Sha256Digest | null;
+    /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
+    size_bytes: string | null;
+    /** Where the bytes are, present exactly while they are: absent before the upload has been read back, and absent again once the archive can no longer be used. Key within IMPORTS_BUCKET; which bucket is deploy configuration. */
+    object_key: import("@repo/protocol").ObjectKey | null;
+    /** The name the archive was uploaded under; the key it lands under carries none. */
+    original_file_name: import("@repo/protocol").Filename;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+}
+
+/** Schema of `imports`. */
+export interface IImportsTable {
+    columns: IImportsColumns;
+    relationType: (typeof schema)["imports"]["_relationType"];
+    indexes: keyof (typeof schema)["imports"]["_indexes"];
+    constraints: keyof (typeof schema)["imports"]["_constraints"];
+}
+
 /** Columns of `live_apps`. */
 export interface ILiveAppsColumns {
     id: import("@repo/protocol").AppId | null;
@@ -1466,6 +1617,8 @@ export interface ILiveAppsColumns {
     updated_at: Date | null;
     activation: import("@repo/protocol").AppActivation | null;
     idle_timeout_ms: number | null;
+    /** When a host first reported this app's filesystem ready. Its presence is what makes the data no longer creatable. */
+    data_initialized_at: Date | null;
 }
 
 /** Schema of `live_apps`. */
@@ -1806,7 +1959,8 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             activation: { _columnName: "activation", _foreignKeys: {} },
-            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} }
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} },
+            data_initialized_at: { _columnName: "data_initialized_at", _foreignKeys: {} }
         },
         _indexes: {
             apps_deleted_idx: { _indexName: "apps_deleted_idx" },
@@ -1883,13 +2037,15 @@ export const schema = {
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             public_ipv4: { _columnName: "public_ipv4", _foreignKeys: {} },
             extra_public_port: { _columnName: "extra_public_port", _foreignKeys: {} },
-            instance_state: { _columnName: "instance_state", _foreignKeys: {} }
+            instance_state: { _columnName: "instance_state", _foreignKeys: {} },
+            initial_data_import_id: { _columnName: "initial_data_import_id", _foreignKeys: { deployments_initial_data_import_id_fkey: { _constraintName: "deployments_initial_data_import_id_fkey", _references: { _relationName: "imports", _columnName: "id" } } } }
         },
         _indexes: {
             deployments_activated_artifact_idx: { _indexName: "deployments_activated_artifact_idx" },
             deployments_app_id_idx: { _indexName: "deployments_app_id_idx" },
             deployments_artifact_id_idx: { _indexName: "deployments_artifact_id_idx" },
             deployments_config_id_idx: { _indexName: "deployments_config_id_idx" },
+            deployments_initial_data_idx: { _indexName: "deployments_initial_data_idx" },
             deployments_live_idx: { _indexName: "deployments_live_idx" },
             deployments_pkey: { _indexName: "deployments_pkey" },
             deployments_rollback_of_idx: { _indexName: "deployments_rollback_of_idx" }
@@ -1899,6 +2055,7 @@ export const schema = {
             deployments_artifact_id_fkey: { _constraintName: "deployments_artifact_id_fkey" },
             deployments_config_id_fkey: { _constraintName: "deployments_config_id_fkey" },
             deployments_extra_public_port_check: { _constraintName: "deployments_extra_public_port_check" },
+            deployments_initial_data_import_id_fkey: { _constraintName: "deployments_initial_data_import_id_fkey" },
             deployments_instance_state_check: { _constraintName: "deployments_instance_state_check" },
             deployments_pkey: { _constraintName: "deployments_pkey" },
             deployments_rollback_of_deployment_id_fkey: { _constraintName: "deployments_rollback_of_deployment_id_fkey" },
@@ -1995,7 +2152,11 @@ export const schema = {
         _relationType: "view",
         _columns: {
             app_id: { _columnName: "app_id", _foreignKeys: {} },
-            state: { _columnName: "state", _foreignKeys: {} }
+            state: { _columnName: "state", _foreignKeys: {} },
+            seed_digest: { _columnName: "seed_digest", _foreignKeys: {} },
+            seed_size_bytes: { _columnName: "seed_size_bytes", _foreignKeys: {} },
+            seed_object_key: { _columnName: "seed_object_key", _foreignKeys: {} },
+            seed_original_file_name: { _columnName: "seed_original_file_name", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -2041,6 +2202,29 @@ export const schema = {
         _indexes: {},
         _constraints: {}
     },
+    imports: {
+        _relationName: "imports",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { imports_app_id_fkey: { _constraintName: "imports_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            digest: { _columnName: "digest", _foreignKeys: {} },
+            size_bytes: { _columnName: "size_bytes", _foreignKeys: {} },
+            object_key: { _columnName: "object_key", _foreignKeys: {} },
+            original_file_name: { _columnName: "original_file_name", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+        },
+        _indexes: {
+            imports_app_id_idx: { _indexName: "imports_app_id_idx" },
+            imports_pending_idx: { _indexName: "imports_pending_idx" },
+            imports_pkey: { _indexName: "imports_pkey" }
+        },
+        _constraints: {
+            imports_app_id_fkey: { _constraintName: "imports_app_id_fkey" },
+            imports_pkey: { _constraintName: "imports_pkey" }
+        }
+    },
     live_apps: {
         _relationName: "live_apps",
         _relationType: "view",
@@ -2052,7 +2236,8 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             activation: { _columnName: "activation", _foreignKeys: {} },
-            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} }
+            idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} },
+            data_initialized_at: { _columnName: "data_initialized_at", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -2113,6 +2298,7 @@ export interface Tables {
     desired_volumes: IDesiredVolumesTable;
     exports: IExportsTable;
     finishable_deletions: IFinishableDeletionsTable;
+    imports: IImportsTable;
     live_apps: ILiveAppsTable;
     profiles: IProfilesTable;
     purgeable_apps: IPurgeableAppsTable;

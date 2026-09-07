@@ -36,6 +36,16 @@ const UNTIL_RESUMED: AppActionAvailability = {
 };
 
 /**
+ * Creating a release supersedes whatever the app was on, and while an app is resuming that is the
+ * release the host is in the middle of bringing back — so an owner who pressed resume and then
+ * deployed would get the app back on the new binary rather than the one that went away.
+ */
+const UNTIL_UP: AppActionAvailability = {
+  kind: 'disabled',
+  reason: 'This app is resuming, so a new release would replace the one coming back. Wait for it.',
+};
+
+/**
  * Every status against every button, written out rather than derived, because there is no rule
  * underneath: export needs a release to have ever existed, suspend needs one that is running,
  * delete needs the app to not already be going. A status added to `AppStatusKey` is a row missing
@@ -110,9 +120,11 @@ const AVAILABILITY: Record<AppStatusKey, AppActions> = {
     suspend: DISABLED,
     delete: DISABLED,
   },
-  // Deploying is offered back the moment the app row asks to run again, which is what resuming is.
+  // Both buttons that change what is running are held for the seconds a resume takes: suspend is
+  // the one the owner just pressed the other way, and a release is the one that would land on top
+  // of the release coming back. Everything that only reads the app is offered as usual.
   resuming: {
-    deploy: ENABLED,
+    deploy: UNTIL_UP,
     redeploy: HIDDEN,
     export: ENABLED,
     suspend: DISABLED,

@@ -104,3 +104,16 @@ describe('an export is a moment rather than an update', () => {
     );
   });
 });
+
+// A run that is killed cannot clean up after itself, so the next one finds its partial in place.
+describe('a partial left by an earlier run', () => {
+  test('one longer than the stream does not keep its tail in the delivered file', async () => {
+    const landed = join(root, 'stale.bin');
+    const longer = CHUNK_COUNT * CHUNK_BYTES + CHUNK_BYTES;
+    await Bun.write(landed, new Uint8Array(longer));
+
+    await writeStream({ stream: trickling(), path: landed });
+
+    expect(Bun.file(landed).size).toBe(CHUNK_COUNT * CHUNK_BYTES);
+  });
+});

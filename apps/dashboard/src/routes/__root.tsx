@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet, redirect } from '@tanstack/react-router';
 import { AppDevtools } from '#components/app-devtools.tsx';
+import { sameOriginPath } from '#lib/same-origin-path.ts';
 import { sessionQueryOptions } from '#queries/session.ts';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
@@ -26,12 +27,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     const session = await context.queryClient.ensureQueryData(sessionQueryOptions);
 
     if (!session && !isPublic(location.pathname)) {
+      const destination = sameOriginPath(location.href);
       // Home is where signing in lands you with no destination, so saying so
       // would only put a `?redirect=%2F` in front of the user.
-      const isHome = location.href === IndexRoute.to;
+      const landsHome = destination === undefined || destination === IndexRoute.to;
       throw redirect({
         to: LoginRoute.to,
-        search: isHome ? {} : { redirect: location.href },
+        search: landsHome ? {} : { redirect: destination },
       });
     }
 
