@@ -12,10 +12,18 @@ import {
   TableRow,
 } from '@repo/ui/components/table';
 import { Tabs, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
+import { CellBar } from '@repo/ui/custom/cell-bar';
 import { SlideToDelete } from '@repo/ui/custom/slide-to-delete';
-import { ChevronDownIcon, ExternalLinkIcon, FileIcon, FolderIcon } from 'lucide-react';
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ExternalLinkIcon,
+  FileIcon,
+  FolderIcon,
+  LoaderCircleIcon,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Gauge, InstrumentPanel, Reading } from '#components/instrument-panel.tsx';
 
 const LAST_CHANGE = '7 Sep 09:14';
@@ -86,7 +94,7 @@ export function PreviewDashboard() {
           <Button size="sm" variant="outline">
             Suspend
           </Button>
-          <Button size="sm">Redeploy</Button>
+          <RedeployDialog />
         </span>
       </header>
 
@@ -304,6 +312,116 @@ function DomainsView() {
       </p>
     </InstrumentPanel>
   );
+}
+
+/**
+ * A deploy playing out, which is the only part of this dashboard that is a sequence rather than a
+ * page: the steps it takes, the bytes going up, and the address at the end of it.
+ */
+const DEPLOY_TOTAL_MIB = 14.2;
+
+const DEPLOY_PHASES = [
+  { sentMib: 0, waiting: 'uploading the binary', ms: 500 },
+  { sentMib: 5.1, waiting: 'uploading the binary', ms: 650 },
+  { sentMib: 11.4, waiting: 'uploading the binary', ms: 650 },
+  { sentMib: DEPLOY_TOTAL_MIB, waiting: 'the app is coming online', ms: 1100 },
+] as const;
+
+function RedeployDialog() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        Redeploy
+      </Button>
+      {open && (
+        <Shade title="Deploying pocketbase" badge="release" onClose={() => setOpen(false)}>
+          <DeployRun onDone={() => setOpen(false)} />
+        </Shade>
+      )}
+    </>
+  );
+}
+
+function DeployRun({ onDone }: { onDone: () => void }) {
+  const phase = useAdvancingPhase();
+  const done = phase >= DEPLOY_PHASES.length;
+  const current = DEPLOY_PHASES[Math.min(phase, DEPLOY_PHASES.length - 1)];
+  const sent = done ? DEPLOY_TOTAL_MIB : (current?.sentMib ?? 0);
+
+  return (
+    <>
+      <ol className="flex flex-col gap-2">
+        <Step done>app pocketbase</Step>
+        <Step done>artifact sha256:9f3c1e</Step>
+        {done ? (
+          <Step done>deployment dpl_01k9wq</Step>
+        ) : (
+          <li className="flex flex-col gap-2 text-muted-foreground">
+            <span className="flex items-center gap-2">
+              <LoaderCircleIcon className="size-4 shrink-0 animate-spin" />
+              {current?.waiting}
+            </span>
+            {sent < DEPLOY_TOTAL_MIB && (
+              <span className="flex flex-col gap-1.5">
+                <CellBar share={sent / DEPLOY_TOTAL_MIB} label="Upload progress" />
+                <span className="text-xs tabular-nums">
+                  {sent.toFixed(1)} MiB of {DEPLOY_TOTAL_MIB} MiB
+                </span>
+              </span>
+            )}
+          </li>
+        )}
+      </ol>
+
+      {done && (
+        <div className="inset-well flex flex-col gap-1 border-2 border-border bg-input px-3 py-2">
+          <span className="text-muted-foreground text-xs">Serving at</span>
+          <a
+            href="https://pocketbase.nibrun.app"
+            target="_blank"
+            rel="noreferrer"
+            className="wrap-anywhere font-medium font-mono text-primary text-xs hover:underline"
+          >
+            https://pocketbase.nibrun.app
+          </a>
+        </div>
+      )}
+
+      {done && (
+        <div className="flex justify-end">
+          <Button onClick={onDone}>Done</Button>
+        </div>
+      )}
+    </>
+  );
+}
+
+function Step({ done, children }: { done: boolean; children: ReactNode }) {
+  return (
+    <li className="flex items-start gap-2">
+      <CheckIcon
+        className={`mt-0.5 size-4 shrink-0 ${done ? 'text-primary' : 'text-muted-foreground'}`}
+      />
+      <span className="wrap-anywhere font-mono text-xs">{children}</span>
+    </li>
+  );
+}
+
+/** Steps its way through the phases once, each waiting its own length. */
+function useAdvancingPhase(): number {
+  const [phase, setPhase] = useState(0);
+
+  useEffect(() => {
+    if (phase >= DEPLOY_PHASES.length) {
+      return;
+    }
+    const timer = setTimeout(() => setPhase((current) => current + 1), DEPLOY_PHASES[phase]?.ms);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  return phase;
 }
 
 /** Deleting, which is the one thing here that cannot be undone and so is the one that is slid. */
