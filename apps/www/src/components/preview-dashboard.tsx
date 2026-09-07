@@ -123,7 +123,7 @@ function Overview() {
           <Separator />
           <span className="flex flex-col gap-2">
             <span className="text-muted-foreground">Run command</span>
-            <code className="select-all break-words border-2 border-border bg-input px-2 py-1.5 font-mono text-xs">
+            <code className="inset-well select-all break-words border-2 border-border bg-input px-2 py-1.5 font-mono text-xs">
               ./pocketbase serve --http 0.0.0.0:8090
             </code>
           </span>
@@ -179,7 +179,7 @@ function LogsView() {
         </span>
       }
     >
-      <div className="flex flex-col gap-0.5 border-2 border-border bg-input p-3 font-mono text-xs">
+      <div className="display-glass flex flex-col gap-0.5 border-2 border-border p-3 font-mono text-xs">
         {LOG_LINES.map((line) => (
           <span key={line.at} className="flex gap-3">
             <span className="shrink-0 text-muted-foreground tabular-nums">{line.at}</span>
@@ -270,7 +270,7 @@ function ExportDialog() {
         Export
       </Button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-6 backdrop-blur-sm">
           <button
             type="button"
             aria-label="Close"
@@ -281,10 +281,13 @@ function ExportDialog() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="preview-export-title"
-            className="panel-rivets relative flex w-full max-w-md flex-col border-2 border-border bg-card"
+            className="panel-face relative flex w-full max-w-md flex-col border-2 border-border bg-card"
           >
             <header className="-mt-[13px] px-5">
-              <h2 id="preview-export-title" className="w-fit bg-card px-2 font-heading text-base">
+              <h2
+                id="preview-export-title"
+                className="legend-notch w-fit px-2 font-heading text-base"
+              >
                 Export this app
               </h2>
             </header>
@@ -297,7 +300,7 @@ function ExportDialog() {
                 <Label htmlFor="preview-export-name">Name the archive</Label>
                 <Input id="preview-export-name" defaultValue="pocketbase-2026-09-07" />
               </div>
-              <div className="flex flex-col gap-3 border-2 border-border bg-input p-3">
+              <div className="inset-well flex flex-col gap-3 border-2 border-border bg-input p-3">
                 <Reading label="Binary">14.2 MB</Reading>
                 <Reading label="Volume">964 MiB</Reading>
                 <Reading label="Environment">6 variables</Reading>

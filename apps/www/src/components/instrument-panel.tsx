@@ -34,21 +34,22 @@ export function InstrumentPanel({
   children: ReactNode;
 }) {
   return (
-    <section className="panel-rivets flex flex-col border-2 border-border bg-card">
+    <section className="panel-face flex flex-col border-2 border-border bg-card">
       <header className="-mt-[13px] flex items-center justify-between gap-3 px-5">
-        <h2 className="bg-card px-2 font-heading text-base">{name}</h2>
-        {action && <span className="bg-card px-2">{action}</span>}
+        <h2 className="legend-notch px-2 font-heading text-base">{name}</h2>
+        {action && <span className="legend-notch px-2">{action}</span>}
       </header>
       <div className="flex flex-col gap-4 p-6 pt-4 text-sm">{children}</div>
     </section>
   );
 }
 
+/** Both, because a lit cell blooms in its own colour and `currentColor` is what carries it. */
 function litColour(share: number): string {
   if (share >= CRITICALLY_FULL) {
-    return 'bg-destructive';
+    return 'bg-destructive text-destructive';
   }
-  return share >= NEARLY_FULL ? 'bg-warning' : 'bg-primary';
+  return share >= NEARLY_FULL ? 'bg-warning text-warning' : 'bg-primary text-primary';
 }
 
 /**
@@ -85,10 +86,17 @@ export function Gauge({
       </div>
       <span
         aria-hidden="true"
-        className="flex h-4 gap-[3px] border-2 border-border bg-input p-[3px]"
+        className="display-glass flex h-4 gap-[3px] border-2 border-border p-[3px]"
       >
         {CELLS.map((cell) => (
-          <span key={cell} className={`flex-1 ${cell < lit ? litColour(share) : 'bg-border/25'}`} />
+          <span
+            key={cell}
+            className={
+              cell < lit
+                ? `flex-1 shadow-[0_0_5px_-1px_currentColor] ${litColour(share)}`
+                : 'flex-1 bg-border/20'
+            }
+          />
         ))}
       </span>
     </div>
