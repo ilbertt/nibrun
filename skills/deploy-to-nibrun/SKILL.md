@@ -122,9 +122,9 @@ nib apps update --app my-app --args "serve --verbose"
 `nib run` waits until the deployment is actually serving and prints the URL. Or drag the binary
 onto [app.nibrun.com](https://app.nibrun.com) — same thing, no CLI.
 
-Every option a deploy takes is listed by `nib run x --help`, `x` standing in for the binary they
-would be passed with — `nib run --help` on its own answers with the subcommand rather than the
-options. What is below is what `--help` does not say.
+Every option a deploy takes is listed by `nib run anything --help` — any word will do in place of
+the binary, because the help does not read it, and `nib run --help` on its own answers with the
+subcommand rather than the options. What is below is what `--help` does not say.
 
 ## 4. Verify
 
