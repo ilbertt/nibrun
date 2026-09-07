@@ -37,7 +37,10 @@ export function InstrumentPanel({
     <section className="panel-face relative flex flex-col border-2 border-border bg-card">
       {/* Centred on the border rather than pulled up by a fixed amount, so a name and a badge of
           different heights both sit on the line. */}
-      <header className="absolute inset-x-0 top-px flex -translate-y-1/2 items-center justify-between gap-3 px-5">
+      {/* Above the body, not merely positioned over it: a readout with `backdrop-filter` becomes a
+          stacking context of its own and paints as though positioned, so anything the header opens
+          would otherwise go behind whatever comes after it in the panel. */}
+      <header className="absolute inset-x-0 top-px z-20 flex -translate-y-1/2 items-center justify-between gap-3 px-5">
         <h2 className="bg-card px-2 font-heading text-base">{name}</h2>
         {action && <span className="flex items-center bg-card px-2">{action}</span>}
       </header>
@@ -52,6 +55,30 @@ function litColour(share: number): string {
     return 'bg-destructive text-destructive';
   }
   return share >= NEARLY_FULL ? 'bg-warning text-warning' : 'bg-primary text-primary';
+}
+
+/**
+ * A row of cells lit up to a share, behind glass. The one piece of this style that carries a
+ * number, so both a resource here and a deploy running on the landing page read off the same bar.
+ */
+export function CellBar({ share, tone }: { share: number; tone: string }) {
+  const lit = Math.round(Math.min(share, FULL) * CELL_COUNT);
+
+  return (
+    <span
+      aria-hidden="true"
+      className="display-glass flex h-4 gap-[3px] border-2 border-border p-[3px]"
+    >
+      {CELLS.map((cell) => (
+        <span
+          key={cell}
+          className={
+            cell < lit ? `flex-1 shadow-[0_0_5px_-1px_currentColor] ${tone}` : 'flex-1 bg-border/20'
+          }
+        />
+      ))}
+    </span>
+  );
 }
 
 /**
@@ -72,7 +99,6 @@ export function Gauge({
   share: number;
 }) {
   const percent = Math.round(Math.min(share, FULL) * PERCENT_SCALE);
-  const lit = Math.round(Math.min(share, FULL) * CELL_COUNT);
 
   return (
     <div className="flex flex-col gap-2">
@@ -86,21 +112,7 @@ export function Gauge({
           </span>
         </span>
       </div>
-      <span
-        aria-hidden="true"
-        className="display-glass flex h-4 gap-[3px] border-2 border-border p-[3px]"
-      >
-        {CELLS.map((cell) => (
-          <span
-            key={cell}
-            className={
-              cell < lit
-                ? `flex-1 shadow-[0_0_5px_-1px_currentColor] ${litColour(share)}`
-                : 'flex-1 bg-border/20'
-            }
-          />
-        ))}
-      </span>
+      <CellBar share={share} tone={litColour(share)} />
     </div>
   );
 }
