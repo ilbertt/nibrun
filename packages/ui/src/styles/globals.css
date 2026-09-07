@@ -267,19 +267,22 @@ body {
    itself, and in dark mode there is almost none left below the page, so it disappeared exactly
    where it was needed. Inside, it is the side of the key, which reads on any ground.
 
-   Which controls wear this is `button.tsx`'s to say — `ghost` and `link` have no face to bevel. */
+   The darkened strip is the whole of it — there is no lit top edge to go with it. A highlight
+   needs a face to sit on, and `outline` has none in dark, where it is transparent: the strip
+   below would darken nothing and the highlight above would be the only thing drawn, which reads
+   as a key lit from underneath.
+
+   Which controls wear this is `button.tsx`'s to say — `ghost` and `link` have no face at all. */
 @utility key-face {
   --key-throw: 3px;
-  --key-bevel: inset 0 1px 0 0 rgb(255 255 255 / 0.18);
 
   box-shadow:
     var(--tw-ring-shadow, 0 0 #0000),
-    var(--key-bevel),
     inset 0 calc(-1 * var(--key-throw)) 0 0 rgb(0 0 0 / 0.3);
 
   &:active:not(:disabled) {
     translate: 0 var(--key-throw);
-    box-shadow: var(--tw-ring-shadow, 0 0 #0000), var(--key-bevel);
+    box-shadow: var(--tw-ring-shadow, 0 0 #0000);
   }
 }
 
