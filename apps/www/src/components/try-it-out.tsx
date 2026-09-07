@@ -20,13 +20,11 @@ export function TryItOut() {
         <h2 className="text-muted-foreground text-sm">Try it out</h2>
         <span aria-hidden="true" className="h-px flex-1 bg-border" />
       </div>
-      <div className="flex items-center rounded-full border bg-card/70 shadow-sm backdrop-blur-sm">
-        <Button
-          variant="ghost"
-          size="lg"
-          onClick={copy}
-          className="rounded-r-none rounded-l-full pr-3 font-mono"
-        >
+      {/* One key, not two: the halves are `ghost` and have no face of their own, so the shell wears
+          the `outline` variant's — same edge, same radius, same base as every other button on the
+          page. `:active` reaches here from whichever half is pressed. */}
+      <div className="key-face flex items-center rounded-2xl border border-border bg-background dark:bg-transparent">
+        <Button variant="ghost" size="lg" onClick={copy} className="rounded-r-none pr-3 font-mono">
           {/* Both labels are the same nineteen characters, and this one control stays monospaced so
               that keeps them the same width — the pill does not resize under the cursor for the
               second and a half the confirmation lasts. The page's face is proportional, where
@@ -46,7 +44,7 @@ export function TryItOut() {
           aria-expanded={reading}
           aria-controls={PROMPT_PANEL_ID}
           aria-label={reading ? 'Hide the prompt' : 'Read the prompt first'}
-          className="rounded-r-full rounded-l-none"
+          className="rounded-l-none"
         >
           <ChevronDownIcon
             className={`transition-transform duration-200 ${reading ? 'rotate-180' : ''}`}

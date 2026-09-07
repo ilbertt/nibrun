@@ -260,57 +260,49 @@ body {
   background: color-mix(in oklch, var(--muted) 40%, transparent);
 }
 
-@utility inset-well {
-  box-shadow: var(--well);
-}
+/* A key with a throw: it stands on a base the height of that throw, and pressing drops the face by
+   exactly the same and takes the base away.
 
-/* The one control on a dialog that is not about the dialog's content. The CLI reaches for
-   `bg-secondary`, which here is the brand green — so a dismiss ends up looking like the action
-   worth taking, and it is the brightest thing in the corner of every dialog. Neutralised here
-   rather than in `dialog.tsx`, which the CLI owns and will overwrite. It stays a key: it is still
-   something you press. */
-[data-slot="dialog-close"] {
-  background-color: var(--card);
-  border-color: var(--border);
-  color: var(--muted-foreground);
-}
+   The base is a solid side in the border colour rather than something the key casts. A shadow
+   needs a ground lighter than itself and dark mode leaves almost none below the page, where
+   `--border` is chosen to read against it.
 
-[data-slot="dialog-close"]:hover {
-  background-color: var(--accent);
-  color: var(--foreground);
-}
+   There is no lit top edge to go with it. A highlight needs a face to sit on, and `outline` has
+   none in dark, where it is transparent — the highlight would be the only thing drawn, which reads
+   as a key lit from underneath.
 
-/* A key with a throw, rather than a rectangle that changes colour: it stands on a base, and
-   pressing drops the face by exactly the depth of that base and takes the base away.
-
-   Matched on the background utility each variant carries rather than on a variant name, which cva
-   does not put in the DOM: a button with a surface of its own is precisely the one that can sit on
-   a base, and `ghost` and `link`, which have none, would otherwise get a shelf under nothing.
-   Written here rather than in `button.tsx` because that file is the CLI's output, and outside any
-   layer because a utility class is what it has to outrank. */
-[data-slot="button"]:is(
-  .bg-primary,
-  .bg-secondary,
-  .bg-background,
-  [class*="bg-destructive"]
-):not(:disabled, [data-key="none"]) {
+   Which controls wear this is `button.tsx`'s to say — `ghost` and `link` have no face at all. */
+@utility key-face {
   --key-throw: 3px;
-  --key-bevel: inset 0 1px 0 0 rgb(255 255 255 / 0.18);
 
   box-shadow:
     var(--tw-ring-shadow, 0 0 #0000),
-    var(--key-bevel),
     0 var(--key-throw) 0 0 var(--border);
+
+  &:active:not(:disabled) {
+    translate: 0 var(--key-throw);
+    box-shadow: var(--tw-ring-shadow, 0 0 #0000);
+  }
 }
 
-[data-slot="button"]:is(
-  .bg-primary,
-  .bg-secondary,
-  .bg-background,
-  [class*="bg-destructive"]
-):not(:disabled, [data-key="none"]):active {
-  translate: 0 var(--key-throw);
-  box-shadow: var(--tw-ring-shadow, 0 0 #0000), var(--key-bevel);
+/* A panel bolted down at four corners. Worn by `card` and by anything hand-written that wants to
+   read as the same object. */
+@utility panel-face {
+  --rivet-inset: 7px;
+  --rivet: radial-gradient(circle, var(--border) 0 1.5px, transparent 1.6px);
+
+  background-image: var(--rivet), var(--rivet), var(--rivet), var(--rivet);
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+  background-position:
+    var(--rivet-inset) var(--rivet-inset),
+    calc(100% - var(--rivet-inset)) var(--rivet-inset),
+    var(--rivet-inset) calc(100% - var(--rivet-inset)),
+    calc(100% - var(--rivet-inset)) calc(100% - var(--rivet-inset));
+}
+
+@utility inset-well {
+  box-shadow: var(--well);
 }
 
 @layer base {
