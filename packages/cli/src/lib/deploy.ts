@@ -14,9 +14,9 @@ import {
   type TenantArguments,
   Value,
 } from '@repo/protocol';
-import { packDataFolder } from '#lib/data-folder.ts';
 import { environmentEdit } from '#lib/environment.ts';
 import { UsageError } from '#lib/errors.ts';
+import { openInitialData } from '#lib/initial-data.ts';
 import type { RunOptions } from '#lib/plan.ts';
 import { announce, awaitServing, type Release } from '#lib/release.ts';
 import type { Ui } from '#lib/ui.ts';
@@ -36,8 +36,9 @@ export async function deploy({ api, ui, detach, ...release }: DeployInput): Prom
 }
 
 /**
- * The archive is a file on this machine for exactly as long as the release is being made: it is as
- * large as the dataset it holds, and leaving one in the temporary directory is leaving that.
+ * An archive this packed is a file on this machine for exactly as long as the release is being
+ * made: it is as large as the dataset it holds, and leaving one in the temporary directory is
+ * leaving that. One the owner handed over is left where it is.
  */
 async function startRelease({
   api,
@@ -53,8 +54,8 @@ async function startRelease({
   dataFolder,
 }: Omit<DeployInput, 'detach'>): Promise<Deployed> {
   const environment = environmentEdit({ env, unset });
-  const packed =
-    dataFolder === undefined ? undefined : await packDataFolder({ folder: dataFolder, ui });
+  const opened =
+    dataFolder === undefined ? undefined : await openInitialData({ data: dataFolder, ui });
 
   try {
     return await startDeployment({
@@ -66,7 +67,7 @@ async function startRelease({
       port,
       extraPublicPort,
       ...(environment !== undefined && { environment }),
-      ...(packed !== undefined && { initialData: packed.archive }),
+      ...(opened !== undefined && { initialData: opened.archive }),
       onStep: (step) => announce({ step, ui }),
       whileUploading: ({ message, task }) => {
         const startedAt = Date.now();
@@ -82,7 +83,7 @@ async function startRelease({
       },
     });
   } finally {
-    await packed?.discard();
+    await opened?.discard();
   }
 }
 

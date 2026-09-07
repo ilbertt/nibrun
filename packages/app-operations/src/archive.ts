@@ -22,6 +22,20 @@ const GZIP_MAGIC = '\u001f\u008b';
 const TAR_MAGIC = 'ustar';
 const TAR_MAGIC_AT = 257;
 
+/** What a zip opens with: the first of the local headers its entries are each introduced by. */
+const ZIP_MAGIC = 'PK\u0003\u0004';
+
+/**
+ * How much of a zip is read before it is taken for one.
+ *
+ * A local header, and the name of the entry it introduces. The index that makes a zip a zip is at
+ * the *end* of the file, and reading it here would mean reading past everything in between — which
+ * is the gibibyte this exists to not spend. So this is the shape of the first record and no more:
+ * enough to tell `zip data.db` from `gzip data.db`, and not a claim that the archive is sound.
+ */
+const ZIP_LOCAL_HEADER_BYTES = 30;
+const ZIP_NAME_LENGTH_AT = 26;
+
 /** Through the magic, which is the last of what says a stream of bytes is a tar at all. */
 const TAR_IDENTITY_BYTES = TAR_MAGIC_AT + TAR_MAGIC.length;
 
@@ -45,7 +59,7 @@ export type OfferedArchive = {
  * Why these bytes cannot be the data an app is created holding, or nothing where they can be.
  *
  * The api is the authority and reads the object it was sent for itself — but it can only do that
- * once the upload has finished, so a `.zip` would cost a gibibyte before anybody said a word about
+ * once the upload has finished, so a `.7z` would cost a gibibyte before anybody said a word about
  * it. Answered from the front of the file, which is where the answer is.
  *
  * Held apart from the name because only one of the two is ever a caller's own doing: `uploadImport`
@@ -64,9 +78,9 @@ export async function refusedArchiveBody({
     return `An app is created with at most ${MAX_IMPORT_GIBIBYTES} GiB of data, and ${name} is more than that.`;
   }
   const opening = await heldFrom({ stream: body.stream(), count: OPENING_BYTES });
-  return (await isGzippedTarball(opening))
+  return (await isAppDataArchive(opening))
     ? undefined
-    : `${name} is not a .tar.gz. An app's data is created from one archive, whose root becomes the root of data/.`;
+    : `${name} is not a .tar.gz or a .zip. An app's data is created from one archive, whose root becomes the root of data/.`;
 }
 
 /**
@@ -84,7 +98,10 @@ export async function refusedArchive({ name, body }: OfferedArchive): Promise<st
   return await refusedArchiveBody({ name, body });
 }
 
-async function isGzippedTarball(opening: Uint8Array): Promise<boolean> {
+async function isAppDataArchive(opening: Uint8Array): Promise<boolean> {
+  if (reads({ bytes: opening, at: 0, magic: ZIP_MAGIC })) {
+    return opensAsZip(opening);
+  }
   if (!reads({ bytes: opening, at: 0, magic: GZIP_MAGIC })) {
     return false;
   }
@@ -96,6 +113,18 @@ async function isGzippedTarball(opening: Uint8Array): Promise<boolean> {
     header.length === TAR_IDENTITY_BYTES &&
     reads({ bytes: header, at: TAR_MAGIC_AT, magic: TAR_MAGIC })
   );
+}
+
+/** A first record whose own fields agree with each other, which bytes behind a magic do not. */
+function opensAsZip(opening: Uint8Array): boolean {
+  if (opening.length < ZIP_LOCAL_HEADER_BYTES) {
+    return false;
+  }
+  const nameBytes = new DataView(opening.buffer, opening.byteOffset, opening.byteLength).getUint16(
+    ZIP_NAME_LENGTH_AT,
+    true,
+  );
+  return nameBytes > 0 && ZIP_LOCAL_HEADER_BYTES + nameBytes <= opening.length;
 }
 
 /**
