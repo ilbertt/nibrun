@@ -4,22 +4,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { UsageError } from '#lib/errors.ts';
 import {
-  addressFor,
-  DEFAULT_PORT,
   type FileServer,
-  type HostEnvironment,
+  type GuestEnvironment,
+  guestAddress,
   requestedPath,
   serveDirectory,
   servedRoot,
 } from '#lib/serve.ts';
 
 const ASSIGNED_PORT = 8080;
-const CHOSEN_PORT = 4321;
 const ANY_FREE_PORT = 0;
 const OK = 200;
 const NOT_FOUND = 404;
 
-const ALONE: HostEnvironment = { httpPort: null, port: null, hostname: null };
+const IN_A_GUEST: GuestEnvironment = { httpPort: ASSIGNED_PORT, hostname: 'my-app.nibrun.app' };
 
 const dirs: string[] = [];
 
@@ -33,51 +31,24 @@ async function scratchDir(): Promise<string> {
   return dir;
 }
 
-function hosted(overrides: Partial<HostEnvironment> = {}): HostEnvironment {
-  return { httpPort: ASSIGNED_PORT, port: ASSIGNED_PORT, hostname: null, ...overrides };
-}
-
-describe('where a folder is served follows from whether anything is hosting this nib', () => {
-  test('nothing assigned means the machine it was typed on, and nowhere else', () => {
-    expect(addressFor({ options: {}, environment: ALONE })).toEqual({
-      hostname: '127.0.0.1',
-      port: DEFAULT_PORT,
-      url: `http://127.0.0.1:${DEFAULT_PORT}`,
-    });
-  });
-
-  test('a host that assigned the port is answered on every interface, which is what it reaches', () => {
-    expect(addressFor({ options: {}, environment: hosted() })).toMatchObject({
+describe('a folder is served on what the guest assigned, or it is not served at all', () => {
+  // Every interface, because that is the only address nibrun reaches a guest on; and the app's own
+  // name, because the port bound here is behind the edge and is in no URL anybody can type.
+  test('the port it was given, on every interface, under the name it is reached by', () => {
+    expect(guestAddress(IN_A_GUEST)).toEqual({
       hostname: '0.0.0.0',
       port: ASSIGNED_PORT,
+      url: 'https://my-app.nibrun.app',
     });
   });
 
-  test('a host that sets only PORT is a host all the same', () => {
-    expect(
-      addressFor({ options: {}, environment: { ...ALONE, port: ASSIGNED_PORT } }),
-    ).toMatchObject({ hostname: '0.0.0.0', port: ASSIGNED_PORT });
+  test('no port from the guest is no guest, and it says which name was missing', () => {
+    expect(() => guestAddress({ ...IN_A_GUEST, httpPort: null })).toThrow(UsageError);
+    expect(() => guestAddress({ ...IN_A_GUEST, httpPort: null })).toThrow('NIBRUN_HTTP_PORT');
   });
 
-  // The two carry one number on nibrun, so which is read only shows up where they disagree.
-  test('the port nibrun assigns is the one it probes, so it wins over the alias beside it', () => {
-    expect(addressFor({ options: {}, environment: hosted({ port: CHOSEN_PORT }) }).port).toBe(
-      ASSIGNED_PORT,
-    );
-  });
-
-  test('a flag is the only one of the three anybody chose, so it wins over both', () => {
-    expect(addressFor({ options: { port: CHOSEN_PORT }, environment: hosted() })).toMatchObject({
-      hostname: '0.0.0.0',
-      port: CHOSEN_PORT,
-    });
-    expect(addressFor({ options: { host: '::1' }, environment: hosted() }).hostname).toBe('::1');
-  });
-
-  test('a host that named the app answers with that name rather than the bound address', () => {
-    expect(
-      addressFor({ options: {}, environment: hosted({ hostname: 'my-app.nibrun.app' }) }).url,
-    ).toBe('https://my-app.nibrun.app');
+  test('nor is a guest that never said what the app is called', () => {
+    expect(() => guestAddress({ ...IN_A_GUEST, hostname: null })).toThrow('NIBRUN_HOSTNAME');
   });
 });
 

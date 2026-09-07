@@ -87,35 +87,11 @@ the layout under `src/commands/` is the command tree.
   it from a script — and that is why `--yes` lives on such a command rather than
   anywhere shared. The terminal question is a typed phrase, not a y/n, which is
   answered by the muscle that answers every other one — see `src/lib/delete.ts`.
-- **`nib serve` is the one command that is the thing being hosted** rather than the
-  thing that deploys it — the same nib serves a folder here and, deployed as an
-  app's binary, serves that app's volume. So it talks to no api and needs no
-  token; what it reads instead is what the host handed the process, through the
-  `runtime` group in `src/context.ts`. Which interface it binds follows from
-  whether anything assigned the port: nothing did means somebody's own machine
-  and the loopback, and anything did means a host reaching it across a network,
-  which on nibrun is `0.0.0.0` and no other address. `PORT` is read beside
-  `NIBRUN_HTTP_PORT` and is spelled here rather than imported, being the name
-  every host uses rather than one of ours — `RUNTIME_VALUES` is what a tenant
-  value may name, and `PORT` deliberately is not one. `cli.main()` exits the
-  moment a handler returns, so serving has to *be* the handler: `untilStopped` is
-  what keeps it there until a signal takes it down.
-- **The single-page fallback is asked for rather than assumed**, which is what
-  `serve`, sirv, Caddy and Netlify all settle on: answering every miss with the
-  shell makes a stale asset url a `200 text/html`, so the app reports a syntax
-  error instead of a missing file, and a docs site answers a bad link with its
-  homepage. Under the flag a real file is the only thing that beats the shell —
-  a directory's own `index.html` does not, because `serve`'s `--single` rewrites
-  to the root before it ever looks inside a directory, and matching it keeps the
-  rule to one sentence. A path that resolved outside the folder is never given
-  the shell either. Note that a traversal cannot reach `requestedPath` over HTTP
-  at all: the URL parser resolves `..` and `%2e%2e` alike before a pathname is
-  anything the handler can read, so that check is tested on its own rather than
-  through a request.
-- **A miss is answered with the folder's own `404.html`** where it has one, and
-  under the 404 it is — a browser, a crawler and a `curl -f` all read the status
-  rather than the body. The filename is spelled from the status code rather than
-  written out, which is how `serve` names it too (`${statusCode}.html`).
+- **`nib serve` runs only inside a guest**, being the thing being hosted rather
+  than the thing that deploys it: it talks to no api, and refuses anywhere the
+  guest set no `NIBRUN_HTTP_PORT` rather than picking a port nothing probes.
+  `cli.main()` exits the moment a handler returns, so serving has to *be* the
+  handler — that is what `untilStopped` is for.
 - Run it with `bun run --filter @repo/cli nib …`. A package script runs from the
   package directory, so relative paths resolve against `packages/cli` rather than
   the caller's shell — pass absolute ones until the CLI ships as a real `bin`.

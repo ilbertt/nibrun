@@ -1,12 +1,11 @@
 import { stat } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
+import { RUNTIME_VALUES } from '@repo/protocol';
 import type { Server } from 'bun';
 import { z } from 'zod';
+import { PROGRAM_NAME } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
 import { defineOutput } from '#lib/output.ts';
-
-/** What a folder is served on when nothing is hosting this nib. */
-export const DEFAULT_PORT = 3000;
 
 const INDEX_FILE = 'index.html';
 const NOT_FOUND = 404;
@@ -19,38 +18,27 @@ const NOT_FOUND_BODY = 'Not found';
  */
 const NOT_FOUND_PAGE = `${NOT_FOUND}.html`;
 
-/**
- * Every interface, which is what a host reaches an app on, against the loopback a folder on
- * somebody's own machine is served on. Handing a local folder to the whole network is not
- * something to arrive at by accident, so which of the two is bound follows from whether anything
- * assigned the port — see `addressFor`.
- */
+/** The one address nibrun reaches an app on, and so the only one worth binding. */
 const EVERY_INTERFACE = '0.0.0.0';
-const LOOPBACK = '127.0.0.1';
-
-/** The name a browser reaches `EVERY_INTERFACE` by, that address not being one it can dial. */
-const LOCALHOST = 'localhost';
 
 /** A terminal's own way of ending a run, and the one a host sends before it replaces the app. */
 const STOP_SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 
 /**
- * What the host running this nib said about itself, `null` for each thing it said nothing about.
- * Nothing at all is what says this is somebody's own machine rather than nibrun.
+ * What the guest tells an app about itself. Both are set on every instance, so `null` here is not
+ * a guest that left something out — it is a nib running somewhere that is not a guest at all.
  */
-export type HostEnvironment = {
+export type GuestEnvironment = {
   /** The port nibrun assigns and probes, which the app must be the one listening on. */
   httpPort: number | null;
-  /** That same number under the name every other host uses, read for the hosts that set only it. */
-  port: number | null;
-  /** The name the app is actually reached by, which is not the interface it is bound to. */
+  /** The name the app is reached by, which is not the interface it is bound to. */
   hostname: string | null;
 };
 
 /** What `Bun.serve` hands back for a server that never upgrades a connection. */
 export type FileServer = Server<undefined>;
 
-/** Where the server listens, and where whoever asked for it should look. */
+/** Where the server listens, and where whoever deployed it should look. */
 export type Address = {
   hostname: string;
   port: number;
@@ -58,45 +46,30 @@ export type Address = {
 };
 
 /**
- * The address to serve on, from what was typed and what the host said — in that order, because a
- * flag is the only one of the two anybody chose.
+ * Where to listen, and the address the app answers at — which is not the one bound: nibrun's edge
+ * terminates TLS in front of a guest listening on plain HTTP, so the port this process knows about
+ * is no part of any URL anybody can type.
  *
- * A host that assigned the port is a host reaching the app across a network, so it is also what
- * decides the interface: nibrun's guest is only answered on `0.0.0.0`, and everywhere nothing was
- * assigned is a folder being served to the person sitting in front of it.
+ * Refused rather than defaulted where the guest said nothing, because there is no answer to default
+ * to. A port nobody assigned is a port nothing probes, and a folder served on one is a folder
+ * nothing ever reaches.
  */
-export function addressFor({
-  options,
-  environment,
-}: {
-  options: { port?: number | undefined; host?: string | undefined };
-  environment: HostEnvironment;
-}): Address {
-  const assigned = environment.httpPort ?? environment.port;
-  const hostname = options.host ?? (assigned === null ? LOOPBACK : EVERY_INTERFACE);
-  const port = options.port ?? assigned ?? DEFAULT_PORT;
+export function guestAddress(environment: GuestEnvironment): Address {
+  const { httpPort, hostname } = environment;
 
-  return { hostname, port, url: reachedAt({ hostname, port, announced: environment.hostname }) };
+  if (httpPort === null) {
+    throw offNibrun(RUNTIME_VALUES.HTTP_PORT.name);
+  }
+  if (hostname === null) {
+    throw offNibrun(RUNTIME_VALUES.HOSTNAME.name);
+  }
+  return { hostname: EVERY_INTERFACE, port: httpPort, url: `https://${hostname}` };
 }
 
-/**
- * A host that named the app named the address it is reached at, and it is not the one bound here:
- * nibrun's edge terminates TLS in front of a guest listening on plain HTTP, so the port this
- * process knows about is not part of any URL anybody can type.
- */
-function reachedAt({
-  hostname,
-  port,
-  announced,
-}: {
-  hostname: string;
-  port: number;
-  announced: string | null;
-}): string {
-  if (announced !== null) {
-    return `https://${announced}`;
-  }
-  return `http://${hostname === EVERY_INTERFACE ? LOCALHOST : hostname}:${port}`;
+function offNibrun(variable: string): UsageError {
+  return new UsageError(
+    `${PROGRAM_NAME} serve is the binary a folder of assets is deployed as, and it serves on what the guest tells it. Nothing set ${variable} here, so this is not one. Deploy the folder instead: ${PROGRAM_NAME} run "./${PROGRAM_NAME} serve data"`,
+  );
 }
 
 /**
@@ -245,16 +218,14 @@ export function untilStopped(server: FileServer): Promise<void> {
 const ServingSchema = z.object({
   directory: z.string(),
   url: z.string(),
-  hostname: z.string(),
   port: z.number(),
   singlePage: z.boolean(),
 });
 
 /**
- * The address bound as well as the URL to visit, because on a host those are two different
- * answers and a folder nobody can reach is usually the first of them. Whether the shell is
- * answering for everything is said out loud for the same reason: it is what a 404 that came back
- * 200 turns out to have been.
+ * The port as well as the URL, those being two different answers here and the port the one an app
+ * that came up serving nothing turns out to have got wrong. Whether the shell is answering for
+ * everything is said out loud for the same reason: it is what a 404 that came back 200 was.
  */
 export const SERVING_OUTPUT = defineOutput({
   schema: ServingSchema,

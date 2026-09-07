@@ -6,15 +6,9 @@ import { z } from 'zod';
 import { DEFAULT_API_URL, PROGRAM_NAME } from '#config.ts';
 import { createApi } from '#lib/api.ts';
 import { CredentialsSchema } from '#lib/credentials.ts';
-import type { HostEnvironment } from '#lib/serve.ts';
+import type { GuestEnvironment } from '#lib/serve.ts';
 
 const CREDENTIALS_FILENAME = 'credentials.json';
-
-/**
- * Not a nibrun name: it is what every other host sets, and nibrun sets it beside
- * `NIBRUN_HTTP_PORT` so that a binary written for one of them needs no porting to run here.
- */
-const PORT_VARIABLE = 'PORT';
 
 const AssignedPortSchema = z.number().int().positive().nullable();
 
@@ -29,19 +23,17 @@ export async function createCliContext() {
   const apiUrl = env.NIBRUN_API_URL;
 
   /**
-   * What the host running this nib says about itself, for `nib serve` — the one command that is
-   * the thing being hosted. `null` rather than a default wherever nothing set it, because
-   * "nobody told us" is what says this is somebody's own machine, and a default would answer
-   * that question instead of leaving it to be asked.
+   * What the guest tells an app about itself, for `nib serve` — the one command that is the thing
+   * being hosted. `null` rather than a default wherever nothing set it: a default would be this
+   * end answering the one question serve exists to ask, which is whether it is on nibrun at all.
    */
-  const runtime: HostEnvironment = createEnvContext({
+  const runtime: GuestEnvironment = createEnvContext({
     vars: {
       httpPort: {
         name: RUNTIME_VALUES.HTTP_PORT.name,
         schema: AssignedPortSchema,
         default: null,
       },
-      port: { name: PORT_VARIABLE, schema: AssignedPortSchema, default: null },
       hostname: {
         name: RUNTIME_VALUES.HOSTNAME.name,
         schema: z.string().min(1).nullable(),
