@@ -2,11 +2,16 @@
 
 All notable changes to `nib` are documented in this file.
 
-## [2026.9.6-2]
+## [2026.9.7-1]
 
 ### 🚀 Features
 
+- *(agent)* An app's data can be created from a zip as well as a tarball (#524)
 - *(dashboard)* An app can be created holding the data its owner uploads (#518)
+
+### 📚 Documentation
+
+- *(skills)* The deployment skill opens on the path a first deploy takes (#525)
 
 ## [2026.9.6-1]
 
