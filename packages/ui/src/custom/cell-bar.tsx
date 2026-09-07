@@ -38,12 +38,19 @@ export function CellBar({
   share,
   tone = 'bg-primary text-primary',
   label,
+  rounded = false,
 }: {
   /** `null` where nothing has been measured, which is not the same claim as nought. */
   share: number | null;
   /** Background and text colour together: a lit cell blooms in its own colour via `currentColor`. */
   tone?: string;
   label?: string;
+  /**
+   * For a reading that mostly sits near empty — a few percent of a vCPU or a disk — where a lone
+   * square cell reads as something broken rather than as a small figure. A bar that fills, like a
+   * transfer, keeps its square segments: they butt up into a bar as it goes.
+   */
+  rounded?: boolean;
 }) {
   const lit = litCells(share);
   // An empty track and a track at nought look the same and mean different things, so where there is
@@ -60,18 +67,16 @@ export function CellBar({
             share === null ? undefined : Math.round(Math.min(share, FULL) * PERCENT_SCALE),
         } as const);
 
+  // No frame around it and no bloom on the lit cells: the cells are the reading, and a box drawn
+  // around every figure on a page of figures is what makes a panel look like equipment.
   return (
-    // Rounded and small rather than a flat row of blocks: most of what this measures sits near
-    // empty — a quarter of a vCPU, a few percent of a disk — and one lit square in a hard row of
-    // twelve reads as something broken rather than as a small reading.
-    //
-    // No frame and no bloom around it either: the cells are the reading, and a box drawn around
-    // every figure on a page of figures is what makes a panel look like equipment.
     <span {...meter} className="flex h-1.5 gap-1">
       {CELLS.map((cell) => (
         <span
           key={cell}
-          className={`flex-1 rounded-full transition-colors ${cell < lit ? tone : 'bg-border/30'}`}
+          className={`flex-1 transition-colors ${rounded ? 'rounded-full' : ''} ${
+            cell < lit ? tone : 'bg-border/30'
+          }`}
         />
       ))}
     </span>
