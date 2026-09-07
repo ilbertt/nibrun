@@ -152,7 +152,7 @@ test('and it is sent as it stands rather than packed again', async () => {
   const opened = await opening(path);
 
   expect((opened.archive.body as Bun.BunFile).name).toBe(path);
-  expect(opened.archive.name).toBe('given.tar.gz');
+  expect(opened.archive.name as string).toBe('given.tar.gz');
 });
 
 /** It is the owner's own file, sitting where they left it: a release ending is no reason to lose it. */
@@ -176,7 +176,7 @@ test('a zip is one of the two an app may be created from', async () => {
 
   const opened = await opening(path);
 
-  expect(opened.archive.name).toBe('given.zip');
+  expect(opened.archive.name as string).toBe('given.zip');
 });
 
 /**
