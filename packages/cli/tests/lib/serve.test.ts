@@ -129,7 +129,13 @@ describe('a request reaches a path under the folder or it reaches nothing', () =
 const OUTSIDE_FILE = 'secret.txt';
 
 /** A site with a page at the root, one in a directory, and an asset beside them. */
-async function siteServedWith({ singlePage }: { singlePage: boolean }): Promise<FileServer> {
+async function siteServedWith({
+  singlePage,
+  notFoundPage = false,
+}: {
+  singlePage: boolean;
+  notFoundPage?: boolean;
+}): Promise<FileServer> {
   const scratch = await scratchDir();
   const root = join(scratch, 'site');
 
@@ -138,6 +144,9 @@ async function siteServedWith({ singlePage }: { singlePage: boolean }): Promise<
   await writeFile(join(root, 'index.html'), '<h1>home</h1>');
   await writeFile(join(root, 'app.css'), 'body{}');
   await writeFile(join(root, 'docs', 'index.html'), '<h1>docs</h1>');
+  if (notFoundPage) {
+    await writeFile(join(root, '404.html'), '<h1>nothing here</h1>');
+  }
 
   return serveDirectory({ root, hostname: '127.0.0.1', port: ANY_FREE_PORT, singlePage });
 }
@@ -211,7 +220,15 @@ describe('a single-page app is routed in the browser, so the shell answers for i
 
   test('a file that is there still wins, so assets are not shadowed by the shell', async () => {
     expect(await (await fetch(`${origin}/app.css`)).text()).toBe('body{}');
-    expect(await (await fetch(`${origin}/docs`)).text()).toBe('<h1>docs</h1>');
+    expect(await (await fetch(`${origin}/docs/index.html`)).text()).toBe('<h1>docs</h1>');
+  });
+
+  // What `serve`'s `--single` does, and the one place it differs from serving the folder plainly:
+  // the rewrite to the root index.html is applied before a directory is ever looked inside, so a
+  // real folder with a real index.html in it is answered by the shell all the same.
+  test('a directory with an index of its own is a route like any other', async () => {
+    expect(await (await fetch(`${origin}/docs`)).text()).toBe('<h1>home</h1>');
+    expect(await (await fetch(`${origin}/docs/`)).text()).toBe('<h1>home</h1>');
   });
 
   // The cost of asking for this, pinned down rather than left to be discovered: a stale bundle url
@@ -241,5 +258,36 @@ describe('a single-page app is routed in the browser, so the shell answers for i
 
     expect((await fetch(`${bare.url.origin}/anywhere`)).status).toBe(NOT_FOUND);
     await bare.stop(true);
+  });
+});
+
+describe("a folder's own 404.html is what its misses are answered with", () => {
+  let server: FileServer;
+  let origin: string;
+
+  beforeAll(async () => {
+    server = await siteServedWith({ singlePage: false, notFoundPage: true });
+    origin = server.url.origin;
+  });
+
+  afterAll(() => server.stop(true));
+
+  // The status, not just the page: a browser, a crawler and a `curl -f` all read that rather than
+  // the body, and `serve` writes the code it was answering rather than a 200 for the same reason.
+  test('the page is served, and it is served as the 404 it is', async () => {
+    const response = await fetch(`${origin}/missing.html`);
+
+    expect(response.status).toBe(NOT_FOUND);
+    expect(await response.text()).toBe('<h1>nothing here</h1>');
+    expect(response.headers.get('content-type')).toContain('text/html');
+  });
+
+  test('a route with no page behind it reaches it too', async () => {
+    expect(await (await fetch(`${origin}/projects/nibrun`)).text()).toBe('<h1>nothing here</h1>');
+  });
+
+  test('what the folder does have is still answered with itself', async () => {
+    expect(await (await fetch(`${origin}/`)).text()).toBe('<h1>home</h1>');
+    expect(await (await fetch(`${origin}/app.css`)).text()).toBe('body{}');
   });
 });

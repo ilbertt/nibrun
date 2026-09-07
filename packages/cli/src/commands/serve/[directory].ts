@@ -11,10 +11,6 @@ import {
   untilStopped,
 } from '#lib/serve.ts';
 
-// parsh spells a flag exactly as its key, and this one is read back out of the options it was
-// declared in — so the two halves are one name rather than two spellings of it.
-const SINGLE_PAGE_FLAG = 'single-page';
-
 /**
  * The one command that is the thing being hosted rather than the thing that hosts it: a nib
  * deployed as an app's binary serves its volume, and the same nib serves a folder here. So it
@@ -22,7 +18,7 @@ const SINGLE_PAGE_FLAG = 'single-page';
  */
 export const command = defineCommand('serve [directory]', {
   description:
-    'Serve a folder of files over HTTP. On this machine that is http://127.0.0.1:3000; on nibrun it binds the port and the interface the guest hands it, so `nib run "./nib serve data"` deploys the app volume as a static site. A path naming a directory is answered with the index.html in it.',
+    'Serve a folder of files over HTTP. On this machine that is http://127.0.0.1:3000; on nibrun it binds the port and the interface the guest hands it, so `nib run "./nib serve data"` deploys the app volume as a static site. A path naming a directory is answered with the index.html in it, and a path naming nothing with the folder’s own 404.html where it has one.',
   params: {
     directory: { schema: z.string().min(1) },
   },
@@ -36,15 +32,15 @@ export const command = defineCommand('serve [directory]', {
       description:
         'Interface to listen on. Defaults to 127.0.0.1, and to 0.0.0.0 wherever a host assigned the port — which is the only address nibrun reaches an app on.',
     },
-    [SINGLE_PAGE_FLAG]: {
+    'single-page': {
       schema: z.boolean().optional(),
       description:
-        'Answer a path with no file of its own with the index.html at the root, for an app whose routes exist only in the browser. Off by default: it makes every miss a 200, so a stale asset url answers with the page rather than saying it is gone.',
+        'Answer everything no file of its own answers with the index.html at the root, for an app whose routes exist only in the browser. Off by default: it makes every miss a 200, so a stale asset url answers with the page rather than saying it is gone.',
     },
   },
   handler: async ({ params, options, context, print, rootOptions }) => {
     const { emit } = createOutput({ output: SERVING_OUTPUT, print, json: rootOptions.json });
-    const { [SINGLE_PAGE_FLAG]: singlePage = false, ...listening } = options;
+    const { 'single-page': singlePage = false, ...listening } = options;
 
     const directory = await servedRoot(params.directory);
     const address = addressFor({ options: listening, environment: context.runtime });

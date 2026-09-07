@@ -104,11 +104,18 @@ the layout under `src/commands/` is the command tree.
   `serve`, sirv, Caddy and Netlify all settle on: answering every miss with the
   shell makes a stale asset url a `200 text/html`, so the app reports a syntax
   error instead of a missing file, and a docs site answers a bad link with its
-  homepage. A path that resolved outside the folder is never given the shell
-  either — the fallback is for paths that were asked for honestly. Note that a
-  traversal cannot reach `requestedPath` over HTTP at all: the URL parser
-  resolves `..` and `%2e%2e` alike before a pathname is anything the handler can
-  read, so that check is tested on its own rather than through a request.
+  homepage. Under the flag a real file is the only thing that beats the shell —
+  a directory's own `index.html` does not, because `serve`'s `--single` rewrites
+  to the root before it ever looks inside a directory, and matching it keeps the
+  rule to one sentence. A path that resolved outside the folder is never given
+  the shell either. Note that a traversal cannot reach `requestedPath` over HTTP
+  at all: the URL parser resolves `..` and `%2e%2e` alike before a pathname is
+  anything the handler can read, so that check is tested on its own rather than
+  through a request.
+- **A miss is answered with the folder's own `404.html`** where it has one, and
+  under the 404 it is — a browser, a crawler and a `curl -f` all read the status
+  rather than the body. The filename is spelled from the status code rather than
+  written out, which is how `serve` names it too (`${statusCode}.html`).
 - Run it with `bun run --filter @repo/cli nib …`. A package script runs from the
   package directory, so relative paths resolve against `packages/cli` rather than
   the caller's shell — pass absolute ones until the CLI ships as a real `bin`.

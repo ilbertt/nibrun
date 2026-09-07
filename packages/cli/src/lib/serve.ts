@@ -13,6 +13,13 @@ const NOT_FOUND = 404;
 const NOT_FOUND_BODY = 'Not found';
 
 /**
+ * The page a folder answers its own misses with, named after the status it is answering — which is
+ * the convention `serve` and every static host reads, and the reason it is spelled from the code
+ * rather than written out.
+ */
+const NOT_FOUND_PAGE = `${NOT_FOUND}.html`;
+
+/**
  * Every interface, which is what a host reaches an app on, against the loopback a folder on
  * somebody's own machine is served on. Handing a local folder to the whole network is not
  * something to arrive at by accident, so which of the two is bound follows from whether anything
@@ -165,11 +172,23 @@ export function serveDirectory({
     port,
     fetch: async (request) => {
       const file = await fileAt({ root, pathname: new URL(request.url).pathname, singlePage });
-      return file === null
-        ? new Response(NOT_FOUND_BODY, { status: NOT_FOUND })
-        : new Response(file);
+      return file === null ? await missing(root) : new Response(file);
     },
   });
+}
+
+/**
+ * The folder's own `404.html` where it has one, and a bare line where it does not.
+ *
+ * Answered as the 404 it is rather than as a 200: a browser, a crawler and a `curl -f` all read
+ * the status rather than the page, and a "not found" served under a 200 is the one answer none of
+ * them can act on.
+ */
+async function missing(root: string): Promise<Response> {
+  const page = await existingFile(join(root, NOT_FOUND_PAGE));
+  return page === null
+    ? new Response(NOT_FOUND_BODY, { status: NOT_FOUND })
+    : new Response(page, { status: NOT_FOUND });
 }
 
 async function fileAt({
@@ -192,14 +211,17 @@ async function fileAt({
   if (await asked.exists()) {
     return asked;
   }
-  // A directory is not a file Bun reads, so falling through to its index is also what answers `/`
-  // and every path a browser arrives at with a trailing slash.
-  const index = Bun.file(join(target, INDEX_FILE));
-  if (await index.exists()) {
-    return index;
+  // Everything a real file did not answer is the app's own routing to do, directory indexes
+  // included: `serve`'s `--single` rewrites every path to the root index.html *before* it looks
+  // for one in the directory that was asked for, so a route that happens to name a real folder is
+  // still a route rather than somewhere to go looking.
+  if (singlePage) {
+    return await existingFile(join(root, INDEX_FILE));
   }
 
-  return singlePage ? await existingFile(join(root, INDEX_FILE)) : null;
+  // A directory is not a file Bun reads, so falling through to its index is also what answers `/`
+  // and every path a browser arrives at with a trailing slash.
+  return await existingFile(join(target, INDEX_FILE));
 }
 
 async function existingFile(path: string): Promise<Bun.BunFile | null> {
