@@ -2,6 +2,16 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.9.7-2]
+
+### 🚀 Features
+
+- *(cli)* A folder of files is something nib can serve on nibrun (#528)
+
+### 🚜 Refactor
+
+- *(cli)* Drop a comment the code already made (#529)
+
 ## [2026.9.7-1]
 
 ### 🚀 Features
