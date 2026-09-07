@@ -86,7 +86,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   return (
     <div className="flex flex-col gap-1">
       <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="inset-well flex items-center gap-2 border-2 border-border bg-input px-2.5 py-1.5 font-mono text-xs">
+      <span className="flex items-center gap-2 bg-input px-2.5 py-2 font-mono text-xs">
         {children}
       </span>
     </div>

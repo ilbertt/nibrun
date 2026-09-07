@@ -150,7 +150,7 @@ function Overview() {
           <Separator />
           <span className="flex flex-col gap-2">
             <span className="text-muted-foreground">Run command</span>
-            <code className="inset-well select-all break-words border-2 border-border bg-input px-2 py-1.5 font-mono text-xs">
+            <code className="select-all break-words bg-input px-2.5 py-2 font-mono text-xs">
               ./pocketbase serve --http 0.0.0.0:8090
             </code>
           </span>
@@ -198,7 +198,7 @@ function Overview() {
 function LogsView() {
   return (
     <InstrumentPanel name="Output" action={<TimerangeMenu />}>
-      <div className="display-glass flex flex-col gap-0.5 border-2 border-border p-3 font-mono text-xs">
+      <div className="flex flex-col gap-0.5 bg-input p-3 font-mono text-xs">
         {LOG_LINES.map((line) => (
           <span key={line.at} className="flex gap-3">
             <span className="shrink-0 text-muted-foreground tabular-nums">{line.at}</span>
@@ -376,7 +376,7 @@ function DeployRun({ onDone }: { onDone: () => void }) {
       </ol>
 
       {done && (
-        <div className="inset-well flex flex-col gap-1 border-2 border-border bg-input px-3 py-2">
+        <div className="flex flex-col gap-1 bg-input px-3 py-2">
           <span className="text-muted-foreground text-xs">Serving at</span>
           <a
             href="https://pocketbase.nibrun.app"
@@ -446,7 +446,7 @@ function DeleteDialog() {
           <p className="text-muted-foreground">
             The machine, the disk and everything on it. There is no undo and no copy kept.
           </p>
-          <dl className="inset-well flex flex-col gap-2 border-2 border-border bg-input p-3">
+          <dl className="flex flex-col gap-2 bg-input p-3">
             <Reading label="volume">964 MiB, erased</Reading>
             <Reading label="binaries">every one ever uploaded</Reading>
             <Reading label="exports">every bundle ever taken</Reading>
@@ -529,7 +529,7 @@ function ExportDialog() {
             <Label htmlFor="preview-export-name">Name the archive</Label>
             <Input id="preview-export-name" defaultValue="pocketbase-2026-09-07" />
           </div>
-          <div className="inset-well flex flex-col gap-3 border-2 border-border bg-input p-3">
+          <div className="flex flex-col gap-3 bg-input p-3">
             <Reading label="Binary">14.2 MB</Reading>
             <Reading label="Volume">964 MiB</Reading>
             <Reading label="Environment">6 variables</Reading>

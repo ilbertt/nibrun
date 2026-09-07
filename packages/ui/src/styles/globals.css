@@ -134,7 +134,6 @@ body {
   --well: inset 0 1px 2px 0 rgb(0 0 0 / 0.06);
   --raise: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --lift: 0 4px 12px -2px rgb(0 0 0 / 0.12);
-  --glass-tint: rgb(255 255 255 / 0.5);
   --chart-1: oklch(0.25 0.17 149.2);
   --chart-2: oklch(0.35 0.17 149.2);
   --chart-3: oklch(0.55 0.17 149.2);
@@ -207,7 +206,6 @@ body {
   --well: inset 0 1px 3px 0 rgb(0 0 0 / 0.3);
   --raise: 0 1px 3px 0 rgb(0 0 0 / 0.3);
   --lift: 0 6px 18px -4px rgb(0 0 0 / 0.6);
-  --glass-tint: rgb(0 0 0 / 0.28);
   --chart-1: oklch(0.35 0.17 149.2);
   --chart-2: oklch(0.55 0.17 149.2);
   --chart-3: oklch(0.75 0.17 149.2);
@@ -274,15 +272,9 @@ body {
   box-shadow: var(--raise);
 }
 
-/* The pane a lamp sits behind — a meter, a readout that lights up. Tinted rather than glossed:
-   a specular streak across it is the part that reads as a period piece. */
-@utility display-glass {
-  background-color: var(--glass-tint);
-  backdrop-filter: blur(6px);
-  box-shadow: var(--well);
-}
-
-/* A readout set into the face: a code line, a field you type into. */
+/* A track something is dragged along, which is the one thing left that is genuinely set into the
+   panel. A border and a shadow around every figure inside a panel is what makes it read as
+   equipment: the outline belongs to the chassis, and what sits inside it gets a fill at most. */
 @utility inset-well {
   box-shadow: var(--well);
 }
