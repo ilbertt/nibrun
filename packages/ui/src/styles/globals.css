@@ -260,35 +260,35 @@ body {
   background: color-mix(in oklch, var(--muted) 40%, transparent);
 }
 
-@utility inset-well {
-  box-shadow: var(--well);
+/* A key with a throw: a darker strip of its own face along the bottom, taken away when it is
+   pressed while the face drops by the same amount.
+
+   Drawn inside the edge rather than cast below it. A cast shadow needs a ground lighter than
+   itself, and in dark mode there is almost none left below the page, so it disappeared exactly
+   where it was needed. Inside, it is the side of the key, which reads on any ground.
+
+   Which controls wear this is `button.tsx`'s to say — `ghost` and `link` have no face to bevel. */
+@utility key-face {
+  --key-throw: 3px;
+  --key-bevel: inset 0 1px 0 0 rgb(255 255 255 / 0.18);
+
+  box-shadow:
+    var(--tw-ring-shadow, 0 0 #0000),
+    var(--key-bevel),
+    inset 0 calc(-1 * var(--key-throw)) 0 0 rgb(0 0 0 / 0.3);
+
+  &:active:not(:disabled) {
+    translate: 0 var(--key-throw);
+    box-shadow: var(--tw-ring-shadow, 0 0 #0000), var(--key-bevel);
+  }
 }
 
-/* The CLI draws a control's shape with a fill and leaves its border transparent, which worked
-   while `input` sat well clear of the surface behind it. This palette moved them close together,
-   so a checkbox nobody has ticked and a field nobody has typed in both read as a faint smudge
-   rather than as somewhere to click.
-
-   Only where nothing else is speaking for the border: focus, invalid and checked all set their own
-   and each says more than "this is a control". Set here rather than in the components, which the
-   CLI owns and will overwrite. */
-:is([data-slot="checkbox"], [data-slot="input"], [data-slot="textarea"]):not(
-  [data-checked],
-  :focus-visible,
-  [aria-invalid="true"]
-) {
-  border-color: var(--border);
-}
-
-/* A card is the panel everything in this dashboard sits in, so it is drawn rather than floated: a
-   real outline and four bolts, where the CLI leaves it a tinted rectangle on a soft ring. The name
-   still sits inside it rather than breaking the border — that is markup, and `card.tsx` is the
-   CLI's. */
-[data-slot="card"] {
+/* A panel bolted down at four corners. Worn by `card` and by anything hand-written that wants to
+   read as the same object. */
+@utility panel-face {
   --rivet-inset: 7px;
   --rivet: radial-gradient(circle, var(--border) 0 1.5px, transparent 1.6px);
 
-  border: 2px solid var(--border);
   background-image: var(--rivet), var(--rivet), var(--rivet), var(--rivet);
   background-size: 4px 4px;
   background-repeat: no-repeat;
@@ -299,58 +299,8 @@ body {
     calc(100% - var(--rivet-inset)) calc(100% - var(--rivet-inset));
 }
 
-/* The one control on a dialog that is not about the dialog's content. The CLI reaches for
-   `bg-secondary`, which here is the brand green — so a dismiss ends up looking like the action
-   worth taking, and it is the brightest thing in the corner of every dialog. Neutralised here
-   rather than in `dialog.tsx`, which the CLI owns and will overwrite. It stays a key: it is still
-   something you press. */
-[data-slot="dialog-close"] {
-  background-color: var(--card);
-  border-color: var(--border);
-  color: var(--muted-foreground);
-}
-
-[data-slot="dialog-close"]:hover {
-  background-color: var(--accent);
-  color: var(--foreground);
-}
-
-/* A key with a throw, rather than a rectangle that changes colour: it stands on a base, and
-   pressing drops the face by exactly the depth of that base and takes the base away.
-
-   The base is drawn inside the key's own bottom edge rather than cast below it. A cast shadow
-   needs a ground lighter than itself, and in dark mode there is almost none left below the page —
-   so it disappeared exactly where it was needed. Inside, it is a darker strip of whatever the key
-   is made of, which reads on any ground and is what the side of a key actually is.
-
-   Matched on the background utility each variant carries rather than on a variant name, which cva
-   does not put in the DOM: a button with a surface of its own is precisely the one that can sit on
-   a base, and `ghost` and `link`, which have none, would otherwise get a shelf under nothing.
-   Written here rather than in `button.tsx` because that file is the CLI's output, and outside any
-   layer because a utility class is what it has to outrank. */
-[data-slot="button"]:is(
-  .bg-primary,
-  .bg-secondary,
-  .bg-background,
-  [class*="bg-destructive"]
-):not(:disabled, [data-key="none"]) {
-  --key-throw: 3px;
-  --key-bevel: inset 0 1px 0 0 rgb(255 255 255 / 0.18);
-
-  box-shadow:
-    var(--tw-ring-shadow, 0 0 #0000),
-    var(--key-bevel),
-    inset 0 calc(-1 * var(--key-throw)) 0 0 rgb(0 0 0 / 0.3);
-}
-
-[data-slot="button"]:is(
-  .bg-primary,
-  .bg-secondary,
-  .bg-background,
-  [class*="bg-destructive"]
-):not(:disabled, [data-key="none"]):active {
-  translate: 0 var(--key-throw);
-  box-shadow: var(--tw-ring-shadow, 0 0 #0000), var(--key-bevel);
+@utility inset-well {
+  box-shadow: var(--well);
 }
 
 @layer base {
