@@ -12,6 +12,13 @@ import {
   TYPE_HARDLINK,
   TYPE_SYMLINK,
 } from '#tests/support/tarball.ts';
+import {
+  METHOD_STORED,
+  UNIX_DIRECTORY,
+  UNIX_SYMLINK,
+  type ZipEntry,
+  zipOf,
+} from '#tests/support/zip.ts';
 
 const run = provided(platform);
 
@@ -30,6 +37,8 @@ const OWNER: Owner = { uid: process.getuid?.() ?? 0, gid: process.getgid?.() ?? 
 
 /** Far below the host's, so a bound can be reached without staging what the real one allows. */
 const SMALL: SeedLimits = { maxBytes: 4096, maxEntries: 4 };
+/** Past what `SMALL` allows, so an archive holding it is one the ceiling has to stop. */
+const PAST_THE_SMALL_CEILING = 8192;
 
 /** Room for an ordinary archive, which is what every test not aiming at a bound wants. */
 const ROOMY: SeedLimits = { maxBytes: 1_048_576, maxEntries: 64 };
@@ -83,10 +92,25 @@ function unpacking({
   entries: readonly TarballEntry[];
   limits?: SeedLimits;
 }) {
+  return unpackingArchive({ bytes: gzippedTarball(entries), limits });
+}
+
+/** The same, of a zip: which reader ran is decided by the bytes, so the name is beside the point. */
+function unpackingZip({
+  entries,
+  limits = ROOMY,
+}: {
+  entries: readonly ZipEntry[];
+  limits?: SeedLimits;
+}) {
+  return unpackingArchive({ bytes: zipOf({ entries }), limits });
+}
+
+function unpackingArchive({ bytes, limits }: { bytes: Uint8Array; limits: SeedLimits }) {
   return Effect.gen(function* () {
     const directory = yield* temporaryDirectory;
-    const archivePath = join(directory, 'archive.tar.gz');
-    yield* Effect.promise(() => writeFile(archivePath, gzippedTarball(entries)));
+    const archivePath = join(directory, 'archive');
+    yield* Effect.promise(() => writeFile(archivePath, bytes));
     const destination = join(directory, 'tree');
     const result = yield* Effect.either(
       unpackSeed({ archivePath, destination, owner: OWNER, limits }),
@@ -403,6 +427,106 @@ test('bytes that are not a gzipped tarball are refused rather than half unpacked
   );
 
   expect(refusal).not.toBe(NOTHING_REFUSED);
+});
+
+/**
+ * The reader is chosen from the archive's first bytes, and everything the unpack does with what
+ * comes back is the same either way: these prove that over a zip rather than restating the walk.
+ */
+describe("a zip is unpacked as an app's data too", () => {
+  test('files, directories and symlinks arrive where the archive put them', async () => {
+    const { refusal, written } = await run(
+      unpackingZip({
+        entries: [
+          { path: 'pb_data/', unixType: UNIX_DIRECTORY, mode: PRIVATE_DIRECTORY_MODE },
+          { path: 'pb_data/data.db', mode: PRIVATE_FILE_MODE, body: 'rows' },
+          {
+            path: 'latest',
+            unixType: UNIX_SYMLINK,
+            body: 'pb_data/data.db',
+            method: METHOD_STORED,
+          },
+        ],
+      }),
+    );
+
+    expect(refusal).toBe(NOTHING_REFUSED);
+    expect(written.content['pb_data/data.db']).toBe('rows');
+    expect(written.links.latest).toBe('pb_data/data.db');
+    expect(written.modes['pb_data/data.db']).toBe(PRIVATE_FILE_MODE);
+    expect(written.modes.pb_data).toBe(PRIVATE_DIRECTORY_MODE);
+  });
+
+  test('everything written belongs to whoever the unpack was told to give it to', async () => {
+    const { written } = await run(
+      unpackingZip({ entries: [{ path: 'pb_data/data.db', body: 'rows' }] }),
+    );
+
+    const expected = `${OWNER.uid}:${OWNER.gid}`;
+    expect(written.owners['pb_data/data.db']).toBe(expected);
+    expect(written.owners.pb_data).toBe(expected);
+  });
+
+  test('a setuid bit in the archive is not a setuid file on the host', async () => {
+    const { written } = await run(
+      unpackingZip({ entries: [{ path: 'helper', mode: SETUID_RUNNABLE_MODE }] }),
+    );
+
+    expect(written.modes.helper).toBe(RUNNABLE_MODE);
+  });
+
+  test('a path that climbs out is refused, as it is in a tarball', async () => {
+    const { refusal, written } = await run(
+      unpackingZip({ entries: [{ path: '../escaped', body: 'x' }] }),
+    );
+
+    expect(refusal).toContain('climbs out of the archive');
+    expect(written.names).toEqual([]);
+  });
+
+  test('a symlink pointing out of the archive is refused', async () => {
+    const { refusal } = await run(
+      unpackingZip({
+        entries: [
+          { path: 'escape', unixType: UNIX_SYMLINK, body: '../../etc', method: METHOD_STORED },
+        ],
+      }),
+    );
+
+    expect(refusal).toContain('pointing out of the archive');
+  });
+
+  test('what it expands to is bounded the same way', async () => {
+    const { refusal } = await run(
+      unpackingZip({
+        entries: [{ path: 'big', body: 'x'.repeat(PAST_THE_SMALL_CEILING) }],
+        limits: SMALL,
+      }),
+    );
+
+    expect(refusal).toContain('an app may be seeded with');
+  });
+
+  /**
+   * What Finder makes: the folder rather than its contents, and a tree of its own beside it. Both
+   * halves have to hold at once for the commonest zip an owner can produce to seed anything.
+   */
+  test("Finder's shape — the folder, and the litter beside it — begins at the folder", async () => {
+    const { refusal, root } = await run(
+      unpackingZip({
+        entries: [
+          { path: 'data/', unixType: UNIX_DIRECTORY },
+          { path: 'data/pb_data/data.db', body: 'rows' },
+          { path: '__MACOSX/', unixType: UNIX_DIRECTORY },
+          { path: '__MACOSX/._data', body: 'apple double' },
+          { path: '.DS_Store', body: 'finder' },
+        ],
+      }),
+    );
+
+    expect(refusal).toBe(NOTHING_REFUSED);
+    expect(root).toBe('data');
+  });
 });
 
 /**

@@ -1,11 +1,14 @@
+import { Buffer } from 'node:buffer';
 import { posix } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
 import type { PlatformError } from '@effect/platform/Error';
 import type { DesiredArtifact, VolumeId } from '@repo/protocol';
 import { Data, Effect, Option, Ref, Stream } from 'effect';
 import { downloadAndVerify } from '#lib/vm/artifacts.ts';
+import { type ArchiveEntry, UnreadableArchive } from '#lib/volumes/archive.ts';
 import { format, isFormatted } from '#lib/volumes/ext4.ts';
-import { type TarEntry, tarEntries } from '#lib/volumes/tar.ts';
+import { tarEntries } from '#lib/volumes/tar.ts';
+import { ZIP_MAGIC, zipEntries } from '#lib/volumes/zip.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
 /**
@@ -90,7 +93,11 @@ export class SeedUnreadable extends Data.TaggedError('SeedUnreadable')<{
   readonly cause: unknown;
 }> {
   override get message() {
-    return 'the archive could not be read as a gzipped tarball';
+    // The reader's own sentence where there is one: it names what the archive did, which is the
+    // difference between an operator seeing a password-protected entry and seeing "unreadable".
+    return this.cause instanceof UnreadableArchive
+      ? this.cause.message
+      : 'the archive could not be read as a .tar.gz or a .zip';
   }
 }
 
@@ -181,6 +188,20 @@ function refuse(reason: string) {
 }
 
 /**
+ * The archive as its entries, read by whichever of the two readers its opening says it needs.
+ *
+ * Decided from the bytes rather than from the name: the name reached the host from whoever uploaded
+ * the archive, and these four bytes did not.
+ */
+async function archiveEntries(archivePath: string): Promise<AsyncIterable<ArchiveEntry>> {
+  const file = Bun.file(archivePath);
+  const opening = Buffer.from(await file.slice(0, ZIP_MAGIC.length).arrayBuffer());
+  return opening.equals(ZIP_MAGIC)
+    ? zipEntries(archivePath)
+    : tarEntries(file.stream().pipeThrough(new DecompressionStream(GZIP)));
+}
+
+/**
  * Owned by the tenant as it is written, rather than chowned in a second pass.
  *
  * `mkfs.ext4 -d` copies what it finds, and the guest chowns only the mount root — so an unchowned
@@ -201,7 +222,7 @@ const madeDirectory = ({ path, mode, owner }: { path: string; mode: number; owne
  * A file's own bytes, written straight through rather than held: an entry is as large as the
  * ceiling allows, and buffering one would be the whole of it in the agent's memory.
  */
-const wroteFile = ({ entry, path, owner }: { entry: TarEntry; path: string; owner: Owner }) =>
+const wroteFile = ({ entry, path, owner }: { entry: ArchiveEntry; path: string; owner: Owner }) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     yield* madeDirectory({ path: posix.dirname(path), mode: DIRECTORY_MODE, owner });
@@ -218,7 +239,15 @@ const wroteFile = ({ entry, path, owner }: { entry: TarEntry; path: string; owne
  * A symlink is created rather than followed, and its ownership left alone: what a symlink permits
  * is decided by what it points at, and chowning one would chown that instead.
  */
-const wroteSymlink = ({ entry, path, owner }: { entry: TarEntry; path: string; owner: Owner }) =>
+const wroteSymlink = ({
+  entry,
+  path,
+  owner,
+}: {
+  entry: ArchiveEntry;
+  path: string;
+  owner: Owner;
+}) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     yield* madeDirectory({ path: posix.dirname(path), mode: DIRECTORY_MODE, owner });
@@ -231,7 +260,7 @@ const wroteEntry = ({
   destination,
   owner,
 }: {
-  entry: TarEntry;
+  entry: ArchiveEntry;
   segments: readonly string[];
   destination: string;
   owner: Owner;
@@ -251,7 +280,7 @@ const advanced = ({
   segments,
 }: {
   unpacked: Unpacked;
-  entry: TarEntry;
+  entry: ArchiveEntry;
   segments: readonly string[];
 }): Unpacked => ({
   bytes: unpacked.bytes + entry.sizeBytes,
@@ -293,7 +322,7 @@ function rootsWith({
   segments,
 }: {
   roots: Roots;
-  entry: TarEntry;
+  entry: ArchiveEntry;
   segments: readonly string[];
 }): Roots {
   const [name] = segments;
@@ -347,7 +376,7 @@ const unpackedEntry = ({
   limits,
 }: {
   unpacked: Unpacked;
-  entry: TarEntry;
+  entry: ArchiveEntry;
   destination: string;
   owner: Owner;
   limits: SeedLimits;
@@ -410,9 +439,8 @@ export const unpackSeed = Effect.fn('unpackSeed')(function* ({
   yield* fs.makeDirectory(destination, { recursive: true, mode: STAGING_MODE });
   yield* owned({ path: destination, owner });
 
-  const entries = yield* Effect.try({
-    try: () =>
-      tarEntries(Bun.file(archivePath).stream().pipeThrough(new DecompressionStream(GZIP))),
+  const entries = yield* Effect.tryPromise({
+    try: () => archiveEntries(archivePath),
     catch: (cause) => new SeedUnreadable({ cause }),
   });
 
