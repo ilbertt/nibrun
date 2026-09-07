@@ -8,6 +8,122 @@ description: Deploy a compiled binary to nibrun and run it as an HTTPS service. 
 nibrun takes one compiled binary and gives it a microVM of its own, a persistent filesystem, and
 an HTTPS URL. No Dockerfile, no YAML, no cluster.
 
+Sign in, build for Linux x86_64, `nib run`, then ask the URL for something. What that path does not
+need is below it: [the guest contract](#the-guest-contract), [naming a runtime
+value](#naming-a-runtime-value), [a second public port](#a-second-public-port), and [what nibrun
+does not do](#tradeoffs).
+
+## 1. Sign in
+
+```sh
+nib apps list
+```
+
+Both halves in one command: `command not found` means the CLI is not installed, `Not signed in.`
+means it is not signed in.
+
+```sh
+curl -fsSL https://nibrun.com/install.sh | sh   # installs `nib` to ~/.local/bin
+nib login                                       # device flow: approve it in the browser
+```
+
+`nib login` waits on a human approving it in a browser, so an agent that finds itself signed out
+asks the user to run it rather than trying to drive it.
+
+## 2. Build the binary
+
+One self-contained `linux-x86_64` file — static, or dynamically linked against glibc, which the
+rootfs carries. It has to be built *for* that target: a binary compiled on a Mac, or for arm64, is
+the most common reason a first deploy never boots.
+
+**If the repo already builds one, run its build.** A project that ships a binary usually wraps more
+than a compiler invocation — assets embedded, constants substituted at build time, a frontend
+compiled first — and a hand-rolled command silently skips all of it, producing something that links
+and then dies on boot. [bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter)
+is one such: `bun run build` gives `backend/dist/app` with the frontend and the migrations inside
+it, defaulting to `PORT` 3000 and `./data`.
+
+A Bun repo with nothing to inherit compiles one itself with `bun build --compile`, targeting
+`bun-linux-x64`. Embedding an asset directory, bytecode, build-time constants — all flags on that
+same command, and worth reading [Bun's single-file executable
+docs](https://bun.com/docs/bundler/executables) for rather than recalling: a flag invented from
+memory is how a binary ends up missing the files it expects to carry.
+
+Three things to read off the binary before deploying rather than after:
+
+- **The port it listens on**, and that it binds `0.0.0.0` rather than `127.0.0.1`. The guest hands
+  the number back as `NIBRUN_HTTP_PORT` and `PORT`, so an app that reads either needs no
+  configuration here.
+- **Where it writes.** Only `/app/data` survives a redeploy, and an app that keeps its SQLite file
+  and its uploads under `./data` is already there.
+- **What it needs from the environment**, off a `.env.example` or whatever it loads config from. It
+  has to be there on the **first** deploy: a process that exits over a missing variable never
+  starts serving, and the deploy fails with it.
+
+## 3. Deploy
+
+First deploy — creates the app:
+
+```sh
+nib run ./my-server --name my-app --port 8080
+```
+
+`--port` is the HTTP port the binary listens on inside the guest — read it off the app rather
+than carrying a number over from an example. It is the number the guest hands back as
+`NIBRUN_HTTP_PORT` and `PORT`, and it defaults to `3000`.
+
+**Every deploy after that must name the app**, or a non-interactive shell creates a second one.
+`nib apps list` finds the slug again when a later session has to redeploy:
+
+```sh
+nib run ./my-server --app my-app
+```
+
+Environment variables are an **edit**, not a replacement — anything a deploy does not name is left
+alone, so secrets are set once:
+
+```sh
+nib run ./my-server --app my-app --env STRIPE_SECRET_KEY=sk_live_... --env LOG_LEVEL=debug
+nib run ./my-server --app my-app --unset LOG_LEVEL
+```
+
+Arguments for the binary go inside the quotes, not after them:
+
+```sh
+nib run "./my-server serve --verbose" --app my-app
+```
+
+The binary may be an https url instead of a path, and nibrun fetches it rather than this machine
+uploading it:
+
+```sh
+nib run https://github.com/me/my-app/releases/download/v1/my-server --app my-app
+```
+
+Changing only how the binary starts is `nib apps update`, which runs the one the app already has
+rather than asking for it again. What no flag names is left alone:
+
+```sh
+nib apps update --app my-app --env LOG_LEVEL=debug
+nib apps update --app my-app --args "serve --verbose"
+```
+
+`nib run` waits until the deployment is actually serving and prints the URL. Add `--detach` to
+return as soon as it is created. Or drag the binary onto [app.nibrun.com](https://app.nibrun.com) —
+same thing, no CLI.
+
+## 4. Verify
+
+Serving is only a TCP connect, and a broken process can hold the port while answering nothing. So
+ask the URL for something:
+
+```sh
+curl -fsS https://my-app.nibrun.app/
+```
+
+`nib apps logs --app my-app` says why one that was created never came up, and what one that did is
+complaining about. `nib --help` lists the rest — status, domains, filesystem, export, delete.
+
 ## The guest contract
 
 Everything the binary can count on, and nothing else:
@@ -25,23 +141,18 @@ Everything the binary can count on, and nothing else:
 | `HOME` | `/app` |
 | URL | `https://<slug>.nibrun.app`, live as soon as it boots |
 
-An app that writes its SQLite file and its uploads under `./data` and reads `PORT` needs no
-configuration to run here. The guest sets three names of its own — `NIBRUN_HTTP_PORT`,
-`NIBRUN_HOSTNAME`, `NIBRUN_DATA_DIR` — and any of them you set yourself is ignored, as is `PORT`,
-which carries the same number as `NIBRUN_HTTP_PORT` under the name every other host uses. `HOME`
-and `TMPDIR` are defaults rather than owned, so one you set yourself is what the binary reads.
-
-An app needing a port HTTP cannot carry — WebRTC media, a game server, anything on UDP — asks for
-one with `--extra-public-port`, and is then set two more: `NIBRUN_PUBLIC_IPV4` and
-`NIBRUN_EXTRA_PUBLIC_PORT`. You do not pick the number; nibrun assigns it. Bind that port
-and announce that pair; it is the same number end to end, which is what makes announcing it
-correct. Neither is discoverable from inside the guest.
+The guest sets three names of its own — `NIBRUN_HTTP_PORT`, `NIBRUN_HOSTNAME`, `NIBRUN_DATA_DIR` —
+and any of them you set yourself is ignored, as is `PORT`, which carries the same number as
+`NIBRUN_HTTP_PORT` under the name every other host uses. `HOME` and `TMPDIR` are defaults rather
+than owned, so one you set yourself is what the binary reads.
 
 A binary that needs its own absolute URL — an OAuth redirect, a webhook it registers, a link in
 an email — builds it from `NIBRUN_HOSTNAME` rather than being told it, and falls back to whatever
 it uses when it is not on nibrun.
 
-One that insists on a variable name of its own reaches the same values through it: a value may
+## Naming a runtime value
+
+A binary that insists on a variable name of its own reaches the same values through it: a value may
 name a runtime one — `APP_BASE_URL=https://${NIBRUN_HOSTNAME}`,
 `DATABASE_URL=file:${NIBRUN_DATA_DIR}/app.db` — and the guest expands it before exec. Only that
 prefix expands, so a secret holding a `$` arrives untouched, and `NIBRUN_HTTP_PORT`,
@@ -49,83 +160,24 @@ prefix expands, so a secret holding a `$` arrives untouched, and `NIBRUN_HTTP_PO
 whole of what may be named — `${PORT}` is not one of them — with anything else refused when you
 deploy it.
 
-The last two are set only for an app that asked for a second port, and naming one the app was not
-given is refused when you deploy it. Ask for the port in the same change that names it:
+The last two are set only for an app that asked for [a second port](#a-second-public-port), and
+naming one the app was not given is refused when you deploy it.
+
+## A second public port
+
+An app needing a port HTTP cannot carry — WebRTC media, a game server, anything on UDP — asks for
+one with `--extra-public-port`, and is then set two more: `NIBRUN_PUBLIC_IPV4` and
+`NIBRUN_EXTRA_PUBLIC_PORT`. You do not pick the number; nibrun assigns it. Bind that port
+and announce that pair; it is the same number end to end, which is what makes announcing it
+correct. Neither is discoverable from inside the guest.
+
+Ask for the port in the same change that names it:
 
 ```sh
 nib apps update --app my-app --extra-public-port --env 'ANNOUNCED_IP=${NIBRUN_PUBLIC_IPV4}'
 ```
 
 `--extra-public-port=false` gives the port up. Saying nothing about it leaves it as it is.
-
-## Deploying
-
-```sh
-curl -fsSL https://nibrun.com/install.sh | sh   # installs `nib` to ~/.local/bin
-nib login                                       # device flow: approve it in the browser
-```
-
-`nib login` waits on a human approving it in a browser, so an agent that finds itself signed out
-asks the user to run it rather than trying to drive it.
-
-Whatever the binary needs from its environment has to be there on the **first** deploy: a process
-that exits over a missing variable never starts serving, and the deploy fails with it. Read off
-what it requires — a `.env.example`, whatever it loads config from — before deploying, not after.
-
-First deploy — creates the app:
-
-```sh
-nib run ./my-server --name my-app --port 8080
-```
-
-`--port` is the HTTP port the binary listens on inside the guest — read it off the app rather
-than carrying a number over from an example. It is the number the guest hands back as
-`NIBRUN_HTTP_PORT` and `PORT`, and it defaults to `3000`.
-
-**Every deploy after that must name the app**, or a non-interactive shell creates a second one:
-
-```sh
-nib run ./my-server --app my-app
-```
-
-The binary may be an https url instead of a path, and nibrun fetches it rather than this machine
-uploading it:
-
-```sh
-nib run https://github.com/me/my-app/releases/download/v1/my-server --app my-app
-```
-
-`nib run` waits until the deployment is actually serving and prints the URL. Add `--detach` to
-return as soon as it is created.
-
-Arguments for the binary go inside the quotes, not after them:
-
-```sh
-nib run "./my-server serve --verbose" --app my-app
-```
-
-Environment variables are an **edit**, not a replacement — anything a deploy does not name is left
-alone, so secrets are set once:
-
-```sh
-nib run ./my-server --app my-app --env STRIPE_SECRET_KEY=sk_live_... --env LOG_LEVEL=debug
-nib run ./my-server --app my-app --unset LOG_LEVEL
-```
-
-Changing only how the binary starts is `nib apps update`, which runs the one the app already has
-rather than asking for it again. What no flag names is left alone:
-
-```sh
-nib apps update --app my-app --env LOG_LEVEL=debug
-nib apps update --app my-app --args "serve --verbose"
-```
-
-`nib apps list` finds the slug again when a later session has to redeploy, and `nib apps logs` says
-why one that was created never came up — worth reaching for, since serving is only a TCP connect
-and a broken process can hold the port. `nib --help` lists the rest — domains, filesystem, export,
-delete.
-
-Or drag the binary onto [app.nibrun.com](https://app.nibrun.com) — same thing, no CLI.
 
 ## Tradeoffs
 
@@ -147,22 +199,3 @@ Worth saying out loud before recommending it:
 
 It fits a single-binary app that owns its own state — an internal tool, a small SaaS, a demo, a
 side project. It does not fit anything that needs to be several machines.
-
-## Producing a binary
-
-One self-contained `linux-x86_64` file — static, or dynamically linked against glibc, which the
-rootfs carries. It has to be built *for* that target: a binary compiled on a Mac, or for arm64, is
-the most common reason a first deploy never boots.
-
-**If the repo already builds one, run its build.** A project that ships a binary usually wraps more
-than a compiler invocation — assets embedded, constants substituted at build time, a frontend
-compiled first — and a hand-rolled command silently skips all of it, producing something that links
-and then dies on boot. [bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter)
-is one such: `bun run build` gives `backend/dist/app` with the frontend and the migrations inside
-it, defaulting to `PORT` 3000 and `./data`.
-
-A Bun repo with nothing to inherit compiles one itself with `bun build --compile`, targeting
-`bun-linux-x64`. Embedding an asset directory, bytecode, build-time constants — all flags on that
-same command, and worth reading [Bun's single-file executable
-docs](https://bun.com/docs/bundler/executables) for rather than recalling: a flag invented from
-memory is how a binary ends up missing the files it expects to carry.
