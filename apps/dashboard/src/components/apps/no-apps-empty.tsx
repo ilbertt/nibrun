@@ -12,8 +12,6 @@ import { CopyableLine } from '@repo/ui/custom/copyable-line';
 import { DeployPresetRoller } from '@repo/ui/custom/deploy-preset-roller';
 import { Link } from '@tanstack/react-router';
 import { BoxIcon } from 'lucide-react';
-import { DeployDialog } from '#components/deploy/deploy-dialog.tsx';
-import { ENABLED } from '#lib/app-actions.ts';
 import { Route as DeployRoute } from '#routes/deploy.tsx';
 
 export function NoAppsEmpty() {
@@ -26,8 +24,6 @@ export function NoAppsEmpty() {
         <EmptyTitle>You have no apps</EmptyTitle>
       </EmptyHeader>
       <EmptyContent>
-        <DeployDialog appId={undefined} availability={ENABLED} />
-        <p className="text-muted-foreground">Or</p>
         <DeployPresetRoller
           presets={DEPLOY_PRESET_SLUGS}
           linkToPreset={(preset) => <Link to={DeployRoute.to} search={DEPLOY_PRESETS[preset]} />}
