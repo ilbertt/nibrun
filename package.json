@@ -24,7 +24,7 @@
       "@types/react": "^19.2.18",
       "@types/react-dom": "^19.2.7",
       "@vitejs/plugin-react": "^6.1.1",
-      "better-auth": "^1.7.3",
+      "better-auth": "1.7.2",
       "lucide-react": "^1.41.0",
       "react": "^19.2.8",
       "react-dom": "^19.2.8",
