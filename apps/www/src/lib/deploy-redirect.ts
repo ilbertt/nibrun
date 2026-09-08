@@ -1,6 +1,6 @@
+import { type DeployLink, findPreset } from '@repo/deploy-link';
 import { DASHBOARD_DEPLOY_PATH, WWW_DEPLOY_PATH } from '@repo/global-constants';
 import { defaultStringifySearch } from '@tanstack/react-router';
-import { findPreset } from '#deploy-presets.ts';
 import { DASHBOARD_ORIGIN } from '#lib/dashboard-origin.ts';
 
 const DEPLOY_ROUTE = new RegExp(`^${WWW_DEPLOY_PATH}(?:/([a-z0-9-]+))?/?$`);
@@ -33,10 +33,9 @@ export function deployRedirect(request: Request): Response | undefined {
 
   const preset = findPreset(slug);
 
-  return preset === undefined
-    ? undefined
-    : Response.redirect(
-        `${DASHBOARD_ORIGIN}${DASHBOARD_DEPLOY_PATH}${defaultStringifySearch(preset)}`,
-        MOVED_FOR_NOW,
-      );
+  return preset === undefined ? undefined : Response.redirect(deployed(preset), MOVED_FOR_NOW);
+}
+
+function deployed(preset: DeployLink): string {
+  return `${DASHBOARD_ORIGIN}${DASHBOARD_DEPLOY_PATH}${defaultStringifySearch(preset)}`;
 }

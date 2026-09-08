@@ -1,8 +1,32 @@
-import type { DeployLink } from '@repo/deploy-link';
 import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
+import type { DeployLink } from '#link.ts';
 
-// Update the root README when changing any entry here.
+// Written in the order the root README lists them, which is the order the roller shows. Update
+// that table when changing any entry here.
 export const DEPLOY_PRESETS = {
+  pocketbase: {
+    name: 'pocketbase',
+    binary:
+      'https://github.com/pocketbase/pocketbase/releases/download/v0.40.2/pocketbase_0.40.2_linux_amd64.zip',
+    sha256: 'dd86b424a07f2bb5ac2b8ba8cdf013a37400a9cf56bd1f92e560981f7dd24244',
+    port: 8090,
+    arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data'],
+    minimal: true,
+  },
+  sharkord: {
+    name: 'sharkord',
+    binary: 'https://github.com/sharkord/sharkord/releases/download/v0.0.25/sharkord-linux-x64',
+    sha256: 'e381198decf43efe92b1b1e947dc220939a98ae3fb578f4d59b99b80a968fc58',
+    port: 4991,
+    'extra-public-port': true,
+    env: [
+      'SHARKORD_DATA_PATH=data',
+      'SHARKORD_AUTOUPDATE=false',
+      `SHARKORD_WEBRTC_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name)}`,
+      `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS=${interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}`,
+    ],
+    minimal: true,
+  },
   boop: {
     name: 'boop',
     binary:
@@ -18,16 +42,6 @@ export const DEPLOY_PRESETS = {
       'BOOP_ADMIN_USER',
       'BOOP_ADMIN_PASSWORD',
     ],
-    minimal: true,
-  },
-  'context-use': {
-    name: 'context-use',
-    // The only release is a rolling tag whose asset is replaced on every build, so a checksum
-    // written here would refuse the next one. Left out, the download is still held to something:
-    // the digest the release publishes for whatever the asset currently is.
-    binary:
-      'https://github.com/massimoalbarello/context-use/releases/download/nibrun-latest/context-use',
-    port: 3000,
     minimal: true,
   },
   gitea: {
@@ -58,32 +72,22 @@ export const DEPLOY_PRESETS = {
     ],
     minimal: true,
   },
-  pocketbase: {
-    name: 'pocketbase',
+  'context-use': {
+    name: 'context-use',
+    // The only release is a rolling tag whose asset is replaced on every build, so a checksum
+    // written here would refuse the next one. Left out, the download is still held to something:
+    // the digest the release publishes for whatever the asset currently is.
     binary:
-      'https://github.com/pocketbase/pocketbase/releases/download/v0.40.2/pocketbase_0.40.2_linux_amd64.zip',
-    sha256: 'dd86b424a07f2bb5ac2b8ba8cdf013a37400a9cf56bd1f92e560981f7dd24244',
-    port: 8090,
-    arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data'],
-    minimal: true,
-  },
-  sharkord: {
-    name: 'sharkord',
-    binary: 'https://github.com/sharkord/sharkord/releases/download/v0.0.25/sharkord-linux-x64',
-    sha256: 'e381198decf43efe92b1b1e947dc220939a98ae3fb578f4d59b99b80a968fc58',
-    port: 4991,
-    'extra-public-port': true,
-    env: [
-      'SHARKORD_DATA_PATH=data',
-      'SHARKORD_AUTOUPDATE=false',
-      `SHARKORD_WEBRTC_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name)}`,
-      `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS=${interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}`,
-    ],
+      'https://github.com/massimoalbarello/context-use/releases/download/nibrun-latest/context-use',
+    port: 3000,
     minimal: true,
   },
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
+
+/** Every preset, in the order they are written above, for anything that offers them all. */
+export const DEPLOY_PRESET_SLUGS = Object.keys(DEPLOY_PRESETS) as [DeploySlug, ...DeploySlug[]];
 
 export function findPreset(slug: string): DeployLink | undefined {
   return Object.hasOwn(DEPLOY_PRESETS, slug) ? DEPLOY_PRESETS[slug as DeploySlug] : undefined;

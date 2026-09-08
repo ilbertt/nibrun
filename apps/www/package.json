@@ -3,7 +3,6 @@
   "private": true,
   "type": "module",
   "imports": {
-    "#deploy-presets.ts": "./deploy-presets.ts",
     "#*": "./src/*"
   },
   "scripts": {
