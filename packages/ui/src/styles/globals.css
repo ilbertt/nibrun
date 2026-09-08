@@ -271,16 +271,15 @@ body {
    none in dark, where it is transparent — the highlight would be the only thing drawn, which reads
    as a key lit from underneath.
 
-   Which controls wear this is `button.tsx`'s to say — `ghost` and `link` have no face at all. */
+   Which controls wear this is each component's to say — `ghost` and `link` have no face at all.
+   A control much smaller than a button sets `--key-throw` down to keep the base in proportion. */
 @utility key-face {
-  --key-throw: 3px;
-
   box-shadow:
     var(--tw-ring-shadow, 0 0 #0000),
-    0 var(--key-throw) 0 0 var(--border);
+    0 var(--key-throw, 3px) 0 0 var(--border);
 
   &:active:not(:disabled) {
-    translate: 0 var(--key-throw);
+    translate: 0 var(--key-throw, 3px);
     box-shadow: var(--tw-ring-shadow, 0 0 #0000);
   }
 }

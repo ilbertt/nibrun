@@ -53,7 +53,13 @@ export function DeployDialogContent({
         </DialogHeader>
         <DialogBody>
           {run.phase === 'idle' ? (
-            <DeployForm appId={appId} binary={undefined} suggested={undefined} minimal={false} />
+            <DeployForm
+              appId={appId}
+              binary={undefined}
+              suggested={undefined}
+              minimal={false}
+              pinnedAction
+            />
           ) : (
             <DeployProgress done={<DeployDoneButton />} />
           )}
