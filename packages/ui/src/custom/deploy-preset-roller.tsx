@@ -1,7 +1,8 @@
 import { Button } from '@repo/ui/components/button';
 import { useEffect, useState } from 'react';
 
-const HOLD_MS = 2400;
+const HOLD_MS = 1100;
+const ROLL_MS = 280;
 
 /**
  * One button standing for every app that deploys in a click, with only the name rolling: what is
@@ -18,25 +19,41 @@ export function DeployPresetRoller<T extends string>({
   /** Where each preset deploys from, as the site around this one addresses its own deploy screen. */
   linkToPreset: (preset: T) => React.ReactElement;
 }) {
-  const [at, setAt] = useState(0);
+  const [rolled, setRolled] = useState(0);
+  const [rolling, setRolling] = useState(false);
   const [held, setHeld] = useState(false);
-  const rolling = presets[at] ?? presets[0];
+  const at = rolled % presets.length;
+  const shown = presets[at] ?? presets[0];
 
   useEffect(() => {
-    if (held) {
+    if (held || rolling) {
       return;
     }
-    const roll = setInterval(() => setAt((shown) => (shown + 1) % presets.length), HOLD_MS);
-    return () => clearInterval(roll);
-  }, [held, presets.length]);
+    const hold = setTimeout(() => setRolling(true), HOLD_MS);
+    return () => clearTimeout(hold);
+  }, [held, rolling]);
+
+  // Landed rather than watched for: a transition that never ends — a tab in the background, a
+  // reader who asked for no motion — would be a name that never rolls again.
+  useEffect(() => {
+    if (!rolling) {
+      return;
+    }
+    const land = setTimeout(() => {
+      setRolled((count) => count + 1);
+      setRolling(false);
+    }, ROLL_MS);
+    return () => clearTimeout(land);
+  }, [rolling]);
 
   return (
     <Button
       variant="outline"
       size="lg"
-      render={linkToPreset(rolling)}
-      // Held while it is under the cursor or on the keyboard: what the button deploys is whatever
-      // it says right now, and a name that rolls on is one nobody meant to click.
+      render={linkToPreset(shown)}
+      // Held between rolls while it is under the cursor or on the keyboard, so what the button
+      // deploys is the name standing still on it. A roll already under way finishes: stopping one
+      // half way would park the window between two names.
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
       onFocus={() => setHeld(true)}
@@ -47,15 +64,22 @@ export function DeployPresetRoller<T extends string>({
           longest of them from the first frame and never resizes as they pass. The line is leaded
           past the label's, or the mono ascenders of the name below reach into the window. */}
       <span className="inline-flex h-[1lh] overflow-hidden leading-6">
+        {/* The column starts at the name on show and is replaced, once the roll has landed, by one
+            starting at the name it landed on — the same picture, so the roll goes on downwards
+            forever instead of winding back up to the top of a fixed list. */}
         <span
-          className="flex flex-col transition-transform duration-500 ease-out motion-reduce:transition-none"
-          style={{ transform: `translateY(calc(${at} * -1lh))` }}
+          key={rolled}
+          className="flex flex-col transition-transform ease-out motion-reduce:transition-none"
+          style={{
+            transitionDuration: `${ROLL_MS}ms`,
+            transform: rolling ? 'translateY(-1lh)' : undefined,
+          }}
         >
-          {presets.map((preset) => (
+          {rotated({ presets, at }).map((preset) => (
             <span
               key={preset}
               className="text-center font-mono text-primary"
-              aria-hidden={preset !== rolling}
+              aria-hidden={preset !== shown}
             >
               {preset}
             </span>
@@ -64,4 +88,14 @@ export function DeployPresetRoller<T extends string>({
       </span>
     </Button>
   );
+}
+
+function rotated<T extends string>({
+  presets,
+  at,
+}: {
+  presets: readonly T[];
+  at: number;
+}): readonly T[] {
+  return [...presets.slice(at), ...presets.slice(0, at)];
 }
