@@ -2,6 +2,7 @@ import { basename } from 'node:path';
 import type { PublicApiClient } from '@repo/api-client/public';
 import {
   type DeployableBinary,
+  type Deployed,
   deploy as startDeployment,
   type UploadableBinary,
 } from '@repo/app-operations';
@@ -15,6 +16,7 @@ import {
 } from '@repo/protocol';
 import { environmentEdit } from '#lib/environment.ts';
 import { UsageError } from '#lib/errors.ts';
+import { openInitialData } from '#lib/initial-data.ts';
 import type { RunOptions } from '#lib/plan.ts';
 import { announce, awaitServing, type Release } from '#lib/release.ts';
 import type { Ui } from '#lib/ui.ts';
@@ -28,7 +30,17 @@ export type DeployInput = RunOptions & {
   detach?: boolean | undefined;
 };
 
-export async function deploy({
+export async function deploy({ api, ui, detach, ...release }: DeployInput): Promise<Release> {
+  const deployed = await startRelease({ api, ui, ...release });
+  return await awaitServing({ api, ui, deployed, detach });
+}
+
+/**
+ * An archive this packed is a file on this machine for exactly as long as the release is being
+ * made: it is as large as the dataset it holds, and leaving one in the temporary directory is
+ * leaving that. One the owner handed over is left where it is.
+ */
+async function startRelease({
   api,
   ui,
   binary,
@@ -39,34 +51,40 @@ export async function deploy({
   extraPublicPort,
   env,
   unset,
-  detach,
-}: DeployInput): Promise<Release> {
+  dataFolder,
+}: Omit<DeployInput, 'detach'>): Promise<Deployed> {
   const environment = environmentEdit({ env, unset });
-  const deployed = await startDeployment({
-    api,
-    binary,
-    args,
-    app,
-    name,
-    port,
-    extraPublicPort,
-    ...(environment !== undefined && { environment }),
-    onStep: (step) => announce({ step, ui }),
-    whileUploading: ({ message, task }) => {
-      const startedAt = Date.now();
-      return ui.waitingFor({
-        message,
-        task: (update) =>
-          task((progress) =>
-            update(
-              `${message} — ${describeProgress({ progress, elapsedMs: Date.now() - startedAt })}`,
-            ),
-          ),
-      });
-    },
-  });
+  const opened =
+    dataFolder === undefined ? undefined : await openInitialData({ data: dataFolder, ui });
 
-  return await awaitServing({ api, ui, deployed, detach });
+  try {
+    return await startDeployment({
+      api,
+      binary,
+      args,
+      app,
+      name,
+      port,
+      extraPublicPort,
+      ...(environment !== undefined && { environment }),
+      ...(opened !== undefined && { initialData: opened.archive }),
+      onStep: (step) => announce({ step, ui }),
+      whileUploading: ({ message, task }) => {
+        const startedAt = Date.now();
+        return ui.waitingFor({
+          message,
+          task: (update) =>
+            task((progress) =>
+              update(
+                `${message} — ${describeProgress({ progress, elapsedMs: Date.now() - startedAt })}`,
+              ),
+            ),
+        });
+      },
+    });
+  } finally {
+    await opened?.discard();
+  }
 }
 
 const SECURE_SCHEME = 'https://';

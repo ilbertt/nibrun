@@ -1,5 +1,5 @@
 import { Skeleton } from '@repo/ui/components/skeleton';
-import { CopyButton } from '@repo/ui/custom/copy-button';
+import { CopyableLine } from '@repo/ui/custom/copyable-line';
 import { useDeployedBinary } from '#lib/hooks/use-deployed-binary.ts';
 import { runCommand } from '#lib/run-command.ts';
 import type { AppSummary } from '#queries/apps.ts';
@@ -26,17 +26,8 @@ export function AppRunCommand({ app }: { app: AppSummary }) {
       {binary.status === 'loading' ? (
         <Skeleton className="h-8 w-full rounded-lg" />
       ) : (
-        <RunCommandLine command={runCommand({ binaryName: binary.name, args: app.config.args })} />
+        <CopyableLine value={runCommand({ binaryName: binary.name, args: app.config.args })} />
       )}
-    </div>
-  );
-}
-
-function RunCommandLine({ command }: { command: string }) {
-  return (
-    <div className="flex items-center gap-1 rounded-lg border bg-muted/40 py-1 pr-1 pl-3">
-      <code className="min-w-0 flex-1 select-all break-words font-mono text-xs">{command}</code>
-      <CopyButton value={command} />
     </div>
   );
 }

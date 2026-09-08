@@ -56,7 +56,7 @@ describe('what an app is using is read against what it was given', () => {
   /**
    * A reading is only taken while the app is running, so this is every app that has never come up.
    * A nought would read as an app using none of what it has, which is a different claim entirely —
-   * so the ring keeps its track and says nothing, rather than saying nought.
+   * so the bar keeps its track and says nothing, rather than saying nought.
    */
   test('a resource nothing has measured says so rather than reading as none spent', () => {
     const markup = renderToStaticMarkup(<AppResourcesCard app={app()} />);
@@ -66,11 +66,11 @@ describe('what an app is using is read against what it was given', () => {
   });
 
   /**
-   * Green reads as headroom and red as trouble, so where the ring changes colour is a claim about
+   * Green reads as headroom and red as trouble, so where the bar changes colour is a claim about
    * the app. Eighty and ninety are where disk and memory alerting has settled almost everywhere.
    */
-  test('a ring turns from green through amber to red as what is left runs out', () => {
-    const ringsAt = (memoryUsedBytes: number) =>
+  test('a bar turns from green through amber to red as what is left runs out', () => {
+    const barsAt = (memoryUsedBytes: number) =>
       renderToStaticMarkup(
         <AppResourcesCard
           app={app({
@@ -84,9 +84,9 @@ describe('what an app is using is read against what it was given', () => {
       );
     const bytesAt = (share: number) => Math.round(MEMORY_MIB * BYTES_PER_MIB * share);
 
-    expect(ringsAt(bytesAt(HEALTHY_SHARE))).toContain('text-primary');
-    expect(ringsAt(bytesAt(NEARLY_FULL_SHARE))).toContain('text-warning');
-    expect(ringsAt(bytesAt(CRITICAL_SHARE))).toContain('text-destructive');
+    expect(barsAt(bytesAt(HEALTHY_SHARE))).toContain('bg-primary');
+    expect(barsAt(bytesAt(NEARLY_FULL_SHARE))).toContain('bg-warning');
+    expect(barsAt(bytesAt(CRITICAL_SHARE))).toContain('bg-destructive');
   });
 
   // Memory arrives whole on the first reading and a share cannot, because a share needs a reading

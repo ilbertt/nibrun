@@ -17,6 +17,7 @@ import {
 import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
 import { DeployEnvironmentField } from '#components/deploy/deploy-environment-field.tsx';
+import { DeployInitialDataField } from '#components/deploy/deploy-initial-data-field.tsx';
 import { DeployNameField } from '#components/deploy/deploy-name-field.tsx';
 import {
   type EnvironmentVariable,
@@ -28,6 +29,7 @@ import { type DeployFormState, tenantArguments, validatePort } from '#lib/hooks/
 
 const ARGUMENTS = 'Arguments';
 const ADDITIONAL_PORTS = 'Additional ports';
+const INITIAL_DATA = 'Initial data';
 const ENVIRONMENT = 'environment';
 
 const AWAITING = 'Fill these in.';
@@ -187,6 +189,34 @@ export function DeployConfiguration({
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+
+      {/* An app's data is created once, along with the app itself — the api refuses an import
+          against a volume a host has already reported — so there is nothing here to ask an app
+          that is already running. */}
+      {!locked && (
+        <Accordion>
+          <AccordionItem>
+            <AccordionTrigger>
+              <span className="flex items-baseline gap-2">
+                {INITIAL_DATA}
+                <api.Subscribe selector={(state) => state.values.initialData?.name}>
+                  {(name) => <CollapsedName name={name} />}
+                </api.Subscribe>
+              </span>
+              {/* Shut, a refused archive would disable the button with nothing on screen saying
+                  why, so the section that holds it says so itself. */}
+              <api.Subscribe
+                selector={(state) => (state.fieldMeta.initialData?.errors.length ?? 0) > 0}
+              >
+                {(refused) => refused && <NeedsALook />}
+              </api.Subscribe>
+            </AccordionTrigger>
+            <AccordionContent keepMounted>
+              <DeployInitialDataField api={api} />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
     </>
   );
 }
@@ -219,9 +249,14 @@ function environmentMark({
   return refused ? 'refused' : undefined;
 }
 
+/** What a shut section says where the field inside it has refused what it was given. */
+function NeedsALook() {
+  return <span className="font-normal text-destructive">needs a look</span>;
+}
+
 function EnvironmentMark({ mark }: { mark: EnvironmentMarkKind }) {
   if (mark === 'refused') {
-    return <span className="font-normal text-destructive">needs a look</span>;
+    return <NeedsALook />;
   }
   if (mark === 'awaiting') {
     return (
@@ -239,6 +274,15 @@ function CollapsedState({ on }: { on: boolean }) {
   return (
     <span className="font-normal text-muted-foreground text-xs group-aria-expanded/accordion-trigger:hidden">
       {on ? 'one' : 'none'}
+    </span>
+  );
+}
+
+/** The same, where what the section holds is one file rather than a number of anything. */
+function CollapsedName({ name }: { name: string | undefined }) {
+  return (
+    <span className="max-w-40 truncate font-mono font-normal text-muted-foreground text-xs group-aria-expanded/accordion-trigger:hidden">
+      {name ?? 'none'}
     </span>
   );
 }

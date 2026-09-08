@@ -11,7 +11,7 @@ import {
   Sha256DigestSchema,
   Value,
 } from '@repo/protocol';
-import { isGzippedTarball, OPENING_BYTES } from '#lib/archive/gzipped-tarball.ts';
+import { isAppDataArchive, OPENING_BYTES } from '#lib/archive/app-data.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
@@ -26,10 +26,10 @@ const NOTHING_UPLOADED = 'Nothing was uploaded against that import.';
 /**
  * Said as the shape rather than as what was found: the upload happened between the caller and the
  * store, so what they sent is a thing they can look at, and naming the format is what tells them
- * `gzip data.db` is not `tar czf`.
+ * `gzip data.db` is neither of them.
  */
 const NOT_AN_ARCHIVE =
-  "That upload is not a .tar.gz. An app's data is created from one archive, whose root becomes the root of data/.";
+  "That upload is not a .tar.gz or a .zip. An app's data is created from one archive, whose root becomes the root of data/.";
 
 const BYTES_PER_GIBIBYTE = 1_073_741_824;
 const MAX_IMPORT_GIBIBYTES = 1;
@@ -51,6 +51,13 @@ const TOO_LARGE = `An import may be at most ${MAX_IMPORT_GIBIBYTES} GiB.`;
 
 /** Long enough that the signed url the row was handed has expired, so no bytes are still coming. */
 const ABANDONED_AFTER_SECONDS = 86_400;
+
+/**
+ * How many spent archives one host report clears. A gibibyte apiece and one delete each, on a path
+ * a host is waiting at the end of — so this drains rather than sweeps, exactly as the app purge
+ * does, and what it does not reach the next report finds still listed.
+ */
+const SPENT_BATCH = 8;
 
 const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
@@ -165,7 +172,7 @@ export class ImportsService extends Service {
     // The envelope, not the contents: a host has to be able to unpack this, and the front of the
     // upload already went past on the way to the digest, so asking costs nothing that was not
     // already spent. Everything else about the archive is the host's to refuse.
-    if (!(await isGzippedTarball(uploaded.opening))) {
+    if (!(await isAppDataArchive(uploaded.opening))) {
       await this.discard({ objectKey });
       throw new BadRequestError(NOT_AN_ARCHIVE);
     }
@@ -235,6 +242,31 @@ export class ImportsService extends Service {
       await this.discard({ objectKey: importKey({ appId: row.app_id, importId: row.id }) });
       await this.importsRepo.removeAbandoned({ importId: row.id });
       this.logger.info('abandoned import swept', { appId: row.app_id, importId: row.id });
+    }
+  }
+
+  /**
+   * Archives that can no longer create a filesystem, because the app's already exists.
+   *
+   * The bucket's own expiry is the backstop for an upload nobody ever deployed; this is for the
+   * ones that have already done their job, and eventually is far too long to leave an owner's whole
+   * dataset lying in a bucket beside the filesystem it became. The row stays and keeps the digest;
+   * only the bytes go.
+   *
+   * Objects before rows, as everywhere else: a row that stopped naming its object first would leave
+   * an owner's dataset behind with nothing left to find it by.
+   */
+  async sweepSpent(): Promise<void> {
+    for (const row of await this.importsRepo.listSpent({ limit: SPENT_BATCH })) {
+      try {
+        await this.storageRepo.remove({ objectKey: row.object_key });
+        await this.importsRepo.forgetObject({ importId: row.id });
+        this.logger.info('spent import removed', { importId: row.id });
+      } catch (error) {
+        // The row goes on naming the object, so the next report finds it again. One bucket refusal
+        // is no reason to fail the report or to skip the archives queued behind it.
+        this.logger.error('a spent import could not be removed', { importId: row.id, error });
+      }
     }
   }
 

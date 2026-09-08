@@ -62,6 +62,10 @@ export async function hasUnreleasedChanges(): Promise<boolean> {
 export async function writeCliVersion(version: string) {
   const updated = { ...packageJson.cli, version };
   await Bun.write(cliPackageJsonPath, `${JSON.stringify(updated, null, 2)}\n`);
+  // The lockfile records every workspace package's version and `--frozen-lockfile` does not object
+  // when one drifts, so skipping this leaves it a release behind until an unrelated branch sweeps
+  // the line up.
+  await $`bun install`.cwd(repoRoot);
 }
 
 async function scoped(options: CliCliffOptions): Promise<Options> {

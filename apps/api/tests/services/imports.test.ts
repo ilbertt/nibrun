@@ -22,9 +22,11 @@ import type {
   ImportRow,
   ImportsRepositoryContract,
   PendingImportRow,
+  SpentImportRow,
 } from '#repositories/imports.repository.ts';
 import { ImportsService, importKey, MAX_IMPORT_SIZE_BYTES } from '#services/imports.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
+import { archiveOf } from '#tests/support/archives.ts';
 import { gzippedTarballOf, tarballOf } from '#tests/support/tarballs.ts';
 
 const ARCHIVE = gzippedTarballOf([{ name: 'pb_data/data.db', content: bytesOf('rows') }]);
@@ -167,6 +169,26 @@ class FakeImportsRepository implements ImportsRepositoryContract {
     return Promise.resolve();
   }
 
+  listSpent({ limit }: { limit: number }): Promise<SpentImportRow[]> {
+    return Promise.resolve(
+      [...this.rows.values()]
+        .filter((row) => row.object_key !== null && this.spentApps.includes(row.app_id))
+        .slice(0, limit)
+        .map((row) => ({ id: row.id, object_key: row.object_key as ObjectKey })),
+    );
+  }
+
+  forgetObject({ importId }: { importId: ImportId }): Promise<void> {
+    const row = this.rows.get(importId);
+    if (row && row.object_key !== null) {
+      this.rows.set(importId, { ...row, object_key: null });
+    }
+    return Promise.resolve();
+  }
+
+  /** The apps a host has said hold a filesystem, which is what makes their archives unusable. */
+  readonly spentApps: AppId[] = [];
+
   /** Pretends the row has been sitting there since before the sweep's cutoff. */
   age(importId: ImportId): void {
     const row = this.rows.get(importId);
@@ -192,6 +214,12 @@ class FakeStorage implements ArtifactStorageRepositoryContract {
   readonly objects = new Map<ObjectKey, Uint8Array>();
   readonly signed: { objectKey: ObjectKey; sizeBytes: number }[] = [];
   readonly removed: ObjectKey[] = [];
+  readonly refused = new Set<ObjectKey>();
+
+  /** A bucket turning one delete down, which must leave the row that names it alone. */
+  refuse(objectKey: ObjectKey): void {
+    this.refused.add(objectKey);
+  }
 
   signUpload(input: { objectKey: ObjectKey; sizeBytes: number }): Promise<string> {
     this.signed.push(input);
@@ -233,6 +261,9 @@ class FakeStorage implements ArtifactStorageRepositoryContract {
   }
 
   remove({ objectKey }: { objectKey: ObjectKey }): Promise<void> {
+    if (this.refused.has(objectKey)) {
+      return Promise.reject(new Error('the bucket refused the delete'));
+    }
     this.removed.push(objectKey);
     this.objects.delete(objectKey);
     return Promise.resolve();
@@ -468,7 +499,7 @@ describe('the bytes are read back rather than taken on trust', () => {
  * a deployment that is accepted, and a filesystem that fails to provision — where the reason
  * reaches its owner as a broken app rather than as a refused upload.
  */
-describe('an upload that is not a .tar.gz is refused where the owner can see it', () => {
+describe('what an upload may be is decided from its bytes, where the owner can see it', () => {
   async function sending(bytes: Uint8Array) {
     const { service, storage } = build();
     const begun = await service.create({
@@ -486,11 +517,26 @@ describe('an upload that is not a .tar.gz is refused where the owner can see it'
     return { refusal, storage, objectKey };
   }
 
+  test('a gzipped tarball is one of the two an app may be created from', async () => {
+    const { refusal } = await sending(
+      gzippedTarballOf([{ name: 'data.db', content: bytesOf('rows') }]),
+    );
+
+    expect(refusal).toBeNull();
+  });
+
+  // The other, and the one an owner with no terminal can actually make.
+  test('and so is a zip', async () => {
+    const { refusal } = await sending(archiveOf([{ name: 'data.db', content: bytesOf('rows') }]));
+
+    expect(refusal).toBeNull();
+  });
+
   test('something that is not compressed at all', async () => {
     const { refusal } = await sending(bytesOf('#!/bin/sh\necho hi\n'));
 
     expect(refusal).toBeInstanceOf(BadRequestError);
-    expect(refusal?.message).toContain('.tar.gz');
+    expect(refusal?.message).toContain('.tar.gz or a .zip');
   });
 
   // `gzip data.db` rather than `tar czf`, which is the mistake the magic bytes alone would miss.
@@ -559,5 +605,88 @@ describe('an upload that never lands leaves nothing behind', () => {
     await service.sweepAbandoned();
 
     expect(importsRepo.rows.size).toBe(1);
+  });
+});
+
+/**
+ * The bucket's own expiry is the backstop for an upload nobody deployed. This is for the archives
+ * that can no longer do anything: eventually is far too long to leave an owner's whole dataset
+ * lying in a bucket beside the filesystem it became.
+ */
+describe('an archive that can no longer create a filesystem stops being stored', () => {
+  test("an app whose data exists has its archive's bytes removed", async () => {
+    const { service, storage, importsRepo } = build();
+    const { begun } = await uploaded({ service, storage });
+    importsRepo.spentApps.push(APP_ID);
+
+    await service.sweepSpent();
+
+    expect(storage.removed).toEqual([importKey({ appId: APP_ID, importId: begun.importId })]);
+    expect(storage.objects.size).toBe(0);
+  });
+
+  // What the owner uploaded and what it hashed to is the app's history; only where the bytes were
+  // has stopped being true.
+  test('the row and its digest stay behind', async () => {
+    const { service, storage, importsRepo } = build();
+    const { begun, stored } = await uploaded({ service, storage });
+    importsRepo.spentApps.push(APP_ID);
+
+    await service.sweepSpent();
+
+    expect(importsRepo.rows.get(begun.importId)).toMatchObject({
+      digest: stored.digest,
+      object_key: null,
+    });
+  });
+
+  // Membership is having an object left, which is the same sentence as the work being done — so a
+  // second pass finds nothing rather than deleting twice.
+  test('a pass that has already run does nothing on the next report', async () => {
+    const { service, storage, importsRepo } = build();
+    await uploaded({ service, storage });
+    importsRepo.spentApps.push(APP_ID);
+
+    await service.sweepSpent();
+    await service.sweepSpent();
+
+    expect(storage.removed).toHaveLength(1);
+  });
+
+  test('an app whose filesystem does not exist yet keeps its archive', async () => {
+    const { service, storage } = build();
+    await uploaded({ service, storage });
+
+    await service.sweepSpent();
+
+    expect(storage.removed).toEqual([]);
+    expect(storage.objects.size).toBe(1);
+  });
+
+  /**
+   * Not only the ones that were used. An archive nobody ever deployed against an app whose data is
+   * now there is one `initialDataFrom` would refuse, so what it is holding is storage nothing can
+   * ever spend.
+   */
+  test('one nobody ever deployed is removed too, once the data exists', async () => {
+    const { service, storage, importsRepo } = build();
+    await uploaded({ service, storage });
+    importsRepo.spentApps.push(APP_ID);
+
+    await service.sweepSpent();
+
+    expect(storage.objects.size).toBe(0);
+  });
+
+  // A bucket refusing one delete leaves the row still naming it, so the next report finds it again.
+  test('an object that could not be removed is left to be found again', async () => {
+    const { service, storage, importsRepo } = build();
+    const { begun } = await uploaded({ service, storage });
+    importsRepo.spentApps.push(APP_ID);
+    storage.refuse(importKey({ appId: APP_ID, importId: begun.importId }));
+
+    await service.sweepSpent();
+
+    expect(importsRepo.rows.get(begun.importId)?.object_key).not.toBeNull();
   });
 });

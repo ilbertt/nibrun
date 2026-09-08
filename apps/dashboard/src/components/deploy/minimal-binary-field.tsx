@@ -72,7 +72,7 @@ function FetchedBinary({ url }: { url: string }) {
 // Whoever followed the link compiled one binary for one app, and the link knows which.
 function invitation(appName: string | undefined): ReactNode {
   if (appName === undefined) {
-    return 'Drop it here';
+    return 'Drop your binary here';
   }
   return (
     <>
