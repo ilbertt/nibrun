@@ -1,3 +1,4 @@
+import { LLMS_TXT_PATH } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { Link } from '@tanstack/react-router';
 import { DashboardLink } from '#components/dashboard-link.tsx';
@@ -19,6 +20,14 @@ export function SiteHeader() {
         </Button>
         <Button variant="ghost" size="sm" render={<Link to="/blog" />}>
           Blog
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="hidden sm:inline-flex"
+          render={<a href={LLMS_TXT_PATH} />}
+        >
+          llms.txt
         </Button>
       </div>
       <div className="flex items-center justify-end gap-1">
