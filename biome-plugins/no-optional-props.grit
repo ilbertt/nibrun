@@ -11,7 +11,6 @@ or {
   `export default function $name($props) { $body }` where {
     $props <: always_passed()
   },
-  `function ($props) { $body }` where { $props <: always_passed() },
   `($props) => $body` where { $props <: always_passed() },
   `type $name = $definition` where {
     $name <: r".*Props",
