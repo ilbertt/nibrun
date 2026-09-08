@@ -26,7 +26,9 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 - Biome caps cognitive complexity at 15 — extract a named function rather than silencing it
 - Only re-export from index files - Biome enforces that
 - Declare functions with `function`, never a `const` bound to an arrow. Applies
-  to test fixtures and one-line helpers too
+  to test fixtures and one-line helpers too. Biome's
+  `useReactFunctionComponentDefinition` holds the line for components, except in
+  `packages/ui/src/components`, which shadcn writes
 
 ## Validation
 
