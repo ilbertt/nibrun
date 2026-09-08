@@ -34,7 +34,7 @@ export function EnvironmentTable({
 }: {
   variables: readonly EnvironmentVariable[];
   onChange: (variables: EnvironmentVariable[]) => void;
-  children?: ReactNode;
+  children: ReactNode;
 }) {
   function replace(replacement: EnvironmentVariable): void {
     onChange(

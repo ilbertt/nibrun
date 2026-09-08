@@ -26,7 +26,10 @@ export function AppRunCommand({ app }: { app: AppSummary }) {
       {binary.status === 'loading' ? (
         <Skeleton className="h-8 w-full rounded-lg" />
       ) : (
-        <CopyableLine value={runCommand({ binaryName: binary.name, args: app.config.args })} />
+        <CopyableLine
+          value={runCommand({ binaryName: binary.name, args: app.config.args })}
+          prompt={false}
+        />
       )}
     </div>
   );

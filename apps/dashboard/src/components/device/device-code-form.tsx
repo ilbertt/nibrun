@@ -11,7 +11,11 @@ export function DeviceCodeForm() {
   const [code, setCode] = useState('');
 
   return (
-    <DeviceCard title="Sign in a terminal" description="Enter the code it showed you.">
+    <DeviceCard
+      failed={false}
+      title="Sign in a terminal"
+      description="Enter the code it showed you."
+    >
       <form
         onSubmit={(event) => {
           event.preventDefault();

@@ -13,12 +13,12 @@ export function DeployForm({
   appId,
   binary,
   suggested,
-  minimal = false,
+  minimal,
 }: {
   appId: string | undefined;
   binary: File | undefined;
-  suggested?: DeploySuggestion | undefined;
-  minimal?: boolean | undefined;
+  suggested: DeploySuggestion | undefined;
+  minimal: boolean;
 }) {
   const form = useDeployForm({ appId, binary, suggested });
   const { api, replacing, targetResolved } = form;

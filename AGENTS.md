@@ -23,6 +23,10 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 - Imports use `#*` subpath mapping (e.g. `import { foo } from '#services/foo'`)
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
+- Props are always passed — a component we wrote has no optional property. Declare
+  `name: T | undefined` rather than `name?: T`, so a call site with nothing to pass says so.
+  `biome-plugins/no-optional-props.grit` enforces it everywhere but `packages/ui/src/components`,
+  which is shadcn's.
 - Biome caps cognitive complexity at 15 — extract a named function rather than silencing it
 - Only re-export from index files - Biome enforces that
 - Declare functions with `function`, never a `const` bound to an arrow. Applies

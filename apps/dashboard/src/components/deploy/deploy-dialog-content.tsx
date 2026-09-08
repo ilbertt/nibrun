@@ -15,7 +15,13 @@ import { DeployForm } from '#components/deploy/deploy-form.tsx';
 import { DeployProgress } from '#components/deploy/deploy-progress.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 
-export function DeployDialogContent({ appId, disabled }: { appId?: string; disabled: boolean }) {
+export function DeployDialogContent({
+  appId,
+  disabled,
+}: {
+  appId: string | undefined;
+  disabled: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const run = useDeployRun();
   const running = run.phase === 'uploading' || run.phase === 'settling';
@@ -47,7 +53,7 @@ export function DeployDialogContent({ appId, disabled }: { appId?: string; disab
         </DialogHeader>
         <DialogBody>
           {run.phase === 'idle' ? (
-            <DeployForm appId={appId} binary={undefined} />
+            <DeployForm appId={appId} binary={undefined} suggested={undefined} minimal={false} />
           ) : (
             <DeployProgress done={<DeployDoneButton />} />
           )}

@@ -8,17 +8,16 @@ import { CopyButton } from '@repo/ui/custom/copy-button';
  */
 export function CopyableLine({
   value,
-  prompt = false,
+  prompt,
 }: {
   value: string;
   /**
-   * For a line someone is meant to type. Off by default, because most of what appears here is
-   * reported rather than typed — a run command belongs to the guest and an address is dialled by
-   * something else, and a prompt in front of either says to paste it into a shell.
+   * For a line someone is meant to type, as against one that is only reported — a run command
+   * belongs to the guest and an address is dialled by something else.
    *
    * Drawn rather than part of `value`: a prompt pasted into a shell is a syntax error.
    */
-  prompt?: boolean;
+  prompt: boolean;
 }) {
   return (
     <span className="code-surface flex items-center gap-2 py-1 pr-1 pl-2.5">

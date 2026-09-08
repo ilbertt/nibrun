@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { AppsList } from '#components/apps/apps-list.tsx';
 import { DeployDialog } from '#components/deploy/deploy-dialog.tsx';
+import { ENABLED } from '#lib/app-actions.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
 
 export const Route = createFileRoute('/(dashboard)/apps/')({ component: RouteComponent });
@@ -14,7 +15,7 @@ function RouteComponent() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-medium text-base">Apps</h1>
         {/* The empty state puts its own Deploy button in the middle of the page. */}
-        {noApps ? null : <DeployDialog />}
+        {noApps ? null : <DeployDialog appId={undefined} availability={ENABLED} />}
       </div>
       <AppsList />
     </div>

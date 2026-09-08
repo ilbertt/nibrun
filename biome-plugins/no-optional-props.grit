@@ -1,0 +1,15 @@
+language js
+
+pattern always_passed() {
+  r"(?s).*\?:.*" as $member where {
+    register_diagnostic(span=$member, message="Every prop is passed at every call site: declare `name: T | undefined`, never `name?: T`.")
+  }
+}
+
+or {
+  `function $name($props) { $body }` where { $props <: always_passed() },
+  `type $name = $definition` where {
+    $name <: r".*Props",
+    $definition <: always_passed()
+  }
+}

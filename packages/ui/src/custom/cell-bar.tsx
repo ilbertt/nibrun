@@ -16,7 +16,7 @@ const CELLS = Array.from(Array(CELL_COUNT).keys());
 /**
  * A row of cells lit up to a share, behind glass.
  *
- * Without a `label` it is decoration for figures printed beside it and hidden from a screen
+ * With a `null` label it is decoration for figures printed beside it and hidden from a screen
  * reader; with one it is the reading itself and says so.
  */
 /**
@@ -36,27 +36,27 @@ function litCells(share: number | null): number {
 
 export function CellBar({
   share,
-  tone = 'bg-primary text-primary',
+  tone,
   label,
-  rounded = false,
+  rounded,
 }: {
   /** `null` where nothing has been measured, which is not the same claim as nought. */
   share: number | null;
   /** Background and text colour together: a lit cell blooms in its own colour via `currentColor`. */
-  tone?: string;
-  label?: string;
+  tone: string;
+  label: string | null;
   /**
    * For a reading that mostly sits near empty — a few percent of a vCPU or a disk — where a lone
    * square cell reads as something broken rather than as a small figure. A bar that fills, like a
    * transfer, keeps its square segments: they butt up into a bar as it goes.
    */
-  rounded?: boolean;
+  rounded: boolean;
 }) {
   const lit = litCells(share);
   // An empty track and a track at nought look the same and mean different things, so where there is
   // no reading the bar carries no value rather than a nought that would be read as one.
   const meter =
-    label === undefined
+    label === null
       ? ({ 'aria-hidden': true } as const)
       : ({
           role: 'progressbar',
