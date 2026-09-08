@@ -26,7 +26,8 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 - Props are always passed — a component we wrote has no optional property. Declare
   `name: T | undefined` rather than `name?: T`, so a call site with nothing to pass says so.
   `biome-plugins/no-optional-props.grit` enforces it everywhere but `packages/ui/src/components`,
-  which is shadcn's.
+  which is shadcn's. It reads parameter lists and `*Props` type aliases, so a props type lifted
+  out of the signature is named for what it is — anything else is unchecked.
 - Biome caps cognitive complexity at 15 — extract a named function rather than silencing it
 - Only re-export from index files - Biome enforces that
 - Declare functions with `function`, never a `const` bound to an arrow. Applies

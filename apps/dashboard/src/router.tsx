@@ -15,6 +15,7 @@ export function getRouter(queryClient: QueryClient) {
 }
 
 declare module '@tanstack/react-router' {
+  // biome-ignore lint/style/useConsistentTypeDefinitions: a module augmentation has to be an interface
   interface Register {
     router: ReturnType<typeof getRouter>;
   }
