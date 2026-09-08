@@ -14,8 +14,8 @@ import { FileTerminalIcon } from 'lucide-react';
 import { HandoffDeploy } from '#components/handoff/handoff-deploy.tsx';
 import { OpenSourceFooter } from '#components/handoff/open-source-footer.tsx';
 import { formatBytes } from '#lib/format-bytes.ts';
+import { discardHandedOffBinary } from '#lib/handoff-store.ts';
 import { useDeployLink } from '#lib/hooks/use-deploy-link.ts';
-import { useFinishHandoff } from '#lib/hooks/use-finish-handoff.ts';
 import { useHandedOffBinary } from '#lib/hooks/use-handed-off-binary.ts';
 import { useSession } from '#lib/hooks/use-session.ts';
 import { DeployRunProvider } from '#lib/providers/deploy-run-provider.tsx';
@@ -45,7 +45,6 @@ export function HandedOffBinary() {
  * need to deploy — which is why there is no empty state to land in.
  */
 function Waiting({ binary, signedIn }: { binary: File | undefined; signedIn: boolean }) {
-  const finishHandoff = useFinishHandoff();
   const link = useDeployLink();
   // What is already known about what will be deployed, so signing in is not asked for on faith.
   const named = binary?.name ?? namedByUrl(link.binary ?? '');
@@ -79,7 +78,9 @@ function Waiting({ binary, signedIn }: { binary: File | undefined; signedIn: boo
   }
 
   return (
-    <DeployRunProvider onDeployed={finishHandoff}>
+    // The drop is spent the moment it lands, and what is left of it is megabytes of somebody's
+    // storage held against a deploy that already happened.
+    <DeployRunProvider onDeployed={discardHandedOffBinary}>
       <HandoffDeploy binary={binary} />
     </DeployRunProvider>
   );
