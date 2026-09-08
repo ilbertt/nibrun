@@ -17,7 +17,13 @@ import { describeRelease } from '#lib/describe-release.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import { useGoToDeployedApp } from '#lib/hooks/use-go-to-deployed-app.ts';
 
-export function DeployDialogContent({ appId, disabled }: { appId?: string; disabled: boolean }) {
+export function DeployDialogContent({
+  appId,
+  disabled,
+}: {
+  appId: string | undefined;
+  disabled: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const run = useDeployRun();
   const goToApp = useGoToDeployedApp();
@@ -55,7 +61,13 @@ export function DeployDialogContent({ appId, disabled }: { appId?: string; disab
         </DialogHeader>
         <DialogBody>
           {run.phase === 'idle' ? (
-            <DeployForm appId={appId} binary={undefined} pinnedAction />
+            <DeployForm
+              appId={appId}
+              binary={undefined}
+              suggested={undefined}
+              minimal={false}
+              pinnedAction
+            />
           ) : (
             <DeployProgress done={<DeployDoneButton />} goToApp={leaveForApp} />
           )}

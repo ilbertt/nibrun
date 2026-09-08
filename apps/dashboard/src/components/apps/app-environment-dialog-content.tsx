@@ -72,7 +72,9 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
               }}
             >
               <Field data-invalid={form.error !== undefined || undefined}>
-                <EnvironmentTable variables={form.variables} onChange={form.change} />
+                <EnvironmentTable variables={form.variables} onChange={form.change}>
+                  {null}
+                </EnvironmentTable>
                 {form.error !== undefined && <FieldError>{form.error}</FieldError>}
               </Field>
               <Button

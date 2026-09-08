@@ -11,13 +11,13 @@ export function SlideToDelete({
   label,
   pendingLabel,
   pending,
-  autoFocus = false,
+  autoFocus,
   onDelete,
 }: {
   label: string;
   pendingLabel: string;
   pending: boolean;
-  autoFocus?: boolean;
+  autoFocus: boolean;
   onDelete: () => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);

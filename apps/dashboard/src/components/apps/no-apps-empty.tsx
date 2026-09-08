@@ -9,6 +9,7 @@ import {
 import { CopyableLine } from '@repo/ui/custom/copyable-line';
 import { BoxIcon } from 'lucide-react';
 import { DeployDialog } from '#components/deploy/deploy-dialog.tsx';
+import { ENABLED } from '#lib/app-actions.ts';
 
 export function NoAppsEmpty() {
   return (
@@ -20,7 +21,7 @@ export function NoAppsEmpty() {
         <EmptyTitle>You have no apps</EmptyTitle>
       </EmptyHeader>
       <EmptyContent>
-        <DeployDialog />
+        <DeployDialog appId={undefined} availability={ENABLED} />
         <div className="flex w-full flex-col gap-2">
           <p className="text-muted-foreground">Alternatively, use the CLI:</p>
           <CopyableLine value={CLI_INSTALL_COMMAND} prompt />

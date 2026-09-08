@@ -4,7 +4,7 @@ import type { Session } from '#lib/auth.ts';
 
 const INITIALS_LENGTH = 2;
 
-export function UserAvatar({ user, className }: { user: Session['user']; className?: string }) {
+export function UserAvatar({ user, className }: { user: Session['user']; className: string }) {
   const label = user.name || user.email;
 
   return (

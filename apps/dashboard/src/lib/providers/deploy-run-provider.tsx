@@ -8,7 +8,7 @@ export function DeployRunProvider({
   onDeployed,
 }: {
   children: ReactNode;
-  onDeployed?: (deployed: Deployed) => void;
+  onDeployed: ((deployed: Deployed) => void) | undefined;
 }) {
   const run = useRunApp({ onDeployed });
 

@@ -51,6 +51,7 @@ export function AppResourcesCard({ app }: { app: AppSummary }) {
           icon={MemoryStickIcon}
           label="Memory"
           total={formatBytes(memoryBytes)}
+          showsPercent={false}
           reading={
             compute
               ? {
@@ -65,6 +66,7 @@ export function AppResourcesCard({ app }: { app: AppSummary }) {
           icon={HardDriveIcon}
           label="Volume"
           total={formatBytes(volumeSizeBytes)}
+          showsPercent={false}
           reading={
             volume
               ? {

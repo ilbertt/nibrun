@@ -1,0 +1,19 @@
+language js
+
+pattern always_passed() {
+  r"(?s).*(?:\?:|Partial<).*" as $member where {
+    register_diagnostic(span=$member, message="Every prop is passed at every call site: declare `name: T | undefined`, never `name?: T` or `Partial<T>`.")
+  }
+}
+
+or {
+  `function $name($props) { $body }` where { $props <: always_passed() },
+  `export default function $name($props) { $body }` where {
+    $props <: always_passed()
+  },
+  `($props) => $body` where { $props <: always_passed() },
+  `type $name = $definition` where {
+    $name <: r".*Props",
+    $definition <: always_passed()
+  }
+}
