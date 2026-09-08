@@ -70,7 +70,7 @@ export function ResourceMeter({
   label,
   total,
   reading,
-  showsPercent = false,
+  showsPercent,
 }: {
   icon: LucideIcon;
   label: string;
@@ -78,7 +78,7 @@ export function ResourceMeter({
   total: string;
   reading: ResourceReading | null;
   /** For a figure whose unit does not say what share it is — 0.36 of 2 vCPU says nothing. */
-  showsPercent?: boolean;
+  showsPercent: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1.5">

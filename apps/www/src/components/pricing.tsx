@@ -52,9 +52,9 @@ function MachineColumn({
 }: {
   title: string;
   resources: MachineResource[];
-  note?: string;
+  note: string | undefined;
   action: ReactNode;
-  className?: string;
+  className: string;
 }) {
   return (
     <div className={`flex h-full flex-col gap-6 ${className}`}>
@@ -143,6 +143,7 @@ export function Pricing() {
           className="sm:border-border/60 sm:border-l sm:pl-10 lg:pl-16"
           title="Need a bigger machine?"
           resources={BIGGER_RESOURCES}
+          note={undefined}
           action={
             <Button
               variant="outline"

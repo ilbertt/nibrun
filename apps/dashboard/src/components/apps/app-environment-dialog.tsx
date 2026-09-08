@@ -4,7 +4,7 @@ import type { AppSummary } from '#queries/apps.ts';
 
 export function AppEnvironmentDialog({ app }: { app: AppSummary }) {
   return (
-    <DeployRunProvider>
+    <DeployRunProvider onDeployed={undefined}>
       <AppEnvironmentDialogContent app={app} />
     </DeployRunProvider>
   );

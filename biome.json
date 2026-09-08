@@ -102,6 +102,20 @@
   },
   "overrides": [
     {
+      "includes": ["**/*.tsx", "!packages/ui/src/components/*.tsx"],
+      "plugins": ["./biome-plugins/no-optional-props.grit"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useConsistentTypeDefinitions": {
+              "level": "error",
+              "options": { "style": "type" }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/*.ts", "**/*.tsx"],
       "linter": {
         "rules": {
