@@ -40,7 +40,9 @@ import {
 
 const ROOT = Value.Parse(GuestPathSchema, '/');
 const APP = Value.Parse(AppIdSchema, 'app-pocketbase');
-const AT = (value: string): Timestamp => Value.Parse(TimestampSchema, value);
+function AT(value: string): Timestamp {
+  return Value.Parse(TimestampSchema, value);
+}
 const MODIFIED = AT('2026-01-15T10:24:00Z');
 const SOME_SIZE = 32_768;
 const UINT32_BYTES = 4;
