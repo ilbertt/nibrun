@@ -17,7 +17,7 @@ export function DeployDoneButton() {
     <DialogClose
       render={<Button render={<Link to={AppRoute.to} params={{ appId: deployed.appId }} />} />}
     >
-      Done
+      Go to app details
     </DialogClose>
   );
 }
