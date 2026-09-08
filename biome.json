@@ -47,6 +47,10 @@
       },
       "nursery": {
         "useAwaitThenable": "error",
+        "useReactFunctionComponentDefinition": {
+          "level": "error",
+          "options": { "namedComponents": "functionDeclaration" }
+        },
         "noFloatingPromises": "error",
         "useSortedClasses": {
           "level": "error",
@@ -202,6 +206,9 @@
       "includes": ["packages/ui/src/components/*.tsx"],
       "linter": {
         "rules": {
+          "nursery": {
+            "useReactFunctionComponentDefinition": "off"
+          },
           "a11y": {
             "noLabelWithoutControl": "off",
             "useFocusableInteractive": "off",
