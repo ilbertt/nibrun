@@ -1,7 +1,7 @@
 import { DIRECTORY_ENTRY_LIMIT } from '@repo/protocol';
-import { Card } from '@repo/ui/components/card';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@repo/ui/components/empty';
 import { Skeleton } from '@repo/ui/components/skeleton';
+import { TableContainer } from '@repo/ui/custom/table-container';
 import { FolderOpenIcon } from 'lucide-react';
 import { DeploymentLine } from '#components/apps/deployment-line.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
@@ -39,9 +39,9 @@ export function DirectoryListing() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <Card className="overflow-hidden p-0">
+          <TableContainer>
             <DirectoryTable entries={view.listing.entries} />
-          </Card>
+          </TableContainer>
         ))}
       {view.listing?.truncated === true && (
         <p className="text-muted-foreground text-sm">

@@ -13,11 +13,20 @@ import { useState } from 'react';
 import { DeployDoneButton } from '#components/deploy/deploy-done-button.tsx';
 import { DeployForm } from '#components/deploy/deploy-form.tsx';
 import { DeployProgress } from '#components/deploy/deploy-progress.tsx';
+import { describeRelease } from '#lib/describe-release.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
+import { useGoToDeployedApp } from '#lib/hooks/use-go-to-deployed-app.ts';
 
-export function DeployDialogContent({ appId, disabled }: { appId?: string; disabled: boolean }) {
+export function DeployDialogContent({
+  appId,
+  disabled,
+}: {
+  appId: string | undefined;
+  disabled: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const run = useDeployRun();
+  const goToApp = useGoToDeployedApp();
   const running = run.phase === 'uploading' || run.phase === 'settling';
   const newApp = appId === undefined;
 
@@ -26,6 +35,13 @@ export function DeployDialogContent({ appId, disabled }: { appId?: string; disab
       run.reset();
     }
     setOpen(next);
+  }
+
+  // The app it landed on is a page this dialog can be sitting over, so leaving for it is only
+  // half a move until the dialog is out of the way.
+  function leaveForApp(): void {
+    setOpen(false);
+    goToApp();
   }
 
   return (
@@ -40,16 +56,20 @@ export function DeployDialogContent({ appId, disabled }: { appId?: string; disab
         <DialogHeader>
           <DialogTitle>{newApp ? 'Deploy a binary' : 'Update'}</DialogTitle>
           <DialogDescription>
-            {run.phase === 'idle'
-              ? describeDeploy(newApp)
-              : 'The release is on its way. Closing this does not stop it.'}
+            {run.phase === 'idle' ? describeDeploy(newApp) : describeRelease(run.phase)}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
           {run.phase === 'idle' ? (
-            <DeployForm appId={appId} binary={undefined} />
+            <DeployForm
+              appId={appId}
+              binary={undefined}
+              suggested={undefined}
+              minimal={false}
+              pinnedAction
+            />
           ) : (
-            <DeployProgress done={<DeployDoneButton />} />
+            <DeployProgress done={<DeployDoneButton />} goToApp={leaveForApp} />
           )}
         </DialogBody>
       </DialogContent>

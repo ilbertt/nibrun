@@ -40,6 +40,8 @@ export function MinimalBinaryField({
                 inputId={BINARY_INPUT_ID}
                 binary={file}
                 title={invitation(appName)}
+                caption={undefined}
+                busy={false}
                 invalid={rejected}
                 onPick={field.handleChange}
               />

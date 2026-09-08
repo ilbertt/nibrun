@@ -9,6 +9,7 @@ export {
   GITHUB_REPO_SLUG,
   GITHUB_REPO_URL,
 } from '#github.ts';
+export { LLMS_TXT_PATH } from '#llms.ts';
 export { FREE_APPS_COUNT, PRICE_PER_APP_USD } from '#pricing.ts';
 export {
   BASE_DOMAIN,

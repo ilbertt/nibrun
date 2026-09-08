@@ -8,7 +8,7 @@ const GRADIENT_FROM = '#16a34a';
 const GRADIENT_TO = '#83fd9e';
 const INK = '#0a0a0a';
 
-export function NibrunMark({ className }: { className?: string }) {
+export function NibrunMark({ className }: { className: string }) {
   // Two marks on one page would otherwise share a gradient id, and the second would paint
   // with the first's definition.
   const gradientId = useId();

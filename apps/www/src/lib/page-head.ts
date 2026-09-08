@@ -1,4 +1,4 @@
-import { PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
+import { LLMS_TXT_PATH, PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 
 /**
  * The tags that differ per page, kept in one place because some of them cannot be repeated:
@@ -12,7 +12,7 @@ export function pageHead({
   description,
   publishedAt,
   image,
-  markdown = { path: '/llms.txt', title: `${PRODUCT_NAME} for agents` },
+  markdown = { path: LLMS_TXT_PATH, title: `${PRODUCT_NAME} for agents` },
 }: {
   path: string;
   title: string;

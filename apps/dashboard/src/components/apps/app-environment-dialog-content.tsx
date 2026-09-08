@@ -15,9 +15,11 @@ import { EnvironmentTable } from '#components/apps/environment-table.tsx';
 import { DeployDoneButton } from '#components/deploy/deploy-done-button.tsx';
 import { DeployProgress } from '#components/deploy/deploy-progress.tsx';
 import { greyedReason } from '#lib/app-actions.ts';
+import { describeRelease } from '#lib/describe-release.ts';
 import { useAppActions } from '#lib/hooks/use-app-actions.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import { useEnvironmentForm } from '#lib/hooks/use-environment-form.ts';
+import { useGoToDeployedApp } from '#lib/hooks/use-go-to-deployed-app.ts';
 import { isReleasing } from '#lib/hooks/use-run-app.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
@@ -27,6 +29,7 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
   const form = useEnvironmentForm(app);
   // Saving is a release, so it is offered exactly where the deploy button is.
   const deploy = useAppActions(app.id).deploy;
+  const goToApp = useGoToDeployedApp();
   const releasing = isReleasing(run.phase);
 
   function handleOpenChange(next: boolean): void {
@@ -35,6 +38,13 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
       form.reset();
     }
     setOpen(next);
+  }
+
+  // The app it released is the page this dialog is sitting over, so leaving for it is only
+  // half a move until the dialog is out of the way.
+  function leaveForApp(): void {
+    setOpen(false);
+    goToApp();
   }
 
   return (
@@ -49,7 +59,7 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
           <DialogDescription>
             {run.phase === 'idle'
               ? describeSave({ slug: app.slug, withheld: greyedReason(deploy) })
-              : 'The release is on its way. Closing this does not stop it.'}
+              : describeRelease(run.phase)}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
@@ -62,7 +72,9 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
               }}
             >
               <Field data-invalid={form.error !== undefined || undefined}>
-                <EnvironmentTable variables={form.variables} onChange={form.change} />
+                <EnvironmentTable variables={form.variables} onChange={form.change}>
+                  {null}
+                </EnvironmentTable>
                 {form.error !== undefined && <FieldError>{form.error}</FieldError>}
               </Field>
               <Button
@@ -74,7 +86,7 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
               </Button>
             </form>
           ) : (
-            <DeployProgress done={<DeployDoneButton />} />
+            <DeployProgress done={<DeployDoneButton />} goToApp={leaveForApp} />
           )}
         </DialogBody>
       </DialogContent>
