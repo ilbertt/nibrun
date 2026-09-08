@@ -16,8 +16,8 @@ export function DeviceCard({
 }: {
   title: string;
   description: string;
-  failed?: boolean;
-  children?: ReactNode;
+  failed: boolean;
+  children: ReactNode;
 }) {
   return (
     <Card>

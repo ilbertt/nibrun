@@ -44,7 +44,7 @@ function ReachedOnItsOwnPort({ appId }: { appId: string }) {
       {publicIpv4 && extraPublicPort ? (
         // Nothing here links anywhere: it is not a URL, and what an owner does with it is paste it
         // into whatever is dialling the app. Same line as the run command for that reason.
-        <CopyableLine value={`${publicIpv4}:${extraPublicPort}`} />
+        <CopyableLine value={`${publicIpv4}:${extraPublicPort}`} prompt={false} />
       ) : (
         // Asked for and not yet answered for: the host says where it is on its first report, so
         // this is a release that has not started rather than an address that failed to arrive.

@@ -14,16 +14,16 @@ export function BinaryDropTarget({
   binary,
   title,
   caption,
-  busy = false,
-  invalid = false,
+  busy,
+  invalid,
   onPick,
 }: {
   inputId: string;
   binary: File | undefined;
   title: ReactNode;
-  caption?: string | undefined;
-  busy?: boolean | undefined;
-  invalid?: boolean | undefined;
+  caption: string | undefined;
+  busy: boolean;
+  invalid: boolean;
   onPick: (binary: File | undefined) => void;
 }) {
   const picker = useBinaryPicker({ onPick });

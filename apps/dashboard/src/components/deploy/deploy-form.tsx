@@ -14,13 +14,13 @@ export function DeployForm({
   appId,
   binary,
   suggested,
-  minimal = false,
+  minimal,
   pinnedAction,
 }: {
   appId: string | undefined;
   binary: File | undefined;
-  suggested?: DeploySuggestion | undefined;
-  minimal?: boolean | undefined;
+  suggested: DeploySuggestion | undefined;
+  minimal: boolean;
   /**
    * Whether the fields scroll past the button rather than the button scrolling away with them.
    * Only a caller that puts the form in a scroll region of its own can answer, so both are made
