@@ -21,9 +21,6 @@ export function SiteHeader() {
         <Button variant="ghost" size="sm" render={<Link to="/blog" />}>
           Blog
         </Button>
-        {/* A file in `public/` rather than a route, so an anchor: `Link` has nothing to resolve.
-            Gone below `sm`, where the row already spends every pixel it has — and whoever wants
-            this is pointing an agent at the site from a desktop, not reading it on a phone. */}
         <Button
           variant="ghost"
           size="sm"
