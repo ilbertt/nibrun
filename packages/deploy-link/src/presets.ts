@@ -1,5 +1,5 @@
-import type { DeployLink } from '@repo/deploy-link';
 import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
+import type { DeployLink } from '#link.ts';
 
 // Update the root README when changing any entry here.
 export const DEPLOY_PRESETS = {
@@ -84,6 +84,9 @@ export const DEPLOY_PRESETS = {
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
+
+/** Every preset, in the order they are written above, for anything that offers them all. */
+export const DEPLOY_PRESET_SLUGS = Object.keys(DEPLOY_PRESETS) as [DeploySlug, ...DeploySlug[]];
 
 export function findPreset(slug: string): DeployLink | undefined {
   return Object.hasOwn(DEPLOY_PRESETS, slug) ? DEPLOY_PRESETS[slug as DeploySlug] : undefined;
