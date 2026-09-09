@@ -62,9 +62,11 @@ Measured at boot, PID 1 receives `argv = ["/init"]` and `envp = {HOME=/, TERM=li
 forwards no command-line tokens, not even ones it did not consume. Anything from the cmdline has
 to be read out of `/proc/cmdline`.
 
-The rootfs carries glibc, `libgcc-s1`, `libstdc++6` and the CA bundle and nothing else.
-`bun build --compile` targets glibc, and Alpine/musl fails at exec with an opaque error — which
-is why the base is Debian rather than the smaller obvious choice.
+The rootfs carries glibc, `libgcc-s1`, `libstdc++6`, `zlib1g` and the CA bundle. A library earns
+a place by being ABI-stable with a versioned soname, no configuration and no plugin loading —
+size is not the test, and `libssl` and `libcurl` fail it. Measured, `bun build --compile` needs
+only glibc; the rest are for the other toolchains people upload. Alpine/musl fails at exec with
+an opaque error, which is why the base is Debian rather than the smaller obvious choice.
 
 ## The kernel config is used off-label
 

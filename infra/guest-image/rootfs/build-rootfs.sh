@@ -9,10 +9,13 @@ root=/rootfs
 out=/out
 staged_init=/staged-init
 
-# Everything a `bun build --compile` binary links against at runtime, and nothing
-# else. The tenant binary and /init are the only things that ever execute, so the
-# image carries no shell, no package manager and no init system.
-runtime_packages=(libc6 libgcc-s1 libstdc++6 ca-certificates)
+# The ABI-stable C libraries a compiled binary expects to find and cannot carry
+# itself: versioned soname, no configuration, no plugin loading, no dependency
+# outside this list. Size is not the test — a library that reads config or loads
+# providers makes the image's copy behave unlike the one the tenant built
+# against. /init and the tenant binary are the only things that ever execute, so
+# there is no shell, no package manager and no init system.
+runtime_packages=(libc6 libgcc-s1 libstdc++6 ca-certificates zlib1g)
 
 block_size=4096
 inode_margin=512
@@ -110,17 +113,22 @@ else
   echo 'init is statically linked'
 fi
 
-step 'Proving the image can exec a dynamically linked glibc/libstdc++ binary'
+step 'Proving the image can exec a binary linked against the libraries it ships'
 cat >/tmp/probe.cc <<'EOF'
 #include <cstdio>
 #include <string>
 int main() {
-  std::string message = "glibc + libstdc++ exec ok";
+  std::string message = "glibc + libstdc++ + libz exec ok";
   std::printf("%s\n", message.c_str());
   return 0;
 }
 EOF
-g++ -O0 -o "$root/.probe" /tmp/probe.cc
+# The soname rather than -lz: that would need zlib1g-dev in the builder for a .so
+# symlink the image itself never carries. --no-as-needed because the probe calls
+# nothing in libz, and the default drops the DT_NEEDED entry this step exists to
+# check.
+g++ -O0 -Wl,--no-as-needed -o "$root/.probe" /tmp/probe.cc \
+  /usr/lib/x86_64-linux-gnu/libz.so.1
 chroot "$root" /.probe
 rm -f "$root/.probe"
 
