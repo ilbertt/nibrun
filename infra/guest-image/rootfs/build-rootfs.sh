@@ -113,17 +113,22 @@ else
   echo 'init is statically linked'
 fi
 
-step 'Proving the image can exec a dynamically linked glibc/libstdc++ binary'
+step 'Proving the image can exec a binary linked against the libraries it ships'
 cat >/tmp/probe.cc <<'EOF'
 #include <cstdio>
 #include <string>
 int main() {
-  std::string message = "glibc + libstdc++ exec ok";
+  std::string message = "glibc + libstdc++ + libz exec ok";
   std::printf("%s\n", message.c_str());
   return 0;
 }
 EOF
-g++ -O0 -o "$root/.probe" /tmp/probe.cc
+# The soname rather than -lz: that would need zlib1g-dev in the builder for a .so
+# symlink the image itself never carries. --no-as-needed because the probe calls
+# nothing in libz, and the default drops the DT_NEEDED entry this step exists to
+# check.
+g++ -O0 -Wl,--no-as-needed -o "$root/.probe" /tmp/probe.cc \
+  /usr/lib/x86_64-linux-gnu/libz.so.1
 chroot "$root" /.probe
 rm -f "$root/.probe"
 
