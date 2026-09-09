@@ -9,10 +9,9 @@ root=/rootfs
 out=/out
 staged_init=/staged-init
 
-# Everything a `bun build --compile` binary links against at runtime, and nothing
-# else. The tenant binary and /init are the only things that ever execute, so the
-# image carries no shell, no package manager and no init system.
-runtime_packages=(libc6 libgcc-s1 libstdc++6 ca-certificates)
+# The tenant binary and /init are the only things that ever execute, so the image
+# carries no shell, no package manager and no init system.
+runtime_packages=(libc6 libgcc-s1 libstdc++6 ca-certificates zlib1g)
 
 block_size=4096
 inode_margin=512
