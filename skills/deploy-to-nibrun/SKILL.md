@@ -9,9 +9,9 @@ nibrun takes one compiled binary and gives it a microVM of its own, a persistent
 an HTTPS URL. No Dockerfile, no YAML, no cluster.
 
 Sign in, build for Linux x86_64, `nib run`, then ask the URL for something. What that path does not
-need is below it: [the guest contract](#the-guest-contract), [naming a runtime
-value](#naming-a-runtime-value), [a second public port](#a-second-public-port), and [what nibrun
-does not do](#tradeoffs).
+need is below it: [copying an app](#copying-an-app), [the guest contract](#the-guest-contract),
+[naming a runtime value](#naming-a-runtime-value), [a second public port](#a-second-public-port),
+and [what nibrun does not do](#tradeoffs).
 
 ## 1. Sign in
 
@@ -80,9 +80,12 @@ nib run ./my-server --name my-app --data-folder ./seed
 ```
 
 It takes a folder, or a `.tar.gz` or `.zip` that already holds one — the zip Finder or Explorer
-made goes as it stands. Up to 1 GiB, and only as the app is created: this and the app writing its
-own files are the whole of how anything gets onto the volume. A zip made anywhere but unix carries
-no permissions, so an executable bit does not survive one.
+made goes as it stands. Either way **the root of the archive becomes the root of `data/`**: a
+folder is packed from the inside, so `./seed/app.db` arrives as `/app/data/app.db`, and bundling
+the folder rather than its contents puts every file one directory deeper than the app looks. Up to
+1 GiB sent and 2 GiB unpacked, and only as the app is created: this and the app writing its own
+files are the whole of how anything gets onto the volume. A zip made anywhere but unix carries no
+permissions, so an executable bit does not survive one.
 
 **Every deploy after that must name the app**, or a non-interactive shell creates a second one.
 `nib apps list` finds the slug again when a later session has to redeploy:
@@ -137,6 +140,23 @@ curl -fsS https://my-app.nibrun.app/
 
 `nib apps logs --app my-app` says why one that was created never came up, and what one that did is
 complaining about. `nib --help` lists the rest — status, domains, filesystem, export, delete.
+
+## Copying an app
+
+An export is a `.tar.gz` holding `data/`, the binary that ran against it, and a `.env` of the
+variables it was deployed with — which is everything a second app is rebuilt from, whether that is
+a staging copy, a restore, or a move to another account:
+
+```sh
+nib apps export ./my-app.tar.gz --app my-app
+tar xzf my-app.tar.gz                       # -> data/  my-server  .env
+nib run ./my-server --name my-app-copy --data-folder ./data --port 8080
+```
+
+`--data-folder ./data` and not the bundle as a whole: only `data/` was the volume, and the binary
+and the `.env` unpacked beside it were never on it. Nothing outside the volume comes across either
+— port, arguments and environment are given to the copy the way any new app is given them, with the
+exported `.env` as the record of what the original had.
 
 ## The guest contract
 

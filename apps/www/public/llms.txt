@@ -7,7 +7,7 @@
 
 - **A machine to itself.** One microVM per app, 1 vCPU and 256 MiB by default. Nothing else runs in it.
 - **Just write to the disk.** `data/` is yours — a SQLite file, uploads, both. 8 GiB, and it survives every redeploy.
-- **Take it all with you.** One click: the binary and its whole disk, as one `.tar.gz`.
+- **Take it all with you.** One click: the binary and its whole disk, as one `.tar.gz` — and a new app can be created holding it again.
 - **A URL right away.** `https://<slug>.nibrun.app`, the moment it boots.
 
 ## Pricing
@@ -27,6 +27,22 @@ nib run ./my-server --name my-app
 
 Redeploy onto the same app with `nib run ./my-server --app my-app`. Without `--app`, a
 non-interactive shell creates a second app rather than replacing the first.
+
+## Starting with data
+
+An app can be created with `data/` already holding something — a seeded SQLite file, a corpus, an
+export of another app:
+
+```sh
+nib run ./my-server --name my-app --data-folder ./seed
+```
+
+It takes a folder, or a `.tar.gz` or `.zip` holding one, and the root of the archive becomes the
+root of `data/`. Up to 1 GiB, and only as the app is created.
+
+`nib apps export ./my-app.tar.gz --app my-app` goes the other way: `data/`, the binary, and a
+`.env` of the variables the app was deployed with. Unpack it, and `--data-folder ./data` gives a
+second app the same disk.
 
 ## What the binary can count on
 
