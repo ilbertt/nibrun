@@ -9,8 +9,12 @@ root=/rootfs
 out=/out
 staged_init=/staged-init
 
-# The tenant binary and /init are the only things that ever execute, so the image
-# carries no shell, no package manager and no init system.
+# The ABI-stable C libraries a compiled binary expects to find and cannot carry
+# itself: versioned soname, no configuration, no plugin loading, no dependency
+# outside this list. Size is not the test — a library that reads config or loads
+# providers makes the image's copy behave unlike the one the tenant built
+# against. /init and the tenant binary are the only things that ever execute, so
+# there is no shell, no package manager and no init system.
 runtime_packages=(libc6 libgcc-s1 libstdc++6 ca-certificates zlib1g)
 
 block_size=4096
