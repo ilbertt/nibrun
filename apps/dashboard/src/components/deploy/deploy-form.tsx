@@ -53,7 +53,7 @@ export function DeployForm({
       {!stripped && <DeployConfiguration form={form} suggested={suggested} />}
 
       {replacing !== undefined && (
-        <p className="wrap-anywhere rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
+        <p className="wrap-anywhere rounded-2xl bg-warning/10 px-3 py-2 text-sm text-warning">
           This restarts <span className="font-medium font-mono">{replacing.slug}</span>
           {picked ? ' on the binary above' : ' on the binary it already runs'}. Its hostnames and
           everything on its volume stay as they are.
