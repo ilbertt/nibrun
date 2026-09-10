@@ -7,10 +7,10 @@ export const DEPLOY_PRESETS = {
   pocketbase: {
     name: 'pocketbase',
     binary:
-      'https://github.com/pocketbase/pocketbase/releases/download/v0.40.2/pocketbase_0.40.2_linux_amd64.zip',
-    sha256: 'dd86b424a07f2bb5ac2b8ba8cdf013a37400a9cf56bd1f92e560981f7dd24244',
+      'https://github.com/pocketbase/pocketbase/releases/download/v0.40.3/pocketbase_0.40.3_linux_amd64.zip',
+    sha256: '8d81b6b79add0e219373e922ebe1dddbee7f57fcff602e3585e0d2c654b983ce',
     port: 8090,
-    arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data'],
+    arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data', '--publicDir=./data/pb_public'],
     minimal: true,
   },
   sharkord: {
