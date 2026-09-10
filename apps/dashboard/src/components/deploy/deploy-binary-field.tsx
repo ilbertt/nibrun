@@ -8,8 +8,11 @@ import {
 } from '#lib/hooks/use-deploy-form.ts';
 
 export function DeployBinaryField({ form }: { form: DeployFormState }) {
-  const { api, binaryListeners, replacing } = form;
-  const validate = replacing === undefined ? validateBinary : validateKeptBinary;
+  const { api, binaryListeners, locked } = form;
+  // Whether a binary is required is asked of the form at mount, and answered again only when the
+  // field changes — so it is read off the app this deploy targets rather than off the summary of
+  // it, which arrives later and would leave a field the owner can fill refusing to be left empty.
+  const validate = locked ? validateKeptBinary : validateBinary;
 
   return (
     <api.Field
@@ -25,7 +28,7 @@ export function DeployBinaryField({ form }: { form: DeployFormState }) {
             <BinarySourcePicker
               value={field.state.value}
               invalid={rejected}
-              keeping={replacing !== undefined}
+              keeping={locked}
               onChange={field.handleChange}
             />
             {rejected && <FieldError>{field.state.meta.errors[0]}</FieldError>}
