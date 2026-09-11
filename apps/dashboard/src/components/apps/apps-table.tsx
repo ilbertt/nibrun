@@ -1,3 +1,4 @@
+import { servingHostname } from '@repo/app-operations';
 import {
   Table,
   TableBody,
@@ -8,6 +9,7 @@ import {
 } from '@repo/ui/components/table';
 import { Link } from '@tanstack/react-router';
 import { AppStatusBadge } from '#components/apps/app-status-badge.tsx';
+import { HostnameLink } from '#components/apps/hostname-link.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 import type { AppSummary } from '#queries/apps.ts';
 import { Route as AppRoute } from '#routes/(dashboard)/apps/$appId/index.tsx';
@@ -18,6 +20,7 @@ export function AppsTable({ apps }: { apps: readonly AppSummary[] }) {
       <TableHeader>
         <TableRow>
           <TableHead>Slug</TableHead>
+          <TableHead>URL</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Last change</TableHead>
         </TableRow>
@@ -33,6 +36,9 @@ export function AppsTable({ apps }: { apps: readonly AppSummary[] }) {
               >
                 {app.slug}
               </Link>
+            </TableCell>
+            <TableCell>
+              <HostnameLink hostname={servingHostname(app.hostnames)} />
             </TableCell>
             <TableCell>
               <AppStatusBadge app={app} />

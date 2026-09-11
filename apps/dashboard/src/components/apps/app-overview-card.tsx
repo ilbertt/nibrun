@@ -1,7 +1,7 @@
 import { Badge } from '@repo/ui/components/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
-import { ExternalLinkIcon } from 'lucide-react';
 import { AppStatusBadge } from '#components/apps/app-status-badge.tsx';
+import { HostnameLink } from '#components/apps/hostname-link.tsx';
 import { HostnameStateBadge } from '#components/apps/hostname-state-badge.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 import type { AppSummary } from '#queries/apps.ts';
@@ -26,15 +26,7 @@ export function AppOverviewCard({ app }: { app: AppSummary }) {
           <ul className="flex flex-col gap-2">
             {app.hostnames.map((hostname) => (
               <li key={hostname.hostname} className="flex items-center justify-between gap-4">
-                <a
-                  href={`https://${hostname.hostname}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-w-0 items-center gap-1.5 font-mono hover:underline"
-                >
-                  <span className="truncate">{hostname.hostname}</span>
-                  <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground" />
-                </a>
+                <HostnameLink hostname={hostname.hostname} />
                 <span className="flex shrink-0 items-center gap-2">
                   {hostname.kind === 'custom' ? <Badge variant="outline">Custom</Badge> : null}
                   {/* Only where it says something: a platform hostname is active from the moment
