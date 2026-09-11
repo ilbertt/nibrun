@@ -2,6 +2,12 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.9.11-1]
+
+### 🚀 Features
+
+- *(www)* The site header points agents at llms.txt (#542)
+
 ## [2026.9.7-2]
 
 ### 🚀 Features
