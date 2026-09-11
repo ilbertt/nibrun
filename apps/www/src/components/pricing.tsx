@@ -1,4 +1,4 @@
-import { FREE_APPS_COUNT, HELLO_EMAIL, PRICE_PER_APP_USD } from '@repo/global-constants';
+import { FREE_APPS_COUNT, helloMailto, PRICE_PER_APP_USD } from '@repo/global-constants';
 import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import { CpuIcon, HardDriveIcon, MemoryStickIcon, MinusIcon, PlusIcon } from 'lucide-react';
@@ -17,11 +17,8 @@ const BIGGER_MACHINE_FACTOR = 2;
 
 const CONTACT_BODY = "Hi,\n\nI'd like to know more.\n\nThanks!";
 
-// Percent-encoded rather than form-encoded: a mail client reads `+` in these as a plus sign
-// rather than a space, so `URLSearchParams` would put one in every subject it wrote.
 function contactUrl(subject: string) {
-  const query = `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(CONTACT_BODY)}`;
-  return `mailto:${HELLO_EMAIL}?${query}`;
+  return helloMailto({ subject, body: CONTACT_BODY });
 }
 
 const VOLUME_GIB = DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB;
