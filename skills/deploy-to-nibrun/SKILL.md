@@ -1,6 +1,6 @@
 ---
 name: deploy-to-nibrun
-description: Deploy a compiled binary to nibrun and run it as an HTTPS service. Use when asked to deploy, ship, host or run a self-contained server binary (Bun, Go, Rust, Zig, C) on nibrun, when working in a repo that targets nibrun, or when deciding whether nibrun fits an app.
+description: Deploy a compiled binary to nibrun and run it as an HTTPS service. Use when asked to deploy, ship, host or run a self-contained server binary (Bun, Go, Rust, Zig, C) or a folder of static assets on nibrun, when working in a repo that targets nibrun, or when deciding whether nibrun fits an app.
 ---
 
 # Deploy to nibrun
@@ -59,6 +59,21 @@ Three things to read off the binary before deploying rather than after:
 - **What it needs from the environment**, off a `.env.example` or whatever it loads config from. It
   has to be there on the **first** deploy: a process that exits over a missing variable never
   starts serving, and the deploy fails with it.
+
+**A folder of static assets has no binary to build**: `nib` is one, and `nib serve` answers for
+whatever folder it is given, on the port the guest hands it. So the folder goes up as the app's
+`data/`, and the CLI's own Linux build as the binary that serves it:
+
+```sh
+nib run "https://github.com/ilbertt/nibrun/releases/latest/download/nib-linux-x64 serve /app/data" --name my-site --data-folder ./dist
+```
+
+A path naming a directory answers with its `index.html`, and a miss with the folder's own
+`404.html` where it has one; `serve /app/data --single-page` answers every miss with the root
+`index.html` instead, for a SPA whose routes exist only in the browser. No `--port`: `nib serve`
+binds whichever port the guest assigns. The assets ride in as data, which goes up only as the app
+is created — a rebuilt site is a new app, at a new URL, and a custom domain (`nib apps domains`)
+is what keeps an address across that.
 
 ## 3. Deploy
 

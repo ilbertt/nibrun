@@ -44,6 +44,18 @@ root of `data/`. Up to 1 GiB, and only as the app is created.
 `.env` of the variables the app was deployed with. Unpack it, and `--data-folder ./data` gives a
 second app the same disk.
 
+## A folder of static assets
+
+Needs no binary of its own: `nib` is one, and `nib serve` serves whatever folder it is given on
+the port the guest hands it. The folder goes up as `data/`, the CLI's own Linux build as the binary:
+
+```sh
+nib run "https://github.com/ilbertt/nibrun/releases/latest/download/nib-linux-x64 serve /app/data" --name my-site --data-folder ./dist
+```
+
+`serve /app/data --single-page` answers every miss with the root `index.html`, for a SPA. The
+assets go up only as the app is created, so a rebuilt site is a new app.
+
 ## What the binary can count on
 
 Linux x86_64 (glibc). Working directory `/app`. The persistent volume is `/app/data`; everything
