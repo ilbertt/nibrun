@@ -1,0 +1,381 @@
+import { FREE_APPS_COUNT, PRICE_PER_APP_USD } from '@repo/global-constants';
+import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/protocol';
+
+const BYTES_PER_GIB = 1_073_741_824;
+const MIB_PER_GIB = 1024;
+
+const VCPU_STEP_COUNT = 4;
+const MEMORY_STEP_COUNT = 5;
+const VOLUME_STEP_COUNT = 5;
+
+const DOUBLING = 2;
+
+const PRICE_PER_EXTRA_VCPU_USD = 2;
+const PRICE_PER_MEMORY_DOUBLING_USD = 1;
+const PRICE_PER_VOLUME_DOUBLING_USD = 0.5;
+
+// What the room holds in total. Eight default apps fit with headroom to grow a few of them,
+// which is the tradeoff worth making rather than a wall nobody ever reaches.
+const FLEET_VCPU_LIMIT = 12;
+const FLEET_MEMORY_MIB_LIMIT = 8192;
+const FLEET_VOLUME_GIB_LIMIT = 384;
+
+const USD_DECIMALS = 2;
+
+function stepsFrom({
+  start,
+  count,
+  next,
+}: {
+  start: number;
+  count: number;
+  next: (value: number) => number;
+}): number[] {
+  const values = [start];
+  while (values.length < count) {
+    values.push(next(values[values.length - 1]!));
+  }
+  return values;
+}
+
+function increment(value: number): number {
+  return value + 1;
+}
+
+function double(value: number): number {
+  return value * DOUBLING;
+}
+
+function sum(values: number[]): number {
+  let total = 0;
+  for (const value of values) {
+    total += value;
+  }
+  return total;
+}
+
+function formatCount(value: number): string {
+  return `${value}`;
+}
+
+function formatMemory(mib: number): string {
+  return mib < MIB_PER_GIB ? `${mib} MiB` : `${mib / MIB_PER_GIB} GiB`;
+}
+
+function formatVolume(gib: number): string {
+  return `${gib} GiB`;
+}
+
+type Axis = {
+  name: string;
+  steps: number[];
+  format: (value: number) => string;
+  pricePerStep: number;
+  fleetLimit: number;
+};
+
+/** Every axis starts at what an app is given today, so the first tick is the machine we ship. */
+export const AXES = {
+  vcpu: {
+    name: 'vCPU',
+    steps: stepsFrom({
+      start: DEFAULT_INSTANCE_RESOURCES.vcpuCount,
+      count: VCPU_STEP_COUNT,
+      next: increment,
+    }),
+    format: formatCount,
+    pricePerStep: PRICE_PER_EXTRA_VCPU_USD,
+    fleetLimit: FLEET_VCPU_LIMIT,
+  },
+  memory: {
+    name: 'RAM',
+    steps: stepsFrom({
+      start: DEFAULT_INSTANCE_RESOURCES.memoryMib,
+      count: MEMORY_STEP_COUNT,
+      next: double,
+    }),
+    format: formatMemory,
+    pricePerStep: PRICE_PER_MEMORY_DOUBLING_USD,
+    fleetLimit: FLEET_MEMORY_MIB_LIMIT,
+  },
+  volume: {
+    name: 'disk',
+    steps: stepsFrom({
+      start: DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB,
+      count: VOLUME_STEP_COUNT,
+      next: double,
+    }),
+    format: formatVolume,
+    pricePerStep: PRICE_PER_VOLUME_DOUBLING_USD,
+    fleetLimit: FLEET_VOLUME_GIB_LIMIT,
+  },
+} satisfies Record<string, Axis>;
+
+export type AxisKey = keyof typeof AXES;
+
+export const AXIS_KEYS = Object.keys(AXES) as AxisKey[];
+
+export type AppSpec = {
+  /** Identity, and the seed for the tint, so a box keeps its colour for as long as it lives. */
+  ordinal: number;
+  tint: string;
+  steps: Record<AxisKey, number>;
+};
+
+export function stepValue({ axisKey, step }: { axisKey: AxisKey; step: number }): number {
+  return AXES[axisKey].steps[step]!;
+}
+
+/**
+ * Cores are useless without the memory to feed them, so every machine holds at least the ratio
+ * the default one has. Disk is nobody's business but its own.
+ */
+const MIN_MIB_PER_VCPU =
+  DEFAULT_INSTANCE_RESOURCES.memoryMib / DEFAULT_INSTANCE_RESOURCES.vcpuCount;
+
+export function memoryFloorFor(vcpuStep: number): number {
+  const needed = stepValue({ axisKey: 'vcpu', step: vcpuStep }) * MIN_MIB_PER_VCPU;
+  const floor = AXES.memory.steps.findIndex((mib) => mib >= needed);
+  return floor === -1 ? AXES.memory.steps.length - 1 : floor;
+}
+
+/** Taking cores drags memory up with them; nothing else moves on its own. */
+export function withStep({
+  app,
+  axisKey,
+  step,
+}: {
+  app: AppSpec;
+  axisKey: AxisKey;
+  step: number;
+}): AppSpec {
+  const steps = { ...app.steps, [axisKey]: step };
+  return {
+    ...app,
+    steps:
+      axisKey === 'vcpu'
+        ? { ...steps, memory: Math.max(steps.memory, memoryFloorFor(step)) }
+        : steps,
+  };
+}
+
+export function upgradesPrice(app: AppSpec): number {
+  return sum(AXIS_KEYS.map((key) => app.steps[key] * AXES[key].pricePerStep));
+}
+
+/** The base is on the house for the first apps in the list; what they were upgraded to is not. */
+export function appPrice({ app, index }: { app: AppSpec; index: number }): number {
+  const base = index < FREE_APPS_COUNT ? 0 : PRICE_PER_APP_USD;
+  return base + upgradesPrice(app);
+}
+
+export function fleetPrice(apps: AppSpec[]): number {
+  return sum([...apps.entries()].map(([index, app]) => appPrice({ app, index })));
+}
+
+export function usedOn({ apps, axisKey }: { apps: AppSpec[]; axisKey: AxisKey }): number {
+  return sum(apps.map((app) => stepValue({ axisKey, step: app.steps[axisKey] })));
+}
+
+function allowanceOn({
+  apps,
+  app,
+  axisKey,
+}: {
+  apps: AppSpec[];
+  app: AppSpec;
+  axisKey: AxisKey;
+}): number {
+  const others = apps.filter((other) => other.ordinal !== app.ordinal);
+  return AXES[axisKey].fleetLimit - usedOn({ apps: others, axisKey });
+}
+
+/** The largest value this app may still take on each axis, with the rest of the room deducted. */
+function allowancesFor({ apps, app }: { apps: AppSpec[]; app: AppSpec }): Record<AxisKey, number> {
+  return {
+    vcpu: allowanceOn({ apps, app, axisKey: 'vcpu' }),
+    memory: allowanceOn({ apps, app, axisKey: 'memory' }),
+    volume: allowanceOn({ apps, app, axisKey: 'volume' }),
+  };
+}
+
+function isPickable({
+  app,
+  axisKey,
+  step,
+  allowances,
+}: {
+  app: AppSpec;
+  axisKey: AxisKey;
+  step: number;
+  allowances: Record<AxisKey, number>;
+}): boolean {
+  if (stepValue({ axisKey, step }) > allowances[axisKey]) {
+    return false;
+  }
+  if (axisKey === 'memory') {
+    return step >= memoryFloorFor(app.steps.vcpu);
+  }
+  if (axisKey === 'vcpu') {
+    const memory = Math.max(app.steps.memory, memoryFloorFor(step));
+    return stepValue({ axisKey: 'memory', step: memory }) <= allowances.memory;
+  }
+  return true;
+}
+
+/** What the room and the machine between them still leave open on one axis of one app. */
+export function pickableSteps({
+  apps,
+  app,
+  axisKey,
+}: {
+  apps: AppSpec[];
+  app: AppSpec;
+  axisKey: AxisKey;
+}): boolean[] {
+  const allowances = allowancesFor({ apps, app });
+  return [...AXES[axisKey].steps.keys()].map((step) =>
+    isPickable({ app, axisKey, step, allowances }),
+  );
+}
+
+export function formatUsd(amount: number): string {
+  return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(USD_DECIMALS)}`;
+}
+
+// Flavours of the brand green rather than a categorical palette: close enough to stay one family,
+// far enough apart to tell two boxes standing next to each other apart.
+const BOX_TINTS = [
+  'var(--primary)',
+  'oklch(0.7 0.15 168)',
+  'oklch(0.52 0.13 136)',
+  'oklch(0.66 0.18 127)',
+  'oklch(0.75 0.13 152)',
+  'oklch(0.48 0.12 160)',
+  'oklch(0.61 0.14 181)',
+  'oklch(0.56 0.16 141)',
+  'oklch(0.72 0.16 134)',
+  'oklch(0.5 0.11 174)',
+  'oklch(0.68 0.12 156)',
+  'oklch(0.58 0.15 122)',
+];
+
+/**
+ * Nothing caps the number of apps but the room itself, and the smallest one still takes a core —
+ * which is the most rooms there can ever be. Only the stored file, which may say anything, is
+ * read against it.
+ */
+const MOST_APPS_POSSIBLE = Math.floor(AXES.vcpu.fleetLimit / AXES.vcpu.steps[0]!);
+
+/** Named by where it sits, so the list always reads app-1 to app-N however it was edited. */
+export function appName(index: number): string {
+  return `app-${index + 1}`;
+}
+
+const DEFAULT_STEPS: Record<AxisKey, number> = { vcpu: 0, memory: 0, volume: 0 };
+
+export function createApp({
+  ordinal,
+  steps = DEFAULT_STEPS,
+}: {
+  ordinal: number;
+  steps?: Record<AxisKey, number>;
+}): AppSpec {
+  return {
+    ordinal,
+    tint: BOX_TINTS[ordinal % BOX_TINTS.length]!,
+    steps,
+  };
+}
+
+export function fitsAnotherApp(apps: AppSpec[]): boolean {
+  return AXIS_KEYS.every(
+    (axisKey) =>
+      usedOn({ apps, axisKey }) + stepValue({ axisKey, step: 0 }) <= AXES[axisKey].fleetLimit,
+  );
+}
+
+/** One box at what an app actually ships with, which is also what it costs nothing to run. */
+export function initialApps(): AppSpec[] {
+  return [createApp({ ordinal: 0 })];
+}
+
+export function nextOrdinalAfter(apps: AppSpec[]): number {
+  return Math.max(-1, ...apps.map((app) => app.ordinal)) + 1;
+}
+
+const STORAGE_KEY = 'nibrun:calculator';
+
+type StoredApp = { ordinal: number; steps: Record<AxisKey, number> };
+
+function isStoredApp(value: unknown): value is StoredApp {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const { ordinal, steps } = value as Partial<StoredApp>;
+  return (
+    Number.isInteger(ordinal) &&
+    (ordinal as number) >= 0 &&
+    typeof steps === 'object' &&
+    steps !== null &&
+    AXIS_KEYS.every((axisKey) => Number.isInteger(steps[axisKey]))
+  );
+}
+
+function clampedStep({ axisKey, step }: { axisKey: AxisKey; step: number }): number {
+  return Math.min(Math.max(step, 0), AXES[axisKey].steps.length - 1);
+}
+
+// The store is the reader's own file and may be anything by the time it comes back, so a box is
+// rebuilt from nothing but its ordinal and three clamped steps, and dropped if the room is full.
+function restoreApp({ stored, sofar }: { stored: StoredApp; sofar: AppSpec[] }): AppSpec | null {
+  const vcpu = clampedStep({ axisKey: 'vcpu', step: stored.steps.vcpu });
+  const app = createApp({
+    ordinal: stored.ordinal,
+    steps: {
+      vcpu,
+      memory: Math.max(
+        clampedStep({ axisKey: 'memory', step: stored.steps.memory }),
+        memoryFloorFor(vcpu),
+      ),
+      volume: clampedStep({ axisKey: 'volume', step: stored.steps.volume }),
+    },
+  });
+  const room = [...sofar, app];
+  const fits = AXIS_KEYS.every(
+    (axisKey) => usedOn({ apps: room, axisKey }) <= AXES[axisKey].fleetLimit,
+  );
+  return fits ? app : null;
+}
+
+export function readStoredApps(): AppSpec[] | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw === null) {
+      return null;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    const apps: AppSpec[] = [];
+    for (const stored of parsed.slice(0, MOST_APPS_POSSIBLE)) {
+      const app = isStoredApp(stored) ? restoreApp({ stored, sofar: apps }) : null;
+      if (app !== null) {
+        apps.push(app);
+      }
+    }
+    return apps.length > 0 ? apps : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredApps(apps: AppSpec[]): void {
+  const stored: StoredApp[] = apps.map((app) => ({ ordinal: app.ordinal, steps: app.steps }));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+  } catch {
+    // A browser refusing to store is not worth telling anyone about.
+  }
+}
