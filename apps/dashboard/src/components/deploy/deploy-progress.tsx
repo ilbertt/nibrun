@@ -3,6 +3,7 @@ import { Button } from '@repo/ui/components/button';
 import { Spinner } from '@repo/ui/components/spinner';
 import { CheckIcon, TriangleAlertIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
+import { OverAppQuota } from '#components/deploy/over-app-quota.tsx';
 import { UploadMeter } from '#components/deploy/upload-meter.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import { type DeployPhase, isUploading } from '#lib/hooks/use-run-app.ts';
@@ -60,7 +61,9 @@ export function DeployProgress({ done, goToApp }: { done: ReactNode; goToApp: ()
       {run.reason !== undefined && (
         <p className="flex items-start gap-2 rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
           <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-          <span className="wrap-anywhere">{run.reason}</span>
+          <span className="wrap-anywhere">
+            {run.overQuota === undefined ? run.reason : <OverAppQuota refusal={run.overQuota} />}
+          </span>
         </p>
       )}
 

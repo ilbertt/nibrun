@@ -15,6 +15,7 @@ export {
   BASE_DOMAIN,
   DASHBOARD_SITE,
   HELLO_EMAIL,
+  helloMailto,
   PRODUCT_NAME,
   type Site,
   WWW_SITE,

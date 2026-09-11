@@ -33,7 +33,8 @@ import type {
   SealedConfigPatch,
   StoredAppConfig,
 } from '#lib/app-config.ts';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
+import { AppQuotaError } from '#lib/app-quota.ts';
+import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import type {
   AppHostnameRow,
@@ -1386,7 +1387,8 @@ describe('an owner at their limit is told so rather than retried', () => {
 
     const refused = createApp({ appsRepo });
 
-    await expect(refused).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(refused).rejects.toBeInstanceOf(AppQuotaError);
+    await expect(refused).rejects.toMatchObject({ appsAllowed: 1 });
     await expect(refused).rejects.toThrow('can have 1 app');
     // One offer and no second: nothing about a full account changes on the next roll of the dice.
     expect(appsRepo.offeredSlugs).toHaveLength(2);

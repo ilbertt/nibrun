@@ -25,9 +25,9 @@ import {
   toAppConfig,
 } from '#lib/app-config.ts';
 import { type PublicAppHostname, platformHostname, toAppHostname } from '#lib/app-hostname.ts';
-import { overAppQuota } from '#lib/app-quota.ts';
+import { AppQuotaError } from '#lib/app-quota.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -186,7 +186,7 @@ export class AppsService extends Service {
           if (allowed === null) {
             throw new Error('The owner refused an app has no quota.');
           }
-          throw new ForbiddenError(overAppQuota(allowed));
+          throw new AppQuotaError(allowed);
         }
         return toPublicApp(created);
       } catch (error) {

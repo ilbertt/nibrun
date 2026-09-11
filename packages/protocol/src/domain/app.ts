@@ -305,3 +305,15 @@ export const AppSchema = Type.Object({
 });
 
 export type App = typeof AppSchema.static;
+
+/**
+ * What an app past the account's limit is refused with. The number rides beside the sentence
+ * because it is the database's — a grant over the default is only visible here — and a client
+ * that can offer more than text asks for more against it.
+ */
+export const AppQuotaRefusalSchema = Type.Object({
+  error: Type.String(),
+  appsAllowed: Type.Integer({ minimum: 0 }),
+});
+
+export type AppQuotaRefusal = typeof AppQuotaRefusalSchema.static;
