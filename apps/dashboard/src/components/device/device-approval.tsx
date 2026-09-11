@@ -10,22 +10,6 @@ export function DeviceApproval({ userCode }: { userCode: string }) {
   const code = useDeviceCode(userCode);
   const decide = useDeviceDecision(userCode);
 
-  if (code.status === 'checking') {
-    return (
-      <DeviceCard failed={false} title="Sign in a terminal" description="Checking that code…">
-        {null}
-      </DeviceCard>
-    );
-  }
-
-  if (code.status === 'refused') {
-    return (
-      <DeviceCard failed title="Sign in failed" description={code.reason}>
-        {null}
-      </DeviceCard>
-    );
-  }
-
   if (decide.isSuccess) {
     return decide.variables === 'approve' ? (
       <DeviceCard failed={false} title="Signed in" description="You can close this page.">
@@ -37,6 +21,22 @@ export function DeviceApproval({ userCode }: { userCode: string }) {
         title="Sign in refused"
         description="Nothing was signed in. You can close this page."
       >
+        {null}
+      </DeviceCard>
+    );
+  }
+
+  if (code.status === 'checking') {
+    return (
+      <DeviceCard failed={false} title="Sign in a terminal" description="Checking that code…">
+        {null}
+      </DeviceCard>
+    );
+  }
+
+  if (code.status === 'refused') {
+    return (
+      <DeviceCard failed title="Sign in failed" description={code.reason}>
         {null}
       </DeviceCard>
     );
