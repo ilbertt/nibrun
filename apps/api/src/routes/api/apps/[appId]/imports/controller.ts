@@ -1,5 +1,6 @@
 import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
+import { Identity } from '#lib/auth/plugin.ts';
 import {
   CreateImportBodySchema,
   CreateImportResponseSchema,
@@ -10,7 +11,7 @@ export const AppsAppIdImportsController = new Elysia()
   .use(loggerPlugin('appsAppIdImportsController'))
   .use(AuthPlugin)
   .use(ImportsServicePlugin)
-  .guard({ auth: true })
+  .guard({ auth: Identity.Optional })
   // Created rather than OK: the import exists from here on, and what is left to do with it is send
   // the bytes to the url this answers with.
   .post(

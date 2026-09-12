@@ -1,5 +1,6 @@
 import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
+import { Identity } from '#lib/auth/plugin.ts';
 import { AppConfigPatchSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
 import { AppsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -7,7 +8,7 @@ export const AppsAppIdController = new Elysia()
   .use(loggerPlugin('appsAppIdController'))
   .use(AuthPlugin)
   .use(AppsServicePlugin)
-  .guard({ auth: true })
+  .guard({ auth: Identity.Optional })
   .get(
     '/apps/:appId',
     async ({ appsService, params, user, status }) => {
@@ -27,6 +28,7 @@ export const AppsAppIdController = new Elysia()
       const app = await appsService.updateConfig({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
+        isAnonymous: user.isAnonymous ?? false,
         patch: body,
       });
       return status(StatusMap.OK, app);

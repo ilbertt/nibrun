@@ -829,3 +829,56 @@ describe('an owner whose apps are given a lifetime is shown when each one ends',
     ]);
   });
 });
+
+/**
+ * The one statement behind a stranger becoming somebody: it has to move every app, the deleted
+ * ones included, because the key from an app to its owner refuses to let an owner go while any
+ * row still names them — and the stranger is deleted the moment the move is done.
+ */
+describe('every app a stranger held changes hands at once', () => {
+  const PASSERBY_ID = Value.Parse(OwnerIdSchema, 'passerby-claiming');
+  const SOMEBODY_ID = Value.Parse(OwnerIdSchema, 'somebody');
+
+  beforeAll(async () => {
+    for (const id of [PASSERBY_ID, SOMEBODY_ID]) {
+      await sql.unsafe(
+        `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+         VALUES ($1, $1, $2, true, now(), now())`,
+        [id, `${id}@example.com`],
+      );
+    }
+  });
+
+  async function createFor(slug: string): Promise<AppId> {
+    const label = Value.Parse(DnsLabelSchema, slug);
+    const created = requireCreated(
+      await repo.create({
+        ownerId: PASSERBY_ID,
+        slug: label,
+        hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+        config: { ...configWithDefaults(), environment: {} },
+      }),
+    );
+    return created.app.id;
+  }
+
+  test('the live ones and the deleted ones alike, and then the stranger can go', async () => {
+    const kept = await createFor('kept-swift');
+    const gone = await createFor('gone-swift');
+    await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [gone]);
+    const theirs = await createApp('theirs-swift');
+
+    const moved = await repo.reassign({ from: PASSERBY_ID, to: SOMEBODY_ID });
+
+    expect(moved.sort()).toEqual([kept, gone].sort());
+    expect(await repo.findById({ appId: kept, ownerId: SOMEBODY_ID })).not.toBeNull();
+    expect(await repo.findById({ appId: kept, ownerId: PASSERBY_ID })).toBeNull();
+    expect(await repo.findById({ appId: theirs, ownerId: OWNER_ID })).not.toBeNull();
+    await sql.unsafe('DELETE FROM auth."user" WHERE id = $1', [PASSERBY_ID]);
+    expect(await repo.appsAllowed({ ownerId: PASSERBY_ID })).toBeNull();
+  });
+
+  test('a stranger who held nothing moves nothing', async () => {
+    expect(await repo.reassign({ from: PASSERBY_ID, to: SOMEBODY_ID })).toEqual([]);
+  });
+});

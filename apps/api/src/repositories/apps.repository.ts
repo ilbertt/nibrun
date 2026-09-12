@@ -83,6 +83,7 @@ export abstract class AppsRepositoryContract {
   abstract isOwnedBy(input: OwnedApp): Promise<boolean>;
   abstract listPurgeable(input: { limit: number }): Promise<AppId[]>;
   abstract listExpirable(input: { limit: number }): Promise<ExpirableAppRow[]>;
+  abstract reassign(input: { from: OwnerId; to: OwnerId }): Promise<AppId[]>;
   abstract listLeftovers(input: { appId: AppId }): Promise<Leftovers>;
   abstract purge(input: { appId: AppId }): Promise<void>;
 }
@@ -603,6 +604,24 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return this.sql.SelectExpirableApps`
       SELECT x.app_id, x.owner_id FROM nibrun.expirable_apps x LIMIT ${limit}
     `;
+  }
+
+  /**
+   * Every app one owner holds becomes another's, deleted ones included: a deleted app keeps its
+   * row so its slug is never reissued, and that row names its owner with a key that refuses to
+   * let the owner go — so a person being deleted must leave none behind.
+   *
+   * The table rather than `live_apps` for the same reason, and no `updated_at` bump beyond what
+   * the trigger does: nothing about the app changed but whose it is.
+   */
+  async reassign({ from, to }: { from: OwnerId; to: OwnerId }): Promise<AppId[]> {
+    const rows = await this.sql.ReassignApps`
+      UPDATE nibrun.apps
+      SET owner_id = ${to}
+      WHERE owner_id = ${from}
+      RETURNING id
+    `;
+    return rows.map((row) => row.id);
   }
 
   /**

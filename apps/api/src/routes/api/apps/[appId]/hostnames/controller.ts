@@ -1,5 +1,6 @@
 import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap, t } from 'elysia';
+import { Identity } from '#lib/auth/plugin.ts';
 import {
   AddHostnameRequestSchema,
   RemoveHostnameQuerySchema,
@@ -11,7 +12,9 @@ export const AppsAppIdHostnamesController = new Elysia()
   .use(loggerPlugin('appsAppIdHostnamesController'))
   .use(AuthPlugin)
   .use(HostnamesServicePlugin)
-  .guard({ auth: true })
+  // A custom domain is a name on the public internet answering for whoever brought it, and a
+  // person with no identity is not handed one to answer for.
+  .guard({ auth: Identity.Required })
   /**
    * Created rather than accepted: the row exists and the edge knows the hostname. What is still
    * outstanding is the owner's own DNS, which is theirs to do — the response carries the record
