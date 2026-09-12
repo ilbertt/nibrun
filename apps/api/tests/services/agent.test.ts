@@ -94,6 +94,11 @@ class FakeAppsService {
     return Promise.resolve();
   }
 
+  expire(): Promise<void> {
+    this.trace.push('expire');
+    return Promise.resolve();
+  }
+
   finishDeletions(): Promise<void> {
     this.trace.push('finishDeletions');
     return Promise.resolve();
@@ -263,6 +268,7 @@ describe('a report is read by whatever owns what it talks about', () => {
       'recordDataInitialized',
       'recordComputeUsage',
       'completeDeletions',
+      'expire',
       'finishDeletions',
       'purgeDeleted',
     ]);

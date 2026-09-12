@@ -246,6 +246,8 @@ export interface ISelectCreatedAppResult {
     cpu_share: IAppUsageColumns["cpu_share"];
     /** When the guest was asked what it was spending, not when the report carrying it arrived. */
     compute_measured_at: IAppUsageColumns["compute_measured_at"];
+    /** When this app is due to be deleted. */
+    expires_at: Date | null;
 }
 
 /** Result of query `SelectAppsByOwner`. */
@@ -291,6 +293,8 @@ export interface ISelectAppsByOwnerResult {
     cpu_share: IAppUsageColumns["cpu_share"];
     /** When the guest was asked what it was spending, not when the report carrying it arrived. */
     compute_measured_at: IAppUsageColumns["compute_measured_at"];
+    /** When this app is due to be deleted. */
+    expires_at: Date | null;
 }
 
 /** Result of query `SelectAppById`. */
@@ -336,6 +340,8 @@ export interface ISelectAppByIdResult {
     cpu_share: IAppUsageColumns["cpu_share"];
     /** When the guest was asked what it was spending, not when the report carrying it arrived. */
     compute_measured_at: IAppUsageColumns["compute_measured_at"];
+    /** When this app is due to be deleted. */
+    expires_at: Date | null;
 }
 
 /** Result of query `SelectAppForConfigUpdate`. */
@@ -414,6 +420,8 @@ export interface ITouchAppAfterConfigPatchResult {
     cpu_share: IAppUsageColumns["cpu_share"];
     /** When the guest was asked what it was spending, not when the report carrying it arrived. */
     compute_measured_at: IAppUsageColumns["compute_measured_at"];
+    /** When this app is due to be deleted. */
+    expires_at: Date | null;
 }
 
 /** Result of query `SelectFinishableDeletion`. */
@@ -434,6 +442,12 @@ export interface IFinishDeletingAppResult {
 /** Result of query `SelectPurgeableApps`. */
 export interface ISelectPurgeableAppsResult {
     app_id: IAppsColumns["id"];
+}
+
+/** Result of query `SelectExpirableApps`. */
+export interface ISelectExpirableAppsResult {
+    app_id: IAppsColumns["id"];
+    owner_id: IAppsColumns["owner_id"];
 }
 
 /** Result of query `SelectUnsharedArtifactKeys`. */
@@ -517,6 +531,8 @@ export interface ISelectAppAfterStateChangeResult {
     cpu_share: IAppUsageColumns["cpu_share"];
     /** When the guest was asked what it was spending, not when the report carrying it arrived. */
     compute_measured_at: IAppUsageColumns["compute_measured_at"];
+    /** When this app is due to be deleted. */
+    expires_at: Date | null;
 }
 
 /** Result of query `InsertPendingArtifact`. */
@@ -978,6 +994,7 @@ export interface Queries {
     SelectFinishableDeletions: ISelectFinishableDeletionsResult;
     FinishDeletingApp: IFinishDeletingAppResult;
     SelectPurgeableApps: ISelectPurgeableAppsResult;
+    SelectExpirableApps: ISelectExpirableAppsResult;
     SelectUnsharedArtifactKeys: ISelectUnsharedArtifactKeysResult;
     SelectExportKeysByApp: ISelectExportKeysByAppResult;
     SelectImportKeysByApp: ISelectImportKeysByAppResult;
