@@ -408,6 +408,11 @@ export interface ISelectExpirableAppsResult {
     owner_id: IAppsColumns["owner_id"];
 }
 
+/** Result of query `ReassignApps`. */
+export interface IReassignAppsResult {
+    id: IAppsColumns["id"];
+}
+
 /** Result of query `SelectUnsharedArtifactKeys`. */
 export interface ISelectUnsharedArtifactKeysResult {
     /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
@@ -981,6 +986,7 @@ export interface Queries {
     FinishDeletingApp: IFinishDeletingAppResult;
     SelectPurgeableApps: ISelectPurgeableAppsResult;
     SelectExpirableApps: ISelectExpirableAppsResult;
+    ReassignApps: IReassignAppsResult;
     SelectUnsharedArtifactKeys: ISelectUnsharedArtifactKeysResult;
     SelectExportKeysByApp: ISelectExportKeysByAppResult;
     SelectImportKeysByApp: ISelectImportKeysByAppResult;

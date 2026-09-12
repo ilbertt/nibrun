@@ -1,5 +1,6 @@
 import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
+import { Identity } from '#lib/auth/plugin.ts';
 import { AppPatchSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
 import { AppsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -7,7 +8,6 @@ export const AppsAppIdController = new Elysia()
   .use(loggerPlugin('appsAppIdController'))
   .use(AuthPlugin)
   .use(AppsServicePlugin)
-  .guard({ auth: true })
   .get(
     '/apps/:appId',
     async ({ appsService, params, user, status }) => {
@@ -18,6 +18,7 @@ export const AppsAppIdController = new Elysia()
       return status(StatusMap.OK, app);
     },
     {
+      auth: Identity.Optional,
       response: { [StatusMap.OK]: AppResponseSchema },
     },
   )
@@ -32,6 +33,7 @@ export const AppsAppIdController = new Elysia()
       return status(StatusMap.OK, app);
     },
     {
+      auth: Identity.Required,
       body: AppPatchSchema,
       response: { [StatusMap.OK]: AppResponseSchema },
     },
@@ -48,6 +50,7 @@ export const AppsAppIdController = new Elysia()
       return status(StatusMap.Accepted, app);
     },
     {
+      auth: Identity.Required,
       response: { [StatusMap.Accepted]: AppResponseSchema },
     },
   );

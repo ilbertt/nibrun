@@ -137,7 +137,7 @@ const logsService = new LogsService({
   deploymentsRepo: deploymentsRepository,
 });
 
-export const auth = createAuth();
+export const auth = createAuth({ appsService });
 
 export const AuthPlugin = createAuthPlugin(auth);
 
