@@ -1,16 +1,15 @@
 import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
-import { authPlugin } from '#lib/auth/plugin.ts';
 import {
   CreateDeploymentBodySchema,
   DeploymentResponseSchema,
   ListDeploymentsResponseSchema,
 } from '#routes/api/apps/[appId]/deployments/model.ts';
-import { DeploymentsServicePlugin, loggerPlugin } from '#services/plugins.ts';
+import { AuthPlugin, DeploymentsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdDeploymentsController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsController'))
-  .use(authPlugin)
+  .use(AuthPlugin)
   .use(DeploymentsServicePlugin)
   .guard({ auth: true })
   .get(

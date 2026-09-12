@@ -7,9 +7,8 @@ import {
   Value,
 } from '@repo/protocol';
 import { Elysia, sse } from 'elysia';
-import { authPlugin } from '#lib/auth/plugin.ts';
 import { StreamLogsQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';
-import { LogsServicePlugin, loggerPlugin } from '#services/plugins.ts';
+import { AuthPlugin, LogsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 /**
  * A stream is closed after this long and the client reconnects, which is what keeps an
@@ -21,7 +20,7 @@ const MAX_STREAM_MS = MAX_STREAM_MINUTES * MS_PER_MINUTE;
 
 export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsDeploymentIdLogsController'))
-  .use(authPlugin)
+  .use(AuthPlugin)
   .use(LogsServicePlugin)
   .guard({ auth: true })
   .get(

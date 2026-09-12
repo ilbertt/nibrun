@@ -1,16 +1,15 @@
 import { OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
-import { authPlugin } from '#lib/auth/plugin.ts';
 import {
   AppResponseSchema,
   CreateAppRequestSchema,
   ListAppsResponseSchema,
 } from '#routes/api/apps/model.ts';
-import { AppsServicePlugin, loggerPlugin } from '#services/plugins.ts';
+import { AppsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsController = new Elysia()
   .use(loggerPlugin('appsController'))
-  .use(authPlugin)
+  .use(AuthPlugin)
   .use(AppsServicePlugin)
   .guard({ auth: true })
   .get(

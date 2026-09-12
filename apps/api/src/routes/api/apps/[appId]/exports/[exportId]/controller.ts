@@ -1,8 +1,7 @@
 import { AppIdSchema, ExportIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
-import { authPlugin } from '#lib/auth/plugin.ts';
 import { ExportResponseSchema } from '#routes/api/apps/[appId]/exports/model.ts';
-import { ExportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
+import { AuthPlugin, ExportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 /**
  * What a client polls. The download URL appears here once the host has written the bundle, and
@@ -11,7 +10,7 @@ import { ExportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
  */
 export const AppsAppIdExportsExportIdController = new Elysia()
   .use(loggerPlugin('appsAppIdExportsExportIdController'))
-  .use(authPlugin)
+  .use(AuthPlugin)
   .use(ExportsServicePlugin)
   .guard({ auth: true })
   .get(

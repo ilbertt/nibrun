@@ -7,9 +7,8 @@ import {
   Value,
 } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
-import { authPlugin } from '#lib/auth/plugin.ts';
 import { ReadDirectoryQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/model.ts';
-import { FilesystemServicePlugin, loggerPlugin } from '#services/plugins.ts';
+import { AuthPlugin, FilesystemServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 /**
  * Held open until a host answers, because a read is only performed when the host that holds the
@@ -23,7 +22,7 @@ const MAX_WAIT_MS = MAX_WAIT_SECONDS * MS_PER_SECOND;
 
 export const AppsAppIdDeploymentsDeploymentIdFilesystemController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsDeploymentIdFilesystemController'))
-  .use(authPlugin)
+  .use(AuthPlugin)
   .use(FilesystemServicePlugin)
   .guard({ auth: true })
   .get(
