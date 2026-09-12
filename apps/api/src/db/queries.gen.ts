@@ -1105,6 +1105,7 @@ export interface IUserColumns {
     image: string | null;
     createdAt: Date;
     updatedAt: Date;
+    isAnonymous: boolean | null;
 }
 
 /** Schema of `user`. */
@@ -1215,6 +1216,21 @@ export interface IAppConfigsWithEnvironmentTable {
     relationType: (typeof schema)["app_configs_with_environment"]["_relationType"];
     indexes: keyof (typeof schema)["app_configs_with_environment"]["_indexes"];
     constraints: keyof (typeof schema)["app_configs_with_environment"]["_constraints"];
+}
+
+/** Columns of `app_deadlines`. */
+export interface IAppDeadlinesColumns {
+    app_id: import("@repo/protocol").AppId;
+    /** When this app is due to be deleted. */
+    expires_at: Date;
+}
+
+/** Schema of `app_deadlines`. */
+export interface IAppDeadlinesTable {
+    columns: IAppDeadlinesColumns;
+    relationType: (typeof schema)["app_deadlines"]["_relationType"];
+    indexes: keyof (typeof schema)["app_deadlines"]["_indexes"];
+    constraints: keyof (typeof schema)["app_deadlines"]["_constraints"];
 }
 
 /** Columns of `app_hostnames`. */
@@ -1538,6 +1554,20 @@ export interface IDesiredVolumesTable {
     constraints: keyof (typeof schema)["desired_volumes"]["_constraints"];
 }
 
+/** Columns of `expirable_apps`. */
+export interface IExpirableAppsColumns {
+    app_id: import("@repo/protocol").AppId;
+    owner_id: import("@repo/protocol").OwnerId;
+}
+
+/** Schema of `expirable_apps`. */
+export interface IExpirableAppsTable {
+    columns: IExpirableAppsColumns;
+    relationType: (typeof schema)["expirable_apps"]["_relationType"];
+    indexes: keyof (typeof schema)["expirable_apps"]["_indexes"];
+    constraints: keyof (typeof schema)["expirable_apps"]["_constraints"];
+}
+
 /** Columns of `exports`. */
 export interface IExportsColumns {
     id: import("@repo/protocol").ExportId;
@@ -1637,6 +1667,8 @@ export interface IProfilesColumns {
     created_at: Date;
     updated_at: Date;
     quota_apps_max_count: number;
+    /** How long an app of this owner's is kept before it is deleted; null keeps it until the owner does. */
+    app_lifetime_seconds: number | null;
 }
 
 /** Schema of `profiles`. */
@@ -1748,7 +1780,8 @@ export const schema = {
             emailVerified: { _columnName: "emailVerified", _foreignKeys: {} },
             image: { _columnName: "image", _foreignKeys: {} },
             createdAt: { _columnName: "createdAt", _foreignKeys: {} },
-            updatedAt: { _columnName: "updatedAt", _foreignKeys: {} }
+            updatedAt: { _columnName: "updatedAt", _foreignKeys: {} },
+            isAnonymous: { _columnName: "isAnonymous", _foreignKeys: {} }
         },
         _indexes: {
             user_email_key: { _indexName: "user_email_key" },
@@ -1872,6 +1905,16 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} },
             environment_names: { _columnName: "environment_names", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
+    app_deadlines: {
+        _relationName: "app_deadlines",
+        _relationType: "view",
+        _columns: {
+            app_id: { _columnName: "app_id", _foreignKeys: {} },
+            expires_at: { _columnName: "expires_at", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -2161,6 +2204,16 @@ export const schema = {
         _indexes: {},
         _constraints: {}
     },
+    expirable_apps: {
+        _relationName: "expirable_apps",
+        _relationType: "view",
+        _columns: {
+            app_id: { _columnName: "app_id", _foreignKeys: {} },
+            owner_id: { _columnName: "owner_id", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
     exports: {
         _relationName: "exports",
         _relationType: "table",
@@ -2250,13 +2303,15 @@ export const schema = {
             owner_id: { _columnName: "owner_id", _foreignKeys: { profiles_owner_id_fkey: { _constraintName: "profiles_owner_id_fkey", _references: { _relationName: "user", _columnName: "id" } } } },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
-            quota_apps_max_count: { _columnName: "quota_apps_max_count", _foreignKeys: {} }
+            quota_apps_max_count: { _columnName: "quota_apps_max_count", _foreignKeys: {} },
+            app_lifetime_seconds: { _columnName: "app_lifetime_seconds", _foreignKeys: {} }
         },
         _indexes: {
             profiles_owner_id_key: { _indexName: "profiles_owner_id_key" },
             profiles_pkey: { _indexName: "profiles_pkey" }
         },
         _constraints: {
+            profiles_app_lifetime_seconds_check: { _constraintName: "profiles_app_lifetime_seconds_check" },
             profiles_owner_id_fkey: { _constraintName: "profiles_owner_id_fkey" },
             profiles_owner_id_key: { _constraintName: "profiles_owner_id_key" },
             profiles_pkey: { _constraintName: "profiles_pkey" },
@@ -2283,6 +2338,7 @@ export interface Tables {
     app_config_environment: IAppConfigEnvironmentTable;
     app_configs: IAppConfigsTable;
     app_configs_with_environment: IAppConfigsWithEnvironmentTable;
+    app_deadlines: IAppDeadlinesTable;
     app_hostnames: IAppHostnamesTable;
     app_quotas: IAppQuotasTable;
     app_usage: IAppUsageTable;
@@ -2296,6 +2352,7 @@ export interface Tables {
     desired_exports: IDesiredExportsTable;
     desired_hostnames: IDesiredHostnamesTable;
     desired_volumes: IDesiredVolumesTable;
+    expirable_apps: IExpirableAppsTable;
     exports: IExportsTable;
     finishable_deletions: IFinishableDeletionsTable;
     imports: IImportsTable;
