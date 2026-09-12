@@ -50,6 +50,7 @@ API_BETTER_AUTH_SECRET="$(secret api_better_auth_secret)"
 API_TENANT_SECRETS_KEY="$(secret api_tenant_secrets_key)"
 API_GITHUB_CLIENT_SECRET="$(secret api_github_client_secret)"
 API_CLOUDFLARE_API_TOKEN="$(secret api_cloudflare_api_token)"
+API_TURNSTILE_SECRET_KEY="$(secret api_turnstile_secret_key)"
 API_S3_ACCESS_KEY_ID="$(secret api_s3_access_key_id)"
 API_S3_SECRET_ACCESS_KEY="$(secret api_s3_secret_access_key)"
 PGWEB_AUTH_USER="$(secret pgweb_auth_user)"
@@ -89,6 +90,7 @@ API_GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
 APP_HOST_DOMAIN=${APP_HOST_DOMAIN}
 API_CLOUDFLARE_API_TOKEN=${API_CLOUDFLARE_API_TOKEN}
 API_CLOUDFLARE_ZONE_ID=${API_CLOUDFLARE_ZONE_ID}
+API_TURNSTILE_SECRET_KEY=${API_TURNSTILE_SECRET_KEY}
 
 API_DB_USER=${API_DB_USER}
 API_DB_PASSWORD=${API_DB_PASSWORD}

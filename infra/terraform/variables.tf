@@ -222,6 +222,20 @@ variable "api_github_client_secret" {
   }
 }
 
+# The secret of the Turnstile widget the dashboard shows a stranger before
+# they sign in without an account. Created by hand in the Cloudflare dashboard
+# like the OAuth App is; its site key is public and ships inside the dashboard.
+variable "api_turnstile_secret_key" {
+  type        = string
+  sensitive   = true
+  description = "Secret key of the Turnstile widget on the dashboard's hostname. CI passes the API_TURNSTILE_SECRET_KEY repository secret through."
+
+  validation {
+    condition     = trimspace(var.api_turnstile_secret_key) != ""
+    error_message = "api_turnstile_secret_key must not be empty."
+  }
+}
+
 # The Cloudflare Origin Certificate the proxy serves, and its key. Issued by
 # hand like the OAuth App credentials, and split the same way: the certificate
 # is handed to every client that connects, so it enters from a repository

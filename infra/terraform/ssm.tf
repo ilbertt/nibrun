@@ -80,6 +80,18 @@ resource "aws_ssm_parameter" "api_cloudflare_api_token" {
   }
 }
 
+# The Turnstile secret the api verifies a stranger's challenge with. Here for
+# the reason the OAuth App secret is.
+resource "aws_ssm_parameter" "api_turnstile_secret_key" {
+  name  = "${var.ssm_secret_prefix}/api_turnstile_secret_key"
+  type  = "SecureString"
+  value = var.api_turnstile_secret_key
+
+  tags = {
+    Name = "${local.resource_name_prefix}-api-turnstile-secret-key"
+  }
+}
+
 # The proxy's TLS material. Both halves land here rather than in the deploy's
 # own environment, for the same reason the OAuth App secret does — and the
 # certificate rides along even though it is public, so the box has one way to

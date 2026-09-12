@@ -72,6 +72,11 @@ Custom domains, in the `app_domain` zone only:
 Unlike every other Cloudflare step here, registering a hostname cannot be manual — a brought
 domain arrives whenever an owner adds one — which is what the token is for.
 
+And on the dashboard's zone, a **Turnstile widget** (Managed) for the dashboard's hostname: its
+secret key as the `API_TURNSTILE_SECRET_KEY` repository secret, its site key in the dashboard's
+build. It stands in front of signing in without an account, which is the one sign-in nothing
+else vouches for.
+
 ## Deploying
 
 `.github/workflows/cd.yml`, on every push to main. No SSH and no key material in CI: the last leg

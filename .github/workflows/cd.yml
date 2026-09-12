@@ -106,6 +106,7 @@ jobs:
           TF_VAR_www_hostname: ${{ vars.WWW_HOSTNAME }}
           TF_VAR_api_github_client_id: ${{ vars.API_GITHUB_CLIENT_ID }}
           TF_VAR_api_github_client_secret: ${{ secrets.API_GITHUB_CLIENT_SECRET }}
+          TF_VAR_api_turnstile_secret_key: ${{ secrets.API_TURNSTILE_SECRET_KEY }}
           TF_VAR_caddy_tls_cert: ${{ vars.CADDY_TLS_CERT }}
           TF_VAR_caddy_tls_key: ${{ secrets.CADDY_TLS_KEY }}
           TF_VAR_app_host_caddy_tls_cert: ${{ vars.APP_HOST_CADDY_TLS_CERT }}
