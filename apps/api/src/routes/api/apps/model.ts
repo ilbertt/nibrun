@@ -10,6 +10,7 @@ import {
   REDACTED,
   TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
+  TimestampSchema,
 } from '@repo/protocol';
 import { t } from 'elysia';
 
@@ -74,7 +75,8 @@ export const AppHostnameResponseSchema = t.Composite([
 //
 // `volumeUsage` is nullable rather than optional: an app that has never been measured is a
 // different thing from a field a client should go looking for, and the two read the same once a
-// key is simply missing.
+// key is simply missing. `expiresAt` for the same reason — most apps are kept, and a client
+// deciding whether to show a deadline should be told there is none rather than left to infer it.
 export const AppResponseSchema = t.Composite([
   t.Omit(AppSchema, ['config', 'hostnames']),
   t.Object({
@@ -82,6 +84,9 @@ export const AppResponseSchema = t.Composite([
     hostnames: t.Array(AppHostnameResponseSchema, { minItems: MIN_HOSTNAMES }),
     volumeUsage: t.Nullable(FilesystemUsageSchema),
     computeUsage: t.Nullable(ComputeUsageSchema),
+    expiresAt: t.Nullable(TimestampSchema, {
+      description: 'When this app will be deleted, or null when it is kept until its owner does.',
+    }),
   }),
 ]);
 

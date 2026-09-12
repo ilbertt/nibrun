@@ -145,6 +145,10 @@ export class AgentService extends Service {
     await this.appsService.recordComputeUsage({ instances: reported.instances });
     await this.appsService.completeDeletions({ volumes: reported.volumes });
     await this.exportsService.applyHostReport({ reported });
+    // Nothing to do with this report: an app whose time is up is found by the clock, and the
+    // report is the clock. Before the two below, so one that never had a filesystem is finished
+    // and purged by this pass rather than the next.
+    await this.appsService.expire();
     // Last, because what an app leaves behind is only safe to remove once a host has said its
     // filesystem is gone — and `completeDeletions` above is where this report says so.
     await this.appsService.finishDeletions();

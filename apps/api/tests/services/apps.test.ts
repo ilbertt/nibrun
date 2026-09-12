@@ -44,6 +44,7 @@ import type {
   AppRow,
   AppsRepositoryContract,
   CreatedApp,
+  ExpirableAppRow,
   Leftovers,
   NewApp,
   StateChange,
@@ -110,6 +111,7 @@ function appRow(slug: DnsLabel): AppRow {
     memory_used_bytes: null,
     cpu_share: null,
     compute_measured_at: null,
+    expires_at: null,
     ...configColumns(DEFAULT_CONFIG),
   };
 }
@@ -131,8 +133,13 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly forgotten: AppId[][] = [];
   deleting: AppId[] = [];
   purgeable: AppId[] = [];
+  expirable: ExpirableAppRow[] = [];
   deployedApps: AppId[] = [];
   owns = false;
+  /** Apps that changed hands: no longer this owner's whatever `owns` says of the rest. */
+  claimed: AppId[] = [];
+  /** When the app is due to go, which is null for every app whose owner keeps it. */
+  dueAt: Date | null = null;
   /** How many apps this owner is holding, which only a test that creates several ever moves. */
   held = 0;
   /** More than any test makes, except the ones that lower it because they are about the limit. */
@@ -229,6 +236,7 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve({
       ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)),
       ...configColumns(this.current),
+      expires_at: this.dueAt,
     });
   }
 
@@ -263,7 +271,7 @@ class StubAppsRepository implements AppsRepositoryContract {
   }
 
   updateState({ appId, state, from }: StateChange): Promise<AppRow | null> {
-    if (!this.owns) {
+    if (!this.owns || this.claimed.includes(appId)) {
       return Promise.resolve(null);
     }
     // The predicate the real statement carries, said the same way: an app in none of the states
@@ -288,6 +296,10 @@ class StubAppsRepository implements AppsRepositoryContract {
 
   listPurgeable({ limit }: { limit: number }): Promise<AppId[]> {
     return Promise.resolve(this.purgeable.slice(0, limit));
+  }
+
+  listExpirable({ limit }: { limit: number }): Promise<ExpirableAppRow[]> {
+    return Promise.resolve(this.expirable.slice(0, limit));
   }
 
   listLeftovers({ appId }: { appId: AppId }): Promise<Leftovers> {
@@ -1370,6 +1382,84 @@ describe('a deletion left stuck before any of this existed is finished when one 
     await serviceWith({ appsRepo }).finishDeletions();
 
     expect(appsRepo.deleted).toEqual([]);
+  });
+});
+
+/**
+ * Which apps are due is SQL, exercised against a database in `tests/repositories/profiles.test.ts`.
+ * What this holds the service to is what it does with one: the deletion its owner would have
+ * asked for, as that owner, and nothing for an app that stopped being theirs on the way.
+ */
+describe('an app whose time is up is deleted as its owner would delete it', () => {
+  const due: ExpirableAppRow = { app_id: APP_ID, owner_id: OWNER_ID };
+
+  test('a host report is what deletes it, exports and all', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const exportsRepo = new StubExportCancellation();
+    appsRepo.owns = true;
+    appsRepo.expirable = [due];
+
+    await serviceWith({ appsRepo, exportsRepo }).expire();
+
+    // Never deployed, so there is no host to wait for and the deletion finishes as it is asked.
+    expect(appsRepo.deleted).toEqual([APP_ID]);
+    expect(exportsRepo.cancelled).toEqual([APP_ID]);
+  });
+
+  test('one with a filesystem is left deleting, for the host holding it to finish', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    appsRepo.expirable = [due];
+    appsRepo.deployedApps = [APP_ID];
+
+    await serviceWith({ appsRepo }).expire();
+
+    expect(appsRepo.deleting).toEqual([APP_ID]);
+    expect(appsRepo.deleted).toEqual([]);
+  });
+
+  // The listing names an owner, and the deletion is scoped on them: an app that changed hands
+  // between the two is one that owner can no longer name, and it is passed over rather than
+  // deleted on the strength of a deadline it no longer has.
+  test('an app that changed hands is passed over, and the one after it is not', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    appsRepo.expirable = [due, { app_id: SECOND_APP_ID, owner_id: OWNER_ID }];
+    appsRepo.claimed = [APP_ID];
+
+    await serviceWith({ appsRepo }).expire();
+
+    expect(appsRepo.deleted).toEqual([SECOND_APP_ID]);
+  });
+
+  test('nothing due does nothing', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).expire();
+
+    expect(appsRepo.deleting).toEqual([]);
+    expect(appsRepo.deleted).toEqual([]);
+  });
+});
+
+describe('an owner is told when their app is due to go', () => {
+  const owned = { appId: APP_ID, ownerId: OWNER_ID };
+
+  test('an app its owner keeps has no deadline', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    expect((await serviceWith({ appsRepo }).get(owned)).expiresAt).toBeNull();
+  });
+
+  test('an app with a lifetime says when it ends', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    appsRepo.dueAt = new Date('2026-09-12T12:00:00.000Z');
+
+    expect((await serviceWith({ appsRepo }).get(owned)).expiresAt).toBe(
+      Value.Parse(TimestampSchema, '2026-09-12T12:00:00.000Z'),
+    );
   });
 });
 

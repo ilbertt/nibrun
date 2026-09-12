@@ -765,3 +765,67 @@ describe('an owner may have the apps they were given and no more', () => {
     expect(await repo.appsAllowed({ ownerId: HOARDER_ID })).toBe(BY_DEFAULT);
   });
 });
+
+/**
+ * The deadline is decided in SQL from the profile, so the only place to see it reach an app is
+ * the real schema: on every read an owner makes of their app, and in the listing the sweep reads.
+ */
+describe('an owner whose apps are given a lifetime is shown when each one ends', () => {
+  const PASSERBY_ID = Value.Parse(OwnerIdSchema, 'passerby');
+  const AN_HOUR_SECONDS = 3600;
+  const MS_PER_SECOND = 1000;
+
+  beforeAll(async () => {
+    await sql.unsafe(
+      `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+       VALUES ($1, $1, $2, true, now(), now())`,
+      [PASSERBY_ID, `${PASSERBY_ID}@example.com`],
+    );
+    await sql.unsafe('UPDATE nibrun.profiles SET app_lifetime_seconds = $2 WHERE owner_id = $1', [
+      PASSERBY_ID,
+      AN_HOUR_SECONDS,
+    ]);
+  });
+
+  test('an app of theirs carries its deadline on every read, an hour from its creation', async () => {
+    const slug = Value.Parse(DnsLabelSchema, 'passing-tern');
+    const created = requireCreated(
+      await repo.create({
+        ownerId: PASSERBY_ID,
+        slug,
+        hostname: Value.Parse(HostnameSchema, `${slug}.apps.example.com`),
+        config: { ...configWithDefaults(), environment: {} },
+      }),
+    );
+    const due = created.app.created_at.getTime() + AN_HOUR_SECONDS * MS_PER_SECOND;
+
+    expect(created.app.expires_at?.getTime()).toBe(due);
+    const found = await repo.findById({ appId: created.app.id, ownerId: PASSERBY_ID });
+    expect(found?.expires_at?.getTime()).toBe(due);
+    const listed = await repo.listByOwner({ ownerId: PASSERBY_ID });
+    expect(listed.map((app) => app.expires_at?.getTime())).toEqual([due]);
+  });
+
+  test('an app of an owner who keeps theirs has none', async () => {
+    const appId = await createApp('kept-tern');
+
+    expect((await repo.findById({ appId, ownerId: OWNER_ID }))?.expires_at).toBeNull();
+  });
+
+  /** `created_at` is derived from the id, so an app past its hour is one whose id was minted there. */
+  test('the sweep is handed each app past its deadline together with its owner', async () => {
+    const [row] = (await sql.unsafe(
+      `INSERT INTO nibrun.apps (id, owner_id, slug)
+       VALUES (uuidv7('-2 hours'::interval), $1, 'passed-tern')
+       RETURNING id`,
+      [PASSERBY_ID],
+    )) as Array<{ id: AppId }>;
+    if (!row) {
+      throw new Error('Inserting into nibrun.apps returned no row.');
+    }
+
+    expect(await repo.listExpirable({ limit: 10 })).toEqual([
+      { app_id: row.id, owner_id: PASSERBY_ID },
+    ]);
+  });
+});

@@ -28,6 +28,8 @@ const TEXT_ARRAY: ArrayType = 'TEXT';
 
 export type AppRow = Queries['SelectAppById'];
 
+export type ExpirableAppRow = Queries['SelectExpirableApps'];
+
 export type CreatedApp = { app: AppRow; hostnames: AppHostnameRow[] };
 
 export type NewApp = {
@@ -80,6 +82,7 @@ export abstract class AppsRepositoryContract {
   abstract listFinishableDeletions(input: { limit: number }): Promise<AppId[]>;
   abstract isOwnedBy(input: OwnedApp): Promise<boolean>;
   abstract listPurgeable(input: { limit: number }): Promise<AppId[]>;
+  abstract listExpirable(input: { limit: number }): Promise<ExpirableAppRow[]>;
   abstract listLeftovers(input: { appId: AppId }): Promise<Leftovers>;
   abstract purge(input: { appId: AppId }): Promise<void>;
 }
@@ -224,13 +227,15 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
                u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
-               u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at
+               u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
+               d.expires_at
         FROM nibrun.live_apps a
         JOIN LATERAL (
           SELECT * FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
         LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
+        LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
         WHERE a.id = ${inserted.id} AND a.owner_id = ${ownerId}
       `;
       if (!app) {
@@ -253,13 +258,15 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
              u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
-             u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at
+             u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
+             d.expires_at
       FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
       LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
+      LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
       WHERE a.owner_id = ${ownerId}
       ORDER BY a.created_at DESC
     `;
@@ -407,13 +414,15 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
              u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
-             u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at
+             u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
+             d.expires_at
       FROM nibrun.live_apps a
       JOIN LATERAL (
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
       LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
+      LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
     `;
     return app ?? null;
@@ -500,6 +509,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         SET updated_at = now()
         FROM nibrun.app_configs_with_environment c
         LEFT JOIN nibrun.app_usage u ON u.app_id = c.app_id
+        LEFT JOIN nibrun.app_deadlines d ON d.app_id = c.app_id
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND c.id = ${inserted.id}
         RETURNING a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
                   a.created_at, a.updated_at,
@@ -510,7 +520,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                   c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                   c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
                   u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
-                  u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at
+                  u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
+                  d.expires_at
       `;
       return app ?? null;
     });
@@ -582,6 +593,16 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       SELECT p.app_id FROM nibrun.purgeable_apps p LIMIT ${limit}
     `;
     return rows.map((row) => row.app_id);
+  }
+
+  /**
+   * The owner comes with the app because the deletion is done as them: every statement moving an
+   * app scopes on its owner, and this is the one deletion no owner asks for.
+   */
+  listExpirable({ limit }: { limit: number }): Promise<ExpirableAppRow[]> {
+    return this.sql.SelectExpirableApps`
+      SELECT x.app_id, x.owner_id FROM nibrun.expirable_apps x LIMIT ${limit}
+    `;
   }
 
   /**
@@ -689,13 +710,15 @@ async function appAfterStateChange({
            c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
            c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
            u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
-           u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at
+           u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
+           d.expires_at
     FROM nibrun.live_apps a
     JOIN LATERAL (
       SELECT * FROM nibrun.app_configs_with_environment c
       WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
     ) c ON true
     LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
+    LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
   `;
   if (!app) {

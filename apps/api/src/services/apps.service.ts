@@ -13,6 +13,7 @@ import {
   type ReportedInstance,
   type ReportedVolume,
   type TenantEnvironment,
+  type Timestamp,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
 import {
@@ -51,6 +52,8 @@ export type PublicApp = Omit<App, 'config' | 'hostnames'> & {
   /** `null` until a host has measured the filesystem, which it cannot while nothing mounts it. */
   volumeUsage: FilesystemUsage | null;
   computeUsage: ComputeUsage | null;
+  /** When the app will be deleted, where its owner's profile gives it a lifetime; `null` is kept. */
+  expiresAt: Timestamp | null;
 };
 
 type AppWithHostnames = { app: AppRow; hostnames: readonly AppHostnameRow[] };
@@ -100,6 +103,12 @@ const PURGE_BATCH = 8;
  * finish itself ever land here, so this drains a backlog that never grows.
  */
 const FINISH_BATCH = 8;
+
+/**
+ * How many expired apps one host report deletes. Small for the reason `PURGE_BATCH` is, and a
+ * backlog grows by one app per hour of strangers arriving — the next report takes the next batch.
+ */
+const EXPIRE_BATCH = 8;
 
 export class AppsService extends Service {
   private readonly appsRepo: AppsRepositoryContract;
@@ -550,6 +559,40 @@ export class AppsService extends Service {
     }
     return finished;
   }
+
+  /**
+   * An app whose lifetime is up is deleted the way its owner would delete it — the same state
+   * change, the same export ended, the same wait for the host holding its filesystem — as that
+   * owner, because every statement that moves an app scopes on one.
+   *
+   * Found by the deadline having passed rather than remembered as owed, so a pass that fails part
+   * way is retried by the next report finding the same app still listed.
+   */
+  async expire(): Promise<void> {
+    const due = await this.appsRepo.listExpirable({ limit: EXPIRE_BATCH });
+    for (const row of due) {
+      await this.expireApp({ appId: row.app_id, ownerId: row.owner_id });
+    }
+  }
+
+  /**
+   * Not found is the one answer this expects: an app that changed hands between the listing and
+   * the deletion is one its old owner can no longer name, and the scoping is what keeps a deadline
+   * it no longer has from deleting it. Anything else is logged rather than thrown, for the reason
+   * `purgeApp` gives — this runs on the way through a host report.
+   */
+  private async expireApp({ appId, ownerId }: OwnedApp): Promise<void> {
+    try {
+      await this.delete({ appId, ownerId });
+      this.logger.info('app expired', { appId, ownerId });
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        this.logger.info('expired app was claimed or already going', { appId, ownerId });
+        return;
+      }
+      this.logger.error('deleting an expired app failed', { appId, error });
+    }
+  }
 }
 
 /**
@@ -653,6 +696,7 @@ function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
     config: toAppConfig(app),
     volumeUsage: toVolumeUsage(app),
     computeUsage: toComputeUsage(app),
+    expiresAt: app.expires_at === null ? null : toTimestamp(app.expires_at),
     state: app.state,
     activation: app.activation,
     idleTimeoutMs: app.idle_timeout_ms,
