@@ -7,6 +7,7 @@ import {
   Value,
 } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
+import { Identity } from '#lib/auth/plugin.ts';
 import { ReadDirectoryQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/model.ts';
 import { AuthPlugin, FilesystemServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -24,7 +25,7 @@ export const AppsAppIdDeploymentsDeploymentIdFilesystemController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsDeploymentIdFilesystemController'))
   .use(AuthPlugin)
   .use(FilesystemServicePlugin)
-  .guard({ auth: true })
+  .guard({ auth: Identity.Optional })
   .get(
     '/apps/:appId/deployments/:deploymentId/filesystem',
     async ({ filesystemService, params, query, user, request, status }) => {

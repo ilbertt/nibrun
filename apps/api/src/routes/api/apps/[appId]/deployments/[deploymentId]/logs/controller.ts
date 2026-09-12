@@ -7,6 +7,7 @@ import {
   Value,
 } from '@repo/protocol';
 import { Elysia, sse } from 'elysia';
+import { Identity } from '#lib/auth/plugin.ts';
 import { StreamLogsQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';
 import { AuthPlugin, LogsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -22,7 +23,7 @@ export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsDeploymentIdLogsController'))
   .use(AuthPlugin)
   .use(LogsServicePlugin)
-  .guard({ auth: true })
+  .guard({ auth: Identity.Optional })
   .get(
     '/apps/:appId/deployments/:deploymentId/logs',
     // Not a generator itself: the ownership check has to answer before anything is streamed, and

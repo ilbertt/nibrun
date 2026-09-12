@@ -1,5 +1,6 @@
 import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
+import { Identity } from '#lib/auth/plugin.ts';
 import {
   CreateArtifactBodySchema,
   CreateArtifactResponseSchema,
@@ -11,7 +12,7 @@ export const AppsAppIdArtifactsController = new Elysia()
   .use(loggerPlugin('appsAppIdArtifactsController'))
   .use(AuthPlugin)
   .use(ArtifactsServicePlugin)
-  .guard({ auth: true })
+  .guard({ auth: Identity.Optional })
   .get(
     '/apps/:appId/artifacts',
     async ({ artifactsService, params, user, status }) => {
