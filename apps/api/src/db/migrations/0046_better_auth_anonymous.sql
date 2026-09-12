@@ -6,6 +6,6 @@
 -- between a run without the plugin and a run with it, spelled as the CLI spelled it. From
 -- `apps/api` with its environment set, at the version of better-auth installed:
 --
---   bunx --bun auth@1.7.3 generate --config src/lib/auth/better-auth.ts --output <file> -y
+--   bunx --bun auth@1.7.3 generate --config scripts/auth-schema.ts --output <file> -y
 
 ALTER TABLE "auth"."user" ADD COLUMN "isAnonymous" boolean;

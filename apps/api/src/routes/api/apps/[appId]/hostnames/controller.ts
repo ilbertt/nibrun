@@ -1,16 +1,15 @@
 import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap, t } from 'elysia';
-import { authPlugin } from '#lib/auth/plugin.ts';
 import {
   AddHostnameRequestSchema,
   RemoveHostnameQuerySchema,
 } from '#routes/api/apps/[appId]/hostnames/model.ts';
 import { AppHostnameResponseSchema } from '#routes/api/apps/model.ts';
-import { HostnamesServicePlugin, loggerPlugin } from '#services/plugins.ts';
+import { AuthPlugin, HostnamesServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdHostnamesController = new Elysia()
   .use(loggerPlugin('appsAppIdHostnamesController'))
-  .use(authPlugin)
+  .use(AuthPlugin)
   .use(HostnamesServicePlugin)
   .guard({ auth: true })
   /**

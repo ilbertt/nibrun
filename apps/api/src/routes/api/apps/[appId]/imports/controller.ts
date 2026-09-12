@@ -1,15 +1,14 @@
 import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
-import { authPlugin } from '#lib/auth/plugin.ts';
 import {
   CreateImportBodySchema,
   CreateImportResponseSchema,
 } from '#routes/api/apps/[appId]/imports/model.ts';
-import { ImportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
+import { AuthPlugin, ImportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdImportsController = new Elysia()
   .use(loggerPlugin('appsAppIdImportsController'))
-  .use(authPlugin)
+  .use(AuthPlugin)
   .use(ImportsServicePlugin)
   .guard({ auth: true })
   // Created rather than OK: the import exists from here on, and what is left to do with it is send

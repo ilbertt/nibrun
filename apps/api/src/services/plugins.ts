@@ -1,5 +1,7 @@
 import { Elysia } from 'elysia';
 import { sql } from '#db/client.ts';
+import { createAuth } from '#lib/auth/better-auth.ts';
+import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { CloudflareClient } from '#lib/cloudflare/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
@@ -134,6 +136,10 @@ const logsService = new LogsService({
   logsRepo: logsRepository,
   deploymentsRepo: deploymentsRepository,
 });
+
+export const auth = createAuth();
+
+export const AuthPlugin = createAuthPlugin(auth);
 
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);
