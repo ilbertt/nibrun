@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { type Hostname, HostnameSchema, isValidMessage } from '@repo/protocol';
-import { isPlatformHostname, platformHostname } from '#lib/app-hostname.ts';
+import { type Hostname, HostnameSchema, isValidMessage, Value } from '@repo/protocol';
+import { dcvMethodFor, isPlatformHostname, platformHostname } from '#lib/app-hostname.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
 
 const APP_HOST_DOMAIN = 'apps.example.com';
@@ -56,5 +56,23 @@ describe('a hostname the platform hands out is not one an owner may bring', () =
 
   test('an ordinary brought domain is allowed', () => {
     expect(brought('app.example.dev')).toBe(true);
+  });
+});
+
+describe('a hostname is proved the way its place in DNS allows', () => {
+  function hostname(value: string): Hostname {
+    return Value.Parse(HostnameSchema, value);
+  }
+
+  test('a subdomain by delegation, which issues the certificate before traffic moves', () => {
+    expect(dcvMethodFor(hostname('app.example.dev'))).toBe('txt');
+    expect(dcvMethodFor(hostname('www.example.co.uk'))).toBe('txt');
+  });
+
+  // A zone on Cloudflare answers TXT at `_acme-challenge.<apex>` from its own certificate's
+  // records rather than the owner's CNAME, so delegation there waits on Cloudflare, not the owner.
+  test('an apex over HTTP, which asks nothing of the name the zone itself uses', () => {
+    expect(dcvMethodFor(hostname('example.dev'))).toBe('http');
+    expect(dcvMethodFor(hostname('example.co.uk'))).toBe('http');
   });
 });
