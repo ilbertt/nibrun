@@ -66,6 +66,9 @@ export const AppHostnameResponseSchema = t.Composite([
     // Absent on a platform hostname, which the wildcard certificate already covers, and until
     // the edge has answered with a target for a custom one.
     dcvTarget: t.Nullable(t.String()),
+    // In the edge's own words, because they name the record still missing. Empty once nothing is,
+    // and while the edge has not been asked yet.
+    edgeErrors: t.Array(t.String()),
   }),
 ]);
 

@@ -12,19 +12,11 @@ import {
   type ObjectKey,
   type OwnerId,
 } from '@repo/protocol';
-import type { ArrayType } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
-import { Repository } from '#repositories/repository.ts';
-
-/**
- * `sql.array` encodes as JSON when the element type is left out, and `text[]` reads that JSON
- * back element by element — so the arguments would arrive quoted rather than rejected. Naming
- * the type is what makes the column and the parameter agree.
- */
-const TEXT_ARRAY: ArrayType = 'TEXT';
+import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
 export type AppRow = Queries['SelectAppById'];
 
@@ -210,7 +202,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       const [hostnameRow] = await tx.InsertAppHostname`
         INSERT INTO nibrun.app_hostnames (app_id, hostname, kind, state)
         VALUES (${inserted.id}, ${hostname}, ${PLATFORM_KIND}, ${ACTIVE_STATE})
-        RETURNING hostname, kind, state, dcv_target
+        RETURNING hostname, kind, state, dcv_target, edge_errors
       `;
       if (!hostnameRow) {
         throw new Error('Inserting into nibrun.app_hostnames returned no row.');

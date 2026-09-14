@@ -102,6 +102,8 @@ export interface ISelectAppHostnamesByOwnerResult {
     state: IAppHostnamesColumns["state"];
     /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
     dcv_target: IAppHostnamesColumns["dcv_target"];
+    /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
+    edge_errors: IAppHostnamesColumns["edge_errors"];
 }
 
 /** Result of query `SelectAppHostnamesByApp`. */
@@ -111,6 +113,8 @@ export interface ISelectAppHostnamesByAppResult {
     state: IAppHostnamesColumns["state"];
     /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
     dcv_target: IAppHostnamesColumns["dcv_target"];
+    /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
+    edge_errors: IAppHostnamesColumns["edge_errors"];
 }
 
 /** Result of query `InsertCustomAppHostname`. */
@@ -120,6 +124,8 @@ export interface IInsertCustomAppHostnameResult {
     state: IAppHostnamesColumns["state"];
     /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
     dcv_target: IAppHostnamesColumns["dcv_target"];
+    /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
+    edge_errors: IAppHostnamesColumns["edge_errors"];
 }
 
 /** Result of query `UpdateCustomAppHostnameEdge`. */
@@ -129,6 +135,8 @@ export interface IUpdateCustomAppHostnameEdgeResult {
     state: IAppHostnamesColumns["state"];
     /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
     dcv_target: IAppHostnamesColumns["dcv_target"];
+    /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
+    edge_errors: IAppHostnamesColumns["edge_errors"];
 }
 
 /** Result of query `UpdateCustomAppHostnameState`. */
@@ -201,6 +209,8 @@ export interface IInsertAppHostnameResult {
     state: IAppHostnamesColumns["state"];
     /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
     dcv_target: IAppHostnamesColumns["dcv_target"];
+    /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
+    edge_errors: IAppHostnamesColumns["edge_errors"];
 }
 
 /** Result of query `SelectCreatedApp`. */
@@ -1264,6 +1274,12 @@ export interface IAppHostnamesColumns {
     cloudflare_id: string | null;
     /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
     dcv_target: string | null;
+    /** The routing half as the edge last reported it, in its vocabulary. Absent for a platform hostname, and until the edge has been asked. */
+    edge_status: string | null;
+    /** The certificate half as the edge last reported it, in its vocabulary. Absent for a platform hostname, and until the edge has been asked. */
+    edge_ssl_status: string | null;
+    /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
+    edge_errors: string[];
 }
 
 /** Schema of `app_hostnames`. */
@@ -1948,7 +1964,10 @@ export const schema = {
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             state: { _columnName: "state", _foreignKeys: {} },
             cloudflare_id: { _columnName: "cloudflare_id", _foreignKeys: {} },
-            dcv_target: { _columnName: "dcv_target", _foreignKeys: {} }
+            dcv_target: { _columnName: "dcv_target", _foreignKeys: {} },
+            edge_status: { _columnName: "edge_status", _foreignKeys: {} },
+            edge_ssl_status: { _columnName: "edge_ssl_status", _foreignKeys: {} },
+            edge_errors: { _columnName: "edge_errors", _foreignKeys: {} }
         },
         _indexes: {
             app_hostnames_app_id_idx: { _indexName: "app_hostnames_app_id_idx" },
