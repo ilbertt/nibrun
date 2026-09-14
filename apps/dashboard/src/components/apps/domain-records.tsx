@@ -7,8 +7,10 @@ import {
   TableRow,
 } from '@repo/ui/components/table';
 import { CopyButton } from '@repo/ui/custom/copy-button';
+import { RetryValidationButton } from '#components/apps/retry-validation-button.tsx';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
+import { useElapsed } from '#lib/hooks/use-elapsed.ts';
 import { usePlatformSuffix } from '#lib/hooks/use-platform-suffix.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
@@ -49,6 +51,28 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
         </Table>
       </div>
       <EdgeReport errors={hostname.edgeErrors} />
+      <RetryValidation hostname={hostname} />
+    </div>
+  );
+}
+
+/**
+ * How long the edge gets before the owner is offered to hurry it: it looks on its own within
+ * moments of being told, so a retry sooner than this is a second request for the first check.
+ */
+const EDGES_OWN_TURN_MS = 60_000;
+
+function RetryValidation({ hostname }: { hostname: Hostname }) {
+  const edgeHasHadItsTurn = useElapsed({ since: hostname.createdAt, ms: EDGES_OWN_TURN_MS });
+  if (!edgeHasHadItsTurn) {
+    return null;
+  }
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-muted-foreground text-xs">
+      <span>
+        Records in place? The edge retries on its own schedule; this asks it to validate now.
+      </span>
+      <RetryValidationButton hostname={hostname.hostname} />
     </div>
   );
 }
