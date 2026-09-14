@@ -20,7 +20,7 @@ import type {
   CustomHostnamesRepositoryContract,
   EdgeHostname,
 } from '#repositories/custom-hostnames.repository.ts';
-import { HostnamesService } from '#services/hostnames.service.ts';
+import { ADD_GRACE_MS, HostnamesService } from '#services/hostnames.service.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
 
 const APP_HOST_DOMAIN = 'apps.example.com';
@@ -275,12 +275,16 @@ describe('a waiting hostname is settled by the clock a host report lends', () =>
     expect(appsRepo.states).toEqual([]);
   });
 
+  function unattachedFor(ms: number): PendingRow {
+    return { hostname: BROUGHT, cloudflare_id: null, created_at: new Date(Date.now() - ms) };
+  }
+
   // The edge was away when the owner added it, or this process died between the two writes.
   // Leaving it would mean the owner cannot add the domain again — their own half-finished row
   // holds the name — until the claim lapses a week later.
   test('one that never reached the edge is finished rather than left to lapse', async () => {
     const { service, appsRepo, customHostnamesRepo } = build();
-    appsRepo.pending = [{ hostname: BROUGHT, cloudflare_id: null, created_at: new Date() }];
+    appsRepo.pending = [unattachedFor(ADD_GRACE_MS + 1)];
     customHostnamesRepo.state_ = 'active';
 
     await service.reconcile();
@@ -290,13 +294,24 @@ describe('a waiting hostname is settled by the clock a host report lends', () =>
     expect(appsRepo.states).toEqual(['active']);
   });
 
+  // The add that wrote the row is still on its way to the edge: this pass asking too would have
+  // the edge refuse one of them as a duplicate, and when that one is the add, the owner is told
+  // their domain failed while it was in fact registered.
+  test('but not while the add that wrote it may still be finishing it', async () => {
+    const { service, appsRepo, customHostnamesRepo } = build();
+    appsRepo.pending = [unattachedFor(ADD_GRACE_MS - 1)];
+    customHostnamesRepo.state_ = 'active';
+
+    await service.reconcile();
+
+    expect(customHostnamesRepo.trace).toEqual([]);
+    expect(appsRepo.states).toEqual([]);
+  });
+
   // One hostname the edge cannot answer for is not a reason to stop reading the others.
   test('and one the edge still cannot answer for does not stop the rest', async () => {
     const { service, appsRepo, customHostnamesRepo } = build();
-    appsRepo.pending = [
-      { hostname: BROUGHT, cloudflare_id: null, created_at: new Date() },
-      pendingSince(1),
-    ];
+    appsRepo.pending = [unattachedFor(ADD_GRACE_MS + 1), pendingSince(1)];
     customHostnamesRepo.addFailure = new Error('cloudflare is away');
     customHostnamesRepo.state_ = 'active';
 
