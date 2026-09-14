@@ -2,6 +2,12 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.9.14-2]
+
+### 🚀 Features
+
+- *(cli)* The api is asked about an app by its id, and `--app` is resolved to one first (#584)
+
 ## [2026.9.14-1]
 
 ### 🚀 Features
