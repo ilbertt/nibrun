@@ -24,8 +24,8 @@ export const command = defineCommand('run [command]', {
       ...SHARED_OPTIONS.app.option,
       description: 'Name of an existing app to deploy onto. Asked for when omitted.',
     },
-    name: {
-      schema: z.string().optional(),
+    [SHARED_OPTIONS.name.name]: {
+      ...SHARED_OPTIONS.name.option,
       description: 'Name for the new app. Defaults to the binary filename.',
     },
     sha256: {

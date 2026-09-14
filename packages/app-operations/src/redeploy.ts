@@ -1,5 +1,6 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import { AppNameSchema, Value } from '@repo/protocol';
 import { appFor, pinnedArtifact } from '#apps.ts';
 import {
   type ConfigEdit,
@@ -14,6 +15,8 @@ const NOTHING_TO_RELEASE = 'This app has never been deployed.';
 export type RedeployInput = ConfigEdit & {
   api: PublicApiClient;
   app: string;
+  /** What to call the app from now on. Its hostnames stay: the slug never follows a rename. */
+  name?: string | undefined;
   onStep?: ((step: DeployStep) => void) | undefined;
 };
 
@@ -30,11 +33,12 @@ export type RedeployInput = ConfigEdit & {
  */
 export async function redeploy({
   api,
-  app: name,
+  app,
+  name,
   onStep,
   ...edit
 }: RedeployInput): Promise<Deployed> {
-  const target = await appFor({ api, name, operation: 'release' });
+  const target = await appFor({ api, name: app, operation: 'release' });
   if (!target.newest) {
     throw new ApiError(NOTHING_TO_RELEASE);
   }
@@ -44,19 +48,26 @@ export async function redeploy({
     artifactId: target.newest.artifactId,
   });
 
-  const app = unwrap(await api.api.apps({ appId: target.app.id }).patch(configPatch(edit)));
-  onStep?.({ kind: 'app', appId: app.id, name: app.name });
+  // Parsed here rather than passed through, for the reason a domain is: a name the api would
+  // refuse is refused by the caller that took it rather than by a round trip.
+  const patched = unwrap(
+    await api.api.apps({ appId: target.app.id }).patch({
+      ...configPatch(edit),
+      ...(name !== undefined && { name: Value.Parse(AppNameSchema, name) }),
+    }),
+  );
+  onStep?.({ kind: 'app', appId: patched.id, name: patched.name });
   onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest });
 
   const deployment = unwrap(
-    await api.api.apps({ appId: app.id }).deployments.post({ artifactId: artifact.id }),
+    await api.api.apps({ appId: patched.id }).deployments.post({ artifactId: artifact.id }),
   );
   onStep?.({ kind: 'deployment', deploymentId: deployment.id });
 
   return {
-    appId: app.id,
-    name: app.name,
+    appId: patched.id,
+    name: patched.name,
     deploymentId: deployment.id,
-    url: `https://${servingHostname(app.hostnames)}`,
+    url: `https://${servingHostname(patched.hostnames)}`,
   };
 }
