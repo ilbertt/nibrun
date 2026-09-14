@@ -74,8 +74,8 @@ describe('a person nibrun has signed up has a profile from the moment they exist
     ago: string;
   }): Promise<string> {
     const [row] = (await sql.unsafe(
-      `INSERT INTO nibrun.apps (id, owner_id, slug)
-       VALUES (uuidv7($3::interval), $1, $2)
+      `INSERT INTO nibrun.apps (id, owner_id, name, slug)
+       VALUES (uuidv7($3::interval), $1, $2, $2)
        RETURNING id`,
       [ownerId, slug, ago],
     )) as Array<{ id: string }>;

@@ -2,7 +2,6 @@ import {
   type App,
   type AppId,
   type AppName,
-  AppNameSchema,
   type ComputeUsage,
   EXTRA_PUBLIC_PORT_VALUES,
   type FilesystemUsage,
@@ -16,7 +15,6 @@ import {
   type ReportedVolume,
   type TenantEnvironment,
   type Timestamp,
-  Value,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
 import {
@@ -702,20 +700,11 @@ function toComputeUsage(app: AppRow): ComputeUsage | null {
   };
 }
 
-/**
- * An app from before names existed has none until it is given one by hand (see migration 0050),
- * and until then answers to its slug — the one name its owner has ever been shown for it. A slug
- * is always a valid name, so the parse is a change of type rather than a check that can fail.
- */
-function nameOf(app: AppRow): AppName {
-  return app.name ?? Value.Parse(AppNameSchema, app.slug);
-}
-
 function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
   return {
     id: app.id,
     ownerId: app.owner_id,
-    name: nameOf(app),
+    name: app.name,
     slug: app.slug,
     hostnames: hostnames.map(toAppHostname),
     config: toAppConfig(app),

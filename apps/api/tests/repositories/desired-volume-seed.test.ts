@@ -98,7 +98,9 @@ async function seedApp(sql: SQL): Promise<void> {
     `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
      VALUES ('owner', 'owner', 'owner@example.com', true, now(), now())`,
   );
-  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, slug) VALUES ('owner', $1)`, [APP_SLUG]);
+  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, name, slug) VALUES ('owner', $1, $1)`, [
+    APP_SLUG,
+  ]);
   await sql.unsafe(
     `INSERT INTO nibrun.artifacts (app_id, digest, size_bytes, object_key, original_file_name)
      SELECT id, 'sha256:a', 1, 'artifacts/a', 'app' FROM nibrun.apps WHERE slug = $1`,
