@@ -11,13 +11,13 @@ beforeEach(() => {
   prompts.reset();
 });
 
-// A slug typed rather than chosen is read against the listing and the release the app is on,
+// A name typed rather than chosen is read against the listing and the release the app is on,
 // which together are what say whether a deploy can land.
 function apiListing({
   apps,
   release = 'running',
 }: {
-  apps: Array<{ slug: string; state: string }>;
+  apps: Array<{ name: string; state: string }>;
   release?: string;
 }) {
   return apiHolding({
@@ -61,8 +61,8 @@ test('an app the owner cannot deploy onto is not offered', async () => {
   const resolved = await completeOptions({
     api: apiListing({
       apps: [
-        { slug: 'demo-abc123', state: 'active' },
-        { slug: 'gone-xyz789', state: 'deleted' },
+        { name: 'demo-abc123', state: 'active' },
+        { name: 'gone-xyz789', state: 'deleted' },
       ],
     }),
     options: {},
@@ -83,7 +83,7 @@ const SEED_FOLDER: InitialData = { kind: 'folder', path: '/tmp/seed' };
 // the api would refuse the archive against any of the ones the question would have offered.
 test('a folder to start the data from is not a question about which app', async () => {
   const resolved = await completeOptions({
-    api: apiListing({ apps: [{ slug: 'demo-abc123', state: 'active' }] }),
+    api: apiListing({ apps: [{ name: 'demo-abc123', state: 'active' }] }),
     options: { dataFolder: SEED_FOLDER },
     binarySource: '/tmp/my-server',
     args: [],
@@ -111,7 +111,7 @@ test('a flag already given is not asked about again', async () => {
 
 test('what the binary will be run with is shown before anything is uploaded', async () => {
   await completeOptions({
-    api: apiListing({ apps: [{ slug: 'demo-abc123', state: 'active' }] }),
+    api: apiListing({ apps: [{ name: 'demo-abc123', state: 'active' }] }),
     options: { app: 'demo-abc123' },
     binarySource: '/tmp/my-server',
     args: ['serve', '--verbose'],
@@ -125,7 +125,7 @@ test('what the binary will be run with is shown before anything is uploaded', as
 // replace, and nothing would start what it landed.
 test('a named app that cannot be deployed onto is refused before anything is asked', async () => {
   const attempt = completeOptions({
-    api: apiListing({ apps: [{ slug: 'demo-abc123', state: 'suspended' }], release: 'stopped' }),
+    api: apiListing({ apps: [{ name: 'demo-abc123', state: 'suspended' }], release: 'stopped' }),
     options: { app: 'demo-abc123' },
     binarySource: '/tmp/my-server',
     args: [],

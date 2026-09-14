@@ -36,7 +36,7 @@ export async function initialDataFrom({
   if (path === undefined) {
     return undefined;
   }
-  // An app's data is created once, as the app is. A slug names one that already exists, so the two
+  // An app's data is created once, as the app is. `--app` names one that already exists, so the two
   // flags cannot both be meant — and which one was is not this end's to guess.
   if (app !== undefined) {
     throw new UsageError(

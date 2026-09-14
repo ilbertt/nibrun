@@ -14,7 +14,7 @@ export function apiHolding({
   apps,
   underApp = () => ({}),
 }: {
-  apps?: Array<{ id: string; slug: string; state?: string }>;
+  apps?: Array<{ id: string; name: string; state?: string }>;
   underApp?: (addressed: { appId: string }) => object;
 }): PublicApiClient {
   function addressed(app: { appId: string }) {

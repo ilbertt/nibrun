@@ -1,4 +1,5 @@
 /** The one app these tests are about, and what nibrun gave it to run on. */
+export const NAME = 'Quiet Otter';
 export const SLUG = 'quiet-otter';
 export const APP_ID = 'app-1';
 export const HOSTNAME = `${SLUG}.nibrun.app`;

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { APP_LIST_OUTPUT, type AppRow, render } from '#lib/app-list.ts';
-import { BYTES_PER_MIB, MEMORY_MIB, SLUG, VOLUME_SIZE_BYTES } from '#tests/support/app.ts';
+import { BYTES_PER_MIB, MEMORY_MIB, NAME, SLUG, VOLUME_SIZE_BYTES } from '#tests/support/app.ts';
 import { writerRecording } from '#tests/support/output.ts';
 
 const MEASURED_SHARE = 0.17;
@@ -14,6 +14,7 @@ const MEMORY_BYTES = MEMORY_MIB * BYTES_PER_MIB;
 
 function app(overrides: Partial<AppRow> = {}): AppRow {
   return {
+    name: NAME,
     slug: SLUG,
     state: 'active',
     updatedAt: '2026-08-07T09:41:00.123Z',
@@ -31,14 +32,14 @@ function used({ share, of }: { share: number; of: number }) {
 describe('a listing is read down a column', () => {
   test('a heading says what each column is', () => {
     expect(render([app()])).toEqual([
-      'SLUG         STATE       CPU   MEM  VOLUME  LAST CHANGE',
-      'quiet-otter  active        -     -       -  2026-08-07 09:41',
+      'NAME         STATE       CPU   MEM  VOLUME  LAST CHANGE',
+      'Quiet Otter  active        -     -       -  2026-08-07 09:41',
     ]);
   });
 
-  test('the widest slug is what the column is wide enough for', () => {
-    expect(render([app({ slug: 'a' }), app({ slug: 'considerably-longer' })])).toEqual([
-      'SLUG                 STATE       CPU   MEM  VOLUME  LAST CHANGE',
+  test('the widest name is what the column is wide enough for', () => {
+    expect(render([app({ name: 'a' }), app({ name: 'considerably-longer' })])).toEqual([
+      'NAME                 STATE       CPU   MEM  VOLUME  LAST CHANGE',
       'a                    active        -     -       -  2026-08-07 09:41',
       'considerably-longer  active        -     -       -  2026-08-07 09:41',
     ]);
@@ -48,9 +49,9 @@ describe('a listing is read down a column', () => {
   // reading the same shape twice.
   test('a state wider than the one beside it does not shift the columns', () => {
     expect(render([app({ state: 'suspended' }), app({ state: 'deleting' })])).toEqual([
-      'SLUG         STATE       CPU   MEM  VOLUME  LAST CHANGE',
-      'quiet-otter  suspended     -     -       -  2026-08-07 09:41',
-      'quiet-otter  deleting      -     -       -  2026-08-07 09:41',
+      'NAME         STATE       CPU   MEM  VOLUME  LAST CHANGE',
+      'Quiet Otter  suspended     -     -       -  2026-08-07 09:41',
+      'Quiet Otter  deleting      -     -       -  2026-08-07 09:41',
     ]);
   });
 
@@ -101,9 +102,9 @@ describe('the share columns say what an app is using of what it was given', () =
 // Newest first is the api's answer, and the order an owner made their apps in is the one they
 // remember them in.
 test('the order the api answered with is the order that is printed', () => {
-  const lines = render([app({ slug: 'newest' }), app({ slug: 'oldest' })]);
+  const lines = render([app({ name: 'newest' }), app({ name: 'oldest' })]);
 
-  expect(lines.map((line) => line.split(' ')[0])).toEqual(['SLUG', 'newest', 'oldest']);
+  expect(lines.map((line) => line.split(' ')[0])).toEqual(['NAME', 'newest', 'oldest']);
 });
 
 // A heading over nothing reads as a listing that failed rather than an account with nothing in it.

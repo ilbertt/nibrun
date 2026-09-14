@@ -13,6 +13,6 @@ export async function deleteApp({
 }: {
   api: PublicApiClient;
   appId: string;
-}): Promise<{ slug: string; state: AppState }> {
+}): Promise<{ name: string; state: AppState }> {
   return unwrap(await api.api.apps({ appId }).delete());
 }

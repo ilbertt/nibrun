@@ -15,7 +15,7 @@ import { answered } from '#lib/prompts.ts';
 const CONFIRMATION_PHRASE = 'delete permanently';
 
 const DeletedSchema = z.object({
-  slug: z.string(),
+  name: z.string(),
   state: z.enum(APP_STATES),
   /** Whether this run is what started the teardown, rather than finding one already under way. */
   changed: z.boolean(),
@@ -28,14 +28,14 @@ export const DELETED_OUTPUT = defineOutput({
   render: ({ value, out }) =>
     out.done(
       value.changed
-        ? `${value.slug} is ${value.state}. What is on the volume goes when the host holding it says so.`
-        : `${value.slug} is already being deleted.`,
+        ? `${value.name} is ${value.state}. What is on the volume goes when the host holding it says so.`
+        : `${value.name} is already being deleted.`,
     ),
 });
 
 export type DeleteInput = {
   api: PublicApiClient;
-  slug: string;
+  name: string;
   yes: boolean;
   interactive: boolean;
 };
@@ -45,26 +45,26 @@ export type DeleteInput = {
  * of it, and — once the api has torn it down — every binary uploaded to it and every export taken
  * of it.
  *
- * The app is looked up before anything is asked, so a slug that names nothing costs one line
+ * The app is looked up before anything is asked, so a name that names nothing costs one line
  * rather than a phrase typed out for an app that was never there.
  */
-export async function deleteApp({ api, slug, yes, interactive }: DeleteInput): Promise<Deleted> {
-  const { app } = await appFor({ api, slug, operation: 'delete' });
+export async function deleteApp({ api, name, yes, interactive }: DeleteInput): Promise<Deleted> {
+  const { app } = await appFor({ api, name, operation: 'delete' });
   // Asking twice is asking once: the teardown already running is the answer to the second.
   if (app.state === 'deleting') {
-    return { slug: app.slug, state: app.state, changed: false };
+    return { name: app.name, state: app.state, changed: false };
   }
 
   if (!yes) {
     await confirmDeletion({
-      slug: app.slug,
+      name: app.name,
       hostnames: app.hostnames.map((each) => each.hostname),
       interactive,
     });
   }
 
   const deleting = await requestDeletion({ api, appId: app.id });
-  return { slug: deleting.slug, state: deleting.state, changed: true };
+  return { name: deleting.name, state: deleting.state, changed: true };
 }
 
 /**
@@ -73,23 +73,23 @@ export async function deleteApp({ api, slug, yes, interactive }: DeleteInput): P
  * behalf. A prompt nobody can read is not a safeguard.
  */
 async function confirmDeletion({
-  slug,
+  name,
   hostnames,
   interactive,
 }: {
-  slug: string;
+  name: string;
   hostnames: readonly string[];
   interactive: boolean;
 }): Promise<void> {
   if (!interactive) {
     throw new UsageError(
-      `Deleting ${slug} cannot be undone, and there is no terminal here to confirm it through. Pass --yes to mean it.`,
+      `Deleting ${name} cannot be undone, and there is no terminal here to confirm it through. Pass --yes to mean it.`,
     );
   }
 
   note(
     [
-      `app: ${slug}`,
+      `app: ${name}`,
       `hostnames: ${hostnames.join(' ')}`,
       'volume: everything on it',
       'binaries: every one ever uploaded to this app',
@@ -99,7 +99,7 @@ async function confirmDeletion({
   );
   answered(
     await text({
-      message: `Type ${CONFIRMATION_PHRASE} to delete ${slug}`,
+      message: `Type ${CONFIRMATION_PHRASE} to delete ${name}`,
       validate: (value) =>
         saysDeletePermanently(value)
           ? undefined

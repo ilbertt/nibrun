@@ -107,7 +107,7 @@ export type DeployInput = ConfigEdit & {
 export async function deploy({
   api,
   binary,
-  app: slug,
+  app: existing,
   name,
   initialData,
   onStep,
@@ -115,14 +115,15 @@ export async function deploy({
   upload = streamedUpload,
   ...edit
 }: DeployInput): Promise<Deployed> {
-  const target = slug === undefined ? null : await appFor({ api, slug, operation: 'release' });
+  const target =
+    existing === undefined ? null : await appFor({ api, name: existing, operation: 'release' });
   const config = configPatch(edit);
 
   const app =
     target === null
       ? await createApp({ api, name: name ?? binaryName(binary), config })
       : unwrap(await api.api.apps({ appId: target.app.id }).patch(config));
-  onStep?.({ kind: 'app', appId: app.id, slug: app.slug });
+  onStep?.({ kind: 'app', appId: app.id, name: app.name });
 
   const artifact = isFetchable(binary)
     ? await fetchBinary({ api, appId: app.id, binary })
@@ -146,7 +147,7 @@ export async function deploy({
 
   return {
     appId: app.id,
-    slug: app.slug,
+    name: app.name,
     deploymentId: deployment.id,
     url: `https://${servingHostname(app.hostnames)}`,
   };

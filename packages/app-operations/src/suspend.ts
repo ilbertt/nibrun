@@ -4,7 +4,7 @@ import type { AppState, OwnedAppState } from '@repo/protocol';
 
 type OwnedApp = { api: PublicApiClient; appId: string };
 
-type SuspendedApp = { slug: string; state: AppState };
+type SuspendedApp = { name: string; state: AppState };
 
 /**
  * Take the app offline and keep everything it wrote: the microVM stops, the volume and every byte

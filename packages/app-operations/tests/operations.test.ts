@@ -10,7 +10,7 @@ import {
 import { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
 import { appStatus } from '#status.ts';
 
-const SLUG = 'quiet-otter';
+const NAME = 'Quiet Otter';
 
 function refusal({
   operation,
@@ -28,7 +28,7 @@ function refusal({
   return operationRefusal({
     status: appStatus({ appState, deploymentState, instanceState }),
     operation,
-    slug: SLUG,
+    name: NAME,
     release: deploymentState && { id: 'deployment-1', state: deploymentState, message },
   });
 }
@@ -38,7 +38,7 @@ describe('an app nobody has deployed', () => {
 
   for (const operation of nothingToRead) {
     test(`has nothing for ${operation} to read`, () => {
-      expect(refusal({ operation })).toContain('App quiet-otter has never been deployed');
+      expect(refusal({ operation })).toContain('App Quiet Otter has never been deployed');
     });
   }
 
@@ -50,7 +50,7 @@ describe('an app nobody has deployed', () => {
 describe('a release that is not serving', () => {
   test('is not a filesystem to read', () => {
     expect(refusal({ operation: 'files', deploymentState: 'failed' })).toBe(
-      'App quiet-otter is on a release that failed, so nothing is mounting its filesystem to read.',
+      'App Quiet Otter is on a release that failed, so nothing is mounting its filesystem to read.',
     );
   });
 
@@ -75,7 +75,7 @@ describe('a suspended app', () => {
   test('takes no release, and says how to make it take one', () => {
     expect(
       refusal({ operation: 'release', appState: 'suspended', deploymentState: 'stopped' }),
-    ).toBe('App quiet-otter is suspended, so a new release would never start. Resume it first.');
+    ).toBe('App Quiet Otter is suspended, so a new release would never start. Resume it first.');
   });
 
   test('has nothing mounting its filesystem', () => {
@@ -122,7 +122,7 @@ describe('an app idle between requests', () => {
   // one — which a browse is not.
   test('has no microVM mounting its filesystem, and says what would make one', () => {
     expect(refusal({ operation: 'files', ...idle })).toBe(
-      'App quiet-otter is idle until something asks for it, so nothing is mounting its filesystem to read. Open it to wake it.',
+      'App Quiet Otter is idle until something asks for it, so nothing is mounting its filesystem to read. Open it to wake it.',
     );
   });
 

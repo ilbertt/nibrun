@@ -14,7 +14,7 @@ const MS_PER_SECOND = 1_000;
 const ELAPSED_DECIMALS = 1;
 
 const ReleaseSchema = z.object({
-  slug: z.string(),
+  name: z.string(),
   appId: z.string(),
   deploymentId: z.string(),
   url: z.string(),
@@ -36,7 +36,7 @@ export const RELEASE_OUTPUT = defineOutput({
 
 export function announce({ step, ui }: { step: DeployStep; ui: Ui }): void {
   if (step.kind === 'app') {
-    ui.step(`app ${step.slug}`);
+    ui.step(`app ${step.name}`);
   }
   if (step.kind === 'artifact') {
     ui.step(`artifact ${step.digest}`);
@@ -59,7 +59,7 @@ export async function awaitServing({
   detach: boolean | undefined;
 }): Promise<Release> {
   const address = {
-    slug: deployed.slug,
+    name: deployed.name,
     appId: deployed.appId,
     deploymentId: deployed.deploymentId,
     url: deployed.url,

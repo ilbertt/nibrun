@@ -25,7 +25,7 @@ type Entry = z.infer<typeof EntrySchema>;
  * what an app is writing now and what the release before it left behind.
  */
 const DirectorySchema = z.object({
-  slug: z.string(),
+  name: z.string(),
   deploymentId: z.string(),
   path: z.string(),
   truncated: z.boolean(),
@@ -57,7 +57,7 @@ export const DIRECTORY_OUTPUT = defineOutput({
 
 export type ListInput = {
   api: PublicApiClient;
-  slug: string;
+  name: string;
   deploymentId: string | undefined;
   path: GuestPath;
   print: Print;
@@ -73,14 +73,14 @@ export type ListInput = {
  */
 export async function listDirectory({
   api,
-  slug,
+  name,
   deploymentId,
   path,
   print,
 }: ListInput): Promise<z.input<typeof DirectorySchema>> {
   const addressed = await announcedDeployment({
     api,
-    slug,
+    name,
     deploymentId,
     operation: 'files',
     print,
@@ -94,7 +94,7 @@ export async function listDirectory({
   });
 
   return {
-    slug: addressed.slug,
+    name: addressed.name,
     deploymentId: addressed.deploymentId,
     path: listing.path,
     truncated: listing.truncated,

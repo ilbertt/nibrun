@@ -16,8 +16,8 @@ export const command = defineCommand('apps status', {
       json: rootOptions.json,
     });
     const { api } = context;
-    const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
+    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
 
-    emit(await readStatus({ api, slug }));
+    emit(await readStatus({ api, name }));
   },
 });

@@ -1,5 +1,5 @@
 import type { PublicApiClient } from '@repo/api-client/public';
-import { addDomain, appBySlug, appFor, removeDomain } from '@repo/app-operations';
+import { addDomain, appByName, appFor, removeDomain } from '@repo/app-operations';
 import { APP_HOSTNAME_KINDS, APP_HOSTNAME_STATES } from '@repo/protocol';
 import { z } from 'zod';
 import { defineOutput } from '#lib/output.ts';
@@ -36,7 +36,7 @@ const AppHostnameSchema = z.object({
 const DomainListSchema = z.object({ hostnames: z.array(AppHostnameSchema) });
 
 const DomainAddedSchema = z.object({
-  slug: z.string(),
+  name: z.string(),
   hostname: z.string(),
   state: z.enum(APP_HOSTNAME_STATES),
   /** False for a domain the app already had, which adding again asks the edge to check now. */
@@ -44,7 +44,7 @@ const DomainAddedSchema = z.object({
   records: z.array(DnsRecordSchema),
 });
 
-const DomainRemovedSchema = z.object({ slug: z.string(), hostname: z.string() });
+const DomainRemovedSchema = z.object({ name: z.string(), hostname: z.string() });
 
 type AppHostname = z.infer<typeof AppHostnameSchema>;
 
@@ -103,18 +103,18 @@ function addedVerdict({
 
 export const DOMAIN_REMOVED_OUTPUT = defineOutput({
   schema: DomainRemovedSchema,
-  render: ({ value, out }) => out.done(`${value.hostname} no longer points at ${value.slug}.`),
+  render: ({ value, out }) => out.done(`${value.hostname} no longer points at ${value.name}.`),
 });
 
 /** Every hostname the app answers on, or is waiting to. */
 export async function listDomains({
   api,
-  slug,
+  name,
 }: {
   api: PublicApiClient;
-  slug: string;
+  name: string;
 }): Promise<z.input<typeof DomainListSchema>> {
-  const app = await appBySlug({ api, slug });
+  const app = await appByName({ api, name });
   const target = platformTarget({ slug: app.slug, hostnames: app.hostnames });
 
   return {
@@ -133,18 +133,18 @@ export async function listDomains({
 
 export async function addAppDomain({
   api,
-  slug,
+  name,
   hostname,
 }: {
   api: PublicApiClient;
-  slug: string;
+  name: string;
   hostname: string;
 }): Promise<z.input<typeof DomainAddedSchema>> {
-  const { app } = await appFor({ api, slug, operation: 'domains' });
+  const { app } = await appFor({ api, name, operation: 'domains' });
   const { hostname: added, created } = await addDomain({ api, appId: app.id, hostname });
 
   return {
-    slug: app.slug,
+    name: app.name,
     hostname: added.hostname,
     state: added.state,
     created,
@@ -187,17 +187,17 @@ function pendingRecords({
  */
 export async function removeAppDomain({
   api,
-  slug,
+  name,
   hostname,
 }: {
   api: PublicApiClient;
-  slug: string;
+  name: string;
   hostname: string;
 }): Promise<z.input<typeof DomainRemovedSchema>> {
-  const { app } = await appFor({ api, slug, operation: 'domains' });
+  const { app } = await appFor({ api, name, operation: 'domains' });
   await removeDomain({ api, appId: app.id, hostname });
 
-  return { slug: app.slug, hostname };
+  return { name: app.name, hostname };
 }
 
 /**

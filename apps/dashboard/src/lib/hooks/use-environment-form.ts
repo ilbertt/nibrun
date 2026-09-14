@@ -41,7 +41,7 @@ export function useEnvironmentForm(app: AppSummary): EnvironmentForm {
     reset: () => setEdited(undefined),
     submit: () =>
       start({
-        app: app.slug,
+        app: app.name,
         args: app.config.args,
         port: app.config.httpPort,
         environment: parseEnvironmentPatch(edits),

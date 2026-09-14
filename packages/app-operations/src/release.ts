@@ -9,13 +9,13 @@ import {
 /** Where a release landed and what to reach it at, whichever way it was asked for. */
 export type Deployed = {
   appId: string;
-  slug: string;
+  name: string;
   deploymentId: string;
   url: string;
 };
 
 export type DeployStep =
-  | { kind: 'app'; appId: string; slug: string }
+  | { kind: 'app'; appId: string; name: string }
   | { kind: 'artifact'; artifactId: string; digest: string }
   | { kind: 'deployment'; deploymentId: string };
 

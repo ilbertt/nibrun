@@ -35,7 +35,7 @@ export function useFilesystemAvailability(appId: string): FilesystemAvailability
   const refusal = operationRefusal({
     status,
     operation: 'files',
-    slug: app.data.slug,
+    name: app.data.name,
     release: newest.data,
   });
   return refusal === undefined ? BROWSABLE : { kind: 'unreadable', reason: refusal };

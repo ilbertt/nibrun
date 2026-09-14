@@ -89,12 +89,12 @@ const CANNOT: Record<AppOperation, string> = {
 export function operationRefusal({
   status,
   operation,
-  slug,
+  name,
   release,
 }: {
   status: AppStatus;
   operation: AppOperation;
-  slug: string;
+  name: string;
   /** The release the app is on, which for one that never came up kept the host's account of why. */
   release?: SettledDeployment | undefined;
 }): string | undefined {
@@ -102,7 +102,7 @@ export function operationRefusal({
   if (!state.refuses.includes(operation)) {
     return undefined;
   }
-  const refusal = `App ${slug} ${state.because}, so ${CANNOT[operation]}`;
+  const refusal = `App ${name} ${state.because}, so ${CANNOT[operation]}`;
   if (state.hint !== undefined) {
     return `${refusal}. ${state.hint}`;
   }

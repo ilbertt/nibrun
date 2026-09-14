@@ -1,4 +1,5 @@
 /** The one app these tests are about, and what it was deployed from. */
+export const NAME = 'Quiet Otter';
 export const SLUG = 'quiet-otter';
 export const APP_ID = 'app-1';
 export const ARTIFACT_ID = 'artifact-1';

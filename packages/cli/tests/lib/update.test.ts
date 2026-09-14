@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { updateApp } from '#lib/update.ts';
 import { answering, apiHolding, listedApp } from '#tests/support/api.ts';
-import { HOSTNAME, SLUG } from '#tests/support/app.ts';
+import { HOSTNAME, NAME } from '#tests/support/app.ts';
 import { uiRecording } from '#tests/support/ui.ts';
 
 const ARTIFACT_ID = 'artifact-1';
@@ -14,7 +14,7 @@ function apiHoldingPatchable({ patched }: { patched: unknown[] }) {
         patched.push(body);
         return answering({
           id: appId,
-          slug: SLUG,
+          name: NAME,
           hostnames: [{ hostname: HOSTNAME, kind: 'platform', state: 'active' }],
         })();
       },
@@ -40,7 +40,7 @@ test('the flags that were given are the whole of what the app is asked to change
   await updateApp({
     api: apiHoldingPatchable({ patched }),
     ui: uiRecording(),
-    slug: SLUG,
+    name: NAME,
     env: ['TOKEN=shh'],
     unset: ['STALE'],
   });
@@ -56,7 +56,7 @@ test('arguments nobody named are not arguments cleared', async () => {
   await updateApp({
     api: apiHoldingPatchable({ patched }),
     ui: uiRecording(),
-    slug: SLUG,
+    name: NAME,
     port: 8080,
   });
 
@@ -69,8 +69,8 @@ test('asking for a public port sends the answer, and so does giving it up', asyn
   const patched: unknown[] = [];
   const api = apiHoldingPatchable({ patched });
 
-  await updateApp({ api, ui: uiRecording(), slug: SLUG, extraPublicPort: true });
-  await updateApp({ api, ui: uiRecording(), slug: SLUG, extraPublicPort: false });
+  await updateApp({ api, ui: uiRecording(), name: NAME, extraPublicPort: true });
+  await updateApp({ api, ui: uiRecording(), name: NAME, extraPublicPort: false });
 
   expect(patched).toEqual([{ hasExtraPublicPort: true }, { hasExtraPublicPort: false }]);
 });
@@ -81,7 +81,7 @@ test('a flag nobody passed says nothing about the port', async () => {
   await updateApp({
     api: apiHoldingPatchable({ patched }),
     ui: uiRecording(),
-    slug: SLUG,
+    name: NAME,
     port: 8080,
   });
 
@@ -96,7 +96,7 @@ test('an empty list of arguments is arguments cleared', async () => {
   await updateApp({
     api: apiHoldingPatchable({ patched }),
     ui: uiRecording(),
-    slug: SLUG,
+    name: NAME,
     args: [],
   });
 
@@ -107,7 +107,7 @@ test('a name the shell would not accept as a variable is refused in this program
   const attempt = updateApp({
     api: apiHoldingPatchable({ patched: [] }),
     ui: uiRecording(),
-    slug: SLUG,
+    name: NAME,
     env: ['9LIVES=cat'],
   });
 
@@ -122,11 +122,11 @@ test('the binary being run again is named, and the release says where it answers
   const release = await updateApp({
     api: apiHoldingPatchable({ patched: [] }),
     ui,
-    slug: SLUG,
+    name: NAME,
     args: [],
   });
 
-  expect(ui.said).toEqual([`app ${SLUG}`, 'artifact sha256:abcd']);
+  expect(ui.said).toEqual([`app ${NAME}`, 'artifact sha256:abcd']);
   expect(release.url).toContain(`https://${HOSTNAME}`);
   expect(release.readyInMs).not.toBeNull();
 });

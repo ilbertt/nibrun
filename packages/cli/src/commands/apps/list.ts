@@ -5,7 +5,7 @@ import { createOutput } from '#lib/output.ts';
 
 /**
  * The one command under `apps` that names no app, so `--app` is the one thing forwarded here that
- * it has nothing to do with: this is where an owner who cannot remember a slug goes to read one,
+ * it has nothing to do with: this is where an owner who cannot remember a name goes to read one,
  * and answering it with the question every sibling asks would be circular.
  */
 export const command = defineCommand('apps list', {

@@ -4,7 +4,7 @@ import { type AppStatusReport, renderStatus } from '#lib/app-status.ts';
 import {
   BYTES_PER_MIB,
   MEMORY_MIB,
-  SLUG,
+  NAME,
   VCPU_COUNT,
   VOLUME_SIZE_BYTES,
 } from '#tests/support/app.ts';
@@ -17,7 +17,7 @@ const A_QUARTER_HOUR_MS = 900_000;
 
 function app(overrides: Partial<AppStatusReport> = {}): AppStatusReport {
   return {
-    slug: SLUG,
+    name: NAME,
     status: 'running',
     activation: 'always',
     idleTimeoutMs: MIN_IDLE_TIMEOUT_MS,
@@ -42,7 +42,7 @@ describe('a status says what one app is using of what it was given', () => {
   test('every resource reads as what is spent over what was allocated', () => {
     const { lines } = renderStatus(measured);
 
-    expect(lines[0]).toBe(`${SLUG}  running`);
+    expect(lines[0]).toBe(`${NAME}  running`);
     expect(lines.join('\n')).toContain('vCPU    0.36 / 2');
     expect(lines.join('\n')).toContain('Memory  393.3 MiB / 1.0 GiB');
     expect(lines.join('\n')).toContain('Volume  1.4 GiB / 8.0 GiB');
@@ -88,7 +88,7 @@ describe('a status says what one app is using of what it was given', () => {
   // not have to work out that they are the same thing.
   test('an app nothing has ever deployed is said the way the dashboard says it', () => {
     expect(renderStatus(app({ status: 'never-deployed' })).lines[0]).toBe(
-      `${SLUG}  never deployed`,
+      `${NAME}  never deployed`,
     );
   });
 
@@ -101,7 +101,7 @@ describe('a status says what one app is using of what it was given', () => {
       app({ status: 'idle', activation: 'on-request', idleTimeoutMs: A_QUARTER_HOUR_MS }),
     ).lines;
 
-    expect(lines[0]).toBe(`${SLUG}  idle`);
+    expect(lines[0]).toBe(`${NAME}  idle`);
     expect(lines[1]).toBe('On request, stopped after 15m of quiet');
   });
 

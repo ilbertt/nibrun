@@ -6,13 +6,13 @@ import { type AppStatus, appStatus } from '#status.ts';
 
 const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
-// Apps are addressed by id and listed by slug; the slug is the half a person sees, so it is the
+// Apps are addressed by id and listed by name; the name is the half a person sees, so it is the
 // half the CLI takes and this is where the two meet.
-export async function appBySlug({ api, slug }: { api: PublicApiClient; slug: string }) {
+export async function appByName({ api, name }: { api: PublicApiClient; name: string }) {
   const { apps } = unwrap(await api.api.apps.get());
-  const found = apps.find((app) => app.slug === slug);
+  const found = apps.find((app) => app.name === name);
   if (!found) {
-    throw new ApiError(`No app with slug ${slug}.`);
+    throw new ApiError(`No app named ${name}.`);
   }
   return found;
 }
@@ -21,14 +21,14 @@ export async function appBySlug({ api, slug }: { api: PublicApiClient; slug: str
  * One app exactly as the api answers with it, for a surface that renders one: every field is the
  * api's to name, so anything restating the shape here would be a second place for it to be wrong.
  */
-export type ListedApp = Awaited<ReturnType<typeof appBySlug>>;
+export type ListedApp = Awaited<ReturnType<typeof appByName>>;
 
 /**
  * The app and what it is doing: the row is what its owner asked for and the newest release is what
  * a host has done about it, and no command can tell what it may do from either alone.
  */
-export async function appWithStatus({ api, slug }: { api: PublicApiClient; slug: string }) {
-  const app = await appBySlug({ api, slug });
+export async function appWithStatus({ api, name }: { api: PublicApiClient; name: string }) {
+  const app = await appByName({ api, name });
   const { deployments } = unwrap(await api.api.apps({ appId: app.id }).deployments.get());
   const newest = deployments[0];
   return {
@@ -52,18 +52,18 @@ export async function appWithStatus({ api, slug }: { api: PublicApiClient; slug:
  */
 export async function appFor({
   api,
-  slug,
+  name,
   operation,
 }: {
   api: PublicApiClient;
-  slug: string;
+  name: string;
   operation: AppOperation;
 }) {
-  const found = await appWithStatus({ api, slug });
+  const found = await appWithStatus({ api, name });
   const refusal = operationRefusal({
     status: found.status,
     operation,
-    slug: found.app.slug,
+    name: found.app.name,
     release: found.newest,
   });
   if (refusal !== undefined) {
@@ -105,7 +105,7 @@ export async function pinnedArtifact({
 export type AddressedDeployment = {
   appId: string;
   deploymentId: string;
-  slug: string;
+  name: string;
   /**
    * The release the app is on, which is a different question from the one addressed: naming an
    * older deployment addresses a release that has been replaced, not the one running now.
@@ -125,23 +125,23 @@ export type AddressedDeployment = {
  */
 export async function addressedDeployment({
   api,
-  slug,
+  name,
   deploymentId,
   operation,
 }: {
   api: PublicApiClient;
-  slug: string;
+  name: string;
   deploymentId: string | undefined;
   operation: AppOperation;
 }): Promise<AddressedDeployment> {
-  const { app, newest, status } = await appFor({ api, slug, operation });
+  const { app, newest, status } = await appFor({ api, name, operation });
   if (!newest) {
     throw new ApiError(NO_DEPLOYMENTS);
   }
   return {
     appId: app.id,
     deploymentId: deploymentId ?? newest.id,
-    slug: app.slug,
+    name: app.name,
     newest,
     status,
   };

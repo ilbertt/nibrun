@@ -47,9 +47,9 @@ async function fillGaps({
   binarySource,
 }: Omit<Plan, 'args'> & { api: PublicApiClient }): Promise<RunOptions> {
   if (options.app !== undefined) {
-    // A slug typed rather than chosen has been checked against nothing yet, and a summary saying
+    // A name typed rather than chosen has been checked against nothing yet, and a summary saying
     // what the deploy replaces is worse than useless in front of an app it cannot land on.
-    await appFor({ api, slug: options.app, operation: 'release' });
+    await appFor({ api, name: options.app, operation: 'release' });
     return options;
   }
   // Not asked when a folder was given: an app's data is created as the app is, so naming one has
@@ -82,7 +82,7 @@ async function chooseApp({ api }: { api: PublicApiClient }): Promise<string | un
     message: 'Deploy onto which app?',
     options: [
       { value: null, label: 'A new app' },
-      ...deployable.map((app) => ({ value: app.slug, label: app.slug })),
+      ...deployable.map((app) => ({ value: app.name, label: app.name })),
     ],
   });
   return answered(chosen) ?? undefined;

@@ -7,7 +7,7 @@ import {
   listedApp,
   RUNNING_DEPLOYMENT,
 } from '#tests/support/api.ts';
-import { APP_ID, HOSTNAME, SLUG } from '#tests/support/app.ts';
+import { APP_ID, HOSTNAME, NAME } from '#tests/support/app.ts';
 import { writerRecording } from '#tests/support/output.ts';
 
 function listed(overrides: Partial<ListedApp> = {}): ListedApp {
@@ -24,7 +24,7 @@ function apiHoldingDeletable({ apps, deleted }: { apps: ListedApp[]; deleted: st
       deployments: deploymentsHolding([RUNNING_DEPLOYMENT]),
       delete: () => {
         deleted.push(appId);
-        return Promise.resolve({ data: { slug: SLUG, state: 'deleting' }, error: null });
+        return Promise.resolve({ data: { name: NAME, state: 'deleting' }, error: null });
       },
     }),
   });
@@ -36,7 +36,7 @@ describe('what a run with nobody watching is allowed to delete', () => {
 
     const attempt = deleteApp({
       api: apiHoldingDeletable({ apps: [listed()], deleted }),
-      slug: SLUG,
+      name: NAME,
       yes: false,
       interactive: false,
     });
@@ -50,7 +50,7 @@ describe('what a run with nobody watching is allowed to delete', () => {
 
     await deleteApp({
       api: apiHoldingDeletable({ apps: [listed()], deleted }),
-      slug: SLUG,
+      name: NAME,
       yes: true,
       interactive: false,
     });
@@ -65,21 +65,21 @@ test('an app already being deleted is not deleted again', async () => {
 
   const deleting = await deleteApp({
     api: apiHoldingDeletable({ apps: [listed({ state: 'deleting' })], deleted }),
-    slug: SLUG,
+    name: NAME,
     yes: true,
     interactive: false,
   });
 
   expect(deleted).toEqual([]);
-  expect(deleting).toEqual({ slug: SLUG, state: 'deleting', changed: false });
+  expect(deleting).toEqual({ name: NAME, state: 'deleting', changed: false });
 });
 
 test('and the teardown already under way is what a reader is told about', () => {
   const out = writerRecording();
 
-  DELETED_OUTPUT.render({ value: { slug: SLUG, state: 'deleting', changed: false }, out });
+  DELETED_OUTPUT.render({ value: { name: NAME, state: 'deleting', changed: false }, out });
 
-  expect(out.said).toEqual([`${SLUG} is already being deleted.`]);
+  expect(out.said).toEqual([`${NAME} is already being deleted.`]);
 });
 
 describe('what counts as having typed the phrase', () => {
@@ -105,8 +105,8 @@ describe('what a y/n would have accepted and this does not', () => {
     expect(saysDeletePermanently('delete')).toBe(false);
   });
 
-  test('the slug of the app being deleted', () => {
-    expect(saysDeletePermanently(SLUG)).toBe(false);
+  test('the name of the app being deleted', () => {
+    expect(saysDeletePermanently(NAME)).toBe(false);
   });
 
   test('a return pressed on an empty line', () => {
