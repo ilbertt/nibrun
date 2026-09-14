@@ -1,5 +1,6 @@
 import { ApiError } from '@repo/api-client/unwrap';
 import {
+  AppNameSchema,
   HttpPortSchema,
   type TenantArguments,
   type TenantEnvironmentPatch,
@@ -42,6 +43,24 @@ export function configPatch({ args, port, extraPublicPort, environment }: Config
     ...(port !== undefined && { httpPort: Value.Parse(HttpPortSchema, port) }),
     ...(extraPublicPort !== undefined && { hasExtraPublicPort: extraPublicPort }),
     ...(environment !== undefined && { environment }),
+  };
+}
+
+/** Everything an owner may change about an app in one patch: the config, and what it is called. */
+export type AppEdit = ConfigEdit & {
+  /** What to call the app from now on. Its hostnames stay: the slug never follows a rename. */
+  name?: string | undefined;
+};
+
+/**
+ * The body `PATCH /apps/:appId` takes. Parsed here rather than passed through, for the reason a
+ * domain is: a name the api would refuse is refused by the caller that took it rather than by a
+ * round trip.
+ */
+export function appPatch({ name, ...edit }: AppEdit) {
+  return {
+    ...configPatch(edit),
+    ...(name !== undefined && { name: Value.Parse(AppNameSchema, name) }),
   };
 }
 

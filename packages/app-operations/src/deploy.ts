@@ -17,6 +17,7 @@ import {
   type DeployStep,
   servingHostname,
 } from '#release.ts';
+import { updateApp } from '#update.ts';
 import {
   mebibytes,
   putObject,
@@ -117,12 +118,10 @@ export async function deploy({
 }: DeployInput): Promise<Deployed> {
   const target =
     existing === undefined ? null : await appFor({ api, name: existing, operation: 'release' });
-  const config = configPatch(edit);
-
   const app =
     target === null
-      ? await createApp({ api, name: name ?? binaryName(binary), config })
-      : unwrap(await api.api.apps({ appId: target.app.id }).patch(config));
+      ? await createApp({ api, name: name ?? binaryName(binary), config: configPatch(edit) })
+      : await updateApp({ api, appId: target.app.id, ...edit });
   onStep?.({ kind: 'app', appId: app.id, name: app.name });
 
   const artifact = isFetchable(binary)
