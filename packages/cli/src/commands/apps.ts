@@ -16,7 +16,8 @@ export const command = defineCommand('apps', {
     [SHARED_OPTIONS.app.name]: {
       ...SHARED_OPTIONS.app.option,
       forwardToChildren: true,
-      description: 'Name of the app to work with. Asked for when omitted.',
+      description:
+        'Name of the app to work with, or its slug where two share a name. Asked for when omitted.',
     },
   },
 });

@@ -45,7 +45,7 @@ export const command = defineCommand('apps update', {
       await updateApp({
         api,
         ui,
-        app,
+        appId: app.id,
         name: given[SHARED_OPTIONS.name.name],
         args: args === undefined ? undefined : parseArguments(args),
         port: given[SHARED_OPTIONS.port.name],

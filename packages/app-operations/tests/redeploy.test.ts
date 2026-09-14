@@ -66,7 +66,7 @@ function apiHolding({
 test('the binary the app is running is the one released again', async () => {
   const sent: Sent[] = [];
 
-  const deployed = await redeploy({ api: apiHolding({ sent }), app: NAME, args: ['serve'] });
+  const deployed = await redeploy({ api: apiHolding({ sent }), appId: APP_ID, args: ['serve'] });
 
   expect(sent.at(-1)).toEqual({ what: 'deployment', body: { artifactId: ARTIFACT_ID } });
   expect(deployed).toEqual({
@@ -84,7 +84,7 @@ test('config is written before the deployment that snapshots it', async () => {
 
   await redeploy({
     api: apiHolding({ sent }),
-    app: NAME,
+    appId: APP_ID,
     args: ['serve'],
     port: PORT,
     environment: TOKEN_SET,
@@ -104,7 +104,7 @@ test('config is written before the deployment that snapshots it', async () => {
 test('what the caller left out is left alone', async () => {
   const sent: Sent[] = [];
 
-  await redeploy({ api: apiHolding({ sent }), app: NAME, environment: TOKEN_SET });
+  await redeploy({ api: apiHolding({ sent }), appId: APP_ID, environment: TOKEN_SET });
 
   expect(sent.find((each) => each.what === 'app patch')?.body).toEqual({
     environment: TOKEN_SET,
@@ -114,7 +114,12 @@ test('what the caller left out is left alone', async () => {
 test('a new name goes in the same patch as the config, parsed', async () => {
   const sent: Sent[] = [];
 
-  await redeploy({ api: apiHolding({ sent }), app: NAME, name: 'Loud Badger', args: ['serve'] });
+  await redeploy({
+    api: apiHolding({ sent }),
+    appId: APP_ID,
+    name: 'Loud Badger',
+    args: ['serve'],
+  });
 
   expect(sent.find((each) => each.what === 'app patch')?.body).toEqual({
     args: ['serve'],
@@ -125,7 +130,7 @@ test('a new name goes in the same patch as the config, parsed', async () => {
 test('a name the api would refuse is refused before anything moves', async () => {
   const sent: Sent[] = [];
 
-  await expect(redeploy({ api: apiHolding({ sent }), app: NAME, name: '' })).rejects.toThrow();
+  await expect(redeploy({ api: apiHolding({ sent }), appId: APP_ID, name: '' })).rejects.toThrow();
   expect(sent.map((each) => each.what)).not.toContain('app patch');
 });
 
@@ -135,7 +140,7 @@ test('an app that has never been deployed is refused before its config moves', a
 
   const attempt = redeploy({
     api: apiHolding({ sent, deployments: [] }),
-    app: NAME,
+    appId: APP_ID,
     args: ['serve'],
   });
 
@@ -150,7 +155,7 @@ test('a suspended app is refused before its config moves', async () => {
 
   const attempt = redeploy({
     api: apiHolding({ sent, state: 'suspended' }),
-    app: NAME,
+    appId: APP_ID,
     args: ['serve'],
   });
 
@@ -161,10 +166,10 @@ test('a suspended app is refused before its config moves', async () => {
   expect(sent.map((each) => each.what)).toEqual(['deployments read']);
 });
 
-test('a name naming nothing is said to name nothing', async () => {
-  const attempt = redeploy({ api: apiHolding({ sent: [] }), app: 'Loud Badger', args: [] });
+test('an id naming nothing is the api saying so', async () => {
+  const attempt = redeploy({ api: apiHolding({ sent: [] }), appId: 'app-9', args: [] });
 
-  await expect(attempt).rejects.toThrow('No app named Loud Badger.');
+  await expect(attempt).rejects.toThrow('The api answered 404: App not found.');
 });
 
 test('each step is announced, the artifact among them', async () => {
@@ -172,7 +177,7 @@ test('each step is announced, the artifact among them', async () => {
 
   await redeploy({
     api: apiHolding({ sent: [] }),
-    app: NAME,
+    appId: APP_ID,
     args: [],
     onStep: (step) => steps.push(step),
   });

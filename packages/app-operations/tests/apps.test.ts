@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { addressedDeployment, appByName, appFor, newestDeployment } from '#apps.ts';
+import { addressedDeployment, appById, appFor, newestDeployment } from '#apps.ts';
 import { answering, apiHolding as apiWith } from '#tests/support/api.ts';
 import { DIGEST } from '#tests/support/app.ts';
 
@@ -21,24 +21,24 @@ function apiHolding({
   });
 }
 
-test('an app is found by the name its owner calls it', async () => {
+test('an app is read by its id, which is the one thing only it has', async () => {
   const api = apiHolding({ apps: [{ id: 'app-1', name: 'Quiet Otter' }] });
 
-  expect(await appByName({ api, name: 'Quiet Otter' })).toMatchObject({ id: 'app-1' });
+  expect(await appById({ api, appId: 'app-1' })).toMatchObject({ name: 'Quiet Otter' });
 });
 
-test('a name naming nothing is said to name nothing', async () => {
+test('an id naming nothing is the api saying so', async () => {
   const api = apiHolding({ apps: [{ id: 'app-1', name: 'Quiet Otter' }] });
 
-  await expect(appByName({ api, name: 'Loud Badger' })).rejects.toThrow(
-    'No app named Loud Badger.',
+  await expect(appById({ api, appId: 'app-9' })).rejects.toThrow(
+    'The api answered 404: App not found.',
   );
 });
 
 test('an app asking to run is one a release can be made onto', async () => {
   const api = apiHolding({ apps: [{ id: 'app-1', name: 'Quiet Otter', state: 'active' }] });
 
-  expect(await appFor({ api, name: 'Quiet Otter', operation: 'release' })).toMatchObject({
+  expect(await appFor({ api, appId: 'app-1', operation: 'release' })).toMatchObject({
     app: { id: 'app-1' },
   });
 });
@@ -51,7 +51,7 @@ test('and it comes back with the release it is on', async () => {
     deployments: [{ id: 'deployment-2', artifactId: 'artifact-2' }],
   });
 
-  expect(await appFor({ api, name: 'Quiet Otter', operation: 'release' })).toMatchObject({
+  expect(await appFor({ api, appId: 'app-1', operation: 'release' })).toMatchObject({
     newest: { artifactId: 'artifact-2' },
   });
 });
@@ -61,7 +61,7 @@ test('and it comes back with the release it is on', async () => {
 test('a suspended one is refused, with the way to make it deployable', async () => {
   const api = apiHolding({ apps: [{ id: 'app-1', name: 'Quiet Otter', state: 'suspended' }] });
 
-  await expect(appFor({ api, name: 'Quiet Otter', operation: 'release' })).rejects.toThrow(
+  await expect(appFor({ api, appId: 'app-1', operation: 'release' })).rejects.toThrow(
     'App Quiet Otter is suspended, so a new release would never start. Resume it first.',
   );
 });
@@ -93,7 +93,7 @@ test('addressing without a deployment id resolves to the newest one', async () =
   expect(
     await addressedDeployment({
       api,
-      name: 'Quiet Otter',
+      appId: 'app-1',
       deploymentId: undefined,
       operation: 'logs',
     }),
@@ -116,7 +116,7 @@ test('a deployment named outright still comes back under its app', async () => {
   expect(
     await addressedDeployment({
       api,
-      name: 'Quiet Otter',
+      appId: 'app-1',
       deploymentId: 'deployment-9',
       operation: 'logs',
     }),
@@ -133,7 +133,7 @@ test('the release the app is on comes back alongside the one addressed', async (
 
   const addressed = await addressedDeployment({
     api,
-    name: 'Quiet Otter',
+    appId: 'app-1',
     deploymentId: 'deployment-1',
     operation: 'logs',
   });

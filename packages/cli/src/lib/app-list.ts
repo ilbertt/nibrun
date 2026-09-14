@@ -20,7 +20,7 @@ const MeasuredSchema = z.object({
 
 const AppRowSchema = z.object({
   name: z.string(),
-  /** What the app is served under, which the listing leaves to `status` but a program may want. */
+  /** What the app is served under — and what tells two of one name apart, so `--app` takes it too. */
   slug: z.string(),
   state: z.enum(APP_STATES),
   updatedAt: z.string(),
@@ -43,6 +43,7 @@ const AppListSchema = z.object({ apps: z.array(AppRowSchema) });
 // a config patch or a state change, and a deploy leaves it alone entirely.
 const HEADINGS = {
   name: 'NAME',
+  slug: 'SLUG',
   state: 'STATE',
   cpu: 'CPU',
   memory: 'MEM',
@@ -138,10 +139,12 @@ function toRow(app: AppListing): AppRow {
 export function render(apps: readonly AppRow[]): string[] {
   const rows = [HEADINGS, ...apps.map(toColumns)];
   const nameWidth = Math.max(...rows.map((row) => row.name.length));
+  const slugWidth = Math.max(...rows.map((row) => row.slug.length));
 
   return rows.map((row) =>
     [
       row.name.padEnd(nameWidth),
+      row.slug.padEnd(slugWidth),
       row.state.padEnd(STATE_WIDTH),
       row.cpu.padStart(shareWidth(HEADINGS.cpu)),
       row.memory.padStart(shareWidth(HEADINGS.memory)),
@@ -154,6 +157,7 @@ export function render(apps: readonly AppRow[]): string[] {
 function toColumns(app: AppRow) {
   return {
     name: app.name,
+    slug: app.slug,
     state: app.state,
     cpu: share(app.cpuShare),
     memory: share(ratio(app.memory)),

@@ -28,8 +28,8 @@ export const command = defineCommand('apps delete', {
     const { api } = context;
 
     ui.open('nib apps delete');
-    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
+    const app = await selectApp({ api, name: parents.apps.options.app, interactive });
 
-    emit(await deleteApp({ api, name, yes: options.yes === true, interactive }));
+    emit(await deleteApp({ api, appId: app.id, yes: options.yes === true, interactive }));
   },
 });

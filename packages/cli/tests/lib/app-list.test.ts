@@ -32,16 +32,16 @@ function used({ share, of }: { share: number; of: number }) {
 describe('a listing is read down a column', () => {
   test('a heading says what each column is', () => {
     expect(render([app()])).toEqual([
-      'NAME         STATE       CPU   MEM  VOLUME  LAST CHANGE',
-      'Quiet Otter  active        -     -       -  2026-08-07 09:41',
+      'NAME         SLUG         STATE       CPU   MEM  VOLUME  LAST CHANGE',
+      'Quiet Otter  quiet-otter  active        -     -       -  2026-08-07 09:41',
     ]);
   });
 
   test('the widest name is what the column is wide enough for', () => {
     expect(render([app({ name: 'a' }), app({ name: 'considerably-longer' })])).toEqual([
-      'NAME                 STATE       CPU   MEM  VOLUME  LAST CHANGE',
-      'a                    active        -     -       -  2026-08-07 09:41',
-      'considerably-longer  active        -     -       -  2026-08-07 09:41',
+      'NAME                 SLUG         STATE       CPU   MEM  VOLUME  LAST CHANGE',
+      'a                    quiet-otter  active        -     -       -  2026-08-07 09:41',
+      'considerably-longer  quiet-otter  active        -     -       -  2026-08-07 09:41',
     ]);
   });
 
@@ -49,9 +49,9 @@ describe('a listing is read down a column', () => {
   // reading the same shape twice.
   test('a state wider than the one beside it does not shift the columns', () => {
     expect(render([app({ state: 'suspended' }), app({ state: 'deleting' })])).toEqual([
-      'NAME         STATE       CPU   MEM  VOLUME  LAST CHANGE',
-      'Quiet Otter  suspended     -     -       -  2026-08-07 09:41',
-      'Quiet Otter  deleting      -     -       -  2026-08-07 09:41',
+      'NAME         SLUG         STATE       CPU   MEM  VOLUME  LAST CHANGE',
+      'Quiet Otter  quiet-otter  suspended     -     -       -  2026-08-07 09:41',
+      'Quiet Otter  quiet-otter  deleting      -     -       -  2026-08-07 09:41',
     ]);
   });
 

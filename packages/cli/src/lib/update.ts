@@ -8,7 +8,7 @@ import type { Ui } from '#lib/ui.ts';
 export type UpdateInput = {
   api: PublicApiClient;
   ui: Ui;
-  app: string;
+  appId: string;
   name?: string | undefined;
   args?: TenantArguments | undefined;
   port?: number | undefined;
@@ -28,7 +28,7 @@ export type UpdateInput = {
 export async function updateApp({
   api,
   ui,
-  app,
+  appId,
   name,
   args,
   port,
@@ -39,7 +39,7 @@ export async function updateApp({
 }: UpdateInput): Promise<Release> {
   const deployed = await redeploy({
     api,
-    app,
+    appId,
     name,
     args,
     port,

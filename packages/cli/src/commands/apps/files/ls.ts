@@ -28,12 +28,12 @@ export const command = defineCommand('apps files ls', {
       json: rootOptions.json,
     });
     const { api } = context;
-    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
+    const app = await selectApp({ api, name: parents.apps.options.app, interactive });
 
     emit(
       await listDirectory({
         api,
-        name,
+        appId: app.id,
         deploymentId: options[SHARED_OPTIONS.deploymentId.name],
         path: GUEST_PATH_ROOT,
         print: aside,

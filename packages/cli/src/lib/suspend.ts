@@ -37,14 +37,14 @@ export const RESUMED_OUTPUT = defineOutput({
     ),
 });
 
-export type SuspendInput = { api: PublicApiClient; name: string };
+export type SuspendInput = { api: PublicApiClient; appId: string };
 
 /**
  * Take an app offline without giving anything of it up. Nothing here is destructive and there is
  * nothing to confirm: what a suspended app costs is its uptime, and resuming is the undo.
  */
-export async function suspendApp({ api, name }: SuspendInput): Promise<AppStateChange> {
-  const { app } = await appFor({ api, name, operation: 'suspend' });
+export async function suspendApp({ api, appId }: SuspendInput): Promise<AppStateChange> {
+  const { app } = await appFor({ api, appId, operation: 'suspend' });
   if (app.state === 'suspended') {
     return { name: app.name, state: app.state, changed: false };
   }
@@ -53,8 +53,8 @@ export async function suspendApp({ api, name }: SuspendInput): Promise<AppStateC
   return { name: suspended.name, state: suspended.state, changed: true };
 }
 
-export async function resumeApp({ api, name }: SuspendInput): Promise<AppStateChange> {
-  const { app } = await appFor({ api, name, operation: 'resume' });
+export async function resumeApp({ api, appId }: SuspendInput): Promise<AppStateChange> {
+  const { app } = await appFor({ api, appId, operation: 'resume' });
   if (app.state === 'active') {
     return { name: app.name, state: app.state, changed: false };
   }

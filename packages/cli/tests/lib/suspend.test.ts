@@ -41,7 +41,10 @@ function apiInState({
 test('suspending a running app asks the api for it', async () => {
   const asked: Asked[] = [];
 
-  const suspended = await suspendApp({ api: apiInState({ state: 'active', asked }), name: NAME });
+  const suspended = await suspendApp({
+    api: apiInState({ state: 'active', asked }),
+    appId: APP_ID,
+  });
 
   expect(asked).toEqual([{ appId: APP_ID, state: 'suspended' }]);
   expect(suspended).toEqual({ name: NAME, state: 'suspended', changed: true });
@@ -53,7 +56,7 @@ test('suspending one that already is says so and sends nothing', async () => {
 
   const suspended = await suspendApp({
     api: apiInState({ state: 'suspended', asked }),
-    name: NAME,
+    appId: APP_ID,
   });
 
   expect(asked).toEqual([]);
@@ -63,7 +66,10 @@ test('suspending one that already is says so and sends nothing', async () => {
 test('resuming a suspended app puts it back', async () => {
   const asked: Asked[] = [];
 
-  const resumed = await resumeApp({ api: apiInState({ state: 'suspended', asked }), name: NAME });
+  const resumed = await resumeApp({
+    api: apiInState({ state: 'suspended', asked }),
+    appId: APP_ID,
+  });
 
   expect(asked).toEqual([{ appId: APP_ID, state: 'active' }]);
   expect(resumed).toEqual({ name: NAME, state: 'active', changed: true });
@@ -72,7 +78,7 @@ test('resuming a suspended app puts it back', async () => {
 test('and resuming one that is already running sends nothing either', async () => {
   const asked: Asked[] = [];
 
-  const resumed = await resumeApp({ api: apiInState({ state: 'active', asked }), name: NAME });
+  const resumed = await resumeApp({ api: apiInState({ state: 'active', asked }), appId: APP_ID });
 
   expect(asked).toEqual([]);
   expect(resumed).toEqual({ name: NAME, state: 'active', changed: false });
@@ -84,7 +90,7 @@ test('an app being deleted is refused rather than sent', async () => {
   const asked: Asked[] = [];
 
   await expect(
-    resumeApp({ api: apiInState({ state: 'deleting', asked }), name: NAME }),
+    resumeApp({ api: apiInState({ state: 'deleting', asked }), appId: APP_ID }),
   ).rejects.toThrow('App Quiet Otter is being deleted, so there is nothing left to bring back.');
   expect(asked).toEqual([]);
 });

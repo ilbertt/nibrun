@@ -8,7 +8,7 @@ const NOTHING_TO_RELEASE = 'This app has never been deployed.';
 
 export type RedeployInput = AppEdit & {
   api: PublicApiClient;
-  app: string;
+  appId: string;
   onStep?: ((step: DeployStep) => void) | undefined;
 };
 
@@ -23,8 +23,8 @@ export type RedeployInput = AppEdit & {
  * deployed has no binary to run again, and finding that out afterwards would leave it configured
  * for a release nobody made.
  */
-export async function redeploy({ api, app, onStep, ...edit }: RedeployInput): Promise<Deployed> {
-  const target = await appFor({ api, name: app, operation: 'release' });
+export async function redeploy({ api, appId, onStep, ...edit }: RedeployInput): Promise<Deployed> {
+  const target = await appFor({ api, appId, operation: 'release' });
   if (!target.newest) {
     throw new ApiError(NOTHING_TO_RELEASE);
   }

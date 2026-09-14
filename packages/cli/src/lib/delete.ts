@@ -35,7 +35,7 @@ export const DELETED_OUTPUT = defineOutput({
 
 export type DeleteInput = {
   api: PublicApiClient;
-  name: string;
+  appId: string;
   yes: boolean;
   interactive: boolean;
 };
@@ -48,8 +48,8 @@ export type DeleteInput = {
  * The app is looked up before anything is asked, so a name that names nothing costs one line
  * rather than a phrase typed out for an app that was never there.
  */
-export async function deleteApp({ api, name, yes, interactive }: DeleteInput): Promise<Deleted> {
-  const { app } = await appFor({ api, name, operation: 'delete' });
+export async function deleteApp({ api, appId, yes, interactive }: DeleteInput): Promise<Deleted> {
+  const { app } = await appFor({ api, appId, operation: 'delete' });
   // Asking twice is asking once: the teardown already running is the answer to the second.
   if (app.state === 'deleting') {
     return { name: app.name, state: app.state, changed: false };

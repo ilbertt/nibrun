@@ -62,7 +62,7 @@ async function startRelease({
       api,
       binary,
       args,
-      app,
+      appId: app?.id,
       name,
       port,
       extraPublicPort,

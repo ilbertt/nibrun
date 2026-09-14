@@ -1,5 +1,5 @@
 import type { PublicApiClient } from '@repo/api-client/public';
-import { addDomain, appByName, appFor, removeDomain } from '@repo/app-operations';
+import { addDomain, appById, appFor, removeDomain } from '@repo/app-operations';
 import { APP_HOSTNAME_KINDS, APP_HOSTNAME_STATES } from '@repo/protocol';
 import { z } from 'zod';
 import { defineOutput } from '#lib/output.ts';
@@ -109,12 +109,12 @@ export const DOMAIN_REMOVED_OUTPUT = defineOutput({
 /** Every hostname the app answers on, or is waiting to. */
 export async function listDomains({
   api,
-  name,
+  appId,
 }: {
   api: PublicApiClient;
-  name: string;
+  appId: string;
 }): Promise<z.input<typeof DomainListSchema>> {
-  const app = await appByName({ api, name });
+  const app = await appById({ api, appId });
   const target = platformTarget({ slug: app.slug, hostnames: app.hostnames });
 
   return {
@@ -133,14 +133,14 @@ export async function listDomains({
 
 export async function addAppDomain({
   api,
-  name,
+  appId,
   hostname,
 }: {
   api: PublicApiClient;
-  name: string;
+  appId: string;
   hostname: string;
 }): Promise<z.input<typeof DomainAddedSchema>> {
-  const { app } = await appFor({ api, name, operation: 'domains' });
+  const { app } = await appFor({ api, appId, operation: 'domains' });
   const { hostname: added, created } = await addDomain({ api, appId: app.id, hostname });
 
   return {
@@ -187,14 +187,14 @@ function pendingRecords({
  */
 export async function removeAppDomain({
   api,
-  name,
+  appId,
   hostname,
 }: {
   api: PublicApiClient;
-  name: string;
+  appId: string;
   hostname: string;
 }): Promise<z.input<typeof DomainRemovedSchema>> {
-  const { app } = await appFor({ api, name, operation: 'domains' });
+  const { app } = await appFor({ api, appId, operation: 'domains' });
   await removeDomain({ api, appId: app.id, hostname });
 
   return { name: app.name, hostname };

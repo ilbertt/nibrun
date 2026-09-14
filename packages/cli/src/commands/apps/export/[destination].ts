@@ -24,8 +24,8 @@ export const command = defineCommand('apps export [destination]', {
     const { api } = context;
 
     ui.open('nib apps export');
-    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
+    const app = await selectApp({ api, name: parents.apps.options.app, interactive });
 
-    emit(await exportApp({ api, name, destination: params.destination, ui }));
+    emit(await exportApp({ api, appId: app.id, destination: params.destination, ui }));
   },
 });

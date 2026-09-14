@@ -15,9 +15,19 @@ import { answered } from '#lib/prompts.ts';
 const NO_APP_NAMED = `Which app? Name one with --${SHARED_OPTIONS.app.name}.`;
 export const NO_APPS = 'You have no apps. `nib run` is what makes one.';
 
+/** An app as `--app` resolves to: the id the api is asked by, and the name to say it by. */
+export type AddressedApp = { id: string; name: string };
+
+type ListedApp = AddressedApp & { slug: string; state: string };
+
 /**
  * The app a command was pointed at: the flag when it was given, and the question it stands for
  * when it was not.
+ *
+ * Resolved to an id here, once, because a name is what an owner calls an app and two of theirs
+ * may share one — the id is the api's, and only ever one app's. Where the name matches more than
+ * one the owner is asked which, or told to say which by slug where there is nobody to ask; a slug
+ * is taken in the flag's place because it is the answer to that.
  *
  * `--app` is optional on `apps` so that asking for nothing is answered with a listing rather
  * than an error, which leaves every command underneath to say what going without one means. They
@@ -31,38 +41,80 @@ export async function selectApp({
   api: PublicApiClient;
   name: string | undefined;
   interactive: boolean;
-}): Promise<string> {
-  if (name !== undefined) {
-    return name;
-  }
-  if (!interactive) {
+}): Promise<AddressedApp> {
+  if (name === undefined && !interactive) {
     throw new UsageError(NO_APP_NAMED);
   }
-  return await chooseApp({ api });
-}
-
-/**
- * A name rather than the app it was read from, even though whatever the answer is handed to reads
- * the listing again: a name is what an owner calls an app by and what every command under `apps`
- * takes, and the second read falls only on somebody already sat at the prompt.
- */
-async function chooseApp({ api }: { api: PublicApiClient }): Promise<string> {
   const { apps } = unwrap(await api.api.apps.get());
+  if (name !== undefined) {
+    return resolveApp({ apps, name, interactive });
+  }
   if (apps.length === 0) {
     throw new UsageError(NO_APPS);
   }
+  return chooseApp({ apps, message: 'Which app?' });
+}
+
+function resolveApp({
+  apps,
+  name,
+  interactive,
+}: {
+  apps: readonly ListedApp[];
+  name: string;
+  interactive: boolean;
+}): Promise<AddressedApp> {
+  const named = apps.filter((app) => app.name === name);
+  const [only] = named;
+  if (only !== undefined && named.length === 1) {
+    return Promise.resolve(addressed(only));
+  }
+  if (named.length > 1) {
+    if (!interactive) {
+      throw new UsageError(
+        `${named.length} apps are named ${name}. Say which by its slug: ${named.map((app) => app.slug).join(', ')}.`,
+      );
+    }
+    return chooseApp({ apps: named, message: `Which ${name}?` });
+  }
+  const bySlug = apps.find((app) => app.slug === name);
+  if (bySlug !== undefined) {
+    return Promise.resolve(addressed(bySlug));
+  }
+  throw new UsageError(`No app named ${name}.`);
+}
+
+/**
+ * Every app offered is offered with its slug, because that is what tells two of one name apart —
+ * and with its state where that is anything but running: reading what a suspended one wrote is a
+ * reason to have kept it, but an app being torn down answers differently, and having chosen it is
+ * too late to find that out.
+ */
+async function chooseApp({
+  apps,
+  message,
+}: {
+  apps: readonly ListedApp[];
+  message: string;
+}): Promise<AddressedApp> {
   const chosen = await select({
-    message: 'Which app?',
+    message,
     options: apps.map((app) => ({
-      value: app.name,
+      value: app.id,
       label: app.name,
-      // Every app the api lists is offered — reading what a suspended one wrote is a reason to
-      // have kept it — so the state is said as well, an app being torn down answering differently
-      // and having chosen it being too late to find that out.
-      hint: app.state === 'active' ? undefined : app.state,
+      hint: app.state === 'active' ? app.slug : `${app.slug} · ${app.state}`,
     })),
   });
-  return answered(chosen);
+  const id = answered(chosen);
+  const app = apps.find((each) => each.id === id);
+  if (app === undefined) {
+    throw new Error('The prompt answered with an app it was not offered.');
+  }
+  return addressed(app);
+}
+
+function addressed({ id, name }: ListedApp): AddressedApp {
+  return { id, name };
 }
 
 /**
@@ -74,20 +126,20 @@ async function chooseApp({ api }: { api: PublicApiClient }): Promise<string> {
  */
 export async function announcedDeployment({
   api,
-  name,
+  appId,
   deploymentId,
   operation,
   print,
 }: {
   api: PublicApiClient;
-  name: string;
+  appId: string;
   deploymentId: string | undefined;
   operation: AppOperation;
   print: Print;
 }): Promise<AddressedDeployment> {
-  const addressed = await addressedDeployment({ api, name, deploymentId, operation });
-  print.dim(`${addressed.name} · deployment ${addressed.deploymentId}`);
-  return addressed;
+  const found = await addressedDeployment({ api, appId, deploymentId, operation });
+  print.dim(`${found.name} · deployment ${found.deploymentId}`);
+  return found;
 }
 
 /**

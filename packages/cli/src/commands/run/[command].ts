@@ -1,6 +1,7 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
 import { SHARED_OPTIONS } from '#config.ts';
+import { selectApp } from '#lib/apps.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { binaryFrom, deploy } from '#lib/deploy.ts';
@@ -22,7 +23,8 @@ export const command = defineCommand('run [command]', {
   options: {
     [SHARED_OPTIONS.app.name]: {
       ...SHARED_OPTIONS.app.option,
-      description: 'Name of an existing app to deploy onto. Asked for when omitted.',
+      description:
+        'Name of an existing app to deploy onto, or its slug where two share a name. Asked for when omitted.',
     },
     [SHARED_OPTIONS.name.name]: {
       ...SHARED_OPTIONS.name.option,
@@ -69,8 +71,10 @@ export const command = defineCommand('run [command]', {
     // is the end that fetches it, and it is the end that says whether it could.
     const binary = await binaryFrom({ source: binarySource, sha256 });
     const dataFolder = await initialDataFrom({ path: dataFolderPath, app: flags.app });
-    const given = { ...flags, extraPublicPort, dataFolder };
     ui.open('nib run');
+    const app =
+      flags.app === undefined ? undefined : await selectApp({ api, name: flags.app, interactive });
+    const given = { ...flags, app, extraPublicPort, dataFolder };
 
     const resolved = interactive
       ? await completeOptions({ api, options: given, binarySource, args })

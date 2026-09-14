@@ -36,7 +36,7 @@ describe('what a run with nobody watching is allowed to delete', () => {
 
     const attempt = deleteApp({
       api: apiHoldingDeletable({ apps: [listed()], deleted }),
-      name: NAME,
+      appId: APP_ID,
       yes: false,
       interactive: false,
     });
@@ -50,7 +50,7 @@ describe('what a run with nobody watching is allowed to delete', () => {
 
     await deleteApp({
       api: apiHoldingDeletable({ apps: [listed()], deleted }),
-      name: NAME,
+      appId: APP_ID,
       yes: true,
       interactive: false,
     });
@@ -65,7 +65,7 @@ test('an app already being deleted is not deleted again', async () => {
 
   const deleting = await deleteApp({
     api: apiHoldingDeletable({ apps: [listed({ state: 'deleting' })], deleted }),
-    name: NAME,
+    appId: APP_ID,
     yes: true,
     interactive: false,
   });

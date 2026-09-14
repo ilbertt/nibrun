@@ -17,8 +17,18 @@ export function apiHolding({
   apps?: Array<{ id: string; name: string; state?: string }>;
   underApp?: (addressed: { appId: string }) => object;
 }): PublicApiClient {
+  // One app answers by id the way the api does: the row the listing holds, or a 404.
   function addressed(app: { appId: string }) {
-    return underApp(app);
+    const listed = apps?.find((each) => each.id === app.appId);
+    return {
+      get: () =>
+        Promise.resolve(
+          listed
+            ? { data: listed, error: null }
+            : { data: null, error: { status: 404, value: { error: 'App not found.' } } },
+        ),
+      ...underApp(app),
+    };
   }
 
   const route =
