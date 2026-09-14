@@ -156,12 +156,12 @@ export const APP_STATUS_OUTPUT = defineOutput({
 
 export async function readStatus({
   api,
-  name,
+  appId,
 }: {
   api: PublicApiClient;
-  name: string;
+  appId: string;
 }): Promise<z.input<typeof AppStatusSchema>> {
-  const { app, status } = await appWithStatus({ api, name });
+  const { app, status } = await appWithStatus({ api, appId });
   const compute = app.computeUsage;
   const volume = app.volumeUsage;
   const { vcpuCount, memoryMib } = app.config.resources;

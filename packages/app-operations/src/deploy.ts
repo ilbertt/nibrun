@@ -88,7 +88,8 @@ export type DeployInput = ConfigEdit & {
   // asked to run with, and carrying over the last release's arguments because none were given
   // this time would run something nobody asked for.
   args: TenantArguments;
-  app?: string | undefined;
+  /** The app to release onto; none makes one, called `name`. */
+  appId?: string | undefined;
   name?: string | undefined;
   // What the app's `data/` is created holding. Nameable on any deployment and accepted on one
   // only while the app's filesystem does not exist yet, which the api is the end that knows.
@@ -108,7 +109,7 @@ export type DeployInput = ConfigEdit & {
 export async function deploy({
   api,
   binary,
-  app: existing,
+  appId,
   name,
   initialData,
   onStep,
@@ -116,8 +117,7 @@ export async function deploy({
   upload = streamedUpload,
   ...edit
 }: DeployInput): Promise<Deployed> {
-  const target =
-    existing === undefined ? null : await appFor({ api, name: existing, operation: 'release' });
+  const target = appId === undefined ? null : await appFor({ api, appId, operation: 'release' });
   const app =
     target === null
       ? await createApp({ api, name: name ?? binaryName(binary), config: configPatch(edit) })

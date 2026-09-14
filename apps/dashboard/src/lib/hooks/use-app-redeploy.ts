@@ -30,7 +30,7 @@ export function useAppRedeploy(appId: string): AppRedeploy {
         ? undefined
         : () =>
             run.start({
-              app: released.name,
+              appId: released.id,
               args: released.config.args,
               port: released.config.httpPort,
             }),

@@ -35,7 +35,7 @@ export const EXPORT_OUTPUT = defineOutput({
 
 export type ExportInput = {
   api: PublicApiClient;
-  name: string;
+  appId: string;
   destination: string;
   ui: Ui;
 };
@@ -50,11 +50,11 @@ export type ExportInput = {
  */
 export async function exportApp({
   api,
-  name,
+  appId,
   destination,
   ui,
 }: ExportInput): Promise<z.input<typeof ExportSchema>> {
-  const { app } = await appFor({ api, name, operation: 'export' });
+  const { app } = await appFor({ api, appId, operation: 'export' });
   const path = await bundlePath({ destination, slug: app.slug });
 
   const requested = await requestExport({ api, appId: app.id });

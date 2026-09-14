@@ -272,7 +272,7 @@ function asReleaseRequest({
   };
 
   if (value.binary === undefined) {
-    return replacing === undefined ? undefined : { ...configured, app: replacing.name };
+    return replacing === undefined ? undefined : { ...configured, appId: replacing.id };
   }
 
   const binary = deployableFrom(value.binary);
@@ -281,7 +281,7 @@ function asReleaseRequest({
     : {
         ...configured,
         binary,
-        app: replacing?.name,
+        appId: replacing?.id,
         name: replacing === undefined ? value.name.trim() || undefined : undefined,
         initialData: initialDataFrom({ file: value.initialData, replacing }),
       };

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { updateApp } from '#lib/update.ts';
 import { answering, apiHolding, listedApp } from '#tests/support/api.ts';
-import { HOSTNAME, NAME } from '#tests/support/app.ts';
+import { APP_ID, HOSTNAME, NAME } from '#tests/support/app.ts';
 import { uiRecording } from '#tests/support/ui.ts';
 
 const ARTIFACT_ID = 'artifact-1';
@@ -40,7 +40,7 @@ test('the flags that were given are the whole of what the app is asked to change
   await updateApp({
     api: apiHoldingPatchable({ patched }),
     ui: uiRecording(),
-    app: NAME,
+    appId: APP_ID,
     env: ['TOKEN=shh'],
     unset: ['STALE'],
   });
@@ -56,7 +56,7 @@ test('a new name is sent with the rest of the edit', async () => {
   await updateApp({
     api: apiHoldingPatchable({ patched }),
     ui: uiRecording(),
-    app: NAME,
+    appId: APP_ID,
     name: 'Loud Badger',
     port: 8080,
   });
@@ -72,7 +72,7 @@ test('arguments nobody named are not arguments cleared', async () => {
   await updateApp({
     api: apiHoldingPatchable({ patched }),
     ui: uiRecording(),
-    app: NAME,
+    appId: APP_ID,
     port: 8080,
   });
 
@@ -85,8 +85,8 @@ test('asking for a public port sends the answer, and so does giving it up', asyn
   const patched: unknown[] = [];
   const api = apiHoldingPatchable({ patched });
 
-  await updateApp({ api, ui: uiRecording(), app: NAME, extraPublicPort: true });
-  await updateApp({ api, ui: uiRecording(), app: NAME, extraPublicPort: false });
+  await updateApp({ api, ui: uiRecording(), appId: APP_ID, extraPublicPort: true });
+  await updateApp({ api, ui: uiRecording(), appId: APP_ID, extraPublicPort: false });
 
   expect(patched).toEqual([{ hasExtraPublicPort: true }, { hasExtraPublicPort: false }]);
 });
@@ -97,7 +97,7 @@ test('a flag nobody passed says nothing about the port', async () => {
   await updateApp({
     api: apiHoldingPatchable({ patched }),
     ui: uiRecording(),
-    app: NAME,
+    appId: APP_ID,
     port: 8080,
   });
 
@@ -112,7 +112,7 @@ test('an empty list of arguments is arguments cleared', async () => {
   await updateApp({
     api: apiHoldingPatchable({ patched }),
     ui: uiRecording(),
-    app: NAME,
+    appId: APP_ID,
     args: [],
   });
 
@@ -123,7 +123,7 @@ test('a name the shell would not accept as a variable is refused in this program
   const attempt = updateApp({
     api: apiHoldingPatchable({ patched: [] }),
     ui: uiRecording(),
-    app: NAME,
+    appId: APP_ID,
     env: ['9LIVES=cat'],
   });
 
@@ -138,7 +138,7 @@ test('the binary being run again is named, and the release says where it answers
   const release = await updateApp({
     api: apiHoldingPatchable({ patched: [] }),
     ui,
-    app: NAME,
+    appId: APP_ID,
     args: [],
   });
 

@@ -18,8 +18,8 @@ export const command = defineCommand('apps resume', {
     const { api } = context;
 
     ui.open('nib apps resume');
-    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
+    const app = await selectApp({ api, name: parents.apps.options.app, interactive });
 
-    emit(await resumeApp({ api, name }));
+    emit(await resumeApp({ api, appId: app.id }));
   },
 });

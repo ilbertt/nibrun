@@ -24,8 +24,8 @@ export const command = defineCommand('apps domains add [hostname]', {
     const { api } = context;
 
     ui.open('nib apps domains add');
-    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
+    const app = await selectApp({ api, name: parents.apps.options.app, interactive });
 
-    emit(await addAppDomain({ api, name, hostname: params.hostname }));
+    emit(await addAppDomain({ api, appId: app.id, hostname: params.hostname }));
   },
 });

@@ -1,6 +1,7 @@
 import { beforeEach, expect, test } from 'bun:test';
 import type { InitialData } from '#lib/initial-data.ts';
 import { apiHolding, deploymentsHolding, listedApp } from '#tests/support/api.ts';
+import { APP_ID } from '#tests/support/app.ts';
 import { recordingPrompts } from '#tests/support/prompts.ts';
 
 const prompts = await recordingPrompts();
@@ -56,7 +57,7 @@ test('a url suggests the same name the path to the same binary would', async () 
 });
 
 test('an app the owner cannot deploy onto is not offered', async () => {
-  prompts.answers.chosen = 'demo-abc123';
+  prompts.answers.chosen = APP_ID;
 
   const resolved = await completeOptions({
     api: apiListing({
@@ -70,7 +71,7 @@ test('an app the owner cannot deploy onto is not offered', async () => {
     args: [],
   });
 
-  expect(resolved).toEqual({ app: 'demo-abc123' });
+  expect(resolved).toEqual({ app: { id: APP_ID, name: 'demo-abc123' } });
   expect(prompts.transcript()).toEqual([
     'select:Deploy onto which app? [A new app|demo-abc123]',
     'confirm:Deploy onto demo-abc123? This replaces what it is running.',
@@ -112,7 +113,7 @@ test('a flag already given is not asked about again', async () => {
 test('what the binary will be run with is shown before anything is uploaded', async () => {
   await completeOptions({
     api: apiListing({ apps: [{ name: 'demo-abc123', state: 'active' }] }),
-    options: { app: 'demo-abc123' },
+    options: { app: { id: APP_ID, name: 'demo-abc123' } },
     binarySource: '/tmp/my-server',
     args: ['serve', '--verbose'],
   });
@@ -126,7 +127,7 @@ test('what the binary will be run with is shown before anything is uploaded', as
 test('a named app that cannot be deployed onto is refused before anything is asked', async () => {
   const attempt = completeOptions({
     api: apiListing({ apps: [{ name: 'demo-abc123', state: 'suspended' }], release: 'stopped' }),
-    options: { app: 'demo-abc123' },
+    options: { app: { id: APP_ID, name: 'demo-abc123' } },
     binarySource: '/tmp/my-server',
     args: [],
   });

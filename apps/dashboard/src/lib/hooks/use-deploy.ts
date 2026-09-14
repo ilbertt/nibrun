@@ -22,13 +22,13 @@ type Configured = {
 
 export type DeployRequest = Configured & {
   binary: DeployableBinary;
-  app: string | undefined;
+  appId: string | undefined;
   name: string | undefined;
   initialData: UploadableArchive | undefined;
 };
 
 /** The same release without a binary to upload, which only an app already running one can ask for. */
-export type RedeployRequest = Configured & { app: string };
+export type RedeployRequest = Configured & { appId: string };
 
 export type ReleaseRequest = DeployRequest | RedeployRequest;
 

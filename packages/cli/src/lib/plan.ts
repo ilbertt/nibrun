@@ -4,12 +4,14 @@ import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
 import { appFor } from '@repo/app-operations';
 import { DEFAULT_HTTP_PORT, type TenantArguments } from '@repo/protocol';
+import type { AddressedApp } from '#lib/apps.ts';
 import { CancelledError } from '#lib/errors.ts';
 import type { InitialData } from '#lib/initial-data.ts';
 import { answered } from '#lib/prompts.ts';
 
 export type RunOptions = {
-  app?: string | undefined;
+  /** The app to release onto, already resolved from whatever `--app` said; none makes one. */
+  app?: AddressedApp | undefined;
   name?: string | undefined;
   port?: number | undefined;
   extraPublicPort?: boolean | undefined;
@@ -47,9 +49,9 @@ async function fillGaps({
   binarySource,
 }: Omit<Plan, 'args'> & { api: PublicApiClient }): Promise<RunOptions> {
   if (options.app !== undefined) {
-    // A name typed rather than chosen has been checked against nothing yet, and a summary saying
+    // An app typed rather than chosen has been checked against nothing yet, and a summary saying
     // what the deploy replaces is worse than useless in front of an app it cannot land on.
-    await appFor({ api, name: options.app, operation: 'release' });
+    await appFor({ api, appId: options.app.id, operation: 'release' });
     return options;
   }
   // Not asked when a folder was given: an app's data is created as the app is, so naming one has
@@ -72,20 +74,23 @@ async function fillGaps({
  * the one case where guessing is expensive: taken literally they get a second app every run,
  * and taken generously they overwrite one they never named.
  */
-async function chooseApp({ api }: { api: PublicApiClient }): Promise<string | undefined> {
+async function chooseApp({ api }: { api: PublicApiClient }): Promise<AddressedApp | undefined> {
   const { apps } = unwrap(await api.api.apps.get());
   const deployable = apps.filter((app) => app.state === 'active');
   if (deployable.length === 0) {
     return undefined;
   }
+  // The slug beside every name, because two of an owner's apps may share one.
   const chosen = await select<string | null>({
     message: 'Deploy onto which app?',
     options: [
       { value: null, label: 'A new app' },
-      ...deployable.map((app) => ({ value: app.name, label: app.name })),
+      ...deployable.map((app) => ({ value: app.id, label: app.name, hint: app.slug })),
     ],
   });
-  return answered(chosen) ?? undefined;
+  const id = answered(chosen);
+  const app = deployable.find((each) => each.id === id);
+  return app === undefined ? undefined : { id: app.id, name: app.name };
 }
 
 async function askName({ suggestion }: { suggestion: string }): Promise<string> {
@@ -116,9 +121,10 @@ async function confirmPlan({ options, binarySource, args }: Plan): Promise<void>
   const creating = options.app === undefined;
   note(summary({ options, binarySource, args }), creating ? 'New app' : 'Existing app');
 
-  const question = creating
-    ? `Create ${options.name} and deploy?`
-    : `Deploy onto ${options.app}? This replaces what it is running.`;
+  const question =
+    options.app === undefined
+      ? `Create ${options.name} and deploy?`
+      : `Deploy onto ${options.app.name}? This replaces what it is running.`;
   if (!answered(await confirm({ message: question }))) {
     throw new CancelledError();
   }
@@ -127,7 +133,7 @@ async function confirmPlan({ options, binarySource, args }: Plan): Promise<void>
 function summary({ options, binarySource, args }: Plan): string {
   const rows = [
     ['binary', binarySource],
-    ['app', options.app ?? options.name],
+    ['app', options.app?.name ?? options.name],
     ['port', options.port],
     ['data', options.dataFolder?.path],
     // Only when it was asked for: a row saying no on every run is one nobody reads.

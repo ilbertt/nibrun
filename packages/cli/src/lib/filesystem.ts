@@ -57,7 +57,7 @@ export const DIRECTORY_OUTPUT = defineOutput({
 
 export type ListInput = {
   api: PublicApiClient;
-  name: string;
+  appId: string;
   deploymentId: string | undefined;
   path: GuestPath;
   print: Print;
@@ -73,14 +73,14 @@ export type ListInput = {
  */
 export async function listDirectory({
   api,
-  name,
+  appId,
   deploymentId,
   path,
   print,
 }: ListInput): Promise<z.input<typeof DirectorySchema>> {
   const addressed = await announcedDeployment({
     api,
-    name,
+    appId,
     deploymentId,
     operation: 'files',
     print,

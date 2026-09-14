@@ -30,10 +30,10 @@ export const command = defineCommand('apps logs', {
       json: rootOptions.json,
     });
     const { api } = context;
-    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
+    const app = await selectApp({ api, name: parents.apps.options.app, interactive });
     const addressed = await announcedDeployment({
       api,
-      name,
+      appId: app.id,
       deploymentId: options[SHARED_OPTIONS.deploymentId.name],
       operation: 'logs',
       print: aside,

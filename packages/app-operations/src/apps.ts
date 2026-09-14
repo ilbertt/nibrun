@@ -6,29 +6,27 @@ import { type AppStatus, appStatus } from '#status.ts';
 
 const NO_DEPLOYMENTS = 'This app has never been deployed.';
 
-// Apps are addressed by id and listed by name; the name is the half a person sees, so it is the
-// half the CLI takes and this is where the two meet.
-export async function appByName({ api, name }: { api: PublicApiClient; name: string }) {
-  const { apps } = unwrap(await api.api.apps.get());
-  const found = apps.find((app) => app.name === name);
-  if (!found) {
-    throw new ApiError(`No app named ${name}.`);
-  }
-  return found;
+/**
+ * The id is the one thing about an app that is only ever its own: a name is what its owner calls
+ * it, and two of theirs may share one. Whoever took a name is the one to have turned it into an
+ * id before asking here — the dashboard reads it off the URL, the CLI off the listing.
+ */
+export async function appById({ api, appId }: { api: PublicApiClient; appId: string }) {
+  return unwrap(await api.api.apps({ appId }).get());
 }
 
 /**
  * One app exactly as the api answers with it, for a surface that renders one: every field is the
  * api's to name, so anything restating the shape here would be a second place for it to be wrong.
  */
-export type ListedApp = Awaited<ReturnType<typeof appByName>>;
+export type ListedApp = Awaited<ReturnType<typeof appById>>;
 
 /**
  * The app and what it is doing: the row is what its owner asked for and the newest release is what
  * a host has done about it, and no command can tell what it may do from either alone.
  */
-export async function appWithStatus({ api, name }: { api: PublicApiClient; name: string }) {
-  const app = await appByName({ api, name });
+export async function appWithStatus({ api, appId }: { api: PublicApiClient; appId: string }) {
+  const app = await appById({ api, appId });
   const { deployments } = unwrap(await api.api.apps({ appId: app.id }).deployments.get());
   const newest = deployments[0];
   return {
@@ -52,14 +50,14 @@ export async function appWithStatus({ api, name }: { api: PublicApiClient; name:
  */
 export async function appFor({
   api,
-  name,
+  appId,
   operation,
 }: {
   api: PublicApiClient;
-  name: string;
+  appId: string;
   operation: AppOperation;
 }) {
-  const found = await appWithStatus({ api, name });
+  const found = await appWithStatus({ api, appId });
   const refusal = operationRefusal({
     status: found.status,
     operation,
@@ -125,16 +123,16 @@ export type AddressedDeployment = {
  */
 export async function addressedDeployment({
   api,
-  name,
+  appId,
   deploymentId,
   operation,
 }: {
   api: PublicApiClient;
-  name: string;
+  appId: string;
   deploymentId: string | undefined;
   operation: AppOperation;
 }): Promise<AddressedDeployment> {
-  const { app, newest, status } = await appFor({ api, name, operation });
+  const { app, newest, status } = await appFor({ api, appId, operation });
   if (!newest) {
     throw new ApiError(NO_DEPLOYMENTS);
   }

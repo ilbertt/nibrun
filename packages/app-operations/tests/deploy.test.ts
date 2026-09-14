@@ -69,7 +69,15 @@ function apiHolding({
         },
       };
     }
+    const listed = apps.find((each) => each.id === appId);
     return {
+      // Read to decide whether the app can take a release; nothing is sent by asking.
+      get: () =>
+        Promise.resolve(
+          listed
+            ? { data: { ...app(appId), ...listed }, error: null }
+            : { data: null, error: { status: 404, value: { error: 'App not found.' } } },
+        ),
       patch: (body: unknown) => {
         sent.push({ what: 'app patch', body });
         return Promise.resolve({ data: app(appId), error: null });
@@ -144,7 +152,7 @@ afterEach(() => {
   globalThis.fetch = REAL_FETCH;
 });
 
-test('a name names the app the release lands on', async () => {
+test('an id names the app the release lands on', async () => {
   const sent: Sent[] = [];
   storeAnswering({ sent });
 
@@ -152,7 +160,7 @@ test('a name names the app the release lands on', async () => {
     api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent }),
     binary: binary(),
     args: [],
-    app: NAME,
+    appId: APP_ID,
   });
 
   expect(sent.map((each) => each.what)).toEqual([
@@ -180,7 +188,7 @@ test('a suspended app is refused before its binary goes anywhere', async () => {
     api: apiHolding({ apps: [{ id: APP_ID, name: NAME, state: 'suspended' }], sent }),
     binary: binary(),
     args: [],
-    app: NAME,
+    appId: APP_ID,
   });
 
   await expect(attempt).rejects.toThrow(
@@ -201,7 +209,7 @@ test('a domain the owner brought is the address handed back, once it is serving'
     }),
     binary: binary(),
     args: [],
-    app: NAME,
+    appId: APP_ID,
   });
 
   expect(deployed.url).toBe('https://shop.example.com');
@@ -218,7 +226,7 @@ test('a domain still waiting on its records is not the one handed back', async (
     api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent }),
     binary: binary(),
     args: [],
-    app: NAME,
+    appId: APP_ID,
   });
 
   expect(deployed.url).toBe(`https://${SLUG}.nibrun.app`);
@@ -259,7 +267,7 @@ test('config is written before the deployment that snapshots it', async () => {
     api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent }),
     binary: binary(),
     args: ['serve'],
-    app: NAME,
+    appId: APP_ID,
     port: PORT,
   });
 
@@ -276,7 +284,7 @@ describe('the bytes go to the store, and the api is told how that went', () => {
       api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent }),
       binary: binary(),
       args: [],
-      app: NAME,
+      appId: APP_ID,
     });
 
     expect(sent[1]).toEqual({
@@ -297,7 +305,7 @@ describe('the bytes go to the store, and the api is told how that went', () => {
       api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent }),
       binary: binary(),
       args: [],
-      app: NAME,
+      appId: APP_ID,
     });
 
     await expect(attempt).rejects.toThrow('the length is not what was signed');
@@ -312,7 +320,7 @@ describe('the bytes go to the store, and the api is told how that went', () => {
       api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent, completed: null }),
       binary: binary(),
       args: [],
-      app: NAME,
+      appId: APP_ID,
     });
 
     await expect(attempt).rejects.toThrow(
@@ -436,7 +444,7 @@ describe('what a caller is told as it happens', () => {
       api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent: [] }),
       binary: binary(),
       args: [],
-      app: NAME,
+      appId: APP_ID,
       onStep: (step) => steps.push(step),
     });
 
@@ -456,7 +464,7 @@ describe('what a caller is told as it happens', () => {
       api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent: [] }),
       binary: binary(),
       args: [],
-      app: NAME,
+      appId: APP_ID,
       whileUploading: ({ message, task }) => {
         waits.push(message);
         return task(() => {});
@@ -475,7 +483,7 @@ describe('what a caller is told as it happens', () => {
       api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent: [] }),
       binary: binary(),
       args: [],
-      app: NAME,
+      appId: APP_ID,
       upload: ({ body, onProgress }) => {
         onProgress({ sentBytes: PART_BYTES, totalBytes: body.size });
         onProgress({ sentBytes: body.size, totalBytes: body.size });
@@ -497,7 +505,7 @@ describe('what a caller is told as it happens', () => {
       api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent: [] }),
       binary: binary(),
       args: [],
-      app: NAME,
+      appId: APP_ID,
       upload: ({ url }) => {
         asked.push(url);
         return Promise.resolve(new Response(''));
@@ -545,7 +553,7 @@ describe('a binary the api fetches is never sent from this end', () => {
       api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent, created: FETCHED }),
       binary: { url: BINARY_URL },
       args: [],
-      app: NAME,
+      appId: APP_ID,
     });
 
     expect(sent.map((each) => each.what)).toEqual(['app patch', 'artifact', 'deployment']);
@@ -614,7 +622,7 @@ describe('a binary the api fetches is never sent from this end', () => {
         api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent }),
         binary: { url: BINARY_URL },
         args: [],
-        app: NAME,
+        appId: APP_ID,
       }),
     ).rejects.toThrow('The api answered a fetched binary with somewhere to upload one.');
   });
@@ -628,7 +636,7 @@ describe('a binary the api fetches is never sent from this end', () => {
         api: apiHolding({ apps: [{ id: APP_ID, name: NAME }], sent, created: FETCHED }),
         binary: binary(),
         args: [],
-        app: NAME,
+        appId: APP_ID,
       }),
     ).rejects.toThrow('The api answered an upload with an artifact nobody sent it.');
   });
