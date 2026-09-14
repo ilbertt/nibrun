@@ -111,6 +111,24 @@ test('what the caller left out is left alone', async () => {
   });
 });
 
+test('a new name goes in the same patch as the config, parsed', async () => {
+  const sent: Sent[] = [];
+
+  await redeploy({ api: apiHolding({ sent }), app: NAME, name: 'Loud Badger', args: ['serve'] });
+
+  expect(sent.find((each) => each.what === 'app patch')?.body).toEqual({
+    args: ['serve'],
+    name: 'Loud Badger',
+  });
+});
+
+test('a name the api would refuse is refused before anything moves', async () => {
+  const sent: Sent[] = [];
+
+  await expect(redeploy({ api: apiHolding({ sent }), app: NAME, name: '' })).rejects.toThrow();
+  expect(sent.map((each) => each.what)).not.toContain('app patch');
+});
+
 // An app configured for a release nobody made is worse than one nothing happened to.
 test('an app that has never been deployed is refused before its config moves', async () => {
   const sent: Sent[] = [];

@@ -27,6 +27,10 @@ export const SHARED_OPTIONS = {
     name: 'app',
     option: { schema: z.string().min(1).optional() },
   },
+  name: {
+    name: 'name',
+    option: { schema: z.string().min(1).optional() },
+  },
   deploymentId: {
     name: 'deployment-id',
     option: {
