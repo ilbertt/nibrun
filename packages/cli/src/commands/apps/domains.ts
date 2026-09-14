@@ -16,8 +16,8 @@ export const command = defineCommand('apps domains', {
       json: rootOptions.json,
     });
     const { api } = context;
-    const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
+    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
 
-    emit(await listDomains({ api, slug }));
+    emit(await listDomains({ api, name }));
   },
 });

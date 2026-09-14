@@ -103,7 +103,7 @@ files are the whole of how anything gets onto the volume. A zip made anywhere bu
 permissions, so an executable bit does not survive one.
 
 **Every deploy after that must name the app**, or a non-interactive shell creates a second one.
-`nib apps list` finds the slug again when a later session has to redeploy:
+`nib apps list` finds the name again when a later session has to redeploy:
 
 ```sh
 nib run ./my-server --app my-app

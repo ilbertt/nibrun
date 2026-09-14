@@ -8,6 +8,7 @@ import {
   ARTIFACT_ID,
   DIGEST,
   type HostnameRow,
+  NAME,
   PLATFORM,
   SLUG,
 } from '#tests/support/app.ts';
@@ -43,7 +44,7 @@ function apiHolding({
     return {
       patch: (body: unknown) => {
         sent.push({ what: 'app patch', body });
-        return Promise.resolve({ data: { id: appId, slug: SLUG, hostnames }, error: null });
+        return Promise.resolve({ data: { id: appId, name: NAME, hostnames }, error: null });
       },
       artifacts: artifact,
       deployments: {
@@ -59,18 +60,18 @@ function apiHolding({
     };
   }
 
-  return apiWith({ apps: [{ id: APP_ID, slug: SLUG, state }], underApp });
+  return apiWith({ apps: [{ id: APP_ID, name: NAME, state }], underApp });
 }
 
 test('the binary the app is running is the one released again', async () => {
   const sent: Sent[] = [];
 
-  const deployed = await redeploy({ api: apiHolding({ sent }), app: SLUG, args: ['serve'] });
+  const deployed = await redeploy({ api: apiHolding({ sent }), app: NAME, args: ['serve'] });
 
   expect(sent.at(-1)).toEqual({ what: 'deployment', body: { artifactId: ARTIFACT_ID } });
   expect(deployed).toEqual({
     appId: APP_ID,
-    slug: SLUG,
+    name: NAME,
     deploymentId: 'deployment-2',
     url: `https://${SLUG}.nibrun.app`,
   });
@@ -83,7 +84,7 @@ test('config is written before the deployment that snapshots it', async () => {
 
   await redeploy({
     api: apiHolding({ sent }),
-    app: SLUG,
+    app: NAME,
     args: ['serve'],
     port: PORT,
     environment: TOKEN_SET,
@@ -103,7 +104,7 @@ test('config is written before the deployment that snapshots it', async () => {
 test('what the caller left out is left alone', async () => {
   const sent: Sent[] = [];
 
-  await redeploy({ api: apiHolding({ sent }), app: SLUG, environment: TOKEN_SET });
+  await redeploy({ api: apiHolding({ sent }), app: NAME, environment: TOKEN_SET });
 
   expect(sent.find((each) => each.what === 'app patch')?.body).toEqual({
     environment: TOKEN_SET,
@@ -116,7 +117,7 @@ test('an app that has never been deployed is refused before its config moves', a
 
   const attempt = redeploy({
     api: apiHolding({ sent, deployments: [] }),
-    app: SLUG,
+    app: NAME,
     args: ['serve'],
   });
 
@@ -131,21 +132,21 @@ test('a suspended app is refused before its config moves', async () => {
 
   const attempt = redeploy({
     api: apiHolding({ sent, state: 'suspended' }),
-    app: SLUG,
+    app: NAME,
     args: ['serve'],
   });
 
   await expect(attempt).rejects.toThrow(
-    'App quiet-otter is suspended, so a new release would never start. Resume it first.',
+    'App Quiet Otter is suspended, so a new release would never start. Resume it first.',
   );
   // Reading what the app is on is what decides it, and a read is all that happened.
   expect(sent.map((each) => each.what)).toEqual(['deployments read']);
 });
 
-test('a slug naming nothing is said to name nothing', async () => {
-  const attempt = redeploy({ api: apiHolding({ sent: [] }), app: 'loud-badger', args: [] });
+test('a name naming nothing is said to name nothing', async () => {
+  const attempt = redeploy({ api: apiHolding({ sent: [] }), app: 'Loud Badger', args: [] });
 
-  await expect(attempt).rejects.toThrow('No app with slug loud-badger.');
+  await expect(attempt).rejects.toThrow('No app named Loud Badger.');
 });
 
 test('each step is announced, the artifact among them', async () => {
@@ -153,13 +154,13 @@ test('each step is announced, the artifact among them', async () => {
 
   await redeploy({
     api: apiHolding({ sent: [] }),
-    app: SLUG,
+    app: NAME,
     args: [],
     onStep: (step) => steps.push(step),
   });
 
   expect(steps).toEqual([
-    { kind: 'app', appId: APP_ID, slug: SLUG },
+    { kind: 'app', appId: APP_ID, name: NAME },
     { kind: 'artifact', artifactId: ARTIFACT_ID, digest: DIGEST },
     { kind: 'deployment', deploymentId: 'deployment-2' },
   ]);

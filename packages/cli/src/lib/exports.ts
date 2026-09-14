@@ -21,7 +21,7 @@ const BYTES_PER_MIB = 1_048_576;
 const MIB_DECIMALS = 1;
 
 const ExportSchema = z.object({
-  slug: z.string(),
+  name: z.string(),
   exportId: z.string(),
   /** Where the bundle was written, which is the whole of what this command is asked for. */
   path: z.string(),
@@ -35,7 +35,7 @@ export const EXPORT_OUTPUT = defineOutput({
 
 export type ExportInput = {
   api: PublicApiClient;
-  slug: string;
+  name: string;
   destination: string;
   ui: Ui;
 };
@@ -50,12 +50,12 @@ export type ExportInput = {
  */
 export async function exportApp({
   api,
-  slug,
+  name,
   destination,
   ui,
 }: ExportInput): Promise<z.input<typeof ExportSchema>> {
-  const path = await bundlePath({ destination, slug });
-  const { app } = await appFor({ api, slug, operation: 'export' });
+  const { app } = await appFor({ api, name, operation: 'export' });
+  const path = await bundlePath({ destination, slug: app.slug });
 
   const requested = await requestExport({ api, appId: app.id });
   ui.step(`export ${requested.id}`);
@@ -69,13 +69,14 @@ export async function exportApp({
     task: () => download({ url: bundle.downloadUrl, path }),
   });
 
-  return { slug: app.slug, exportId: requested.id, path, sizeBytes: bundle.sizeBytes ?? null };
+  return { name: app.name, exportId: requested.id, path, sizeBytes: bundle.sizeBytes ?? null };
 }
 
 /**
- * A directory is somewhere to put the bundle rather than a name for it, so the app names it
- * there. Anything else is the name itself, suffix or no suffix — someone who typed a filename has
- * said what they want it called.
+ * A directory is somewhere to put the bundle rather than a name for it, so the app's slug names it
+ * there — the slug rather than the name, because a slug is the one of the two that is always a
+ * filename. Anything else is the name itself, suffix or no suffix: someone who typed a filename
+ * has said what they want it called.
  */
 export async function bundlePath({
   destination,

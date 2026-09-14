@@ -31,7 +31,7 @@ const SpentSchema = z.object({
 type Spent = z.infer<typeof SpentSchema>;
 
 const AppStatusSchema = z.object({
-  slug: z.string(),
+  name: z.string(),
   /**
    * What the app is doing, not what its row says. An app row is `active` from the moment it is
    * created, so on its own it says nothing about whether anything is serving — the release
@@ -126,7 +126,7 @@ export function renderStatus(app: AppStatusReport): RenderedStatus {
 
   return {
     lines: [
-      `${app.slug}  ${APP_STATUS_LABELS[app.status]}`,
+      `${app.name}  ${APP_STATUS_LABELS[app.status]}`,
       // Under the status rather than in the table: `idle` is only an answer beside the setting
       // that put it there, and neither is something the app is spending.
       activationSummary(app),
@@ -156,12 +156,12 @@ export const APP_STATUS_OUTPUT = defineOutput({
 
 export async function readStatus({
   api,
-  slug,
+  name,
 }: {
   api: PublicApiClient;
-  slug: string;
+  name: string;
 }): Promise<z.input<typeof AppStatusSchema>> {
-  const { app, status } = await appWithStatus({ api, slug });
+  const { app, status } = await appWithStatus({ api, name });
   const compute = app.computeUsage;
   const volume = app.volumeUsage;
   const { vcpuCount, memoryMib } = app.config.resources;
@@ -170,7 +170,7 @@ export async function readStatus({
   const cpuShare = compute?.cpuShare;
 
   return {
-    slug: app.slug,
+    name: app.name,
     status: statusKey(status),
     activation: app.activation,
     idleTimeoutMs: app.idleTimeoutMs,

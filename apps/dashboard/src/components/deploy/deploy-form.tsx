@@ -54,7 +54,7 @@ export function DeployForm({
 
       {replacing !== undefined && (
         <p className="wrap-anywhere rounded-2xl bg-warning/10 px-3 py-2 text-sm text-warning">
-          This restarts <span className="font-medium font-mono">{replacing.slug}</span>
+          This restarts <span className="font-medium font-mono">{replacing.name}</span>
           {picked ? ' on the binary above' : ' on the binary it already runs'}. Its hostnames and
           everything on its volume stay as they are.
         </p>
@@ -96,7 +96,7 @@ function deployedName({
   replacing: AppSummary | undefined;
 }): string | undefined {
   if (replacing !== undefined) {
-    return replacing.slug;
+    return replacing.name;
   }
   const typed = values.name.trim();
   // Whichever way the binary was given: the file that was picked, or the file the url ends in.

@@ -9,7 +9,7 @@ export {
 export {
   type AddressedDeployment,
   addressedDeployment,
-  appBySlug,
+  appByName,
   appFor,
   appWithStatus,
   type ListedApp,

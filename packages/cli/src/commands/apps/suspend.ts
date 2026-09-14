@@ -18,8 +18,8 @@ export const command = defineCommand('apps suspend', {
     const { api } = context;
 
     ui.open('nib apps suspend');
-    const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
+    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
 
-    emit(await suspendApp({ api, slug }));
+    emit(await suspendApp({ api, name }));
   },
 });

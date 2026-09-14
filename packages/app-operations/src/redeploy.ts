@@ -30,11 +30,11 @@ export type RedeployInput = ConfigEdit & {
  */
 export async function redeploy({
   api,
-  app: slug,
+  app: name,
   onStep,
   ...edit
 }: RedeployInput): Promise<Deployed> {
-  const target = await appFor({ api, slug, operation: 'release' });
+  const target = await appFor({ api, name, operation: 'release' });
   if (!target.newest) {
     throw new ApiError(NOTHING_TO_RELEASE);
   }
@@ -45,7 +45,7 @@ export async function redeploy({
   });
 
   const app = unwrap(await api.api.apps({ appId: target.app.id }).patch(configPatch(edit)));
-  onStep?.({ kind: 'app', appId: app.id, slug: app.slug });
+  onStep?.({ kind: 'app', appId: app.id, name: app.name });
   onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest });
 
   const deployment = unwrap(
@@ -55,7 +55,7 @@ export async function redeploy({
 
   return {
     appId: app.id,
-    slug: app.slug,
+    name: app.name,
     deploymentId: deployment.id,
     url: `https://${servingHostname(app.hostnames)}`,
   };

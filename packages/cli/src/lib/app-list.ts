@@ -19,6 +19,8 @@ const MeasuredSchema = z.object({
 });
 
 const AppRowSchema = z.object({
+  name: z.string(),
+  /** What the app is served under, which the listing leaves to `status` but a program may want. */
   slug: z.string(),
   state: z.enum(APP_STATES),
   updatedAt: z.string(),
@@ -32,7 +34,7 @@ export type AppRow = z.infer<typeof AppRowSchema>;
 /** The half of the api's answer a row is read off. */
 type AppListing = Pick<
   ListedApp,
-  'slug' | 'state' | 'updatedAt' | 'config' | 'volumeUsage' | 'computeUsage'
+  'name' | 'slug' | 'state' | 'updatedAt' | 'config' | 'volumeUsage' | 'computeUsage'
 >;
 
 const AppListSchema = z.object({ apps: z.array(AppRowSchema) });
@@ -40,7 +42,7 @@ const AppListSchema = z.object({ apps: z.array(AppRowSchema) });
 // `LAST CHANGE` rather than `UPDATED`, which reads as the owner having done it: the row moves on
 // a config patch or a state change, and a deploy leaves it alone entirely.
 const HEADINGS = {
-  slug: 'SLUG',
+  name: 'NAME',
   state: 'STATE',
   cpu: 'CPU',
   memory: 'MEM',
@@ -109,6 +111,7 @@ export async function listApps({
 
 function toRow(app: AppListing): AppRow {
   return {
+    name: app.name,
     slug: app.slug,
     state: app.state,
     updatedAt: app.updatedAt,
@@ -126,7 +129,7 @@ function toRow(app: AppListing): AppRow {
 
 /**
  * Left in the order the api answered with, which is newest first — the order an owner made these
- * in is the one they remember them in, and sorting by slug would bury the app they just deployed
+ * in is the one they remember them in, and sorting by name would bury the app they just deployed
  * somewhere in the middle.
  *
  * A heading, unlike the filesystem listing: there a name and a size say what they are, and here
@@ -134,11 +137,11 @@ function toRow(app: AppListing): AppRow {
  */
 export function render(apps: readonly AppRow[]): string[] {
   const rows = [HEADINGS, ...apps.map(toColumns)];
-  const slugWidth = Math.max(...rows.map((row) => row.slug.length));
+  const nameWidth = Math.max(...rows.map((row) => row.name.length));
 
   return rows.map((row) =>
     [
-      row.slug.padEnd(slugWidth),
+      row.name.padEnd(nameWidth),
       row.state.padEnd(STATE_WIDTH),
       row.cpu.padStart(shareWidth(HEADINGS.cpu)),
       row.memory.padStart(shareWidth(HEADINGS.memory)),
@@ -150,7 +153,7 @@ export function render(apps: readonly AppRow[]): string[] {
 
 function toColumns(app: AppRow) {
   return {
-    slug: app.slug,
+    name: app.name,
     state: app.state,
     cpu: share(app.cpuShare),
     memory: share(ratio(app.memory)),

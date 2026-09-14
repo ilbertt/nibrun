@@ -25,8 +25,8 @@ export const command = defineCommand('apps domains remove [hostname]', {
     const { api } = context;
 
     ui.open('nib apps domains remove');
-    const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
+    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
 
-    emit(await removeAppDomain({ api, slug, hostname: params.hostname }));
+    emit(await removeAppDomain({ api, name, hostname: params.hostname }));
   },
 });

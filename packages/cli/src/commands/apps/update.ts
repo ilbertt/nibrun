@@ -34,13 +34,13 @@ export const command = defineCommand('apps update', {
     const { api } = context;
 
     ui.open('nib apps update');
-    const slug = await selectApp({ api, slug: parents.apps.options.app, interactive });
+    const name = await selectApp({ api, name: parents.apps.options.app, interactive });
 
     emit(
       await updateApp({
         api,
         ui,
-        slug,
+        name,
         args: args === undefined ? undefined : parseArguments(args),
         port: given[SHARED_OPTIONS.port.name],
         extraPublicPort: given[SHARED_OPTIONS.extraPublicPort.name],

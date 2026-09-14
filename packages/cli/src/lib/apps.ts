@@ -25,15 +25,15 @@ export const NO_APPS = 'You have no apps. `nib run` is what makes one.';
  */
 export async function selectApp({
   api,
-  slug,
+  name,
   interactive,
 }: {
   api: PublicApiClient;
-  slug: string | undefined;
+  name: string | undefined;
   interactive: boolean;
 }): Promise<string> {
-  if (slug !== undefined) {
-    return slug;
+  if (name !== undefined) {
+    return name;
   }
   if (!interactive) {
     throw new UsageError(NO_APP_NAMED);
@@ -42,8 +42,8 @@ export async function selectApp({
 }
 
 /**
- * A slug rather than the app it was read from, even though whatever the answer is handed to reads
- * the listing again: a slug is what an owner calls an app by and what every command under `apps`
+ * A name rather than the app it was read from, even though whatever the answer is handed to reads
+ * the listing again: a name is what an owner calls an app by and what every command under `apps`
  * takes, and the second read falls only on somebody already sat at the prompt.
  */
 async function chooseApp({ api }: { api: PublicApiClient }): Promise<string> {
@@ -54,8 +54,8 @@ async function chooseApp({ api }: { api: PublicApiClient }): Promise<string> {
   const chosen = await select({
     message: 'Which app?',
     options: apps.map((app) => ({
-      value: app.slug,
-      label: app.slug,
+      value: app.name,
+      label: app.name,
       // Every app the api lists is offered — reading what a suspended one wrote is a reason to
       // have kept it — so the state is said as well, an app being torn down answering differently
       // and having chosen it being too late to find that out.
@@ -74,19 +74,19 @@ async function chooseApp({ api }: { api: PublicApiClient }): Promise<string> {
  */
 export async function announcedDeployment({
   api,
-  slug,
+  name,
   deploymentId,
   operation,
   print,
 }: {
   api: PublicApiClient;
-  slug: string;
+  name: string;
   deploymentId: string | undefined;
   operation: AppOperation;
   print: Print;
 }): Promise<AddressedDeployment> {
-  const addressed = await addressedDeployment({ api, slug, deploymentId, operation });
-  print.dim(`${addressed.slug} · deployment ${addressed.deploymentId}`);
+  const addressed = await addressedDeployment({ api, name, deploymentId, operation });
+  print.dim(`${addressed.name} · deployment ${addressed.deploymentId}`);
   return addressed;
 }
 

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { resumeApp, suspendApp } from '#suspend.ts';
 import { answering, apiHolding } from '#tests/support/api.ts';
-import { APP_ID, SLUG } from '#tests/support/app.ts';
+import { APP_ID, NAME } from '#tests/support/app.ts';
 
 type Asked = { appId: string; state: string };
 
@@ -11,7 +11,7 @@ function apiRecording(asked: Asked[]) {
       state: {
         put: ({ state }: { state: string }) => {
           asked.push({ appId, state });
-          return answering({ slug: SLUG, state })();
+          return answering({ name: NAME, state })();
         },
       },
     }),
@@ -25,7 +25,7 @@ test('suspending asks for the app to be suspended, and nothing else', async () =
   const suspended = await suspendApp({ api: apiRecording(asked), appId: APP_ID });
 
   expect(asked).toEqual([{ appId: APP_ID, state: 'suspended' }]);
-  expect(suspended).toEqual({ slug: SLUG, state: 'suspended' });
+  expect(suspended).toEqual({ name: NAME, state: 'suspended' });
 });
 
 test('and resuming asks for the state it was in before', async () => {
@@ -34,5 +34,5 @@ test('and resuming asks for the state it was in before', async () => {
   const resumed = await resumeApp({ api: apiRecording(asked), appId: APP_ID });
 
   expect(asked).toEqual([{ appId: APP_ID, state: 'active' }]);
-  expect(resumed).toEqual({ slug: SLUG, state: 'active' });
+  expect(resumed).toEqual({ name: NAME, state: 'active' });
 });

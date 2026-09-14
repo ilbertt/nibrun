@@ -1,8 +1,9 @@
 import type { PublicApiClient } from '@repo/api-client/public';
-import { APP_ID, SLUG } from '#tests/support/app.ts';
+import { APP_ID, NAME, SLUG } from '#tests/support/app.ts';
 
 export type ListedApp = {
   id: string;
+  name: string;
   slug: string;
   state?: string;
   hostnames?: Array<{ hostname: string }>;
@@ -11,7 +12,7 @@ export type ListedApp = {
 export const RUNNING_DEPLOYMENT = { id: 'deployment-1', state: 'running' };
 
 export function listedApp(overrides: Partial<ListedApp> = {}): ListedApp {
-  return { id: APP_ID, slug: SLUG, state: 'active', ...overrides };
+  return { id: APP_ID, name: NAME, slug: SLUG, state: 'active', ...overrides };
 }
 
 /** A route that answers, in the shape Eden hands every reply back in. */

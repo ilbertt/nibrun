@@ -22,7 +22,7 @@ export const command = defineCommand('run [command]', {
   options: {
     [SHARED_OPTIONS.app.name]: {
       ...SHARED_OPTIONS.app.option,
-      description: 'Slug of an existing app to deploy onto. Asked for when omitted.',
+      description: 'Name of an existing app to deploy onto. Asked for when omitted.',
     },
     name: {
       schema: z.string().optional(),

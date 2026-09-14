@@ -110,7 +110,7 @@ function waitingOn(phase: DeployPhase): string | undefined {
 
 function describeStep(step: DeployStep): string {
   if (step.kind === 'app') {
-    return `app ${step.slug}`;
+    return `app ${step.name}`;
   }
   if (step.kind === 'artifact') {
     return `artifact ${step.digest}`;
