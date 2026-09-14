@@ -62,6 +62,13 @@ export class HostnamesService extends Service {
   private readonly hostnamesRepo: AppHostnamesRepositoryContract;
   private readonly customHostnamesRepo: CustomHostnamesRepositoryContract;
   private readonly appHostDomain: string;
+  /**
+   * Where the last pass stopped, so the next carries on from there and comes back round to the
+   * first rows only after the last. Held in the process rather than written down: a restart
+   * starting over from the top costs one lap, while a column saying when each row was last
+   * asked would be written for every row on every host report.
+   */
+  private lastPolledId: string | null = null;
 
   constructor({
     hostnamesRepo,
@@ -163,7 +170,13 @@ export class HostnamesService extends Service {
    * cannot answer for does not stop the rest.
    */
   async reconcile(): Promise<void> {
-    const pending = await this.hostnamesRepo.listPendingCustom({ limit: POLL_BATCH });
+    const pending = await this.hostnamesRepo.listPendingCustom({
+      after: this.lastPolledId,
+      limit: POLL_BATCH,
+    });
+    // Moved on before the batch is asked about, so a pass that dies part way is not repeated
+    // from the same rows by the next.
+    this.lastPolledId = pending.at(-1)?.id ?? this.lastPolledId;
     for (const row of pending) {
       await this.advance(row);
     }

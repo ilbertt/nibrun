@@ -32,7 +32,12 @@ const BROUGHT = Value.Parse(HostnameSchema, 'app.example.dev');
 const CLOUDFLARE_ID = 'ch-1';
 const PENDING_TTL_DAYS = 7;
 
-type PendingRow = { hostname: Hostname; cloudflare_id: string | null; created_at: Date };
+type PendingRow = {
+  id: string;
+  hostname: Hostname;
+  cloudflare_id: string | null;
+  created_at: Date;
+};
 
 function hostnameRow(overrides: Partial<AppHostnameRow> = {}): AppHostnameRow {
   return {
@@ -49,6 +54,7 @@ class StubHostnamesRepository implements AppHostnamesRepositoryContract {
   readonly trace: string[] = [];
   readonly states: AppHostnameState[] = [];
   readonly reports: EdgeReport[] = [];
+  readonly polledAfter: Array<string | null> = [];
   pending: PendingRow[] = [];
   owns = true;
   insertFailure: unknown;
@@ -90,7 +96,8 @@ class StubHostnamesRepository implements AppHostnamesRepositoryContract {
     return Promise.resolve(this.removed);
   }
 
-  listPendingCustom(): Promise<PendingRow[]> {
+  listPendingCustom({ after }: { after: string | null }): Promise<PendingRow[]> {
+    this.polledAfter.push(after);
     return Promise.resolve(this.pending);
   }
 
@@ -254,11 +261,35 @@ describe('removing a domain lets the row go whatever the edge says', () => {
 describe('a waiting hostname is settled by the clock a host report lends', () => {
   function pendingSince(days: number): PendingRow {
     return {
+      id: 'row-1',
       hostname: BROUGHT,
       cloudflare_id: CLOUDFLARE_ID,
       created_at: new Date(Date.now() - days * MS_PER_DAY),
     };
   }
+
+  // The order itself is the query's; what is the service's is handing back where it got to.
+  test('each pass carries on from the last row the one before it took', async () => {
+    const { service, appsRepo } = build();
+    appsRepo.pending = [pendingSince(1), { ...pendingSince(1), id: 'row-2' }];
+
+    await service.reconcile();
+    await service.reconcile();
+
+    expect(appsRepo.polledAfter).toEqual([null, 'row-2']);
+  });
+
+  test('and stays where it was when a pass finds nothing to take', async () => {
+    const { service, appsRepo } = build();
+    appsRepo.pending = [pendingSince(1)];
+    await service.reconcile();
+    appsRepo.pending = [];
+
+    await service.reconcile();
+    await service.reconcile();
+
+    expect(appsRepo.polledAfter).toEqual([null, 'row-1', 'row-1']);
+  });
 
   test('one the edge is now serving becomes routable', async () => {
     const { service, appsRepo, customHostnamesRepo } = build();
@@ -312,7 +343,12 @@ describe('a waiting hostname is settled by the clock a host report lends', () =>
   });
 
   function unattachedFor(ms: number): PendingRow {
-    return { hostname: BROUGHT, cloudflare_id: null, created_at: new Date(Date.now() - ms) };
+    return {
+      id: 'row-1',
+      hostname: BROUGHT,
+      cloudflare_id: null,
+      created_at: new Date(Date.now() - ms),
+    };
   }
 
   // The edge was away when the owner added it, or this process died between the two writes.
@@ -367,7 +403,7 @@ describe('a deployment without an edge says so rather than half-working', () => 
   test('and the pass that settles them does nothing at all', async () => {
     const { service, appsRepo } = build({ withEdge: false });
     appsRepo.pending = [
-      { hostname: BROUGHT, cloudflare_id: CLOUDFLARE_ID, created_at: new Date() },
+      { id: 'row-1', hostname: BROUGHT, cloudflare_id: CLOUDFLARE_ID, created_at: new Date() },
     ];
 
     await service.reconcile();

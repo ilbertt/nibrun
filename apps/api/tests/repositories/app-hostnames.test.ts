@@ -14,6 +14,22 @@ const BROUGHT = Value.Parse(HostnameSchema, 'brought.example.dev');
 
 const NOT_POINTED_AT_US = 'custom hostname does not CNAME to this zone.';
 
+// One database for the file, because bringing a container up and migrating it is the expensive
+// part and every describe below wants the same app to hang its hostnames off.
+let sql: SQL;
+let repo: AppHostnamesRepository;
+
+// Long enough to pull the image, which the first run on a fresh machine does inside this hook.
+beforeAll(async () => {
+  sql = await startTestDatabase();
+  await seedApp(sql);
+  repo = new AppHostnamesRepository(withTypes<Queries>(sql));
+}, DATABASE_START_TIMEOUT_MS);
+
+afterAll(async () => {
+  await stopTestDatabase(sql);
+}, DATABASE_START_TIMEOUT_MS);
+
 function waiting(errors: string[]): EdgeReport {
   return { state: 'pending', status: 'pending', sslStatus: 'pending_validation', errors };
 }
@@ -25,19 +41,9 @@ function waiting(errors: string[]): EdgeReport {
  * differently, and the log line keyed on the write would fire a thousand times an hour.
  */
 describe('the edge report is written only when it changes', () => {
-  let sql: SQL;
-  let repo: AppHostnamesRepository;
-
-  // Long enough to pull the image, which the first run on a fresh machine does inside this hook.
   beforeAll(async () => {
-    sql = await startTestDatabase();
-    await seedBroughtDomain(sql);
-    repo = new AppHostnamesRepository(withTypes<Queries>(sql));
-  }, DATABASE_START_TIMEOUT_MS);
-
-  afterAll(async () => {
-    await stopTestDatabase(sql);
-  }, DATABASE_START_TIMEOUT_MS);
+    await addCustomHostname({ sql, hostname: BROUGHT });
+  });
 
   async function row(): Promise<{ state: string; edge_errors: string[]; updated_at: Date }> {
     const [found] = (await sql.unsafe(
@@ -90,15 +96,81 @@ describe('the edge report is written only when it changes', () => {
   });
 });
 
-async function seedBroughtDomain(sql: SQL): Promise<void> {
+/**
+ * The order is the statement's, so no stub reaches it. It matters because the batch is small and
+ * the pass is on every host report: read from the top each time, a batch's worth of older rows
+ * would be asked about on every report and the ones behind them never, until the older ones
+ * settled or lapsed a week later.
+ */
+describe('the pending batch carries on from where the last one stopped', () => {
+  // Inserted in this order, so their uuidv7 ids sort the same way.
+  const WAITING = ['first', 'second', 'third'].map((label) =>
+    Value.Parse(HostnameSchema, `${label}.example.dev`),
+  );
+  const BATCH = 2;
+  const ids = new Map<string, string>();
+
+  beforeAll(async () => {
+    for (const hostname of WAITING) {
+      ids.set(hostname, await addCustomHostname({ sql, hostname }));
+    }
+  });
+
+  async function batchAfter(hostname: string | null): Promise<string[]> {
+    const after = hostname === null ? null : (ids.get(hostname) ?? null);
+    return (await repo.listPendingCustom({ after, limit: BATCH })).map((row) => row.hostname);
+  }
+
+  test('with nowhere to carry on from, it starts at the top', async () => {
+    expect(await batchAfter(null)).toEqual(WAITING.slice(0, BATCH));
+  });
+
+  test('past the end it comes round to the top, after the rows not yet reached', async () => {
+    expect(await batchAfter('second.example.dev')).toEqual([
+      'third.example.dev',
+      'first.example.dev',
+    ]);
+  });
+
+  test('so the row a full batch would have hidden is reached on the next pass', async () => {
+    const first = await batchAfter(null);
+    const second = await batchAfter(first.at(-1) ?? null);
+
+    expect(new Set([...first, ...second])).toEqual(new Set(WAITING));
+  });
+
+  // The brought domain from the describe above is `active` by now, and a platform hostname is
+  // never anything the edge is asked about.
+  test('and only rows still waiting are in it', async () => {
+    const all = await repo.listPendingCustom({ after: null, limit: WAITING.length * BATCH });
+
+    expect(all.map((row) => row.hostname).sort()).toEqual([...WAITING].sort());
+  });
+});
+
+async function seedApp(sql: SQL): Promise<void> {
   await sql.unsafe(
     `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
      VALUES ('owner', 'owner', 'owner@example.com', true, now(), now())`,
   );
   await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, slug) VALUES ('owner', $1)`, [APP_SLUG]);
-  await sql.unsafe(
+}
+
+async function addCustomHostname({
+  sql,
+  hostname,
+}: {
+  sql: SQL;
+  hostname: string;
+}): Promise<string> {
+  const [row] = (await sql.unsafe(
     `INSERT INTO nibrun.app_hostnames (app_id, hostname, kind)
-     SELECT id, $1, 'custom' FROM nibrun.apps WHERE slug = $2`,
-    [BROUGHT, APP_SLUG],
-  );
+     SELECT id, $1, 'custom' FROM nibrun.apps WHERE slug = $2
+     RETURNING id`,
+    [hostname, APP_SLUG],
+  )) as Array<{ id: string }>;
+  if (!row) {
+    throw new Error(`${APP_SLUG} is not in the table.`);
+  }
+  return row.id;
 }

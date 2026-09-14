@@ -152,6 +152,7 @@ export interface IDeleteCustomAppHostnameResult {
 
 /** Result of query `SelectPendingCustomHostnames`. */
 export interface ISelectPendingCustomHostnamesResult {
+    id: IAppHostnamesColumns["id"];
     hostname: IAppHostnamesColumns["hostname"];
     /** The custom hostname this row is projected onto at the edge. Absent for a platform hostname, which the wildcard already covers. */
     cloudflare_id: IAppHostnamesColumns["cloudflare_id"];
