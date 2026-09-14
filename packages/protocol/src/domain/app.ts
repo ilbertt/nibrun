@@ -1,10 +1,11 @@
-import { Type } from '@sinclair/typebox';
+import { type TString, Type } from '@sinclair/typebox';
 import { AppIdSchema, OwnerIdSchema } from '#domain/identifiers.ts';
 import {
   HealthCheckSchema,
   InstanceResourcesSchema,
   RestartPolicySchema,
 } from '#domain/instance.ts';
+import type { Brand, BrandedSchema } from '#lib/brand.ts';
 import { secretString } from '#lib/secret.ts';
 import { stringEnum } from '#lib/string-enum.ts';
 import { DnsLabelSchema, HostnameSchema, HttpPortSchema, TimestampSchema } from '#lib/wire.ts';
@@ -288,9 +289,24 @@ export const OwnedAppStateSchema = stringEnum(OWNED_APP_STATES);
 
 export type OwnedAppState = typeof OwnedAppStateSchema.static;
 
+const MAX_APP_NAME_LENGTH = 128;
+
+export type AppName = Brand<string, 'AppName'>;
+
+/**
+ * What an owner calls the app, and what they name it by everywhere they are asked for one. Unique
+ * among the apps they still have, so it can stand for the app the way the slug does — the slug is
+ * what it is served under, minted from the first name once and kept through every rename.
+ */
+export const AppNameSchema = Type.String({
+  minLength: 1,
+  maxLength: MAX_APP_NAME_LENGTH,
+}) as BrandedSchema<TString, AppName>;
+
 export const AppSchema = Type.Object({
   id: AppIdSchema,
   ownerId: OwnerIdSchema,
+  name: AppNameSchema,
   slug: DnsLabelSchema,
   hostnames: Type.Array(AppHostnameSchema, { minItems: MIN_HOSTNAMES }),
   config: AppConfigSchema,

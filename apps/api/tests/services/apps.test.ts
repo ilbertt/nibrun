@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
   AppIdSchema,
+  type AppName,
+  AppNameSchema,
   type AppState,
   type ComputeUsage,
   type DnsLabel,
@@ -80,7 +82,7 @@ function asPatch(entries: Record<string, string | null>): TenantEnvironmentPatch
   return Value.Parse(TenantEnvironmentPatchSchema, entries);
 }
 
-const APP_NAME = 'pocketbase';
+const APP_NAME = Value.Parse(AppNameSchema, 'pocketbase');
 const BROUGHT_HOSTNAME = Value.Parse(HostnameSchema, 'pocketbase.example.dev');
 const CLOUDFLARE_ID = 'ch-1';
 
@@ -98,6 +100,7 @@ function appRow(slug: DnsLabel): AppRow {
   return {
     id: APP_ID,
     owner_id: OWNER_ID,
+    name: APP_NAME,
     slug,
     state: 'active',
     activation: 'always',
@@ -122,6 +125,7 @@ function appRow(slug: DnsLabel): AppRow {
  * app is this owner's, which is what an app belonging to somebody else looks like.
  */
 class StubAppsRepository implements AppsRepositoryContract {
+  readonly offeredNames: AppName[] = [];
   readonly offeredSlugs: DnsLabel[] = [];
   readonly offeredConfigs: StoredAppConfig[] = [];
   readonly offeredPatches: SealedConfigPatch[] = [];
@@ -140,6 +144,8 @@ class StubAppsRepository implements AppsRepositoryContract {
   claimed: AppId[] = [];
   /** When the app is due to go, which is null for every app whose owner keeps it. */
   dueAt: Date | null = null;
+  /** An app from before names existed, not yet given one by hand. */
+  unnamed = false;
   /** How many apps this owner is holding, which only a test that creates several ever moves. */
   held = 0;
   /** More than any test makes, except the ones that lower it because they are about the limit. */
@@ -186,7 +192,8 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve(true);
   }
 
-  create({ slug, hostname, config }: NewApp): Promise<CreatedApp | null> {
+  create({ name, slug, hostname, config }: NewApp): Promise<CreatedApp | null> {
+    this.offeredNames.push(name);
     this.offeredSlugs.push(slug);
     this.offeredConfigs.push(config);
     if (this.#remainingFailures > 0) {
@@ -239,6 +246,7 @@ class StubAppsRepository implements AppsRepositoryContract {
       ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)),
       ...configColumns(this.current),
       expires_at: this.dueAt,
+      ...(this.unnamed && { name: null }),
     });
   }
 
@@ -453,6 +461,7 @@ describe('a taken hostname is a re-roll, not something the owner sees', () => {
 
     expect(appsRepo.offeredSlugs).toHaveLength(2);
     // The name survives the re-roll; only the entropy moves.
+    expect(appsRepo.offeredNames).toEqual([APP_NAME, APP_NAME]);
     expect(appsRepo.offeredSlugs.every((slug) => slug.startsWith(`${APP_NAME}-`))).toBe(true);
     expect(distinct(appsRepo.offeredSlugs)).toBe(2);
     // The app answers to the label that was accepted, not to the one that was refused.
@@ -492,6 +501,21 @@ describe('retrying is bounded, and only covers collisions', () => {
 
     await expect(createApp({ appsRepo })).rejects.toBeInstanceOf(ConflictError);
     expect(appsRepo.offeredSlugs).toHaveLength(MAX_SLUG_ATTEMPTS);
+  });
+
+  // The name is the owner's to change, so a second app given it is refused to them rather than
+  // re-rolled — fresh entropy moves the slug and leaves the name exactly where it was.
+  test('a name the owner already gave an app is refused on the first attempt', async () => {
+    const appsRepo = new StubAppsRepository({
+      failures: 1,
+      failure: uniqueViolation(schema.apps._indexes.apps_owner_id_name_key._indexName),
+    });
+
+    const refused = createApp({ appsRepo });
+
+    await expect(refused).rejects.toBeInstanceOf(ConflictError);
+    await expect(refused).rejects.toThrow(`already have an app named ${APP_NAME}`);
+    expect(appsRepo.offeredSlugs).toHaveLength(1);
   });
 
   // Retrying a violation fresh entropy cannot fix would spend every attempt on the same failure
@@ -798,6 +822,20 @@ describe('an app the caller does not own is one that does not exist', () => {
     await expect(service.setState({ ...owned, state: 'suspended' })).rejects.toBeInstanceOf(
       NotFoundError,
     );
+  });
+});
+
+/** Every app from before names existed, until each is given one by hand. */
+describe('an app not yet named answers to its slug', () => {
+  test('the slug is what a read returns as the name', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+    appsRepo.unnamed = true;
+
+    const app = await serviceWith({ appsRepo }).get({ appId: APP_ID, ownerId: OWNER_ID });
+
+    expect(app.name).toBe(Value.Parse(AppNameSchema, APP_NAME));
+    expect(app.slug).toBe(Value.Parse(DnsLabelSchema, APP_NAME));
   });
 });
 

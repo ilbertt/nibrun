@@ -80,6 +80,8 @@ export {
   AppHostnameSchema,
   type AppHostnameState,
   AppHostnameStateSchema,
+  type AppName,
+  AppNameSchema,
   AppSchema,
   type AppState,
   AppStateSchema,
