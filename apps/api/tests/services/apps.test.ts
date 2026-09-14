@@ -37,6 +37,7 @@ import type {
 } from '#lib/app-config.ts';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
+import { toTimestamp } from '#lib/timestamp.ts';
 import type {
   AppHostnameRow,
   DisposableAppHostnameRow,
@@ -70,6 +71,7 @@ import {
 import { uniqueViolation } from '#tests/support/postgres.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
+const MINTED_AT = new Date('2026-09-01T09:14:12.784Z');
 const SECRET = 'sk-not-in-any-response';
 
 // The branded records a controller parses before the service ever sees one: the whole of an
@@ -210,7 +212,14 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve({
       app: { ...appRow(slug), ...configColumns(config) },
       hostnames: [
-        { hostname, kind: 'platform', state: 'active', dcv_target: null, edge_errors: [] },
+        {
+          hostname,
+          kind: 'platform',
+          state: 'active',
+          dcv_target: null,
+          edge_errors: [],
+          created_at: MINTED_AT,
+        },
       ],
     });
   }
@@ -487,6 +496,7 @@ describe('a taken hostname is a re-roll, not something the owner sees', () => {
         state: 'active',
         dcvTarget: null,
         edgeErrors: [],
+        createdAt: toTimestamp(MINTED_AT),
       },
     ]);
   });

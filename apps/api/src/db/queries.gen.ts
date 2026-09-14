@@ -104,6 +104,8 @@ export interface ISelectAppHostnamesByOwnerResult {
     dcv_target: IAppHostnamesColumns["dcv_target"];
     /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
     edge_errors: IAppHostnamesColumns["edge_errors"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
 }
 
 /** Result of query `SelectAppHostnamesByApp`. */
@@ -115,6 +117,8 @@ export interface ISelectAppHostnamesByAppResult {
     dcv_target: IAppHostnamesColumns["dcv_target"];
     /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
     edge_errors: IAppHostnamesColumns["edge_errors"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
 }
 
 /** Result of query `ClaimCustomAppHostname`. */
@@ -129,6 +133,7 @@ export interface IClaimCustomAppHostnameResult {
     edge_errors: string[] | null;
     /** The custom hostname this row is projected onto at the edge. Absent for a platform hostname, which the wildcard already covers. */
     cloudflare_id: string | null;
+    created_at: Date | null;
 }
 
 /** Result of query `UpdateCustomAppHostnameEdge`. */
@@ -140,6 +145,8 @@ export interface IUpdateCustomAppHostnameEdgeResult {
     dcv_target: IAppHostnamesColumns["dcv_target"];
     /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
     edge_errors: IAppHostnamesColumns["edge_errors"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
 }
 
 /** Result of query `UpdateCustomAppHostnameState`. */
@@ -215,6 +222,8 @@ export interface IInsertAppHostnameResult {
     dcv_target: IAppHostnamesColumns["dcv_target"];
     /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
     edge_errors: IAppHostnamesColumns["edge_errors"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
 }
 
 /** Result of query `SelectCreatedApp`. */

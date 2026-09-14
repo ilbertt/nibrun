@@ -63,7 +63,8 @@ function toClaim(row: ClaimRow): CustomHostnameClaim {
     row.hostname === null ||
     row.kind === null ||
     row.state === null ||
-    row.edge_errors === null
+    row.edge_errors === null ||
+    row.created_at === null
   ) {
     return { outcome: 'taken' };
   }
@@ -76,6 +77,7 @@ function toClaim(row: ClaimRow): CustomHostnameClaim {
       dcv_target: row.dcv_target,
       edge_errors: row.edge_errors,
       cloudflare_id: row.cloudflare_id,
+      created_at: row.created_at,
     },
   };
 }
@@ -83,7 +85,7 @@ function toClaim(row: ClaimRow): CustomHostnameClaim {
 export class AppHostnamesRepository extends Repository implements AppHostnamesRepositoryContract {
   listByOwner({ ownerId }: { ownerId: OwnerId }): Promise<OwnedAppHostnameRow[]> {
     return this.sql.SelectAppHostnamesByOwner`
-      SELECT h.app_id, h.hostname, h.kind, h.state, h.dcv_target, h.edge_errors
+      SELECT h.app_id, h.hostname, h.kind, h.state, h.dcv_target, h.edge_errors, h.created_at
       FROM nibrun.app_hostnames h
       JOIN nibrun.live_apps a ON a.id = h.app_id
       WHERE a.owner_id = ${ownerId}
@@ -93,7 +95,7 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
 
   listByApp({ appId, ownerId }: OwnedApp): Promise<AppHostnameRow[]> {
     return this.sql.SelectAppHostnamesByApp`
-      SELECT h.hostname, h.kind, h.state, h.dcv_target, h.edge_errors
+      SELECT h.hostname, h.kind, h.state, h.dcv_target, h.edge_errors, h.created_at
       FROM nibrun.app_hostnames h
       JOIN nibrun.live_apps a ON a.id = h.app_id
       WHERE h.app_id = ${appId} AND a.owner_id = ${ownerId}
@@ -129,15 +131,16 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
         INSERT INTO nibrun.app_hostnames (app_id, hostname, kind)
         SELECT app.id, ${hostname}, ${CUSTOM_KIND} FROM app
         ON CONFLICT (hostname) DO NOTHING
-        RETURNING hostname, kind, state, dcv_target, edge_errors, cloudflare_id
+        RETURNING hostname, kind, state, dcv_target, edge_errors, cloudflare_id, created_at
       ), held AS (
-        SELECT h.hostname, h.kind, h.state, h.dcv_target, h.edge_errors, h.cloudflare_id
+        SELECT h.hostname, h.kind, h.state, h.dcv_target, h.edge_errors, h.cloudflare_id,
+               h.created_at
         FROM nibrun.app_hostnames h
         JOIN app ON app.id = h.app_id
         WHERE h.hostname = ${hostname} AND h.kind = ${CUSTOM_KIND}
       )
       SELECT own.created, own.hostname, own.kind, own.state, own.dcv_target, own.edge_errors,
-             own.cloudflare_id
+             own.cloudflare_id, own.created_at
       FROM app
       LEFT JOIN (
         SELECT true AS created, * FROM created
@@ -161,7 +164,7 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
       UPDATE nibrun.app_hostnames
       SET cloudflare_id = ${cloudflareId}, dcv_target = ${dcvTarget}
       WHERE hostname = ${hostname} AND kind = ${CUSTOM_KIND}
-      RETURNING hostname, kind, state, dcv_target, edge_errors
+      RETURNING hostname, kind, state, dcv_target, edge_errors, created_at
     `;
     return row ?? null;
   }

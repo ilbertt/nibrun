@@ -48,6 +48,7 @@ function hostnameRow(overrides: Partial<AppHostnameRow> = {}): AppHostnameRow {
     state: 'pending',
     dcv_target: null,
     edge_errors: [],
+    created_at: new Date(),
     ...overrides,
   };
 }
