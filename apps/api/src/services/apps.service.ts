@@ -75,8 +75,6 @@ const SLUG_CONSTRAINTS = [
 // a signal that something other than luck is wrong.
 const MAX_SLUG_ATTEMPTS = 5;
 
-const NAME_CONSTRAINT = schema.apps._indexes.apps_owner_id_name_key._indexName;
-
 /** What an app needs from its hostnames while it lives and while it is being removed. */
 export type AppHostnameAccess = Pick<
   AppHostnamesRepositoryContract,
@@ -162,9 +160,7 @@ export class AppsService extends Service {
 
   /**
    * A taken hostname is a re-roll, never an error the owner sees: they picked a name, not a
-   * URL, and two owners are entitled to pick the same name. A name the owner already gave one of
-   * their own apps is the one refusal here that is theirs to answer, because it is what they will
-   * be naming the app by.
+   * URL, and anyone is entitled to pick the same name — the id is what an app is known by here.
    */
   async create({
     ownerId,
@@ -208,9 +204,6 @@ export class AppsService extends Service {
         }
         return toPublicApp(created);
       } catch (error) {
-        if (isUniqueViolation({ error, constraint: NAME_CONSTRAINT })) {
-          throw new ConflictError(alreadyNamed(name));
-        }
         if (!SLUG_CONSTRAINTS.some((constraint) => isUniqueViolation({ error, constraint }))) {
           throw error;
         }
@@ -291,8 +284,7 @@ export class AppsService extends Service {
 
   /**
    * The name moves and nothing else does: the slug was minted from the first name and is in
-   * somebody's bookmarks by now, so the hostname stays. A name the owner already gave another app
-   * is a conflict, the way it is on create.
+   * somebody's bookmarks by now, so the hostname stays.
    */
   async update({
     appId,
@@ -300,15 +292,11 @@ export class AppsService extends Service {
     patch: { name, ...config },
   }: OwnedApp & { patch: AppPatch }): Promise<PublicApp> {
     await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch: config });
-    let app: AppRow | null;
-    try {
-      app = await this.appsRepo.update({ appId, ownerId, patch: this.sealed({ name, ...config }) });
-    } catch (error) {
-      if (name !== undefined && isUniqueViolation({ error, constraint: NAME_CONSTRAINT })) {
-        throw new ConflictError(alreadyNamed(name));
-      }
-      throw error;
-    }
+    const app = await this.appsRepo.update({
+      appId,
+      ownerId,
+      patch: this.sealed({ name, ...config }),
+    });
     const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
     if (name !== undefined) {
       this.logger.info('app renamed', { appId, name });
@@ -664,10 +652,6 @@ function refuseValuesNeedingAPort({
       `${EXTRA_PUBLIC_PORT_VALUES.map((value) => interpolableRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
     );
   }
-}
-
-function alreadyNamed(name: AppName): string {
-  return `You already have an app named ${name}.`;
 }
 
 // An app the caller does not own is indistinguishable from one that does not exist; a 403 would
