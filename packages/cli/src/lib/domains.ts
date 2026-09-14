@@ -26,6 +26,11 @@ const AppHostnameSchema = z.object({
   state: z.enum(APP_HOSTNAME_STATES),
   /** What the domain is waiting on. Empty for one that is already answering. */
   records: z.array(DnsRecordSchema),
+  /**
+   * What the edge says is still missing, in its own words. Empty once nothing is, and while it
+   * has not been asked — so a domain added a moment ago shows its records and no verdict yet.
+   */
+  edgeErrors: z.array(z.string()),
 });
 
 const DomainListSchema = z.object({ hostnames: z.array(AppHostnameSchema) });
@@ -59,6 +64,10 @@ export const APP_DOMAINS_OUTPUT = defineOutput({
       out.dim(`${waiting.hostname} is waiting on:`);
       for (const record of waiting.records) {
         out.dim(`  ${spell(record)}`);
+      }
+      // The edge's words say which of the two is still wrong, which the records alone cannot.
+      for (const error of waiting.edgeErrors) {
+        out.dim(`  the edge reports: ${error}`);
       }
     }
   },
@@ -99,6 +108,7 @@ export async function listDomains({
         each.state === 'pending'
           ? pendingRecords({ hostname: each.hostname, dcvTarget: each.dcvTarget, target })
           : [],
+      edgeErrors: each.edgeErrors,
     })),
   };
 }
