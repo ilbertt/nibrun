@@ -1,6 +1,13 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
-import type { DeploymentState, Filename, Sha256Digest, TenantArguments } from '@repo/protocol';
+import {
+  AppNameSchema,
+  type DeploymentState,
+  type Filename,
+  type Sha256Digest,
+  type TenantArguments,
+  Value,
+} from '@repo/protocol';
 import { appFor } from '#apps.ts';
 import { type UploadableArchive, uploadImport } from '#imports.ts';
 import {
@@ -161,7 +168,7 @@ async function createApp({
   if (name === undefined) {
     throw new ApiError('An app needs a name, and this url ends in nothing to take one from.');
   }
-  return unwrap(await api.api.apps.post({ name, config }));
+  return unwrap(await api.api.apps.post({ name: Value.Parse(AppNameSchema, name), config }));
 }
 
 /**

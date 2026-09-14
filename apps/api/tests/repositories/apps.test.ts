@@ -3,6 +3,7 @@ import { withTypes } from '@ilbertt/bun-sqlgen';
 import {
   type AppId,
   AppIdSchema,
+  AppNameSchema,
   type ComputeUsage,
   DnsLabelSchema,
   HostnameSchema,
@@ -16,7 +17,7 @@ import {
   Value,
 } from '@repo/protocol';
 import type { SQL } from 'bun';
-import type { Queries } from '#db/queries.gen.ts';
+import { type Queries, schema } from '#db/queries.gen.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { AppsRepository, type CreatedApp, LIVE_APP_STATES } from '#repositories/apps.repository.ts';
@@ -92,6 +93,7 @@ async function createApp(slug: string): Promise<AppId> {
   const created = requireCreated(
     await repo.create({
       ownerId: OWNER_ID,
+      name: Value.Parse(AppNameSchema, slug),
       slug: label,
       hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
       config: { ...configWithDefaults(), environment: {} },
@@ -138,6 +140,7 @@ describe('a config patch carries forward every variable it says nothing about', 
     const created = requireCreated(
       await repo.create({
         ownerId: OWNER_ID,
+        name: Value.Parse(AppNameSchema, APP_SLUG),
         slug: APP_SLUG,
         hostname: PLATFORM,
         config: {
@@ -675,6 +678,7 @@ describe('an owner may have the apps they were given and no more', () => {
     const label = Value.Parse(DnsLabelSchema, slug);
     return repo.create({
       ownerId,
+      name: Value.Parse(AppNameSchema, slug),
       slug: label,
       hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
       config: { ...configWithDefaults(), environment: {} },
@@ -767,6 +771,73 @@ describe('an owner may have the apps they were given and no more', () => {
 });
 
 /**
+ * The name is what an owner names an app by, so two of theirs answering to it is a command acting
+ * on the wrong one. The rule is a partial unique index, and which rows it reaches — one owner's,
+ * and only the ones they still have — is the index's own, so it is exercised against Postgres.
+ */
+describe('an owner names each app they still have differently', () => {
+  const NAME_KEY = schema.apps._indexes.apps_owner_id_name_key._indexName;
+
+  function makeApp({ ownerId, name, slug }: { ownerId: OwnerId; name: string; slug: string }) {
+    const label = Value.Parse(DnsLabelSchema, slug);
+    return repo.create({
+      ownerId,
+      name: Value.Parse(AppNameSchema, name),
+      slug: label,
+      hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+      config: { ...configWithDefaults(), environment: {} },
+    });
+  }
+
+  test('an app is read back under the name it was given, which is not its slug', async () => {
+    const created = requireCreated(
+      await makeApp({ ownerId: OWNER_ID, name: 'My Blog', slug: 'my-blog-x7k2pq' }),
+    );
+
+    expect(created.app).toMatchObject({ name: 'My Blog', slug: 'my-blog-x7k2pq' });
+    expect(await repo.findById({ appId: created.app.id, ownerId: OWNER_ID })).toMatchObject({
+      name: 'My Blog',
+      slug: 'my-blog-x7k2pq',
+    });
+  });
+
+  test('a second app of theirs under the same name is refused', async () => {
+    expect(
+      await refusedBy(() => makeApp({ ownerId: OWNER_ID, name: 'My Blog', slug: 'my-blog-again' })),
+    ).toBe(NAME_KEY);
+  });
+
+  test('somebody else may name theirs the same', async () => {
+    expect(
+      await makeApp({ ownerId: STRANGER_ID, name: 'My Blog', slug: 'my-blog-theirs' }),
+    ).not.toBeNull();
+  });
+
+  test('an app being deleted still holds its name', async () => {
+    const holding = requireCreated(
+      await makeApp({ ownerId: OWNER_ID, name: 'Going', slug: 'going-qx8m2t' }),
+    );
+    await repo.updateState({
+      appId: holding.app.id,
+      ownerId: OWNER_ID,
+      state: 'deleting',
+      from: LIVE_APP_STATES,
+    });
+
+    expect(
+      await refusedBy(() => makeApp({ ownerId: OWNER_ID, name: 'Going', slug: 'going-again' })),
+    ).toBe(NAME_KEY);
+  });
+
+  test('a deleted app gives its name back', async () => {
+    const [going] = await sql.unsafe(`SELECT id FROM nibrun.apps WHERE slug = 'going-qx8m2t'`);
+    await repo.finishDeleting({ appId: Value.Parse(AppIdSchema, going.id) });
+
+    expect(await makeApp({ ownerId: OWNER_ID, name: 'Going', slug: 'going-again' })).not.toBeNull();
+  });
+});
+
+/**
  * The deadline is decided in SQL from the profile, so the only place to see it reach an app is
  * the real schema: on every read an owner makes of their app, and in the listing the sweep reads.
  */
@@ -792,6 +863,7 @@ describe('an owner whose apps are given a lifetime is shown when each one ends',
     const created = requireCreated(
       await repo.create({
         ownerId: PASSERBY_ID,
+        name: Value.Parse(AppNameSchema, slug),
         slug,
         hostname: Value.Parse(HostnameSchema, `${slug}.apps.example.com`),
         config: { ...configWithDefaults(), environment: {} },

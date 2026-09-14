@@ -2,6 +2,7 @@ import {
   AppConfigSchema,
   AppHostnameSchema,
   AppHostnameStateSchema,
+  AppNameSchema,
   AppSchema,
   ByteSizeSchema,
   ComputeUsageSchema,
@@ -13,8 +14,6 @@ import {
   TimestampSchema,
 } from '@repo/protocol';
 import { t } from 'elysia';
-
-const MAX_APP_NAME_LENGTH = 128;
 
 // Which variables are set, never what they hold: the values are sealed in the database and only
 // opened on their way to the host, so there is nothing here that could return one.
@@ -98,7 +97,7 @@ export const ListAppsResponseSchema = t.Object({ apps: t.Array(AppResponseSchema
 // A name, not a URL: the hostname is derived from it once and never follows a rename.
 export const CreateAppRequestSchema = t.Object(
   {
-    name: t.String({ minLength: 1, maxLength: MAX_APP_NAME_LENGTH }),
+    name: AppNameSchema,
     config: t.Optional(NewAppConfigSchema),
   },
   { additionalProperties: false },

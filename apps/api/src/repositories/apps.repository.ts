@@ -4,6 +4,7 @@ import {
   type AppHostnameKind,
   type AppHostnameState,
   type AppId,
+  type AppName,
   type AppState,
   type ComputeUsage,
   type DnsLabel,
@@ -26,6 +27,7 @@ export type CreatedApp = { app: AppRow; hostnames: AppHostnameRow[] };
 
 export type NewApp = {
   ownerId: OwnerId;
+  name: AppName;
   slug: DnsLabel;
   hostname: Hostname;
   config: StoredAppConfig;
@@ -112,7 +114,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
   /**
    * `null` where the owner already has every app they are allowed, which is the only reason this
-   * declines — a slug already taken raises, because it is a re-roll rather than an answer.
+   * declines — a slug already taken raises, because it is a re-roll rather than an answer, and so
+   * does a name the owner has already given another app, because it is theirs to change.
    *
    * The count and the insert are one decision, so they are one transaction and the owner's profile
    * is locked across it. Without that, requests arriving together each read the same count and
@@ -125,7 +128,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * on every sign-in — this is nibrun's row about the same person, and it is the one carrying the
    * number being decided against.
    */
-  create({ ownerId, slug, hostname, config }: NewApp): Promise<CreatedApp | null> {
+  create({ ownerId, name, slug, hostname, config }: NewApp): Promise<CreatedApp | null> {
     return this.sql.begin(async (tx) => {
       const [locked] = await tx.SelectProfileForAppCreate`
         SELECT p.owner_id
@@ -157,8 +160,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       }
 
       const [inserted] = await tx.InsertApp`
-        INSERT INTO nibrun.apps (owner_id, slug)
-        VALUES (${ownerId}, ${slug})
+        INSERT INTO nibrun.apps (owner_id, name, slug)
+        VALUES (${ownerId}, ${name}, ${slug})
         RETURNING id
       `;
       if (!inserted) {
@@ -210,7 +213,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const [app] = await tx.SelectCreatedApp`
         /* @notNull environment_names */
-        SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+        SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
                a.created_at, a.updated_at,
                c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
@@ -241,7 +244,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   listByOwner({ ownerId }: { ownerId: OwnerId }): Promise<AppRow[]> {
     return this.sql.SelectAppsByOwner`
       /* @notNull environment_names */
-      SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+      SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
              a.created_at, a.updated_at,
              c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
@@ -397,7 +400,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   async findById({ appId, ownerId }: OwnedApp): Promise<AppRow | null> {
     const [app] = await this.sql.SelectAppById`
       /* @notNull environment_names */
-      SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+      SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
              a.created_at, a.updated_at,
              c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
@@ -503,7 +506,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         LEFT JOIN nibrun.app_usage u ON u.app_id = c.app_id
         LEFT JOIN nibrun.app_deadlines d ON d.app_id = c.app_id
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND c.id = ${inserted.id}
-        RETURNING a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+        RETURNING a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
                   a.created_at, a.updated_at,
                   c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                   c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
@@ -693,7 +696,7 @@ async function appAfterStateChange({
 }): Promise<AppRow> {
   const [app] = await tx.SelectAppAfterStateChange`
     /* @notNull environment_names */
-    SELECT a.id, a.owner_id, a.slug, a.state, a.activation, a.idle_timeout_ms,
+    SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
            a.created_at, a.updated_at,
            c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
            c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,

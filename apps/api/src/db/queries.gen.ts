@@ -221,6 +221,8 @@ export interface IInsertAppHostnameResult {
 export interface ISelectCreatedAppResult {
     id: IAppsColumns["id"];
     owner_id: IAppsColumns["owner_id"];
+    /** What its owner calls the app, and names it by. */
+    name: IAppsColumns["name"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
@@ -268,6 +270,8 @@ export interface ISelectCreatedAppResult {
 export interface ISelectAppsByOwnerResult {
     id: IAppsColumns["id"];
     owner_id: IAppsColumns["owner_id"];
+    /** What its owner calls the app, and names it by. */
+    name: IAppsColumns["name"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
@@ -315,6 +319,8 @@ export interface ISelectAppsByOwnerResult {
 export interface ISelectAppByIdResult {
     id: IAppsColumns["id"];
     owner_id: IAppsColumns["owner_id"];
+    /** What its owner calls the app, and names it by. */
+    name: IAppsColumns["name"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
@@ -395,6 +401,8 @@ export interface IInsertPatchedAppConfigResult {
 export interface ITouchAppAfterConfigPatchResult {
     id: IAppsColumns["id"];
     owner_id: IAppsColumns["owner_id"];
+    /** What its owner calls the app, and names it by. */
+    name: IAppsColumns["name"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
@@ -506,6 +514,8 @@ export interface IDeleteAppUsageByAppResult {
 export interface ISelectAppAfterStateChangeResult {
     id: IAppsColumns["id"];
     owner_id: IAppsColumns["owner_id"];
+    /** What its owner calls the app, and names it by. */
+    name: IAppsColumns["name"];
     slug: IAppsColumns["slug"];
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
@@ -1354,6 +1364,8 @@ export interface IAppsColumns {
     idle_timeout_ms: number;
     /** When a host first reported this app's filesystem ready. Its presence is what makes the data no longer creatable. */
     data_initialized_at: Date | null;
+    /** What its owner calls the app, and names it by. */
+    name: import("@repo/protocol").AppName | null;
 }
 
 /** Schema of `apps`. */
@@ -1686,6 +1698,8 @@ export interface ILiveAppsColumns {
     idle_timeout_ms: number | null;
     /** When a host first reported this app's filesystem ready. Its presence is what makes the data no longer creatable. */
     data_initialized_at: Date | null;
+    /** What its owner calls the app, and names it by. */
+    name: import("@repo/protocol").AppName | null;
 }
 
 /** Schema of `live_apps`. */
@@ -2043,11 +2057,13 @@ export const schema = {
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             activation: { _columnName: "activation", _foreignKeys: {} },
             idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} },
-            data_initialized_at: { _columnName: "data_initialized_at", _foreignKeys: {} }
+            data_initialized_at: { _columnName: "data_initialized_at", _foreignKeys: {} },
+            name: { _columnName: "name", _foreignKeys: {} }
         },
         _indexes: {
             apps_deleted_idx: { _indexName: "apps_deleted_idx" },
             apps_owner_id_idx: { _indexName: "apps_owner_id_idx" },
+            apps_owner_id_name_key: { _indexName: "apps_owner_id_name_key" },
             apps_pkey: { _indexName: "apps_pkey" },
             apps_slug_key: { _indexName: "apps_slug_key" }
         },
@@ -2330,7 +2346,8 @@ export const schema = {
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             activation: { _columnName: "activation", _foreignKeys: {} },
             idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} },
-            data_initialized_at: { _columnName: "data_initialized_at", _foreignKeys: {} }
+            data_initialized_at: { _columnName: "data_initialized_at", _foreignKeys: {} },
+            name: { _columnName: "name", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
