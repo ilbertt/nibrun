@@ -7,7 +7,7 @@ export function DeploymentLine({ deploymentId }: { deploymentId: string }) {
 
   return (
     <p className="font-mono text-muted-foreground text-xs">
-      {app.data?.slug ?? appId} · deployment {deploymentId}
+      {app.data?.name ?? appId} · deployment {deploymentId}
     </p>
   );
 }

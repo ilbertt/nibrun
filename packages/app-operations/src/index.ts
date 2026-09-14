@@ -43,7 +43,13 @@ export { type UploadableArchive, uploadImport } from '#imports.ts';
 export { type FollowInput, followLogs } from '#logs.ts';
 export { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
 export { type RedeployInput, redeploy } from '#redeploy.ts';
-export { type ConfigEdit, type Deployed, type DeployStep, servingHostname } from '#release.ts';
+export {
+  type AppEdit,
+  type ConfigEdit,
+  type Deployed,
+  type DeployStep,
+  servingHostname,
+} from '#release.ts';
 export {
   APP_STATUS_LABELS,
   type AppStatus,
@@ -55,6 +61,7 @@ export {
   statusKey,
 } from '#status.ts';
 export { resumeApp, suspendApp } from '#suspend.ts';
+export { type UpdateInput, updateApp } from '#update.ts';
 export {
   streamedUpload,
   type UploadProgress,

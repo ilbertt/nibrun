@@ -1,22 +1,14 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
-import { AppNameSchema, Value } from '@repo/protocol';
 import { appFor, pinnedArtifact } from '#apps.ts';
-import {
-  type ConfigEdit,
-  configPatch,
-  type Deployed,
-  type DeployStep,
-  servingHostname,
-} from '#release.ts';
+import { type AppEdit, type Deployed, type DeployStep, servingHostname } from '#release.ts';
+import { updateApp } from '#update.ts';
 
 const NOTHING_TO_RELEASE = 'This app has never been deployed.';
 
-export type RedeployInput = ConfigEdit & {
+export type RedeployInput = AppEdit & {
   api: PublicApiClient;
   app: string;
-  /** What to call the app from now on. Its hostnames stay: the slug never follows a rename. */
-  name?: string | undefined;
   onStep?: ((step: DeployStep) => void) | undefined;
 };
 
@@ -31,13 +23,7 @@ export type RedeployInput = ConfigEdit & {
  * deployed has no binary to run again, and finding that out afterwards would leave it configured
  * for a release nobody made.
  */
-export async function redeploy({
-  api,
-  app,
-  name,
-  onStep,
-  ...edit
-}: RedeployInput): Promise<Deployed> {
+export async function redeploy({ api, app, onStep, ...edit }: RedeployInput): Promise<Deployed> {
   const target = await appFor({ api, name: app, operation: 'release' });
   if (!target.newest) {
     throw new ApiError(NOTHING_TO_RELEASE);
@@ -48,14 +34,7 @@ export async function redeploy({
     artifactId: target.newest.artifactId,
   });
 
-  // Parsed here rather than passed through, for the reason a domain is: a name the api would
-  // refuse is refused by the caller that took it rather than by a round trip.
-  const patched = unwrap(
-    await api.api.apps({ appId: target.app.id }).patch({
-      ...configPatch(edit),
-      ...(name !== undefined && { name: Value.Parse(AppNameSchema, name) }),
-    }),
-  );
+  const patched = await updateApp({ api, appId: target.app.id, ...edit });
   onStep?.({ kind: 'app', appId: patched.id, name: patched.name });
   onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest });
 

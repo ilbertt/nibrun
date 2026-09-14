@@ -19,7 +19,7 @@ export function AppsTable({ apps }: { apps: readonly AppSummary[] }) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Slug</TableHead>
+          <TableHead>Name</TableHead>
           <TableHead>URL</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Last change</TableHead>
@@ -34,7 +34,7 @@ export function AppsTable({ apps }: { apps: readonly AppSummary[] }) {
                 params={{ appId: app.id }}
                 className="font-medium hover:underline"
               >
-                {app.slug}
+                {app.name}
               </Link>
             </TableCell>
             <TableCell>

@@ -30,7 +30,7 @@ export function DeleteAppDialog({ availability }: { availability: AppActionAvail
     return null;
   }
 
-  const slug = app.data?.slug;
+  const name = app.data?.name;
   const alreadyDeleting = app.data?.state === 'deleting';
 
   return (
@@ -51,7 +51,7 @@ export function DeleteAppDialog({ availability }: { availability: AppActionAvail
           <AlertDialogMedia className="bg-destructive/10 text-destructive">
             <TriangleAlertIcon />
           </AlertDialogMedia>
-          <AlertDialogTitle>Delete {slug}?</AlertDialogTitle>
+          <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
           <AlertDialogDescription>
             This cannot be undone, and nothing here is recoverable afterwards.
           </AlertDialogDescription>
@@ -60,7 +60,7 @@ export function DeleteAppDialog({ availability }: { availability: AppActionAvail
         <dl className="flex flex-col gap-2 rounded-2xl bg-muted px-3 py-2 text-sm">
           <div className="flex justify-between gap-4">
             <dt className="shrink-0 text-muted-foreground">app</dt>
-            <dd className="truncate font-mono">{slug}</dd>
+            <dd className="truncate">{name}</dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="shrink-0 text-muted-foreground">hostnames</dt>
@@ -102,7 +102,7 @@ export function DeleteAppDialog({ availability }: { availability: AppActionAvail
         <AlertDialogFooter>
           <AlertDialogCancel disabled={deletion.isPending}>Keep the app</AlertDialogCancel>
           <AlertDialogAction variant="destructive" disabled={armed} onClick={() => setArmed(true)}>
-            Delete {slug}
+            Delete {name}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

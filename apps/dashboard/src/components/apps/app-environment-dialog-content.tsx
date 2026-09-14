@@ -58,7 +58,7 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
           <DialogTitle>Environment variables</DialogTitle>
           <DialogDescription>
             {run.phase === 'idle'
-              ? describeSave({ slug: app.slug, withheld: greyedReason(deploy) })
+              ? describeSave({ name: app.name, withheld: greyedReason(deploy) })
               : describeRelease(run.phase)}
           </DialogDescription>
         </DialogHeader>
@@ -82,7 +82,7 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
                 size="lg"
                 disabled={!form.submittable || deploy.kind !== 'enabled'}
               >
-                <span className="truncate">Save and redeploy {app.slug}</span>
+                <span className="truncate">Save and redeploy {app.name}</span>
               </Button>
             </form>
           ) : (
@@ -94,9 +94,9 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
   );
 }
 
-function describeSave({ slug, withheld }: { slug: string; withheld: string | undefined }): string {
+function describeSave({ name, withheld }: { name: string; withheld: string | undefined }): string {
   return (
     withheld ??
-    `Saving releases ${slug} again on the binary it already runs. Its hostnames and everything on its volume stay as they are.`
+    `Saving releases ${name} again on the binary it already runs. Its hostnames and everything on its volume stay as they are.`
   );
 }
