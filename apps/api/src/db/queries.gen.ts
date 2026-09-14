@@ -373,86 +373,13 @@ export interface ISelectAppByIdResult {
     expires_at: Date | null;
 }
 
-/** Result of query `SelectAppForConfigUpdate`. */
-export interface ISelectAppForConfigUpdateResult {
+/** Result of query `SelectAppForUpdate`. */
+export interface ISelectAppForUpdateResult {
     id: IAppsColumns["id"];
 }
 
-/** Result of query `SelectCurrentAppConfig`. */
-export interface ISelectCurrentAppConfigResult {
-    id: IAppConfigsColumns["id"];
-    http_port: IAppConfigsColumns["http_port"];
-    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
-    args: IAppConfigsColumns["args"];
-    vcpu_count: IAppConfigsColumns["vcpu_count"];
-    memory_mib: IAppConfigsColumns["memory_mib"];
-    health_check_path: IAppConfigsColumns["health_check_path"];
-    health_check_interval_ms: IAppConfigsColumns["health_check_interval_ms"];
-    health_check_timeout_ms: IAppConfigsColumns["health_check_timeout_ms"];
-    health_check_grace_period_ms: IAppConfigsColumns["health_check_grace_period_ms"];
-    health_check_healthy_threshold: IAppConfigsColumns["health_check_healthy_threshold"];
-    health_check_unhealthy_threshold: IAppConfigsColumns["health_check_unhealthy_threshold"];
-    restart_max_restarts: IAppConfigsColumns["restart_max_restarts"];
-    restart_initial_backoff_ms: IAppConfigsColumns["restart_initial_backoff_ms"];
-    restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
-    restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
-    restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
-    /** Names of the variables this config version runs with, never their values. */
-    environment_names: string[];
-}
-
-/** Result of query `InsertPatchedAppConfig`. */
-export interface IInsertPatchedAppConfigResult {
-    id: IAppConfigsColumns["id"];
-}
-
-/** Result of query `TouchAppAfterConfigPatch`. */
-export interface ITouchAppAfterConfigPatchResult {
-    id: IAppsColumns["id"];
-    owner_id: IAppsColumns["owner_id"];
-    /** What its owner calls the app, and names it by. */
-    name: IAppsColumns["name"];
-    slug: IAppsColumns["slug"];
-    state: IAppsColumns["state"];
-    activation: IAppsColumns["activation"];
-    idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
-    /** Derived from the uuidv7 id; the moment the row was created. */
-    created_at: Date;
-    updated_at: IAppsColumns["updated_at"];
-    http_port: IAppConfigsColumns["http_port"];
-    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
-    args: IAppConfigsColumns["args"];
-    vcpu_count: IAppConfigsColumns["vcpu_count"];
-    memory_mib: IAppConfigsColumns["memory_mib"];
-    health_check_path: IAppConfigsColumns["health_check_path"];
-    health_check_interval_ms: IAppConfigsColumns["health_check_interval_ms"];
-    health_check_timeout_ms: IAppConfigsColumns["health_check_timeout_ms"];
-    health_check_grace_period_ms: IAppConfigsColumns["health_check_grace_period_ms"];
-    health_check_healthy_threshold: IAppConfigsColumns["health_check_healthy_threshold"];
-    health_check_unhealthy_threshold: IAppConfigsColumns["health_check_unhealthy_threshold"];
-    restart_max_restarts: IAppConfigsColumns["restart_max_restarts"];
-    restart_initial_backoff_ms: IAppConfigsColumns["restart_initial_backoff_ms"];
-    restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
-    restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
-    restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
-    /** Names of the variables this config version runs with, never their values. */
-    environment_names: string[];
-    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
-    /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    volume_used_bytes: IAppUsageColumns["volume_used_bytes"];
-    /** When the guest was asked how full its filesystem was, not when the report carrying it arrived. */
-    volume_measured_at: IAppUsageColumns["volume_measured_at"];
-    /** MemTotal, which reads under the memory the app was allocated. A bigint, so it arrives as a string. */
-    memory_total_bytes: IAppUsageColumns["memory_total_bytes"];
-    /** MemTotal less MemAvailable, so cache the kernel would hand back is not counted as spent. */
-    memory_used_bytes: IAppUsageColumns["memory_used_bytes"];
-    /** The mean share of the vCPUs spent computing over the interval ending at compute_measured_at. */
-    cpu_share: IAppUsageColumns["cpu_share"];
-    /** When the guest was asked what it was spending, not when the report carrying it arrived. */
-    compute_measured_at: IAppUsageColumns["compute_measured_at"];
-    /** When this app is due to be deleted. */
-    expires_at: Date | null;
+/** Result of query `TouchApp`. */
+export interface ITouchAppResult {
 }
 
 /** Result of query `SelectFinishableDeletion`. */
@@ -519,8 +446,36 @@ export interface IDeleteArtifactsByAppResult {
 export interface IDeleteAppUsageByAppResult {
 }
 
-/** Result of query `SelectAppAfterStateChange`. */
-export interface ISelectAppAfterStateChangeResult {
+/** Result of query `SelectCurrentAppConfig`. */
+export interface ISelectCurrentAppConfigResult {
+    id: IAppConfigsColumns["id"];
+    http_port: IAppConfigsColumns["http_port"];
+    has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
+    args: IAppConfigsColumns["args"];
+    vcpu_count: IAppConfigsColumns["vcpu_count"];
+    memory_mib: IAppConfigsColumns["memory_mib"];
+    health_check_path: IAppConfigsColumns["health_check_path"];
+    health_check_interval_ms: IAppConfigsColumns["health_check_interval_ms"];
+    health_check_timeout_ms: IAppConfigsColumns["health_check_timeout_ms"];
+    health_check_grace_period_ms: IAppConfigsColumns["health_check_grace_period_ms"];
+    health_check_healthy_threshold: IAppConfigsColumns["health_check_healthy_threshold"];
+    health_check_unhealthy_threshold: IAppConfigsColumns["health_check_unhealthy_threshold"];
+    restart_max_restarts: IAppConfigsColumns["restart_max_restarts"];
+    restart_initial_backoff_ms: IAppConfigsColumns["restart_initial_backoff_ms"];
+    restart_max_backoff_ms: IAppConfigsColumns["restart_max_backoff_ms"];
+    restart_backoff_factor: IAppConfigsColumns["restart_backoff_factor"];
+    restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
+    /** Names of the variables this config version runs with, never their values. */
+    environment_names: string[];
+}
+
+/** Result of query `InsertPatchedAppConfig`. */
+export interface IInsertPatchedAppConfigResult {
+    id: IAppConfigsColumns["id"];
+}
+
+/** Result of query `SelectAppAsChanged`. */
+export interface ISelectAppAsChangedResult {
     id: IAppsColumns["id"];
     owner_id: IAppsColumns["owner_id"];
     /** What its owner calls the app, and names it by. */
@@ -1019,10 +974,8 @@ export interface Queries {
     SelectCreatedApp: ISelectCreatedAppResult;
     SelectAppsByOwner: ISelectAppsByOwnerResult;
     SelectAppById: ISelectAppByIdResult;
-    SelectAppForConfigUpdate: ISelectAppForConfigUpdateResult;
-    SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
-    InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
-    TouchAppAfterConfigPatch: ITouchAppAfterConfigPatchResult;
+    SelectAppForUpdate: ISelectAppForUpdateResult;
+    TouchApp: ITouchAppResult;
     SelectFinishableDeletion: ISelectFinishableDeletionResult;
     SelectFinishableDeletions: ISelectFinishableDeletionsResult;
     FinishDeletingApp: IFinishDeletingAppResult;
@@ -1036,7 +989,9 @@ export interface Queries {
     DeleteImportsByApp: IDeleteImportsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
-    SelectAppAfterStateChange: ISelectAppAfterStateChangeResult;
+    SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
+    InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
+    SelectAppAsChanged: ISelectAppAsChangedResult;
     InsertPendingArtifact: IInsertPendingArtifactResult;
     CompleteArtifact: ICompleteArtifactResult;
     DeleteArtifact: IDeleteArtifactResult;

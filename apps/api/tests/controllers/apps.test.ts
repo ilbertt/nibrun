@@ -125,6 +125,12 @@ describe('a malformed request is a bad request', () => {
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
 
+  test('renaming an app to nothing', async () => {
+    const response = await sendJson({ method: 'PATCH', url: APP_URL, body: { name: '' } });
+
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
   test('patching the volume size is refused, because the api owns it', async () => {
     const response = await sendJson({
       method: 'PATCH',

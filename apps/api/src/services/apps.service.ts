@@ -22,7 +22,6 @@ import {
   configWithDefaults,
   type NewAppConfig,
   type PublicAppConfig,
-  type SealedConfigPatch,
   splitEnvironmentPatch,
   toAppConfig,
 } from '#lib/app-config.ts';
@@ -41,6 +40,7 @@ import {
   type AppRow,
   type AppsRepositoryContract,
   LIVE_APP_STATES,
+  type SealedAppPatch,
 } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type { CustomHostnamesRepositoryContract } from '#repositories/custom-hostnames.repository.ts';
@@ -58,6 +58,9 @@ export type PublicApp = Omit<App, 'config' | 'hostnames'> & {
 };
 
 type AppWithHostnames = { app: AppRow; hostnames: readonly AppHostnameRow[] };
+
+/** Everything an owner may change about an app in one request: what they call it, and how it starts. */
+export type AppPatch = AppConfigPatch & { name?: AppName | undefined };
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
@@ -252,9 +255,9 @@ export class AppsService extends Service {
     });
   }
 
-  private sealed({ environment, ...rest }: AppConfigPatch): SealedConfigPatch {
+  private sealed({ name, environment, ...rest }: AppPatch): SealedAppPatch {
     if (environment === undefined) {
-      return rest;
+      return { ...rest, name };
     }
 
     const { set, removed } = splitEnvironmentPatch(environment);
@@ -262,6 +265,7 @@ export class AppsService extends Service {
 
     return {
       ...rest,
+      name,
       environment: { set: sealEnvironment({ key: this.secretsKey, environment: set }), removed },
     };
   }
@@ -285,18 +289,32 @@ export class AppsService extends Service {
     return toPublicApp({ app: requireApp(app), hostnames });
   }
 
-  async updateConfig({
+  /**
+   * The name moves and nothing else does: the slug was minted from the first name and is in
+   * somebody's bookmarks by now, so the hostname stays. A name the owner already gave another app
+   * is a conflict, the way it is on create.
+   */
+  async update({
     appId,
     ownerId,
-    patch,
-  }: OwnedApp & { patch: AppConfigPatch }): Promise<PublicApp> {
-    await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch });
-    const app = requireApp(
-      await this.appsRepo.updateConfig({ appId, ownerId, patch: this.sealed(patch) }),
-    );
+    patch: { name, ...config },
+  }: OwnedApp & { patch: AppPatch }): Promise<PublicApp> {
+    await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch: config });
+    let app: AppRow | null;
+    try {
+      app = await this.appsRepo.update({ appId, ownerId, patch: this.sealed({ name, ...config }) });
+    } catch (error) {
+      if (name !== undefined && isUniqueViolation({ error, constraint: NAME_CONSTRAINT })) {
+        throw new ConflictError(alreadyNamed(name));
+      }
+      throw error;
+    }
     const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
+    if (name !== undefined) {
+      this.logger.info('app renamed', { appId, name });
+    }
 
-    return toPublicApp({ app, hostnames });
+    return toPublicApp({ app: requireApp(app), hostnames });
   }
 
   /**

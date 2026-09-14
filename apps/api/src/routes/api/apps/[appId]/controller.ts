@@ -1,6 +1,6 @@
 import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
-import { AppConfigPatchSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
+import { AppPatchSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
 import { AppsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdController = new Elysia()
@@ -24,7 +24,7 @@ export const AppsAppIdController = new Elysia()
   .patch(
     '/apps/:appId',
     async ({ appsService, params, body, user, status }) => {
-      const app = await appsService.updateConfig({
+      const app = await appsService.update({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         patch: body,
@@ -32,7 +32,7 @@ export const AppsAppIdController = new Elysia()
       return status(StatusMap.OK, app);
     },
     {
-      body: AppConfigPatchSchema,
+      body: AppPatchSchema,
       response: { [StatusMap.OK]: AppResponseSchema },
     },
   )

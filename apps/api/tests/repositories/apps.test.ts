@@ -167,7 +167,7 @@ describe('a config patch carries forward every variable it says nothing about', 
   }
 
   function patchEnvironment(environment: SealedEnvironmentPatch) {
-    return repo.updateConfig({ appId, ownerId, patch: { environment } });
+    return repo.update({ appId, ownerId, patch: { name: undefined, environment } });
   }
 
   function opened(value: string | undefined): string {
@@ -177,7 +177,7 @@ describe('a config patch carries forward every variable it says nothing about', 
   test('a patch that says nothing about the environment keeps all of it', async () => {
     const before = await storedEnvironment();
 
-    await repo.updateConfig({ appId, ownerId, patch: { args: ['serve'] } });
+    await repo.update({ appId, ownerId, patch: { name: undefined, args: ['serve'] } });
 
     expect(await storedEnvironment()).toEqual(before);
   });
@@ -834,6 +834,61 @@ describe('an owner names each app they still have differently', () => {
     await repo.finishDeleting({ appId: Value.Parse(AppIdSchema, going.id) });
 
     expect(await makeApp({ ownerId: OWNER_ID, name: 'Going', slug: 'going-again' })).not.toBeNull();
+  });
+
+  describe('a rename moves the name and nothing else', () => {
+    let appId: AppId;
+    let before: Date;
+
+    beforeAll(async () => {
+      const created = requireCreated(
+        await makeApp({ ownerId: OWNER_ID, name: 'Draft', slug: 'draft-p3nq7w' }),
+      );
+      appId = created.app.id;
+      before = created.app.updated_at;
+    });
+
+    async function configVersions(): Promise<number> {
+      const [row] = (await sql.unsafe(
+        'SELECT count(*)::int AS versions FROM nibrun.app_configs WHERE app_id = $1',
+        [appId],
+      )) as Array<{ versions: number }>;
+      return row?.versions ?? 0;
+    }
+
+    function rename({ name, ownerId }: { name: string; ownerId: OwnerId }) {
+      return repo.update({ appId, ownerId, patch: { name: Value.Parse(AppNameSchema, name) } });
+    }
+
+    // Through the view, so this is also the check that the table's trigger still fires: an app
+    // renamed is an app changed, and its owner is shown when.
+    test('the app is read back under the new name, at the slug it had, and marked changed', async () => {
+      const renamed = await rename({ name: 'Final', ownerId: OWNER_ID });
+
+      expect(renamed).toMatchObject({ name: 'Final', slug: 'draft-p3nq7w' });
+      expect(renamed?.updated_at.getTime()).toBeGreaterThan(before.getTime());
+    });
+
+    // A deployment pins a config version, so a rename that minted one would look like a release
+    // waiting to be made.
+    test('a rename appends no config version', async () => {
+      const versions = await configVersions();
+
+      await rename({ name: 'Final Again', ownerId: OWNER_ID });
+
+      expect(await configVersions()).toBe(versions);
+    });
+
+    test('a name another app of theirs already has is refused by the same index', async () => {
+      expect(await refusedBy(() => rename({ name: 'My Blog', ownerId: OWNER_ID }))).toBe(NAME_KEY);
+    });
+
+    test('somebody else cannot rename it', async () => {
+      expect(await rename({ name: 'Theirs', ownerId: STRANGER_ID })).toBeNull();
+      expect(await repo.findById({ appId, ownerId: OWNER_ID })).toMatchObject({
+        name: 'Final Again',
+      });
+    });
   });
 });
 
