@@ -25,28 +25,51 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
   const suffix = usePlatformSuffix();
 
   return (
-    // Bordered rather than filled, because a row of this table lights up on hover and has to
-    // have something to light up against.
-    <div className="overflow-hidden rounded-xl border">
-      <Table className="text-xs">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="h-8">Type</TableHead>
-            <TableHead className="h-8">Name</TableHead>
-            <TableHead className="h-8">Value</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <DomainRecord name={hostname.hostname} value={`${app.data?.slug}.${suffix}`} />
-          {hostname.dcvTarget ? (
-            <DomainRecord
-              name={`_acme-challenge.${hostname.hostname}`}
-              value={hostname.dcvTarget}
-            />
-          ) : null}
-        </TableBody>
-      </Table>
+    <div className="flex flex-col gap-2">
+      {/* Bordered rather than filled, because a row of this table lights up on hover and has to
+          have something to light up against. */}
+      <div className="overflow-hidden rounded-xl border">
+        <Table className="text-xs">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="h-8">Type</TableHead>
+              <TableHead className="h-8">Name</TableHead>
+              <TableHead className="h-8">Value</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <DomainRecord name={hostname.hostname} value={`${app.data?.slug}.${suffix}`} />
+            {hostname.dcvTarget ? (
+              <DomainRecord
+                name={`_acme-challenge.${hostname.hostname}`}
+                value={hostname.dcvTarget}
+              />
+            ) : null}
+          </TableBody>
+        </Table>
+      </div>
+      <EdgeReport errors={hostname.edgeErrors} />
     </div>
+  );
+}
+
+/**
+ * The edge's own words on what is still missing. They say which of the two records is wrong,
+ * which the table above cannot; and nothing while there are none, because a domain added a
+ * moment ago has not been asked about yet and one the edge is busy with has no error to show.
+ */
+function EdgeReport({ errors }: { errors: string[] }) {
+  if (errors.length === 0) {
+    return null;
+  }
+  return (
+    <ul className="flex flex-col gap-1 text-muted-foreground text-xs">
+      {errors.map((error) => (
+        <li key={error} className="wrap-anywhere">
+          The edge reports: {error}
+        </li>
+      ))}
+    </ul>
   );
 }
 
