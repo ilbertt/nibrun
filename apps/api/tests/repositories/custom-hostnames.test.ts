@@ -3,15 +3,26 @@ import type { CustomHostname } from '#lib/cloudflare/client.ts';
 import {
   CustomHostnamesRepository,
   CustomHostnamesUnavailableError,
+  toReport,
   toState,
 } from '#repositories/custom-hostnames.repository.ts';
 
-function edge({ status, ssl }: { status: string; ssl: string }): CustomHostname {
+function edge({
+  status,
+  ssl,
+  ...errors
+}: {
+  status: string;
+  ssl: string;
+  verification_errors?: string[];
+  validation_errors?: { message: string }[];
+}): CustomHostname {
   return {
     id: 'ch-1',
     hostname: 'app.example.dev',
     status,
-    ssl: { status: ssl },
+    verification_errors: errors.verification_errors,
+    ssl: { status: ssl, validation_errors: errors.validation_errors },
   };
 }
 
@@ -51,6 +62,34 @@ describe('waiting is the default, because the edge retries on its own', () => {
   });
 });
 
+describe('the report keeps what the state was collapsed from', () => {
+  // The owner reads these to learn which record is still missing, and Cloudflare splits them
+  // between the two halves it answers separately — one list is what they can act on.
+  test('the errors of both halves, in the order the halves are proved', () => {
+    const report = toReport(
+      edge({
+        status: 'pending',
+        ssl: 'pending_validation',
+        verification_errors: ['custom hostname does not CNAME to this zone.'],
+        validation_errors: [{ message: 'SERVFAIL looking up CAA for app.example.dev' }],
+      }),
+    );
+
+    expect(report.state).toBe('pending');
+    expect(report.status).toBe('pending');
+    expect(report.sslStatus).toBe('pending_validation');
+    expect(report.errors).toEqual([
+      'custom hostname does not CNAME to this zone.',
+      'SERVFAIL looking up CAA for app.example.dev',
+    ]);
+  });
+
+  // Cloudflare leaves the lists off rather than sending them empty.
+  test('and none at all when the edge sends none', () => {
+    expect(toReport(edge({ status: 'active', ssl: 'pending_issuance' })).errors).toEqual([]);
+  });
+});
+
 describe('a deployment with no Cloudflare account says so where the edge would be reached', () => {
   const unconfigured = new CustomHostnamesRepository(undefined);
 
@@ -69,7 +108,7 @@ describe('a deployment with no Cloudflare account says so where the edge would b
     await expect(unconfigured.dcvTarget({ hostname })).rejects.toBeInstanceOf(
       CustomHostnamesUnavailableError,
     );
-    await expect(unconfigured.state({ cloudflareId: 'ch-1' })).rejects.toBeInstanceOf(
+    await expect(unconfigured.report({ cloudflareId: 'ch-1' })).rejects.toBeInstanceOf(
       CustomHostnamesUnavailableError,
     );
     await expect(unconfigured.remove({ cloudflareId: 'ch-1' })).rejects.toBeInstanceOf(

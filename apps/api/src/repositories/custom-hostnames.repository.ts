@@ -30,6 +30,19 @@ export type EdgeHostname = {
 };
 
 /**
+ * What the edge says of a hostname, whole: the state this codebase acts on, and the two statuses
+ * and the messages it was collapsed from. The latter are kept in the edge's vocabulary because
+ * they are for reading — by the owner, who is told which record is still missing, and by whoever
+ * is later asked why a hostname took as long as it did.
+ */
+export type EdgeReport = {
+  state: AppHostnameState;
+  status: string;
+  sslStatus: string;
+  errors: string[];
+};
+
+/**
  * No client, because the deployment configured no Cloudflare account. Thrown rather than answered
  * with a value, so a caller that forgot to ask `available` first cannot mistake "not configured"
  * for "the edge said no".
@@ -46,7 +59,7 @@ export abstract class CustomHostnamesRepositoryContract {
   abstract readonly available: boolean;
   abstract add(input: { hostname: Hostname }): Promise<EdgeHostname>;
   abstract dcvTarget(input: { hostname: Hostname }): Promise<string>;
-  abstract state(input: { cloudflareId: string }): Promise<AppHostnameState>;
+  abstract report(input: { cloudflareId: string }): Promise<EdgeReport>;
   abstract remove(input: { cloudflareId: string }): Promise<void>;
 }
 
@@ -83,8 +96,8 @@ export class CustomHostnamesRepository implements CustomHostnamesRepositoryContr
     return await this.reachable().dcvDelegationTarget({ hostname });
   }
 
-  async state({ cloudflareId }: { cloudflareId: string }): Promise<AppHostnameState> {
-    return toState(await this.reachable().getCustomHostname({ id: cloudflareId }));
+  async report({ cloudflareId }: { cloudflareId: string }): Promise<EdgeReport> {
+    return toReport(await this.reachable().getCustomHostname({ id: cloudflareId }));
   }
 
   async remove({ cloudflareId }: { cloudflareId: string }): Promise<void> {
@@ -97,6 +110,18 @@ export class CustomHostnamesRepository implements CustomHostnamesRepositoryContr
     }
     return this.client;
   }
+}
+
+export function toReport(hostname: CustomHostname): EdgeReport {
+  return {
+    state: toState(hostname),
+    status: hostname.status,
+    sslStatus: hostname.ssl.status,
+    errors: [
+      ...(hostname.verification_errors ?? []),
+      ...(hostname.ssl.validation_errors ?? []).map((error) => error.message),
+    ],
+  };
 }
 
 export function toState(hostname: CustomHostname): AppHostnameState {

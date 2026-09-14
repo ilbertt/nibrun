@@ -16,9 +16,11 @@ import type {
   AppHostnameRow,
   AppHostnamesRepositoryContract,
 } from '#repositories/app-hostnames.repository.ts';
-import type {
-  CustomHostnamesRepositoryContract,
-  EdgeHostname,
+import {
+  type CustomHostnamesRepositoryContract,
+  CustomHostnamesUnavailableError,
+  type EdgeHostname,
+  type EdgeReport,
 } from '#repositories/custom-hostnames.repository.ts';
 import { ADD_GRACE_MS, HostnamesService } from '#services/hostnames.service.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
@@ -38,6 +40,7 @@ function hostnameRow(overrides: Partial<AppHostnameRow> = {}): AppHostnameRow {
     kind: 'custom',
     state: 'pending',
     dcv_target: null,
+    edge_errors: [],
     ...overrides,
   };
 }
@@ -45,6 +48,7 @@ function hostnameRow(overrides: Partial<AppHostnameRow> = {}): AppHostnameRow {
 class StubHostnamesRepository implements AppHostnamesRepositoryContract {
   readonly trace: string[] = [];
   readonly states: AppHostnameState[] = [];
+  readonly reports: EdgeReport[] = [];
   pending: PendingRow[] = [];
   owns = true;
   insertFailure: unknown;
@@ -66,6 +70,18 @@ class StubHostnamesRepository implements AppHostnamesRepositoryContract {
   setCustomState({ state }: { state: AppHostnameState }): Promise<boolean> {
     this.trace.push(`state:${state}`);
     this.states.push(state);
+    return Promise.resolve(true);
+  }
+
+  // Written only when the edge said something new, as the real one's WHERE decides.
+  recordEdgeReport({ report }: { report: EdgeReport }): Promise<boolean> {
+    const last = this.reports.at(-1);
+    if (last && Bun.deepEquals(last, report)) {
+      return Promise.resolve(false);
+    }
+    this.trace.push(`state:${report.state}`);
+    this.states.push(report.state);
+    this.reports.push(report);
     return Promise.resolve(true);
   }
 
@@ -94,6 +110,7 @@ class StubEdge implements CustomHostnamesRepositoryContract {
   readonly trace: string[] = [];
   available = true;
   state_: AppHostnameState = 'pending';
+  errors: string[] = [];
   addFailure: unknown;
   removeFailure: unknown;
 
@@ -109,9 +126,19 @@ class StubEdge implements CustomHostnamesRepositoryContract {
     return Promise.resolve(`${hostname}.uuid.dcv.cloudflare.com`);
   }
 
-  state(): Promise<AppHostnameState> {
+  // Refuses as the real one does, so a pass without an edge is shown to write nothing because
+  // the edge could not be asked, not because it happened to answer `pending`.
+  report(): Promise<EdgeReport> {
+    if (!this.available) {
+      return Promise.reject(new CustomHostnamesUnavailableError());
+    }
     this.trace.push('state');
-    return Promise.resolve(this.state_);
+    return Promise.resolve({
+      state: this.state_,
+      status: this.state_,
+      sslStatus: this.state_,
+      errors: this.errors,
+    });
   }
 
   remove(): Promise<void> {
@@ -243,14 +270,23 @@ describe('a waiting hostname is settled by the clock a host report lends', () =>
     expect(appsRepo.states).toEqual(['active']);
   });
 
-  // Writing `pending` over `pending` would touch `updated_at` on every report forever.
-  test('one still waiting is left exactly as it was', async () => {
-    const { service, appsRepo } = build();
+  // The owner is shown these under the records to place, so the row has to carry them; and the
+  // pass runs on every host report, so a report the edge has already given is not written again.
+  test('one still waiting carries what the edge says is missing, written when it changes', async () => {
+    const { service, appsRepo, customHostnamesRepo } = build();
     appsRepo.pending = [pendingSince(1)];
+    customHostnamesRepo.errors = ['custom hostname does not CNAME to this zone.'];
 
     await service.reconcile();
+    await service.reconcile();
+    customHostnamesRepo.errors = [];
+    await service.reconcile();
 
-    expect(appsRepo.states).toEqual([]);
+    expect(appsRepo.reports.map((report) => report.errors)).toEqual([
+      ['custom hostname does not CNAME to this zone.'],
+      [],
+    ]);
+    expect(appsRepo.states).toEqual(['pending', 'pending']);
   });
 
   // Uniqueness is platform-wide, so a claim nobody ever proved is a name every other owner is

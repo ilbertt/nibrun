@@ -26,7 +26,7 @@ export function platformHostname({
 // than silently reading undefined.
 export type AppHostnameColumns = Pick<
   Queries['SelectAppHostnamesByApp'],
-  'hostname' | 'kind' | 'state' | 'dcv_target'
+  'hostname' | 'kind' | 'state' | 'dcv_target' | 'edge_errors'
 >;
 
 /**
@@ -55,6 +55,7 @@ export function isPlatformHostname({
 export type PublicAppHostname = AppHostname & {
   state: AppHostnameState;
   dcvTarget: string | null;
+  edgeErrors: string[];
 };
 
 export function toAppHostname(row: AppHostnameColumns): PublicAppHostname {
@@ -63,5 +64,6 @@ export function toAppHostname(row: AppHostnameColumns): PublicAppHostname {
     kind: row.kind,
     state: row.state,
     dcvTarget: row.dcv_target,
+    edgeErrors: row.edge_errors,
   };
 }

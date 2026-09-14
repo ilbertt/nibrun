@@ -187,10 +187,18 @@ export class HostnamesService extends Service {
       // process died between the two. Finished here rather than left to lapse: the owner cannot
       // add it again while their own half-finished row holds the name.
       const cloudflareId = row.cloudflare_id ?? (await this.attachAtEdge(row));
-      const state = await this.customHostnamesRepo.state({ cloudflareId });
-      if (state && state !== 'pending') {
-        await this.hostnamesRepo.setCustomState({ hostname: row.hostname, state });
-        this.logger.info('custom hostname settled', { hostname: row.hostname, state });
+      const report = await this.customHostnamesRepo.report({ cloudflareId });
+      const changed = await this.hostnamesRepo.recordEdgeReport({
+        hostname: row.hostname,
+        report,
+      });
+      // Logged on change alone: the pass is on every host report, and a line per pass would bury
+      // the few that say something — which, read back later, are what explain a slow domain.
+      if (changed) {
+        this.logger.info(
+          report.state === 'pending' ? 'custom hostname still waiting' : 'custom hostname settled',
+          { hostname: row.hostname, ...report },
+        );
       }
     } catch (error) {
       this.logger.error('reading a custom hostname from the edge failed', {

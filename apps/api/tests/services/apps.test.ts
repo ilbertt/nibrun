@@ -202,7 +202,9 @@ class StubAppsRepository implements AppsRepositoryContract {
     this.held++;
     return Promise.resolve({
       app: { ...appRow(slug), ...configColumns(config) },
-      hostnames: [{ hostname, kind: 'platform', state: 'active', dcv_target: null }],
+      hostnames: [
+        { hostname, kind: 'platform', state: 'active', dcv_target: null, edge_errors: [] },
+      ],
     });
   }
 
@@ -475,6 +477,7 @@ describe('a taken hostname is a re-roll, not something the owner sees', () => {
         kind: 'platform',
         state: 'active',
         dcvTarget: null,
+        edgeErrors: [],
       },
     ]);
   });

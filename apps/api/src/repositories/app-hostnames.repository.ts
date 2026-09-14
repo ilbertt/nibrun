@@ -1,6 +1,7 @@
 import type { AppHostnameKind, AppHostnameState, AppId, Hostname, OwnerId } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
-import { Repository } from '#repositories/repository.ts';
+import type { EdgeReport } from '#repositories/custom-hostnames.repository.ts';
+import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
 export type AppHostnameRow = Queries['SelectAppHostnamesByApp'];
 export type OwnedAppHostnameRow = Queries['SelectAppHostnamesByOwner'];
@@ -29,6 +30,7 @@ export abstract class AppHostnamesRepositoryContract {
     dcvTarget: string | null;
   }): Promise<AppHostnameRow | null>;
   abstract setCustomState(input: { hostname: Hostname; state: AppHostnameState }): Promise<boolean>;
+  abstract recordEdgeReport(input: { hostname: Hostname; report: EdgeReport }): Promise<boolean>;
   abstract removeCustom(input: OwnedApp & { hostname: Hostname }): Promise<string | null>;
   abstract listPendingCustom(input: { limit: number }): Promise<PendingHostnameRow[]>;
   abstract listDisposable(input: { appId: AppId }): Promise<DisposableAppHostnameRow[]>;
@@ -38,7 +40,7 @@ export abstract class AppHostnamesRepositoryContract {
 export class AppHostnamesRepository extends Repository implements AppHostnamesRepositoryContract {
   listByOwner({ ownerId }: { ownerId: OwnerId }): Promise<OwnedAppHostnameRow[]> {
     return this.sql.SelectAppHostnamesByOwner`
-      SELECT h.app_id, h.hostname, h.kind, h.state, h.dcv_target
+      SELECT h.app_id, h.hostname, h.kind, h.state, h.dcv_target, h.edge_errors
       FROM nibrun.app_hostnames h
       JOIN nibrun.live_apps a ON a.id = h.app_id
       WHERE a.owner_id = ${ownerId}
@@ -48,7 +50,7 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
 
   listByApp({ appId, ownerId }: OwnedApp): Promise<AppHostnameRow[]> {
     return this.sql.SelectAppHostnamesByApp`
-      SELECT h.hostname, h.kind, h.state, h.dcv_target
+      SELECT h.hostname, h.kind, h.state, h.dcv_target, h.edge_errors
       FROM nibrun.app_hostnames h
       JOIN nibrun.live_apps a ON a.id = h.app_id
       WHERE h.app_id = ${appId} AND a.owner_id = ${ownerId}
@@ -71,7 +73,7 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
       SELECT a.id, ${hostname}, ${CUSTOM_KIND}
       FROM nibrun.live_apps a
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      RETURNING hostname, kind, state, dcv_target
+      RETURNING hostname, kind, state, dcv_target, edge_errors
     `;
     return row ?? null;
   }
@@ -89,7 +91,7 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
       UPDATE nibrun.app_hostnames
       SET cloudflare_id = ${cloudflareId}, dcv_target = ${dcvTarget}
       WHERE hostname = ${hostname} AND kind = ${CUSTOM_KIND}
-      RETURNING hostname, kind, state, dcv_target
+      RETURNING hostname, kind, state, dcv_target, edge_errors
     `;
     return row ?? null;
   }
@@ -105,6 +107,37 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
       UPDATE nibrun.app_hostnames
       SET state = ${state}
       WHERE hostname = ${hostname} AND kind = ${CUSTOM_KIND} AND state <> ${state}
+      RETURNING hostname
+    `;
+    return row !== undefined;
+  }
+
+  /**
+   * Whether anything the edge said is new. Guarded on every column rather than written through,
+   * so the row's `updated_at` marks the last time the edge said something different — the pass
+   * asking is on every host report, and a row rewritten on each would date nothing.
+   *
+   * Untagged for the reason `insertEnvironment` is: `sql.array` is a clause the generator blanks
+   * out before it parses the statement, and `SET edge_errors =` is not a statement. The one
+   * column read back is hand-typed instead.
+   */
+  async recordEdgeReport({
+    hostname,
+    report,
+  }: {
+    hostname: Hostname;
+    report: EdgeReport;
+  }): Promise<boolean> {
+    const errors = this.sql.array(report.errors, TEXT_ARRAY);
+    const [row] = await this.sql<Array<{ hostname: Hostname }>>`
+      UPDATE nibrun.app_hostnames
+      SET state = ${report.state},
+          edge_status = ${report.status},
+          edge_ssl_status = ${report.sslStatus},
+          edge_errors = ${errors}
+      WHERE hostname = ${hostname} AND kind = ${CUSTOM_KIND}
+        AND (state, edge_status, edge_ssl_status, edge_errors) IS DISTINCT FROM
+            (${report.state}::text, ${report.status}::text, ${report.sslStatus}::text, ${errors})
       RETURNING hostname
     `;
     return row !== undefined;
