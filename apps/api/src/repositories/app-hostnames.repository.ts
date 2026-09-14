@@ -32,7 +32,10 @@ export abstract class AppHostnamesRepositoryContract {
   abstract setCustomState(input: { hostname: Hostname; state: AppHostnameState }): Promise<boolean>;
   abstract recordEdgeReport(input: { hostname: Hostname; report: EdgeReport }): Promise<boolean>;
   abstract removeCustom(input: OwnedApp & { hostname: Hostname }): Promise<string | null>;
-  abstract listPendingCustom(input: { limit: number }): Promise<PendingHostnameRow[]>;
+  abstract listPendingCustom(input: {
+    after: string | null;
+    limit: number;
+  }): Promise<PendingHostnameRow[]>;
   abstract listDisposable(input: { appId: AppId }): Promise<DisposableAppHostnameRow[]>;
   abstract removeDisposable(input: { appId: AppId; hostname: Hostname }): Promise<boolean>;
 }
@@ -168,15 +171,28 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
   }
 
   /**
-   * Every custom hostname still waiting, whatever app it belongs to and whoever owns it: this
-   * feeds the pass that asks the edge what became of them, which answers to nobody's request.
+   * The next batch of custom hostnames still waiting, whatever app they belong to and whoever
+   * owns them: this feeds the pass that asks the edge what became of them, which answers to
+   * nobody's request.
+   *
+   * Taken up from `after` rather than from the top, and round to the top once past the end, so
+   * a batch's worth of older rows cannot hold the ones behind them out of every pass until they
+   * settle. A boolean sorts false before true, which is what puts the rows not yet reached this
+   * lap ahead of the ones already asked about; with no cursor every row compares unknown and
+   * the order is the plain one.
    */
-  listPendingCustom({ limit }: { limit: number }): Promise<PendingHostnameRow[]> {
+  listPendingCustom({
+    after,
+    limit,
+  }: {
+    after: string | null;
+    limit: number;
+  }): Promise<PendingHostnameRow[]> {
     return this.sql.SelectPendingCustomHostnames`
-      SELECT h.hostname, h.cloudflare_id, h.created_at
+      SELECT h.id, h.hostname, h.cloudflare_id, h.created_at
       FROM nibrun.app_hostnames h
       WHERE h.state = 'pending' AND h.kind = ${CUSTOM_KIND}
-      ORDER BY h.id
+      ORDER BY h.id <= ${after}::uuid, h.id
       LIMIT ${limit}
     `;
   }
