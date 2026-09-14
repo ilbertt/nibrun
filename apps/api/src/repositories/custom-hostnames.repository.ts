@@ -61,6 +61,7 @@ export abstract class CustomHostnamesRepositoryContract {
   abstract add(input: { hostname: Hostname; method: DcvMethod }): Promise<EdgeHostname>;
   abstract dcvTarget(input: { hostname: Hostname }): Promise<string>;
   abstract report(input: { cloudflareId: string }): Promise<EdgeReport>;
+  abstract revalidate(input: { cloudflareId: string; method: DcvMethod }): Promise<void>;
   abstract remove(input: { cloudflareId: string }): Promise<void>;
 }
 
@@ -105,6 +106,16 @@ export class CustomHostnamesRepository implements CustomHostnamesRepositoryContr
 
   async report({ cloudflareId }: { cloudflareId: string }): Promise<EdgeReport> {
     return toReport(await this.reachable().getCustomHostname({ id: cloudflareId }));
+  }
+
+  async revalidate({
+    cloudflareId,
+    method,
+  }: {
+    cloudflareId: string;
+    method: DcvMethod;
+  }): Promise<void> {
+    await this.reachable().restartValidation({ id: cloudflareId, method });
   }
 
   async remove({ cloudflareId }: { cloudflareId: string }): Promise<void> {

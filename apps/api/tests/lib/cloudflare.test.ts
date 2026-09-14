@@ -41,6 +41,24 @@ function ok(result: unknown): Answer {
   return { body: { success: true, result, errors: [] } };
 }
 
+describe('validation is asked for again by sending the same configuration back', () => {
+  // The edge reads a PATCH that changes nothing as "run validation now"; sending a different
+  // method would change how the hostname is proved instead.
+  test('the hostname is patched in place with the method it was registered with', async () => {
+    const { calls } = answering([ok({ id: 'ch-1' })]);
+
+    await client().restartValidation({ id: 'ch-1', method: 'http' });
+
+    expect(calls[0]?.method).toBe('PATCH');
+    expect(calls[0]?.url).toBe(
+      `https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/custom_hostnames/ch-1`,
+    );
+    expect(await calls[0]?.json()).toEqual({
+      ssl: { method: 'http', type: 'dv', settings: { min_tls_version: '1.2' } },
+    });
+  });
+});
+
 describe('a call to the edge carries this zone and this token', () => {
   test('the hostname is created under the configured zone', async () => {
     const { calls } = answering([ok({ id: 'ch-1' })]);
