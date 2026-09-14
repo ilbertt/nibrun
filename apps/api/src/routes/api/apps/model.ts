@@ -39,8 +39,14 @@ const OwnedAppConfigSchema = t.Pick(AppConfigSchema, ['httpPort', 'hasExtraPubli
 // `environment` is an edit rather than a replacement, where `args` is always the whole list. They
 // differ because a caller cannot read a secret back to restate it: a variable it says nothing
 // about is one it is leaving alone, and removing one is `null`.
-export const AppConfigPatchSchema = t.Partial(
-  t.Composite([OwnedAppConfigSchema, t.Object({ environment: TenantEnvironmentPatchSchema })]),
+//
+// `name` is the one field here that is not config: a rename changes what the owner calls the
+// app and nothing about how it starts, so the hostname minted from the first name stays.
+export const AppPatchSchema = t.Partial(
+  t.Composite([
+    OwnedAppConfigSchema,
+    t.Object({ environment: TenantEnvironmentPatchSchema, name: AppNameSchema }),
+  ]),
   { additionalProperties: false },
 );
 

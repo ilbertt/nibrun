@@ -53,6 +53,13 @@ type OwnedApp = { appId: AppId; ownerId: OwnerId };
  */
 export type StateChange = OwnedApp & { state: AppState; from: readonly AppState[] };
 
+/**
+ * What an owner may change about an app in one request: what they call it, and how it starts.
+ * The name is on the app row and the rest is a config version, so the two are written apart
+ * and read back together.
+ */
+export type SealedAppPatch = SealedConfigPatch & { name: AppName | undefined };
+
 /** Everything but `deleted`, which is a host's word for a filesystem that is gone. */
 export const LIVE_APP_STATES: readonly AppState[] = APP_STATES.filter(
   (state) => state !== 'deleted',
@@ -68,7 +75,7 @@ export abstract class AppsRepositoryContract {
   }): Promise<void>;
   abstract recordComputeUsage(input: { readings: ReadonlyMap<AppId, ComputeUsage> }): Promise<void>;
   abstract clearComputeUsage(input: { appIds: readonly AppId[] }): Promise<void>;
-  abstract updateConfig(input: OwnedApp & { patch: SealedConfigPatch }): Promise<AppRow | null>;
+  abstract update(input: OwnedApp & { patch: SealedAppPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract stampDataInitialized(input: { appIds: readonly AppId[] }): Promise<void>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
@@ -423,12 +430,20 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return app ?? null;
   }
 
-  // A patch appends a version rather than editing one, and the newest version is the live one,
-  // so the write is a single INSERT. `FOR UPDATE` is what stops two concurrent patches reading
-  // the same starting config and the later INSERT silently dropping the earlier one's fields.
-  updateConfig({ appId, ownerId, patch }: OwnedApp & { patch: SealedConfigPatch }) {
+  /**
+   * `FOR UPDATE` is what stops two concurrent patches reading the same starting config and the
+   * later INSERT silently dropping the earlier one's fields — and what keeps a rename from
+   * landing between the two.
+   *
+   * The name is written through `live_apps` rather than the table, because this is an owner's
+   * write and not a state move: the view is what says which apps an owner can still name, and it
+   * is updatable because it is one table under a predicate. A name already given raises — the
+   * index is the rule. Written whether or not the name moved, because reconfiguring an app changes
+   * the app and the new version lands in another table, so nothing else would move `updated_at`.
+   */
+  update({ appId, ownerId, patch: { name, ...config } }: OwnedApp & { patch: SealedAppPatch }) {
     return this.sql.begin(async (tx) => {
-      const [locked] = await tx.SelectAppForConfigUpdate`
+      const [locked] = await tx.SelectAppForUpdate`
         SELECT a.id
         FROM nibrun.live_apps a
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
@@ -438,87 +453,16 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         return null;
       }
 
-      const [current] = await tx.SelectCurrentAppConfig`
-        /* @notNull environment_names */
-        SELECT c.id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
-               c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
-               c.health_check_grace_period_ms, c.health_check_healthy_threshold,
-               c.health_check_unhealthy_threshold,
-               c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
-        FROM nibrun.app_configs_with_environment c
-        WHERE c.app_id = ${appId}
-        ORDER BY c.id DESC
-        LIMIT 1
-      `;
-      if (!current) {
-        throw new Error('An app exists with no config.');
+      if (Object.keys(config).length > 0) {
+        await appendConfigVersion({ tx, appId, patch: config });
       }
 
-      const config = { ...toAppConfig(current), ...patch };
-
-      const [inserted] = await tx.InsertPatchedAppConfig`
-        INSERT INTO nibrun.app_configs (
-          app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
-          health_check_path, health_check_interval_ms, health_check_timeout_ms,
-          health_check_grace_period_ms, health_check_healthy_threshold,
-          health_check_unhealthy_threshold,
-          restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-          restart_backoff_factor, restart_reset_after_ms
-        )
-        VALUES (
-          ${appId}, ${config.httpPort}, ${config.hasExtraPublicPort},
-          ${tx.array(config.args, TEXT_ARRAY)},
-          ${config.resources.vcpuCount}, ${config.resources.memoryMib},
-          ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
-          ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
-          ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
-          ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
-          ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
-          ${config.restartPolicy.resetAfterMs}
-        )
-        RETURNING id
+      await tx.TouchApp`
+        UPDATE nibrun.live_apps a
+        SET name = COALESCE(${name ?? null}, a.name)
+        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
       `;
-      if (!inserted) {
-        throw new Error('Inserting into nibrun.app_configs returned no row.');
-      }
-
-      // Everything the patch said nothing about, which is every variable there is when it said
-      // nothing at all. A name it sets or removes is left out of the copy: one row per name per
-      // version, and for a name it sets that row is the one inserted below.
-      const environment = patch.environment ?? { set: {}, removed: [] };
-      const edited = new Set([...Object.keys(environment.set), ...environment.removed]);
-      await carryEnvironmentForward({
-        tx,
-        fromConfigId: current.id,
-        toConfigId: inserted.id,
-        names: current.environment_names.filter((name) => !edited.has(name)),
-      });
-      await insertEnvironment({ tx, configId: inserted.id, environment: environment.set });
-
-      // Reconfiguring an app changes the app, but the new version lands in another table, so
-      // nothing would move `updated_at` without this.
-      const [app] = await tx.TouchAppAfterConfigPatch`
-        /* @notNull environment_names */
-        UPDATE nibrun.apps a
-        SET updated_at = now()
-        FROM nibrun.app_configs_with_environment c
-        LEFT JOIN nibrun.app_usage u ON u.app_id = c.app_id
-        LEFT JOIN nibrun.app_deadlines d ON d.app_id = c.app_id
-        WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND c.id = ${inserted.id}
-        RETURNING a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
-                  a.created_at, a.updated_at,
-                  c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
-                  c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
-                  c.health_check_grace_period_ms, c.health_check_healthy_threshold,
-                  c.health_check_unhealthy_threshold,
-                  c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-                  c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
-                  u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
-                  u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
-                  d.expires_at
-      `;
-      return app ?? null;
+      return await appAsChanged({ tx, appId, ownerId });
     });
   }
 
@@ -673,19 +617,92 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           AND state = ANY(${tx.array([...from], TEXT_ARRAY)})
         RETURNING id
       `;
-      return updated ? await appAfterStateChange({ tx, appId, ownerId }) : null;
+      return updated ? await appAsChanged({ tx, appId, ownerId }) : null;
     });
   }
 }
 
 /**
- * The app as the transaction that just moved it can see it, which is the state it is now in.
- *
- * A row that moved and cannot be read back is an app with no config version, which nothing can
- * produce: raised rather than returned as `null`, because a caller reading that `null` as "the
- * state did not move" would report a change that did happen as one that was refused.
+ * A patch appends a version rather than editing one, and the newest version is the live one, so
+ * the write is a single INSERT — under the row lock `update` holds, which is what keeps two of
+ * these from each reading the same starting config.
  */
-async function appAfterStateChange({
+async function appendConfigVersion({
+  tx,
+  appId,
+  patch,
+}: {
+  tx: TypedSQL<Queries>;
+  appId: AppId;
+  patch: SealedConfigPatch;
+}): Promise<void> {
+  const [current] = await tx.SelectCurrentAppConfig`
+    /* @notNull environment_names */
+    SELECT c.id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
+           c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
+           c.health_check_grace_period_ms, c.health_check_healthy_threshold,
+           c.health_check_unhealthy_threshold,
+           c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
+           c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+    FROM nibrun.app_configs_with_environment c
+    WHERE c.app_id = ${appId}
+    ORDER BY c.id DESC
+    LIMIT 1
+  `;
+  if (!current) {
+    throw new Error('An app exists with no config.');
+  }
+
+  const config = { ...toAppConfig(current), ...patch };
+
+  const [inserted] = await tx.InsertPatchedAppConfig`
+    INSERT INTO nibrun.app_configs (
+      app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
+      health_check_path, health_check_interval_ms, health_check_timeout_ms,
+      health_check_grace_period_ms, health_check_healthy_threshold,
+      health_check_unhealthy_threshold,
+      restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
+      restart_backoff_factor, restart_reset_after_ms
+    )
+    VALUES (
+      ${appId}, ${config.httpPort}, ${config.hasExtraPublicPort},
+      ${tx.array(config.args, TEXT_ARRAY)},
+      ${config.resources.vcpuCount}, ${config.resources.memoryMib},
+      ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
+      ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
+      ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
+      ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
+      ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
+      ${config.restartPolicy.resetAfterMs}
+    )
+    RETURNING id
+  `;
+  if (!inserted) {
+    throw new Error('Inserting into nibrun.app_configs returned no row.');
+  }
+
+  // Everything the patch said nothing about, which is every variable there is when it said
+  // nothing at all. A name it sets or removes is left out of the copy: one row per name per
+  // version, and for a name it sets that row is the one inserted below.
+  const environment = patch.environment ?? { set: {}, removed: [] };
+  const edited = new Set([...Object.keys(environment.set), ...environment.removed]);
+  await carryEnvironmentForward({
+    tx,
+    fromConfigId: current.id,
+    toConfigId: inserted.id,
+    names: current.environment_names.filter((name) => !edited.has(name)),
+  });
+  await insertEnvironment({ tx, configId: inserted.id, environment: environment.set });
+}
+
+/**
+ * The app as the transaction that just changed it can see it, which is what it now is.
+ *
+ * A row that changed and cannot be read back is an app with no config version, which nothing can
+ * produce: raised rather than returned as `null`, because a caller reading that `null` as "nothing
+ * changed" would report a change that did happen as one that was refused.
+ */
+async function appAsChanged({
   tx,
   appId,
   ownerId,
@@ -694,7 +711,7 @@ async function appAfterStateChange({
   appId: AppId;
   ownerId: OwnerId;
 }): Promise<AppRow> {
-  const [app] = await tx.SelectAppAfterStateChange`
+  const [app] = await tx.SelectAppAsChanged`
     /* @notNull environment_names */
     SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
            a.created_at, a.updated_at,
@@ -717,7 +734,7 @@ async function appAfterStateChange({
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
   `;
   if (!app) {
-    throw new Error(`app ${appId} changed state and has no config version to read it back with`);
+    throw new Error(`app ${appId} changed and has no config version to read it back with`);
   }
   return app;
 }

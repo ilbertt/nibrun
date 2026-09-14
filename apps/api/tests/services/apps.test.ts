@@ -29,12 +29,7 @@ import {
 } from '@repo/protocol';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
-import type {
-  NewAppConfig,
-  PublicAppConfig,
-  SealedConfigPatch,
-  StoredAppConfig,
-} from '#lib/app-config.ts';
+import type { NewAppConfig, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -50,6 +45,7 @@ import type {
   ExpirableAppRow,
   Leftovers,
   NewApp,
+  SealedAppPatch,
   StateChange,
 } from '#repositories/apps.repository.ts';
 import {
@@ -85,6 +81,7 @@ function asPatch(entries: Record<string, string | null>): TenantEnvironmentPatch
 }
 
 const APP_NAME = Value.Parse(AppNameSchema, 'pocketbase');
+const NEW_NAME = Value.Parse(AppNameSchema, 'My Blog');
 const BROUGHT_HOSTNAME = Value.Parse(HostnameSchema, 'pocketbase.example.dev');
 const CLOUDFLARE_ID = 'ch-1';
 
@@ -130,7 +127,7 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly offeredNames: AppName[] = [];
   readonly offeredSlugs: DnsLabel[] = [];
   readonly offeredConfigs: StoredAppConfig[] = [];
-  readonly offeredPatches: SealedConfigPatch[] = [];
+  readonly offeredPatches: SealedAppPatch[] = [];
   readonly deleted: AppId[] = [];
   readonly trace: string[] = [];
   readonly leftovers = new Map<AppId, Leftovers>();
@@ -275,15 +272,23 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve();
   }
 
-  updateConfig({
+  update({
     patch,
   }: {
     appId: AppId;
     ownerId: OwnerId;
-    patch: SealedConfigPatch;
+    patch: SealedAppPatch;
   }): Promise<AppRow | null> {
     this.offeredPatches.push(patch);
-    return Promise.resolve(this.owns ? appRow(Value.Parse(DnsLabelSchema, APP_NAME)) : null);
+    if (this.#remainingFailures > 0) {
+      this.#remainingFailures--;
+      return Promise.reject(this.#failure);
+    }
+    if (!this.owns) {
+      return Promise.resolve(null);
+    }
+    const row = appRow(Value.Parse(DnsLabelSchema, APP_NAME));
+    return Promise.resolve(patch.name === undefined ? row : { ...row, name: patch.name });
   }
 
   updateState({ appId, state, from }: StateChange): Promise<AppRow | null> {
@@ -606,7 +611,7 @@ describe('an app asks for a public port besides HTTP, and is never handed one it
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
 
-    await serviceWith({ appsRepo }).updateConfig({
+    await serviceWith({ appsRepo }).update({
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { args: ['serve'] },
@@ -619,7 +624,7 @@ describe('an app asks for a public port besides HTTP, and is never handed one it
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
 
-    await serviceWith({ appsRepo }).updateConfig({
+    await serviceWith({ appsRepo }).update({
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { hasExtraPublicPort: false },
@@ -668,7 +673,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
     appsRepo.owns = true;
     appsRepo.current = { ...DEFAULT_CONFIG, hasExtraPublicPort: true };
 
-    await serviceWith({ appsRepo }).updateConfig({
+    await serviceWith({ appsRepo }).update({
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
@@ -682,7 +687,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
     appsRepo.owns = true;
 
     await expect(
-      serviceWith({ appsRepo }).updateConfig({
+      serviceWith({ appsRepo }).update({
         appId: APP_ID,
         ownerId: OWNER_ID,
         patch: { environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
@@ -695,7 +700,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
 
-    await serviceWith({ appsRepo }).updateConfig({
+    await serviceWith({ appsRepo }).update({
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { hasExtraPublicPort: true, environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
@@ -710,7 +715,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
 
-    await serviceWith({ appsRepo }).updateConfig({
+    await serviceWith({ appsRepo }).update({
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { environment: asPatch({ TOKEN: SECRET }) },
@@ -726,7 +731,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     appsRepo.owns = true;
     const service = serviceWith({ appsRepo });
 
-    await service.updateConfig({ appId: APP_ID, ownerId: OWNER_ID, patch: { args: ['serve'] } });
+    await service.update({ appId: APP_ID, ownerId: OWNER_ID, patch: { args: ['serve'] } });
 
     // Absent rather than empty: the repository reads absence as "carry every variable forward",
     // and there is no shape of empty that means anything else.
@@ -738,7 +743,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     appsRepo.owns = true;
     const service = serviceWith({ appsRepo });
 
-    await service.updateConfig({
+    await service.update({
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { environment: asPatch({ TOKEN: SECRET }) },
@@ -758,7 +763,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     appsRepo.owns = true;
     const service = serviceWith({ appsRepo });
 
-    await service.updateConfig({
+    await service.update({
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { environment: asPatch({ TOKEN: null }) },
@@ -772,7 +777,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     appsRepo.owns = true;
     const service = serviceWith({ appsRepo });
 
-    await service.updateConfig({
+    await service.update({
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { environment: asPatch({ TOKEN: SECRET, GONE: null }) },
@@ -796,7 +801,7 @@ describe('the placeholder a read returns cannot be set as a value', () => {
     const service = serviceWith({ appsRepo });
 
     await expect(
-      service.updateConfig({
+      service.update({
         appId: APP_ID,
         ownerId: OWNER_ID,
         patch: { environment: asPatch({ TOKEN: REDACTED }) },
@@ -822,13 +827,49 @@ describe('an app the caller does not own is one that does not exist', () => {
     const owned = { appId: APP_ID, ownerId: OWNER_ID };
 
     await expect(service.get(owned)).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service.updateConfig({ ...owned, patch: {} })).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(service.update({ ...owned, patch: {} })).rejects.toBeInstanceOf(NotFoundError);
     await expect(service.delete(owned)).rejects.toBeInstanceOf(NotFoundError);
     await expect(service.setState({ ...owned, state: 'suspended' })).rejects.toBeInstanceOf(
       NotFoundError,
     );
+  });
+});
+
+/** The slug is in somebody's bookmarks by now, so a rename is the one column and nothing else. */
+describe('an app is renamed by patching its name, and stays where it is served', () => {
+  const owned = { appId: APP_ID, ownerId: OWNER_ID };
+
+  test('the app answers to the new name under the slug it had', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    const app = await serviceWith({ appsRepo }).update({ ...owned, patch: { name: NEW_NAME } });
+
+    expect(appsRepo.offeredPatches).toEqual([{ name: NEW_NAME }]);
+    expect(app.name).toBe(NEW_NAME);
+    expect(app.slug).toBe(Value.Parse(DnsLabelSchema, APP_NAME));
+  });
+
+  test('a patch that says nothing about the name leaves it alone', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.owns = true;
+
+    await serviceWith({ appsRepo }).update({ ...owned, patch: { args: ['serve'] } });
+
+    expect(appsRepo.offeredPatches).toEqual([{ name: undefined, args: ['serve'] }]);
+  });
+
+  test('a name the owner already gave another app is refused as a conflict', async () => {
+    const appsRepo = new StubAppsRepository({
+      failures: 1,
+      failure: uniqueViolation(schema.apps._indexes.apps_owner_id_name_key._indexName),
+    });
+    appsRepo.owns = true;
+
+    const refused = serviceWith({ appsRepo }).update({ ...owned, patch: { name: NEW_NAME } });
+
+    await expect(refused).rejects.toBeInstanceOf(ConflictError);
+    await expect(refused).rejects.toThrow(`already have an app named ${NEW_NAME}`);
   });
 });
 
