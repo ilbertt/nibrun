@@ -205,7 +205,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       const [hostnameRow] = await tx.InsertAppHostname`
         INSERT INTO nibrun.app_hostnames (app_id, hostname, kind, state)
         VALUES (${inserted.id}, ${hostname}, ${PLATFORM_KIND}, ${ACTIVE_STATE})
-        RETURNING hostname, kind, state, dcv_target, edge_errors
+        RETURNING hostname, kind, state, dcv_target, edge_errors, created_at
       `;
       if (!hostnameRow) {
         throw new Error('Inserting into nibrun.app_hostnames returned no row.');

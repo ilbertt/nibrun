@@ -68,6 +68,8 @@ export const AppHostnameResponseSchema = t.Composite([
     // In the edge's own words, because they name the record still missing. Empty once nothing is,
     // and while the edge has not been asked yet.
     edgeErrors: t.Array(t.String()),
+    // When the owner asked for it — which for a waiting domain is how long it has been waiting.
+    createdAt: TimestampSchema,
   }),
 ]);
 

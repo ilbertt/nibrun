@@ -4,10 +4,12 @@ import {
   type DnsLabel,
   type Hostname,
   HostnameSchema,
+  type Timestamp,
   Value,
 } from '@repo/protocol';
 import { getDomain } from 'tldts';
 import type { Queries } from '#db/queries.gen.ts';
+import { toTimestamp } from '#lib/timestamp.ts';
 
 /**
  * The app domain is a different registrable domain from the one the dashboard is served on, so
@@ -27,7 +29,7 @@ export function platformHostname({
 // than silently reading undefined.
 export type AppHostnameColumns = Pick<
   Queries['SelectAppHostnamesByApp'],
-  'hostname' | 'kind' | 'state' | 'dcv_target' | 'edge_errors'
+  'hostname' | 'kind' | 'state' | 'dcv_target' | 'edge_errors' | 'created_at'
 >;
 
 /**
@@ -78,6 +80,7 @@ export type PublicAppHostname = AppHostname & {
   state: AppHostnameState;
   dcvTarget: string | null;
   edgeErrors: string[];
+  createdAt: Timestamp;
 };
 
 export function toAppHostname(row: AppHostnameColumns): PublicAppHostname {
@@ -87,5 +90,6 @@ export function toAppHostname(row: AppHostnameColumns): PublicAppHostname {
     state: row.state,
     dcvTarget: row.dcv_target,
     edgeErrors: row.edge_errors,
+    createdAt: toTimestamp(row.created_at),
   };
 }
