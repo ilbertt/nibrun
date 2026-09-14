@@ -39,3 +39,9 @@ export const DASHBOARD_SITE = site({
 });
 
 export const HELLO_EMAIL = `hello@${BASE_DOMAIN}`;
+
+// Percent-encoded rather than form-encoded: a mail client reads `+` in these as a plus sign
+// rather than a space, so `URLSearchParams` would put one in every subject it wrote.
+export function helloMailto({ subject, body }: { subject: string; body: string }): string {
+  return `mailto:${HELLO_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}

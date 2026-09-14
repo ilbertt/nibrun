@@ -14,6 +14,11 @@ export class AppError extends Error {
     this.name = 'AppError';
     this.statusCode = statusCode;
   }
+
+  /** What the response says — the sentence alone, unless a refusal has more a client can act on. */
+  body(): { error: string } {
+    return { error: this.message };
+  }
 }
 
 export class BadRequestError extends AppError {
@@ -105,7 +110,7 @@ export function elysiaErrorHandler({
     if (error.statusCode >= StatusMap['Internal Server Error']) {
       errorLogger.error(code, error);
     }
-    return status(error.statusCode, { error: error.message });
+    return status(error.statusCode, error.body());
   }
   if (code === 'VALIDATION') {
     return status(StatusMap['Bad Request'], {

@@ -1,4 +1,10 @@
-import type { Deployed, DeployStep, UploadProgress } from '@repo/app-operations';
+import {
+  appQuotaRefusal,
+  type Deployed,
+  type DeployStep,
+  type UploadProgress,
+} from '@repo/app-operations';
+import type { AppQuotaRefusal } from '@repo/protocol';
 import { useState } from 'react';
 import {
   type BinaryDelivery,
@@ -46,6 +52,8 @@ export type DeployRun = {
   progress: UploadProgress | undefined;
   deployed: Deployed | undefined;
   reason: string | undefined;
+  /** The same failure as `reason`, where it was the account's limit and there is a number to ask against. */
+  overQuota: AppQuotaRefusal | undefined;
   start: (request: ReleaseRequest) => void;
   reset: () => void;
 };
@@ -70,6 +78,7 @@ export function useRunApp({
     progress,
     deployed: run.data,
     reason: run.error?.message,
+    overQuota: appQuotaRefusal(run.error),
     start: (request) => {
       setSteps([]);
       setProgress(undefined);

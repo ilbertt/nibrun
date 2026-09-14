@@ -80,6 +80,8 @@ export {
   AppHostnameSchema,
   type AppHostnameState,
   AppHostnameStateSchema,
+  type AppQuotaRefusal,
+  AppQuotaRefusalSchema,
   AppSchema,
   type AppState,
   AppStateSchema,
