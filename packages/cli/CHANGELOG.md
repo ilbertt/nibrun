@@ -2,6 +2,18 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.9.14-1]
+
+### 🚀 Features
+
+- *(dashboard)* An app is shown by its name, and renamed beside it (#576)
+- *(cli)* Nib apps update --name calls an app something else (#575)
+- *(cli)* An app is named by the name its owner gave it (#574)
+- *(api)* An app keeps the name its owner gave it (#572)
+- Adding a domain again says what it did, and a waiting one can be added again from its row (#570)
+- A pending domain shows the edge's own words under the records to place (#565)
+- *(dashboard)* Show app URLs in the apps table (#553)
+
 ## [2026.9.11-1]
 
 ### 🚀 Features
