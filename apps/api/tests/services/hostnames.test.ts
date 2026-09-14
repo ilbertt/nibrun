@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, setSystemTime, test } from 'bun:test';
 import {
   type AppHostnameState,
   type AppId,
@@ -338,6 +338,14 @@ describe('a domain the app already holds is said again rather than created again
 });
 
 describe('a waiting hostname is settled by the clock a host report lends', () => {
+  beforeEach(() => {
+    setSystemTime(new Date('2026-01-01T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    setSystemTime();
+  });
+
   function pendingSince(days: number): PendingRow {
     return {
       id: 'row-1',
@@ -433,17 +441,20 @@ describe('a waiting hostname is settled by the clock a host report lends', () =>
   // The edge was away when the owner added it, or this process died between the two writes.
   // Leaving it would mean the owner cannot add the domain again — their own half-finished row
   // holds the name — until the claim lapses a week later.
-  test('one that never reached the edge is finished rather than left to lapse', async () => {
-    const { service, appsRepo, customHostnamesRepo } = build();
-    appsRepo.pending = [unattachedFor(ADD_GRACE_MS + 1)];
-    customHostnamesRepo.state_ = 'active';
+  test.each([ADD_GRACE_MS, ADD_GRACE_MS + 1])(
+    'one that never reached the edge is finished rather than left to lapse at age %i ms',
+    async (age) => {
+      const { service, appsRepo, customHostnamesRepo } = build();
+      appsRepo.pending = [unattachedFor(age)];
+      customHostnamesRepo.state_ = 'active';
 
-    await service.reconcile();
+      await service.reconcile();
 
-    expect(customHostnamesRepo.trace).toEqual(['add', 'state']);
-    expect(appsRepo.trace).toContain('attach');
-    expect(appsRepo.states).toEqual(['active']);
-  });
+      expect(customHostnamesRepo.trace).toEqual(['add', 'state']);
+      expect(appsRepo.trace).toContain('attach');
+      expect(appsRepo.states).toEqual(['active']);
+    },
+  );
 
   // The add that wrote the row is still on its way to the edge: this pass asking too would have
   // the edge refuse one of them as a duplicate, and when that one is the add, the owner is told
