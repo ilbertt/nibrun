@@ -1,6 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
-import { HostnameSchema, Value } from '@repo/protocol';
+import {
+  type AppId,
+  AppIdSchema,
+  type Hostname,
+  HostnameSchema,
+  type OwnerId,
+  OwnerIdSchema,
+  Value,
+} from '@repo/protocol';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { AppHostnamesRepository } from '#repositories/app-hostnames.repository.ts';
@@ -10,6 +18,9 @@ import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts'
 const DATABASE_START_TIMEOUT_MS = 180_000;
 
 const APP_SLUG = 'brought';
+const STRANGER_SLUG = 'strangers';
+const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner');
+const STRANGER_ID = Value.Parse(OwnerIdSchema, 'stranger');
 const BROUGHT = Value.Parse(HostnameSchema, 'brought.example.dev');
 
 const NOT_POINTED_AT_US = 'custom hostname does not CNAME to this zone.';
@@ -148,12 +159,115 @@ describe('the pending batch carries on from where the last one stopped', () => {
   });
 });
 
+/**
+ * Whose the name turns out to be is decided inside the one statement that claims it, so no stub
+ * reaches it. The four answers are the four things an owner can be told: made, already yours,
+ * somebody else's, and not your app at all — and the last two must not read alike, because one
+ * is a name to change and the other a request to stop making.
+ */
+describe('claiming a hostname says whose it is', () => {
+  const CLAIMED = Value.Parse(HostnameSchema, 'claimed.example.dev');
+  const STRANGERS = Value.Parse(HostnameSchema, 'strangers.example.dev');
+  let appId: AppId;
+  let strangersAppId: AppId;
+
+  beforeAll(async () => {
+    appId = await appIdOf({ sql, slug: APP_SLUG });
+    strangersAppId = await seedStranger(sql);
+    await sql.unsafe(
+      `INSERT INTO nibrun.app_hostnames (app_id, hostname, kind) VALUES ($1, $2, 'custom')`,
+      [strangersAppId, STRANGERS],
+    );
+  });
+
+  function claim({ hostname, ownerId = OWNER_ID }: { hostname: Hostname; ownerId?: OwnerId }) {
+    return repo.addCustom({ appId, ownerId, hostname });
+  }
+
+  test('a free name is made, once', async () => {
+    const first = await claim({ hostname: CLAIMED });
+    const again = await claim({ hostname: CLAIMED });
+
+    expect(first).toMatchObject({ outcome: 'created', row: { hostname: CLAIMED } });
+    expect(again).toMatchObject({ outcome: 'held', row: { hostname: CLAIMED, state: 'pending' } });
+  });
+
+  // Nothing of the other app's row comes back: the caller learns the name is not theirs and
+  // nothing else about it.
+  test("another app's name is taken, and stays theirs", async () => {
+    expect(await claim({ hostname: STRANGERS })).toEqual({ outcome: 'taken' });
+
+    const [row] = (await sql.unsafe('SELECT app_id FROM nibrun.app_hostnames WHERE hostname = $1', [
+      STRANGERS,
+    ])) as Array<{ app_id: string }>;
+    expect(row?.app_id).toBe(strangersAppId);
+  });
+
+  test("an app that is not the caller's answers nothing, whatever the name", async () => {
+    expect(await claim({ hostname: CLAIMED, ownerId: STRANGER_ID })).toBeNull();
+    expect(
+      await claim({
+        hostname: Value.Parse(HostnameSchema, 'free.example.dev'),
+        ownerId: STRANGER_ID,
+      }),
+    ).toBeNull();
+  });
+
+  // Held or taken are read in the same statement that failed to insert, so the row is neither
+  // written nor touched: `updated_at` still says what the edge last reported.
+  test('and saying a name again writes nothing', async () => {
+    const before = await updatedAt(CLAIMED);
+
+    await claim({ hostname: CLAIMED });
+
+    expect(await updatedAt(CLAIMED)).toEqual(before);
+  });
+
+  async function updatedAt(hostname: Hostname): Promise<Date> {
+    const [row] = (await sql.unsafe(
+      'SELECT updated_at FROM nibrun.app_hostnames WHERE hostname = $1',
+      [hostname],
+    )) as Array<{ updated_at: Date }>;
+    if (!row) {
+      throw new Error(`${hostname} is not in the table.`);
+    }
+    return row.updated_at;
+  }
+});
+
 async function seedApp(sql: SQL): Promise<void> {
   await sql.unsafe(
     `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
-     VALUES ('owner', 'owner', 'owner@example.com', true, now(), now())`,
+     VALUES ($1, $1, $2, true, now(), now())`,
+    [OWNER_ID, `${OWNER_ID}@example.com`],
   );
-  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, slug) VALUES ('owner', $1)`, [APP_SLUG]);
+  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, slug) VALUES ($1, $2)`, [
+    OWNER_ID,
+    APP_SLUG,
+  ]);
+}
+
+async function seedStranger(sql: SQL): Promise<AppId> {
+  await sql.unsafe(
+    `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+     VALUES ($1, $1, $2, true, now(), now())`,
+    [STRANGER_ID, `${STRANGER_ID}@example.com`],
+  );
+  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, slug) VALUES ($1, $2)`, [
+    STRANGER_ID,
+    STRANGER_SLUG,
+  ]);
+  return appIdOf({ sql, slug: STRANGER_SLUG });
+}
+
+async function appIdOf({ sql, slug }: { sql: SQL; slug: string }): Promise<AppId> {
+  const [row] = (await sql.unsafe('SELECT id FROM nibrun.apps WHERE slug = $1', [slug])) as Array<{
+    id: string;
+  }>;
+  if (!row) {
+    throw new Error(`${slug} is not in the table.`);
+  }
+  return Value.Parse(AppIdSchema, row.id);
 }
 
 async function addCustomHostname({

@@ -9,13 +9,15 @@ import {
   OwnerIdSchema,
   Value,
 } from '@repo/protocol';
-import { schema } from '#db/queries.gen.ts';
 import type { DcvMethod } from '#lib/app-hostname.ts';
+import { CloudflareError } from '#lib/cloudflare/client.ts';
 import { MS_PER_DAY } from '#lib/duration.ts';
 import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
   AppHostnameRow,
   AppHostnamesRepositoryContract,
+  CustomHostnameClaim,
+  CustomHostnameRow,
 } from '#repositories/app-hostnames.repository.ts';
 import {
   type CustomHostnamesRepositoryContract,
@@ -24,7 +26,6 @@ import {
   type EdgeReport,
 } from '#repositories/custom-hostnames.repository.ts';
 import { ADD_GRACE_MS, HostnamesService } from '#services/hostnames.service.ts';
-import { uniqueViolation } from '#tests/support/postgres.ts';
 
 const APP_HOST_DOMAIN = 'apps.example.com';
 const APP_ID = Value.Parse(AppIdSchema, 'app-1');
@@ -51,22 +52,23 @@ function hostnameRow(overrides: Partial<AppHostnameRow> = {}): AppHostnameRow {
   };
 }
 
+function customHostnameRow(overrides: Partial<CustomHostnameRow> = {}): CustomHostnameRow {
+  return { ...hostnameRow(), cloudflare_id: null, ...overrides };
+}
+
 class StubHostnamesRepository implements AppHostnamesRepositoryContract {
   readonly trace: string[] = [];
   readonly states: AppHostnameState[] = [];
   readonly reports: EdgeReport[] = [];
   readonly polledAfter: Array<string | null> = [];
   pending: PendingRow[] = [];
-  owns = true;
-  insertFailure: unknown;
   removed: string | null = CLOUDFLARE_ID;
+  // What the claim comes to, as the statement would answer it; null is an app not the caller's.
+  claim: CustomHostnameClaim | null = { outcome: 'created', row: customHostnameRow() };
 
-  addCustom(): Promise<AppHostnameRow | null> {
+  addCustom(): Promise<CustomHostnameClaim | null> {
     this.trace.push('insert');
-    if (this.insertFailure) {
-      return Promise.reject(this.insertFailure);
-    }
-    return Promise.resolve(this.owns ? hostnameRow() : null);
+    return Promise.resolve(this.claim);
   }
 
   attachCustom({ dcvTarget }: { dcvTarget: string | null }): Promise<AppHostnameRow | null> {
@@ -122,6 +124,7 @@ class StubEdge implements CustomHostnamesRepositoryContract {
   errors: string[] = [];
   addFailure: unknown;
   removeFailure: unknown;
+  revalidateFailure: unknown;
 
   add({ method }: { method: DcvMethod }): Promise<EdgeHostname> {
     this.trace.push('add');
@@ -149,6 +152,15 @@ class StubEdge implements CustomHostnamesRepositoryContract {
       sslStatus: this.state_,
       errors: this.errors,
     });
+  }
+
+  revalidate({ method }: { method: DcvMethod }): Promise<void> {
+    this.trace.push('revalidate');
+    this.methods.push(method);
+    if (this.revalidateFailure) {
+      return Promise.reject(this.revalidateFailure);
+    }
+    return Promise.resolve();
   }
 
   remove(): Promise<void> {
@@ -197,25 +209,14 @@ describe('a domain the platform issues is not one an owner may claim', () => {
   // when it names a hostname nibrun issued to somebody else.
   test('a hostname another app already holds is a conflict the owner can read', async () => {
     const { service, appsRepo } = build();
-    appsRepo.insertFailure = uniqueViolation(
-      schema.app_hostnames._indexes.app_hostnames_hostname_key._indexName,
-    );
+    appsRepo.claim = { outcome: 'taken' };
 
     await expect(service.add(owned())).rejects.toBeInstanceOf(ConflictError);
   });
 
-  // Every other violation means the request itself is wrong in a way retrying cannot fix, and
-  // dressing one up as a conflict would tell the owner to try a different hostname.
-  test('and any other violation is not rewritten into one', async () => {
-    const { service, appsRepo } = build();
-    appsRepo.insertFailure = uniqueViolation('some_other_key');
-
-    await expect(service.add(owned())).rejects.not.toBeInstanceOf(ConflictError);
-  });
-
   test('an app the caller does not own is indistinguishable from one that is not there', async () => {
     const { service, appsRepo } = build();
-    appsRepo.owns = false;
+    appsRepo.claim = null;
 
     await expect(service.add(owned())).rejects.toBeInstanceOf(NotFoundError);
   });
@@ -236,8 +237,9 @@ describe('the row is written before the edge is told', () => {
   test('and the owner is handed the record to place rather than told to come back', async () => {
     const { service, customHostnamesRepo } = build();
 
-    const added = await service.add(owned());
+    const { hostname: added, created } = await service.add(owned());
 
+    expect(created).toBe(true);
     expect(added.state).toBe('pending');
     expect(added.dcvTarget).toBe(`${BROUGHT}.uuid.dcv.cloudflare.com`);
     expect(customHostnamesRepo.methods).toEqual(['txt']);
@@ -248,7 +250,9 @@ describe('the row is written before the edge is told', () => {
   test('an apex is proved over HTTP and handed no delegation record', async () => {
     const { service, customHostnamesRepo } = build();
 
-    const added = await service.add(owned(Value.Parse(HostnameSchema, 'example.dev')));
+    const { hostname: added } = await service.add(
+      owned(Value.Parse(HostnameSchema, 'example.dev')),
+    );
 
     expect(customHostnamesRepo.methods).toEqual(['http']);
     expect(added.dcvTarget).toBeNull();
@@ -270,6 +274,65 @@ describe('removing a domain lets the row go whatever the edge says', () => {
     customHostnamesRepo.removeFailure = new Error('cloudflare is away');
 
     await expect(service.remove(owned())).resolves.toBeUndefined();
+  });
+});
+
+describe('a domain the app already holds is said again rather than created again', () => {
+  function holding(row: Partial<CustomHostnameRow>): ReturnType<typeof build> {
+    const built = build();
+    built.appsRepo.claim = {
+      outcome: 'held',
+      row: customHostnameRow({ cloudflare_id: CLOUDFLARE_ID, ...row }),
+    };
+    return built;
+  }
+
+  // The owner who has just fixed their records is the one who knows it is time; the edge's own
+  // retries back off to hours.
+  test('one still waiting is what asks the edge to check it now', async () => {
+    const { service, customHostnamesRepo } = holding({ state: 'pending' });
+
+    const { hostname, created } = await service.add(owned());
+
+    expect(created).toBe(false);
+    expect(hostname.state).toBe('pending');
+    expect(customHostnamesRepo.trace).toEqual(['revalidate']);
+    expect(customHostnamesRepo.methods).toEqual(['txt']);
+  });
+
+  test('one already answering has nothing to ask for', async () => {
+    const { service, customHostnamesRepo } = holding({ state: 'active' });
+
+    const { hostname, created } = await service.add(owned());
+
+    expect(created).toBe(false);
+    expect(hostname.state).toBe('active');
+    expect(customHostnamesRepo.trace).toEqual([]);
+  });
+
+  // The add that wrote it is still on its way to the edge, or the pass will finish it shortly.
+  test('nor has one the edge has not been told about yet', async () => {
+    const { service, customHostnamesRepo } = holding({ cloudflare_id: null });
+
+    const { created } = await service.add(owned());
+
+    expect(created).toBe(false);
+    expect(customHostnamesRepo.trace).toEqual([]);
+  });
+
+  // A failed claim has lapsed or been let go of by the edge, which nothing here can undo.
+  test('and a failed one is told what will', async () => {
+    const { service } = holding({ state: 'failed' });
+
+    await expect(service.add(owned())).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  // The row says pending while the edge has already let the hostname go.
+  test('as is one the edge no longer holds', async () => {
+    const { service, customHostnamesRepo } = holding({ state: 'pending' });
+    customHostnamesRepo.revalidateFailure = new CloudflareError({ status: 404, body: 'gone' });
+
+    await expect(service.add(owned())).rejects.toBeInstanceOf(ConflictError);
   });
 });
 

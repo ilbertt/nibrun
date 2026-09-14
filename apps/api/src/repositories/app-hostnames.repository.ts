@@ -5,6 +5,19 @@ import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
 export type AppHostnameRow = Queries['SelectAppHostnamesByApp'];
 export type OwnedAppHostnameRow = Queries['SelectAppHostnamesByOwner'];
+type ClaimRow = Queries['ClaimCustomAppHostname'];
+/** A custom hostname with the one column its owner is never shown: where it lives at the edge. */
+export type CustomHostnameRow = AppHostnameRow &
+  Pick<Queries['DeleteCustomAppHostname'], 'cloudflare_id'>;
+
+/**
+ * What claiming a hostname for an app came to. `taken` is a name another app holds — nothing of
+ * that app's is carried here, only that the name is not this one's to have.
+ */
+export type CustomHostnameClaim =
+  | { outcome: 'created'; row: CustomHostnameRow }
+  | { outcome: 'held'; row: CustomHostnameRow }
+  | { outcome: 'taken' };
 export type PendingHostnameRow = Queries['SelectPendingCustomHostnames'];
 export type DisposableAppHostnameRow = Queries['SelectDisposableAppHostnames'];
 
@@ -23,7 +36,7 @@ export const CUSTOM_KIND: AppHostnameKind = 'custom';
 export abstract class AppHostnamesRepositoryContract {
   abstract listByOwner(input: { ownerId: OwnerId }): Promise<OwnedAppHostnameRow[]>;
   abstract listByApp(input: OwnedApp): Promise<AppHostnameRow[]>;
-  abstract addCustom(input: OwnedApp & { hostname: Hostname }): Promise<AppHostnameRow | null>;
+  abstract addCustom(input: OwnedApp & { hostname: Hostname }): Promise<CustomHostnameClaim | null>;
   abstract attachCustom(input: {
     hostname: Hostname;
     cloudflareId: string;
@@ -38,6 +51,33 @@ export abstract class AppHostnamesRepositoryContract {
   }): Promise<PendingHostnameRow[]>;
   abstract listDisposable(input: { appId: AppId }): Promise<DisposableAppHostnameRow[]>;
   abstract removeDisposable(input: { appId: AppId; hostname: Hostname }): Promise<boolean>;
+}
+
+/**
+ * The outer join leaves every column of a claim nullable together, and they are read back
+ * together: a claim is whole or it is the one row that says the name was somebody else's.
+ */
+function toClaim(row: ClaimRow): CustomHostnameClaim {
+  if (
+    row.created === null ||
+    row.hostname === null ||
+    row.kind === null ||
+    row.state === null ||
+    row.edge_errors === null
+  ) {
+    return { outcome: 'taken' };
+  }
+  return {
+    outcome: row.created ? 'created' : 'held',
+    row: {
+      hostname: row.hostname,
+      kind: row.kind,
+      state: row.state,
+      dcv_target: row.dcv_target,
+      edge_errors: row.edge_errors,
+      cloudflare_id: row.cloudflare_id,
+    },
+  };
 }
 
 export class AppHostnamesRepository extends Repository implements AppHostnamesRepositoryContract {
@@ -65,20 +105,47 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
    * Written before the edge is asked for anything, so a row exists to find the custom hostname by
    * if this process dies before the edge answers. The reverse order would leave a hostname at the
    * edge that nothing here names, and nothing to notice it.
+   *
+   * One statement for every way it can go, so the name is claimed or read as it stood at the same
+   * instant. The unique index is what refuses a taken name; `DO NOTHING` rather than a no-op
+   * update on the app's own row, because any update moves `updated_at`, which says when the edge
+   * last reported something new. Which of the two the conflict was is read back in the same
+   * statement, scoped to this app — another app's row is never selected, only found missing.
+   *
+   * Null when the app is not the caller's, which is the one case that yields no row at all.
    */
   async addCustom({
     appId,
     ownerId,
     hostname,
-  }: OwnedApp & { hostname: Hostname }): Promise<AppHostnameRow | null> {
-    const [row] = await this.sql.InsertCustomAppHostname`
-      INSERT INTO nibrun.app_hostnames (app_id, hostname, kind)
-      SELECT a.id, ${hostname}, ${CUSTOM_KIND}
-      FROM nibrun.live_apps a
-      WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      RETURNING hostname, kind, state, dcv_target, edge_errors
+  }: OwnedApp & { hostname: Hostname }): Promise<CustomHostnameClaim | null> {
+    const [row] = await this.sql.ClaimCustomAppHostname`
+      /* @type state import('@repo/protocol').AppHostnameState | null */
+      WITH app AS (
+        SELECT a.id
+        FROM nibrun.live_apps a
+        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+      ), created AS (
+        INSERT INTO nibrun.app_hostnames (app_id, hostname, kind)
+        SELECT app.id, ${hostname}, ${CUSTOM_KIND} FROM app
+        ON CONFLICT (hostname) DO NOTHING
+        RETURNING hostname, kind, state, dcv_target, edge_errors, cloudflare_id
+      ), held AS (
+        SELECT h.hostname, h.kind, h.state, h.dcv_target, h.edge_errors, h.cloudflare_id
+        FROM nibrun.app_hostnames h
+        JOIN app ON app.id = h.app_id
+        WHERE h.hostname = ${hostname} AND h.kind = ${CUSTOM_KIND}
+      )
+      SELECT own.created, own.hostname, own.kind, own.state, own.dcv_target, own.edge_errors,
+             own.cloudflare_id
+      FROM app
+      LEFT JOIN (
+        SELECT true AS created, * FROM created
+        UNION ALL
+        SELECT false AS created, * FROM held
+      ) own ON true
     `;
-    return row ?? null;
+    return row === undefined ? null : toClaim(row);
   }
 
   async attachCustom({

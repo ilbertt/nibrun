@@ -1,25 +1,23 @@
 import type { AppHostnameState, AppId, Hostname, OwnerId } from '@repo/protocol';
-import { schema } from '#db/queries.gen.ts';
 import {
   dcvMethodFor,
   isPlatformHostname,
   type PublicAppHostname,
   toAppHostname,
 } from '#lib/app-hostname.ts';
-import { REQUEST_DEADLINE_MS } from '#lib/cloudflare/client.ts';
+import { CloudflareError, REQUEST_DEADLINE_MS } from '#lib/cloudflare/client.ts';
 import { MS_PER_DAY } from '#lib/duration.ts';
 import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
-import { isUniqueViolation } from '#lib/pg-errors.ts';
 import type {
-  AppHostnameRow,
   AppHostnamesRepositoryContract,
+  CustomHostnameRow,
 } from '#repositories/app-hostnames.repository.ts';
 import type { CustomHostnamesRepositoryContract } from '#repositories/custom-hostnames.repository.ts';
 import { Service } from '#services/service.ts';
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
-const HOSTNAME_TAKEN = schema.app_hostnames._indexes.app_hostnames_hostname_key._indexName;
+const HTTP_NOT_FOUND = 404;
 
 /**
  * How many waiting hostnames one host report asks the edge about. Each is its own round trip to
@@ -97,12 +95,15 @@ export class HostnamesService extends Service {
    * The edge call is made while the owner waits rather than deferred, because what comes back is
    * the record they have to go and place — deferring it would mean answering the request with
    * nothing to act on.
+   *
+   * A hostname the app already holds is not created again but said again, and `created` is how
+   * the caller tells the two apart. Saying it again is what a waiting domain has to offer its
+   * owner: the edge is asked to check it now, rather than when its own schedule next comes round.
    */
-  async add({
-    appId,
-    ownerId,
-    hostname,
-  }: OwnedApp & { hostname: Hostname }): Promise<PublicAppHostname> {
+  async add({ appId, ownerId, hostname }: OwnedApp & { hostname: Hostname }): Promise<{
+    hostname: PublicAppHostname;
+    created: boolean;
+  }> {
     this.refuseWithoutEdge();
     if (isPlatformHostname({ hostname, appHostDomain: this.appHostDomain })) {
       throw new BadRequestError(
@@ -110,7 +111,17 @@ export class HostnamesService extends Service {
       );
     }
 
-    const row = await this.insert({ appId, ownerId, hostname });
+    const claim = await this.hostnamesRepo.addCustom({ appId, ownerId, hostname });
+    if (!claim) {
+      throw new NotFoundError('App not found.');
+    }
+    if (claim.outcome === 'taken') {
+      throw new ConflictError('That hostname is already in use.');
+    }
+    if (claim.outcome === 'held') {
+      return { hostname: await this.reassert({ appId, hostname, row: claim.row }), created: false };
+    }
+
     const { cloudflareId, state, dcvTarget } = await this.register(hostname);
     const attached = await this.hostnamesRepo.attachCustom({
       hostname,
@@ -120,7 +131,61 @@ export class HostnamesService extends Service {
 
     this.logger.info('custom hostname added', { appId, hostname, state });
 
-    return toAppHostname(attached ?? { ...row, state, dcv_target: dcvTarget });
+    return {
+      hostname: toAppHostname(attached ?? { ...claim.row, state, dcv_target: dcvTarget }),
+      created: true,
+    };
+  }
+
+  /**
+   * Only a hostname still waiting has anything to ask the edge for. An active one is answered
+   * on already; one the edge has not been told about yet is finished by the next pass, not by
+   * asking sooner; and a failed one has lapsed or been given up by the edge, which nothing here
+   * can undo — the row is what tells its owner to remove it and add it again.
+   */
+  private async reassert({
+    appId,
+    hostname,
+    row,
+  }: {
+    appId: AppId;
+    hostname: Hostname;
+    row: CustomHostnameRow;
+  }): Promise<PublicAppHostname> {
+    if (row.state === 'failed') {
+      throw new ConflictError('That domain failed validation. Remove it and add it again.');
+    }
+    if (row.state === 'pending' && row.cloudflare_id !== null) {
+      await this.revalidate({ appId, hostname, cloudflareId: row.cloudflare_id });
+    }
+    return toAppHostname(row);
+  }
+
+  /**
+   * The edge retries validation on its own, on a clock that backs off to hours; the owner who has
+   * just fixed their records is the one who knows it is time.
+   */
+  private async revalidate({
+    appId,
+    hostname,
+    cloudflareId,
+  }: {
+    appId: AppId;
+    hostname: Hostname;
+    cloudflareId: string;
+  }): Promise<void> {
+    try {
+      await this.customHostnamesRepo.revalidate({ cloudflareId, method: dcvMethodFor(hostname) });
+    } catch (error) {
+      if (error instanceof CloudflareError && error.status === HTTP_NOT_FOUND) {
+        throw new ConflictError(
+          'The edge no longer holds that domain. Remove it and add it again.',
+        );
+      }
+      throw error;
+    }
+
+    this.logger.info('custom hostname validation asked for again', { appId, hostname });
   }
 
   /**
@@ -135,25 +200,6 @@ export class HostnamesService extends Service {
     const dcvTarget =
       method === 'txt' ? await this.customHostnamesRepo.dcvTarget({ hostname }) : null;
     return { cloudflareId, state, dcvTarget };
-  }
-
-  private async insert({
-    appId,
-    ownerId,
-    hostname,
-  }: OwnedApp & { hostname: Hostname }): Promise<AppHostnameRow> {
-    try {
-      const row = await this.hostnamesRepo.addCustom({ appId, ownerId, hostname });
-      if (!row) {
-        throw new NotFoundError('App not found.');
-      }
-      return row;
-    } catch (error) {
-      if (isUniqueViolation({ error, constraint: HOSTNAME_TAKEN })) {
-        throw new ConflictError('That hostname is already in use.');
-      }
-      throw error;
-    }
   }
 
   /**

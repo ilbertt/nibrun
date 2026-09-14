@@ -111,6 +111,9 @@ describe('a deployment with no Cloudflare account says so where the edge would b
     await expect(unconfigured.report({ cloudflareId: 'ch-1' })).rejects.toBeInstanceOf(
       CustomHostnamesUnavailableError,
     );
+    await expect(
+      unconfigured.revalidate({ cloudflareId: 'ch-1', method: 'txt' }),
+    ).rejects.toBeInstanceOf(CustomHostnamesUnavailableError);
     await expect(unconfigured.remove({ cloudflareId: 'ch-1' })).rejects.toBeInstanceOf(
       CustomHostnamesUnavailableError,
     );

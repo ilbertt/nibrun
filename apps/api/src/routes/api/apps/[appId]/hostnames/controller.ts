@@ -16,20 +16,27 @@ export const AppsAppIdHostnamesController = new Elysia()
    * Created rather than accepted: the row exists and the edge knows the hostname. What is still
    * outstanding is the owner's own DNS, which is theirs to do — the response carries the record
    * to place, so there is nothing here for them to poll before acting.
+   *
+   * Saying it again is not a conflict: a domain the app already answers on, or is waiting to,
+   * comes back as it is. While it is waiting, that is also what asks the edge to check it now —
+   * the owner who has just fixed their records is the one who knows it is time.
    */
   .post(
     '/apps/:appId/hostnames',
     async ({ hostnamesService, params, body, user, status }) => {
-      const hostname = await hostnamesService.add({
+      const { hostname, created } = await hostnamesService.add({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         hostname: body.hostname,
       });
-      return status(StatusMap.Created, hostname);
+      return status(created ? StatusMap.Created : StatusMap.OK, hostname);
     },
     {
       body: AddHostnameRequestSchema,
-      response: { [StatusMap.Created]: AppHostnameResponseSchema },
+      response: {
+        [StatusMap.Created]: AppHostnameResponseSchema,
+        [StatusMap.OK]: AppHostnameResponseSchema,
+      },
     },
   )
   .delete(

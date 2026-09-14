@@ -117,15 +117,18 @@ export interface ISelectAppHostnamesByAppResult {
     edge_errors: IAppHostnamesColumns["edge_errors"];
 }
 
-/** Result of query `InsertCustomAppHostname`. */
-export interface IInsertCustomAppHostnameResult {
-    hostname: IAppHostnamesColumns["hostname"];
-    kind: IAppHostnamesColumns["kind"];
-    state: IAppHostnamesColumns["state"];
+/** Result of query `ClaimCustomAppHostname`. */
+export interface IClaimCustomAppHostnameResult {
+    created: boolean | null;
+    hostname: import("@repo/protocol").Hostname | null;
+    kind: import("@repo/protocol").AppHostnameKind | null;
+    state: import("@repo/protocol").AppHostnameState | null;
     /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
-    dcv_target: IAppHostnamesColumns["dcv_target"];
+    dcv_target: string | null;
     /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
-    edge_errors: IAppHostnamesColumns["edge_errors"];
+    edge_errors: string[] | null;
+    /** The custom hostname this row is projected onto at the edge. Absent for a platform hostname, which the wildcard already covers. */
+    cloudflare_id: string | null;
 }
 
 /** Result of query `UpdateCustomAppHostnameEdge`. */
@@ -980,7 +983,7 @@ export interface Queries {
     SelectDesiredExportEnvironment: ISelectDesiredExportEnvironmentResult;
     SelectAppHostnamesByOwner: ISelectAppHostnamesByOwnerResult;
     SelectAppHostnamesByApp: ISelectAppHostnamesByAppResult;
-    InsertCustomAppHostname: IInsertCustomAppHostnameResult;
+    ClaimCustomAppHostname: IClaimCustomAppHostnameResult;
     UpdateCustomAppHostnameEdge: IUpdateCustomAppHostnameEdgeResult;
     UpdateCustomAppHostnameState: IUpdateCustomAppHostnameStateResult;
     DeleteCustomAppHostname: IDeleteCustomAppHostnameResult;

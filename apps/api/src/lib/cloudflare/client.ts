@@ -89,6 +89,19 @@ export class CloudflareClient {
     });
   }
 
+  /**
+   * The same configuration sent again is how the edge is asked to run validation now: it retries
+   * on its own, but on a clock that backs off to hours, and an owner who has just fixed their
+   * records should not have to wait on it.
+   */
+  restartValidation({ id, method }: { id: string; method: DcvMethod }): Promise<CustomHostname> {
+    return this.#request<CustomHostname>({
+      method: 'PATCH',
+      path: `custom_hostnames/${id}`,
+      body: { ssl: sslConfig(method) },
+    });
+  }
+
   getCustomHostname({ id }: { id: string }): Promise<CustomHostname> {
     return this.#request<CustomHostname>({ method: 'GET', path: `custom_hostnames/${id}` });
   }
