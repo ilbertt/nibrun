@@ -16,7 +16,7 @@ const HTTP_NOT_FOUND = 404;
  * Short is affordable because a call given up on is the case the reconcile pass already finishes:
  * a row written with no `cloudflare_id` is attached to the edge on a later one.
  */
-const REQUEST_DEADLINE_MS = 5_000;
+export const REQUEST_DEADLINE_MS = 5_000;
 
 /**
  * Where Cloudflare answers the challenge on the owner's behalf. They point `_acme-challenge` at

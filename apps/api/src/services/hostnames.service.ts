@@ -1,6 +1,7 @@
 import type { AppId, Hostname, OwnerId } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
 import { isPlatformHostname, type PublicAppHostname, toAppHostname } from '#lib/app-hostname.ts';
+import { REQUEST_DEADLINE_MS } from '#lib/cloudflare/client.ts';
 import { MS_PER_DAY } from '#lib/duration.ts';
 import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
@@ -31,6 +32,22 @@ const POLL_BATCH = 8;
  */
 const PENDING_TTL_DAYS = 7;
 const PENDING_TTL_MS = PENDING_TTL_DAYS * MS_PER_DAY;
+
+/** What `add` asks the edge with the owner waiting: create the hostname, read the zone's dcv uuid. */
+const EDGE_CALLS_PER_ADD = 2;
+const ADD_DEADLINE_MS = EDGE_CALLS_PER_ADD * REQUEST_DEADLINE_MS;
+
+/**
+ * How long a row with no hostname behind it is left to the `add` that wrote it. Past the add's
+ * own deadline it has either attached the hostname or given up, and only then is the row this
+ * pass's to finish. As long again on top, because `created_at` is the database's clock and the
+ * comparison is made on the process's.
+ *
+ * Without it the pass and the add race to create the same hostname: the pass runs on every host
+ * report, the add takes a second, and whichever asks the edge second is refused as a duplicate.
+ * When that is the add, the owner is told their domain failed while it was in fact registered.
+ */
+export const ADD_GRACE_MS = ADD_DEADLINE_MS + ADD_DEADLINE_MS;
 
 /**
  * Custom domains, which live either side of a boundary this process does not control: a row here
@@ -157,8 +174,12 @@ export class HostnamesService extends Service {
     cloudflare_id: string | null;
     created_at: Date;
   }): Promise<void> {
-    if (Date.now() - row.created_at.getTime() > PENDING_TTL_MS) {
+    const age = Date.now() - row.created_at.getTime();
+    if (age > PENDING_TTL_MS) {
       await this.expire(row);
+      return;
+    }
+    if (row.cloudflare_id === null && age < ADD_GRACE_MS) {
       return;
     }
     try {
