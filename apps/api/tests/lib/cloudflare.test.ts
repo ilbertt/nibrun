@@ -45,7 +45,7 @@ describe('a call to the edge carries this zone and this token', () => {
   test('the hostname is created under the configured zone', async () => {
     const { calls } = answering([ok({ id: 'ch-1' })]);
 
-    await client().createCustomHostname({ hostname: HOSTNAME });
+    await client().createCustomHostname({ hostname: HOSTNAME, method: 'txt' });
 
     expect(calls[0]?.url).toBe(
       `https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/custom_hostnames`,
@@ -53,18 +53,19 @@ describe('a call to the edge carries this zone and this token', () => {
     expect(calls[0]?.headers.get('authorization')).toBe(`Bearer ${API_TOKEN}`);
   });
 
-  // Delegated DCV is what keeps renewal from ever coming back to the owner, and it answers the
-  // `txt` method. `http` would need their server rather than their DNS, which is a different
-  // promise to the one the dashboard prints them.
-  test('and asks for the validation the owner answers once and never again', async () => {
-    const { calls } = answering([ok({ id: 'ch-1' })]);
+  // Which validation is the caller's decision, made per hostname; here it is only carried to the
+  // edge in the shape the edge reads it.
+  test('and asks for the validation it was told to, as the edge spells it', async () => {
+    const { calls } = answering([ok({ id: 'ch-1' }), ok({ id: 'ch-2' })]);
 
-    await client().createCustomHostname({ hostname: HOSTNAME });
+    await client().createCustomHostname({ hostname: HOSTNAME, method: 'txt' });
+    await client().createCustomHostname({ hostname: HOSTNAME, method: 'http' });
 
     expect(await calls[0]?.json()).toMatchObject({
       hostname: HOSTNAME,
       ssl: { method: 'txt', type: 'dv' },
     });
+    expect(await calls[1]?.json()).toMatchObject({ ssl: { method: 'http', type: 'dv' } });
   });
 });
 
@@ -72,9 +73,9 @@ describe('a refusal is an error however the edge phrases it', () => {
   test('a non-2xx is an error', async () => {
     answering([{ status: 403, body: { success: false, result: null, errors: [] } }]);
 
-    await expect(client().createCustomHostname({ hostname: HOSTNAME })).rejects.toBeInstanceOf(
-      CloudflareError,
-    );
+    await expect(
+      client().createCustomHostname({ hostname: HOSTNAME, method: 'txt' }),
+    ).rejects.toBeInstanceOf(CloudflareError);
   });
 
   // Cloudflare answers some failures 200 with `success: false`. Reading only the status code
@@ -86,9 +87,9 @@ describe('a refusal is an error however the edge phrases it', () => {
       },
     ]);
 
-    await expect(client().createCustomHostname({ hostname: HOSTNAME })).rejects.toThrow(
-      /already exists/,
-    );
+    await expect(
+      client().createCustomHostname({ hostname: HOSTNAME, method: 'txt' }),
+    ).rejects.toThrow(/already exists/);
   });
 
   // An edge that answered with a proxy's error page rather than its own envelope is still a
@@ -96,9 +97,9 @@ describe('a refusal is an error however the edge phrases it', () => {
   test('and so is a body that is not the envelope at all', async () => {
     answering([{ status: HTTP_BAD_GATEWAY, body: undefined }]);
 
-    await expect(client().createCustomHostname({ hostname: HOSTNAME })).rejects.toBeInstanceOf(
-      CloudflareError,
-    );
+    await expect(
+      client().createCustomHostname({ hostname: HOSTNAME, method: 'txt' }),
+    ).rejects.toBeInstanceOf(CloudflareError);
   });
 });
 

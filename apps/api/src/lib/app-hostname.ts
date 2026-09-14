@@ -6,6 +6,7 @@ import {
   HostnameSchema,
   Value,
 } from '@repo/protocol';
+import { getDomain } from 'tldts';
 import type { Queries } from '#db/queries.gen.ts';
 
 /**
@@ -45,6 +46,27 @@ export function isPlatformHostname({
   appHostDomain: string;
 }): boolean {
   return hostname === appHostDomain || hostname.endsWith(`.${appHostDomain}`);
+}
+
+/** How the edge is asked to prove a hostname before issuing its certificate. */
+export type DcvMethod = 'txt' | 'http';
+
+/**
+ * Delegated TXT lets the certificate be issued before any traffic moves, and it is what every
+ * subdomain gets. It cannot be trusted at a zone apex: a zone on Cloudflare proves its own
+ * certificate through TXT records at `_acme-challenge.<apex>`, kept out of the owner's sight, and
+ * Cloudflare answers TXT queries for that name from those rather than following the CNAME the
+ * owner placed for us — so validation waits until Cloudflare's own tokens are withdrawn, which
+ * took four hours the day it was noticed. HTTP asks nothing of that name: once the domain points
+ * at us the edge serves the token itself, and renews the same way.
+ *
+ * Every apex rather than only the ones on Cloudflare: an apex can only point at us from a
+ * provider that flattens CNAMEs, whose apex is a zone somewhere either way, and finding out
+ * whose would be a DNS lookup on the owner's request. The price is the pre-issued certificate,
+ * which a subdomain keeps.
+ */
+export function dcvMethodFor(hostname: Hostname): DcvMethod {
+  return getDomain(hostname) === hostname ? 'http' : 'txt';
 }
 
 /**

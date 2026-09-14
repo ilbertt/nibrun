@@ -1,4 +1,5 @@
 import type { AppHostnameState, Hostname } from '@repo/protocol';
+import type { DcvMethod } from '#lib/app-hostname.ts';
 import type { CloudflareClient, CustomHostname } from '#lib/cloudflare/client.ts';
 
 /**
@@ -57,7 +58,7 @@ export class CustomHostnamesUnavailableError extends Error {
 export abstract class CustomHostnamesRepositoryContract {
   /** Whether this deployment can register a hostname at the edge at all. */
   abstract readonly available: boolean;
-  abstract add(input: { hostname: Hostname }): Promise<EdgeHostname>;
+  abstract add(input: { hostname: Hostname; method: DcvMethod }): Promise<EdgeHostname>;
   abstract dcvTarget(input: { hostname: Hostname }): Promise<string>;
   abstract report(input: { cloudflareId: string }): Promise<EdgeReport>;
   abstract remove(input: { cloudflareId: string }): Promise<void>;
@@ -85,8 +86,14 @@ export class CustomHostnamesRepository implements CustomHostnamesRepositoryContr
     return this.client !== undefined;
   }
 
-  async add({ hostname }: { hostname: Hostname }): Promise<EdgeHostname> {
-    const created = await this.reachable().createCustomHostname({ hostname });
+  async add({
+    hostname,
+    method,
+  }: {
+    hostname: Hostname;
+    method: DcvMethod;
+  }): Promise<EdgeHostname> {
+    const created = await this.reachable().createCustomHostname({ hostname, method });
     return { cloudflareId: created.id, state: toState(created) };
   }
 

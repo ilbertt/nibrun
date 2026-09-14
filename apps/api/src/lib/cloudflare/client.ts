@@ -1,3 +1,5 @@
+import type { DcvMethod } from '#lib/app-hostname.ts';
+
 const API_BASE = 'https://api.cloudflare.com/client/v4/';
 
 const MAX_ERROR_BODY = 256;
@@ -73,16 +75,17 @@ export class CloudflareClient {
     this.#zoneId = zoneId;
   }
 
-  createCustomHostname({ hostname }: { hostname: string }): Promise<CustomHostname> {
+  createCustomHostname({
+    hostname,
+    method,
+  }: {
+    hostname: string;
+    method: DcvMethod;
+  }): Promise<CustomHostname> {
     return this.#request<CustomHostname>({
       method: 'POST',
       path: 'custom_hostnames',
-      // `txt` is what delegated DCV answers with: the records go to the delegation target the
-      // owner already pointed at us, so no value here ever has to reach them.
-      body: {
-        hostname,
-        ssl: { method: 'txt', type: 'dv', settings: { min_tls_version: '1.2' } },
-      },
+      body: { hostname, ssl: sslConfig(method) },
     });
   }
 
@@ -148,6 +151,15 @@ export class CloudflareClient {
     }
     return envelope.result;
   }
+}
+
+/**
+ * `txt` is answered by delegated DCV: the records go to the delegation target the owner pointed
+ * `_acme-challenge` at, so no value here ever has to reach them. `http` is answered by the edge
+ * itself once the hostname's traffic arrives there, and needs no record of the owner at all.
+ */
+function sslConfig(method: DcvMethod) {
+  return { method, type: 'dv', settings: { min_tls_version: '1.2' } };
 }
 
 function parseEnvelope<Result>(text: string): CloudflareEnvelope<Result> | undefined {

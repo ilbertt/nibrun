@@ -1,6 +1,11 @@
-import type { AppId, Hostname, OwnerId } from '@repo/protocol';
+import type { AppHostnameState, AppId, Hostname, OwnerId } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
-import { isPlatformHostname, type PublicAppHostname, toAppHostname } from '#lib/app-hostname.ts';
+import {
+  dcvMethodFor,
+  isPlatformHostname,
+  type PublicAppHostname,
+  toAppHostname,
+} from '#lib/app-hostname.ts';
 import { REQUEST_DEADLINE_MS } from '#lib/cloudflare/client.ts';
 import { MS_PER_DAY } from '#lib/duration.ts';
 import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
@@ -106,8 +111,7 @@ export class HostnamesService extends Service {
     }
 
     const row = await this.insert({ appId, ownerId, hostname });
-    const { cloudflareId, state } = await this.customHostnamesRepo.add({ hostname });
-    const dcvTarget = await this.customHostnamesRepo.dcvTarget({ hostname });
+    const { cloudflareId, state, dcvTarget } = await this.register(hostname);
     const attached = await this.hostnamesRepo.attachCustom({
       hostname,
       cloudflareId,
@@ -117,6 +121,20 @@ export class HostnamesService extends Service {
     this.logger.info('custom hostname added', { appId, hostname, state });
 
     return toAppHostname(attached ?? { ...row, state, dcv_target: dcvTarget });
+  }
+
+  /**
+   * The delegation target is only read for a hostname proved that way: an apex is proved over
+   * HTTP, and a target handed to its owner would be a record to place that nothing ever reads.
+   */
+  private async register(
+    hostname: Hostname,
+  ): Promise<{ cloudflareId: string; state: AppHostnameState; dcvTarget: string | null }> {
+    const method = dcvMethodFor(hostname);
+    const { cloudflareId, state } = await this.customHostnamesRepo.add({ hostname, method });
+    const dcvTarget =
+      method === 'txt' ? await this.customHostnamesRepo.dcvTarget({ hostname }) : null;
+    return { cloudflareId, state, dcvTarget };
   }
 
   private async insert({
@@ -222,8 +240,7 @@ export class HostnamesService extends Service {
   }
 
   private async attachAtEdge(row: { hostname: Hostname }): Promise<string> {
-    const { cloudflareId } = await this.customHostnamesRepo.add({ hostname: row.hostname });
-    const dcvTarget = await this.customHostnamesRepo.dcvTarget({ hostname: row.hostname });
+    const { cloudflareId, dcvTarget } = await this.register(row.hostname);
     await this.hostnamesRepo.attachCustom({ hostname: row.hostname, cloudflareId, dcvTarget });
 
     this.logger.info('custom hostname reached the edge on a later pass', {

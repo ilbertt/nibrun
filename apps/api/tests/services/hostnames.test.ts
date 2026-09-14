@@ -10,6 +10,7 @@ import {
   Value,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
+import type { DcvMethod } from '#lib/app-hostname.ts';
 import { MS_PER_DAY } from '#lib/duration.ts';
 import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
@@ -115,14 +116,16 @@ function notAsked(): never {
 
 class StubEdge implements CustomHostnamesRepositoryContract {
   readonly trace: string[] = [];
+  readonly methods: DcvMethod[] = [];
   available = true;
   state_: AppHostnameState = 'pending';
   errors: string[] = [];
   addFailure: unknown;
   removeFailure: unknown;
 
-  add(): Promise<EdgeHostname> {
+  add({ method }: { method: DcvMethod }): Promise<EdgeHostname> {
     this.trace.push('add');
+    this.methods.push(method);
     if (this.addFailure) {
       return Promise.reject(this.addFailure);
     }
@@ -231,12 +234,24 @@ describe('the row is written before the edge is told', () => {
   });
 
   test('and the owner is handed the record to place rather than told to come back', async () => {
-    const { service } = build();
+    const { service, customHostnamesRepo } = build();
 
     const added = await service.add(owned());
 
     expect(added.state).toBe('pending');
     expect(added.dcvTarget).toBe(`${BROUGHT}.uuid.dcv.cloudflare.com`);
+    expect(customHostnamesRepo.methods).toEqual(['txt']);
+  });
+
+  // The edge proves an apex itself once traffic arrives, so there is no second record to place —
+  // and handing one over would be a record nothing ever reads.
+  test('an apex is proved over HTTP and handed no delegation record', async () => {
+    const { service, customHostnamesRepo } = build();
+
+    const added = await service.add(owned(Value.Parse(HostnameSchema, 'example.dev')));
+
+    expect(customHostnamesRepo.methods).toEqual(['http']);
+    expect(added.dcvTarget).toBeNull();
   });
 });
 
