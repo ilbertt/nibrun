@@ -2027,7 +2027,6 @@ export const schema = {
         _indexes: {
             apps_deleted_idx: { _indexName: "apps_deleted_idx" },
             apps_owner_id_idx: { _indexName: "apps_owner_id_idx" },
-            apps_owner_id_name_key: { _indexName: "apps_owner_id_name_key" },
             apps_pkey: { _indexName: "apps_pkey" },
             apps_slug_key: { _indexName: "apps_slug_key" }
         },

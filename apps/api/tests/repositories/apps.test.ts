@@ -17,7 +17,7 @@ import {
   Value,
 } from '@repo/protocol';
 import type { SQL } from 'bun';
-import { type Queries, schema } from '#db/queries.gen.ts';
+import type { Queries } from '#db/queries.gen.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { AppsRepository, type CreatedApp, LIVE_APP_STATES } from '#repositories/apps.repository.ts';
@@ -771,13 +771,11 @@ describe('an owner may have the apps they were given and no more', () => {
 });
 
 /**
- * The name is what an owner names an app by, so two of theirs answering to it is a command acting
- * on the wrong one. The rule is a partial unique index, and which rows it reaches — one owner's,
- * and only the ones they still have — is the index's own, so it is exercised against Postgres.
+ * A name is what an owner calls an app and nothing the schema holds it to: the id is what an app
+ * is known by, so two of theirs may share a name — exercised against Postgres because a
+ * constraint's absence is only visible where one could be.
  */
-describe('an owner names each app they still have differently', () => {
-  const NAME_KEY = schema.apps._indexes.apps_owner_id_name_key._indexName;
-
+describe('an app is called what its owner said, and so may another', () => {
   function makeApp({ ownerId, name, slug }: { ownerId: OwnerId; name: string; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
     return repo.create({
@@ -801,39 +799,15 @@ describe('an owner names each app they still have differently', () => {
     });
   });
 
-  test('a second app of theirs under the same name is refused', async () => {
-    expect(
-      await refusedBy(() => makeApp({ ownerId: OWNER_ID, name: 'My Blog', slug: 'my-blog-again' })),
-    ).toBe(NAME_KEY);
-  });
-
-  test('somebody else may name theirs the same', async () => {
-    expect(
-      await makeApp({ ownerId: STRANGER_ID, name: 'My Blog', slug: 'my-blog-theirs' }),
-    ).not.toBeNull();
-  });
-
-  test('an app being deleted still holds its name', async () => {
-    const holding = requireCreated(
-      await makeApp({ ownerId: OWNER_ID, name: 'Going', slug: 'going-qx8m2t' }),
+  test('a second app of theirs may be called the same', async () => {
+    const again = requireCreated(
+      await makeApp({ ownerId: OWNER_ID, name: 'My Blog', slug: 'my-blog-again' }),
     );
-    await repo.updateState({
-      appId: holding.app.id,
-      ownerId: OWNER_ID,
-      state: 'deleting',
-      from: LIVE_APP_STATES,
-    });
 
+    expect(again.app).toMatchObject({ name: 'My Blog', slug: 'my-blog-again' });
     expect(
-      await refusedBy(() => makeApp({ ownerId: OWNER_ID, name: 'Going', slug: 'going-again' })),
-    ).toBe(NAME_KEY);
-  });
-
-  test('a deleted app gives its name back', async () => {
-    const [going] = await sql.unsafe(`SELECT id FROM nibrun.apps WHERE slug = 'going-qx8m2t'`);
-    await repo.finishDeleting({ appId: Value.Parse(AppIdSchema, going.id) });
-
-    expect(await makeApp({ ownerId: OWNER_ID, name: 'Going', slug: 'going-again' })).not.toBeNull();
+      (await repo.listByOwner({ ownerId: OWNER_ID })).filter((app) => app.name === 'My Blog'),
+    ).toHaveLength(2);
   });
 
   describe('a rename moves the name and nothing else', () => {
@@ -877,10 +851,6 @@ describe('an owner names each app they still have differently', () => {
       await rename({ name: 'Final Again', ownerId: OWNER_ID });
 
       expect(await configVersions()).toBe(versions);
-    });
-
-    test('a name another app of theirs already has is refused by the same index', async () => {
-      expect(await refusedBy(() => rename({ name: 'My Blog', ownerId: OWNER_ID }))).toBe(NAME_KEY);
     });
 
     test('somebody else cannot rename it', async () => {

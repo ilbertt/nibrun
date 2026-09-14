@@ -515,21 +515,6 @@ describe('retrying is bounded, and only covers collisions', () => {
     expect(appsRepo.offeredSlugs).toHaveLength(MAX_SLUG_ATTEMPTS);
   });
 
-  // The name is the owner's to change, so a second app given it is refused to them rather than
-  // re-rolled — fresh entropy moves the slug and leaves the name exactly where it was.
-  test('a name the owner already gave an app is refused on the first attempt', async () => {
-    const appsRepo = new StubAppsRepository({
-      failures: 1,
-      failure: uniqueViolation(schema.apps._indexes.apps_owner_id_name_key._indexName),
-    });
-
-    const refused = createApp({ appsRepo });
-
-    await expect(refused).rejects.toBeInstanceOf(ConflictError);
-    await expect(refused).rejects.toThrow(`already have an app named ${APP_NAME}`);
-    expect(appsRepo.offeredSlugs).toHaveLength(1);
-  });
-
   // Retrying a violation fresh entropy cannot fix would spend every attempt on the same failure
   // and then report a hostname conflict that never happened.
   test('a unique violation on another constraint is not a collision', async () => {
@@ -857,19 +842,6 @@ describe('an app is renamed by patching its name, and stays where it is served',
     await serviceWith({ appsRepo }).update({ ...owned, patch: { args: ['serve'] } });
 
     expect(appsRepo.offeredPatches).toEqual([{ name: undefined, args: ['serve'] }]);
-  });
-
-  test('a name the owner already gave another app is refused as a conflict', async () => {
-    const appsRepo = new StubAppsRepository({
-      failures: 1,
-      failure: uniqueViolation(schema.apps._indexes.apps_owner_id_name_key._indexName),
-    });
-    appsRepo.owns = true;
-
-    const refused = serviceWith({ appsRepo }).update({ ...owned, patch: { name: NEW_NAME } });
-
-    await expect(refused).rejects.toBeInstanceOf(ConflictError);
-    await expect(refused).rejects.toThrow(`already have an app named ${NEW_NAME}`);
   });
 });
 
