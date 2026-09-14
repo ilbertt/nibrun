@@ -38,6 +38,9 @@ const DomainListSchema = z.object({ hostnames: z.array(AppHostnameSchema) });
 const DomainAddedSchema = z.object({
   slug: z.string(),
   hostname: z.string(),
+  state: z.enum(APP_HOSTNAME_STATES),
+  /** False for a domain the app already had, which adding again asks the edge to check now. */
+  created: z.boolean(),
   records: z.array(DnsRecordSchema),
 });
 
@@ -79,9 +82,24 @@ export const DOMAIN_ADDED_OUTPUT = defineOutput({
     for (const record of value.records) {
       out.step(spell(record));
     }
-    out.done(`${value.hostname} answers once those resolve. Nothing here has to be run again.`);
+    out.done(addedVerdict(value));
   },
 });
+
+/** Three endings for one command, because saying a domain again is the same command as saying it. */
+function addedVerdict({
+  hostname,
+  state,
+  created,
+}: Pick<z.infer<typeof DomainAddedSchema>, 'hostname' | 'state' | 'created'>): string {
+  if (created) {
+    return `${hostname} answers once those resolve. Nothing here has to be run again.`;
+  }
+  if (state === 'pending') {
+    return `${hostname} was already added. It will be checked again shortly; \`nib apps domains\` shows how it went.`;
+  }
+  return `${hostname} already answers.`;
+}
 
 export const DOMAIN_REMOVED_OUTPUT = defineOutput({
   schema: DomainRemovedSchema,
@@ -123,16 +141,21 @@ export async function addAppDomain({
   hostname: string;
 }): Promise<z.input<typeof DomainAddedSchema>> {
   const { app } = await appFor({ api, slug, operation: 'domains' });
-  const added = await addDomain({ api, appId: app.id, hostname });
+  const { hostname: added, created } = await addDomain({ api, appId: app.id, hostname });
 
   return {
     slug: app.slug,
     hostname: added.hostname,
-    records: pendingRecords({
-      hostname: added.hostname,
-      dcvTarget: added.dcvTarget,
-      target: platformTarget({ slug: app.slug, hostnames: app.hostnames }),
-    }),
+    state: added.state,
+    created,
+    records:
+      added.state === 'pending'
+        ? pendingRecords({
+            hostname: added.hostname,
+            dcvTarget: added.dcvTarget,
+            target: platformTarget({ slug: app.slug, hostnames: app.hostnames }),
+          })
+        : [],
   };
 }
 
