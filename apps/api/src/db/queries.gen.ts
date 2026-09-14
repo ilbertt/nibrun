@@ -1374,7 +1374,7 @@ export interface IAppsColumns {
     /** When a host first reported this app's filesystem ready. Its presence is what makes the data no longer creatable. */
     data_initialized_at: Date | null;
     /** What its owner calls the app, and names it by. */
-    name: import("@repo/protocol").AppName | null;
+    name: import("@repo/protocol").AppName;
 }
 
 /** Schema of `apps`. */

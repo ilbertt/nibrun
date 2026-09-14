@@ -77,7 +77,9 @@ async function seedDeployedApp(sql: SQL): Promise<void> {
     `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
      VALUES ('owner', 'owner', 'owner@example.com', true, now(), now())`,
   );
-  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, slug) VALUES ('owner', $1)`, [APP_SLUG]);
+  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, name, slug) VALUES ('owner', $1, $1)`, [
+    APP_SLUG,
+  ]);
   await sql.unsafe(
     `INSERT INTO nibrun.app_hostnames (app_id, hostname, kind, state)
      SELECT id, $1, 'platform', 'active' FROM nibrun.apps WHERE slug = $2`,

@@ -887,8 +887,8 @@ describe('an owner whose apps are given a lifetime is shown when each one ends',
   /** `created_at` is derived from the id, so an app past its hour is one whose id was minted there. */
   test('the sweep is handed each app past its deadline together with its owner', async () => {
     const [row] = (await sql.unsafe(
-      `INSERT INTO nibrun.apps (id, owner_id, slug)
-       VALUES (uuidv7('-2 hours'::interval), $1, 'passed-tern')
+      `INSERT INTO nibrun.apps (id, owner_id, name, slug)
+       VALUES (uuidv7('-2 hours'::interval), $1, 'passed-tern', 'passed-tern')
        RETURNING id`,
       [PASSERBY_ID],
     )) as Array<{ id: AppId }>;

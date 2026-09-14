@@ -241,7 +241,7 @@ async function seedApp(sql: SQL): Promise<void> {
      VALUES ($1, $1, $2, true, now(), now())`,
     [OWNER_ID, `${OWNER_ID}@example.com`],
   );
-  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, slug) VALUES ($1, $2)`, [
+  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, name, slug) VALUES ($1, $2, $2)`, [
     OWNER_ID,
     APP_SLUG,
   ]);
@@ -253,7 +253,7 @@ async function seedStranger(sql: SQL): Promise<AppId> {
      VALUES ($1, $1, $2, true, now(), now())`,
     [STRANGER_ID, `${STRANGER_ID}@example.com`],
   );
-  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, slug) VALUES ($1, $2)`, [
+  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, name, slug) VALUES ($1, $2, $2)`, [
     STRANGER_ID,
     STRANGER_SLUG,
   ]);

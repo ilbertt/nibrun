@@ -105,7 +105,9 @@ async function activate({ sql, slug }: { sql: SQL; slug: string }): Promise<void
  * distinguishes one: nothing was fetched, so there is no url anybody could ask for again.
  */
 async function seedApp({ sql, slug, sourceDigest, activated }: SeededApp): Promise<void> {
-  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, slug) VALUES ('owner', $1)`, [slug]);
+  await sql.unsafe(`INSERT INTO nibrun.apps (owner_id, name, slug) VALUES ('owner', $1, $1)`, [
+    slug,
+  ]);
   await sql.unsafe(
     `INSERT INTO nibrun.artifacts
        (app_id, digest, size_bytes, object_key, original_file_name, original_file_url, source_digest)

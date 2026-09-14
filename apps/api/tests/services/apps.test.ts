@@ -146,8 +146,6 @@ class StubAppsRepository implements AppsRepositoryContract {
   claimed: AppId[] = [];
   /** When the app is due to go, which is null for every app whose owner keeps it. */
   dueAt: Date | null = null;
-  /** An app from before names existed, not yet given one by hand. */
-  unnamed = false;
   /** How many apps this owner is holding, which only a test that creates several ever moves. */
   held = 0;
   /** More than any test makes, except the ones that lower it because they are about the limit. */
@@ -255,7 +253,6 @@ class StubAppsRepository implements AppsRepositoryContract {
       ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)),
       ...configColumns(this.current),
       expires_at: this.dueAt,
-      ...(this.unnamed && { name: null }),
     });
   }
 
@@ -832,20 +829,6 @@ describe('an app the caller does not own is one that does not exist', () => {
     await expect(service.setState({ ...owned, state: 'suspended' })).rejects.toBeInstanceOf(
       NotFoundError,
     );
-  });
-});
-
-/** Every app from before names existed, until each is given one by hand. */
-describe('an app not yet named answers to its slug', () => {
-  test('the slug is what a read returns as the name', async () => {
-    const appsRepo = new StubAppsRepository({ failures: 0 });
-    appsRepo.owns = true;
-    appsRepo.unnamed = true;
-
-    const app = await serviceWith({ appsRepo }).get({ appId: APP_ID, ownerId: OWNER_ID });
-
-    expect(app.name).toBe(Value.Parse(AppNameSchema, APP_NAME));
-    expect(app.slug).toBe(Value.Parse(DnsLabelSchema, APP_NAME));
   });
 });
 
