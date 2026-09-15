@@ -16,6 +16,7 @@ import {
   ObjectKeySchema,
   OWNED_APP_STATES,
   type OwnerId,
+  OwnerIdSchema,
   REDACTED,
   type ReportedInstance,
   type ReportedVolume,
@@ -323,6 +324,17 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve(this.expirable.slice(0, limit));
   }
 
+  /** Whose each app is, for the one statement that moves them all at once. */
+  readonly heldBy = new Map<AppId, OwnerId>();
+
+  reassign({ from, to }: { from: OwnerId; to: OwnerId }): Promise<AppId[]> {
+    const moved = [...this.heldBy].filter(([, owner]) => owner === from).map(([appId]) => appId);
+    for (const appId of moved) {
+      this.heldBy.set(appId, to);
+    }
+    return Promise.resolve(moved);
+  }
+
   listLeftovers({ appId }: { appId: AppId }): Promise<Leftovers> {
     return Promise.resolve(this.leftovers.get(appId) ?? NOTHING_LEFT);
   }
@@ -458,7 +470,12 @@ function createApp({
   appsRepo: AppsRepositoryContract;
   config?: NewAppConfig;
 }) {
-  return serviceWith({ appsRepo }).create({ ownerId: OWNER_ID, name: APP_NAME, config });
+  return serviceWith({ appsRepo }).create({
+    ownerId: OWNER_ID,
+    isAnonymous: false,
+    name: APP_NAME,
+    config,
+  });
 }
 
 describe('a taken hostname is a re-roll, not something the owner sees', () => {
@@ -1486,6 +1503,77 @@ describe('an app whose time is up is deleted as its owner would delete it', () =
 
     expect(appsRepo.deleting).toEqual([]);
     expect(appsRepo.deleted).toEqual([]);
+  });
+});
+
+/**
+ * The statement is SQL, exercised against a database in `tests/repositories/apps.test.ts`. What
+ * this holds the service to is that a claim is the move and nothing else: no count, no refusal.
+ */
+describe("what a stranger held becomes the person's who they signed in as", () => {
+  const STRANGER_ID = Value.Parse(OwnerIdSchema, 'stranger');
+
+  test('every app of theirs changes hands', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.heldBy.set(APP_ID, STRANGER_ID);
+    appsRepo.heldBy.set(SECOND_APP_ID, STRANGER_ID);
+
+    await serviceWith({ appsRepo }).claim({ from: STRANGER_ID, to: OWNER_ID });
+
+    expect(appsRepo.heldBy.get(APP_ID)).toBe(OWNER_ID);
+    expect(appsRepo.heldBy.get(SECOND_APP_ID)).toBe(OWNER_ID);
+  });
+
+  test('a stranger who held nothing hands over nothing, and that is not an error', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await expect(
+      serviceWith({ appsRepo }).claim({ from: STRANGER_ID, to: OWNER_ID }),
+    ).resolves.toBeUndefined();
+  });
+
+  // The person they signed in as may already be at their quota. That is refused at the next
+  // creation, where the number can be named, rather than here, where they were told to sign in
+  // to keep what they had.
+  test('the claim is not counted against the quota', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.allowed = 0;
+    appsRepo.heldBy.set(APP_ID, STRANGER_ID);
+
+    await serviceWith({ appsRepo }).claim({ from: STRANGER_ID, to: OWNER_ID });
+
+    expect(appsRepo.heldBy.get(APP_ID)).toBe(OWNER_ID);
+  });
+});
+
+/**
+ * A raw listener on the public internet is not handed to a person with no identity. Only the
+ * creation that asks for it is refused; an app created without is theirs.
+ */
+describe('a stranger is not given a public port besides HTTP', () => {
+  test('an app created asking for one is refused', async () => {
+    const service = serviceWith({ appsRepo: new StubAppsRepository({ failures: 0 }) });
+
+    await expect(
+      service.create({
+        ownerId: OWNER_ID,
+        isAnonymous: true,
+        name: APP_NAME,
+        config: { hasExtraPublicPort: true },
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test('an app created without asking is theirs', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    const app = await serviceWith({ appsRepo }).create({
+      ownerId: OWNER_ID,
+      isAnonymous: true,
+      name: APP_NAME,
+    });
+
+    expect(app.config.hasExtraPublicPort).toBe(false);
   });
 });
 

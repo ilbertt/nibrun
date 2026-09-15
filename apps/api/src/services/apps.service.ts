@@ -28,6 +28,7 @@ import {
 import { type PublicAppHostname, platformHostname, toAppHostname } from '#lib/app-hostname.ts';
 import { overAppQuota } from '#lib/app-quota.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
+import type { AccountLink } from '#lib/auth/better-auth.ts';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
@@ -164,16 +165,19 @@ export class AppsService extends Service {
    */
   async create({
     ownerId,
+    isAnonymous,
     name,
     config,
   }: {
     ownerId: OwnerId;
+    isAnonymous: boolean;
     name: AppName;
     config?: NewAppConfig;
   }): Promise<PublicApp> {
     const environment = config?.environment ?? {};
     refuseRedactedValues(environment);
     const withDefaults = configWithDefaults(config);
+    refusePortToAStranger({ isAnonymous, hasExtraPublicPort: withDefaults.hasExtraPublicPort });
     refuseValuesNeedingAPort({
       environment,
       hasExtraPublicPort: withDefaults.hasExtraPublicPort,
@@ -608,6 +612,22 @@ export class AppsService extends Service {
       this.logger.error('deleting an expired app failed', { appId, error });
     }
   }
+
+  /**
+   * What a stranger held becomes the person's who they signed in as, and stops being temporary by
+   * the same move: an app is read against its owner's profile, and the profile it lands in keeps
+   * its apps.
+   *
+   * Nothing is counted. The person may now hold more than their quota allows, and that is the
+   * quota's to refuse at the next creation rather than this one's to refuse at the moment they
+   * were told to sign in to keep what they had.
+   */
+  async claim({ from, to }: AccountLink): Promise<void> {
+    const appIds = await this.appsRepo.reassign({ from, to });
+    if (appIds.length > 0) {
+      this.logger.info('apps claimed', { from, to, appIds });
+    }
+  }
 }
 
 /**
@@ -651,6 +671,23 @@ function refuseValuesNeedingAPort({
     throw new BadRequestError(
       `${EXTRA_PUBLIC_PORT_VALUES.map((value) => interpolableRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
     );
+  }
+}
+
+/**
+ * A port besides HTTP is a raw listener on the public internet, and a person with no identity is
+ * handed nothing that reaches past the HTTPS the platform terminates for them. Only creation
+ * asks: changing an app is not a stranger's to do at all.
+ */
+function refusePortToAStranger({
+  isAnonymous,
+  hasExtraPublicPort,
+}: {
+  isAnonymous: boolean;
+  hasExtraPublicPort: boolean;
+}): void {
+  if (hasExtraPublicPort && isAnonymous) {
+    throw new ForbiddenError('Sign in to open a public port besides HTTP.');
   }
 }
 
