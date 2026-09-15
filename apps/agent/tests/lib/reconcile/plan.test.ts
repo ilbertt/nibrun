@@ -205,6 +205,29 @@ describe('volumes are not authoritative', () => {
     expect(plan.volumes[0]?.action).toBe('teardown');
   });
 
+  /**
+   * The case that left an app deleting forever: its volume was never provisioned — the host was
+   * out of slots — so there was nothing to observe, and nothing observed was nothing to tear down.
+   * The teardown is what says `deleted`, and the control plane waits on that sentence whether or
+   * not the filesystem ever existed.
+   */
+  test('an absent volume this host has nothing of is torn down all the same', () => {
+    const plan = planReconcile({
+      desired: desiredState({ volumes: [absent] }),
+      observed: observedState(),
+    });
+    expect(plan.volumes).toEqual([{ action: 'teardown', desired: absent }]);
+  });
+
+  test('a removal already remembered is not made again', () => {
+    const plan = planReconcile({
+      desired: desiredState({ volumes: [absent] }),
+      observed: observedState({ deletedVolumes: [VOLUME_ID] }),
+    });
+    expect(plan.volumes).toEqual([{ action: 'none', volumeId: VOLUME_ID }]);
+    expect(hasDeferredWork(plan)).toBe(false);
+  });
+
   test('a volume still held by an instance is blocked rather than destroyed', () => {
     const plan = planReconcile({
       desired: desiredState({ volumes: [absent] }),

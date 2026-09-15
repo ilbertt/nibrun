@@ -178,7 +178,14 @@ export function observedVolume(overrides: Partial<ObservedVolume> = {}): Observe
 }
 
 export function observedState(overrides: Partial<ObservedState> = {}): ObservedState {
-  return { instances: [], volumes: [], checkpoints: [], exports: [], ...overrides };
+  return {
+    instances: [],
+    volumes: [],
+    deletedVolumes: [],
+    checkpoints: [],
+    exports: [],
+    ...overrides,
+  };
 }
 
 export const LOG_SOURCE = {

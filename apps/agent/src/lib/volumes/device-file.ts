@@ -72,3 +72,33 @@ export const ensureDeviceFile = Effect.fn('ensureDeviceFile')(function* ({
   );
   return target;
 });
+
+export class NotMounted extends Data.TaggedError('NotMounted')<{
+  readonly mount: string;
+}> {
+  override get message() {
+    return `${this.mount} is not a mountpoint`;
+  }
+}
+
+/**
+ * Only ever from a mounted filesystem. Unmounted, `mount` is a directory on the host's own disk
+ * where the file is absent whatever became of the volume, and `force` would read that absence as
+ * the volume being gone — of bytes still on the filesystem behind it, which is the one thing a
+ * removal must never say. A mountpoint is a path on a different device from its parent.
+ */
+export const removeDeviceFile = Effect.fn('removeDeviceFile')(function* ({
+  mount,
+  volumeId,
+}: {
+  mount: string;
+  volumeId: VolumeId;
+}) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const [root, parent] = yield* Effect.all([fs.stat(mount), fs.stat(path.dirname(mount))]);
+  if (root.dev === parent.dev) {
+    return yield* new NotMounted({ mount });
+  }
+  yield* fs.remove(devicePathFor({ mount, volumeId, path }), { force: true });
+});

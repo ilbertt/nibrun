@@ -10,7 +10,12 @@ import {
 import { Array as Arr, Effect, Option } from 'effect';
 import type { AppSlot } from '#lib/network/slot.ts';
 import type { ObservedVolume } from '#lib/reconcile/plan.ts';
-import { devicePathFor, ensureDeviceFile, NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
+import {
+  devicePathFor,
+  ensureDeviceFile,
+  NBD_DIRECTORY,
+  removeDeviceFile,
+} from '#lib/volumes/device-file.ts';
 import { format } from '#lib/volumes/ext4.ts';
 import { detach, isUsable, reattach } from '#lib/volumes/nbd.ts';
 import { formatFromSeed } from '#lib/volumes/seed.ts';
@@ -183,10 +188,7 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
       if (Option.isSome(slot)) {
         yield* detach(slot.value.nbdDevicePath);
       }
-      yield* fs.remove(
-        devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId, path }),
-        { force: true },
-      );
+      yield* removeDeviceFile({ mount: filesystem.mountPath, volumeId: desired.volumeId });
       yield* allocator.release(desired.appId);
       // `deleted` rather than `deleting`: everything above has already happened, and the control
       // plane finishes deleting the app on the strength of this.
