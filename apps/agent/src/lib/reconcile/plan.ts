@@ -49,6 +49,11 @@ export type ObservedExport = {
 export type ObservedState = {
   readonly instances: readonly ObservedInstance[];
   readonly volumes: readonly ObservedVolume[];
+  /**
+   * Remembered rather than observed, like `exports`: a removal leaves nothing on disk to find it
+   * by, and it is held until the control plane stops naming the volume.
+   */
+  readonly deletedVolumes: readonly VolumeId[];
   readonly checkpoints: readonly ObservedCheckpoint[];
   readonly exports: readonly ObservedExport[];
 };
@@ -217,6 +222,7 @@ function planVolumes({
   observed: ObservedState;
 }): VolumePlan[] {
   const observedById = byId({ items: observed.volumes, key: (volume) => volume.volumeId });
+  const deleted = new Set(observed.deletedVolumes);
   const usedBy = new Map<VolumeId, AppId[]>();
   for (const instance of observed.instances) {
     if (!instance.present || instance.volumeId === undefined) {
@@ -237,9 +243,12 @@ function planVolumes({
       if (holders.length > 0) {
         return { action: 'blocked', desired: wanted, blockedBy: holders };
       }
-      return current
-        ? { action: 'teardown', desired: wanted }
-        : { action: 'none', volumeId: wanted.volumeId };
+      // Torn down whether or not anything was found: the teardown is what says `deleted`, and a
+      // volume this host was never able to create is one the control plane is still waiting to
+      // hear is gone. Only a removal already remembered has nothing left to say.
+      return current === undefined && deleted.has(wanted.volumeId)
+        ? { action: 'none', volumeId: wanted.volumeId }
+        : { action: 'teardown', desired: wanted };
     }
     if (!current?.attached || current.sizeBytes < wanted.sizeBytes) {
       return { action: 'provision', desired: wanted };

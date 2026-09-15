@@ -113,6 +113,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
         volumes: yield* volumes
           .observe(volumeOwners({ desired, records: current.records }))
           .pipe(Effect.orElseSucceed(() => [])),
+        deletedVolumes: [...current.deletedVolumes.keys()],
         checkpoints: [],
         exports: [...current.exportReports.values()].map((report) => ({
           exportId: report.exportId,
