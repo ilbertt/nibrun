@@ -193,16 +193,6 @@ export interface ISelectAppsAllowedResult {
     apps_allowed: IProfilesColumns["quota_apps_max_count"];
 }
 
-/** Result of query `SelectProfileForAppCreate`. */
-export interface ISelectProfileForAppCreateResult {
-    owner_id: IProfilesColumns["owner_id"];
-}
-
-/** Result of query `SelectAppsLeft`. */
-export interface ISelectAppsLeftResult {
-    apps_left: number;
-}
-
 /** Result of query `InsertApp`. */
 export interface IInsertAppResult {
     id: IAppsColumns["id"];
@@ -477,6 +467,21 @@ export interface ISelectCurrentAppConfigResult {
 /** Result of query `InsertPatchedAppConfig`. */
 export interface IInsertPatchedAppConfigResult {
     id: IAppConfigsColumns["id"];
+}
+
+/** Result of query `SelectProfileForAppCreate`. */
+export interface ISelectProfileForAppCreateResult {
+    owner_id: IProfilesColumns["owner_id"];
+}
+
+/** Result of query `SelectAppsLeft`. */
+export interface ISelectAppsLeftResult {
+    apps_left: number;
+}
+
+/** Result of query `SelectAnonymousAppsHeld`. */
+export interface ISelectAnonymousAppsHeldResult {
+    held: number;
 }
 
 /** Result of query `SelectAppAsChanged`. */
@@ -991,8 +996,6 @@ export interface Queries {
     DeleteDisposableAppHostname: IDeleteDisposableAppHostnameResult;
     SelectAppOwnership: ISelectAppOwnershipResult;
     SelectAppsAllowed: ISelectAppsAllowedResult;
-    SelectProfileForAppCreate: ISelectProfileForAppCreateResult;
-    SelectAppsLeft: ISelectAppsLeftResult;
     InsertApp: IInsertAppResult;
     InsertAppConfig: IInsertAppConfigResult;
     InsertAppHostname: IInsertAppHostnameResult;
@@ -1017,6 +1020,9 @@ export interface Queries {
     DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
+    SelectProfileForAppCreate: ISelectProfileForAppCreateResult;
+    SelectAppsLeft: ISelectAppsLeftResult;
+    SelectAnonymousAppsHeld: ISelectAnonymousAppsHeldResult;
     SelectAppAsChanged: ISelectAppAsChangedResult;
     SelectAppForOnlyArtifact: ISelectAppForOnlyArtifactResult;
     SelectArtifactHeldByApp: ISelectArtifactHeldByAppResult;
