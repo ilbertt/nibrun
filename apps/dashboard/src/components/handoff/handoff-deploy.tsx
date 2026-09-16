@@ -1,4 +1,5 @@
 import { deploySuggestion } from '@repo/deploy-link';
+import { ANONYMOUS_APP_LIFETIME_MINUTES } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import {
   Card,
@@ -35,7 +36,8 @@ export function HandoffDeploy({ binary }: { binary: File | undefined }) {
               what not signing in gets. */}
           {session === null && (
             <CardDescription>
-              No account needed. It runs for an hour; sign in to keep it.
+              No account needed. It runs for {ANONYMOUS_APP_LIFETIME_MINUTES} minutes; sign in to
+              keep it.
             </CardDescription>
           )}
         </CardHeader>
