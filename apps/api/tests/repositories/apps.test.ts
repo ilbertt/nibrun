@@ -24,7 +24,12 @@ import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
-import { AppsRepository, type CreatedApp, LIVE_APP_STATES } from '#repositories/apps.repository.ts';
+import {
+  type AppCreation,
+  AppsRepository,
+  type CreatedApp,
+  LIVE_APP_STATES,
+} from '#repositories/apps.repository.ts';
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
@@ -86,9 +91,9 @@ function sealed(entries: Record<string, string>) {
 const AMPLE = 100;
 
 /** Every test creating an app wants one, so the quota refusal is the caller's to ask for. */
-function requireCreated(created: CreatedApp | null): CreatedApp {
-  if (!created) {
-    throw new Error('The owner had no room for another app.');
+function requireCreated(created: AppCreation): CreatedApp {
+  if (created.outcome !== 'created') {
+    throw new Error(`The app was not created: ${created.outcome}.`);
   }
   return created;
 }
@@ -98,6 +103,7 @@ async function createApp(slug: string): Promise<AppId> {
   const label = Value.Parse(DnsLabelSchema, slug);
   const created = requireCreated(
     await repo.create({
+      anonymousAppsAtMost: null,
       ownerId: OWNER_ID,
       name: Value.Parse(AppNameSchema, slug),
       slug: label,
@@ -145,6 +151,7 @@ describe('a config patch carries forward every variable it says nothing about', 
   beforeAll(async () => {
     const created = requireCreated(
       await repo.create({
+        anonymousAppsAtMost: null,
         ownerId: OWNER_ID,
         name: Value.Parse(AppNameSchema, APP_SLUG),
         slug: APP_SLUG,
@@ -680,15 +687,17 @@ describe('an owner may have the apps they were given and no more', () => {
   const BY_DEFAULT = 3;
   const GRANTED = 5;
 
-  function makeApp({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
+  async function makeApp({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
-    return repo.create({
+    const created = await repo.create({
+      anonymousAppsAtMost: null,
       ownerId,
       name: Value.Parse(AppNameSchema, slug),
       slug: label,
       hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
       config: { ...configWithDefaults(), environment: {} },
     });
+    return created.outcome;
   }
 
   beforeAll(async () => {
@@ -708,10 +717,10 @@ describe('an owner may have the apps they were given and no more', () => {
 
   test('the app past the quota is declined rather than written', async () => {
     for (let made = 0; made < BY_DEFAULT; made++) {
-      expect(await makeApp({ ownerId: HOARDER_ID, slug: `hoard-${made}` })).not.toBeNull();
+      expect(await makeApp({ ownerId: HOARDER_ID, slug: `hoard-${made}` })).toBe('created');
     }
 
-    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-over' })).toBeNull();
+    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-over' })).toBe('over-quota');
     expect(await repo.listByOwner({ ownerId: HOARDER_ID })).toHaveLength(BY_DEFAULT);
   });
 
@@ -722,7 +731,7 @@ describe('an owner may have the apps they were given and no more', () => {
     }
     await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [first.id]);
 
-    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-again' })).not.toBeNull();
+    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-again' })).toBe('created');
   });
 
   /** A suspended app is one its owner can bring back, so it is one they are still holding. */
@@ -733,7 +742,7 @@ describe('an owner may have the apps they were given and no more', () => {
     }
     await sql.unsafe(`UPDATE nibrun.apps SET state = 'suspended' WHERE id = $1`, [first.id]);
 
-    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-suspended' })).toBeNull();
+    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-suspended' })).toBe('over-quota');
   });
 
   /**
@@ -755,7 +764,7 @@ describe('an owner may have the apps they were given and no more', () => {
       attempts.map((index) => makeApp({ ownerId: RACER_ID, slug: `racer-${index}` })),
     );
 
-    expect(asked.filter((made) => made !== null)).toHaveLength(BY_DEFAULT);
+    expect(asked.filter((made) => made === 'created')).toHaveLength(BY_DEFAULT);
     expect(await repo.listByOwner({ ownerId: RACER_ID })).toHaveLength(BY_DEFAULT);
   });
 
@@ -767,9 +776,9 @@ describe('an owner may have the apps they were given and no more', () => {
     ]);
 
     for (let made = 0; made < GRANTED; made++) {
-      expect(await makeApp({ ownerId: FRIEND_ID, slug: `friend-${made}` })).not.toBeNull();
+      expect(await makeApp({ ownerId: FRIEND_ID, slug: `friend-${made}` })).toBe('created');
     }
-    expect(await makeApp({ ownerId: FRIEND_ID, slug: 'friend-over' })).toBeNull();
+    expect(await makeApp({ ownerId: FRIEND_ID, slug: 'friend-over' })).toBe('over-quota');
 
     expect(await repo.appsAllowed({ ownerId: FRIEND_ID })).toBe(GRANTED);
     expect(await repo.appsAllowed({ ownerId: HOARDER_ID })).toBe(BY_DEFAULT);
@@ -785,6 +794,7 @@ describe('an app is called what its owner said, and so may another', () => {
   function makeApp({ ownerId, name, slug }: { ownerId: OwnerId; name: string; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
     return repo.create({
+      anonymousAppsAtMost: null,
       ownerId,
       name: Value.Parse(AppNameSchema, name),
       slug: label,
@@ -893,6 +903,7 @@ describe('an owner whose apps are given a lifetime is shown when each one ends',
     const slug = Value.Parse(DnsLabelSchema, 'passing-tern');
     const created = requireCreated(
       await repo.create({
+        anonymousAppsAtMost: null,
         ownerId: PASSERBY_ID,
         name: Value.Parse(AppNameSchema, slug),
         slug,
@@ -956,6 +967,7 @@ describe('every app a stranger held changes hands at once', () => {
     const label = Value.Parse(DnsLabelSchema, slug);
     const created = requireCreated(
       await repo.create({
+        anonymousAppsAtMost: null,
         ownerId: PASSERBY_ID,
         name: Value.Parse(AppNameSchema, slug),
         slug: label,
@@ -1020,6 +1032,7 @@ describe("a stranger's app takes one binary and one deployment", () => {
     const label = Value.Parse(DnsLabelSchema, slug);
     const created = requireCreated(
       await repo.create({
+        anonymousAppsAtMost: null,
         ownerId: STRANGER_ID,
         name: Value.Parse(AppNameSchema, slug),
         slug: label,
@@ -1118,5 +1131,98 @@ describe("a stranger's app takes one binary and one deployment", () => {
     );
 
     expect(asked.filter((one) => one.outcome === 'created')).toHaveLength(1);
+  });
+});
+
+/**
+ * The count behind strangers holding so many apps between them and no more. What only the database
+ * can show is the race: strangers arriving together must not each count the same number and each
+ * take a place past the ceiling — which is what the advisory lock across the count and the insert
+ * is for.
+ *
+ * What strangers hold is what has a deadline, so the owners here are given a lifetime rather than
+ * signed in without an identity: the ceiling reads nibrun's own rows.
+ */
+describe('strangers hold so many apps between them and no more', () => {
+  const CEILING = 2;
+  const AT_ONCE = 6;
+  const AN_HOUR_SECONDS = 3600;
+
+  const strangers = ['first-stranger', 'second-stranger', 'third-stranger'].map((id) =>
+    Value.Parse(OwnerIdSchema, id),
+  );
+
+  /** The apps with a deadline are what the ceiling counts, and the describes above left some. */
+  function clearWhatStrangersHold(): Promise<unknown> {
+    return sql.unsafe(
+      `UPDATE nibrun.apps a SET state = 'deleted'
+       FROM nibrun.profiles p
+       WHERE p.owner_id = a.owner_id AND p.app_lifetime_seconds IS NOT NULL`,
+    );
+  }
+
+  beforeAll(async () => {
+    await clearWhatStrangersHold();
+    for (const id of strangers) {
+      await sql.unsafe(
+        `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+         VALUES ($1, $1, $2, true, now(), now())`,
+        [id, `${id}@example.com`],
+      );
+      await sql.unsafe(
+        'UPDATE nibrun.profiles SET quota_apps_max_count = $2, app_lifetime_seconds = $3 WHERE owner_id = $1',
+        [id, AMPLE, AN_HOUR_SECONDS],
+      );
+    }
+  });
+
+  async function arrive({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
+    const label = Value.Parse(DnsLabelSchema, slug);
+    const created = await repo.create({
+      ownerId,
+      anonymousAppsAtMost: CEILING,
+      name: Value.Parse(AppNameSchema, slug),
+      slug: label,
+      hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+      config: { ...configWithDefaults(), environment: {} },
+    });
+    return created.outcome;
+  }
+
+  test('the stranger past the ceiling is declined, whoever the others were', async () => {
+    const [first, second, third] = strangers as [OwnerId, OwnerId, OwnerId];
+
+    expect(await arrive({ ownerId: first, slug: 'ceiling-first' })).toBe('created');
+    expect(await arrive({ ownerId: second, slug: 'ceiling-second' })).toBe('created');
+    expect(await arrive({ ownerId: third, slug: 'ceiling-third' })).toBe('at-capacity');
+  });
+
+  /** The number is the platform's, so a person with an identity is not what it is counting. */
+  test('an owner with an identity is not held to it', async () => {
+    expect(await createApp('ceiling-somebody')).toBeDefined();
+  });
+
+  test('a place freed by an app going is a place the next stranger takes', async () => {
+    const [first, , third] = strangers as [OwnerId, OwnerId, OwnerId];
+    const [held] = await repo.listByOwner({ ownerId: first });
+    if (!held) {
+      throw new Error('The stranger from the test above has no app.');
+    }
+    await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [held.id]);
+
+    expect(await arrive({ ownerId: third, slug: 'ceiling-freed' })).toBe('created');
+  });
+
+  test('strangers arriving at the same time cannot each take a place past the ceiling', async () => {
+    await clearWhatStrangersHold();
+    const [first] = strangers as [OwnerId, OwnerId, OwnerId];
+
+    const asked = await Promise.all(
+      [...Array(AT_ONCE).keys()].map((index) =>
+        arrive({ ownerId: first, slug: `ceiling-raced-${index}` }),
+      ),
+    );
+
+    expect(asked.filter((one) => one === 'created')).toHaveLength(CEILING);
   });
 });
