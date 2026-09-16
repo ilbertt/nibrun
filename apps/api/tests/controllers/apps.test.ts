@@ -1,9 +1,33 @@
 import { describe, expect, test } from 'bun:test';
 import { StatusMap } from 'elysia';
-import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
+import { ORIGIN, type Route, routesUnder, sendJson } from '#tests/controllers/support/api.ts';
 
 const APPS_URL = `${ORIGIN}/api/apps`;
 const APP_URL = `${APPS_URL}/app-1`;
+
+// The routes this file answers for: the app collection, one app, and its state. Everything
+// deeper has a suite of its own.
+const OWN_ROUTE = /^\/api\/apps(\/:appId(\/state)?)?$/;
+
+// A well-formed body for every route that takes one, so what refuses it is the missing session
+// and not the shape — the schema is checked before the session is. Keyed by the route as the app
+// lists it, which is what makes a route these controllers gain without a line here a failure
+// rather than a route nobody asked about.
+const A_BODY: Record<string, unknown> = {
+  'POST /api/apps': { name: 'pocketbase' },
+  'PATCH /api/apps/:appId': {},
+  'PUT /api/apps/:appId/state': { state: 'suspended' },
+};
+
+const BODILESS = new Set(['GET', 'DELETE']);
+
+function asRequest({ method, path }: Route) {
+  const body = A_BODY[`${method} ${path}`];
+  if (body === undefined && !BODILESS.has(method)) {
+    throw new Error(`${method} ${path} takes a body this suite does not know: add one to A_BODY.`);
+  }
+  return { method, url: `${ORIGIN}${path.replace(':appId', 'app-1')}`, body };
+}
 
 // Well-formed on its own terms, so what refuses it is the api owning the field rather than the
 // value being wrong.
@@ -23,19 +47,19 @@ const A_RESTART_POLICY = {
   resetAfterMs: 60_000,
 };
 
-const OWNED_ROUTES = [
-  { method: 'GET', url: APPS_URL },
-  { method: 'POST', url: APPS_URL, body: { name: 'pocketbase' } },
-  { method: 'GET', url: APP_URL },
-  { method: 'PATCH', url: APP_URL, body: {} },
-  { method: 'PUT', url: `${APP_URL}/state`, body: { state: 'suspended' } },
-  { method: 'DELETE', url: APP_URL },
-];
+const OWNED_ROUTES = routesUnder('/api/apps').filter(({ path }) => OWN_ROUTE.test(path));
+
+// Restated rather than derived, so a route these controllers gain or lose is noticed here.
+const OWN_ROUTE_COUNT = 6;
 
 describe('nothing under /api/apps answers a caller with no session', () => {
-  test.each(OWNED_ROUTES)('$method $url is refused', async (route) => {
+  test('the app lists the routes this suite expects to answer for', () => {
+    expect(OWNED_ROUTES).toHaveLength(OWN_ROUTE_COUNT);
+  });
+
+  test.each(OWNED_ROUTES)('$method $path is refused', async (route) => {
     // Unauthorized rather than Not Found: every route is mounted, each one refuses to serve.
-    expect((await sendJson(route)).status).toBe(StatusMap.Unauthorized);
+    expect((await sendJson(asRequest(route))).status).toBe(StatusMap.Unauthorized);
   });
 
   // A path segment is a plain string until a handler parses it, so a malformed one is refused

@@ -31,6 +31,13 @@ export function createAuth() {
         clientSecret: env.GITHUB_CLIENT_SECRET,
       },
     },
+    // The column 0046 added for the anonymous plugin, declared here until the plugin is: what a
+    // route asks of a session is decided by it, and nothing writes it yet.
+    user: {
+      additionalFields: {
+        isAnonymous: { type: 'boolean', required: false, input: false },
+      },
+    },
     plugins: [deviceAuthorization({ verificationUri: DEVICE_VERIFICATION_PATH }), bearer()],
   });
 }
