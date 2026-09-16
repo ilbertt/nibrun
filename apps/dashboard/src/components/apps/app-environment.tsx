@@ -1,5 +1,6 @@
 import { AppEnvironmentDialog } from '#components/apps/app-environment-dialog.tsx';
 import { storedNames } from '#lib/environment-variables.ts';
+import { useIsAnonymous } from '#lib/hooks/use-is-anonymous.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 // Enough to recognise the app by what it is configured with. The rest are a count, because a card
@@ -10,12 +11,14 @@ const NAMES_SHOWN = 5;
 export function AppEnvironment({ app }: { app: AppSummary }) {
   const names = storedNames(app);
   const beyond = names.length - NAMES_SHOWN;
+  // Editing them changes the app, which waits for an identity.
+  const editable = !useIsAnonymous();
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-4">
         <span className="text-muted-foreground">Environment variables</span>
-        <AppEnvironmentDialog app={app} />
+        {editable && <AppEnvironmentDialog app={app} />}
       </div>
       {names.length === 0 ? (
         <span className="text-muted-foreground">

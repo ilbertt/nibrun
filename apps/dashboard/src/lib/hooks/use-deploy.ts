@@ -13,6 +13,8 @@ import type { TenantArguments, TenantEnvironmentPatch } from '@repo/protocol';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 import { browserUpload } from '#lib/browser-upload.ts';
+import { useAnonymousSignIn } from '#lib/hooks/use-anonymous-sign-in.ts';
+import { useSession } from '#lib/hooks/use-session.ts';
 
 type Configured = {
   args: TenantArguments;
@@ -63,9 +65,16 @@ export function useDeploy({
   onDeployed: ((deployed: Deployed) => void) | undefined;
 }): DeployMutation {
   const queryClient = useQueryClient();
+  const session = useSession();
+  const signInAnonymously = useAnonymousSignIn();
 
   return useMutation<Deployed, Error, ReleaseRequest>({
     mutationFn: async (request) => {
+      // A deploy is the one thing a visitor with no session may ask for, and asking is what makes
+      // them a stranger: nothing is minted for a visit that never presses the button.
+      if (session === null) {
+        await signInAnonymously();
+      }
       const deployed = carriesBinary(request)
         ? await deploy({
             api,
