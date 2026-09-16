@@ -181,11 +181,12 @@ Everything the binary can count on, and nothing else:
 | --- | --- |
 | Platform | Linux **x86_64**, glibc (Debian rootfs) |
 | Working directory | `/app` — a tmpfs the app does not own |
-| Persistent volume | `/app/data` — 8 GiB, survives every redeploy. `NIBRUN_DATA_DIR` names it |
+| Persistent volume | `/app/data` — 8 GiB, survives every redeploy. `NIBRUN_DATA_DIR` names it. Not `noexec`: a file unpacked here can be exec'd in place |
 | Port | `NIBRUN_HTTP_PORT`, and `PORT` beside it; the app **must** listen on it, on `0.0.0.0` |
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
 | Second port | Only with `--extra-public-port`: `NIBRUN_EXTRA_PUBLIC_PORT` on `NIBRUN_PUBLIC_IPV4`, TCP and UDP, assigned rather than chosen, and reached at that number and no other |
-| Ephemeral | `TMPDIR=/tmp` is a tmpfs and is lost on restart. So is everything outside `/app/data` |
+| Ephemeral | `TMPDIR=/tmp` is a tmpfs of **64 MiB** — a quarter of the RAM — and is lost on restart. So is everything outside `/app/data` |
+| Programs | None beside yours: no shell, no `tar`, no `unzip`, nothing on `$PATH`. Spawning one dies `Executable not found in $PATH` |
 | Resources | 1 vCPU, 256 MiB RAM |
 | `HOME` | `/app`, which the app cannot write: a binary that puts a cache or a config file under `~` dies of `EACCES` before it ever serves. `/app/data` is the only path it can write |
 | URL | `https://<slug>.nibrun.app`, live as soon as it boots |
@@ -195,6 +196,11 @@ and any of them you set yourself is ignored, as is `PORT`, which carries the sam
 `NIBRUN_HTTP_PORT` under the name every other host uses. `HOME` and `TMPDIR` are defaults rather
 than fixed, so one you set yourself is what the binary reads — `HOME=${NIBRUN_DATA_DIR}` is how a
 binary that insists on writing under `~` is given a home it owns.
+
+A launcher that carries a runtime and unpacks it at boot — a `node` and a Next standalone build,
+say — meets all three at once: it unpacks with its own code rather than `tar`, into `/app/data`
+rather than `/tmp` (a `node` alone is larger than `/tmp`), and execs from there. Copying out to
+`/tmp` first is what a `noexec` volume elsewhere would need, and this one is not.
 
 A binary that needs its own absolute URL — an OAuth redirect, a webhook it registers, a link in
 an email — builds it from `NIBRUN_HOSTNAME` rather than being told it, and falls back to whatever
