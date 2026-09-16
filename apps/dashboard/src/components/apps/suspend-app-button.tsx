@@ -37,15 +37,16 @@ export function SuspendAppButton({ availability }: { availability: AppActionAvai
   const suspended = app.data?.state === 'suspended';
   const Icon = suspended ? PlayIcon : PauseIcon;
   const moving = status.status?.kind === 'transition' ? status.status.label : undefined;
-  const waiting = availability.kind === 'disabled' || suspension.isPending;
+  // Greyed is not always waiting: a stranger's button stays greyed, and a spinner would say otherwise.
+  const busy = moving !== undefined || suspension.isPending;
 
   return (
     <Button
       variant="outline"
-      disabled={waiting}
+      disabled={availability.kind === 'disabled' || suspension.isPending}
       onClick={() => suspension.mutate(suspended ? 'active' : 'suspended')}
     >
-      {waiting ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" />}
+      {busy ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" />}
       {moving ? WHILE_MOVING[moving] : suspended ? 'Resume' : 'Suspend'}
     </Button>
   );
