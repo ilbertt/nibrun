@@ -9,10 +9,10 @@ const LEAVING = 'departing';
 const STRANGER = 'unnamed';
 const CLAIMANT = 'claimant';
 
-// What the migrations give a stranger: the two numbers 0048 writes, restated so a change to
-// either is a change here too.
+// What the migrations give a stranger: the two numbers 0048 and 0053 write, restated so a change
+// to either is a change here too.
 const ONE_APP = 1;
-const ONE_HOUR_SECONDS = 3600;
+const FIFTEEN_MINUTES_SECONDS = 900;
 const MS_PER_SECOND = 1000;
 
 // The defaults a person with an identity gets — the column default, and no lifetime at all.
@@ -135,7 +135,7 @@ describe('a person nibrun has signed up has a profile from the moment they exist
     expect(await profileFor(LEAVING)).toBeUndefined();
   });
 
-  describe('a person who arrived without an identity is given one app for an hour', () => {
+  describe('a person who arrived without an identity is given one app for fifteen minutes', () => {
     beforeAll(async () => {
       await arriveWithoutAnIdentity(STRANGER);
       await signUp(CLAIMANT);
@@ -144,24 +144,28 @@ describe('a person nibrun has signed up has a profile from the moment they exist
     test('their profile says so in the two numbers', async () => {
       expect(await profileFor(STRANGER)).toMatchObject({
         quota_apps_max_count: ONE_APP,
-        app_lifetime_seconds: ONE_HOUR_SECONDS,
+        app_lifetime_seconds: FIFTEEN_MINUTES_SECONDS,
       });
     });
 
-    test('their app is due an hour after it was made', async () => {
+    test('their app is due fifteen minutes after it was made', async () => {
       const appId = await createAppAgo({ ownerId: STRANGER, slug: 'just-now', ago: '0' });
 
       const deadline = await deadlineFor(appId);
       const made = await createdAt(appId);
 
       expect(deadline?.expires_at.getTime()).toBe(
-        made.getTime() + ONE_HOUR_SECONDS * MS_PER_SECOND,
+        made.getTime() + FIFTEEN_MINUTES_SECONDS * MS_PER_SECOND,
       );
       expect(await expirable()).not.toContainEqual({ app_id: appId, owner_id: STRANGER });
     });
 
-    test('once the hour has passed the app is listed to be deleted, as its owner', async () => {
-      const appId = await createAppAgo({ ownerId: STRANGER, slug: 'two-hours', ago: '-2 hours' });
+    test('once the fifteen minutes have passed the app is listed to be deleted, as its owner', async () => {
+      const appId = await createAppAgo({
+        ownerId: STRANGER,
+        slug: 'half-an-hour-ago',
+        ago: '-30 minutes',
+      });
 
       expect(await expirable()).toContainEqual({ app_id: appId, owner_id: STRANGER });
     });
