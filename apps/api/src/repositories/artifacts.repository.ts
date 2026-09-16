@@ -16,7 +16,15 @@ export type InsertPendingArtifactInput = {
   // What the download was held to, where anybody said. Null is every upload, every url nobody
   // vouched for, and every url whose bytes are not this api's to hand on.
   sourceDigest: Sha256Digest | null;
+  // Whether the app takes this one artifact and no other, pending or not.
+  onlyOne: boolean;
 };
+
+/** `held` is an app asked to take only one artifact that already has one. */
+export type PendingArtifactInsert =
+  | { outcome: 'created'; row: PendingArtifactRow }
+  | { outcome: 'no-app' }
+  | { outcome: 'held' };
 
 export type CompleteArtifactInput = {
   appId: AppId;
@@ -28,7 +36,7 @@ export type CompleteArtifactInput = {
 };
 
 export abstract class ArtifactsRepositoryContract {
-  abstract insertPending(input: InsertPendingArtifactInput): Promise<PendingArtifactRow | null>;
+  abstract insertPending(input: InsertPendingArtifactInput): Promise<PendingArtifactInsert>;
   abstract complete(input: CompleteArtifactInput): Promise<ArtifactRow | null>;
   abstract remove(input: { appId: AppId; artifactId: ArtifactId; ownerId: OwnerId }): Promise<void>;
   abstract findPending(input: {
@@ -51,21 +59,50 @@ export abstract class ArtifactsRepositoryContract {
  * read that returns one carries it. A row without it names bytes that may never arrive.
  */
 export class ArtifactsRepository extends Repository implements ArtifactsRepositoryContract {
-  async insertPending({
+  /**
+   * An app that takes only one is counted and written in one transaction with its row locked,
+   * for the reason the app quota is: requests arriving together would otherwise each count none
+   * and each take the one place. The count is its own statement rather than a predicate on the
+   * insert, because a statement's snapshot is taken before it blocks — a predicate would count
+   * the artifacts as they were before the transaction it waited for committed.
+   *
+   * Pending rows count. An upload still in flight is the place already taken, or a stranger
+   * would start as many as they like and complete one.
+   */
+  insertPending({
     appId,
     ownerId,
     originalFileName,
     originalFileUrl,
     sourceDigest,
-  }: InsertPendingArtifactInput): Promise<PendingArtifactRow | null> {
-    const [row] = await this.sql.InsertPendingArtifact`
-      INSERT INTO nibrun.artifacts (app_id, original_file_name, original_file_url, source_digest)
-      SELECT a.id, ${originalFileName}, ${originalFileUrl}, ${sourceDigest}
-      FROM nibrun.live_apps a
-      WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      RETURNING id, app_id, original_file_name, original_file_url, created_at
-    `;
-    return row ?? null;
+    onlyOne,
+  }: InsertPendingArtifactInput): Promise<PendingArtifactInsert> {
+    return this.sql.begin(async (tx): Promise<PendingArtifactInsert> => {
+      if (onlyOne) {
+        const [locked] = await tx.SelectAppForOnlyArtifact`
+          SELECT a.id FROM nibrun.live_apps a
+          WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+          FOR UPDATE
+        `;
+        if (!locked) {
+          return { outcome: 'no-app' };
+        }
+        const [held] = await tx.SelectArtifactHeldByApp`
+          SELECT ar.id FROM nibrun.artifacts ar WHERE ar.app_id = ${appId} LIMIT 1
+        `;
+        if (held) {
+          return { outcome: 'held' };
+        }
+      }
+      const [row] = await tx.InsertPendingArtifact`
+        INSERT INTO nibrun.artifacts (app_id, original_file_name, original_file_url, source_digest)
+        SELECT a.id, ${originalFileName}, ${originalFileUrl}, ${sourceDigest}
+        FROM nibrun.live_apps a
+        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+        RETURNING id, app_id, original_file_name, original_file_url, created_at
+      `;
+      return row ? { outcome: 'created', row } : { outcome: 'no-app' };
+    });
   }
 
   /**

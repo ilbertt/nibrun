@@ -29,13 +29,20 @@ import {
 } from '#lib/artifact-digest.ts';
 import { carriesCredentials, filenameFromUrl, withoutCredentials } from '#lib/binary-url.ts';
 import { describeMachine } from '#lib/elf.ts';
-import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+  TooManyRequestsError,
+} from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
   ArtifactRow,
   ArtifactsRepositoryContract,
+  PendingArtifactInsert,
+  PendingArtifactRow,
 } from '#repositories/artifacts.repository.ts';
 import {
   type BinarySource,
@@ -63,6 +70,9 @@ const UNNAMED_BINARY =
 const NOTHING_FETCHED = 'The url answered with no body.';
 const TOO_MANY_REDIRECTS = 'The url redirected more times than nibrun will follow.';
 const NOT_AN_EXECUTABLE = 'The artifact is not a Linux executable.';
+// A stranger's app takes one binary. Not counted, because the number is one and the refusal is
+// what to do about it.
+const ONE_BINARY = 'Sign in to upload another binary to this app.';
 
 /**
  * A binary being fetched passes through this process, which is the cost signing an upload away was
@@ -320,11 +330,13 @@ export class ArtifactsService extends Service {
   async create({
     appId,
     ownerId,
+    isAnonymous,
     filename,
     sizeBytes,
   }: {
     appId: AppId;
     ownerId: OwnerId;
+    isAnonymous: boolean;
     filename: Filename;
     sizeBytes: number;
   }): Promise<ArtifactUpload> {
@@ -335,16 +347,16 @@ export class ArtifactsService extends Service {
       throw new BadRequestError(TOO_LARGE);
     }
 
-    const pending = await this.artifactsRepo.insertPending({
-      appId,
-      ownerId,
-      originalFileName: filename,
-      originalFileUrl: null,
-      sourceDigest: null,
-    });
-    if (!pending) {
-      throw new NotFoundError(NO_SUCH_APP);
-    }
+    const pending = takenPlace(
+      await this.artifactsRepo.insertPending({
+        appId,
+        ownerId,
+        originalFileName: filename,
+        originalFileUrl: null,
+        sourceDigest: null,
+        onlyOne: isAnonymous,
+      }),
+    );
 
     const url = await this.storageRepo.signUpload({
       objectKey: stagingKey({ appId, artifactId: pending.id }),
@@ -412,11 +424,13 @@ export class ArtifactsService extends Service {
   async createFromUrl({
     appId,
     ownerId,
+    isAnonymous,
     url,
     sha256,
   }: {
     appId: AppId;
     ownerId: OwnerId;
+    isAnonymous: boolean;
     url: string;
     sha256?: Sha256Digest | undefined;
   }): Promise<Artifact> {
@@ -437,7 +451,8 @@ export class ArtifactsService extends Service {
     const sourceDigest =
       expected !== undefined && !carriesCredentials(url) ? expected.digest : null;
 
-    const reused = await this.reuse({ appId, ownerId, url: said, sourceDigest });
+    const onlyOne = isAnonymous;
+    const reused = await this.reuse({ appId, ownerId, onlyOne, url: said, sourceDigest });
     if (reused) {
       return reused;
     }
@@ -447,7 +462,16 @@ export class ArtifactsService extends Service {
     // answer nobody can act on.
     this.takeFetchSlot(ownerId);
     try {
-      return await this.fetchInto({ appId, ownerId, url, said, filename, expected, sourceDigest });
+      return await this.fetchInto({
+        appId,
+        ownerId,
+        onlyOne,
+        url,
+        said,
+        filename,
+        expected,
+        sourceDigest,
+      });
     } finally {
       this.releaseFetchSlot(ownerId);
     }
@@ -552,11 +576,13 @@ export class ArtifactsService extends Service {
   private async reuse({
     appId,
     ownerId,
+    onlyOne,
     url,
     sourceDigest,
   }: {
     appId: AppId;
     ownerId: OwnerId;
+    onlyOne: boolean;
     url: string;
     sourceDigest: Sha256Digest | null;
   }): Promise<Artifact | undefined> {
@@ -569,7 +595,7 @@ export class ArtifactsService extends Service {
     }
 
     this.logger.info('a url was served from what nibrun already holds', { url, sourceDigest });
-    return await this.stored({ appId, ownerId, url, cached });
+    return await this.stored({ appId, ownerId, onlyOne, url, cached });
   }
 
   /**
@@ -583,24 +609,26 @@ export class ArtifactsService extends Service {
   private async stored({
     appId,
     ownerId,
+    onlyOne,
     url,
     cached,
   }: {
     appId: AppId;
     ownerId: OwnerId;
+    onlyOne: boolean;
     url: string;
     cached: CachedBinaryRow;
   }): Promise<Artifact> {
-    const pending = await this.artifactsRepo.insertPending({
-      appId,
-      ownerId,
-      originalFileName: cached.original_file_name,
-      originalFileUrl: url,
-      sourceDigest: cached.source_digest,
-    });
-    if (!pending) {
-      throw new NotFoundError(NO_SUCH_APP);
-    }
+    const pending = takenPlace(
+      await this.artifactsRepo.insertPending({
+        appId,
+        ownerId,
+        originalFileName: cached.original_file_name,
+        originalFileUrl: url,
+        sourceDigest: cached.source_digest,
+        onlyOne,
+      }),
+    );
 
     const stored = await this.artifactsRepo.complete({
       appId,
@@ -626,6 +654,7 @@ export class ArtifactsService extends Service {
   private async fetchInto({
     appId,
     ownerId,
+    onlyOne,
     url,
     said,
     filename,
@@ -634,6 +663,7 @@ export class ArtifactsService extends Service {
   }: {
     appId: AppId;
     ownerId: OwnerId;
+    onlyOne: boolean;
     url: string;
     said: string;
     filename: Filename;
@@ -659,17 +689,18 @@ export class ArtifactsService extends Service {
     const { body: fetched, check } = checking({ source: bounded, expected });
     const held = await unwrapped({ source: fetched, named: filename, url: said });
 
-    const pending = await this.artifactsRepo.insertPending({
+    const inserted = await this.artifactsRepo.insertPending({
       appId,
       ownerId,
       originalFileName: held.filename,
       originalFileUrl: said,
       sourceDigest,
+      onlyOne,
     });
-    if (!pending) {
+    if (inserted.outcome !== 'created') {
       await release(held.body);
-      throw new NotFoundError(NO_SUCH_APP);
     }
+    const pending = takenPlace(inserted);
 
     const staged = stagingKey({ appId, artifactId: pending.id });
     const inspection = await this.stageOrGiveUp({
@@ -1034,6 +1065,21 @@ async function release(body: ReadableStream<Uint8Array>): Promise<void> {
   } catch {
     return;
   }
+}
+
+/**
+ * A place that was not taken is one of two refusals, and they are told apart by what the caller
+ * can do: an app that is not theirs is one that does not exist, while an app that already holds
+ * its one binary is theirs to keep by signing in.
+ */
+function takenPlace(inserted: PendingArtifactInsert): PendingArtifactRow {
+  if (inserted.outcome === 'held') {
+    throw new ForbiddenError(ONE_BINARY);
+  }
+  if (inserted.outcome === 'no-app') {
+    throw new NotFoundError(NO_SUCH_APP);
+  }
+  return inserted.row;
 }
 
 function stagingKey({ appId, artifactId }: { appId: AppId; artifactId: ArtifactId }): ObjectKey {

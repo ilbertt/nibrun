@@ -152,6 +152,26 @@ export function appActions(status: AppStatus | undefined): AppActions {
   return status === undefined ? WHILE_UNREAD : AVAILABILITY[statusKey(status)];
 }
 
+/**
+ * A stranger's app is deployed once and then read, so every button that would change it waits
+ * for an identity. Greyed rather than gone: each is something signing in gets, and a button that
+ * says so is the reason to. Delete is the exception — what they made is theirs to throw away.
+ */
+const UNTIL_SIGNED_IN: AppActionAvailability = {
+  kind: 'disabled',
+  reason: 'Sign in to keep this app — then it is yours to deploy again, export or suspend.',
+};
+
+/** The same table for a stranger: whatever the status offers, it waits for an identity. */
+export function withoutIdentity(actions: AppActions): AppActions {
+  return Object.fromEntries(
+    APP_ACTIONS.map((action) => [
+      action,
+      action === 'delete' || actions[action].kind === 'hidden' ? actions[action] : UNTIL_SIGNED_IN,
+    ]),
+  ) as AppActions;
+}
+
 /** Why a button is greyed, where its own label does not already say. */
 export function greyedReason(availability: AppActionAvailability): string | undefined {
   return availability.kind === 'disabled' ? availability.reason : undefined;

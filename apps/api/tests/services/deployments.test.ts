@@ -18,7 +18,7 @@ import {
 import { schema } from '#db/queries.gen.ts';
 import type { PublicAppConfig } from '#lib/app-config.ts';
 import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
-import { ConflictError, NotFoundError } from '#lib/errors.ts';
+import { ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import type {
   CreateDeploymentInput,
   CreatedDeployment,
@@ -71,6 +71,7 @@ const PINNED_CONFIG: PublicAppConfig = {
 const ROLLBACK_REQUEST = {
   appId: APP_ID,
   ownerId: OWNER_ID,
+  isAnonymous: false,
   source: { rollbackOf: DEPLOYMENT_ID },
 };
 
@@ -217,6 +218,7 @@ describe('a deployment publishes the config version it pins', () => {
     const { service } = serviceWith({ row: deploymentRow() });
 
     const deployment = await service.createOrRollback({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       source: { artifactId: ARTIFACT_ID },
@@ -315,6 +317,7 @@ describe('an app the caller does not own is indistinguishable from one that does
 
     await expect(
       service.createOrRollback({
+        isAnonymous: false,
         appId: APP_ID,
         ownerId: OWNER_ID,
         source: { artifactId: ARTIFACT_ID },
@@ -346,6 +349,7 @@ describe('an app the caller does not own is indistinguishable from one that does
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow(), rows: [] });
 
     await service.createOrRollback({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       source: { artifactId: ARTIFACT_ID },
@@ -368,6 +372,7 @@ describe('creating a deployment is asking for it to run', () => {
     const { service } = serviceWith({ row: deploymentRow({ state: 'pending' }) });
 
     const deployment = await service.createOrRollback({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       source: { artifactId: ARTIFACT_ID },
@@ -384,11 +389,59 @@ describe('creating a deployment is asking for it to run', () => {
 
     await expect(
       service.createOrRollback({
+        isAnonymous: false,
         appId: APP_ID,
         ownerId: OWNER_ID,
         source: { artifactId: ARTIFACT_ID },
       }),
     ).rejects.toBeInstanceOf(ConflictError);
+  });
+});
+
+/**
+ * The count is SQL, exercised against a database in `tests/repositories/apps.test.ts`. What this
+ * holds the service to is the refusal a `held` becomes — and that a rollback, which is a further
+ * deployment by definition, is refused a stranger before the repository is asked.
+ */
+describe("a stranger's app is deployed once", () => {
+  const asStranger = { appId: APP_ID, ownerId: OWNER_ID, isAnonymous: true };
+
+  test('the repository is asked to take only one', async () => {
+    const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
+
+    await service.createOrRollback({ ...asStranger, source: { artifactId: ARTIFACT_ID } });
+
+    expect(deploymentsRepo.calls.at(0)).toMatchObject({ onlyOne: true });
+  });
+
+  test('a place already taken is a sign-in away', async () => {
+    const { service } = serviceWith({ refusal: { outcome: 'held' } });
+
+    await expect(
+      service.createOrRollback({ ...asStranger, source: { artifactId: ARTIFACT_ID } }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test('a rollback is refused without the repository being asked', async () => {
+    const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
+
+    await expect(
+      service.createOrRollback({ ...asStranger, source: { rollbackOf: DEPLOYMENT_ID } }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(deploymentsRepo.calls).toEqual([]);
+  });
+
+  test('a person with an identity is not counted', async () => {
+    const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
+
+    await service.createOrRollback({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      isAnonymous: false,
+      source: { artifactId: ARTIFACT_ID },
+    });
+
+    expect(deploymentsRepo.calls.at(0)).toMatchObject({ onlyOne: false });
   });
 });
 
@@ -593,6 +646,7 @@ describe('a deployment can say what the app starts with, once', () => {
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
 
     await service.createOrRollback({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       source: { artifactId: ARTIFACT_ID, initialDataFrom: IMPORT_ID },
@@ -605,6 +659,7 @@ describe('a deployment can say what the app starts with, once', () => {
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
 
     await service.createOrRollback({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       source: { artifactId: ARTIFACT_ID },
@@ -620,6 +675,7 @@ describe('a deployment can say what the app starts with, once', () => {
 
     await expect(
       service.createOrRollback({
+        isAnonymous: false,
         appId: APP_ID,
         ownerId: OWNER_ID,
         source: { artifactId: ARTIFACT_ID, initialDataFrom: IMPORT_ID },
@@ -632,6 +688,7 @@ describe('a deployment can say what the app starts with, once', () => {
 
     await expect(
       service.createOrRollback({
+        isAnonymous: false,
         appId: APP_ID,
         ownerId: OWNER_ID,
         source: { artifactId: ARTIFACT_ID, initialDataFrom: IMPORT_ID },
@@ -645,6 +702,7 @@ describe('a deployment can say what the app starts with, once', () => {
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
 
     await service.createOrRollback({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       source: { rollbackOf: DEPLOYMENT_ID },

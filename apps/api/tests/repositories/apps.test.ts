@@ -4,12 +4,16 @@ import {
   type AppId,
   AppIdSchema,
   AppNameSchema,
+  type ArtifactId,
   type ComputeUsage,
   DnsLabelSchema,
+  FilenameSchema,
   HostnameSchema,
+  ObjectKeySchema,
   OWNED_APP_STATES,
   type OwnerId,
   OwnerIdSchema,
+  Sha256DigestSchema,
   type TenantEnvironment,
   TenantEnvironmentSchema,
   type Timestamp,
@@ -20,7 +24,14 @@ import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
-import { AppsRepository, type CreatedApp, LIVE_APP_STATES } from '#repositories/apps.repository.ts';
+import {
+  type AppCreation,
+  AppsRepository,
+  type CreatedApp,
+  LIVE_APP_STATES,
+} from '#repositories/apps.repository.ts';
+import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
+import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { refusedBy } from '#tests/support/postgres.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
@@ -80,9 +91,9 @@ function sealed(entries: Record<string, string>) {
 const AMPLE = 100;
 
 /** Every test creating an app wants one, so the quota refusal is the caller's to ask for. */
-function requireCreated(created: CreatedApp | null): CreatedApp {
-  if (!created) {
-    throw new Error('The owner had no room for another app.');
+function requireCreated(created: AppCreation): CreatedApp {
+  if (created.outcome !== 'created') {
+    throw new Error(`The app was not created: ${created.outcome}.`);
   }
   return created;
 }
@@ -92,6 +103,7 @@ async function createApp(slug: string): Promise<AppId> {
   const label = Value.Parse(DnsLabelSchema, slug);
   const created = requireCreated(
     await repo.create({
+      anonymousAppsAtMost: null,
       ownerId: OWNER_ID,
       name: Value.Parse(AppNameSchema, slug),
       slug: label,
@@ -139,6 +151,7 @@ describe('a config patch carries forward every variable it says nothing about', 
   beforeAll(async () => {
     const created = requireCreated(
       await repo.create({
+        anonymousAppsAtMost: null,
         ownerId: OWNER_ID,
         name: Value.Parse(AppNameSchema, APP_SLUG),
         slug: APP_SLUG,
@@ -674,15 +687,17 @@ describe('an owner may have the apps they were given and no more', () => {
   const BY_DEFAULT = 3;
   const GRANTED = 5;
 
-  function makeApp({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
+  async function makeApp({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
-    return repo.create({
+    const created = await repo.create({
+      anonymousAppsAtMost: null,
       ownerId,
       name: Value.Parse(AppNameSchema, slug),
       slug: label,
       hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
       config: { ...configWithDefaults(), environment: {} },
     });
+    return created.outcome;
   }
 
   beforeAll(async () => {
@@ -702,10 +717,10 @@ describe('an owner may have the apps they were given and no more', () => {
 
   test('the app past the quota is declined rather than written', async () => {
     for (let made = 0; made < BY_DEFAULT; made++) {
-      expect(await makeApp({ ownerId: HOARDER_ID, slug: `hoard-${made}` })).not.toBeNull();
+      expect(await makeApp({ ownerId: HOARDER_ID, slug: `hoard-${made}` })).toBe('created');
     }
 
-    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-over' })).toBeNull();
+    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-over' })).toBe('over-quota');
     expect(await repo.listByOwner({ ownerId: HOARDER_ID })).toHaveLength(BY_DEFAULT);
   });
 
@@ -716,7 +731,7 @@ describe('an owner may have the apps they were given and no more', () => {
     }
     await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [first.id]);
 
-    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-again' })).not.toBeNull();
+    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-again' })).toBe('created');
   });
 
   /** A suspended app is one its owner can bring back, so it is one they are still holding. */
@@ -727,7 +742,7 @@ describe('an owner may have the apps they were given and no more', () => {
     }
     await sql.unsafe(`UPDATE nibrun.apps SET state = 'suspended' WHERE id = $1`, [first.id]);
 
-    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-suspended' })).toBeNull();
+    expect(await makeApp({ ownerId: HOARDER_ID, slug: 'hoard-suspended' })).toBe('over-quota');
   });
 
   /**
@@ -749,7 +764,7 @@ describe('an owner may have the apps they were given and no more', () => {
       attempts.map((index) => makeApp({ ownerId: RACER_ID, slug: `racer-${index}` })),
     );
 
-    expect(asked.filter((made) => made !== null)).toHaveLength(BY_DEFAULT);
+    expect(asked.filter((made) => made === 'created')).toHaveLength(BY_DEFAULT);
     expect(await repo.listByOwner({ ownerId: RACER_ID })).toHaveLength(BY_DEFAULT);
   });
 
@@ -761,9 +776,9 @@ describe('an owner may have the apps they were given and no more', () => {
     ]);
 
     for (let made = 0; made < GRANTED; made++) {
-      expect(await makeApp({ ownerId: FRIEND_ID, slug: `friend-${made}` })).not.toBeNull();
+      expect(await makeApp({ ownerId: FRIEND_ID, slug: `friend-${made}` })).toBe('created');
     }
-    expect(await makeApp({ ownerId: FRIEND_ID, slug: 'friend-over' })).toBeNull();
+    expect(await makeApp({ ownerId: FRIEND_ID, slug: 'friend-over' })).toBe('over-quota');
 
     expect(await repo.appsAllowed({ ownerId: FRIEND_ID })).toBe(GRANTED);
     expect(await repo.appsAllowed({ ownerId: HOARDER_ID })).toBe(BY_DEFAULT);
@@ -779,6 +794,7 @@ describe('an app is called what its owner said, and so may another', () => {
   function makeApp({ ownerId, name, slug }: { ownerId: OwnerId; name: string; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
     return repo.create({
+      anonymousAppsAtMost: null,
       ownerId,
       name: Value.Parse(AppNameSchema, name),
       slug: label,
@@ -887,6 +903,7 @@ describe('an owner whose apps are given a lifetime is shown when each one ends',
     const slug = Value.Parse(DnsLabelSchema, 'passing-tern');
     const created = requireCreated(
       await repo.create({
+        anonymousAppsAtMost: null,
         ownerId: PASSERBY_ID,
         name: Value.Parse(AppNameSchema, slug),
         slug,
@@ -924,5 +941,288 @@ describe('an owner whose apps are given a lifetime is shown when each one ends',
     expect(await repo.listExpirable({ limit: 10 })).toEqual([
       { app_id: row.id, owner_id: PASSERBY_ID },
     ]);
+  });
+});
+
+/**
+ * The one statement behind a stranger becoming somebody: it has to move every app, the deleted
+ * ones included, because the key from an app to its owner refuses to let an owner go while any
+ * row still names them — and the stranger is deleted the moment the move is done.
+ */
+describe('every app a stranger held changes hands at once', () => {
+  const PASSERBY_ID = Value.Parse(OwnerIdSchema, 'passerby-claiming');
+  const SOMEBODY_ID = Value.Parse(OwnerIdSchema, 'somebody');
+
+  beforeAll(async () => {
+    for (const id of [PASSERBY_ID, SOMEBODY_ID]) {
+      await sql.unsafe(
+        `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+         VALUES ($1, $1, $2, true, now(), now())`,
+        [id, `${id}@example.com`],
+      );
+    }
+  });
+
+  async function createFor(slug: string): Promise<AppId> {
+    const label = Value.Parse(DnsLabelSchema, slug);
+    const created = requireCreated(
+      await repo.create({
+        anonymousAppsAtMost: null,
+        ownerId: PASSERBY_ID,
+        name: Value.Parse(AppNameSchema, slug),
+        slug: label,
+        hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+        config: { ...configWithDefaults(), environment: {} },
+      }),
+    );
+    return created.app.id;
+  }
+
+  test('the live ones and the deleted ones alike, and then the stranger can go', async () => {
+    const kept = await createFor('kept-swift');
+    const gone = await createFor('gone-swift');
+    await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [gone]);
+    const theirs = await createApp('theirs-swift');
+
+    const moved = await repo.reassign({ from: PASSERBY_ID, to: SOMEBODY_ID });
+
+    expect(moved.sort()).toEqual([kept, gone].sort());
+    expect(await repo.findById({ appId: kept, ownerId: SOMEBODY_ID })).not.toBeNull();
+    expect(await repo.findById({ appId: kept, ownerId: PASSERBY_ID })).toBeNull();
+    expect(await repo.findById({ appId: theirs, ownerId: OWNER_ID })).not.toBeNull();
+    await sql.unsafe('DELETE FROM auth."user" WHERE id = $1', [PASSERBY_ID]);
+    expect(await repo.appsAllowed({ ownerId: PASSERBY_ID })).toBeNull();
+  });
+
+  test('a stranger who held nothing moves nothing', async () => {
+    expect(await repo.reassign({ from: PASSERBY_ID, to: SOMEBODY_ID })).toEqual([]);
+  });
+});
+
+/**
+ * The count behind a stranger's app taking one binary and one deployment. What only the database
+ * can show is the race: requests arriving together must not each count none and each take the
+ * one place — which is what locking the app's row across the count and the insert is for.
+ */
+describe("a stranger's app takes one binary and one deployment", () => {
+  const STRANGER_ID = Value.Parse(OwnerIdSchema, 'stranger-of-one');
+  const ONLY_ONE = true;
+  const ANY_NUMBER = false;
+  const AT_ONCE = 6;
+  const SHA256_HEX_LENGTH = 64;
+
+  let artifacts: ArtifactsRepository;
+  let deployments: DeploymentsRepository;
+
+  beforeAll(async () => {
+    await sql.unsafe(
+      `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+       VALUES ($1, $1, $2, true, now(), now())`,
+      [STRANGER_ID, `${STRANGER_ID}@example.com`],
+    );
+    await sql.unsafe('UPDATE nibrun.profiles SET quota_apps_max_count = $2 WHERE owner_id = $1', [
+      STRANGER_ID,
+      AMPLE,
+    ]);
+    artifacts = new ArtifactsRepository(withTypes<Queries>(sql));
+    deployments = new DeploymentsRepository(withTypes<Queries>(sql));
+  });
+
+  async function createFor(slug: string): Promise<AppId> {
+    const label = Value.Parse(DnsLabelSchema, slug);
+    const created = requireCreated(
+      await repo.create({
+        anonymousAppsAtMost: null,
+        ownerId: STRANGER_ID,
+        name: Value.Parse(AppNameSchema, slug),
+        slug: label,
+        hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+        config: { ...configWithDefaults(), environment: {} },
+      }),
+    );
+    return created.app.id;
+  }
+
+  function pending({ appId, onlyOne }: { appId: AppId; onlyOne: boolean }) {
+    return artifacts.insertPending({
+      appId,
+      ownerId: STRANGER_ID,
+      originalFileName: Value.Parse(FilenameSchema, 'server'),
+      originalFileUrl: null,
+      sourceDigest: null,
+      onlyOne,
+    });
+  }
+
+  /** A binary a deployment can name: the pending row completed with bytes nobody uploaded. */
+  async function stored({ appId, digest }: { appId: AppId; digest: string }): Promise<ArtifactId> {
+    const inserted = await pending({ appId, onlyOne: ANY_NUMBER });
+    if (inserted.outcome !== 'created') {
+      throw new Error('The artifact was not created.');
+    }
+    const row = await artifacts.complete({
+      appId,
+      artifactId: inserted.row.id,
+      ownerId: STRANGER_ID,
+      digest: Value.Parse(Sha256DigestSchema, digest),
+      sizeBytes: 1,
+      objectKey: Value.Parse(ObjectKeySchema, digest),
+    });
+    if (!row) {
+      throw new Error('The artifact was not completed.');
+    }
+    return row.id;
+  }
+
+  test('a second binary is held, pending or not', async () => {
+    const appId = await createFor('one-binary');
+
+    expect((await pending({ appId, onlyOne: ONLY_ONE })).outcome).toBe('created');
+    expect((await pending({ appId, onlyOne: ONLY_ONE })).outcome).toBe('held');
+  });
+
+  test('binaries asked for at the same time cannot each take the one place', async () => {
+    const appId = await createFor('raced-binary');
+
+    const asked = await Promise.all(
+      [...Array(AT_ONCE).keys()].map(() => pending({ appId, onlyOne: ONLY_ONE })),
+    );
+
+    expect(asked.filter((one) => one.outcome === 'created')).toHaveLength(1);
+  });
+
+  test('an app that takes any number is not counted', async () => {
+    const appId = await createFor('many-binaries');
+
+    expect((await pending({ appId, onlyOne: ANY_NUMBER })).outcome).toBe('created');
+    expect((await pending({ appId, onlyOne: ANY_NUMBER })).outcome).toBe('created');
+  });
+
+  test('a second deployment is held, whatever became of the first', async () => {
+    const appId = await createFor('one-deployment');
+    const artifactId = await stored({ appId, digest: 'a'.repeat(SHA256_HEX_LENGTH) });
+    const deploy = () =>
+      deployments.insert({
+        appId,
+        ownerId: STRANGER_ID,
+        artifactId,
+        initialDataFrom: null,
+        onlyOne: ONLY_ONE,
+      });
+
+    expect((await deploy()).outcome).toBe('created');
+    expect((await deploy()).outcome).toBe('held');
+  });
+
+  test('deployments asked for at the same time cannot each take the one place', async () => {
+    const appId = await createFor('raced-deployment');
+    const artifactId = await stored({ appId, digest: 'b'.repeat(SHA256_HEX_LENGTH) });
+
+    const asked = await Promise.all(
+      [...Array(AT_ONCE).keys()].map(() =>
+        deployments.insert({
+          appId,
+          ownerId: STRANGER_ID,
+          artifactId,
+          initialDataFrom: null,
+          onlyOne: ONLY_ONE,
+        }),
+      ),
+    );
+
+    expect(asked.filter((one) => one.outcome === 'created')).toHaveLength(1);
+  });
+});
+
+/**
+ * The count behind strangers holding so many apps between them and no more. What only the database
+ * can show is the race: strangers arriving together must not each count the same number and each
+ * take a place past the ceiling — which is what the advisory lock across the count and the insert
+ * is for.
+ *
+ * What strangers hold is what has a deadline, so the owners here are given a lifetime rather than
+ * signed in without an identity: the ceiling reads nibrun's own rows.
+ */
+describe('strangers hold so many apps between them and no more', () => {
+  const CEILING = 2;
+  const AT_ONCE = 6;
+  const AN_HOUR_SECONDS = 3600;
+
+  const strangers = ['first-stranger', 'second-stranger', 'third-stranger'].map((id) =>
+    Value.Parse(OwnerIdSchema, id),
+  );
+
+  /** The apps with a deadline are what the ceiling counts, and the describes above left some. */
+  function clearWhatStrangersHold(): Promise<unknown> {
+    return sql.unsafe(
+      `UPDATE nibrun.apps a SET state = 'deleted'
+       FROM nibrun.profiles p
+       WHERE p.owner_id = a.owner_id AND p.app_lifetime_seconds IS NOT NULL`,
+    );
+  }
+
+  beforeAll(async () => {
+    await clearWhatStrangersHold();
+    for (const id of strangers) {
+      await sql.unsafe(
+        `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+         VALUES ($1, $1, $2, true, now(), now())`,
+        [id, `${id}@example.com`],
+      );
+      await sql.unsafe(
+        'UPDATE nibrun.profiles SET quota_apps_max_count = $2, app_lifetime_seconds = $3 WHERE owner_id = $1',
+        [id, AMPLE, AN_HOUR_SECONDS],
+      );
+    }
+  });
+
+  async function arrive({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
+    const label = Value.Parse(DnsLabelSchema, slug);
+    const created = await repo.create({
+      ownerId,
+      anonymousAppsAtMost: CEILING,
+      name: Value.Parse(AppNameSchema, slug),
+      slug: label,
+      hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+      config: { ...configWithDefaults(), environment: {} },
+    });
+    return created.outcome;
+  }
+
+  test('the stranger past the ceiling is declined, whoever the others were', async () => {
+    const [first, second, third] = strangers as [OwnerId, OwnerId, OwnerId];
+
+    expect(await arrive({ ownerId: first, slug: 'ceiling-first' })).toBe('created');
+    expect(await arrive({ ownerId: second, slug: 'ceiling-second' })).toBe('created');
+    expect(await arrive({ ownerId: third, slug: 'ceiling-third' })).toBe('at-capacity');
+  });
+
+  /** The number is the platform's, so a person with an identity is not what it is counting. */
+  test('an owner with an identity is not held to it', async () => {
+    expect(await createApp('ceiling-somebody')).toBeDefined();
+  });
+
+  test('a place freed by an app going is a place the next stranger takes', async () => {
+    const [first, , third] = strangers as [OwnerId, OwnerId, OwnerId];
+    const [held] = await repo.listByOwner({ ownerId: first });
+    if (!held) {
+      throw new Error('The stranger from the test above has no app.');
+    }
+    await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [held.id]);
+
+    expect(await arrive({ ownerId: third, slug: 'ceiling-freed' })).toBe('created');
+  });
+
+  test('strangers arriving at the same time cannot each take a place past the ceiling', async () => {
+    await clearWhatStrangersHold();
+    const [first] = strangers as [OwnerId, OwnerId, OwnerId];
+
+    const asked = await Promise.all(
+      [...Array(AT_ONCE).keys()].map((index) =>
+        arrive({ ownerId: first, slug: `ceiling-raced-${index}` }),
+      ),
+    );
+
+    expect(asked.filter((one) => one === 'created')).toHaveLength(CEILING);
   });
 });

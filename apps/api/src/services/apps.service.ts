@@ -28,7 +28,14 @@ import {
 import { type PublicAppHostname, platformHostname, toAppHostname } from '#lib/app-hostname.ts';
 import { overAppQuota } from '#lib/app-quota.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
+import type { AccountLink } from '#lib/auth/better-auth.ts';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  TooManyRequestsError,
+} from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -109,6 +116,16 @@ const PURGE_BATCH = 8;
 const FINISH_BATCH = 8;
 
 /**
+ * How many apps without an account behind them may be live at once, platform-wide. Each holds
+ * one of a host's 63 slots for the hour it lives whether or not anybody visits it, and nothing
+ * but this bounds how many strangers arrive — so this is what keeps them to a quarter of a host,
+ * whatever the rate. A person who signs in counts against their own quota instead.
+ */
+export const MAX_ANONYMOUS_APPS = 15;
+const ANONYMOUS_APPS_FULL =
+  'nibrun is running as many apps without an account as it will at once. Sign in, or try again in a while.';
+
+/**
  * How many expired apps one host report deletes. Small for the reason `PURGE_BATCH` is, and a
  * backlog grows by one app per hour of strangers arriving — the next report takes the next batch.
  */
@@ -164,16 +181,19 @@ export class AppsService extends Service {
    */
   async create({
     ownerId,
+    isAnonymous,
     name,
     config,
   }: {
     ownerId: OwnerId;
+    isAnonymous: boolean;
     name: AppName;
     config?: NewAppConfig;
   }): Promise<PublicApp> {
     const environment = config?.environment ?? {};
     refuseRedactedValues(environment);
     const withDefaults = configWithDefaults(config);
+    refusePortToAStranger({ isAnonymous, hasExtraPublicPort: withDefaults.hasExtraPublicPort });
     refuseValuesNeedingAPort({
       environment,
       hasExtraPublicPort: withDefaults.hasExtraPublicPort,
@@ -192,15 +212,10 @@ export class AppsService extends Service {
           slug,
           hostname: platformHostname({ slug, appHostDomain: this.appHostDomain }),
           config: appConfig,
+          anonymousAppsAtMost: isAnonymous ? MAX_ANONYMOUS_APPS : null,
         });
-        // Nothing was written, so there is no re-roll to make and no later attempt that would go
-        // any differently: the owner has every app they are allowed until they delete one.
-        if (!created) {
-          const allowed = await this.appsRepo.appsAllowed({ ownerId });
-          if (allowed === null) {
-            throw new Error('The owner refused an app has no quota.');
-          }
-          throw new ForbiddenError(overAppQuota(allowed));
+        if (created.outcome !== 'created') {
+          throw await this.declined({ outcome: created.outcome, ownerId });
         }
         return toPublicApp(created);
       } catch (error) {
@@ -212,6 +227,28 @@ export class AppsService extends Service {
     }
 
     throw new ConflictError('Could not mint a free hostname for the app.');
+  }
+
+  /**
+   * Nothing was written either way, so there is no re-roll to make and no later attempt that would
+   * go any differently: the owner has every app they are allowed until they delete one, and the
+   * platform has every stranger it will carry until an hour passes.
+   */
+  private async declined({
+    outcome,
+    ownerId,
+  }: {
+    outcome: 'over-quota' | 'at-capacity';
+    ownerId: OwnerId;
+  }): Promise<Error> {
+    if (outcome === 'at-capacity') {
+      return new TooManyRequestsError(ANONYMOUS_APPS_FULL);
+    }
+    const allowed = await this.appsRepo.appsAllowed({ ownerId });
+    if (allowed === null) {
+      return new Error('The owner refused an app has no quota.');
+    }
+    return new ForbiddenError(overAppQuota(allowed));
   }
 
   /**
@@ -608,6 +645,22 @@ export class AppsService extends Service {
       this.logger.error('deleting an expired app failed', { appId, error });
     }
   }
+
+  /**
+   * What a stranger held becomes the person's who they signed in as, and stops being temporary by
+   * the same move: an app is read against its owner's profile, and the profile it lands in keeps
+   * its apps.
+   *
+   * Nothing is counted. The person may now hold more than their quota allows, and that is the
+   * quota's to refuse at the next creation rather than this one's to refuse at the moment they
+   * were told to sign in to keep what they had.
+   */
+  async claim({ from, to }: AccountLink): Promise<void> {
+    const appIds = await this.appsRepo.reassign({ from, to });
+    if (appIds.length > 0) {
+      this.logger.info('apps claimed', { from, to, appIds });
+    }
+  }
 }
 
 /**
@@ -651,6 +704,23 @@ function refuseValuesNeedingAPort({
     throw new BadRequestError(
       `${EXTRA_PUBLIC_PORT_VALUES.map((value) => interpolableRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
     );
+  }
+}
+
+/**
+ * A port besides HTTP is a raw listener on the public internet, and a person with no identity is
+ * handed nothing that reaches past the HTTPS the platform terminates for them. Only creation
+ * asks: changing an app is not a stranger's to do at all.
+ */
+function refusePortToAStranger({
+  isAnonymous,
+  hasExtraPublicPort,
+}: {
+  isAnonymous: boolean;
+  hasExtraPublicPort: boolean;
+}): void {
+  if (hasExtraPublicPort && isAnonymous) {
+    throw new ForbiddenError('Sign in to open a public port besides HTTP.');
   }
 }
 

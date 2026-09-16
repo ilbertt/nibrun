@@ -16,6 +16,7 @@ import {
   ObjectKeySchema,
   OWNED_APP_STATES,
   type OwnerId,
+  OwnerIdSchema,
   REDACTED,
   type ReportedInstance,
   type ReportedVolume,
@@ -30,7 +31,13 @@ import {
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
 import type { NewAppConfig, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  TooManyRequestsError,
+} from '#lib/errors.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {
@@ -39,9 +46,9 @@ import type {
   OwnedAppHostnameRow,
 } from '#repositories/app-hostnames.repository.ts';
 import type {
+  AppCreation,
   AppRow,
   AppsRepositoryContract,
-  CreatedApp,
   ExpirableAppRow,
   Leftovers,
   NewApp,
@@ -53,6 +60,7 @@ import {
   AppsService,
   type CustomHostnameRemoval,
   type ExportCancellation,
+  MAX_ANONYMOUS_APPS,
   type ObjectRemoval,
 } from '#services/apps.service.ts';
 import {
@@ -189,10 +197,16 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve(true);
   }
 
-  create({ name, slug, hostname, config }: NewApp): Promise<CreatedApp | null> {
+  /** The ceilings each create was given, so a test can see what a stranger's is held to. */
+  readonly offeredCeilings: (number | null)[] = [];
+  /** How many apps strangers hold between them, which only a test about the ceiling moves. */
+  strangersHold = 0;
+
+  create({ name, slug, hostname, config, anonymousAppsAtMost }: NewApp): Promise<AppCreation> {
     this.offeredNames.push(name);
     this.offeredSlugs.push(slug);
     this.offeredConfigs.push(config);
+    this.offeredCeilings.push(anonymousAppsAtMost);
     if (this.#remainingFailures > 0) {
       this.#remainingFailures--;
       return Promise.reject(this.#failure);
@@ -201,10 +215,14 @@ class StubAppsRepository implements AppsRepositoryContract {
     // default; this counts what it has handed back, which is the same question asked of a stub
     // that never deletes anything.
     if (this.held >= this.allowed) {
-      return Promise.resolve(null);
+      return Promise.resolve({ outcome: 'over-quota' });
+    }
+    if (anonymousAppsAtMost !== null && this.strangersHold >= anonymousAppsAtMost) {
+      return Promise.resolve({ outcome: 'at-capacity' });
     }
     this.held++;
     return Promise.resolve({
+      outcome: 'created',
       app: { ...appRow(slug), ...configColumns(config) },
       hostnames: [
         {
@@ -321,6 +339,17 @@ class StubAppsRepository implements AppsRepositoryContract {
 
   listExpirable({ limit }: { limit: number }): Promise<ExpirableAppRow[]> {
     return Promise.resolve(this.expirable.slice(0, limit));
+  }
+
+  /** Whose each app is, for the one statement that moves them all at once. */
+  readonly heldBy = new Map<AppId, OwnerId>();
+
+  reassign({ from, to }: { from: OwnerId; to: OwnerId }): Promise<AppId[]> {
+    const moved = [...this.heldBy].filter(([, owner]) => owner === from).map(([appId]) => appId);
+    for (const appId of moved) {
+      this.heldBy.set(appId, to);
+    }
+    return Promise.resolve(moved);
   }
 
   listLeftovers({ appId }: { appId: AppId }): Promise<Leftovers> {
@@ -458,7 +487,12 @@ function createApp({
   appsRepo: AppsRepositoryContract;
   config?: NewAppConfig;
 }) {
-  return serviceWith({ appsRepo }).create({ ownerId: OWNER_ID, name: APP_NAME, config });
+  return serviceWith({ appsRepo }).create({
+    ownerId: OWNER_ID,
+    isAnonymous: false,
+    name: APP_NAME,
+    config,
+  });
 }
 
 describe('a taken hostname is a re-roll, not something the owner sees', () => {
@@ -1489,6 +1523,77 @@ describe('an app whose time is up is deleted as its owner would delete it', () =
   });
 });
 
+/**
+ * The statement is SQL, exercised against a database in `tests/repositories/apps.test.ts`. What
+ * this holds the service to is that a claim is the move and nothing else: no count, no refusal.
+ */
+describe("what a stranger held becomes the person's who they signed in as", () => {
+  const STRANGER_ID = Value.Parse(OwnerIdSchema, 'stranger');
+
+  test('every app of theirs changes hands', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.heldBy.set(APP_ID, STRANGER_ID);
+    appsRepo.heldBy.set(SECOND_APP_ID, STRANGER_ID);
+
+    await serviceWith({ appsRepo }).claim({ from: STRANGER_ID, to: OWNER_ID });
+
+    expect(appsRepo.heldBy.get(APP_ID)).toBe(OWNER_ID);
+    expect(appsRepo.heldBy.get(SECOND_APP_ID)).toBe(OWNER_ID);
+  });
+
+  test('a stranger who held nothing hands over nothing, and that is not an error', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await expect(
+      serviceWith({ appsRepo }).claim({ from: STRANGER_ID, to: OWNER_ID }),
+    ).resolves.toBeUndefined();
+  });
+
+  // The person they signed in as may already be at their quota. That is refused at the next
+  // creation, where the number can be named, rather than here, where they were told to sign in
+  // to keep what they had.
+  test('the claim is not counted against the quota', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.allowed = 0;
+    appsRepo.heldBy.set(APP_ID, STRANGER_ID);
+
+    await serviceWith({ appsRepo }).claim({ from: STRANGER_ID, to: OWNER_ID });
+
+    expect(appsRepo.heldBy.get(APP_ID)).toBe(OWNER_ID);
+  });
+});
+
+/**
+ * A raw listener on the public internet is not handed to a person with no identity. Only the
+ * creation that asks for it is refused; an app created without is theirs.
+ */
+describe('a stranger is not given a public port besides HTTP', () => {
+  test('an app created asking for one is refused', async () => {
+    const service = serviceWith({ appsRepo: new StubAppsRepository({ failures: 0 }) });
+
+    await expect(
+      service.create({
+        ownerId: OWNER_ID,
+        isAnonymous: true,
+        name: APP_NAME,
+        config: { hasExtraPublicPort: true },
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test('an app created without asking is theirs', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    const app = await serviceWith({ appsRepo }).create({
+      ownerId: OWNER_ID,
+      isAnonymous: true,
+      name: APP_NAME,
+    });
+
+    expect(app.config.hasExtraPublicPort).toBe(false);
+  });
+});
+
 describe('an owner is told when their app is due to go', () => {
   const owned = { appId: APP_ID, ownerId: OWNER_ID };
 
@@ -1507,6 +1612,44 @@ describe('an owner is told when their app is due to go', () => {
     expect((await serviceWith({ appsRepo }).get(owned)).expiresAt).toBe(
       Value.Parse(TimestampSchema, '2026-09-12T12:00:00.000Z'),
     );
+  });
+});
+
+/**
+ * The count is SQL, exercised against a database in `tests/repositories/apps.test.ts`. What this
+ * holds the service to is the number a stranger is held to, that a person with an identity is
+ * held to none, and that the refusal names what to do about it rather than reading as a quota.
+ */
+describe('strangers hold so many apps between them and no more', () => {
+  test('a stranger is held to the platform ceiling', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await serviceWith({ appsRepo }).create({
+      ownerId: OWNER_ID,
+      isAnonymous: true,
+      name: APP_NAME,
+    });
+
+    expect(appsRepo.offeredCeilings).toEqual([MAX_ANONYMOUS_APPS]);
+  });
+
+  test('a person with an identity is held to none', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    await createApp({ appsRepo });
+
+    expect(appsRepo.offeredCeilings).toEqual([null]);
+  });
+
+  test('a stranger arriving at the ceiling is told to sign in or wait, not that they are over quota', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    appsRepo.strangersHold = MAX_ANONYMOUS_APPS;
+
+    await expect(
+      serviceWith({ appsRepo }).create({ ownerId: OWNER_ID, isAnonymous: true, name: APP_NAME }),
+    ).rejects.toBeInstanceOf(TooManyRequestsError);
+    // Nothing was written, so nothing is re-rolled.
+    expect(appsRepo.offeredSlugs).toHaveLength(1);
   });
 });
 

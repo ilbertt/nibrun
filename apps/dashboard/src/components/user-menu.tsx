@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@repo/ui/components/dropdown-menu';
 import { LogOutIcon } from 'lucide-react';
+import { KeepAppsButton } from '#components/login/keep-apps-button.tsx';
 import { UserAvatar } from '#components/user-avatar.tsx';
 import { useSession } from '#lib/hooks/use-session.ts';
 import { useSignOut } from '#lib/hooks/use-sign-out.ts';
@@ -22,6 +23,12 @@ export function UserMenu() {
   }
 
   const { user } = session;
+
+  // A stranger has nothing to see in a menu and one thing to do. Signing out is not offered: a
+  // stranger's session is the only key to their app, and there is no way back in.
+  if (user.isAnonymous) {
+    return <KeepAppsButton size="sm" />;
+  }
 
   return (
     <DropdownMenu>
