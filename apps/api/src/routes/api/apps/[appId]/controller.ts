@@ -50,7 +50,7 @@ export const AppsAppIdController = new Elysia()
       return status(StatusMap.Accepted, app);
     },
     {
-      auth: Identity.Required,
+      auth: Identity.Optional,
       response: { [StatusMap.Accepted]: AppResponseSchema },
     },
   );
