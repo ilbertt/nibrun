@@ -82,6 +82,14 @@ export const DEPLOY_PRESETS = {
     port: 3000,
     minimal: true,
   },
+  'nibrun-vitals': {
+    name: 'nibrun-vitals',
+    binary:
+      'https://github.com/ilbertt/nibrun-vitals/releases/download/v2026.9.15-1/vitals-linux-x64',
+    sha256: '7dc1910531f9bec63c190abfec06de661348b0885d391982cc333fac312b1f42',
+    port: 3000,
+    minimal: true,
+  },
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
