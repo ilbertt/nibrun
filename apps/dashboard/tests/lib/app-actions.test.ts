@@ -184,18 +184,23 @@ test('every app and release the api can report is answered for, button by button
 /**
  * A stranger's app is deployed once and then read. What the status offers is greyed rather than
  * taken away, so every button is a reason to sign in — and what the status has already taken
- * away stays gone, since signing in would not bring it back either.
+ * away stays gone, since signing in would not bring it back either. Delete alone is theirs.
  */
-describe('a stranger is offered nothing that changes the app, and told why', () => {
+describe('a stranger is offered nothing that changes the app but its deletion, and told why', () => {
   test('every button the status offers waits for an identity, saying so', () => {
     const offered = withoutIdentity(actions({ deploymentState: 'running' }));
 
     for (const action of APP_ACTIONS) {
-      if (action === 'redeploy') {
+      if (action === 'redeploy' || action === 'delete') {
         continue;
       }
       expect(offered[action]).toEqual({ kind: 'disabled', reason: expect.any(String) });
     }
+  });
+
+  test('delete is offered as the status offers it', () => {
+    expect(withoutIdentity(actions({ deploymentState: 'running' })).delete).toEqual(ENABLED);
+    expect(withoutIdentity(actions({ appState: 'deleting' })).delete).toEqual(DISABLED);
   });
 
   test('a button the status hides stays hidden', () => {
