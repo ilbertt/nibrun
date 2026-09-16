@@ -4,12 +4,16 @@ import {
   type AppId,
   AppIdSchema,
   AppNameSchema,
+  type ArtifactId,
   type ComputeUsage,
   DnsLabelSchema,
+  FilenameSchema,
   HostnameSchema,
+  ObjectKeySchema,
   OWNED_APP_STATES,
   type OwnerId,
   OwnerIdSchema,
+  Sha256DigestSchema,
   type TenantEnvironment,
   TenantEnvironmentSchema,
   type Timestamp,
@@ -21,6 +25,8 @@ import type { Queries } from '#db/queries.gen.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { AppsRepository, type CreatedApp, LIVE_APP_STATES } from '#repositories/apps.repository.ts';
+import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
+import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { refusedBy } from '#tests/support/postgres.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
@@ -924,5 +930,193 @@ describe('an owner whose apps are given a lifetime is shown when each one ends',
     expect(await repo.listExpirable({ limit: 10 })).toEqual([
       { app_id: row.id, owner_id: PASSERBY_ID },
     ]);
+  });
+});
+
+/**
+ * The one statement behind a stranger becoming somebody: it has to move every app, the deleted
+ * ones included, because the key from an app to its owner refuses to let an owner go while any
+ * row still names them — and the stranger is deleted the moment the move is done.
+ */
+describe('every app a stranger held changes hands at once', () => {
+  const PASSERBY_ID = Value.Parse(OwnerIdSchema, 'passerby-claiming');
+  const SOMEBODY_ID = Value.Parse(OwnerIdSchema, 'somebody');
+
+  beforeAll(async () => {
+    for (const id of [PASSERBY_ID, SOMEBODY_ID]) {
+      await sql.unsafe(
+        `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+         VALUES ($1, $1, $2, true, now(), now())`,
+        [id, `${id}@example.com`],
+      );
+    }
+  });
+
+  async function createFor(slug: string): Promise<AppId> {
+    const label = Value.Parse(DnsLabelSchema, slug);
+    const created = requireCreated(
+      await repo.create({
+        ownerId: PASSERBY_ID,
+        name: Value.Parse(AppNameSchema, slug),
+        slug: label,
+        hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+        config: { ...configWithDefaults(), environment: {} },
+      }),
+    );
+    return created.app.id;
+  }
+
+  test('the live ones and the deleted ones alike, and then the stranger can go', async () => {
+    const kept = await createFor('kept-swift');
+    const gone = await createFor('gone-swift');
+    await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [gone]);
+    const theirs = await createApp('theirs-swift');
+
+    const moved = await repo.reassign({ from: PASSERBY_ID, to: SOMEBODY_ID });
+
+    expect(moved.sort()).toEqual([kept, gone].sort());
+    expect(await repo.findById({ appId: kept, ownerId: SOMEBODY_ID })).not.toBeNull();
+    expect(await repo.findById({ appId: kept, ownerId: PASSERBY_ID })).toBeNull();
+    expect(await repo.findById({ appId: theirs, ownerId: OWNER_ID })).not.toBeNull();
+    await sql.unsafe('DELETE FROM auth."user" WHERE id = $1', [PASSERBY_ID]);
+    expect(await repo.appsAllowed({ ownerId: PASSERBY_ID })).toBeNull();
+  });
+
+  test('a stranger who held nothing moves nothing', async () => {
+    expect(await repo.reassign({ from: PASSERBY_ID, to: SOMEBODY_ID })).toEqual([]);
+  });
+});
+
+/**
+ * The count behind a stranger's app taking one binary and one deployment. What only the database
+ * can show is the race: requests arriving together must not each count none and each take the
+ * one place — which is what locking the app's row across the count and the insert is for.
+ */
+describe("a stranger's app takes one binary and one deployment", () => {
+  const STRANGER_ID = Value.Parse(OwnerIdSchema, 'stranger-of-one');
+  const ONLY_ONE = true;
+  const ANY_NUMBER = false;
+  const AT_ONCE = 6;
+  const SHA256_HEX_LENGTH = 64;
+
+  let artifacts: ArtifactsRepository;
+  let deployments: DeploymentsRepository;
+
+  beforeAll(async () => {
+    await sql.unsafe(
+      `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+       VALUES ($1, $1, $2, true, now(), now())`,
+      [STRANGER_ID, `${STRANGER_ID}@example.com`],
+    );
+    await sql.unsafe('UPDATE nibrun.profiles SET quota_apps_max_count = $2 WHERE owner_id = $1', [
+      STRANGER_ID,
+      AMPLE,
+    ]);
+    artifacts = new ArtifactsRepository(withTypes<Queries>(sql));
+    deployments = new DeploymentsRepository(withTypes<Queries>(sql));
+  });
+
+  async function createFor(slug: string): Promise<AppId> {
+    const label = Value.Parse(DnsLabelSchema, slug);
+    const created = requireCreated(
+      await repo.create({
+        ownerId: STRANGER_ID,
+        name: Value.Parse(AppNameSchema, slug),
+        slug: label,
+        hostname: Value.Parse(HostnameSchema, `${label}.apps.example.com`),
+        config: { ...configWithDefaults(), environment: {} },
+      }),
+    );
+    return created.app.id;
+  }
+
+  function pending({ appId, onlyOne }: { appId: AppId; onlyOne: boolean }) {
+    return artifacts.insertPending({
+      appId,
+      ownerId: STRANGER_ID,
+      originalFileName: Value.Parse(FilenameSchema, 'server'),
+      originalFileUrl: null,
+      sourceDigest: null,
+      onlyOne,
+    });
+  }
+
+  /** A binary a deployment can name: the pending row completed with bytes nobody uploaded. */
+  async function stored({ appId, digest }: { appId: AppId; digest: string }): Promise<ArtifactId> {
+    const inserted = await pending({ appId, onlyOne: ANY_NUMBER });
+    if (inserted.outcome !== 'created') {
+      throw new Error('The artifact was not created.');
+    }
+    const row = await artifacts.complete({
+      appId,
+      artifactId: inserted.row.id,
+      ownerId: STRANGER_ID,
+      digest: Value.Parse(Sha256DigestSchema, digest),
+      sizeBytes: 1,
+      objectKey: Value.Parse(ObjectKeySchema, digest),
+    });
+    if (!row) {
+      throw new Error('The artifact was not completed.');
+    }
+    return row.id;
+  }
+
+  test('a second binary is held, pending or not', async () => {
+    const appId = await createFor('one-binary');
+
+    expect((await pending({ appId, onlyOne: ONLY_ONE })).outcome).toBe('created');
+    expect((await pending({ appId, onlyOne: ONLY_ONE })).outcome).toBe('held');
+  });
+
+  test('binaries asked for at the same time cannot each take the one place', async () => {
+    const appId = await createFor('raced-binary');
+
+    const asked = await Promise.all(
+      [...Array(AT_ONCE).keys()].map(() => pending({ appId, onlyOne: ONLY_ONE })),
+    );
+
+    expect(asked.filter((one) => one.outcome === 'created')).toHaveLength(1);
+  });
+
+  test('an app that takes any number is not counted', async () => {
+    const appId = await createFor('many-binaries');
+
+    expect((await pending({ appId, onlyOne: ANY_NUMBER })).outcome).toBe('created');
+    expect((await pending({ appId, onlyOne: ANY_NUMBER })).outcome).toBe('created');
+  });
+
+  test('a second deployment is held, whatever became of the first', async () => {
+    const appId = await createFor('one-deployment');
+    const artifactId = await stored({ appId, digest: 'a'.repeat(SHA256_HEX_LENGTH) });
+    const deploy = () =>
+      deployments.insert({
+        appId,
+        ownerId: STRANGER_ID,
+        artifactId,
+        initialDataFrom: null,
+        onlyOne: ONLY_ONE,
+      });
+
+    expect((await deploy()).outcome).toBe('created');
+    expect((await deploy()).outcome).toBe('held');
+  });
+
+  test('deployments asked for at the same time cannot each take the one place', async () => {
+    const appId = await createFor('raced-deployment');
+    const artifactId = await stored({ appId, digest: 'b'.repeat(SHA256_HEX_LENGTH) });
+
+    const asked = await Promise.all(
+      [...Array(AT_ONCE).keys()].map(() =>
+        deployments.insert({
+          appId,
+          ownerId: STRANGER_ID,
+          artifactId,
+          initialDataFrom: null,
+          onlyOne: ONLY_ONE,
+        }),
+      ),
+    );
+
+    expect(asked.filter((one) => one.outcome === 'created')).toHaveLength(1);
   });
 });

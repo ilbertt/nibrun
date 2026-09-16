@@ -408,6 +408,11 @@ export interface ISelectExpirableAppsResult {
     owner_id: IAppsColumns["owner_id"];
 }
 
+/** Result of query `ReassignApps`. */
+export interface IReassignAppsResult {
+    id: IAppsColumns["id"];
+}
+
 /** Result of query `SelectUnsharedArtifactKeys`. */
 export interface ISelectUnsharedArtifactKeysResult {
     /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
@@ -521,6 +526,16 @@ export interface ISelectAppAsChangedResult {
     compute_measured_at: IAppUsageColumns["compute_measured_at"];
     /** When this app is due to be deleted. */
     expires_at: Date | null;
+}
+
+/** Result of query `SelectAppForOnlyArtifact`. */
+export interface ISelectAppForOnlyArtifactResult {
+    id: IAppsColumns["id"];
+}
+
+/** Result of query `SelectArtifactHeldByApp`. */
+export interface ISelectArtifactHeldByAppResult {
+    id: IArtifactsColumns["id"];
 }
 
 /** Result of query `InsertPendingArtifact`. */
@@ -787,6 +802,16 @@ export interface ISelectInsertedDeploymentResult {
     environment_names: string[];
 }
 
+/** Result of query `SelectAppForOnlyDeployment`. */
+export interface ISelectAppForOnlyDeploymentResult {
+    id: IAppsColumns["id"];
+}
+
+/** Result of query `SelectDeploymentHeldByApp`. */
+export interface ISelectDeploymentHeldByAppResult {
+    id: IDeploymentsColumns["id"];
+}
+
 /** Result of query `SelectAppAwaitingData`. */
 export interface ISelectAppAwaitingDataResult {
     id: IAppsColumns["id"];
@@ -981,6 +1006,7 @@ export interface Queries {
     FinishDeletingApp: IFinishDeletingAppResult;
     SelectPurgeableApps: ISelectPurgeableAppsResult;
     SelectExpirableApps: ISelectExpirableAppsResult;
+    ReassignApps: IReassignAppsResult;
     SelectUnsharedArtifactKeys: ISelectUnsharedArtifactKeysResult;
     SelectExportKeysByApp: ISelectExportKeysByAppResult;
     SelectImportKeysByApp: ISelectImportKeysByAppResult;
@@ -992,6 +1018,8 @@ export interface Queries {
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
     SelectAppAsChanged: ISelectAppAsChangedResult;
+    SelectAppForOnlyArtifact: ISelectAppForOnlyArtifactResult;
+    SelectArtifactHeldByApp: ISelectArtifactHeldByAppResult;
     InsertPendingArtifact: IInsertPendingArtifactResult;
     CompleteArtifact: ICompleteArtifactResult;
     DeleteArtifact: IDeleteArtifactResult;
@@ -1013,6 +1041,8 @@ export interface Queries {
     FailDeployment: IFailDeploymentResult;
     SupersedeLiveDeployment: ISupersedeLiveDeploymentResult;
     SelectInsertedDeployment: ISelectInsertedDeploymentResult;
+    SelectAppForOnlyDeployment: ISelectAppForOnlyDeploymentResult;
+    SelectDeploymentHeldByApp: ISelectDeploymentHeldByAppResult;
     SelectAppAwaitingData: ISelectAppAwaitingDataResult;
     SelectUsableImport: ISelectUsableImportResult;
     InsertExport: IInsertExportResult;
