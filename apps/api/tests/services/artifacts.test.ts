@@ -19,7 +19,12 @@ import {
   Value,
 } from '@repo/protocol';
 import { MAX_EXPANSION } from '#lib/archive/walk.ts';
-import { BadRequestError, NotFoundError, TooManyRequestsError } from '#lib/errors.ts';
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+  TooManyRequestsError,
+} from '#lib/errors.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
   AbandonedArtifactRow,
@@ -27,6 +32,7 @@ import type {
   ArtifactsRepositoryContract,
   CompleteArtifactInput,
   InsertPendingArtifactInput,
+  PendingArtifactInsert,
   PendingArtifactRow,
 } from '#repositories/artifacts.repository.ts';
 import {
@@ -118,9 +124,14 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
     originalFileName,
     originalFileUrl,
     sourceDigest,
-  }: InsertPendingArtifactInput): Promise<PendingArtifactRow | null> {
+    onlyOne,
+  }: InsertPendingArtifactInput): Promise<PendingArtifactInsert> {
     if (ownerId !== this.ownedBy || this.refuses) {
-      return Promise.resolve(null);
+      return Promise.resolve({ outcome: 'no-app' });
+    }
+    // Pending rows count, as the real one counts them: a place is taken the moment it is asked for.
+    if (onlyOne && [...this.rows.values()].some((held) => held.app_id === appId)) {
+      return Promise.resolve({ outcome: 'held' });
     }
     const row: StoredRow = {
       id: Value.Parse(ArtifactIdSchema, `artifact-${this.rows.size}`),
@@ -135,11 +146,14 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
     };
     this.rows.set(row.id, row);
     return Promise.resolve({
-      id: row.id,
-      app_id: row.app_id,
-      original_file_name: row.original_file_name,
-      original_file_url: row.original_file_url,
-      created_at: row.created_at,
+      outcome: 'created',
+      row: {
+        id: row.id,
+        app_id: row.app_id,
+        original_file_name: row.original_file_name,
+        original_file_url: row.original_file_url,
+        created_at: row.created_at,
+      },
     });
   }
 
@@ -573,6 +587,7 @@ async function upload({
   filename?: Filename;
 }) {
   const { artifactId } = await service.create({
+    isAnonymous: false,
     appId: APP_ID,
     ownerId,
     filename,
@@ -587,6 +602,7 @@ describe('an artifact begins before its bytes do', () => {
     const { service, storage } = build();
 
     const { artifactId } = await service.create({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       filename: UPLOADED_NAME,
@@ -604,6 +620,7 @@ describe('an artifact begins before its bytes do', () => {
     const { service, storage } = build();
 
     await service.create({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       filename: UPLOADED_NAME,
@@ -618,6 +635,7 @@ describe('an artifact begins before its bytes do', () => {
     const input = {
       appId: APP_ID,
       ownerId: OWNER_ID,
+      isAnonymous: false,
       filename: UPLOADED_NAME,
       sizeBytes: BINARY_TEXT.length,
     };
@@ -634,6 +652,7 @@ describe('an artifact begins before its bytes do', () => {
 
     await expect(
       service.create({
+        isAnonymous: false,
         appId: APP_ID,
         ownerId: OWNER_ID,
         filename: UPLOADED_NAME,
@@ -650,6 +669,7 @@ describe('an artifact begins before its bytes do', () => {
 
     await expect(
       service.create({
+        isAnonymous: false,
         appId: APP_ID,
         ownerId: OTHER_OWNER_ID,
         filename: UPLOADED_NAME,
@@ -665,6 +685,7 @@ describe('an artifact begins before its bytes do', () => {
     const { service, artifactsRepo } = build();
 
     const { artifactId } = await service.create({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       filename: UPLOADED_NAME,
@@ -676,6 +697,50 @@ describe('an artifact begins before its bytes do', () => {
       service.get({ appId: APP_ID, artifactId, ownerId: OWNER_ID }),
     ).rejects.toBeInstanceOf(NotFoundError);
     expect(artifactsRepo.rows.size).toBe(1);
+  });
+});
+
+/**
+ * The count is SQL, exercised against a database in `tests/repositories/apps.test.ts`. What this
+ * holds the service to is which answer of the repository's becomes which refusal, on both ways
+ * a binary arrives.
+ */
+describe("a stranger's app takes one binary", () => {
+  const asStranger = { appId: APP_ID, ownerId: OWNER_ID, isAnonymous: true };
+
+  test('the first upload is theirs, the second is a sign-in away', async () => {
+    const { service } = build();
+
+    await service.create({ ...asStranger, filename: UPLOADED_NAME, sizeBytes: BINARY_TEXT.length });
+
+    await expect(
+      service.create({ ...asStranger, filename: UPLOADED_NAME, sizeBytes: BINARY_TEXT.length }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test('an upload still in flight is the place already taken', async () => {
+    const { service, sourceRepo } = build();
+    sourceRepo.serves({ text: BINARY_TEXT });
+    await service.create({ ...asStranger, filename: UPLOADED_NAME, sizeBytes: BINARY_TEXT.length });
+
+    await expect(service.createFromUrl({ ...asStranger, url: BINARY_URL })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+  });
+
+  test('a person with an identity is not counted', async () => {
+    const { service } = build();
+    const input = {
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      isAnonymous: false,
+      filename: UPLOADED_NAME,
+      sizeBytes: BINARY_TEXT.length,
+    };
+
+    await service.create(input);
+
+    await expect(service.create(input)).resolves.toBeDefined();
   });
 });
 
@@ -752,6 +817,7 @@ describe('what the store accepted, this api still has to agree to', () => {
   test('saying an upload landed when nothing did is not an artifact', async () => {
     const { service, artifactsRepo } = build();
     const { artifactId } = await service.create({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       filename: UPLOADED_NAME,
@@ -789,6 +855,7 @@ describe('what the store accepted, this api still has to agree to', () => {
   test('two completions racing settle on the one artifact', async () => {
     const { service, storage, artifactsRepo } = build();
     const { artifactId } = await service.create({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       filename: UPLOADED_NAME,
@@ -839,6 +906,7 @@ describe('an upload the caller gave up on does not wait to be noticed', () => {
   test('saying it failed takes the row and the bytes with it', async () => {
     const { service, storage, artifactsRepo } = build();
     const { artifactId } = await service.create({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       filename: UPLOADED_NAME,
@@ -867,6 +935,7 @@ describe('an upload the caller gave up on does not wait to be noticed', () => {
   test('another owner cannot abandon an upload that is not theirs', async () => {
     const { service, artifactsRepo } = build();
     const { artifactId } = await service.create({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       filename: UPLOADED_NAME,
@@ -885,6 +954,7 @@ describe('an upload nobody ever came back about is swept', () => {
   test('one old enough that nothing can still be on its way goes', async () => {
     const { service, storage, artifactsRepo } = build();
     const { artifactId } = await service.create({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       filename: UPLOADED_NAME,
@@ -905,6 +975,7 @@ describe('an upload nobody ever came back about is swept', () => {
   test('one still within its window is left alone', async () => {
     const { service, artifactsRepo } = build();
     const { artifactId } = await service.create({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       filename: UPLOADED_NAME,
@@ -1022,6 +1093,7 @@ describe('a release nibrun already holds is not fetched twice', () => {
     const { service, sourceRepo, storage } = readyToReuse();
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: CACHED_URL,
@@ -1044,6 +1116,7 @@ describe('a release nibrun already holds is not fetched twice', () => {
     const { service } = readyToReuse();
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: CACHED_URL,
@@ -1059,6 +1132,7 @@ describe('a release nibrun already holds is not fetched twice', () => {
     const { service, artifactsRepo } = readyToReuse();
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: CACHED_URL,
@@ -1080,6 +1154,7 @@ describe('a release nibrun already holds is not fetched twice', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1096,7 +1171,12 @@ describe('a release nibrun already holds is not fetched twice', () => {
     const { service, sourceRepo, cachedRepo } = build();
     sourceRepo.serves({ text: BINARY_TEXT });
 
-    await service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+    await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      isAnonymous: false,
+      url: BINARY_URL,
+    });
 
     expect(cachedRepo.asked).toEqual([]);
     expect(sourceRepo.opened).toEqual([BINARY_URL]);
@@ -1113,6 +1193,7 @@ describe('a release nibrun already holds is not fetched twice', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: CREDENTIALLED_URL,
@@ -1137,11 +1218,12 @@ describe('a release nibrun already holds is not fetched twice', () => {
     const letThemGo = sourceRepo.holdsOpen();
 
     const held = ownersFillingTheCeiling().map((ownerId) =>
-      service.createFromUrl({ appId: APP_ID, ownerId, url: BINARY_URL }),
+      service.createFromUrl({ appId: APP_ID, ownerId, isAnonymous: false, url: BINARY_URL }),
     );
     await Bun.sleep(0);
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: CACHED_URL,
@@ -1169,6 +1251,7 @@ describe('a release that publishes its own digest is taken at its word', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1186,6 +1269,7 @@ describe('a release that publishes its own digest is taken at its word', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1201,6 +1285,7 @@ describe('a release that publishes its own digest is taken at its word', () => {
     storage.put({ objectKey: Value.Parse(ObjectKeySchema, BINARY_DIGEST), text: BINARY_TEXT });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1220,6 +1305,7 @@ describe('a release that publishes its own digest is taken at its word', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1239,6 +1325,7 @@ describe('a release that publishes its own digest is taken at its word', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1259,6 +1346,7 @@ describe('a release that publishes its own digest is taken at its word', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1280,6 +1368,7 @@ describe('a release that publishes its own digest is taken at its word', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const refusal = service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1300,6 +1389,7 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1320,6 +1410,7 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1337,6 +1428,7 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const refusal = service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1357,6 +1449,7 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: BINARY_URL,
@@ -1370,7 +1463,12 @@ describe('a binary is fetched from the url it was given', () => {
     const { service, sourceRepo, storage } = build();
     sourceRepo.serves({ text: BINARY_TEXT });
 
-    await service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+    await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      isAnonymous: false,
+      url: BINARY_URL,
+    });
 
     expect([...storage.objects.keys()]).toEqual([Value.Parse(ObjectKeySchema, BINARY_DIGEST)]);
   });
@@ -1380,7 +1478,12 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.serves({ text: BINARY_TEXT });
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OTHER_OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OTHER_OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
     expect(sourceRepo.opened).toEqual([]);
   });
@@ -1389,7 +1492,12 @@ describe('a binary is fetched from the url it was given', () => {
     const { service, sourceRepo, artifactsRepo } = build();
     sourceRepo.answers({ outcome: 'unreachable' });
 
-    const refusal = service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+    const refusal = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      isAnonymous: false,
+      url: BINARY_URL,
+    });
 
     await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
     await expect(refusal).rejects.toThrow(BINARY_URL);
@@ -1401,7 +1509,12 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.answers({ outcome: 'refused', status: 404 });
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toThrow('404');
     expect(artifactsRepo.rows.size).toBe(0);
   });
@@ -1412,6 +1525,7 @@ describe('a binary is fetched from the url it was given', () => {
 
     await expect(
       service.createFromUrl({
+        isAnonymous: false,
         appId: APP_ID,
         ownerId: OWNER_ID,
         url: 'https://releases.test/downloads/',
@@ -1425,7 +1539,12 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.serves({ text: BINARY_TEXT, declaredSizeBytes: MAX_ARTIFACT_SIZE_BYTES + 1 });
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(artifactsRepo.rows.size).toBe(0);
     expect(storage.objects.size).toBe(0);
@@ -1436,7 +1555,12 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.serves({ text: 'not an executable' });
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(artifactsRepo.rows.size).toBe(0);
     expect(storage.objects.size).toBe(0);
@@ -1448,7 +1572,12 @@ describe('a binary is fetched from the url it was given', () => {
     const { service, sourceRepo, artifactsRepo, storage } = build();
     sourceRepo.stopsPartWay();
 
-    const refusal = service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+    const refusal = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      isAnonymous: false,
+      url: BINARY_URL,
+    });
 
     await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
     await expect(refusal).rejects.toThrow(BINARY_URL);
@@ -1463,7 +1592,12 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.serves({ text: BINARY_TEXT, declaredSizeBytes: MAX_ARTIFACT_SIZE_BYTES + 1 });
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(sourceRepo.wasLetGo).toBe(true);
   });
@@ -1476,7 +1610,12 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.keepsSending();
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
     expect(sourceRepo.wasLetGo).toBe(true);
   });
@@ -1485,7 +1624,12 @@ describe('a binary is fetched from the url it was given', () => {
     const { service, sourceRepo, artifactsRepo } = build();
     sourceRepo.answers({ outcome: 'private-address', host: 'internal.releases.test' });
 
-    const refusal = service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL });
+    const refusal = service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      isAnonymous: false,
+      url: BINARY_URL,
+    });
 
     await expect(refusal).rejects.toBeInstanceOf(BadRequestError);
     await expect(refusal).rejects.toThrow('internal.releases.test');
@@ -1497,7 +1641,12 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.answers({ outcome: 'insecure-redirect', to: 'http://mirror.test/my-server' });
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toThrow('http://mirror.test/my-server');
   });
 
@@ -1507,6 +1656,7 @@ describe('a binary is fetched from the url it was given', () => {
     const withToken = 'https://owner:ghp_secret@releases.test/v1/my-server';
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: withToken,
@@ -1532,6 +1682,7 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: ARCHIVE_URL,
@@ -1559,6 +1710,7 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.servesBytes({ bytes });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: ARCHIVE_URL,
@@ -1585,6 +1737,7 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.servesBytes({ bytes, chunkBytes: A_TRANSFER_CHUNK });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: TARBALL_URL,
@@ -1603,6 +1756,7 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     const refusal = service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: TARBALL_URL,
@@ -1620,6 +1774,7 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.servesBytes({ bytes });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: COMPRESSED_URL,
@@ -1637,6 +1792,7 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     const refusal = service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: ARCHIVE_URL,
@@ -1656,6 +1812,7 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: ARCHIVE_URL,
@@ -1678,6 +1835,7 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: TARBALL_URL,
@@ -1699,6 +1857,7 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.servesBytes({ bytes: gzipSync(bytesOf(BINARY_TEXT)) });
 
     const artifact = await service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: COMPRESSED_URL,
@@ -1722,6 +1881,7 @@ describe('a binary is fetched from the url it was given', () => {
     sourceRepo.servesBytes({ bytes: gzipSync(expandsTooFar({ asExecutable: true })) });
 
     const refusal = service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
       url: COMPRESSED_URL,
@@ -1742,7 +1902,12 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: TARBALL_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: TARBALL_URL,
+      }),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(artifactsRepo.rows.size).toBe(0);
     expect(storage.objects.size).toBe(0);
@@ -1755,7 +1920,12 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: ARCHIVE_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: ARCHIVE_URL,
+      }),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(artifactsRepo.rows.size).toBe(0);
     expect(storage.objects.size).toBe(0);
@@ -1772,12 +1942,17 @@ describe('a binary is fetched from the url it was given', () => {
     const letThemGo = sourceRepo.holdsOpen();
 
     const held = ownersFillingTheCeiling().map((ownerId) =>
-      service.createFromUrl({ appId: APP_ID, ownerId, url: BINARY_URL }),
+      service.createFromUrl({ appId: APP_ID, ownerId, isAnonymous: false, url: BINARY_URL }),
     );
     await Bun.sleep(0);
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
 
     letThemGo();
@@ -1785,7 +1960,12 @@ describe('a binary is fetched from the url it was given', () => {
 
     // The slot each was holding is given back, so the next caller is not refused for their sake.
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toBeInstanceOf(BadRequestError);
   });
 
@@ -1801,15 +1981,26 @@ describe('a binary is fetched from the url it was given', () => {
     const letThemGo = sourceRepo.holdsOpen();
 
     const held = Array.from({ length: MAX_CONCURRENT_FETCHES_PER_OWNER }, () =>
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     );
     await Bun.sleep(0);
 
     await expect(
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
 
     const theirs = service.createFromUrl({
+      isAnonymous: false,
       appId: APP_ID,
       ownerId: OTHER_OWNER_ID,
       url: BINARY_URL,
@@ -1832,12 +2023,22 @@ describe('a binary is fetched from the url it was given', () => {
     const letThemGo = sourceRepo.holdsOpen();
 
     const held = Array.from({ length: MAX_CONCURRENT_FETCHES_PER_OWNER }, () =>
-      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     );
     await Bun.sleep(0);
 
     await expect(
-      service.createFromUrl({ appId: OTHER_APP_ID, ownerId: OWNER_ID, url: BINARY_URL }),
+      service.createFromUrl({
+        appId: OTHER_APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        url: BINARY_URL,
+      }),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
 
     letThemGo();

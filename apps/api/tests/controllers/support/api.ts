@@ -29,6 +29,15 @@ const api = createApp();
 // A bare path is not a URL, so every request here carries an origin. Nothing routes on it.
 export const ORIGIN = 'http://localhost';
 
+export type Route = { method: string; path: string };
+
+/** Every route the app mounts under a prefix, as it lists them itself — `:appId` and all. */
+export function routesUnder(prefix: string): Route[] {
+  return api.routes
+    .filter((route) => route.path.startsWith(prefix))
+    .map(({ method, path }) => ({ method, path }));
+}
+
 // `signal` is the caller going away, exactly as it is for a request off a socket: a route that
 // holds one open has nothing else to end it inside a test.
 export function send({

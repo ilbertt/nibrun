@@ -11,7 +11,7 @@ import type {
 import { schema } from '#db/queries.gen.ts';
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { DeploymentLifecycle } from '#lib/deployments/lifecycle.ts';
-import { ConflictError, NotFoundError } from '#lib/errors.ts';
+import { ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {
@@ -30,6 +30,9 @@ const LIVE_DEPLOYMENT_CONSTRAINT = schema.deployments._indexes.deployments_live_
 
 const NEVER_STARTED = 'No host started this deployment in time.';
 const ANOTHER_DEPLOYMENT = 'Another deployment for this app is being started.';
+// A stranger's app is deployed once. A rollback is a further deployment by definition, so it is
+// refused before the repository is asked anything.
+const ONE_DEPLOYMENT = 'Sign in to deploy this app again.';
 const NOTHING_TO_DEPLOY = 'App, artifact or deployment not found.';
 const NO_SUCH_IMPORT = 'No uploaded import of that name is ready to be used.';
 /**
@@ -64,20 +67,25 @@ export class DeploymentsService extends Service {
    *
    * What comes back is still `pending`: a host has to boot it and say so.
    */
-  createOrRollback({
+  async createOrRollback({
     source,
+    isAnonymous,
     ...owned
-  }: OwnedApp & { source: DeploymentSource }): Promise<PublicDeployment> {
+  }: OwnedApp & { isAnonymous: boolean; source: DeploymentSource }): Promise<PublicDeployment> {
     if ('rollbackOf' in source) {
-      return this.published(
+      if (isAnonymous) {
+        throw new ForbiddenError(ONE_DEPLOYMENT);
+      }
+      return await this.published(
         this.deploymentsRepo.insertRollback({ ...owned, rollbackOf: source.rollbackOf }),
       );
     }
-    return this.created(
+    return await this.created(
       this.deploymentsRepo.insert({
         ...owned,
         artifactId: source.artifactId,
         initialDataFrom: source.initialDataFrom ?? null,
+        onlyOne: isAnonymous,
       }),
     );
   }
@@ -174,6 +182,9 @@ export class DeploymentsService extends Service {
     }
     if (outcome.outcome === 'no-artifact') {
       throw new NotFoundError(NOTHING_TO_DEPLOY);
+    }
+    if (outcome.outcome === 'held') {
+      throw new ForbiddenError(ONE_DEPLOYMENT);
     }
     throw outcome.outcome === 'no-import'
       ? new NotFoundError(NO_SUCH_IMPORT)

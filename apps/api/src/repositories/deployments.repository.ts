@@ -24,6 +24,8 @@ export type OwnedApp = { appId: AppId; ownerId: OwnerId };
 export type CreateDeploymentInput = OwnedApp & {
   artifactId: ArtifactId;
   initialDataFrom: ImportId | null;
+  // Whether the app takes this one deployment and no other.
+  onlyOne: boolean;
 };
 
 /**
@@ -38,7 +40,8 @@ export type CreatedDeployment =
   | { outcome: 'created'; row: DeploymentRow }
   | { outcome: 'no-artifact' }
   | { outcome: 'no-import' }
-  | { outcome: 'data-exists' };
+  | { outcome: 'data-exists' }
+  | { outcome: 'held' };
 
 /**
  * Going back to a release is a new row naming the one it replays, rather than that one revived:
@@ -109,6 +112,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     ownerId,
     artifactId,
     initialDataFrom,
+    onlyOne,
   }: CreateDeploymentInput): Promise<CreatedDeployment> {
     return this.sql.begin(async (tx): Promise<CreatedDeployment> => {
       // Asked before anything is superseded: returning from this callback commits, so an
@@ -132,6 +136,9 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
           : await seedRefusal({ tx, appId, ownerId, initialDataFrom });
       if (refusal) {
         return refusal;
+      }
+      if (onlyOne && (await alreadyDeployed({ tx, appId, ownerId }))) {
+        return { outcome: 'held' };
       }
       await this.supersedeLive({ tx, appId, ownerId });
 
@@ -377,6 +384,31 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
  * host skips a device that already carries a filesystem, so a deployment written past this would
  * be an owner told their data was replaced when nothing read the archive at all.
  */
+/**
+ * Whether the app has ever been deployed, asked with its row locked for the reason the app quota
+ * locks the profile: requests arriving together would otherwise each count none and each take
+ * the one place. Its own statement after the lock rather than a predicate on the insert, because
+ * a statement's snapshot is taken before it blocks.
+ *
+ * Every row counts, superseded and failed included: what is being bounded is deployments made,
+ * not deployments running.
+ */
+async function alreadyDeployed({
+  tx,
+  appId,
+  ownerId,
+}: OwnedApp & { tx: Transaction }): Promise<boolean> {
+  await tx.SelectAppForOnlyDeployment`
+    SELECT a.id FROM nibrun.live_apps a
+    WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+    FOR UPDATE
+  `;
+  const [deployed] = await tx.SelectDeploymentHeldByApp`
+    SELECT d.id FROM nibrun.deployments d WHERE d.app_id = ${appId} LIMIT 1
+  `;
+  return deployed !== undefined;
+}
+
 async function seedRefusal({
   tx,
   appId,
