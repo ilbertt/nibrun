@@ -31,7 +31,20 @@ export type NewApp = {
   slug: DnsLabel;
   hostname: Hostname;
   config: StoredAppConfig;
+  // How many apps without an account behind them may be live at once, platform-wide, where this
+  // is one; null where the owner has an identity and the number is not theirs to count against.
+  anonymousAppsAtMost: number | null;
 };
+
+/**
+ * Why an app was not written, where the two answers ask different things of the caller: an owner
+ * over their quota deletes an app, while a stranger refused for the platform's sake signs in or
+ * waits.
+ */
+export type AppCreation =
+  | ({ outcome: 'created' } & CreatedApp)
+  | { outcome: 'over-quota' }
+  | { outcome: 'at-capacity' };
 
 /**
  * The objects a deleted app still has behind it, ready to be removed before the rows naming them
@@ -66,7 +79,7 @@ export const LIVE_APP_STATES: readonly AppState[] = APP_STATES.filter(
 );
 
 export abstract class AppsRepositoryContract {
-  abstract create(input: NewApp): Promise<CreatedApp | null>;
+  abstract create(input: NewApp): Promise<AppCreation>;
   abstract appsAllowed(input: { ownerId: OwnerId }): Promise<number | null>;
   abstract listByOwner(input: { ownerId: OwnerId }): Promise<AppRow[]>;
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
@@ -121,9 +134,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   }
 
   /**
-   * `null` where the owner already has every app they are allowed, which is the only reason this
-   * declines — a slug already taken raises, because it is a re-roll rather than an answer, and so
-   * does a name the owner has already given another app, because it is theirs to change.
+   * Declined where the owner already has every app they are allowed, or where the apps strangers
+   * hold between them are as many as the platform will carry — a slug already taken raises,
+   * because it is a re-roll rather than an answer.
    *
    * The count and the insert are one decision, so they are one transaction and the owner's profile
    * is locked across it. Without that, requests arriving together each read the same count and
@@ -135,36 +148,27 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * profile rather than `auth."user"`, because that table is better-auth's and writes its own rows
    * on every sign-in — this is nibrun's row about the same person, and it is the one carrying the
    * number being decided against.
+   *
+   * The platform-wide count has no row to lock, so it takes an advisory lock for the transaction
+   * instead — after the profile's, so every stranger takes the two in the same order.
    */
-  create({ ownerId, name, slug, hostname, config }: NewApp): Promise<CreatedApp | null> {
-    return this.sql.begin(async (tx) => {
-      const [locked] = await tx.SelectProfileForAppCreate`
-        SELECT p.owner_id
-        FROM nibrun.profiles p
-        WHERE p.owner_id = ${ownerId}
-        FOR UPDATE
-      `;
-      // Raised rather than returned as `null`: every owner has a profile, so one that is missing
-      // is a database disagreeing with the session — and read as a refusal it would tell somebody
-      // their account was full.
-      if (!locked) {
-        throw new Error('The owner creating an app has no profile.');
+  create({
+    ownerId,
+    name,
+    slug,
+    hostname,
+    config,
+    anonymousAppsAtMost,
+  }: NewApp): Promise<AppCreation> {
+    return this.sql.begin(async (tx): Promise<AppCreation> => {
+      if (!(await ownerHasRoom({ tx, ownerId }))) {
+        return { outcome: 'over-quota' };
       }
-
-      // A second statement rather than a CTE holding the lock, which parses and reads better: a
-      // statement's snapshot is taken before it blocks, so a merged query counts apps as they were
-      // before the transaction it waited for committed — six through a quota of three.
-      const [room] = await tx.SelectAppsLeft`
-        /* @notNull apps_left */
-        SELECT q.apps_left
-        FROM nibrun.app_quotas q
-        WHERE q.owner_id = ${ownerId}
-      `;
-      if (!room) {
-        throw new Error('An owner with a profile has no quota.');
-      }
-      if (room.apps_left === NONE_LEFT) {
-        return null;
+      if (
+        anonymousAppsAtMost !== null &&
+        (await strangersHold({ tx, atLeast: anonymousAppsAtMost }))
+      ) {
+        return { outcome: 'at-capacity' };
       }
 
       const [inserted] = await tx.InsertApp`
@@ -245,7 +249,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('Reading back the created app returned no row.');
       }
 
-      return { app, hostnames: [hostnameRow] };
+      return { outcome: 'created', app, hostnames: [hostnameRow] };
     });
   }
 
@@ -712,6 +716,74 @@ async function appendConfigVersion({
     names: current.environment_names.filter((name) => !edited.has(name)),
   });
   await insertEnvironment({ tx, configId: inserted.id, environment: environment.set });
+}
+
+/**
+ * Whether the owner may hold another app, with their profile locked for the transaction — the
+ * lock every other decision in the same transaction is taken behind.
+ *
+ * A second statement rather than a CTE holding the lock, which parses and reads better: a
+ * statement's snapshot is taken before it blocks, so a merged query counts apps as they were
+ * before the transaction it waited for committed — six through a quota of three.
+ */
+async function ownerHasRoom({
+  tx,
+  ownerId,
+}: {
+  tx: TypedSQL<Queries>;
+  ownerId: OwnerId;
+}): Promise<boolean> {
+  const [locked] = await tx.SelectProfileForAppCreate`
+    SELECT p.owner_id
+    FROM nibrun.profiles p
+    WHERE p.owner_id = ${ownerId}
+    FOR UPDATE
+  `;
+  // Raised rather than answered as no room: every owner has a profile, so one that is missing is
+  // a database disagreeing with the session — and read as a refusal it would tell somebody their
+  // account was full.
+  if (!locked) {
+    throw new Error('The owner creating an app has no profile.');
+  }
+  const [room] = await tx.SelectAppsLeft`
+    /* @notNull apps_left */
+    SELECT q.apps_left
+    FROM nibrun.app_quotas q
+    WHERE q.owner_id = ${ownerId}
+  `;
+  if (!room) {
+    throw new Error('An owner with a profile has no quota.');
+  }
+  return room.apps_left !== NONE_LEFT;
+}
+
+/**
+ * Whether the apps strangers hold between them have reached a number, counted under a lock the
+ * transaction keeps: the count has no row of its own to lock, and two strangers counting at once
+ * would otherwise each find the place the other is taking.
+ *
+ * What strangers hold is what has a deadline — the apps that will go on their own.
+ */
+async function strangersHold({
+  tx,
+  atLeast,
+}: {
+  tx: TypedSQL<Queries>;
+  atLeast: number;
+}): Promise<boolean> {
+  // Untagged, as `updateState` is: there is no row type to lose, and the generator has no relation
+  // to read a lock's return through.
+  await tx`SELECT pg_advisory_xact_lock(hashtext('nibrun.anonymous_apps'))`;
+  const [strangers] = await tx.SelectAnonymousAppsHeld`
+    /* @notNull held */
+    SELECT count(*)::int AS held
+    FROM nibrun.live_apps a
+    JOIN nibrun.app_deadlines d ON d.app_id = a.id
+  `;
+  if (!strangers) {
+    throw new Error('Counting the apps strangers hold returned no row.');
+  }
+  return strangers.held >= atLeast;
 }
 
 /**

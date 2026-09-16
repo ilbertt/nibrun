@@ -29,7 +29,13 @@ import { type PublicAppHostname, platformHostname, toAppHostname } from '#lib/ap
 import { overAppQuota } from '#lib/app-quota.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
 import type { AccountLink } from '#lib/auth/better-auth.ts';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  TooManyRequestsError,
+} from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -108,6 +114,16 @@ const PURGE_BATCH = 8;
  * finish itself ever land here, so this drains a backlog that never grows.
  */
 const FINISH_BATCH = 8;
+
+/**
+ * How many apps without an account behind them may be live at once, platform-wide. Each holds
+ * one of a host's 63 slots for the hour it lives whether or not anybody visits it, and nothing
+ * but this bounds how many strangers arrive — so this is what keeps them to a quarter of a host,
+ * whatever the rate. A person who signs in counts against their own quota instead.
+ */
+export const MAX_ANONYMOUS_APPS = 15;
+const ANONYMOUS_APPS_FULL =
+  'nibrun is running as many apps without an account as it will at once. Sign in, or try again in a while.';
 
 /**
  * How many expired apps one host report deletes. Small for the reason `PURGE_BATCH` is, and a
@@ -196,15 +212,10 @@ export class AppsService extends Service {
           slug,
           hostname: platformHostname({ slug, appHostDomain: this.appHostDomain }),
           config: appConfig,
+          anonymousAppsAtMost: isAnonymous ? MAX_ANONYMOUS_APPS : null,
         });
-        // Nothing was written, so there is no re-roll to make and no later attempt that would go
-        // any differently: the owner has every app they are allowed until they delete one.
-        if (!created) {
-          const allowed = await this.appsRepo.appsAllowed({ ownerId });
-          if (allowed === null) {
-            throw new Error('The owner refused an app has no quota.');
-          }
-          throw new ForbiddenError(overAppQuota(allowed));
+        if (created.outcome !== 'created') {
+          throw await this.declined({ outcome: created.outcome, ownerId });
         }
         return toPublicApp(created);
       } catch (error) {
@@ -216,6 +227,28 @@ export class AppsService extends Service {
     }
 
     throw new ConflictError('Could not mint a free hostname for the app.');
+  }
+
+  /**
+   * Nothing was written either way, so there is no re-roll to make and no later attempt that would
+   * go any differently: the owner has every app they are allowed until they delete one, and the
+   * platform has every stranger it will carry until an hour passes.
+   */
+  private async declined({
+    outcome,
+    ownerId,
+  }: {
+    outcome: 'over-quota' | 'at-capacity';
+    ownerId: OwnerId;
+  }): Promise<Error> {
+    if (outcome === 'at-capacity') {
+      return new TooManyRequestsError(ANONYMOUS_APPS_FULL);
+    }
+    const allowed = await this.appsRepo.appsAllowed({ ownerId });
+    if (allowed === null) {
+      return new Error('The owner refused an app has no quota.');
+    }
+    return new ForbiddenError(overAppQuota(allowed));
   }
 
   /**
