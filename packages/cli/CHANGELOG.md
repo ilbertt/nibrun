@@ -2,6 +2,12 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.9.17-1]
+
+### 🚀 Features
+
+- A stranger's app is kept for fifteen minutes, and the dashboard quotes the number (#594)
+
 ## [2026.9.14-2]
 
 ### 🚀 Features
