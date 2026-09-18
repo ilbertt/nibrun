@@ -12,19 +12,24 @@ import { DeploymentsTable } from '#components/apps/deployments-table.tsx';
 import { FailedDeploymentNotice } from '#components/apps/failed-deployment-notice.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
+import { useArtifacts } from '#lib/hooks/use-artifacts.ts';
 import { useDeployments } from '#lib/hooks/use-deployments.ts';
 
 export function DeploymentHistory() {
   const appId = useAppId();
   const deployments = useDeployments(appId);
+  const artifacts = useArtifacts(appId);
 
-  if (deployments.isPending) {
+  if (deployments.isPending || artifacts.isPending) {
     return <Skeleton className="h-48 w-full rounded-2xl" />;
   }
   if (deployments.isError) {
     return (
       <FailureEmpty title="Could not read the deployments" reason={deployments.error.message} />
     );
+  }
+  if (artifacts.isError) {
+    return <FailureEmpty title="Could not read the binaries" reason={artifacts.error.message} />;
   }
   const newest = deployments.data[0];
   if (newest === undefined) {
@@ -58,7 +63,7 @@ export function DeploymentHistory() {
             <FailedDeploymentNotice deployment={newest} />
           </div>
         )}
-        <DeploymentsTable deployments={deployments.data} />
+        <DeploymentsTable deployments={deployments.data} artifacts={artifacts.data} />
       </CardContent>
     </Card>
   );
