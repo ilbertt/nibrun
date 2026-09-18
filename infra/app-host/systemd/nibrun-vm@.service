@@ -22,6 +22,10 @@ ExecStartPre=-/bin/rm -f /var/lib/nibrun/vm/%i/logs.vsock
 # the agent left when it put this microVM to sleep. It `exec`s Firecracker, so
 # what Type=exec waits for and what KillSignal reaches are still the VMM itself.
 ExecStart=/opt/nibrun/bundle/vm_launch.sh %i
+# Firecracker leaves its socket behind whether it exited or was killed, and only
+# a start of the same instance would ever remove it — so a deleted app's socket
+# would otherwise sit in /run/nibrun until the host reboots.
+ExecStopPost=-/bin/rm -f /run/nibrun/vm-%i.sock
 
 # No restart here on purpose. The guest's own init supervises the tenant process
 # with backoff and powers the VM off once that budget is exhausted, and the agent
