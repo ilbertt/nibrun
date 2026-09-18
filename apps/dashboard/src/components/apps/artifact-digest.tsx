@@ -10,7 +10,7 @@ export function ArtifactDigest({ digest }: { digest: string }) {
 
   return (
     <Tooltip>
-      <TooltipTrigger closeOnClick={false} onClick={copy} className="cursor-copy">
+      <TooltipTrigger closeOnClick={false} onClick={copy} className="cursor-pointer">
         {digest.slice(0, SHORT_DIGEST_LENGTH)}
       </TooltipTrigger>
       <TooltipContent className="break-all font-mono">{copied ? 'Copied' : digest}</TooltipContent>
