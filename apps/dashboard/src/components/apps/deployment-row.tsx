@@ -1,5 +1,5 @@
 import { TableCell, TableRow } from '@repo/ui/components/table';
-import { ArtifactDigest } from '#components/apps/artifact-digest.tsx';
+import { BinaryLabel } from '#components/apps/binary-label.tsx';
 import { DeploymentDetails } from '#components/apps/deployment-details.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
 import type { ArtifactSummary } from '#queries/artifacts.ts';
@@ -20,9 +20,8 @@ export function DeploymentRow({
       <TableCell>
         <DeploymentDetails deployment={deployment} />
       </TableCell>
-      <TableCell className="font-mono">{artifact?.originalFileName ?? ABSENT}</TableCell>
-      <TableCell className="font-mono text-muted-foreground">
-        {artifact === undefined ? ABSENT : <ArtifactDigest digest={artifact.digest} />}
+      <TableCell className="font-mono">
+        {artifact === undefined ? ABSENT : <BinaryLabel artifact={artifact} />}
       </TableCell>
       <TableCell className="text-muted-foreground tabular-nums">
         {deployment.activatedAt === undefined ? ABSENT : dayAndMinute(deployment.activatedAt)}

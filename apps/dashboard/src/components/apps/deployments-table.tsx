@@ -19,7 +19,6 @@ export function DeploymentsTable({
           <TableHead>Deployment</TableHead>
           <TableHead>State</TableHead>
           <TableHead>Binary</TableHead>
-          <TableHead>SHA-256</TableHead>
           <TableHead>Activated</TableHead>
         </TableRow>
       </TableHeader>
