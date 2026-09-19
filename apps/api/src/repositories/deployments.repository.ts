@@ -257,7 +257,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   listLive(): Promise<LiveDeploymentRow[]> {
     return this.sql.SelectLiveDeployments`
       /* @notNull desired_running */
-      SELECT d.id, d.state, d.created_at, a.updated_at AS state_changed_at,
+      SELECT d.id, d.app_id, d.state, d.created_at, a.updated_at AS state_changed_at,
              (a.state = 'active') AS desired_running
       FROM nibrun.deployments d
       JOIN nibrun.apps a ON a.id = d.app_id

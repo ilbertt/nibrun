@@ -12,8 +12,10 @@ import {
   type InstanceState,
   Ipv4AddressSchema,
   type ReportedInstance,
+  type ReportedVolume,
   TimestampSchema,
   Value,
+  VolumeIdSchema,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
 import type { PublicAppConfig } from '#lib/app-config.ts';
@@ -52,6 +54,9 @@ const ACTIVATED_AT = new Date('2026-08-04T11:30:00.000Z');
 const STARTED_AT = new Date('2026-08-04T11:29:00.000Z');
 const LAST_HEALTHY_AT = new Date('2026-08-04T12:00:00.000Z');
 const FAILURE_MESSAGE = 'No host started this deployment in time.';
+const HOST_FULL = 'all 63 host slots are allocated';
+const DATA_NOT_CREATED = "The host could not create this app's data";
+const VOLUME_ID = Value.Parse(VolumeIdSchema, APP_ID);
 const HEALTHY_AT = new Date('2026-08-04T11:31:00.000Z');
 const REPORTED_AT = new Date('2026-08-04T11:32:00.000Z');
 const HOST_PORT = Value.Parse(HostPortSchema, HOST_PORT_NUMBER);
@@ -118,7 +123,7 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
   readonly calls: Array<Record<string, unknown>> = [];
   readonly applied: ReportedDeployment[] = [];
   readonly activations: { deploymentId: DeploymentId; at: Date }[] = [];
-  readonly failed: DeploymentId[] = [];
+  readonly failed: { deploymentId: DeploymentId; message: string }[] = [];
   readonly #behaviour: FakeBehaviour;
 
   constructor(behaviour: FakeBehaviour = {}) {
@@ -139,8 +144,8 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
     return Promise.resolve();
   }
 
-  fail({ deploymentId }: { deploymentId: DeploymentId }): Promise<void> {
-    this.failed.push(deploymentId);
+  fail(input: { deploymentId: DeploymentId; message: string }): Promise<void> {
+    this.failed.push(input);
     return Promise.resolve();
   }
 
@@ -183,6 +188,7 @@ function liveRow(overrides: Partial<LiveDeploymentRow> = {}): LiveDeploymentRow 
   const createdAt = overrides.created_at ?? new Date();
   return {
     id: DEPLOYMENT_ID,
+    app_id: APP_ID,
     state: 'pending' as DeploymentState,
     created_at: createdAt,
     state_changed_at: createdAt,
@@ -204,8 +210,33 @@ function instance({
   };
 }
 
+function volume(overrides: Partial<ReportedVolume> = {}): ReportedVolume {
+  return {
+    volumeId: VOLUME_ID,
+    appId: APP_ID,
+    state: 'failed',
+    sizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
+    message: HOST_FULL,
+    ...overrides,
+  };
+}
+
+function reportOf({
+  instances,
+  volumes,
+}: {
+  instances: ReportedInstance[];
+  volumes: ReportedVolume[];
+}): HostReportedState {
+  return {
+    instances,
+    volumes,
+    reportedAt: REPORTED_AT.toISOString(),
+  } as unknown as HostReportedState;
+}
+
 function report(instances: ReportedInstance[]): HostReportedState {
-  return { instances, reportedAt: REPORTED_AT.toISOString() } as unknown as HostReportedState;
+  return reportOf({ instances, volumes: [] });
 }
 
 function serviceWith(behaviour: FakeBehaviour = {}) {
@@ -572,7 +603,9 @@ describe('a host reporting is what moves a release through its states', () => {
 
     await service.applyHostReport({ reported: report([]) });
 
-    expect(deploymentsRepo.failed).toEqual([DEPLOYMENT_ID]);
+    expect(deploymentsRepo.failed).toEqual([
+      { deploymentId: DEPLOYMENT_ID, message: FAILURE_MESSAGE },
+    ]);
     expect(deploymentsRepo.applied).toEqual([]);
   });
 
@@ -580,6 +613,54 @@ describe('a host reporting is what moves a release through its states', () => {
     const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
 
     await service.applyHostReport({ reported: report([]) });
+
+    expect(deploymentsRepo.failed).toEqual([]);
+  });
+
+  // A host that cannot make the filesystem never reaches a microVM, so waiting out the deadline
+  // would end the release with a message about a host that never tried.
+  test('one whose filesystem the host could not create is failed with the reason', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
+
+    await service.applyHostReport({ reported: reportOf({ instances: [], volumes: [volume()] }) });
+
+    expect(deploymentsRepo.failed).toEqual([
+      { deploymentId: DEPLOYMENT_ID, message: `${DATA_NOT_CREATED}: ${HOST_FULL}.` },
+    ]);
+    expect(deploymentsRepo.applied).toEqual([]);
+  });
+
+  test('and with no reason given, says only that much', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
+
+    await service.applyHostReport({
+      reported: reportOf({ instances: [], volumes: [volume({ message: undefined })] }),
+    });
+
+    expect(deploymentsRepo.failed).toEqual([
+      { deploymentId: DEPLOYMENT_ID, message: `${DATA_NOT_CREATED}.` },
+    ]);
+  });
+
+  // The volume was there for the microVM to start on, so whatever went wrong with it since is
+  // reported through the instance rather than by ending the release from here.
+  test('a release already past pending is left to the instance', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow({ state: 'running' })] });
+
+    await service.applyHostReport({
+      reported: reportOf({ instances: [instance({ state: 'running' })], volumes: [volume()] }),
+    });
+
+    expect(deploymentsRepo.failed).toEqual([]);
+    expect(deploymentsRepo.applied).toHaveLength(1);
+  });
+
+  test('a volume that was made says nothing about the release', async () => {
+    const { deploymentsRepo, service } = serviceWith({ live: [liveRow()] });
+
+    await service.applyHostReport({
+      reported: reportOf({ instances: [], volumes: [volume({ state: 'ready' })] }),
+    });
 
     expect(deploymentsRepo.failed).toEqual([]);
   });
