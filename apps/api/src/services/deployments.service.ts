@@ -1,4 +1,5 @@
 import type {
+  AppId,
   ArtifactId,
   Deployment,
   DeploymentId,
@@ -6,6 +7,7 @@ import type {
   HostReportedState,
   ImportId,
   ReportedInstance,
+  ReportedVolume,
   Timestamp,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
@@ -20,6 +22,7 @@ import type {
   DeploymentRow,
   DeploymentsByAppInput,
   DeploymentsRepositoryContract,
+  LiveDeploymentRow,
   OwnedApp,
   ReportedDeployment,
   RollbackDeploymentInput,
@@ -29,6 +32,7 @@ import { Service } from '#services/service.ts';
 const LIVE_DEPLOYMENT_CONSTRAINT = schema.deployments._indexes.deployments_live_idx._indexName;
 
 const NEVER_STARTED = 'No host started this deployment in time.';
+const DATA_NOT_CREATED = "The host could not create this app's data";
 const ANOTHER_DEPLOYMENT = 'Another deployment for this app is being started.';
 // A stranger's app is deployed once. A rollback is a further deployment by definition, so it is
 // refused before the repository is asked anything.
@@ -43,6 +47,32 @@ const NO_SUCH_IMPORT = 'No uploaded import of that name is ready to be used.';
 const DATA_EXISTS = "This app's data already exists, so it cannot be created from an import.";
 
 export type PublicDeployment = Omit<Deployment, 'config'> & { config: PublicAppConfig };
+
+type Failure = { deploymentId: DeploymentId; message: string };
+
+/**
+ * A release waiting on a filesystem the host has just said it cannot make, which is the one
+ * thing a host says about a deployment it has no microVM for — the deadline would otherwise be
+ * all that ever ended it. Only a pending one: once an instance has been reported the volume was
+ * there, and whatever the host says about it afterwards is the instance's story to tell.
+ */
+function dataNotCreated({
+  row,
+  volumes,
+}: {
+  row: LiveDeploymentRow;
+  volumes: ReadonlyMap<AppId, ReportedVolume>;
+}): Failure | undefined {
+  const volume = row.state === 'pending' ? volumes.get(row.app_id) : undefined;
+  if (!volume) {
+    return undefined;
+  }
+  const message =
+    volume.message === undefined
+      ? `${DATA_NOT_CREATED}.`
+      : `${DATA_NOT_CREATED}: ${volume.message}.`;
+  return { deploymentId: row.id, message };
+}
 
 /**
  * An artifact to run, or a release to go back to. Which of the two a request is saying decides
@@ -108,20 +138,37 @@ export class DeploymentsService extends Service {
    *
    * Every live deployment is considered rather than only the ones the report names: one no
    * instance has appeared for is exactly the case a startup deadline exists for, and it is
-   * knowable only by looking at the deployments the report left out.
+   * knowable only by looking at the deployments the report left out. The volumes are read
+   * first, because a host that cannot make an app's filesystem never gets as far as an instance,
+   * and has said why.
    */
   async applyHostReport({ reported }: { reported: HostReportedState }): Promise<void> {
     const instances = new Map(
       reported.instances.map((instance) => [instance.deploymentId, instance]),
+    );
+    const unprovisioned = new Map(
+      reported.volumes
+        .filter((volume) => volume.state === 'failed')
+        .map((volume) => [volume.appId, volume]),
     );
     const now = new Date();
     const live = await this.deploymentsRepo.listLive();
 
     const observed: ReportedDeployment[] = [];
     const activated: DeploymentId[] = [];
-    const overdue: DeploymentId[] = [];
+    const failed: Failure[] = [];
 
     for (const row of live) {
+      const notCreated = dataNotCreated({ row, volumes: unprovisioned });
+      if (notCreated) {
+        this.logger.warn('deployment failed before its data existed', {
+          deploymentId: row.id,
+          appId: row.app_id,
+          message: notCreated.message,
+        });
+        failed.push(notCreated);
+        continue;
+      }
       const instance = instances.get(row.id);
       const state = new DeploymentLifecycle({
         state: row.state,
@@ -143,7 +190,7 @@ export class DeploymentsService extends Service {
       if (instance) {
         observed.push(toReportedDeployment({ instance, state }));
       } else if (state === 'failed') {
-        overdue.push(row.id);
+        failed.push({ deploymentId: row.id, message: NEVER_STARTED });
       }
     }
 
@@ -154,8 +201,8 @@ export class DeploymentsService extends Service {
         at: servedFrom({ instance: instances.get(deploymentId), reportedAt: reported.reportedAt }),
       });
     }
-    for (const deploymentId of overdue) {
-      await this.deploymentsRepo.fail({ deploymentId, message: NEVER_STARTED });
+    for (const failure of failed) {
+      await this.deploymentsRepo.fail(failure);
     }
   }
 

@@ -745,6 +745,7 @@ export interface ISelectDeploymentByIdResult {
 /** Result of query `SelectLiveDeployments`. */
 export interface ISelectLiveDeploymentsResult {
     id: IDeploymentsColumns["id"];
+    app_id: IDeploymentsColumns["app_id"];
     state: IDeploymentsColumns["state"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
