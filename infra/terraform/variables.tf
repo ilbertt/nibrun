@@ -68,8 +68,9 @@ variable "port_relay_instance_type" {
 }
 
 # Restated from the agent's own base, because a security group is the other half
-# of opening a port and nothing compares the two numbers — the same bargain as
-# nbds_max in app_host_user_data.sh.tftpl. One per slot, so it cannot run out.
+# of opening a port and nothing compares the two numbers. One per slot, so it
+# cannot run out: `tenant_port_last` is the base plus the last slot, which is
+# `SLOT_COUNT - 1` in apps/agent/src/lib/network/slot.ts.
 variable "tenant_port_first" {
   type        = number
   default     = 22000
@@ -78,7 +79,7 @@ variable "tenant_port_first" {
 
 variable "tenant_port_last" {
   type        = number
-  default     = 22062
+  default     = 22126
   description = "Last port a tenant can be given, inclusive. Headroom runs to about 32767, where this would meet the kernel's own ephemeral range."
 }
 
