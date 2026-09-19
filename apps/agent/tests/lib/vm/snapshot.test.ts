@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DeploymentIdSchema, Value } from '@repo/protocol';
 import { Effect, Option } from 'effect';
 import { writeJsonFile } from '#lib/json-store.ts';
+import { SLOT_COUNT } from '#lib/network/slot.ts';
 import {
   driftFrom,
   ensureLoadable,
@@ -131,7 +132,6 @@ describe('the moments a microVM must not be snapshotted', () => {
 const GIB = 1_073_741_824;
 const DEFAULT_MEMORY_MIB = 256;
 const A_GENEROUS_MEMORY_MIB = 4_096;
-const SLOTS = 63;
 const NOTHING = 0;
 
 /** An app host as the fleet runs it: 110 GiB of instance store, 70 GiB of it ZeroFS's. */
@@ -159,12 +159,16 @@ const ANOTHER_MEMORY_FILE_BYTES = 512;
 // disk snapshots filled is every app on the host losing the filesystem it runs from — including
 // every app that never sleeps.
 describe('what snapshots may hold on a host', () => {
-  test('a host asleep in every slot at the default memory size is nowhere near the bound', () => {
-    const asleep = SLOTS * snapshotBytesFor(DEFAULT_MEMORY_MIB);
-    expect(asleep).toBeLessThan(snapshotBudget(hostDisk));
+  // The slot count is sized to this: on a host full of default-sized apps, the last one to fall
+  // asleep is still let.
+  test('a host asleep in every slot at the default memory size fits within the bound', () => {
+    const allButOne = (SLOT_COUNT - 1) * snapshotBytesFor(DEFAULT_MEMORY_MIB);
+    expect(SLOT_COUNT * snapshotBytesFor(DEFAULT_MEMORY_MIB)).toBeLessThanOrEqual(
+      snapshotBudget(hostDisk),
+    );
     expect(
       refusalForDisk({
-        disk: { ...hostDisk, snapshotBytes: asleep },
+        disk: { ...hostDisk, snapshotBytes: allButOne },
         wantedBytes: snapshotBytesFor(DEFAULT_MEMORY_MIB),
       }),
     ).toBeUndefined();
