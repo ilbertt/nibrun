@@ -23,7 +23,7 @@ export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsDeploymentIdLogsController'))
   .use(AuthPlugin)
   .use(LogsServicePlugin)
-  .guard({ auth: Identity.Required })
+  .guard({ auth: Identity.Optional })
   .get(
     '/apps/:appId/deployments/:deploymentId/logs',
     // Not a generator itself: the ownership check has to answer before anything is streamed, and

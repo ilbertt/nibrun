@@ -190,10 +190,9 @@ export class AppsService extends Service {
     name: AppName;
     config?: NewAppConfig;
   }): Promise<PublicApp> {
-    const environment = config?.environment ?? {};
+    const asked = { ...configWithDefaults(config), environment: config?.environment ?? {} };
+    const { environment, ...withDefaults } = isAnonymous ? withoutAPort(asked) : asked;
     refuseRedactedValues(environment);
-    const withDefaults = configWithDefaults(config);
-    refusePortToAStranger({ isAnonymous, hasExtraPublicPort: withDefaults.hasExtraPublicPort });
     refuseValuesNeedingAPort({
       environment,
       hasExtraPublicPort: withDefaults.hasExtraPublicPort,
@@ -707,21 +706,23 @@ function refuseValuesNeedingAPort({
   }
 }
 
+type AskedAppConfig = Omit<PublicAppConfig, 'environment'> & { environment: TenantEnvironment };
+
 /**
  * A port besides HTTP is a raw listener on the public internet, and a person with no identity is
- * handed nothing that reaches past the HTTPS the platform terminates for them. Only creation
+ * handed nothing that reaches past the HTTPS the platform terminates for them. Taken away rather
+ * than refused, so a link written for the port — sharkord's — still deploys; and the values naming
+ * it go with it, because the guest fails a boot over a reference it was not given. Only creation
  * asks: changing an app is not a stranger's to do at all.
  */
-function refusePortToAStranger({
-  isAnonymous,
-  hasExtraPublicPort,
-}: {
-  isAnonymous: boolean;
-  hasExtraPublicPort: boolean;
-}): void {
-  if (hasExtraPublicPort && isAnonymous) {
-    throw new ForbiddenError('Sign in to open a public port besides HTTP.');
-  }
+function withoutAPort(config: AskedAppConfig): AskedAppConfig {
+  return {
+    ...config,
+    hasExtraPublicPort: false,
+    environment: Object.fromEntries(
+      Object.entries(config.environment).filter(([, value]) => !namesExtraPublicPortValues(value)),
+    ),
+  };
 }
 
 // An app the caller does not own is indistinguishable from one that does not exist; a 403 would

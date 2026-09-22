@@ -12,12 +12,9 @@ import { Route as LogsRoute } from '#routes/(dashboard)/apps/$appId/logs.tsx';
 export function AppTabs() {
   const appId = useAppId();
   const tab = useAppTab();
-  const anonymous = useIsAnonymous();
-
-  // Logs, files and domains wait for an identity, and a strip with one tab is a strip.
-  if (anonymous) {
-    return null;
-  }
+  // Domains wait for an identity. Logs and files do not: a binary that prints its first
+  // credential once, on boot, is one a stranger has to be able to read.
+  const domains = !useIsAnonymous();
 
   return (
     <Tabs value={tab}>
@@ -43,9 +40,11 @@ export function AppTabs() {
         >
           Files
         </TabsTrigger>
-        <TabsTrigger value="domains" render={<Link to={DomainsRoute.to} params={{ appId }} />}>
-          Domains
-        </TabsTrigger>
+        {domains && (
+          <TabsTrigger value="domains" render={<Link to={DomainsRoute.to} params={{ appId }} />}>
+            Domains
+          </TabsTrigger>
+        )}
       </TabsList>
     </Tabs>
   );

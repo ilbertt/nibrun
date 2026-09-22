@@ -42,7 +42,8 @@ export function DeployConfiguration({
   form: DeployFormState;
   suggested: DeploySuggestion | undefined;
 }) {
-  const { api, locked, replacing, defaultPort, defaultExtraPublicPort, defaultArgs } = form;
+  const { api, locked, replacing, defaultPort, defaultExtraPublicPort, defaultArgs, portOffered } =
+    form;
 
   return (
     <>
@@ -87,35 +88,13 @@ export function DeployConfiguration({
                     id="deploy-extra-public-port"
                     checked={field.state.value ?? defaultExtraPublicPort}
                     onCheckedChange={(checked) => field.handleChange(checked)}
+                    disabled={!portOffered}
                   />
                   <FieldContent>
                     <FieldLabel htmlFor="deploy-extra-public-port">
                       Give this app a public port besides HTTPS
                     </FieldLabel>
-                    <FieldDescription>
-                      One port, TCP and UDP, for a protocol HTTPS cannot carry — WebRTC media, a
-                      game server, anything that has to be reached directly.
-                    </FieldDescription>
-                    <FieldDescription>
-                      You do not pick the number. nibrun assigns it and sets these for the app:
-                    </FieldDescription>
-                    <ul className="list-disc space-y-1 pt-2 pb-3 pl-4 text-muted-foreground text-sm">
-                      {EXTRA_PUBLIC_PORT_VALUES.map(({ name, description }) => (
-                        <li key={name}>
-                          <code className="font-mono">{name}</code> — {description}
-                        </li>
-                      ))}
-                    </ul>
-                    <FieldDescription>
-                      Your own variables may name them — set{' '}
-                      <code className="font-mono">
-                        ANNOUNCED_IP={interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}
-                      </code>{' '}
-                      and the app reads it under the name it already expects.
-                    </FieldDescription>
-                    <FieldDescription>
-                      Free for now, and likely to become part of a paid plan later.
-                    </FieldDescription>
+                    {portOffered ? <ExtraPublicPortExplained /> : <ExtraPublicPortAfterSigningIn />}
                   </FieldContent>
                 </Field>
               )}
@@ -267,6 +246,50 @@ function EnvironmentMark({ mark }: { mark: EnvironmentMarkKind }) {
     );
   }
   return null;
+}
+
+function ExtraPublicPortExplained() {
+  return (
+    <>
+      <FieldDescription>
+        One port, TCP and UDP, for a protocol HTTPS cannot carry — WebRTC media, a game server,
+        anything that has to be reached directly.
+      </FieldDescription>
+      <FieldDescription>
+        You do not pick the number. nibrun assigns it and sets these for the app:
+      </FieldDescription>
+      <ul className="list-disc space-y-1 pt-2 pb-3 pl-4 text-muted-foreground text-sm">
+        {EXTRA_PUBLIC_PORT_VALUES.map(({ name, description }) => (
+          <li key={name}>
+            <code className="font-mono">{name}</code> — {description}
+          </li>
+        ))}
+      </ul>
+      <FieldDescription>
+        Your own variables may name them — set{' '}
+        <code className="font-mono">
+          ANNOUNCED_IP={interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}
+        </code>{' '}
+        and the app reads it under the name it already expects.
+      </FieldDescription>
+      <FieldDescription>
+        Free for now, and likely to become part of a paid plan later.
+      </FieldDescription>
+    </>
+  );
+}
+
+/**
+ * Greyed rather than gone, as every other thing a stranger is not offered: the box says what
+ * signing in gets, and that a link asking for the port is answered without one until then.
+ */
+function ExtraPublicPortAfterSigningIn() {
+  return (
+    <FieldDescription>
+      Sign in to open one. An app made without an account is deployed without it, whatever the link
+      asked for.
+    </FieldDescription>
+  );
 }
 
 /** What the section says while it is shut, in the one word a count would be. */

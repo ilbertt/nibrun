@@ -28,6 +28,7 @@ import { discardHandedOffBinary } from '#lib/handoff-store.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
+import { useHasIdentity } from '#lib/hooks/use-has-identity.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export type DeployFormValues = {
@@ -67,6 +68,8 @@ export type DeployFormState = {
   defaultPort: string;
   defaultExtraPublicPort: boolean;
   defaultArgs: string;
+  /** Whether a port besides HTTPS may be asked for, which waits for an identity. */
+  portOffered: boolean;
 };
 
 const UNTOUCHED: DeployFormValues = {
@@ -171,6 +174,7 @@ export function useDeployForm({
 }): DeployFormState {
   const { start } = useDeployRun();
   const apps = useApps();
+  const portOffered = useHasIdentity();
   const owned = apps.data ?? [];
   const locked = appId !== undefined;
   const replacing = owned.find((app) => app.id === appId);
@@ -179,7 +183,7 @@ export function useDeployForm({
   const api: DeployFormApi = useForm({
     // Read once, at mount. A binary handed over from the landing page is only rendered into
     // this form after it has been read out of storage, so there is nothing to arrive later.
-    defaultValues: suggestedValues({ binary, suggested }),
+    defaultValues: suggestedValues({ binary, suggested, portOffered }),
     onSubmit: ({ value }) => {
       const request = targetResolved ? asReleaseRequest({ value, replacing }) : undefined;
       if (request !== undefined) {
@@ -197,6 +201,7 @@ export function useDeployForm({
     defaultPort: String(replacing?.config.httpPort ?? DEFAULT_HTTP_PORT),
     defaultExtraPublicPort: replacing?.config.hasExtraPublicPort ?? false,
     defaultArgs: replacing?.config.args.join('\n') ?? '',
+    portOffered,
   };
 }
 
@@ -218,9 +223,11 @@ function spendsHandoff(binary: File | undefined): BinaryFieldListeners {
 function suggestedValues({
   binary,
   suggested,
+  portOffered,
 }: {
   binary: File | undefined;
   suggested: DeploySuggestion | undefined;
+  portOffered: boolean;
 }): DeployFormValues {
   return {
     ...UNTOUCHED,
@@ -233,7 +240,9 @@ function suggestedValues({
         : { url: suggested.binary, sha256: suggested.sha256 }),
     name: suggested?.name ?? namedByUrl(suggested?.binary ?? '') ?? UNTOUCHED.name,
     port: suggested?.port === undefined ? undefined : String(suggested.port),
-    extraPublicPort: suggested?.extraPublicPort,
+    // The api makes a stranger's app without the port whatever the link asked, so the form asks
+    // for what it will get.
+    extraPublicPort: portOffered ? suggested?.extraPublicPort : undefined,
     args: suggested?.args?.join('\n'),
     environment: suggested?.environment && askedVariables(suggested.environment),
   };

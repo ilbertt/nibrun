@@ -1564,21 +1564,45 @@ describe("what a stranger held becomes the person's who they signed in as", () =
 });
 
 /**
- * A raw listener on the public internet is not handed to a person with no identity. Only the
- * creation that asks for it is refused; an app created without is theirs.
+ * A raw listener on the public internet is not handed to a person with no identity. The ask is
+ * dropped rather than refused, and the values that would name the port go with it: a link written
+ * for one still deploys, and the guest is never asked to expand a reference it was not given.
  */
 describe('a stranger is not given a public port besides HTTP', () => {
-  test('an app created asking for one is refused', async () => {
-    const service = serviceWith({ appsRepo: new StubAppsRepository({ failures: 0 }) });
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being dropped, not an interpolation
+  const ANNOUNCED_IP = '${NIBRUN_PUBLIC_IPV4}';
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being dropped, not an interpolation
+  const WEBRTC_PORT = '${NIBRUN_EXTRA_PUBLIC_PORT}';
 
-    await expect(
-      service.create({
-        ownerId: OWNER_ID,
-        isAnonymous: true,
-        name: APP_NAME,
-        config: { hasExtraPublicPort: true },
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+  test('an app created asking for one is made without it', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    const app = await serviceWith({ appsRepo }).create({
+      ownerId: OWNER_ID,
+      isAnonymous: true,
+      name: APP_NAME,
+      config: { hasExtraPublicPort: true },
+    });
+
+    expect(app.config.hasExtraPublicPort).toBe(false);
+    expect(appsRepo.offeredConfigs).toEqual([DEFAULT_STORED_CONFIG]);
+  });
+
+  test('the values that would name the port go with it, and the rest stay', async () => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+
+    const app = await serviceWith({ appsRepo }).create({
+      ownerId: OWNER_ID,
+      isAnonymous: true,
+      name: APP_NAME,
+      config: {
+        hasExtraPublicPort: true,
+        environment: asEnvironment({ ANNOUNCED_IP, WEBRTC_PORT, TOKEN: SECRET }),
+      },
+    });
+
+    expect(app.config.environment).toEqual({ TOKEN: REDACTED });
+    expect(Object.keys(appsRepo.offeredConfigs[0]?.environment ?? {})).toEqual(['TOKEN']);
   });
 
   test('an app created without asking is theirs', async () => {
