@@ -6,7 +6,7 @@ import { CheckIcon, ChevronDownIcon, CopyIcon } from 'lucide-react';
 import { useState } from 'react';
 
 const STARTER_REPO_URL = 'https://github.com/ilbertt/bun-full-stack-starter';
-const AGENT_PROMPT = `Create my personal drive using ${STARTER_REPO_URL} and deploy it on ${BASE_DOMAIN}`;
+const AGENT_PROMPT = `Ask me what I want to build, then build it from ${STARTER_REPO_URL} and deploy it on ${BASE_DOMAIN}.`;
 const PROMPT_PANEL_ID = 'starter-prompt';
 
 /** The prompt that turns an agent into the thing that writes the app, handed over to be pasted. */
@@ -25,15 +25,14 @@ export function AgentPrompt() {
               does not resize under the cursor for the second and a half the confirmation lasts. */}
           <span className="grid text-center">
             <span className={`col-start-1 row-start-1 ${copied ? 'invisible' : ''}`}>
-              Create one with your agent
+              Create your app
             </span>
             <span className={`col-start-1 row-start-1 ${copied ? '' : 'invisible'}`}>
-              Copied to clipboard
+              Prompt copied
             </span>
           </span>
-          {/* The first thing to go when the row runs out of width: the label already says an agent
-              is what this is for, and the marks only say which ones. */}
-          <span className="hidden items-center gap-1.5 text-muted-foreground transition-colors group-hover/button:text-foreground sm:flex">
+          {/* The marks are all that says this is for an agent, so they stay at every width. */}
+          <span className="flex items-center gap-1.5 text-muted-foreground transition-colors group-hover/button:text-foreground">
             <ClaudeMark />
             <CodexMark />
             <CursorMark />
