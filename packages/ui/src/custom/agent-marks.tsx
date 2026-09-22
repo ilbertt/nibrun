@@ -1,5 +1,5 @@
-// Nominative use: the marks name which agents the prompt is meant for, next to a label that
-// says so. Paths are the CC0 simple-icons glyphs.
+// Nominative use: the marks name which agents the prompt is meant for. Paths are the CC0
+// simple-icons glyphs.
 
 export function ClaudeMark() {
   return (
