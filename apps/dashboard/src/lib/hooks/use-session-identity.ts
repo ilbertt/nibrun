@@ -7,7 +7,9 @@ export function useSessionIdentity(): SessionIdentity {
   if (session === null) {
     return SessionIdentity.Visitor;
   }
-  // Null is a person with an identity: better-auth never wrote the column for a user from before
-  // there were strangers.
-  return session.user.isAnonymous === true ? SessionIdentity.Stranger : SessionIdentity.Person;
+  // Null is an account: better-auth never wrote the column for a user from before there were
+  // anonymous ones.
+  return session.user.isAnonymous === true
+    ? SessionIdentity.Anonymous
+    : SessionIdentity.WithAccount;
 }

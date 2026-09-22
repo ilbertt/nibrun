@@ -175,7 +175,7 @@ export function useDeployForm({
 }): DeployFormState {
   const { start } = useDeployRun();
   const apps = useApps();
-  const portOffered = useSessionIdentity() === SessionIdentity.Person;
+  const portOffered = useSessionIdentity() === SessionIdentity.WithAccount;
   const owned = apps.data ?? [];
   const locked = appId !== undefined;
   const replacing = owned.find((app) => app.id === appId);

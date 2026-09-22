@@ -15,7 +15,7 @@ export function AppTabs() {
   const tab = useAppTab();
   // Domains wait for an identity. Logs and files do not: a binary that prints its first
   // credential once, on boot, is one a stranger has to be able to read.
-  const domains = useSessionIdentity() === SessionIdentity.Person;
+  const domains = useSessionIdentity() === SessionIdentity.WithAccount;
 
   return (
     <Tabs value={tab}>

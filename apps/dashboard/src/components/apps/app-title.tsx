@@ -8,7 +8,7 @@ export function AppTitle() {
   const appId = useAppId();
   const app = useApp(appId);
   // Renaming changes the app, which waits for an identity.
-  const renameable = useSessionIdentity() === SessionIdentity.Person;
+  const renameable = useSessionIdentity() === SessionIdentity.WithAccount;
 
   return (
     <div className="flex min-w-0 items-center gap-1">

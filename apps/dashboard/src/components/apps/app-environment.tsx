@@ -13,7 +13,7 @@ export function AppEnvironment({ app }: { app: AppSummary }) {
   const names = storedNames(app);
   const beyond = names.length - NAMES_SHOWN;
   // Editing them changes the app, which waits for an identity.
-  const editable = useSessionIdentity() === SessionIdentity.Person;
+  const editable = useSessionIdentity() === SessionIdentity.WithAccount;
 
   return (
     <div className="flex flex-col gap-2">

@@ -8,5 +8,5 @@ import { SessionIdentity } from '#lib/session-identity.ts';
 export function useAppActions(appId: string): AppActions {
   const app = useApp(appId);
   const actions = appActions(useAppStatus(app.data).status);
-  return useSessionIdentity() === SessionIdentity.Person ? actions : withoutIdentity(actions);
+  return useSessionIdentity() === SessionIdentity.WithAccount ? actions : withoutIdentity(actions);
 }
