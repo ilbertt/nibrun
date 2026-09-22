@@ -28,7 +28,8 @@ import { discardHandedOffBinary } from '#lib/handoff-store.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
-import { useHasIdentity } from '#lib/hooks/use-has-identity.ts';
+import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
+import { SessionIdentity } from '#lib/session-identity.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export type DeployFormValues = {
@@ -174,7 +175,7 @@ export function useDeployForm({
 }): DeployFormState {
   const { start } = useDeployRun();
   const apps = useApps();
-  const portOffered = useHasIdentity();
+  const portOffered = useSessionIdentity() === SessionIdentity.Person;
   const owned = apps.data ?? [];
   const locked = appId !== undefined;
   const replacing = owned.find((app) => app.id === appId);

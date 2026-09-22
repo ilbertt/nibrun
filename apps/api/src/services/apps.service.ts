@@ -191,7 +191,7 @@ export class AppsService extends Service {
     config?: NewAppConfig;
   }): Promise<PublicApp> {
     const asked = { ...configWithDefaults(config), environment: config?.environment ?? {} };
-    const { environment, ...withDefaults } = isAnonymous ? withoutAPort(asked) : asked;
+    const { environment, ...withDefaults } = isAnonymous ? withoutExtraPort(asked) : asked;
     refuseRedactedValues(environment);
     refuseValuesNeedingAPort({
       environment,
@@ -715,7 +715,7 @@ type AskedAppConfig = Omit<PublicAppConfig, 'environment'> & { environment: Tena
  * it go with it, because the guest fails a boot over a reference it was not given. Only creation
  * asks: changing an app is not a stranger's to do at all.
  */
-function withoutAPort(config: AskedAppConfig): AskedAppConfig {
+function withoutExtraPort(config: AskedAppConfig): AskedAppConfig {
   return {
     ...config,
     hasExtraPublicPort: false,
