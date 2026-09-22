@@ -25,7 +25,7 @@ export const AppsAppIdDeploymentsDeploymentIdFilesystemController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsDeploymentIdFilesystemController'))
   .use(AuthPlugin)
   .use(FilesystemServicePlugin)
-  .guard({ auth: Identity.Required })
+  .guard({ auth: Identity.Optional })
   .get(
     '/apps/:appId/deployments/:deploymentId/filesystem',
     async ({ filesystemService, params, query, user, request, status }) => {
