@@ -24,6 +24,7 @@ Open source projects that already ship a single binary. One click to deploy:
 | **[OpenConnector](https://nibrun.com/deploy/open-connector)** | One OAuth hub for 1,000+ providers, with prebuilt actions your agents can call. |
 | **[Context Use](https://nibrun.com/deploy/context-use)** | A personal knowledge base your agents read and write over MCP, behind a passkey. |
 | **[nibrun-vitals](https://nibrun.com/deploy/nibrun-vitals)** | The microVM it runs on, as a face you can boop: live CPU, memory, disk, network, visitors and naps. |
+| **[PicoShare](https://nibrun.com/deploy/picoshare)** | A minimalist file host: upload a file, share a link, no account needed to download. |
 
 ## Why
 
