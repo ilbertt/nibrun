@@ -331,6 +331,26 @@ export const DEPLOY_PRESETS = {
       minimal: true,
     },
   },
+  gotify: {
+    title: 'Gotify',
+    subtitle: 'A push notification server your own scripts post to, with apps to receive them.',
+    category: DeployCategory.Communication,
+    deployLink: {
+      name: 'gotify',
+      binary: 'https://github.com/gotify/server/releases/download/v3.1.1/gotify-linux-amd64.zip',
+      sha256: 'd452faad071981d191d5c95f70d0f9520dc2ef2336b2b03055e12cfabfbae2d2',
+      port: 8080,
+      env: [
+        `GOTIFY_SERVER_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+        'GOTIFY_DATABASE_DIALECT=sqlite3',
+        `GOTIFY_DATABASE_CONNECTION=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/gotify.db`,
+        `GOTIFY_UPLOADEDIMAGESDIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/images`,
+        `GOTIFY_PLUGINSDIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/plugins`,
+        'GOTIFY_DEFAULTUSER_PASS',
+      ],
+      minimal: true,
+    },
+  },
 } satisfies Record<string, DeployPreset>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;

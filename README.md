@@ -33,6 +33,7 @@ Open source projects that already ship a single binary. One click to deploy:
 | **[GoatCounter](https://nibrun.com/deploy/goatcounter)** | Web analytics without cookies, and without following anyone between sites. |
 | **[Remark42](https://nibrun.com/deploy/remark42)** | Comments for a static blog, with no tracking and no third party. |
 | **[Traggo](https://nibrun.com/deploy/traggo)** | Time tracking where an entry is a set of tags rather than a project. |
+| **[Gotify](https://nibrun.com/deploy/gotify)** | A push notification server your own scripts post to, with apps to receive them. |
 
 ## Why
 
