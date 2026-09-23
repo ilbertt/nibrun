@@ -399,6 +399,25 @@ export const DEPLOY_PRESETS = {
       minimal: true,
     },
   },
+  yarr: {
+    title: 'yarr',
+    subtitle: 'A small feed reader, driven from the keyboard, that keeps everything in one file.',
+    category: DeployCategory.Feeds,
+    deployLink: {
+      name: 'yarr',
+      binary: 'https://github.com/nkanaev/yarr/releases/download/v2.9/yarr_linux_amd64.zip',
+      sha256: 'fe0b176d53d77706760d00fe5232561437a3efd7b61d945eef09eedc7a7947f4',
+      port: 7070,
+      env: [
+        'YARR_ADDR=0.0.0.0:7070',
+        `YARR_DB=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/yarr.db`,
+        // Carried without a value, as `username:password`: yarr serves its api to anyone who
+        // asks until this is set.
+        'YARR_AUTH',
+      ],
+      minimal: true,
+    },
+  },
 } satisfies Record<string, DeployPreset>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
