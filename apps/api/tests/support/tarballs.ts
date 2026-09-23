@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { gzipSync } from 'node:zlib';
+import { compressedOf } from '#tests/support/compress.ts';
 
 /** An entry as a release tarball carries one, and the ways a writer can have written it. */
 export type TarballEntry = {
@@ -56,6 +57,11 @@ export function tarballOf(entries: TarballEntry[]): Uint8Array {
 /** The same, as a url actually serves one. */
 export function gzippedTarballOf(entries: TarballEntry[]): Uint8Array {
   return gzipSync(tarballOf(entries));
+}
+
+/** The same, through Unix `compress` — which is what some releases named `.tar.gz` really are. */
+export function compressedTarballOf(entries: TarballEntry[]): Uint8Array {
+  return compressedOf(tarballOf(entries));
 }
 
 function headerOf(entry: TarballEntry): Uint8Array {
