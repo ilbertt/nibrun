@@ -386,6 +386,19 @@ export const DEPLOY_PRESETS = {
       minimal: true,
     },
   },
+  'pdf-signer': {
+    title: 'PDF Signer',
+    subtitle: 'Your handwritten signature, kept once and stamped onto any PDF, behind a passkey.',
+    category: DeployCategory.Productivity,
+    deployLink: {
+      name: 'pdf-signer',
+      // No checksum, for the reason context-use carries none.
+      binary:
+        'https://github.com/massimoalbarello/pdf-signer/releases/download/nibrun-latest/pdf-signer',
+      port: 3000,
+      minimal: true,
+    },
+  },
 } satisfies Record<string, DeployPreset>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
