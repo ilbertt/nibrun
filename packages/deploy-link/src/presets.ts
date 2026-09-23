@@ -117,6 +117,16 @@ export const DEPLOY_PRESETS = {
     ],
     minimal: true,
   },
+  shiori: {
+    name: 'shiori',
+    binary:
+      'https://github.com/go-shiori/shiori/releases/download/v1.8.0/shiori_Linux_x86_64_1.8.0.tar.gz',
+    sha256: '20552c4d91c720dc9786d73a7f5b68abd9ed32addb177861f89ea5d4e5937d3f',
+    port: 8080,
+    arg: ['serve', '--address', '0.0.0.0', '--port', '8080'],
+    env: [`SHIORI_DIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`],
+    minimal: true,
+  },
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
