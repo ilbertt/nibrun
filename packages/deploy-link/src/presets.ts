@@ -169,6 +169,26 @@ export const DEPLOY_PRESETS = {
     ],
     minimal: true,
   },
+  goatcounter: {
+    name: 'goatcounter',
+    binary:
+      'https://github.com/arp242/goatcounter/releases/download/v2.7.0/goatcounter-v2.7.0-linux-amd64.gz',
+    sha256: '98d221cb9c8ef2bf76d8daa9cca647839f8d8b0bb5bc7400ff9337c5da834511',
+    port: 8080,
+    arg: [
+      'serve',
+      '-listen',
+      '0.0.0.0:8080',
+      '-db',
+      'sqlite+/app/data/goatcounter.sqlite3',
+      // TLS is already terminated at the edge, and left to itself it would go and ask for a
+      // certificate of its own for a name it cannot answer the challenge on.
+      '-tls',
+      'none',
+      '-automigrate',
+    ],
+    minimal: true,
+  },
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;

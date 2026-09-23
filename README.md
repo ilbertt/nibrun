@@ -30,6 +30,7 @@ Open source projects that already ship a single binary. One click to deploy:
 | **[Fusion](https://nibrun.com/deploy/fusion)** | An RSS reader for your own feeds, behind a password. |
 | **[File Browser](https://nibrun.com/deploy/filebrowser)** | A file manager for the volume in a browser: upload, preview, rename, share. |
 | **[MicroBin](https://nibrun.com/deploy/microbin)** | A pastebin for text, files and links, with expiry and QR codes. |
+| **[GoatCounter](https://nibrun.com/deploy/goatcounter)** | Web analytics without cookies, and without following anyone between sites. |
 
 ## Why
 
