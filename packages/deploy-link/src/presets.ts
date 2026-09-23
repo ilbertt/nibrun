@@ -189,6 +189,26 @@ export const DEPLOY_PRESETS = {
     ],
     minimal: true,
   },
+  remark42: {
+    name: 'remark42',
+    binary:
+      'https://github.com/umputun/remark42/releases/download/v1.17.1/remark42.linux-amd64.tar.gz',
+    sha256: '434e64fc0903d028e8506c4047e99260446d6a51573c8b2dc2492e43558519d4',
+    port: 8080,
+    arg: ['server'],
+    env: [
+      `REMARK_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
+      'LISTEN=0.0.0.0:8080',
+      `STORE_BOLT_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+      `BACKUP_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/backup`,
+      // Both default under `./var`, which is the working directory the tenant cannot write: left
+      // alone it panics on the first mkdir rather than starting.
+      `IMAGE_FS_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/pictures`,
+      `AVATAR_FS_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/avatars`,
+      'SECRET',
+    ],
+    minimal: true,
+  },
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;

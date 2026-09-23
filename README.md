@@ -31,6 +31,7 @@ Open source projects that already ship a single binary. One click to deploy:
 | **[File Browser](https://nibrun.com/deploy/filebrowser)** | A file manager for the volume in a browser: upload, preview, rename, share. |
 | **[MicroBin](https://nibrun.com/deploy/microbin)** | A pastebin for text, files and links, with expiry and QR codes. |
 | **[GoatCounter](https://nibrun.com/deploy/goatcounter)** | Web analytics without cookies, and without following anyone between sites. |
+| **[Remark42](https://nibrun.com/deploy/remark42)** | Comments for a static blog, with no tracking and no third party. |
 
 ## Why
 
