@@ -16,6 +16,7 @@ export enum DeployCategory {
   Communication = 'Communication',
   DeveloperTools = 'Developer tools',
   Analytics = 'Analytics',
+  Productivity = 'Productivity',
 }
 
 export type DeployPreset = {
@@ -306,6 +307,26 @@ export const DEPLOY_PRESETS = {
         `IMAGE_FS_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/pictures`,
         `AVATAR_FS_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/avatars`,
         'SECRET',
+      ],
+      minimal: true,
+    },
+  },
+  traggo: {
+    title: 'Traggo',
+    subtitle: 'Time tracking where an entry is a set of tags rather than a project.',
+    category: DeployCategory.Productivity,
+    deployLink: {
+      name: 'traggo',
+      binary:
+        'https://github.com/traggo/server/releases/download/v0.8.3/traggo_0.8.3_linux_amd64.tar.gz',
+      sha256: 'c14012c5d4975c23e8214770bba02a106de7fa8fcf1d10c7a127ebec30536639',
+      port: 3030,
+      env: [
+        `TRAGGO_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+        'TRAGGO_DATABASE_DIALECT=sqlite3',
+        `TRAGGO_DATABASE_CONNECTION=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/traggo.db`,
+        'TRAGGO_DEFAULT_USER_NAME',
+        'TRAGGO_DEFAULT_USER_PASS',
       ],
       minimal: true,
     },
