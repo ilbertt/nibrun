@@ -18,6 +18,17 @@ export function SiteHeader() {
         <Button variant="ghost" size="sm" render={<Link to="/" hash="pricing" />}>
           Pricing
         </Button>
+        {/* Hidden below `sm` for the same reason as llms.txt: the row is Pricing, Blog, the star
+            and the deploy key, and a fourth label puts the page into horizontal scroll on a
+            phone. The catalog is what a phone arrives on from search rather than navigates to. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="hidden sm:inline-flex"
+          render={<Link to="/apps" />}
+        >
+          Apps
+        </Button>
         <Button variant="ghost" size="sm" render={<Link to="/blog" />}>
           Blog
         </Button>

@@ -82,7 +82,11 @@
 .prose code {
   border-radius: calc(var(--radius) / 6);
   background: var(--muted);
-  padding: 0.125em 0.375em;
+  padding: 0.15em 0.3em;
+  /* Pulled back by about what the padding adds, so a chip takes up the room its text does. Left
+     to stand, the padding is a stripe of background the sentence reads as a second space before
+     the next word, and as a gap in front of a comma that follows one. */
+  margin-inline: -0.15em;
   font-size: 0.9em;
 }
 
@@ -110,6 +114,9 @@
 .prose pre code {
   background: none;
   padding: 0;
+  /* No chip in here, so nothing to pull back: left inherited, every block would start a fraction
+     of a character outside its own padding. */
+  margin-inline: 0;
   font-size: 0.875rem;
 }
 

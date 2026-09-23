@@ -1,5 +1,26 @@
 import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
 import type { DeployLink } from '#link.ts';
+import boopPage from '../content/boop.md?raw';
+import contextUsePage from '../content/context-use.md?raw';
+import filebrowserPage from '../content/filebrowser.md?raw';
+import fliptPage from '../content/flipt.md?raw';
+import fusionPage from '../content/fusion.md?raw';
+import giteaPage from '../content/gitea.md?raw';
+import goatcounterPage from '../content/goatcounter.md?raw';
+import gotifyPage from '../content/gotify.md?raw';
+import memosPage from '../content/memos.md?raw';
+import microbinPage from '../content/microbin.md?raw';
+import nibrunVitalsPage from '../content/nibrun-vitals.md?raw';
+import openConnectorPage from '../content/open-connector.md?raw';
+import openSyncPage from '../content/open-sync.md?raw';
+import pdfSignerPage from '../content/pdf-signer.md?raw';
+import picosharePage from '../content/picoshare.md?raw';
+import pocketbasePage from '../content/pocketbase.md?raw';
+import remark42Page from '../content/remark42.md?raw';
+import sharkordPage from '../content/sharkord.md?raw';
+import shioriPage from '../content/shiori.md?raw';
+import traggoPage from '../content/traggo.md?raw';
+import yarrPage from '../content/yarr.md?raw';
 
 /**
  * What a preset is filed under, in the order a catalog should offer them.
@@ -23,6 +44,10 @@ export type DeployPreset = {
   title: string;
   subtitle: string;
   category: DeployCategory;
+  repositoryUrl: string;
+  /** The upstream release the link pins, so anything offering it says what it would deploy. */
+  version: string;
+  markdownContent: string;
   deployLink: DeployLink;
 };
 
@@ -30,6 +55,9 @@ export type DeployPreset = {
 // that table when changing any entry here.
 export const DEPLOY_PRESETS = {
   pocketbase: {
+    repositoryUrl: 'https://github.com/pocketbase/pocketbase',
+    version: 'v0.40.3',
+    markdownContent: pocketbasePage,
     category: DeployCategory.Backends,
     title: 'PocketBase',
     subtitle: 'A database, auth, file storage and an admin UI, in one file.',
@@ -44,6 +72,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   sharkord: {
+    repositoryUrl: 'https://github.com/sharkord/sharkord',
+    version: 'v0.0.25',
+    markdownContent: sharkordPage,
     category: DeployCategory.Communication,
     title: 'Sharkord',
     subtitle: 'A self-hosted chat server with voice, video and screen sharing.',
@@ -63,6 +94,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   boop: {
+    repositoryUrl: 'https://github.com/chrisgreg/boop',
+    version: 'v1.3.0',
+    markdownContent: boopPage,
     category: DeployCategory.Communication,
     title: 'Boop',
     subtitle: 'A self-hosted notification inbox for your own apps.',
@@ -85,6 +119,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   gitea: {
+    repositoryUrl: 'https://github.com/go-gitea/gitea',
+    version: 'v1.28.0-dev-nibrun.3',
+    markdownContent: giteaPage,
     category: DeployCategory.DeveloperTools,
     title: 'Gitea',
     subtitle:
@@ -100,6 +137,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   'open-connector': {
+    repositoryUrl: 'https://github.com/oomol-lab/open-connector',
+    version: 'v1.5.0',
+    markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
     subtitle: 'One OAuth hub for 1,000+ providers, with prebuilt actions your agents can call.',
@@ -124,6 +164,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   'context-use': {
+    repositoryUrl: 'https://github.com/massimoalbarello/context-use',
+    version: 'nibrun-latest',
+    markdownContent: contextUsePage,
     category: DeployCategory.NotesAndKnowledge,
     title: 'Context Use',
     subtitle: 'A personal knowledge base your agents read and write over MCP, behind a passkey.',
@@ -139,6 +182,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   'nibrun-vitals': {
+    repositoryUrl: 'https://github.com/ilbertt/nibrun-vitals',
+    version: 'v2026.9.15-1',
+    markdownContent: nibrunVitalsPage,
     category: DeployCategory.Analytics,
     title: 'nibrun-vitals',
     subtitle:
@@ -153,6 +199,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   picoshare: {
+    repositoryUrl: 'https://github.com/mtlynch/picoshare',
+    version: 'v1.5.4',
+    markdownContent: picosharePage,
     category: DeployCategory.FilesAndSharing,
     title: 'PicoShare',
     subtitle: 'A minimalist file host: upload a file, share a link, no account needed to download.',
@@ -172,6 +221,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   memos: {
+    repositoryUrl: 'https://github.com/usememos/memos',
+    version: 'v0.31.0',
+    markdownContent: memosPage,
     category: DeployCategory.NotesAndKnowledge,
     title: 'Memos',
     subtitle: 'A place for short notes, one card to a thought, with tags and search.',
@@ -190,6 +242,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   shiori: {
+    repositoryUrl: 'https://github.com/go-shiori/shiori',
+    version: 'v1.8.0',
+    markdownContent: shioriPage,
     category: DeployCategory.NotesAndKnowledge,
     title: 'Shiori',
     subtitle: 'Bookmarks, each with a readable copy of the page saved beside it.',
@@ -205,6 +260,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   fusion: {
+    repositoryUrl: 'https://github.com/0x2E/fusion',
+    version: 'v1.2.1',
+    markdownContent: fusionPage,
     category: DeployCategory.Feeds,
     title: 'Fusion',
     subtitle: 'An RSS reader for your own feeds, behind a password.',
@@ -224,6 +282,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   filebrowser: {
+    repositoryUrl: 'https://github.com/filebrowser/filebrowser',
+    version: 'v2.63.23',
+    markdownContent: filebrowserPage,
     category: DeployCategory.FilesAndSharing,
     title: 'File Browser',
     subtitle: 'A file manager for the volume in a browser: upload, preview, rename, share.',
@@ -240,6 +301,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   microbin: {
+    repositoryUrl: 'https://github.com/szabodanika/microbin',
+    version: 'v2.1.0',
+    markdownContent: microbinPage,
     category: DeployCategory.FilesAndSharing,
     title: 'MicroBin',
     subtitle: 'A pastebin for text, files and links, with expiry and QR codes.',
@@ -262,6 +326,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   goatcounter: {
+    repositoryUrl: 'https://github.com/arp242/goatcounter',
+    version: 'v2.7.0',
+    markdownContent: goatcounterPage,
     category: DeployCategory.Analytics,
     title: 'GoatCounter',
     subtitle: 'Web analytics without cookies, and without following anyone between sites.',
@@ -287,6 +354,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   remark42: {
+    repositoryUrl: 'https://github.com/umputun/remark42',
+    version: 'v1.17.1',
+    markdownContent: remark42Page,
     category: DeployCategory.Communication,
     title: 'Remark42',
     subtitle: 'Comments for a static blog, with no tracking and no third party.',
@@ -312,6 +382,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   traggo: {
+    repositoryUrl: 'https://github.com/traggo/server',
+    version: 'v0.8.3',
+    markdownContent: traggoPage,
     title: 'Traggo',
     subtitle: 'Time tracking where an entry is a set of tags rather than a project.',
     category: DeployCategory.Productivity,
@@ -332,6 +405,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   gotify: {
+    repositoryUrl: 'https://github.com/gotify/server',
+    version: 'v3.1.1',
+    markdownContent: gotifyPage,
     title: 'Gotify',
     subtitle: 'A push notification server your own scripts post to, with apps to receive them.',
     category: DeployCategory.Communication,
@@ -352,6 +428,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   flipt: {
+    repositoryUrl: 'https://github.com/flipt-io/flipt',
+    version: 'v2.13.0',
+    markdownContent: fliptPage,
     title: 'Flipt',
     subtitle: 'Feature flags with a UI, evaluated over HTTP or gRPC.',
     category: DeployCategory.DeveloperTools,
@@ -373,6 +452,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   'open-sync': {
+    repositoryUrl: 'https://github.com/massimoalbarello/open-sync',
+    version: 'nibrun-latest',
+    markdownContent: openSyncPage,
     title: 'Open Sync',
     subtitle:
       'Your GitHub pull requests, Gmail and Slack threads and Granola meetings, synced to a copy you keep.',
@@ -387,6 +469,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   'pdf-signer': {
+    repositoryUrl: 'https://github.com/massimoalbarello/pdf-signer',
+    version: 'nibrun-latest',
+    markdownContent: pdfSignerPage,
     title: 'PDF Signer',
     subtitle: 'Your handwritten signature, kept once and stamped onto any PDF, behind a passkey.',
     category: DeployCategory.Productivity,
@@ -400,6 +485,9 @@ export const DEPLOY_PRESETS = {
     },
   },
   yarr: {
+    repositoryUrl: 'https://github.com/nkanaev/yarr',
+    version: 'v2.9',
+    markdownContent: yarrPage,
     title: 'yarr',
     subtitle: 'A small feed reader, driven from the keyboard, that keeps everything in one file.',
     category: DeployCategory.Feeds,
