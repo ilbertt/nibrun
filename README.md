@@ -28,6 +28,7 @@ Open source projects that already ship a single binary. One click to deploy:
 | **[Memos](https://nibrun.com/deploy/memos)** | A place for short notes, one card to a thought, with tags and search. |
 | **[Shiori](https://nibrun.com/deploy/shiori)** | Bookmarks, each with a readable copy of the page saved beside it. |
 | **[Fusion](https://nibrun.com/deploy/fusion)** | An RSS reader for your own feeds, behind a password. |
+| **[File Browser](https://nibrun.com/deploy/filebrowser)** | A file manager for the volume in a browser: upload, preview, rename, share. |
 
 ## Why
 
