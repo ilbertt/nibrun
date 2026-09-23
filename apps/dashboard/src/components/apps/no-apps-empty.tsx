@@ -26,7 +26,9 @@ export function NoAppsEmpty() {
       <EmptyContent>
         <DeployPresetRoller
           presets={DEPLOY_PRESET_SLUGS}
-          linkToPreset={(preset) => <Link to={DeployRoute.to} search={DEPLOY_PRESETS[preset]} />}
+          linkToPreset={(preset) => (
+            <Link to={DeployRoute.to} search={DEPLOY_PRESETS[preset].deployLink} />
+          )}
         />
         <p className="text-muted-foreground">Or</p>
         <AgentPrompt />
