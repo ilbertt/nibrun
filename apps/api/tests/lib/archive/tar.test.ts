@@ -19,6 +19,7 @@ import {
 import { expandsTooFar, incompressible } from '#tests/support/downloads.ts';
 import {
   BLOCK_BYTES,
+  compressedTarballOf,
   gzippedTarballOf,
   type TarballEntry,
   tarballOf,
@@ -156,6 +157,22 @@ describe('a tarball is walked to the executable inside it', () => {
     expect(unwrapped.outcome).toBe('unwrapped');
     expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
   });
+
+  // `tar` reads it by its bytes, so a release built with `tar -Z` ships as `.tar.gz` unnoticed.
+  test('where the tarball was compressed with Unix `compress` rather than gzip', async () => {
+    const unwrapped = await unwrapExecutable({
+      archive: streamOf(
+        compressedTarballOf([
+          { name: 'CHANGELOG.md', content: NOTES },
+          { name: 'my-server', content: BINARY },
+        ]),
+      ),
+      maxSkippedBytes: NO_LIMIT,
+    });
+
+    expect(unwrapped.outcome).toBe('unwrapped');
+    expect(unwrapped.outcome === 'unwrapped' && (await collected(unwrapped.body))).toEqual(BINARY);
+  });
 });
 
 describe('a tarball that holds no executable is not one to fetch from', () => {
@@ -252,6 +269,20 @@ describe('a tarball that holds no executable is not one to fetch from', () => {
         { name: 'pad.bin', content: expandsTooFar() },
         { name: 'my-server', content: BINARY },
       ],
+      maxSkippedBytes: PAST_THE_EXPANSION_FLOOR,
+    });
+
+    expect(unwrapped.outcome).toBe('expands-too-far');
+  });
+
+  test('and one compressed with Unix `compress` is held to the same ratio', async () => {
+    const unwrapped = await unwrapExecutable({
+      archive: streamOf(
+        compressedTarballOf([
+          { name: 'pad.bin', content: expandsTooFar() },
+          { name: 'my-server', content: BINARY },
+        ]),
+      ),
       maxSkippedBytes: PAST_THE_EXPANSION_FLOOR,
     });
 

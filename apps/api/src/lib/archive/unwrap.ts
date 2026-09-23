@@ -1,10 +1,13 @@
 // What a url answered with, as the binary it holds. A release is published as a bare executable, as
 // a zip, or as a tarball — and for Linux far more often as the last of the three than the second —
-// so what a fetch has in hand is decided by the bytes rather than by what the link was called.
+// so what a fetch has in hand is decided by the bytes rather than by what the link was called. A
+// `.tar.gz` is sometimes not a gzip at all but Unix `compress`, which `tar` reads without a word.
 
 import { Buffer } from 'node:buffer';
+import type { Duplex } from 'node:stream';
 import { createGunzip } from 'node:zlib';
 import { decompressed, type Queued, queued, streamed } from '#lib/archive/bytes.ts';
+import { COMPRESS_MAGIC, createUncompress } from '#lib/archive/lzw.ts';
 import { executableInTarball, isTarball, TAR_IDENTITY_BYTES } from '#lib/archive/tar.ts';
 import {
   EntryTooLargeError,
@@ -18,7 +21,7 @@ import { executableInZip, ZIP_MAGIC } from '#lib/archive/zip.ts';
 const GZIP_MAGIC = Buffer.from('\x1f\x8b', 'latin1');
 
 /** Enough to tell the two containers apart that say what they are in their first bytes. */
-const OPENING_BYTES = Math.max(ZIP_MAGIC.length, GZIP_MAGIC.length);
+const OPENING_BYTES = Math.max(ZIP_MAGIC.length, GZIP_MAGIC.length, COMPRESS_MAGIC.length);
 
 /**
  * The executable inside whatever the url answered with, or the bytes back where they are already
@@ -42,7 +45,16 @@ export async function unwrapExecutable({
     return await walked({ bytes, walk: () => executableInZip({ bytes, maxSkippedBytes }) });
   }
   if (opening?.subarray(0, GZIP_MAGIC.length).equals(GZIP_MAGIC)) {
-    return await walked({ bytes, walk: () => gunzipped({ bytes, maxSkippedBytes }) });
+    return await walked({
+      bytes,
+      walk: () => inflated({ bytes, engine: createGunzip(), maxSkippedBytes }),
+    });
+  }
+  if (opening?.subarray(0, COMPRESS_MAGIC.length).equals(COMPRESS_MAGIC)) {
+    return await walked({
+      bytes,
+      walk: () => inflated({ bytes, engine: createUncompress(), maxSkippedBytes }),
+    });
   }
   // A tar says what it is a quarter of a kibibyte in, so it is asked for last and asked for
   // separately: a zip small enough to end before that is still a zip.
@@ -54,21 +66,23 @@ export async function unwrapExecutable({
 }
 
 /**
- * What a gzip holds: the executable inside the tarball it turns out to be, or the executable it is
- * itself. Releases are published both ways — `my-server_linux_amd64.tar.gz` beside a bare
- * `my-server.gz` — and both are one gunzip away from the same question.
+ * What a compressed source holds: the executable inside the tarball it turns out to be, or the
+ * executable it is itself. Releases are published both ways — `my-server_linux_amd64.tar.gz` beside
+ * a bare `my-server.gz` — and both are one decompression away from the same question.
  *
  * What is not a tarball is handed on rather than refused. Whether those bytes are an executable is
  * a question the inspection asks of everything, and asking it twice would only answer it worse.
  */
-async function gunzipped({
+async function inflated({
   bytes,
+  engine,
   maxSkippedBytes,
 }: {
   bytes: Queued;
+  engine: Duplex;
   maxSkippedBytes: number;
 }): Promise<Unwrapping> {
-  const content = queued(streamed(decompressed({ engine: createGunzip(), data: bytes.rest() })));
+  const content = queued(streamed(decompressed({ engine, data: bytes.rest() })));
   const opening = await content.need(TAR_IDENTITY_BYTES);
   if (opening === undefined || !isTarball(opening)) {
     return { outcome: 'not-an-archive', body: content.rest() };
