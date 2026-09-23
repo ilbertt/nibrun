@@ -104,6 +104,19 @@ export const DEPLOY_PRESETS = {
     ],
     minimal: true,
   },
+  memos: {
+    name: 'memos',
+    binary:
+      'https://github.com/usememos/memos/releases/download/v0.31.0/memos_0.31.0_linux_amd64.tar.gz',
+    sha256: 'd99bf9de5e947cd41f7f1ae59e1e97d9af933d1bcc2d1316b3ab1ffe0a69e5c0',
+    port: 5230,
+    env: [
+      `MEMOS_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+      'MEMOS_ADDR=0.0.0.0',
+      `MEMOS_DATA=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+    ],
+    minimal: true,
+  },
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
