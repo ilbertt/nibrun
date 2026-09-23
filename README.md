@@ -27,6 +27,7 @@ Open source projects that already ship a single binary. One click to deploy:
 | **[PicoShare](https://nibrun.com/deploy/picoshare)** | A minimalist file host: upload a file, share a link, no account needed to download. |
 | **[Memos](https://nibrun.com/deploy/memos)** | A place for short notes, one card to a thought, with tags and search. |
 | **[Shiori](https://nibrun.com/deploy/shiori)** | Bookmarks, each with a readable copy of the page saved beside it. |
+| **[Fusion](https://nibrun.com/deploy/fusion)** | An RSS reader for your own feeds, behind a password. |
 
 ## Why
 
