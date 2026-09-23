@@ -152,6 +152,23 @@ export const DEPLOY_PRESETS = {
     arg: ['-r', '/app/data', '-d', '/app/data/filebrowser.db', '-a', '0.0.0.0', '-p', '8080'],
     minimal: true,
   },
+  microbin: {
+    name: 'microbin',
+    binary:
+      'https://github.com/szabodanika/microbin/releases/download/v2.1.0/microbin-v2.1.0-x86_64-unknown-linux-musl.tar.gz',
+    sha256: '3d6285b4520340c0611875916a7b1dbfa880973541f044c3d18efce799725f45',
+    port: 8080,
+    env: [
+      `MICROBIN_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+      'MICROBIN_BIND=0.0.0.0',
+      `MICROBIN_DATA_DIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+      // The address it prints into the links it hands out, which is the one the reader followed.
+      `MICROBIN_PUBLIC_PATH=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
+      'MICROBIN_ADMIN_USERNAME',
+      'MICROBIN_ADMIN_PASSWORD',
+    ],
+    minimal: true,
+  },
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
