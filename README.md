@@ -36,6 +36,7 @@ Open source projects that already ship a single binary. One click to deploy:
 | **[Gotify](https://nibrun.com/deploy/gotify)** | A push notification server your own scripts post to, with apps to receive them. |
 | **[Flipt](https://nibrun.com/deploy/flipt)** | Feature flags with a UI, evaluated over HTTP or gRPC. |
 | **[Open Sync](https://nibrun.com/deploy/open-sync)** | Your GitHub pull requests, Gmail and Slack threads and Granola meetings, synced to a copy you keep. |
+| **[PDF Signer](https://nibrun.com/deploy/pdf-signer)** | Your handwritten signature, kept once and stamped onto any PDF, behind a passkey. |
 
 ## Why
 
