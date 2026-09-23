@@ -32,6 +32,7 @@ Open source projects that already ship a single binary. One click to deploy:
 | **[MicroBin](https://nibrun.com/deploy/microbin)** | A pastebin for text, files and links, with expiry and QR codes. |
 | **[GoatCounter](https://nibrun.com/deploy/goatcounter)** | Web analytics without cookies, and without following anyone between sites. |
 | **[Remark42](https://nibrun.com/deploy/remark42)** | Comments for a static blog, with no tracking and no third party. |
+| **[Traggo](https://nibrun.com/deploy/traggo)** | Time tracking where an entry is a set of tags rather than a project. |
 
 ## Why
 
