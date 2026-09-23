@@ -127,6 +127,20 @@ export const DEPLOY_PRESETS = {
     env: [`SHIORI_DIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`],
     minimal: true,
   },
+  fusion: {
+    name: 'fusion',
+    binary: 'https://github.com/0x2E/fusion/releases/download/v1.2.1/fusion-linux-amd64',
+    sha256: '46bbc00d928eed56432a1a8d7bf75c6715b7fbc07594bc7128cbafee492d3dc6',
+    port: 8080,
+    env: [
+      `FUSION_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+      `FUSION_DB_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/fusion.db`,
+      // Carried without a value: it is the whole of what stands between the feeds and everyone
+      // else who reaches the url.
+      'FUSION_PASSWORD',
+    ],
+    minimal: true,
+  },
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
