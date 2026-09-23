@@ -1,9 +1,27 @@
 import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
 import type { DeployLink } from '#link.ts';
 
+/**
+ * What a preset is filed under, in the order a catalog should offer them.
+ *
+ * A closed set rather than free text: a category invented at one entry is a filter that appears
+ * once and sorts nothing, and the order the members are written in is a decision about what to
+ * show first rather than whatever order the presets happen to be in.
+ */
+export enum DeployCategory {
+  Backends = 'Backends',
+  NotesAndKnowledge = 'Notes & knowledge',
+  FilesAndSharing = 'Files & sharing',
+  Feeds = 'Feeds',
+  Communication = 'Communication',
+  DeveloperTools = 'Developer tools',
+  Analytics = 'Analytics',
+}
+
 export type DeployPreset = {
   title: string;
   subtitle: string;
+  category: DeployCategory;
   deployLink: DeployLink;
 };
 
@@ -11,6 +29,7 @@ export type DeployPreset = {
 // that table when changing any entry here.
 export const DEPLOY_PRESETS = {
   pocketbase: {
+    category: DeployCategory.Backends,
     title: 'PocketBase',
     subtitle: 'A database, auth, file storage and an admin UI, in one file.',
     deployLink: {
@@ -24,6 +43,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   sharkord: {
+    category: DeployCategory.Communication,
     title: 'Sharkord',
     subtitle: 'A self-hosted chat server with voice, video and screen sharing.',
     deployLink: {
@@ -42,6 +62,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   boop: {
+    category: DeployCategory.Communication,
     title: 'Boop',
     subtitle: 'A self-hosted notification inbox for your own apps.',
     deployLink: {
@@ -63,6 +84,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   gitea: {
+    category: DeployCategory.DeveloperTools,
     title: 'Gitea',
     subtitle:
       'A self-hosted Git service with repositories, issues, pull requests, packages and CI.',
@@ -77,6 +99,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'open-connector': {
+    category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
     subtitle: 'One OAuth hub for 1,000+ providers, with prebuilt actions your agents can call.',
     deployLink: {
@@ -100,6 +123,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'context-use': {
+    category: DeployCategory.NotesAndKnowledge,
     title: 'Context Use',
     subtitle: 'A personal knowledge base your agents read and write over MCP, behind a passkey.',
     deployLink: {
@@ -114,6 +138,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'nibrun-vitals': {
+    category: DeployCategory.Analytics,
     title: 'nibrun-vitals',
     subtitle:
       'The microVM it runs on, as a face you can boop: live CPU, memory, disk, network, visitors and naps.',
@@ -127,6 +152,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   picoshare: {
+    category: DeployCategory.FilesAndSharing,
     title: 'PicoShare',
     subtitle: 'A minimalist file host: upload a file, share a link, no account needed to download.',
     deployLink: {
@@ -145,6 +171,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   memos: {
+    category: DeployCategory.NotesAndKnowledge,
     title: 'Memos',
     subtitle: 'A place for short notes, one card to a thought, with tags and search.',
     deployLink: {
@@ -162,6 +189,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   shiori: {
+    category: DeployCategory.NotesAndKnowledge,
     title: 'Shiori',
     subtitle: 'Bookmarks, each with a readable copy of the page saved beside it.',
     deployLink: {
@@ -176,6 +204,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   fusion: {
+    category: DeployCategory.Feeds,
     title: 'Fusion',
     subtitle: 'An RSS reader for your own feeds, behind a password.',
     deployLink: {
@@ -194,6 +223,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   filebrowser: {
+    category: DeployCategory.FilesAndSharing,
     title: 'File Browser',
     subtitle: 'A file manager for the volume in a browser: upload, preview, rename, share.',
     deployLink: {
@@ -209,6 +239,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   microbin: {
+    category: DeployCategory.FilesAndSharing,
     title: 'MicroBin',
     subtitle: 'A pastebin for text, files and links, with expiry and QR codes.',
     deployLink: {
@@ -230,6 +261,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   goatcounter: {
+    category: DeployCategory.Analytics,
     title: 'GoatCounter',
     subtitle: 'Web analytics without cookies, and without following anyone between sites.',
     deployLink: {
@@ -254,6 +286,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   remark42: {
+    category: DeployCategory.Communication,
     title: 'Remark42',
     subtitle: 'Comments for a static blog, with no tracking and no third party.',
     deployLink: {

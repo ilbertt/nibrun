@@ -5,6 +5,7 @@ export { type DeploySuggestion, deployLink, deploySuggestion } from '#link.ts';
 export {
   DEPLOY_PRESET_SLUGS,
   DEPLOY_PRESETS,
+  DeployCategory,
   type DeployPreset,
   type DeploySlug,
   findPreset,
