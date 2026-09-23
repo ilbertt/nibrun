@@ -141,6 +141,17 @@ export const DEPLOY_PRESETS = {
     ],
     minimal: true,
   },
+  filebrowser: {
+    name: 'filebrowser',
+    binary:
+      'https://github.com/filebrowser/filebrowser/releases/download/v2.63.23/linux-amd64-filebrowser.tar.gz',
+    sha256: 'b14db2bb8033caa3f80205eb6578b2ed0744ebd9e716b790bc4a9703ce909e88',
+    port: 8080,
+    // Rooted at the volume rather than the working directory, which is the one place a file put
+    // here is still here after a redeploy.
+    arg: ['-r', '/app/data', '-d', '/app/data/filebrowser.db', '-a', '0.0.0.0', '-p', '8080'],
+    minimal: true,
+  },
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
