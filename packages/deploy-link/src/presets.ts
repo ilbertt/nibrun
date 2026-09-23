@@ -372,6 +372,20 @@ export const DEPLOY_PRESETS = {
       minimal: true,
     },
   },
+  'open-sync': {
+    title: 'Open Sync',
+    subtitle:
+      'Your GitHub pull requests, Gmail and Slack threads and Granola meetings, synced to a copy you keep.',
+    category: DeployCategory.Productivity,
+    deployLink: {
+      name: 'open-sync',
+      // No checksum, for the reason context-use carries none.
+      binary:
+        'https://github.com/massimoalbarello/open-sync/releases/download/nibrun-latest/open-sync',
+      port: 3000,
+      minimal: true,
+    },
+  },
 } satisfies Record<string, DeployPreset>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
