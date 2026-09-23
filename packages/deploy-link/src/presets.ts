@@ -90,6 +90,19 @@ export const DEPLOY_PRESETS = {
     port: 3000,
     minimal: true,
   },
+  picoshare: {
+    name: 'picoshare',
+    binary:
+      'https://github.com/mtlynch/picoshare/releases/download/v1.5.4/picoshare-v1.5.4-linux-amd64.tar.gz',
+    sha256: '5cd141ac24373b61ed4feaa64850c0de56f88455bc7695b43624ae2fae014431',
+    port: 4001,
+    env: [
+      `PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+      'PS_BEHIND_PROXY=true',
+      'PS_SHARED_SECRET',
+    ],
+    minimal: true,
+  },
 } satisfies Record<string, DeployLink>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;
