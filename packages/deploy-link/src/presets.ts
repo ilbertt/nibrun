@@ -351,6 +351,27 @@ export const DEPLOY_PRESETS = {
       minimal: true,
     },
   },
+  flipt: {
+    title: 'Flipt',
+    subtitle: 'Feature flags with a UI, evaluated over HTTP or gRPC.',
+    category: DeployCategory.DeveloperTools,
+    deployLink: {
+      name: 'flipt',
+      binary:
+        'https://github.com/flipt-io/flipt/releases/download/v2.13.0/flipt_linux_x86_64.tar.gz',
+      sha256: 'c701751a28e0ffa6a5a0135917673becc435fedcb9b563d29a6ee754de019e45',
+      port: 8080,
+      arg: ['server'],
+      env: [
+        'FLIPT_SERVER_HOST=0.0.0.0',
+        `FLIPT_SERVER_HTTP_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+        // v2 keeps the flags in a git repository it writes under `$HOME`, which is a directory the
+        // tenant does not own — so it is given one it does.
+        `HOME=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+      ],
+      minimal: true,
+    },
+  },
 } satisfies Record<string, DeployPreset>;
 
 export type DeploySlug = keyof typeof DEPLOY_PRESETS;

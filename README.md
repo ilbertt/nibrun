@@ -34,6 +34,7 @@ Open source projects that already ship a single binary. One click to deploy:
 | **[Remark42](https://nibrun.com/deploy/remark42)** | Comments for a static blog, with no tracking and no third party. |
 | **[Traggo](https://nibrun.com/deploy/traggo)** | Time tracking where an entry is a set of tags rather than a project. |
 | **[Gotify](https://nibrun.com/deploy/gotify)** | A push notification server your own scripts post to, with apps to receive them. |
+| **[Flipt](https://nibrun.com/deploy/flipt)** | Feature flags with a UI, evaluated over HTTP or gRPC. |
 
 ## Why
 
