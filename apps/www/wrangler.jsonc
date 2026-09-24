@@ -15,13 +15,7 @@
     // agree, so the address that gets shared is the address that gets served.
     "html_handling": "drop-trailing-slash"
   },
-  "env": {
-    // Wrangler derives `nibrun-www-preview` from the environment name and would deploy a
-    // second worker under it. Naming it back to the base keeps preview a version of the one
-    // worker — which is what `wrangler versions upload` ships, a version that serves no
-    // traffic until it is promoted. Anything a preview should do differently goes here.
-    "preview": {
-      "name": "nibrun-www"
-    }
-  }
+  // `wrangler preview` refuses to run without this block. It is empty because the only binding
+  // is the assets, which stay top-level and serve a preview the same way they serve production.
+  "previews": {}
 }
