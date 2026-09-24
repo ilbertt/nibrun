@@ -13,19 +13,24 @@ const ROLL_MS = 280;
 
 /**
  * One button standing for every app that deploys in a click, with only the name rolling: what is
- * on offer is the deploy, and a list would say that once per row. The list is still there, behind
- * the chevron, for a reader who knows which one they want and will not wait for it to come round.
+ * on offer is the deploy, and a list would say that once per row.
  *
  * The name a preset is written under is also the name of the binary it deploys, so it is the one
  * word here — the button is otherwise a sentence about the reader's own app.
  */
 export function DeployPresetRoller<T extends string>({
   presets,
+  linkToShown,
   linkToPreset,
 }: {
   presets: readonly [T, ...T[]];
-  /** Where each preset deploys from, as the site around this one addresses its own deploy screen. */
-  linkToPreset: (preset: T) => React.ReactElement;
+  /** Where the key itself goes, given the name standing on it. */
+  linkToShown: (preset: T) => React.ReactElement;
+  /**
+   * The list behind the chevron, for a reader who knows which one they want and will not wait for
+   * it to come round. `undefined` where there is somewhere better to send them than a menu.
+   */
+  linkToPreset: ((preset: T) => React.ReactElement) | undefined;
 }) {
   const [rolled, setRolled] = useState(0);
   const [rolling, setRolling] = useState(false);
@@ -77,8 +82,8 @@ export function DeployPresetRoller<T extends string>({
       <Button
         variant="ghost"
         size="lg"
-        render={linkToPreset(shown)}
-        className="rounded-r-none pr-3"
+        render={linkToShown(shown)}
+        className={linkToPreset === undefined ? 'px-5' : 'rounded-r-none pr-3'}
         {...holding}
       >
         Deploy your own
@@ -109,35 +114,39 @@ export function DeployPresetRoller<T extends string>({
           </span>
         </span>
       </Button>
-      <span aria-hidden="true" className="h-5 w-px bg-border" />
-      {/* Held too while the list is open: the cursor has left the key for the list, and the name
+      {linkToPreset === undefined ? null : (
+        <>
+          <span aria-hidden="true" className="h-5 w-px bg-border" />
+          {/* Held too while the list is open: the cursor has left the key for the list, and the name
           on the key is the one the reader is choosing against. */}
-      <DropdownMenu open={choosing} onOpenChange={setChoosing}>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-lg"
-              aria-label="Choose what to deploy"
-              className="rounded-l-none"
-              {...holding}
-            />
-          }
-        >
-          <ChevronDownIcon
-            className={`transition-transform duration-200 ${choosing ? 'rotate-180' : ''}`}
-          />
-        </DropdownMenuTrigger>
-        {/* Hung from the whole key rather than the chevron that opens it: the list is as wide as the
+          <DropdownMenu open={choosing} onOpenChange={setChoosing}>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  aria-label="Choose what to deploy"
+                  className="rounded-l-none"
+                  {...holding}
+                />
+              }
+            >
+              <ChevronDownIcon
+                className={`transition-transform duration-200 ${choosing ? 'rotate-180' : ''}`}
+              />
+            </DropdownMenuTrigger>
+            {/* Hung from the whole key rather than the chevron that opens it: the list is as wide as the
             key, and every name on it fits on one line as the one on the key does. */}
-        <DropdownMenuContent anchor={key} align="end">
-          {presets.map((preset) => (
-            <DropdownMenuItem key={preset} render={linkToPreset(preset)} className="font-mono">
-              {preset}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+            <DropdownMenuContent anchor={key} align="end">
+              {presets.map((preset) => (
+                <DropdownMenuItem key={preset} render={linkToPreset(preset)} className="font-mono">
+                  {preset}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      )}
     </div>
   );
 }

@@ -1,0 +1,51 @@
+/* `@apply` needs the theme this file is not part of: it is imported on its own by the catalog
+   route rather than through the stylesheet Tailwind builds. */
+@reference "@repo/ui/globals.css";
+
+/* A card as a bolted-on plate rather than a rectangle of text.
+   `CellBar` already reads the product's surfaces as equipment, and this is the same idea at card
+   size: a face raised off the dotted backdrop, held down at the corners.
+
+   The rivets are four background layers rather than elements, so a card carries no markup that
+   exists only to be decorative and nothing inside it has to leave room for them.
+
+   The face is opaque: the page's dotted grid running underneath a card is the backdrop showing
+   through a plate, which reads as a hole in it rather than as a surface. */
+
+.panel {
+  --rivet: color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+  --rivet-inset: 0.625rem;
+  --rivet-size: 4px;
+
+  background-color: var(--card);
+  background-image:
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.5px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.5px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.5px),
+    radial-gradient(circle, var(--rivet) 1.4px, transparent 1.5px);
+  background-position:
+    left var(--rivet-inset) top var(--rivet-inset),
+    right var(--rivet-inset) top var(--rivet-inset),
+    left var(--rivet-inset) bottom var(--rivet-inset),
+    right var(--rivet-inset) bottom var(--rivet-inset);
+  background-repeat: no-repeat;
+  background-size: var(--rivet-size) var(--rivet-size);
+  transition:
+    background-color 200ms,
+    border-color 200ms;
+}
+
+/* The plate catches the light on hover, and the rivets catch it harder — they are the part that
+   would actually be metal. */
+.panel:hover {
+  --rivet: var(--primary);
+
+  background-color: color-mix(in oklab, var(--card) 92%, var(--foreground) 8%);
+}
+
+/* Nothing moves for a reader who asked for no motion; the colour change is the whole hover. */
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    transition: none;
+  }
+}
