@@ -203,8 +203,12 @@ function RouteComponent() {
           <p className="max-w-2xl text-balance text-lg text-muted-foreground">{app.subtitle}</p>
           <div className="flex flex-wrap items-center gap-2">
             {/* The short link the README hands out, not the deploy it expands to: the worker
-                knows what it stands for, and this is an address somebody reads and sends on. */}
-            <Button size="lg" render={<a href={deployPath(app)} />}>
+                knows what it stands for, and this is an address somebody reads and sends on.
+                A new tab, because the instructions below are what the reader follows next. */}
+            <Button
+              size="lg"
+              render={<a href={deployPath(app)} target="_blank" rel="noreferrer" />}
+            >
               Deploy on nibrun
             </Button>
             <AskYourAgent app={app} />
