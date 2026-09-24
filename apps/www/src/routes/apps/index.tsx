@@ -6,24 +6,18 @@ import { SearchIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
-import { APPS, CATALOG, type CatalogApp } from '#lib/apps.ts';
+import { APPS, CATALOG } from '#lib/apps.ts';
+import {
+  ALL,
+  asCategory,
+  type CatalogSearch,
+  type Chip,
+  counted,
+  matches,
+} from '#lib/catalog-filter.ts';
 import { pageHead } from '#lib/page-head.ts';
 import { pageTitle } from '#lib/page-title.ts';
 import '#styles/panel.css';
-
-const MARKDOWN_PATH = '/apps.md';
-const ALL = 'All';
-
-type Chip = DeployCategory | typeof ALL;
-
-/** What the address carries. A filter nothing is under is the whole catalog, which is `undefined`. */
-type CatalogSearch = { category: DeployCategory | undefined };
-
-// Read off the enum rather than trusted: this comes out of somebody's address bar, and a member
-// that does not exist would be a filter that empties the page with no way back but editing the URL.
-function asCategory(value: unknown): DeployCategory | undefined {
-  return Object.values(DeployCategory).find((member) => member === value);
-}
 
 export const Route = createFileRoute('/apps/')({
   validateSearch: (search: Record<string, unknown>): CatalogSearch => ({
@@ -35,25 +29,10 @@ export const Route = createFileRoute('/apps/')({
       title: pageTitle(CATALOG.heading),
       description: CATALOG.description,
       image: CATALOG.cardPath,
-      markdown: { path: MARKDOWN_PATH, title: 'This catalog in Markdown' },
+      markdown: { path: CATALOG.markdownPath, title: 'This catalog in Markdown' },
     }),
   component: RouteComponent,
 });
-
-function matches({ app, query }: { app: CatalogApp; query: string }): boolean {
-  const needle = query.trim().toLowerCase();
-  return (
-    needle === '' ||
-    app.title.toLowerCase().includes(needle) ||
-    app.subtitle.toLowerCase().includes(needle) ||
-    app.slug.includes(needle)
-  );
-}
-
-/** How many the chip would leave on screen, which is what makes the row read as a tally. */
-function counted(name: Chip): number {
-  return name === ALL ? APPS.length : APPS.filter((app) => app.category === name).length;
-}
 
 function RouteComponent() {
   const [query, setQuery] = useState('');
@@ -209,7 +188,7 @@ function RouteComponent() {
 
         <div className="py-16 text-center text-muted-foreground text-sm">
           {/* Not a router link: the target is a file the worker hands back, not a route. */}
-          <a className="underline" href={MARKDOWN_PATH}>
+          <a className="underline" href={CATALOG.markdownPath}>
             This catalog in Markdown
           </a>
         </div>
