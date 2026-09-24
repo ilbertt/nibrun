@@ -23,8 +23,8 @@ export function SiteHeader() {
         </Button>
         <Button
           variant="ghost"
-          size="sm"
-          className="hidden sm:inline-flex"
+          size="xs"
+          className="hidden text-muted-foreground underline underline-offset-4 sm:inline-flex"
           render={<a href={LLMS_TXT_PATH} />}
         >
           llms.txt
