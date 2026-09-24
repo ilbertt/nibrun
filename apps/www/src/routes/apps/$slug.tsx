@@ -34,7 +34,7 @@ export const Route = createFileRoute('/apps/$slug')({
       // What somebody searching actually types, which is the app's name and the wish to run it
       // somewhere — not the catalog's name for itself.
       title: pageTitle(`Deploy ${app.title}`),
-      description: `${app.subtitle} Deployed in one click on nibrun — ${app.version}, pinned by digest, on a microVM of its own.`,
+      description: `${app.subtitle} Deployed in one click on nibrun.`,
       image: appCardPath(app),
       markdown: { path: markdownPath(app), title: `${app.title} in Markdown` },
     });
