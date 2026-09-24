@@ -13,11 +13,6 @@ export function SiteHeader() {
     <header className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-1 pt-5 pb-16 sm:grid-cols-[1fr_auto_1fr]">
       <HomeLink />
       <div className="flex items-center justify-center gap-1">
-        {/* Routed to the page rather than the fragment alone: this header is on the blog too, and
-            a bare `#pricing` there is a link to nothing. */}
-        <Button variant="ghost" size="sm" render={<Link to="/" hash="pricing" />}>
-          Pricing
-        </Button>
         {/* Hidden below `sm` for the same reason as llms.txt: the row is Pricing, Blog, the star
             and the deploy key, and a fourth label puts the page into horizontal scroll on a
             phone. The catalog is what a phone arrives on from search rather than navigates to. */}
@@ -31,6 +26,11 @@ export function SiteHeader() {
         </Button>
         <Button variant="ghost" size="sm" render={<Link to="/blog" />}>
           Blog
+        </Button>
+        {/* Routed to the page rather than the fragment alone: this header is on the blog too, and
+            a bare `#pricing` there is a link to nothing. */}
+        <Button variant="ghost" size="sm" render={<Link to="/" hash="pricing" />}>
+          Pricing
         </Button>
         <Button
           variant="ghost"

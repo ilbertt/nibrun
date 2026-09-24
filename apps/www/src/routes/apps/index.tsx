@@ -13,7 +13,7 @@ import '#styles/panel.css';
 
 const TITLE = pageTitle('One-click deploys');
 const DESCRIPTION =
-  'Open source apps that already ship a single binary, pinned by digest and deployed in one click — no Dockerfile, no YAML, no cluster.';
+  'Open source apps that already ship a single binary, deployed straight from their release assets. No infra needed.';
 const MARKDOWN_PATH = '/apps.md';
 const ALL = 'All';
 

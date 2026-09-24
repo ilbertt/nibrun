@@ -45,7 +45,7 @@ function catalog(): string {
 
   return `# One-click deploys
 
-Open source apps that already ship a single binary, pinned by digest and deployed in one click.
+Open source apps that already ship a single binary, deployed straight from their release assets.
 Each one runs in a microVM of its own: 1 vCPU, 256 MiB, and an 8 GiB volume at \`data/\`.
 
 ${rows.join('\n')}

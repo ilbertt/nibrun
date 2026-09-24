@@ -74,7 +74,7 @@ owns its own state; it does not fit anything that has to be several machines.
 - [Skill: deploy-to-nibrun](https://github.com/ilbertt/nibrun/blob/main/skills/deploy-to-nibrun/SKILL.md) — the full guest contract, every command, and when not to use nibrun. Install it with `npx skills add ilbertt/nibrun`.
 - [bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter) — a template already shaped for this: an Elysia API and a React SPA compiled into one binary.
 - [One-click deploys](https://nibrun.com/apps) — open source apps that already ship a single
-  binary, each pinned to a release and deployable in one click. The catalog is also served as
+  binary, deployed straight from their release assets. The catalog is also served as
   Markdown at `https://nibrun.com/apps.md`, and every app's page at `/apps/<slug>.md`.
 - [Blog](https://nibrun.com/blog) — every post is also served as Markdown, at its own URL with
   `.md` on the end.

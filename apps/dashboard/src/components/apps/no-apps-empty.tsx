@@ -26,6 +26,9 @@ export function NoAppsEmpty() {
       <EmptyContent>
         <DeployPresetRoller
           presets={DEPLOY_PRESET_SLUGS}
+          linkToShown={(preset) => (
+            <Link to={DeployRoute.to} search={DEPLOY_PRESETS[preset].deployLink} />
+          )}
           linkToPreset={(preset) => (
             <Link to={DeployRoute.to} search={DEPLOY_PRESETS[preset].deployLink} />
           )}
