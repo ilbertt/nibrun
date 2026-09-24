@@ -8,11 +8,10 @@
   "scripts": {
     "dev": "vite dev --port 3002",
     "build": "vite build",
-    "build:preview": "CLOUDFLARE_ENV=preview vite build",
     "preview": "vite preview",
     "cf:typegen": "wrangler types",
     "cf:deploy": "bun run build && wrangler deploy",
-    "cf:deploy:preview": "bun run build:preview && wrangler versions upload",
+    "cf:deploy:preview": "bun run build && wrangler preview",
     "check:types": "bun run cf:typegen && bun run --bun tsc"
   },
   "dependencies": {
@@ -30,7 +29,7 @@
     "tailwindcss": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.54.4",
+    "@cloudflare/vite-plugin": "^1.58.0",
     "@repo/typescript-config": "workspace:*",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/router-plugin": "catalog:",
@@ -40,6 +39,6 @@
     "@vitejs/plugin-react": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "wrangler": "^4.129.0"
+    "wrangler": "^4.137.0"
   }
 }
