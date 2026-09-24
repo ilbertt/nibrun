@@ -1,15 +1,13 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
-import { formatPostDate, POSTS } from '#lib/blog.ts';
+import { BLOG, formatPostDate, POSTS } from '#lib/blog.ts';
 import { pageHead } from '#lib/page-head.ts';
 import { pageTitle } from '#lib/page-title.ts';
 
-const TITLE = pageTitle('Blog');
-const DESCRIPTION = "Notes on small apps, single binaries, and the infrastructure they don't need.";
-
 export const Route = createFileRoute('/blog/')({
-  head: () => pageHead({ path: '/blog', title: TITLE, description: DESCRIPTION }),
+  head: () =>
+    pageHead({ path: '/blog', title: pageTitle(BLOG.heading), description: BLOG.description }),
   component: RouteComponent,
 });
 
@@ -20,8 +18,8 @@ function RouteComponent() {
       <main className="mx-auto flex w-full max-w-3xl flex-col px-6">
         <SiteHeader />
         <div className="flex flex-col gap-3 pb-12 sm:pb-16">
-          <h1 className="font-semibold text-4xl tracking-tight">Blog</h1>
-          <p className="text-balance text-lg text-muted-foreground">{DESCRIPTION}</p>
+          <h1 className="font-semibold text-4xl tracking-tight">{BLOG.heading}</h1>
+          <p className="text-balance text-lg text-muted-foreground">{BLOG.description}</p>
         </div>
         <ul className="flex flex-col border-border/60 border-t">
           {POSTS.map((post) => (

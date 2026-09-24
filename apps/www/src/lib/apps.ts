@@ -1,4 +1,5 @@
 import { DEPLOY_PRESETS, type DeployPreset, type DeploySlug } from '@repo/deploy-link';
+import { WWW_DEPLOY_PATH } from '@repo/global-constants';
 import { renderMarkdown } from '#lib/markdown.ts';
 
 export type CatalogApp = DeployPreset & { slug: DeploySlug };
@@ -9,6 +10,7 @@ export const CATALOG = {
   description:
     'Open source apps that already ship a single binary, deployed straight from their release assets. No infra needed.',
   cardPath: '/apps.png',
+  markdownPath: '/apps.md',
 };
 
 /**
@@ -26,6 +28,14 @@ export function findApp(slug: string): CatalogApp | undefined {
 
 export function appCardPath(app: CatalogApp): string {
   return `/apps/${app.slug}.png`;
+}
+
+export function appMarkdownPath(app: CatalogApp): string {
+  return `/apps/${app.slug}.md`;
+}
+
+export function appDeployPath(app: CatalogApp): string {
+  return `${WWW_DEPLOY_PATH}/${app.slug}`;
 }
 
 export function renderApp(app: CatalogApp): string {

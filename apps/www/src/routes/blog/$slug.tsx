@@ -1,13 +1,11 @@
 import { Button } from '@repo/ui/components/button';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileTextIcon } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { CodeCopyButton } from '#components/code-copy-button.tsx';
+import { ArticleBody } from '#components/article-body.tsx';
 import { DeployCta } from '#components/deploy-cta.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
-import { type BlogPost, findPost, formatPostDate, renderPost } from '#lib/blog.ts';
+import { findPost, formatPostDate, postMarkdownPath } from '#lib/blog.ts';
 import { pageHead } from '#lib/page-head.ts';
 import { pageTitle } from '#lib/page-title.ts';
 import '#styles/prose.css';
@@ -31,56 +29,11 @@ export const Route = createFileRoute('/blog/$slug')({
       description: post.description,
       publishedAt: post.date,
       image: post.image,
-      markdown: { path: markdownPath(post), title: 'This post in Markdown' },
+      markdown: { path: postMarkdownPath(post), title: 'This post in Markdown' },
     });
   },
   component: RouteComponent,
 });
-
-type CodeBlock = { key: string; slot: Element; code: string };
-
-/**
- * The article is one block of HTML, so the copy buttons cannot be written into it as components.
- * They are portalled into the slots the renderer left behind instead, which keeps the clipboard
- * behaviour in one place rather than reimplemented against the DOM. The slots are empty in the
- * prerendered page and fill in on hydration; the space they take is already reserved.
- */
-function ArticleBody({ post }: { post: BlogPost }) {
-  // Stable across renders, and not only to save the parse: React compares this prop by object
-  // identity, so a fresh one re-runs `innerHTML =` and replaces the very slots the portals below
-  // are pointed at — leaving the buttons mounted in nodes no longer on the page.
-  const content = useMemo(() => ({ __html: renderPost(post) }), [post]);
-  const body = useRef<HTMLDivElement>(null);
-  const [blocks, setBlocks] = useState<CodeBlock[]>([]);
-
-  useEffect(() => {
-    const collected: CodeBlock[] = [];
-    for (const slot of body.current?.querySelectorAll('[data-copy-slot]') ?? []) {
-      collected.push({
-        key: `code-block-${collected.length}`,
-        slot,
-        code: slot.parentElement?.querySelector('code')?.textContent ?? '',
-      });
-    }
-    setBlocks(collected);
-  }, []);
-
-  return (
-    <>
-      {/* The source is a file in this repo, written by us and compiled at build time. */}
-      <div
-        ref={body}
-        className="prose border-border/60 border-t pt-10"
-        dangerouslySetInnerHTML={content}
-      />
-      {blocks.map(({ key, slot, code }) => createPortal(<CodeCopyButton code={code} />, slot, key))}
-    </>
-  );
-}
-
-function markdownPath(post: BlogPost): string {
-  return `/blog/${post.slug}.md`;
-}
 
 function RouteComponent() {
   const { slug } = Route.useParams();
@@ -110,7 +63,7 @@ function RouteComponent() {
               variant="outline"
               size="sm"
               className="self-start"
-              render={<a href={markdownPath(post)} />}
+              render={<a href={postMarkdownPath(post)} />}
             >
               <FileTextIcon data-icon="inline-start" />
               View markdown

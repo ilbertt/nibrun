@@ -3,7 +3,6 @@ import { findPost } from '#lib/blog.ts';
 
 const BLOG_PATH = /^\/blog\/([a-z0-9-]+)\.md$/;
 const APP_PATH = /^\/apps\/([a-z0-9-]+)\.md$/;
-const CATALOG_PATH = '/apps.md';
 
 /**
  * Every page is prerendered to a static file and served from the edge, but a `.md` prerendered
@@ -20,7 +19,7 @@ export function markdownResponse(request: Request): Response | undefined {
 }
 
 function written(pathname: string): string | undefined {
-  if (pathname === CATALOG_PATH) {
+  if (pathname === CATALOG.markdownPath) {
     return catalog();
   }
 

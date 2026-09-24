@@ -11,6 +11,11 @@ export type BlogPost = {
   image: string | undefined;
 };
 
+export const BLOG = {
+  heading: 'Blog',
+  description: "Notes on small apps, single binaries, and the infrastructure they don't need.",
+};
+
 const FIRST_IMAGE = /^!\[[^\]]*]\(([^\s)]+)/m;
 
 const SOURCES = import.meta.glob('../content/blog/*.md', {
@@ -31,6 +36,10 @@ export function findPost(slug: string): BlogPost | undefined {
 
 export function renderPost(post: BlogPost): string {
   return renderMarkdown(post.markdown);
+}
+
+export function postMarkdownPath(post: BlogPost): string {
+  return `/blog/${post.slug}.md`;
 }
 
 // UTC on both sides: the date is a plain `YYYY-MM-DD`, which parses as UTC midnight, and
