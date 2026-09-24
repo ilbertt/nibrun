@@ -9,7 +9,7 @@ import { createPortal } from 'react-dom';
 import { CodeCopyButton } from '#components/code-copy-button.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
-import { APPS, type CatalogApp, findApp, renderApp, repoName } from '#lib/apps.ts';
+import { APPS, appCardPath, type CatalogApp, findApp, renderApp, repoName } from '#lib/apps.ts';
 import { pageHead } from '#lib/page-head.ts';
 import { pageTitle } from '#lib/page-title.ts';
 import '#styles/prose.css';
@@ -35,6 +35,7 @@ export const Route = createFileRoute('/apps/$slug')({
       // somewhere — not the catalog's name for itself.
       title: pageTitle(`Deploy ${app.title}`),
       description: `${app.subtitle} Deployed in one click on nibrun — ${app.version}, pinned by digest, on a microVM of its own.`,
+      image: appCardPath(app),
       markdown: { path: markdownPath(app), title: `${app.title} in Markdown` },
     });
   },

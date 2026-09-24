@@ -6,14 +6,11 @@ import { SearchIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
-import { APPS, type CatalogApp } from '#lib/apps.ts';
+import { APPS, CATALOG, type CatalogApp } from '#lib/apps.ts';
 import { pageHead } from '#lib/page-head.ts';
 import { pageTitle } from '#lib/page-title.ts';
 import '#styles/panel.css';
 
-const TITLE = pageTitle('One-click deploys');
-const DESCRIPTION =
-  'Open source apps that already ship a single binary, deployed straight from their release assets. No infra needed.';
 const MARKDOWN_PATH = '/apps.md';
 const ALL = 'All';
 
@@ -35,8 +32,9 @@ export const Route = createFileRoute('/apps/')({
   head: () =>
     pageHead({
       path: '/apps',
-      title: TITLE,
-      description: DESCRIPTION,
+      title: pageTitle(CATALOG.heading),
+      description: CATALOG.description,
+      image: CATALOG.cardPath,
       markdown: { path: MARKDOWN_PATH, title: 'This catalog in Markdown' },
     }),
   component: RouteComponent,
@@ -106,8 +104,10 @@ function RouteComponent() {
       <main className="mx-auto flex w-full max-w-5xl flex-col px-6">
         <SiteHeader />
         <div className="flex flex-col gap-3 pb-10">
-          <h1 className="font-semibold text-4xl tracking-tight">One-click deploys</h1>
-          <p className="max-w-2xl text-balance text-lg text-muted-foreground">{DESCRIPTION}</p>
+          <h1 className="font-semibold text-4xl tracking-tight">{CATALOG.heading}</h1>
+          <p className="max-w-2xl text-balance text-lg text-muted-foreground">
+            {CATALOG.description}
+          </p>
         </div>
 
         <div className="pb-4">
