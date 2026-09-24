@@ -1,6 +1,6 @@
 import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/server';
-import { markdownResponse } from '#lib/blog-markdown.ts';
 import { deployRedirect } from '#lib/deploy-redirect.ts';
+import { markdownResponse } from '#lib/markdown-response.ts';
 
 const startFetch = createStartHandler(defaultStreamHandler);
 
