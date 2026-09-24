@@ -19,7 +19,19 @@ const ALL = 'All';
 
 type Chip = DeployCategory | typeof ALL;
 
+/** What the address carries. A filter nothing is under is the whole catalog, which is `undefined`. */
+type CatalogSearch = { category: DeployCategory | undefined };
+
+// Read off the enum rather than trusted: this comes out of somebody's address bar, and a member
+// that does not exist would be a filter that empties the page with no way back but editing the URL.
+function asCategory(value: unknown): DeployCategory | undefined {
+  return Object.values(DeployCategory).find((member) => member === value);
+}
+
 export const Route = createFileRoute('/apps/')({
+  validateSearch: (search: Record<string, unknown>): CatalogSearch => ({
+    category: asCategory(search.category),
+  }),
   head: () =>
     pageHead({
       path: '/apps',
@@ -47,7 +59,8 @@ function counted(name: Chip): number {
 
 function RouteComponent() {
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<Chip>(ALL);
+  const { category } = Route.useSearch();
+  const selected: Chip = category ?? ALL;
   // Only the ones something is actually in, so the row never offers a filter that empties the
   // page. Annotated because a literal spreading the members beside `ALL` widens to `string`.
   const chips: readonly Chip[] = [
@@ -82,7 +95,7 @@ function RouteComponent() {
   const shown = useMemo(
     () =>
       APPS.filter(
-        (app) => (category === ALL || app.category === category) && matches({ app, query }),
+        (app) => (category === undefined || app.category === category) && matches({ app, query }),
       ),
     [query, category],
   );
@@ -125,20 +138,26 @@ function RouteComponent() {
         <fieldset className="flex flex-wrap gap-2 pb-6">
           <legend className="sr-only">Filter by category</legend>
           {chips.map((name) => (
-            <button
+            <Link
               key={name}
-              type="button"
-              aria-pressed={category === name}
-              onClick={() => setCategory(name)}
-              className="group flex items-center gap-2 rounded-full border border-border/60 py-1 pr-2 pl-3 font-mono text-sm transition-colors hover:border-primary/60 hover:text-primary aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+              to="/apps"
+              // The whole catalog carries no parameter at all, so the plain address is the one
+              // that gets shared for it.
+              search={{ category: name === ALL ? undefined : name }}
+              data-selected={selected === name}
+              // Matched on the search too, and exactly: every chip addresses this same path, so
+              // anything less marks all of them as the current one — `All` included, whatever
+              // the catalog is filtered to.
+              activeOptions={{ exact: true, includeSearch: true }}
+              className="group flex items-center gap-2 rounded-full border border-border/60 py-1 pr-2 pl-3 font-mono text-sm transition-colors hover:border-primary/60 hover:text-primary data-[selected=true]:border-primary data-[selected=true]:bg-primary data-[selected=true]:text-primary-foreground"
             >
               {name}
               {/* Tabular so the counts keep a column as chips light up, rather than the label
                   beside them shifting by a digit. */}
-              <span className="rounded-full bg-muted/60 px-1.5 text-muted-foreground text-xs tabular-nums transition-colors group-aria-pressed:bg-primary-foreground/20 group-aria-pressed:text-primary-foreground">
+              <span className="rounded-full bg-muted/60 px-1.5 text-muted-foreground text-xs tabular-nums transition-colors group-data-[selected=true]:bg-primary-foreground/20 group-data-[selected=true]:text-primary-foreground">
                 {counted(name)}
               </span>
-            </button>
+            </Link>
           ))}
         </fieldset>
 

@@ -25,7 +25,7 @@ export function SiteHeader() {
           variant="ghost"
           size="sm"
           className="hidden sm:inline-flex"
-          render={<Link to="/apps" />}
+          render={<Link to="/apps" search={{ category: undefined }} />}
         >
           Apps
         </Button>

@@ -132,7 +132,7 @@ function Sidebar({ app }: { app: CatalogApp }) {
       <div className="flex flex-col gap-1">
         <dt className="text-muted-foreground text-xs uppercase tracking-wide">Category</dt>
         <dd>
-          <Link to="/apps" className="underline">
+          <Link to="/apps" search={{ category: app.category }} className="underline">
             {app.category}
           </Link>
         </dd>
@@ -151,9 +151,13 @@ function Related({ app }: { app: CatalogApp }) {
   }
 
   return (
-    <section className="border-border/60 border-t py-10">
+    // Clear of the article rather than tight against it: the rule reads as the end of what was
+    // being read, and it needs the room to say so.
+    <section className="mt-16 border-border/60 border-t pt-10 sm:mt-20">
       <h2 className="pb-4 text-muted-foreground text-xs uppercase tracking-wide">
-        More in {app.category}
+        <Link to="/apps" search={{ category: app.category }} className="hover:text-primary">
+          More in {app.category}
+        </Link>
       </h2>
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {related.map((other) => (
@@ -183,9 +187,14 @@ function RouteComponent() {
   return (
     <>
       <PageBackdrop />
-      <main className="mx-auto flex w-full max-w-5xl flex-col px-6">
+      <main className="mx-auto flex w-full max-w-5xl flex-col px-6 pb-16 sm:pb-20">
         <SiteHeader />
-        <Button variant="ghost" size="sm" className="self-start" render={<Link to="/apps" />}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          render={<Link to="/apps" search={{ category: undefined }} />}
+        >
           <ArrowLeftIcon data-icon="inline-start" />
           All apps
         </Button>
