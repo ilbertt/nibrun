@@ -1,4 +1,4 @@
-import { APPS, findApp } from '#lib/apps.ts';
+import { APPS, CATALOG, findApp } from '#lib/apps.ts';
 import { findPost } from '#lib/blog.ts';
 
 const BLOG_PATH = /^\/blog\/([a-z0-9-]+)\.md$/;
@@ -43,7 +43,7 @@ function catalog(): string {
       `- [${app.title}](/apps/${app.slug}) — ${app.subtitle} \`${app.category}\`, \`${app.repositoryUrl}\`, \`${app.version}\``,
   );
 
-  return `# One-click deploys
+  return `# ${CATALOG.heading}
 
 Open source apps that already ship a single binary, deployed straight from their release assets.
 Each one runs in a microVM of its own: 1 vCPU, 256 MiB, and an 8 GiB volume at \`data/\`.
