@@ -12,3 +12,17 @@ the API your app will call.
 4. Add collections in the admin UI at `/_/`, then call them from your app over REST or the SDKs.
 
 Everything it stores lives on the volume, so it is still there after a redeploy.
+
+## A site and JS hooks, from the first deploy
+
+This deploy keeps PocketBase's two optional folders in `data/`, so an archive dropped under
+**Advanced configuration → Initial data** brings them along. Its root becomes the root of `data/`,
+unpacked before PocketBase first starts:
+
+- **`pb_public/`** is served as a static site from the app's URL, and a path it does not hold
+  falls back to its `index.html`, so a single-page app works as is. See the
+  [PocketBase introduction](https://pocketbase.io/docs/).
+- **`pb_hooks/`** holds `*.pb.js` files that extend PocketBase in JavaScript: custom routes, event
+  hooks, scheduled jobs. See [Extend with JavaScript](https://pocketbase.io/docs/js-overview/).
+
+The archive is only read as the app is created; a redeploy keeps whatever `data/` already holds.
