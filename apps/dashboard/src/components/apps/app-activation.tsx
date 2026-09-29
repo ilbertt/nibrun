@@ -10,9 +10,16 @@ import type { AppSummary } from '#queries/apps.ts';
  */
 export function AppActivation({ app }: { app: AppSummary }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-muted-foreground">Activation</span>
-      <span>{activationSummary(app)}</span>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-muted-foreground">Activation</span>
+        <span>{activationSummary(app)}</span>
+      </div>
+      {app.activation === 'on-request' && (
+        <p className="text-muted-foreground text-xs">
+          Background work pauses during sleep. Activation isn’t configurable for now.
+        </p>
+      )}
     </div>
   );
 }

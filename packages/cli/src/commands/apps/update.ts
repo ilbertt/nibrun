@@ -10,7 +10,7 @@ import { updateApp } from '#lib/update.ts';
 
 export const command = defineCommand('apps update', {
   description:
-    'Change how the app starts and run it again on the binary it already has. Nothing is uploaded, and whatever no flag names is left as it is.',
+    'Change how the app starts and run it again on the binary it already has. Nothing is uploaded, and whatever no flag names is left as it is. Activation cannot currently be changed: on-request apps sleep without incoming traffic, and background jobs and timers do not run while asleep.',
   options: {
     args: {
       schema: z.string().optional(),
