@@ -1,9 +1,83 @@
 import { describe, expect, test } from 'bun:test';
-import { LOG_RECORD_OUTPUT, type LogRecord, render } from '#lib/logs.ts';
+import { LOG_RECORD_OUTPUT, type LogRecord, readLogs, render } from '#lib/logs.ts';
+import { apiHolding } from '#tests/support/api.ts';
 import { writerRecording } from '#tests/support/output.ts';
 
 const DROPPED_BYTES = 4096;
 const ESCAPE_CODE = 27;
+
+async function readOutput({ follow, live }: { follow: boolean; live: boolean }) {
+  const requests: boolean[] = [];
+  const emitted: LogRecord[] = [];
+  const stopping = new AbortController();
+  const print = writerRecording();
+  const api = apiHolding({
+    apps: [],
+    underApp: () => ({
+      deployments: () => ({
+        logs: {
+          get: ({ query }: { query: { follow: boolean } }) => {
+            requests.push(query.follow);
+            return Promise.resolve({ data: output(), error: null });
+          },
+        },
+      }),
+    }),
+  });
+
+  function* output() {
+    yield {
+      data: {
+        _time: '2026-08-06T09:41:00.123Z',
+        _msg: 'ready',
+        stream: 'stdout',
+        sourceId: 'source-1',
+        sequence: 1,
+      },
+    };
+    if (follow && live) {
+      stopping.abort();
+      throw new Error('interrupted');
+    }
+  }
+
+  await readLogs({
+    api,
+    appId: 'app-1',
+    deploymentId: 'deployment-1',
+    timerange: '5m',
+    follow,
+    live,
+    signal: stopping.signal,
+    print,
+    emit: (line) => emitted.push(line),
+  });
+  return { requests, emitted, said: print.said };
+}
+
+test('a snapshot of a running app exits without saying the app is stopped', async () => {
+  const result = await readOutput({ follow: false, live: true });
+
+  expect(result.requests).toEqual([false]);
+  expect(result.emitted).toMatchObject([{ message: 'ready', stream: 'stdout' }]);
+  expect(result.said).toEqual([]);
+});
+
+test('following requests live output until interrupted', async () => {
+  const result = await readOutput({ follow: true, live: true });
+
+  expect(result.requests).toEqual([true]);
+  expect(result.emitted).toHaveLength(1);
+  expect(result.said).toEqual([]);
+});
+
+test('following a stopped deployment prints its history and exits', async () => {
+  const result = await readOutput({ follow: true, live: false });
+
+  expect(result.requests).toEqual([false]);
+  expect(result.emitted).toHaveLength(1);
+  expect(result.said).toEqual(['nothing is running, so that is everything it wrote']);
+});
 
 function record(overrides: Partial<LogRecord> = {}): LogRecord {
   return {

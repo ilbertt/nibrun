@@ -153,7 +153,8 @@ ask the URL for something:
 curl -fsS https://my-app.nibrun.app/
 ```
 
-`nib apps logs --app my-app` says why one that was created never came up, and what one that did is
+`nib apps logs --app my-app` prints recent output and exits. Add `--follow` for live output, or
+`--timerange 2h` to read further back. It says why an app never came up, and what one that did is
 complaining about. `nib --help` lists the rest — status, domains, filesystem, export, delete.
 
 ## Copying an app

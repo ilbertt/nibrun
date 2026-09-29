@@ -4,12 +4,19 @@ import { z } from 'zod';
 import { SHARED_OPTIONS } from '#config.ts';
 import { announcedDeployment, selectApp, stillWriting } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
-import { follow, LOG_RECORD_OUTPUT, untilInterrupted } from '#lib/logs.ts';
+import { LOG_RECORD_OUTPUT, readLogs, untilInterrupted } from '#lib/logs.ts';
 import { createOutput } from '#lib/output.ts';
 
+const FOLLOW_FLAG = 'follow';
+
 export const command = defineCommand('apps logs', {
-  description: 'Print an app output and keep printing it. Ends when you do.',
+  description: `Print an app output and exit. Use --${FOLLOW_FLAG} to keep printing live output.`,
   options: {
+    [FOLLOW_FLAG]: {
+      schema: z.boolean().default(false),
+      aliases: ['f'],
+      description: 'Keep printing new output until interrupted.',
+    },
     timerange: {
       schema: z
         .string()
@@ -18,7 +25,7 @@ export const command = defineCommand('apps logs', {
           'A timerange is a duration such as 30s, 5m or 2h.',
         )
         .default(DEFAULT_LOG_TIMERANGE),
-      description: 'How much history to print before following.',
+      description: 'How much recent history to print.',
     },
     [SHARED_OPTIONS.deploymentId.name]: SHARED_OPTIONS.deploymentId.option,
   },
@@ -39,12 +46,13 @@ export const command = defineCommand('apps logs', {
       print: aside,
     });
 
-    await follow({
+    await readLogs({
       api,
       appId: addressed.appId,
       deploymentId: addressed.deploymentId,
       timerange: options.timerange,
-      following: stillWriting(addressed),
+      follow: options[FOLLOW_FLAG],
+      live: stillWriting(addressed),
       emit,
       print: aside,
       signal: untilInterrupted(),
