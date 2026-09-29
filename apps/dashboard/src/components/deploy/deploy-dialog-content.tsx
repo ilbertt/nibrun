@@ -8,7 +8,7 @@ import {
   DialogTrigger,
 } from '@repo/ui/components/dialog';
 import { DialogBody } from '@repo/ui/custom/dialog-body';
-import { RocketIcon } from 'lucide-react';
+import { PencilIcon, RocketIcon } from 'lucide-react';
 import { useState } from 'react';
 import { DeployDoneButton } from '#components/deploy/deploy-done-button.tsx';
 import { DeployForm } from '#components/deploy/deploy-form.tsx';
@@ -29,6 +29,7 @@ export function DeployDialogContent({
   const goToApp = useGoToDeployedApp();
   const running = run.phase === 'uploading' || run.phase === 'settling';
   const newApp = appId === undefined;
+  const TriggerIcon = newApp ? RocketIcon : PencilIcon;
 
   function handleOpenChange(next: boolean): void {
     if (next && !running) {
@@ -49,7 +50,7 @@ export function DeployDialogContent({
       <DialogTrigger
         render={<Button variant={newApp ? 'default' : 'outline'} disabled={disabled} />}
       >
-        <RocketIcon data-icon="inline-start" />
+        <TriggerIcon data-icon="inline-start" />
         {newApp ? 'Deploy' : 'Update'}
       </DialogTrigger>
       <DialogContent showCloseButton={!running} className="sm:max-w-lg">
