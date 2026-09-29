@@ -48,6 +48,15 @@ nib run ./my-server --name my-app --data-folder ./seed
 It takes a folder, or a `.tar.gz` or `.zip` holding one, and the root of the archive becomes the
 root of `data/`. Up to 1 GiB, and only as the app is created.
 
+For an app where the first visitor claims the admin account, try seeding that setup before
+deploying, if the app supports it. Use a compatible native build or run from source: a Linux
+binary cannot run directly on macOS. Check that the same app version can share data between the
+local and Linux builds. Use a documented initialization command, or complete setup on localhost
+and stop the app cleanly, then deploy the configured folder with `--data-folder` and the Linux
+binary. Supply any environment values the saved data needs on that first deploy too. If seeding
+is unavailable, check for first-boot admin configuration; otherwise, first-visitor setup is
+reachable when the public URL goes live.
+
 `nib apps export ./my-app.tar.gz --app my-app` goes the other way: `data/`, the binary, and a
 `.env` of the variables the app was deployed with. Unpack it, and `--data-folder ./data` gives a
 second app the same disk.
