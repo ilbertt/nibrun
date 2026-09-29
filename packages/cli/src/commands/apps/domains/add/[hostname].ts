@@ -1,4 +1,5 @@
 import { defineCommand } from '@parshjs/core';
+import { CUSTOM_DOMAIN_PRICING_NOTICE } from '@repo/global-constants';
 import { z } from 'zod';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
@@ -6,8 +7,7 @@ import { addAppDomain, DOMAIN_ADDED_OUTPUT } from '#lib/domains.ts';
 import { createOutput } from '#lib/output.ts';
 
 export const command = defineCommand('apps domains add [hostname]', {
-  description:
-    'Point a domain you own at this app. Prints the two DNS records to add; the app answers on it once they resolve.',
+  description: `Point a domain you own at this app. Prints the two DNS records to add; the app answers on it once they resolve. ${CUSTOM_DOMAIN_PRICING_NOTICE}`,
   options: {},
   params: {
     hostname: {

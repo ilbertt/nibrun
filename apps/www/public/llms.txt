@@ -15,6 +15,8 @@
 The first 3 apps are free forever, and each app after that is $1/month. Every app gets the same
 machine either way — 1 vCPU, 256 MiB, 8 GiB disk. Past 10 apps, or for a bigger machine, email hello@nibrun.com.
 
+Custom domains are free for now and will become a paid feature. Pricing has not been announced.
+
 ## Deploying
 
 Drag the binary onto https://app.nibrun.com, or:
