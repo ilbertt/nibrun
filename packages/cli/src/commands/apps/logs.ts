@@ -7,10 +7,12 @@ import { requireSignedIn } from '#lib/credentials.ts';
 import { LOG_RECORD_OUTPUT, readLogs, untilInterrupted } from '#lib/logs.ts';
 import { createOutput } from '#lib/output.ts';
 
+const FOLLOW_FLAG = 'follow';
+
 export const command = defineCommand('apps logs', {
-  description: 'Print an app output and exit. Use --follow to keep printing live output.',
+  description: `Print an app output and exit. Use --${FOLLOW_FLAG} to keep printing live output.`,
   options: {
-    follow: {
+    [FOLLOW_FLAG]: {
       schema: z.boolean().default(false),
       aliases: ['f'],
       description: 'Keep printing new output until interrupted.',
@@ -49,7 +51,7 @@ export const command = defineCommand('apps logs', {
       appId: addressed.appId,
       deploymentId: addressed.deploymentId,
       timerange: options.timerange,
-      follow: options.follow,
+      follow: options[FOLLOW_FLAG],
       live: stillWriting(addressed),
       emit,
       print: aside,
