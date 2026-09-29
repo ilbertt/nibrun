@@ -40,6 +40,12 @@ nib run ./my-server --name my-app --data-folder ./seed
 It takes a folder, or a `.tar.gz` or `.zip` holding one, and the root of the archive becomes the
 root of `data/`. Up to 1 GiB, and only as the app is created.
 
+For an app where the first visitor claims the admin account, complete that setup locally before
+deploying: bind it to localhost, create the admin account, then stop it cleanly. Deploy the
+folder holding that configured database with `--data-folder`. The app starts with its admin
+account already claimed when its public URL goes live. Supply any encryption keys or other
+environment values the saved data needs on that first deploy too.
+
 `nib apps export ./my-app.tar.gz --app my-app` goes the other way: `data/`, the binary, and a
 `.env` of the variables the app was deployed with. Unpack it, and `--data-folder ./data` gives a
 second app the same disk.

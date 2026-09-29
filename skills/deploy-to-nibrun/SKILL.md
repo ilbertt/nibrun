@@ -102,6 +102,27 @@ the folder rather than its contents puts every file one directory deeper than th
 files are the whole of how anything gets onto the volume. A zip made anywhere but unix carries no
 permissions, so an executable bit does not survive one.
 
+### Complete first-run setup before going public
+
+Some apps let the first visitor claim the admin account. Their public URL is reachable as soon
+as they boot, so complete that claim locally before deploying:
+
+1. Run the app locally, bound to `127.0.0.1`, with its database and uploads in a dedicated data folder.
+2. Complete the initial admin setup and stop the app cleanly so its database is ready to copy.
+3. Deploy that folder with `--data-folder`, using a compatible Linux x86_64 binary. Supply any
+   encryption keys or other environment values the saved data needs on this first deploy.
+4. Check the public app requires the configured login and no longer offers an initial admin claim.
+
+```sh
+nib run ./my-server-linux-x64 --name my-app --data-folder ./configured-data
+```
+
+The app starts with its admin account already claimed. Keep the configured data folder private:
+it contains the app's account state. The app must support moving that state between the local
+and hosted versions.
+
+### Redeploying
+
 **Every deploy after that must name the app**, or a non-interactive shell creates a second one.
 `nib apps list` finds the name again when a later session has to redeploy:
 
