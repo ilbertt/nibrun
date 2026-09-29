@@ -45,6 +45,10 @@ export function WhatYourAppGets() {
           </li>
         ))}
       </ul>
+      <p className="text-pretty text-muted-foreground text-sm">
+        Apps and persistent storage are hosted in Frankfurt, Germany (AWS eu-central-1). HTTPS
+        requests pass through Cloudflare&apos;s global network.
+      </p>
     </section>
   );
 }

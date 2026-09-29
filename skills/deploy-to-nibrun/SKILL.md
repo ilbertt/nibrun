@@ -176,6 +176,10 @@ exported `.env` as the record of what the original had.
 
 ## The guest contract
 
+Apps and persistent storage are hosted in Frankfurt, Germany (AWS `eu-central-1`). Uploaded
+binaries, data imports, exports and platform database backups are stored in the same region.
+HTTPS requests pass through Cloudflare's global network.
+
 Everything the binary can count on, and nothing else:
 
 | | |
