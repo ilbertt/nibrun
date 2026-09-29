@@ -66,8 +66,11 @@ listen on it, on `0.0.0.0`.
 
 One microVM per app: no horizontal scaling, no load balancing. A deploy stops the old VM before
 starting the new one, so it is a few seconds of downtime rather than blue/green. An app sleeps
-after five minutes idle and wakes on the next request in ~120 ms. It fits a single-binary app that
-owns its own state; it does not fit anything that has to be several machines.
+after five minutes without incoming traffic and wakes on the next request in ~120 ms.
+Background jobs, timers, scheduled emails and outbound polling do not run while it sleeps.
+Owners cannot change activation through the CLI, API or dashboard. Apps that need background
+work to run on schedule are not currently a fit. It fits a single-binary app that owns its own
+state; it does not fit anything that has to be several machines.
 
 ## Links
 

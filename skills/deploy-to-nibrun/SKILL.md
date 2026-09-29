@@ -232,6 +232,10 @@ nib apps update --app my-app --extra-public-port --env 'ANNOUNCED_IP=${NIBRUN_PU
 
 Worth saying out loud before recommending it:
 
+- **New apps sleep after five minutes without incoming traffic.** The next request wakes them.
+  Background jobs, timers, scheduled emails and outbound polling do not run while an app sleeps,
+  and outbound work does not keep it awake. Owners cannot change activation through the CLI, API
+  or dashboard. An app that needs background work to run on schedule is not currently a fit.
 - **One microVM per app, one size.** No horizontal scaling, no load balancing, no resizing.
 - **A deploy is a replace.** The old VM is stopped before the new one starts, because they share
   one volume — so there are a few seconds of downtime, and no blue/green or canary.

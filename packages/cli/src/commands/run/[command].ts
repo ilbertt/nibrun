@@ -80,6 +80,12 @@ export const command = defineCommand('run [command]', {
       ? await completeOptions({ api, options: given, binarySource, args })
       : given;
 
+    if (resolved.app === undefined) {
+      ui.step(
+        'New apps sleep after five minutes without incoming traffic. Background jobs and timers do not run while asleep; activation cannot currently be changed.',
+      );
+    }
+
     emit(await deploy({ ...resolved, api, ui, binary, args, detach }));
   },
 });

@@ -79,6 +79,6 @@ export function DeployDialogContent({
 
 function describeDeploy(newApp: boolean): string {
   return newApp
-    ? 'The binary is uploaded to the store, then released as what the app runs.'
+    ? 'New apps sleep after five minutes without incoming traffic. Background jobs and timers do not run while asleep; activation cannot currently be changed.'
     : 'The app is released again with whatever this leaves it set to. A binary replaces the one it runs; without one, it keeps it.';
 }
