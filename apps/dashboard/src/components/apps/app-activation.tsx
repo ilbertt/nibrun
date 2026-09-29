@@ -17,8 +17,7 @@ export function AppActivation({ app }: { app: AppSummary }) {
       </div>
       {app.activation === 'on-request' && (
         <p className="text-muted-foreground text-xs">
-          Background jobs and timers do not run while the app sleeps. Outbound work does not keep it
-          awake. Activation cannot currently be changed through the dashboard, CLI or API.
+          Background work pauses during sleep. Activation isn’t configurable.
         </p>
       )}
     </div>
