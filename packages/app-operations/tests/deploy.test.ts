@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { PublicApiClient } from '@repo/api-client/public';
-import type { Filename } from '@repo/protocol';
+import type { Artifact, Filename, Sha256Digest } from '@repo/protocol';
 import { MAX_IMPORT_SIZE_BYTES } from '#archive.ts';
 import { deploy, describeUnservedDeployment } from '#deploy.ts';
+import { parseEnvironment } from '#environment.ts';
 import type { DeployStep } from '#release.ts';
 import { answering } from '#tests/support/api.ts';
 import {
@@ -39,6 +40,7 @@ function apiHolding({
   completed = { id: ARTIFACT_ID, digest: DIGEST },
   created = { artifactId: ARTIFACT_ID, url: PUT_URL },
   hostnames = [PENDING_CUSTOM, PLATFORM],
+  artifacts = [],
 }: {
   apps: Array<{ id: string; name: string; state?: string }>;
   sent: Sent[];
@@ -47,6 +49,7 @@ function apiHolding({
   // and which one a caller is owed is decided by what it asked for.
   created?: { artifactId: string; url: string } | { id: string; digest: string };
   hostnames?: HostnameRow[];
+  artifacts?: Pick<Artifact, 'id' | 'digest' | 'sizeBytes' | 'originalFileName'>[];
 }): PublicApiClient {
   function app(id: string) {
     return { id, name: NAME, hostnames };
@@ -83,6 +86,10 @@ function apiHolding({
         return Promise.resolve({ data: app(appId), error: null });
       },
       artifacts: Object.assign(artifact, {
+        get: () => {
+          sent.push({ what: 'list artifacts', body: appId });
+          return Promise.resolve({ data: { artifacts }, error: null });
+        },
         post: (body: unknown) => {
           sent.push({ what: 'artifact', body });
           return Promise.resolve({ data: created, error: null });
@@ -122,6 +129,100 @@ function apiHolding({
 function binary() {
   return { name: 'my-server' as Filename, body: new Blob([new Uint8Array(SIZE_BYTES)]) };
 }
+
+function storedBinary(
+  overrides: Partial<Pick<Artifact, 'id' | 'digest' | 'sizeBytes' | 'originalFileName'>> = {},
+) {
+  return {
+    id: ARTIFACT_ID as Artifact['id'],
+    digest: DIGEST as Sha256Digest,
+    sizeBytes: SIZE_BYTES,
+    originalFileName: binary().name,
+    ...overrides,
+  };
+}
+
+test('an unchanged local binary reuses this app artifact and still releases the new config', async () => {
+  const sent: Sent[] = [];
+  const steps: DeployStep[] = [];
+  storeAnswering({ sent });
+
+  await deploy({
+    api: apiHolding({
+      apps: [{ id: APP_ID, name: NAME }],
+      sent,
+      artifacts: [storedBinary()],
+    }),
+    binary: { ...binary(), digest: DIGEST as Sha256Digest },
+    args: ['serve'],
+    environment: parseEnvironment({ set: ['MODE=updated'], remove: [] }),
+    appId: APP_ID,
+    onStep: (step) => steps.push(step),
+    whileUploading: () => {
+      throw new Error('An unchanged binary must not start an upload.');
+    },
+  });
+
+  expect(sent).toEqual([
+    { what: 'app patch', body: { args: ['serve'], environment: { MODE: 'updated' } } },
+    { what: 'list artifacts', body: APP_ID },
+    { what: 'deployment', body: { artifactId: ARTIFACT_ID } },
+  ]);
+  expect(steps).toContainEqual({
+    kind: 'artifact',
+    artifactId: ARTIFACT_ID,
+    digest: DIGEST,
+    reused: true,
+  });
+});
+
+test.each([
+  { digest: 'different' as Sha256Digest },
+  { sizeBytes: SIZE_BYTES + 1 },
+  { originalFileName: 'another-server' as Filename },
+])('a different digest, size or export filename still uploads: %j', async (difference) => {
+  const sent: Sent[] = [];
+  storeAnswering({ sent });
+
+  await deploy({
+    api: apiHolding({
+      apps: [{ id: APP_ID, name: NAME }],
+      sent,
+      artifacts: [storedBinary(difference)],
+    }),
+    binary: { ...binary(), digest: DIGEST as Sha256Digest },
+    args: [],
+    appId: APP_ID,
+  });
+
+  expect(sent.map((each) => each.what)).toEqual([
+    'app patch',
+    'list artifacts',
+    'artifact',
+    'put',
+    'artifact patch',
+    'deployment',
+  ]);
+});
+
+test('a new app uploads without searching other apps for its digest', async () => {
+  const sent: Sent[] = [];
+  storeAnswering({ sent });
+
+  await deploy({
+    api: apiHolding({ apps: [], sent }),
+    binary: { ...binary(), digest: DIGEST as Sha256Digest },
+    args: [],
+  });
+
+  expect(sent.map((each) => each.what)).toEqual([
+    'create',
+    'artifact',
+    'put',
+    'artifact patch',
+    'deployment',
+  ]);
+});
 
 /** A real one, because a send now reads the front of what it is given before it sends it. */
 function archive() {
@@ -450,7 +551,7 @@ describe('what a caller is told as it happens', () => {
 
     expect(steps).toEqual([
       { kind: 'app', appId: APP_ID, name: NAME },
-      { kind: 'artifact', artifactId: ARTIFACT_ID, digest: DIGEST },
+      { kind: 'artifact', artifactId: ARTIFACT_ID, digest: DIGEST, reused: false },
       { kind: 'deployment', deploymentId: 'deployment-1' },
     ]);
   });
