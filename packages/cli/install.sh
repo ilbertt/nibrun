@@ -211,13 +211,44 @@ report_path() {
       fi
       ;;
     *)
-      warn "$1 is not on your PATH. Add it with:"
-      say "    ${BOLD}export PATH=\"$1:\$PATH\"${RESET}"
+      warn "$1 is not on your PATH."
+      report_missing_path "$1"
       ;;
   esac
 }
 
-say() { echo "$*" >&2; }
+report_missing_path() {
+  case "${SHELL:-}" in
+    */fish)
+      escaped=$(printf '%s' "$1" | sed "s/\\\\/\\\\\\\\/g; s/'/\\\\'/g")
+      say "Run this in fish to add nib now and in future shells:"
+      say "    fish_add_path '$escaped'"
+      ;;
+    *)
+      say "Run this in your current terminal before using nib:"
+      say "    export PATH=$(shell_quote "$1"):\"\$PATH\""
+      case "${SHELL:-}" in
+        */zsh) profile="${ZDOTDIR:-$HOME}/.zshrc" ;;
+        */bash)
+          case "$(uname -s)" in
+            Darwin) profile="$HOME/.bash_profile" ;;
+            *) profile="$HOME/.bashrc" ;;
+          esac
+          ;;
+        *) profile="$HOME/.profile" ;;
+      esac
+      say "Add the same export line to $(shell_quote "$profile") to keep it in new shells."
+      say "Or sign in immediately without changing PATH:"
+      say "    $(shell_quote "$1/nib") login"
+      ;;
+  esac
+}
+
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+say() { printf '%s\n' "$*" >&2; }
 step() { say "${DIM}${DOWN}${RESET} $*"; }
 ok() { say "${GREEN}${TICK}${RESET} $*"; }
 warn() { say "${YELLOW}!${RESET} $*"; }
