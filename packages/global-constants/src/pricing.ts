@@ -8,6 +8,9 @@ export const FREE_APPS_COUNT = 3;
 
 export const PRICE_PER_APP_USD = 1;
 
+export const CUSTOM_DOMAIN_PRICING_NOTICE =
+  'Custom domains are free for now and will become a paid feature. Pricing has not been announced.';
+
 /**
  * Kept in step by hand with the `app_lifetime_seconds` the `add_profile` trigger writes for a user
  * without an identity, in `apps/api/src/db/migrations/0053_a_stranger_gets_fifteen_minutes.sql`,

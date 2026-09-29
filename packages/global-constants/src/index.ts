@@ -10,7 +10,12 @@ export {
   GITHUB_REPO_URL,
 } from '#github.ts';
 export { LLMS_TXT_PATH } from '#llms.ts';
-export { ANONYMOUS_APP_LIFETIME_MINUTES, FREE_APPS_COUNT, PRICE_PER_APP_USD } from '#pricing.ts';
+export {
+  ANONYMOUS_APP_LIFETIME_MINUTES,
+  CUSTOM_DOMAIN_PRICING_NOTICE,
+  FREE_APPS_COUNT,
+  PRICE_PER_APP_USD,
+} from '#pricing.ts';
 export {
   BASE_DOMAIN,
   DASHBOARD_SITE,

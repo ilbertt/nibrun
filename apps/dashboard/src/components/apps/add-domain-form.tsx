@@ -1,3 +1,4 @@
+import { CUSTOM_DOMAIN_PRICING_NOTICE } from '@repo/global-constants';
 import { HostnameSchema, Value } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
@@ -52,9 +53,7 @@ export function AddDomainForm() {
                   {addition.isPending ? <Spinner /> : 'Add'}
                 </Button>
               </div>
-              <FieldDescription>
-                Free for now, and likely to become part of a paid plan later.
-              </FieldDescription>
+              <FieldDescription>{CUSTOM_DOMAIN_PRICING_NOTICE}</FieldDescription>
               {refused === undefined ? null : <FieldError>{refused}</FieldError>}
             </Field>
           );
