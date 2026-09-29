@@ -37,6 +37,7 @@ const SERVING_TIMEOUT_MS = 300_000;
 export type UploadableBinary = {
   name: Filename;
   body: Blob;
+  digest?: Sha256Digest | undefined;
 };
 
 /**
@@ -124,10 +125,15 @@ export async function deploy({
       : await updateApp({ api, appId: target.app.id, ...edit });
   onStep?.({ kind: 'app', appId: app.id, name: app.name });
 
-  const artifact = isFetchable(binary)
-    ? await fetchBinary({ api, appId: app.id, binary })
-    : await uploadBinary({ api, appId: app.id, binary, whileUploading, upload });
-  onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest });
+  const { artifact, reused } = await artifactFor({
+    api,
+    appId: app.id,
+    binary,
+    canReuse: target !== null,
+    whileUploading,
+    upload,
+  });
+  onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest, reused });
 
   // After the binary and not before it: an archive is the larger of the two by far, and a binary
   // the api refuses is the failure worth reaching first.
@@ -205,6 +211,43 @@ type StoredArtifact = Extract<NonNullable<CreatedArtifact>, { digest: string }>;
 
 function isStored(created: NonNullable<CreatedArtifact>): created is StoredArtifact {
   return 'digest' in created;
+}
+
+async function artifactFor({
+  api,
+  appId,
+  binary,
+  canReuse,
+  whileUploading,
+  upload,
+}: {
+  api: PublicApiClient;
+  appId: string;
+  binary: DeployableBinary;
+  canReuse: boolean;
+  whileUploading: UploadWait;
+  upload: UploadTransport;
+}): Promise<{ artifact: StoredArtifact; reused: boolean }> {
+  if (isFetchable(binary)) {
+    return { artifact: await fetchBinary({ api, appId, binary }), reused: false };
+  }
+  if (canReuse && binary.digest !== undefined) {
+    const { artifacts } = unwrap(await api.api.apps({ appId }).artifacts.get());
+    // The filename must still match because an export uses the artifact's recorded name.
+    const stored = artifacts.find(
+      (artifact) =>
+        artifact.digest === binary.digest &&
+        artifact.sizeBytes === binary.body.size &&
+        artifact.originalFileName === binary.name,
+    );
+    if (stored) {
+      return { artifact: stored, reused: true };
+    }
+  }
+  return {
+    artifact: await uploadBinary({ api, appId, binary, whileUploading, upload }),
+    reused: false,
+  };
 }
 
 /**

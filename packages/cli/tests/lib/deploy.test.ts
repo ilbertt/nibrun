@@ -1,4 +1,7 @@
 import { expect, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Sha256DigestSchema, Value } from '@repo/protocol';
 import { binaryFrom } from '#lib/deploy.ts';
 import { UsageError } from '#lib/errors.ts';
@@ -40,6 +43,20 @@ test('anything that is not a url is a file on this machine', async () => {
   const binary = await binaryFrom({ source: import.meta.path });
 
   expect(binary).toMatchObject({ name: 'deploy.test.ts' });
+});
+
+test('a local binary carries the digest of its bytes for upload reuse', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'nib-binary-'));
+  const source = join(directory, 'my-server');
+  try {
+    await Bun.write(source, 'abc');
+    expect(await binaryFrom({ source })).toMatchObject({
+      name: 'my-server',
+      digest: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 // Refused rather than dropped: a deploy that went ahead without checking the checksum it was

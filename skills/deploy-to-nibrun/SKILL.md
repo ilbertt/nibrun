@@ -109,6 +109,9 @@ permissions, so an executable bit does not survive one.
 nib run ./my-server --app my-app
 ```
 
+For a local binary, the CLI skips uploading when that app already has an artifact with the same
+bytes and filename. It still creates a new deployment with the configuration you supplied.
+
 Environment variables are an **edit**, not a replacement — anything a deploy does not name is left
 alone, so secrets are set once:
 

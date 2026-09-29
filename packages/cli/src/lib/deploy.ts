@@ -136,16 +136,17 @@ function asDigest(sha256: string): Sha256Digest {
   }
 }
 
-/**
- * Opened rather than read: the bytes are streamed to the store when the time comes, and all
- * that is wanted here is that there is a file and what it is called.
- */
 async function openBinary(path: string): Promise<UploadableBinary> {
   const body = Bun.file(path);
   if (!(await body.exists())) {
     throw new UsageError(`No such file: ${path}`);
   }
-  return { name: asFilename(basename(path)), body };
+  const name = asFilename(basename(path));
+  const hasher = new Bun.CryptoHasher('sha256');
+  for await (const chunk of body.stream()) {
+    hasher.update(chunk);
+  }
+  return { name, body, digest: Value.Parse(Sha256DigestSchema, hasher.digest('hex')) };
 }
 
 /**

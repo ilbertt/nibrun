@@ -39,7 +39,7 @@ export function announce({ step, ui }: { step: DeployStep; ui: Ui }): void {
     ui.step(`app ${step.name}`);
   }
   if (step.kind === 'artifact') {
-    ui.step(`artifact ${step.digest}`);
+    ui.step(`artifact ${step.digest}${step.reused ? ' already present; skipping upload' : ''}`);
   }
 }
 

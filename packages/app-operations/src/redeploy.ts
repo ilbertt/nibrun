@@ -36,7 +36,7 @@ export async function redeploy({ api, appId, onStep, ...edit }: RedeployInput): 
 
   const patched = await updateApp({ api, appId: target.app.id, ...edit });
   onStep?.({ kind: 'app', appId: patched.id, name: patched.name });
-  onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest });
+  onStep?.({ kind: 'artifact', artifactId: artifact.id, digest: artifact.digest, reused: true });
 
   const deployment = unwrap(
     await api.api.apps({ appId: patched.id }).deployments.post({ artifactId: artifact.id }),
