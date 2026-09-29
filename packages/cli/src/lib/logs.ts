@@ -55,45 +55,40 @@ export const LOG_RECORD_OUTPUT = defineOutput({
   },
 });
 
-export type FollowInput = {
+export type ReadLogsInput = {
   api: PublicApiClient;
   appId: string;
   deploymentId: string;
   timerange: string;
-  /** Whether there is a microVM to write anything more, which is what makes this a wait at all. */
-  following: boolean;
+  follow: boolean;
+  live: boolean;
   emit: (record: LogRecord) => void;
   print: Print;
   signal: AbortSignal;
 };
 
-/**
- * Hand over what a deployment has written, and keep handing over what it writes until stopped.
- *
- * An app with nothing running is not waited on: what it wrote is printed and that is the end of
- * it, said beside the output so a log that stops is not read as one that was cut off.
- */
-export async function follow({
+export async function readLogs({
   api,
   appId,
   deploymentId,
   timerange,
-  following,
+  follow,
+  live,
   emit,
   print,
   signal,
-}: FollowInput): Promise<void> {
+}: ReadLogsInput): Promise<void> {
   for await (const record of followLogs({
     api,
     appId,
     deploymentId,
     timerange,
-    following,
+    following: follow && live,
     signal,
   })) {
     emit(asRecord(record));
   }
-  if (!following) {
+  if (follow && !live) {
     print.dim('nothing is running, so that is everything it wrote');
   }
 }
