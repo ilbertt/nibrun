@@ -31,8 +31,6 @@
  * against any of them reads this one and nothing of ours. */
 #define PORT_ALIAS "PORT"
 
-/* Only a sigil followed by RUNTIME_PREFIX opens a reference, which is what leaves a
- * secret's own '$' alone — see the format contract in config.h. */
 #define REFERENCE_SIGIL '$'
 #define REFERENCE_OPEN '{'
 #define REFERENCE_CLOSE '}'
@@ -316,50 +314,24 @@ struct reference {
   const char *after;
 };
 
-static bool at_reference(const char *text) {
-  if (*text != REFERENCE_SIGIL) {
-    return false;
-  }
-  const char *name = text + 1;
-  if (*name == REFERENCE_OPEN) {
-    name++;
-  }
-  return starts_with(name, RUNTIME_PREFIX);
-}
-
-static const char *find_reference(const char *value) {
+static const char *find_reference(const char *value, struct reference *out) {
   for (const char *cursor = strchr(value, REFERENCE_SIGIL); cursor != NULL;
        cursor = strchr(cursor + 1, REFERENCE_SIGIL)) {
-    if (at_reference(cursor)) {
-      return cursor;
+    if (cursor[1] != REFERENCE_OPEN || !starts_with(cursor + 2, RUNTIME_PREFIX)) {
+      continue;
     }
+    const char *name = cursor + 2;
+    const char *end = name;
+    while (is_name_character(*end)) {
+      end++;
+    }
+    if (*end != REFERENCE_CLOSE) {
+      continue;
+    }
+    *out = (struct reference){.name = name, .length = (size_t)(end - name), .after = end + 1};
+    return cursor;
   }
   return NULL;
-}
-
-/* `text` starts at a sigil at_reference has already accepted, so the only way this
- * fails is a braced form nobody closed — a typo rather than a value meant literally. */
-static bool read_reference(const char *text, struct reference *out) {
-  const char *cursor = text + 1;
-  bool braced = *cursor == REFERENCE_OPEN;
-  if (braced) {
-    cursor++;
-  }
-  out->name = cursor;
-  while (is_name_character(*cursor)) {
-    cursor++;
-  }
-  out->length = (size_t)(cursor - out->name);
-  if (braced) {
-    if (*cursor != REFERENCE_CLOSE) {
-      log_line("a tenant variable names %.*s with no closing '%c'", (int)out->length, out->name,
-               REFERENCE_CLOSE);
-      return false;
-    }
-    cursor++;
-  }
-  out->after = cursor;
-  return true;
 }
 
 static bool names_key(const struct reference *reference, const char *key) {
@@ -430,25 +402,19 @@ static void append(struct arena *arena, const char *text, size_t length) {
  * which is almost every one of them. */
 static bool expand_entry(const struct instance_config *config, struct arena *arena, char **entry) {
   const char *value = strchr(*entry, '=') + 1;
-  if (find_reference(value) == NULL) {
+  struct reference reference;
+  const char *found = find_reference(value, &reference);
+  if (found == NULL) {
     return true;
   }
 
   char *expansion = arena->cursor;
   append(arena, *entry, (size_t)(value - *entry));
 
-  for (const char *remaining = value;;) {
-    const char *found = find_reference(remaining);
-    if (found == NULL) {
-      append(arena, remaining, strlen(remaining));
-      break;
-    }
+  const char *remaining = value;
+  while (found != NULL) {
     append(arena, remaining, (size_t)(found - remaining));
 
-    struct reference reference;
-    if (!read_reference(found, &reference)) {
-      return false;
-    }
     /* uint32_t's whole range rather than the port's: anything narrower is a
      * truncation the compiler is right to refuse. */
     char rendered[sizeof("4294967295")];
@@ -465,8 +431,9 @@ static bool expand_entry(const struct instance_config *config, struct arena *are
     }
     append(arena, substitution, strlen(substitution));
     remaining = reference.after;
+    found = find_reference(remaining, &reference);
   }
-  append(arena, "", 1);
+  append(arena, remaining, strlen(remaining) + 1);
 
   if (arena->overflowed) {
     log_line("instance.env expands to more than %d bytes", CONFIG_MAX_EXPANDED_BYTES);

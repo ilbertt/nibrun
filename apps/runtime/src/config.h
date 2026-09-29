@@ -15,13 +15,11 @@
  * called NIBRUN_HTTP_PORT arrives as ENV_NIBRUN_HTTP_PORT and is read as the
  * tenant's, which is what lets config_build_environment drop it on its own terms.
  *
- * A tenant value may name a runtime one it is handed: `$NIBRUN_HTTP_PORT` and
- * `${NIBRUN_HTTP_PORT}` both expand, and a name this runtime does not offer fails the
- * boot rather than reaching the tenant as itself. Nothing else expands, so a secret
- * holding `$`, `$$` or `$HOME` arrives byte for byte — the prefix is what keeps the
- * substitution off values it was never meant for. The cost is that a value holding a
- * literal `$NIBRUN_` has no representation, which is the bargain the format already
- * makes for one holding a newline.
+ * Only complete `${NIBRUN_NAME}` references expand in tenant values. A complete
+ * reference to a name this runtime does not offer fails the boot. Bare names,
+ * unmatched braces and every other `$` remain literal, so secrets survive byte for
+ * byte unless they contain a complete runtime reference. There is no escape syntax
+ * for a literal complete runtime reference.
  *
  * The runtime carries no defaults for any of it. DEFAULT_RESTART_POLICY in
  * packages/protocol is the only place those values exist; the agent resolves them
