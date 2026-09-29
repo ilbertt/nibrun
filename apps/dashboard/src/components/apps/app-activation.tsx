@@ -17,7 +17,7 @@ export function AppActivation({ app }: { app: AppSummary }) {
       </div>
       {app.activation === 'on-request' && (
         <p className="text-muted-foreground text-xs">
-          Background work pauses during sleep. Activation isn’t configurable.
+          Background work pauses during sleep. Activation isn’t configurable for now.
         </p>
       )}
     </div>
