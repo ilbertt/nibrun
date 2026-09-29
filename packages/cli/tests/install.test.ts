@@ -103,6 +103,50 @@ describe('a binary is checked against the checksum its release publishes', () =>
   });
 });
 
+describe('an install outside PATH explains how to use it', () => {
+  test('the suggested export works with spaces, quotes, dollars and backslashes in the path', async () => {
+    const installed = await runInstall({
+      checksums: null,
+      installName: "bin with 'quotes' $dollars\\slashes",
+    });
+    const exported = installed.stderr
+      .split('\n')
+      .find((line) => line.trim().startsWith('export PATH='));
+    expect(exported).toBeDefined();
+    const proc = Bun.spawn(['sh', '-c', `${exported}\nnib --version`], {
+      env: { PATH: '/usr/bin:/bin' },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    expect(await proc.exited).toBe(0);
+    expect((await new Response(proc.stdout).text()).trim()).toBe(RELEASE_VERSION);
+    expect(installed.stderr).toContain('login');
+    expect(installed.stderr).toContain(`${installed.configDir}/.zshrc`);
+  });
+
+  test('fish gets a command that applies now and persists', async () => {
+    const installed = await runInstall({ checksums: null, shell: '/usr/local/bin/fish' });
+
+    expect(installed.stderr).toContain(`fish_add_path '${installed.installDir}'`);
+    expect(installed.stderr).not.toContain('export PATH=');
+  });
+
+  test.each([
+    { os: 'Linux', arch: 'x86_64', profile: '.bashrc' },
+    { os: 'Darwin', arch: 'arm64', profile: '.bash_profile' },
+  ])('bash on $os names $profile', async ({ os, arch, profile }) => {
+    const installed = await runInstall({
+      checksums: null,
+      shell: '/bin/bash',
+      machine: { os, arch },
+    });
+
+    expect(installed.stderr).toContain(`/${profile}'`);
+    expect(installed.stderr).toContain('current terminal');
+  });
+});
+
 /**
  * Runs the real script against a `uname` that answers for the machine being described. Stubbing the
  * command rather than the script is what keeps this a test of the thing an owner actually runs.
@@ -130,11 +174,22 @@ async function resolveTarget({ os, arch }: { os: string; arch: string }) {
  * A whole install against a stubbed release: `curl` answers for both the asset and the checksums,
  * and `NIB_VERSION` is what keeps the script from asking github.com which release is newest.
  */
-async function runInstall({ checksums }: { checksums: string | null }) {
+async function runInstall({
+  checksums,
+  shell = '/bin/zsh',
+  installName = 'bin',
+  machine = RELEASE_MACHINE,
+}: {
+  checksums: string | null;
+  shell?: string;
+  installName?: string;
+  machine?: { os: string; arch: string };
+}) {
   const dir = await stubDir();
-  const installDir = join(dir, 'bin');
+  const installDir = join(dir, installName);
+  const configDir = join(dir, 'config');
 
-  await writeStub({ dir, name: 'uname', body: unameStub(RELEASE_MACHINE) });
+  await writeStub({ dir, name: 'uname', body: unameStub(machine) });
   await writeStub({ dir, name: 'curl', body: curlStub({ checksums }) });
 
   const proc = Bun.spawn(['sh', INSTALL_SH], {
@@ -143,6 +198,8 @@ async function runInstall({ checksums }: { checksums: string | null }) {
       PATH: `${dir}:${process.env.PATH}`,
       NIB_VERSION: RELEASE,
       NIB_INSTALL_DIR: installDir,
+      SHELL: shell,
+      ZDOTDIR: configDir,
     },
     stdout: 'pipe',
     stderr: 'pipe',
@@ -160,6 +217,8 @@ async function runInstall({ checksums }: { checksums: string | null }) {
     stdout,
     stderr,
     exitCode,
+    installDir,
+    configDir,
     binary: (await installed.exists()) ? await installed.text() : null,
     entries: await readdir(installDir),
   };
