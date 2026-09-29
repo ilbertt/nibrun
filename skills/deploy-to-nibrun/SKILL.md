@@ -116,6 +116,11 @@ alone, so secrets are set once:
 nib run ./my-server --app my-app --env STRIPE_SECRET_KEY=sk_live_...
 ```
 
+Every saved environment value is encrypted in storage and redacted from ordinary API reads and
+the dashboard; there is no separate `--secret` flag. The dashboard shows values while you enter
+them, then hides saved values and lets you replace them. The running app receives the values,
+and an owner-requested export includes them in its `.env`.
+
 Arguments for the binary go inside the quotes, not after them:
 
 ```sh

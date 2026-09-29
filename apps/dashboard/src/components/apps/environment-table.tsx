@@ -87,6 +87,10 @@ export function EnvironmentTable({
         {children}
       </div>
       <p className="text-muted-foreground text-xs">
+        Values are visible while you enter them. Saved values are encrypted and hidden here and in
+        API reads. App exports include their values in the .env file.
+      </p>
+      <p className="text-muted-foreground text-xs">
         A value may name one the guest sets, and nothing else:{' '}
         {[...RUNTIME_VALUE_NAMES.entries()].map(([index, name]) => (
           <Fragment key={name}>

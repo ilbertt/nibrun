@@ -28,6 +28,11 @@ nib run ./my-server --name my-app
 Redeploy onto the same app with `nib run ./my-server --app my-app`. Without `--app`, a
 non-interactive shell creates a second app rather than replacing the first.
 
+Environment values set with `--env NAME=value` are encrypted in storage and redacted from
+ordinary API reads and the dashboard after saving. No separate `--secret` flag is needed.
+Values are visible while being entered, available to the running app, and included in an
+owner-requested export's `.env`.
+
 ## Starting with data
 
 An app can be created with `data/` already holding something — a seeded SQLite file, a corpus, an
