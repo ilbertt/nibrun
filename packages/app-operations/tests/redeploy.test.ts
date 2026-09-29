@@ -184,7 +184,7 @@ test('each step is announced, the artifact among them', async () => {
 
   expect(steps).toEqual([
     { kind: 'app', appId: APP_ID, name: NAME },
-    { kind: 'artifact', artifactId: ARTIFACT_ID, digest: DIGEST },
+    { kind: 'artifact', artifactId: ARTIFACT_ID, digest: DIGEST, reused: true },
     { kind: 'deployment', deploymentId: 'deployment-2' },
   ]);
 });

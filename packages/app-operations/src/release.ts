@@ -17,7 +17,7 @@ export type Deployed = {
 
 export type DeployStep =
   | { kind: 'app'; appId: string; name: string }
-  | { kind: 'artifact'; artifactId: string; digest: string }
+  | { kind: 'artifact'; artifactId: string; digest: string; reused: boolean }
   | { kind: 'deployment'; deploymentId: string };
 
 /**

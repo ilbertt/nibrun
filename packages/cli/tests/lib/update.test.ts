@@ -142,7 +142,7 @@ test('the binary being run again is named, and the release says where it answers
     args: [],
   });
 
-  expect(ui.said).toEqual([`app ${NAME}`, 'artifact sha256:abcd']);
+  expect(ui.said).toEqual([`app ${NAME}`, 'artifact sha256:abcd already present; skipping upload']);
   expect(release.url).toContain(`https://${HOSTNAME}`);
   expect(release.readyInMs).not.toBeNull();
 });
