@@ -215,9 +215,10 @@ it uses when it is not on nibrun.
 
 A binary that insists on a variable name of its own reaches the same values through it —
 `APP_BASE_URL=https://${NIBRUN_HOSTNAME}`, `DATABASE_URL=file:${NIBRUN_DATA_DIR}/app.db` — and the
-guest expands it before exec. Only the `NIBRUN_` names above expand, and only those: a secret
-holding a `$` arrives untouched, `${PORT}` is not one of them, and anything else is refused when
-you deploy it.
+guest expands it before exec. Only complete `${NIBRUN_NAME}` references to the names above
+expand. Bare names such as `$NIBRUN_HTTP_PORT`, unmatched braces, and other dollar signs remain
+literal. A complete reference to an unknown `NIBRUN_` name is refused when you deploy it;
+`${PORT}` remains literal.
 
 ## A second public port
 

@@ -87,15 +87,13 @@ const OFFERED = RUNTIME_VALUE_NAMES.join('|');
 const NEEDS_A_PORT = EXTRA_PUBLIC_PORT_VALUES.map((value) => value.name).join('|');
 const NAME_CHARACTER = '[A-Za-z0-9_]';
 
-// A value as the guest reads it: anything but a `$`, a `$` that opens no reference — which is what
-// leaves a bcrypt hash and a literal `$HOME` alone — and the two forms that expand. A name the
-// guest would refuse matches none of them, so it has no way through.
+// Match the guest's complete reference syntax so secrets with bare names or unmatched
+// braces remain literal. Complete references to unavailable names still fail validation.
 const TENANT_VALUE_PATTERN = [
   '^(?:',
   '[^$]',
-  `|\\$(?!\\{?${RUNTIME_VALUE_PREFIX})`,
+  `|\\$(?!\\{${RUNTIME_VALUE_PREFIX}${NAME_CHARACTER}*\\})`,
   `|\\$\\{(?:${OFFERED})\\}`,
-  `|\\$(?:${OFFERED})(?!${NAME_CHARACTER})`,
   ')*$',
 ].join('');
 
@@ -115,12 +113,8 @@ export function interpolableRuntimeValue(name: string): string {
   return `\${${name}}`;
 }
 
-// Both forms that expand, and only the names an app has to have asked for. Not a schema pattern
-// like the one above: whether this is allowed depends on the config beside it, which is not
-// something a value can be validated against on its own.
-const NAMES_A_PORT = new RegExp(
-  `\\$(?:\\{(?:${NEEDS_A_PORT})\\}|(?:${NEEDS_A_PORT})(?!${NAME_CHARACTER}))`,
-);
+// Whether these references are allowed depends on the app's public-port config.
+const NAMES_A_PORT = new RegExp(`\\$\\{(?:${NEEDS_A_PORT})\\}`);
 
 /** Whether `value` names a runtime value only an app with an extra public port is given. */
 export function namesExtraPublicPortValues(value: string): boolean {

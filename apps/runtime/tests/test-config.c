@@ -143,7 +143,7 @@ static void expands_the_public_address(void) {
   EXPECT(parse(&config, REQUIRED "NIBRUN_PUBLIC_IPV4=203.0.113.7\n"
                                  "NIBRUN_EXTRA_PUBLIC_PORT=22003\n"
                                  "ENV_ANNOUNCED=${NIBRUN_PUBLIC_IPV4}:${NIBRUN_EXTRA_PUBLIC_PORT}\n"
-                                 "ENV_RTC_PORT=$NIBRUN_EXTRA_PUBLIC_PORT\n"));
+                                 "ENV_RTC_PORT=${NIBRUN_EXTRA_PUBLIC_PORT}\n"));
   char *const *environment = config_build_environment(&config);
   EXPECT(strcmp(value_of(environment, "ANNOUNCED"), "203.0.113.7:22003") == 0);
   EXPECT(strcmp(value_of(environment, "RTC_PORT"), "22003") == 0);
@@ -168,18 +168,17 @@ static void expands_a_runtime_reference(void) {
   EXPECT(parse(&config, REQUIRED "NIBRUN_HOSTNAME=my-app.nibrun.app\n"
                                  "ENV_BARE=$NIBRUN_HTTP_PORT\n"
                                  "ENV_BRACED=${NIBRUN_HTTP_PORT}\n"
-                                 "ENV_WITHIN=http://$NIBRUN_HOSTNAME:${NIBRUN_HTTP_PORT}/health\n"
+                                 "ENV_WITHIN=http://${NIBRUN_HOSTNAME}:${NIBRUN_HTTP_PORT}/health\n"
                                  "ENV_UNDER_THE_VOLUME=${NIBRUN_DATA_DIR}/state.db\n"
-                                 "ENV_TWICE=$NIBRUN_HTTP_PORT-$NIBRUN_HTTP_PORT\n"
+                                 "ENV_TWICE=${NIBRUN_HTTP_PORT}-${NIBRUN_HTTP_PORT}\n"
                                  "ENV_ADJACENT=${NIBRUN_HTTP_PORT}0\n"));
 
   char *const *environment = config_build_environment(&config);
-  EXPECT(strcmp(value_of(environment, "BARE"), "8080") == 0);
+  EXPECT(strcmp(value_of(environment, "BARE"), "$NIBRUN_HTTP_PORT") == 0);
   EXPECT(strcmp(value_of(environment, "BRACED"), "8080") == 0);
   EXPECT(strcmp(value_of(environment, "WITHIN"), "http://my-app.nibrun.app:8080/health") == 0);
   EXPECT(strcmp(value_of(environment, "UNDER_THE_VOLUME"), "/app/data/state.db") == 0);
   EXPECT(strcmp(value_of(environment, "TWICE"), "8080-8080") == 0);
-  /* Braces are the whole reason there are two forms: without them this names PORT0. */
   EXPECT(strcmp(value_of(environment, "ADJACENT"), "80800") == 0);
 }
 
@@ -199,19 +198,42 @@ static void leaves_every_other_dollar_alone(void) {
   EXPECT(strcmp(value_of(environment, "TRAILING"), "the cost is $") == 0);
 }
 
+static void preserves_incomplete_references(void) {
+  const char *literals[] = {
+      "$", "{", "}", "${", "${}", "$NIBRUN_HTTP_PORT", "$NIBRUN_NOTHING",
+      "$NIBRUN_PUBLIC_IPV4", "$NIBRUN_EXTRA_PUBLIC_PORT", "${NIBRUN_HTTP_PORT",
+      "${NIBRUN_NOTHING", "{NIBRUN_HTTP_PORT}", "${NIBRUN_HTTP_PORT!}",
+      "${NIBRUN_HTTP_PORT with spaces}", "secret$NIBRUN_HTTP_PORT}suffix",
+  };
+  for (size_t index = 0; index < sizeof(literals) / sizeof(literals[0]); index++) {
+    char text[CONFIG_MAX_BYTES];
+    snprintf(text, sizeof(text), "%sENV_SECRET=%s\n", REQUIRED, literals[index]);
+    struct instance_config config;
+    EXPECT(parse(&config, text));
+    EXPECT(strcmp(value_of(config_build_environment(&config), "SECRET"), literals[index]) == 0);
+  }
+}
+
+static void expands_complete_references_among_literal_characters(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "ENV_MIXED=$${NIBRUN_HTTP_PORT}|{${NIBRUN_DATA_DIR}}|"
+                                 "${NIBRUN_BROKEN:${NIBRUN_HTTP_PORT}|$\n"));
+  EXPECT(strcmp(value_of(config_build_environment(&config), "MIXED"),
+                "$8080|{/app/data}|${NIBRUN_BROKEN:8080|$") == 0);
+}
+
 /* A reference nobody can answer fails the boot rather than reaching the tenant as
  * itself, where it would read as a value somebody meant to write. */
 static void rejects_a_reference_it_cannot_answer(void) {
-  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_NOTHING\n"));
-  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_HTTP_PORT0\n"));
-  EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_HTTP_PORT\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_NOTHING}\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_HTTP_PORT0}\n"));
   /* Offered, but this instance was issued no hostname. */
-  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_HOSTNAME\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_HOSTNAME}\n"));
   /* Likewise for an app that asked for no port. */
-  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_PUBLIC_IPV4\n"));
-  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_EXTRA_PUBLIC_PORT\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_PUBLIC_IPV4}\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_EXTRA_PUBLIC_PORT}\n"));
   /* The supervisor's own, and never handed to a tenant. */
-  EXPECT(rejects(REQUIRED "ENV_A=$NIBRUN_MAX_RESTARTS\n"));
+  EXPECT(rejects(REQUIRED "ENV_A=${NIBRUN_MAX_RESTARTS}\n"));
 }
 
 static void rejects_an_expansion_that_does_not_fit(void) {
@@ -417,6 +439,8 @@ int main(void) {
   drops_a_tenant_public_address();
   expands_a_runtime_reference();
   leaves_every_other_dollar_alone();
+  preserves_incomplete_references();
+  expands_complete_references_among_literal_characters();
   rejects_a_reference_it_cannot_answer();
   rejects_an_expansion_that_does_not_fit();
   rejects_a_broken_file();
