@@ -1,9 +1,14 @@
 # runtime
 
-The guest's PID 1. It boots and supervises the tenant binary inside one microVM, and is the only
-other thing that ever executes there. `src/init.c` is the sequence in order, `src/paths.h` is the
+The guest's PID 1. It boots and supervises the tenant binary inside one microVM. The same binary
+also serves `/usr/bin/crontab` through an argv[0] dispatch before any boot operation.
+`src/init.c` is the sequence in order, `src/paths.h` is the
 boot contract shared with the host agent, `src/vsock.h` is the port contract, and `src/config.h`
 is the `/instance.env` format.
+
+`src/crontab.c` forwards replacements and reads to the agent on port 51003, without a local
+spool or scheduler. Its bounded NBC1 protocol matches the agent's cron registration receiver.
+The unit suite uses a socketpair to verify framing and acknowledgement without AF_VSOCK.
 
 `src/guest-control.c` and `src/guest-filesystem.c` are the two things here the host drives rather
 than reads, and both exist because the host's view of the block device is not the filesystem.

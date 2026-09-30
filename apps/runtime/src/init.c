@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "crontab.h"
 #include "guest-control.h"
 #include "guest-filesystem.h"
 #include "guest-logs.h"
@@ -151,7 +152,13 @@ static bool read_instance_config(struct instance_config *config) {
   return true;
 }
 
-int main(void) {
+int main(int argc, char **argv) {
+  const char *name = strrchr(argv[0], '/');
+  name = name == NULL ? argv[0] : name + 1;
+  if (strcmp(name, "crontab") == 0) {
+    struct crontab_arguments arguments = {.count = argc, .values = argv};
+    return crontab_main(&arguments);
+  }
   umask(TENANT_UMASK);
 
   struct guest_channels channels = {

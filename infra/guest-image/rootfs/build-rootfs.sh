@@ -13,8 +13,8 @@ staged_init=/staged-init
 # itself: versioned soname, no configuration, no plugin loading, no dependency
 # outside this list. Size is not the test — a library that reads config or loads
 # providers makes the image's copy behave unlike the one the tenant built
-# against. /init and the tenant binary are the only things that ever execute, so
-# there is no shell, no package manager and no init system.
+# against. The crontab command shares /init's static binary; there is no shell,
+# package manager or init system.
 runtime_packages=(libc6 libgcc-s1 libstdc++6 ca-certificates zlib1g)
 
 block_size=4096
@@ -100,6 +100,7 @@ ldconfig -r "$root"
 
 step 'Installing /init'
 install -m 0755 "$staged_init" "$root/init"
+ln -s ../../init "$root/usr/bin/crontab"
 file "$root/init"
 file "$root/init" | grep -q 'ELF 64-bit LSB.*x86-64'
 if readelf -l "$root/init" | grep -q INTERP; then

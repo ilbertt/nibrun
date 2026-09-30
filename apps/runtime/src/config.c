@@ -43,8 +43,8 @@
 #define MAX_BACKOFF_FACTOR 1000.0
 
 /* NIBRUN_HTTP_PORT, PORT, NIBRUN_DATA_DIR, NIBRUN_HOSTNAME, NIBRUN_PUBLIC_IPV4,
- * NIBRUN_EXTRA_PUBLIC_PORT, HOME and TMPDIR, on top of whatever the tenant configured. */
-#define BASE_VARIABLES 8
+ * NIBRUN_EXTRA_PUBLIC_PORT, HOME, TMPDIR and PATH, on top of whatever the tenant configured. */
+#define BASE_VARIABLES 9
 
 enum field_type {
   FIELD_UNSIGNED,
@@ -631,6 +631,9 @@ char *const *config_build_environment(const struct instance_config *config) {
   }
   if (!defines(environment, count, "TMPDIR")) {
     environment[count++] = "TMPDIR=" TENANT_TMP_DIR;
+  }
+  if (!defines(environment, count, "PATH")) {
+    environment[count++] = "PATH=/usr/bin:/bin";
   }
   environment[count] = NULL;
   return environment;
