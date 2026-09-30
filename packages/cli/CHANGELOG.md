@@ -2,6 +2,23 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.9.29-1]
+
+### 🚀 Features
+
+- *(cli)* Reuse unchanged local artifacts (#643)
+- *(cli)* [**breaking**] Make log following opt-in (#638)
+
+### 🐛 Bug Fixes
+
+- *(runtime)* Require complete braced environment references (#647)
+- *(cli)* Explain current and persistent PATH setup (#644)
+
+### 📚 Documentation
+
+- Explain when app background work stops (#639)
+- Clarify the custom-domain pricing policy (#645)
+
 ## [2026.9.17-1]
 
 ### 🚀 Features
