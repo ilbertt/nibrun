@@ -112,8 +112,7 @@ static void drops_a_tenant_hostname(void) {
   while (environment[count] != NULL) {
     count++;
   }
-  /* NIBRUN_HTTP_PORT, PORT, NIBRUN_DATA_DIR, NIBRUN_HOSTNAME, HOME, TMPDIR */
-  EXPECT(count == 6);
+  EXPECT(count == 7);
 }
 
 /* Where the world reaches a port this instance was given, which a guest cannot discover
@@ -331,16 +330,21 @@ static void builds_the_tenant_environment(void) {
   EXPECT(strcmp(value_of(environment, "HOME"), "/somewhere") == 0);
   EXPECT(strcmp(value_of(environment, "TOKEN"), "abc") == 0);
   EXPECT(strcmp(value_of(environment, "TMPDIR"), "/tmp") == 0);
+  EXPECT(strcmp(value_of(environment, "PATH"), "/usr/bin:/bin") == 0);
   EXPECT(strcmp(value_of(environment, "NIBRUN_DATA_DIR"), "/app/data") == 0);
 
   size_t count = 0;
   while (environment[count] != NULL) {
     count++;
   }
-  /* NIBRUN_HTTP_PORT, PORT, NIBRUN_DATA_DIR, HOME, TOKEN, TMPDIR — the tenant's own PORT
-   * dropped, its HOME kept, because only the first of the two names an instance it is
-   * served on. */
-  EXPECT(count == 6);
+  EXPECT(count == 7);
+}
+
+static void preserves_the_tenant_path(void) {
+  struct instance_config config;
+  EXPECT(parse(&config, REQUIRED "ENV_PATH=/custom/bin\n"));
+  char *const *environment = config_build_environment(&config);
+  EXPECT(strcmp(value_of(environment, "PATH"), "/custom/bin") == 0);
 }
 
 /* One number under two names, so a value naming the prefixed one and a binary reading the
@@ -450,6 +454,7 @@ int main(void) {
   rejects_a_nul_byte();
   rejects_too_many_tenant_variables();
   builds_the_tenant_environment();
+  preserves_the_tenant_path();
   carries_the_port_under_both_names();
   drops_a_tenant_http_port();
   drops_a_tenant_data_dir();

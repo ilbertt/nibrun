@@ -45,8 +45,9 @@ The static `ip=…:off` form is why the image ships no DHCP client.
 
 ## What the image gives `/init`
 
-`/init` is PID 1, comes from `apps/runtime`, and is the only thing here that executes besides
-the tenant binary. There is no shell, package manager, init system or login.
+`/init` is PID 1 and comes from `apps/runtime`. `/usr/bin/crontab` symlinks to the same binary;
+its multicall entry forwards schedules to the host agent. There is no shell, package manager,
+cron daemon, init system or login.
 
 The root is read-only for the life of the VM, and **a mount point cannot be created on a
 read-only root** — so `/proc`, `/sys`, `/dev`, `/tmp`, `/run`, `/mnt/artifact` and `/app` exist
