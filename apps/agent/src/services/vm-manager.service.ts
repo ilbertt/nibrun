@@ -1,6 +1,8 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { AppId, DeploymentId, DesiredInstance } from '@repo/protocol';
 import { Duration, Effect, Either } from 'effect';
+import { cronRegistrationSocketPath } from '#lib/cron/registration-protocol.ts';
+import type { CronDeployment } from '#lib/cron/registry.ts';
 import { writeJsonFile } from '#lib/json-store.ts';
 import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
 import type { AppSlot } from '#lib/network/slot.ts';
@@ -29,6 +31,7 @@ import { readCacheDiskBytes } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
+import { CronRegistrationReceiver } from '#services/cron-registration-receiver.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -53,10 +56,30 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     const fs = yield* FileSystem.FileSystem;
     const images = yield* ArtifactImages;
     const logs = yield* TenantLogReceiver;
+    const crons = yield* CronRegistrationReceiver;
     const zerofs = yield* ZerofsTopology;
     const agentState = yield* AgentState;
 
     const workingDir = (appId: AppId) => vmWorkingDir({ vmDir: config.vmDir, appId });
+    const attachReceivers = Effect.fn('VmManager.attachReceivers')(
+      ({ appId, deploymentId }: CronDeployment) => {
+        const source = { appId, deploymentId };
+        const directory = workingDir(appId);
+        return Effect.all(
+          [
+            logs.attach({ source, socketPath: tenantLogSocketPath({ workingDir: directory }) }),
+            crons.attach({
+              source,
+              socketPath: cronRegistrationSocketPath({ workingDir: directory }),
+            }),
+          ],
+          { discard: true },
+        );
+      },
+    );
+    function detachReceivers(appId: AppId) {
+      return Effect.all([logs.detach(appId), crons.detach(appId)], { discard: true });
+    }
     function snapshotFor(appId: AppId) {
       return snapshotPaths({ snapshotDir: config.vmSnapshotDir, appId });
     }
@@ -177,13 +200,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
         }),
       });
 
-      yield* logs.attach({
-        source: {
-          appId: desired.appId,
-          deploymentId: desired.deploymentId,
-        },
-        socketPath: tenantLogSocketPath({ workingDir: directory }),
-      });
+      yield* attachReceivers(desired);
     });
 
     /**
@@ -218,7 +235,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       );
       const [starting] = yield* Effect.timed(
         Effect.onError(Systemd.start(desired.appId), () =>
-          Effect.ignore(logs.detach(desired.appId)),
+          Effect.ignore(detachReceivers(desired.appId)),
         ),
       );
       yield* Effect.logInfo('instance booting').pipe(
@@ -430,6 +447,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
 
     return {
       workingDir,
+      attachReceivers,
       boot,
       sleep,
       wake,
@@ -442,7 +460,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
         yield* Effect.annotateCurrentSpan({ appId });
         yield* discardSnapshot(appId);
         yield* Systemd.forget(appId);
-        yield* logs.detach(appId);
+        yield* detachReceivers(appId);
         yield* fs.remove(workingDir(appId), { recursive: true, force: true });
       }),
     };
@@ -452,6 +470,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     AgentState.Default,
     ArtifactImages.Default,
     TenantLogReceiver.Default,
+    CronRegistrationReceiver.Default,
     ZerofsTopology.Default,
   ],
 }) {}

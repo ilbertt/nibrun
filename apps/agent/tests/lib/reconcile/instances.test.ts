@@ -195,6 +195,7 @@ function recordingVms({
       VmManager,
       VmManager.make({
         workingDir: () => VM_DIR,
+        attachReceivers: () => Effect.void,
         boot: () => taking({ call: 'boot', outcome: Effect.void }),
         sleep: () => taking({ call: 'sleep', outcome: onSleep }),
         wake: () => taking({ call: 'wake', outcome: onWake }),

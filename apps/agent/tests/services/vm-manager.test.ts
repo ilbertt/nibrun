@@ -8,6 +8,7 @@ import { type SnapshotStamp, snapshotPaths } from '#lib/vm/snapshot.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { ArtifactTransferError } from '#services/artifact-store.service.ts';
+import { CronRegistrationReceiver } from '#services/cron-registration-receiver.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -103,6 +104,10 @@ function hostAsleepAndRefusing() {
           AgentState.Default,
           noArtifactImages,
           TenantLogReceiver.Default,
+          Layer.succeed(
+            CronRegistrationReceiver,
+            CronRegistrationReceiver.make({ attach: () => Effect.void, detach: () => Effect.void }),
+          ),
           ZerofsTopology.DefaultWithoutDependencies,
         ),
       ),

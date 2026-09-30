@@ -6,31 +6,22 @@ import { pollLoop, reconcileSafely } from '#lib/agent/poll.ts';
 import { reportLoop } from '#lib/agent/report.ts';
 import { statusLoop } from '#lib/agent/status.ts';
 import { usageLoop } from '#lib/agent/usage.ts';
-import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
-import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 
-const restoreLogReceivers = Effect.gen(function* () {
+const restoreGuestReceivers = Effect.gen(function* () {
   const vms = yield* VmManager;
-  const receiver = yield* TenantLogReceiver;
   yield* Effect.forEach(
     yield* AgentState.records,
     (record) =>
-      receiver
-        .attach({
-          source: {
-            appId: record.appId,
-            deploymentId: record.deploymentId,
-          },
-          socketPath: tenantLogSocketPath({ workingDir: vms.workingDir(record.appId) }),
-        })
+      vms
+        .attachReceivers({ appId: record.appId, deploymentId: record.deploymentId })
         .pipe(
           Effect.catchAll((error) =>
-            Effect.logWarning('tenant log receiver restore failed', error).pipe(
+            Effect.logWarning('guest receiver restore failed', error).pipe(
               Effect.annotateLogs({ appId: record.appId }),
             ),
           ),
@@ -49,7 +40,7 @@ export const run = Effect.gen(function* () {
   const sessions = yield* AgentSessionHolder;
 
   yield* reconciler.load;
-  yield* restoreLogReceivers;
+  yield* restoreGuestReceivers;
 
   const cached = yield* cache.restore;
   if (Option.isSome(cached)) {
