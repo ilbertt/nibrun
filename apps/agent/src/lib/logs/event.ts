@@ -9,11 +9,12 @@ import type { TenantLogSource } from '#lib/logs/vsock.ts';
  * rather than being dropped for want of a label — and it is why this shape is the agent's own
  * rather than the record the store keeps.
  */
-export type TenantLogEvent = TenantLogSource & {
-  readonly sourceId: string;
-  readonly sequence: number;
-  readonly observedAt: Timestamp;
-} & (
+export type TenantLogEvent = TenantLogSource &
+  Pick<TenantLogRecord, 'cronJobId' | 'cronRunId'> & {
+    readonly sourceId: string;
+    readonly sequence: number;
+    readonly observedAt: Timestamp;
+  } & (
     | { readonly kind: 'data'; readonly stream: TenantLogStream; readonly text: string }
     | { readonly kind: 'gap'; readonly droppedBytes: number }
   );
@@ -39,6 +40,8 @@ export function tenantLogRecord({
     deploymentId: event.deploymentId,
     sourceId: event.sourceId,
     sequence: event.sequence,
+    ...(event.cronJobId === undefined ? {} : { cronJobId: event.cronJobId }),
+    ...(event.cronRunId === undefined ? {} : { cronRunId: event.cronRunId }),
   } as const;
   return event.kind === 'gap'
     ? { ...common, _msg: GAP_MESSAGE, stream: 'stderr', droppedBytes: event.droppedBytes }
