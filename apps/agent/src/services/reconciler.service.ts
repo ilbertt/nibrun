@@ -22,6 +22,7 @@ import { readDeletedVolumes } from '#lib/volumes/manager.ts';
 import { reapSeedStaging } from '#lib/volumes/seed.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { CronRegistry } from '#services/cron-registry.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
@@ -37,6 +38,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
     const allocator = yield* SlotAllocator;
     const volumes = yield* VolumeManager;
     const vms = yield* VmManager;
+    const crons = yield* CronRegistry;
 
     const load = Effect.gen(function* () {
       const instances = readInstanceRecords(
@@ -235,6 +237,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       });
 
     const reconcile = Effect.fn('Reconciler.reconcile')(function* (desired: HostDesiredState) {
+      yield* crons.syncDeployments({ deployments: desired.instances });
       const observed = yield* observe(desired);
       const plan = planReconcile({ desired, observed });
       yield* AgentState.modify((current) => ({
@@ -292,5 +295,6 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
     SlotAllocator.Default,
     VolumeManager.Default,
     VmManager.Default,
+    CronRegistry.Default,
   ],
 }) {}

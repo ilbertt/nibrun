@@ -32,6 +32,26 @@ export class CronRegistry extends Effect.Service<CronRegistry>()('CronRegistry',
     }
 
     return {
+      syncDeployments: Effect.fn('CronRegistry.syncDeployments')(
+        ({ deployments }: { deployments: readonly CronDeployment[] }) =>
+          update((current) => {
+            const next = new Map(
+              deployments.map((deployment) => {
+                const existing = current.get(deployment.appId);
+                const table =
+                  existing?.deploymentId === deployment.deploymentId
+                    ? existing
+                    : copyCronTable({ ...deployment, jobs: [] });
+                return [deployment.appId, table] as const;
+              }),
+            );
+            const unchanged =
+              next.size === current.size &&
+              [...next].every(([appId, table]) => current.get(appId) === table);
+            return unchanged ? Effect.succeed(current) : persist(next);
+          }),
+      ),
+
       get: ({ appId }: { appId: AppId }) =>
         SynchronizedRef.get(tables).pipe(
           Effect.map((current) =>
