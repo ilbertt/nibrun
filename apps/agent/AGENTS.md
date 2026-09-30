@@ -63,6 +63,13 @@ so a route the api does not mount is a compile error. What it cannot describe is
 come back, so `lib/control/client.ts` still validates every response against `@repo/protocol` —
 TypeBox, not `effect/Schema`, because the schemas are shared with the api.
 
+**Cron expressions are Bun's.** `lib/cron/schedule.ts` validates them and calculates the next
+occurrence with `Bun.cron.parse`, explicitly in the protocol's `CRON_TIME_ZONE`. The shared
+TypeBox schemas bound the table and its fields; expression syntax stays in Bun rather than a
+second parser. Waiting and dispatch belong to scoped Effect fibers so cancellation, supervision
+and `TestClock` work like the agent's other loops. Schedule calculation does not register a
+timer or execute a tenant command.
+
 ## What the host must provide, and does not yet
 
 Owned by `infra/app-host/`, not fixable here.

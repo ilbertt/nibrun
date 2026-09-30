@@ -67,6 +67,14 @@ describe('Bun cron expressions', () => {
     );
   });
 
+  test('a leap-day schedule advances to the next leap year', async () => {
+    expect<string>(await next('0 0 29 2 *')).toBe('2028-02-29T00:00:00.000Z');
+  });
+
+  test('calculating from the current instant skips past occurrences', async () => {
+    expect<string>(await next('0 9 * * *')).toBe('2026-10-01T09:00:00.000Z');
+  });
+
   test('UTC is explicit even when the reference instant has another offset', async () => {
     expect<string>(
       await runScoped(
