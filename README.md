@@ -13,31 +13,7 @@ Small apps don't need to scale. They need a machine and a disk.
 
 ## Try it out
 
-Open source projects that already ship a single binary. One click to deploy:
-
-| App | What you get |
-| --- | --- |
-| **[PocketBase](https://nibrun.com/deploy/pocketbase)** | A database, auth, file storage and an admin UI, in one file. |
-| **[Sharkord](https://nibrun.com/deploy/sharkord)** | A self-hosted chat server with voice, video and screen sharing. |
-| **[Boop](https://nibrun.com/deploy/boop)** | A self-hosted notification inbox for your own apps. |
-| **[Gitea](https://nibrun.com/deploy/gitea)** | A self-hosted Git service with repositories, issues, pull requests, packages and CI. |
-| **[OpenConnector](https://nibrun.com/deploy/open-connector)** | One OAuth hub for 1,000+ providers, with prebuilt actions your agents can call. |
-| **[Context Use](https://nibrun.com/deploy/context-use)** | A personal knowledge base your agents read and write over MCP, behind a passkey. |
-| **[nibrun-vitals](https://nibrun.com/deploy/nibrun-vitals)** | The microVM it runs on, as a face you can boop: live CPU, memory, disk, network, visitors and naps. |
-| **[PicoShare](https://nibrun.com/deploy/picoshare)** | A minimalist file host: upload a file, share a link, no account needed to download. |
-| **[Memos](https://nibrun.com/deploy/memos)** | A place for short notes, one card to a thought, with tags and search. |
-| **[Shiori](https://nibrun.com/deploy/shiori)** | Bookmarks, each with a readable copy of the page saved beside it. |
-| **[Fusion](https://nibrun.com/deploy/fusion)** | An RSS reader for your own feeds, behind a password. |
-| **[File Browser](https://nibrun.com/deploy/filebrowser)** | A file manager for the volume in a browser: upload, preview, rename, share. |
-| **[MicroBin](https://nibrun.com/deploy/microbin)** | A pastebin for text, files and links, with expiry and QR codes. |
-| **[GoatCounter](https://nibrun.com/deploy/goatcounter)** | Web analytics without cookies, and without following anyone between sites. |
-| **[Remark42](https://nibrun.com/deploy/remark42)** | Comments for a static blog, with no tracking and no third party. |
-| **[Traggo](https://nibrun.com/deploy/traggo)** | Time tracking where an entry is a set of tags rather than a project. |
-| **[Gotify](https://nibrun.com/deploy/gotify)** | A push notification server your own scripts post to, with apps to receive them. |
-| **[Flipt](https://nibrun.com/deploy/flipt)** | Feature flags with a UI, evaluated over HTTP or gRPC. |
-| **[Open Sync](https://nibrun.com/deploy/open-sync)** | Your GitHub pull requests, Gmail and Slack threads and Granola meetings, synced to a copy you keep. |
-| **[PDF Signer](https://nibrun.com/deploy/pdf-signer)** | Your handwritten signature, kept once and stamped onto any PDF, behind a passkey. |
-| **[yarr](https://nibrun.com/deploy/yarr)** | A small feed reader, driven from the keyboard, that keeps everything in one file. |
+Visit [nibrun.com/apps](https://nibrun.com/apps) to see the available open source projects you can deploy in one click.
 
 ## Why
 
