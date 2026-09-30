@@ -3,6 +3,7 @@ import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileTextIcon } from 'lucide-react';
 import { ArticleBody } from '#components/article-body.tsx';
 import { DeployCta } from '#components/deploy-cta.tsx';
+import { GithubStarLink } from '#components/github-star-link.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { findPost, formatPostDate, postMarkdownPath } from '#lib/blog.ts';
@@ -57,7 +58,7 @@ function RouteComponent() {
               {formatPostDate(post.date)}
             </time>
             <h1 className="text-balance font-semibold text-4xl tracking-tight">{post.title}</h1>
-            <p className="text-balance text-lg text-muted-foreground">{post.description}</p>
+            <p className="text-pretty text-lg text-muted-foreground">{post.description}</p>
             {/* Not a router link: the target is a file the worker hands back, not a route. */}
             <Button
               variant="outline"
@@ -72,6 +73,9 @@ function RouteComponent() {
           <ArticleBody post={post} />
         </article>
         <DeployCta />
+        <footer className="flex justify-center pb-12 sm:pb-16">
+          <GithubStarLink />
+        </footer>
       </main>
     </>
   );
