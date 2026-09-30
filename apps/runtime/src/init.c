@@ -18,6 +18,7 @@
 #include "config.h"
 #include "crontab.h"
 #include "guest-control.h"
+#include "guest-cron.h"
 #include "guest-filesystem.h"
 #include "guest-logs.h"
 #include "log.h"
@@ -34,6 +35,7 @@
 struct guest_channels {
   struct guest_control control;
   struct guest_filesystem files;
+  struct guest_cron cron;
 };
 
 static _Noreturn void shutdown_guest(const struct guest_channels *channels) {
@@ -41,6 +43,7 @@ static _Noreturn void shutdown_guest(const struct guest_channels *channels) {
    * worker still holding a file open would keep it busy. */
   guest_control_stop(&channels->control);
   guest_filesystem_stop(&channels->files);
+  guest_cron_stop(&channels->cron);
   /* Unmounted rather than only synced, so the next boot finds a clean filesystem
    * instead of replaying a journal. */
   if (umount(DATA_DIR) < 0 && errno != EINVAL && errno != ENOENT) {
@@ -164,6 +167,7 @@ int main(int argc, char **argv) {
   struct guest_channels channels = {
       .control = {.process = -1, .mount_point = DATA_DIR},
       .files = {.process = -1, .mount_point = DATA_DIR},
+      .cron = {.process = -1},
   };
 
   if (!mounts_dev()) {
@@ -181,11 +185,11 @@ int main(int argc, char **argv) {
     shutdown_guest(&channels);
   }
 
-  /* After the data filesystem exists and before the tenant does: both channels have
-   * that filesystem as their only job, and the host may ask about it while the
-   * tenant is still starting. */
+  /* The host can reach these channels even while the tenant is between restarts. */
   guest_control_start(&channels.control);
   guest_filesystem_start(&channels.files);
+  channels.cron.config = &config;
+  guest_cron_start(&channels.cron);
 
   struct supervisor supervisor = {
       .tenant =
