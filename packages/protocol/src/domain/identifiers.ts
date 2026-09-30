@@ -19,6 +19,12 @@ export const DeploymentIdSchema = identifierSchema<DeploymentId>(
   'One artifact plus the configuration it was launched with.',
 );
 
+export type CronJobId = Identifier<'CronJobId'>;
+export const CronJobIdSchema = identifierSchema<CronJobId>('One registered cron job.');
+
+export type CronRunId = Identifier<'CronRunId'>;
+export const CronRunIdSchema = identifierSchema<CronRunId>('One execution of a cron job.');
+
 export type HostId = Identifier<'HostId'>;
 export const HostIdSchema = identifierSchema<HostId>('One app host.');
 

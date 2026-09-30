@@ -1,5 +1,11 @@
 import { Type } from '@sinclair/typebox';
-import { AppIdSchema, DeploymentIdSchema, HostIdSchema } from '#domain/identifiers.ts';
+import {
+  AppIdSchema,
+  CronJobIdSchema,
+  CronRunIdSchema,
+  DeploymentIdSchema,
+  HostIdSchema,
+} from '#domain/identifiers.ts';
 import { stringEnum } from '#lib/string-enum.ts';
 import { TimestampSchema } from '#lib/wire.ts';
 
@@ -54,6 +60,8 @@ export const TenantLogRecordSchema = Type.Object({
   // buffering dropped records; a new `sourceId` means the receiver itself restarted.
   sourceId: Type.String({ minLength: 1, maxLength: 64 }),
   sequence: Type.Integer({ minimum: 0, maximum: MAX_SAFE_WIRE_INTEGER }),
+  cronJobId: Type.Optional(CronJobIdSchema),
+  cronRunId: Type.Optional(CronRunIdSchema),
   droppedBytes: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_SAFE_WIRE_INTEGER })),
 });
 

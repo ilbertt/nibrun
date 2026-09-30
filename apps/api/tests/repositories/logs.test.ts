@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import {
   AppIdSchema,
+  CronJobIdSchema,
+  CronRunIdSchema,
   DeploymentIdSchema,
   HostIdSchema,
   TimestampSchema,
@@ -63,6 +65,16 @@ async function read(rows: LogRow[]) {
 }
 
 describe('a read takes one window of one deployment out of the store', () => {
+  test('cron context survives reading a stored run', async () => {
+    const cronJobId = Value.Parse(CronJobIdSchema, 'cron-job-1');
+    const cronRunId = Value.Parse(CronRunIdSchema, 'cron-run-1');
+    const { records } = await read([storedRow({ cronJobId, cronRunId })]);
+    expect(records[0]?.cronJobId).toBe(cronJobId);
+    expect(records[0]?.cronRunId).toBe(cronRunId);
+    expect(records[0]?.sourceId).toBe('source-1');
+    expect(records[0]?.sequence).toBe(0);
+  });
+
   test('the filter names the stream fields before the deployment', async () => {
     const { asked } = await read([]);
 
