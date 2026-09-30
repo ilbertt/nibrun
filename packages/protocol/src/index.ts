@@ -120,6 +120,16 @@ export {
 } from '#domain/checkpoint.ts';
 export { type ComputeUsage, ComputeUsageSchema } from '#domain/compute.ts';
 export {
+  CRON_TIME_ZONE,
+  CronCommandSchema,
+  type CronJobDefinition,
+  CronJobDefinitionSchema,
+  type CronJobDefinitions,
+  CronJobDefinitionsSchema,
+  CronScheduleSchema,
+  MAX_CRON_JOBS_PER_APP,
+} from '#domain/cron.ts';
+export {
   DEPLOYMENT_STATES,
   type Deployment,
   DeploymentSchema,
