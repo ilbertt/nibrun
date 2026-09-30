@@ -4,12 +4,18 @@ description: Open source apps, with the binary, port and persistent storage alre
 date: 2026-09-30
 ---
 
-PocketBase ships as a single binary, but you still need to tell it to run `serve`, bind to
-`0.0.0.0:8090`, and put its database somewhere persistent. Sharkord needs a public UDP port for
-voice and the address to announce to clients. Memos needs its data directory set.
+Self-hosting is a lot to ask of someone who just wants to use an app. Getting it online means
+setting up a server, persistent storage, a reverse proxy and HTTPS. Then they need to keep that
+setup working. Even if you know how to do all of it, you might not want another server to look
+after just to keep some notes or share files.
 
-These are small bits of configuration, but you have to look them up before you can use the app.
-They are also the same for everyone deploying it on nibrun, so we put them in deploy presets.
+That makes it harder for open source projects to reach users. Someone can want the software
+and still stop at the deployment guide. The people willing to maintain a server are a smaller
+group than the people who could use the app.
+
+Many of these apps already ship a single binary. nibrun handles the hosting; what remains is
+the app's port, startup arguments and data directory. We put those settings in deploy presets
+so each person doesn't have to work them out again.
 
 Now those presets have a page: [nibrun.com/apps](/apps). The button cycling through app names
 under **Try it out** on the home page opens it, and there is an **Apps** link in the header.
