@@ -46,8 +46,8 @@ The static `ip=…:off` form is why the image ships no DHCP client.
 ## What the image gives `/init`
 
 `/init` is PID 1 and comes from `apps/runtime`. `/usr/bin/crontab` symlinks to the same binary;
-its multicall entry forwards schedules to the host agent. There is no shell, package manager,
-cron daemon, init system or login.
+its multicall entry forwards schedules to the host agent. Dash provides `/bin/sh` for cron command
+strings. There is no package manager, cron daemon, init system or login.
 
 The root is read-only for the life of the VM, and **a mount point cannot be created on a
 read-only root** — so `/proc`, `/sys`, `/dev`, `/tmp`, `/run`, `/mnt/artifact` and `/app` exist
@@ -63,7 +63,8 @@ Measured at boot, PID 1 receives `argv = ["/init"]` and `envp = {HOME=/, TERM=li
 forwards no command-line tokens, not even ones it did not consume. Anything from the cmdline has
 to be read out of `/proc/cmdline`.
 
-The rootfs carries glibc, `libgcc-s1`, `libstdc++6`, `zlib1g` and the CA bundle. A library earns
+The rootfs carries glibc, `libgcc-s1`, `libstdc++6`, `zlib1g`, the CA bundle and dash. Dash is the
+command interpreter for crontab entries; external tools remain the app's responsibility. A library earns
 a place by being ABI-stable with a versioned soname, no configuration and no plugin loading —
 size is not the test, and `libssl` and `libcurl` fail it. Measured, `bun build --compile` needs
 only glibc; the rest are for the other toolchains people upload. Alpine/musl fails at exec with
