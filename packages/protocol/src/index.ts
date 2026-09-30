@@ -127,6 +127,9 @@ export {
   type CronJobDefinitions,
   CronJobDefinitionsSchema,
   CronScheduleSchema,
+  type CronTable,
+  CronTableSchema,
+  CronTablesSchema,
   MAX_CRON_JOBS_PER_APP,
 } from '#domain/cron.ts';
 export {

@@ -1,4 +1,5 @@
 import { Type } from '@sinclair/typebox';
+import { AppIdSchema, DeploymentIdSchema } from '#domain/identifiers.ts';
 
 export const MAX_CRON_JOBS_PER_APP = 10;
 export const CRON_TIME_ZONE = 'UTC';
@@ -32,3 +33,13 @@ export const CronJobDefinitionsSchema = Type.Array(CronJobDefinitionSchema, {
 });
 
 export type CronJobDefinitions = typeof CronJobDefinitionsSchema.static;
+
+export const CronTableSchema = Type.Object({
+  appId: AppIdSchema,
+  deploymentId: DeploymentIdSchema,
+  jobs: CronJobDefinitionsSchema,
+});
+
+export type CronTable = typeof CronTableSchema.static;
+
+export const CronTablesSchema = Type.Array(CronTableSchema);
