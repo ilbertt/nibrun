@@ -13,9 +13,8 @@ staged_init=/staged-init
 # itself: versioned soname, no configuration, no plugin loading, no dependency
 # outside this list. Size is not the test — a library that reads config or loads
 # providers makes the image's copy behave unlike the one the tenant built
-# against. The crontab command shares /init's static binary; there is no shell,
-# package manager or init system.
-runtime_packages=(libc6 libgcc-s1 libstdc++6 ca-certificates zlib1g)
+# against. Crontab shares /init's static binary; dash executes cron command strings.
+runtime_packages=(libc6 libgcc-s1 libstdc++6 ca-certificates zlib1g dash)
 
 block_size=4096
 inode_margin=512
@@ -53,6 +52,7 @@ dpkg -L "${runtime_packages[@]}" |
     printf '%s\n' "${path#/}"
   done >/tmp/harvest
 tar -C / --no-recursion -cf - -T /tmp/harvest | tar -C "$root" -xf -
+ln -sf dash "$root/usr/bin/sh"
 
 # update-ca-certificates generates the bundle and the hash symlinks in postinst,
 # so dpkg does not own them and a dpkg -L harvest alone leaves the image with a
@@ -132,6 +132,7 @@ g++ -O0 -Wl,--no-as-needed -o "$root/.probe" /tmp/probe.cc \
   /usr/lib/x86_64-linux-gnu/libz.so.1
 chroot "$root" /.probe
 rm -f "$root/.probe"
+chroot "$root" /bin/sh -c 'printf "cron shell exec ok\n"'
 
 step 'Normalising timestamps'
 find "$root" -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +

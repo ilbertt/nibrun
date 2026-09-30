@@ -42,10 +42,6 @@
 #define MIN_BACKOFF_FACTOR 1.0
 #define MAX_BACKOFF_FACTOR 1000.0
 
-/* NIBRUN_HTTP_PORT, PORT, NIBRUN_DATA_DIR, NIBRUN_HOSTNAME, NIBRUN_PUBLIC_IPV4,
- * NIBRUN_EXTRA_PUBLIC_PORT, HOME, TMPDIR and PATH, on top of whatever the tenant configured. */
-#define BASE_VARIABLES 9
-
 enum field_type {
   FIELD_UNSIGNED,
   FIELD_BACKOFF_FACTOR,
@@ -579,7 +575,7 @@ char *const *config_build_argv(const struct instance_config *config, const char 
 }
 
 char *const *config_build_environment(const struct instance_config *config) {
-  static char *environment[CONFIG_MAX_TENANT_VARIABLES + BASE_VARIABLES + 1];
+  static char *environment[CONFIG_MAX_ENVIRONMENT_VARIABLES + 1];
   static char http_port_variable[sizeof(HTTP_PORT_VARIABLE "=65535")];
   static char port_alias_variable[sizeof(PORT_ALIAS "=65535")];
   static char hostname_variable[sizeof(HOSTNAME_VARIABLE "=") + CONFIG_MAX_HOSTNAME];

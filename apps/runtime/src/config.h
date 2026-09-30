@@ -35,6 +35,8 @@
 /* INET6_ADDRSTRLEN without its terminator. */
 #define CONFIG_MAX_ADDRESS 45
 #define CONFIG_MAX_TENANT_VARIABLES 256
+#define CONFIG_PLATFORM_VARIABLES 9
+#define CONFIG_MAX_ENVIRONMENT_VARIABLES (CONFIG_MAX_TENANT_VARIABLES + CONFIG_PLATFORM_VARIABLES)
 /* Mirrors MAX_ARGUMENTS in packages/protocol, which refuses to write more. */
 #define CONFIG_MAX_ARGUMENTS 64
 /* glibc's resolver reads at most MAXNS entries and silently drops the rest. */

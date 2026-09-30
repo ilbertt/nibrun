@@ -6,16 +6,7 @@
 #include <sys/types.h>
 
 #include "config.h"
-
-struct tenant_process {
-  const char *executable;
-  const char *working_directory;
-  /* argv as execve wants it, the binary itself included. */
-  char *const *argv;
-  char *const *environment;
-  uid_t uid;
-  gid_t gid;
-};
+#include "tenant-process.h"
 
 enum tenant_output_stream {
   TENANT_OUTPUT_STDOUT,

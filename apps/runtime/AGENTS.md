@@ -10,6 +10,11 @@ is the `/instance.env` format.
 spool or scheduler. Its bounded NBC1 protocol matches the agent's cron registration receiver.
 The unit suite uses a socketpair to verify framing and acknowledgement without AF_VSOCK.
 
+`src/cron-command.c` starts one shell command with the instance environment and per-job overrides.
+`src/tenant-process.c` is the shared privilege and process-group boundary for cron commands and
+the supervised binary. Cron stdin is `/dev/null`; callers own output collection and reaping.
+`SHELL` in the merged environment chooses the interpreter, with `/bin/sh` as the default.
+
 `src/guest-control.c` and `src/guest-filesystem.c` are the two things here the host drives rather
 than reads, and both exist because the host's view of the block device is not the filesystem.
 

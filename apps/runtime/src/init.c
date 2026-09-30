@@ -3,7 +3,7 @@
  * Boots one tenant binary inside one Firecracker microVM: mounts what the guest
  * needs, reads the instance config off its own drive, gives the tenant its data
  * filesystem at data/, drops privileges, and supervises it until it is asked to
- * stop or has run out of restarts. Nothing else runs in this VM. */
+ * stop or has run out of restarts. */
 
 #include <errno.h>
 #include <fcntl.h>

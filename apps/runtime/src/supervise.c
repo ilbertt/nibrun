@@ -2,7 +2,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <grp.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -15,10 +14,10 @@
 
 #include "clock.h"
 #include "log.h"
+#include "tenant-process.h"
 
 #define MS_PER_SECOND 1000
 #define NS_PER_MS 1000000L
-#define TENANT_SPAWN_EXIT_CODE 126
 #define SIGKILL_GRACE_MS 2000
 #define OUTPUT_CHUNK_BYTES 4096
 /* How long the supervisor may sit in poll before giving the output sink a turn. A tenant that
@@ -87,38 +86,6 @@ static struct wait_result reap_children(pid_t tenant) {
       result.status = status;
     }
   }
-}
-
-#define OR_GIVE_UP(call, description)                       \
-  do {                                                      \
-    if ((call) < 0) {                                       \
-      log_errno("could not %s for the tenant", description); \
-      _exit(TENANT_SPAWN_EXIT_CODE);                        \
-    }                                                       \
-  } while (0)
-
-static _Noreturn void become_tenant(const struct tenant_process *tenant, int stdout_descriptor,
-                                    int stderr_descriptor) {
-  sigset_t none;
-  sigemptyset(&none);
-  sigprocmask(SIG_SETMASK, &none, NULL);
-
-  OR_GIVE_UP(dup2(stdout_descriptor, STDOUT_FILENO), "attach stdout");
-  OR_GIVE_UP(dup2(stderr_descriptor, STDERR_FILENO), "attach stderr");
-  close(stdout_descriptor);
-  close(stderr_descriptor);
-
-  /* Its own session: the tenant's own children can then be signalled as a group,
-   * and sharing the console with PID 1 cannot make job control stop it. */
-  OR_GIVE_UP(setsid(), "open a session");
-  OR_GIVE_UP(chdir(tenant->working_directory), "change directory");
-  OR_GIVE_UP(setgroups(0, NULL), "drop supplementary groups");
-  OR_GIVE_UP(setgid(tenant->gid), "drop to its gid");
-  OR_GIVE_UP(setuid(tenant->uid), "drop to its uid");
-
-  execve(tenant->executable, tenant->argv, tenant->environment);
-  log_errno("could not run %s", tenant->executable);
-  _exit(TENANT_SPAWN_EXIT_CODE);
 }
 
 static void close_descriptor(int *descriptor) {
@@ -356,7 +323,11 @@ enum supervise_outcome supervise(const struct supervisor *supervisor) {
     if (tenant == 0) {
       close(stdout_pipe[0]);
       close(stderr_pipe[0]);
-      become_tenant(&supervisor->tenant, stdout_pipe[1], stderr_pipe[1]);
+      struct tenant_launch launch = {.tenant = &supervisor->tenant,
+                                     .input = -1,
+                                     .output = stdout_pipe[1],
+                                     .errors = stderr_pipe[1]};
+      tenant_process_exec(&launch);
     }
     close(stdout_pipe[1]);
     close(stderr_pipe[1]);
