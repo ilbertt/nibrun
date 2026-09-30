@@ -12,7 +12,7 @@ import { Deferred, Effect, Either, Exit, Fiber, Layer, Option, Ref } from 'effec
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
-import { APP_ID, DEPLOYMENT_ID } from '#tests/support/fixtures.ts';
+import { APP_ID, DEPLOYMENT_ID, desiredInstance } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const DEPLOYMENT = { appId: APP_ID, deploymentId: DEPLOYMENT_ID };
@@ -38,6 +38,29 @@ function withRegistry<A, E>(
 }
 
 describe('durable cron registrations', () => {
+  test('desired deployments clear replaced jobs, forget removed apps, and retain suspended tables', async () => {
+    await withRegistry(
+      Effect.gen(function* () {
+        const registry = yield* CronRegistry;
+        yield* registry.syncDeployments({ deployments: [DEPLOYMENT, OTHER_APP] });
+        yield* registry.replace({ ...DEPLOYMENT, jobs: [JOB] });
+        yield* registry.replace({ ...OTHER_APP, jobs: [JOB] });
+        yield* registry.syncDeployments({
+          deployments: [desiredInstance({ desiredState: 'stopped' }), OTHER_APP],
+        });
+        expect(Option.getOrThrow(yield* registry.get({ appId: APP_ID })).jobs).toEqual([JOB]);
+        yield* registry.syncDeployments({ deployments: [NEXT_DEPLOYMENT] });
+        expect(Option.getOrThrow(yield* registry.get({ appId: APP_ID }))).toEqual({
+          ...NEXT_DEPLOYMENT,
+          jobs: [],
+        });
+        expect(Option.isNone(yield* registry.get({ appId: OTHER_APP.appId }))).toBe(true);
+        const stale = yield* Effect.either(registry.replace({ ...DEPLOYMENT, jobs: [JOB] }));
+        expect(Either.isLeft(stale) && stale.left._tag).toBe('CronDeploymentMismatch');
+      }),
+    );
+  });
+
   test('a new deployment starts empty and replacement preserves order and duplicate jobs', async () => {
     await withRegistry(
       Effect.gen(function* () {
@@ -234,10 +257,12 @@ describe('durable cron registrations', () => {
           yield* registry.beginDeployment(DEPLOYMENT);
           yield* registry.replace({ ...DEPLOYMENT, jobs: [JOB] });
           yield* Ref.set(failWrites, true);
+          yield* registry.syncDeployments({ deployments: [DEPLOYMENT] });
           for (const change of [
             registry.replace({ ...DEPLOYMENT, jobs: [] }),
             registry.beginDeployment(NEXT_DEPLOYMENT),
             registry.remove(DEPLOYMENT),
+            registry.syncDeployments({ deployments: [NEXT_DEPLOYMENT] }),
           ]) {
             const result = yield* Effect.either(change);
             expect(Either.isLeft(result) && result.left._tag).toBe('CronRegistryError');
