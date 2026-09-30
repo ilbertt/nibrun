@@ -4,15 +4,22 @@ import { SystemError } from '@effect/platform/Error';
 import {
   AppIdSchema,
   type CronJobDefinition,
+  CrontabSchema,
   DeploymentIdSchema,
   MAX_CRON_JOBS_PER_APP,
+  SecretStringSchema,
   Value,
 } from '@repo/protocol';
 import { Deferred, Effect, Either, Exit, Fiber, Layer, Option, Ref } from 'effect';
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
-import { APP_ID, DEPLOYMENT_ID, desiredInstance } from '#tests/support/fixtures.ts';
+import {
+  APP_ID,
+  DEPLOYMENT_ID,
+  desiredInstance,
+  tenantEnvironment,
+} from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const DEPLOYMENT = { appId: APP_ID, deploymentId: DEPLOYMENT_ID };
@@ -38,6 +45,37 @@ function withRegistry<A, E>(
 }
 
 describe('durable cron registrations', () => {
+  test('crontab source and per-job environment survive restart; invalid replacements preserve them', async () => {
+    await provided(platform)(
+      Effect.gen(function* () {
+        const directory = yield* temporaryDirectory;
+        const path = `${directory}/crons.json`;
+        const text =
+          '# preserve formatting\nTOKEN="tenant-secret"\n@hourly /mnt/artifact/server cleanup\n';
+        yield* Effect.gen(function* () {
+          const registry = yield* CronRegistry;
+          yield* registry.beginDeployment(DEPLOYMENT);
+          yield* registry.replaceCrontab({ ...DEPLOYMENT, text });
+          const rejected = yield* Effect.either(
+            registry.replaceCrontab({ ...DEPLOYMENT, text: '@reboot command' }),
+          );
+          expect(Either.isLeft(rejected)).toBe(true);
+          const table = Option.getOrThrow(yield* registry.get({ appId: APP_ID }));
+          table.jobs[0]!.environment!.TOKEN = Value.Parse(SecretStringSchema, 'changed');
+          expect(
+            Option.getOrThrow(yield* registry.get({ appId: APP_ID })).jobs[0]?.environment,
+          ).toEqual(tenantEnvironment({ TOKEN: 'tenant-secret' }));
+        }).pipe(Effect.provide(registryAt(path)));
+        yield* Effect.gen(function* () {
+          const registry = yield* CronRegistry;
+          const table = Option.getOrThrow(yield* registry.get({ appId: APP_ID }));
+          expect(table.crontab).toBe(Value.Parse(CrontabSchema, text));
+          expect(table.jobs[0]?.environment).toEqual(tenantEnvironment({ TOKEN: 'tenant-secret' }));
+        }).pipe(Effect.provide(registryAt(path)));
+      }),
+    );
+  });
+
   test('desired deployments clear replaced jobs, forget removed apps, and retain suspended tables', async () => {
     await withRegistry(
       Effect.gen(function* () {

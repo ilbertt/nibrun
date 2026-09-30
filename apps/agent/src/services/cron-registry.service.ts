@@ -1,5 +1,6 @@
 import type { AppId, CronTable } from '@repo/protocol';
 import { Effect, Option, SynchronizedRef } from 'effect';
+import { parseCrontab } from '#lib/cron/crontab.ts';
 import {
   type CronDeployment,
   CronRegistryError,
@@ -79,6 +80,19 @@ export class CronRegistry extends Effect.Service<CronRegistry>()('CronRegistry',
               const definitions = yield* validateCronJobs({ jobs, after });
               const next = new Map(current);
               next.set(appId, copyCronTable({ appId, deploymentId, jobs: definitions }));
+              return yield* persist(next);
+            }),
+          ),
+      ),
+
+      replaceCrontab: Effect.fn('CronRegistry.replaceCrontab')(
+        ({ appId, deploymentId, text }: CronDeployment & { text: string }) =>
+          update((current) =>
+            Effect.gen(function* () {
+              yield* requireCronDeployment({ tables: current, appId, deploymentId });
+              const parsed = yield* parseCrontab({ text, after: yield* cronValidationTime });
+              const next = new Map(current);
+              next.set(appId, copyCronTable({ appId, deploymentId, ...parsed }));
               return yield* persist(next);
             }),
           ),

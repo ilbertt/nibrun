@@ -130,7 +130,10 @@ export {
   type CronTable,
   CronTableSchema,
   CronTablesSchema,
+  CrontabSchema,
+  MAX_CRON_ENVIRONMENT_VARIABLES,
   MAX_CRON_JOBS_PER_APP,
+  MAX_CRONTAB_BYTES,
 } from '#domain/cron.ts';
 export {
   DEPLOYMENT_STATES,

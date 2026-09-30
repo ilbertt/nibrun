@@ -31,7 +31,12 @@ export function copyCronTable(table: CronTable): CronTable {
   return {
     appId: table.appId,
     deploymentId: table.deploymentId,
-    jobs: table.jobs.map(({ schedule, command }) => ({ schedule, command })),
+    jobs: table.jobs.map(({ schedule, command, environment }) => ({
+      schedule,
+      command,
+      ...(environment === undefined ? {} : { environment: { ...environment } }),
+    })),
+    ...(table.crontab === undefined ? {} : { crontab: table.crontab }),
   };
 }
 
