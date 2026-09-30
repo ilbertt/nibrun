@@ -95,6 +95,7 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
       deletedVolumesFile: inStateDir('deleted-volumes.json'),
       activityFile: inStateDir('activity.json'),
       desiredStateFile: inStateDir('desired-state.json'),
+      cronRegistryFile: inStateDir('crons.json'),
       exportStagingDir: inStateDir('exports'),
       // Beside the export staging tree and reaped the same way, because it is the same thing:
       // one tenant's dataset in the clear on a host they share with others.

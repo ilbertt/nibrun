@@ -8,6 +8,7 @@ export const HOST_STORAGE_PREFIX = Value.Parse(ObjectKeySchema, 'filesystems/hos
 export const AGENT_CONFIG = {
   slotsFile: '/nonexistent/nibrun-test/slots.json',
   slotCursorFile: '/nonexistent/nibrun-test/slot-cursor.json',
+  cronRegistryFile: '/nonexistent/nibrun-test/crons.json',
   zerofsStoragePrefix: HOST_STORAGE_PREFIX,
   zerofsMount: '/mnt/zerofs',
   zerofsNbdSocket: '/run/zerofs/nbd.sock',
