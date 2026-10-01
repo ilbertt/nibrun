@@ -27,6 +27,7 @@ const LogRecordSchema = z.object({
   time: z.string(),
   stream: z.enum(TENANT_LOG_STREAMS),
   message: z.string(),
+  cronJobId: z.string().optional(),
   /** How much output the host had to drop, for a record that stands for a gap rather than a line. */
   droppedBytes: z.number().nullable(),
 });
@@ -98,6 +99,7 @@ function asRecord(record: TenantLogRecord): LogRecord {
     time: record._time,
     stream: record.stream,
     message: record._msg,
+    ...(record.cronJobId === undefined ? {} : { cronJobId: record.cronJobId }),
     droppedBytes: record.droppedBytes ?? null,
   };
 }
@@ -117,8 +119,9 @@ const TERMINATOR = /\r?\n$/;
 export function render(record: LogRecord): string {
   const gap = record.droppedBytes === null ? '' : ` (${record.droppedBytes} bytes)`;
   const mark = record.stream === 'stderr' ? 'err' : 'out';
+  const cron = record.cronJobId === undefined ? '' : `${COLUMN_GAP}${record.cronJobId}`;
   const column = dimmed({
-    text: `${stampOf(record.time)}${COLUMN_GAP}${mark}`,
+    text: `${stampOf(record.time)}${COLUMN_GAP}${mark}${cron}`,
     stream: record.stream,
   });
   return `${column}${COLUMN_GAP}${record.message.replace(TERMINATOR, '')}${gap}`;
