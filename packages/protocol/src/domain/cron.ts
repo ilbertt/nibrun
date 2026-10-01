@@ -1,6 +1,6 @@
 import { Type } from '@sinclair/typebox';
 import { TenantEnvironmentSchema } from '#domain/app.ts';
-import { AppIdSchema, DeploymentIdSchema } from '#domain/identifiers.ts';
+import { AppIdSchema, CronJobIdSchema, DeploymentIdSchema } from '#domain/identifiers.ts';
 import { secretString } from '#lib/secret.ts';
 
 export const MAX_CRON_JOBS_PER_APP = 10;
@@ -57,3 +57,21 @@ export const CronTableSchema = Type.Object({
 export type CronTable = typeof CronTableSchema.static;
 
 export const CronTablesSchema = Type.Array(CronTableSchema);
+
+export const RegisteredCronJobSchema = Type.Composite([
+  CronJobDefinitionSchema,
+  Type.Object({ jobId: CronJobIdSchema }),
+]);
+
+export type RegisteredCronJob = typeof RegisteredCronJobSchema.static;
+
+export const CronListingSchema = Type.Composite([
+  Type.Pick(CronTableSchema, ['appId', 'deploymentId']),
+  Type.Object({
+    enabled: Type.Boolean(),
+    timeZone: Type.Literal(CRON_TIME_ZONE),
+    jobs: Type.Array(RegisteredCronJobSchema, { maxItems: MAX_CRON_JOBS_PER_APP }),
+  }),
+]);
+
+export type CronListing = typeof CronListingSchema.static;
