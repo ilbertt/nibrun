@@ -11,7 +11,7 @@ an HTTPS URL. No Dockerfile, no YAML, no cluster.
 Sign in, build for Linux x86_64, `nib run`, then ask the URL for something. What that path does not
 need is below it: [copying an app](#copying-an-app), [the guest contract](#the-guest-contract),
 [naming a runtime value](#naming-a-runtime-value), [a second public port](#a-second-public-port),
-and [what nibrun does not do](#tradeoffs).
+[cron jobs](#cron-jobs), and [what nibrun does not do](#tradeoffs).
 
 ## 1. Sign in
 
@@ -223,7 +223,7 @@ Everything the binary can count on, and nothing else:
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
 | Second port | Only with `--extra-public-port`: `NIBRUN_EXTRA_PUBLIC_PORT` on `NIBRUN_PUBLIC_IPV4`, TCP and UDP, assigned rather than chosen, and reached at that number and no other |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs of **64 MiB** — a quarter of the RAM — and is lost on restart. So is everything outside `/app/data` |
-| Programs | None beside yours: no shell, no `tar`, no `unzip`, nothing on `$PATH`. Spawning one dies `Executable not found in $PATH` |
+| Programs | `/bin/sh` and `crontab` are available. Ship other tools yourself; there is no `tar` or `unzip` |
 | Resources | 1 vCPU, 256 MiB RAM |
 | `HOME` | `/app`, which the app cannot write: a binary that puts a cache or a config file under `~` dies of `EACCES` before it ever serves. `/app/data` is the only path it can write |
 | URL | `https://<slug>.nibrun.app`, live as soon as it boots |
@@ -266,14 +266,35 @@ Ask for the port in the same change that names it:
 nib apps update --app my-app --extra-public-port --env 'ANNOUNCED_IP=${NIBRUN_PUBLIC_IPV4}'
 ```
 
+## Cron jobs
+
+Register jobs through `crontab` from the binary's normal server startup. nibrun's agent keeps
+the schedule and wakes an idle app to run it; in-process timers only run while the app is awake.
+For Bun apps, see [Bun's cron documentation](https://bun.com/docs/runtime/cron) and use
+crontab-backed scheduling. A task command should do its work and exit without starting the
+server or registering jobs again.
+
+- Maximum **10 jobs per app**, in **UTC**. Use standard five-field crontab syntax or nicknames such as
+  `@daily`; no seconds field or `@reboot`.
+- `/mnt/artifact/server` is the uploaded binary. Commands run through `/bin/sh` as the app user
+  in `/app`, inherit deployment environment, and send stdout/stderr to app logs.
+- Registration replaces the entire table. `crontab -l` reads it; `crontab -r` removes it.
+- Every new deployment clears schedules, including binary upgrades and settings redeploys
+  through `nib apps update`. Register them again at startup. Settings edits that create no
+  deployment preserve schedules.
+- Manual suspension disables execution but keeps schedules visible. Runs may overlap; missed
+  runs are not replayed and failures are not retried.
+
+Inspect with `nib apps crons --app my-app` (add `--json`) or the dashboard's **Crons** tab.
+
 ## Tradeoffs
 
 Worth saying out loud before recommending it:
 
 - **New apps sleep after five minutes without incoming traffic.** The next request wakes them.
-  Background jobs, timers, scheduled emails and outbound polling do not run while an app sleeps,
-  and outbound work does not keep it awake. Owners cannot change activation through the CLI, API
-  or dashboard. An app that needs background work to run on schedule is not currently a fit.
+  In-process timers and outbound polling pause while asleep; registered [cron jobs](#cron-jobs)
+  can wake the app and keep it awake until they finish. Owners cannot change activation through
+  the CLI, API or dashboard. For an always-on app, email [hello@nibrun.com](mailto:hello@nibrun.com).
 - **One microVM per app, one size.** No horizontal scaling, no load balancing, no resizing.
 - **A deploy is a replace.** The old VM is stopped before the new one starts, because they share
   one volume — so there are a few seconds of downtime, and no blue/green or canary.
