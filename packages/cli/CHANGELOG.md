@@ -2,6 +2,17 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.10.1-1]
+
+### 🚀 Features
+
+- *(cli)* List registered cron jobs (#685)
+- *(protocol)* Define realtime cron listing queries (#674)
+- *(logs)* Preserve cron job and run identities (#659)
+- *(cron)* Parse and persist tenant crontabs (#655)
+- *(agent)* Persist deployment-scoped cron registrations (#652)
+- *(cron)* Define job contracts and Bun schedule validation (#651)
+
 ## [2026.9.29-1]
 
 ### 🚀 Features
