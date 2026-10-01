@@ -5,8 +5,17 @@ import { writerRecording } from '#tests/support/output.ts';
 
 const DROPPED_BYTES = 4096;
 const ESCAPE_CODE = 27;
+const CRON_JOB_ID = 'cron-CsKypu7sYgXAb0WuIMJpywy_3HFUTFH88qBtbZ5RS_E';
 
-async function readOutput({ follow, live }: { follow: boolean; live: boolean }) {
+async function readOutput({
+  follow,
+  live,
+  cronJobId,
+}: {
+  follow: boolean;
+  live: boolean;
+  cronJobId: string | undefined;
+}) {
   const requests: boolean[] = [];
   const emitted: LogRecord[] = [];
   const stopping = new AbortController();
@@ -33,6 +42,7 @@ async function readOutput({ follow, live }: { follow: boolean; live: boolean }) 
         stream: 'stdout',
         sourceId: 'source-1',
         sequence: 1,
+        ...(cronJobId === undefined ? {} : { cronJobId }),
       },
     };
     if (follow && live) {
@@ -56,15 +66,24 @@ async function readOutput({ follow, live }: { follow: boolean; live: boolean }) 
 }
 
 test('a snapshot of a running app exits without saying the app is stopped', async () => {
-  const result = await readOutput({ follow: false, live: true });
+  const result = await readOutput({ follow: false, live: true, cronJobId: undefined });
 
   expect(result.requests).toEqual([false]);
   expect(result.emitted).toMatchObject([{ message: 'ready', stream: 'stdout' }]);
   expect(result.said).toEqual([]);
+  expect(LOG_RECORD_OUTPUT.schema.parse(result.emitted[0])).not.toHaveProperty('cronJobId');
+});
+
+test('cron job IDs survive reading and the JSON output projection', async () => {
+  const result = await readOutput({ follow: false, live: true, cronJobId: CRON_JOB_ID });
+  expect(LOG_RECORD_OUTPUT.schema.parse(result.emitted[0])).toMatchObject({
+    message: 'ready',
+    cronJobId: CRON_JOB_ID,
+  });
 });
 
 test('following requests live output until interrupted', async () => {
-  const result = await readOutput({ follow: true, live: true });
+  const result = await readOutput({ follow: true, live: true, cronJobId: undefined });
 
   expect(result.requests).toEqual([true]);
   expect(result.emitted).toHaveLength(1);
@@ -72,7 +91,7 @@ test('following requests live output until interrupted', async () => {
 });
 
 test('following a stopped deployment prints its history and exits', async () => {
-  const result = await readOutput({ follow: true, live: false });
+  const result = await readOutput({ follow: true, live: false, cronJobId: undefined });
 
   expect(result.requests).toEqual([false]);
   expect(result.emitted).toHaveLength(1);
@@ -142,6 +161,14 @@ describe('a record is one line of what the app wrote', () => {
 
   test('what the app wrote to its error stream is labelled as such', () => {
     expect(columns(render(record({ stream: 'stderr' }))).mark).toBe('err');
+  });
+
+  test('cron output carries its job ID alongside the stream mark', () => {
+    const line = render(record({ cronJobId: CRON_JOB_ID }));
+    expect(columns(line)).toMatchObject({
+      mark: 'out',
+      message: `${CRON_JOB_ID}  listening on 0.0.0.0:8090`,
+    });
   });
 
   // The store keeps the newline the guest wrote and printing supplies another, which is a blank
