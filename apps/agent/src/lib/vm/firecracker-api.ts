@@ -1,5 +1,6 @@
 import { Data, Duration, Effect, Schedule } from 'effect';
 import { describe } from '#lib/failure.ts';
+import { DRIVE_IDS } from '#lib/vm/firecracker-config.ts';
 
 /**
  * The per-VM API socket `nibrun-vm@.service` has always given every microVM, and which nothing
@@ -16,8 +17,10 @@ const API_ORIGIN = 'http://localhost';
 const VM_PATH = '/vm';
 const SNAPSHOT_CREATE_PATH = '/snapshot/create';
 const SNAPSHOT_LOAD_PATH = '/snapshot/load';
+const VM_CONFIG_PATH = '/vm/config';
 
 const NO_CONTENT = 204;
+const OK = 200;
 const MAX_DETAIL_LENGTH = 200;
 
 /** A 256 MiB guest measures ~1.7s to snapshot, and is paused for every millisecond of it. */
@@ -56,12 +59,12 @@ export type FirecrackerApiError = FirecrackerUnreachable | FirecrackerRejected;
 
 type ApiCall = {
   readonly socketPath: string;
-  readonly method: 'PATCH' | 'PUT';
+  readonly method: 'GET' | 'PATCH' | 'PUT';
   readonly path: string;
   readonly body: unknown;
 };
 
-function call({ socketPath, method, path, body }: ApiCall) {
+function responseFor({ socketPath, method, path, body }: ApiCall) {
   return Effect.gen(function* () {
     const response = yield* Effect.tryPromise({
       try: (signal) =>
@@ -69,13 +72,13 @@ function call({ socketPath, method, path, body }: ApiCall) {
           unix: socketPath,
           method,
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
+          body: method === 'GET' ? undefined : JSON.stringify(body),
           signal,
         }),
       catch: (cause) => new FirecrackerUnreachable({ socketPath, cause }),
     });
-    if (response.status === NO_CONTENT) {
-      return;
+    if (response.status === (method === 'GET' ? OK : NO_CONTENT)) {
+      return response;
     }
     // Every refusal is a `fault_message`, and a body that is not one is still the only account of
     // itself the VMM gave.
@@ -98,6 +101,77 @@ function call({ socketPath, method, path, body }: ApiCall) {
         }),
     }),
     Effect.withSpan('firecracker', { attributes: { path } }),
+  );
+}
+
+function call(request: ApiCall) {
+  return responseFor(request).pipe(Effect.asVoid);
+}
+
+function rootDrive(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'is_root_device' in value &&
+    value.is_root_device === true
+  );
+}
+
+function configuredRootfs(value: unknown): string | undefined {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    !('drives' in value) ||
+    !Array.isArray(value.drives)
+  ) {
+    return undefined;
+  }
+  const roots = value.drives.filter(rootDrive);
+  const root = roots[0];
+  return roots.length === 1 &&
+    root?.drive_id === DRIVE_IDS[0] &&
+    root.is_read_only === true &&
+    typeof root.path_on_host === 'string'
+    ? root.path_on_host
+    : undefined;
+}
+
+export function rootfsPath(socketPath: string) {
+  return Effect.gen(function* () {
+    const response = yield* responseFor({
+      socketPath,
+      method: 'GET',
+      path: VM_CONFIG_PATH,
+      body: undefined,
+    });
+    const configuration = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<unknown>,
+      catch: () =>
+        new FirecrackerRejected({
+          path: VM_CONFIG_PATH,
+          status: response.status,
+          detail: 'the VM configuration is not valid JSON',
+        }),
+    });
+    const rootfs = configuredRootfs(configuration);
+    if (rootfs === undefined) {
+      return yield* new FirecrackerRejected({
+        path: VM_CONFIG_PATH,
+        status: response.status,
+        detail: 'the VM configuration has no unique read-only root drive',
+      });
+    }
+    return rootfs;
+  }).pipe(
+    Effect.timeoutFail({
+      duration: CALL_TIMEOUT,
+      onTimeout: () =>
+        new FirecrackerUnreachable({
+          socketPath,
+          cause: 'the VM configuration did not finish answering',
+        }),
+    }),
+    Effect.withSpan('firecracker.rootfsPath'),
   );
 }
 

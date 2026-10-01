@@ -1,6 +1,6 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { AppId, DeploymentId, DesiredInstance } from '@repo/protocol';
-import { Duration, Effect, Either, Option } from 'effect';
+import { Duration, Effect, Either } from 'effect';
 import { cronRegistrationSocketPath } from '#lib/cron/registration-protocol.ts';
 import type { CronDeployment } from '#lib/cron/registry.ts';
 import { writeJsonFile } from '#lib/json-store.ts';
@@ -10,12 +10,7 @@ import { ensureTap, refreshNeighbour } from '#lib/network/tap.ts';
 import { readFilesystemSpace } from '#lib/report/capacity.ts';
 import * as Firecracker from '#lib/vm/firecracker-api.ts';
 import { renderFirecrackerConfig } from '#lib/vm/firecracker-config.ts';
-import {
-  adoptedGuestImage,
-  BOOTED_IMAGE_FILENAME,
-  type GuestImage,
-  readBootedGuestImage,
-} from '#lib/vm/guest-image.ts';
+import { adoptedGuestImage, type GuestImage } from '#lib/vm/guest-image.ts';
 import { buildInstanceConfigImage } from '#lib/vm/instance-env.ts';
 import {
   ensureLoadable,
@@ -231,8 +226,6 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       // the new deployment's disk rather than boot the new one.
       yield* discardSnapshot(desired.appId);
       const image = yield* adoptedGuestImage(config);
-      const bootedImagePath = path.join(workingDir(desired.appId), BOOTED_IMAGE_FILENAME);
-      yield* fs.remove(bootedImagePath, { force: true });
       const [fetching, artifactImagePath] = yield* Effect.timed(images.ensure(desired.artifact));
       const [staging] = yield* Effect.timed(
         stage({ desired, slot, dataDevicePath, artifactImagePath, image }),
@@ -242,14 +235,6 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
           Effect.ignore(detachReceivers(desired.appId)),
         ),
       );
-      yield* writeJsonFile({
-        path: bootedImagePath,
-        value: { ...image, deploymentId: desired.deploymentId },
-      });
-      yield* agentState.updateRecord({
-        appId: desired.appId,
-        change: (record) => ({ ...record, guestImageVersion: image.version }),
-      });
       yield* Effect.logInfo('instance booting').pipe(
         Effect.annotateLogs({
           appId: desired.appId,
@@ -342,25 +327,21 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       slot,
     }: SuspendRequest) {
       yield* Effect.annotateCurrentSpan({ appId });
-      const booted = yield* readBootedGuestImage(workingDir(appId));
-      if (Option.isNone(booted) || booted.value.deploymentId !== deploymentId) {
-        return yield* new SleepRefused({ reason: 'the booted guest image is unknown' });
-      }
-      const adopted = yield* adoptedGuestImage(config);
-      if (
-        booted.value.version !== adopted.version ||
-        booted.value.rootfsPath !== adopted.rootfsPath
-      ) {
-        return yield* new SleepRefused({ reason: 'the booted guest image awaits an upgrade' });
+      const paths = snapshotFor(appId);
+      const socketPath = apiSocket(appId);
+      const image = yield* adoptedGuestImage(config);
+      const bootedRootfs = yield* Firecracker.rootfsPath(socketPath).pipe(
+        Effect.mapError(() => new SleepRefused({ reason: 'the booted guest image is unknown' })),
+      );
+      // Resolving a legacy drive symlink here would mistake an old VM for the newly adopted image.
+      if (bootedRootfs !== image.rootfsPath) {
+        return yield* new SleepRefused({ reason: 'the booted guest image is old or unpinned' });
       }
       const refusal = yield* refusalToSnapshot(appId);
       if (refusal !== undefined) {
         return yield* new SleepRefused({ reason: refusal });
       }
-
-      const paths = snapshotFor(appId);
-      const socketPath = apiSocket(appId);
-      const stamp = yield* stampForImage({ deploymentId, slot, image: booted.value });
+      const stamp = yield* stampForImage({ deploymentId, slot, image });
 
       yield* discardSnapshot(appId);
       yield* fs.makeDirectory(paths.directory, { recursive: true, mode: VM_DIR_MODE });

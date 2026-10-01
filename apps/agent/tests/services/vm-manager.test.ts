@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { FileSystem } from '@effect/platform';
 import type { HostVersions } from '@repo/protocol';
-import { Effect, Either, Layer, Option } from 'effect';
+import { Effect, Either, Layer } from 'effect';
 import { writeJsonFile } from '#lib/json-store.ts';
 import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import type { FirecrackerConfig } from '#lib/vm/firecracker-config.ts';
-import { readBootedGuestImage } from '#lib/vm/guest-image.ts';
 import { type SnapshotStamp, snapshotPaths } from '#lib/vm/snapshot.ts';
+import * as Systemd from '#lib/vm/systemd.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { ArtifactTransferError } from '#services/artifact-store.service.ts';
@@ -16,13 +16,13 @@ import { VmManager } from '#services/vm-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
+import { servingFirecracker } from '#tests/support/firecracker.ts';
 import { APP_ID, DEPLOYMENT_ID, desiredInstance, instanceRecord } from '#tests/support/fixtures.ts';
 import { installedGuestImage } from '#tests/support/guest-image.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const run = provided(platform);
 
-const RUNTIME_DIR = '/nonexistent/nibrun-test/run';
 const SLOT = describeSlot({ slot: FIRST_SLOT, appId: APP_ID });
 
 /** Where `readHostBootId` reads, answered here so the stamp can match on a host with no such file. */
@@ -89,6 +89,7 @@ function hostAsleepAndRefusing() {
     const fs = yield* FileSystem.FileSystem;
     const snapshotDir = yield* temporaryDirectory;
     const imageHost = yield* installedGuestImage(versions.guestImage);
+    const runtimeDir = yield* temporaryDirectory;
     const paths = snapshotPaths({ snapshotDir, appId: APP_ID });
     yield* fs.makeDirectory(paths.directory, { recursive: true });
     yield* fs.writeFileString(paths.statePath, 'the vmm as it was');
@@ -105,7 +106,7 @@ function hostAsleepAndRefusing() {
         vmDir: yield* temporaryDirectory,
         versionsFile: imageHost.versionsFile,
         guestImageDir: imageHost.guestImageDir,
-        runtimeDir: RUNTIME_DIR,
+        runtimeDir,
       }),
       systemctl.layer,
       hostBooted(HOST_BOOT_ID),
@@ -138,6 +139,7 @@ function hostAsleepAndRefusing() {
       commands: systemctl.commands,
       imageHost,
       paths,
+      socketPath: Systemd.vmApiSocketPath({ runtimeDir, appId: APP_ID }),
       sleep: Effect.flatMap(VmManager, (vms) =>
         vms.sleep({ appId: APP_ID, deploymentId: DEPLOYMENT_ID, slot: SLOT }),
       ).pipe(Effect.either, Effect.provide(services)),
@@ -223,12 +225,13 @@ describe('a wake whose unit systemd would not start', () => {
   });
 });
 
-test('a cold boot pins its configuration and identity to the image actually started', () =>
+test('a cold boot pins paths and refuses capture after a subsequent image adoption', () =>
   run(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const imageHost = yield* installedGuestImage(versions.guestImage);
       const vmDir = yield* temporaryDirectory;
+      const runtimeDir = yield* temporaryDirectory;
       const snapshotDir = yield* temporaryDirectory;
       const configImageArgument = 2;
       const commands = recordingCommands(({ command }) => {
@@ -244,6 +247,7 @@ test('a cold boot pins its configuration and identity to the image actually star
       const host = Layer.mergeAll(
         agentConfig({
           vmDir,
+          runtimeDir,
           vmSnapshotDir: snapshotDir,
           versionsFile: imageHost.versionsFile,
           guestImageDir: imageHost.guestImageDir,
@@ -282,11 +286,6 @@ test('a cold boot pins its configuration and identity to the image actually star
           slot: SLOT,
           dataDevicePath: SLOT.nbdDevicePath,
         });
-        const booted = yield* readBootedGuestImage(vms.workingDir(APP_ID));
-        expect(booted).toEqual(Option.some({ ...imageHost.image, deploymentId: DEPLOYMENT_ID }));
-        expect((yield* AgentState.snapshot).records.get(APP_ID)?.guestImageVersion).toBe(
-          versions.guestImage,
-        );
         const staged = JSON.parse(
           yield* fs.readFileString(`${vms.workingDir(APP_ID)}/firecracker.json`),
         ) as FirecrackerConfig;
@@ -294,12 +293,63 @@ test('a cold boot pins its configuration and identity to the image actually star
         expect(staged.drives.find((drive) => drive.is_root_device)?.path_on_host).toBe(
           imageHost.image.rootfsPath,
         );
+        const received = yield* servingFirecracker({
+          socketPath: Systemd.vmApiSocketPath({ runtimeDir, appId: APP_ID }),
+          configuration: staged,
+          fault: undefined,
+        });
         yield* imageHost.activate('image-new');
-        expect(yield* readBootedGuestImage(vms.workingDir(APP_ID))).toEqual(booted);
         const sleep = yield* vms
           .sleep({ appId: APP_ID, deploymentId: DEPLOYMENT_ID, slot: SLOT })
           .pipe(Effect.either);
         expect(Either.isLeft(sleep) && sleep.left._tag).toBe('SleepRefused');
+        expect(Either.isLeft(sleep) && sleep.left.message).toContain('old or unpinned');
+        expect(received.map((call) => call.method)).toEqual(['GET']);
       }).pipe(Effect.provide(services));
+    }),
+  ));
+
+test('a legacy running VM cannot be identified by resolving its movable rootfs symlink', () =>
+  run(
+    Effect.gen(function* () {
+      const host = yield* hostAsleepAndRefusing();
+      yield* host.imageHost.activate('image-new');
+      const received = yield* servingFirecracker({
+        socketPath: host.socketPath,
+        fault: undefined,
+        configuration: {
+          drives: [
+            {
+              drive_id: 'rootfs',
+              is_root_device: true,
+              is_read_only: true,
+              path_on_host: `${host.imageHost.guestImageDir}/rootfs.ext4`,
+            },
+          ],
+        },
+      });
+      const outcome = yield* host.sleep;
+      expect(Either.isLeft(outcome) && outcome.left._tag).toBe('SleepRefused');
+      expect(Either.isLeft(outcome) && outcome.left.message).toContain('old or unpinned');
+      expect(received.map((call) => call.method)).toEqual(['GET']);
+      expect(host.commands).toEqual([]);
+      expect(yield* host.kept).toEqual({ stamp: true, snapshot: true });
+    }),
+  ));
+
+test('an unreadable running configuration leaves the VM and saved files untouched', () =>
+  run(
+    Effect.gen(function* () {
+      const host = yield* hostAsleepAndRefusing();
+      const received = yield* servingFirecracker({
+        socketPath: host.socketPath,
+        configuration: undefined,
+        fault: 'Cannot read VM configuration',
+      });
+      const outcome = yield* host.sleep;
+      expect(Either.isLeft(outcome) && outcome.left._tag).toBe('SleepRefused');
+      expect(received.map((call) => call.method)).toEqual(['GET']);
+      expect(host.commands).toEqual([]);
+      expect(yield* host.kept).toEqual({ stamp: true, snapshot: true });
     }),
   ));

@@ -5,7 +5,6 @@ import { readExportReports } from '#lib/exports/manager.ts';
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
 import { applyCheckpoints } from '#lib/reconcile/checkpoints.ts';
 import { applyExports } from '#lib/reconcile/exports.ts';
-import { applyGuestImageRollout } from '#lib/reconcile/guest-image.ts';
 import {
   prefetchArtifacts,
   refreshStates,
@@ -23,7 +22,6 @@ import { readDeletedVolumes } from '#lib/volumes/manager.ts';
 import { reapSeedStaging } from '#lib/volumes/seed.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
-import { CronActivity } from '#services/cron-activity.service.ts';
 import { CronExecutions } from '#services/cron-executions.service.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
@@ -265,13 +263,6 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       // started its VMs first would serve tenants through a kernel with no `nibrun` table.
       yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
       yield* applyStarts(plan).pipe(Effect.withSpan('reconcile.starts'));
-      const imageUpgradePending = yield* applyGuestImageRollout({ desired, observed }).pipe(
-        Effect.withSpan('reconcile.guest-image'),
-      );
-      yield* AgentState.modify((current) => ({
-        ...current,
-        deferredWork: current.deferredWork || imageUpgradePending,
-      }));
       yield* applyCheckpoints({ plan, desired }).pipe(Effect.withSpan('reconcile.checkpoints'));
       // After starts, so an export never competes with a boot for the device it reads, and
       // before teardowns, so a volume marked absent this generation is still there to read.
@@ -309,6 +300,5 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
     VmManager.Default,
     CronRegistry.Default,
     CronExecutions.Default,
-    CronActivity.Default,
   ],
 }) {}

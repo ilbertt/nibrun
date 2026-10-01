@@ -49,8 +49,6 @@ export type InstanceRecord = {
   readonly restartCount: number;
   readonly stopRequested: boolean;
   readonly startedAt?: Timestamp;
-  readonly guestImageVersion?: string;
-  readonly guestImageUpgradeTarget?: string;
   readonly lastExitCode?: number;
   readonly message?: string;
 };
