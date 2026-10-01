@@ -274,7 +274,7 @@ For Bun apps, see [Bun's cron documentation](https://bun.com/docs/runtime/cron) 
 crontab-backed scheduling. A task command should do its work and exit without starting the
 server or registering jobs again.
 
-- Maximum **10 jobs per app**, in **UTC**. Use Bun's five-field cron syntax or nicknames such as
+- Maximum **10 jobs per app**, in **UTC**. Use standard five-field crontab syntax or nicknames such as
   `@daily`; no seconds field or `@reboot`.
 - `/mnt/artifact/server` is the uploaded binary. Commands run through `/bin/sh` as the app user
   in `/app`, inherit deployment environment, and send stdout/stderr to app logs.
