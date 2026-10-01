@@ -1,5 +1,4 @@
 import type { CronListing } from '@repo/protocol';
-import { Badge } from '@repo/ui/components/badge';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@repo/ui/components/empty';
 import {
   Table,
@@ -15,12 +14,7 @@ import { ClockIcon } from 'lucide-react';
 export function CronSchedules({ listing }: { listing: CronListing }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Badge variant={listing.enabled ? 'secondary' : 'outline'}>
-          Execution {listing.enabled ? 'enabled' : 'disabled'}
-        </Badge>
-        <span className="text-muted-foreground">Time zone: {listing.timeZone}</span>
-      </div>
+      <p className="text-muted-foreground text-sm">Time zone: {listing.timeZone}</p>
       {listing.jobs.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>

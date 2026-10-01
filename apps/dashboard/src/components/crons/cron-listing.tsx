@@ -1,7 +1,6 @@
 import { Button } from '@repo/ui/components/button';
 import { Skeleton } from '@repo/ui/components/skeleton';
 import { RefreshCwIcon } from 'lucide-react';
-import { DeploymentLine } from '#components/apps/deployment-line.tsx';
 import { CronSchedules } from '#components/crons/cron-schedules.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
@@ -12,7 +11,6 @@ export function CronListing() {
 
   return (
     <div className="flex flex-col gap-4">
-      {view.deploymentId !== undefined && <DeploymentLine deploymentId={view.deploymentId} />}
       <div className="flex items-center justify-between gap-4">
         <h2 className="font-medium">Cron jobs</h2>
         <Button
