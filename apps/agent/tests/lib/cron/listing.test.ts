@@ -1,16 +1,36 @@
 import { describe, expect, test } from 'bun:test';
 import { CronListingSchema, DeploymentIdSchema, isValidMessage, Value } from '@repo/protocol';
-import { Effect, Either } from 'effect';
+import { Effect, Either, Layer, TestClock, TestContext } from 'effect';
 import { registeredCronJobs } from '#lib/cron/jobs.ts';
 import { readCronListing } from '#lib/cron/listing.ts';
 import { CRON_JOB, cronListingHost, registeredCronHost } from '#tests/support/crons.ts';
 import { desiredInstance, desiredState, LOG_SOURCE } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
-const run = provided(platform);
+const run = provided(Layer.merge(platform, TestContext.TestContext));
 const NEXT_DEPLOYMENT = { ...LOG_SOURCE, deploymentId: Value.Parse(DeploymentIdSchema, 'dep-2') };
 
 describe('live cron listings from the registry', () => {
+  test('next executions use the scheduler parser and advance from the listing time in UTC', () =>
+    run(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(Date.parse('2026-09-30T09:41:56.000Z'));
+        const host = yield* registeredCronHost(yield* temporaryDirectory);
+        yield* host.registry.replace({
+          ...LOG_SOURCE,
+          jobs: [CRON_JOB, { ...CRON_JOB, schedule: '@daily' }],
+        });
+        const listing = yield* readCronListing(LOG_SOURCE).pipe(Effect.provide(host.layer));
+        expect<(string | undefined)[]>(listing.jobs.map((job) => job.nextRunAt)).toEqual([
+          '2026-09-30T09:45:00.000Z',
+          '2026-10-01T00:00:00.000Z',
+        ]);
+        yield* TestClock.setTime(Date.parse('2026-09-30T09:45:00.000Z'));
+        const refreshed = yield* readCronListing(LOG_SOURCE).pipe(Effect.provide(host.layer));
+        expect<string | undefined>(refreshed.jobs[0]?.nextRunAt).toBe('2026-09-30T09:50:00.000Z');
+      }),
+    ));
+
   test('job identities match execution, including duplicate definitions', () =>
     run(
       Effect.gen(function* () {
@@ -36,7 +56,9 @@ describe('live cron listings from the registry', () => {
         );
         const suspended = yield* readCronListing(LOG_SOURCE).pipe(Effect.provide(host.layer));
         expect(suspended.enabled).toBe(false);
-        expect(suspended.jobs).toEqual(before.jobs);
+        expect(suspended.jobs[0]).toMatchObject(CRON_JOB);
+        expect(suspended.jobs[0]?.jobId).toBe(before.jobs[0]?.jobId);
+        expect(suspended.jobs[0]?.nextRunAt).toBeUndefined();
         yield* host.cache.accept(desiredState({ instances: [desiredInstance()] }));
         expect((yield* readCronListing(LOG_SOURCE).pipe(Effect.provide(host.layer))).enabled).toBe(
           true,

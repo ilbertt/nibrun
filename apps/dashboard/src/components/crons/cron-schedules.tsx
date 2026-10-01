@@ -10,6 +10,7 @@ import {
 } from '@repo/ui/components/table';
 import { TableContainer } from '@repo/ui/custom/table-container';
 import { ClockIcon } from 'lucide-react';
+import { dayAndSecondUtc } from '#lib/format-timestamp.ts';
 
 export function CronSchedules({ listing }: { listing: CronListing }) {
   return (
@@ -30,6 +31,7 @@ export function CronSchedules({ listing }: { listing: CronListing }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Schedule</TableHead>
+                <TableHead>Next execution (estimated)</TableHead>
                 <TableHead>Command</TableHead>
                 <TableHead>Job ID</TableHead>
               </TableRow>
@@ -38,6 +40,15 @@ export function CronSchedules({ listing }: { listing: CronListing }) {
               {listing.jobs.map((job) => (
                 <TableRow key={job.jobId}>
                   <TableCell className="align-top font-mono">{job.schedule}</TableCell>
+                  <TableCell className="align-top tabular-nums">
+                    {listing.enabled && job.nextRunAt !== undefined ? (
+                      <time dateTime={job.nextRunAt}>{dayAndSecondUtc(job.nextRunAt)}</time>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {listing.enabled ? 'Unavailable' : 'Disabled'}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="min-w-48 whitespace-normal break-all align-top font-mono">
                     {job.command}
                   </TableCell>
