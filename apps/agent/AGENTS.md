@@ -89,6 +89,13 @@ future timers: changing a crontab replaces timers while started commands finish 
 deployment scope. Its registry loop runs without waiting for a control-plane session;
 Effect schedules wait on Bun-calculated UTC occurrences and never retry a command.
 
+Cold boots pin kernel/rootfs paths to the immutable guest image adopted in the host bundle.
+Before snapshotting, the agent checks the running Firecracker's root drive through `/vm/config`;
+a symlink path, an older image or an unreadable configuration leaves the VM running. Image
+identity never comes from resolving a running VM's drive symlink or from cached agent records.
+Snapshots name the immutable rootfs path; legacy stamps and image changes force a cold boot.
+Image adoption does not restart running guests.
+
 ## What the host must provide, and does not yet
 
 Owned by `infra/app-host/`, not fixable here.

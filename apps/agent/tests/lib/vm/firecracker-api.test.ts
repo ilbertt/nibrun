@@ -7,47 +7,15 @@ import {
   loadSnapshot,
   pause,
   resume,
+  rootfsPath,
 } from '#lib/vm/firecracker-api.ts';
+import { servingFirecracker } from '#tests/support/firecracker.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const run = provided(platform);
 
-const HTTP_NO_CONTENT = 204;
-const HTTP_BAD_REQUEST = 400;
-
 /** Long enough that the load has certainly failed to connect at least once before anything binds. */
 const LATE_BIND_MS = 100;
-
-type ReceivedCall = { readonly method: string; readonly path: string; readonly body: unknown };
-
-/**
- * A listening unix socket rather than a substituted `fetch`: the request Firecracker would have
- * to recognise is the thing under test, and the only honest way to read one is to receive it.
- */
-function servingApi({ socketPath, fault }: { socketPath: string; fault?: string }) {
-  const received: ReceivedCall[] = [];
-  return Effect.as(
-    Effect.acquireRelease(
-      Effect.sync(() =>
-        Bun.serve({
-          unix: socketPath,
-          fetch: async (request) => {
-            received.push({
-              method: request.method,
-              path: new URL(request.url).pathname,
-              body: await request.json(),
-            });
-            return fault === undefined
-              ? new Response(null, { status: HTTP_NO_CONTENT })
-              : Response.json({ fault_message: fault }, { status: HTTP_BAD_REQUEST });
-          },
-        }),
-      ),
-      (server) => Effect.asVoid(Effect.sync(() => server.stop(true))),
-    ),
-    received,
-  );
-}
 
 function files({ socketPath }: { socketPath: string }) {
   return {
@@ -67,7 +35,7 @@ function against({
   return run(
     Effect.gen(function* () {
       const socketPath = join(yield* temporaryDirectory, 'vm.sock');
-      const received = yield* servingApi({ socketPath, ...(fault === undefined ? {} : { fault }) });
+      const received = yield* servingFirecracker({ socketPath, fault, configuration: undefined });
       const outcome = yield* Effect.either(call(socketPath));
       return { received, outcome };
     }),
@@ -146,9 +114,71 @@ test('a load waits for a Firecracker that has not bound its socket', async () =>
       const socketPath = join(yield* temporaryDirectory, 'vm.sock');
       const loading = yield* Effect.fork(loadSnapshot(files({ socketPath })));
       yield* Effect.sleep(Duration.millis(LATE_BIND_MS));
-      const received = yield* servingApi({ socketPath });
+      const received = yield* servingFirecracker({
+        socketPath,
+        fault: undefined,
+        configuration: undefined,
+      });
       yield* Fiber.join(loading);
       expect(received).toHaveLength(1);
     }),
   );
+});
+
+const PINNED_ROOTFS = '/images/image-a/rootfs.ext4';
+const ROOT_DRIVE = {
+  drive_id: 'rootfs',
+  is_root_device: true,
+  is_read_only: true,
+  path_on_host: PINNED_ROOTFS,
+};
+
+describe('running guest image identity', () => {
+  test('reads the configured root path without a request body or a boot source', () =>
+    run(
+      Effect.gen(function* () {
+        const socketPath = join(yield* temporaryDirectory, 'vm.sock');
+        const received = yield* servingFirecracker({
+          socketPath,
+          fault: undefined,
+          configuration: { drives: [ROOT_DRIVE] },
+        });
+        expect(yield* rootfsPath(socketPath)).toBe(PINNED_ROOTFS);
+        expect(received).toEqual([{ method: 'GET', path: '/vm/config', body: undefined }]);
+      }),
+    ));
+
+  for (const configuration of [
+    null,
+    {},
+    { drives: [] },
+    { drives: [ROOT_DRIVE, ROOT_DRIVE] },
+    { drives: [{ ...ROOT_DRIVE, is_read_only: false }] },
+    { drives: [{ ...ROOT_DRIVE, path_on_host: null }] },
+  ]) {
+    test('rejects an unknown or ambiguous root drive', () =>
+      run(
+        Effect.gen(function* () {
+          const socketPath = join(yield* temporaryDirectory, 'vm.sock');
+          yield* servingFirecracker({ socketPath, fault: undefined, configuration });
+          expect((yield* rootfsPath(socketPath).pipe(Effect.flip))._tag).toBe(
+            'FirecrackerRejected',
+          );
+        }),
+      ));
+  }
+
+  test('a failed identity query is reported without pausing the VM', () =>
+    run(
+      Effect.gen(function* () {
+        const socketPath = join(yield* temporaryDirectory, 'vm.sock');
+        const received = yield* servingFirecracker({
+          socketPath,
+          configuration: undefined,
+          fault: 'Cannot read configuration',
+        });
+        expect((yield* rootfsPath(socketPath).pipe(Effect.flip))._tag).toBe('FirecrackerRejected');
+        expect(received.map((call) => call.method)).toEqual(['GET']);
+      }),
+    ));
 });
