@@ -53,12 +53,12 @@ export type SystemHealth = {
 
 export class HealthService extends Service {
   private readonly healthRepo: HealthRepositoryContract;
-  private readonly agentRepo: HostObserver;
+  private readonly agentRepo: HostObserverRepositoryContract;
 
   constructor({
     healthRepo,
     agentRepo,
-  }: { healthRepo: HealthRepositoryContract; agentRepo: HostObserver }) {
+  }: { healthRepo: HealthRepositoryContract; agentRepo: HostObserverRepositoryContract }) {
     super();
     this.healthRepo = healthRepo;
     this.agentRepo = agentRepo;
@@ -117,7 +117,7 @@ export class HealthService extends Service {
 }
 
 /** The whole of what health asks of the agent: what the last report said, if there was one. */
-export type HostObserver = Pick<AgentRepositoryContract, 'lastObservation'>;
+export type HostObserverRepositoryContract = Pick<AgentRepositoryContract, 'lastObservation'>;
 
 class ProbeTimeout extends Error {
   constructor() {

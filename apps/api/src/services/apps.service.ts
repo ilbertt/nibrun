@@ -83,22 +83,25 @@ const SLUG_CONSTRAINTS = [
 const MAX_SLUG_ATTEMPTS = 5;
 
 /** What an app needs from its hostnames while it lives and while it is being removed. */
-export type AppHostnameAccess = Pick<
+export type AppHostnameAccessRepositoryContract = Pick<
   AppHostnamesRepositoryContract,
   'listByOwner' | 'listByApp' | 'listDisposable' | 'removeDisposable'
 >;
 
-export type CustomHostnameRemoval = Pick<CustomHostnamesRepositoryContract, 'remove'>;
+export type CustomHostnameRemovalRepositoryContract = Pick<
+  CustomHostnamesRepositoryContract,
+  'remove'
+>;
 
 /** What deleting an app needs from the exports it leaves behind, and nothing else. */
-export type ExportCancellation = Pick<ExportsRepositoryContract, 'failInFlight'>;
+export type ExportCancellationRepositoryContract = Pick<ExportsRepositoryContract, 'failInFlight'>;
 
 /**
  * Likewise for the buckets: purging only ever takes objects out of them. Narrowed so that a
  * service holding the whole of one — able to sign an upload, or read a tenant's binary back —
  * is not what a reader has to rule out here.
  */
-export type ObjectRemoval = Pick<ArtifactStorageRepositoryContract, 'remove'>;
+export type ObjectRemovalRepositoryContract = Pick<ArtifactStorageRepositoryContract, 'remove'>;
 
 const APP_DELETED = 'The app was deleted while this export was still being written.';
 
@@ -133,12 +136,12 @@ const EXPIRE_BATCH = 8;
 
 export class AppsService extends Service {
   private readonly appsRepo: AppsRepositoryContract;
-  private readonly hostnamesRepo: AppHostnameAccess;
-  private readonly customHostnamesRepo: CustomHostnameRemoval;
-  private readonly exportsRepo: ExportCancellation;
-  private readonly artifactStorageRepo: ObjectRemoval;
-  private readonly exportStorageRepo: ObjectRemoval;
-  private readonly importStorageRepo: ObjectRemoval;
+  private readonly hostnamesRepo: AppHostnameAccessRepositoryContract;
+  private readonly customHostnamesRepo: CustomHostnameRemovalRepositoryContract;
+  private readonly exportsRepo: ExportCancellationRepositoryContract;
+  private readonly artifactStorageRepo: ObjectRemovalRepositoryContract;
+  private readonly exportStorageRepo: ObjectRemovalRepositoryContract;
+  private readonly importStorageRepo: ObjectRemovalRepositoryContract;
   private readonly appHostDomain: string;
   private readonly secretsKey: TenantSecretsKey;
 
@@ -154,12 +157,12 @@ export class AppsService extends Service {
     secretsKey,
   }: {
     appsRepo: AppsRepositoryContract;
-    hostnamesRepo: AppHostnameAccess;
-    customHostnamesRepo: CustomHostnameRemoval;
-    exportsRepo: ExportCancellation;
-    artifactStorageRepo: ObjectRemoval;
-    exportStorageRepo: ObjectRemoval;
-    importStorageRepo: ObjectRemoval;
+    hostnamesRepo: AppHostnameAccessRepositoryContract;
+    customHostnamesRepo: CustomHostnameRemovalRepositoryContract;
+    exportsRepo: ExportCancellationRepositoryContract;
+    artifactStorageRepo: ObjectRemovalRepositoryContract;
+    exportStorageRepo: ObjectRemovalRepositoryContract;
+    importStorageRepo: ObjectRemovalRepositoryContract;
     appHostDomain: string;
     secretsKey: TenantSecretsKey;
   }) {

@@ -12,7 +12,11 @@ import {
 import { AgentSessions } from '#lib/agent/sessions.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
-import { AgentService, type HostnameReconcile, type ImportSweep } from '#services/agent.service.ts';
+import {
+  AgentService,
+  type HostnameReconcileServiceContract,
+  type ImportSweepServiceContract,
+} from '#services/agent.service.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { ExportsService } from '#services/exports.service.ts';
@@ -129,7 +133,7 @@ class FakeExportsService {
 }
 
 /** A report is the only clock this process has, so the sweep rides along on one. */
-class FakeUploadSweep implements ImportSweep {
+class FakeImportSweepService implements ImportSweepServiceContract {
   swept = 0;
   sweptSpent = 0;
 
@@ -145,7 +149,7 @@ class FakeUploadSweep implements ImportSweep {
 }
 
 /** The same clock, borrowed for the hostnames whose fate is decided in somebody else's DNS. */
-class FakeHostnameReconcile implements HostnameReconcile {
+class FakeHostnameReconcileService implements HostnameReconcileServiceContract {
   reconciled = 0;
 
   reconcile(): Promise<void> {
@@ -159,9 +163,9 @@ function build() {
   const deployments = new FakeDeploymentsService();
   const apps = new FakeAppsService();
   const exports = new FakeExportsService();
-  const artifacts = new FakeUploadSweep();
-  const imports = new FakeUploadSweep();
-  const hostnames = new FakeHostnameReconcile();
+  const artifacts = new FakeImportSweepService();
+  const imports = new FakeImportSweepService();
+  const hostnames = new FakeHostnameReconcileService();
   return {
     agentRepo,
     apps,

@@ -82,3 +82,6 @@ When a change affects code style, tooling, conventions, or project taste (new li
 ## Pull requests
 
 Keep PR descriptions minimal — the diff is self-explanatory, so don't enumerate every change. State the intent in a line or two.
+
+Do not add a validation section for checks CI already runs. Include validation only when it is
+specific to the PR and not covered by CI, such as a local manual run and its observed result.

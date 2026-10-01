@@ -10,7 +10,7 @@ import { durationToMs } from '#lib/duration.ts';
 import { NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import { wait } from '#lib/wait.ts';
-import type { DeploymentLookup } from '#repositories/deployments.repository.ts';
+import type { DeploymentLookupRepositoryContract } from '#repositories/deployments.repository.ts';
 import type { LogsRepositoryContract } from '#repositories/logs.repository.ts';
 import { Service } from '#services/service.ts';
 
@@ -37,14 +37,14 @@ export type TenantLogStreamRequest = {
 
 export class LogsService extends Service {
   private readonly logsRepo: LogsRepositoryContract;
-  private readonly deploymentsRepo: DeploymentLookup;
+  private readonly deploymentsRepo: DeploymentLookupRepositoryContract;
 
   constructor({
     logsRepo,
     deploymentsRepo,
   }: {
     logsRepo: LogsRepositoryContract;
-    deploymentsRepo: DeploymentLookup;
+    deploymentsRepo: DeploymentLookupRepositoryContract;
   }) {
     super();
     this.logsRepo = logsRepo;

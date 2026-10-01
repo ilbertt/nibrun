@@ -22,6 +22,7 @@ export {
   refusedArchive,
   refusedArchiveBody,
 } from '#archive.ts';
+export { readCrons } from '#crons.ts';
 export { deleteApp } from '#delete.ts';
 export {
   awaitDeploymentSettled,

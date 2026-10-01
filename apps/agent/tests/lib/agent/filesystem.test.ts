@@ -133,6 +133,8 @@ function immediateApi(queued: FilesystemQuery[]) {
       openSession: unreached,
       fetchDesiredState: unreached,
       sendReportedState: unreached,
+      fetchCronQuery: unreached,
+      sendCronQueryResult: unreached,
       fetchFilesystemQuery: ({ request }: { request: FilesystemQueryRequest }) =>
         Effect.sync(() => {
           polls.push(request);
