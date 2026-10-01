@@ -40,8 +40,9 @@ const HOST_BOOT_ID_PATH = '/proc/sys/kernel/random/boot_id';
  */
 export type SnapshotStamp = {
   readonly deploymentId: DeploymentId;
-  /** `/opt/nibrun/bin/guest-image` is a symlink, so the kernel and rootfs move without the path. */
   readonly guestImageVersion: string;
+  /** A restore must reopen the immutable image, never the adoption symlink. */
+  readonly guestRootfsPath: string;
   readonly hostBootId: string;
   /** The tap, the addresses, the MAC and the NBD minor all derive from this one number. */
   readonly slot: number;
@@ -51,6 +52,7 @@ export type SnapshotStamp = {
 const DRIFT: readonly (readonly [keyof SnapshotStamp, string])[] = [
   ['deploymentId', 'the app has been deployed again since'],
   ['guestImageVersion', 'the guest image has changed'],
+  ['guestRootfsPath', 'the guest root filesystem has changed'],
   ['hostBootId', 'the host has rebooted'],
   ['slot', 'the app has moved to another slot'],
 ];
@@ -241,16 +243,18 @@ export function readStamp(value: unknown): Option.Option<SnapshotStamp> {
   if (value === null || typeof value !== 'object') {
     return Option.none();
   }
-  const { deploymentId, guestImageVersion, hostBootId, slot } = value as Partial<SnapshotStamp>;
+  const { deploymentId, guestImageVersion, guestRootfsPath, hostBootId, slot } =
+    value as Partial<SnapshotStamp>;
   if (
     typeof deploymentId !== 'string' ||
     typeof guestImageVersion !== 'string' ||
+    typeof guestRootfsPath !== 'string' ||
     typeof hostBootId !== 'string' ||
     typeof slot !== 'number'
   ) {
     return Option.none();
   }
-  return Option.some({ deploymentId, guestImageVersion, hostBootId, slot });
+  return Option.some({ deploymentId, guestImageVersion, guestRootfsPath, hostBootId, slot });
 }
 
 /** Why a stored stamp is not the one a restore would need, or `undefined` when it is. */

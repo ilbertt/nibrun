@@ -13,6 +13,7 @@ import type { InstanceRecord } from '#lib/report/instance-record.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
+import { CronActivity } from '#services/cron-activity.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { RefreshSignal } from '#services/refresh-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -86,6 +87,7 @@ export class HostHasNoRoom extends Data.TaggedError('HostHasNoRoom')<{
 export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
   effect: Effect.gen(function* () {
     const config = yield* AgentConfig;
+    const activity = yield* CronActivity;
     const cache = yield* DesiredStateCache;
     const refresh = yield* RefreshSignal;
     const context = yield* Effect.context<WakeContext>();
@@ -226,20 +228,22 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
           yield* Ref.update(held.value.joined, (count) => count + 1);
           return yield* Deferred.await(held.value.deferred);
         }
-        return yield* boot({ appId, joined: claim.joined }).pipe(
-          Effect.provide(context),
-          Effect.onExit((exit) =>
-            Deferred.done(claim.deferred, exit).pipe(
-              Effect.andThen(
-                Ref.update(inFlight, (current) => {
-                  const remaining = new Map(current);
-                  remaining.delete(appId);
-                  return remaining;
-                }),
+        return yield* activity
+          .exclusive({ appId, effect: boot({ appId, joined: claim.joined }) })
+          .pipe(
+            Effect.provide(context),
+            Effect.onExit((exit) =>
+              Deferred.done(claim.deferred, exit).pipe(
+                Effect.andThen(
+                  Ref.update(inFlight, (current) => {
+                    const remaining = new Map(current);
+                    remaining.delete(appId);
+                    return remaining;
+                  }),
+                ),
               ),
             ),
-          ),
-        );
+          );
       }),
     };
   }),
@@ -247,6 +251,7 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
     AgentConfig.Default,
     AgentState.Default,
     CommandRunner.Default,
+    CronActivity.Default,
     DesiredStateCache.Default,
     RefreshSignal.Default,
     SlotAllocator.Default,

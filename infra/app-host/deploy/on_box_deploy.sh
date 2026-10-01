@@ -540,8 +540,8 @@ else
   systemctl start nibrun-agent.service
 fi
 
-# Firecracker and the guest image are read by the *next* boot of a microVM, so a
-# bump reaches an app when it is next redeployed and restarts nothing now.
+# The agent rolls running microVMs onto an adopted guest image one at a time.
+# Sleeping apps cold-boot onto it when next used; Firecracker changes reach the next VM start.
 
 log "Waiting for the services to settle"
 for unit in nibrun-zerofs nibrun-caddy nibrun-agent; do

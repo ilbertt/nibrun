@@ -89,7 +89,17 @@ export class CronActivity extends Effect.Service<CronActivity>()('CronActivity',
       });
     }
 
-    return { run, whenIdle };
+    function exclusive<A, E, R>({
+      appId,
+      effect,
+    }: {
+      appId: AppId;
+      effect: Effect.Effect<A, E, R>;
+    }) {
+      return withActivity({ appId, use: (activity) => activity.gate.withPermits(1)(effect) });
+    }
+
+    return { run, whenIdle, exclusive };
   }),
   dependencies: [AgentState.Default],
 }) {}

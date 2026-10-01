@@ -88,6 +88,14 @@ future timers: changing a crontab replaces timers while started commands finish 
 deployment scope. Its registry loop runs without waiting for a control-plane session;
 Effect schedules wait on Bun-calculated UTC occurrences and never retry a command.
 
+Guest images converge to the version adopted in the host bundle. Cold boots resolve the
+adoption symlink once and persist immutable kernel/rootfs paths in the VM's `guest-image.json`.
+Unknown legacy images cannot snapshot, and legacy snapshot stamps cold-boot. Reconciliation
+upgrades one running VM per host, keeps the deployment identity and cron registry, and waits
+for healthy completion before advancing. A failed upgrade pauses the rollout; sleeping and
+manually suspended apps take the adopted image when next started. Wake and upgrade share
+the per-app activity gate, and active cron runs defer an upgrade.
+
 ## What the host must provide, and does not yet
 
 Owned by `infra/app-host/`, not fixable here.

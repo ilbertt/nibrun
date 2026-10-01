@@ -428,6 +428,8 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
       Effect.gen(function* () {
         yield* AgentState.putRecord({
           ...attempted,
+          guestImageVersion: (yield* AgentState.snapshot).records.get(desired.appId)
+            ?.guestImageVersion,
           startedAt: yield* nowTimestamp,
           state: 'starting',
           health: initialTracker(),
