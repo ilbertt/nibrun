@@ -15,6 +15,13 @@ The unit suite uses a socketpair to verify framing and acknowledgement without A
 the supervised binary. Cron stdin is `/dev/null`; callers own output collection and reaping.
 `SHELL` in the merged environment chooses the interpreter, with `/bin/sh` as the default.
 
+`src/guest-cron.c` serves one command per connection on port 51004. Its NBR1 frames
+stream stdout, stderr and exit status; the host acknowledges each output frame before
+another is sent. Disconnects and channel shutdown cancel the command's process group.
+Workers catch SIGTERM and reap commands before the data filesystem is unmounted.
+The listener admits up to 64 simultaneous workers and rejects excess requests without
+queueing or retries. Socketpair tests cover the wire protocol and process cleanup.
+
 `src/guest-control.c` and `src/guest-filesystem.c` are the two things here the host drives rather
 than reads, and both exist because the host's view of the block device is not the filesystem.
 

@@ -17,6 +17,7 @@
  * hanging, which is the opposite of what a file browser is for. */
 #define GUEST_FILESYSTEM_VSOCK_PORT 51002U
 #define CRON_REGISTRATION_VSOCK_PORT 51003U
+#define GUEST_CRON_VSOCK_PORT 51004U
 
 #ifndef AF_VSOCK
 #define AF_VSOCK 40
