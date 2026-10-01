@@ -1,3 +1,5 @@
+import { CRON_TIME_ZONE } from '@repo/protocol';
+
 const DAY_AND_MINUTE: Intl.DateTimeFormatOptions = {
   year: 'numeric',
   month: '2-digit',
@@ -21,6 +23,14 @@ const DAY_AND_SECOND: Intl.DateTimeFormatOptions = { ...DAY_AND_MINUTE, second: 
 
 export function dayAndSecond(instant: string): string {
   return new Date(instant).toLocaleString(undefined, DAY_AND_SECOND);
+}
+
+export function dayAndSecondUtc(instant: string): string {
+  return new Date(instant).toLocaleString(undefined, {
+    ...DAY_AND_SECOND,
+    timeZone: CRON_TIME_ZONE,
+    timeZoneName: 'short',
+  });
 }
 
 export function dayAndMinute(instant: string): string {

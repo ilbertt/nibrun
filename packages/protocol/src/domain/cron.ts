@@ -2,6 +2,7 @@ import { Type } from '@sinclair/typebox';
 import { TenantEnvironmentSchema } from '#domain/app.ts';
 import { AppIdSchema, CronJobIdSchema, DeploymentIdSchema } from '#domain/identifiers.ts';
 import { secretString } from '#lib/secret.ts';
+import { TimestampSchema } from '#lib/wire.ts';
 
 export const MAX_CRON_JOBS_PER_APP = 10;
 export const CRON_TIME_ZONE = 'UTC';
@@ -60,7 +61,7 @@ export const CronTablesSchema = Type.Array(CronTableSchema);
 
 export const RegisteredCronJobSchema = Type.Composite([
   CronJobDefinitionSchema,
-  Type.Object({ jobId: CronJobIdSchema }),
+  Type.Object({ jobId: CronJobIdSchema, nextRunAt: Type.Optional(TimestampSchema) }),
 ]);
 
 export type RegisteredCronJob = typeof RegisteredCronJobSchema.static;

@@ -48,6 +48,25 @@ describe('cron queries', () => {
     );
   });
 
+  test('next execution timestamps are optional during rollout and must be valid when present', () => {
+    for (const nextRunAt of [undefined, '2026-09-30T09:45:00.000Z']) {
+      expect(
+        isValidMessage({
+          schema: CronListingSchema,
+          value: { ...LISTING, jobs: [{ ...JOB, nextRunAt }] },
+        }),
+      ).toBe(true);
+    }
+    for (const nextRunAt of [null, 'tomorrow']) {
+      expect(
+        isValidMessage({
+          schema: CronListingSchema,
+          value: { ...LISTING, jobs: [{ ...JOB, nextRunAt }] },
+        }),
+      ).toBe(false);
+    }
+  });
+
   test('listing limits and job identity match the registration contract', () => {
     expect(
       isValidMessage({
