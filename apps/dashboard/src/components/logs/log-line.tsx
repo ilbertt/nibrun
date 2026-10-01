@@ -17,6 +17,12 @@ export function LogLine({ record }: { record: TenantLogRecord }) {
         {wroteToStderr ? 'err' : 'out'}
       </span>
       <span className={cn('whitespace-pre-wrap break-all', wroteToStderr && 'text-destructive')}>
+        {record.cronJobId !== undefined && (
+          <span className="text-muted-foreground" title="Cron job ID">
+            {record.cronJobId}
+            {'  '}
+          </span>
+        )}
         {ansiSpans(record._msg.replace(TERMINATOR, '')).map((span) => (
           <span key={span.offset} style={span.style}>
             {span.text}
