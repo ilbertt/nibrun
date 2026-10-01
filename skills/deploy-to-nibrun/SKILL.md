@@ -270,22 +270,18 @@ nib apps update --app my-app --extra-public-port --env 'ANNOUNCED_IP=${NIBRUN_PU
 
 Register jobs through `crontab` from the binary's normal server startup. nibrun's agent keeps
 the schedule and wakes an idle app to run it; in-process timers only run while the app is awake.
-Give the binary a task command that does its work and exits without starting the server or
-registering jobs again. For a `cleanup` command, register every five minutes from Bun:
+For Bun apps, see [Bun's cron documentation](https://bun.com/docs/runtime/cron) and use
+crontab-backed scheduling. A task command should do its work and exit without starting the
+server or registering jobs again.
 
-```ts
-const registration = Bun.spawn(['crontab', '-'], {
-  stdin: new Blob(['*/5 * * * * /mnt/artifact/server cleanup\n']),
-  stderr: 'inherit',
-});
-if ((await registration.exited) !== 0) throw new Error('Cron registration failed');
-```
-
-- Maximum **10 jobs per app**, in **UTC**. Use [Bun's five-field cron syntax and nicknames](https://bun.com/docs/runtime/cron#cron-expression-syntax), such as `@daily`; no seconds field or `@reboot`.
+- Maximum **10 jobs per app**, in **UTC**. Use Bun's five-field cron syntax or nicknames such as
+  `@daily`; no seconds field or `@reboot`.
 - `/mnt/artifact/server` is the uploaded binary. Commands run through `/bin/sh` as the app user
   in `/app`, inherit deployment environment, and send stdout/stderr to app logs.
 - Registration replaces the entire table. `crontab -l` reads it; `crontab -r` removes it.
-  Redeployment clears schedules, so the new binary must register them again.
+- Every new deployment clears schedules, including binary upgrades and settings redeploys
+  through `nib apps update`. Register them again at startup. Settings edits that create no
+  deployment preserve schedules.
 - Manual suspension disables execution but keeps schedules visible. Runs may overlap; missed
   runs are not replayed and failures are not retried.
 
@@ -298,7 +294,7 @@ Worth saying out loud before recommending it:
 - **New apps sleep after five minutes without incoming traffic.** The next request wakes them.
   In-process timers and outbound polling pause while asleep; registered [cron jobs](#cron-jobs)
   can wake the app and keep it awake until they finish. Owners cannot change activation through
-  the CLI, API or dashboard.
+  the CLI, API or dashboard. For an always-on app, email [hello@nibrun.com](mailto:hello@nibrun.com).
 - **One microVM per app, one size.** No horizontal scaling, no load balancing, no resizing.
 - **A deploy is a replace.** The old VM is stopped before the new one starts, because they share
   one volume — so there are a few seconds of downtime, and no blue/green or canary.
