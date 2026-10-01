@@ -4,12 +4,14 @@ import { LogStream } from '#components/logs/log-stream.tsx';
 import { LogStreamStatus } from '#components/logs/log-stream-status.tsx';
 import { LogTimerangeMenu } from '#components/logs/log-timerange-menu.tsx';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
+import { useCronListing } from '#lib/hooks/use-cron-listing.ts';
 import { useDeploymentLogs } from '#lib/hooks/use-deployment-logs.ts';
 import { useFailureToast } from '#lib/hooks/use-failure-toast.ts';
 
 export function DeploymentLogs() {
   const appId = useAppId();
   const logs = useDeploymentLogs(appId);
+  const crons = useCronListing(appId);
 
   useFailureToast(logs.reason);
 
@@ -32,7 +34,7 @@ export function DeploymentLogs() {
           <LogTimerangeMenu />
         </div>
       </div>
-      <LogStream records={logs.records} />
+      <LogStream records={logs.records} cronListing={crons.listing} />
     </div>
   );
 }

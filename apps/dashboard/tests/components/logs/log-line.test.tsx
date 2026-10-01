@@ -19,17 +19,20 @@ function record(overrides: Partial<TenantLogRecord> = {}): TenantLogRecord {
   } as TenantLogRecord;
 }
 
-test('cron log rows expose the full job ID beside their output', () => {
-  const markup = renderToStaticMarkup(<LogLine record={record({ cronJobId: CRON_JOB_ID })} />);
-  expect(markup).toContain(CRON_JOB_ID);
-  expect(markup).toContain('title="Cron job ID"');
+test('cron log rows place a details trigger after the output and keep the ID hidden', () => {
+  const markup = renderToStaticMarkup(
+    <LogLine record={record({ cronJobId: CRON_JOB_ID })} cronSchedule="*/5 * * * *" />,
+  );
+  expect(markup).not.toContain(CRON_JOB_ID);
+  expect(markup).toContain('aria-label="Cron job details"');
+  expect(markup.indexOf('cleanup complete')).toBeLessThan(markup.indexOf('Cron job details'));
   expect(markup).toContain('cleanup complete');
   expect(markup).toContain('out');
 });
 
 test('server log rows carry no cron label', () => {
-  const markup = renderToStaticMarkup(<LogLine record={record()} />);
-  expect(markup).not.toContain('Cron job ID');
+  const markup = renderToStaticMarkup(<LogLine record={record()} cronSchedule={undefined} />);
+  expect(markup).not.toContain('Cron job details');
   expect(markup).not.toContain(CRON_JOB_ID);
   expect(markup).toContain('cleanup complete');
 });
@@ -42,9 +45,10 @@ test('cron metadata preserves stderr labels and escapes tenant output', () => {
         stream: 'stderr',
         _msg: '<script>alert(1)</script>',
       })}
+      cronSchedule={undefined}
     />,
   );
-  expect(markup).toContain(CRON_JOB_ID);
+  expect(markup).toContain('Cron job details');
   expect(markup).toContain('err');
   expect(markup).toContain('text-destructive');
   expect(markup).toContain('&lt;script&gt;');
