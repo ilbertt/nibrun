@@ -4,6 +4,16 @@
 // dependency on the validator this package already owns.
 export { AssertError, Value } from '@sinclair/typebox/value';
 export {
+  type CronQuery,
+  type CronQueryRequest,
+  CronQueryRequestSchema,
+  type CronQueryResponse,
+  CronQueryResponseSchema,
+  type CronQueryResult,
+  CronQueryResultSchema,
+  CronQuerySchema,
+} from '#control/cron-query.ts';
+export {
   DESIRED_INSTANCE_STATES,
   DESIRED_PRESENCE,
   type DesiredArtifact,
@@ -126,6 +136,8 @@ export {
   CronJobDefinitionSchema,
   type CronJobDefinitions,
   CronJobDefinitionsSchema,
+  type CronListing,
+  CronListingSchema,
   CronScheduleSchema,
   type CronTable,
   CronTableSchema,
@@ -134,6 +146,8 @@ export {
   MAX_CRON_ENVIRONMENT_VARIABLES,
   MAX_CRON_JOBS_PER_APP,
   MAX_CRONTAB_BYTES,
+  type RegisteredCronJob,
+  RegisteredCronJobSchema,
 } from '#domain/cron.ts';
 export {
   DEPLOYMENT_STATES,
@@ -185,6 +199,8 @@ export {
   CheckpointIdSchema,
   type CronJobId,
   CronJobIdSchema,
+  type CronQueryId,
+  CronQueryIdSchema,
   type CronRunId,
   CronRunIdSchema,
   type DeploymentId,
