@@ -76,6 +76,11 @@ The client acknowledges each output frame after its consumer accepts it and clos
 connection on interruption or consumer failure. It neither wakes a VM nor retries a run;
 deployment ownership, wakeup and idle protection belong to its caller.
 
+`lib/cron/execution-logs.ts` wraps that client with per-run stdout/stderr decoders and
+publishes into the shared tenant log queue. Its caller supplies the job and run IDs before
+dispatch. Queue refusal drops output without stalling a command; sequence gaps identify
+missing records. Decoder remainders are flushed on completion, failure and interruption.
+
 ## What the host must provide, and does not yet
 
 Owned by `infra/app-host/`, not fixable here.
