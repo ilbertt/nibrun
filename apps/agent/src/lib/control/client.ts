@@ -3,6 +3,9 @@ import {
   AGENT_ROUTES,
   type AgentSessionRequest,
   AgentSessionSchema,
+  type CronQueryRequest,
+  CronQueryResponseSchema,
+  type CronQueryResult,
   type DesiredStateRequest,
   DesiredStateResponseSchema,
   type FilesystemQueryRequest,
@@ -20,13 +23,13 @@ import { decode } from '#lib/protocol.ts';
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * The one route the api answers slowly on purpose: a poll for a read is held there until a read
+ * Query routes answer slowly on purpose: a poll for a read is held there until a read
  * arrives or its own 25s hold expires, so the ordinary ceiling would abandon every idle poll a
  * few seconds before the reply it was waiting for. Above the hold with room for the round trip,
  * and never below it — a client that gives up first turns an idle fleet into a retry loop and
  * loses every read handed to a host on the way out.
  */
-const FILESYSTEM_QUERY_TIMEOUT_MS = 45_000;
+const HELD_QUERY_TIMEOUT_MS = 45_000;
 const HTTP_UNAUTHORIZED = 401;
 const NOT_DELIVERED = 0;
 const MAX_BODY = 256;
@@ -103,12 +106,18 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
   const options = ({
     sessionToken,
     timeoutMs = REQUEST_TIMEOUT_MS,
+    signal,
   }: {
     sessionToken?: SecretString;
     timeoutMs?: number;
+    signal?: AbortSignal;
   } = {}) => ({
     headers: protocolHeaders({ sessionToken }),
-    fetch: { signal: AbortSignal.timeout(timeoutMs) },
+    fetch: {
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+        : AbortSignal.timeout(timeoutMs),
+    },
   });
 
   return {
@@ -164,7 +173,7 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
         send: () =>
           api.internal.agent['filesystem-query'].post(
             request,
-            options({ sessionToken, timeoutMs: FILESYSTEM_QUERY_TIMEOUT_MS }),
+            options({ sessionToken, timeoutMs: HELD_QUERY_TIMEOUT_MS }),
           ),
       }).pipe(
         Effect.flatMap((value) =>
@@ -184,6 +193,41 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
           route: AGENT_ROUTES.filesystemQueryResult,
           send: () =>
             api.internal.agent['filesystem-query-result'].post(result, options({ sessionToken })),
+        }),
+      ),
+
+    fetchCronQuery: ({
+      sessionToken,
+      request,
+    }: {
+      sessionToken: SecretString;
+      request: CronQueryRequest;
+    }) =>
+      call({
+        route: AGENT_ROUTES.cronQuery,
+        send: (signal) =>
+          api.internal.agent['cron-query'].post(
+            request,
+            options({ sessionToken, timeoutMs: HELD_QUERY_TIMEOUT_MS, signal }),
+          ),
+      }).pipe(
+        Effect.flatMap((value) =>
+          decode(() => parseMessage({ schema: CronQueryResponseSchema, value })),
+        ),
+      ),
+
+    sendCronQueryResult: ({
+      sessionToken,
+      result,
+    }: {
+      sessionToken: SecretString;
+      result: CronQueryResult;
+    }) =>
+      Effect.asVoid(
+        call({
+          route: AGENT_ROUTES.cronQueryResult,
+          send: (signal) =>
+            api.internal.agent['cron-query-result'].post(result, options({ sessionToken, signal })),
         }),
       ),
   };

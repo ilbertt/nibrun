@@ -1,3 +1,4 @@
+import { CronQuerySchema, Value } from '@repo/protocol';
 import { Context, Effect, Layer } from 'effect';
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
@@ -5,6 +6,7 @@ import { agentConfig } from '#tests/support/config.ts';
 import { desiredInstance, desiredState, LOG_SOURCE } from '#tests/support/fixtures.ts';
 
 export const CRON_JOB = { schedule: '*/5 * * * *', command: 'echo hello' };
+export const CRON_QUERY = Value.Parse(CronQuerySchema, { ...LOG_SOURCE, queryId: 'query-1' });
 
 export function cronListingHost(directory: string) {
   return Effect.gen(function* () {
