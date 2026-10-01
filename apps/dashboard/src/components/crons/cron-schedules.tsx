@@ -1,5 +1,5 @@
 import type { CronListing } from '@repo/protocol';
-import { Button } from '@repo/ui/components/button';
+import { Badge } from '@repo/ui/components/badge';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@repo/ui/components/empty';
 import {
   Table,
@@ -37,15 +37,16 @@ export function CronSchedules({ listing }: { listing: CronListing }) {
                 <TableHead>
                   <div className="flex items-center gap-2">
                     Next execution (estimated)
-                    <Button
+                    <Badge
                       aria-label="Use local time for next executions"
                       aria-pressed={timeZone.isLocal}
+                      className="cursor-pointer px-1.5 outline-none hover:bg-secondary/80"
                       onClick={timeZone.toggle}
-                      size="xs"
-                      variant="outline"
+                      render={<button type="button" />}
+                      variant="secondary"
                     >
                       {timeZone.label}
-                    </Button>
+                    </Badge>
                   </div>
                 </TableHead>
                 <TableHead>Command</TableHead>

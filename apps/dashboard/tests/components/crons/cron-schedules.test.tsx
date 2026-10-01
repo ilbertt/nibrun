@@ -43,6 +43,7 @@ test('next execution estimates default to UTC with a column time zone toggle', (
   expect(markup).toContain('09:45:00');
   expect(markup).toContain('aria-label="Use local time for next executions"');
   expect(markup).toContain('aria-pressed="false"');
+  expect(markup).toContain('data-slot="badge"');
   expect(markup).toContain('>UTC</button>');
 });
 
