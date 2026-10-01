@@ -34,7 +34,7 @@ function refusal({
 }
 
 describe('an app nobody has deployed', () => {
-  const nothingToRead: AppOperation[] = ['logs', 'files', 'export'];
+  const nothingToRead: AppOperation[] = ['logs', 'crons', 'files', 'export'];
 
   for (const operation of nothingToRead) {
     test(`has nothing for ${operation} to read`, () => {
@@ -72,6 +72,12 @@ describe('a release that is not serving', () => {
 });
 
 describe('a suspended app', () => {
+  test('keeps its cron registrations readable while execution is disabled', () => {
+    expect(
+      refusal({ operation: 'crons', appState: 'suspended', deploymentState: 'stopped' }),
+    ).toBeUndefined();
+  });
+
   test('takes no release, and says how to make it take one', () => {
     expect(
       refusal({ operation: 'release', appState: 'suspended', deploymentState: 'stopped' }),
@@ -100,7 +106,15 @@ describe('a suspended app', () => {
 });
 
 describe('an app on its way out', () => {
-  const gone: AppOperation[] = ['release', 'files', 'export', 'suspend', 'resume', 'domains'];
+  const gone: AppOperation[] = [
+    'release',
+    'crons',
+    'files',
+    'export',
+    'suspend',
+    'resume',
+    'domains',
+  ];
 
   for (const operation of gone) {
     test(`has nothing left for ${operation}`, () => {
@@ -126,7 +140,15 @@ describe('an app idle between requests', () => {
     );
   });
 
-  const still: AppOperation[] = ['release', 'logs', 'export', 'suspend', 'delete', 'domains'];
+  const still: AppOperation[] = [
+    'release',
+    'logs',
+    'crons',
+    'export',
+    'suspend',
+    'delete',
+    'domains',
+  ];
 
   for (const operation of still) {
     test(`is still an app to ${operation}`, () => {

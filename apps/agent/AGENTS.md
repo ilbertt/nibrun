@@ -5,9 +5,10 @@ plane, long-polls for desired state, converges the host onto it, and reports wha
 is never sent a command. Read `lib/reconcile/`, `lib/volumes/topology.ts` and
 `lib/network/slot.ts` first.
 
-It answers one kind of question besides converging: `lib/agent/filesystem.ts` polls for a
-directory read and answers it, on routes of its own. A read is not a state anything converges on,
-so it carries no generation and cannot delay a stop.
+Besides converging, it answers directory reads through `lib/agent/filesystem.ts` and cron
+listings through `lib/agent/cron-query.ts`, each on routes of its own. A read is not a state
+anything converges on, so it carries no generation and cannot delay a stop. Cron listings read
+the durable registry and cached desired state without waking a guest, including suspended apps.
 
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
 test needs to substitute is a service. State that used to be
@@ -75,6 +76,25 @@ the guest's port 51004. Its bounded NBR1 protocol matches `apps/runtime/src/gues
 The client acknowledges each output frame after its consumer accepts it and closes the
 connection on interruption or consumer failure. It neither wakes a VM nor retries a run;
 deployment ownership, wakeup and idle protection belong to its caller.
+
+`lib/cron/execution-logs.ts` wraps that client with per-run stdout/stderr decoders and
+publishes into the shared tenant log queue. Its caller supplies the job and run IDs before
+dispatch. Queue refusal drops output without stalling a command; sequence gaps identify
+missing records. Decoder remainders are flushed on completion, failure and interruption.
+
+`CronActivity` serializes idle capture against run admission and keeps each overlapping
+run protected until completion. `CronExecutions` owns deployment scopes, wakes idle apps,
+and drains old runs before reconcile replaces or suspends a VM. `CronScheduler` owns the
+future timers: changing a crontab replaces timers while started commands finish in their
+deployment scope. Its registry loop runs without waiting for a control-plane session;
+Effect schedules wait on Bun-calculated UTC occurrences and never retry a command.
+
+Cold boots pin kernel/rootfs paths to the immutable guest image adopted in the host bundle.
+Before snapshotting, the agent checks the running Firecracker's root drive through `/vm/config`;
+a symlink path, an older image or an unreadable configuration leaves the VM running. Image
+identity never comes from resolving a running VM's drive symlink or from cached agent records.
+Snapshots name the immutable rootfs path; legacy stamps and image changes force a cold boot.
+Image adoption does not restart running guests.
 
 ## What the host must provide, and does not yet
 

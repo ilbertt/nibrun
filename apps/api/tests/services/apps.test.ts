@@ -56,12 +56,12 @@ import type {
   StateChange,
 } from '#repositories/apps.repository.ts';
 import {
-  type AppHostnameAccess,
+  type AppHostnameAccessRepositoryContract,
   AppsService,
-  type CustomHostnameRemoval,
-  type ExportCancellation,
+  type CustomHostnameRemovalRepositoryContract,
+  type ExportCancellationRepositoryContract,
   MAX_ANONYMOUS_APPS,
-  type ObjectRemoval,
+  type ObjectRemovalRepositoryContract,
 } from '#services/apps.service.ts';
 import {
   APP_HOST_DOMAIN,
@@ -370,7 +370,7 @@ class StubAppsRepository implements AppsRepositoryContract {
  * still find.
  */
 /** Every read answers empty, which is what an app belonging to somebody else looks like. */
-class StubHostnameAccess implements AppHostnameAccess {
+class StubHostnameAccessRepository implements AppHostnameAccessRepositoryContract {
   readonly disposable = new Map<AppId, DisposableAppHostnameRow[]>();
   readonly removed: Hostname[] = [];
 
@@ -398,7 +398,7 @@ class StubHostnameAccess implements AppHostnameAccess {
   }
 }
 
-class StubCustomHostnameRemoval implements CustomHostnameRemoval {
+class StubCustomHostnameRemovalRepository implements CustomHostnameRemovalRepositoryContract {
   readonly removed: string[] = [];
   readonly failures = new Set<string>();
 
@@ -441,7 +441,7 @@ function objectKey(key: string): ObjectKey {
 const VOLUME_ID = Value.Parse(VolumeIdSchema, APP_ID);
 const NO_BYTES = 0;
 
-class StubExportCancellation implements ExportCancellation {
+class StubExportCancellationRepository implements ExportCancellationRepositoryContract {
   readonly cancelled: AppId[] = [];
 
   failInFlight({ appId }: { appId: AppId; message: string }): Promise<void> {
@@ -452,20 +452,20 @@ class StubExportCancellation implements ExportCancellation {
 
 function serviceWith({
   appsRepo,
-  hostnamesRepo = new StubHostnameAccess(),
-  customHostnamesRepo = new StubCustomHostnameRemoval(),
-  exportsRepo = new StubExportCancellation(),
+  hostnamesRepo = new StubHostnameAccessRepository(),
+  customHostnamesRepo = new StubCustomHostnameRemovalRepository(),
+  exportsRepo = new StubExportCancellationRepository(),
   artifactStorageRepo = new StubObjectStorage({ trace: [] }),
   exportStorageRepo = new StubObjectStorage({ trace: [] }),
   importStorageRepo = new StubObjectStorage({ trace: [] }),
 }: {
   appsRepo: AppsRepositoryContract;
-  hostnamesRepo?: AppHostnameAccess;
-  customHostnamesRepo?: CustomHostnameRemoval;
-  exportsRepo?: ExportCancellation;
-  artifactStorageRepo?: ObjectRemoval;
-  exportStorageRepo?: ObjectRemoval;
-  importStorageRepo?: ObjectRemoval;
+  hostnamesRepo?: AppHostnameAccessRepositoryContract;
+  customHostnamesRepo?: CustomHostnameRemovalRepositoryContract;
+  exportsRepo?: ExportCancellationRepositoryContract;
+  artifactStorageRepo?: ObjectRemovalRepositoryContract;
+  exportStorageRepo?: ObjectRemovalRepositoryContract;
+  importStorageRepo?: ObjectRemovalRepositoryContract;
 }) {
   return new AppsService({
     appsRepo,
@@ -935,7 +935,7 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
   test('an export still being written is ended rather than left to finish', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
-    const exportsRepo = new StubExportCancellation();
+    const exportsRepo = new StubExportCancellationRepository();
 
     await serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
 
@@ -945,7 +945,7 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
   // Reached only by an owner the app answered to: the state change is what says it is theirs.
   test('and an app the caller does not own has none of its exports touched', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-    const exportsRepo = new StubExportCancellation();
+    const exportsRepo = new StubExportCancellationRepository();
 
     await expect(
       serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID }),
@@ -1201,8 +1201,8 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
   // describing an app that had none, which failed the whole listing rather than that one app.
   test('deletion returns with the rows still there, because the app is still one to show', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-    const hostnamesRepo = new StubHostnameAccess();
-    const edge = new StubCustomHostnameRemoval();
+    const hostnamesRepo = new StubHostnameAccessRepository();
+    const edge = new StubCustomHostnameRemovalRepository();
     appsRepo.owns = true;
     appsRepo.deployedApps.push(APP_ID);
     hostnamesRepo.disposable.set(APP_ID, appHostnames());
@@ -1220,8 +1220,8 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
 
   test('the platform name and a custom domain are both free once the app is purged', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-    const hostnamesRepo = new StubHostnameAccess();
-    const edge = new StubCustomHostnameRemoval();
+    const hostnamesRepo = new StubHostnameAccessRepository();
+    const edge = new StubCustomHostnameRemovalRepository();
     appsRepo.owns = true;
     hostnamesRepo.disposable.set(APP_ID, appHostnames());
     const apps = serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge });
@@ -1239,8 +1239,8 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
 
   test('an edge failure keeps its row for the next sweep to retry', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-    const hostnamesRepo = new StubHostnameAccess();
-    const edge = new StubCustomHostnameRemoval();
+    const hostnamesRepo = new StubHostnameAccessRepository();
+    const edge = new StubCustomHostnameRemovalRepository();
     appsRepo.owns = true;
     hostnamesRepo.disposable.set(APP_ID, appHostnames());
     edge.failures.add(CLOUDFLARE_ID);
@@ -1427,7 +1427,7 @@ describe('an app with no filesystem to tear down is not left waiting for one', (
   test('an export still being written is ended either way', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
-    const exportsRepo = new StubExportCancellation();
+    const exportsRepo = new StubExportCancellationRepository();
 
     await serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
 
@@ -1476,7 +1476,7 @@ describe('an app whose time is up is deleted as its owner would delete it', () =
 
   test('a host report is what deletes it, exports and all', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-    const exportsRepo = new StubExportCancellation();
+    const exportsRepo = new StubExportCancellationRepository();
     appsRepo.owns = true;
     appsRepo.expirable = [due];
 

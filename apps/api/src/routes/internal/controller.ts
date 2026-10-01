@@ -1,5 +1,7 @@
 import { Elysia } from 'elysia';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
+import { AgentCronQueryController } from '#routes/internal/agent/cron-query/controller.ts';
+import { AgentCronQueryResultController } from '#routes/internal/agent/cron-query-result/controller.ts';
 import { AgentDesiredStateController } from '#routes/internal/agent/desired-state/controller.ts';
 import { AgentFilesystemQueryController } from '#routes/internal/agent/filesystem-query/controller.ts';
 import { AgentFilesystemQueryResultController } from '#routes/internal/agent/filesystem-query-result/controller.ts';
@@ -14,4 +16,6 @@ export const InternalController = new Elysia({ prefix: RoutePrefix.Internal })
   .use(AgentDesiredStateController)
   .use(AgentReportedStateController)
   .use(AgentFilesystemQueryController)
-  .use(AgentFilesystemQueryResultController);
+  .use(AgentFilesystemQueryResultController)
+  .use(AgentCronQueryController)
+  .use(AgentCronQueryResultController);

@@ -32,6 +32,7 @@ import { UNKNOWN_UNIT, type UnitStatus } from '#lib/vm/unit-status.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
+import { CronActivity } from '#services/cron-activity.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
@@ -153,7 +154,7 @@ export const stopInstance = Effect.fn('stopInstance')(function* ({
  * the microVM running either way and the record untouched, so the app goes on serving and the
  * next measurement tick asks again — which is the safe end of this to be wrong at.
  */
-export const suspendInstance = Effect.fn('suspendInstance')(function* ({
+const captureIdleInstance = Effect.fn('captureIdleInstance')(function* ({
   appId,
   deploymentId,
   reason,
@@ -201,6 +202,22 @@ export const suspendInstance = Effect.fn('suspendInstance')(function* ({
     Effect.ensuring(AgentState.markSnapshotting({ appId, active: false })),
   );
 });
+
+export function suspendInstance(
+  request: Parameters<typeof captureIdleInstance>[0] & { quietSinceMs: number | undefined },
+) {
+  return Effect.flatMap(CronActivity, (activity) =>
+    activity.whenIdle({
+      appId: request.appId,
+      effect: Effect.flatMap(AgentState.snapshot, (current) =>
+        request.quietSinceMs === undefined ||
+        current.lastActiveAtMs.get(request.appId) === request.quietSinceMs
+          ? captureIdleInstance(request)
+          : Effect.void,
+      ),
+    }),
+  );
+}
 
 function setState({
   appId,

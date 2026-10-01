@@ -263,7 +263,7 @@ const ABANDONED_AFTER_SECONDS = 86_400;
 // artifact's own id is in it so that two uploads never write over each other.
 const UPLOAD_PREFIX = 'uploads';
 
-export type AppOwnership = Pick<AppsRepositoryContract, 'isOwnedBy'>;
+export type AppOwnershipRepositoryContract = Pick<AppsRepositoryContract, 'isOwnedBy'>;
 
 export type ArtifactUpload = {
   artifactId: ArtifactId;
@@ -288,7 +288,7 @@ export class ArtifactsService extends Service {
   private readonly sourceRepo: BinarySourceRepositoryContract;
   private readonly cachedRepo: CachedBinariesRepositoryContract;
   private readonly releaseRepo: ReleaseDigestRepositoryContract;
-  private readonly appsRepo: AppOwnership;
+  private readonly appsRepo: AppOwnershipRepositoryContract;
   private fetchesInFlight = 0;
   private readonly fetchesInFlightByOwner = new Map<OwnerId, number>();
 
@@ -305,7 +305,7 @@ export class ArtifactsService extends Service {
     sourceRepo: BinarySourceRepositoryContract;
     cachedRepo: CachedBinariesRepositoryContract;
     releaseRepo: ReleaseDigestRepositoryContract;
-    appsRepo: AppOwnership;
+    appsRepo: AppOwnershipRepositoryContract;
   }) {
     super();
     this.artifactsRepo = artifactsRepo;

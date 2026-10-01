@@ -49,7 +49,7 @@ import type {
   ReleaseDigestRepositoryContract,
 } from '#repositories/release-digest.repository.ts';
 import {
-  type AppOwnership,
+  type AppOwnershipRepositoryContract,
   ArtifactsService,
   MAX_ARTIFACT_SIZE_BYTES,
   MAX_CONCURRENT_FETCHES,
@@ -359,12 +359,12 @@ class RefusingStorage extends FakeStorage {
   }
 }
 
-const appsRepo: AppOwnership = {
+const appsRepo: AppOwnershipRepositoryContract = {
   isOwnedBy: ({ ownerId }) => Promise.resolve(ownerId === OWNER_ID),
 };
 
 /** Whoever is asking has an app, which is what it takes to watch tenants compete for the slots. */
-const everyOwner: AppOwnership = { isOwnedBy: () => Promise.resolve(true) };
+const everyOwner: AppOwnershipRepositoryContract = { isOwnedBy: () => Promise.resolve(true) };
 
 /** One owner per slot, so the global ceiling fills with nobody near their own cap. */
 function ownersFillingTheCeiling(): OwnerId[] {
@@ -549,7 +549,7 @@ function build({
   ownership = appsRepo,
 }: {
   storageRepo?: FakeStorage;
-  ownership?: AppOwnership;
+  ownership?: AppOwnershipRepositoryContract;
 } = {}) {
   const artifactsRepo = new FakeArtifactsRepository(OWNER_ID);
   const sourceRepo = new FakeBinarySource();

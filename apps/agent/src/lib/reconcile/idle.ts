@@ -108,6 +108,7 @@ export const applySleep = Effect.gen(function* () {
               appId: record.appId,
               deploymentId: record.deploymentId,
               reason: 'idle',
+              quietSinceMs: current.lastActiveAtMs.get(record.appId),
             }),
           ),
         ),

@@ -1,4 +1,6 @@
 import { Effect, Option } from 'effect';
+import { cronQueryLoop } from '#lib/agent/cron-query.ts';
+import { cronLoop } from '#lib/agent/crons.ts';
 import { filesystemLoop } from '#lib/agent/filesystem.ts';
 import { heartbeatLoop } from '#lib/agent/heartbeat.ts';
 import { logLoop } from '#lib/agent/logs.ts';
@@ -47,9 +49,19 @@ export const run = Effect.gen(function* () {
     yield* reconcileSafely(cached.value);
   }
 
+  yield* Effect.forkScoped(cronLoop);
   yield* sessions.current;
   yield* Effect.all(
-    [pollLoop, statusLoop, reportLoop, logLoop, heartbeatLoop, filesystemLoop, usageLoop],
+    [
+      pollLoop,
+      statusLoop,
+      reportLoop,
+      logLoop,
+      heartbeatLoop,
+      filesystemLoop,
+      cronQueryLoop,
+      usageLoop,
+    ],
     { concurrency: 'unbounded' },
   );
-});
+}).pipe(Effect.scoped);

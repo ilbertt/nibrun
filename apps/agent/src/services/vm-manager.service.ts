@@ -8,9 +8,9 @@ import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
 import type { AppSlot } from '#lib/network/slot.ts';
 import { ensureTap, refreshNeighbour } from '#lib/network/tap.ts';
 import { readFilesystemSpace } from '#lib/report/capacity.ts';
-import { readHostVersions } from '#lib/report/versions.ts';
 import * as Firecracker from '#lib/vm/firecracker-api.ts';
 import { renderFirecrackerConfig } from '#lib/vm/firecracker-config.ts';
+import { adoptedGuestImage, type GuestImage } from '#lib/vm/guest-image.ts';
 import { buildInstanceConfigImage } from '#lib/vm/instance-env.ts';
 import {
   ensureLoadable,
@@ -36,8 +36,6 @@ import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
 export const FIRECRACKER_CONFIG_FILENAME = 'firecracker.json';
-export const GUEST_KERNEL_FILENAME = 'vmlinux';
-export const GUEST_ROOTFS_FILENAME = 'rootfs.ext4';
 
 const VM_DIR_MODE = 0o700;
 const FIRST_GUEST_CID = 3;
@@ -87,19 +85,15 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       return Systemd.vmApiSocketPath({ runtimeDir: config.runtimeDir, appId });
     }
 
-    /**
-     * The stamp a snapshot taken now would carry, and the one a stored snapshot has to match to
-     * be loadable. Both readings are of the host as it is at this moment rather than as it was
-     * when the agent started, because a deploy moves the guest image under a running agent.
-     */
-    const currentStamp = Effect.fn('VmManager.currentStamp')(function* ({
+    const stampForImage = Effect.fn('VmManager.stampForImage')(function* ({
       deploymentId,
       slot,
-    }: Omit<SuspendRequest, 'appId'>) {
-      const versions = yield* readHostVersions(config.versionsFile);
+      image,
+    }: Omit<SuspendRequest, 'appId'> & { image: GuestImage }) {
       return {
         deploymentId,
-        guestImageVersion: versions.guestImage,
+        guestImageVersion: image.version,
+        guestRootfsPath: image.rootfsPath,
         hostBootId: yield* readHostBootId,
         slot: slot.slot,
       } satisfies SnapshotStamp;
@@ -140,11 +134,13 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       slot,
       dataDevicePath,
       artifactImagePath,
+      image,
     }: {
       desired: DesiredInstance;
       slot: AppSlot;
       dataDevicePath: string;
       artifactImagePath: string;
+      image: GuestImage;
     }) {
       yield* ensureTap({
         tapName: slot.tapName,
@@ -180,8 +176,8 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
         value: renderFirecrackerConfig({
           resources: desired.config.resources,
           paths: {
-            kernelPath: path.join(config.guestImageDir, GUEST_KERNEL_FILENAME),
-            rootfsPath: path.join(config.guestImageDir, GUEST_ROOTFS_FILENAME),
+            kernelPath: image.kernelPath,
+            rootfsPath: image.rootfsPath,
             artifactImagePath,
             instanceConfigImagePath,
             dataDevicePath,
@@ -229,9 +225,10 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       // taken against — and a start that still found a stamp would restore the old guest onto
       // the new deployment's disk rather than boot the new one.
       yield* discardSnapshot(desired.appId);
+      const image = yield* adoptedGuestImage(config);
       const [fetching, artifactImagePath] = yield* Effect.timed(images.ensure(desired.artifact));
       const [staging] = yield* Effect.timed(
-        stage({ desired, slot, dataDevicePath, artifactImagePath }),
+        stage({ desired, slot, dataDevicePath, artifactImagePath, image }),
       );
       const [starting] = yield* Effect.timed(
         Effect.onError(Systemd.start(desired.appId), () =>
@@ -330,14 +327,21 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       slot,
     }: SuspendRequest) {
       yield* Effect.annotateCurrentSpan({ appId });
+      const paths = snapshotFor(appId);
+      const socketPath = apiSocket(appId);
+      const image = yield* adoptedGuestImage(config);
+      const bootedRootfs = yield* Firecracker.rootfsPath(socketPath).pipe(
+        Effect.mapError(() => new SleepRefused({ reason: 'the booted guest image is unknown' })),
+      );
+      // Resolving a legacy drive symlink here would mistake an old VM for the newly adopted image.
+      if (bootedRootfs !== image.rootfsPath) {
+        return yield* new SleepRefused({ reason: 'the booted guest image is old or unpinned' });
+      }
       const refusal = yield* refusalToSnapshot(appId);
       if (refusal !== undefined) {
         return yield* new SleepRefused({ reason: refusal });
       }
-
-      const paths = snapshotFor(appId);
-      const socketPath = apiSocket(appId);
-      const stamp = yield* currentStamp({ deploymentId, slot });
+      const stamp = yield* stampForImage({ deploymentId, slot, image });
 
       yield* discardSnapshot(appId);
       yield* fs.makeDirectory(paths.directory, { recursive: true, mode: VM_DIR_MODE });
@@ -395,7 +399,11 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       yield* Effect.annotateCurrentSpan({ appId });
       const paths = snapshotFor(appId);
       const socketPath = apiSocket(appId);
-      const expected = yield* currentStamp({ deploymentId, slot });
+      const expected = yield* stampForImage({
+        deploymentId,
+        slot,
+        image: yield* adoptedGuestImage(config),
+      });
       yield* Effect.onError(ensureLoadable({ stampPath: paths.stampPath, expected }), () =>
         forgetSnapshot(appId),
       );

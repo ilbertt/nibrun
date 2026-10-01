@@ -18,6 +18,7 @@ import { Route as dashboardIndexRouteImport } from './routes/(dashboard)/index'
 import { Route as dashboardAppsIndexRouteImport } from './routes/(dashboard)/apps/index'
 import { Route as dashboardAppsAppIdRouteRouteImport } from './routes/(dashboard)/apps/$appId/route'
 import { Route as dashboardAppsAppIdIndexRouteImport } from './routes/(dashboard)/apps/$appId/index'
+import { Route as dashboardAppsAppIdCronsRouteImport } from './routes/(dashboard)/apps/$appId/crons'
 import { Route as dashboardAppsAppIdDomainsRouteImport } from './routes/(dashboard)/apps/$appId/domains'
 import { Route as dashboardAppsAppIdFilesRouteImport } from './routes/(dashboard)/apps/$appId/files'
 import { Route as dashboardAppsAppIdLogsRouteImport } from './routes/(dashboard)/apps/$appId/logs'
@@ -65,6 +66,11 @@ const dashboardAppsAppIdIndexRoute = dashboardAppsAppIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => dashboardAppsAppIdRouteRoute,
 } as any)
+const dashboardAppsAppIdCronsRoute = dashboardAppsAppIdCronsRouteImport.update({
+  id: '/crons',
+  path: '/crons',
+  getParentRoute: () => dashboardAppsAppIdRouteRoute,
+} as any)
 const dashboardAppsAppIdDomainsRoute =
   dashboardAppsAppIdDomainsRouteImport.update({
     id: '/domains',
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/': typeof dashboardIndexRoute
   '/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
   '/apps/': typeof dashboardAppsIndexRoute
+  '/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
   '/apps/$appId/files': typeof dashboardAppsAppIdFilesRoute
   '/apps/$appId/logs': typeof dashboardAppsAppIdLogsRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
   '/apps': typeof dashboardAppsIndexRoute
+  '/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
   '/apps/$appId/files': typeof dashboardAppsAppIdFilesRoute
   '/apps/$appId/logs': typeof dashboardAppsAppIdLogsRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/(dashboard)/': typeof dashboardIndexRoute
   '/(dashboard)/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
   '/(dashboard)/apps/': typeof dashboardAppsIndexRoute
+  '/(dashboard)/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/(dashboard)/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
   '/(dashboard)/apps/$appId/files': typeof dashboardAppsAppIdFilesRoute
   '/(dashboard)/apps/$appId/logs': typeof dashboardAppsAppIdLogsRoute
@@ -129,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/apps/$appId'
     | '/apps/'
+    | '/apps/$appId/crons'
     | '/apps/$appId/domains'
     | '/apps/$appId/files'
     | '/apps/$appId/logs'
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/'
     | '/apps'
+    | '/apps/$appId/crons'
     | '/apps/$appId/domains'
     | '/apps/$appId/files'
     | '/apps/$appId/logs'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/(dashboard)/'
     | '/(dashboard)/apps/$appId'
     | '/(dashboard)/apps/'
+    | '/(dashboard)/apps/$appId/crons'
     | '/(dashboard)/apps/$appId/domains'
     | '/(dashboard)/apps/$appId/files'
     | '/(dashboard)/apps/$appId/logs'
@@ -231,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof dashboardAppsAppIdIndexRouteImport
       parentRoute: typeof dashboardAppsAppIdRouteRoute
     }
+    '/(dashboard)/apps/$appId/crons': {
+      id: '/(dashboard)/apps/$appId/crons'
+      path: '/crons'
+      fullPath: '/apps/$appId/crons'
+      preLoaderRoute: typeof dashboardAppsAppIdCronsRouteImport
+      parentRoute: typeof dashboardAppsAppIdRouteRoute
+    }
     '/(dashboard)/apps/$appId/domains': {
       id: '/(dashboard)/apps/$appId/domains'
       path: '/domains'
@@ -270,6 +289,7 @@ const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
 )
 
 interface dashboardAppsAppIdRouteRouteChildren {
+  dashboardAppsAppIdCronsRoute: typeof dashboardAppsAppIdCronsRoute
   dashboardAppsAppIdDomainsRoute: typeof dashboardAppsAppIdDomainsRoute
   dashboardAppsAppIdFilesRoute: typeof dashboardAppsAppIdFilesRoute
   dashboardAppsAppIdLogsRoute: typeof dashboardAppsAppIdLogsRoute
@@ -278,6 +298,7 @@ interface dashboardAppsAppIdRouteRouteChildren {
 
 const dashboardAppsAppIdRouteRouteChildren: dashboardAppsAppIdRouteRouteChildren =
   {
+    dashboardAppsAppIdCronsRoute: dashboardAppsAppIdCronsRoute,
     dashboardAppsAppIdDomainsRoute: dashboardAppsAppIdDomainsRoute,
     dashboardAppsAppIdFilesRoute: dashboardAppsAppIdFilesRoute,
     dashboardAppsAppIdLogsRoute: dashboardAppsAppIdLogsRoute,

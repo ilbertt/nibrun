@@ -30,6 +30,7 @@ const OTHER_DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'dep-2');
 const stamp: SnapshotStamp = {
   deploymentId: DEPLOYMENT_ID,
   guestImageVersion: '2026.08.01',
+  guestRootfsPath: '/images/2026.08.01/rootfs.ext4',
   hostBootId: 'b6b8f0d2-0000-4000-8000-000000000001',
   slot: SLOT,
 };
@@ -80,6 +81,15 @@ describe('every way a snapshot stops being loadable is named', () => {
     expect(
       driftFrom({ stored: { ...stamp, guestImageVersion: '2026.09.01' }, expected: stamp }),
     ).toContain('guest image');
+  });
+
+  test('a matching version cannot restore through a different rootfs path', () => {
+    expect(
+      driftFrom({
+        stored: { ...stamp, guestRootfsPath: '/images/current/rootfs.ext4' },
+        expected: stamp,
+      }),
+    ).toContain('root filesystem');
   });
 
   test('a reboot has renumbered the NBD devices', () => {

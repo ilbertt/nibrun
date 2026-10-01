@@ -37,6 +37,8 @@ export const AGENT_ROUTES = {
   // converges on, so it must not be able to disturb one.
   filesystemQuery: '/filesystem-query',
   filesystemQueryResult: '/filesystem-query-result',
+  cronQuery: '/cron-query',
+  cronQueryResult: '/cron-query-result',
 } as const;
 
 /**
