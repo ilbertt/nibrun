@@ -28,6 +28,7 @@ import { AgentService } from '#services/agent.service.ts';
 import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
+import { CronsService } from '#services/crons.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
 import { ExportsService } from '#services/exports.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
@@ -110,6 +111,7 @@ const healthService = new HealthService({
   agentRepo: agentRepository,
 });
 const filesystemService = new FilesystemService({ deploymentsRepo: deploymentsRepository });
+const cronsService = new CronsService({ deploymentsRepo: deploymentsRepository });
 const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,
@@ -164,6 +166,11 @@ export const AgentServicePlugin = new Elysia({ name: 'service.agent' }).decorate
 export const FilesystemServicePlugin = new Elysia({ name: 'service.filesystem' }).decorate(
   'filesystemService',
   filesystemService,
+);
+
+export const CronsServicePlugin = new Elysia({ name: 'service.crons' }).decorate(
+  'cronsService',
+  cronsService,
 );
 
 export const AppsServicePlugin = new Elysia({ name: 'service.apps' }).decorate(
