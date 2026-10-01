@@ -9,6 +9,7 @@ import { type AppStatus, type AppStatusKey, statusKey } from '#status.ts';
 export const APP_OPERATIONS = [
   'release',
   'logs',
+  'crons',
   'files',
   'export',
   'suspend',
@@ -36,7 +37,10 @@ type AppState = {
  * command someone finds hanging on an app that was never going to answer it.
  */
 const STATE: Record<AppStatusKey, AppState> = {
-  'never-deployed': { because: 'has never been deployed', refuses: ['logs', 'files', 'export'] },
+  'never-deployed': {
+    because: 'has never been deployed',
+    refuses: ['logs', 'crons', 'files', 'export'],
+  },
   pending: { because: 'is staging a release', refuses: [] },
   starting: { because: 'is starting', refuses: [] },
   running: { because: 'is running', refuses: [] },
@@ -65,7 +69,7 @@ const STATE: Record<AppStatusKey, AppState> = {
   // goes, and reading it asks nothing of the host that is tearing the app down.
   deleting: {
     because: 'is being deleted',
-    refuses: ['release', 'files', 'export', 'suspend', 'resume', 'domains'],
+    refuses: ['release', 'crons', 'files', 'export', 'suspend', 'resume', 'domains'],
   },
   deleted: { because: 'has been deleted', refuses: [...APP_OPERATIONS] },
 };
@@ -74,6 +78,7 @@ const STATE: Record<AppStatusKey, AppState> = {
 const CANNOT: Record<AppOperation, string> = {
   release: 'a new release would never start',
   logs: 'there is no output to read',
+  crons: 'there are no cron registrations to read',
   files: 'nothing is mounting its filesystem to read',
   export: 'there is nothing to bundle',
   suspend: 'there is nothing left to take offline',
