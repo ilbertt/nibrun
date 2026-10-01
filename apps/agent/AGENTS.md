@@ -70,6 +70,12 @@ second parser. Waiting and dispatch belong to scoped Effect fibers so cancellati
 and `TestClock` work like the agent's other loops. Schedule calculation does not register a
 timer or execute a tenant command.
 
+`lib/cron/execution-client.ts` runs one registered command over a scoped connection to
+the guest's port 51004. Its bounded NBR1 protocol matches `apps/runtime/src/guest-cron.h`.
+The client acknowledges each output frame after its consumer accepts it and closes the
+connection on interruption or consumer failure. It neither wakes a VM nor retries a run;
+deployment ownership, wakeup and idle protection belong to its caller.
+
 ## What the host must provide, and does not yet
 
 Owned by `infra/app-host/`, not fixable here.
