@@ -1,5 +1,5 @@
 import type { AppId, CronTable } from '@repo/protocol';
-import { Effect, Option, SynchronizedRef } from 'effect';
+import { Effect, Option, Queue, SynchronizedRef } from 'effect';
 import { parseCrontab } from '#lib/cron/crontab.ts';
 import {
   type CronDeployment,
@@ -17,6 +17,7 @@ export class CronRegistry extends Effect.Service<CronRegistry>()('CronRegistry',
   effect: Effect.gen(function* () {
     const config = yield* AgentConfig;
     const tables = yield* SynchronizedRef.make(yield* readCronRegistry(config.cronRegistryFile));
+    const changes = yield* Queue.sliding<void>(1);
 
     function persist(next: Map<AppId, CronTable>) {
       return writeJsonFile({ path: config.cronRegistryFile, value: [...next.values()] }).pipe(
@@ -29,10 +30,14 @@ export class CronRegistry extends Effect.Service<CronRegistry>()('CronRegistry',
     function update<E, R>(
       change: (current: Map<AppId, CronTable>) => Effect.Effect<Map<AppId, CronTable>, E, R>,
     ) {
-      return SynchronizedRef.updateEffect(tables, change).pipe(Effect.uninterruptible);
+      return SynchronizedRef.updateEffect(tables, change).pipe(
+        Effect.andThen(Effect.asVoid(Queue.offer(changes, undefined))),
+        Effect.uninterruptible,
+      );
     }
 
     return {
+      changed: Queue.take(changes),
       syncDeployments: Effect.fn('CronRegistry.syncDeployments')(
         ({ deployments }: { deployments: readonly CronDeployment[] }) =>
           update((current) => {
