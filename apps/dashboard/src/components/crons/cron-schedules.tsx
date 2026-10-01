@@ -1,4 +1,5 @@
 import type { CronListing } from '@repo/protocol';
+import { Badge } from '@repo/ui/components/badge';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@repo/ui/components/empty';
 import {
   Table,
@@ -10,12 +11,14 @@ import {
 } from '@repo/ui/components/table';
 import { TableContainer } from '@repo/ui/custom/table-container';
 import { ClockIcon } from 'lucide-react';
-import { dayAndSecondUtc } from '#lib/format-timestamp.ts';
+import { useCronTimeZone } from '#lib/hooks/use-cron-time-zone.ts';
 
 export function CronSchedules({ listing }: { listing: CronListing }) {
+  const timeZone = useCronTimeZone();
+
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-muted-foreground text-sm">Time zone: {listing.timeZone}</p>
+      <p className="text-muted-foreground text-sm">Schedule time zone: {listing.timeZone}</p>
       {listing.jobs.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>
@@ -31,7 +34,21 @@ export function CronSchedules({ listing }: { listing: CronListing }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Schedule</TableHead>
-                <TableHead>Next execution (estimated)</TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-2">
+                    Next execution (estimated)
+                    <Badge
+                      aria-label="Use local time for next executions"
+                      aria-pressed={timeZone.isLocal}
+                      className="cursor-pointer px-1.5 outline-none hover:bg-secondary/80"
+                      onClick={timeZone.toggle}
+                      render={<button type="button" />}
+                      variant="secondary"
+                    >
+                      {timeZone.label}
+                    </Badge>
+                  </div>
+                </TableHead>
                 <TableHead>Command</TableHead>
                 <TableHead>Job ID</TableHead>
               </TableRow>
@@ -42,7 +59,9 @@ export function CronSchedules({ listing }: { listing: CronListing }) {
                   <TableCell className="align-top font-mono">{job.schedule}</TableCell>
                   <TableCell className="align-top tabular-nums">
                     {listing.enabled && job.nextRunAt !== undefined ? (
-                      <time dateTime={job.nextRunAt}>{dayAndSecondUtc(job.nextRunAt)}</time>
+                      <time dateTime={job.nextRunAt}>
+                        {timeZone.formatTimestamp(job.nextRunAt)}
+                      </time>
                     ) : (
                       <span className="text-muted-foreground">
                         {listing.enabled ? 'Unavailable' : 'Disabled'}
