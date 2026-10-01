@@ -5,6 +5,7 @@ import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useAppTab } from '#lib/hooks/use-app-tab.ts';
 import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
 import { SessionIdentity } from '#lib/session-identity.ts';
+import { Route as CronsRoute } from '#routes/(dashboard)/apps/$appId/crons.tsx';
 import { Route as DomainsRoute } from '#routes/(dashboard)/apps/$appId/domains.tsx';
 import { Route as FilesRoute } from '#routes/(dashboard)/apps/$appId/files.tsx';
 import { Route as AppRoute } from '#routes/(dashboard)/apps/$appId/index.tsx';
@@ -40,6 +41,9 @@ export function AppTabs() {
           render={<Link to={FilesRoute.to} params={{ appId }} search={{ path: GUEST_PATH_ROOT }} />}
         >
           Files
+        </TabsTrigger>
+        <TabsTrigger value="crons" render={<Link to={CronsRoute.to} params={{ appId }} />}>
+          Crons
         </TabsTrigger>
         {domains && (
           <TabsTrigger value="domains" render={<Link to={DomainsRoute.to} params={{ appId }} />}>
