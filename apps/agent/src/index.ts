@@ -14,6 +14,7 @@ import { CaddyProxy } from '#services/caddy-proxy.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
 import { CronActivity } from '#services/cron-activity.service.ts';
+import { CronExecutions } from '#services/cron-executions.service.ts';
 import { CronRegistrationReceiver } from '#services/cron-registration-receiver.service.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
@@ -47,6 +48,7 @@ const agent = Layer.mergeAll(
   CommandRunner.Default,
   ControlPlane.Default,
   CronActivity.Default,
+  CronExecutions.Default,
   CronRegistry.Default,
   CronRegistrationReceiver.Default,
   LogStore.Default,
