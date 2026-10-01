@@ -2,6 +2,13 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.10.1-2]
+
+### 🚀 Features
+
+- *(dashboard)* Show estimated next cron execution (#694)
+- *(cli)* Show cron job IDs in logs (#690)
+
 ## [2026.10.1-1]
 
 ### 🚀 Features
