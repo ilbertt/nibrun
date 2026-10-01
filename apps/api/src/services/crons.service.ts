@@ -8,7 +8,7 @@ import type {
 } from '@repo/protocol';
 import { PendingCronQueries } from '#lib/cron/pending-queries.ts';
 import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
-import type { DeploymentLookup } from '#repositories/deployments.repository.ts';
+import type { DeploymentLookupRepositoryContract } from '#repositories/deployments.repository.ts';
 import { Service } from '#services/service.ts';
 
 type CronReadRequest = Pick<CronQuery, 'appId' | 'deploymentId'> & {
@@ -17,10 +17,10 @@ type CronReadRequest = Pick<CronQuery, 'appId' | 'deploymentId'> & {
 };
 
 export class CronsService extends Service {
-  private readonly deploymentsRepo: DeploymentLookup;
+  private readonly deploymentsRepo: DeploymentLookupRepositoryContract;
   private readonly pending = new PendingCronQueries();
 
-  constructor({ deploymentsRepo }: { deploymentsRepo: DeploymentLookup }) {
+  constructor({ deploymentsRepo }: { deploymentsRepo: DeploymentLookupRepositoryContract }) {
     super();
     this.deploymentsRepo = deploymentsRepo;
   }

@@ -24,7 +24,7 @@ import type {
   ReportedExportRow,
   RequestExportInput,
 } from '#repositories/exports.repository.ts';
-import type { AppOwnership } from '#services/artifacts.service.ts';
+import type { AppOwnershipRepositoryContract } from '#services/artifacts.service.ts';
 import { ExportsService } from '#services/exports.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 
@@ -132,7 +132,7 @@ class FakeExportStorage implements ExportStorageRepositoryContract {
 
 function build(exportsRepo = new FakeExportsRepository()) {
   const storage = new FakeExportStorage();
-  const appsRepo: AppOwnership = {
+  const appsRepo: AppOwnershipRepositoryContract = {
     isOwnedBy: ({ ownerId }) => Promise.resolve(ownerId === OWNER_ID),
   };
   return {

@@ -25,22 +25,23 @@ const SECONDS_PER_HOUR = 60 * 60;
 const SESSION_LIFETIME_MS = SECONDS_PER_HOUR * MS_PER_SECOND;
 
 /** What a report is borrowed for, and nothing else an upload's own service can do. */
-export type UploadSweep = Pick<ArtifactsService, 'sweepAbandoned'>;
+export type UploadSweepServiceContract = Pick<ArtifactsService, 'sweepAbandoned'>;
 
 /** The same, plus the archives this report's own volume states have just made unusable. */
-export type ImportSweep = UploadSweep & Pick<ImportsService, 'sweepSpent'>;
+export type ImportSweepServiceContract = UploadSweepServiceContract &
+  Pick<ImportsService, 'sweepSpent'>;
 
 /** Likewise for hostnames: a report is the clock, not permission to add or remove one. */
-export type HostnameReconcile = Pick<HostnamesService, 'reconcile'>;
+export type HostnameReconcileServiceContract = Pick<HostnamesService, 'reconcile'>;
 
 export class AgentService extends Service {
   private readonly agentRepo: AgentRepositoryContract;
   private readonly deploymentsService: DeploymentsService;
   private readonly appsService: AppsService;
   private readonly exportsService: ExportsService;
-  private readonly artifactsService: UploadSweep;
-  private readonly importsService: ImportSweep;
-  private readonly hostnamesService: HostnameReconcile;
+  private readonly artifactsService: UploadSweepServiceContract;
+  private readonly importsService: ImportSweepServiceContract;
+  private readonly hostnamesService: HostnameReconcileServiceContract;
 
   constructor({
     agentRepo,
@@ -55,9 +56,9 @@ export class AgentService extends Service {
     deploymentsService: DeploymentsService;
     appsService: AppsService;
     exportsService: ExportsService;
-    artifactsService: UploadSweep;
-    importsService: ImportSweep;
-    hostnamesService: HostnameReconcile;
+    artifactsService: UploadSweepServiceContract;
+    importsService: ImportSweepServiceContract;
+    hostnamesService: HostnameReconcileServiceContract;
   }) {
     super();
     this.agentRepo = agentRepo;

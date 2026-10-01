@@ -1,6 +1,6 @@
-import { type AppClaim, createAuth } from '#lib/auth/better-auth.ts';
+import { type AppClaimServiceContract, createAuth } from '#lib/auth/better-auth.ts';
 
-const appsServiceMock: AppClaim = { claim: () => Promise.resolve() };
+const appsServiceMock: AppClaimServiceContract = { claim: () => Promise.resolve() };
 
 /**
  * What `auth generate --config scripts/auth-schema.ts` reads: an instance made only to be asked

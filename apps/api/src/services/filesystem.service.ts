@@ -9,7 +9,7 @@ import type {
 } from '@repo/protocol';
 import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import { PendingFilesystemQueries } from '#lib/filesystem/pending-queries.ts';
-import type { DeploymentLookup } from '#repositories/deployments.repository.ts';
+import type { DeploymentLookupRepositoryContract } from '#repositories/deployments.repository.ts';
 import { Service } from '#services/service.ts';
 
 // A deployment the caller does not own has to be indistinguishable from one that does not exist.
@@ -35,10 +35,10 @@ export type DirectoryReadRequest = {
 };
 
 export class FilesystemService extends Service {
-  private readonly deploymentsRepo: DeploymentLookup;
+  private readonly deploymentsRepo: DeploymentLookupRepositoryContract;
   private readonly pending = new PendingFilesystemQueries();
 
-  constructor({ deploymentsRepo }: { deploymentsRepo: DeploymentLookup }) {
+  constructor({ deploymentsRepo }: { deploymentsRepo: DeploymentLookupRepositoryContract }) {
     super();
     this.deploymentsRepo = deploymentsRepo;
   }

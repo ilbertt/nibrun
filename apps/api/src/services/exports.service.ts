@@ -3,7 +3,7 @@ import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { ExportStorageRepositoryContract } from '#repositories/export-storage.repository.ts';
 import type { ExportRow, ExportsRepositoryContract } from '#repositories/exports.repository.ts';
-import type { AppOwnership } from '#services/artifacts.service.ts';
+import type { AppOwnershipRepositoryContract } from '#services/artifacts.service.ts';
 import { Service } from '#services/service.ts';
 
 // An app the caller does not own has to be indistinguishable from one that does not exist: a 403
@@ -22,7 +22,7 @@ export type OwnedExport = Omit<Export, 'objectKey'> & { downloadUrl?: string };
 export class ExportsService extends Service {
   private readonly exportsRepo: ExportsRepositoryContract;
   private readonly storageRepo: ExportStorageRepositoryContract;
-  private readonly appsRepo: AppOwnership;
+  private readonly appsRepo: AppOwnershipRepositoryContract;
   private readonly retentionDays: number;
 
   constructor({
@@ -33,7 +33,7 @@ export class ExportsService extends Service {
   }: {
     exportsRepo: ExportsRepositoryContract;
     storageRepo: ExportStorageRepositoryContract;
-    appsRepo: AppOwnership;
+    appsRepo: AppOwnershipRepositoryContract;
     retentionDays: number;
   }) {
     super();
