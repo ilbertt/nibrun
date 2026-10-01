@@ -25,7 +25,8 @@ const LISTING = {
 
 test('suspended schedules stay visible while execution is disabled', () => {
   const markup = renderToStaticMarkup(<CronSchedules listing={{ ...LISTING, enabled: false }} />);
-  expect(markup).toContain('Execution disabled');
+  expect(markup).toContain('Paused');
+  expect(markup).toContain('Jobs will not run while the app is stopped.');
   expect(markup).toContain('UTC');
   expect(markup).toContain('*/5 * * * *');
   expect(markup).toContain('@daily');
@@ -36,7 +37,8 @@ test('suspended schedules stay visible while execution is disabled', () => {
 test('an empty table reports no registrations independently of execution status', () => {
   const markup = renderToStaticMarkup(<CronSchedules listing={{ ...LISTING, jobs: [] }} />);
   expect(markup).toContain('No cron jobs registered');
-  expect(markup).toContain('Execution enabled');
+  expect(markup).toContain('Scheduled');
+  expect(markup).toContain('Jobs run on schedule, even when the app is idle.');
   expect(markup).not.toContain('<table');
 });
 

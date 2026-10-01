@@ -9,7 +9,6 @@ import { newestDeploymentQueryOptions } from '#queries/deployments.ts';
 
 export type CronListingView = {
   listing: CronListing | undefined;
-  deploymentId: string | undefined;
   reason: string | undefined;
   isRefreshing: boolean;
   refresh: () => void;
@@ -52,7 +51,6 @@ export function useCronListing(appId: string): CronListingView {
 
   return {
     listing: reason === undefined ? listing.data : undefined,
-    deploymentId: newest.data?.id,
     reason,
     isRefreshing: refreshing.isPending || app.isFetching || newest.isFetching || listing.isFetching,
     refresh: () => refreshing.mutate(),

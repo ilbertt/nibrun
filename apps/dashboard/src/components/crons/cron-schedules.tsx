@@ -17,10 +17,15 @@ export function CronSchedules({ listing }: { listing: CronListing }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Badge variant={listing.enabled ? 'secondary' : 'outline'}>
-          Execution {listing.enabled ? 'enabled' : 'disabled'}
+          {listing.enabled ? 'Scheduled' : 'Paused'}
         </Badge>
         <span className="text-muted-foreground">Time zone: {listing.timeZone}</span>
       </div>
+      <p className="text-muted-foreground text-sm">
+        {listing.enabled
+          ? 'Jobs run on schedule, even when the app is idle.'
+          : 'Jobs will not run while the app is stopped.'}
+      </p>
       {listing.jobs.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>
