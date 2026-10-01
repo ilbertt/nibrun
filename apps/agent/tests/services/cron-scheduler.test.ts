@@ -76,6 +76,85 @@ function schedulerHost() {
 }
 
 describe('scoped cron scheduling', () => {
+  test('synchronizes on registry changes without polling between occurrences', () =>
+    run(
+      Effect.gen(function* () {
+        const host = yield* schedulerHost();
+        yield* host.registry.changed;
+        const synchronizations = yield* Ref.make(0);
+        const scheduler = CronScheduler.make({
+          sync: Ref.update(synchronizations, (count) => count + 1).pipe(
+            Effect.andThen(host.scheduler.sync),
+          ),
+        });
+        yield* cronLoop.pipe(
+          Effect.provideService(CronScheduler, scheduler),
+          Effect.provideService(CronRegistry, host.registry),
+          Effect.forkScoped,
+        );
+        yield* TestClock.adjust('2 minutes');
+        expect(yield* Ref.get(synchronizations)).toBe(1);
+        expect(host.requests).toHaveLength(2);
+        yield* host.registry.replace({ ...LOG_SOURCE, jobs: [NEXT_JOB] });
+        yield* TestClock.adjust('1 minute');
+        expect(yield* Ref.get(synchronizations)).toBe(2);
+        expect(host.requests.at(-1)?.job).toEqual(NEXT_JOB);
+      }),
+    ));
+
+  test('retries failed synchronization and then waits for a registry change', () =>
+    run(
+      Effect.gen(function* () {
+        const host = yield* schedulerHost();
+        yield* host.registry.changed;
+        const attempts = yield* Ref.make(0);
+        const scheduler = CronScheduler.make({
+          sync: Ref.updateAndGet(attempts, (count) => count + 1).pipe(
+            Effect.flatMap((count) =>
+              count === 1 ? Effect.die('synchronization failed') : host.scheduler.sync,
+            ),
+          ),
+        });
+        yield* cronLoop.pipe(
+          Effect.provideService(CronScheduler, scheduler),
+          Effect.provideService(CronRegistry, host.registry),
+          Effect.forkScoped,
+        );
+        yield* TestClock.adjust('999 millis');
+        expect(yield* Ref.get(attempts)).toBe(1);
+        yield* TestClock.adjust('1 millis');
+        expect(yield* Ref.get(attempts)).toBe(2);
+        yield* TestClock.adjust('2 minutes');
+        expect(yield* Ref.get(attempts)).toBe(2);
+      }),
+    ));
+
+  test('deployment notifications suspend and resume unchanged registrations', () =>
+    run(
+      Effect.gen(function* () {
+        const host = yield* schedulerHost();
+        yield* cronLoop.pipe(
+          Effect.provideService(CronScheduler, host.scheduler),
+          Effect.provideService(CronRegistry, host.registry),
+          Effect.forkScoped,
+        );
+        yield* TestClock.adjust('30 seconds');
+        const suspended = desiredState({
+          instances: [desiredInstance({ desiredState: 'stopped' })],
+        });
+        yield* host.cache.accept(suspended);
+        yield* host.registry.syncDeployments({ deployments: suspended.instances });
+        yield* TestClock.adjust('10 minutes');
+        expect(host.requests).toEqual([]);
+        expect((yield* host.registry.get({ appId: APP_ID }))._tag).toBe('Some');
+        const resumed = desiredState({ instances: [desiredInstance()] });
+        yield* host.cache.accept(resumed);
+        yield* host.registry.syncDeployments({ deployments: resumed.instances });
+        yield* TestClock.adjust('30 seconds');
+        expect(host.requests).toHaveLength(1);
+      }),
+    ));
+
   test('a registration just before an occurrence refreshes timers immediately', () =>
     run(
       Effect.gen(function* () {
