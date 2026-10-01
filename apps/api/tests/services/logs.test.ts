@@ -14,7 +14,7 @@ import {
   A_DEPLOYMENT_ROW,
   APP_ID,
   DEPLOYMENT_ID,
-  deploymentLookup,
+  deploymentLookupRepository,
   OTHER_OWNER_ID,
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
@@ -71,7 +71,7 @@ function service({
   row: DeploymentRow | null;
   windows?: TenantLogRecord[][];
 }) {
-  const deploymentsRepo = deploymentLookup(row);
+  const deploymentsRepo = deploymentLookupRepository(row);
   const logsRepo = logs(windows);
   return {
     logsRepo,

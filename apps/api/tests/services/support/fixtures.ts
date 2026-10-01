@@ -14,7 +14,7 @@ import {
 import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import type {
   DeploymentByIdInput,
-  DeploymentLookup,
+  DeploymentLookupRepositoryContract,
   DeploymentRow,
 } from '#repositories/deployments.repository.ts';
 
@@ -31,9 +31,9 @@ export const APP_HOST_DOMAIN = 'apps.test';
 // caller see this deployment — and never reads the row, so this is the whole of what it needs.
 export const A_DEPLOYMENT_ROW = {} as DeploymentRow;
 
-export function deploymentLookup(
+export function deploymentLookupRepository(
   row: DeploymentRow | null,
-): DeploymentLookup & { asked: DeploymentByIdInput[] } {
+): DeploymentLookupRepositoryContract & { asked: DeploymentByIdInput[] } {
   const asked: DeploymentByIdInput[] = [];
   return {
     asked,

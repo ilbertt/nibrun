@@ -12,6 +12,11 @@ Bun + Elysia service.
 
 Every feature is a repository, a service, and a controller. Do not collapse them.
 
+Repository implementations end in `Repository`; their full and narrowed dependency
+contracts end in `RepositoryContract` (`DeploymentLookupRepositoryContract`). Service
+implementations end in `Service`; narrowed service contracts end in `ServiceContract`.
+Controllers end in `Controller`.
+
 - `src/repositories/` — every system outside this process, one repository per
   concern, each behind an abstract `Contract` a test can implement. SQL ones
   extend `Repository` (holds the `Bun.sql` client); an object store or an HTTP

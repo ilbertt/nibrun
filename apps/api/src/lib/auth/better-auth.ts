@@ -23,7 +23,7 @@ const DEVICE_VERIFICATION_PATH = '/device';
 export type AccountLink = { from: OwnerId; to: OwnerId };
 
 /** What signing in needs of the apps service, and nothing else it can do. */
-export type AppClaim = Pick<AppsService, 'claim'>;
+export type AppClaimServiceContract = Pick<AppsService, 'claim'>;
 
 /**
  * A factory rather than an instance, so that what better-auth is given to call back into is
@@ -31,7 +31,7 @@ export type AppClaim = Pick<AppsService, 'claim'>;
  * reached for from here. The one instance the api serves is made there; the schema the CLI
  * prints is read off another, in `scripts/auth-schema.ts`, with nothing behind it.
  */
-export function createAuth({ appsService }: { appsService: AppClaim }) {
+export function createAuth({ appsService }: { appsService: AppClaimServiceContract }) {
   return betterAuth({
     database: bunSqlAdapter({ sql, pgSchema: AUTH_SCHEMA }),
     baseURL: env.BASE_URL.origin,

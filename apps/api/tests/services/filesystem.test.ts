@@ -17,7 +17,7 @@ import {
   A_DEPLOYMENT_ROW,
   APP_ID,
   DEPLOYMENT_ID,
-  deploymentLookup,
+  deploymentLookupRepository,
   OTHER_OWNER_ID,
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
@@ -44,7 +44,7 @@ const LISTING: DirectoryListing = {
 };
 
 function service({ row = A_DEPLOYMENT_ROW }: { row?: DeploymentRow | null } = {}) {
-  const deploymentsRepo = deploymentLookup(row);
+  const deploymentsRepo = deploymentLookupRepository(row);
   return { deploymentsRepo, filesystemService: new FilesystemService({ deploymentsRepo }) };
 }
 

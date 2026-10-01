@@ -5,7 +5,7 @@ import type { DeploymentRow } from '#repositories/deployments.repository.ts';
 import { CronsService } from '#services/crons.service.ts';
 import {
   A_DEPLOYMENT_ROW,
-  deploymentLookup,
+  deploymentLookupRepository,
   OTHER_OWNER_ID,
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
@@ -14,7 +14,7 @@ import { CRON_DEPLOYMENT, CRON_LISTING } from '#tests/support/crons.ts';
 const HOST_ID = Value.Parse(HostIdSchema, 'host-1');
 
 function service(row: DeploymentRow | null = A_DEPLOYMENT_ROW) {
-  const deploymentsRepo = deploymentLookup(row);
+  const deploymentsRepo = deploymentLookupRepository(row);
   return { deploymentsRepo, crons: new CronsService({ deploymentsRepo }) };
 }
 
