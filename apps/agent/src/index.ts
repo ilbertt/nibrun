@@ -13,6 +13,7 @@ import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { CaddyProxy } from '#services/caddy-proxy.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
+import { CronActivity } from '#services/cron-activity.service.ts';
 import { CronRegistrationReceiver } from '#services/cron-registration-receiver.service.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
@@ -45,6 +46,7 @@ const agent = Layer.mergeAll(
   RefreshSignal.Default,
   CommandRunner.Default,
   ControlPlane.Default,
+  CronActivity.Default,
   CronRegistry.Default,
   CronRegistrationReceiver.Default,
   LogStore.Default,
