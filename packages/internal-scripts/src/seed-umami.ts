@@ -1,13 +1,25 @@
+import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { DASHBOARD_SITE, WWW_SITE } from '@repo/global-constants';
+import { compareSync, hashSync } from 'bcryptjs';
 
-const API_URL = 'http://127.0.0.1:3000';
-const REQUEST_TIMEOUT_MS = 30_000;
-const UNAUTHORIZED = 401;
-const NOT_FOUND = 404;
+const BCRYPT_ROUNDS = 10;
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_BYTES = 72;
 const FACTORY_ADMIN = { username: 'admin', password: 'umami' };
 
-type Credentials = { username: string; password: string };
-type Session = { token: string; user: { id: string; isAdmin: boolean } };
+type Database = {
+  connect(): Promise<void>;
+  end(): Promise<void>;
+  query<Row>(query: string | { text: string; values: unknown[] }): Promise<{ rows: Row[] }>;
+};
+type Administrator = {
+  id: string;
+  username: string;
+  password: string;
+  twoFactorEnabled: boolean;
+  twoFactorRequired: boolean;
+};
 type Website = { id: string; name: string; domain: string };
 
 function requiredConfig(name: string): string {
@@ -18,103 +30,101 @@ function requiredConfig(name: string): string {
   return value;
 }
 
-function requireSuccess(response: Response): void {
-  if (!response.ok) {
-    throw new Error(`Umami API returned ${response.status} for ${new URL(response.url).pathname}`);
-  }
+function isUntouchedFactoryAdministrator(administrator: Administrator): boolean {
+  return (
+    administrator.username === FACTORY_ADMIN.username &&
+    !administrator.twoFactorEnabled &&
+    !administrator.twoFactorRequired &&
+    compareSync(FACTORY_ADMIN.password, administrator.password)
+  );
 }
 
-async function login(credentials: Credentials): Promise<Session | null> {
-  const response = await fetch(`${API_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(credentials),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+async function seedAdministrator(): Promise<string> {
+  const { rows } = await database.query<Administrator>({
+    text: `SELECT u.user_id AS id, u.username, u.password,
+      u.two_factor_required AS "twoFactorRequired",
+      COALESCE(t.is_enabled, false) AS "twoFactorEnabled"
+      FROM "user" u LEFT JOIN two_factor_auth t ON t.user_id = u.user_id
+      WHERE u.role = 'admin' AND u.deleted_at IS NULL
+      ORDER BY (u.username = $1) DESC, u.created_at, u.user_id LIMIT 1`,
+    values: [credentials.username],
   });
-  if (response.status === UNAUTHORIZED) {
-    return null;
+  const existing = rows[0];
+  if (existing && !isUntouchedFactoryAdministrator(existing)) {
+    return existing.id;
   }
-  requireSuccess(response);
-  const session = (await response.json()) as Session;
-  if (!session.token) {
-    throw new Error('Complete Umami bootstrap before enabling two-factor authentication.');
-  }
-  if (!session.user.isAdmin) {
-    throw new Error('Umami bootstrap requires an administrator.');
-  }
-  return session;
-}
-
-async function request(options: {
-  path: string;
-  token: string;
-  body: Credentials | Website | undefined;
-}): Promise<Response> {
-  return await fetch(`${API_URL}${options.path}`, {
-    method: options.body ? 'POST' : 'GET',
-    headers: {
-      Authorization: `Bearer ${options.token}`,
-      'Content-Type': 'application/json',
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-}
-
-async function bootstrapAdmin(credentials: Credentials): Promise<Session> {
-  const existing = await login(credentials);
+  const id = existing?.id ?? randomUUID();
+  const password = hashSync(credentials.password, BCRYPT_ROUNDS);
   if (existing) {
-    return existing;
+    await database.query({
+      text: `UPDATE "user" SET username = $1, password = $2, updated_at = now()
+        WHERE user_id = $3`,
+      values: [credentials.username, password, id],
+    });
+  } else {
+    await database.query({
+      text: `INSERT INTO "user" (user_id, username, password, role, created_at, updated_at)
+        VALUES ($1, $2, $3, 'admin', now(), now())`,
+      values: [id, credentials.username, password],
+    });
   }
-  const factory = await login(FACTORY_ADMIN);
-  if (!factory) {
-    throw new Error('Neither configured nor factory Umami credentials work; bootstrap stopped.');
-  }
-  requireSuccess(
-    await request({
-      path: `/api/users/${factory.user.id}`,
-      token: factory.token,
-      body: credentials,
-    }),
-  );
-  // Changing the password invalidates the factory login token.
-  const updated = await login(credentials);
-  if (!updated) {
-    throw new Error('Unable to sign in after updating the Umami administrator.');
-  }
-  return updated;
+  return id;
 }
 
-async function seedWebsite(options: { website: Website; token: string }): Promise<void> {
-  const response = await request({
-    path: `/api/websites/${options.website.id}`,
-    token: options.token,
-    body: undefined,
+async function seedWebsite(options: { website: Website; administratorId: string }): Promise<void> {
+  const { website, administratorId } = options;
+  await database.query({
+    text: `INSERT INTO website
+      (website_id, name, domain, user_id, created_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $4, now(), now())
+      ON CONFLICT (website_id) DO NOTHING`,
+    values: [website.id, website.name, website.domain, administratorId],
   });
-  if (response.status !== NOT_FOUND) {
-    requireSuccess(response);
-    if (await response.json()) {
-      return;
-    }
-  }
-  requireSuccess(
-    await request({ path: '/api/websites', token: options.token, body: options.website }),
-  );
 }
 
 const credentials = {
   username: requiredConfig('UMAMI_ADMIN_USERNAME').toLowerCase(),
   password: requiredConfig('UMAMI_ADMIN_PASSWORD'),
 };
-const websites = [
-  { id: requiredConfig('UMAMI_WWW_WEBSITE_ID'), site: WWW_SITE },
-  { id: requiredConfig('UMAMI_DASHBOARD_WEBSITE_ID'), site: DASHBOARD_SITE },
-];
-const session = await bootstrapAdmin(credentials);
-for (const { id, site } of websites) {
-  await seedWebsite({
-    website: { id, name: site.title, domain: new URL(site.url).hostname },
-    token: session.token,
-  });
+if (
+  credentials.password.length < MIN_PASSWORD_LENGTH ||
+  Buffer.byteLength(credentials.password) > MAX_PASSWORD_BYTES
+) {
+  throw new Error('UMAMI_ADMIN_PASSWORD must contain at least 8 characters and at most 72 bytes.');
 }
-console.info('Umami administrator and both websites are ready.');
+const websites = [
+  {
+    id: requiredConfig('UMAMI_WWW_WEBSITE_ID'),
+    name: WWW_SITE.title,
+    domain: new URL(WWW_SITE.url).hostname,
+  },
+  {
+    id: requiredConfig('UMAMI_DASHBOARD_WEBSITE_ID'),
+    name: DASHBOARD_SITE.title,
+    domain: new URL(DASHBOARD_SITE.url).hostname,
+  },
+];
+
+// Resolve the driver from the pinned Umami image, which already ships it for Prisma.
+const imageRequire = createRequire('/app/package.json');
+const adapterRequire = createRequire(imageRequire.resolve('@prisma/adapter-pg'));
+const { Client } = adapterRequire('pg') as {
+  Client: new (options: { connectionString: string }) => Database;
+};
+const database = new Client({ connectionString: requiredConfig('DATABASE_URL') });
+await database.connect();
+try {
+  await database.query('BEGIN');
+  await database.query("SELECT pg_advisory_xact_lock(hashtext('nibrun:umami:bootstrap'))");
+  const administratorId = await seedAdministrator();
+  for (const website of websites) {
+    await seedWebsite({ website, administratorId });
+  }
+  await database.query('COMMIT');
+  console.info('Umami administrator and both websites are ready.');
+} catch (error) {
+  await database.query('ROLLBACK');
+  throw error;
+} finally {
+  await database.end();
+}

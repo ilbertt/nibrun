@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@actions/core": "^3.0.1",
-    "@repo/global-constants": "workspace:*"
+    "@repo/global-constants": "workspace:*",
+    "bcryptjs": "3.0.3"
   }
 }

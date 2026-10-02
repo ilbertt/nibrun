@@ -230,14 +230,8 @@ EOF
   sleep 5
 done
 
-# Keep completion beside the database so snapshots preserve it. Later password
-# changes and 2FA must not require another bootstrap login on every deployment.
-umami_seed_marker=/data/volumes/umami-data/.nibrun-seeded
-if [ ! -f "$umami_seed_marker" ]; then
-  log "Bootstrapping Umami"
-  $compose exec -T umami node --input-type=module < seed-umami.mjs
-  touch "$umami_seed_marker"
-fi
+log "Ensuring Umami administrator and websites exist"
+$compose exec -T umami node --input-type=module < seed-umami.mjs
 
 # `up -d` leaves a container alone when only a bind-mounted file changed, so a
 # new Caddyfile or a re-issued certificate would go on being ignored. Reload
