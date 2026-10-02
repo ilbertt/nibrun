@@ -5,6 +5,8 @@ Internal tracking shared by the marketing site and dashboard.
 - Seed one Umami website named `nibrun` for marketing and dashboard tracking.
 - Keep both sites on the same Umami website. Derive its ID from `src/config.ts`
   in clients and seeding; separate websites cannot form one native funnel.
+- `www` and `dashboard` identify the emitting site inside the shared collection.
+- Require `VITE_UMAMI_HOSTNAME` at build time; do not add a hostname fallback.
 - Keep the browser's Distinct ID stable across sites and sign-in. Changing it
   during authentication splits Umami sessions and breaks conversion funnels.
 - Use Umami's automatic SPA tracking and documented `data-before-send` hook.

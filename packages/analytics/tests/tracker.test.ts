@@ -5,6 +5,8 @@ import { loadTracker } from '#tracker.ts';
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
 const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+const originalUmamiHostname = process.env.VITE_UMAMI_HOSTNAME;
+process.env.VITE_UMAMI_HOSTNAME = 'analytics.example';
 let cookie = '';
 let cookieWrite = '';
 const scripts: HTMLScriptElement[] = [];
@@ -78,6 +80,11 @@ function nativeTrack(payload: Record<string, unknown>): void {
 }
 
 afterAll(() => {
+  if (originalUmamiHostname === undefined) {
+    Reflect.deleteProperty(process.env, 'VITE_UMAMI_HOSTNAME');
+  } else {
+    process.env.VITE_UMAMI_HOSTNAME = originalUmamiHostname;
+  }
   for (const [name, descriptor] of [
     ['window', originalWindow],
     ['document', originalDocument],
@@ -117,7 +124,7 @@ test('native pageviews share identity and redact queries, titles and app IDs', a
   expect(scripts[0]?.dataset.beforeSend).toBe('nibrunBeforeSend');
   expect(scripts[0]?.dataset.excludeSearch).toBe('true');
   expect(scripts[0]?.dataset.excludeHash).toBe('true');
-  expect(scripts[0]?.src).toBe('https://umami.nibrun.com/script.js');
+  expect(scripts[0]?.src).toBe('https://analytics.example/script.js');
   nativeTrack(nativePayload('https://nibrun.com/?query=SECRET'));
   browser.location = {
     protocol: 'https:',

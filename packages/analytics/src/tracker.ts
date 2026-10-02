@@ -1,4 +1,4 @@
-import { DEFAULT_UMAMI_HOSTNAME, UMAMI_WEBSITE_ID } from '#config.ts';
+import { UMAMI_WEBSITE_ID } from '#config.ts';
 import { analyticsIdentity } from '#identity.ts';
 import { analyticsPath, analyticsReferrer, analyticsSite } from '#page.ts';
 
@@ -8,7 +8,7 @@ type AnalyticsWindow = Window & {
   umami?: Tracker;
   nibrunBeforeSend?: typeof beforeSend;
 };
-type AnalyticsImportMeta = ImportMeta & { env?: { VITE_UMAMI_HOSTNAME?: string } };
+type AnalyticsImportMeta = ImportMeta & { env: { VITE_UMAMI_HOSTNAME: string } };
 let loading: Promise<boolean> | undefined;
 let previousPage: URL | undefined;
 let distinctId: string | undefined;
@@ -32,8 +32,8 @@ export function loadTracker(): Promise<boolean> {
   }
   loading = new Promise((resolve) => {
     const script = document.createElement('script');
-    const hostname = (import.meta as AnalyticsImportMeta).env?.VITE_UMAMI_HOSTNAME;
-    script.src = `https://${hostname || DEFAULT_UMAMI_HOSTNAME}/script.js`;
+    const hostname = (import.meta as AnalyticsImportMeta).env.VITE_UMAMI_HOSTNAME;
+    script.src = `https://${hostname}/script.js`;
     script.async = true;
     script.dataset.websiteId = UMAMI_WEBSITE_ID;
     script.dataset.beforeSend = 'nibrunBeforeSend';
