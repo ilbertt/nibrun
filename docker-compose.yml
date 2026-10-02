@@ -38,6 +38,8 @@ services:
       - APP_SECRET=${UMAMI_APP_SECRET}
       - TWO_FACTOR_ENCRYPTION_KEY=${UMAMI_TWO_FACTOR_ENCRYPTION_KEY}
       - DISABLE_TELEMETRY=1
+      - USE_UUIDV7=1
+      - MCP_ENABLED=1
     ports:
       - "127.0.0.1:${UMAMI_PORT}:3000"
     healthcheck:
