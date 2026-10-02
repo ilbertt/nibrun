@@ -1,6 +1,11 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { addDomain, appById, appFor, removeDomain } from '@repo/app-operations';
-import { APP_HOSTNAME_KINDS, APP_HOSTNAME_STATES } from '@repo/protocol';
+import {
+  APP_HOSTNAME_KINDS,
+  APP_HOSTNAME_STATES,
+  CNAME_RECORD_TYPE,
+  requiredDomainDnsRecords,
+} from '@repo/protocol';
 import { z } from 'zod';
 import { defineOutput } from '#lib/output.ts';
 
@@ -14,7 +19,7 @@ const HEADINGS = { hostname: 'HOSTNAME', kind: 'KIND', state: 'STATE' };
  */
 const DnsRecordSchema = z.object({
   hostname: z.string(),
-  type: z.literal('CNAME'),
+  type: z.literal(CNAME_RECORD_TYPE.name),
   target: z.string(),
 });
 
@@ -115,7 +120,7 @@ export async function listDomains({
   appId: string;
 }): Promise<z.input<typeof DomainListSchema>> {
   const app = await appById({ api, appId });
-  const target = platformTarget({ slug: app.slug, hostnames: app.hostnames });
+  const target = platformTarget(app.hostnames);
 
   return {
     hostnames: app.hostnames.map((each) => ({
@@ -124,7 +129,11 @@ export async function listDomains({
       state: each.state,
       records:
         each.state === 'pending'
-          ? pendingRecords({ hostname: each.hostname, dcvTarget: each.dcvTarget, target })
+          ? requiredDomainDnsRecords({
+              hostname: each.hostname,
+              dcvTarget: each.dcvTarget ?? undefined,
+              routingTarget: target,
+            })
           : [],
       edgeErrors: each.edgeErrors,
     })),
@@ -150,34 +159,13 @@ export async function addAppDomain({
     created,
     records:
       added.state === 'pending'
-        ? pendingRecords({
+        ? requiredDomainDnsRecords({
             hostname: added.hostname,
-            dcvTarget: added.dcvTarget,
-            target: platformTarget({ slug: app.slug, hostnames: app.hostnames }),
+            dcvTarget: added.dcvTarget ?? undefined,
+            routingTarget: platformTarget(app.hostnames),
           })
         : [],
   };
-}
-
-/**
- * The two records, in the order they matter: the first is what routes the domain and what proves
- * the owner controls it, the second is what lets the edge renew the certificate afterwards
- * without ever coming back to them.
- */
-function pendingRecords({
-  hostname,
-  dcvTarget,
-  target,
-}: {
-  hostname: string;
-  dcvTarget: string | null;
-  target: string;
-}): DnsRecord[] {
-  const records: DnsRecord[] = [{ hostname, type: 'CNAME', target }];
-  if (dcvTarget) {
-    records.push({ hostname: `_acme-challenge.${hostname}`, type: 'CNAME', target: dcvTarget });
-  }
-  return records;
 }
 
 /**
@@ -205,15 +193,12 @@ export async function removeAppDomain({
  * fleet already. Read off the app rather than configured here, so the CLI holds no copy of a
  * domain the deployment owns.
  */
-function platformTarget({
-  slug,
-  hostnames,
-}: {
-  slug: string;
-  hostnames: readonly { hostname: string; kind: string }[];
-}): string {
+function platformTarget(hostnames: readonly { hostname: string; kind: string }[]): string {
   const platform = hostnames.find((each) => each.kind === 'platform');
-  return `${slug}.${platform?.hostname.split('.').slice(1).join('.') ?? ''}`;
+  if (platform === undefined) {
+    throw new Error('The app has no platform hostname to use as a DNS target.');
+  }
+  return platform.hostname;
 }
 
 export function render(hostnames: readonly Pick<AppHostname, 'hostname' | 'kind' | 'state'>[]) {

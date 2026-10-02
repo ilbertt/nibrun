@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { CloudflareClient, CloudflareError } from '#lib/cloudflare/client.ts';
+import {
+  CloudflareClient,
+  CloudflareError,
+  DCV_DELEGATION_SUFFIX,
+} from '#lib/cloudflare/client.ts';
 
 const ZONE_ID = 'zone-1';
 const API_TOKEN = 'token-1';
@@ -147,7 +151,7 @@ describe('the record the owner places is derived, not fetched per hostname', () 
     answering([ok({ uuid: 'abc123' })]);
 
     expect(await client().dcvDelegationTarget({ hostname: HOSTNAME })).toBe(
-      `${HOSTNAME}.abc123.dcv.cloudflare.com`,
+      `${HOSTNAME}.abc123.${DCV_DELEGATION_SUFFIX}`,
     );
   });
 
