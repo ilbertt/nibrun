@@ -11,6 +11,15 @@ import { defineConfig } from 'vite';
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
   plugins: [
+    {
+      name: 'require-umami-hostname',
+      apply: 'build',
+      configResolved(config) {
+        if (!config.env.VITE_UMAMI_HOSTNAME) {
+          throw new Error('Set VITE_UMAMI_HOSTNAME in the homepage build environment.');
+        }
+      },
+    },
     cloudflare({ viteEnvironment: { name: 'ssr' } }),
     tailwindcss(),
     tanstackStart({

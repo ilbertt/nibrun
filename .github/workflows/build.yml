@@ -17,4 +17,6 @@ jobs:
       - uses: ./.github/actions/prepare
 
       - name: Build
+        env:
+          VITE_UMAMI_HOSTNAME: ${{ vars.UMAMI_HOSTNAME }}
         run: bun run build
