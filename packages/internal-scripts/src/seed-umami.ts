@@ -21,7 +21,6 @@ type Administrator = {
   twoFactorEnabled: boolean;
   twoFactorRequired: boolean;
 };
-type Website = { id: string; name: string; domain: string; previousSeedNames: string[] };
 
 function requiredConfig(name: string): string {
   const value = process.env[name];
@@ -72,16 +71,13 @@ async function seedAdministrator(): Promise<string> {
   return id;
 }
 
-async function seedWebsite(options: { website: Website; administratorId: string }): Promise<void> {
-  const { website, administratorId } = options;
+async function seedWebsite(administratorId: string): Promise<void> {
   await database.query({
     text: `INSERT INTO website
       (website_id, name, domain, user_id, created_by, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $4, now(), now())
-      ON CONFLICT (website_id) DO UPDATE
-      SET name = EXCLUDED.name, updated_at = now()
-      WHERE website.name = ANY($5::text[]) AND website.name IS DISTINCT FROM EXCLUDED.name`,
-    values: [website.id, website.name, website.domain, administratorId, website.previousSeedNames],
+      ON CONFLICT (website_id) DO NOTHING`,
+    values: [UMAMI_WEBSITE_ID, PRODUCT_NAME, new URL(WWW_SITE.url).hostname, administratorId],
   });
 }
 
@@ -95,13 +91,6 @@ if (
 ) {
   throw new Error('UMAMI_ADMIN_PASSWORD must contain at least 8 characters and at most 72 bytes.');
 }
-const website = {
-  id: UMAMI_WEBSITE_ID,
-  name: PRODUCT_NAME,
-  domain: new URL(WWW_SITE.url).hostname,
-  previousSeedNames: ['www', WWW_SITE.title],
-};
-
 // Resolve the driver from the pinned Umami image, which already ships it for Prisma.
 const imageRequire = createRequire('/app/package.json');
 const adapterRequire = createRequire(imageRequire.resolve('@prisma/adapter-pg'));
@@ -114,7 +103,7 @@ try {
   await database.query('BEGIN');
   await database.query("SELECT pg_advisory_xact_lock(hashtext('nibrun:umami:bootstrap'))");
   const administratorId = await seedAdministrator();
-  await seedWebsite({ website, administratorId });
+  await seedWebsite(administratorId);
   await database.query('COMMIT');
   console.info('Umami administrator and website are ready.');
 } catch (error) {
