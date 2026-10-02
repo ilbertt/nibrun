@@ -31,7 +31,7 @@ a rebuilt account to names its predecessor still holds for ~90 days.
 DNS, every record **proxied** (orange cloud):
 
 - one A record per control-plane hostname (`api_hostname`, `dozzle_hostname`,
-  `victorialogs_hostname`) → `terraform output public_ip`
+  `victorialogs_hostname`, `umami_hostname`) → `terraform output public_ip`
 - `*.<app_domain>` A → `app_host_public_ips`. One record covers the whole fleet, so there is
   nothing per app in DNS.
 
@@ -46,6 +46,10 @@ requires the client certificate it enables, and without it every visitor gets a 
 
 Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
+
+Umami uses the `UMAMI_HOSTNAME` repository variable (`umami.nibrun.com` for this deployment).
+Include that hostname in the control-plane Origin Certificate; an existing `*.nibrun.com`
+certificate already covers it. Its admin credentials are seeded before the public proxy starts.
 
 Custom domains, in the `app_domain` zone only:
 

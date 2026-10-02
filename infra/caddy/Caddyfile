@@ -132,6 +132,15 @@ https://{$DOZZLE_HOSTNAME} {
 	}
 }
 
+https://{$UMAMI_HOSTNAME} {
+	import origin_tls
+
+	reverse_proxy umami:3000 {
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
+}
+
 # The fleet's logs. Unlike Dozzle, VictoriaLogs has no login of its own and no
 # way to expose a subset of itself: one -httpAuth credential covers every
 # endpoint including /insert, and -select.disable is all-or-nothing. So both the

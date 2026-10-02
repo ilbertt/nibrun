@@ -15,7 +15,7 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${PG_BACKUP_BUCKET:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" \
   "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}" "${VICTORIALOGS_HOSTNAME:?}" \
   "${INTERNAL_PORT:?}" "${LOG_INGEST_PORT:?}" "${APP_HOST_DOMAIN:?}" \
-  "${API_CLOUDFLARE_ZONE_ID:?}"
+  "${API_CLOUDFLARE_ZONE_ID:?}" "${UMAMI_HOSTNAME:?}"
 
 # Per-deployment values no infrastructure resource feeds, still overridable from
 # the deploy so they never have to be edited here. The host port bindings are
@@ -106,6 +106,7 @@ PGWEB_AUTH_USER=${PGWEB_AUTH_USER}
 PGWEB_AUTH_PASS=${PGWEB_AUTH_PASS}
 
 UMAMI_PORT=${UMAMI_PORT}
+UMAMI_HOSTNAME=${UMAMI_HOSTNAME}
 UMAMI_DB_PASSWORD=${UMAMI_DB_PASSWORD}
 UMAMI_APP_SECRET=${UMAMI_APP_SECRET}
 UMAMI_TWO_FACTOR_ENCRYPTION_KEY=${UMAMI_TWO_FACTOR_ENCRYPTION_KEY}
@@ -189,6 +190,11 @@ victorialogs_hash=$(printf '%s\n' "$(secret victorialogs_password)" |
 mkdir -p caddy/auth
 printf 'basic_auth {\n\tadmin %s\n}\n' "${victorialogs_hash}" > caddy/auth/victorialogs.caddy
 
+log "Starting Umami before exposing its public route"
+$compose up -d --wait --wait-timeout 180 umami
+log "Ensuring Umami administrator and websites exist"
+$compose exec -T umami node --input-type=module < seed-umami.mjs
+
 log "Starting services (up -d --remove-orphans)"
 $compose up -d --remove-orphans
 
@@ -225,9 +231,6 @@ EOF
   fi
   sleep 5
 done
-
-log "Ensuring Umami administrator and websites exist"
-$compose exec -T umami node --input-type=module < seed-umami.mjs
 
 # `up -d` leaves a container alone when only a bind-mounted file changed, so a
 # new Caddyfile or a re-issued certificate would go on being ignored. Reload

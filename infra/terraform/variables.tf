@@ -358,3 +358,13 @@ variable "umami_admin_username" {
     error_message = "Use 1–255 lowercase letters, digits, underscores or hyphens, starting with a letter or digit."
   }
 }
+
+variable "umami_hostname" {
+  type        = string
+  description = "Public hostname of the Umami dashboard. CI passes the UMAMI_HOSTNAME repository variable."
+
+  validation {
+    condition     = trimspace(var.umami_hostname) != ""
+    error_message = "umami_hostname must not be empty."
+  }
+}
