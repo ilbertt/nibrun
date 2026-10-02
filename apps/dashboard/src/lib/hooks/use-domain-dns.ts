@@ -17,7 +17,12 @@ export function useDomainDns({
   return useQuery({
     queryKey: ['apps', appId, 'domain-dns', hostname],
     queryFn: () => checkDomainDns({ api, appId, hostname }),
-    refetchInterval: pending ? REFRESH_MS : false,
+    refetchInterval: (query) =>
+      pending ||
+      query.state.status !== 'success' ||
+      query.state.data?.records.some((record) => record.matched !== true)
+        ? REFRESH_MS
+        : false,
     staleTime: REFRESH_MS,
   });
 }
