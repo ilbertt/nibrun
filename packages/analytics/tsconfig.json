@@ -1,0 +1,6 @@
+{
+  "extends": "@repo/typescript-config/react.json",
+  "compilerOptions": { "types": ["bun", "react"] },
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist"]
+}

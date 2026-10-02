@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { DASHBOARD_SITE, WWW_SITE } from '@repo/global-constants';
+import { UMAMI_WEBSITE_ID } from '@repo/analytics/config';
+import { PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 import { compareSync, hashSync } from 'bcryptjs';
 
 const BCRYPT_ROUNDS = 10;
@@ -94,14 +95,9 @@ if (
 }
 const websites = [
   {
-    id: '00000000-0000-4000-8000-000000000001',
-    name: WWW_SITE.title,
+    id: UMAMI_WEBSITE_ID,
+    name: PRODUCT_NAME,
     domain: new URL(WWW_SITE.url).hostname,
-  },
-  {
-    id: '00000000-0000-4000-8000-000000000002',
-    name: DASHBOARD_SITE.title,
-    domain: new URL(DASHBOARD_SITE.url).hostname,
   },
 ];
 
@@ -121,7 +117,7 @@ try {
     await seedWebsite({ website, administratorId });
   }
   await database.query('COMMIT');
-  console.info('Umami administrator and both websites are ready.');
+  console.info('Umami administrator and website are ready.');
 } catch (error) {
   await database.query('ROLLBACK');
   throw error;

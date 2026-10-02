@@ -27,6 +27,8 @@ jobs:
   api-images:
     name: api-images (${{ matrix.name }})
     runs-on: ubuntu-latest
+    env:
+      UMAMI_HOSTNAME: ${{ vars.UMAMI_HOSTNAME }}
     outputs:
       # Same in every leg, so them racing to write it changes nothing.
       repository: ${{ steps.registry.outputs.repo }}

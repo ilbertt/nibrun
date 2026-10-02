@@ -1,0 +1,26 @@
+{
+  "name": "@repo/analytics",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts"
+  },
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "check:types": "bun run --bun tsc",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@repo/global-constants": "workspace:*",
+    "@tanstack/react-router": "catalog:",
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/react": "catalog:",
+    "typescript": "catalog:"
+  }
+}

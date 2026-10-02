@@ -50,6 +50,7 @@
     "apps/dashboard": {
       "name": "@repo/dashboard",
       "dependencies": {
+        "@repo/analytics": "workspace:*",
         "@repo/api-client": "workspace:*",
         "@repo/app-operations": "workspace:*",
         "@repo/binary-handoff": "workspace:*",
@@ -89,6 +90,7 @@
     "apps/www": {
       "name": "@repo/www",
       "dependencies": {
+        "@repo/analytics": "workspace:*",
         "@repo/binary-handoff": "workspace:*",
         "@repo/deploy-link": "workspace:*",
         "@repo/global-constants": "workspace:*",
@@ -118,6 +120,19 @@
         "typescript": "catalog:",
         "vite": "catalog:",
         "wrangler": "^4.137.0",
+      },
+    },
+    "packages/analytics": {
+      "name": "@repo/analytics",
+      "dependencies": {
+        "@repo/global-constants": "workspace:*",
+        "@tanstack/react-router": "catalog:",
+        "react": "catalog:",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "@types/react": "catalog:",
+        "typescript": "catalog:",
       },
     },
     "packages/api-client": {
@@ -193,6 +208,7 @@
       "name": "@repo/internal-scripts",
       "dependencies": {
         "@actions/core": "^3.0.1",
+        "@repo/analytics": "workspace:*",
         "@repo/global-constants": "workspace:*",
         "bcryptjs": "3.0.3",
       },
@@ -760,6 +776,8 @@
     "@poppinss/exception": ["@poppinss/exception@1.2.3", "", {}, "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw=="],
 
     "@repo/agent": ["@repo/agent@workspace:apps/agent"],
+
+    "@repo/analytics": ["@repo/analytics@workspace:packages/analytics"],
 
     "@repo/api": ["@repo/api@workspace:apps/api"],
 

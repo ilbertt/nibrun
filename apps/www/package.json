@@ -26,7 +26,8 @@
     "marked": "^18.0.11",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "tailwindcss": "catalog:"
+    "tailwindcss": "catalog:",
+    "@repo/analytics": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.58.0",

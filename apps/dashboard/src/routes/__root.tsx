@@ -1,3 +1,4 @@
+import { AnalyticsTracker } from '@repo/analytics';
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet, redirect } from '@tanstack/react-router';
 import { AppDevtools } from '#components/app-devtools.tsx';
@@ -45,6 +46,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RouteComponent() {
   return (
     <>
+      <AnalyticsTracker hostname={import.meta.env.VITE_UMAMI_HOSTNAME} />
       <Outlet />
       <AppDevtools />
     </>

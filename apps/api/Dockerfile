@@ -19,6 +19,8 @@ COPY packages packages
 COPY apps apps
 COPY brand brand
 ENV NODE_ENV=production
+ARG UMAMI_HOSTNAME
+ENV VITE_UMAMI_HOSTNAME=${UMAMI_HOSTNAME}
 RUN bun run build --filter=@repo/api
 
 FROM gcr.io/distroless/base-debian12:debug AS release
