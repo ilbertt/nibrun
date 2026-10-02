@@ -17,10 +17,6 @@ resource "random_password" "umami_admin_password" {
   special = false
 }
 
-resource "random_uuid" "umami_website_id" {
-  for_each = toset(["www", "dashboard"])
-}
-
 resource "aws_ssm_parameter" "umami_admin_username" {
   name  = "${var.ssm_secret_prefix}/umami_admin_username"
   type  = "String"
@@ -38,18 +34,6 @@ resource "aws_ssm_parameter" "umami_admin_password" {
 
   tags = {
     Name = "${local.resource_name_prefix}-umami-admin-password"
-  }
-}
-
-resource "aws_ssm_parameter" "umami_website_id" {
-  for_each = random_uuid.umami_website_id
-
-  name  = "${var.ssm_secret_prefix}/umami_${each.key}_website_id"
-  type  = "String"
-  value = each.value.result
-
-  tags = {
-    Name = "${local.resource_name_prefix}-umami-${each.key}-website-id"
   }
 }
 

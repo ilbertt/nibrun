@@ -60,8 +60,6 @@ UMAMI_APP_SECRET="$(secret umami_app_secret)"
 UMAMI_TWO_FACTOR_ENCRYPTION_KEY="$(secret umami_two_factor_encryption_key)"
 UMAMI_ADMIN_USERNAME="$(secret umami_admin_username)"
 UMAMI_ADMIN_PASSWORD="$(secret umami_admin_password)"
-UMAMI_WWW_WEBSITE_ID="$(secret umami_www_website_id)"
-UMAMI_DASHBOARD_WEBSITE_ID="$(secret umami_dashboard_website_id)"
 
 # Everything written from here on carries a secret: the PEMs below, then .env.
 umask 077
@@ -113,8 +111,6 @@ UMAMI_APP_SECRET=${UMAMI_APP_SECRET}
 UMAMI_TWO_FACTOR_ENCRYPTION_KEY=${UMAMI_TWO_FACTOR_ENCRYPTION_KEY}
 UMAMI_ADMIN_USERNAME=${UMAMI_ADMIN_USERNAME}
 UMAMI_ADMIN_PASSWORD=${UMAMI_ADMIN_PASSWORD}
-UMAMI_WWW_WEBSITE_ID=${UMAMI_WWW_WEBSITE_ID}
-UMAMI_DASHBOARD_WEBSITE_ID=${UMAMI_DASHBOARD_WEBSITE_ID}
 
 API_S3_ENDPOINT=${API_S3_ENDPOINT}
 ARTIFACTS_BUCKET=${ARTIFACTS_BUCKET}

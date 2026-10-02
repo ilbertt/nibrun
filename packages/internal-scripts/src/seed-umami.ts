@@ -94,12 +94,12 @@ if (
 }
 const websites = [
   {
-    id: requiredConfig('UMAMI_WWW_WEBSITE_ID'),
+    id: '00000000-0000-4000-8000-000000000001',
     name: WWW_SITE.title,
     domain: new URL(WWW_SITE.url).hostname,
   },
   {
-    id: requiredConfig('UMAMI_DASHBOARD_WEBSITE_ID'),
+    id: '00000000-0000-4000-8000-000000000002',
     name: DASHBOARD_SITE.title,
     domain: new URL(DASHBOARD_SITE.url).hostname,
   },
