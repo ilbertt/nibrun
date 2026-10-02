@@ -2,8 +2,8 @@ import { Badge } from '@repo/ui/components/badge';
 import { Button } from '@repo/ui/components/button';
 import { Spinner } from '@repo/ui/components/spinner';
 import { Trash2Icon } from 'lucide-react';
+import { CurrentAppHostnameLink } from '#components/apps/current-app-hostname-link.tsx';
 import { DomainRecords } from '#components/apps/domain-records.tsx';
-import { HostnameLink } from '#components/apps/hostname-link.tsx';
 import { HostnameStateBadge } from '#components/apps/hostname-state-badge.tsx';
 import { useRemoveDomain } from '#lib/hooks/use-app-domains.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
@@ -20,7 +20,7 @@ export function DomainRow({ hostname }: { hostname: Hostname }) {
   return (
     <li className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-4">
-        <HostnameLink hostname={hostname.hostname} />
+        <CurrentAppHostnameLink hostname={hostname.hostname} />
         <div className="flex shrink-0 items-center gap-2">
           {isPlatform ? <Badge variant="outline">Issued</Badge> : null}
           <HostnameStateBadge state={hostname.state} />

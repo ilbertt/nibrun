@@ -38,7 +38,7 @@ export function AppsTable({ apps }: { apps: readonly AppSummary[] }) {
               </Link>
             </TableCell>
             <TableCell>
-              <HostnameLink hostname={servingHostname(app.hostnames)} />
+              <HostnameLink hostname={servingHostname(app.hostnames)} appId={app.id} />
             </TableCell>
             <TableCell>
               <AppStatusBadge app={app} />

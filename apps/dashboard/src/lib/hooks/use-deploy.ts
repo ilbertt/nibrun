@@ -1,3 +1,4 @@
+import { trackEvent } from '@repo/analytics';
 import {
   awaitDeploymentSettled,
   type DeployableBinary,
@@ -13,8 +14,11 @@ import type { TenantArguments, TenantEnvironmentPatch } from '@repo/protocol';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 import { browserUpload } from '#lib/browser-upload.ts';
+import { DeploymentAnalytics, presetForBinary } from '#lib/deployment-analytics.ts';
 import { useAnonymousSignIn } from '#lib/hooks/use-anonymous-sign-in.ts';
 import { useSession } from '#lib/hooks/use-session.ts';
+import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
+import { SessionIdentity } from '#lib/session-identity.ts';
 
 type Configured = {
   args: TenantArguments;
@@ -67,37 +71,74 @@ export function useDeploy({
   const queryClient = useQueryClient();
   const session = useSession();
   const signInAnonymously = useAnonymousSignIn();
+  const identity = useSessionIdentity();
 
   return useMutation<Deployed, Error, ReleaseRequest>({
     mutationFn: async (request) => {
-      // A deploy is the one thing a visitor with no session may ask for, and asking is what makes
-      // them a stranger: nothing is minted for a visit that never presses the button.
-      if (session === null) {
-        await signInAnonymously();
+      const analytics = deploymentAnalytics({ request, identity });
+      function reportStep(step: DeployStep): void {
+        analytics.step(step);
+        onStep(step);
       }
-      const deployed = carriesBinary(request)
-        ? await deploy({
-            api,
-            ...request,
-            onStep,
-            upload: browserUpload,
-            whileUploading: ({ task }) => task(onProgress),
-          })
-        : await redeploy({ api, ...request, onStep });
-      const settled = await awaitDeploymentSettled({
-        api,
-        appId: deployed.appId,
-        deploymentId: deployed.deploymentId,
-      });
-      if (settled.state !== 'running') {
-        throw new Error(describeUnservedDeployment(settled));
+      try {
+        // A deploy is the one thing a visitor with no session may ask for, and asking is what makes
+        // them a stranger: nothing is minted for a visit that never presses the button.
+        if (session === null) {
+          analytics.authenticating();
+          await signInAnonymously();
+          analytics.authenticated(SessionIdentity.Anonymous);
+        }
+        const deployed = carriesBinary(request)
+          ? await deploy({
+              api,
+              ...request,
+              onStep: reportStep,
+              upload: browserUpload,
+              whileUploading: ({ task }) => task(onProgress),
+            })
+          : await redeploy({ api, ...request, onStep: reportStep });
+        const settled = await awaitDeploymentSettled({
+          api,
+          appId: deployed.appId,
+          deploymentId: deployed.deploymentId,
+        });
+        if (settled.state !== 'running') {
+          throw new Error(describeUnservedDeployment(settled));
+        }
+        analytics.succeeded(deployed);
+        return deployed;
+      } catch (error) {
+        analytics.failed();
+        throw error;
       }
-      return deployed;
     },
     onSuccess: onDeployed,
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: ['apps'] });
       await queryClient.invalidateQueries({ queryKey: ['deployments'] });
+    },
+  });
+}
+
+function deploymentAnalytics({
+  request,
+  identity,
+}: {
+  request: ReleaseRequest;
+  identity: SessionIdentity;
+}): DeploymentAnalytics {
+  return new DeploymentAnalytics({
+    emit: trackEvent,
+    data: {
+      identity_state: identity,
+      operation:
+        request.appId === undefined ? 'create' : carriesBinary(request) ? 'update' : 'retry',
+      binary_delivery: binaryDelivery(request),
+      has_initial_data: carriesInitialData(request),
+      preset_slug:
+        carriesBinary(request) && 'url' in request.binary
+          ? presetForBinary(request.binary.url)
+          : undefined,
     },
   });
 }

@@ -1,3 +1,4 @@
+import { trackEvent } from '@repo/analytics';
 import {
   type DeployableBinary,
   type FetchableBinary,
@@ -27,6 +28,7 @@ import {
 import { discardHandedOffBinary } from '#lib/handoff-store.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
+import { useDeployFormAnalytics } from '#lib/hooks/use-deploy-form-analytics.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
 import { SessionIdentity } from '#lib/session-identity.ts';
@@ -58,7 +60,9 @@ export type DeployFormApi = ReactFormExtendedApi<
 >;
 
 /** What a change to the binary field does besides changing it. */
-export type BinaryFieldListeners = { onChange?: () => void };
+export type BinaryFieldListeners = {
+  onChange?: (change: { value: BinarySource | undefined }) => void;
+};
 
 export type DeployFormState = {
   api: DeployFormApi;
@@ -174,6 +178,7 @@ export function useDeployForm({
   suggested?: DeploySuggestion | undefined;
 }): DeployFormState {
   const { start } = useDeployRun();
+  useDeployFormAnalytics({ appId, suggested });
   const apps = useApps();
   const portOffered = useSessionIdentity() === SessionIdentity.WithAccount;
   const owned = apps.data ?? [];
@@ -195,7 +200,7 @@ export function useDeployForm({
 
   return {
     api,
-    binaryListeners: spendsHandoff(binary),
+    binaryListeners: binaryFieldListeners(binary),
     locked,
     replacing,
     targetResolved,
@@ -212,8 +217,18 @@ export function useDeployForm({
  * the moment this form holds anything else — cleared with the x, replaced by another file, given
  * up for a url — and a form that was never handed one has nothing to spend.
  */
-function spendsHandoff(binary: File | undefined): BinaryFieldListeners {
-  return binary === undefined ? {} : { onChange: discardHandedOffBinary };
+function binaryFieldListeners(binary: File | undefined): BinaryFieldListeners {
+  return {
+    onChange: ({ value }) => {
+      if (binary !== undefined) {
+        discardHandedOffBinary();
+      }
+      const file = pickedFile(value);
+      if (file) {
+        trackEvent({ name: 'binary_selected', data: { size_bytes: file.size } });
+      }
+    },
+  };
 }
 
 /**
