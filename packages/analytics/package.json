@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@repo/global-constants": "workspace:*",
-    "@tanstack/react-router": "catalog:",
     "react": "catalog:"
   },
   "devDependencies": {

@@ -4,20 +4,27 @@ import { analyticsPath, analyticsReferrer, analyticsSite } from '#page.ts';
 
 type Payload = Record<string, unknown>;
 type Tracker = { track(payload: (defaults: Payload) => Payload): Promise<void> };
-type AnalyticsWindow = Window & { umami?: Tracker };
+type AnalyticsWindow = Window & {
+  umami?: Tracker;
+  nibrunBeforeSend?: typeof beforeSend;
+};
+type AnalyticsImportMeta = ImportMeta & { env?: { VITE_UMAMI_HOSTNAME?: string } };
 let loading: Promise<boolean> | undefined;
-let previousUrl: string | undefined;
-let previousPathname: string | undefined;
-let referrer: string | undefined;
+let previousPage: URL | undefined;
 let distinctId: string | undefined;
 
-export function loadTracker(hostname: string | undefined): Promise<boolean> {
-  if (
-    window.parent !== window ||
-    window.location.protocol !== 'https:' ||
-    !analyticsSite(window.location.hostname) ||
-    navigator.doNotTrack === '1'
-  ) {
+export function trackingAllowed(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    window.parent === window &&
+    window.location.protocol === 'https:' &&
+    analyticsSite(window.location.hostname) !== undefined &&
+    navigator.doNotTrack !== '1'
+  );
+}
+
+export function loadTracker(): Promise<boolean> {
+  if (!trackingAllowed()) {
     return Promise.resolve(false);
   }
   if (loading) {
@@ -25,37 +32,68 @@ export function loadTracker(hostname: string | undefined): Promise<boolean> {
   }
   loading = new Promise((resolve) => {
     const script = document.createElement('script');
+    const hostname = (import.meta as AnalyticsImportMeta).env?.VITE_UMAMI_HOSTNAME;
     script.src = `https://${hostname || DEFAULT_UMAMI_HOSTNAME}/script.js`;
     script.async = true;
     script.dataset.websiteId = UMAMI_WEBSITE_ID;
-    script.dataset.autoTrack = 'false';
+    script.dataset.beforeSend = 'nibrunBeforeSend';
+    script.dataset.excludeSearch = 'true';
+    script.dataset.excludeHash = 'true';
     script.dataset.doNotTrack = 'true';
     distinctId = analyticsIdentity();
-    script.onload = () => resolve(true);
+    (window as AnalyticsWindow).nibrunBeforeSend = beforeSend;
+    script.onload = () => {
+      // Umami 3.4 observes pushState/replaceState but does not listen for popstate.
+      window.addEventListener('popstate', syncHistoryTraversal);
+      resolve(true);
+    };
     script.onerror = () => resolve(false);
     document.head.appendChild(script);
   });
   return loading;
 }
 
-export function trackPage(pathname: string): void {
-  const site = analyticsSite(window.location.hostname);
-  const tracker = (window as AnalyticsWindow).umami;
-  if (!site || !tracker) {
-    return;
+function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined {
+  if (type !== 'event' || !trackingAllowed()) {
+    return undefined;
   }
-  const url = `${window.location.origin}${analyticsPath({ site, pathname })}`;
-  if (pathname === previousPathname) {
-    return;
+  const url = new URL(String(payload.url), window.location.href);
+  const site = analyticsSite(url.hostname);
+  if (!site) {
+    return undefined;
   }
-  referrer = previousUrl ?? analyticsReferrer(document.referrer);
-  previousUrl = url;
-  previousPathname = pathname;
-  void tracker.track((defaults) => ({
-    ...defaults,
+  if (!payload.name) {
+    if (previousPage?.origin === url.origin && previousPage.pathname === url.pathname) {
+      return undefined;
+    }
+    previousPage = url;
+  }
+  return {
+    ...payload,
     id: distinctId,
-    url,
-    referrer,
+    url: `${url.origin}${analyticsPath({ site, pathname: url.pathname })}`,
+    referrer: sanitizedReferrer(payload.referrer),
     title: `nibrun ${site}`,
-  }));
+  };
+}
+
+function sanitizedReferrer(referrer: unknown): string {
+  return typeof referrer === 'string' && referrer
+    ? analyticsReferrer(new URL(referrer, window.location.origin).href)
+    : '';
+}
+
+function syncHistoryTraversal(): void {
+  window.history.replaceState(window.history.state, '', window.location.href);
+}
+
+export function pagePayload(): Payload {
+  return { url: window.location.href };
+}
+
+export function sendEvent(payload: Payload): Promise<void> {
+  return (
+    (window as AnalyticsWindow).umami?.track((defaults) => ({ ...defaults, ...payload })) ??
+    Promise.resolve()
+  );
 }

@@ -1,4 +1,4 @@
-import { AnalyticsTracker } from '@repo/analytics';
+import { useAnalytics } from '@repo/analytics';
 import { PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 import { Toaster } from '@repo/ui/components/sonner';
 import appCss from '@repo/ui/globals.css?url';
@@ -32,6 +32,7 @@ export const Route = createRootRoute({
 });
 
 function RootDocument({ children }: { children: ReactNode }) {
+  useAnalytics();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -39,7 +40,6 @@ function RootDocument({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <AnalyticsTracker hostname={import.meta.env.VITE_UMAMI_HOSTNAME} />
         {children}
         <Toaster />
         <Scripts />
