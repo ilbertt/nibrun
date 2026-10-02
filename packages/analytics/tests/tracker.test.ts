@@ -1,5 +1,7 @@
 import { afterAll, expect, test } from 'bun:test';
+import { readEntry, recordEntry } from '#entry.ts';
 import { analyticsIdentity } from '#identity.ts';
+import { trackEvent } from '#track-event.ts';
 import { loadTracker } from '#tracker.ts';
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
@@ -174,4 +176,26 @@ test('all event payloads are filtered at send time and same-origin referrers are
   nativeTrack({ ...nativePayload(browser.location.href), name: 'fixture_event' });
   expect(events).toHaveLength(count);
   browser.parent = browser;
+});
+
+test('acquisition survives the hostname change and events use sanitized context', async () => {
+  recordEntry({ entry_source: 'preset', preset_slug: 'pocketbase' });
+  expect(readEntry()).toEqual({ entry_source: 'preset', preset_slug: 'pocketbase' });
+  const count = events.length;
+  trackEvent({
+    name: 'deploy_cta_clicked',
+    data: { cta_placement: 'preset', preset_slug: 'pocketbase' },
+  });
+  await Promise.resolve();
+  expect(events).toHaveLength(count + 1);
+  expect(events.at(-1)?.data).toMatchObject({
+    entry_source: 'preset',
+    preset_slug: 'pocketbase',
+    identity_state: 'unknown',
+  });
+  expect(JSON.stringify(events.at(-1))).not.toContain('SECRET');
+  cookie = 'nibrun_analytics_entry=%7Bbad';
+  expect(readEntry()).toEqual({ entry_source: 'direct', preset_slug: undefined });
+  cookie = `nibrun_analytics_entry=${encodeURIComponent(JSON.stringify({ entry_source: 'preset', preset_slug: 'TOKEN=secret' }))}`;
+  expect(readEntry().preset_slug).toBeUndefined();
 });

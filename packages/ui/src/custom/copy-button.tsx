@@ -3,7 +3,7 @@ import { useClipboardCopy } from '@repo/ui/hooks/use-clipboard-copy';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 
 export function CopyButton({ value }: { value: string }) {
-  const { copied, copy } = useClipboardCopy(value);
+  const { copied, copy } = useClipboardCopy({ value: value, onCopied: undefined });
 
   return (
     <Button

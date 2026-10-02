@@ -34,7 +34,7 @@ export function NoAppsEmpty() {
           )}
         />
         <p className="text-muted-foreground">Or</p>
-        <AgentPrompt />
+        <AgentPrompt onCopied={undefined} />
         <div className="flex w-full flex-col gap-2">
           <p className="text-muted-foreground">Or use the CLI to deploy your app</p>
           <CopyableLine value={CLI_INSTALL_COMMAND} prompt />

@@ -1,3 +1,4 @@
+import { trackEvent } from '@repo/analytics';
 import { DEPLOY_PRESET_SLUGS } from '@repo/deploy-link';
 import { AgentPrompt } from '@repo/ui/custom/agent-prompt';
 import { DeployPresetRoller } from '@repo/ui/custom/deploy-preset-roller';
@@ -19,7 +20,11 @@ export function TryItOut() {
         linkToPreset={undefined}
       />
       <p className="text-muted-foreground text-sm">Or</p>
-      <AgentPrompt />
+      <AgentPrompt
+        onCopied={() =>
+          trackEvent({ name: 'agent_prompt_copied', data: { preset_slug: undefined } })
+        }
+      />
     </section>
   );
 }

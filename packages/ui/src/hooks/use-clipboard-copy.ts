@@ -9,7 +9,13 @@ export type ClipboardCopy = { copied: boolean; copy: () => void };
  * A clipboard write is silent, so what is worth holding is that it happened: `copied` is what a
  * caller shows back, and it lapses on its own so nothing has to clear it.
  */
-export function useClipboardCopy(value: string): ClipboardCopy {
+export function useClipboardCopy({
+  value,
+  onCopied,
+}: {
+  value: string;
+  onCopied: (() => void) | undefined;
+}): ClipboardCopy {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -24,7 +30,10 @@ export function useClipboardCopy(value: string): ClipboardCopy {
     copied,
     copy: () => {
       void navigator.clipboard.writeText(value).then(
-        () => setCopied(true),
+        () => {
+          setCopied(true);
+          onCopied?.();
+        },
         // Denied, or a page served over plain http. Said out loud rather than left as a button
         // that does nothing — the text it would have copied is selectable either way.
         () => toast.error('Could not reach the clipboard. Select the text and copy it.'),
