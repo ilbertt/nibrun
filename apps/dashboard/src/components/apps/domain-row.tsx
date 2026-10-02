@@ -37,7 +37,7 @@ export function DomainRow({ hostname }: { hostname: Hostname }) {
           )}
         </div>
       </div>
-      {hostname.state === 'pending' ? <DomainRecords hostname={hostname} /> : null}
+      {isPlatform ? null : <DomainRecords hostname={hostname} />}
     </li>
   );
 }

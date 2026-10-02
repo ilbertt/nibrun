@@ -3,6 +3,7 @@ import { sql } from '#db/client.ts';
 import { createAuth } from '#lib/auth/better-auth.ts';
 import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { CloudflareClient } from '#lib/cloudflare/client.ts';
+import { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
 import { artifactsS3, exportsS3, importsS3, uploadSigner } from '#lib/s3/client.ts';
@@ -18,6 +19,7 @@ import { BinarySourceRepository } from '#repositories/binary-source.repository.t
 import { CachedBinariesRepository } from '#repositories/cached-binaries.repository.ts';
 import { CustomHostnamesRepository } from '#repositories/custom-hostnames.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { DnsRepository } from '#repositories/dns.repository.ts';
 import { ExportStorageRepository } from '#repositories/export-storage.repository.ts';
 import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
@@ -30,6 +32,7 @@ import { ArtifactsService } from '#services/artifacts.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
 import { CronsService } from '#services/crons.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
+import { DomainDnsService } from '#services/domain-dns.service.ts';
 import { ExportsService } from '#services/exports.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
 import { HealthService } from '#services/health.service.ts';
@@ -48,6 +51,8 @@ const cloudflareClient =
         zoneId: env.CLOUDFLARE_ZONE_ID,
       })
     : undefined;
+
+const cloudflareDnsClient = new CloudflareDnsClient();
 
 const victoriaLogsClient = new VictoriaLogsClient(env.VICTORIALOGS_ENDPOINT);
 
@@ -79,6 +84,7 @@ const exportsRepository = new ExportsRepository(sql);
 const importsRepository = new ImportsRepository(sql);
 const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient);
+const dnsRepository = new DnsRepository(cloudflareDnsClient);
 const logsRepository = new LogsRepository(victoriaLogsClient);
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
@@ -97,6 +103,10 @@ const hostnamesService = new HostnamesService({
   hostnamesRepo: appHostnamesRepository,
   customHostnamesRepo: customHostnamesRepository,
   appHostDomain: env.APP_HOST_DOMAIN,
+});
+const domainDnsService = new DomainDnsService({
+  hostnamesRepo: appHostnamesRepository,
+  dnsRepo: dnsRepository,
 });
 const exportsService = new ExportsService({
   exportsRepo: exportsRepository,
@@ -196,6 +206,11 @@ export const LogsServicePlugin = new Elysia({ name: 'service.logs' }).decorate(
 export const HostnamesServicePlugin = new Elysia({ name: 'service.hostnames' }).decorate(
   'hostnamesService',
   hostnamesService,
+);
+
+export const DomainDnsServicePlugin = new Elysia({ name: 'service.domainDns' }).decorate(
+  'domainDnsService',
+  domainDnsService,
 );
 
 export const ExportsServicePlugin = new Elysia({ name: 'service.exports' }).decorate(
