@@ -1,3 +1,4 @@
+import { trackEvent } from '@repo/analytics';
 import { type DomainDnsRecord, domainDnsPrompt } from '@repo/app-operations';
 import { Button } from '@repo/ui/components/button';
 import { Spinner } from '@repo/ui/components/spinner';
@@ -39,7 +40,12 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
       <div className="flex flex-wrap items-center gap-2">
         {dns.data ? (
           <AgentPromptButton
-            onCopied={undefined}
+            onCopied={() =>
+              trackEvent({
+                name: 'agent_prompt_copied',
+                data: { preset_slug: undefined, purpose: 'configure-domain' },
+              })
+            }
             label="Ask your agent"
             prompt={domainDnsPrompt(dns.data.records)}
             compact={true}
