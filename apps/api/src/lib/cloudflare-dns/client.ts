@@ -18,14 +18,8 @@ const DnsResponseSchema = t.Object({
 });
 
 export class CloudflareDnsClient {
-  readonly #endpoint: string;
-
-  constructor({ endpoint = DNS_QUERY_ENDPOINT }: { endpoint?: string } = {}) {
-    this.#endpoint = endpoint;
-  }
-
   async queryCname({ hostname }: { hostname: string }): Promise<CloudflareDnsAnswer[]> {
-    const url = new URL(this.#endpoint);
+    const url = new URL(DNS_QUERY_ENDPOINT);
     url.searchParams.set('name', hostname);
     url.searchParams.set('type', CNAME_RECORD_TYPE.name);
     const response = await fetch(url, {
