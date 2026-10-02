@@ -13,12 +13,14 @@ export const AppsAppIdHostnamesDnsController = new Elysia()
   .use(DomainDnsServicePlugin)
   .get(
     '/apps/:appId/hostnames/dns',
-    async ({ domainDnsService, params, query, user }) =>
-      domainDnsService.check({
+    async ({ domainDnsService, params, query, user }) => {
+      const result = await domainDnsService.check({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         hostname: query.hostname,
-      }),
+      });
+      return result;
+    },
     {
       auth: Identity.Required,
       query: DomainDnsQuerySchema,
