@@ -157,6 +157,14 @@ export {
   DeploymentStateSchema,
 } from '#domain/deployment.ts';
 export {
+  CNAME_RECORD_TYPE,
+  certificateValidationName,
+  dnsName,
+  type RequiredDomainDnsRecord,
+  RequiredDomainDnsRecordSchema,
+  requiredDomainDnsRecords,
+} from '#domain/dns.ts';
+export {
   EXPORT_STATES,
   type Export,
   ExportSchema,
