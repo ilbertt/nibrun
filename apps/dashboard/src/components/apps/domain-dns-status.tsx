@@ -1,7 +1,22 @@
 import type { DomainDnsRecord } from '@repo/app-operations';
+import { Spinner } from '@repo/ui/components/spinner';
 import { CheckIcon, CircleHelpIcon, ClockIcon, TriangleAlertIcon } from 'lucide-react';
 
-export function DomainDnsStatus({ record }: { record: DomainDnsRecord }) {
+export function DomainDnsStatus({
+  record,
+  isChecking,
+}: {
+  record: DomainDnsRecord;
+  isChecking: boolean;
+}) {
+  if (isChecking) {
+    return (
+      <span className="inline-flex items-center gap-1 text-muted-foreground">
+        <Spinner className="size-3.5" />
+        Checking…
+      </span>
+    );
+  }
   if (record.matched === true) {
     return (
       <span className="inline-flex items-center gap-1 text-emerald-600">
