@@ -37,7 +37,7 @@ export function DomainRow({ hostname }: { hostname: Hostname }) {
           )}
         </div>
       </div>
-      {isPlatform ? null : <DomainRecords hostname={hostname} />}
+      {isPlatform || hostname.state === 'active' ? null : <DomainRecords hostname={hostname} />}
     </li>
   );
 }
