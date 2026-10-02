@@ -5,11 +5,14 @@ import { AppTabs } from '#components/apps/app-tabs.tsx';
 import { AppTitle } from '#components/apps/app-title.tsx';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
+import { useAppPageAnalytics } from '#lib/hooks/use-app-page-analytics.ts';
 
 export const Route = createFileRoute('/(dashboard)/apps/$appId')({ component: RouteComponent });
 
 function RouteComponent() {
-  const app = useApp(useAppId());
+  const appId = useAppId();
+  const app = useApp(appId);
+  useAppPageAnalytics(appId);
   const expiresAt = app.data?.expiresAt ?? null;
 
   return (

@@ -22,7 +22,10 @@ export function TryItOut() {
       <p className="text-muted-foreground text-sm">Or</p>
       <AgentPrompt
         onCopied={() =>
-          trackEvent({ name: 'agent_prompt_copied', data: { preset_slug: undefined } })
+          trackEvent({
+            name: 'agent_prompt_copied',
+            data: { preset_slug: undefined, purpose: 'create-app' },
+          })
         }
       />
     </section>

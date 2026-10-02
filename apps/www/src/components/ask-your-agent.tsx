@@ -16,7 +16,11 @@ function agentPrompt(app: CatalogApp): string {
 export function AskYourAgent({ app }: { app: CatalogApp }) {
   const { copied, copy } = useClipboardCopy({
     value: agentPrompt(app),
-    onCopied: () => trackEvent({ name: 'agent_prompt_copied', data: { preset_slug: app.slug } }),
+    onCopied: () =>
+      trackEvent({
+        name: 'agent_prompt_copied',
+        data: { preset_slug: app.slug, purpose: 'deploy-preset' },
+      }),
   });
 
   return (

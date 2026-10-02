@@ -1,3 +1,4 @@
+import { trackEvent } from '@repo/analytics';
 import { DEPLOY_PRESET_SLUGS, DEPLOY_PRESETS } from '@repo/deploy-link';
 import { CLI_INSTALL_COMMAND } from '@repo/global-constants';
 import {
@@ -34,7 +35,14 @@ export function NoAppsEmpty() {
           )}
         />
         <p className="text-muted-foreground">Or</p>
-        <AgentPrompt onCopied={undefined} />
+        <AgentPrompt
+          onCopied={() =>
+            trackEvent({
+              name: 'agent_prompt_copied',
+              data: { preset_slug: undefined, purpose: 'create-app' },
+            })
+          }
+        />
         <div className="flex w-full flex-col gap-2">
           <p className="text-muted-foreground">Or use the CLI to deploy your app</p>
           <CopyableLine value={CLI_INSTALL_COMMAND} prompt />

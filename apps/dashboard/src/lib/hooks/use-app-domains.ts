@@ -2,6 +2,7 @@ import { addDomain, removeDomain } from '@repo/app-operations';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '#lib/api.ts';
+import { useAppAnalytics } from '#lib/hooks/use-app-analytics.ts';
 
 export type AddedDomain = Awaited<ReturnType<typeof addDomain>>;
 
@@ -16,15 +17,18 @@ export type AddedDomain = Awaited<ReturnType<typeof addDomain>>;
  */
 export function useAddDomain(appId: string): UseMutationResult<AddedDomain, Error, string> {
   const queryClient = useQueryClient();
+  const analytics = useAppAnalytics(appId);
 
   return useMutation({
     mutationFn: (hostname: string) => addDomain({ api, appId, hostname }),
     onSuccess: (added) => {
+      analytics.settingsSaved({ area: 'domains', changed_fields: added.created ? 'add' : 'retry' });
       if (!added.created) {
         toast.success(saidAgain(added.hostname));
       }
       return queryClient.invalidateQueries({ queryKey: ['apps'] });
     },
+    onError: () => analytics.failed('domains'),
   });
 }
 
@@ -36,9 +40,14 @@ function saidAgain({ hostname, state }: AddedDomain['hostname']): string {
 
 export function useRemoveDomain(appId: string): UseMutationResult<void, Error, string> {
   const queryClient = useQueryClient();
+  const analytics = useAppAnalytics(appId);
 
   return useMutation({
     mutationFn: (hostname: string) => removeDomain({ api, appId, hostname }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['apps'] }),
+    onSuccess: () => {
+      analytics.settingsSaved({ area: 'domains', changed_fields: 'remove' });
+      return queryClient.invalidateQueries({ queryKey: ['apps'] });
+    },
+    onError: () => analytics.failed('domains'),
   });
 }
