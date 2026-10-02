@@ -45,7 +45,7 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
               <TableHead className="h-8">Type</TableHead>
               <TableHead className="h-8">Name</TableHead>
               <TableHead className="h-8">Value</TableHead>
-              <TableHead className="h-8">DNS</TableHead>
+              <TableHead className="h-8">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -70,11 +70,7 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
           </TableBody>
         </Table>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-muted-foreground text-xs">
-        <span>
-          Checks public DNS. Pending domains refresh every 30 seconds. Propagation, flattening, or
-          proxying can hide a CNAME. Certificate activation is checked separately.
-        </span>
+      <div className="flex justify-end">
         <Button
           variant="outline"
           size="xs"
@@ -85,7 +81,7 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
         </Button>
       </div>
       {dns.data ? (
-        <AgentPromptButton label="Tell your agent" prompt={domainDnsPrompt(dns.data.records)} />
+        <AgentPromptButton label="Ask your agent" prompt={domainDnsPrompt(dns.data.records)} />
       ) : null}
       <EdgeReport errors={hostname.edgeErrors} />
       {hostname.state === 'pending' ? <RetryValidation hostname={hostname} /> : null}
