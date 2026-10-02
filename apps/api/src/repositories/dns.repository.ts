@@ -6,9 +6,9 @@ export abstract class DnsRepositoryContract {
 }
 
 export class DnsRepository implements DnsRepositoryContract {
-  private readonly client: Pick<CloudflareDnsClient, 'queryCname'>;
+  private readonly client: CloudflareDnsClient;
 
-  constructor(client: Pick<CloudflareDnsClient, 'queryCname'>) {
+  constructor(client: CloudflareDnsClient) {
     this.client = client;
   }
 
