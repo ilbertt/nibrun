@@ -5,7 +5,7 @@ import { CheckIcon, CopyIcon } from 'lucide-react';
 // Not the shared CopyButton: that one reads the value into its own label, which for a whole
 // snippet would hand a screen reader the snippet instead of the word for the action.
 export function CodeCopyButton({ code }: { code: string }) {
-  const { copied, copy } = useClipboardCopy(code);
+  const { copied, copy } = useClipboardCopy({ value: code, onCopied: undefined });
 
   return (
     <Button

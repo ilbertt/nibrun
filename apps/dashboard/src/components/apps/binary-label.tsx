@@ -7,7 +7,7 @@ import type { ArtifactSummary } from '#queries/artifacts.ts';
 const SHORT_DIGEST_LENGTH = 12;
 
 export function BinaryLabel({ artifact }: { artifact: ArtifactSummary }) {
-  const { copied, copy } = useClipboardCopy(artifact.digest);
+  const { copied, copy } = useClipboardCopy({ value: artifact.digest, onCopied: undefined });
 
   return (
     <>

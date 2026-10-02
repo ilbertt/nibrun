@@ -1,3 +1,4 @@
+import { recordEntry, trackEvent } from '@repo/analytics';
 import { Button } from '@repo/ui/components/button';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { ArrowLeftIcon } from 'lucide-react';
@@ -68,6 +69,13 @@ function RouteComponent() {
                 A new tab, because the instructions below are what the reader follows next. */}
             <Button
               size="lg"
+              onClick={() => {
+                recordEntry({ entry_source: 'preset', preset_slug: app.slug });
+                trackEvent({
+                  name: 'deploy_cta_clicked',
+                  data: { cta_placement: 'preset', preset_slug: app.slug },
+                });
+              }}
               render={<a href={appDeployPath(app)} target="_blank" rel="noreferrer" />}
             >
               Deploy on nibrun

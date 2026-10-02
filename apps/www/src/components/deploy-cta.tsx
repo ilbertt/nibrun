@@ -1,3 +1,4 @@
+import { recordEntry, trackEvent } from '@repo/analytics';
 import { DASHBOARD_DEPLOY_PATH } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { DASHBOARD_ORIGIN } from '#lib/dashboard-origin.ts';
@@ -12,9 +13,17 @@ export function DeployCta() {
     <div className="flex w-full justify-center border-border/60 border-t py-16 sm:py-20">
       {/* No brand mark beside the label: the mark is a green gradient over dark ink, and on the
           primary green only the ink survives. The label already names nibrun. */}
-      <Button size="lg" render={<a href={DEPLOY_URL} />}>
+      <Button size="lg" render={<a href={DEPLOY_URL} />} onClick={trackDeploy}>
         Deploy on nibrun
       </Button>
     </div>
   );
+}
+
+function trackDeploy(): void {
+  recordEntry({ entry_source: 'deploy-cta', preset_slug: undefined });
+  trackEvent({
+    name: 'deploy_cta_clicked',
+    data: { cta_placement: 'footer', preset_slug: undefined },
+  });
 }

@@ -10,12 +10,14 @@ export function AgentPromptButton({
   label,
   prompt,
   compact,
+  onCopied,
 }: {
   label: string;
   prompt: string;
   compact: boolean;
+  onCopied: (() => void) | undefined;
 }) {
-  const { copied, copy } = useClipboardCopy(prompt);
+  const { copied, copy } = useClipboardCopy({ value: prompt, onCopied });
   const panelId = useId();
   const [reading, setReading] = useState(false);
 

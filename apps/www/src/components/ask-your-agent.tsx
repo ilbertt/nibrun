@@ -1,3 +1,4 @@
+import { trackEvent } from '@repo/analytics';
 import { WWW_SITE } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { useClipboardCopy } from '@repo/ui/hooks/use-clipboard-copy';
@@ -13,7 +14,10 @@ function agentPrompt(app: CatalogApp): string {
 }
 
 export function AskYourAgent({ app }: { app: CatalogApp }) {
-  const { copied, copy } = useClipboardCopy(agentPrompt(app));
+  const { copied, copy } = useClipboardCopy({
+    value: agentPrompt(app),
+    onCopied: () => trackEvent({ name: 'agent_prompt_copied', data: { preset_slug: app.slug } }),
+  });
 
   return (
     <Button variant="outline" size="lg" onClick={copy}>

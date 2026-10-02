@@ -39,6 +39,7 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
       <div className="flex flex-wrap items-center gap-2">
         {dns.data ? (
           <AgentPromptButton
+            onCopied={undefined}
             label="Ask your agent"
             prompt={domainDnsPrompt(dns.data.records)}
             compact={true}
