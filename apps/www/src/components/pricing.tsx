@@ -7,15 +7,10 @@ import {
 import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import { CpuIcon, HardDriveIcon, MemoryStickIcon, MinusIcon, PlusIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
+import { usePricing } from '#lib/hooks/use-pricing.ts';
 
 const BYTES_PER_GIB = 1_073_741_824;
-
-const MIN_APPS = 1;
-const MAX_APPS = 20;
-
-/** Past this many, the per-app price stops being the answer and a conversation is. */
-const BULK_APP_THRESHOLD = 10;
 
 /** What "bigger" starts at, so the second card moves with the machine rather than beside it. */
 const BIGGER_MACHINE_FACTOR = 2;
@@ -83,23 +78,14 @@ function MachineColumn({
 }
 
 export function Pricing() {
-  const [appCount, setAppCount] = useState(FREE_APPS_COUNT);
-  const monthly = Math.max(0, appCount - FREE_APPS_COUNT) * PRICE_PER_APP_USD;
-
-  function fewer() {
-    setAppCount((count) => Math.max(MIN_APPS, count - 1));
-  }
-
-  function more() {
-    setAppCount((count) => Math.min(MAX_APPS, count + 1));
-  }
+  const { appCount, monthly, volumePricing, headingRef, fewer, more } = usePricing();
 
   return (
     <section
       id="pricing"
       className="flex w-full flex-col gap-10 border-border/60 border-t py-16 sm:py-20"
     >
-      <div className="flex max-w-2xl flex-col gap-3">
+      <div ref={headingRef} className="flex max-w-2xl flex-col gap-3">
         <h2 className="font-semibold text-2xl tracking-tight sm:text-3xl">
           First {FREE_APPS_COUNT} apps free. Forever.
         </h2>
@@ -124,7 +110,7 @@ export function Pricing() {
                   <PlusIcon />
                 </Button>
               </div>
-              {appCount > BULK_APP_THRESHOLD ? (
+              {volumePricing ? (
                 <a
                   href={contactUrl(`Volume pricing for ${appCount} apps`)}
                   className="flex h-9 items-center font-medium text-primary text-sm underline underline-offset-4"
