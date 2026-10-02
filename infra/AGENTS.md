@@ -51,6 +51,10 @@ Umami uses the `UMAMI_HOSTNAME` repository variable (`umami.nibrun.com` for this
 Include that hostname in the control-plane Origin Certificate; an existing `*.nibrun.com`
 certificate already covers it. Its admin credentials are seeded before the public proxy starts.
 
+For Umami's region and city data, enable **Rules → Settings → Managed Transforms → Add visitor
+location headers** in the control-plane zone. Caddy forwards Cloudflare's headers to Umami, which
+uses `CF-Connecting-IP` for the visitor IP. See [Umami's guide](https://docs.umami.is/docs/enable-cloudflare-headers).
+
 Custom domains, in the `app_domain` zone only:
 
 - **Cloudflare for SaaS** on, and `fallback.<app_domain>` A → `app_host_public_ips`, **proxied**,
