@@ -3,6 +3,7 @@ import { sql } from '#db/client.ts';
 import { createAuth } from '#lib/auth/better-auth.ts';
 import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { CloudflareClient } from '#lib/cloudflare/client.ts';
+import { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
 import { artifactsS3, exportsS3, importsS3, uploadSigner } from '#lib/s3/client.ts';
@@ -51,6 +52,8 @@ const cloudflareClient =
       })
     : undefined;
 
+const cloudflareDnsClient = new CloudflareDnsClient();
+
 const victoriaLogsClient = new VictoriaLogsClient(env.VICTORIALOGS_ENDPOINT);
 
 const agentRepository = new AgentRepository({ sql, secretsKey });
@@ -81,6 +84,7 @@ const exportsRepository = new ExportsRepository(sql);
 const importsRepository = new ImportsRepository(sql);
 const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient);
+const dnsRepository = new DnsRepository(cloudflareDnsClient);
 const logsRepository = new LogsRepository(victoriaLogsClient);
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
@@ -102,7 +106,7 @@ const hostnamesService = new HostnamesService({
 });
 const domainDnsService = new DomainDnsService({
   hostnamesRepo: appHostnamesRepository,
-  dnsRepo: new DnsRepository(),
+  dnsRepo: dnsRepository,
 });
 const exportsService = new ExportsService({
   exportsRepo: exportsRepository,
