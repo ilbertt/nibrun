@@ -3,6 +3,20 @@ import type { AnalyticsEvent } from '#events.ts';
 import { analyticsSite } from '#page.ts';
 import { loadTracker, pagePayload, sendEvent, trackingAllowed } from '#tracker.ts';
 
+let identityState = 'unknown';
+
+export function analyticsIdentityState(): string {
+  return identityState;
+}
+
+export function setAnalyticsIdentityState(identity: string): boolean {
+  if (identity === identityState) {
+    return false;
+  }
+  identityState = identity;
+  return true;
+}
+
 export function trackEvent({ name, data }: AnalyticsEvent): void {
   if (!trackingAllowed()) {
     return;
@@ -13,7 +27,7 @@ export function trackEvent({ name, data }: AnalyticsEvent): void {
     ...entry,
     entry_preset_slug: entry.preset_slug,
     site: analyticsSite(window.location.hostname),
-    identity_state: 'unknown',
+    identity_state: identityState,
     ...data,
   };
   void loadTracker()

@@ -7,7 +7,7 @@ import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 export function GithubSignInButton() {
   const { redirect } = LoginRoute.useSearch();
-  const signIn = useSignIn(redirect ?? IndexRoute.to);
+  const signIn = useSignIn({ callbackURL: redirect ?? IndexRoute.to, reason: 'login' });
 
   return (
     <Field data-invalid={signIn.isError || undefined}>

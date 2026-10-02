@@ -1,5 +1,7 @@
+import { setAnalyticsIdentityState, trackEvent } from '@repo/analytics';
 import { useQueryClient } from '@tanstack/react-query';
 import { authClient } from '#lib/auth.ts';
+import { SessionIdentity } from '#lib/session-identity.ts';
 import { sessionQueryOptions } from '#queries/session.ts';
 
 /**
@@ -18,5 +20,8 @@ export function useAnonymousSignIn(): () => Promise<void> {
       throw new Error(error.message ?? 'Could not start without an account.');
     }
     queryClient.removeQueries({ queryKey: sessionQueryOptions.queryKey });
+    if (setAnalyticsIdentityState(SessionIdentity.Anonymous)) {
+      trackEvent({ name: 'session_seen', data: { identity_state: SessionIdentity.Anonymous } });
+    }
   };
 }

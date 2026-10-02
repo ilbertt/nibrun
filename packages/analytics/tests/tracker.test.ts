@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from 'bun:test';
 import { readEntry, recordEntry } from '#entry.ts';
 import { analyticsIdentity } from '#identity.ts';
-import { trackEvent } from '#track-event.ts';
+import { setAnalyticsIdentityState, trackEvent } from '#track-event.ts';
 import { loadTracker } from '#tracker.ts';
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
@@ -198,4 +198,14 @@ test('acquisition survives the hostname change and events use sanitized context'
   expect(readEntry()).toEqual({ entry_source: 'direct', preset_slug: undefined });
   cookie = `nibrun_analytics_entry=${encodeURIComponent(JSON.stringify({ entry_source: 'preset', preset_slug: 'TOKEN=secret' }))}`;
   expect(readEntry().preset_slug).toBeUndefined();
+});
+
+test('authentication state changes keep the browser identifier intact', async () => {
+  const authenticated = 'identified';
+  expect(setAnalyticsIdentityState(authenticated)).toBe(true);
+  expect(setAnalyticsIdentityState(authenticated)).toBe(false);
+  trackEvent({ name: 'binary_selected', data: { size_bytes: 1 } });
+  await Promise.resolve();
+  expect(events.at(-1)?.id).toBe(events[0]?.id);
+  expect(events.at(-1)?.data).toMatchObject({ identity_state: authenticated });
 });
