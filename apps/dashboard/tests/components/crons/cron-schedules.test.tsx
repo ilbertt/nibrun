@@ -36,11 +36,15 @@ test('suspended schedules stay visible while execution is disabled', () => {
   expect(markup).not.toContain('<time');
 });
 
-test('next execution estimates include the timestamp and its UTC time zone', () => {
+test('next execution estimates default to UTC with a column time zone toggle', () => {
   const markup = renderToStaticMarkup(<CronSchedules listing={LISTING} />);
   expect(markup).toContain('Next execution (estimated)');
   expect(markup).toContain('dateTime="2026-09-30T09:45:00.000Z"');
-  expect(markup).toContain('09:45:00 UTC');
+  expect(markup).toContain('09:45:00');
+  expect(markup).toContain('aria-label="Use local time for next executions"');
+  expect(markup).toContain('aria-pressed="false"');
+  expect(markup).toContain('data-slot="badge"');
+  expect(markup).toContain('>UTC</button>');
 });
 
 test('older agents without next execution estimates remain readable', () => {
