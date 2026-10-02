@@ -10,6 +10,10 @@
 #   - Caddy fronts the api and terminates TLS; local talks to the api directly.
 
 services:
+  umami:
+    environment:
+      - CLIENT_IP_HEADER=CF-Connecting-IP
+
   api:
     build: !reset null
     image: ${API_IMAGE_URI}
