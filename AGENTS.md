@@ -22,6 +22,9 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
   or extract it instead. Delete comments that no longer earn their place.
 - Imports use `#*` subpath mapping (e.g. `import { foo } from '#services/foo'`)
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
+  DNS record names, type metadata, and required-record construction live in
+  `packages/protocol/src/domain/dns.ts`. Consumers and fixtures use those definitions;
+  dashboard, CLI, and agent prompts render the records returned by the API.
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
 - Props are always passed — a component we wrote has no optional property. Declare
   `name: T | undefined` rather than `name?: T`, so a call site with nothing to pass says so.

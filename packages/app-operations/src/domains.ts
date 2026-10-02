@@ -1,6 +1,6 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import { HostnameSchema, Value } from '@repo/protocol';
+import { HostnameSchema, type RequiredDomainDnsRecord, Value } from '@repo/protocol';
 
 const HTTP_CREATED = 201;
 
@@ -17,9 +17,7 @@ export async function checkDomainDns({ api, appId, hostname }: AddDomainInput) {
 
 export type DomainDnsRecord = Awaited<ReturnType<typeof checkDomainDns>>['records'][number];
 
-export function domainDnsPrompt(
-  records: readonly Pick<DomainDnsRecord, 'hostname' | 'type' | 'target'>[],
-): string {
+export function domainDnsPrompt(records: readonly RequiredDomainDnsRecord[]): string {
   const table = records
     .map((record) => `${record.type} ${record.hostname} → ${record.target}`)
     .join('\n');

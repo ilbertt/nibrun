@@ -136,7 +136,7 @@ function EdgeReport({ errors }: { errors: string[] }) {
 function DomainRecord({ record }: { record: DomainDnsRecord }) {
   return (
     <TableRow>
-      <TableCell className="font-mono text-muted-foreground">CNAME</TableCell>
+      <TableCell className="font-mono text-muted-foreground">{record.type}</TableCell>
       <CopyableCell value={record.hostname} />
       <CopyableCell value={record.target} />
       <TableCell>

@@ -1,5 +1,12 @@
-import type { AppId, Hostname, OwnerId } from '@repo/protocol';
-import { type DomainDnsRecord, dnsName } from '#lib/domain-dns.ts';
+import {
+  type AppId,
+  dnsName,
+  type Hostname,
+  type OwnerId,
+  type RequiredDomainDnsRecord,
+  requiredDomainDnsRecords,
+} from '@repo/protocol';
+import type { DomainDnsRecord } from '#lib/domain-dns.ts';
 import { NotFoundError } from '#lib/errors.ts';
 import type { AppHostnamesRepositoryContract } from '#repositories/app-hostnames.repository.ts';
 import type { DnsRepositoryContract } from '#repositories/dns.repository.ts';
@@ -41,34 +48,25 @@ export class DomainDnsService extends Service {
     if (!domain || !platform) {
       throw new NotFoundError('Custom hostname not found.');
     }
-    const records: { hostname: string; target: string }[] = [
-      { hostname, target: platform.hostname },
-    ];
-    if (domain.dcv_target) {
-      records.push({ hostname: `_acme-challenge.${hostname}`, target: domain.dcv_target });
-    }
+    const records = requiredDomainDnsRecords({
+      hostname,
+      routingTarget: platform.hostname,
+      dcvTarget: domain.dcv_target ?? undefined,
+    });
     return { records: await Promise.all(records.map((record) => this.checkRecord(record))) };
   }
 
-  private async checkRecord({
-    hostname,
-    target,
-  }: {
-    hostname: string;
-    target: string;
-  }): Promise<DomainDnsRecord> {
+  private async checkRecord(record: RequiredDomainDnsRecord): Promise<DomainDnsRecord> {
     try {
-      const observedTargets = await this.dnsRepo.cnameTargets({ hostname });
+      const observedTargets = await this.dnsRepo.cnameTargets({ hostname: record.hostname });
       return {
-        hostname,
-        type: 'CNAME',
-        target,
-        matched: observedTargets.some((observed) => dnsName(observed) === dnsName(target)),
+        ...record,
+        matched: observedTargets.some((observed) => dnsName(observed) === dnsName(record.target)),
         observedTargets,
       };
     } catch (error) {
-      this.logger.warn('checking a domain DNS record failed', { hostname, error });
-      return { hostname, type: 'CNAME', target, matched: null, observedTargets: [] };
+      this.logger.warn('checking a domain DNS record failed', { hostname: record.hostname, error });
+      return { ...record, matched: null, observedTargets: [] };
     }
   }
 }

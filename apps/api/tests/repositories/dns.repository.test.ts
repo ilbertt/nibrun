@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
+import { CNAME_RECORD_TYPE } from '@repo/protocol';
 import { DnsRepository } from '#repositories/dns.repository.ts';
 
 const HTTP_OK = 200;
@@ -34,14 +35,14 @@ test('queries CNAME using DNS JSON and only accepts answers owned by the queried
   const result = await targets({
     Status: 0,
     Answer: [
-      { name: 'APP.EXAMPLE.DEV.', type: 5, data: 'First.Example.com.' },
-      { name: 'first.example.com.', type: 5, data: 'expected.example.com.' },
+      { name: 'APP.EXAMPLE.DEV.', type: CNAME_RECORD_TYPE.code, data: 'First.Example.com.' },
+      { name: 'first.example.com.', type: CNAME_RECORD_TYPE.code, data: 'expected.example.com.' },
       { name: 'app.example.dev.', type: 1, data: '192.0.2.1' },
     ],
   });
   expect(result).toEqual(['first.example.com']);
   expect(requested.searchParams.get('name')).toBe('app.example.dev');
-  expect(requested.searchParams.get('type')).toBe('CNAME');
+  expect(requested.searchParams.get('type')).toBe(CNAME_RECORD_TYPE.name);
   expect(accept).toBe('application/dns-json');
 });
 
@@ -55,7 +56,7 @@ test('SERVFAIL, truncation, malformed JSON data and HTTP failure are not missing
     { Status: 2 },
     { Status: 0, TC: true },
     { error: 'invalid' },
-    { Status: 0, Answer: [{ name: 'app.example.dev.', type: 5, data: null }] },
+    { Status: 0, Answer: [{ name: 'app.example.dev.', type: CNAME_RECORD_TYPE.code, data: null }] },
   ]) {
     await expect(targets(response)).rejects.toThrow();
   }

@@ -1,5 +1,12 @@
 import { expect, test } from 'bun:test';
-import { AppIdSchema, HostnameSchema, OwnerIdSchema, Value } from '@repo/protocol';
+import {
+  AppIdSchema,
+  certificateValidationName,
+  HostnameSchema,
+  OwnerIdSchema,
+  requiredDomainDnsRecords,
+  Value,
+} from '@repo/protocol';
 import { NotFoundError } from '#lib/errors.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import type { DnsRepositoryContract } from '#repositories/dns.repository.ts';
@@ -12,6 +19,12 @@ const OWNED_APP = {
 const HOSTNAME = Value.Parse(HostnameSchema, 'app.example.dev');
 const PLATFORM = Value.Parse(HostnameSchema, 'quiet-otter.nibrun.app');
 const DCV_TARGET = 'delegation.example.com';
+const VALIDATION_NAME = certificateValidationName(HOSTNAME);
+const REQUIRED_RECORDS = requiredDomainDnsRecords({
+  hostname: HOSTNAME,
+  routingTarget: PLATFORM,
+  dcvTarget: DCV_TARGET,
+});
 
 function row(overrides: Partial<AppHostnameRow> = {}): AppHostnameRow {
   return {
@@ -57,23 +70,19 @@ test('checks routing and certificate delegation independently against the expect
   const { service, scopes } = fixture({
     answers: {
       [HOSTNAME]: ['QUIET-OTTER.NIBRUN.APP.'],
-      [`_acme-challenge.${HOSTNAME}`]: ['wrong.example.com'],
+      [VALIDATION_NAME]: ['wrong.example.com'],
     },
   });
   const { records } = await service.check({ ...OWNED_APP, hostname: HOSTNAME });
   expect(scopes).toEqual([OWNED_APP]);
   expect(records).toEqual([
     {
-      hostname: HOSTNAME,
-      type: 'CNAME',
-      target: PLATFORM,
+      ...REQUIRED_RECORDS[0]!,
       matched: true,
       observedTargets: ['QUIET-OTTER.NIBRUN.APP.'],
     },
     {
-      hostname: `_acme-challenge.${HOSTNAME}`,
-      type: 'CNAME',
-      target: DCV_TARGET,
+      ...REQUIRED_RECORDS[1]!,
       matched: false,
       observedTargets: ['wrong.example.com'],
     },
@@ -84,14 +93,12 @@ test('a resolver failure preserves the required record and does not hide the oth
   const { service } = fixture({
     answers: {
       [HOSTNAME]: new Error('SERVFAIL'),
-      [`_acme-challenge.${HOSTNAME}`]: [DCV_TARGET],
+      [VALIDATION_NAME]: [DCV_TARGET],
     },
   });
   const { records } = await service.check({ ...OWNED_APP, hostname: HOSTNAME });
   expect(records[0]).toEqual({
-    hostname: HOSTNAME,
-    type: 'CNAME',
-    target: PLATFORM,
+    ...REQUIRED_RECORDS[0]!,
     matched: null,
     observedTargets: [],
   });

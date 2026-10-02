@@ -32,6 +32,7 @@ const APP_ID = Value.Parse(AppIdSchema, 'app-1');
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-1');
 const BROUGHT = Value.Parse(HostnameSchema, 'app.example.dev');
 const CLOUDFLARE_ID = 'ch-1';
+const DCV_TARGET = 'delegation.example.com';
 const PENDING_TTL_DAYS = 7;
 
 type PendingRow = {
@@ -136,8 +137,8 @@ class StubEdge implements CustomHostnamesRepositoryContract {
     return Promise.resolve({ cloudflareId: CLOUDFLARE_ID, state: 'pending' });
   }
 
-  dcvTarget({ hostname }: { hostname: Hostname }): Promise<string> {
-    return Promise.resolve(`${hostname}.uuid.dcv.cloudflare.com`);
+  dcvTarget(): Promise<string> {
+    return Promise.resolve(DCV_TARGET);
   }
 
   // Refuses as the real one does, so a pass without an edge is shown to write nothing because
@@ -242,7 +243,7 @@ describe('the row is written before the edge is told', () => {
 
     expect(created).toBe(true);
     expect(added.state).toBe('pending');
-    expect(added.dcvTarget).toBe(`${BROUGHT}.uuid.dcv.cloudflare.com`);
+    expect(added.dcvTarget).toBe(DCV_TARGET);
     expect(customHostnamesRepo.methods).toEqual(['txt']);
   });
 

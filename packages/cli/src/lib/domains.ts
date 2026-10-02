@@ -1,6 +1,6 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { addDomain, appById, appFor, checkDomainDns, removeDomain } from '@repo/app-operations';
-import { APP_HOSTNAME_KINDS, APP_HOSTNAME_STATES } from '@repo/protocol';
+import { APP_HOSTNAME_KINDS, APP_HOSTNAME_STATES, CNAME_RECORD_TYPE } from '@repo/protocol';
 import { z } from 'zod';
 import { defineOutput } from '#lib/output.ts';
 
@@ -14,7 +14,7 @@ const HEADINGS = { hostname: 'HOSTNAME', kind: 'KIND', state: 'STATE' };
  */
 const DnsRecordSchema = z.object({
   hostname: z.string(),
-  type: z.literal('CNAME'),
+  type: z.literal(CNAME_RECORD_TYPE.name),
   target: z.string(),
   matched: z.boolean().nullable(),
   observedTargets: z.array(z.string()),

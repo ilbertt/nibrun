@@ -1,8 +1,6 @@
-import { Value } from '@repo/protocol';
+import { CNAME_RECORD_TYPE, dnsName, Value } from '@repo/protocol';
 import { t } from 'elysia';
-import { dnsName } from '#lib/domain-dns.ts';
 
-const CNAME_TYPE = 5;
 const NO_ERROR = 0;
 const NAME_ERROR = 3;
 const DEADLINE_MS = 5_000;
@@ -27,7 +25,7 @@ export class DnsRepository implements DnsRepositoryContract {
   async cnameTargets({ hostname }: { hostname: string }): Promise<string[]> {
     const url = new URL(this.endpoint);
     url.searchParams.set('name', hostname);
-    url.searchParams.set('type', 'CNAME');
+    url.searchParams.set('type', CNAME_RECORD_TYPE.name);
     const response = await fetch(url, {
       headers: { accept: 'application/dns-json' },
       signal: AbortSignal.timeout(DEADLINE_MS),
@@ -40,7 +38,10 @@ export class DnsRepository implements DnsRepositoryContract {
       throw new Error(`DNS resolver could not answer the query (status ${answer.Status}).`);
     }
     return (answer.Answer ?? [])
-      .filter((record) => record.type === CNAME_TYPE && dnsName(record.name) === dnsName(hostname))
+      .filter(
+        (record) =>
+          record.type === CNAME_RECORD_TYPE.code && dnsName(record.name) === dnsName(hostname),
+      )
       .map((record) => dnsName(record.data));
   }
 }
