@@ -25,7 +25,7 @@ export const REQUEST_DEADLINE_MS = 5_000;
  * this once and the edge renews against it forever, which is the whole reason to prefer it over
  * handing them a TXT value that changes on every issuance.
  */
-const DCV_DELEGATION_SUFFIX = 'dcv.cloudflare.com';
+export const DCV_DELEGATION_SUFFIX = 'dcv.cloudflare.com';
 
 export class CloudflareError extends Error {
   readonly status: number;

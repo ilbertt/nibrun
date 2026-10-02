@@ -1,3 +1,4 @@
+import type { RequiredDomainDnsRecord } from '@repo/protocol';
 import {
   Table,
   TableBody,
@@ -8,10 +9,8 @@ import {
 } from '@repo/ui/components/table';
 import { CopyButton } from '@repo/ui/custom/copy-button';
 import { RetryValidationButton } from '#components/apps/retry-validation-button.tsx';
-import { useApp } from '#lib/hooks/use-app.ts';
-import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useElapsed } from '#lib/hooks/use-elapsed.ts';
-import { usePlatformSuffix } from '#lib/hooks/use-platform-suffix.ts';
+import { useRequiredDomainDnsRecords } from '#lib/hooks/use-required-domain-dns-records.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 type Hostname = AppSummary['hostnames'][number];
@@ -23,8 +22,7 @@ type Hostname = AppSummary['hostnames'][number];
  * once, and often not by the person reading this page.
  */
 export function DomainRecords({ hostname }: { hostname: Hostname }) {
-  const app = useApp(useAppId());
-  const suffix = usePlatformSuffix();
+  const records = useRequiredDomainDnsRecords(hostname);
 
   return (
     <div className="flex flex-col gap-2">
@@ -40,13 +38,9 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            <DomainRecord name={hostname.hostname} value={`${app.data?.slug}.${suffix}`} />
-            {hostname.dcvTarget ? (
-              <DomainRecord
-                name={`_acme-challenge.${hostname.hostname}`}
-                value={hostname.dcvTarget}
-              />
-            ) : null}
+            {records.map((record) => (
+              <DomainRecord key={record.hostname} record={record} />
+            ))}
           </TableBody>
         </Table>
       </div>
@@ -97,12 +91,12 @@ function EdgeReport({ errors }: { errors: string[] }) {
   );
 }
 
-function DomainRecord({ name, value }: { name: string; value: string }) {
+function DomainRecord({ record }: { record: RequiredDomainDnsRecord }) {
   return (
     <TableRow>
-      <TableCell className="font-mono text-muted-foreground">CNAME</TableCell>
-      <CopyableCell value={name} />
-      <CopyableCell value={value} />
+      <TableCell className="font-mono text-muted-foreground">{record.type}</TableCell>
+      <CopyableCell value={record.hostname} />
+      <CopyableCell value={record.target} />
     </TableRow>
   );
 }
