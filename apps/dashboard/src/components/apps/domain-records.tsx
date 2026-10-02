@@ -50,7 +50,7 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
           </TableHeader>
           <TableBody>
             {dns.data?.records.map((record) => (
-              <DomainRecord key={record.hostname} record={record} />
+              <DomainRecord key={record.hostname} record={record} isChecking={dns.isFetching} />
             ))}
             {dns.isPending ? (
               <TableRow>
@@ -129,14 +129,14 @@ function EdgeReport({ errors }: { errors: string[] }) {
   );
 }
 
-function DomainRecord({ record }: { record: DomainDnsRecord }) {
+function DomainRecord({ record, isChecking }: { record: DomainDnsRecord; isChecking: boolean }) {
   return (
     <TableRow>
       <TableCell className="font-mono text-muted-foreground">{record.type}</TableCell>
       <CopyableCell value={record.hostname} />
       <CopyableCell value={record.target} />
       <TableCell>
-        <DomainDnsStatus record={record} />
+        <DomainDnsStatus record={record} isChecking={isChecking} />
       </TableCell>
     </TableRow>
   );
