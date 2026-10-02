@@ -18,6 +18,10 @@ output "victorialogs_hostname" {
   value = var.victorialogs_hostname
 }
 
+output "umami_hostname" {
+  value = var.umami_hostname
+}
+
 output "www_hostname" {
   value = var.www_hostname
 }

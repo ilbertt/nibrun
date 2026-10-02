@@ -19,6 +19,7 @@ const onBoxEnv: Record<string, string> = {
   API_HOSTNAME: requiredEnv('API_HOSTNAME'),
   DOZZLE_HOSTNAME: requiredEnv('DOZZLE_HOSTNAME'),
   VICTORIALOGS_HOSTNAME: requiredEnv('VICTORIALOGS_HOSTNAME'),
+  UMAMI_HOSTNAME: requiredEnv('UMAMI_HOSTNAME'),
   INTERNAL_PORT: requiredEnv('INTERNAL_PORT'),
   LOG_INGEST_PORT: requiredEnv('LOG_INGEST_PORT'),
   API_GITHUB_CLIENT_ID: requiredEnv('API_GITHUB_CLIENT_ID'),

@@ -67,6 +67,7 @@ services:
       - API_HOSTNAME
       - DOZZLE_HOSTNAME
       - VICTORIALOGS_HOSTNAME
+      - UMAMI_HOSTNAME
       - INTERNAL_PORT
       # Without this the Caddyfile's `:{$LOG_INGEST_PORT}` site address expands
       # to a bare `:`, which Caddy drops silently rather than refusing — the
