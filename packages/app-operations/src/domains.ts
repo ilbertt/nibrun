@@ -1,11 +1,28 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import { HostnameSchema, Value } from '@repo/protocol';
+import { HostnameSchema, type RequiredDomainDnsRecord, Value } from '@repo/protocol';
 
 const HTTP_CREATED = 201;
 
 export type AddDomainInput = { api: PublicApiClient; appId: string; hostname: string };
 export type RemoveDomainInput = AddDomainInput;
+
+export async function checkDomainDns({ api, appId, hostname }: AddDomainInput) {
+  return unwrap(
+    await api.api.apps({ appId }).hostnames.dns.get({
+      query: { hostname: Value.Parse(HostnameSchema, hostname) },
+    }),
+  );
+}
+
+export type DomainDnsRecord = Awaited<ReturnType<typeof checkDomainDns>>['records'][number];
+
+export function domainDnsPrompt(records: readonly RequiredDomainDnsRecord[]): string {
+  const table = records
+    .map((record) => `${record.type} ${record.hostname} → ${record.target}`)
+    .join('\n');
+  return `I want to set up custom DNS records for my app on nibrun. Here are the required records:\n\n${table}\n\nAsk me who my domain's DNS provider is, then guide me through adding these records in their dashboard. Explain how to enter the name and target correctly for that provider. If this is an apex domain, check whether the provider supports CNAME flattening or ALIAS/ANAME records. Help me verify propagation afterwards. Ask before replacing any existing records.`;
+}
 
 /**
  * Register a domain the owner brought.

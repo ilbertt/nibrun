@@ -1,4 +1,6 @@
-import type { RequiredDomainDnsRecord } from '@repo/protocol';
+import { type DomainDnsRecord, domainDnsPrompt } from '@repo/app-operations';
+import { Button } from '@repo/ui/components/button';
+import { Spinner } from '@repo/ui/components/spinner';
 import {
   Table,
   TableBody,
@@ -7,25 +9,43 @@ import {
   TableHeader,
   TableRow,
 } from '@repo/ui/components/table';
+import { AgentPromptButton } from '@repo/ui/custom/agent-prompt-button';
 import { CopyButton } from '@repo/ui/custom/copy-button';
+import { RefreshCwIcon } from 'lucide-react';
+import { DomainDnsStatus } from '#components/apps/domain-dns-status.tsx';
 import { RetryValidationButton } from '#components/apps/retry-validation-button.tsx';
+import { useAppId } from '#lib/hooks/use-app-id.ts';
+import { useDomainDns } from '#lib/hooks/use-domain-dns.ts';
 import { useElapsed } from '#lib/hooks/use-elapsed.ts';
-import { useRequiredDomainDnsRecords } from '#lib/hooks/use-required-domain-dns-records.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 type Hostname = AppSummary['hostnames'][number];
 
 /**
- * The records a pending domain is waiting on, under the headings a DNS provider asks for them by.
+ * The required records, under the headings a DNS provider asks for them by.
  *
  * Copyable and selectable both: a record is pasted into somebody else's form, usually more than
  * once, and often not by the person reading this page.
  */
 export function DomainRecords({ hostname }: { hostname: Hostname }) {
-  const records = useRequiredDomainDnsRecords(hostname);
+  const dns = useDomainDns({
+    appId: useAppId(),
+    hostname: hostname.hostname,
+    pending: hostname.state === 'pending',
+  });
 
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {dns.data ? (
+          <AgentPromptButton
+            label="Ask your agent"
+            prompt={domainDnsPrompt(dns.data.records)}
+            compact={true}
+          />
+        ) : null}
+        {hostname.state === 'pending' ? <RetryValidation hostname={hostname} /> : null}
+      </div>
       {/* Bordered rather than filled, because a row of this table lights up on hover and has to
           have something to light up against. */}
       <div className="overflow-hidden rounded-xl border">
@@ -35,17 +55,46 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
               <TableHead className="h-8">Type</TableHead>
               <TableHead className="h-8">Name</TableHead>
               <TableHead className="h-8">Value</TableHead>
+              <TableHead className="h-8">
+                <span className="inline-flex items-center gap-1">
+                  Status
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Check DNS"
+                    title="Check DNS"
+                    disabled={dns.isFetching}
+                    onClick={() => void dns.refetch()}
+                  >
+                    {dns.isFetching ? <Spinner /> : <RefreshCwIcon />}
+                  </Button>
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {records.map((record) => (
-              <DomainRecord key={record.hostname} record={record} />
+            {dns.data?.records.map((record) => (
+              <DomainRecord key={record.hostname} record={record} isChecking={dns.isFetching} />
             ))}
+            {dns.isPending ? (
+              <TableRow>
+                <TableCell colSpan={4}>
+                  <span className="inline-flex items-center gap-2">
+                    <Spinner />
+                    Checking DNS records…
+                  </span>
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {dns.isError ? (
+              <TableRow>
+                <TableCell colSpan={4}>Could not check DNS records. Try again.</TableCell>
+              </TableRow>
+            ) : null}
           </TableBody>
         </Table>
       </div>
       <EdgeReport errors={hostname.edgeErrors} />
-      <RetryValidation hostname={hostname} />
     </div>
   );
 }
@@ -61,19 +110,11 @@ function RetryValidation({ hostname }: { hostname: Hostname }) {
   if (!edgeHasHadItsTurn) {
     return null;
   }
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 text-muted-foreground text-xs">
-      <span>
-        Records in place? The edge retries on its own schedule; this asks it to validate now.
-      </span>
-      <RetryValidationButton hostname={hostname.hostname} />
-    </div>
-  );
+  return <RetryValidationButton hostname={hostname.hostname} />;
 }
 
 /**
- * The edge's own words on what is still missing. They say which of the two records is wrong,
- * which the table above cannot; and nothing while there are none, because a domain added a
+ * The edge's own words on what is still missing. Nothing while there are none, because a domain added a
  * moment ago has not been asked about yet and one the edge is busy with has no error to show.
  */
 function EdgeReport({ errors }: { errors: string[] }) {
@@ -91,12 +132,15 @@ function EdgeReport({ errors }: { errors: string[] }) {
   );
 }
 
-function DomainRecord({ record }: { record: RequiredDomainDnsRecord }) {
+function DomainRecord({ record, isChecking }: { record: DomainDnsRecord; isChecking: boolean }) {
   return (
     <TableRow>
       <TableCell className="font-mono text-muted-foreground">{record.type}</TableCell>
       <CopyableCell value={record.hostname} />
       <CopyableCell value={record.target} />
+      <TableCell>
+        <DomainDnsStatus record={record} isChecking={isChecking} />
+      </TableCell>
     </TableRow>
   );
 }
