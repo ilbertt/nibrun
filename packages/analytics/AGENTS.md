@@ -2,6 +2,8 @@
 
 Internal tracking shared by the marketing site and dashboard.
 
+- Seed both `www` and `dashboard` websites. Browser tracking shares `www` for
+  cross-site funnels; this does not require removing the dashboard seed.
 - Keep both sites on the same Umami website. Derive its ID from `src/config.ts`
   in clients and seeding; separate websites cannot form one native funnel.
 - Keep the browser's Distinct ID stable across sites and sign-in. Changing it

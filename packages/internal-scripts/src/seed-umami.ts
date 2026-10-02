@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { UMAMI_WEBSITE_ID } from '@repo/analytics/config';
-import { PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
+import { DASHBOARD_SITE, PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 import { compareSync, hashSync } from 'bcryptjs';
 
 const BCRYPT_ROUNDS = 10;
@@ -21,7 +21,7 @@ type Administrator = {
   twoFactorEnabled: boolean;
   twoFactorRequired: boolean;
 };
-type Website = { id: string; name: string; domain: string };
+type Website = { id: string; name: string; domain: string; previousSeedNames: string[] };
 
 function requiredConfig(name: string): string {
   const value = process.env[name];
@@ -78,8 +78,10 @@ async function seedWebsite(options: { website: Website; administratorId: string 
     text: `INSERT INTO website
       (website_id, name, domain, user_id, created_by, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $4, now(), now())
-      ON CONFLICT (website_id) DO NOTHING`,
-    values: [website.id, website.name, website.domain, administratorId],
+      ON CONFLICT (website_id) DO UPDATE
+      SET name = EXCLUDED.name, updated_at = now()
+      WHERE website.name = ANY($5::text[]) AND website.name IS DISTINCT FROM EXCLUDED.name`,
+    values: [website.id, website.name, website.domain, administratorId, website.previousSeedNames],
   });
 }
 
@@ -96,8 +98,15 @@ if (
 const websites = [
   {
     id: UMAMI_WEBSITE_ID,
-    name: PRODUCT_NAME,
+    name: 'www',
     domain: new URL(WWW_SITE.url).hostname,
+    previousSeedNames: [WWW_SITE.title, PRODUCT_NAME],
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000002',
+    name: 'dashboard',
+    domain: new URL(DASHBOARD_SITE.url).hostname,
+    previousSeedNames: [DASHBOARD_SITE.title],
   },
 ];
 
@@ -117,7 +126,7 @@ try {
     await seedWebsite({ website, administratorId });
   }
   await database.query('COMMIT');
-  console.info('Umami administrator and website are ready.');
+  console.info('Umami administrator and websites are ready.');
 } catch (error) {
   await database.query('ROLLBACK');
   throw error;
