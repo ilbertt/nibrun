@@ -18,6 +18,7 @@ import { BinarySourceRepository } from '#repositories/binary-source.repository.t
 import { CachedBinariesRepository } from '#repositories/cached-binaries.repository.ts';
 import { CustomHostnamesRepository } from '#repositories/custom-hostnames.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { DnsRepository } from '#repositories/dns.repository.ts';
 import { ExportStorageRepository } from '#repositories/export-storage.repository.ts';
 import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
@@ -30,6 +31,7 @@ import { ArtifactsService } from '#services/artifacts.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
 import { CronsService } from '#services/crons.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
+import { DomainDnsService } from '#services/domain-dns.service.ts';
 import { ExportsService } from '#services/exports.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
 import { HealthService } from '#services/health.service.ts';
@@ -97,6 +99,10 @@ const hostnamesService = new HostnamesService({
   hostnamesRepo: appHostnamesRepository,
   customHostnamesRepo: customHostnamesRepository,
   appHostDomain: env.APP_HOST_DOMAIN,
+});
+const domainDnsService = new DomainDnsService({
+  hostnamesRepo: appHostnamesRepository,
+  dnsRepo: new DnsRepository(),
 });
 const exportsService = new ExportsService({
   exportsRepo: exportsRepository,
@@ -196,6 +202,11 @@ export const LogsServicePlugin = new Elysia({ name: 'service.logs' }).decorate(
 export const HostnamesServicePlugin = new Elysia({ name: 'service.hostnames' }).decorate(
   'hostnamesService',
   hostnamesService,
+);
+
+export const DomainDnsServicePlugin = new Elysia({ name: 'service.domainDns' }).decorate(
+  'domainDnsService',
+  domainDnsService,
 );
 
 export const ExportsServicePlugin = new Elysia({ name: 'service.exports' }).decorate(

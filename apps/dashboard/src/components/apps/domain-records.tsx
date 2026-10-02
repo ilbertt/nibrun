@@ -1,3 +1,6 @@
+import { type DomainDnsRecord, domainDnsPrompt } from '@repo/app-operations';
+import { Button } from '@repo/ui/components/button';
+import { Spinner } from '@repo/ui/components/spinner';
 import {
   Table,
   TableBody,
@@ -6,25 +9,30 @@ import {
   TableHeader,
   TableRow,
 } from '@repo/ui/components/table';
+import { AgentPromptButton } from '@repo/ui/custom/agent-prompt-button';
 import { CopyButton } from '@repo/ui/custom/copy-button';
+import { RefreshCwIcon } from 'lucide-react';
+import { DomainDnsStatus } from '#components/apps/domain-dns-status.tsx';
 import { RetryValidationButton } from '#components/apps/retry-validation-button.tsx';
-import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
+import { useDomainDns } from '#lib/hooks/use-domain-dns.ts';
 import { useElapsed } from '#lib/hooks/use-elapsed.ts';
-import { usePlatformSuffix } from '#lib/hooks/use-platform-suffix.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 type Hostname = AppSummary['hostnames'][number];
 
 /**
- * The records a pending domain is waiting on, under the headings a DNS provider asks for them by.
+ * The required records, under the headings a DNS provider asks for them by.
  *
  * Copyable and selectable both: a record is pasted into somebody else's form, usually more than
  * once, and often not by the person reading this page.
  */
 export function DomainRecords({ hostname }: { hostname: Hostname }) {
-  const app = useApp(useAppId());
-  const suffix = usePlatformSuffix();
+  const dns = useDomainDns({
+    appId: useAppId(),
+    hostname: hostname.hostname,
+    pending: hostname.state === 'pending',
+  });
 
   return (
     <div className="flex flex-col gap-2">
@@ -37,21 +45,50 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
               <TableHead className="h-8">Type</TableHead>
               <TableHead className="h-8">Name</TableHead>
               <TableHead className="h-8">Value</TableHead>
+              <TableHead className="h-8">DNS</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            <DomainRecord name={hostname.hostname} value={`${app.data?.slug}.${suffix}`} />
-            {hostname.dcvTarget ? (
-              <DomainRecord
-                name={`_acme-challenge.${hostname.hostname}`}
-                value={hostname.dcvTarget}
-              />
+            {dns.data?.records.map((record) => (
+              <DomainRecord key={record.hostname} record={record} />
+            ))}
+            {dns.isPending ? (
+              <TableRow>
+                <TableCell colSpan={4}>
+                  <span className="inline-flex items-center gap-2">
+                    <Spinner />
+                    Checking DNS records…
+                  </span>
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {dns.isError ? (
+              <TableRow>
+                <TableCell colSpan={4}>Could not check DNS records. Try again.</TableCell>
+              </TableRow>
             ) : null}
           </TableBody>
         </Table>
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-muted-foreground text-xs">
+        <span>
+          Checks public DNS. Pending domains refresh every 30 seconds. Propagation, flattening, or
+          proxying can hide a CNAME. Certificate activation is checked separately.
+        </span>
+        <Button
+          variant="outline"
+          size="xs"
+          disabled={dns.isFetching}
+          onClick={() => void dns.refetch()}
+        >
+          {dns.isFetching ? <Spinner /> : <RefreshCwIcon />} Check DNS
+        </Button>
+      </div>
+      {dns.data ? (
+        <AgentPromptButton label="Tell your agent" prompt={domainDnsPrompt(dns.data.records)} />
+      ) : null}
       <EdgeReport errors={hostname.edgeErrors} />
-      <RetryValidation hostname={hostname} />
+      {hostname.state === 'pending' ? <RetryValidation hostname={hostname} /> : null}
     </div>
   );
 }
@@ -78,8 +115,7 @@ function RetryValidation({ hostname }: { hostname: Hostname }) {
 }
 
 /**
- * The edge's own words on what is still missing. They say which of the two records is wrong,
- * which the table above cannot; and nothing while there are none, because a domain added a
+ * The edge's own words on what is still missing. Nothing while there are none, because a domain added a
  * moment ago has not been asked about yet and one the edge is busy with has no error to show.
  */
 function EdgeReport({ errors }: { errors: string[] }) {
@@ -97,12 +133,15 @@ function EdgeReport({ errors }: { errors: string[] }) {
   );
 }
 
-function DomainRecord({ name, value }: { name: string; value: string }) {
+function DomainRecord({ record }: { record: DomainDnsRecord }) {
   return (
     <TableRow>
       <TableCell className="font-mono text-muted-foreground">CNAME</TableCell>
-      <CopyableCell value={name} />
-      <CopyableCell value={value} />
+      <CopyableCell value={record.hostname} />
+      <CopyableCell value={record.target} />
+      <TableCell>
+        <DomainDnsStatus record={record} />
+      </TableCell>
     </TableRow>
   );
 }
