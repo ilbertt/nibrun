@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { UMAMI_WEBSITE_ID } from '@repo/analytics/config';
-import { DASHBOARD_SITE, PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
+import { PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 import { compareSync, hashSync } from 'bcryptjs';
 
 const BCRYPT_ROUNDS = 10;
@@ -95,20 +95,12 @@ if (
 ) {
   throw new Error('UMAMI_ADMIN_PASSWORD must contain at least 8 characters and at most 72 bytes.');
 }
-const websites = [
-  {
-    id: UMAMI_WEBSITE_ID,
-    name: 'www',
-    domain: new URL(WWW_SITE.url).hostname,
-    previousSeedNames: [WWW_SITE.title, PRODUCT_NAME],
-  },
-  {
-    id: '00000000-0000-4000-8000-000000000002',
-    name: 'dashboard',
-    domain: new URL(DASHBOARD_SITE.url).hostname,
-    previousSeedNames: [DASHBOARD_SITE.title],
-  },
-];
+const website = {
+  id: UMAMI_WEBSITE_ID,
+  name: PRODUCT_NAME,
+  domain: new URL(WWW_SITE.url).hostname,
+  previousSeedNames: ['www', WWW_SITE.title],
+};
 
 // Resolve the driver from the pinned Umami image, which already ships it for Prisma.
 const imageRequire = createRequire('/app/package.json');
@@ -122,11 +114,9 @@ try {
   await database.query('BEGIN');
   await database.query("SELECT pg_advisory_xact_lock(hashtext('nibrun:umami:bootstrap'))");
   const administratorId = await seedAdministrator();
-  for (const website of websites) {
-    await seedWebsite({ website, administratorId });
-  }
+  await seedWebsite({ website, administratorId });
   await database.query('COMMIT');
-  console.info('Umami administrator and websites are ready.');
+  console.info('Umami administrator and website are ready.');
 } catch (error) {
   await database.query('ROLLBACK');
   throw error;
