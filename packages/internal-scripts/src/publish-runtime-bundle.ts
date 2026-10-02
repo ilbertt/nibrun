@@ -26,8 +26,18 @@ for (const composeFile of COMPOSE_FILES) {
 }
 
 const bundlePath = join(tmpdir(), 'nibrun-bundle.tar.gz');
+const seedScript = 'seed-umami.mjs';
+const seedBuild = await Bun.build({
+  entrypoints: [join(repoRoot, 'packages/internal-scripts/src/seed-umami.ts')],
+  target: 'node',
+  outdir: tmpdir(),
+  naming: seedScript,
+});
+if (!seedBuild.success) {
+  throw new AggregateError(seedBuild.logs, 'Unable to bundle Umami bootstrap');
+}
 
-await $`tar czf ${bundlePath} -C ${repoRoot} ${COMPOSE_FILES} -C ${join(repoRoot, 'infra/deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra')} ${CADDY_DIR}`;
+await $`tar czf ${bundlePath} -C ${repoRoot} ${COMPOSE_FILES} -C ${join(repoRoot, 'infra/deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra')} ${CADDY_DIR} -C ${tmpdir()} ${seedScript}`;
 
 const url = `s3://${deployBucket}/bundles/${revision}.tar.gz`;
 await aws(['s3', 'cp', bundlePath, url]);
