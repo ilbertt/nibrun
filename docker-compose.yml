@@ -1,10 +1,60 @@
-# Local stack: Postgres, MinIO, the API, VictoriaLogs, Dozzle and pgweb. Copy
+# Local stack: Postgres, MinIO, the API, VictoriaLogs, Dozzle, pgweb and Umami. Copy
 # .env.example to .env first.
 #
 # Anything truly opinionated (internal service URLs, container ports, bucket
 # bootstrap) lives here, not in .env.
 
 services:
+  # Analytics migrations and growth stay separate from the api's database.
+  umami-db:
+    image: postgres:18-alpine
+    container_name: umami-db
+    environment:
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD}
+      POSTGRES_DB: umami
+    volumes:
+      - umami-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - nibrun
+
+  umami:
+    image: ghcr.io/umami-software/umami:3.4.0
+    container_name: umami
+    init: true
+    environment:
+      - DATABASE_URL=postgresql://umami:${UMAMI_DB_PASSWORD}@umami-db:5432/umami
+      - APP_SECRET=${UMAMI_APP_SECRET}
+      - TWO_FACTOR_ENCRYPTION_KEY=${UMAMI_TWO_FACTOR_ENCRYPTION_KEY}
+      - DISABLE_TELEMETRY=1
+      - USE_UUIDV7=1
+      - MCP_ENABLED=1
+    ports:
+      - "127.0.0.1:${UMAMI_PORT}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/api/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: always
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    networks:
+      - nibrun
+
   postgres-db:
     image: postgres:18-alpine
     container_name: postgres-db
@@ -240,6 +290,8 @@ networks:
   nibrun:
 
 volumes:
+  umami-data:
+    driver: local
   postgres-data:
     driver: local
   minio-data:

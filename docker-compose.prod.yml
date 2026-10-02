@@ -139,6 +139,12 @@ services:
       - nibrun
 
 volumes:
+  umami-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/volumes/umami-data
+
   postgres-data:
     driver_opts:
       type: none
