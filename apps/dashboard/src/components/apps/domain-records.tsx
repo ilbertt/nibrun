@@ -36,6 +36,16 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
 
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {dns.data ? (
+          <AgentPromptButton
+            label="Ask your agent"
+            prompt={domainDnsPrompt(dns.data.records)}
+            compact={true}
+          />
+        ) : null}
+        {hostname.state === 'pending' ? <RetryValidation hostname={hostname} /> : null}
+      </div>
       {/* Bordered rather than filled, because a row of this table lights up on hover and has to
           have something to light up against. */}
       <div className="overflow-hidden rounded-xl border">
@@ -45,7 +55,21 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
               <TableHead className="h-8">Type</TableHead>
               <TableHead className="h-8">Name</TableHead>
               <TableHead className="h-8">Value</TableHead>
-              <TableHead className="h-8">Status</TableHead>
+              <TableHead className="h-8">
+                <span className="inline-flex items-center gap-1">
+                  Status
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Check DNS"
+                    title="Check DNS"
+                    disabled={dns.isFetching}
+                    onClick={() => void dns.refetch()}
+                  >
+                    {dns.isFetching ? <Spinner /> : <RefreshCwIcon />}
+                  </Button>
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -70,21 +94,7 @@ export function DomainRecords({ hostname }: { hostname: Hostname }) {
           </TableBody>
         </Table>
       </div>
-      <div className="flex justify-end">
-        <Button
-          variant="outline"
-          size="xs"
-          disabled={dns.isFetching}
-          onClick={() => void dns.refetch()}
-        >
-          {dns.isFetching ? <Spinner /> : <RefreshCwIcon />} Check DNS
-        </Button>
-      </div>
-      {dns.data ? (
-        <AgentPromptButton label="Ask your agent" prompt={domainDnsPrompt(dns.data.records)} />
-      ) : null}
       <EdgeReport errors={hostname.edgeErrors} />
-      {hostname.state === 'pending' ? <RetryValidation hostname={hostname} /> : null}
     </div>
   );
 }
@@ -100,14 +110,7 @@ function RetryValidation({ hostname }: { hostname: Hostname }) {
   if (!edgeHasHadItsTurn) {
     return null;
   }
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 text-muted-foreground text-xs">
-      <span>
-        Records in place? The edge retries on its own schedule; this asks it to validate now.
-      </span>
-      <RetryValidationButton hostname={hostname.hostname} />
-    </div>
-  );
+  return <RetryValidationButton hostname={hostname.hostname} />;
 }
 
 /**
