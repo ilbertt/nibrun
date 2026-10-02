@@ -1,6 +1,7 @@
 import { useAnalytics } from '@repo/analytics';
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet, redirect } from '@tanstack/react-router';
+import { AnalyticsSession } from '#components/analytics-session.tsx';
 import { AppDevtools } from '#components/app-devtools.tsx';
 import { sameOriginPath } from '#lib/same-origin-path.ts';
 import { sessionQueryOptions } from '#queries/session.ts';
@@ -47,6 +48,7 @@ function RouteComponent() {
   useAnalytics();
   return (
     <>
+      <AnalyticsSession />
       <Outlet />
       <AppDevtools />
     </>

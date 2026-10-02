@@ -1,4 +1,4 @@
-import { trackEvent } from '@repo/analytics';
+import { analyticsIdentityState, trackEvent } from '@repo/analytics';
 import {
   awaitDeploymentSettled,
   type DeployableBinary,
@@ -130,7 +130,11 @@ function deploymentAnalytics({
   return new DeploymentAnalytics({
     emit: trackEvent,
     data: {
-      identity_state: identity,
+      identity_state:
+        identity === SessionIdentity.Visitor &&
+        analyticsIdentityState() === SessionIdentity.Anonymous
+          ? SessionIdentity.Anonymous
+          : identity,
       operation:
         request.appId === undefined ? 'create' : carriesBinary(request) ? 'update' : 'retry',
       binary_delivery: binaryDelivery(request),

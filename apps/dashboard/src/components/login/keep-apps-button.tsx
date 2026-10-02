@@ -10,7 +10,7 @@ import { useSignIn } from '#lib/hooks/use-sign-in.ts';
  */
 export function KeepAppsButton({ size }: { size: 'sm' | 'lg' }) {
   const here = useLocation({ select: (location) => location.href });
-  const signIn = useSignIn(here);
+  const signIn = useSignIn({ callbackURL: here, reason: 'keep-app' });
 
   return (
     <Button
