@@ -139,6 +139,14 @@ services:
       - nibrun
 
 volumes:
+  # Analytics rides the data volume's DLM snapshots, separately from the api's
+  # nightly logical dump so event volume cannot grow that backup.
+  umami-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/volumes/umami-data
+
   postgres-data:
     driver_opts:
       type: none

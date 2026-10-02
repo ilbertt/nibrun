@@ -27,6 +27,7 @@ API_DB_USER="${API_DB_USER:-nibrun}"
 API_DB_NAME="${API_DB_NAME:-nibrun}"
 API_DB_PORT="${API_DB_PORT:-5432}"
 PGWEB_PORT="${PGWEB_PORT:-8081}"
+UMAMI_PORT="${UMAMI_PORT:-3003}"
 API_S3_PORT="${API_S3_PORT:-9000}"
 API_S3_CONSOLE_PORT="${API_S3_CONSOLE_PORT:-9001}"
 DOZZLE_PORT="${DOZZLE_PORT:-8080}"
@@ -38,7 +39,7 @@ VICTORIALOGS_RETENTION_PERIOD="${VICTORIALOGS_RETENTION_PERIOD:-30d}"
 # Postgres and the log store: production talks to real S3, so MinIO does not run
 # here and has no volume to back.
 log "Ensuring the persistent data volume is mounted and holds the data-bearing volumes"
-bash ensure_data_volume.sh volumes/postgres-data volumes/victorialogs-data
+bash ensure_data_volume.sh volumes/postgres-data volumes/victorialogs-data volumes/umami-data
 
 secret() {
   aws ssm get-parameter --name "${SSM_SECRET_PREFIX}/$1" --with-decryption \
@@ -54,6 +55,9 @@ API_S3_ACCESS_KEY_ID="$(secret api_s3_access_key_id)"
 API_S3_SECRET_ACCESS_KEY="$(secret api_s3_secret_access_key)"
 PGWEB_AUTH_USER="$(secret pgweb_auth_user)"
 PGWEB_AUTH_PASS="$(secret pgweb_auth_pass)"
+UMAMI_DB_PASSWORD="$(secret umami_db_password)"
+UMAMI_APP_SECRET="$(secret umami_app_secret)"
+UMAMI_TWO_FACTOR_ENCRYPTION_KEY="$(secret umami_two_factor_encryption_key)"
 
 # Everything written from here on carries a secret: the PEMs below, then .env.
 umask 077
@@ -98,6 +102,11 @@ API_DB_PORT=${API_DB_PORT}
 PGWEB_PORT=${PGWEB_PORT}
 PGWEB_AUTH_USER=${PGWEB_AUTH_USER}
 PGWEB_AUTH_PASS=${PGWEB_AUTH_PASS}
+
+UMAMI_PORT=${UMAMI_PORT}
+UMAMI_DB_PASSWORD=${UMAMI_DB_PASSWORD}
+UMAMI_APP_SECRET=${UMAMI_APP_SECRET}
+UMAMI_TWO_FACTOR_ENCRYPTION_KEY=${UMAMI_TWO_FACTOR_ENCRYPTION_KEY}
 
 API_S3_ENDPOINT=${API_S3_ENDPOINT}
 ARTIFACTS_BUCKET=${ARTIFACTS_BUCKET}
