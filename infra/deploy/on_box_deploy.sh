@@ -58,6 +58,8 @@ PGWEB_AUTH_PASS="$(secret pgweb_auth_pass)"
 UMAMI_DB_PASSWORD="$(secret umami_db_password)"
 UMAMI_APP_SECRET="$(secret umami_app_secret)"
 UMAMI_TWO_FACTOR_ENCRYPTION_KEY="$(secret umami_two_factor_encryption_key)"
+UMAMI_ADMIN_USERNAME="$(secret umami_admin_username)"
+UMAMI_ADMIN_PASSWORD="$(secret umami_admin_password)"
 
 # Everything written from here on carries a secret: the PEMs below, then .env.
 umask 077
@@ -107,6 +109,8 @@ UMAMI_PORT=${UMAMI_PORT}
 UMAMI_DB_PASSWORD=${UMAMI_DB_PASSWORD}
 UMAMI_APP_SECRET=${UMAMI_APP_SECRET}
 UMAMI_TWO_FACTOR_ENCRYPTION_KEY=${UMAMI_TWO_FACTOR_ENCRYPTION_KEY}
+UMAMI_ADMIN_USERNAME=${UMAMI_ADMIN_USERNAME}
+UMAMI_ADMIN_PASSWORD=${UMAMI_ADMIN_PASSWORD}
 
 API_S3_ENDPOINT=${API_S3_ENDPOINT}
 ARTIFACTS_BUCKET=${ARTIFACTS_BUCKET}
@@ -221,6 +225,9 @@ EOF
   fi
   sleep 5
 done
+
+log "Ensuring Umami administrator and websites exist"
+$compose exec -T umami node --input-type=module < seed-umami.mjs
 
 # `up -d` leaves a container alone when only a bind-mounted file changed, so a
 # new Caddyfile or a re-issued certificate would go on being ignored. Reload

@@ -347,3 +347,14 @@ variable "ssm_secret_prefix" {
   type    = string
   default = "/nibrun"
 }
+
+variable "umami_admin_username" {
+  type        = string
+  default     = "nibrun"
+  description = "Initial Umami administrator username; subsequent changes belong in Umami."
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9_-]{0,254}$", var.umami_admin_username))
+    error_message = "Use 1–255 lowercase letters, digits, underscores or hyphens, starting with a letter or digit."
+  }
+}

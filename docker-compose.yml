@@ -40,6 +40,8 @@ services:
       - DISABLE_TELEMETRY=1
       - USE_UUIDV7=1
       - MCP_ENABLED=1
+      - UMAMI_ADMIN_USERNAME=${UMAMI_ADMIN_USERNAME}
+      - UMAMI_ADMIN_PASSWORD=${UMAMI_ADMIN_PASSWORD}
     ports:
       - "127.0.0.1:${UMAMI_PORT}:3000"
     healthcheck:

@@ -14,6 +14,7 @@
     "publish-app-host-bundle": "bun run src/publish-app-host-bundle.ts",
     "publish-guest-image": "bun run src/publish-guest-image.ts",
     "publish-runtime-bundle": "bun run src/publish-runtime-bundle.ts",
+    "seed-umami": "bun run src/seed-umami.ts",
     "ssm-deploy": "bun run src/ssm-deploy.ts",
     "ssm-deploy-app-hosts": "bun run src/ssm-deploy-app-hosts.ts",
     "terraform-apply": "bun run src/terraform-apply.ts",
@@ -29,6 +30,7 @@
   },
   "dependencies": {
     "@actions/core": "^3.0.1",
-    "@repo/global-constants": "workspace:*"
+    "@repo/global-constants": "workspace:*",
+    "bcryptjs": "3.0.3"
   }
 }
