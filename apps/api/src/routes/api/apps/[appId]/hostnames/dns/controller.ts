@@ -11,6 +11,9 @@ export const AppsAppIdHostnamesDnsController = new Elysia()
   .use(loggerPlugin('appsAppIdHostnamesDnsController'))
   .use(AuthPlugin)
   .use(DomainDnsServicePlugin)
+  .onRequest(({ set }) => {
+    set.headers['cache-control'] = 'no-store';
+  })
   .get(
     '/apps/:appId/hostnames/dns',
     async ({ domainDnsService, params, query, user }) => {

@@ -10,6 +10,7 @@ export type RemoveDomainInput = AddDomainInput;
 export async function checkDomainDns({ api, appId, hostname }: AddDomainInput) {
   return unwrap(
     await api.api.apps({ appId }).hostnames.dns.get({
+      fetch: { cache: 'no-store' },
       query: { hostname: Value.Parse(HostnameSchema, hostname) },
     }),
   );
