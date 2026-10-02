@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { DASHBOARD_SITE, WWW_SITE } from '@repo/global-constants';
+import { UMAMI_WEBSITE_ID } from '@repo/analytics/config';
+import { PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 import { compareSync, hashSync } from 'bcryptjs';
 
 const BCRYPT_ROUNDS = 10;
@@ -20,7 +21,6 @@ type Administrator = {
   twoFactorEnabled: boolean;
   twoFactorRequired: boolean;
 };
-type Website = { id: string; name: string; domain: string };
 
 function requiredConfig(name: string): string {
   const value = process.env[name];
@@ -71,14 +71,13 @@ async function seedAdministrator(): Promise<string> {
   return id;
 }
 
-async function seedWebsite(options: { website: Website; administratorId: string }): Promise<void> {
-  const { website, administratorId } = options;
+async function seedWebsite(administratorId: string): Promise<void> {
   await database.query({
     text: `INSERT INTO website
       (website_id, name, domain, user_id, created_by, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $4, now(), now())
       ON CONFLICT (website_id) DO NOTHING`,
-    values: [website.id, website.name, website.domain, administratorId],
+    values: [UMAMI_WEBSITE_ID, PRODUCT_NAME, new URL(WWW_SITE.url).hostname, administratorId],
   });
 }
 
@@ -92,19 +91,6 @@ if (
 ) {
   throw new Error('UMAMI_ADMIN_PASSWORD must contain at least 8 characters and at most 72 bytes.');
 }
-const websites = [
-  {
-    id: '00000000-0000-4000-8000-000000000001',
-    name: WWW_SITE.title,
-    domain: new URL(WWW_SITE.url).hostname,
-  },
-  {
-    id: '00000000-0000-4000-8000-000000000002',
-    name: DASHBOARD_SITE.title,
-    domain: new URL(DASHBOARD_SITE.url).hostname,
-  },
-];
-
 // Resolve the driver from the pinned Umami image, which already ships it for Prisma.
 const imageRequire = createRequire('/app/package.json');
 const adapterRequire = createRequire(imageRequire.resolve('@prisma/adapter-pg'));
@@ -117,11 +103,9 @@ try {
   await database.query('BEGIN');
   await database.query("SELECT pg_advisory_xact_lock(hashtext('nibrun:umami:bootstrap'))");
   const administratorId = await seedAdministrator();
-  for (const website of websites) {
-    await seedWebsite({ website, administratorId });
-  }
+  await seedWebsite(administratorId);
   await database.query('COMMIT');
-  console.info('Umami administrator and both websites are ready.');
+  console.info('Umami administrator and website are ready.');
 } catch (error) {
   await database.query('ROLLBACK');
   throw error;

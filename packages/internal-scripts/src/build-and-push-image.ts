@@ -14,6 +14,7 @@ const platform = optionalEnv('PLATFORM') ?? 'linux/amd64';
 const sourceLabel = optionalEnv('SOURCE_LABEL') ?? GITHUB_REPO_URL;
 const cacheFrom = optionalEnv('CACHE_FROM');
 const cacheTo = optionalEnv('CACHE_TO');
+const umamiHostname = optionalEnv('UMAMI_HOSTNAME');
 
 core.setOutput('image-uri', imageUri);
 
@@ -42,6 +43,7 @@ const argv = [
   dockerfile,
   ...(cacheFrom ? ['--cache-from', cacheFrom] : []),
   ...(cacheTo ? ['--cache-to', cacheTo] : []),
+  ...(umamiHostname ? ['--build-arg', `UMAMI_HOSTNAME=${umamiHostname}`] : []),
   buildContext,
 ];
 
