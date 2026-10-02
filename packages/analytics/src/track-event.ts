@@ -8,8 +8,10 @@ export function trackEvent({ name, data }: AnalyticsEvent): void {
     return;
   }
   const page = pagePayload();
+  const entry = readEntry();
   const properties = {
-    ...readEntry(),
+    ...entry,
+    entry_preset_slug: entry.preset_slug,
     site: analyticsSite(window.location.hostname),
     identity_state: 'unknown',
     ...data,

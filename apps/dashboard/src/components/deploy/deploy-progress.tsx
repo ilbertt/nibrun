@@ -1,3 +1,4 @@
+import { trackEvent } from '@repo/analytics';
 import type { DeployStep } from '@repo/app-operations';
 import { Button } from '@repo/ui/components/button';
 import { Spinner } from '@repo/ui/components/spinner';
@@ -6,6 +7,8 @@ import { type ReactNode, useEffect, useRef } from 'react';
 import { UploadMeter } from '#components/deploy/upload-meter.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import { type DeployPhase, isUploading } from '#lib/hooks/use-run-app.ts';
+import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
+import { SessionIdentity } from '#lib/session-identity.ts';
 
 /** Long enough for the app's own tab to be the one in front before this one moves off the run. */
 const FOLLOW_DELAY_MS = 1000;
@@ -17,6 +20,7 @@ export function DeployProgress({ done, goToApp }: { done: ReactNode; goToApp: ()
   const run = useDeployRun();
   const waiting = waitingOn(run.phase);
   const followToApp = useFollowLater(goToApp);
+  const identity = useSessionIdentity();
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -49,7 +53,18 @@ export function DeployProgress({ done, goToApp }: { done: ReactNode; goToApp: ()
             href={run.deployed.url}
             target="_blank"
             rel="noreferrer"
-            onClick={followToApp}
+            onClick={() => {
+              trackEvent({
+                name: 'app_open_clicked',
+                data: {
+                  identity_state:
+                    identity === SessionIdentity.Visitor ? SessionIdentity.Anonymous : identity,
+                  app_id: run.deployed!.appId,
+                  placement: 'deployment',
+                },
+              });
+              followToApp();
+            }}
             className="wrap-anywhere font-medium font-mono underline underline-offset-4"
           >
             {run.deployed.url}

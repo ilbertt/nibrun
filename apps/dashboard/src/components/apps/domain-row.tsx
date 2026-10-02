@@ -12,7 +12,8 @@ import type { AppSummary } from '#queries/apps.ts';
 type Hostname = AppSummary['hostnames'][number];
 
 export function DomainRow({ hostname }: { hostname: Hostname }) {
-  const removal = useRemoveDomain(useAppId());
+  const appId = useAppId();
+  const removal = useRemoveDomain(appId);
   // The platform hostname has no remove: it is how the app is addressed once every brought
   // domain has gone, and nothing would put it back.
   const isPlatform = hostname.kind === 'platform';
@@ -20,7 +21,7 @@ export function DomainRow({ hostname }: { hostname: Hostname }) {
   return (
     <li className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-4">
-        <HostnameLink hostname={hostname.hostname} />
+        <HostnameLink hostname={hostname.hostname} appId={appId} />
         <div className="flex shrink-0 items-center gap-2">
           {isPlatform ? <Badge variant="outline">Issued</Badge> : null}
           <HostnameStateBadge state={hostname.state} />
