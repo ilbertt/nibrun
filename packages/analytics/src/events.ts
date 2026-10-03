@@ -9,6 +9,9 @@ export type DeploymentContext = {
 export const SIGN_IN_REASONS = ['login', 'keep-app'] as const;
 
 export type AnalyticsEventData = {
+  pricing_link_clicked: { cta_placement: 'header' };
+  pricing_viewed: Record<string, never>;
+  pricing_calculated: { app_count: number };
   deploy_cta_clicked: {
     cta_placement: 'header' | 'footer' | 'preset';
     preset_slug: string | undefined;

@@ -1,3 +1,4 @@
+import { trackEvent } from '@repo/analytics';
 import { LLMS_TXT_PATH } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { Link } from '@tanstack/react-router';
@@ -29,7 +30,14 @@ export function SiteHeader() {
         </Button>
         {/* Routed to the page rather than the fragment alone: this header is on the blog too, and
             a bare `#pricing` there is a link to nothing. */}
-        <Button variant="ghost" size="sm" render={<Link to="/" hash="pricing" />}>
+        <Button
+          variant="ghost"
+          size="sm"
+          render={<Link to="/" hash="pricing" />}
+          onClick={() =>
+            trackEvent({ name: 'pricing_link_clicked', data: { cta_placement: 'header' } })
+          }
+        >
           Pricing
         </Button>
         <Button

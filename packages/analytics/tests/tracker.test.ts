@@ -74,7 +74,9 @@ Object.defineProperty(globalThis, 'document', {
     head: {
       appendChild(script: HTMLScriptElement) {
         scripts.push(script);
-        nativeTrack(nativePayload(browser.location.href));
+        if (script.src.endsWith('/script.js')) {
+          nativeTrack(nativePayload(browser.location.href));
+        }
         script.onload?.(new Event('load'));
       },
     },
@@ -150,7 +152,7 @@ test('native pageviews share identity and redact queries, titles and app IDs', a
   nativeTrack(nativePayload(browser.location.href));
   nativeTrack(nativePayload('/apps/private-id/logs?path=SECRET'));
   nativeTrack(nativePayload('/apps/another-private-id/logs'));
-  expect(scripts).toHaveLength(1);
+  expect(scripts).toHaveLength(2);
   expect(events).toHaveLength(EXPECTED_PAGEVIEWS);
   expect(events[0]?.referrer).toBe('https://github.com');
   expect(events[0]?.id).toBe(id);
@@ -158,6 +160,14 @@ test('native pageviews share identity and redact queries, titles and app IDs', a
   expect(JSON.stringify(events)).not.toContain('SECRET');
   expect(JSON.stringify(events)).not.toContain('Private app');
   expect(JSON.stringify(events)).not.toContain('private-id');
+});
+
+test('the recorder loads once alongside the tracker for the same website', async () => {
+  expect(await loadTracker()).toBe(true);
+  expect(scripts).toHaveLength(2);
+  expect(scripts[1]?.src).toBe('https://analytics.example/recorder.js');
+  expect(scripts[1]?.dataset.websiteId).toBe(scripts[0]?.dataset.websiteId);
+  expect(scripts[1]?.async).toBe(true);
 });
 
 test('back and forward pageviews use the current URL and redact their referrer', () => {
