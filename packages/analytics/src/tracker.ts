@@ -46,12 +46,24 @@ export function loadTracker(): Promise<boolean> {
     script.onload = () => {
       // Umami 3.4 observes pushState/replaceState but does not listen for popstate.
       window.addEventListener('popstate', syncHistoryTraversal);
+      loadRecorder(hostname);
       resolve(true);
     };
     script.onerror = () => resolve(false);
     document.head.appendChild(script);
   });
   return loading;
+}
+
+function loadRecorder(hostname: string): void {
+  if (!trackingAllowed()) {
+    return;
+  }
+  const script = document.createElement('script');
+  script.src = `https://${hostname}/recorder.js`;
+  script.async = true;
+  script.dataset.websiteId = UMAMI_WEBSITE_ID;
+  document.head.appendChild(script);
 }
 
 function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined {
