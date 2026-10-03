@@ -12,7 +12,6 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
-    "@repo/analytics": "workspace:*",
     "@repo/api-client": "workspace:*",
     "@repo/app-operations": "workspace:*",
     "@repo/binary-handoff": "workspace:*",
@@ -31,7 +30,8 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "sonner": "catalog:",
-    "tailwindcss": "catalog:"
+    "tailwindcss": "catalog:",
+    "@repo/analytics": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

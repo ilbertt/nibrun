@@ -17,6 +17,7 @@ const config = defineConfig({
     'import.meta.env.SITE_TITLE': JSON.stringify(DASHBOARD_SITE.title),
     'import.meta.env.SITE_DESCRIPTION': JSON.stringify(DASHBOARD_SITE.description),
     'import.meta.env.OG_IMAGE_URL': JSON.stringify(DASHBOARD_SITE.ogImage.url),
+    'import.meta.env.OG_IMAGE_TYPE': JSON.stringify(DASHBOARD_SITE.ogImage.type),
     'import.meta.env.OG_IMAGE_WIDTH': JSON.stringify(DASHBOARD_SITE.ogImage.width),
     'import.meta.env.OG_IMAGE_HEIGHT': JSON.stringify(DASHBOARD_SITE.ogImage.height),
   },
