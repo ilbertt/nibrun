@@ -3,7 +3,6 @@ import tailwindcss from '@tailwindcss/vite';
 import { devtools } from '@tanstack/devtools-vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import viteReact from '@vitejs/plugin-react';
-import { lookup } from 'mrmime';
 import { defineConfig } from 'vite';
 
 // Must match the api's PORT (see apps/api/.env.example).
@@ -18,9 +17,6 @@ const config = defineConfig({
     'import.meta.env.SITE_TITLE': JSON.stringify(DASHBOARD_SITE.title),
     'import.meta.env.SITE_DESCRIPTION': JSON.stringify(DASHBOARD_SITE.description),
     'import.meta.env.OG_IMAGE_URL': JSON.stringify(DASHBOARD_SITE.ogImage.url),
-    'import.meta.env.OG_IMAGE_TYPE': JSON.stringify(
-      lookup(new URL(DASHBOARD_SITE.ogImage.url).pathname),
-    ),
     'import.meta.env.OG_IMAGE_WIDTH': JSON.stringify(DASHBOARD_SITE.ogImage.width),
     'import.meta.env.OG_IMAGE_HEIGHT': JSON.stringify(DASHBOARD_SITE.ogImage.height),
   },

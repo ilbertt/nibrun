@@ -28,7 +28,6 @@
     "@tanstack/react-router-devtools": "^1.167.1",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
-    "mrmime": "^2.0.1",
     "react": "catalog:",
     "react-dom": "catalog:",
     "sonner": "catalog:",
