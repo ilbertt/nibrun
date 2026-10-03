@@ -22,7 +22,7 @@ export function domainDnsPrompt(records: readonly RequiredDomainDnsRecord[]): st
   const table = records
     .map((record) => `${record.type} ${record.hostname} → ${record.target}`)
     .join('\n');
-  return `I want to set up custom DNS records for my app on nibrun. Here are the required records:\n\n${table}\n\nAsk me who my domain's DNS provider is, then guide me through adding these records in their dashboard. Explain how to enter the name and target correctly for that provider. If this is an apex domain, check whether the provider supports CNAME flattening or ALIAS/ANAME records. Help me verify propagation afterwards. Ask before replacing any existing records.`;
+  return `I want to set up custom DNS records for my app on nibrun. Here are the required records:\n\n${table}\n\nAsk me who my domain's DNS provider is, then guide me through adding these records in their dashboard. Explain how to enter the name and target correctly for that provider. If this is a root (apex) domain, explain that my registrar or DNS provider may not support root-level CNAME records. Check whether the provider supports CNAME flattening or ALIAS/ANAME records for the required target. If none are supported, explain that I may need to switch my domain's authoritative nameservers to a DNS provider such as Cloudflare, which supports root-level CNAMEs through CNAME flattening. Explain that I can keep my current registrar, and guide me through preserving all existing DNS records, including email records, before changing nameservers. Help me verify propagation afterwards. Ask before replacing any existing records or changing nameservers.`;
 }
 
 /**
