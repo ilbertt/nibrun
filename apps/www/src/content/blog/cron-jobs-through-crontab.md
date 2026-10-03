@@ -10,7 +10,7 @@ generate a report or run a daily task using the same binary you already deploy.
 The schedule lives with your application. Register it during server startup using normal
 crontab syntax, and nibrun handles running the jobs. No extra config.
 
-![A binary registers an hourly crontab and nibrun wakes the idle app when the job is due.](/blog/cron-jobs-through-crontab.png)
+![A binary registers an hourly crontab and nibrun wakes the idle app when the job is due.](/blog/cron-jobs-through-crontab.webp)
 
 ## Registering a job
 

@@ -29,6 +29,10 @@ export function pageHead({
       ? []
       : [
           { property: 'og:image', content: `${WWW_SITE.url}${image}` },
+          {
+            property: 'og:image:type',
+            content: image.endsWith('.webp') ? 'image/webp' : WWW_SITE.ogImage.type,
+          },
           { property: 'og:image:alt', content: title },
           { name: 'twitter:image', content: `${WWW_SITE.url}${image}` },
           { name: 'twitter:image:alt', content: title },
