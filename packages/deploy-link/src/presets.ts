@@ -310,7 +310,8 @@ export const DEPLOY_PRESETS = {
     subtitle: 'A private file server you can connect to with any WebDAV client, powered by rclone.',
     deployLink: {
       name: 'webdav',
-      binary: 'https://downloads.rclone.org/v1.75.1/rclone-v1.75.1-linux-amd64.zip',
+      binary:
+        'https://github.com/rclone/rclone/releases/download/v1.75.1/rclone-v1.75.1-linux-amd64.zip',
       sha256: '982b5aa772841168f8e380f139e9e787b2a105403e32b94da8676a0e1c0a13ab',
       port: 8080,
       arg: [
