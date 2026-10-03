@@ -1,0 +1,30 @@
+# intent-workflow-version: 6
+name: Check Skills
+
+on:
+  pull_request: {}
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    uses: TanStack/intent/.github/workflows/check-skills.yml@3cf6c146aa36288fba6bc5b7190413d878706756 # v0.5.0
+    with:
+      artifacts: '_artifacts'
+      node-version: '24'
+      repair: true
+
+  review:
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+    uses: TanStack/intent/.github/workflows/review-skills.yml@3cf6c146aa36288fba6bc5b7190413d878706756 # v0.5.0
+    with:
+      package-label: 'nibrun'
+      node-version: '24'

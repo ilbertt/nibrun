@@ -1,3 +1,28 @@
+<!-- intent-maintainer:start -->
+## Skill maintenance
+
+Use the lockfile-pinned Intent dependency; do not download a replacement during maintenance.
+Before source or skill work, read its procedure with
+`bun run --bun intent meta generate-skill`.
+
+- Keep each skill's `sources` in its frontmatter. `bun skills:sync` derives the matching
+  tree metadata; `_artifacts/domain_map.yaml` records tasks, and `_artifacts/skill_spec.md`
+  records scope, decisions, and verification limits.
+- Before handoff, run `bun skills:sync` and `bun skills:review --json`. Inspect affected
+  guidance and unmapped changes, update skills when behavior changes, and record an
+  outcome, reason, and evidence with `bun skills:review --record <report.json>`.
+  Accurate guidance can receive a justified `no-change` outcome. Commit
+  `.intent/review-state.json` with the changes it reviews.
+- Finish with `bun check:skills`. CI checks against the PR's base commit.
+- Register future skills with `bun run --bun intent maintainer add`, keeping the shared
+  planning records cumulative. Root skills stay in `skills/`; package-specific skills
+  belong to their owning package. Keep the existing `npx skills add ilbertt/nibrun`
+  distribution alongside Intent maintenance.
+
+Intent validates structure and JS/TS snippets. Shell examples and deployment behavior
+need relevant package tests or a manual check; passing Intent alone does not verify them.
+<!-- intent-maintainer:end -->
+
 ## Project
 
 nibrun hosts a user-uploaded compiled binary in an isolated guest with a
