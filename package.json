@@ -8,7 +8,10 @@
     "check:types": "bun run --bun turbo check:types",
     "test": "bun run --bun turbo test",
     "check:codestyle": "bun run --bun biome check",
-    "check:all": "bun check:types && bun check:codestyle && bun run test",
+    "check:skills": "bun run --bun intent maintainer check",
+    "check:all": "bun check:types && bun check:codestyle && bun run test && bun check:skills",
+    "skills:sync": "bun run --bun intent maintainer sync",
+    "skills:review": "bun run --bun intent maintainer review",
     "check:commit-message": "bun run --bun commitlint",
     "fix:codestyle": "bun run --bun biome check --write"
   },
@@ -40,9 +43,13 @@
     "@commitlint/config-conventional": "^21.2.2",
     "@commitlint/format": "^21.2.2",
     "@commitlint/types": "^21.2.0",
+    "@tanstack/intent": "0.5.0",
     "@types/bun": "1.4.2",
-    "typescript": "catalog:",
-    "turbo": "^2.10.12"
+    "turbo": "^2.10.12",
+    "typescript": "catalog:"
   },
-  "packageManager": "bun@1.4.2"
+  "packageManager": "bun@1.4.2",
+  "keywords": [
+    "tanstack-intent"
+  ]
 }

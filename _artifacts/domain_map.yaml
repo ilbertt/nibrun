@@ -1,0 +1,47 @@
+library:
+  name: nibrun
+domains:
+  - name: Deployment
+    slug: deployment
+    description: Preparing and operating a single-binary app on nibrun.
+skills:
+  - name: deploy-to-nibrun
+    slug: deploy-to-nibrun
+    domain: deployment
+    description: Deploy and operate a compiled binary or static site on nibrun.
+    packages:
+      - nibrun
+      - '@repo/cli'
+      - '@repo/app-operations'
+      - '@repo/protocol'
+      - '@repo/runtime'
+      - '@repo/agent'
+      - '@repo/api'
+    tasks:
+      - Decide whether nibrun fits the app's runtime and persistence needs.
+      - Build a Linux x86_64 binary and deploy it with first-run configuration.
+      - Deploy static assets with nib serve and select SPA fallback when needed.
+      - Redeploy an existing app while preserving its data and unnamed environment variables.
+      - Seed starting data or restore a copy from an app export.
+      - Configure guest runtime values, an extra public port, and crontab-backed jobs.
+      - Verify the public HTTP response and inspect deployment logs.
+    covers:
+      - CLI deployment, settings updates, logs, domains, and exports
+      - Guest filesystem, environment, resources, health, and restart contract
+      - Initial data archives and persistent storage
+      - Idle sleep, public ports, and cron execution
+    failure_modes:
+      - mistake: Redeploy without identifying the existing app.
+        mechanism: Noninteractive nib run without --app creates another app.
+        source: packages/cli/src/commands/run/[command].ts
+      - mistake: Supply starting data during a redeploy.
+        mechanism: --data-folder and --app are refused together because data is seeded at creation.
+        source: packages/cli/src/lib/initial-data.ts
+      - mistake: Treat a serving deployment as verified HTTP behavior.
+        mechanism: The default health probe only establishes a TCP connection.
+        source: packages/protocol/src/domain/instance.ts
+gaps:
+  - skill: deploy-to-nibrun
+    question: Shell snippets are not validated by Intent's JS/TS example checker.
+    context: Use existing CLI and operation tests; live deployment and fresh-consumer behavior remain separate checks.
+    status: open

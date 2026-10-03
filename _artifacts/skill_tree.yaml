@@ -1,0 +1,44 @@
+library:
+  name: nibrun
+generated_from:
+  domain_map: _artifacts/domain_map.yaml
+  skill_spec: _artifacts/skill_spec.md
+skills:
+  - name: deploy-to-nibrun
+    slug: deploy-to-nibrun
+    domain: deployment
+    path: skills/deploy-to-nibrun/SKILL.md
+    description: Deploy a compiled binary to nibrun and run it as an HTTPS service.
+      Use when asked to deploy, ship, host or run a self-contained server binary
+      (Bun, Go, Rust, Zig, C) or a folder of static assets on nibrun, when
+      working in a repo that targets nibrun, or when deciding whether nibrun
+      fits an app.
+    sources:
+      - "**/packages/cli/src/**"
+      - "**/packages/app-operations/src/**"
+      - "**/packages/protocol/src/domain/app.ts"
+      - "**/packages/protocol/src/domain/instance.ts"
+      - "**/packages/protocol/src/domain/volume.ts"
+      - "**/packages/protocol/src/domain/cron.ts"
+      - "**/packages/protocol/src/lib/wire.ts"
+      - "**/apps/runtime/src/**"
+      - "**/apps/agent/src/lib/cron/**"
+      - "**/apps/agent/src/services/cron-*.ts"
+      - "**/apps/agent/src/lib/reconcile/**"
+      - "**/apps/agent/src/lib/volumes/**"
+      - "**/apps/agent/src/lib/exports/**"
+      - "**/apps/agent/src/lib/vm/instance-env.ts"
+      - "**/apps/api/src/lib/app-config.ts"
+      - "**/apps/api/src/services/apps.service.ts"
+      - "**/apps/api/src/services/deployments.service.ts"
+      - "**/apps/api/src/services/artifacts.service.ts"
+      - "**/apps/api/src/services/imports.service.ts"
+      - "**/apps/api/src/services/exports.service.ts"
+      - "**/apps/api/src/services/crons.service.ts"
+      - "**/infra/guest-image/rootfs/build-rootfs.sh"
+      - "**/infra/terraform/variables.tf"
+      - "**/infra/terraform/providers.tf"
+      - "**/infra/terraform/s3.tf"
+    requires: []
+distribution:
+  mode: none
