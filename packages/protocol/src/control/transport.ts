@@ -27,8 +27,8 @@ export const AGENT_API_PREFIX = '/internal/agent';
 // request body keeps them to exactly one wire format and one validation path rather than adding
 // query-string coercion at the only edge that would need it.
 //
-// Tenant output is not among them. It goes from the agent to the log store directly, on a port of
-// its own, so a host's log volume can never delay the desired state it is waiting on.
+// Live tenant output goes directly to the log store on its own port. The export route only reads
+// retained output for a requested bundle, so shipping a log burst never waits on this channel.
 export const AGENT_ROUTES = {
   session: '/session',
   desiredState: '/desired-state',
@@ -39,6 +39,7 @@ export const AGENT_ROUTES = {
   filesystemQueryResult: '/filesystem-query-result',
   cronQuery: '/cron-query',
   cronQueryResult: '/cron-query-result',
+  exportLogs: '/export-logs',
 } as const;
 
 /**

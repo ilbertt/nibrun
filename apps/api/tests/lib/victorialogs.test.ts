@@ -88,3 +88,35 @@ describe('the query endpoint answers with one window of the store', () => {
     expect(collect()).rejects.toThrow(VictoriaLogsError);
   });
 });
+
+describe('an export reads retained logs as a stream', () => {
+  test('asks for all records through the cutoff without a start or row limit', async () => {
+    const body = jsonLine({ _msg: 'retained output' });
+    answer = { body, chunkAt: Math.floor(body.length / HALF) };
+    asked.length = 0;
+    const stream = await client.export.open({
+      query: QUERY,
+      end: START,
+      signal: new AbortController().signal,
+    });
+
+    expect(await new Response(stream).text()).toBe(body);
+    expect(asked[0]?.path).toBe('/select/logsql/query');
+    expect(Object.fromEntries(asked[0]!.form)).toEqual({
+      query: QUERY,
+      end: START,
+      timeout: '1h',
+    });
+  });
+
+  test('an abandoned export does not reach the store', async () => {
+    asked.length = 0;
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      client.export.open({ query: QUERY, end: START, signal: controller.signal }),
+    ).rejects.toThrow();
+    expect(asked).toHaveLength(0);
+  });
+});

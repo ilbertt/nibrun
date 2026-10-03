@@ -34,6 +34,12 @@ export {
   HostDesiredStateSchema,
 } from '#control/desired-state.ts';
 export {
+  type ExportLogEvent,
+  ExportLogEventSchema,
+  type ExportLogsRequest,
+  ExportLogsRequestSchema,
+} from '#control/export-logs.ts';
+export {
   type FilesystemQuery,
   type FilesystemQueryRequest,
   FilesystemQueryRequestSchema,

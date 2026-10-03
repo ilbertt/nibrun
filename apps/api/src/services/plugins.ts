@@ -24,6 +24,7 @@ import { ExportStorageRepository } from '#repositories/export-storage.repository
 import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { ImportsRepository } from '#repositories/imports.repository.ts';
+import { LogExportsRepository } from '#repositories/log-exports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
 import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
@@ -33,6 +34,7 @@ import { AssetsService } from '#services/assets.service.ts';
 import { CronsService } from '#services/crons.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
 import { DomainDnsService } from '#services/domain-dns.service.ts';
+import { ExportLogsService } from '#services/export-logs.service.ts';
 import { ExportsService } from '#services/exports.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
 import { HealthService } from '#services/health.service.ts';
@@ -86,6 +88,10 @@ const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient);
 const dnsRepository = new DnsRepository(cloudflareDnsClient);
 const logsRepository = new LogsRepository(victoriaLogsClient);
+const exportLogsService = new ExportLogsService({
+  agentRepo: agentRepository,
+  logsRepo: new LogExportsRepository(victoriaLogsClient.export),
+});
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
@@ -216,6 +222,11 @@ export const DomainDnsServicePlugin = new Elysia({ name: 'service.domainDns' }).
 export const ExportsServicePlugin = new Elysia({ name: 'service.exports' }).decorate(
   'exportsService',
   exportsService,
+);
+
+export const ExportLogsServicePlugin = new Elysia({ name: 'service.exportLogs' }).decorate(
+  'exportLogsService',
+  exportLogsService,
 );
 
 export const ImportsServicePlugin = new Elysia({ name: 'service.imports' }).decorate(

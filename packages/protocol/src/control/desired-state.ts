@@ -139,6 +139,8 @@ export const DesiredExportSchema = Type.Object({
   objectKey: ObjectKeySchema,
   artifact: DesiredArtifactSchema,
   environment: Type.Optional(TenantEnvironmentSchema),
+  // An older control plane has no log export route, so a newer host must not call it.
+  includeLogs: Type.Optional(Type.Literal(true)),
   desiredState: DesiredPresenceSchema,
 });
 

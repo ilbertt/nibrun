@@ -81,6 +81,7 @@ function desiredExportRow(state: ExportState): DesiredExportRow {
 describe('what a host is told to do about an export', () => {
   test.each(['pending', 'preparing'] as const)('is to write it while it is %s', (state) => {
     expect(desired({ state }).desiredState).toBe('present');
+    expect(desired({ state }).includeLogs).toBe(true);
   });
 
   /**
@@ -90,6 +91,7 @@ describe('what a host is told to do about an export', () => {
    */
   test.each(['ready', 'failed'] as const)('is to forget it once it is %s', (state) => {
     expect(desired({ state }).desiredState).toBe('absent');
+    expect(desired({ state }).includeLogs).toBeUndefined();
   });
 
   // An app runs one microVM against one filesystem, so the volume is the app.

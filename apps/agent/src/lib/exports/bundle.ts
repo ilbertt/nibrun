@@ -2,6 +2,7 @@ import { basename } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact, TenantEnvironment } from '@repo/protocol';
 import { Data, Duration, Effect, Either } from 'effect';
+import { EXPORTED_LOGS_FILENAME } from '#lib/exports/logs.ts';
 import { BINARY_MODE, downloadAndVerify } from '#lib/vm/artifacts.ts';
 import { MKFS_ROOT_ENTRIES } from '#lib/volumes/ext4.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
@@ -134,11 +135,13 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
   artifact,
   environment,
   crontab,
+  logs,
   stagingDir,
 }: {
   artifact: DesiredArtifact;
   environment: TenantEnvironment | undefined;
   crontab: string | undefined;
+  logs: boolean;
   stagingDir: string;
 }) {
   const fs = yield* FileSystem.FileSystem;
@@ -146,7 +149,8 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
   const config = yield* AgentConfig;
   const uploadedBinaryName = yield* bundleBinaryName(artifact);
   const binaryName =
-    crontab !== undefined && uploadedBinaryName === CRONTAB_FILENAME
+    (crontab !== undefined && uploadedBinaryName === CRONTAB_FILENAME) ||
+    (logs && uploadedBinaryName === EXPORTED_LOGS_FILENAME)
       ? `${uploadedBinaryName}.binary`
       : uploadedBinaryName;
 
@@ -184,6 +188,7 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
       binaryName,
       ...(environment === undefined ? [] : [ENV_FILENAME]),
       ...(crontab === undefined ? [] : [CRONTAB_FILENAME]),
+      ...(logs ? [EXPORTED_LOGS_FILENAME] : []),
     ],
     timeout: DUMP_TIMEOUT,
   });

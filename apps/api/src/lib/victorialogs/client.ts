@@ -1,3 +1,4 @@
+import { durationToMs } from '#lib/duration.ts';
 import { type LogRow, lines, toRow } from '#lib/victorialogs/parse.ts';
 
 const QUERY_PATH = '/select/logsql/query';
@@ -53,7 +54,9 @@ abstract class VictoriaLogsEndpoint {
   protected async send(init: RequestInit): Promise<Response> {
     const response = await fetch(this.url, {
       ...init,
-      signal: AbortSignal.timeout(this.deadlineMs),
+      signal: init.signal
+        ? AbortSignal.any([init.signal, AbortSignal.timeout(this.deadlineMs)])
+        : AbortSignal.timeout(this.deadlineMs),
     });
     if (!response.ok) {
       throw new VictoriaLogsError({
@@ -129,6 +132,34 @@ export class VictoriaLogsHealth extends VictoriaLogsEndpoint {
   }
 }
 
+// An export reads all retained output, so it needs a streaming response and a longer deadline
+// than the bounded windows used by a live log view.
+const EXPORT_TIMEOUT = '1h';
+const EXPORT_DEADLINE_MS = durationToMs(EXPORT_TIMEOUT);
+
+export class VictoriaLogsExport extends VictoriaLogsEndpoint {
+  constructor(baseUrl: URL) {
+    super({ baseUrl, path: QUERY_PATH, deadlineMs: EXPORT_DEADLINE_MS });
+  }
+
+  async open({ query, end, signal }: { query: string; end: string; signal: AbortSignal }) {
+    const response = await this.send({
+      method: 'POST',
+      headers: { 'content-type': FORM_CONTENT_TYPE },
+      body: new URLSearchParams({ query, end, timeout: EXPORT_TIMEOUT }),
+      signal,
+    });
+    return (
+      response.body ??
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.close();
+        },
+      })
+    );
+  }
+}
+
 /**
  * Reads the store, and only reads it.
  *
@@ -139,9 +170,11 @@ export class VictoriaLogsHealth extends VictoriaLogsEndpoint {
 export class VictoriaLogsClient {
   readonly query: VictoriaLogsQuery;
   readonly health: VictoriaLogsHealth;
+  readonly export: VictoriaLogsExport;
 
   constructor(baseUrl: URL) {
     this.query = new VictoriaLogsQuery(baseUrl);
     this.health = new VictoriaLogsHealth(baseUrl);
+    this.export = new VictoriaLogsExport(baseUrl);
   }
 }

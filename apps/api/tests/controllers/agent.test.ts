@@ -180,6 +180,14 @@ describe('a host polls for filesystem reads on a channel of its own', () => {
 });
 
 describe('nothing reaches desired state without proving what it is', () => {
+  test('an unknown session cannot read logs for an export', async () => {
+    const response = await post({
+      route: AGENT_ROUTES.exportLogs,
+      body: { exportId: 'export-1' },
+      sessionToken: 'not-a-session',
+    });
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  });
   test('an unknown session cannot collect another tenant read', async () => {
     const response = await pollFilesystem({ sessionToken: 'not-a-session' });
 

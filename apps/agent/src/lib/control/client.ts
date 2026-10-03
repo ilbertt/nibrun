@@ -8,6 +8,7 @@ import {
   type CronQueryResult,
   type DesiredStateRequest,
   DesiredStateResponseSchema,
+  type ExportLogsRequest,
   type FilesystemQueryRequest,
   FilesystemQueryResponseSchema,
   type FilesystemQueryResult,
@@ -17,10 +18,11 @@ import {
   parseMessage,
   type SecretString,
 } from '@repo/protocol';
-import { Data, Effect } from 'effect';
+import { Data, Duration, Effect } from 'effect';
 import { decode } from '#lib/protocol.ts';
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const EXPORT_TIMEOUT_MS = Duration.toMillis(Duration.hours(1));
 
 /**
  * Query routes answer slowly on purpose: a poll for a read is held there until a read
@@ -121,6 +123,38 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
   });
 
   return {
+    fetchExportLogs: ({
+      sessionToken,
+      request,
+      signal,
+    }: {
+      sessionToken: SecretString;
+      request: ExportLogsRequest;
+      signal: AbortSignal;
+    }) =>
+      call({
+        route: AGENT_ROUTES.exportLogs,
+        send: () =>
+          api.internal.agent['export-logs'].post(
+            request,
+            options({ sessionToken, timeoutMs: EXPORT_TIMEOUT_MS, signal }),
+          ),
+      }).pipe(
+        Effect.flatMap((value) =>
+          decode(() => {
+            if (
+              value &&
+              typeof value === 'object' &&
+              Symbol.asyncIterator in value &&
+              typeof value[Symbol.asyncIterator] === 'function'
+            ) {
+              return value as AsyncIterable<unknown>;
+            }
+            throw new Error('The log export response is not a stream.');
+          }),
+        ),
+      ),
+
     openSession: (request: AgentSessionRequest) =>
       call({
         route: AGENT_ROUTES.session,

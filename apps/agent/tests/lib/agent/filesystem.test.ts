@@ -131,6 +131,7 @@ function immediateApi(queued: FilesystemQuery[]) {
     ControlPlane,
     ControlPlane.make({
       openSession: unreached,
+      fetchExportLogs: unreached,
       fetchDesiredState: unreached,
       sendReportedState: unreached,
       fetchCronQuery: unreached,

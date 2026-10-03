@@ -42,12 +42,14 @@ function bundling({
   environment = {},
   crontab,
   filename = 'pocketbase',
+  logs,
 }: {
   dumps?: keyof typeof DUMPS;
   /** `'unknown'` is a control plane that could not say, which is not the same as none. */
   environment?: Record<string, string> | 'unknown';
   crontab?: string;
   filename?: string;
+  logs?: string;
 } = {}) {
   return Effect.gen(function* () {
     const stagingDir = yield* temporaryDirectory;
@@ -67,11 +69,19 @@ function bundling({
     const result = yield* Effect.either(
       Effect.provide(
         Effect.flatMap(dumpVolume({ devicePath: DEVICE_PATH, stagingDir }), () =>
-          writeBundle({
-            artifact: artifact({ filename: Value.Parse(FilenameSchema, filename) }),
-            environment: environment === 'unknown' ? undefined : tenantEnvironment(environment),
-            crontab,
-            stagingDir,
+          Effect.gen(function* () {
+            if (logs !== undefined) {
+              yield* Effect.promise(() =>
+                writeFile(join(stagingDir, 'logs.jsonl'), logs, { mode: PRIVATE_MODE }),
+              );
+            }
+            return yield* writeBundle({
+              artifact: artifact({ filename: Value.Parse(FilenameSchema, filename) }),
+              environment: environment === 'unknown' ? undefined : tenantEnvironment(environment),
+              crontab,
+              logs: logs !== undefined,
+              stagingDir,
+            });
           }),
         ),
         layer,
@@ -185,6 +195,16 @@ describe('the exported crontab', () => {
     expect(archived).toContain('crontab');
     expect(archived).not.toContain('crontab.binary');
   });
+});
+
+test('includes staged logs without overwriting an app binary uploaded as logs.jsonl', async () => {
+  const { commands, result } = await run(
+    bundling({ filename: 'logs.jsonl', logs: '{"_msg":"hello"}\n' }),
+  );
+  expect(Either.isRight(result)).toBe(true);
+  const archived = commands.find((call) => call.command[0] === 'tar')?.command;
+  expect(archived).toContain('logs.jsonl');
+  expect(archived).toContain('logs.jsonl.binary');
 });
 
 // The bundle exists so the copy can be run, and `tar` records the mode the staging tree has. A

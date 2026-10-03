@@ -52,6 +52,7 @@ export function toDesiredExport({
     // it, so sending the owner's variables again would put secrets on the wire to no end.
     environment:
       desiredState === 'present' ? bundleEnvironment({ row, environments, secretsKey }) : undefined,
+    ...(desiredState === 'present' ? { includeLogs: true } : {}),
     desiredState,
   };
 }

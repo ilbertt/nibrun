@@ -12,6 +12,7 @@ import {
 import { attachedCheckpoint, detachReader, stopCheckpointServer } from '#lib/exports/reader.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
+import { ExportLogs } from '#services/export-logs.service.ts';
 import { ExportUploader } from '#services/export-uploader.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -32,6 +33,7 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
     const filesystem = topology.place();
     const uploader = yield* ExportUploader;
     const crons = yield* CronRegistry;
+    const logs = yield* ExportLogs;
     const reader = yield* Effect.makeSemaphore(READER_PERMITS);
 
     /**
@@ -129,6 +131,10 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
             artifact: desired.artifact,
             environment: desired.environment,
             crontab: table && table.jobs.length > 0 ? table.crontab : undefined,
+            logs:
+              desired.includeLogs === true
+                ? yield* logs.write({ exportId: desired.exportId, stagingDir })
+                : false,
             stagingDir,
           });
           yield* uploader.upload({ bundlePath: bundle.path, objectKey: desired.objectKey });
@@ -158,5 +164,6 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
     ZerofsTopology.Default,
     ExportUploader.Default,
     CronRegistry.Default,
+    ExportLogs.Default,
   ],
 }) {}

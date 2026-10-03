@@ -19,6 +19,7 @@ import { CronRegistrationReceiver } from '#services/cron-registration-receiver.s
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { CronScheduler } from '#services/cron-scheduler.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
+import { ExportLogs } from '#services/export-logs.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
 import { ExportUploader } from '#services/export-uploader.service.ts';
 import { FilesystemReader } from '#services/filesystem-reader.service.ts';
@@ -67,6 +68,7 @@ const agent = Layer.mergeAll(
   VolumeManager.Default,
   ExportUploader.Default,
   ExportManager.Default,
+  ExportLogs.Default,
   FilesystemReader.Default,
   VmManager.Default,
   DesiredStateCache.Default,

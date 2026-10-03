@@ -25,6 +25,7 @@ export async function* lines(body: ReadableStream<Uint8Array>): AsyncGenerator<s
       }
     }
   }
+  buffered += decoder.decode();
   if (buffered.length > 0) {
     yield buffered;
   }

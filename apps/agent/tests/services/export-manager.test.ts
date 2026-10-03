@@ -5,8 +5,10 @@ import { join } from 'node:path';
 import { Deferred, Effect, Exit, Fiber, Layer } from 'effect';
 import { UnknownException } from 'effect/Cause';
 import type { CommandRequest, CommandResult } from '#lib/exec.ts';
+import { ExportLogsIncomplete } from '#lib/exports/logs.ts';
 import { EXPORT_READER_DEVICE_PATH } from '#lib/network/slot.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
+import { ExportLogs } from '#services/export-logs.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
 import { ExportUploader } from '#services/export-uploader.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -38,6 +40,9 @@ type Script = {
   readonly uploadFails?: boolean;
   readonly interrupt?: boolean;
   readonly crontab?: string;
+  readonly includeLogs?: true;
+  readonly logs?: string;
+  readonly logExportFails?: boolean;
 };
 
 /**
@@ -131,11 +136,17 @@ const staged = (script: Script) =>
     const stateDir = yield* temporaryDirectory;
     const vmDir = join(stateDir, 'vm');
     const exportStagingDir = join(stateDir, 'exports');
-    const desired = desiredExport();
+    const desired = desiredExport({ includeLogs: script.includeLogs });
     const guest = yield* fakeGuest({ vmDir, appId: APP_ID, behaviour: script.guest });
     const frozenAtCut: boolean[] = [];
     const reachedDump = yield* Deferred.make<void>();
-    const uploads: { objectKey: string; commandsSoFar: number; crontab: string | undefined }[] = [];
+    const uploads: {
+      objectKey: string;
+      commandsSoFar: number;
+      crontab: string | undefined;
+      logs: string | undefined;
+    }[] = [];
+    const logReads: number[] = [];
 
     const { commands, layer: commandLayer } = recordingCommands(
       answering({
@@ -155,7 +166,10 @@ const staged = (script: Script) =>
             const crontab = yield* Effect.promise(() =>
               readFile(join(bundlePath, '..', 'crontab'), 'utf8').catch(() => undefined),
             );
-            uploads.push({ objectKey, commandsSoFar: commands.length, crontab });
+            const logs = yield* Effect.promise(() =>
+              readFile(join(bundlePath, '..', 'logs.jsonl'), 'utf8').catch(() => undefined),
+            );
+            uploads.push({ objectKey, commandsSoFar: commands.length, crontab, logs });
             return yield* script.uploadFails
               ? Effect.fail(new UnknownException(new Error('the bucket refused the bundle')))
               : Effect.void;
@@ -166,6 +180,23 @@ const staged = (script: Script) =>
     const support = Layer.mergeAll(
       agentConfig({ vmDir, exportStagingDir, cronRegistryFile: join(stateDir, 'crons.json') }),
       uploader,
+      Layer.succeed(
+        ExportLogs,
+        ExportLogs.make({
+          write: ({ stagingDir }) =>
+            Effect.gen(function* () {
+              logReads.push(commands.length);
+              if (script.logExportFails) {
+                return yield* new ExportLogsIncomplete();
+              }
+              if (script.logs === undefined) {
+                return false;
+              }
+              yield* Effect.promise(() => writeFile(join(stagingDir, 'logs.jsonl'), script.logs!));
+              return true;
+            }),
+        }),
+      ),
       commandLayer,
       artifactStore(),
       platform,
@@ -176,6 +207,7 @@ const staged = (script: Script) =>
       exportStagingDir,
       frozenAtCut,
       uploads,
+      logReads,
       reachedDump,
       lines: () => commands.map(({ command }) => command.join(' ')),
       layers: Layer.provideMerge(
@@ -301,6 +333,40 @@ describe('the crontab in an app export', () => {
       expect(lines.find((line) => line.startsWith('tar '))).not.toContain('crontab');
     },
   );
+});
+
+describe('retained app logs in an export', () => {
+  test('are fetched after the checkpoint is released and included in the archive', async () => {
+    const logs = '{"_msg":"hello"}\n';
+    const { result, uploads, lines, logReads } = await run(exporting({ includeLogs: true, logs }));
+    expect(Exit.isSuccess(result)).toBe(true);
+    expect(uploads[0]?.logs).toBe(logs);
+    expect(lines.find((line) => line.startsWith('tar '))).toContain('logs.jsonl');
+    expect(logReads[0]).toBeGreaterThan(at({ lines, needle: 'checkpoint delete' }));
+  });
+
+  test('are omitted when the log store has no retained output', async () => {
+    const { result, uploads, lines, logReads } = await run(exporting({ includeLogs: true }));
+    expect(Exit.isSuccess(result)).toBe(true);
+    expect(uploads[0]?.logs).toBeUndefined();
+    expect(lines.find((line) => line.startsWith('tar '))).not.toContain('logs.jsonl');
+    expect(logReads).toHaveLength(1);
+  });
+
+  test('are not requested from a control plane that predates log exports', async () => {
+    const { result, logReads } = await run(exporting());
+    expect(Exit.isSuccess(result)).toBe(true);
+    expect(logReads).toEqual([]);
+  });
+
+  test('a failed log transfer fails the bundle, uploads nothing, and removes staging', async () => {
+    const { result, uploads, exportStagingDir } = await run(
+      exporting({ includeLogs: true, logExportFails: true }),
+    );
+    expect(Exit.isFailure(result)).toBe(true);
+    expect(uploads).toEqual([]);
+    expect(existsSync(exportStagingDir)).toBe(false);
+  });
 });
 
 describe('a freeze that did not survive the cut', () => {

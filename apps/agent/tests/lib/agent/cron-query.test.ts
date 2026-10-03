@@ -48,6 +48,7 @@ function queryApi(queued: CronQuery[]) {
       ControlPlane,
       ControlPlane.make({
         openSession: unreached,
+        fetchExportLogs: unreached,
         fetchDesiredState: unreached,
         sendReportedState: unreached,
         fetchFilesystemQuery: unreached,
