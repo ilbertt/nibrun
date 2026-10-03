@@ -1,8 +1,6 @@
-import { WWW_SITE } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileTextIcon } from 'lucide-react';
-import { lookup } from 'mrmime';
 import { ArticleBody } from '#components/article-body.tsx';
 import { DeployCta } from '#components/deploy-cta.tsx';
 import { GithubStarLink } from '#components/github-star-link.tsx';
@@ -26,7 +24,7 @@ export const Route = createFileRoute('/blog/$slug')({
     if (post === undefined) {
       return {};
     }
-    const head = pageHead({
+    return pageHead({
       path: `/blog/${post.slug}`,
       title: pageTitle(post.title),
       description: post.description,
@@ -34,15 +32,6 @@ export const Route = createFileRoute('/blog/$slug')({
       image: post.image,
       markdown: { path: postMarkdownPath(post), title: 'This post in Markdown' },
     });
-    const imageType =
-      post.image === undefined ? undefined : lookup(new URL(post.image, WWW_SITE.url).pathname);
-    if (imageType !== undefined) {
-      head.meta.push({
-        property: 'og:image:type',
-        content: imageType,
-      });
-    }
-    return head;
   },
   component: RouteComponent,
 });
