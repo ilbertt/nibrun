@@ -5,7 +5,10 @@ import { analyticsIdentity } from '#identity.ts';
 import { analyticsPath, analyticsReferrer, analyticsSite } from '#page.ts';
 
 type Payload = Record<string, unknown>;
-type Tracker = { track(payload: (defaults: Payload) => Payload): Promise<void> };
+type Tracker = {
+  track(payload: (defaults: Payload) => Payload): Promise<void>;
+  identify(data: { account_id: string }): Promise<void>;
+};
 type AnalyticsWindow = Window & {
   umami?: Tracker;
   nibrunBeforeSend?: typeof beforeSend;
@@ -13,6 +16,26 @@ type AnalyticsWindow = Window & {
 let loading: Promise<boolean> | undefined;
 let previousPage: URL | undefined;
 let distinctId: string | undefined;
+let accountId: string | undefined;
+
+export function analyticsAccountId(): string | undefined {
+  return accountId;
+}
+
+export function setAnalyticsAccountId(id: string | undefined): boolean {
+  if (id === accountId) {
+    return false;
+  }
+  accountId = id;
+  void loadTracker()
+    .then(async (loaded) => {
+      if (loaded && accountId === id && trackingAllowed()) {
+        await (window as AnalyticsWindow).umami?.identify({ account_id: id ?? '' });
+      }
+    })
+    .catch(function ignoreAnalyticsFailure() {});
+  return true;
+}
 
 export function trackingAllowed(): boolean {
   return (
@@ -47,6 +70,7 @@ export function loadTracker(): Promise<boolean> {
       // Umami 3.4 observes pushState/replaceState but not popstate or hashchange.
       window.addEventListener('popstate', syncLocation);
       window.addEventListener('hashchange', syncLocation);
+      loadRecorder(hostname);
       resolve(true);
     };
     script.onerror = () => resolve(false);
@@ -55,8 +79,19 @@ export function loadTracker(): Promise<boolean> {
   return loading;
 }
 
+function loadRecorder(hostname: string): void {
+  if (!trackingAllowed()) {
+    return;
+  }
+  const script = document.createElement('script');
+  script.src = `https://${hostname}/recorder.js`;
+  script.async = true;
+  script.dataset.websiteId = UMAMI_WEBSITE_ID;
+  document.head.appendChild(script);
+}
+
 function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined {
-  if ((type !== 'event' && type !== 'performance') || !trackingAllowed()) {
+  if ((type !== 'event' && type !== 'identify' && type !== 'performance') || !trackingAllowed()) {
     return undefined;
   }
   const url = new URL(String(payload.url), window.location.href);
@@ -76,6 +111,7 @@ function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined 
   }
   return {
     ...payload,
+    ...(type === 'identify' && { data: { account_id: accountId ?? '' } }),
     id: distinctId,
     url: `${url.origin}${analyticsPath({ site, pathname: url.pathname })}${url.hash}`,
     referrer: sanitizedReferrer(payload.referrer),

@@ -9,6 +9,9 @@ export type DeploymentContext = {
 export const SIGN_IN_REASONS = ['login', 'keep-app'] as const;
 
 export type AnalyticsEventData = {
+  pricing_link_clicked: { cta_placement: 'header' };
+  pricing_viewed: Record<string, never>;
+  pricing_calculated: { app_count: number };
   deploy_cta_clicked: {
     cta_placement: 'header' | 'footer' | 'preset';
     preset_slug: string | undefined;
@@ -40,7 +43,11 @@ export type AnalyticsEventData = {
   app_open_clicked: { identity_state: string; app_id: string; placement: 'deployment' | 'app' };
   session_seen: { identity_state: string };
   sign_in_started: { identity_state: string; reason: (typeof SIGN_IN_REASONS)[number] };
-  sign_in_completed: { identity_state: string; reason: (typeof SIGN_IN_REASONS)[number] };
+  sign_in_completed: {
+    identity_state: string;
+    previous_identity_state: string | undefined;
+    reason: (typeof SIGN_IN_REASONS)[number];
+  };
   sign_in_failed: { identity_state: string; reason: (typeof SIGN_IN_REASONS)[number] };
   app_claimed: { identity_state: string; app_id: string };
   app_viewed: { identity_state: string; app_id: string; tab: string };

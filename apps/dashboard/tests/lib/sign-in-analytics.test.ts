@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { AppIdSchema, TimestampSchema, Value } from '@repo/protocol';
+import { SessionIdentity } from '#lib/session-identity.ts';
 import { consumeSignIn, verifiedClaims } from '#lib/sign-in-analytics.ts';
 
 const APP_ID = Value.Parse(AppIdSchema, '00000000-0000-4000-8000-000000000001');
@@ -9,6 +10,7 @@ const SIGN_IN_WINDOW_MS = 60_000;
 test('a sign-in return is consumed once and accepts only app identifiers', () => {
   let stored: string | null = JSON.stringify({
     reason: 'keep-app',
+    previous_identity_state: SessionIdentity.Anonymous,
     expires_at: Date.now() + SIGN_IN_WINDOW_MS,
     anonymous_app_ids: [APP_ID, null],
   });
@@ -20,7 +22,10 @@ test('a sign-in return is consumed once and accepts only app identifiers', () =>
       stored = null;
     },
   };
-  expect(consumeSignIn(storage)?.anonymous_app_ids).toEqual([APP_ID]);
+  expect(consumeSignIn(storage)).toMatchObject({
+    previous_identity_state: SessionIdentity.Anonymous,
+    anonymous_app_ids: [APP_ID],
+  });
   expect(consumeSignIn(storage)).toBeUndefined();
 });
 
@@ -33,14 +38,35 @@ test('expired and malformed sign-in records cannot create conversions', () => {
       expires_at: Date.now() + SIGN_IN_WINDOW_MS,
       anonymous_app_ids: [],
     }),
+    JSON.stringify({
+      reason: 'login',
+      previous_identity_state: 'invalid',
+      expires_at: Date.now() + SIGN_IN_WINDOW_MS,
+      anonymous_app_ids: [],
+    }),
   ]) {
     expect(consumeSignIn({ getItem: () => stored, removeItem() {} })).toBeUndefined();
+  }
+});
+
+test('visitor sign-ins and records created before identity tracking are not anonymous conversions', () => {
+  for (const identity of [SessionIdentity.Visitor, undefined]) {
+    const stored = JSON.stringify({
+      reason: 'login',
+      previous_identity_state: identity,
+      expires_at: Date.now() + SIGN_IN_WINDOW_MS,
+      anonymous_app_ids: [],
+    });
+    expect(consumeSignIn({ getItem: () => stored, removeItem() {} })?.previous_identity_state).toBe(
+      identity,
+    );
   }
 });
 
 test('a claim requires the same anonymous app to become permanent under the account', () => {
   const pending = {
     reason: 'keep-app' as const,
+    previous_identity_state: SessionIdentity.Anonymous,
     expires_at: Date.now() + SIGN_IN_WINDOW_MS,
     anonymous_app_ids: [APP_ID],
   };

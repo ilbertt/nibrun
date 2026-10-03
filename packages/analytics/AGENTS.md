@@ -10,6 +10,10 @@ Internal tracking shared by the marketing site and dashboard.
 - Declare Vite environment types in `src/vite-env.d.ts`, without local casts.
 - Keep the browser's Distinct ID stable across sites and sign-in. Changing it
   during authentication splits Umami sessions and breaks conversion funnels.
+- Attach the opaque account ID as Umami session data and custom event data, and
+  clear it on sign-out. Never send names or emails. Persist the pre-sign-in
+  identity state across OAuth so completed sign-ins can distinguish anonymous
+  upgrades from visitor logins.
 - Use Umami's automatic SPA tracking and documented `data-before-send` hook.
   Add a navigation fallback only for a verified gap in the pinned tracker.
 - Gate tracking through `trackingAllowed()`, including custom events. Preserve

@@ -28,7 +28,7 @@ export function useSignIn({
   return useMutation({
     mutationFn: async () => {
       if (trackingAllowed()) {
-        rememberSignIn({ reason, anonymousAppIds: cachedAnonymousApps(queryClient) });
+        rememberSignIn({ reason, identity, anonymousAppIds: cachedAnonymousApps(queryClient) });
         trackEvent({ name: 'sign_in_started', data: { identity_state: identity, reason } });
       }
       const result = await authClient.signIn.social({ provider: 'github', callbackURL: landing });
