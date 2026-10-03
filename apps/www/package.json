@@ -15,7 +15,6 @@
     "check:types": "bun run cf:typegen && bun run --bun tsc"
   },
   "dependencies": {
-    "@repo/analytics": "workspace:*",
     "@repo/binary-handoff": "workspace:*",
     "@repo/deploy-link": "workspace:*",
     "@repo/global-constants": "workspace:*",
@@ -28,7 +27,8 @@
     "mrmime": "^2.0.1",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "tailwindcss": "catalog:"
+    "tailwindcss": "catalog:",
+    "@repo/analytics": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.58.0",

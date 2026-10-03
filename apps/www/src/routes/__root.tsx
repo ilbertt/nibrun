@@ -3,7 +3,6 @@ import { PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 import { Toaster } from '@repo/ui/components/sonner';
 import appCss from '@repo/ui/globals.css?url';
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router';
-import { lookup } from 'mrmime';
 import type { ReactNode } from 'react';
 import { themeScript } from '#lib/theme-script.ts';
 
@@ -16,7 +15,7 @@ export const Route = createRootRoute({
       { property: 'og:site_name', content: PRODUCT_NAME },
       { property: 'og:locale', content: 'en_US' },
       { property: 'og:image', content: WWW_SITE.ogImage.url },
-      { property: 'og:image:type', content: lookup(new URL(WWW_SITE.ogImage.url).pathname) },
+      { property: 'og:image:type', content: WWW_SITE.ogImage.type },
       { property: 'og:image:width', content: `${WWW_SITE.ogImage.width}` },
       { property: 'og:image:height', content: `${WWW_SITE.ogImage.height}` },
       { property: 'og:image:alt', content: WWW_SITE.title },
