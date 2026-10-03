@@ -9,7 +9,6 @@ export type Site = {
   description: string;
   ogImage: {
     url: string;
-    type: string;
     width: number;
     height: number;
   };
@@ -18,7 +17,7 @@ export type Site = {
 function site(fields: Omit<Site, 'ogImage'>): Site {
   return {
     ...fields,
-    ogImage: { url: `${fields.url}/og.png`, type: 'image/png', width: 1200, height: 630 },
+    ogImage: { url: `${fields.url}/og.png`, width: 1200, height: 630 },
   };
 }
 

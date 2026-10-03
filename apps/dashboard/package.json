@@ -12,6 +12,7 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
+    "@repo/analytics": "workspace:*",
     "@repo/api-client": "workspace:*",
     "@repo/app-operations": "workspace:*",
     "@repo/binary-handoff": "workspace:*",
@@ -27,11 +28,11 @@
     "@tanstack/react-router-devtools": "^1.167.1",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
+    "mrmime": "^2.0.1",
     "react": "catalog:",
     "react-dom": "catalog:",
     "sonner": "catalog:",
-    "tailwindcss": "catalog:",
-    "@repo/analytics": "workspace:*"
+    "tailwindcss": "catalog:"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

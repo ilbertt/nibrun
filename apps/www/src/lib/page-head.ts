@@ -1,4 +1,5 @@
 import { LLMS_TXT_PATH, PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
+import { lookup } from 'mrmime';
 
 /**
  * The tags that differ per page, kept in one place because some of them cannot be repeated:
@@ -31,7 +32,7 @@ export function pageHead({
           { property: 'og:image', content: `${WWW_SITE.url}${image}` },
           {
             property: 'og:image:type',
-            content: image.endsWith('.webp') ? 'image/webp' : WWW_SITE.ogImage.type,
+            content: lookup(new URL(image, WWW_SITE.url).pathname),
           },
           { property: 'og:image:alt', content: title },
           { name: 'twitter:image', content: `${WWW_SITE.url}${image}` },
