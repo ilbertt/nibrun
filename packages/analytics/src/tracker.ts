@@ -38,6 +38,7 @@ export function loadTracker(): Promise<boolean> {
     script.async = true;
     script.dataset.websiteId = UMAMI_WEBSITE_ID;
     script.dataset.beforeSend = 'nibrunBeforeSend';
+    script.dataset.performance = 'true';
     script.dataset.excludeSearch = 'true';
     script.dataset.excludeHash = 'true';
     script.dataset.doNotTrack = 'true';
@@ -55,7 +56,7 @@ export function loadTracker(): Promise<boolean> {
 }
 
 function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined {
-  if (type !== 'event' || !trackingAllowed()) {
+  if ((type !== 'event' && type !== 'performance') || !trackingAllowed()) {
     return undefined;
   }
   const url = new URL(String(payload.url), window.location.href);
@@ -63,7 +64,7 @@ function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined 
   if (!site) {
     return undefined;
   }
-  if (!payload.name) {
+  if (type === 'event' && !payload.name) {
     if (previousPage?.origin === url.origin && previousPage.pathname === url.pathname) {
       return undefined;
     }
