@@ -126,7 +126,7 @@ test('native pageviews share identity and redact queries, titles and app IDs', a
   expect(scripts[0]?.dataset.beforeSend).toBe('nibrunBeforeSend');
   expect(scripts[0]?.dataset.performance).toBe('true');
   expect(scripts[0]?.dataset.excludeSearch).toBe('true');
-  expect(scripts[0]?.dataset.excludeHash).toBe('true');
+  expect(scripts[0]?.dataset.excludeHash).toBeUndefined();
   expect(scripts[0]?.src).toBe('https://analytics.example/script.js');
   nativeTrack(nativePayload('https://nibrun.com/?query=SECRET'));
   browser.location = {
@@ -160,9 +160,37 @@ test('back and forward pageviews use the current URL and redact their referrer',
   expect(events).toHaveLength(count);
 });
 
+test('direct hash visits and native hash navigation are distinct pageviews without duplicates', () => {
+  const location = browser.location;
+  const count = events.length;
+  browser.location = {
+    protocol: 'https:',
+    hostname: 'nibrun.com',
+    origin: 'https://nibrun.com',
+    href: 'https://nibrun.com/?query=SECRET#pricing',
+  };
+  nativeTrack(nativePayload(browser.location.href));
+  browser.location.href = 'https://nibrun.com/#features';
+  listeners.get('hashchange')?.(new Event('hashchange'));
+  nativeTrack(nativePayload(browser.location.href));
+  browser.location.href = 'https://nibrun.com/#pricing';
+  listeners.get('popstate')?.(new Event('popstate'));
+  listeners.get('hashchange')?.(new Event('hashchange'));
+  browser.location.href = 'https://nibrun.com/';
+  listeners.get('hashchange')?.(new Event('hashchange'));
+  expect(events.slice(count).map((event) => event.url)).toEqual([
+    'https://nibrun.com/www/#pricing',
+    'https://nibrun.com/www/#features',
+    'https://nibrun.com/www/#pricing',
+    'https://nibrun.com/www/',
+  ]);
+  expect(JSON.stringify(events.slice(count))).not.toContain('SECRET');
+  browser.location = location;
+});
+
 test('performance payloads retain metrics and sanitized identity without suppressing pageviews', () => {
   const payload = {
-    ...nativePayload('/apps/private-id/logs?path=SECRET#SECRET'),
+    ...nativePayload('/apps/private-id/logs?path=SECRET#details'),
     referrer: '/apps/another-private-id/files?path=SECRET',
     lcp: 1200,
     ttfb: 150,
@@ -175,7 +203,7 @@ test('performance payloads retain metrics and sanitized identity without suppres
   expect(sanitized).toEqual({
     ...payload,
     id: events[0]?.id,
-    url: 'https://app.nibrun.com/dashboard/apps/:appId/logs',
+    url: 'https://app.nibrun.com/dashboard/apps/:appId/logs#details',
     referrer: 'https://app.nibrun.com/dashboard/apps/:appId/files',
     title: 'nibrun dashboard',
   });
@@ -218,12 +246,12 @@ test('performance payloads obey the tracking restrictions', () => {
 
 test('all event payloads are filtered at send time and same-origin referrers are sanitized', () => {
   nativeTrack({
-    ...nativePayload('/deploy?env=SECRET'),
+    ...nativePayload('/deploy?env=SECRET#configuration'),
     name: 'fixture_event',
     referrer: '/apps/private-id/files?path=SECRET',
   });
   expect(events.at(-1)?.referrer).toBe('https://app.nibrun.com/dashboard/apps/:appId/files');
-  expect(events.at(-1)?.url).toBe('https://app.nibrun.com/dashboard/deploy');
+  expect(events.at(-1)?.url).toBe('https://app.nibrun.com/dashboard/deploy#configuration');
   expect(JSON.stringify(events.at(-1))).not.toContain('SECRET');
   const count = events.length;
   expect(

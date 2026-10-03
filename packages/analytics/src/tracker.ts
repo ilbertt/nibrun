@@ -40,13 +40,13 @@ export function loadTracker(): Promise<boolean> {
     script.dataset.beforeSend = 'nibrunBeforeSend';
     script.dataset.performance = 'true';
     script.dataset.excludeSearch = 'true';
-    script.dataset.excludeHash = 'true';
     script.dataset.doNotTrack = 'true';
     distinctId = analyticsIdentity();
     (window as AnalyticsWindow).nibrunBeforeSend = beforeSend;
     script.onload = () => {
-      // Umami 3.4 observes pushState/replaceState but does not listen for popstate.
-      window.addEventListener('popstate', syncHistoryTraversal);
+      // Umami 3.4 observes pushState/replaceState but not popstate or hashchange.
+      window.addEventListener('popstate', syncLocation);
+      window.addEventListener('hashchange', syncLocation);
       resolve(true);
     };
     script.onerror = () => resolve(false);
@@ -65,7 +65,11 @@ function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined 
     return undefined;
   }
   if (type === 'event' && !payload.name) {
-    if (previousPage?.origin === url.origin && previousPage.pathname === url.pathname) {
+    if (
+      previousPage?.origin === url.origin &&
+      previousPage.pathname === url.pathname &&
+      previousPage.hash === url.hash
+    ) {
       return undefined;
     }
     previousPage = url;
@@ -73,7 +77,7 @@ function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined 
   return {
     ...payload,
     id: distinctId,
-    url: `${url.origin}${analyticsPath({ site, pathname: url.pathname })}`,
+    url: `${url.origin}${analyticsPath({ site, pathname: url.pathname })}${url.hash}`,
     referrer: sanitizedReferrer(payload.referrer),
     title: `nibrun ${site}`,
   };
@@ -85,7 +89,7 @@ function sanitizedReferrer(referrer: unknown): string {
     : '';
 }
 
-function syncHistoryTraversal(): void {
+function syncLocation(): void {
   window.history.replaceState(window.history.state, '', window.location.href);
 }
 
