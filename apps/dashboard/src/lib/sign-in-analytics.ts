@@ -1,11 +1,13 @@
 import { type AnalyticsEventData, SIGN_IN_REASONS } from '@repo/analytics';
 import { AppIdSchema, Value } from '@repo/protocol';
 import type { QueryClient } from '@tanstack/react-query';
+import { SessionIdentity } from '#lib/session-identity.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export type SignInReason = AnalyticsEventData['sign_in_started']['reason'];
 export type PendingSignIn = {
   reason: SignInReason;
+  previous_identity_state: SessionIdentity | undefined;
   anonymous_app_ids: string[];
   expires_at: number;
 };
@@ -23,9 +25,11 @@ export function cachedAnonymousApps(queryClient: QueryClient): string[] {
 
 export function rememberSignIn({
   reason,
+  identity,
   anonymousAppIds,
 }: {
   reason: SignInReason;
+  identity: SessionIdentity;
   anonymousAppIds: string[];
 }): void {
   try {
@@ -33,6 +37,7 @@ export function rememberSignIn({
       STORAGE_KEY,
       JSON.stringify({
         reason,
+        previous_identity_state: identity,
         anonymous_app_ids: anonymousAppIds,
         expires_at: Date.now() + SIGN_IN_WINDOW_MINUTES * MILLISECONDS_PER_MINUTE,
       } satisfies PendingSignIn),
@@ -70,6 +75,8 @@ export function consumeSignIn(
     const pending = JSON.parse(stored);
     if (
       !SIGN_IN_REASONS.includes(pending.reason) ||
+      (pending.previous_identity_state !== undefined &&
+        !Object.values(SessionIdentity).includes(pending.previous_identity_state)) ||
       typeof pending.expires_at !== 'number' ||
       pending.expires_at < Date.now() ||
       !Array.isArray(pending.anonymous_app_ids)
@@ -78,6 +85,7 @@ export function consumeSignIn(
     }
     return {
       reason: pending.reason,
+      previous_identity_state: pending.previous_identity_state,
       expires_at: pending.expires_at,
       anonymous_app_ids: pending.anonymous_app_ids.filter((id: unknown) =>
         Value.Check(AppIdSchema, id),
