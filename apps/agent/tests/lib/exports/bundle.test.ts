@@ -5,7 +5,7 @@ import { parseEnvFile } from '@repo/app-operations';
 import { type Filename, FilenameSchema, Value } from '@repo/protocol';
 import { Effect, Either, Layer } from 'effect';
 import { bundleBinaryName, dumpVolume, renderDotenv, writeBundle } from '#lib/exports/bundle.ts';
-import { artifactStore } from '#tests/support/artifacts.ts';
+import { ARTIFACT_BYTES, artifactStore } from '#tests/support/artifacts.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { artifact, tenantEnvironment } from '#tests/support/fixtures.ts';
@@ -40,10 +40,14 @@ const DUMPS = {
 function bundling({
   dumps = 'tenant',
   environment = {},
+  crontab,
+  filename = 'pocketbase',
 }: {
   dumps?: keyof typeof DUMPS;
   /** `'unknown'` is a control plane that could not say, which is not the same as none. */
   environment?: Record<string, string> | 'unknown';
+  crontab?: string;
+  filename?: string;
 } = {}) {
   return Effect.gen(function* () {
     const stagingDir = yield* temporaryDirectory;
@@ -64,8 +68,9 @@ function bundling({
       Effect.provide(
         Effect.flatMap(dumpVolume({ devicePath: DEVICE_PATH, stagingDir }), () =>
           writeBundle({
-            artifact: artifact(),
+            artifact: artifact({ filename: Value.Parse(FilenameSchema, filename) }),
             environment: environment === 'unknown' ? undefined : tenantEnvironment(environment),
+            crontab,
             stagingDir,
           }),
         ),
@@ -86,7 +91,25 @@ function bundling({
         .then((stats) => stats.mode & PERMISSION_BITS)
         .catch(() => null),
     );
-    return { commands, result, stagingDir, archived, binaryMode, dotenv, dotenvMode };
+    const exportedCrontab = yield* Effect.promise(() =>
+      readFile(join(stagingDir, 'crontab'), 'utf8').catch(() => null),
+    );
+    const crontabMode = yield* Effect.promise(() =>
+      stat(join(stagingDir, 'crontab'))
+        .then((stats) => stats.mode & PERMISSION_BITS)
+        .catch(() => null),
+    );
+    return {
+      commands,
+      result,
+      stagingDir,
+      archived,
+      binaryMode,
+      dotenv,
+      dotenvMode,
+      exportedCrontab,
+      crontabMode,
+    };
   });
 }
 
@@ -105,8 +128,8 @@ test('reads the device with debugfs and never mounts it', async () => {
   expect(dump?.command).not.toContain('-w');
 });
 
-test('archives the data tree, the binary under its uploaded name, and the environment', async () => {
-  const { commands, result, stagingDir } = await run(bundling());
+test('archives the data tree, the binary, the environment, and the crontab', async () => {
+  const { commands, result, stagingDir } = await run(bundling({ crontab: '@hourly echo hello\n' }));
 
   const tar = commands.find((call) => call.command[0] === 'tar');
   expect(tar?.command).toEqual([
@@ -118,10 +141,50 @@ test('archives the data tree, the binary under its uploaded name, and the enviro
     'data',
     'pocketbase',
     '.env',
+    'crontab',
   ]);
   // `.` would sweep the archive into itself.
   expect(tar?.command).not.toContain('.');
   expect(Either.isRight(result)).toBe(true);
+});
+
+describe('the exported crontab', () => {
+  test('preserves the original text and restricts access to its secrets', async () => {
+    const crontab = '# cleanup\r\nTOKEN="a secret"\r\n@hourly echo "$TOKEN"  ';
+    const { exportedCrontab, crontabMode } = await run(bundling({ crontab }));
+
+    expect(exportedCrontab).toBe(crontab);
+    expect(crontabMode).toBe(PRIVATE_MODE);
+  });
+
+  test('is omitted from the staging tree and archive when not provided', async () => {
+    const { commands, result, exportedCrontab } = await run(bundling());
+
+    expect(Either.isRight(result)).toBe(true);
+    expect(exportedCrontab).toBeNull();
+    expect(commands.find((call) => call.command[0] === 'tar')?.command).not.toContain('crontab');
+  });
+
+  test('does not overwrite a binary uploaded under the name crontab', async () => {
+    const crontab = '@hourly echo hello\n';
+    const { commands, result, exportedCrontab } = await run(
+      bundling({ crontab, filename: 'crontab' }),
+    );
+
+    expect(Either.isRight(result)).toBe(true);
+    expect(exportedCrontab).toBe(crontab);
+    expect(commands.find((call) => call.command[0] === 'tar')?.command).toContain('crontab.binary');
+  });
+
+  test('keeps the binary upload name when there is no crontab to export', async () => {
+    const { commands, result, exportedCrontab } = await run(bundling({ filename: 'crontab' }));
+
+    expect(Either.isRight(result)).toBe(true);
+    expect(exportedCrontab).toBe(new TextDecoder().decode(ARTIFACT_BYTES));
+    const archived = commands.find((call) => call.command[0] === 'tar')?.command;
+    expect(archived).toContain('crontab');
+    expect(archived).not.toContain('crontab.binary');
+  });
 });
 
 // The bundle exists so the copy can be run, and `tar` records the mode the staging tree has. A

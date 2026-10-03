@@ -1,6 +1,6 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredExport, ReportedExport } from '@repo/protocol';
-import { Effect } from 'effect';
+import { Effect, Option } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { dumpVolume, writeBundle } from '#lib/exports/bundle.ts';
 import {
@@ -11,6 +11,7 @@ import {
 } from '#lib/exports/checkpoint.ts';
 import { attachedCheckpoint, detachReader, stopCheckpointServer } from '#lib/exports/reader.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
+import { CronRegistry } from '#services/cron-registry.service.ts';
 import { ExportUploader } from '#services/export-uploader.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -30,6 +31,7 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
     const topology = yield* ZerofsTopology;
     const filesystem = topology.place();
     const uploader = yield* ExportUploader;
+    const crons = yield* CronRegistry;
     const reader = yield* Effect.makeSemaphore(READER_PERMITS);
 
     /**
@@ -98,6 +100,7 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
       yield* Effect.annotateCurrentSpan({ exportId: desired.exportId });
       const stagingDir = path.join(config.exportStagingDir, desired.exportId);
       const checkpointId = exportCheckpointId(desired.exportId);
+      const table = Option.getOrUndefined(yield* crons.get({ appId: desired.appId }));
 
       return yield* Effect.ensuring(
         Effect.gen(function* () {
@@ -125,6 +128,7 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
           const bundle = yield* writeBundle({
             artifact: desired.artifact,
             environment: desired.environment,
+            crontab: table && table.jobs.length > 0 ? table.crontab : undefined,
             stagingDir,
           });
           yield* uploader.upload({ bundlePath: bundle.path, objectKey: desired.objectKey });
@@ -149,5 +153,10 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
 
     return { write, reap };
   }),
-  dependencies: [AgentConfig.Default, ZerofsTopology.Default, ExportUploader.Default],
+  dependencies: [
+    AgentConfig.Default,
+    ZerofsTopology.Default,
+    ExportUploader.Default,
+    CronRegistry.Default,
+  ],
 }) {}
