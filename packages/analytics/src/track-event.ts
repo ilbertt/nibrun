@@ -1,7 +1,13 @@
 import { readEntry } from '#entry.ts';
 import type { AnalyticsEvent } from '#events.ts';
 import { analyticsSite } from '#page.ts';
-import { loadTracker, pagePayload, sendEvent, trackingAllowed } from '#tracker.ts';
+import {
+  analyticsAccountId,
+  loadTracker,
+  pagePayload,
+  sendEvent,
+  trackingAllowed,
+} from '#tracker.ts';
 
 let identityState = 'unknown';
 
@@ -29,6 +35,7 @@ export function trackEvent({ name, data }: AnalyticsEvent): void {
     site: analyticsSite(window.location.hostname),
     identity_state: identityState,
     ...data,
+    account_id: analyticsAccountId(),
   };
   void loadTracker()
     .then(async (loaded) => {

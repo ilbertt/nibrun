@@ -5,7 +5,10 @@ import { analyticsIdentity } from '#identity.ts';
 import { analyticsPath, analyticsReferrer, analyticsSite } from '#page.ts';
 
 type Payload = Record<string, unknown>;
-type Tracker = { track(payload: (defaults: Payload) => Payload): Promise<void> };
+type Tracker = {
+  track(payload: (defaults: Payload) => Payload): Promise<void>;
+  identify(data: { account_id: string }): Promise<void>;
+};
 type AnalyticsWindow = Window & {
   umami?: Tracker;
   nibrunBeforeSend?: typeof beforeSend;
@@ -13,6 +16,26 @@ type AnalyticsWindow = Window & {
 let loading: Promise<boolean> | undefined;
 let previousPage: URL | undefined;
 let distinctId: string | undefined;
+let accountId: string | undefined;
+
+export function analyticsAccountId(): string | undefined {
+  return accountId;
+}
+
+export function setAnalyticsAccountId(id: string | undefined): boolean {
+  if (id === accountId) {
+    return false;
+  }
+  accountId = id;
+  void loadTracker()
+    .then(async (loaded) => {
+      if (loaded && accountId === id && trackingAllowed()) {
+        await (window as AnalyticsWindow).umami?.identify({ account_id: id ?? '' });
+      }
+    })
+    .catch(function ignoreAnalyticsFailure() {});
+  return true;
+}
 
 export function trackingAllowed(): boolean {
   return (
@@ -67,7 +90,7 @@ function loadRecorder(hostname: string): void {
 }
 
 function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined {
-  if (type !== 'event' || !trackingAllowed()) {
+  if ((type !== 'event' && type !== 'identify') || !trackingAllowed()) {
     return undefined;
   }
   const url = new URL(String(payload.url), window.location.href);
@@ -75,7 +98,7 @@ function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined 
   if (!site) {
     return undefined;
   }
-  if (!payload.name) {
+  if (type === 'event' && !payload.name) {
     if (previousPage?.origin === url.origin && previousPage.pathname === url.pathname) {
       return undefined;
     }
@@ -83,6 +106,7 @@ function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined 
   }
   return {
     ...payload,
+    ...(type === 'identify' && { data: { account_id: accountId ?? '' } }),
     id: distinctId,
     url: `${url.origin}${analyticsPath({ site, pathname: url.pathname })}`,
     referrer: sanitizedReferrer(payload.referrer),

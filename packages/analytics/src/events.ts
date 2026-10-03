@@ -43,7 +43,11 @@ export type AnalyticsEventData = {
   app_open_clicked: { identity_state: string; app_id: string; placement: 'deployment' | 'app' };
   session_seen: { identity_state: string };
   sign_in_started: { identity_state: string; reason: (typeof SIGN_IN_REASONS)[number] };
-  sign_in_completed: { identity_state: string; reason: (typeof SIGN_IN_REASONS)[number] };
+  sign_in_completed: {
+    identity_state: string;
+    previous_identity_state: string | undefined;
+    reason: (typeof SIGN_IN_REASONS)[number];
+  };
   sign_in_failed: { identity_state: string; reason: (typeof SIGN_IN_REASONS)[number] };
   app_claimed: { identity_state: string; app_id: string };
   app_viewed: { identity_state: string; app_id: string; tab: string };

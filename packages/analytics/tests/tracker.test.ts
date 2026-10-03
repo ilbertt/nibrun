@@ -2,7 +2,7 @@ import { afterAll, expect, test } from 'bun:test';
 import { readEntry, recordEntry } from '#entry.ts';
 import { analyticsIdentity } from '#identity.ts';
 import { setAnalyticsIdentityState, trackEvent } from '#track-event.ts';
-import { loadTracker } from '#tracker.ts';
+import { loadTracker, setAnalyticsAccountId } from '#tracker.ts';
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
@@ -13,6 +13,7 @@ let cookie = '';
 let cookieWrite = '';
 const scripts: HTMLScriptElement[] = [];
 const events: Record<string, unknown>[] = [];
+const identifications: Record<string, unknown>[] = [];
 const listeners = new Map<string, EventListener>();
 const EXPECTED_PAGEVIEWS = 4;
 const browser = {
@@ -37,6 +38,16 @@ const browser = {
     },
   },
   umami: {
+    identify(data: { account_id: string }): Promise<void> {
+      const sanitized = browser.nibrunBeforeSend?.('identify', {
+        ...nativePayload(browser.location.href),
+        data,
+      });
+      if (sanitized) {
+        identifications.push(sanitized);
+      }
+      return Promise.resolve();
+    },
     track(payload: (defaults: Record<string, unknown>) => Record<string, unknown>): Promise<void> {
       nativeTrack(payload(nativePayload(browser.location.href)));
       return Promise.resolve();
@@ -180,7 +191,7 @@ test('all event payloads are filtered at send time and same-origin referrers are
   expect(JSON.stringify(events.at(-1))).not.toContain('SECRET');
   const count = events.length;
   expect(
-    browser.nibrunBeforeSend?.('identify', nativePayload(browser.location.href)),
+    browser.nibrunBeforeSend?.('performance', nativePayload(browser.location.href)),
   ).toBeUndefined();
   browser.parent = {};
   nativeTrack({ ...nativePayload(browser.location.href), name: 'fixture_event' });
@@ -218,4 +229,63 @@ test('authentication state changes keep the browser identifier intact', async ()
   await Promise.resolve();
   expect(events.at(-1)?.id).toBe(events[0]?.id);
   expect(events.at(-1)?.data).toMatchObject({ identity_state: authenticated });
+});
+
+test('account identification preserves the anonymous journey and excludes personal session data', async () => {
+  const accountId = crypto.randomUUID();
+  expect(setAnalyticsAccountId(accountId)).toBe(true);
+  expect(setAnalyticsAccountId(accountId)).toBe(false);
+  trackEvent({ name: 'binary_selected', data: { size_bytes: 1 } });
+  await Promise.resolve();
+  expect(identifications).toHaveLength(1);
+  expect(identifications.at(-1)?.id).toBe(events[0]?.id);
+  expect(identifications.at(-1)?.data).toEqual({ account_id: accountId });
+  expect(events.at(-1)?.data).toMatchObject({ account_id: accountId });
+  const sanitized = browser.nibrunBeforeSend?.('identify', {
+    ...nativePayload('/apps/private-id?env=SECRET'),
+    data: { email: 'private@example.com', name: 'Private name' },
+  });
+  expect(sanitized?.data).toEqual({ account_id: accountId });
+  expect(JSON.stringify(sanitized)).not.toContain('SECRET');
+  expect(JSON.stringify(sanitized)).not.toContain('private@example.com');
+  expect(JSON.stringify(sanitized)).not.toContain('Private name');
+});
+
+test('account switching and sign-out update attribution without changing the browser identifier', async () => {
+  const accountId = crypto.randomUUID();
+  setAnalyticsAccountId(accountId);
+  trackEvent({ name: 'binary_selected', data: { size_bytes: 1 } });
+  await Promise.resolve();
+  expect(events.at(-1)?.data).toMatchObject({ account_id: accountId });
+  expect(identifications.at(-1)?.data).toEqual({ account_id: accountId });
+  setAnalyticsAccountId(undefined);
+  trackEvent({ name: 'binary_selected', data: { size_bytes: 1 } });
+  await Promise.resolve();
+  expect(events.at(-1)?.data).toHaveProperty('account_id', undefined);
+  expect(identifications.at(-1)?.data).toEqual({ account_id: '' });
+  expect(identifications.every((payload) => payload.id === events[0]?.id)).toBe(true);
+});
+
+test('queued identification cannot restore an account after sign-out and honors Do Not Track', async () => {
+  const count = identifications.length;
+  setAnalyticsAccountId(crypto.randomUUID());
+  setAnalyticsAccountId(undefined);
+  await Promise.resolve();
+  expect(identifications).toHaveLength(count + 1);
+  expect(identifications.at(-1)?.data).toEqual({ account_id: '' });
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { doNotTrack: '1' },
+  });
+  setAnalyticsAccountId(crypto.randomUUID());
+  await Promise.resolve();
+  expect(identifications).toHaveLength(count + 1);
+  expect(
+    browser.nibrunBeforeSend?.('identify', nativePayload(browser.location.href)),
+  ).toBeUndefined();
+  setAnalyticsAccountId(undefined);
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { doNotTrack: null },
+  });
 });
