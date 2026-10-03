@@ -15,7 +15,6 @@ export const Route = createRootRoute({
       { property: 'og:site_name', content: PRODUCT_NAME },
       { property: 'og:locale', content: 'en_US' },
       { property: 'og:image', content: WWW_SITE.ogImage.url },
-      { property: 'og:image:type', content: WWW_SITE.ogImage.type },
       { property: 'og:image:width', content: `${WWW_SITE.ogImage.width}` },
       { property: 'og:image:height', content: `${WWW_SITE.ogImage.height}` },
       { property: 'og:image:alt', content: WWW_SITE.title },
