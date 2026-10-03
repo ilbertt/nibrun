@@ -135,7 +135,7 @@ const staged = (script: Script) =>
     const guest = yield* fakeGuest({ vmDir, appId: APP_ID, behaviour: script.guest });
     const frozenAtCut: boolean[] = [];
     const reachedDump = yield* Deferred.make<void>();
-    const uploads: { objectKey: string; commandsSoFar: number; crontab: string }[] = [];
+    const uploads: { objectKey: string; commandsSoFar: number; crontab: string | undefined }[] = [];
 
     const { commands, layer: commandLayer } = recordingCommands(
       answering({
@@ -153,7 +153,7 @@ const staged = (script: Script) =>
         upload: ({ objectKey, bundlePath }) =>
           Effect.gen(function* () {
             const crontab = yield* Effect.promise(() =>
-              readFile(join(bundlePath, '..', 'crontab'), 'utf8'),
+              readFile(join(bundlePath, '..', 'crontab'), 'utf8').catch(() => undefined),
             );
             uploads.push({ objectKey, commandsSoFar: commands.length, crontab });
             return yield* script.uploadFails
@@ -281,12 +281,26 @@ describe('the crontab in an app export', () => {
     expect(uploads[0]?.crontab).toBe(crontab);
   });
 
-  test('is an empty file for an app without a registered crontab', async () => {
-    const { result, uploads } = await run(exporting());
+  test('is omitted for an app without a registered crontab', async () => {
+    const { result, uploads, lines } = await run(exporting());
 
     expect(Exit.isSuccess(result)).toBe(true);
-    expect(uploads[0]?.crontab).toBe('');
+    expect(uploads).toHaveLength(1);
+    expect(uploads[0]?.crontab).toBeUndefined();
+    expect(lines.find((line) => line.startsWith('tar '))).not.toContain('crontab');
   });
+
+  test.each(['', '# no jobs\n', 'TOKEN=unused\n'])(
+    'is omitted when a registered table has no jobs: %j',
+    async (crontab) => {
+      const { result, uploads, lines } = await run(exporting({ crontab }));
+
+      expect(Exit.isSuccess(result)).toBe(true);
+      expect(uploads).toHaveLength(1);
+      expect(uploads[0]?.crontab).toBeUndefined();
+      expect(lines.find((line) => line.startsWith('tar '))).not.toContain('crontab');
+    },
+  );
 });
 
 describe('a freeze that did not survive the cut', () => {

@@ -39,7 +39,8 @@ export function ExportAppDialog({ availability }: { availability: AppActionAvail
           <DialogDescription>
             One <span className="font-mono">.tar.gz</span> holding the binary this app runs,
             everything on its volume, a <span className="font-mono">.env</span> of the variables it
-            was deployed with, and its <span className="font-mono">crontab</span>.
+            was deployed with, and its <span className="font-mono">crontab</span> if it has
+            registered cron jobs.
           </DialogDescription>
         </DialogHeader>
 

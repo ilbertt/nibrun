@@ -79,7 +79,7 @@ export function bundleBinaryName(artifact: DesiredArtifact): Either.Either<strin
   const { filename } = artifact;
   return filename !== basename(filename) || filename.startsWith('.') || filename.startsWith('-')
     ? Either.left(new UnsafeFilename({ filename }))
-    : Either.right(filename === CRONTAB_FILENAME ? `${filename}.binary` : filename);
+    : Either.right(filename);
 }
 
 /**
@@ -138,13 +138,17 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
 }: {
   artifact: DesiredArtifact;
   environment: TenantEnvironment | undefined;
-  crontab: string;
+  crontab: string | undefined;
   stagingDir: string;
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const config = yield* AgentConfig;
-  const binaryName = yield* bundleBinaryName(artifact);
+  const uploadedBinaryName = yield* bundleBinaryName(artifact);
+  const binaryName =
+    crontab !== undefined && uploadedBinaryName === CRONTAB_FILENAME
+      ? `${uploadedBinaryName}.binary`
+      : uploadedBinaryName;
 
   const binaryPath = path.join(stagingDir, binaryName);
   yield* downloadAndVerify({ artifact, destination: binaryPath, bucket: config.artifactBucket });
@@ -161,9 +165,11 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
     });
   }
 
-  yield* fs.writeFileString(path.join(stagingDir, CRONTAB_FILENAME), crontab, {
-    mode: PRIVATE_FILE_MODE,
-  });
+  if (crontab !== undefined) {
+    yield* fs.writeFileString(path.join(stagingDir, CRONTAB_FILENAME), crontab, {
+      mode: PRIVATE_FILE_MODE,
+    });
+  }
 
   const bundlePath = path.join(stagingDir, BUNDLE_NAME);
   yield* stdoutOf({
@@ -177,7 +183,7 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
       DATA_DIRECTORY,
       binaryName,
       ...(environment === undefined ? [] : [ENV_FILENAME]),
-      CRONTAB_FILENAME,
+      ...(crontab === undefined ? [] : [CRONTAB_FILENAME]),
     ],
     timeout: DUMP_TIMEOUT,
   });

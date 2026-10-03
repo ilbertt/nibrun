@@ -5,7 +5,7 @@ import { parseEnvFile } from '@repo/app-operations';
 import { type Filename, FilenameSchema, Value } from '@repo/protocol';
 import { Effect, Either, Layer } from 'effect';
 import { bundleBinaryName, dumpVolume, renderDotenv, writeBundle } from '#lib/exports/bundle.ts';
-import { artifactStore } from '#tests/support/artifacts.ts';
+import { ARTIFACT_BYTES, artifactStore } from '#tests/support/artifacts.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { artifact, tenantEnvironment } from '#tests/support/fixtures.ts';
@@ -40,7 +40,7 @@ const DUMPS = {
 function bundling({
   dumps = 'tenant',
   environment = {},
-  crontab = '',
+  crontab,
   filename = 'pocketbase',
 }: {
   dumps?: keyof typeof DUMPS;
@@ -129,7 +129,7 @@ test('reads the device with debugfs and never mounts it', async () => {
 });
 
 test('archives the data tree, the binary, the environment, and the crontab', async () => {
-  const { commands, result, stagingDir } = await run(bundling());
+  const { commands, result, stagingDir } = await run(bundling({ crontab: '@hourly echo hello\n' }));
 
   const tar = commands.find((call) => call.command[0] === 'tar');
   expect(tar?.command).toEqual([
@@ -157,10 +157,12 @@ describe('the exported crontab', () => {
     expect(crontabMode).toBe(PRIVATE_MODE);
   });
 
-  test('is empty when there are no registered jobs', async () => {
-    const { exportedCrontab } = await run(bundling());
+  test('is omitted from the staging tree and archive when not provided', async () => {
+    const { commands, result, exportedCrontab } = await run(bundling());
 
-    expect(exportedCrontab).toBe('');
+    expect(Either.isRight(result)).toBe(true);
+    expect(exportedCrontab).toBeNull();
+    expect(commands.find((call) => call.command[0] === 'tar')?.command).not.toContain('crontab');
   });
 
   test('does not overwrite a binary uploaded under the name crontab', async () => {
@@ -172,6 +174,16 @@ describe('the exported crontab', () => {
     expect(Either.isRight(result)).toBe(true);
     expect(exportedCrontab).toBe(crontab);
     expect(commands.find((call) => call.command[0] === 'tar')?.command).toContain('crontab.binary');
+  });
+
+  test('keeps the binary upload name when there is no crontab to export', async () => {
+    const { commands, result, exportedCrontab } = await run(bundling({ filename: 'crontab' }));
+
+    expect(Either.isRight(result)).toBe(true);
+    expect(exportedCrontab).toBe(new TextDecoder().decode(ARTIFACT_BYTES));
+    const archived = commands.find((call) => call.command[0] === 'tar')?.command;
+    expect(archived).toContain('crontab');
+    expect(archived).not.toContain('crontab.binary');
   });
 });
 

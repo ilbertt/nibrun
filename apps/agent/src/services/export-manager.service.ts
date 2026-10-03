@@ -128,7 +128,7 @@ export class ExportManager extends Effect.Service<ExportManager>()('ExportManage
           const bundle = yield* writeBundle({
             artifact: desired.artifact,
             environment: desired.environment,
-            crontab: table?.crontab ?? '',
+            crontab: table && table.jobs.length > 0 ? table.crontab : undefined,
             stagingDir,
           });
           yield* uploader.upload({ bundlePath: bundle.path, objectKey: desired.objectKey });

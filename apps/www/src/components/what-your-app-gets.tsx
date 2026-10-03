@@ -23,7 +23,7 @@ const OFFERINGS: { icon: typeof CpuIcon; name: string; detail: ReactNode }[] = [
     detail: (
       <>
         One export: the binary, the disk, its <code className="text-foreground">.env</code> and{' '}
-        <code className="text-foreground">crontab</code>.
+        <code className="text-foreground">crontab</code> when it has cron jobs.
       </>
     ),
   },
