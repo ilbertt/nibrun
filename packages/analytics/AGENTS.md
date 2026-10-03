@@ -18,7 +18,9 @@ Internal tracking shared by the marketing site and dashboard.
   Add a navigation fallback only for a verified gap in the pinned tracker.
 - Gate tracking through `trackingAllowed()`, including custom events. Preserve
   production-host, HTTPS, top-level-window and Do Not Track restrictions.
-- Sanitize every outgoing payload. Exclude credentials, query/hash values,
+- Preserve URL hashes in pageviews, custom events and performance payloads.
+  Hash navigation is a pageview; deduplicate by origin, pathname and hash.
+- Sanitize every outgoing payload. Exclude credentials, query values, referrer hashes,
   app names, custom hostnames, file paths, prompt contents, configuration values
   and raw errors. Opaque app and attempt IDs may correlate events; settings
   events carry changed field names only.

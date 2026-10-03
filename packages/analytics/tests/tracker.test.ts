@@ -137,8 +137,9 @@ test('native pageviews share identity and redact queries, titles and app IDs', a
   expect(scripts[0]?.dataset.distinctId).toBeUndefined();
   expect(scripts[0]?.dataset.autoTrack).toBeUndefined();
   expect(scripts[0]?.dataset.beforeSend).toBe('nibrunBeforeSend');
+  expect(scripts[0]?.dataset.performance).toBe('true');
   expect(scripts[0]?.dataset.excludeSearch).toBe('true');
-  expect(scripts[0]?.dataset.excludeHash).toBe('true');
+  expect(scripts[0]?.dataset.excludeHash).toBeUndefined();
   expect(scripts[0]?.src).toBe('https://analytics.example/script.js');
   nativeTrack(nativePayload('https://nibrun.com/?query=SECRET'));
   browser.location = {
@@ -180,18 +181,102 @@ test('back and forward pageviews use the current URL and redact their referrer',
   expect(events).toHaveLength(count);
 });
 
+test('direct hash visits and native hash navigation are distinct pageviews without duplicates', () => {
+  const location = browser.location;
+  const count = events.length;
+  browser.location = {
+    protocol: 'https:',
+    hostname: 'nibrun.com',
+    origin: 'https://nibrun.com',
+    href: 'https://nibrun.com/?query=SECRET#pricing',
+  };
+  nativeTrack(nativePayload(browser.location.href));
+  browser.location.href = 'https://nibrun.com/#features';
+  listeners.get('hashchange')?.(new Event('hashchange'));
+  nativeTrack(nativePayload(browser.location.href));
+  browser.location.href = 'https://nibrun.com/#pricing';
+  listeners.get('popstate')?.(new Event('popstate'));
+  listeners.get('hashchange')?.(new Event('hashchange'));
+  browser.location.href = 'https://nibrun.com/';
+  listeners.get('hashchange')?.(new Event('hashchange'));
+  expect(events.slice(count).map((event) => event.url)).toEqual([
+    'https://nibrun.com/www/#pricing',
+    'https://nibrun.com/www/#features',
+    'https://nibrun.com/www/#pricing',
+    'https://nibrun.com/www/',
+  ]);
+  expect(JSON.stringify(events.slice(count))).not.toContain('SECRET');
+  browser.location = location;
+});
+
+test('performance payloads retain metrics and sanitized identity without suppressing pageviews', () => {
+  const payload = {
+    ...nativePayload('/apps/private-id/logs?path=SECRET#details'),
+    referrer: '/apps/another-private-id/files?path=SECRET',
+    lcp: 1200,
+    ttfb: 150,
+    fcp: 400,
+    inp: 80,
+    cls: 0.01,
+    duration: 10000,
+  };
+  const sanitized = browser.nibrunBeforeSend?.('performance', payload);
+  expect(sanitized).toEqual({
+    ...payload,
+    id: events[0]?.id,
+    url: 'https://app.nibrun.com/dashboard/apps/:appId/logs#details',
+    referrer: 'https://app.nibrun.com/dashboard/apps/:appId/files',
+    title: 'nibrun dashboard',
+  });
+  expect(JSON.stringify(sanitized)).not.toContain('SECRET');
+  expect(JSON.stringify(sanitized)).not.toContain('private-id');
+  expect(JSON.stringify(sanitized)).not.toContain('Private app');
+  expect(browser.nibrunBeforeSend?.('performance', payload)).toEqual(sanitized);
+  const count = events.length;
+  nativeTrack(payload);
+  expect(events).toHaveLength(count + 1);
+  expect(browser.nibrunBeforeSend?.('performance', payload)).toEqual(sanitized);
+  nativeTrack(payload);
+  expect(events).toHaveLength(count + 1);
+});
+
+test('performance payloads obey the tracking restrictions', () => {
+  const payload = nativePayload(browser.location.href);
+  const location = browser.location;
+  const navigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')!;
+  try {
+    browser.parent = {};
+    expect(browser.nibrunBeforeSend?.('performance', payload)).toBeUndefined();
+    browser.parent = browser;
+    browser.location = { ...location, hostname: 'preview.nibrun.com' };
+    expect(browser.nibrunBeforeSend?.('performance', payload)).toBeUndefined();
+    browser.location = { ...location, protocol: 'http:' };
+    expect(browser.nibrunBeforeSend?.('performance', payload)).toBeUndefined();
+    browser.location = location;
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { doNotTrack: '1' },
+    });
+    expect(browser.nibrunBeforeSend?.('performance', payload)).toBeUndefined();
+  } finally {
+    browser.parent = browser;
+    browser.location = location;
+    Object.defineProperty(globalThis, 'navigator', navigator);
+  }
+});
+
 test('all event payloads are filtered at send time and same-origin referrers are sanitized', () => {
   nativeTrack({
-    ...nativePayload('/deploy?env=SECRET'),
+    ...nativePayload('/deploy?env=SECRET#configuration'),
     name: 'fixture_event',
     referrer: '/apps/private-id/files?path=SECRET',
   });
   expect(events.at(-1)?.referrer).toBe('https://app.nibrun.com/dashboard/apps/:appId/files');
-  expect(events.at(-1)?.url).toBe('https://app.nibrun.com/dashboard/deploy');
+  expect(events.at(-1)?.url).toBe('https://app.nibrun.com/dashboard/deploy#configuration');
   expect(JSON.stringify(events.at(-1))).not.toContain('SECRET');
   const count = events.length;
   expect(
-    browser.nibrunBeforeSend?.('performance', nativePayload(browser.location.href)),
+    browser.nibrunBeforeSend?.('unsupported', nativePayload(browser.location.href)),
   ).toBeUndefined();
   browser.parent = {};
   nativeTrack({ ...nativePayload(browser.location.href), name: 'fixture_event' });
