@@ -20,6 +20,7 @@ import remark42Page from '../content/remark42.md?raw';
 import sharkordPage from '../content/sharkord.md?raw';
 import shioriPage from '../content/shiori.md?raw';
 import traggoPage from '../content/traggo.md?raw';
+import webdavPage from '../content/webdav.md?raw';
 import yarrPage from '../content/yarr.md?raw';
 
 /**
@@ -297,6 +298,35 @@ export const DEPLOY_PRESETS = {
       // Rooted at the volume rather than the working directory, which is the one place a file put
       // here is still here after a redeploy.
       arg: ['-r', '/app/data', '-d', '/app/data/filebrowser.db', '-a', '0.0.0.0', '-p', '8080'],
+      minimal: true,
+    },
+  },
+  webdav: {
+    repositoryUrl: 'https://github.com/rclone/rclone',
+    version: 'v1.75.1',
+    markdownContent: webdavPage,
+    category: DeployCategory.FilesAndSharing,
+    title: 'WebDAV',
+    subtitle: 'A private file server you can connect to with any WebDAV client, powered by rclone.',
+    deployLink: {
+      name: 'webdav',
+      binary: 'https://downloads.rclone.org/v1.75.1/rclone-v1.75.1-linux-amd64.zip',
+      sha256: '982b5aa772841168f8e380f139e9e787b2a105403e32b94da8676a0e1c0a13ab',
+      port: 8080,
+      arg: [
+        'serve',
+        'webdav',
+        '/app/data',
+        '--addr',
+        '0.0.0.0:8080',
+        '--config',
+        '/dev/null',
+        '--cache-dir',
+        '/tmp/rclone',
+        '--buffer-size',
+        '1M',
+      ],
+      env: ['RCLONE_USER', 'RCLONE_PASS'],
       minimal: true,
     },
   },
