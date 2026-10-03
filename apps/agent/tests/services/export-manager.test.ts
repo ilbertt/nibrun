@@ -1,18 +1,19 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Deferred, Effect, Exit, Fiber, Layer } from 'effect';
 import { UnknownException } from 'effect/Cause';
 import type { CommandRequest, CommandResult } from '#lib/exec.ts';
 import { EXPORT_READER_DEVICE_PATH } from '#lib/network/slot.ts';
+import { CronRegistry } from '#services/cron-registry.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
 import { ExportUploader } from '#services/export-uploader.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
-import { APP_ID, desiredExport } from '#tests/support/fixtures.ts';
+import { APP_ID, desiredExport, LOG_SOURCE } from '#tests/support/fixtures.ts';
 import { fakeGuest, type GuestBehaviour } from '#tests/support/guest.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
@@ -36,6 +37,7 @@ type Script = {
   readonly emptyDump?: boolean;
   readonly uploadFails?: boolean;
   readonly interrupt?: boolean;
+  readonly crontab?: string;
 };
 
 /**
@@ -133,7 +135,7 @@ const staged = (script: Script) =>
     const guest = yield* fakeGuest({ vmDir, appId: APP_ID, behaviour: script.guest });
     const frozenAtCut: boolean[] = [];
     const reachedDump = yield* Deferred.make<void>();
-    const uploads: { objectKey: string; commandsSoFar: number }[] = [];
+    const uploads: { objectKey: string; commandsSoFar: number; crontab: string }[] = [];
 
     const { commands, layer: commandLayer } = recordingCommands(
       answering({
@@ -148,17 +150,21 @@ const staged = (script: Script) =>
     const uploader = Layer.succeed(
       ExportUploader,
       ExportUploader.make({
-        upload: ({ objectKey }) => {
-          uploads.push({ objectKey, commandsSoFar: commands.length });
-          return script.uploadFails
-            ? Effect.fail(new UnknownException(new Error('the bucket refused the bundle')))
-            : Effect.void;
-        },
+        upload: ({ objectKey, bundlePath }) =>
+          Effect.gen(function* () {
+            const crontab = yield* Effect.promise(() =>
+              readFile(join(bundlePath, '..', 'crontab'), 'utf8'),
+            );
+            uploads.push({ objectKey, commandsSoFar: commands.length, crontab });
+            return yield* script.uploadFails
+              ? Effect.fail(new UnknownException(new Error('the bucket refused the bundle')))
+              : Effect.void;
+          }),
       }),
     );
 
     const support = Layer.mergeAll(
-      agentConfig({ vmDir, exportStagingDir }),
+      agentConfig({ vmDir, exportStagingDir, cronRegistryFile: join(stateDir, 'crons.json') }),
       uploader,
       commandLayer,
       artifactStore(),
@@ -174,7 +180,13 @@ const staged = (script: Script) =>
       lines: () => commands.map(({ command }) => command.join(' ')),
       layers: Layer.provideMerge(
         ExportManager.DefaultWithoutDependencies,
-        Layer.provideMerge(ZerofsTopology.DefaultWithoutDependencies, support),
+        Layer.provideMerge(
+          Layer.mergeAll(
+            ZerofsTopology.DefaultWithoutDependencies,
+            CronRegistry.DefaultWithoutDependencies,
+          ),
+          support,
+        ),
       ),
     };
   });
@@ -184,6 +196,11 @@ function exporting(script: Script = {}) {
     const stage = yield* staged(script);
     const result = yield* Effect.provide(
       Effect.gen(function* () {
+        const crons = yield* CronRegistry;
+        if (script.crontab !== undefined) {
+          yield* crons.beginDeployment(LOG_SOURCE);
+          yield* crons.replaceCrontab({ ...LOG_SOURCE, text: script.crontab });
+        }
         const exports = yield* ExportManager;
         const writing = exports.write({ desired: stage.desired });
         if (!script.interrupt) {
@@ -252,6 +269,23 @@ describe('an export reads a checkpoint rather than the tenant device', () => {
     const { lines } = await run(exporting());
 
     expect(lines).toContain(`${ZEROFS} checkpoint create -c ${ZEROFS_CONFIG} ${CHECKPOINT}`);
+  });
+});
+
+describe('the crontab in an app export', () => {
+  test('comes from the durable registry with comments and environment assignments intact', async () => {
+    const crontab = '# cleanup\nTOKEN="a secret"\n@hourly echo "$TOKEN"\n';
+    const { result, uploads } = await run(exporting({ crontab }));
+
+    expect(Exit.isSuccess(result)).toBe(true);
+    expect(uploads[0]?.crontab).toBe(crontab);
+  });
+
+  test('is an empty file for an app without a registered crontab', async () => {
+    const { result, uploads } = await run(exporting());
+
+    expect(Exit.isSuccess(result)).toBe(true);
+    expect(uploads[0]?.crontab).toBe('');
   });
 });
 

@@ -10,8 +10,9 @@ import { stdoutOf } from '#services/command-runner.service.ts';
 const STAGING_MODE = 0o700;
 const DATA_DIRECTORY = 'data';
 const ENV_FILENAME = '.env';
-/** The tenant's environment in the clear, which is what it is for and why nobody else may read it. */
-const ENV_MODE = 0o600;
+const CRONTAB_FILENAME = 'crontab';
+/** Both files can carry tenant secrets, so only the owner may read them. */
+const PRIVATE_FILE_MODE = 0o600;
 const BUNDLE_NAME = 'bundle.tar.gz';
 /**
  * A tenant filesystem is unbounded, and the default would abort a large export part-way.
@@ -78,7 +79,7 @@ export function bundleBinaryName(artifact: DesiredArtifact): Either.Either<strin
   const { filename } = artifact;
   return filename !== basename(filename) || filename.startsWith('.') || filename.startsWith('-')
     ? Either.left(new UnsafeFilename({ filename }))
-    : Either.right(filename);
+    : Either.right(filename === CRONTAB_FILENAME ? `${filename}.binary` : filename);
 }
 
 /**
@@ -132,10 +133,12 @@ export const dumpVolume = Effect.fn('dumpVolume')(function* ({
 export const writeBundle = Effect.fn('writeBundle')(function* ({
   artifact,
   environment,
+  crontab,
   stagingDir,
 }: {
   artifact: DesiredArtifact;
   environment: TenantEnvironment | undefined;
+  crontab: string;
   stagingDir: string;
 }) {
   const fs = yield* FileSystem.FileSystem;
@@ -154,9 +157,13 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
   // empty file pretending to be one.
   if (environment !== undefined) {
     yield* fs.writeFileString(path.join(stagingDir, ENV_FILENAME), renderDotenv(environment), {
-      mode: ENV_MODE,
+      mode: PRIVATE_FILE_MODE,
     });
   }
+
+  yield* fs.writeFileString(path.join(stagingDir, CRONTAB_FILENAME), crontab, {
+    mode: PRIVATE_FILE_MODE,
+  });
 
   const bundlePath = path.join(stagingDir, BUNDLE_NAME);
   yield* stdoutOf({
@@ -170,6 +177,7 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
       DATA_DIRECTORY,
       binaryName,
       ...(environment === undefined ? [] : [ENV_FILENAME]),
+      CRONTAB_FILENAME,
     ],
     timeout: DUMP_TIMEOUT,
   });

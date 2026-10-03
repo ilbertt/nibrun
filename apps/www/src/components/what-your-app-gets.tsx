@@ -22,7 +22,8 @@ const OFFERINGS: { icon: typeof CpuIcon; name: string; detail: ReactNode }[] = [
     name: 'A way out',
     detail: (
       <>
-        One export: the binary, the disk, its <code className="text-foreground">.env</code>.
+        One export: the binary, the disk, its <code className="text-foreground">.env</code> and{' '}
+        <code className="text-foreground">crontab</code>.
       </>
     ),
   },
