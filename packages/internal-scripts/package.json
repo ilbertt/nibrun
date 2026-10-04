@@ -2,6 +2,9 @@
   "name": "@repo/internal-scripts",
   "private": true,
   "type": "module",
+  "exports": {
+    "./package-json": "./src/shared/package-json.ts"
+  },
   "imports": {
     "#*": "./src/*"
   },
