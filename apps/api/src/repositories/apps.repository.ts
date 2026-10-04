@@ -620,6 +620,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   purge({ appId }: { appId: AppId }): Promise<void> {
     return this.sql.begin(async (tx) => {
       await tx.DeleteExportsByApp`DELETE FROM nibrun.exports WHERE app_id = ${appId}`;
+      await tx.DeleteDeployKeysByApp`DELETE FROM nibrun.deploy_keys WHERE app_id = ${appId}`;
       await tx.DeleteDeploymentsByApp`DELETE FROM nibrun.deployments WHERE app_id = ${appId}`;
       await tx.DeleteImportsByApp`DELETE FROM nibrun.imports WHERE app_id = ${appId}`;
       await tx.DeleteArtifactsByApp`DELETE FROM nibrun.artifacts WHERE app_id = ${appId}`;

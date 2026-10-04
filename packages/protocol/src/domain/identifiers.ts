@@ -19,6 +19,9 @@ export const DeploymentIdSchema = identifierSchema<DeploymentId>(
   'One artifact plus the configuration it was launched with.',
 );
 
+export type DeployKeyId = Identifier<'DeployKeyId'>;
+export const DeployKeyIdSchema = identifierSchema<DeployKeyId>('One app-scoped SSH deploy key.');
+
 export type CronJobId = Identifier<'CronJobId'>;
 export const CronJobIdSchema = identifierSchema<CronJobId>('One registered cron job.');
 

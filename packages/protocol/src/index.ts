@@ -150,6 +150,13 @@ export {
   RegisteredCronJobSchema,
 } from '#domain/cron.ts';
 export {
+  type DeployKey,
+  DeployKeyNameSchema,
+  DeployKeySchema,
+  DeployPublicKeySchema,
+  SSH_DEPLOY_KEY_ALGORITHM,
+} from '#domain/deploy-key.ts';
+export {
   DEPLOYMENT_STATES,
   type Deployment,
   DeploymentSchema,
@@ -211,6 +218,8 @@ export {
   CronQueryIdSchema,
   type CronRunId,
   CronRunIdSchema,
+  type DeployKeyId,
+  DeployKeyIdSchema,
   type DeploymentId,
   DeploymentIdSchema,
   type ExportId,
