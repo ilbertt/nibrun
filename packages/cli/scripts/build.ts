@@ -1,21 +1,21 @@
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PROGRAM_NAME } from '#config.ts';
+import rootPackageJson from '../../../package.json' with { type: 'json' };
 import { RELEASE_PLATFORMS } from './release-platforms.ts';
 
 const CLI_DIR = join(import.meta.dir, '..');
 const DIST_DIR = join(CLI_DIR, 'dist');
-const BUN_VERSION_FILE = join(CLI_DIR, '../../.bun-version');
 const ENTRYPOINT = 'src/main.ts';
 const CHECKSUMS_FILE = 'checksums.txt';
 
 const FAILURE_EXIT_CODE = 1;
 
-// The target pins the released Bun `.bun-version` names rather than resolving to whichever one
-// runs the build. Left unversioned, Bun embeds its own version and downloads it for every platform
+// The target pins the released Bun version from `packageManager` rather than whichever one runs
+// the build. Left unversioned, Bun embeds its own version and downloads it for every platform
 // that is not the host — and a canary publishes no such download, so two of these three would fail
 // for anyone on one. The versioned form is undocumented, and the type does not describe it.
-const bunVersion = (await Bun.file(BUN_VERSION_FILE).text()).trim();
+const bunVersion = rootPackageJson.packageManager.replace(/^bun@/, '');
 
 console.log('🧹 Cleaning dist dir...');
 await rm(DIST_DIR, { recursive: true, force: true });

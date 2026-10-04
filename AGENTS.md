@@ -8,6 +8,7 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 ## Stack
 
 - **Runtime:** Bun
+- **Bun version:** Root `package.json` pins `packageManager`; CI and CLI compilation read that pin.
 - **Monorepo:** Bun workspaces + Turbo
 - **Linter/Formatter:** Biome (auto-formats on save)
 - **Commits:** Conventional Commits (commitlint)
