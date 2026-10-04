@@ -57,8 +57,8 @@ at runtime does.
 
 The root's `build` is the one turbo script without `bun run --bun`: that flag symlinks `node`
 to Bun for every descendant process, and miniflare — which `@repo/www` prerenders through —
-crashes on teardown under Bun's `node:http`. `.node-version` is what CI installs a real node
-from, so the www build finds one.
+crashes on teardown under Bun's `node:http`. CI installs a real Node from the root
+`package.json`'s `engines.node`, so the www build finds one.
 
 Check `package.json` scripts (root and per-app) for other available commands.
 
