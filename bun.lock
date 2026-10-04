@@ -180,6 +180,7 @@
       },
       "devDependencies": {
         "@parshjs/codegen": "^0.0.5",
+        "@repo/internal-scripts": "workspace:*",
         "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",
       },

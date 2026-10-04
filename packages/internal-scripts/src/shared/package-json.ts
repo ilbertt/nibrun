@@ -13,6 +13,8 @@ export const packageJson = {
   cli: cliPackageJson,
 };
 
+export const bunVersion = packageJson.root.packageManager.replace(/^bun@/, '');
+
 export const WORKSPACE_DEPENDENCY = 'workspace:*';
 
 /**
