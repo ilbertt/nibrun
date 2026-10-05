@@ -7,6 +7,8 @@ export type OwnerId = Identifier<'OwnerId'>;
 export const OwnerIdSchema = identifierSchema<OwnerId>('The account an app belongs to.');
 export type ArtifactId = Identifier<'ArtifactId'>;
 export const ArtifactIdSchema = identifierSchema<ArtifactId>('One uploaded binary.');
+export type DeployKeyId = Identifier<'DeployKeyId'>;
+export const DeployKeyIdSchema = identifierSchema<DeployKeyId>('One app-scoped SSH deploy key.');
 export type ImportId = Identifier<'ImportId'>;
 
 export const ImportIdSchema = identifierSchema<ImportId>(
