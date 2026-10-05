@@ -12,8 +12,8 @@ export type PublicValue<Value> =
           ? { [Key in keyof Value]: PublicValue<Value[Key]> }
           : Value;
 
-// Elysia's module inference loses TypeBox record keys. Preserve the schema's runtime kind
-// and constraints while exposing its JSON values, without internal brands, to HTTP callers.
+// Treaty preserves private brands from schema static types. Expose JSON primitives while
+// retaining the original runtime schema and its validation constraints.
 export function publicSchema<Schema extends TSchema>(
   schema: Schema,
 ): TUnsafe<PublicValue<Static<Schema>>> {

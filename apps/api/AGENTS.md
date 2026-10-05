@@ -15,9 +15,9 @@ schema/helper barrel. Only route types are exported through `@repo/api/types` fo
 Public consumers must use `@repo/api-client`, never API implementation files.
 Public request and response types derive directly from Treaty.
 Keep public models faithful to JSON: `publicSchema` preserves runtime validation while exposing
-ordinary primitives and record keys to HTTP callers. Controllers parse inputs into internal
-brands before calling services. Fix incomplete Treaty inference in these models; never generate
-a separate client contract. Defaults and guest runtime metadata needed by consumers are served
+ordinary primitives to HTTP callers without internal TypeScript brands. Controllers parse inputs
+into internal brands before calling services. Fix incomplete Treaty inference in these models;
+never generate a separate client contract. Defaults and guest runtime metadata needed by consumers are served
 by `/api/configuration`.
 
 Reuse wire schemas from `@repo/protocol` where public responses carry the same values.
