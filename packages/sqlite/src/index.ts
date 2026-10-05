@@ -32,6 +32,7 @@ export {
 } from '#hrana.ts';
 export { executeHranaBatch } from '#hrana-batch.ts';
 export { HranaError, hranaError } from '#hrana-error.ts';
+export { HranaPipelineAdapter } from '#hrana-pipeline.ts';
 export { hranaStatement, resolveHranaSql } from '#hrana-sql.ts';
 export { type HranaStream, HranaStreams } from '#hrana-streams.ts';
 export { parseHranaPipeline } from '#hrana-validation.ts';
