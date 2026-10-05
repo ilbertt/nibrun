@@ -6,7 +6,7 @@ import {
   SecretStringSchema,
   TimestampSchema,
   Value,
-} from '@repo/protocol';
+} from '@repo/api/domain';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CronSchedules } from '#components/crons/cron-schedules.tsx';
 

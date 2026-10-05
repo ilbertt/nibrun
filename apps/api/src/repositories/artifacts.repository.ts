@@ -1,5 +1,6 @@
-import type { AppId, ArtifactId, Filename, ObjectKey, OwnerId, Sha256Digest } from '@repo/protocol';
+import type { AppId, Filename, ObjectKey, Sha256Digest } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import type { ArtifactId, OwnerId } from '#domain/identifiers.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type ArtifactRow = Queries['SelectArtifactById'];

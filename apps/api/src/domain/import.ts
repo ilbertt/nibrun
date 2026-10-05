@@ -1,6 +1,12 @@
+import {
+  AppIdSchema,
+  ByteSizeSchema,
+  FilenameSchema,
+  Sha256DigestSchema,
+  TimestampSchema,
+} from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
-import { AppIdSchema, ImportIdSchema } from '#domain/identifiers.ts';
-import { ByteSizeSchema, FilenameSchema, Sha256DigestSchema, TimestampSchema } from '#lib/wire.ts';
+import { ImportIdSchema } from '#domain/identifiers.ts';
 
 // An archive an owner uploaded, which an app's filesystem can be created holding. A noun with no
 // notion of use: what it is for is said by whatever names it, exactly as a deployment says which

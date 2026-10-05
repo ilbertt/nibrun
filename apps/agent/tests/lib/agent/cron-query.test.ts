@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
+import { DEFAULT_AGENT_POLL_SETTINGS } from '@repo/api/domain';
 import {
   AgentSessionSchema,
   type CronQuery,
   type CronQueryRequest,
   type CronQueryResult,
-  DEFAULT_AGENT_POLL_SETTINGS,
   DeploymentIdSchema,
   HostVersionsSchema,
   Value,

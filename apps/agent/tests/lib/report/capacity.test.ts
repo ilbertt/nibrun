@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { AppIdSchema, DEFAULT_INSTANCE_RESOURCES, type InstanceState, Value } from '@repo/protocol';
+import { DEFAULT_INSTANCE_RESOURCES } from '@repo/api/domain';
+import { AppIdSchema, type InstanceState, Value } from '@repo/protocol';
 import { committedResources, guestMemoryMib, memoryShortfallMib } from '#lib/report/capacity.ts';
 import { instanceRecord } from '#tests/support/fixtures.ts';
 

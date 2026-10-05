@@ -5,7 +5,7 @@ import {
   type TenantEnvironmentPatch,
   TenantEnvironmentPatchSchema,
   Value,
-} from '@repo/protocol';
+} from '@repo/api/domain';
 import { InvalidEnvironmentError } from '#errors.ts';
 
 const ASSIGNMENT = '=';

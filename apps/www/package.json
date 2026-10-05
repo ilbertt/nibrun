@@ -18,7 +18,6 @@
     "@repo/binary-handoff": "workspace:*",
     "@repo/deploy-link": "workspace:*",
     "@repo/global-constants": "workspace:*",
-    "@repo/protocol": "workspace:*",
     "@repo/ui": "workspace:*",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "^1.168.49",
@@ -27,7 +26,8 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:",
-    "@repo/analytics": "workspace:*"
+    "@repo/analytics": "workspace:*",
+    "@repo/api": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.58.0",

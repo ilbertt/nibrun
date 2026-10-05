@@ -1,6 +1,8 @@
-import { type AppId, CronRunIdSchema, type CronTable, Value } from '@repo/protocol';
+import { CronRunIdSchema } from '@repo/api/domain';
+import { type AppId, Value } from '@repo/protocol';
 import { Cause, Effect, Exit, Option, Scope, SynchronizedRef } from 'effect';
 import { registeredCronJobs } from '#lib/cron/jobs.ts';
+import type { CronTable } from '#lib/cron/model.ts';
 import { cronTimer } from '#lib/cron/timer.ts';
 import { CronExecutions } from '#services/cron-executions.service.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';

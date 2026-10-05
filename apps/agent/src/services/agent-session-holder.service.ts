@@ -1,4 +1,5 @@
-import { type AgentSession, DEFAULT_AGENT_POLL_SETTINGS } from '@repo/protocol';
+import { DEFAULT_AGENT_POLL_SETTINGS } from '@repo/api/domain';
+import type { AgentSession } from '@repo/protocol';
 import { Clock, Effect, Option, SynchronizedRef } from 'effect';
 import type { ControlPlaneError } from '#lib/control/client.ts';
 import { isSessionExpiring, openSession } from '#lib/control/session.ts';

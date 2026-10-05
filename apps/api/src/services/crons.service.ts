@@ -4,8 +4,8 @@ import type {
   CronQueryRequest,
   CronQueryResult,
   HostId,
-  OwnerId,
 } from '@repo/protocol';
+import type { OwnerId } from '#domain/identifiers.ts';
 import { PendingCronQueries } from '#lib/cron/pending-queries.ts';
 import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import type { DeploymentLookupRepositoryContract } from '#repositories/deployments.repository.ts';

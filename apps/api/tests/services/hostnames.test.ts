@@ -1,14 +1,7 @@
 import { afterEach, beforeEach, describe, expect, setSystemTime, test } from 'bun:test';
-import {
-  type AppHostnameState,
-  type AppId,
-  AppIdSchema,
-  type Hostname,
-  HostnameSchema,
-  type OwnerId,
-  OwnerIdSchema,
-  Value,
-} from '@repo/protocol';
+import { type AppId, AppIdSchema, type Hostname, HostnameSchema, Value } from '@repo/protocol';
+import type { AppHostnameState } from '#domain/app.ts';
+import { type OwnerId, OwnerIdSchema } from '#domain/identifiers.ts';
 import type { DcvMethod } from '#lib/app-hostname.ts';
 import { CloudflareError } from '#lib/cloudflare/client.ts';
 import { MS_PER_DAY } from '#lib/duration.ts';

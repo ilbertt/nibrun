@@ -16,11 +16,6 @@ import {
 import { stringEnum } from '#lib/string-enum.ts';
 import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } from '#lib/wire.ts';
 
-// What a host should be running. There is deliberately nothing here shaped like `start(x)` or
-// `stop(x)`: the control plane describes a world and the agent converges on it, so a missed
-// message, an agent restart and a control-plane restart are all non-events — the next poll
-// re-reads the truth.
-
 /**
  * `on-request` is `running` with the microVM left out until something asks for it: the app is
  * reachable, its host answers for its hostnames, and the guest is brought up by the first request
@@ -32,15 +27,10 @@ import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } f
  * why that policy never has to travel separately.
  */
 export const DESIRED_INSTANCE_STATES = ['running', 'on-request', 'stopped'] as const;
-
 export const DesiredInstanceStateSchema = stringEnum(DESIRED_INSTANCE_STATES);
-
 export type DesiredInstanceState = typeof DesiredInstanceStateSchema.static;
-
 export const DESIRED_PRESENCE = ['present', 'absent'] as const;
-
 export const DesiredPresenceSchema = stringEnum(DESIRED_PRESENCE);
-
 export type DesiredPresence = typeof DesiredPresenceSchema.static;
 
 /**

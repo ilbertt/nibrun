@@ -1,16 +1,14 @@
 import type {
   AppId,
-  ArtifactId,
-  Deployment,
   DeploymentId,
-  DeploymentState,
   HostReportedState,
-  ImportId,
   ReportedInstance,
   ReportedVolume,
   Timestamp,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
+import type { Deployment, DeploymentState } from '#domain/deployment.ts';
+import type { ArtifactId, ImportId } from '#domain/identifiers.ts';
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { DeploymentLifecycle } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';

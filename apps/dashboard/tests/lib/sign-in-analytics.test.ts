@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { AppIdSchema, TimestampSchema, Value } from '@repo/protocol';
+import { AppIdSchema, TimestampSchema, Value } from '@repo/api/domain';
 import { SessionIdentity } from '#lib/session-identity.ts';
 import { consumeSignIn, verifiedClaims } from '#lib/sign-in-analytics.ts';
 

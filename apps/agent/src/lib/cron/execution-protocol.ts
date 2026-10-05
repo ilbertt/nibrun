@@ -1,13 +1,12 @@
 import { Buffer } from 'node:buffer';
+import type { TenantLogStream } from '@repo/api/domain';
+import { MAX_CRON_ENVIRONMENT_VARIABLES, Value } from '@repo/protocol';
+import { Data, Either, Option } from 'effect';
 import {
   type CronJobDefinition,
   CronJobDefinitionSchema,
-  MAX_CRON_ENVIRONMENT_VARIABLES,
   MAX_CRONTAB_BYTES,
-  type TenantLogStream,
-  Value,
-} from '@repo/protocol';
-import { Data, Either, Option } from 'effect';
+} from '#lib/cron/model.ts';
 
 // NBR1 and its acknowledgement match apps/runtime/src/guest-cron.h.
 export const GUEST_CRON_VSOCK_PORT = 51004;

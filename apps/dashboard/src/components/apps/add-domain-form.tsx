@@ -1,5 +1,5 @@
+import { HostnameSchema, Value } from '@repo/api/domain';
 import { CUSTOM_DOMAIN_PRICING_NOTICE } from '@repo/global-constants';
-import { HostnameSchema, Value } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';

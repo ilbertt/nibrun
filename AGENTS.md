@@ -23,8 +23,13 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 - Imports use `#*` subpath mapping (e.g. `import { foo } from '#services/foo'`)
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
   DNS record names, type metadata, and required-record construction live in
-  `packages/protocol/src/domain/dns.ts`. Consumers and fixtures use those definitions
+  `apps/api/src/domain/dns.ts`. Consumers and fixtures use those definitions
   and render record names and targets rather than reconstructing them.
+- `@repo/protocol` owns only API–agent requests, responses, and their wire schemas.
+  Public API models, validation policy, defaults, and log-store contracts belong to
+  `apps/api/src/domain/`, exposed to clients through `@repo/api/domain`. Guest protocols
+  and agent persistence models belong to `apps/agent/src/lib/`. Biome restricts direct protocol
+  imports to its owning apps and prevents protocol from importing another workspace package.
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
 - Props are always passed — a component we wrote has no optional property. Declare
   `name: T | undefined` rather than `name?: T`, so a call site with nothing to pass says so.

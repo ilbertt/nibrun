@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import type { TenantLogStream } from '@repo/protocol';
+import type { TenantLogStream } from '@repo/api/domain';
 import { Data, Either } from 'effect';
 
 const FRAME_MAGIC = Buffer.from('NBL1');

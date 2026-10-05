@@ -1,3 +1,4 @@
+import { APP_ACTIVATIONS } from '@repo/api/domain';
 import type { PublicApiClient } from '@repo/api-client/public';
 import {
   APP_STATUS_LABELS,
@@ -6,7 +7,6 @@ import {
   appWithStatus,
   statusKey,
 } from '@repo/app-operations';
-import { APP_ACTIVATIONS } from '@repo/protocol';
 import { z } from 'zod';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { defineOutput } from '#lib/output.ts';

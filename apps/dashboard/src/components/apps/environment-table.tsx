@@ -2,7 +2,7 @@ import {
   EXTRA_PUBLIC_PORT_VALUES,
   interpolableRuntimeValue,
   RUNTIME_VALUE_NAMES,
-} from '@repo/protocol';
+} from '@repo/api/domain';
 import { Button } from '@repo/ui/components/button';
 import {
   Table,

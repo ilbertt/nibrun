@@ -1,16 +1,8 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
-import type {
-  AppId,
-  ArtifactId,
-  DeploymentId,
-  DeploymentState,
-  HostPort,
-  ImportId,
-  InstanceState,
-  Ipv4Address,
-  OwnerId,
-} from '@repo/protocol';
+import type { AppId, DeploymentId, HostPort, InstanceState, Ipv4Address } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import type { DeploymentState } from '#domain/deployment.ts';
+import type { ArtifactId, ImportId, OwnerId } from '#domain/identifiers.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type DeploymentRow = Queries['SelectDeploymentById'];

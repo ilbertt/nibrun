@@ -1,6 +1,6 @@
 import { defineCommand } from '@parshjs/core';
 import { createEnvContext } from '@parshjs/env';
-import { RUNTIME_VALUES } from '@repo/protocol';
+import { RUNTIME_VALUES } from '@repo/api/domain';
 import { z } from 'zod';
 import { createOutput } from '#lib/output.ts';
 import {

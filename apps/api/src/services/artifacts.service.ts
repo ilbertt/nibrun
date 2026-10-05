@@ -1,15 +1,14 @@
 import {
   type AppId,
-  type Artifact,
-  type ArtifactId,
   type Filename,
   FilenameSchema,
   type ObjectKey,
   ObjectKeySchema,
-  type OwnerId,
   type Sha256Digest,
   Value,
 } from '@repo/protocol';
+import type { Artifact } from '#domain/artifact.ts';
+import type { ArtifactId, OwnerId } from '#domain/identifiers.ts';
 import { unwrapExecutable } from '#lib/archive/unwrap.ts';
 import {
   ExpandsTooFarError,

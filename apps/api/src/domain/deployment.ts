@@ -1,14 +1,16 @@
-import { Type } from '@sinclair/typebox';
-import { AppConfigSchema } from '#domain/app.ts';
-import { AppIdSchema, ArtifactIdSchema, DeploymentIdSchema } from '#domain/identifiers.ts';
-import { InstanceStateSchema } from '#domain/instance.ts';
-import { stringEnum } from '#lib/string-enum.ts';
 import {
+  AppConfigSchema,
+  AppIdSchema,
+  DeploymentIdSchema,
   HostPortSchema,
+  InstanceStateSchema,
   Ipv4AddressSchema,
   StateMessageSchema,
+  stringEnum,
   TimestampSchema,
-} from '#lib/wire.ts';
+} from '@repo/protocol';
+import { Type } from '@sinclair/typebox';
+import { ArtifactIdSchema } from '#domain/identifiers.ts';
 
 // `stopped` is the one an owner puts a release into and takes it back out of: a suspended app's
 // microVM is down and the release is still the app's current one, which is a different thing from
@@ -24,7 +26,6 @@ export const DEPLOYMENT_STATES = [
 ] as const;
 
 export const DeploymentStateSchema = stringEnum(DEPLOYMENT_STATES);
-
 export type DeploymentState = typeof DeploymentStateSchema.static;
 
 export const DeploymentSchema = Type.Object({

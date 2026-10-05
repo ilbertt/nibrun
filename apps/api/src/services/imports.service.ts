@@ -2,15 +2,14 @@ import { Buffer } from 'node:buffer';
 import {
   type AppId,
   type Filename,
-  type Import,
-  type ImportId,
   type ObjectKey,
   ObjectKeySchema,
-  type OwnerId,
   type Sha256Digest,
   Sha256DigestSchema,
   Value,
 } from '@repo/protocol';
+import type { ImportId, OwnerId } from '#domain/identifiers.ts';
+import type { Import } from '#domain/import.ts';
 import { isAppDataArchive, OPENING_BYTES } from '#lib/archive/app-data.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';

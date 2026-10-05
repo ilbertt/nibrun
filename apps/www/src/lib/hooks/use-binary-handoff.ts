@@ -1,5 +1,5 @@
 import { recordEntry, trackEvent } from '@repo/analytics';
-import { FilenameSchema, Value } from '@repo/protocol';
+import { FilenameSchema, Value } from '@repo/api/domain';
 import { useState } from 'react';
 import { appDestination, handOffBinary } from '#lib/handoff.ts';
 

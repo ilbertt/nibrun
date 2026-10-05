@@ -1,4 +1,5 @@
-import { type DnsLabel, DnsLabelSchema, MAX_DNS_LABEL_LENGTH, Value } from '@repo/protocol';
+import { Value } from '@repo/protocol';
+import { type DnsLabel, DnsLabelSchema, MAX_DNS_LABEL_LENGTH } from '#domain/wire.ts';
 
 const SEPARATOR = '-';
 

@@ -1,4 +1,5 @@
-import { type HostId, LOG_STREAM_FIELDS } from '@repo/protocol';
+import { LOG_STREAM_FIELDS } from '@repo/api/domain';
+import type { HostId } from '@repo/protocol';
 import { Data, Effect } from 'effect';
 import { type TenantLogEvent, tenantLogRecord } from '#lib/logs/event.ts';
 

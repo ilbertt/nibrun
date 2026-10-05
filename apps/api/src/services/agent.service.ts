@@ -1,7 +1,6 @@
 import {
   type AgentSession,
   type AgentSessionRequest,
-  DEFAULT_AGENT_POLL_SETTINGS,
   type HostDesiredState,
   type HostId,
   HostIdSchema,
@@ -10,6 +9,7 @@ import {
   TimestampSchema,
   Value,
 } from '@repo/protocol';
+import { DEFAULT_AGENT_POLL_SETTINGS } from '#domain/defaults.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
 import type { AppsService } from '#services/apps.service.ts';

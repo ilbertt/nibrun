@@ -109,7 +109,9 @@
           "style": {
             "useConsistentTypeDefinitions": {
               "level": "error",
-              "options": { "style": "type" }
+              "options": {
+                "style": "type"
+              }
             }
           }
         }
@@ -216,6 +218,49 @@
           },
           "complexity": {
             "useMaxParams": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/*.ts",
+        "**/*.tsx",
+        "!apps/api/**",
+        "!apps/agent/**",
+        "!packages/protocol/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@repo/protocol": "Only the API and agent consume the wire protocol. Public consumers use @repo/api/domain."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/protocol/src/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@repo/**"],
+                    "message": "The API-agent wire contract must not depend on an application or another workspace package."
+                  }
+                ]
+              }
+            }
           }
         }
       }

@@ -5,6 +5,13 @@ compile against it, so a change here is a change to both — and the two are out
 every rollout, which is the case the schemas and `PROTOCOL_VERSION` are shaped around.
 
 The model is desired state, never commands. Nothing here may be shaped like `start(x)`.
+Filesystem and cron reads use separate query request/response contracts.
+
+Every domain schema here must be carried by a session, desired-state, reported-state, or query
+message. Public API models, DNS logic, configuration defaults, runtime reference validation,
+log-store records, and log deduplication belong to `apps/api/src/domain/`. Guest framing and
+persisted cron tables belong to `apps/agent/src/lib/`. Public consumers import `@repo/api/domain`;
+only the API and agent depend directly on this package.
 
 ## Constraints on a change
 
@@ -18,8 +25,6 @@ The model is desired state, never commands. Nothing here may be shaped like `sta
   whole message — so one instance in a state the reader has not heard of loses that host's entire
   report, not just that instance. The side that reads the enum ships first: a new value on a
   report means the control plane before the agents, and one on desired state means the reverse.
-- Absent means unknown or not applicable. **No field is ever `null`.** The one exception is
-  `TenantEnvironmentPatchSchema`, which is an owner editing their app rather than anything a host
-  is sent: there absent means "leave this variable as it is", so removing one needs a word of its
-  own.
+- Absent means unknown or not applicable. **No field is ever `null`.** Owner environment patches
+  belong to the public API and never travel to an agent.
 - **Log shipping, when it is built, gets its own path.** A log burst must never delay a stop.

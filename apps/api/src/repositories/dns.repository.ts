@@ -1,4 +1,4 @@
-import { CNAME_RECORD_TYPE, dnsName } from '@repo/protocol';
+import { CNAME_RECORD_TYPE, dnsName } from '#domain/dns.ts';
 import type { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
 
 export abstract class DnsRepositoryContract {

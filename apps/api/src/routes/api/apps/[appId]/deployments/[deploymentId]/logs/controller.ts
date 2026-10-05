@@ -1,12 +1,7 @@
-import {
-  AppIdSchema,
-  DEFAULT_LOG_TIMERANGE,
-  DeploymentIdSchema,
-  OwnerIdSchema,
-  type TenantLogRecord,
-  Value,
-} from '@repo/protocol';
+import { AppIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
 import { Elysia, sse } from 'elysia';
+import { OwnerIdSchema } from '#domain/identifiers.ts';
+import { DEFAULT_LOG_TIMERANGE, type TenantLogRecord } from '#domain/log.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { StreamLogsQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';
 import { AuthPlugin, LogsServicePlugin, loggerPlugin } from '#services/plugins.ts';

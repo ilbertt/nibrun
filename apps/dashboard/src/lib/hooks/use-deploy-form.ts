@@ -1,4 +1,5 @@
 import { trackEvent } from '@repo/analytics';
+import { DEFAULT_HTTP_PORT, FilenameSchema, Sha256DigestSchema, Value } from '@repo/api/domain';
 import {
   type DeployableBinary,
   type FetchableBinary,
@@ -8,7 +9,6 @@ import {
   type UploadableArchive,
 } from '@repo/app-operations';
 import { type DeploySuggestion, namedByUrl, refusedChecksum, refusedUrl } from '@repo/deploy-link';
-import { DEFAULT_HTTP_PORT, FilenameSchema, Sha256DigestSchema, Value } from '@repo/protocol';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
 import {
   type BinarySource,

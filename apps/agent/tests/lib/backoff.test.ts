@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_RESTART_POLICY } from '@repo/protocol';
+import { DEFAULT_RESTART_POLICY } from '@repo/api/domain';
 import { backoffDelayMs, isReadyToRetry, nextAttemptWindow } from '#lib/backoff.ts';
 
 const policy = DEFAULT_RESTART_POLICY;

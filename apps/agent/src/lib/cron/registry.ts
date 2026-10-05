@@ -1,12 +1,6 @@
-import {
-  type AppId,
-  type CronTable,
-  CronTablesSchema,
-  parseMessage,
-  TimestampSchema,
-  Value,
-} from '@repo/protocol';
+import { type AppId, parseMessage, TimestampSchema, Value } from '@repo/protocol';
 import { Clock, Data, Effect, Option } from 'effect';
+import { type CronTable, CronTablesSchema } from '#lib/cron/model.ts';
 import { validateCronJobs } from '#lib/cron/schedule.ts';
 import { readJsonFile } from '#lib/json-store.ts';
 import { decode } from '#lib/protocol.ts';

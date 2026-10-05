@@ -1,4 +1,4 @@
-import type { TenantArguments } from '@repo/protocol';
+import type { TenantArguments } from '@repo/api/domain';
 import { UsageError } from '#lib/errors.ts';
 
 const WHITESPACE = /\s/;

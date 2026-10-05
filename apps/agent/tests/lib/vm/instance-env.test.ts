@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { DEFAULT_HTTP_PORT, DEFAULT_RESTART_POLICY } from '@repo/api/domain';
 import {
   type AppHostname,
-  DEFAULT_HTTP_PORT,
-  DEFAULT_RESTART_POLICY,
   HostnameSchema,
   HostPortSchema,
   HttpPortSchema,

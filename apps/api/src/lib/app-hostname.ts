@@ -1,7 +1,5 @@
 import {
   type AppHostname,
-  type AppHostnameState,
-  type DnsLabel,
   type Hostname,
   HostnameSchema,
   type Timestamp,
@@ -9,6 +7,8 @@ import {
 } from '@repo/protocol';
 import { getDomain } from 'tldts';
 import type { Queries } from '#db/queries.gen.ts';
+import type { AppHostnameState } from '#domain/app.ts';
+import type { DnsLabel } from '#domain/wire.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 
 /**

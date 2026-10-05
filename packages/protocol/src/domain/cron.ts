@@ -1,19 +1,11 @@
 import { Type } from '@sinclair/typebox';
 import { TenantEnvironmentSchema } from '#domain/app.ts';
 import { AppIdSchema, CronJobIdSchema, DeploymentIdSchema } from '#domain/identifiers.ts';
-import { secretString } from '#lib/secret.ts';
 import { TimestampSchema } from '#lib/wire.ts';
 
 export const MAX_CRON_JOBS_PER_APP = 10;
 export const CRON_TIME_ZONE = 'UTC';
-export const MAX_CRONTAB_BYTES = 65_536;
 export const MAX_CRON_ENVIRONMENT_VARIABLES = 256;
-
-export const CrontabSchema = secretString({
-  maxLength: MAX_CRONTAB_BYTES,
-  pattern: '^[^\\u0000]*$',
-});
-
 const MAX_CRON_SCHEDULE_LENGTH = 256;
 const MAX_CRON_COMMAND_LENGTH = 4096;
 const NONEMPTY_LINE_PATTERN = '^(?![ \\t]*$)[^\\u0000\\r\\n]+$';
@@ -31,43 +23,21 @@ export const CronCommandSchema = Type.String({
   pattern: NONEMPTY_LINE_PATTERN,
 });
 
-export const CronJobDefinitionSchema = Type.Object({
+export const RegisteredCronJobSchema = Type.Object({
+  jobId: CronJobIdSchema,
   schedule: CronScheduleSchema,
   command: CronCommandSchema,
   environment: Type.Optional({
     ...TenantEnvironmentSchema,
     maxProperties: MAX_CRON_ENVIRONMENT_VARIABLES,
   }),
+  nextRunAt: Type.Optional(TimestampSchema),
 });
-
-export type CronJobDefinition = typeof CronJobDefinitionSchema.static;
-
-export const CronJobDefinitionsSchema = Type.Array(CronJobDefinitionSchema, {
-  maxItems: MAX_CRON_JOBS_PER_APP,
-});
-
-export type CronJobDefinitions = typeof CronJobDefinitionsSchema.static;
-
-export const CronTableSchema = Type.Object({
-  appId: AppIdSchema,
-  deploymentId: DeploymentIdSchema,
-  jobs: CronJobDefinitionsSchema,
-  crontab: Type.Optional(CrontabSchema),
-});
-
-export type CronTable = typeof CronTableSchema.static;
-
-export const CronTablesSchema = Type.Array(CronTableSchema);
-
-export const RegisteredCronJobSchema = Type.Composite([
-  CronJobDefinitionSchema,
-  Type.Object({ jobId: CronJobIdSchema, nextRunAt: Type.Optional(TimestampSchema) }),
-]);
 
 export type RegisteredCronJob = typeof RegisteredCronJobSchema.static;
 
 export const CronListingSchema = Type.Composite([
-  Type.Pick(CronTableSchema, ['appId', 'deploymentId']),
+  Type.Object({ appId: AppIdSchema, deploymentId: DeploymentIdSchema }),
   Type.Object({
     enabled: Type.Boolean(),
     timeZone: Type.Literal(CRON_TIME_ZONE),

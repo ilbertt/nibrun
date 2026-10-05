@@ -1,10 +1,10 @@
+import { APP_STATES } from '@repo/api/domain';
 import type { PublicApiClient } from '@repo/api-client/public';
 import {
   appFor,
   resumeApp as requestResume,
   suspendApp as requestSuspension,
 } from '@repo/app-operations';
-import { APP_STATES } from '@repo/protocol';
 import { z } from 'zod';
 import { defineOutput } from '#lib/output.ts';
 

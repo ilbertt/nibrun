@@ -1,7 +1,7 @@
+import { APP_STATES } from '@repo/api/domain';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
 import type { ListedApp } from '@repo/app-operations';
-import { APP_STATES } from '@repo/protocol';
 import { z } from 'zod';
 import { NO_APPS } from '#lib/apps.ts';
 import { defineOutput } from '#lib/output.ts';

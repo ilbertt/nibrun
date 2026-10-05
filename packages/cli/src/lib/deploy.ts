@@ -1,11 +1,4 @@
 import { basename } from 'node:path';
-import type { PublicApiClient } from '@repo/api-client/public';
-import {
-  type DeployableBinary,
-  type Deployed,
-  deploy as startDeployment,
-  type UploadableBinary,
-} from '@repo/app-operations';
 import {
   type Filename,
   FilenameSchema,
@@ -13,7 +6,14 @@ import {
   Sha256DigestSchema,
   type TenantArguments,
   Value,
-} from '@repo/protocol';
+} from '@repo/api/domain';
+import type { PublicApiClient } from '@repo/api-client/public';
+import {
+  type DeployableBinary,
+  type Deployed,
+  deploy as startDeployment,
+  type UploadableBinary,
+} from '@repo/app-operations';
 import { environmentEdit } from '#lib/environment.ts';
 import { UsageError } from '#lib/errors.ts';
 import { openInitialData } from '#lib/initial-data.ts';

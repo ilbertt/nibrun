@@ -1,5 +1,6 @@
-import type { AppId, CheckpointId, ExportId, ExportState, OwnerId } from '@repo/protocol';
+import type { AppId, CheckpointId, ExportId, ExportState } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import type { OwnerId } from '#domain/identifiers.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type ExportRow = Queries['SelectExportById'];

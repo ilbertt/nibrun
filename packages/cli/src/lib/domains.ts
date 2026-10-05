@@ -1,6 +1,6 @@
+import { APP_HOSTNAME_KINDS, APP_HOSTNAME_STATES, CNAME_RECORD_TYPE } from '@repo/api/domain';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { addDomain, appById, appFor, checkDomainDns, removeDomain } from '@repo/app-operations';
-import { APP_HOSTNAME_KINDS, APP_HOSTNAME_STATES, CNAME_RECORD_TYPE } from '@repo/protocol';
 import { z } from 'zod';
 import { defineOutput } from '#lib/output.ts';
 

@@ -1,6 +1,6 @@
+import { HostnameSchema, type RequiredDomainDnsRecord, Value } from '@repo/api/domain';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import { HostnameSchema, type RequiredDomainDnsRecord, Value } from '@repo/protocol';
 
 const HTTP_CREATED = 201;
 

@@ -1,5 +1,6 @@
-import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap, t } from 'elysia';
+import { OwnerIdSchema } from '#domain/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   AddHostnameRequestSchema,

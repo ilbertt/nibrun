@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  HostIdSchema,
-  type TenantLogRecord,
-  type Timestamp,
-  TimestampSchema,
-  Value,
-} from '@repo/protocol';
+import { HostIdSchema, type Timestamp, TimestampSchema, Value } from '@repo/protocol';
+import type { TenantLogRecord } from '#domain/log.ts';
 import { NotFoundError } from '#lib/errors.ts';
 import type { DeploymentByIdInput, DeploymentRow } from '#repositories/deployments.repository.ts';
 import type { LogsRepositoryContract, TenantLogWindow } from '#repositories/logs.repository.ts';

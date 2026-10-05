@@ -1,13 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  CrontabSchema,
-  MAX_CRON_ENVIRONMENT_VARIABLES,
-  MAX_CRON_JOBS_PER_APP,
-  MAX_CRONTAB_BYTES,
-  Value,
-} from '@repo/protocol';
+import { MAX_CRON_ENVIRONMENT_VARIABLES, MAX_CRON_JOBS_PER_APP, Value } from '@repo/protocol';
 import { Effect, Either } from 'effect';
 import { parseCrontab } from '#lib/cron/crontab.ts';
+import { CrontabSchema, MAX_CRONTAB_BYTES } from '#lib/cron/model.ts';
 import { OBSERVED_AT, tenantEnvironment } from '#tests/support/fixtures.ts';
 import { runScoped } from '#tests/support/run.ts';
 

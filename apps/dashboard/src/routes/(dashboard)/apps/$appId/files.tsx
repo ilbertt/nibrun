@@ -1,4 +1,4 @@
-import { GUEST_PATH_ROOT } from '@repo/protocol';
+import { GUEST_PATH_ROOT } from '@repo/api/domain';
 import { createFileRoute } from '@tanstack/react-router';
 import { DirectoryBrowser } from '#components/files/directory-browser.tsx';
 

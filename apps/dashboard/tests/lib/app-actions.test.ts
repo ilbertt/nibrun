@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import {
+  APP_STATES,
+  type AppState,
+  DEPLOYMENT_STATES,
+  type DeploymentState,
+} from '@repo/api/domain';
 import { appStatus } from '@repo/app-operations';
-import { APP_STATES, type AppState, DEPLOYMENT_STATES, type DeploymentState } from '@repo/protocol';
 import { APP_ACTIONS, type AppActions, appActions, withoutIdentity } from '#lib/app-actions.ts';
 
 const ENABLED = { kind: 'enabled' } as const;

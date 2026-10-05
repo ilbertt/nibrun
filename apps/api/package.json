@@ -7,7 +7,8 @@
     "#tests/*": "./tests/*"
   },
   "exports": {
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./domain": "./src/domain/index.ts"
   },
   "scripts": {
     "build": "bun run scripts/build.ts",
@@ -24,7 +25,8 @@
     "@repo/protocol": "workspace:*",
     "better-auth": "catalog:",
     "elysia": "^1.4.30",
-    "tldts": "^7.4.13"
+    "tldts": "^7.4.13",
+    "@sinclair/typebox": "^0.34.52"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

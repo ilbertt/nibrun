@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Sha256DigestSchema, Value } from '@repo/protocol';
+import { Sha256DigestSchema, Value } from '@repo/api/domain';
 import { binaryFrom } from '#lib/deploy.ts';
 import { UsageError } from '#lib/errors.ts';
 

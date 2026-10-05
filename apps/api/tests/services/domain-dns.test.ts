@@ -1,12 +1,7 @@
 import { expect, test } from 'bun:test';
-import {
-  AppIdSchema,
-  certificateValidationName,
-  HostnameSchema,
-  OwnerIdSchema,
-  requiredDomainDnsRecords,
-  Value,
-} from '@repo/protocol';
+import { AppIdSchema, HostnameSchema, Value } from '@repo/protocol';
+import { certificateValidationName, requiredDomainDnsRecords } from '#domain/dns.ts';
+import { OwnerIdSchema } from '#domain/identifiers.ts';
 import { NotFoundError } from '#lib/errors.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import type { DnsRepositoryContract } from '#repositories/dns.repository.ts';

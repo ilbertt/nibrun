@@ -1,5 +1,4 @@
 import { BunSocket } from '@effect/platform-bun';
-import type { CronJobDefinition } from '@repo/protocol';
 import { Cause, Deferred, Duration, Effect, Exit, Option } from 'effect';
 import {
   type CronExecutionEvent,
@@ -15,6 +14,7 @@ import {
   type CronWireError,
   cronExecutionSession,
 } from '#lib/cron/execution-session.ts';
+import type { CronJobDefinition } from '#lib/cron/model.ts';
 import { connectRequest } from '#lib/vm/vsock.ts';
 
 const RESPONSE_TIMEOUT_SECONDS = 5;

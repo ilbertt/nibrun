@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_INSTANCE_RESOURCES, Ipv4AddressSchema, Value } from '@repo/protocol';
+import { DEFAULT_INSTANCE_RESOURCES } from '@repo/api/domain';
+import { Ipv4AddressSchema, Value } from '@repo/protocol';
 import {
   DRIVE_IDS,
   netmaskFor,

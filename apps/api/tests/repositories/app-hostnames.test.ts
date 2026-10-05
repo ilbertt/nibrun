@@ -1,16 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
-import {
-  type AppId,
-  AppIdSchema,
-  type Hostname,
-  HostnameSchema,
-  type OwnerId,
-  OwnerIdSchema,
-  Value,
-} from '@repo/protocol';
+import { type AppId, AppIdSchema, type Hostname, HostnameSchema, Value } from '@repo/protocol';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
+import { type OwnerId, OwnerIdSchema } from '#domain/identifiers.ts';
 import { AppHostnamesRepository } from '#repositories/app-hostnames.repository.ts';
 import type { EdgeReport } from '#repositories/custom-hostnames.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';

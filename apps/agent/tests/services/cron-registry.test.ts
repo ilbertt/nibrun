@@ -3,14 +3,13 @@ import { FileSystem, type Path } from '@effect/platform';
 import { SystemError } from '@effect/platform/Error';
 import {
   AppIdSchema,
-  type CronJobDefinition,
-  CrontabSchema,
   DeploymentIdSchema,
   MAX_CRON_JOBS_PER_APP,
   SecretStringSchema,
   Value,
 } from '@repo/protocol';
 import { Deferred, Effect, Either, Exit, Fiber, Layer, Option, Ref } from 'effect';
+import { type CronJobDefinition, CrontabSchema } from '#lib/cron/model.ts';
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { agentConfig } from '#tests/support/config.ts';

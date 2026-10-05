@@ -1,4 +1,4 @@
-import type { DeploymentState } from '@repo/protocol';
+import type { DeploymentState } from '@repo/api/domain';
 import { Badge } from '@repo/ui/components/badge';
 import type { ComponentProps } from 'react';
 

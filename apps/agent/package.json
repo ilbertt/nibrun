@@ -16,7 +16,9 @@
     "@effect/platform-bun": "0.91.2",
     "@repo/api-client": "workspace:*",
     "@repo/protocol": "workspace:*",
-    "effect": "3.22.1"
+    "effect": "3.22.1",
+    "@repo/api": "workspace:*",
+    "@sinclair/typebox": "^0.34.52"
   },
   "devDependencies": {
     "@repo/app-operations": "workspace:*",

@@ -1,15 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { Buffer } from 'node:buffer';
-import {
-  CronJobDefinitionSchema,
-  CronJobIdSchema,
-  CronRunIdSchema,
-  TenantLogRecordSchema,
-  Value,
-} from '@repo/protocol';
+import { CronRunIdSchema, TenantLogRecordSchema } from '@repo/api/domain';
+import { CronJobIdSchema, Value } from '@repo/protocol';
 import { Deferred, Effect, Fiber, Layer, Logger } from 'effect';
 import { makeCronRunLogs, runLoggedGuestCron } from '#lib/cron/execution-logs.ts';
 import { CronExecutionDisconnected } from '#lib/cron/execution-session.ts';
+import { CronJobDefinitionSchema } from '#lib/cron/model.ts';
 import type { TenantLogEvent } from '#lib/logs/event.ts';
 import { makeLogStoreClient } from '#lib/logs/store-client.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';

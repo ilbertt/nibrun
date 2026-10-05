@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { MIN_IDLE_TIMEOUT_MS } from '@repo/protocol';
+import { MIN_IDLE_TIMEOUT_MS } from '@repo/api/domain';
 import { type AppStatusReport, renderStatus } from '#lib/app-status.ts';
 import {
   BYTES_PER_MIB,

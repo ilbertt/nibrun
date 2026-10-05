@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import type { Brand } from '@repo/protocol';
-import { type TenantEnvironment, TenantEnvironmentSchema, Value } from '@repo/protocol';
+import { type TenantEnvironment, Value } from '@repo/protocol';
+import { TenantEnvironmentSchema } from '#domain/environment.ts';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_BYTES = 32;

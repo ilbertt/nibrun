@@ -1,6 +1,6 @@
+import type { Filename, ImportId } from '@repo/api/domain';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
-import type { Filename, ImportId } from '@repo/protocol';
 import { refusedArchiveBody } from '#archive.ts';
 import { mebibytes, putObject, type UploadTransport, type UploadWait } from '#upload.ts';
 

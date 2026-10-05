@@ -1,6 +1,7 @@
-import type { CronJobDefinition, DesiredInstance } from '@repo/protocol';
+import type { DesiredInstance } from '@repo/protocol';
 import { Data } from 'effect';
 import type { CronRunLogContext } from '#lib/cron/execution-logs.ts';
+import type { CronJobDefinition } from '#lib/cron/model.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
 
 export type CronDispatch = {

@@ -1,19 +1,16 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
-import {
-  APP_STATES,
-  type AppHostnameKind,
-  type AppHostnameState,
-  type AppId,
-  type AppName,
-  type AppState,
-  type ComputeUsage,
-  type DnsLabel,
-  type FilesystemUsage,
-  type Hostname,
-  type ObjectKey,
-  type OwnerId,
+import type {
+  AppHostnameKind,
+  AppId,
+  ComputeUsage,
+  FilesystemUsage,
+  Hostname,
+  ObjectKey,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import { APP_STATES, type AppHostnameState, type AppName, type AppState } from '#domain/app.ts';
+import type { OwnerId } from '#domain/identifiers.ts';
+import type { DnsLabel } from '#domain/wire.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';

@@ -1,4 +1,5 @@
-import { DEFAULT_AGENT_POLL_SETTINGS, type HostState } from '@repo/protocol';
+import type { HostState } from '@repo/protocol';
+import { DEFAULT_AGENT_POLL_SETTINGS } from '#domain/defaults.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
 import type { HealthRepositoryContract } from '#repositories/health.repository.ts';
 import { Service } from '#services/service.ts';

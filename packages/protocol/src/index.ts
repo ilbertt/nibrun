@@ -1,7 +1,5 @@
 /** biome-ignore-all lint/performance/noBarrelFile: index is the only allowed file where we can export other files */
 
-// Re-exported so a consumer can `Value.Parse` a branded schema without taking its own
-// dependency on the validator this package already owns.
 export { AssertError, Value } from '@sinclair/typebox/value';
 export {
   type CronQuery,
@@ -62,7 +60,6 @@ export {
   type AgentSessionRequest,
   AgentSessionRequestSchema,
   AgentSessionSchema,
-  DEFAULT_AGENT_POLL_SETTINGS,
 } from '#control/session.ts';
 export {
   AGENT_API_PREFIX,
@@ -75,56 +72,23 @@ export {
   PROTOCOL_VERSION_HEADER,
 } from '#control/transport.ts';
 export {
-  APP_ACTIVATIONS,
   APP_HOSTNAME_KINDS,
-  APP_HOSTNAME_STATES,
-  APP_STATES,
-  type App,
-  type AppActivation,
-  AppActivationSchema,
   type AppConfig,
   AppConfigSchema,
   type AppHostname,
   type AppHostnameKind,
   AppHostnameKindSchema,
   AppHostnameSchema,
-  type AppHostnameState,
-  AppHostnameStateSchema,
-  type AppName,
-  AppNameSchema,
-  AppSchema,
-  type AppState,
-  AppStateSchema,
-  EXTRA_PUBLIC_PORT_VALUES,
   IdleTimeoutMsSchema,
-  interpolableRuntimeValue,
   MAX_IDLE_TIMEOUT_MS,
-  MIN_HOSTNAMES,
   MIN_IDLE_TIMEOUT_MS,
-  namesExtraPublicPortValues,
-  namesOfferedRuntimeValues,
-  OWNED_APP_STATES,
-  type OwnedAppState,
-  OwnedAppStateSchema,
-  RUNTIME_VALUE_NAMES,
-  RUNTIME_VALUES,
-  type RuntimeValue,
-  type RuntimeValueName,
   type TenantArguments,
   TenantArgumentsSchema,
   type TenantEnvironment,
-  type TenantEnvironmentPatch,
-  TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
 } from '#domain/app.ts';
 export {
-  type Artifact,
-  ArtifactSchema,
-} from '#domain/artifact.ts';
-export {
   CHECKPOINT_STATES,
-  type Checkpoint,
-  CheckpointSchema,
   type CheckpointState,
   CheckpointStateSchema,
 } from '#domain/checkpoint.ts';
@@ -132,45 +96,15 @@ export { type ComputeUsage, ComputeUsageSchema } from '#domain/compute.ts';
 export {
   CRON_TIME_ZONE,
   CronCommandSchema,
-  type CronJobDefinition,
-  CronJobDefinitionSchema,
-  type CronJobDefinitions,
-  CronJobDefinitionsSchema,
   type CronListing,
   CronListingSchema,
   CronScheduleSchema,
-  type CronTable,
-  CronTableSchema,
-  CronTablesSchema,
-  CrontabSchema,
   MAX_CRON_ENVIRONMENT_VARIABLES,
   MAX_CRON_JOBS_PER_APP,
-  MAX_CRONTAB_BYTES,
   type RegisteredCronJob,
   RegisteredCronJobSchema,
 } from '#domain/cron.ts';
-export {
-  DEPLOYMENT_STATES,
-  type Deployment,
-  DeploymentSchema,
-  type DeploymentState,
-  DeploymentStateSchema,
-} from '#domain/deployment.ts';
-export {
-  CNAME_RECORD_TYPE,
-  certificateValidationName,
-  dnsName,
-  type RequiredDomainDnsRecord,
-  RequiredDomainDnsRecordSchema,
-  requiredDomainDnsRecords,
-} from '#domain/dns.ts';
-export {
-  EXPORT_STATES,
-  type Export,
-  ExportSchema,
-  type ExportState,
-  ExportStateSchema,
-} from '#domain/export.ts';
+export { EXPORT_STATES, type ExportState, ExportStateSchema } from '#domain/export.ts';
 export {
   DIRECTORY_ENTRY_LIMIT,
   type DirectoryListing,
@@ -189,10 +123,8 @@ export {
 } from '#domain/filesystem.ts';
 export {
   HOST_STATES,
-  type Host,
   type HostCapacity,
   HostCapacitySchema,
-  HostSchema,
   type HostState,
   HostStateSchema,
   type HostVersions,
@@ -201,16 +133,12 @@ export {
 export {
   type AppId,
   AppIdSchema,
-  type ArtifactId,
-  ArtifactIdSchema,
   type CheckpointId,
   CheckpointIdSchema,
   type CronJobId,
   CronJobIdSchema,
   type CronQueryId,
   CronQueryIdSchema,
-  type CronRunId,
-  CronRunIdSchema,
   type DeploymentId,
   DeploymentIdSchema,
   type ExportId,
@@ -219,18 +147,10 @@ export {
   FilesystemQueryIdSchema,
   type HostId,
   HostIdSchema,
-  type ImportId,
-  ImportIdSchema,
-  type OwnerId,
-  OwnerIdSchema,
   type VolumeId,
   VolumeIdSchema,
 } from '#domain/identifiers.ts';
-export { type Import, ImportSchema } from '#domain/import.ts';
 export {
-  DEFAULT_HEALTH_CHECK,
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_RESTART_POLICY,
   type HealthCheck,
   HealthCheckSchema,
   INSTANCE_STATES,
@@ -241,32 +161,15 @@ export {
   type RestartPolicy,
   RestartPolicySchema,
 } from '#domain/instance.ts';
+export { VOLUME_STATES, type VolumeState, VolumeStateSchema } from '#domain/volume.ts';
+export type { Brand, BrandedSchema } from '#lib/brand.ts';
 export {
-  DEFAULT_LOG_TIMERANGE,
-  LOG_SOURCES,
-  LOG_STREAM_FIELDS,
-  LOG_TIMERANGE_PATTERN,
-  type LogSource,
-  LogSourceSchema,
-  type LogTimerange,
-  LogTimerangeSchema,
-  SeenTenantLogs,
-  TENANT_LOG_STREAMS,
-  type TenantLogRecord,
-  TenantLogRecordSchema,
-  type TenantLogStream,
-  TenantLogStreamSchema,
-} from '#domain/log.ts';
-export {
-  DEFAULT_VOLUME_SIZE_BYTES,
-  VOLUME_STATES,
-  type Volume,
-  VolumeSchema,
-  type VolumeState,
-  VolumeStateSchema,
-} from '#domain/volume.ts';
-export type { Brand } from '#lib/brand.ts';
-export { REDACTED, redactSecrets, type SecretString, SecretStringSchema } from '#lib/secret.ts';
+  SECRET_ANNOTATION,
+  type SecretString,
+  SecretStringSchema,
+  secretString,
+} from '#lib/secret.ts';
+export { stringEnum } from '#lib/string-enum.ts';
 export {
   isValidMessage,
   type ProtocolIssue,
@@ -275,9 +178,6 @@ export {
 } from '#lib/validate.ts';
 export {
   ByteSizeSchema,
-  DEFAULT_HTTP_PORT,
-  type DnsLabel,
-  DnsLabelSchema,
   type Filename,
   FilenameSchema,
   type Hostname,
@@ -286,9 +186,10 @@ export {
   HostPortSchema,
   type HttpPort,
   HttpPortSchema,
+  type Identifier,
   type Ipv4Address,
   Ipv4AddressSchema,
-  MAX_DNS_LABEL_LENGTH,
+  identifierSchema,
   type ObjectKey,
   ObjectKeySchema,
   type Sha256Digest,

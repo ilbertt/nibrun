@@ -1,14 +1,12 @@
-import { type TString, Type } from '@sinclair/typebox';
-import { AppIdSchema, OwnerIdSchema } from '#domain/identifiers.ts';
+import { Type } from '@sinclair/typebox';
 import {
   HealthCheckSchema,
   InstanceResourcesSchema,
   RestartPolicySchema,
 } from '#domain/instance.ts';
-import type { Brand, BrandedSchema } from '#lib/brand.ts';
-import { secretString } from '#lib/secret.ts';
+import { SecretStringSchema } from '#lib/secret.ts';
 import { stringEnum } from '#lib/string-enum.ts';
-import { DnsLabelSchema, HostnameSchema, HttpPortSchema, TimestampSchema } from '#lib/wire.ts';
+import { HostnameSchema, HttpPortSchema } from '#lib/wire.ts';
 
 /**
  * One name is carved out of what is otherwise the shell's own rule, because a JavaScript object is
@@ -17,118 +15,7 @@ import { DnsLabelSchema, HostnameSchema, HttpPortSchema, TimestampSchema } from 
  * turns that into something an owner is told, rather than a variable they set and nobody carries.
  */
 const ENVIRONMENT_NAME_PATTERN = '^(?!__proto__$)[A-Za-z_][A-Za-z0-9_]*$';
-
-// What opens a reference in a tenant value, and the whole of what expands. The format contract is
-// in apps/runtime/src/config.h, which is also what resolves one.
-const RUNTIME_VALUE_PREFIX = 'NIBRUN_';
-
-/**
- * Every runtime value the guest sets, spelled as it is written, against what it holds. The value
- * is carried because a name on its own tells a reader nothing, and every end that lists them has
- * somewhere to say which is which.
- *
- * This is what every other end reads rather than restates, so adding one is this record and
- * whoever renders it. Two places cannot import it and have to be changed by hand:
- * `reference_value` in `apps/runtime/src/config.c`, which is what actually substitutes them, and
- * `skills/deploy-to-nibrun/SKILL.md`, which is what tells an agent they exist.
- */
-export const RUNTIME_VALUES = {
-  DATA_DIR: {
-    name: `${RUNTIME_VALUE_PREFIX}DATA_DIR`,
-    description: 'the directory the volume is mounted at',
-  },
-  EXTRA_PUBLIC_PORT: {
-    name: `${RUNTIME_VALUE_PREFIX}EXTRA_PUBLIC_PORT`,
-    description: 'the port to bind and announce',
-  },
-  HOSTNAME: {
-    name: `${RUNTIME_VALUE_PREFIX}HOSTNAME`,
-    description: "the app's own hostname",
-  },
-  HTTP_PORT: {
-    name: `${RUNTIME_VALUE_PREFIX}HTTP_PORT`,
-    description: 'the port the binary must listen on',
-  },
-  PUBLIC_IPV4: {
-    name: `${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`,
-    description: 'the address it is reached at',
-  },
-} as const;
-
-export type RuntimeValue = (typeof RUNTIME_VALUES)[keyof typeof RUNTIME_VALUES];
-
-/** A name the record holds, so anything naming one is a rename away from failing to compile. */
-export type RuntimeValueName = RuntimeValue['name'];
-
-/**
- * The names alone, in the order they are written above. The guest fails the boot over one it does
- * not offer, so a value naming anything else is refused here instead, while whoever typed it is
- * still listening.
- */
-export const RUNTIME_VALUE_NAMES: readonly RuntimeValueName[] = Object.values(RUNTIME_VALUES).map(
-  (value) => value.name,
-);
-
-/**
- * The two the guest is only given when the app asked for a public port besides HTTP. Naming one on
- * an app without it fails the boot — the runtime refuses a reference it was not given rather than
- * expanding it to nothing — so the pair has to be answerable here, where the config that decides it
- * is also being written.
- *
- * Entries of the record above rather than a second list, so one of these can only be a value the
- * guest offers at all.
- */
-export const EXTRA_PUBLIC_PORT_VALUES = [
-  RUNTIME_VALUES.EXTRA_PUBLIC_PORT,
-  RUNTIME_VALUES.PUBLIC_IPV4,
-] as const;
-
-const OFFERED = RUNTIME_VALUE_NAMES.join('|');
-const NEEDS_A_PORT = EXTRA_PUBLIC_PORT_VALUES.map((value) => value.name).join('|');
-const NAME_CHARACTER = '[A-Za-z0-9_]';
-
-// Match the guest's complete reference syntax so secrets with bare names or unmatched
-// braces remain literal. Complete references to unavailable names still fail validation.
-const TENANT_VALUE_PATTERN = [
-  '^(?:',
-  '[^$]',
-  `|\\$(?!\\{${RUNTIME_VALUE_PREFIX}${NAME_CHARACTER}*\\})`,
-  `|\\$\\{(?:${OFFERED})\\}`,
-  ')*$',
-].join('');
-
-const TENANT_VALUE = new RegExp(TENANT_VALUE_PATTERN);
-
-/**
- * Whether every runtime value `value` names is one the guest offers, which most values name none
- * of. The same rule the schema carries, for a caller with somewhere better to report it than a
- * pattern nobody can read.
- */
-export function namesOfferedRuntimeValues(value: string): boolean {
-  return TENANT_VALUE.test(value);
-}
-
-/** A runtime value as it is named in a tenant value, which is the form worth showing back. */
-export function interpolableRuntimeValue(name: string): string {
-  return `\${${name}}`;
-}
-
-// Whether these references are allowed depends on the app's public-port config.
-const NAMES_A_PORT = new RegExp(`\\$\\{(?:${NEEDS_A_PORT})\\}`);
-
-/** Whether `value` names a runtime value only an app with an extra public port is given. */
-export function namesExtraPublicPortValues(value: string): boolean {
-  return NAMES_A_PORT.test(value);
-}
-
-// The pattern rather than a check of its own, so what the schema refuses and what a caller may
-// spell out to whoever typed it are the same rule read twice.
-const TenantValueSchema = secretString({ pattern: TENANT_VALUE_PATTERN });
-
-// An app is always reachable at the hostname nibrun issued it, so every list of them has one.
-// Exported because the api narrows this array for its own response and would otherwise restate
-// the bound — or, as it did, quietly drop it.
-export const MIN_HOSTNAMES = 1;
+const TenantValueSchema = SecretStringSchema;
 
 // Mirrored by CONFIG_MAX_ARGUMENTS in apps/runtime, which refuses a file exceeding it.
 const MAX_ARGUMENTS = 64;
@@ -138,19 +25,8 @@ const MAX_ARGUMENT_LENGTH = 4096;
 // hostnames as a set from the start is what keeps custom domains a new entry rather than a
 // schema change and a rewrite of every routing path.
 export const APP_HOSTNAME_KINDS = ['platform', 'custom'] as const;
-
 export const AppHostnameKindSchema = stringEnum(APP_HOSTNAME_KINDS);
-
 export type AppHostnameKind = typeof AppHostnameKindSchema.static;
-
-// Whether the edge can serve the hostname yet. A platform hostname is born `active` — the
-// wildcard record and the wildcard certificate already cover it — while a custom one waits for
-// the owner to point DNS at us, which is the only proof of ownership there is.
-export const APP_HOSTNAME_STATES = ['pending', 'active', 'failed'] as const;
-
-export const AppHostnameStateSchema = stringEnum(APP_HOSTNAME_STATES);
-
-export type AppHostnameState = typeof AppHostnameStateSchema.static;
 
 // No state: a host is sent the hostnames it should be answering for, and one it should not
 // answer for yet is left out rather than sent with a flag saying so.
@@ -171,22 +47,6 @@ export const TenantEnvironmentSchema = Type.Record(
 );
 
 export type TenantEnvironment = typeof TenantEnvironmentSchema.static;
-
-/**
- * An edit to an app's environment rather than the whole of one: a variable named is set to what it
- * is given, one given `null` is removed, and one not named is left exactly as it is. That is what
- * lets an owner change one variable without restating values they are not allowed to read back.
- *
- * The one schema here whose values may be `null`, and only ever sent by an owner — a host is told
- * the environment an instance runs with, in full, and never an edit to one.
- */
-export const TenantEnvironmentPatchSchema = Type.Record(
-  Type.String({ pattern: ENVIRONMENT_NAME_PATTERN }),
-  Type.Union([TenantValueSchema, Type.Null()]),
-  { additionalProperties: false },
-);
-
-export type TenantEnvironmentPatch = typeof TenantEnvironmentPatchSchema.static;
 
 // What the user configured, snapshotted into every deployment so a rollback replays exactly
 // what ran rather than whatever the app happens to be configured with now.
@@ -218,25 +78,6 @@ export const AppConfigSchema = Type.Object({
 
 export type AppConfig = typeof AppConfigSchema.static;
 
-// Whether the app's microVM is kept up or is brought up by a request for it. `on-request` is what
-// a new app gets: an app nobody is visiting holds no memory, and the visitor who ends a quiet
-// spell waits for a restore rather than for a boot.
-//
-// `always` is the answer to the two things a request cannot stand in for. A connection that is the
-// first one to a stopped app cannot be carried across the wake, so a websocket is asked to
-// reconnect; and only requests reaching the app count as activity, so one that does nothing but
-// outbound work reads as quiet and is stopped.
-//
-// A property of the app rather than of a release, and so on `apps` beside `state` rather than on
-// the config a deployment pins: it is the same kind of fact as being suspended — how the app is
-// brought up, not what it runs — and a rollback replaying an activation policy from months ago
-// would be the wrong thing every time.
-export const APP_ACTIVATIONS = ['always', 'on-request'] as const;
-
-export const AppActivationSchema = stringEnum(APP_ACTIVATIONS);
-
-export type AppActivation = typeof AppActivationSchema.static;
-
 /**
  * How long an `on-request` app goes unasked-for before its microVM is stopped.
  *
@@ -267,51 +108,3 @@ export const IdleTimeoutMsSchema = Type.Integer({
   minimum: MIN_IDLE_TIMEOUT_MS,
   maximum: MAX_IDLE_TIMEOUT_MS,
 });
-
-export const APP_STATES = ['active', 'suspended', 'deleting', 'deleted'] as const;
-
-export const AppStateSchema = stringEnum(APP_STATES);
-
-export type AppState = typeof AppStateSchema.static;
-
-// The two an owner moves an app between, and the whole of what a request may ask for.
-// `deleting` is asked for by deleting the app, and `deleted` is a host's word for a filesystem
-// it no longer holds — neither is a state something outside can name.
-export const OWNED_APP_STATES = ['active', 'suspended'] as const satisfies readonly AppState[];
-
-export const OwnedAppStateSchema = stringEnum(OWNED_APP_STATES);
-
-export type OwnedAppState = typeof OwnedAppStateSchema.static;
-
-const MAX_APP_NAME_LENGTH = 128;
-
-export type AppName = Brand<string, 'AppName'>;
-
-/**
- * What an owner calls the app, and what they name it by everywhere they are asked for one. Unique
- * among the apps they still have, so it can stand for the app the way the slug does — the slug is
- * what it is served under, minted from the first name once and kept through every rename.
- */
-export const AppNameSchema = Type.String({
-  minLength: 1,
-  maxLength: MAX_APP_NAME_LENGTH,
-}) as BrandedSchema<TString, AppName>;
-
-export const AppSchema = Type.Object({
-  id: AppIdSchema,
-  ownerId: OwnerIdSchema,
-  name: AppNameSchema,
-  slug: DnsLabelSchema,
-  hostnames: Type.Array(AppHostnameSchema, { minItems: MIN_HOSTNAMES }),
-  config: AppConfigSchema,
-  state: AppStateSchema,
-  activation: AppActivationSchema,
-  // Carried on every app rather than only on the ones it is read for, so that how an app comes up
-  // is one field and not two — and so an app moved off `on-request` and back keeps the timeout it
-  // was given rather than the default.
-  idleTimeoutMs: IdleTimeoutMsSchema,
-  createdAt: TimestampSchema,
-  updatedAt: TimestampSchema,
-});
-
-export type App = typeof AppSchema.static;

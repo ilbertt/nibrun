@@ -2,17 +2,17 @@ import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
   CheckpointIdSchema,
-  DnsLabelSchema,
   type ExportId,
   ExportIdSchema,
   type ExportState,
   type HostReportedState,
   type ObjectKey,
   ObjectKeySchema,
-  type OwnerId,
   TimestampSchema,
   Value,
 } from '@repo/protocol';
+import type { OwnerId } from '#domain/identifiers.ts';
+import { DnsLabelSchema } from '#domain/wire.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
   ExportStorageRepositoryContract,

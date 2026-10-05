@@ -1,6 +1,6 @@
+import type { CronListing } from '@repo/api/domain';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import type { CronListing } from '@repo/protocol';
 
 export async function readCrons({
   api,

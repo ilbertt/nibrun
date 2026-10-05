@@ -1,7 +1,7 @@
 import { note, text } from '@clack/prompts';
+import { APP_STATES } from '@repo/api/domain';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { appFor, deleteApp as requestDeletion } from '@repo/app-operations';
-import { APP_STATES } from '@repo/protocol';
 import { z } from 'zod';
 import { UsageError } from '#lib/errors.ts';
 import { defineOutput } from '#lib/output.ts';

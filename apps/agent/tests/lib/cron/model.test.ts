@@ -1,13 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import {
   CronCommandSchema,
-  type CronJobDefinition,
-  CronJobDefinitionsSchema,
   CronScheduleSchema,
   isValidMessage,
   MAX_CRON_JOBS_PER_APP,
   parseMessage,
-} from '#index.ts';
+} from '@repo/protocol';
+import { type CronJobDefinition, CronJobDefinitionsSchema } from '#lib/cron/model.ts';
 
 const JOB: CronJobDefinition = {
   schedule: '*/5 * * * *',
@@ -58,7 +57,12 @@ describe('cron definitions', () => {
     expect(parseMessage({ schema: CronJobDefinitionsSchema, value: jobs })).toEqual(jobs);
   });
 
-  test('additional fields are tolerated during a rollout', () => {
+  test('runtime references are validated before a registration reaches the guest', () => {
+    expect(accepts([{ ...JOB, environment: { URL: `https://\${NIBRUN_HOSTNAME}` } }])).toBe(true);
+    expect(accepts([{ ...JOB, environment: { URL: `https://\${NIBRUN_HSOTNAME}` } }])).toBe(false);
+  });
+
+  test('additional fields do not change a registration', () => {
     expect(accepts([{ ...JOB, futureField: true }])).toBe(true);
   });
 });

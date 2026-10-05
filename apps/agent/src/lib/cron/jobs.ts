@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
-import { CronJobIdSchema, type CronTable, Value } from '@repo/protocol';
+import { CronJobIdSchema, Value } from '@repo/protocol';
+import type { CronTable } from '#lib/cron/model.ts';
 
 export function registeredCronJobs(table: CronTable) {
   return Array.from(table.jobs.entries(), ([index, job]) => {

@@ -1,5 +1,5 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test';
-import { CNAME_RECORD_TYPE } from '@repo/protocol';
+import { CNAME_RECORD_TYPE } from '#domain/dns.ts';
 import { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
 import { DnsRepository } from '#repositories/dns.repository.ts';
 

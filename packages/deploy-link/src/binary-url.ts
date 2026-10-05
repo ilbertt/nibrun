@@ -1,4 +1,4 @@
-import { FilenameSchema, Sha256DigestSchema, Value } from '@repo/protocol';
+import { FilenameSchema, Sha256DigestSchema, Value } from '@repo/api/domain';
 
 const SECURE_SCHEME = 'https://';
 

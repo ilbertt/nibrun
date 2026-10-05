@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
+import { DEFAULT_AGENT_POLL_SETTINGS } from '@repo/api/domain';
 import {
   type AgentSession,
   AppIdSchema,
-  DEFAULT_AGENT_POLL_SETTINGS,
   type DirectoryListing,
   type FilesystemQuery,
   FilesystemQueryIdSchema,

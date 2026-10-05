@@ -14,7 +14,6 @@ import { HostDesiredStateSchema } from '#control/desired-state.ts';
  * we do not deploy depends on the shape.
  */
 export const PROTOCOL_VERSION = 1;
-
 export const PROTOCOL_VERSION_HEADER = 'x-nibrun-protocol-version';
 
 // Under /internal, not /api: the public edge answers 404 for that whole
@@ -59,9 +58,6 @@ export const AGENT_ROUTES = {
  * exists to notify.
  */
 export const DesiredStateRequestSchema = Type.Object({});
-
 export type DesiredStateRequest = typeof DesiredStateRequestSchema.static;
-
 export const DesiredStateResponseSchema = HostDesiredStateSchema;
-
 export type DesiredStateResponse = typeof DesiredStateResponseSchema.static;

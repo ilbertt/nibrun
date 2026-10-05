@@ -1,4 +1,4 @@
-import { CRON_TIME_ZONE, type TenantLogRecord } from '@repo/protocol';
+import { CRON_TIME_ZONE, type TenantLogRecord } from '@repo/api/domain';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui/components/tooltip';
 import { cn } from '@repo/ui/lib/utils';
 import { ClockIcon } from 'lucide-react';

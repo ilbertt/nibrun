@@ -1,4 +1,4 @@
-import { DEFAULT_LOG_TIMERANGE } from '@repo/protocol';
+import { DEFAULT_LOG_TIMERANGE } from '@repo/api/domain';
 import { Link } from '@tanstack/react-router';
 import { TriangleAlertIcon } from 'lucide-react';
 import { useAppId } from '#lib/hooks/use-app-id.ts';

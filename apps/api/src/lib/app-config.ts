@@ -1,16 +1,14 @@
+import type { AppConfig, SecretString, TenantEnvironment } from '@repo/protocol';
+import type { Queries } from '#db/queries.gen.ts';
 import {
-  type AppConfig,
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
   DEFAULT_VOLUME_SIZE_BYTES,
-  REDACTED,
-  type SecretString,
-  type TenantEnvironment,
-  type TenantEnvironmentPatch,
-} from '@repo/protocol';
-import type { Queries } from '#db/queries.gen.ts';
+} from '#domain/defaults.ts';
+import type { TenantEnvironmentPatch } from '#domain/environment.ts';
+import { REDACTED } from '#lib/redact-secrets.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 
 // An owner reads which variables are set, never what they hold: the values are sealed in the

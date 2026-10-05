@@ -1,10 +1,7 @@
-import {
-  ArtifactIdSchema,
-  DeploymentIdSchema,
-  DeploymentSchema,
-  ImportIdSchema,
-} from '@repo/protocol';
+import { DeploymentIdSchema } from '@repo/protocol';
 import { t } from 'elysia';
+import { DeploymentSchema } from '#domain/deployment.ts';
+import { ArtifactIdSchema, ImportIdSchema } from '#domain/identifiers.ts';
 import { PublicAppConfigSchema } from '#routes/api/apps/model.ts';
 
 /**

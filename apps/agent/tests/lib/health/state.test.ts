@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  DEFAULT_HEALTH_CHECK,
-  DEFAULT_HTTP_PORT,
-  type HealthCheck,
-  type InstanceState,
-} from '@repo/protocol';
+import { DEFAULT_HEALTH_CHECK, DEFAULT_HTTP_PORT } from '@repo/api/domain';
+import type { HealthCheck, InstanceState } from '@repo/protocol';
 import {
   applyProbe,
   describeInstanceFailure,

@@ -1,5 +1,6 @@
-import { CNAME_RECORD_TYPE, Value } from '@repo/protocol';
+import { Value } from '@repo/protocol';
 import { t } from 'elysia';
+import { CNAME_RECORD_TYPE } from '#domain/dns.ts';
 
 const DNS_QUERY_ENDPOINT = 'https://cloudflare-dns.com/dns-query';
 

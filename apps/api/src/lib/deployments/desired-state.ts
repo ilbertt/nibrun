@@ -2,7 +2,6 @@ import {
   type AppConfig,
   type AppHostname,
   type AppId,
-  DEFAULT_VOLUME_SIZE_BYTES,
   type DesiredInstance,
   type DesiredInstanceState,
   type DesiredVolume,
@@ -11,6 +10,7 @@ import {
   VolumeIdSchema,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import { DEFAULT_VOLUME_SIZE_BYTES } from '#domain/defaults.ts';
 import { toRunConfig } from '#lib/app-config.ts';
 import {
   openEnvironment,

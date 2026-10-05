@@ -6,7 +6,7 @@ import {
   type DeploymentState,
   INSTANCE_STATES,
   type InstanceState,
-} from '@repo/protocol';
+} from '@repo/api/domain';
 import { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
 import { appStatus } from '#status.ts';
 

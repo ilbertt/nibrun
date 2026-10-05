@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
+import { requiredDomainDnsRecords } from '@repo/api/domain';
 import type { DomainDnsRecord } from '@repo/app-operations';
-import { requiredDomainDnsRecords } from '@repo/protocol';
 import {
   APP_DOMAINS_OUTPUT,
   addAppDomain,

@@ -2,12 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import {
   AppIdSchema,
   CronJobIdSchema,
-  CronRunIdSchema,
   DeploymentIdSchema,
   HostIdSchema,
   TimestampSchema,
   Value,
 } from '@repo/protocol';
+import { CronRunIdSchema } from '#domain/identifiers.ts';
 import type { QueryRequest } from '#lib/victorialogs/client.ts';
 import type { LogRow } from '#lib/victorialogs/parse.ts';
 import { LogsRepository, type TenantLogStore } from '#repositories/logs.repository.ts';
@@ -92,7 +92,7 @@ describe('a read takes one window of one deployment out of the store', () => {
     expect(asked[0]?.query).toEndWith(`| sort by (_time) limit ${LIMIT}`);
   });
 
-  test('a stored row becomes a record the protocol accepts', async () => {
+  test('a stored row becomes a record the log schema accepts', async () => {
     const { records } = await read([storedRow()]);
 
     expect(records[0]?.sequence).toBe(0);
@@ -110,7 +110,7 @@ describe('a read takes one window of one deployment out of the store', () => {
 
   // The schema is what would catch a field renamed on the writing side, and the reader is
   // watching a live app rather than auditing the store — so it drops the row and carries on.
-  test('a row the protocol does not recognise is skipped rather than failing the window', async () => {
+  test('a row the log schema does not recognise is skipped rather than failing the window', async () => {
     const { hostId: _hostId, ...missingAField } = storedRow();
     const { records } = await read([missingAField, storedRow()]);
 

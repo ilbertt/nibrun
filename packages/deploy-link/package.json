@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@repo/app-operations": "workspace:*",
-    "@repo/protocol": "workspace:*"
+    "@repo/api": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

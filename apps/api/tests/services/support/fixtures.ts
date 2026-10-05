@@ -1,16 +1,12 @@
+import { AppIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
 import {
-  AppIdSchema,
-  ArtifactIdSchema,
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
   DEFAULT_VOLUME_SIZE_BYTES,
-  DeploymentIdSchema,
-  ImportIdSchema,
-  OwnerIdSchema,
-  Value,
-} from '@repo/protocol';
+} from '#domain/defaults.ts';
+import { ArtifactIdSchema, ImportIdSchema, OwnerIdSchema } from '#domain/identifiers.ts';
 import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import type {
   DeploymentByIdInput,

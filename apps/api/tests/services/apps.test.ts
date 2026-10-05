@@ -2,34 +2,30 @@ import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
   AppIdSchema,
-  type AppName,
-  AppNameSchema,
-  type AppState,
   type ComputeUsage,
-  type DnsLabel,
-  DnsLabelSchema,
   type FilesystemUsage,
   type Hostname,
   HostnameSchema,
   MIN_IDLE_TIMEOUT_MS,
   type ObjectKey,
   ObjectKeySchema,
-  OWNED_APP_STATES,
-  type OwnerId,
-  OwnerIdSchema,
-  REDACTED,
   type ReportedInstance,
   type ReportedVolume,
   type TenantEnvironment,
-  type TenantEnvironmentPatch,
-  TenantEnvironmentPatchSchema,
-  TenantEnvironmentSchema,
   TimestampSchema,
   Value,
   VolumeIdSchema,
 } from '@repo/protocol';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
+import { type AppName, AppNameSchema, type AppState, OWNED_APP_STATES } from '#domain/app.ts';
+import {
+  type TenantEnvironmentPatch,
+  TenantEnvironmentPatchSchema,
+  TenantEnvironmentSchema,
+} from '#domain/environment.ts';
+import { type OwnerId, OwnerIdSchema } from '#domain/identifiers.ts';
+import { type DnsLabel, DnsLabelSchema } from '#domain/wire.ts';
 import type { NewAppConfig, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import {
   BadRequestError,
@@ -38,6 +34,7 @@ import {
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
+import { REDACTED } from '#lib/redact-secrets.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { AppIdSchema, DEFAULT_HTTP_PORT, INSTANCE_STATES, Value } from '@repo/protocol';
+import { DEFAULT_HTTP_PORT } from '@repo/api/domain';
+import { AppIdSchema, INSTANCE_STATES, Value } from '@repo/protocol';
 import { Effect, Layer, Option } from 'effect';
 import { forwardedInstances } from '#lib/reconcile/network.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';

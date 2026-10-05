@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { CronJobIdSchema, CronRunIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
+import { CronRunIdSchema } from '@repo/api/domain';
+import { CronJobIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
 import { Clock, Context, Effect, Layer, Ref, TestClock, TestContext } from 'effect';
 import { cronLoop } from '#lib/agent/crons.ts';
 import { type CronDispatch, CronExecutionUnavailable } from '#lib/cron/dispatch.ts';

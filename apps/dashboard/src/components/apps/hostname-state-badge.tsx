@@ -1,4 +1,4 @@
-import type { AppHostnameState } from '@repo/protocol';
+import type { AppHostnameState } from '@repo/api/domain';
 import { Badge } from '@repo/ui/components/badge';
 import type { ComponentProps } from 'react';
 

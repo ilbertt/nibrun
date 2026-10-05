@@ -1,11 +1,7 @@
-import {
-  AppIdSchema,
-  ArtifactIdSchema,
-  ArtifactSchema,
-  OwnerIdSchema,
-  Value,
-} from '@repo/protocol';
+import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap, t } from 'elysia';
+import { ArtifactSchema } from '#domain/artifact.ts';
+import { ArtifactIdSchema, OwnerIdSchema } from '#domain/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { UpdateArtifactBodySchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { ArtifactsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';

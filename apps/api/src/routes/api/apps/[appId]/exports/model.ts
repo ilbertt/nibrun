@@ -1,5 +1,5 @@
-import { ExportSchema } from '@repo/protocol';
 import { t } from 'elysia';
+import { ExportSchema } from '#domain/export.ts';
 
 /**
  * `objectKey` is dropped and a signed URL put in its place: where the bundle sits is this end's

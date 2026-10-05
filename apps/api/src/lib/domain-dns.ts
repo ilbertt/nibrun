@@ -1,5 +1,5 @@
-import { RequiredDomainDnsRecordSchema } from '@repo/protocol';
 import { t } from 'elysia';
+import { RequiredDomainDnsRecordSchema } from '#domain/dns.ts';
 
 export const DomainDnsRecordSchema = t.Object({
   ...RequiredDomainDnsRecordSchema.properties,

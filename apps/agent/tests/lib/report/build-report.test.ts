@@ -1,10 +1,9 @@
 import { describe, expect, test } from 'bun:test';
+import { DEFAULT_HTTP_PORT, DEFAULT_INSTANCE_RESOURCES } from '@repo/api/domain';
 import {
   type AppId,
   AppIdSchema,
   type ComputeUsage,
-  DEFAULT_HTTP_PORT,
-  DEFAULT_INSTANCE_RESOURCES,
   type FilesystemUsage,
   type HostPort,
   HostPortSchema,

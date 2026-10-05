@@ -1,5 +1,6 @@
-import { AppIdSchema, DeploymentIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
+import { OwnerIdSchema } from '#domain/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { DeploymentResponseSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
 import { AuthPlugin, DeploymentsServicePlugin, loggerPlugin } from '#services/plugins.ts';

@@ -3,21 +3,23 @@ import { gzipSync } from 'node:zlib';
 import {
   type AppId,
   AppIdSchema,
-  type ArtifactId,
-  ArtifactIdSchema,
-  ArtifactSchema,
   type Filename,
   FilenameSchema,
   isValidMessage,
   type ObjectKey,
   ObjectKeySchema,
-  type OwnerId,
-  OwnerIdSchema,
   type Sha256Digest,
   Sha256DigestSchema,
   TimestampSchema,
   Value,
 } from '@repo/protocol';
+import { ArtifactSchema } from '#domain/artifact.ts';
+import {
+  type ArtifactId,
+  ArtifactIdSchema,
+  type OwnerId,
+  OwnerIdSchema,
+} from '#domain/identifiers.ts';
 import { MAX_EXPANSION } from '#lib/archive/walk.ts';
 import {
   BadRequestError,

@@ -1,4 +1,4 @@
-import { DEFAULT_LOG_TIMERANGE, GUEST_PATH_ROOT } from '@repo/protocol';
+import { DEFAULT_LOG_TIMERANGE, GUEST_PATH_ROOT } from '@repo/api/domain';
 import { Tabs, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
 import { Link } from '@tanstack/react-router';
 import { useAppId } from '#lib/hooks/use-app-id.ts';

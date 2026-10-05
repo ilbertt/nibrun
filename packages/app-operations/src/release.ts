@@ -1,11 +1,11 @@
-import { ApiError } from '@repo/api-client/unwrap';
 import {
   AppNameSchema,
   HttpPortSchema,
   type TenantArguments,
   type TenantEnvironmentPatch,
   Value,
-} from '@repo/protocol';
+} from '@repo/api/domain';
+import { ApiError } from '@repo/api-client/unwrap';
 
 /** Where a release landed and what to reach it at, whichever way it was asked for. */
 export type Deployed = {

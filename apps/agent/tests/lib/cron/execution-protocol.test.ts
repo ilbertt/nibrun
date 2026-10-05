@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import { Buffer } from 'node:buffer';
-import { CronJobDefinitionSchema, MAX_CRONTAB_BYTES, Value } from '@repo/protocol';
+import { Value } from '@repo/protocol';
 import { Either, Option } from 'effect';
 import {
   decodeCronConnect,
   decodeCronExecution,
   encodeCronExecution,
 } from '#lib/cron/execution-protocol.ts';
+import { CronJobDefinitionSchema, MAX_CRONTAB_BYTES } from '#lib/cron/model.ts';
 import {
   CRON_HEADER_BYTES,
   CRON_LENGTH_OFFSET,

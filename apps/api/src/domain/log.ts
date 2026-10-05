@@ -1,20 +1,13 @@
-import { Type } from '@sinclair/typebox';
 import {
   AppIdSchema,
   CronJobIdSchema,
-  CronRunIdSchema,
   DeploymentIdSchema,
   HostIdSchema,
-} from '#domain/identifiers.ts';
-import { stringEnum } from '#lib/string-enum.ts';
-import { TimestampSchema } from '#lib/wire.ts';
-
-/**
- * Domain rather than control: a log record is not a message the agent sends the control plane.
- * The agent writes these to the log store and the api reads them back out of it, so the two never
- * exchange one — but a field renamed on the writing side and not the reading side would silently
- * stop matching, which is what keeps the shape here rather than in either app.
- */
+  stringEnum,
+  TimestampSchema,
+} from '@repo/protocol';
+import { Type } from '@sinclair/typebox';
+import { CronRunIdSchema } from '#domain/identifiers.ts';
 
 export const TENANT_LOG_STREAMS = ['stdout', 'stderr'] as const;
 export const TenantLogStreamSchema = stringEnum(TENANT_LOG_STREAMS);
@@ -42,12 +35,11 @@ export type LogSource = (typeof LOG_SOURCES)[number];
  * and never stop.
  */
 export const LOG_STREAM_FIELDS = ['hostId', 'SOURCE', 'appId'] as const;
-
 const MAX_LOG_CHUNK_LENGTH = 65_536;
 const MAX_SAFE_WIRE_INTEGER = Number.MAX_SAFE_INTEGER;
 
 // `_msg` and `_time` are the store's own names for a record's message and timestamp. Everything
-// else is ours and stays camelCase, like the rest of the protocol.
+// else is ours and stays camelCase.
 export const TenantLogRecordSchema = Type.Object({
   _time: TimestampSchema,
   _msg: Type.String({ maxLength: MAX_LOG_CHUNK_LENGTH }),
@@ -117,7 +109,6 @@ export class SeenTenantLogs {
  * whose validator is not TypeBox still has to refuse the same values this one does.
  */
 export const LOG_TIMERANGE_PATTERN = '^[1-9][0-9]{0,3}[smh]$';
-
 const MAX_LOG_TIMERANGE_LENGTH = 5;
 
 export const LogTimerangeSchema = Type.String({
@@ -127,5 +118,4 @@ export const LogTimerangeSchema = Type.String({
 });
 
 export type LogTimerange = typeof LogTimerangeSchema.static;
-
 export const DEFAULT_LOG_TIMERANGE = '5m';

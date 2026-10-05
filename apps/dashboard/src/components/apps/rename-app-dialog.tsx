@@ -1,4 +1,4 @@
-import { AppNameSchema, Value } from '@repo/protocol';
+import { AppNameSchema, Value } from '@repo/api/domain';
 import { Button } from '@repo/ui/components/button';
 import {
   Dialog,

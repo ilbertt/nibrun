@@ -1,12 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { FetchHttpClient } from '@effect/platform';
-import {
-  DEFAULT_HEALTH_CHECK,
-  type HealthCheck,
-  HttpPortSchema,
-  Ipv4AddressSchema,
-  Value,
-} from '@repo/protocol';
+import { DEFAULT_HEALTH_CHECK } from '@repo/api/domain';
+import { type HealthCheck, HttpPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
 import { Effect } from 'effect';
 import { probeInstance } from '#lib/health/probe.ts';
 import { provided } from '#tests/support/run.ts';

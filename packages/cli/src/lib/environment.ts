@@ -1,5 +1,5 @@
+import type { TenantEnvironmentPatch } from '@repo/api/domain';
 import { InvalidEnvironmentError, parseEnvironment } from '@repo/app-operations';
-import type { TenantEnvironmentPatch } from '@repo/protocol';
 import { UsageError } from '#lib/errors.ts';
 
 /**

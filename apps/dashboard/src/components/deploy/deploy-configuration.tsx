@@ -1,5 +1,9 @@
+import {
+  EXTRA_PUBLIC_PORT_VALUES,
+  interpolableRuntimeValue,
+  RUNTIME_VALUES,
+} from '@repo/api/domain';
 import type { DeploySuggestion } from '@repo/deploy-link';
-import { EXTRA_PUBLIC_PORT_VALUES, interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
 import {
   Accordion,
   AccordionContent,

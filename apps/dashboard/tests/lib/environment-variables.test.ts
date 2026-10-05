@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { REDACTED } from '@repo/protocol';
+import { REDACTED } from '@repo/api/domain';
 import {
   askedVariables,
   type EnvironmentVariable,

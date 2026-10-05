@@ -1,11 +1,6 @@
-import {
-  type AppId,
-  type DeploymentId,
-  type OwnerId,
-  SeenTenantLogs,
-  type TenantLogRecord,
-  type Timestamp,
-} from '@repo/protocol';
+import type { AppId, DeploymentId, Timestamp } from '@repo/protocol';
+import type { OwnerId } from '#domain/identifiers.ts';
+import { SeenTenantLogs, type TenantLogRecord } from '#domain/log.ts';
 import { durationToMs } from '#lib/duration.ts';
 import { NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';

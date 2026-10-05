@@ -1,7 +1,6 @@
 import { Type } from '@sinclair/typebox';
 
 export const CNAME_RECORD_TYPE = { name: 'CNAME', code: 5 } as const;
-
 const CERTIFICATE_VALIDATION_LABEL = '_acme-challenge';
 
 export const RequiredDomainDnsRecordSchema = Type.Object({

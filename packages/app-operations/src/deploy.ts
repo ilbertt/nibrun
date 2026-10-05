@@ -1,5 +1,3 @@
-import type { PublicApiClient } from '@repo/api-client/public';
-import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import {
   AppNameSchema,
   type DeploymentState,
@@ -7,7 +5,9 @@ import {
   type Sha256Digest,
   type TenantArguments,
   Value,
-} from '@repo/protocol';
+} from '@repo/api/domain';
+import type { PublicApiClient } from '@repo/api-client/public';
+import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import { appFor } from '#apps.ts';
 import { type UploadableArchive, uploadImport } from '#imports.ts';
 import {

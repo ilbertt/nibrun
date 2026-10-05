@@ -1,12 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  CronJobIdSchema,
   CronRunIdSchema,
   LOG_STREAM_FIELDS,
   SeenTenantLogs,
   TenantLogRecordSchema,
-  Value,
-} from '@repo/protocol';
+} from '@repo/api/domain';
+import { CronJobIdSchema, Value } from '@repo/protocol';
 import { Effect } from 'effect';
 import type { TenantLogEvent } from '#lib/logs/event.ts';
 import { makeLogStoreClient } from '#lib/logs/store-client.ts';

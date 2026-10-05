@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol';
+import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/api/domain';
 import { defaultParseSearch, defaultStringifySearch } from '@tanstack/react-router';
 import { type DeployLink, type DeploySuggestion, deployLink, deploySuggestion } from '#link.ts';
 

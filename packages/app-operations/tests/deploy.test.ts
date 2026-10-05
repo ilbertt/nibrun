@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import type { Artifact, Filename, Sha256Digest } from '@repo/api/domain';
 import type { PublicApiClient } from '@repo/api-client/public';
-import type { Artifact, Filename, Sha256Digest } from '@repo/protocol';
 import { MAX_IMPORT_SIZE_BYTES } from '#archive.ts';
 import { deploy, describeUnservedDeployment } from '#deploy.ts';
 import { parseEnvironment } from '#environment.ts';

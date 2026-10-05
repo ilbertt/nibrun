@@ -1,11 +1,13 @@
 import {
-  type AppHostname,
-  AppIdSchema,
-  CheckpointIdSchema,
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
+} from '@repo/api/domain';
+import {
+  type AppHostname,
+  AppIdSchema,
+  CheckpointIdSchema,
   DeploymentIdSchema,
   type DesiredArtifact,
   type DesiredCheckpoint,

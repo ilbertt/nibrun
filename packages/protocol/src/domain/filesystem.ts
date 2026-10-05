@@ -5,17 +5,6 @@ import { stringEnum } from '#lib/string-enum.ts';
 import { ByteSizeSchema, TimestampSchema } from '#lib/wire.ts';
 
 /**
- * Domain rather than control, for the same reason a log record is: the agent reads a listing off
- * a tenant device and the api hands it to a dashboard, so neither sends the other one as a
- * message — but the two would drift apart silently if the shape lived in either app.
- *
- * A listing is one directory's children, flat. Nothing here nests, and nothing here is a tree:
- * the wire carries what a person is looking at, and the path back to the root is the dashboard's
- * own navigation state. That is what keeps the cost of listing a filesystem independent of how
- * large the filesystem is.
- */
-
-/**
  * `other` is every symlink, socket, fifo and device node.
  *
  * They are named rather than hidden, because a file a tenant can see and we do not show is worse
@@ -24,9 +13,7 @@ import { ByteSizeSchema, TimestampSchema } from '#lib/wire.ts';
  * here has to describe a symlink target, so no listing can point out of the tenant's filesystem.
  */
 export const FILESYSTEM_ENTRY_KINDS = ['file', 'directory', 'other'] as const;
-
 export const FilesystemEntryKindSchema = stringEnum(FILESYSTEM_ENTRY_KINDS);
-
 export type FilesystemEntryKind = (typeof FILESYSTEM_ENTRY_KINDS)[number];
 
 /**
@@ -61,7 +48,6 @@ const PATH_SEGMENT_CHARACTERS = '[^/\\\\"\'\\u0000-\\u001f]';
 const NOT_A_TRAVERSAL = '(?!\\.{1,2}(?:/|$))';
 const PATH_SEGMENT = `${NOT_A_TRAVERSAL}${PATH_SEGMENT_CHARACTERS}+`;
 const GUEST_PATH_PATTERN = `^/(?:${PATH_SEGMENT}(?:/${PATH_SEGMENT})*)?$`;
-
 export type GuestPath = Brand<string, 'GuestPath'>;
 
 // Branded apart from the host paths it sits beside in the agent: a device path and a path inside

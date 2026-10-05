@@ -1,6 +1,7 @@
-import type { AppId, CronTable } from '@repo/protocol';
+import type { AppId } from '@repo/protocol';
 import { Effect, Option, Queue, SynchronizedRef } from 'effect';
 import { parseCrontab } from '#lib/cron/crontab.ts';
+import type { CronTable } from '#lib/cron/model.ts';
 import {
   type CronDeployment,
   CronRegistryError,
