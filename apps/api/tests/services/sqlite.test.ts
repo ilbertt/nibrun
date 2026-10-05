@@ -46,10 +46,10 @@ test('another owner cannot select an app or close its selection', async () => {
     path: PATH,
     signal: SIGNAL,
   });
-  expect(function closeAsOtherOwner() {
-    service.closeSelection({ id: selected.id, ownerId: OTHER_OWNER_ID });
-  }).toThrow(NotFoundError);
-  service.closeSelection({ id: selected.id, ownerId: OWNER_ID });
+  await expect(
+    service.closeSelection({ id: selected.id, ownerId: OTHER_OWNER_ID }),
+  ).rejects.toBeInstanceOf(NotFoundError);
+  await service.closeSelection({ id: selected.id, ownerId: OWNER_ID });
 });
 
 test('a stopped deployment is refused before contacting its host', async () => {

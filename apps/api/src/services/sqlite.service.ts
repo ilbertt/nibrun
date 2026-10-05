@@ -1,6 +1,8 @@
 import type { AppId, DeploymentId, GuestPath, OwnerId } from '@repo/protocol';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type { SqliteExecutorContract } from '#lib/hrana/executor.ts';
+import { HranaPipelineAdapter } from '#lib/hrana/pipeline.ts';
+import { HranaStreams } from '#lib/hrana/streams.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { type SqliteSelection, SqliteSelections } from '#lib/sqlite/selections.ts';
 import type { DeploymentsRepositoryContract } from '#repositories/deployments.repository.ts';
@@ -23,6 +25,8 @@ export class SqliteService extends Service {
   private readonly openExecutor: OpenSqliteExecutor;
   private readonly baseUrl: URL;
   private readonly selections = new SqliteSelections();
+  private readonly streams = new HranaStreams({ limit: undefined, idleTimeoutMs: undefined });
+  private readonly adapter = new HranaPipelineAdapter(this.streams);
 
   constructor({
     deploymentsRepo,
@@ -86,8 +90,43 @@ export class SqliteService extends Service {
     }
   }
 
-  closeSelection({ id, ownerId }: { id: string; ownerId: OwnerId }): void {
+  async closeSelection({ id, ownerId }: { id: string; ownerId: OwnerId }): Promise<void> {
     this.selections.remove({ id, ownerId, nowMs: Date.now() });
+    await this.streams.closeScope(selectionScope({ id, ownerId }));
+  }
+
+  async checkSelection({ id, ownerId }: { id: string; ownerId: OwnerId }): Promise<void> {
+    await this.selected({ id, ownerId });
+  }
+
+  async pipeline({
+    id,
+    ownerId,
+    body,
+    signal,
+  }: {
+    id: string;
+    ownerId: OwnerId;
+    body: unknown;
+    signal: AbortSignal;
+  }) {
+    const selection = await this.selected({ id, ownerId });
+    const openExecutor = this.openExecutor;
+    function open({ signal }: { signal: AbortSignal }) {
+      return openExecutor({ ...selection, signal });
+    }
+    return await this.adapter.handle({ body, scope: selectionScope(selection), open, signal });
+  }
+
+  private async selected(input: { id: string; ownerId: OwnerId }): Promise<SqliteSelection> {
+    try {
+      const selection = this.selections.get({ ...input, nowMs: Date.now() });
+      await this.authorize(selection);
+      return selection;
+    } catch (error) {
+      await this.streams.closeScope(selectionScope(input));
+      throw error;
+    }
   }
 
   private async authorize(selection: SqliteSelection): Promise<void> {
@@ -99,4 +138,8 @@ export class SqliteService extends Service {
       throw new ConflictError('The selected database deployment is no longer running.');
     }
   }
+}
+
+function selectionScope({ id, ownerId }: { id: string; ownerId: OwnerId }): string {
+  return JSON.stringify([ownerId, id]);
 }
