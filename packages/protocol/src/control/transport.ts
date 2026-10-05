@@ -39,6 +39,8 @@ export const AGENT_ROUTES = {
   filesystemQueryResult: '/filesystem-query-result',
   cronQuery: '/cron-query',
   cronQueryResult: '/cron-query-result',
+  sqliteQuery: '/sqlite-query',
+  sqliteQueryResult: '/sqlite-query-result',
 } as const;
 
 /**

@@ -65,6 +65,20 @@ export {
   DEFAULT_AGENT_POLL_SETTINGS,
 } from '#control/session.ts';
 export {
+  type SqliteOperation,
+  SqliteOperationSchema,
+  type SqliteOutcome,
+  SqliteOutcomeSchema,
+  type SqliteQuery,
+  type SqliteQueryRequest,
+  SqliteQueryRequestSchema,
+  type SqliteQueryResponse,
+  SqliteQueryResponseSchema,
+  type SqliteQueryResult,
+  SqliteQueryResultSchema,
+  SqliteQuerySchema,
+} from '#control/sqlite-query.ts';
+export {
   AGENT_API_PREFIX,
   AGENT_ROUTES,
   type DesiredStateRequest,
@@ -223,6 +237,10 @@ export {
   ImportIdSchema,
   type OwnerId,
   OwnerIdSchema,
+  type SqliteQueryId,
+  SqliteQueryIdSchema,
+  type SqliteSessionId,
+  SqliteSessionIdSchema,
   type VolumeId,
   VolumeIdSchema,
 } from '#domain/identifiers.ts';

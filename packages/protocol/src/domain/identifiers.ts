@@ -53,3 +53,11 @@ export type FilesystemQueryId = Identifier<'FilesystemQueryId'>;
 export const FilesystemQueryIdSchema = identifierSchema<FilesystemQueryId>(
   'One read of one directory, alive only while its answer is still awaited.',
 );
+
+export type SqliteQueryId = Identifier<'SqliteQueryId'>;
+export const SqliteQueryIdSchema = identifierSchema<SqliteQueryId>('One pending SQLite operation.');
+
+export type SqliteSessionId = Identifier<'SqliteSessionId'>;
+export const SqliteSessionIdSchema = identifierSchema<SqliteSessionId>(
+  'One guest SQLite connection.',
+);
