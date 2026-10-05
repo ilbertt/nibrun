@@ -17,13 +17,14 @@ set -euo pipefail
 runtime_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 container=nibrun-runtime-boot-test
 image_prefix=nibrun-runtime
+test_platform=${RUNTIME_TEST_PLATFORM:-linux/amd64}
 
 # shellcheck disable=SC1091
 set -a && . "$runtime_dir/versions.env" && set +a
 
 build() {
   docker build \
-    --platform=linux/amd64 \
+    --platform="$test_platform" \
     --build-arg BUILDER_IMAGE="$BUILDER_IMAGE" \
     --build-arg DEBIAN_SNAPSHOT="$DEBIAN_SNAPSHOT" \
     --build-arg SQLITE_ARCHIVE="$SQLITE_ARCHIVE" \
@@ -57,7 +58,7 @@ build --target=unit-test --no-cache-filter=unit-test --output type=cacheonly
 
 echo '=== mount tests ==='
 build --target=mount-test --tag "$image_prefix-mount-test"
-docker run --rm --privileged --platform=linux/amd64 "$image_prefix-mount-test"
+docker run --rm --privileged --platform="$test_platform" "$image_prefix-mount-test"
 
 echo '=== boot test ==='
 build --target=boot-test --tag "$image_prefix-boot-test"
@@ -68,7 +69,7 @@ trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
 # are real disks and cannot be stood in for. These are the capabilities /init
 # actually uses — mounting, making device nodes, and ending the machine — and the
 # default seccomp and apparmor profiles refuse the first and the last regardless.
-docker run --detach --name "$container" --platform=linux/amd64 \
+docker run --detach --name "$container" --platform="$test_platform" \
   --cap-add SYS_ADMIN --cap-add MKNOD --cap-add SYS_BOOT \
   --security-opt apparmor=unconfined --security-opt seccomp=unconfined \
   --device-cgroup-rule 'b *:* rwm' --device-cgroup-rule 'c *:* rwm' \
@@ -112,7 +113,7 @@ require 'no tenant had to be killed' lacks "$logs" 'killing it'
 
 image=$(mktemp "${TMPDIR:-/tmp}/nibrun-data.XXXXXX")
 docker cp "$container:/images/data.ext4" "$image" >/dev/null
-volume=$(docker run --rm --platform=linux/amd64 -v "$image:/data.ext4" --entrypoint /bin/sh \
+volume=$(docker run --rm --platform="$test_platform" -v "$image:/data.ext4" --entrypoint /bin/sh \
   "$image_prefix-boot-test" -ec 'debugfs -R "cat /report" /data.ext4 2>/dev/null; dumpe2fs -h /data.ext4 2>/dev/null | grep "Filesystem state"')
 rm -f "$image"
 

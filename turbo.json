@@ -9,7 +9,8 @@
       "dependsOn": ["^check:types"]
     },
     "test": {
-      "dependsOn": []
+      "dependsOn": [],
+      "env": ["RUNTIME_TEST_PLATFORM"]
     }
   }
 }

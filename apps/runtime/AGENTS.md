@@ -93,3 +93,7 @@ VMM.
 
 SQLite is the pinned official amalgamation from `versions.env`, checked by SHA-256 before compilation.
 It links statically against musl, with extension loading omitted and temporary storage in memory.
+
+On ARM Macs, `RUNTIME_TEST_PLATFORM=linux/arm64 bun run test` runs the Linux suites
+natively. Rosetta cannot enforce the SQLite worker address-space limit reliably.
+This test override does not change the production build target, which stays amd64.
