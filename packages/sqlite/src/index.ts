@@ -29,6 +29,8 @@ export {
   type HranaValue,
   HranaValueSchema,
 } from '#hrana.ts';
+export { HranaError } from '#hrana-error.ts';
+export { parseHranaPipeline } from '#hrana-validation.ts';
 export {
   SQLITE_MAX_COLUMNS,
   SQLITE_MAX_PARAMETERS,
