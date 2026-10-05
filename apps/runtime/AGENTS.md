@@ -90,3 +90,6 @@ What that leaves uncovered is the AF_VSOCK transport itself, for every leg: a co
 Firecracker vsock backend, so the log connection and both `CONNECT` handshakes still need a
 Firecracker integration test. The host's half of them is covered in `apps/agent`, against a fake
 VMM.
+
+SQLite is the pinned official amalgamation from `versions.env`, checked by SHA-256 before compilation.
+It links statically against musl, with extension loading omitted and temporary storage in memory.
