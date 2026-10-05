@@ -1,10 +1,7 @@
+import type { DirectoryListing, GuestPath } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import {
-  type DirectoryListing,
-  type GuestPath,
-  GuestPathSchema,
-} from '@repo/protocol/schemas/filesystem';
+import { GuestPathSchema } from '@repo/api-client/validation';
 import { Value } from '@sinclair/typebox/value';
 import { InvalidPathError } from '#errors.ts';
 

@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'bun:test';
-import { requiredDomainDnsRecords } from '@repo/api/lib/dns-records';
+import { requiredDomainDnsRecords } from '@repo/api-client/configuration';
 import { checkDomainDns, domainDnsPrompt } from '#domains.ts';
 import { apiHolding } from '#tests/support/api.ts';
 

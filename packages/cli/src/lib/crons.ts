@@ -1,7 +1,7 @@
 import type { Print } from '@parshjs/core';
+import { CRON_TIME_ZONE } from '@repo/api-client/configuration';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { readCrons } from '@repo/app-operations';
-import { CRON_TIME_ZONE } from '@repo/protocol/schemas/cron';
 import { z } from 'zod';
 import { announcedDeployment } from '#lib/apps.ts';
 import { defineOutput } from '#lib/output.ts';

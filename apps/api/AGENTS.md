@@ -10,12 +10,14 @@ Bun + Elysia service.
 
 `src/lib/api/` contains public resource schemas and their derived types. Defaults, DNS record
 construction, runtime reference descriptions, redaction and log deduplication live in `src/lib/`.
-Consumers import the defining file directly (`@repo/api/lib/api/app`,
-`@repo/api/lib/runtime-values`), never an API schema/helper barrel. Export only pure helpers
-needed by public consumers; server setup and clients remain private.
+Internal consumers import the defining file directly (`#lib/api/app.ts`), never an API
+schema/helper barrel. Only route types are exported through `@repo/api/types` for api-client.
+Public consumers must use `@repo/api-client`, never API implementation files. Its runtime
+validation and configuration are generated from these definitions; after changing them, run
+`bun run generate:contract` in `packages/api-client`. Type checks reject a stale generated contract.
 
-Reuse wire schemas from `@repo/protocol` where public responses carry the same values. Public
-consumers import those definitions from their protocol files instead of an API re-export.
+Reuse wire schemas from `@repo/protocol` where public responses carry the same values.
+Public consumers derive those types from the exported Treaty client.
 Shared environment validation and agent-produced tenant log records belong to protocol.
 The agent may not import `@repo/api` or its subpaths; neither app imports the other app.
 

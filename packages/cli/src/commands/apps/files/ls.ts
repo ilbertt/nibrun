@@ -1,5 +1,5 @@
 import { defineCommand } from '@parshjs/core';
-import { GUEST_PATH_ROOT } from '@repo/protocol/schemas/filesystem';
+import { GUEST_PATH_ROOT } from '@repo/api-client/validation';
 import { SHARED_OPTIONS } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { requireSignedIn } from '#lib/credentials.ts';

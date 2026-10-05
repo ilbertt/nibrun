@@ -1,4 +1,4 @@
-import { AppNameSchema } from '@repo/api/lib/api/app';
+import { AppNameSchema } from '@repo/api-client/validation';
 import { Button } from '@repo/ui/components/button';
 import {
   Dialog,

@@ -1,11 +1,7 @@
 import { expect, test } from 'bun:test';
-import { SecretStringSchema } from '@repo/protocol/lib/secret';
-import { TimestampSchema } from '@repo/protocol/lib/wire';
-import {
-  CRON_TIME_ZONE,
-  type CronListing,
-  type RegisteredCronJob,
-} from '@repo/protocol/schemas/cron';
+import { CRON_TIME_ZONE } from '@repo/api-client/configuration';
+import type { CronListing, RegisteredCronJob } from '@repo/api-client/models';
+import { SecretStringSchema, TimestampSchema } from '@repo/api-client/validation';
 import { Value } from '@sinclair/typebox/value';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CronSchedules } from '#components/crons/cron-schedules.tsx';

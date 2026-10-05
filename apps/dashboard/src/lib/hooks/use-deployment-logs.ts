@@ -1,5 +1,5 @@
+import type { TenantLogRecord } from '@repo/api-client/models';
 import { hasLiveOutput } from '@repo/app-operations';
-import type { TenantLogRecord } from '@repo/protocol/control/tenant-log';
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppStatus } from '#lib/hooks/use-app-status.ts';

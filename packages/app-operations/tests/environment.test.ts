@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { RUNTIME_VALUE_NAMES } from '@repo/api/lib/runtime-values';
+import { RUNTIME_VALUE_NAMES } from '@repo/api-client/configuration';
 import { parseEnvironment, parseEnvironmentPatch } from '#environment.ts';
 import { InvalidEnvironmentError } from '#errors.ts';
 

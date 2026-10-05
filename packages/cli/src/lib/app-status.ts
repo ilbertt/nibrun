@@ -1,4 +1,4 @@
-import { APP_ACTIVATIONS } from '@repo/api/lib/api/app';
+import { APP_ACTIVATIONS } from '@repo/api-client/configuration';
 import type { PublicApiClient } from '@repo/api-client/public';
 import {
   APP_STATUS_LABELS,

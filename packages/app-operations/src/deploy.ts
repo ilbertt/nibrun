@@ -1,9 +1,12 @@
-import { AppNameSchema } from '@repo/api/lib/api/app';
-import type { DeploymentState } from '@repo/api/lib/api/deployment';
+import type {
+  DeploymentState,
+  Filename,
+  Sha256Digest,
+  TenantArguments,
+} from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
-import type { Filename, Sha256Digest } from '@repo/protocol/lib/wire';
-import type { TenantArguments } from '@repo/protocol/schemas/app';
+import { AppNameSchema } from '@repo/api-client/validation';
 import { Value } from '@sinclair/typebox/value';
 import { appFor } from '#apps.ts';
 import { type UploadableArchive, uploadImport } from '#imports.ts';

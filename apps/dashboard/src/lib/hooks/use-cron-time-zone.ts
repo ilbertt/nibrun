@@ -1,4 +1,4 @@
-import { CRON_TIME_ZONE } from '@repo/protocol/schemas/cron';
+import { CRON_TIME_ZONE } from '@repo/api-client/configuration';
 import { useState } from 'react';
 import { dayAndSecondInTimeZone } from '#lib/format-timestamp.ts';
 

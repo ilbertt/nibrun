@@ -1,4 +1,4 @@
-import { FilenameSchema, Sha256DigestSchema } from '@repo/protocol/lib/wire';
+import { FilenameSchema, Sha256DigestSchema } from '@repo/api-client/validation';
 import { Value } from '@sinclair/typebox/value';
 
 const SECURE_SCHEME = 'https://';

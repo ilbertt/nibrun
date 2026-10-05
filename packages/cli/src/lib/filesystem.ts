@@ -1,11 +1,8 @@
 import type { Print } from '@parshjs/core';
+import { DIRECTORY_ENTRY_LIMIT, FILESYSTEM_ENTRY_KINDS } from '@repo/api-client/configuration';
+import type { GuestPath } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { guestPath, InvalidPathError, readDirectory } from '@repo/app-operations';
-import {
-  DIRECTORY_ENTRY_LIMIT,
-  FILESYSTEM_ENTRY_KINDS,
-  type GuestPath,
-} from '@repo/protocol/schemas/filesystem';
 import { z } from 'zod';
 import { announcedDeployment } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';

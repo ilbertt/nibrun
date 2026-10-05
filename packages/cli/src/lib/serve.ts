@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
-import { RUNTIME_VALUES } from '@repo/api/lib/runtime-values';
+import { RUNTIME_VALUES } from '@repo/api-client/configuration';
 import type { Server } from 'bun';
 import { z } from 'zod';
 import { PROGRAM_NAME } from '#config.ts';

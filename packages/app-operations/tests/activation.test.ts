@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { MAX_IDLE_TIMEOUT_MS, MIN_IDLE_TIMEOUT_MS } from '@repo/protocol/schemas/app';
+import { MAX_IDLE_TIMEOUT_MS, MIN_IDLE_TIMEOUT_MS } from '@repo/api-client/configuration';
 import { activationSummary, idleTimeoutLabel } from '#activation.ts';
 
 const A_QUARTER_HOUR_MS = 900_000;

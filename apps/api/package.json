@@ -7,13 +7,7 @@
     "#tests/*": "./tests/*"
   },
   "exports": {
-    "./types": "./src/types.ts",
-    "./lib/api/*": "./src/lib/api/*.ts",
-    "./lib/app-config-defaults": "./src/lib/app-config-defaults.ts",
-    "./lib/dns-records": "./src/lib/dns-records.ts",
-    "./lib/redact-secrets": "./src/lib/redact-secrets.ts",
-    "./lib/runtime-values": "./src/lib/runtime-values.ts",
-    "./lib/seen-tenant-logs": "./src/lib/seen-tenant-logs.ts"
+    "./types": "./src/types.ts"
   },
   "scripts": {
     "build": "bun run scripts/build.ts",

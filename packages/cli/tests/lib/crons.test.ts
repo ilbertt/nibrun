@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import { CRON_TIME_ZONE, type CronListing } from '@repo/protocol/schemas/cron';
+import { CRON_TIME_ZONE } from '@repo/api-client/configuration';
+import type { CronListing } from '@repo/api-client/models';
 import { CRONS_OUTPUT, listCrons } from '#lib/crons.ts';
 import {
   apiHolding,

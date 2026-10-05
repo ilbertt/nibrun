@@ -1,7 +1,7 @@
-import type { RequiredDomainDnsRecord } from '@repo/api/lib/dns-records';
+import type { RequiredDomainDnsRecord } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import { HostnameSchema } from '@repo/protocol/lib/wire';
+import { HostnameSchema } from '@repo/api-client/validation';
 import { Value } from '@sinclair/typebox/value';
 
 const HTTP_CREATED = 201;

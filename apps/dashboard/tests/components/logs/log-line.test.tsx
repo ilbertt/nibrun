@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import type { TenantLogRecord } from '@repo/protocol/control/tenant-log';
-import { CronJobIdSchema } from '@repo/protocol/schemas/identifiers';
+import type { TenantLogRecord } from '@repo/api-client/models';
+import { CronJobIdSchema } from '@repo/api-client/validation';
 import { Value } from '@sinclair/typebox/value';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { LogLine } from '#components/logs/log-line.tsx';

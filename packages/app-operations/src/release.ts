@@ -1,8 +1,6 @@
-import { AppNameSchema } from '@repo/api/lib/api/app';
-import type { TenantEnvironmentPatch } from '@repo/api/lib/api/environment';
+import type { TenantArguments, TenantEnvironmentPatch } from '@repo/api-client/models';
 import { ApiError } from '@repo/api-client/unwrap';
-import { HttpPortSchema } from '@repo/protocol/lib/wire';
-import type { TenantArguments } from '@repo/protocol/schemas/app';
+import { AppNameSchema, HttpPortSchema } from '@repo/api-client/validation';
 import { Value } from '@sinclair/typebox/value';
 
 /** Where a release landed and what to reach it at, whichever way it was asked for. */

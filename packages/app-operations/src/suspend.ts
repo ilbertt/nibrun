@@ -1,4 +1,4 @@
-import type { AppState, OwnedAppState } from '@repo/api/lib/api/app';
+import type { AppState, OwnedAppState } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
 

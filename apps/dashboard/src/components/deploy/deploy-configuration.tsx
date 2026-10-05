@@ -2,7 +2,7 @@ import {
   EXTRA_PUBLIC_PORT_VALUES,
   interpolableRuntimeValue,
   RUNTIME_VALUES,
-} from '@repo/api/lib/runtime-values';
+} from '@repo/api-client/configuration';
 import type { DeploySuggestion } from '@repo/deploy-link';
 import {
   Accordion,

@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Sha256DigestSchema } from '@repo/protocol/lib/wire';
+import { Sha256DigestSchema } from '@repo/api-client/validation';
 import { Value } from '@sinclair/typebox/value';
 import { binaryFrom } from '#lib/deploy.ts';
 import { UsageError } from '#lib/errors.ts';

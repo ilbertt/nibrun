@@ -1,18 +1,13 @@
 import { basename } from 'node:path';
+import type { Filename, Sha256Digest, TenantArguments } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
+import { FilenameSchema, Sha256DigestSchema } from '@repo/api-client/validation';
 import {
   type DeployableBinary,
   type Deployed,
   deploy as startDeployment,
   type UploadableBinary,
 } from '@repo/app-operations';
-import {
-  type Filename,
-  FilenameSchema,
-  type Sha256Digest,
-  Sha256DigestSchema,
-} from '@repo/protocol/lib/wire';
-import type { TenantArguments } from '@repo/protocol/schemas/app';
 import { Value } from '@sinclair/typebox/value';
 import { environmentEdit } from '#lib/environment.ts';
 import { UsageError } from '#lib/errors.ts';

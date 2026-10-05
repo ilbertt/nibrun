@@ -124,7 +124,7 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
     hostname,
   }: OwnedApp & { hostname: Hostname }): Promise<CustomHostnameClaim | null> {
     const [row] = await this.sql.ClaimCustomAppHostname`
-      /* @type state import('@repo/api/lib/api/app').AppHostnameState | null */
+      /* @type state import('#lib/api/app.ts').AppHostnameState | null */
       WITH app AS (
         SELECT a.id
         FROM nibrun.live_apps a

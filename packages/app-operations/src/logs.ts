@@ -1,7 +1,7 @@
-import { SeenTenantLogs } from '@repo/api/lib/seen-tenant-logs';
+import type { TenantLogRecord } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
+import { SeenTenantLogs } from '@repo/api-client/seen-tenant-logs';
 import { unwrap } from '@repo/api-client/unwrap';
-import type { TenantLogRecord } from '@repo/protocol/control/tenant-log';
 import { pause } from '#wait.ts';
 
 /**

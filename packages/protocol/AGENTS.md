@@ -63,13 +63,13 @@ An import being pure or safe to bundle does not make an application dependency a
 Protocol must not depend on either app, and API must not import agent implementation code.
 Biome enforces the agent-to-API import boundary.
 
-Public consumers import API resource schemas and pure helpers from their defining files, such
-as `@repo/api/lib/api/app` and `@repo/api/lib/runtime-values`. When a public response carries
-protocol values, import their defining files directly, such as `@repo/protocol/schemas/cron`
-or `@repo/protocol/control/tenant-log`; do not hide their ownership behind API re-exports.
-This reuse does not make public API policy part of protocol. Do not duplicate field definitions,
-enums or bounds, and do not add an API schema/helper barrel. Biome restricts the protocol root
-barrel to the API and agent and prevents protocol from importing another workspace package.
+Public consumers must use `@repo/api-client`, deriving request and response types from its
+exported Treaty client. They may not import API or protocol implementation files, including in
+tests. Client runtime validation and configuration are generated from the API's definitions,
+not redefined in protocol. The api-client generator may read wire definitions used by public
+routes; its runtime source must not import this package or API implementation code.
+Do not duplicate field definitions, enums or bounds, and do not add an API schema/helper barrel.
+Biome enforces the public consumer boundary and prevents protocol dependencies on another workspace package.
 
 ## Constraints on a change
 

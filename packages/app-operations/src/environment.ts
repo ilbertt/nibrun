@@ -1,12 +1,10 @@
 import {
-  type TenantEnvironmentPatch,
-  TenantEnvironmentPatchSchema,
-} from '@repo/api/lib/api/environment';
-import {
   interpolableRuntimeValue,
   namesOfferedRuntimeValues,
   RUNTIME_VALUE_NAMES,
-} from '@repo/api/lib/runtime-values';
+} from '@repo/api-client/configuration';
+import type { TenantEnvironmentPatch } from '@repo/api-client/models';
+import { TenantEnvironmentPatchSchema } from '@repo/api-client/validation';
 import { Value } from '@sinclair/typebox/value';
 import { InvalidEnvironmentError } from '#errors.ts';
 

@@ -1,6 +1,5 @@
 import { expect, test } from 'bun:test';
-import { TimestampSchema } from '@repo/protocol/lib/wire';
-import { AppIdSchema } from '@repo/protocol/schemas/identifiers';
+import { AppIdSchema, TimestampSchema } from '@repo/api-client/validation';
 import { Value } from '@sinclair/typebox/value';
 import { SessionIdentity } from '#lib/session-identity.ts';
 import { consumeSignIn, verifiedClaims } from '#lib/sign-in-analytics.ts';

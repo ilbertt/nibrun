@@ -1,11 +1,8 @@
 import type { Print } from '@parshjs/core';
+import { TENANT_LOG_STREAMS } from '@repo/api-client/configuration';
+import type { TenantLogRecord, TenantLogStream } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { followLogs } from '@repo/app-operations';
-import {
-  TENANT_LOG_STREAMS,
-  type TenantLogRecord,
-  type TenantLogStream,
-} from '@repo/protocol/control/tenant-log';
 import { z } from 'zod';
 import { defineOutput } from '#lib/output.ts';
 

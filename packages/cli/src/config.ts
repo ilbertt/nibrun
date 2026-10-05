@@ -1,5 +1,5 @@
 import type { CommandOption } from '@parshjs/core';
-import { EXTRA_PUBLIC_PORT_VALUES, RUNTIME_VALUE_NAMES } from '@repo/api/lib/runtime-values';
+import { EXTRA_PUBLIC_PORT_VALUES, RUNTIME_VALUE_NAMES } from '@repo/api-client/configuration';
 import { DASHBOARD_SITE } from '@repo/global-constants';
 import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };

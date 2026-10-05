@@ -1,4 +1,4 @@
-import type { FilesystemEntry, FilesystemEntryKind } from '@repo/protocol/schemas/filesystem';
+import type { FilesystemEntry, FilesystemEntryKind } from '@repo/api-client/models';
 import { Link } from '@tanstack/react-router';
 import { FileIcon, FileQuestionMarkIcon, FolderIcon, type LucideIcon } from 'lucide-react';
 import { useAppId } from '#lib/hooks/use-app-id.ts';

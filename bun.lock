@@ -53,13 +53,11 @@
       "name": "@repo/dashboard",
       "dependencies": {
         "@repo/analytics": "workspace:*",
-        "@repo/api": "workspace:*",
         "@repo/api-client": "workspace:*",
         "@repo/app-operations": "workspace:*",
         "@repo/binary-handoff": "workspace:*",
         "@repo/deploy-link": "workspace:*",
         "@repo/global-constants": "workspace:*",
-        "@repo/protocol": "workspace:*",
         "@repo/ui": "workspace:*",
         "@sinclair/typebox": "^0.34.52",
         "@tanstack/react-devtools": "^0.10.12",
@@ -95,11 +93,10 @@
       "name": "@repo/www",
       "dependencies": {
         "@repo/analytics": "workspace:*",
-        "@repo/api": "workspace:*",
+        "@repo/api-client": "workspace:*",
         "@repo/binary-handoff": "workspace:*",
         "@repo/deploy-link": "workspace:*",
         "@repo/global-constants": "workspace:*",
-        "@repo/protocol": "workspace:*",
         "@repo/ui": "workspace:*",
         "@sinclair/typebox": "^0.34.52",
         "@tanstack/react-router": "catalog:",
@@ -144,9 +141,11 @@
       "name": "@repo/api-client",
       "dependencies": {
         "@elysiajs/eden": "^1.4.9",
+        "@sinclair/typebox": "^0.34.52",
       },
       "devDependencies": {
         "@repo/api": "workspace:*",
+        "@repo/protocol": "workspace:*",
         "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",
       },
@@ -154,9 +153,7 @@
     "packages/app-operations": {
       "name": "@repo/app-operations",
       "dependencies": {
-        "@repo/api": "workspace:*",
         "@repo/api-client": "workspace:*",
-        "@repo/protocol": "workspace:*",
         "@sinclair/typebox": "^0.34.52",
       },
       "devDependencies": {
@@ -179,11 +176,9 @@
         "@parshjs/core": "^0.0.10",
         "@parshjs/env": "^0.0.3",
         "@parshjs/files": "^0.0.4",
-        "@repo/api": "workspace:*",
         "@repo/api-client": "workspace:*",
         "@repo/app-operations": "workspace:*",
         "@repo/global-constants": "workspace:*",
-        "@repo/protocol": "workspace:*",
         "@sinclair/typebox": "^0.34.52",
         "better-auth": "catalog:",
         "zod": "^4.5.4",
@@ -198,9 +193,8 @@
     "packages/deploy-link": {
       "name": "@repo/deploy-link",
       "dependencies": {
-        "@repo/api": "workspace:*",
+        "@repo/api-client": "workspace:*",
         "@repo/app-operations": "workspace:*",
-        "@repo/protocol": "workspace:*",
         "@sinclair/typebox": "^0.34.52",
       },
       "devDependencies": {

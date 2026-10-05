@@ -1,6 +1,6 @@
+import type { ExportState } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
-import type { ExportState } from '@repo/protocol/schemas/export';
 import { pause } from '#wait.ts';
 
 const MS_PER_MINUTE = 60_000;
