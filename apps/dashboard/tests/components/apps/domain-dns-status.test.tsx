@@ -1,14 +1,11 @@
 import { expect, test } from 'bun:test';
-import { requiredDomainDnsRecords } from '@repo/api-client/configuration';
 import type { DomainDnsRecord } from '@repo/app-operations';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DomainDnsStatus } from '#components/apps/domain-dns-status.tsx';
 
-const REQUIRED_RECORD = requiredDomainDnsRecords({
-  hostname: 'app.example.com',
-  routingTarget: 'app.nibrun.app',
-  dcvTarget: undefined,
-})[0]!;
+const REQUIRED_RECORD = [
+  { hostname: 'app.example.com', type: 'CNAME' as const, target: 'app.nibrun.app' },
+][0]!;
 
 function record(matched: DomainDnsRecord['matched']): DomainDnsRecord {
   return {

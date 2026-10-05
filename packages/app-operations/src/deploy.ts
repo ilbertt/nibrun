@@ -6,8 +6,6 @@ import type {
 } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
-import { AppNameSchema } from '@repo/api-client/validation';
-import { Value } from '@sinclair/typebox/value';
 import { appFor } from '#apps.ts';
 import { type UploadableArchive, uploadImport } from '#imports.ts';
 import {
@@ -174,7 +172,22 @@ async function createApp({
   if (name === undefined) {
     throw new ApiError('An app needs a name, and this url ends in nothing to take one from.');
   }
-  return unwrap(await api.api.apps.post({ name: Value.Parse(AppNameSchema, name), config }));
+  const { environment, ...defaults } = config;
+  return unwrap(
+    await api.api.apps.post({
+      name,
+      config: {
+        ...defaults,
+        ...(environment !== undefined && {
+          environment: Object.fromEntries(
+            Object.entries(environment).filter(
+              (entry): entry is [string, string] => entry[1] !== null,
+            ),
+          ),
+        }),
+      },
+    }),
+  );
 }
 
 /**

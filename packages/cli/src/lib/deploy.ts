@@ -1,14 +1,12 @@
 import { basename } from 'node:path';
-import type { Filename, Sha256Digest, TenantArguments } from '@repo/api-client/models';
+import type { Sha256Digest, TenantArguments } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { FilenameSchema, Sha256DigestSchema } from '@repo/api-client/validation';
 import {
   type DeployableBinary,
   type Deployed,
   deploy as startDeployment,
   type UploadableBinary,
 } from '@repo/app-operations';
-import { Value } from '@sinclair/typebox/value';
 import { environmentEdit } from '#lib/environment.ts';
 import { UsageError } from '#lib/errors.ts';
 import { openInitialData } from '#lib/initial-data.ts';
@@ -101,7 +99,7 @@ export async function binaryFrom({
   sha256?: string | undefined;
 }): Promise<DeployableBinary> {
   if (source.startsWith(SECURE_SCHEME)) {
-    return { url: source, sha256: sha256 === undefined ? undefined : asDigest(sha256) };
+    return { url: source, sha256: sha256 === undefined ? undefined : normalizedDigest(sha256) };
   }
   if (source.startsWith(INSECURE_SCHEME)) {
     throw new UsageError(`A binary is fetched over https, and this is not: ${source}`);
@@ -121,14 +119,14 @@ export async function binaryFrom({
  * than sent, so a mistyped digest costs a line rather than the whole transfer it would fail at
  * the end of.
  */
-function asDigest(sha256: string): Sha256Digest {
-  try {
-    return Value.Parse(Sha256DigestSchema, sha256.trim().toLowerCase());
-  } catch {
+function normalizedDigest(sha256: string): Sha256Digest {
+  const digest = sha256.trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(digest)) {
     throw new UsageError(
       `A checksum is the 64 hex characters sha256sum prints, and this is not: ${sha256}`,
     );
   }
+  return digest;
 }
 
 async function openBinary(path: string): Promise<UploadableBinary> {
@@ -136,25 +134,10 @@ async function openBinary(path: string): Promise<UploadableBinary> {
   if (!(await body.exists())) {
     throw new UsageError(`No such file: ${path}`);
   }
-  const name = asFilename(basename(path));
+  const name = basename(path);
   const hasher = new Bun.CryptoHasher('sha256');
   for await (const chunk of body.stream()) {
     hasher.update(chunk);
   }
-  return { name, body, digest: Value.Parse(Sha256DigestSchema, hasher.digest('hex')) };
-}
-
-/**
- * The name travels with the binary — it is what a host writes into an export archive, which the
- * api will not take as anything but a single plain path segment. Said here so that a name it
- * would refuse costs a line rather than the upload that preceded the refusal.
- */
-function asFilename(name: string): Filename {
-  try {
-    return Value.Parse(FilenameSchema, name);
-  } catch {
-    throw new UsageError(
-      `A binary's name must start with a letter or digit and hold only letters, digits, dots, dashes or underscores: ${name}`,
-    );
-  }
+  return { name, body, digest: hasher.digest('hex') };
 }

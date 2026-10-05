@@ -1,4 +1,3 @@
-import { CRON_TIME_ZONE } from '@repo/api-client/configuration';
 import type { TenantLogRecord } from '@repo/api-client/models';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui/components/tooltip';
 import { cn } from '@repo/ui/lib/utils';
@@ -11,9 +10,11 @@ const TERMINATOR = /\r?\n$/;
 export function LogLine({
   record,
   cronSchedule,
+  cronTimeZone,
 }: {
   record: TenantLogRecord;
   cronSchedule: string | undefined;
+  cronTimeZone: string | undefined;
 }) {
   const wroteToStderr = record.stream === 'stderr';
 
@@ -46,9 +47,9 @@ export function LogLine({
             </TooltipTrigger>
             <TooltipContent className="max-w-sm flex-col items-start gap-1 font-mono">
               <span>
-                {cronSchedule === undefined
+                {cronSchedule === undefined || cronTimeZone === undefined
                   ? 'Schedule unavailable'
-                  : `${cronSchedule} (${CRON_TIME_ZONE})`}
+                  : `${cronSchedule} (${cronTimeZone})`}
               </span>
               <span className="break-all opacity-60">{record.cronJobId}</span>
             </TooltipContent>

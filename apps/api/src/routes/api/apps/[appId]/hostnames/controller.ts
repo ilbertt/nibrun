@@ -1,6 +1,7 @@
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap, t } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   AddHostnameRequestSchema,
@@ -25,7 +26,8 @@ export const AppsAppIdHostnamesController = new Elysia()
    */
   .post(
     '/apps/:appId/hostnames',
-    async ({ hostnamesService, params, body, user, status }) => {
+    async ({ hostnamesService, params, body: bodyInput, user, status }) => {
+      const body = Value.Parse(AddHostnameRequestSchema, bodyInput);
       const { hostname, created } = await hostnamesService.add({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
@@ -34,16 +36,17 @@ export const AppsAppIdHostnamesController = new Elysia()
       return status(created ? StatusMap.Created : StatusMap.OK, hostname);
     },
     {
-      body: AddHostnameRequestSchema,
+      body: publicSchema(AddHostnameRequestSchema),
       response: {
-        [StatusMap.Created]: AppHostnameResponseSchema,
-        [StatusMap.OK]: AppHostnameResponseSchema,
+        [StatusMap.Created]: publicSchema(AppHostnameResponseSchema),
+        [StatusMap.OK]: publicSchema(AppHostnameResponseSchema),
       },
     },
   )
   .delete(
     '/apps/:appId/hostnames',
-    async ({ hostnamesService, params, query, user, status }) => {
+    async ({ hostnamesService, params, query: queryInput, user, status }) => {
+      const query = Value.Parse(RemoveHostnameQuerySchema, queryInput);
       await hostnamesService.remove({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
@@ -52,7 +55,7 @@ export const AppsAppIdHostnamesController = new Elysia()
       return status(StatusMap['No Content'], undefined);
     },
     {
-      query: RemoveHostnameQuerySchema,
+      query: publicSchema(RemoveHostnameQuerySchema),
       response: { [StatusMap['No Content']]: t.Void() },
     },
   );

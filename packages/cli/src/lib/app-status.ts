@@ -1,4 +1,4 @@
-import { APP_ACTIVATIONS } from '@repo/api-client/configuration';
+import type { AppActivation } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import {
   APP_STATUS_LABELS,
@@ -43,7 +43,7 @@ const AppStatusSchema = z.object({
    * caller reading `--json` is deciding something, and a timeout it would have to parse back out
    * of `stopped after 15m of quiet` is one this has taken away from it.
    */
-  activation: z.enum(APP_ACTIVATIONS),
+  activation: z.custom<AppActivation>((value) => typeof value === 'string'),
   idleTimeoutMs: z.number(),
   /** In vCPUs, so it is read against the count beside it rather than as a share of it. */
   vcpu: SpentSchema,

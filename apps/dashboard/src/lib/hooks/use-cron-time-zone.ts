@@ -1,4 +1,3 @@
-import { CRON_TIME_ZONE } from '@repo/api-client/configuration';
 import { useState } from 'react';
 import { dayAndSecondInTimeZone } from '#lib/format-timestamp.ts';
 
@@ -9,7 +8,7 @@ type CronTimeZoneView = {
   formatTimestamp: (instant: string) => string;
 };
 
-export function useCronTimeZone(): CronTimeZoneView {
+export function useCronTimeZone(timeZone: string): CronTimeZoneView {
   const [isLocal, setIsLocal] = useState(false);
 
   function toggle() {
@@ -19,9 +18,9 @@ export function useCronTimeZone(): CronTimeZoneView {
   function formatTimestamp(instant: string): string {
     return dayAndSecondInTimeZone({
       instant,
-      timeZone: isLocal ? undefined : CRON_TIME_ZONE,
+      timeZone: isLocal ? undefined : timeZone,
     });
   }
 
-  return { label: isLocal ? 'Local' : CRON_TIME_ZONE, isLocal, toggle, formatTimestamp };
+  return { label: isLocal ? 'Local' : timeZone, isLocal, toggle, formatTimestamp };
 }

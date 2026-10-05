@@ -20,6 +20,7 @@ export function LogStream({
             <LogLine
               key={`${record.sourceId}/${record.sequence}`}
               record={record}
+              cronTimeZone={cronListing?.timeZone}
               cronSchedule={
                 cronListing?.jobs.find((job) => job.jobId === record.cronJobId)?.schedule
               }

@@ -19,7 +19,6 @@ export {
 export {
   MAX_IMPORT_SIZE_BYTES,
   type OfferedArchive,
-  refusedArchive,
   refusedArchiveBody,
 } from '#archive.ts';
 export { readCrons } from '#crons.ts';
@@ -47,7 +46,7 @@ export { type EnvironmentAssignment, parseEnvFile } from '#env-file.ts';
 export { type EnvironmentEdit, parseEnvironment, parseEnvironmentPatch } from '#environment.ts';
 export { InvalidEnvironmentError, InvalidPathError } from '#errors.ts';
 export { awaitExportBundle, type ExportBundle, requestExport } from '#exports.ts';
-export { guestPath, readDirectory } from '#filesystem.ts';
+export { GUEST_PATH_ROOT, guestPath, readDirectory } from '#filesystem.ts';
 export { type UploadableArchive, uploadImport } from '#imports.ts';
 export { type FollowInput, followLogs } from '#logs.ts';
 export { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';

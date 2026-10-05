@@ -1,11 +1,9 @@
 import { expect, test } from 'bun:test';
-import { AppIdSchema, TimestampSchema } from '@repo/api-client/validation';
-import { Value } from '@sinclair/typebox/value';
 import { SessionIdentity } from '#lib/session-identity.ts';
 import { consumeSignIn, verifiedClaims } from '#lib/sign-in-analytics.ts';
 
-const APP_ID = Value.Parse(AppIdSchema, '00000000-0000-4000-8000-000000000001');
-const OTHER_APP_ID = Value.Parse(AppIdSchema, '00000000-0000-4000-8000-000000000002');
+const APP_ID = '00000000-0000-4000-8000-000000000001';
+const OTHER_APP_ID = '00000000-0000-4000-8000-000000000002';
 const SIGN_IN_WINDOW_MS = 60_000;
 
 test('a sign-in return is consumed once and accepts only app identifiers', () => {
@@ -75,7 +73,7 @@ test('a claim requires the same anonymous app to become permanent under the acco
   expect(
     verifiedClaims({
       pending,
-      apps: [{ id: APP_ID, expiresAt: Value.Parse(TimestampSchema, new Date().toISOString()) }],
+      apps: [{ id: APP_ID, expiresAt: new Date().toISOString() }],
     }),
   ).toEqual([]);
   expect(verifiedClaims({ pending, apps: [{ id: APP_ID, expiresAt: null }] })).toEqual([APP_ID]);

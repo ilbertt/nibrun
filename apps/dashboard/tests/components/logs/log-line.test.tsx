@@ -1,14 +1,9 @@
 import { expect, test } from 'bun:test';
 import type { TenantLogRecord } from '@repo/api-client/models';
-import { CronJobIdSchema } from '@repo/api-client/validation';
-import { Value } from '@sinclair/typebox/value';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { LogLine } from '#components/logs/log-line.tsx';
 
-const CRON_JOB_ID = Value.Parse(
-  CronJobIdSchema,
-  'cron-CsKypu7sYgXAb0WuIMJpywy_3HFUTFH88qBtbZ5RS_E',
-);
+const CRON_JOB_ID = 'cron-CsKypu7sYgXAb0WuIMJpywy_3HFUTFH88qBtbZ5RS_E';
 
 function record(overrides: Partial<TenantLogRecord> = {}): TenantLogRecord {
   return {
@@ -23,7 +18,11 @@ function record(overrides: Partial<TenantLogRecord> = {}): TenantLogRecord {
 
 test('cron log rows place a details trigger after the output and keep the ID hidden', () => {
   const markup = renderToStaticMarkup(
-    <LogLine record={record({ cronJobId: CRON_JOB_ID })} cronSchedule="*/5 * * * *" />,
+    <LogLine
+      record={record({ cronJobId: CRON_JOB_ID })}
+      cronTimeZone="UTC"
+      cronSchedule="*/5 * * * *"
+    />,
   );
   expect(markup).not.toContain(CRON_JOB_ID);
   expect(markup).toContain('aria-label="Cron job details"');
@@ -33,7 +32,9 @@ test('cron log rows place a details trigger after the output and keep the ID hid
 });
 
 test('server log rows carry no cron label', () => {
-  const markup = renderToStaticMarkup(<LogLine record={record()} cronSchedule={undefined} />);
+  const markup = renderToStaticMarkup(
+    <LogLine record={record()} cronTimeZone="UTC" cronSchedule={undefined} />,
+  );
   expect(markup).not.toContain('Cron job details');
   expect(markup).not.toContain(CRON_JOB_ID);
   expect(markup).toContain('cleanup complete');
@@ -47,6 +48,7 @@ test('cron metadata preserves stderr labels and escapes tenant output', () => {
         stream: 'stderr',
         _msg: '<script>alert(1)</script>',
       })}
+      cronTimeZone="UTC"
       cronSchedule={undefined}
     />,
   );

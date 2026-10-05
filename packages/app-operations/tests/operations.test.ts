@@ -1,8 +1,34 @@
 import { describe, expect, test } from 'bun:test';
-import { APP_STATES, DEPLOYMENT_STATES, INSTANCE_STATES } from '@repo/api-client/configuration';
 import type { AppState, DeploymentState, InstanceState } from '@repo/api-client/models';
 import { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
 import { appStatus } from '#status.ts';
+
+const INSTANCE_STATES = Object.keys({
+  pending: true,
+  starting: true,
+  running: true,
+  unhealthy: true,
+  stopping: true,
+  stopped: true,
+  idle: true,
+  failed: true,
+} satisfies Record<InstanceState, true>) as InstanceState[];
+
+const DEPLOYMENT_STATES = Object.keys({
+  pending: true,
+  starting: true,
+  running: true,
+  stopped: true,
+  superseded: true,
+  failed: true,
+} satisfies Record<DeploymentState, true>) as DeploymentState[];
+
+const APP_STATES = Object.keys({
+  active: true,
+  suspended: true,
+  deleting: true,
+  deleted: true,
+} satisfies Record<AppState, true>) as AppState[];
 
 const NAME = 'Quiet Otter';
 

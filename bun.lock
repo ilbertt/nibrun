@@ -59,7 +59,6 @@
         "@repo/deploy-link": "workspace:*",
         "@repo/global-constants": "workspace:*",
         "@repo/ui": "workspace:*",
-        "@sinclair/typebox": "^0.34.52",
         "@tanstack/react-devtools": "^0.10.12",
         "@tanstack/react-form": "^1.33.5",
         "@tanstack/react-query": "^5.102.8",
@@ -98,7 +97,6 @@
         "@repo/deploy-link": "workspace:*",
         "@repo/global-constants": "workspace:*",
         "@repo/ui": "workspace:*",
-        "@sinclair/typebox": "^0.34.52",
         "@tanstack/react-router": "catalog:",
         "@tanstack/react-start": "^1.168.49",
         "lucide-react": "catalog:",
@@ -141,11 +139,9 @@
       "name": "@repo/api-client",
       "dependencies": {
         "@elysiajs/eden": "^1.4.9",
-        "@sinclair/typebox": "^0.34.52",
       },
       "devDependencies": {
         "@repo/api": "workspace:*",
-        "@repo/protocol": "workspace:*",
         "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",
       },
@@ -154,7 +150,6 @@
       "name": "@repo/app-operations",
       "dependencies": {
         "@repo/api-client": "workspace:*",
-        "@sinclair/typebox": "^0.34.52",
       },
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
@@ -179,7 +174,6 @@
         "@repo/api-client": "workspace:*",
         "@repo/app-operations": "workspace:*",
         "@repo/global-constants": "workspace:*",
-        "@sinclair/typebox": "^0.34.52",
         "better-auth": "catalog:",
         "zod": "^4.5.4",
       },
@@ -195,7 +189,6 @@
       "dependencies": {
         "@repo/api-client": "workspace:*",
         "@repo/app-operations": "workspace:*",
-        "@sinclair/typebox": "^0.34.52",
       },
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",

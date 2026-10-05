@@ -1,8 +1,3 @@
-import {
-  EXTRA_PUBLIC_PORT_VALUES,
-  interpolableRuntimeValue,
-  RUNTIME_VALUES,
-} from '@repo/api-client/configuration';
 import type { DeploySuggestion } from '@repo/deploy-link';
 import {
   Accordion,
@@ -29,6 +24,7 @@ import {
   storedVariables,
   unfilledAsked,
 } from '#lib/environment-variables.ts';
+import { useConfiguration } from '#lib/hooks/use-configuration.ts';
 import { type DeployFormState, tenantArguments, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 const ARGUMENTS = 'Arguments';
@@ -253,6 +249,8 @@ function EnvironmentMark({ mark }: { mark: EnvironmentMarkKind }) {
 }
 
 function ExtraPublicPortExplained() {
+  const { data } = useConfiguration();
+  const portValues = data?.runtimeValues.filter((value) => value.requiresExtraPublicPort) ?? [];
   return (
     <>
       <FieldDescription>
@@ -263,18 +261,15 @@ function ExtraPublicPortExplained() {
         You do not pick the number. nibrun assigns it and sets these for the app:
       </FieldDescription>
       <ul className="list-disc space-y-1 pt-2 pb-3 pl-4 text-muted-foreground text-sm">
-        {EXTRA_PUBLIC_PORT_VALUES.map(({ name, description }) => (
+        {portValues.map(({ name, description }) => (
           <li key={name}>
             <code className="font-mono">{name}</code> — {description}
           </li>
         ))}
       </ul>
       <FieldDescription>
-        Your own variables may name them — set{' '}
-        <code className="font-mono">
-          ANNOUNCED_IP={interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}
-        </code>{' '}
-        and the app reads it under the name it already expects.
+        Your own variables can reference these values, and the app reads them under the names it
+        expects.
       </FieldDescription>
       <FieldDescription>
         Free for now, and likely to become part of a paid plan later.

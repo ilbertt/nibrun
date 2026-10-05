@@ -49,7 +49,9 @@
         "useAwaitThenable": "error",
         "useReactFunctionComponentDefinition": {
           "level": "error",
-          "options": { "namedComponents": "functionDeclaration" }
+          "options": {
+            "namedComponents": "functionDeclaration"
+          }
         },
         "noFloatingPromises": "error",
         "useSortedClasses": {
@@ -299,8 +301,8 @@
     },
     {
       "includes": [
-        "packages/api-client/src/**/*.ts",
-        "packages/api-client/tests/**/*.ts"
+        "packages/api-client/**/*.ts",
+        "packages/api-client/**/*.tsx"
       ],
       "linter": {
         "rules": {
@@ -321,7 +323,7 @@
                       "@repo/protocol/**",
                       "**/packages/protocol/**"
                     ],
-                    "message": "Client runtime code must not depend on API or protocol implementation. Only the contract generator reads those definitions."
+                    "message": "Client runtime code must not depend on API or protocol implementation. Only type imports from @repo/api/types are allowed."
                   }
                 ]
               }

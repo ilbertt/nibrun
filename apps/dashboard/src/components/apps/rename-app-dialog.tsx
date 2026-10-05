@@ -1,4 +1,3 @@
-import { AppNameSchema } from '@repo/api-client/validation';
 import { Button } from '@repo/ui/components/button';
 import {
   Dialog,
@@ -13,7 +12,6 @@ import {
 import { Field, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Spinner } from '@repo/ui/components/spinner';
-import { Value } from '@sinclair/typebox/value';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { PencilIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -100,7 +98,5 @@ export function RenameAppDialog({ name }: { name: string }) {
 }
 
 function validateName({ value }: { value: string }): string | undefined {
-  return Value.Check(AppNameSchema, value.trim())
-    ? undefined
-    : `A name is 1 to ${AppNameSchema.maxLength} characters.`;
+  return value.trim() ? undefined : 'The app needs a name.';
 }

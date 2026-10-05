@@ -1,5 +1,5 @@
 import type { Print } from '@parshjs/core';
-import { CRON_TIME_ZONE } from '@repo/api-client/configuration';
+import type { CronListing } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { readCrons } from '@repo/app-operations';
 import { z } from 'zod';
@@ -11,7 +11,7 @@ export const CRONS_OUTPUT = defineOutput({
     appId: z.string(),
     deploymentId: z.string(),
     enabled: z.boolean(),
-    timeZone: z.literal(CRON_TIME_ZONE),
+    timeZone: z.custom<CronListing['timeZone']>((value) => typeof value === 'string'),
     jobs: z.array(z.object({ jobId: z.string(), schedule: z.string(), command: z.string() })),
   }),
   render: ({ value, out }) => {

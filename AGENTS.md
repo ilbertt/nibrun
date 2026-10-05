@@ -23,15 +23,16 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 - Imports use `#*` subpath mapping (e.g. `import { foo } from '#services/foo'`)
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
   DNS record names, type metadata, and required-record construction live in
-  `apps/api/src/lib/dns-records.ts`. Consumers and fixtures use those definitions
-  and render record names and targets rather than reconstructing them.
+  `apps/api/src/lib/dns-records.ts`. Consumers render the DNS records returned by the API;
+  client fixtures describe those responses instead of reconstructing records from templates.
 - `@repo/protocol` owns only API–agent messages and their wire schemas. Public API
   resource schemas and derived types belong to `apps/api/src/lib/api/`; API defaults and
   helpers belong to `apps/api/src/lib/`. Import each definition from its owning file,
   such as `#lib/api/app.ts`; do not add API barrels. External consumers must not import
   `@repo/api` or `@repo/protocol`; their request and response types derive from the Treaty
-  client exported by `@repo/api-client`. Client runtime validation and configuration are
-  generated from their API definitions and checked for freshness; never edit generated files.
+  client exported by `@repo/api-client`. API route models must preserve complete Treaty
+  inference; do not generate a second public contract. Validation stays in the API, and
+  defaults or metadata needed by consumers are served through API responses.
   Shared environment validation and agent-to-API tenant log messages stay in protocol.
   Neither app imports the other app; the agent must not depend on `@repo/api`, including in
   tests. Guest protocols and persistence models belong to `apps/agent/src/lib/`.

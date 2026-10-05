@@ -1,6 +1,7 @@
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   ExportResponseSchema,
@@ -23,7 +24,7 @@ export const AppsAppIdExportsController = new Elysia()
       return status(StatusMap.OK, { exports });
     },
     {
-      response: { [StatusMap.OK]: ListExportsResponseSchema },
+      response: { [StatusMap.OK]: publicSchema(ListExportsResponseSchema) },
     },
   )
   /**
@@ -40,6 +41,6 @@ export const AppsAppIdExportsController = new Elysia()
       return status(StatusMap.Accepted, requested);
     },
     {
-      response: { [StatusMap.Accepted]: ExportResponseSchema },
+      response: { [StatusMap.Accepted]: publicSchema(ExportResponseSchema) },
     },
   );

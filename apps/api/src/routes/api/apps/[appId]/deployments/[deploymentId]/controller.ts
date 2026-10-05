@@ -1,6 +1,7 @@
 import { AppIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { DeploymentResponseSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
 import { AuthPlugin, DeploymentsServicePlugin, loggerPlugin } from '#services/plugins.ts';
@@ -21,6 +22,6 @@ export const AppsAppIdDeploymentsDeploymentIdController = new Elysia()
       return status(StatusMap.OK, deployment);
     },
     {
-      response: { [StatusMap.OK]: DeploymentResponseSchema },
+      response: { [StatusMap.OK]: publicSchema(DeploymentResponseSchema) },
     },
   );

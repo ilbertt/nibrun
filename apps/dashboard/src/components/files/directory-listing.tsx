@@ -1,4 +1,3 @@
-import { DIRECTORY_ENTRY_LIMIT } from '@repo/api-client/configuration';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@repo/ui/components/empty';
 import { Skeleton } from '@repo/ui/components/skeleton';
 import { TableContainer } from '@repo/ui/custom/table-container';
@@ -45,7 +44,7 @@ export function DirectoryListing() {
         ))}
       {view.listing?.truncated === true && (
         <p className="text-muted-foreground text-sm">
-          Only the first {DIRECTORY_ENTRY_LIMIT} entries of {view.listing.path} are shown.
+          Only the first {view.listing.entries.length} entries of {view.listing.path} are shown.
         </p>
       )}
     </div>

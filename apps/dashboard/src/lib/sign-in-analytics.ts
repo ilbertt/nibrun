@@ -1,6 +1,4 @@
 import { type AnalyticsEventData, SIGN_IN_REASONS } from '@repo/analytics';
-import { AppIdSchema } from '@repo/api-client/validation';
-import { Value } from '@sinclair/typebox/value';
 import type { QueryClient } from '@tanstack/react-query';
 import { SessionIdentity } from '#lib/session-identity.ts';
 import type { AppSummary } from '#queries/apps.ts';
@@ -88,9 +86,7 @@ export function consumeSignIn(
       reason: pending.reason,
       previous_identity_state: pending.previous_identity_state,
       expires_at: pending.expires_at,
-      anonymous_app_ids: pending.anonymous_app_ids.filter((id: unknown) =>
-        Value.Check(AppIdSchema, id),
-      ),
+      anonymous_app_ids: pending.anonymous_app_ids.filter((id: unknown) => typeof id === 'string'),
     };
   } catch {
     return undefined;

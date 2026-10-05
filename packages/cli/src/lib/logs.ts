@@ -1,5 +1,4 @@
 import type { Print } from '@parshjs/core';
-import { TENANT_LOG_STREAMS } from '@repo/api-client/configuration';
 import type { TenantLogRecord, TenantLogStream } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { followLogs } from '@repo/app-operations';
@@ -26,7 +25,7 @@ export function untilInterrupted(): AbortSignal {
  */
 const LogRecordSchema = z.object({
   time: z.string(),
-  stream: z.enum(TENANT_LOG_STREAMS),
+  stream: z.custom<TenantLogStream>((value) => typeof value === 'string'),
   message: z.string(),
   cronJobId: z.string().optional(),
   /** How much output the host had to drop, for a record that stands for a gap rather than a line. */
@@ -61,7 +60,7 @@ export type ReadLogsInput = {
   api: PublicApiClient;
   appId: string;
   deploymentId: string;
-  timerange: string;
+  timerange: string | undefined;
   follow: boolean;
   live: boolean;
   emit: (record: LogRecord) => void;

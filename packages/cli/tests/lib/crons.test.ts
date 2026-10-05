@@ -1,5 +1,4 @@
 import { expect, test } from 'bun:test';
-import { CRON_TIME_ZONE } from '@repo/api-client/configuration';
 import type { CronListing } from '@repo/api-client/models';
 import { CRONS_OUTPUT, listCrons } from '#lib/crons.ts';
 import {
@@ -17,7 +16,7 @@ const LISTING = {
   appId: APP_ID,
   deploymentId: RUNNING_DEPLOYMENT.id,
   enabled: true,
-  timeZone: CRON_TIME_ZONE,
+  timeZone: 'UTC' as const,
   jobs: [FIRST_JOB, { jobId: 'cron-2', schedule: '@daily', command: './app cleanup' }],
 } as CronListing;
 

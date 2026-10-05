@@ -1,4 +1,4 @@
-import { APP_STATES } from '@repo/api-client/configuration';
+import type { AppState } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import {
   appFor,
@@ -11,7 +11,7 @@ import { defineOutput } from '#lib/output.ts';
 /** Where the app was left, and whether this run is what put it there. */
 const AppStateChangeSchema = z.object({
   name: z.string(),
-  state: z.enum(APP_STATES),
+  state: z.custom<AppState>((value) => typeof value === 'string'),
   changed: z.boolean(),
 });
 

@@ -1,8 +1,4 @@
 import {
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_VOLUME_SIZE_BYTES,
-} from '@repo/api-client/configuration';
-import {
   CUSTOM_DOMAIN_PRICING_NOTICE,
   FREE_APPS_COUNT,
   HELLO_EMAIL,
@@ -11,6 +7,7 @@ import {
 import { Button } from '@repo/ui/components/button';
 import { CpuIcon, HardDriveIcon, MemoryStickIcon, MinusIcon, PlusIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useAppDefaults } from '#lib/hooks/use-app-defaults.ts';
 import { usePricing } from '#lib/hooks/use-pricing.ts';
 
 const BYTES_PER_GIB = 1_073_741_824;
@@ -27,24 +24,7 @@ function contactUrl(subject: string) {
   return `mailto:${HELLO_EMAIL}?${query}`;
 }
 
-const VOLUME_GIB = DEFAULT_VOLUME_SIZE_BYTES / BYTES_PER_GIB;
-
 type MachineResource = { icon: typeof CpuIcon; label: string };
-
-const STANDARD_RESOURCES: MachineResource[] = [
-  { icon: CpuIcon, label: `${DEFAULT_INSTANCE_RESOURCES.vcpuCount} vCPU` },
-  { icon: MemoryStickIcon, label: `${DEFAULT_INSTANCE_RESOURCES.memoryMib} MB memory` },
-  { icon: HardDriveIcon, label: `${VOLUME_GIB} GB disk` },
-];
-
-const BIGGER_RESOURCES: MachineResource[] = [
-  { icon: CpuIcon, label: `${DEFAULT_INSTANCE_RESOURCES.vcpuCount * BIGGER_MACHINE_FACTOR}+ vCPU` },
-  {
-    icon: MemoryStickIcon,
-    label: `${DEFAULT_INSTANCE_RESOURCES.memoryMib * BIGGER_MACHINE_FACTOR}+ MB memory`,
-  },
-  { icon: HardDriveIcon, label: `${VOLUME_GIB * BIGGER_MACHINE_FACTOR}+ GB disk` },
-];
 
 function MachineColumn({
   title,
@@ -81,6 +61,39 @@ function MachineColumn({
 }
 
 export function Pricing() {
+  const defaults = useAppDefaults();
+  const resources: MachineResource[] = [
+    {
+      icon: CpuIcon,
+      label: defaults === undefined ? 'Isolated compute' : `${defaults.resources.vcpuCount} vCPU`,
+    },
+    {
+      icon: MemoryStickIcon,
+      label:
+        defaults === undefined ? 'Dedicated memory' : `${defaults.resources.memoryMib} MB memory`,
+    },
+    {
+      icon: HardDriveIcon,
+      label:
+        defaults === undefined
+          ? 'Persistent disk'
+          : `${defaults.volumeSizeBytes / BYTES_PER_GIB} GB disk`,
+    },
+  ];
+  const biggerResources: MachineResource[] =
+    defaults === undefined
+      ? resources
+      : [
+          { icon: CpuIcon, label: `${defaults.resources.vcpuCount * BIGGER_MACHINE_FACTOR}+ vCPU` },
+          {
+            icon: MemoryStickIcon,
+            label: `${defaults.resources.memoryMib * BIGGER_MACHINE_FACTOR}+ MB memory`,
+          },
+          {
+            icon: HardDriveIcon,
+            label: `${(defaults.volumeSizeBytes / BYTES_PER_GIB) * BIGGER_MACHINE_FACTOR}+ GB disk`,
+          },
+        ];
   const { appCount, monthly, volumePricing, headingRef, fewer, more } = usePricing();
 
   return (
@@ -98,7 +111,7 @@ export function Pricing() {
         <MachineColumn
           className="sm:pr-10"
           title="Your binary runs on"
-          resources={STANDARD_RESOURCES}
+          resources={resources}
           note="Managed. Isolated. Persistent disk. Unlimited exports."
           action={
             <>
@@ -136,7 +149,7 @@ export function Pricing() {
         <MachineColumn
           className="sm:border-border/60 sm:border-l sm:pl-10 lg:pl-16"
           title="Need a bigger machine?"
-          resources={BIGGER_RESOURCES}
+          resources={biggerResources}
           note={undefined}
           action={
             <Button

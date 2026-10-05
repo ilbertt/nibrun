@@ -1,10 +1,7 @@
 import { mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
-import type { Filename } from '@repo/api-client/models';
-import { FilenameSchema } from '@repo/api-client/validation';
 import { refusedArchiveBody, type UploadableArchive } from '@repo/app-operations';
-import { Value } from '@sinclair/typebox/value';
 import { UsageError } from '#lib/errors.ts';
 import type { Ui } from '#lib/ui.ts';
 
@@ -102,7 +99,7 @@ async function openedArchive({
   path: string;
   limitBytes?: number;
 }): Promise<OpenedData> {
-  const archive = { name: archiveNamed(basename(path)), body: Bun.file(path) };
+  const archive = { name: basename(path), body: Bun.file(path) };
   await held({ archive, limitBytes });
   // Nothing to discard: this is the owner's own file, sitting where they left it.
   return { archive, discard: () => Promise.resolve() };
@@ -127,7 +124,7 @@ async function packedFolder({
   limitBytes?: number;
 }): Promise<OpenedData> {
   const staging = await mkdtemp(join(tmpdir(), STAGING_PREFIX));
-  const name = archiveNamed(`${basename(folder)}${ARCHIVE_SUFFIX}`);
+  const name = `${basename(folder)}${ARCHIVE_SUFFIX}`;
   const path = join(staging, name);
 
   async function discard(): Promise<void> {
@@ -183,21 +180,6 @@ async function pack({ folder, into }: { folder: string; into: string }): Promise
   if (status !== TAR_SUCCEEDED) {
     throw new UsageError(
       `${folder} could not be packed: ${complaint === '' ? `tar exited ${status}` : complaint}`,
-    );
-  }
-}
-
-/**
- * What the upload is called, which is the only name its owner would recognise it by afterwards.
- * Refused rather than repaired where the api would not take it: the folder or the archive is theirs
- * to rename, and a name invented here is one they would not know their own upload by.
- */
-function archiveNamed(name: string): Filename {
-  try {
-    return Value.Parse(FilenameSchema, name);
-  } catch {
-    throw new UsageError(
-      `An app's data is uploaded under the name it has here, and ${name} is not a name nibrun takes: it must start with a letter or digit and hold only letters, digits, dots, dashes or underscores.`,
     );
   }
 }

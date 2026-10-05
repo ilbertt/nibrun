@@ -1,6 +1,7 @@
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { AppPatchSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
 import { AppsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
@@ -20,12 +21,13 @@ export const AppsAppIdController = new Elysia()
     },
     {
       auth: Identity.Optional,
-      response: { [StatusMap.OK]: AppResponseSchema },
+      response: { [StatusMap.OK]: publicSchema(AppResponseSchema) },
     },
   )
   .patch(
     '/apps/:appId',
-    async ({ appsService, params, body, user, status }) => {
+    async ({ appsService, params, body: bodyInput, user, status }) => {
+      const body = Value.Parse(AppPatchSchema, bodyInput);
       const app = await appsService.update({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
@@ -35,8 +37,8 @@ export const AppsAppIdController = new Elysia()
     },
     {
       auth: Identity.Required,
-      body: AppPatchSchema,
-      response: { [StatusMap.OK]: AppResponseSchema },
+      body: publicSchema(AppPatchSchema),
+      response: { [StatusMap.OK]: publicSchema(AppResponseSchema) },
     },
   )
   // Accepted rather than No Content: the app is marked for teardown and the agent does the
@@ -52,6 +54,6 @@ export const AppsAppIdController = new Elysia()
     },
     {
       auth: Identity.Optional,
-      response: { [StatusMap.Accepted]: AppResponseSchema },
+      response: { [StatusMap.Accepted]: publicSchema(AppResponseSchema) },
     },
   );

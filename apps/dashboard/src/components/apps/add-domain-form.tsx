@@ -1,10 +1,8 @@
-import { HostnameSchema } from '@repo/api-client/validation';
 import { CUSTOM_DOMAIN_PRICING_NOTICE } from '@repo/global-constants';
 import { Button } from '@repo/ui/components/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Spinner } from '@repo/ui/components/spinner';
-import { Value } from '@sinclair/typebox/value';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { useAddDomain } from '#lib/hooks/use-app-domains.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
@@ -65,7 +63,5 @@ export function AddDomainForm() {
 }
 
 function validateHostname({ value }: { value: string }): string | undefined {
-  return Value.Check(HostnameSchema, value.trim())
-    ? undefined
-    : 'A domain looks like app.example.com.';
+  return value.trim() ? undefined : 'Enter the domain to add.';
 }

@@ -17,12 +17,15 @@ beforeEach(() => {
 function apiListing({
   apps,
   release = 'running',
+  httpPort,
 }: {
   apps: Array<{ name: string; state: string }>;
   release?: string;
+  httpPort?: number;
 }) {
   return apiHolding({
     apps: apps.map((app) => listedApp(app)),
+    httpPort,
     underApp: () => ({
       deployments: deploymentsHolding([{ id: 'deployment-1', state: release }]),
     }),
@@ -163,4 +166,18 @@ test('a port is a whole number above zero, so nothing, zero and a negative are r
 
 test('a port typed as one is passed', () => {
   expect(validatePort('8080')).toBeUndefined();
+});
+
+test('the new-app port suggestion comes from the API response', async () => {
+  const port = 8088;
+  const resolved = await completeOptions({
+    api: apiListing({ apps: [], httpPort: port }),
+    options: {},
+    binarySource: '/tmp/my-server',
+    args: [],
+  });
+  expect(resolved.port).toBe(port);
+  expect(prompts.transcript()).toContain(
+    `text:Which HTTP port does the binary listen on? (${port})`,
+  );
 });

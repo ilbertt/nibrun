@@ -1,4 +1,4 @@
-import type { TenantLogRecord } from '#models.ts';
+import type { TenantLogRecord } from '@repo/api-client/models';
 
 // Streams replay an overlap after reconnecting. Sequence numbers can arrive out of order
 // within a millisecond, so retain every key at the newest instant instead of a high-water mark.

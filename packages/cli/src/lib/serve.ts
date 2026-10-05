@@ -1,10 +1,10 @@
 import { stat } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
-import { RUNTIME_VALUES } from '@repo/api-client/configuration';
 import type { Server } from 'bun';
 import { z } from 'zod';
 import { PROGRAM_NAME } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
+import { GUEST_ENVIRONMENT } from '#lib/guest-environment.ts';
 import { defineOutput } from '#lib/output.ts';
 
 const INDEX_FILE = 'index.html';
@@ -37,10 +37,10 @@ export function guestAddress(environment: GuestEnvironment): Address {
   const { httpPort, hostname } = environment;
 
   if (httpPort === null) {
-    throw offNibrun(RUNTIME_VALUES.HTTP_PORT.name);
+    throw offNibrun(GUEST_ENVIRONMENT.HTTP_PORT);
   }
   if (hostname === null) {
-    throw offNibrun(RUNTIME_VALUES.HOSTNAME.name);
+    throw offNibrun(GUEST_ENVIRONMENT.HOSTNAME);
   }
   return { hostname: EVERY_INTERFACE, port: httpPort, url: `https://${hostname}` };
 }

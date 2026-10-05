@@ -1,5 +1,4 @@
 import type { CommandOption } from '@parshjs/core';
-import { EXTRA_PUBLIC_PORT_VALUES, RUNTIME_VALUE_NAMES } from '@repo/api-client/configuration';
 import { DASHBOARD_SITE } from '@repo/global-constants';
 import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };
@@ -19,8 +18,6 @@ export const DEFAULT_API_URL = DASHBOARD_SITE.url;
 // Reached by two of the descriptions below, and a record cannot read its own entries while it is
 // being built — so the one flag another flag has to name is a constant before either of them.
 const EXTRA_PUBLIC_PORT_FLAG = 'extra-public-port';
-
-const PORT_VALUE_NAMES = EXTRA_PUBLIC_PORT_VALUES.map((value) => value.name).join(' and ');
 
 export const SHARED_OPTIONS = {
   app: {
@@ -49,14 +46,14 @@ export const SHARED_OPTIONS = {
     name: 'env',
     option: {
       schema: z.array(z.string()).optional(),
-      description: `Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. A value may name one the guest sets — ${RUNTIME_VALUE_NAMES.join(', ')} — quote it, as in 'URL=https://\${NIBRUN_HOSTNAME}', or the shell expands it here instead. ${PORT_VALUE_NAMES} need --${EXTRA_PUBLIC_PORT_FLAG} on the same app.`,
+      description: `Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. Runtime values are listed in the dashboard. Quote a reference, as in 'URL=https://\${NIBRUN_HOSTNAME}', or the shell expands it here instead. References to the assigned public port and address need --${EXTRA_PUBLIC_PORT_FLAG} on the same app.`,
     },
   },
   extraPublicPort: {
     name: EXTRA_PUBLIC_PORT_FLAG,
     option: {
       schema: z.boolean().optional(),
-      description: `Give the app a public TCP and UDP port of its own, for a protocol HTTPS cannot carry. The number is assigned rather than chosen, and the guest is told which address and port it was given, as ${PORT_VALUE_NAMES}. Pass --${EXTRA_PUBLIC_PORT_FLAG}=false to give it up.`,
+      description: `Give the app a public TCP and UDP port of its own, for a protocol HTTPS cannot carry. The number is assigned rather than chosen, and the guest is told which address and port it was given. Pass --${EXTRA_PUBLIC_PORT_FLAG}=false to give it up.`,
     },
   },
   unset: {

@@ -6,27 +6,21 @@
     "./public": "./src/public.ts",
     "./internal": "./src/internal.ts",
     "./unwrap": "./src/unwrap.ts",
-    "./models": "./src/models.ts",
-    "./validation": "./src/validation.ts",
-    "./configuration": "./src/configuration.ts",
-    "./seen-tenant-logs": "./src/seen-tenant-logs.ts"
+    "./models": "./src/models.ts"
   },
   "imports": {
     "#*": "./src/*"
   },
   "scripts": {
-    "test": "bun test",
-    "check:types": "bun run generate:contract --check && bun run --bun tsc",
-    "generate:contract": "bun scripts/generate-public-contract.ts"
+    "check:types": "bun run --bun tsc",
+    "test": "bun test"
   },
   "dependencies": {
-    "@elysiajs/eden": "^1.4.9",
-    "@sinclair/typebox": "^0.34.52"
+    "@elysiajs/eden": "^1.4.9"
   },
   "devDependencies": {
     "@repo/api": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "typescript": "catalog:",
-    "@repo/protocol": "workspace:*"
+    "typescript": "catalog:"
   }
 }

@@ -12,3 +12,5 @@ export type LogTimerangeChoice = (typeof LOG_TIMERANGES)[number]['value'];
 export function isLogTimerangeChoice(value: unknown): value is LogTimerangeChoice {
   return LOG_TIMERANGES.some((timerange) => timerange.value === value);
 }
+
+export const DEFAULT_LOG_TIMERANGE = LOG_TIMERANGES[0].value;

@@ -1,6 +1,3 @@
-import { FilenameSchema } from '@repo/api-client/validation';
-import { Value } from '@sinclair/typebox/value';
-
 const BYTES_PER_GIBIBYTE = 1_073_741_824;
 const MAX_IMPORT_GIBIBYTES = 1;
 
@@ -62,9 +59,6 @@ export type OfferedArchive = {
  * The api is the authority and reads the object it was sent for itself — but it can only do that
  * once the upload has finished, so a `.7z` would cost a gibibyte before anybody said a word about
  * it. Answered from the front of the file, which is where the answer is.
- *
- * Held apart from the name because only one of the two is ever a caller's own doing: `uploadImport`
- * asks this of everything it sends, where a name is checked by whoever took one from a person.
  */
 export async function refusedArchiveBody({
   name,
@@ -82,21 +76,6 @@ export async function refusedArchiveBody({
   return (await isAppDataArchive(opening))
     ? undefined
     : `${name} is not a .tar.gz or a .zip. An app's data is created from one archive, whose root becomes the root of data/.`;
-}
-
-/**
- * The same, of a file somebody picked — which is the one case where the name is theirs too.
- *
- * The name travels with the archive and is what the api records the upload as, so one it would
- * refuse costs a line here rather than the upload that preceded the refusal. Nothing asks this of
- * a name the caller generated: `UploadableArchive` takes a `Filename`, so one that got that far
- * was already held to it.
- */
-export async function refusedArchive({ name, body }: OfferedArchive): Promise<string | undefined> {
-  if (!Value.Check(FilenameSchema, name)) {
-    return `${name} is not a name nibrun takes: it must start with a letter or digit and hold only letters, digits, dots, dashes or underscores.`;
-  }
-  return await refusedArchiveBody({ name, body });
 }
 
 async function isAppDataArchive(opening: Uint8Array): Promise<boolean> {

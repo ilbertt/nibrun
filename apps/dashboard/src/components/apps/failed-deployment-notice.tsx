@@ -1,7 +1,7 @@
-import { DEFAULT_LOG_TIMERANGE } from '@repo/api-client/configuration';
 import { Link } from '@tanstack/react-router';
 import { TriangleAlertIcon } from 'lucide-react';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
+import { DEFAULT_LOG_TIMERANGE } from '#lib/log-timeranges.ts';
 import type { DeploymentSummary } from '#queries/deployments.ts';
 import { Route as LogsRoute } from '#routes/(dashboard)/apps/$appId/logs.tsx';
 

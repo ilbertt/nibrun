@@ -1,6 +1,7 @@
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   CreateArtifactBodySchema,
@@ -24,7 +25,7 @@ export const AppsAppIdArtifactsController = new Elysia()
       return status(StatusMap.OK, { artifacts });
     },
     {
-      response: { [StatusMap.OK]: ListArtifactsResponseSchema },
+      response: { [StatusMap.OK]: publicSchema(ListArtifactsResponseSchema) },
     },
   )
   // Created rather than OK: the artifact exists from here on. What is left to do with it is what
@@ -32,7 +33,8 @@ export const AppsAppIdArtifactsController = new Elysia()
   // the time this answers, and the request the caller is waiting on is the one that fetched it.
   .post(
     '/apps/:appId/artifacts',
-    async ({ artifactsService, params, body, user, status }) => {
+    async ({ artifactsService, params, body: bodyInput, user, status }) => {
+      const body = Value.Parse(CreateArtifactBodySchema, bodyInput);
       const appId = Value.Parse(AppIdSchema, params.appId);
       const ownerId = Value.Parse(OwnerIdSchema, user.id);
       const created =
@@ -54,7 +56,7 @@ export const AppsAppIdArtifactsController = new Elysia()
       return status(StatusMap.Created, created);
     },
     {
-      body: CreateArtifactBodySchema,
-      response: { [StatusMap.Created]: CreateArtifactResponseSchema },
+      body: publicSchema(CreateArtifactBodySchema),
+      response: { [StatusMap.Created]: publicSchema(CreateArtifactResponseSchema) },
     },
   );

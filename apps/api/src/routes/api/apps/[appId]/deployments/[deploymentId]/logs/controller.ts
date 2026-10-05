@@ -2,6 +2,7 @@ import { AppIdSchema, DeploymentIdSchema, type TenantLogRecord, Value } from '@r
 import { Elysia, sse } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { DEFAULT_LOG_TIMERANGE } from '#lib/api/log-query.ts';
+import { type PublicValue, publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { StreamLogsQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';
 import { AuthPlugin, LogsServicePlugin, loggerPlugin } from '#services/plugins.ts';
@@ -23,7 +24,8 @@ export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
     '/apps/:appId/deployments/:deploymentId/logs',
     // Not a generator itself: the ownership check has to answer before anything is streamed, and
     // a generator body would only run once the response had already been committed as a stream.
-    async ({ logsService, params, query, user, request }) => {
+    async ({ logsService, params, query: queryInput, user, request }) => {
+      const query = Value.Parse(StreamLogsQuerySchema, queryInput);
       const signal = AbortSignal.any([request.signal, AbortSignal.timeout(MAX_STREAM_MS)]);
       const records = await logsService.openStream({
         appId: Value.Parse(AppIdSchema, params.appId),
@@ -36,7 +38,7 @@ export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
       return events({ records, signal });
     },
     {
-      query: StreamLogsQuerySchema,
+      query: publicSchema(StreamLogsQuerySchema),
     },
   );
 
@@ -56,7 +58,8 @@ async function* events({
 }) {
   try {
     for await (const record of records) {
-      yield sse({ event: 'log', data: record });
+      const data: PublicValue<TenantLogRecord> = record;
+      yield sse({ event: 'log', data });
     }
   } catch (error) {
     if (!signal.aborted) {

@@ -50,3 +50,6 @@ export type CronJobId = RegisteredCronJob['jobId'];
 export type LogSource = TenantLogRecord['SOURCE'];
 
 export type TenantLogStream = TenantLogRecord['stream'];
+
+export type Configuration = Treaty.Data<PublicApiClient['api']['configuration']['get']>;
+export type RuntimeValueName = Configuration['runtimeValues'][number]['name'];

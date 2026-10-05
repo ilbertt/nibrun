@@ -27,7 +27,6 @@
     "react-dom": "catalog:",
     "tailwindcss": "catalog:",
     "@repo/analytics": "workspace:*",
-    "@sinclair/typebox": "^0.34.52",
     "@repo/api-client": "workspace:*"
   },
   "devDependencies": {

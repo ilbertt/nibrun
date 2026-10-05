@@ -1,5 +1,4 @@
 import { defineCommand } from '@parshjs/core';
-import { DEFAULT_LOG_TIMERANGE, LOG_TIMERANGE_PATTERN } from '@repo/api-client/configuration';
 import { z } from 'zod';
 import { SHARED_OPTIONS } from '#config.ts';
 import { announcedDeployment, selectApp, stillWriting } from '#lib/apps.ts';
@@ -18,13 +17,7 @@ export const command = defineCommand('apps logs', {
       description: 'Keep printing new output until interrupted.',
     },
     timerange: {
-      schema: z
-        .string()
-        .regex(
-          new RegExp(LOG_TIMERANGE_PATTERN),
-          'A timerange is a duration such as 30s, 5m or 2h.',
-        )
-        .default(DEFAULT_LOG_TIMERANGE),
+      schema: z.string().optional(),
       description: 'How much recent history to print.',
     },
     [SHARED_OPTIONS.deploymentId.name]: SHARED_OPTIONS.deploymentId.option,

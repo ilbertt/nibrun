@@ -12,9 +12,13 @@ Bun + Elysia service.
 construction, runtime reference descriptions, redaction and log deduplication live in `src/lib/`.
 Internal consumers import the defining file directly (`#lib/api/app.ts`), never an API
 schema/helper barrel. Only route types are exported through `@repo/api/types` for api-client.
-Public consumers must use `@repo/api-client`, never API implementation files. Its runtime
-validation and configuration are generated from these definitions; after changing them, run
-`bun run generate:contract` in `packages/api-client`. Type checks reject a stale generated contract.
+Public consumers must use `@repo/api-client`, never API implementation files.
+Public request and response types derive directly from Treaty.
+Keep public models faithful to JSON: `publicSchema` preserves runtime validation while exposing
+ordinary primitives and record keys to HTTP callers. Controllers parse inputs into internal
+brands before calling services. Fix incomplete Treaty inference in these models; never generate
+a separate client contract. Defaults and guest runtime metadata needed by consumers are served
+by `/api/configuration`.
 
 Reuse wire schemas from `@repo/protocol` where public responses carry the same values.
 Public consumers derive those types from the exported Treaty client.

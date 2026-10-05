@@ -1,7 +1,7 @@
 import { defineCommand } from '@parshjs/core';
 import { createEnvContext } from '@parshjs/env';
-import { RUNTIME_VALUES } from '@repo/api-client/configuration';
 import { z } from 'zod';
+import { GUEST_ENVIRONMENT } from '#lib/guest-environment.ts';
 import { createOutput } from '#lib/output.ts';
 import {
   type GuestEnvironment,
@@ -16,12 +16,12 @@ import {
 const GUEST_ENV: GuestEnvironment = createEnvContext({
   vars: {
     httpPort: {
-      name: RUNTIME_VALUES.HTTP_PORT.name,
+      name: GUEST_ENVIRONMENT.HTTP_PORT,
       schema: z.number().int().positive().nullable(),
       default: null,
     },
     hostname: {
-      name: RUNTIME_VALUES.HOSTNAME.name,
+      name: GUEST_ENVIRONMENT.HOSTNAME,
       schema: z.string().min(1).nullable(),
       default: null,
     },

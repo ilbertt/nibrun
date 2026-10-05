@@ -30,8 +30,7 @@
     "react-dom": "catalog:",
     "sonner": "catalog:",
     "tailwindcss": "catalog:",
-    "@repo/analytics": "workspace:*",
-    "@sinclair/typebox": "^0.34.52"
+    "@repo/analytics": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

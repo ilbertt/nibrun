@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import type { Configuration as PublicConfiguration } from '@repo/api-client/models';
 import { useForm } from '@tanstack/react-form';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type {
   DeployFormApi,
@@ -24,6 +26,23 @@ Object.defineProperty(globalThis, 'window', {
 });
 
 const { DeployConfiguration } = await import('#components/deploy/deploy-configuration.tsx');
+const { configurationQueryOptions } = await import('#queries/configuration.ts');
+const MEMORY_MIB = 256;
+const CONFIGURATION: PublicConfiguration = {
+  appDefaults: {
+    httpPort: Number(PORT),
+    resources: { vcpuCount: 1, memoryMib: MEMORY_MIB },
+    volumeSizeBytes: 1,
+  },
+  runtimeValues: [
+    {
+      name: 'NIBRUN_EXTRA_PUBLIC_PORT',
+      description: 'assigned port',
+      requiresExtraPublicPort: true,
+    },
+    { name: 'NIBRUN_PUBLIC_IPV4', description: 'assigned address', requiresExtraPublicPort: true },
+  ],
+};
 
 const UNTOUCHED: DeployFormValues = {
   binary: undefined,
@@ -59,7 +78,13 @@ function Configuration({
     portOffered,
   };
 
-  return <DeployConfiguration form={form} suggested={undefined} />;
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(configurationQueryOptions.queryKey, CONFIGURATION);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <DeployConfiguration form={form} suggested={undefined} />
+    </QueryClientProvider>
+  );
 }
 
 describe('what a deploy is beyond the binary itself', () => {

@@ -1,6 +1,7 @@
 import { AppIdSchema, CronListingSchema, DeploymentIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { AuthPlugin, CronsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -22,5 +23,5 @@ export const AppsAppIdDeploymentsDeploymentIdCronsController = new Elysia()
       });
       return status(StatusMap.OK, listing);
     },
-    { response: { [StatusMap.OK]: CronListingSchema } },
+    { response: { [StatusMap.OK]: publicSchema(CronListingSchema) } },
   );

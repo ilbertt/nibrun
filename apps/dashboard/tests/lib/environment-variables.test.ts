@@ -1,5 +1,4 @@
 import { expect, test } from 'bun:test';
-import { REDACTED } from '@repo/api-client/configuration';
 import {
   askedVariables,
   type EnvironmentVariable,
@@ -15,7 +14,7 @@ const STORED = ['TOKEN', 'LOG_LEVEL'];
 
 // The one field any of this reads; the rest of an app response is nothing to do with it.
 const APP = {
-  config: { environment: { TOKEN: REDACTED, LOG_LEVEL: REDACTED } },
+  config: { environment: { TOKEN: '[redacted]', LOG_LEVEL: '[redacted]' } },
 } as unknown as AppSummary;
 
 function rows(): EnvironmentVariable[] {

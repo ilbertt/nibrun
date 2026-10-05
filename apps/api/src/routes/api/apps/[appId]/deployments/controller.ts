@@ -1,6 +1,7 @@
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   CreateDeploymentBodySchema,
@@ -24,12 +25,13 @@ export const AppsAppIdDeploymentsController = new Elysia()
       return status(StatusMap.OK, { deployments });
     },
     {
-      response: { [StatusMap.OK]: ListDeploymentsResponseSchema },
+      response: { [StatusMap.OK]: publicSchema(ListDeploymentsResponseSchema) },
     },
   )
   .post(
     '/apps/:appId/deployments',
-    async ({ deploymentsService, params, body, user, status }) => {
+    async ({ deploymentsService, params, body: bodyInput, user, status }) => {
+      const body = Value.Parse(CreateDeploymentBodySchema, bodyInput);
       const deployment = await deploymentsService.createOrRollback({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
@@ -39,7 +41,7 @@ export const AppsAppIdDeploymentsController = new Elysia()
       return status(StatusMap.Created, deployment);
     },
     {
-      body: CreateDeploymentBodySchema,
-      response: { [StatusMap.Created]: DeploymentResponseSchema },
+      body: publicSchema(CreateDeploymentBodySchema),
+      response: { [StatusMap.Created]: publicSchema(DeploymentResponseSchema) },
     },
   );

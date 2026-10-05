@@ -1,6 +1,5 @@
 import type { Print } from '@parshjs/core';
-import { DIRECTORY_ENTRY_LIMIT, FILESYSTEM_ENTRY_KINDS } from '@repo/api-client/configuration';
-import type { GuestPath } from '@repo/api-client/models';
+import type { FilesystemEntryKind, GuestPath } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { guestPath, InvalidPathError, readDirectory } from '@repo/app-operations';
 import { z } from 'zod';
@@ -9,11 +8,10 @@ import { UsageError } from '#lib/errors.ts';
 import { defineOutput } from '#lib/output.ts';
 import { dayAndMinute } from '#lib/timestamp.ts';
 
-const KIND_WIDTH = Math.max(...FILESYSTEM_ENTRY_KINDS.map((kind) => kind.length));
-
+const MIN_KIND_WIDTH = 9;
 const EntrySchema = z.object({
   name: z.string(),
-  kind: z.enum(FILESYSTEM_ENTRY_KINDS),
+  kind: z.custom<FilesystemEntryKind>((value) => typeof value === 'string'),
   sizeBytes: z.number(),
   modifiedAt: z.string(),
 });
@@ -51,7 +49,7 @@ export const DIRECTORY_OUTPUT = defineOutput({
       out.info(line);
     }
     if (value.truncated) {
-      out.warn(`Only the first ${DIRECTORY_ENTRY_LIMIT} entries of ${value.path} are shown.`);
+      out.warn(`Only the first ${value.entries.length} entries of ${value.path} are shown.`);
     }
   },
 });
@@ -114,10 +112,11 @@ export async function listDirectory({
  * what their binary wrote, and `1.2 MiB` is what a second listing cannot be compared against.
  */
 export function render(entries: readonly Entry[]): string[] {
+  const kindWidth = Math.max(MIN_KIND_WIDTH, ...entries.map((entry) => entry.kind.length));
   const sizeWidth = Math.max(0, ...entries.map((entry) => String(entry.sizeBytes).length));
   return byName(entries).map((entry) =>
     [
-      entry.kind.padEnd(KIND_WIDTH),
+      entry.kind.padEnd(kindWidth),
       String(entry.sizeBytes).padStart(sizeWidth),
       dayAndMinute(entry.modifiedAt),
       entry.name,

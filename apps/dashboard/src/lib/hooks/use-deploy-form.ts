@@ -1,16 +1,13 @@
 import { trackEvent } from '@repo/analytics';
-import { DEFAULT_HTTP_PORT } from '@repo/api-client/configuration';
-import { FilenameSchema, Sha256DigestSchema } from '@repo/api-client/validation';
 import {
   type DeployableBinary,
   type FetchableBinary,
   InvalidEnvironmentError,
   parseEnvironmentPatch,
-  refusedArchive,
+  refusedArchiveBody,
   type UploadableArchive,
 } from '@repo/app-operations';
 import { type DeploySuggestion, namedByUrl, refusedChecksum, refusedUrl } from '@repo/deploy-link';
-import { Value } from '@sinclair/typebox/value';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
 import {
   type BinarySource,
@@ -29,6 +26,7 @@ import {
 } from '#lib/environment-variables.ts';
 import { discardHandedOffBinary } from '#lib/handoff-store.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
+import { useConfiguration } from '#lib/hooks/use-configuration.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployFormAnalytics } from '#lib/hooks/use-deploy-form-analytics.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
@@ -110,10 +108,7 @@ function validateBinarySource(source: BinarySource): string | undefined {
   if (fetched !== undefined) {
     return refusedUrl(fetched.url) ?? refusedChecksum(fetched.sha256);
   }
-  const file = pickedFile(source);
-  return file !== undefined && !Value.Check(FilenameSchema, file.name)
-    ? 'That file cannot be named inside an export. Rename it and pick it again.'
-    : undefined;
+  return undefined;
 }
 
 /**
@@ -127,7 +122,9 @@ export async function validateInitialData({
 }: {
   value: File | undefined;
 }): Promise<string | undefined> {
-  return value === undefined ? undefined : await refusedArchive({ name: value.name, body: value });
+  return value === undefined
+    ? undefined
+    : await refusedArchiveBody({ name: value.name, body: value });
 }
 
 export function validatePort({ value }: { value: string | undefined }): string | undefined {
@@ -179,6 +176,7 @@ export function useDeployForm({
   binary: File | undefined;
   suggested?: DeploySuggestion | undefined;
 }): DeployFormState {
+  const configuration = useConfiguration();
   const { start } = useDeployRun();
   useDeployFormAnalytics({ appId, suggested });
   const apps = useApps();
@@ -206,7 +204,9 @@ export function useDeployForm({
     locked,
     replacing,
     targetResolved,
-    defaultPort: String(replacing?.config.httpPort ?? DEFAULT_HTTP_PORT),
+    defaultPort: String(
+      replacing?.config.httpPort ?? configuration.data?.appDefaults.httpPort ?? '',
+    ),
     defaultExtraPublicPort: replacing?.config.hasExtraPublicPort ?? false,
     defaultArgs: replacing?.config.args.join('\n') ?? '',
     portOffered,
@@ -278,8 +278,8 @@ function asReleaseRequest({
   value: DeployFormValues;
   replacing: AppSummary | undefined;
 }): ReleaseRequest | undefined {
-  const port = Number(value.port ?? replacing?.config.httpPort ?? DEFAULT_HTTP_PORT);
-  if (!Number.isInteger(port)) {
+  const port = value.port === undefined ? undefined : Number(value.port);
+  if (port !== undefined && !Number.isInteger(port)) {
     return undefined;
   }
 
@@ -329,7 +329,7 @@ function initialDataFrom({
   if (file === undefined || replacing !== undefined) {
     return undefined;
   }
-  return Value.Check(FilenameSchema, file.name) ? { name: file.name, body: file } : undefined;
+  return { name: file.name, body: file };
 }
 
 /**
@@ -345,7 +345,7 @@ function deployableFrom(source: BinarySource): DeployableBinary | undefined {
   if (file === undefined) {
     return undefined;
   }
-  return Value.Check(FilenameSchema, file.name) ? { name: file.name, body: file } : undefined;
+  return { name: file.name, body: file };
 }
 
 /** The url as the api takes it. Nothing at all where the checksum beside it is not one. */
@@ -353,7 +353,7 @@ function fetchable({ url, sha256 }: FetchedBinary): FetchableBinary | undefined 
   if (sha256 === undefined) {
     return { url };
   }
-  return Value.Check(Sha256DigestSchema, sha256) ? { url, sha256 } : undefined;
+  return refusedChecksum(sha256) === undefined ? { url, sha256 } : undefined;
 }
 
 /** The lines that are arguments: what a blank one is not, and what the trailing newline is not. */

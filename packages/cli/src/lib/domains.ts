@@ -1,9 +1,6 @@
-import {
-  APP_HOSTNAME_KINDS,
-  APP_HOSTNAME_STATES,
-  CNAME_RECORD_TYPE,
-} from '@repo/api-client/configuration';
+import type { AppHostname as ApiAppHostname } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
+import type { DomainDnsRecord } from '@repo/app-operations';
 import { addDomain, appById, appFor, checkDomainDns, removeDomain } from '@repo/app-operations';
 import { z } from 'zod';
 import { defineOutput } from '#lib/output.ts';
@@ -18,7 +15,7 @@ const HEADINGS = { hostname: 'HOSTNAME', kind: 'KIND', state: 'STATE' };
  */
 const DnsRecordSchema = z.object({
   hostname: z.string(),
-  type: z.literal(CNAME_RECORD_TYPE.name),
+  type: z.custom<DomainDnsRecord['type']>((value) => typeof value === 'string'),
   target: z.string(),
   matched: z.boolean().nullable(),
   observedTargets: z.array(z.string()),
@@ -28,8 +25,8 @@ type DnsRecord = z.infer<typeof DnsRecordSchema>;
 
 const AppHostnameSchema = z.object({
   hostname: z.string(),
-  kind: z.enum(APP_HOSTNAME_KINDS),
-  state: z.enum(APP_HOSTNAME_STATES),
+  kind: z.custom<ApiAppHostname['kind']>((value) => typeof value === 'string'),
+  state: z.custom<ApiAppHostname['state']>((value) => typeof value === 'string'),
   /** Empty for the platform hostname, whose DNS nibrun manages. */
   records: z.array(DnsRecordSchema),
   /**
@@ -44,7 +41,7 @@ const DomainListSchema = z.object({ hostnames: z.array(AppHostnameSchema) });
 const DomainAddedSchema = z.object({
   name: z.string(),
   hostname: z.string(),
-  state: z.enum(APP_HOSTNAME_STATES),
+  state: z.custom<ApiAppHostname['state']>((value) => typeof value === 'string'),
   /** False for a domain the app already had, which adding again asks the edge to check now. */
   created: z.boolean(),
   records: z.array(DnsRecordSchema),

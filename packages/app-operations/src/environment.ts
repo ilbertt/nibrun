@@ -1,11 +1,4 @@
-import {
-  interpolableRuntimeValue,
-  namesOfferedRuntimeValues,
-  RUNTIME_VALUE_NAMES,
-} from '@repo/api-client/configuration';
 import type { TenantEnvironmentPatch } from '@repo/api-client/models';
-import { TenantEnvironmentPatchSchema } from '@repo/api-client/validation';
-import { Value } from '@sinclair/typebox/value';
 import { InvalidEnvironmentError } from '#errors.ts';
 
 const ASSIGNMENT = '=';
@@ -39,34 +32,15 @@ export function parseEnvironment({
  * each — so that what a name may be is answered in one place whatever it was typed into.
  */
 export function parseEnvironmentPatch(edits: readonly EnvironmentEdit[]): TenantEnvironmentPatch {
-  // Checked before it is parsed, never by parsing: a name the schema does not allow is no part of
-  // the record, so parsing drops it and then succeeds — which reads as a variable accepted and
-  // then silently not set.
-  const refused = edits
-    .map(({ name }) => name)
-    .filter((name) => !Value.Check(TenantEnvironmentPatchSchema, { [name]: null }));
+  const refused = edits.filter(
+    ({ name }) => name === '__proto__' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name),
+  );
   if (refused.length > 0) {
     throw new InvalidEnvironmentError(
-      `An environment variable's name must start with a letter or underscore, hold only letters, digits and underscores, and not be __proto__: ${refused.join(', ')}`,
+      `An environment variable’s name must start with a letter or underscore, hold only letters, digits and underscores, and not be __proto__: ${refused.map(({ name }) => name).join(', ')}`,
     );
   }
-
-  // The guest is what substitutes these, and a name it does not offer fails the boot rather than
-  // reaching the binary as itself — so a typo is answered here, before anything is deployed over
-  // it. The variable is named and its value never is: it is the tenant's secret either way.
-  const naming = edits
-    .filter(({ value }) => value !== null && !namesOfferedRuntimeValues(value))
-    .map(({ name }) => name);
-  if (naming.length > 0) {
-    throw new InvalidEnvironmentError(
-      `A value may name a runtime value the guest sets — ${RUNTIME_VALUE_NAMES.map(interpolableRuntimeValue).join(', ')} — and nothing else: ${naming.join(', ')}`,
-    );
-  }
-
-  return Value.Parse(
-    TenantEnvironmentPatchSchema,
-    Object.fromEntries(edits.map(({ name, value }) => [name, value])),
-  );
+  return Object.fromEntries(edits.map(({ name, value }) => [name, value]));
 }
 
 function assigned(assignment: string): EnvironmentEdit {

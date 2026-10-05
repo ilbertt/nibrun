@@ -3,6 +3,8 @@ import { answering, apiHolding } from '#tests/support/api.ts';
 import { APP_ID, SLUG } from '#tests/support/app.ts';
 import { updateApp } from '#update.ts';
 
+const HTTP_BAD_REQUEST = 400;
+
 type Sent = { appId: string; body: unknown };
 
 function apiRecording(sent: Sent[]) {
@@ -10,6 +12,12 @@ function apiRecording(sent: Sent[]) {
     underApp: ({ appId }) => ({
       patch: (body: { name?: string }) => {
         sent.push({ appId, body });
+        if (body.name === '') {
+          return Promise.resolve({
+            data: null,
+            error: { status: HTTP_BAD_REQUEST, value: { error: 'Invalid app name.' } },
+          });
+        }
         return answering({ id: appId, name: body.name ?? 'Quiet Otter', slug: SLUG })();
       },
       deployments: {
@@ -38,11 +46,11 @@ test('config and name travel in one patch', async () => {
   expect(sent[0]?.body).toEqual({ name: 'Loud Badger', httpPort: 8080 });
 });
 
-// The api would refuse it too, after the round trip; the whole point of parsing here is that
-// nothing is sent.
-test('a name the api would refuse is refused before anything is sent', async () => {
+test('the API refusal of a name is reported to the caller', async () => {
   const sent: Sent[] = [];
 
-  await expect(updateApp({ api: apiRecording(sent), appId: APP_ID, name: '' })).rejects.toThrow();
-  expect(sent).toEqual([]);
+  await expect(updateApp({ api: apiRecording(sent), appId: APP_ID, name: '' })).rejects.toThrow(
+    'Invalid app name.',
+  );
+  expect(sent).toEqual([{ appId: APP_ID, body: { name: '' } }]);
 });

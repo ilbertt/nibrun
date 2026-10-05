@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { MIN_IDLE_TIMEOUT_MS } from '@repo/api-client/configuration';
 import { type AppStatusReport, renderStatus } from '#lib/app-status.ts';
 import {
   BYTES_PER_MIB,
@@ -20,7 +19,7 @@ function app(overrides: Partial<AppStatusReport> = {}): AppStatusReport {
     name: NAME,
     status: 'running',
     activation: 'always',
-    idleTimeoutMs: MIN_IDLE_TIMEOUT_MS,
+    idleTimeoutMs: 60_000,
     vcpu: { used: null, total: VCPU_COUNT, measuredAt: null },
     memory: { used: null, total: MEMORY_MIB * BYTES_PER_MIB, measuredAt: null },
     volume: { used: null, total: VOLUME_SIZE_BYTES, measuredAt: null },

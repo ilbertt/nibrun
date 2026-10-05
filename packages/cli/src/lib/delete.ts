@@ -1,5 +1,5 @@
 import { note, text } from '@clack/prompts';
-import { APP_STATES } from '@repo/api-client/configuration';
+import type { AppState } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { appFor, deleteApp as requestDeletion } from '@repo/app-operations';
 import { z } from 'zod';
@@ -16,7 +16,7 @@ const CONFIRMATION_PHRASE = 'delete permanently';
 
 const DeletedSchema = z.object({
   name: z.string(),
-  state: z.enum(APP_STATES),
+  state: z.custom<AppState>((value) => typeof value === 'string'),
   /** Whether this run is what started the teardown, rather than finding one already under way. */
   changed: z.boolean(),
 });

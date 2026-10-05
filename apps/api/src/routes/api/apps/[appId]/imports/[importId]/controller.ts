@@ -1,6 +1,7 @@
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap, t } from 'elysia';
 import { ImportIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   ImportResponseSchema,
@@ -24,12 +25,13 @@ export const AppsAppIdImportsImportIdController = new Elysia()
       return status(StatusMap.OK, stored);
     },
     {
-      response: { [StatusMap.OK]: ImportResponseSchema },
+      response: { [StatusMap.OK]: publicSchema(ImportResponseSchema) },
     },
   )
   .patch(
     '/apps/:appId/imports/:importId',
-    async ({ importsService, params, body, user, status }) => {
+    async ({ importsService, params, body: bodyInput, user, status }) => {
+      const body = Value.Parse(UpdateImportBodySchema, bodyInput);
       const appId = Value.Parse(AppIdSchema, params.appId);
       const importId = Value.Parse(ImportIdSchema, params.importId);
       const ownerId = Value.Parse(OwnerIdSchema, user.id);
@@ -43,9 +45,9 @@ export const AppsAppIdImportsImportIdController = new Elysia()
       return status(StatusMap.OK, stored);
     },
     {
-      body: UpdateImportBodySchema,
+      body: publicSchema(UpdateImportBodySchema),
       response: {
-        [StatusMap.OK]: ImportResponseSchema,
+        [StatusMap.OK]: publicSchema(ImportResponseSchema),
         [StatusMap['No Content']]: t.Void(),
       },
     },

@@ -65,9 +65,8 @@ Biome enforces the agent-to-API import boundary.
 
 Public consumers must use `@repo/api-client`, deriving request and response types from its
 exported Treaty client. They may not import API or protocol implementation files, including in
-tests. Client runtime validation and configuration are generated from the API's definitions,
-not redefined in protocol. The api-client generator may read wire definitions used by public
-routes; its runtime source must not import this package or API implementation code.
+tests. Fix incomplete Treaty inference in API route models; never generate a second public contract
+or export wire schemas to public consumers.
 Do not duplicate field definitions, enums or bounds, and do not add an API schema/helper barrel.
 Biome enforces the public consumer boundary and prevents protocol dependencies on another workspace package.
 

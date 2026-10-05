@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { MAX_IMPORT_SIZE_BYTES, refusedArchive } from '#archive.ts';
+import { MAX_IMPORT_SIZE_BYTES, refusedArchiveBody } from '#archive.ts';
 import { gzippedTarball, zip } from '#tests/support/archives.ts';
 
 const NAME = 'data.tar.gz';
@@ -21,11 +21,11 @@ function claiming(sizeBytes: number) {
 
 describe('an archive an app can be created from', () => {
   test('a gzipped tarball is what one is', async () => {
-    expect(await refusedArchive(offered({ bytes: gzippedTarball() }))).toBeUndefined();
+    expect(await refusedArchiveBody(offered({ bytes: gzippedTarball() }))).toBeUndefined();
   });
 
   test('and so is a zip, which is what a desktop archiver makes', async () => {
-    expect(await refusedArchive(offered({ name: 'data.zip', bytes: zip() }))).toBeUndefined();
+    expect(await refusedArchiveBody(offered({ name: 'data.zip', bytes: zip() }))).toBeUndefined();
   });
 
   /**
@@ -36,7 +36,7 @@ describe('an archive an app can be created from', () => {
   test('bytes that only open like a zip are refused as the shape they are not', async () => {
     const opening = encoder.encode('PK and the rest of an ordinary zip');
 
-    expect(await refusedArchive(offered({ bytes: opening }))).toContain(
+    expect(await refusedArchiveBody(offered({ bytes: opening }))).toContain(
       'is not a .tar.gz or a .zip',
     );
   });
@@ -45,30 +45,30 @@ describe('an archive an app can be created from', () => {
   test('a gzip wrapped around anything else is refused for what it holds', async () => {
     const gzipped = Bun.gzipSync(encoder.encode('SQLite format 3'));
 
-    expect(await refusedArchive(offered({ bytes: gzipped }))).toContain(
+    expect(await refusedArchiveBody(offered({ bytes: gzipped }))).toContain(
       'is not a .tar.gz or a .zip',
     );
   });
 
   test('nothing at all is refused as nothing to give the app', async () => {
-    expect(await refusedArchive(offered({ bytes: new Uint8Array() }))).toBe(
+    expect(await refusedArchiveBody(offered({ bytes: new Uint8Array() }))).toBe(
       'There is nothing in data.tar.gz to give the app as its data.',
     );
   });
 
   test('more than the api would sign for is refused before a byte of it is read', async () => {
-    expect(await refusedArchive(claiming(MAX_IMPORT_SIZE_BYTES + 1))).toContain(
+    expect(await refusedArchiveBody(claiming(MAX_IMPORT_SIZE_BYTES + 1))).toContain(
       'at most 1 GiB of data',
     );
   });
 
   test('the size the api signs for is not itself too much', async () => {
-    expect(await refusedArchive(claiming(MAX_IMPORT_SIZE_BYTES))).toBeUndefined();
+    expect(await refusedArchiveBody(claiming(MAX_IMPORT_SIZE_BYTES))).toBeUndefined();
   });
 
-  test('a name the api would refuse costs a line rather than the upload before it', async () => {
+  test('content preflight leaves filename policy to the API', async () => {
     const named = { ...offered({ bytes: gzippedTarball() }), name: 'my data.tar.gz' };
 
-    expect(await refusedArchive(named)).toContain('is not a name nibrun takes');
+    expect(await refusedArchiveBody(named)).toBeUndefined();
   });
 });
