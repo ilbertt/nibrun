@@ -7,6 +7,7 @@ import { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
 import { artifactsS3, exportsS3, importsS3, uploadSigner } from '#lib/s3/client.ts';
+import { openRemoteSqliteExecutor } from '#lib/sqlite/remote-executor.ts';
 import { readSecretsKey } from '#lib/tenant-secrets.ts';
 import { VictoriaLogsClient } from '#lib/victorialogs/client.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
@@ -39,6 +40,7 @@ import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
 import { LogsService } from '#services/logs.service.ts';
+import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
 
 // Read once, where every other piece of the environment is read: a key of the wrong length is a
@@ -124,6 +126,13 @@ const healthService = new HealthService({
 const filesystemService = new FilesystemService({ deploymentsRepo: deploymentsRepository });
 const cronsService = new CronsService({ deploymentsRepo: deploymentsRepository });
 const sqliteRelayService = new SqliteRelayService();
+const sqliteService = new SqliteService({
+  deploymentsRepo: deploymentsRepository,
+  baseUrl: env.BASE_URL,
+  openExecutor: function open(input) {
+    return openRemoteSqliteExecutor({ ...input, relay: sqliteRelayService });
+  },
+});
 const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,
@@ -229,3 +238,7 @@ export const SqliteRelayServicePlugin = new Elysia({ name: 'service.sqliteRelay'
   'sqliteRelayService',
   sqliteRelayService,
 );
+
+export const SqliteServicePlugin = new Elysia({ name: 'service.sqlite' })
+  .decorate('sqliteService', sqliteService)
+  .decorate('sqliteOrigin', env.BASE_URL.origin);

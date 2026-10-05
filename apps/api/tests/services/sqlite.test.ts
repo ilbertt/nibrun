@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { GuestPathSchema, Value } from '@repo/protocol';
-import { ConflictError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
+import { HranaError } from '#lib/hrana/errors.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import {
   APP_ID,
@@ -79,4 +80,19 @@ test('a database that fails to open leaves no occupied selections', async () => 
       service.select({ appId: APP_ID, ownerId: OWNER_ID, path: PATH, signal: SIGNAL }),
     ).rejects.toThrow('not a database');
   }
+});
+
+test('selecting a file that is not a database reports a client error', async () => {
+  const fixture = sqliteSelectionFixture();
+  const service = new SqliteService({
+    ...fixture,
+    openExecutor() {
+      return Promise.reject(
+        new HranaError({ code: 'SQLITE_26', message: 'file is not a database' }),
+      );
+    },
+  });
+  await expect(
+    service.select({ appId: APP_ID, ownerId: OWNER_ID, path: PATH, signal: SIGNAL }),
+  ).rejects.toBeInstanceOf(BadRequestError);
 });

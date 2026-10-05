@@ -1,10 +1,12 @@
 import type { AppId, DeploymentId, GuestPath, OwnerId } from '@repo/protocol';
-import { ConflictError, NotFoundError } from '#lib/errors.ts';
+import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
+import { HranaError } from '#lib/hrana/errors.ts';
 import type { SqliteExecutorContract } from '#lib/hrana/executor.ts';
 import { HranaPipelineAdapter } from '#lib/hrana/pipeline.ts';
 import { HranaStreams } from '#lib/hrana/streams.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { type SqliteSelection, SqliteSelections } from '#lib/sqlite/selections.ts';
+import { toTimestamp } from '#lib/timestamp.ts';
 import type { DeploymentsRepositoryContract } from '#repositories/deployments.repository.ts';
 import { Service } from '#services/service.ts';
 
@@ -81,11 +83,16 @@ export class SqliteService extends Service {
         appId,
         deploymentId: selection.deploymentId,
         path,
-        expiresAt: new Date(selection.expiresAt).toISOString(),
+        expiresAt: toTimestamp(new Date(selection.expiresAt)),
         url: new URL(`${RoutePrefix.Api}/sqlite/connections/${selection.id}/`, this.baseUrl).href,
       };
     } catch (error) {
       this.selections.remove({ id: selection.id, ownerId, nowMs: Date.now() });
+      if (error instanceof HranaError) {
+        throw error.code.startsWith('SQLITE_')
+          ? new BadRequestError(error.message)
+          : new BadGatewayError(error.message);
+      }
       throw error;
     }
   }
