@@ -18,8 +18,17 @@ The model is desired state, never commands. Nothing here may be shaped like `sta
   whole message — so one instance in a state the reader has not heard of loses that host's entire
   report, not just that instance. The side that reads the enum ships first: a new value on a
   report means the control plane before the agents, and one on desired state means the reverse.
-- Absent means unknown or not applicable. **No field is ever `null`.** The one exception is
+- Absent means unknown or not applicable. **No field is ever `null`.** Exceptions are Hrana wire structures, whose nullable fields preserve the upstream protocol, and
   `TenantEnvironmentPatchSchema`, which is an owner editing their app rather than anything a host
   is sent: there absent means "leave this variable as it is", so removing one needs a word of its
   own.
 - **Log shipping, when it is built, gets its own path.** A log burst must never delay a stop.
+
+## Hrana v2
+
+Wire declarations come from the pinned libSQL specifications in `vendor/hrana-v2/`
+(MIT; preserve the license). `bun codegen:hrana` generates `domain/hrana-v2.gen.ts`
+with a build-time dependency; `check:types` verifies it is current offline. Never
+edit the generated shapes or duplicate them in consumers. `domain/hrana.ts` applies
+nibrun's resource limits without changing wire field names. Types derive from the
+bounded schemas. The agent and API share these definitions; neither imports a client.

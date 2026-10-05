@@ -1,8 +1,9 @@
+import type { HranaStreamRequest } from '@repo/protocol';
 import { executeHranaBatch } from '#lib/hrana/batch.ts';
 import { HranaError, hranaError } from '#lib/hrana/errors.ts';
 import type { SqliteExecutorContract } from '#lib/hrana/executor.ts';
 import { hranaDescribeResult, hranaStatementResult } from '#lib/hrana/results.ts';
-import { type HranaStreamRequest, parseHranaPipeline } from '#lib/hrana/schema.ts';
+import { parseHranaPipeline } from '#lib/hrana/schema.ts';
 import { hranaStatement, resolveHranaSql } from '#lib/hrana/sql.ts';
 import type { HranaStream, HranaStreams } from '#lib/hrana/streams.ts';
 

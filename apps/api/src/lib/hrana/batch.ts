@@ -1,7 +1,7 @@
+import type { HranaBatch, HranaBatchCond as HranaCondition } from '@repo/protocol';
 import { HranaError, hranaError } from '#lib/hrana/errors.ts';
 import type { SqliteExecutorContract } from '#lib/hrana/executor.ts';
 import { type HranaStatementResult, hranaStatementResult } from '#lib/hrana/results.ts';
-import type { HranaBatch, HranaCondition } from '#lib/hrana/schema.ts';
 import { hranaStatement } from '#lib/hrana/sql.ts';
 
 type StepError = ReturnType<typeof hranaError>;

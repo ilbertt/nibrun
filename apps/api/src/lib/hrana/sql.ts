@@ -1,6 +1,5 @@
-import type { SqliteStatement } from '@repo/protocol';
+import type { HranaStmt as HranaStatement, SqliteStatement } from '@repo/protocol';
 import { HranaError } from '#lib/hrana/errors.ts';
-import type { HranaStatement } from '#lib/hrana/schema.ts';
 
 type SqlReference = Pick<HranaStatement, 'sql' | 'sql_id'>;
 
