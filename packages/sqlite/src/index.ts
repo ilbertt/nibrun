@@ -1,6 +1,5 @@
 /** biome-ignore-all lint/performance/noBarrelFile: index is the only allowed file where we can export other files */
 
-export { Value } from '@sinclair/typebox/value';
 export { SqliteExecutorContract } from '#executor.ts';
 export {
   type HranaBatch,
@@ -13,6 +12,7 @@ export {
   HranaColSchema,
   type HranaDescribeResult,
   HranaDescribeResultSchema,
+  HranaErrorSchema,
   type HranaPipelineReqBody,
   HranaPipelineReqBodySchema,
   type HranaPipelineRespBody,
@@ -30,7 +30,8 @@ export {
   type HranaValue,
   HranaValueSchema,
 } from '#hrana.ts';
-export { HranaError } from '#hrana-error.ts';
+export { executeHranaBatch } from '#hrana-batch.ts';
+export { HranaError, hranaError } from '#hrana-error.ts';
 export { hranaStatement, resolveHranaSql } from '#hrana-sql.ts';
 export { parseHranaPipeline } from '#hrana-validation.ts';
 export {
