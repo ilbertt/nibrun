@@ -270,8 +270,12 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["@repo/**", "!@repo/typebox-extensions"],
-                    "message": "The API-agent wire contract may depend only on TypeBox schema extensions, never on applications or other workspace packages."
+                    "group": [
+                      "@repo/**",
+                      "!@repo/typebox-extensions",
+                      "!@repo/sqlite"
+                    ],
+                    "message": "The API-agent wire contract may depend only on TypeBox schema extensions and shared SQLite wire schemas, never on applications."
                   }
                 ]
               }

@@ -61,6 +61,20 @@ export {
   AgentSessionSchema,
 } from '#control/session.ts';
 export {
+  type SqliteOperation,
+  SqliteOperationSchema,
+  type SqliteOutcome,
+  SqliteOutcomeSchema,
+  type SqliteQuery,
+  type SqliteQueryRequest,
+  SqliteQueryRequestSchema,
+  type SqliteQueryResponse,
+  SqliteQueryResponseSchema,
+  type SqliteQueryResult,
+  SqliteQueryResultSchema,
+  SqliteQuerySchema,
+} from '#control/sqlite-query.ts';
+export {
   TENANT_LOG_STREAMS,
   type TenantLogRecord,
   TenantLogRecordSchema,
@@ -200,6 +214,10 @@ export {
   FilesystemQueryIdSchema,
   type HostId,
   HostIdSchema,
+  type SqliteQueryId,
+  SqliteQueryIdSchema,
+  type SqliteSessionId,
+  SqliteSessionIdSchema,
   type VolumeId,
   VolumeIdSchema,
 } from '#schemas/identifiers.ts';
