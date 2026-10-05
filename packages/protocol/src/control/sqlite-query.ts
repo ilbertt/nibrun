@@ -15,7 +15,7 @@ import {
 
 const MAX_SERVED_DEPLOYMENTS = 200;
 const MAX_ERROR_CODE_LENGTH = 128;
-const MAX_ERROR_MESSAGE_LENGTH = 1024;
+export const SQLITE_MAX_ERROR_MESSAGE_LENGTH = 1024;
 
 export const SqliteOperationSchema = Type.Union([
   Type.Object({ type: Type.Literal('open'), path: GuestPathSchema }),
@@ -57,7 +57,7 @@ export const SqliteOutcomeSchema = Type.Union([
   Type.Object({
     status: Type.Literal('failed'),
     code: Type.String({ maxLength: MAX_ERROR_CODE_LENGTH }),
-    message: Type.String({ maxLength: MAX_ERROR_MESSAGE_LENGTH }),
+    message: Type.String({ maxLength: SQLITE_MAX_ERROR_MESSAGE_LENGTH }),
   }),
 ]);
 export type SqliteOutcome = typeof SqliteOutcomeSchema.static;

@@ -65,6 +65,7 @@ export {
   DEFAULT_AGENT_POLL_SETTINGS,
 } from '#control/session.ts';
 export {
+  SQLITE_MAX_ERROR_MESSAGE_LENGTH,
   type SqliteOperation,
   SqliteOperationSchema,
   type SqliteOutcome,
