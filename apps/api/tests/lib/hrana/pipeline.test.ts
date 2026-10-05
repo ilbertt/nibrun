@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { SqliteStatement, SqliteStatementResult } from '@repo/protocol';
+import type { HranaStmtResult, SqliteStatement } from '@repo/protocol';
 import { HranaPipelineAdapter } from '#lib/hrana/pipeline.ts';
 import { HranaStreams } from '#lib/hrana/streams.ts';
 import { openRecordingExecutor, RecordingSqliteExecutor } from '#tests/support/hrana/executor.ts';
@@ -94,7 +94,7 @@ describe('Hrana HTTP pipelines', () => {
       override execute(_input: {
         statement: SqliteStatement;
         signal: AbortSignal;
-      }): Promise<SqliteStatementResult> {
+      }): Promise<HranaStmtResult> {
         controller.abort(new Error('cancelled'));
         return Promise.reject(controller.signal.reason);
       }
@@ -119,11 +119,12 @@ describe('Hrana HTTP pipelines', () => {
       override execute(_input: {
         statement: SqliteStatement;
         signal: AbortSignal;
-      }): Promise<SqliteStatementResult> {
+      }): Promise<HranaStmtResult> {
         return Promise.resolve({
-          columns: [{ name: 'value' }],
+          cols: [{ name: 'value', decltype: null }],
           rows: [[{ type: 'text', value: 'x'.repeat(TOO_MANY_BYTES) }]],
-          affectedRowCount: 0,
+          affected_row_count: 0,
+          last_insert_rowid: null,
         });
       }
     }

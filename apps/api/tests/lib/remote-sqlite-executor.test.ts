@@ -12,9 +12,10 @@ import {
 const signal = new AbortController().signal;
 const path = Value.Parse(GuestPathSchema, '/app.db');
 const RESULT = {
-  columns: [{ name: 'value' }],
+  cols: [{ name: 'value', decltype: null }],
   rows: [[{ type: 'integer' as const, value: '1' }]],
-  affectedRowCount: 0,
+  affected_row_count: 0,
+  last_insert_rowid: null,
 };
 
 async function claim(relay: SqliteRelayService): Promise<SqliteQuery> {
@@ -68,10 +69,10 @@ test('the remote executor preserves its session and host across every operation'
   const description = executor.describe({ sql: 'SELECT 1', signal });
   const described = await claim(relay);
   const metadata = {
-    parameters: [],
-    columns: [{ name: 'value' }],
-    isExplain: false,
-    isReadonly: true,
+    params: [],
+    cols: [{ name: 'value', decltype: null }],
+    is_explain: false,
+    is_readonly: true,
   };
   answer({ relay, query: described, outcome: { status: 'described', result: metadata } });
   expect(await description).toEqual(metadata);

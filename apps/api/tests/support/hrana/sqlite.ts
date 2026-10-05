@@ -1,9 +1,9 @@
 import { Database, type SQLQueryBindings } from 'bun:sqlite';
 import type {
-  SqliteDescribeResult,
+  HranaDescribeResult,
+  HranaStmtResult,
+  HranaValue,
   SqliteStatement,
-  SqliteStatementResult,
-  SqliteValue,
 } from '@repo/protocol';
 import { HranaError } from '#lib/hrana/errors.ts';
 import { SqliteExecutorContract } from '#lib/hrana/executor.ts';
@@ -24,15 +24,15 @@ export class LocalSqliteExecutor extends SqliteExecutorContract {
   }: {
     statement: SqliteStatement;
     signal: AbortSignal;
-  }): Promise<SqliteStatementResult> {
+  }): Promise<HranaStmtResult> {
     signal.throwIfAborted();
     const prepared = prepareSql({ database: this.#database, sql: statement.sql });
     try {
       const bindings =
-        statement.namedArgs.length > 0
+        statement.named_args.length > 0
           ? [
               Object.fromEntries(
-                statement.namedArgs.map(function binding(argument) {
+                statement.named_args.map(function binding(argument) {
                   const name = /^[:$@]/.test(argument.name) ? argument.name : `:${argument.name}`;
                   return [name, fromValue(argument.value)];
                 }),
@@ -40,21 +40,22 @@ export class LocalSqliteExecutor extends SqliteExecutorContract {
             ]
           : statement.args.map(fromValue);
       const rows = prepared.values(...(bindings as SQLQueryBindings[]));
-      const columns = Array.from(
+      const cols = Array.from(
         prepared.columnNames.entries(),
         function describeColumn([index, name]) {
-          const declaredType = prepared.declaredTypes[index];
-          return declaredType == null ? { name } : { name, declaredType };
+          const decltype = prepared.declaredTypes[index];
+          return { name, decltype: decltype ?? null };
         },
       );
       return Promise.resolve({
-        columns,
-        rows: statement.wantRows
+        cols,
+        rows: statement.want_rows
           ? rows.map(function row(values) {
               return values.map(toValue);
             })
           : [],
-        affectedRowCount: 0,
+        affected_row_count: 0,
+        last_insert_rowid: null,
       });
     } catch (error) {
       throw new HranaError({
@@ -66,18 +67,18 @@ export class LocalSqliteExecutor extends SqliteExecutorContract {
     }
   }
 
-  override describe({ sql }: { sql: string; signal: AbortSignal }): Promise<SqliteDescribeResult> {
+  override describe({ sql }: { sql: string; signal: AbortSignal }): Promise<HranaDescribeResult> {
     const prepared = this.#database.prepare(sql);
     try {
       return Promise.resolve({
-        parameters: Array.from({ length: prepared.paramsCount }, function parameter() {
-          return {};
+        params: Array.from({ length: prepared.paramsCount }, function parameter() {
+          return { name: null };
         }),
-        columns: prepared.columnNames.map(function describeColumn(name) {
-          return { name };
+        cols: prepared.columnNames.map(function describeColumn(name) {
+          return { name, decltype: null };
         }),
-        isExplain: false,
-        isReadonly: true,
+        is_explain: false,
+        is_readonly: true,
       });
     } finally {
       prepared.finalize();
@@ -96,7 +97,7 @@ export class LocalSqliteExecutor extends SqliteExecutorContract {
   }
 }
 
-function fromValue(value: SqliteValue): SQLQueryBindings {
+function fromValue(value: HranaValue): SQLQueryBindings {
   switch (value.type) {
     case 'null':
       return null;
@@ -110,7 +111,7 @@ function fromValue(value: SqliteValue): SQLQueryBindings {
   }
 }
 
-function toValue(value: unknown): SqliteValue {
+function toValue(value: unknown): HranaValue {
   if (value === null) {
     return { type: 'null' };
   }

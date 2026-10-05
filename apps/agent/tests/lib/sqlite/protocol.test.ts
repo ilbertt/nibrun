@@ -29,9 +29,9 @@ describe('SQLite guest protocol', () => {
         type: 'execute',
         statement: {
           sql: 'SELECT ?, :blob',
-          wantRows: true,
+          want_rows: true,
           args: [{ type: 'integer', value: '9223372036854775807' }],
-          namedArgs: [{ name: 'blob', value: { type: 'blob', base64: 'AP8=' } }],
+          named_args: [{ name: 'blob', value: { type: 'blob', base64: 'AP8=' } }],
         },
       }),
     );
@@ -63,8 +63,8 @@ describe('SQLite guest protocol', () => {
             statement: {
               sql: 'SELECT ?',
               args: [{ type: 'integer', value }],
-              namedArgs: [],
-              wantRows: true,
+              named_args: [],
+              want_rows: true,
             },
           }),
         ),
@@ -88,10 +88,10 @@ describe('SQLite guest protocol', () => {
       kind: 'result',
       autocommit: true,
       result: {
-        columns: [{ name: 'value', declaredType: 'INTEGER' }],
+        cols: [{ name: 'value', decltype: 'INTEGER' }],
         rows: [[{ type: 'integer', value: '9223372036854775807' }]],
-        affectedRowCount: 0,
-        lastInsertRowid: '0',
+        affected_row_count: 0,
+        last_insert_rowid: '0',
       },
     });
   });

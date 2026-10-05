@@ -1,17 +1,25 @@
 import { Type } from '@sinclair/typebox';
 import { GuestPathSchema } from '#domain/filesystem.ts';
 import {
+  HranaDescribeResultSchema,
+  HranaStmtResultSchema,
+  HranaStmtSchema,
+} from '#domain/hrana.ts';
+import {
   AppIdSchema,
   DeploymentIdSchema,
   SqliteQueryIdSchema,
   SqliteSessionIdSchema,
 } from '#domain/identifiers.ts';
-import {
-  SqliteDescribeResultSchema,
-  SqliteSqlSchema,
-  SqliteStatementResultSchema,
-  SqliteStatementSchema,
-} from '#domain/sqlite.ts';
+import { SQLITE_MAX_STATEMENT_LENGTH } from '#domain/sqlite-limits.ts';
+
+const SqliteSqlSchema = Type.String({ maxLength: SQLITE_MAX_STATEMENT_LENGTH });
+export const SqliteStatementSchema = Type.Object({
+  ...Type.Required(Type.Pick(HranaStmtSchema, ['sql', 'args', 'named_args', 'want_rows']))
+    .properties,
+  sql: SqliteSqlSchema,
+});
+export type SqliteStatement = typeof SqliteStatementSchema.static;
 
 const MAX_SERVED_DEPLOYMENTS = 200;
 const MAX_ERROR_CODE_LENGTH = 128;
@@ -50,8 +58,8 @@ export type SqliteQueryResponse = typeof SqliteQueryResponseSchema.static;
 
 export const SqliteOutcomeSchema = Type.Union([
   Type.Object({ status: Type.Literal('opened') }),
-  Type.Object({ status: Type.Literal('executed'), result: SqliteStatementResultSchema }),
-  Type.Object({ status: Type.Literal('described'), result: SqliteDescribeResultSchema }),
+  Type.Object({ status: Type.Literal('executed'), result: HranaStmtResultSchema }),
+  Type.Object({ status: Type.Literal('described'), result: HranaDescribeResultSchema }),
   Type.Object({ status: Type.Literal('sequenced') }),
   Type.Object({ status: Type.Literal('closed') }),
   Type.Object({

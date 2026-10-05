@@ -13,7 +13,7 @@ const run = provided(Layer.mergeAll(platform, AgentState.Default, GuestActivity.
 const OPEN = sqliteQuery({ type: 'open', path: Value.Parse(GuestPathSchema, '/app.db') });
 const QUERY = sqliteQuery({
   type: 'execute',
-  statement: { sql: 'SELECT value', args: [], namedArgs: [], wantRows: true },
+  statement: { sql: 'SELECT value', args: [], named_args: [], want_rows: true },
 });
 const CLOSED = sqliteQuery({ type: 'close' });
 const NEXT_DEPLOYMENT = Value.Parse(DeploymentIdSchema, 'next-deployment');

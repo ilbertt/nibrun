@@ -1,30 +1,18 @@
-import type { HranaStreamRequest } from '@repo/protocol';
+import type {
+  HranaPipelineRespBody,
+  HranaStreamRequest,
+  HranaStreamResponse,
+  HranaStreamResult,
+} from '@repo/protocol';
 import { executeHranaBatch } from '#lib/hrana/batch.ts';
 import { HranaError, hranaError } from '#lib/hrana/errors.ts';
 import type { SqliteExecutorContract } from '#lib/hrana/executor.ts';
-import { hranaDescribeResult, hranaStatementResult } from '#lib/hrana/results.ts';
 import { parseHranaPipeline } from '#lib/hrana/schema.ts';
 import { hranaStatement, resolveHranaSql } from '#lib/hrana/sql.ts';
 import type { HranaStream, HranaStreams } from '#lib/hrana/streams.ts';
 
 const MAX_STORED_SQL = 30;
 const MAX_RESPONSE_BYTES = 4_194_304;
-
-type StreamResponse =
-  | { type: 'execute'; result: ReturnType<typeof hranaStatementResult> }
-  | { type: 'batch'; result: Awaited<ReturnType<typeof executeHranaBatch>> }
-  | { type: 'describe'; result: ReturnType<typeof hranaDescribeResult> }
-  | { type: 'sequence' | 'store_sql' | 'close_sql' | 'close' };
-
-type StreamResult =
-  | { type: 'ok'; response: StreamResponse }
-  | { type: 'error'; error: ReturnType<typeof hranaError> };
-
-export type HranaPipelineResponse = {
-  baton: string | null;
-  base_url: null;
-  results: StreamResult[];
-};
 
 export class HranaPipelineAdapter {
   readonly #streams: HranaStreams;
@@ -43,7 +31,7 @@ export class HranaPipelineAdapter {
     scope: string;
     open: (input: { signal: AbortSignal }) => Promise<SqliteExecutorContract>;
     signal: AbortSignal;
-  }): Promise<HranaPipelineResponse> {
+  }): Promise<HranaPipelineRespBody> {
     const pipeline = parseHranaPipeline(body);
     const stream = await this.#streams.acquire({
       baton: pipeline.baton ?? null,
@@ -52,7 +40,7 @@ export class HranaPipelineAdapter {
       signal,
     });
     try {
-      const results: StreamResult[] = [];
+      const results: HranaStreamResult[] = [];
       for (const request of pipeline.requests) {
         signal.throwIfAborted();
         results.push(await this.#result({ request, stream, signal }));
@@ -79,7 +67,7 @@ export class HranaPipelineAdapter {
     request: HranaStreamRequest;
     stream: HranaStream;
     signal: AbortSignal;
-  }): Promise<StreamResult> {
+  }): Promise<HranaStreamResult> {
     try {
       if (stream.closed) {
         throw new HranaError({ message: 'Stream is closed', code: 'STREAM_CLOSED' });
@@ -99,18 +87,16 @@ export class HranaPipelineAdapter {
     request: HranaStreamRequest;
     stream: HranaStream;
     signal: AbortSignal;
-  }): Promise<StreamResponse> {
+  }): Promise<HranaStreamResponse> {
     const { executor, storedSql } = stream;
     switch (request.type) {
       case 'execute':
         return {
           type: request.type,
-          result: hranaStatementResult(
-            await executor.execute({
-              statement: hranaStatement({ statement: request.stmt, storedSql }),
-              signal,
-            }),
-          ),
+          result: await executor.execute({
+            statement: hranaStatement({ statement: request.stmt, storedSql }),
+            signal,
+          }),
         };
       case 'batch':
         return {
@@ -120,12 +106,10 @@ export class HranaPipelineAdapter {
       case 'describe':
         return {
           type: request.type,
-          result: hranaDescribeResult(
-            await executor.describe({
-              sql: resolveHranaSql({ reference: request, storedSql }),
-              signal,
-            }),
-          ),
+          result: await executor.describe({
+            sql: resolveHranaSql({ reference: request, storedSql }),
+            signal,
+          }),
         };
       case 'sequence':
         await executor.sequence({

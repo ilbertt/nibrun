@@ -45,3 +45,7 @@ The agent wakes an idle guest, protects its active stream from idle capture, and
 bounded frames over the SQLite vsock channel. The runtime forks a restricted worker per
 connection inside the tenant data directory. Existing databases remain in place, including WAL
 sidecars. Files are not copied into the control plane.
+
+Hrana v2 wire schemas are generated from pinned upstream declarations in
+`packages/protocol/vendor/hrana-v2/`. The API and agent share those wire fields
+and bounded schemas; the relay adds deployment routing and resolved SQL text.

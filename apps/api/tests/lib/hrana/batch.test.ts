@@ -69,7 +69,7 @@ describe('Hrana batches', () => {
     });
     expect(executor.statements[0]?.sql).toBe('SELECT :name');
     expect(executor.statements[0]?.args).toEqual([]);
-    expect(executor.statements[0]?.wantRows).toBe(false);
+    expect(executor.statements[0]?.want_rows).toBe(false);
     expect(result.step_results[0]?.rows).toEqual([]);
     expect(result.step_errors[1]?.code).toBe('PROTO_ERROR');
   });

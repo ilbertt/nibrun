@@ -38,7 +38,7 @@ export function hranaStatement({
   return {
     sql: resolveHranaSql({ reference: statement, storedSql }),
     args: statement.args ?? [],
-    namedArgs: statement.named_args ?? [],
-    wantRows: statement.want_rows ?? true,
+    named_args: statement.named_args ?? [],
+    want_rows: statement.want_rows ?? true,
   };
 }

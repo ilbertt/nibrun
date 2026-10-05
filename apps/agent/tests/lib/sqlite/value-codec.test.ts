@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Buffer } from 'node:buffer';
-import type { SqliteValue } from '@repo/protocol';
+import type { HranaValue } from '@repo/protocol';
 import { encodeSqliteValue, SqliteReplyReader } from '#lib/sqlite/value-codec.ts';
 import { SQLITE_INT64_MAX, sqliteField, sqliteInteger } from '#tests/support/sqlite.ts';
 
@@ -9,7 +9,7 @@ const INVALID_TAG = 42;
 const MAX_BYTE = 255;
 
 describe('SQLite value codec', () => {
-  test.each<SqliteValue>([
+  test.each<HranaValue>([
     { type: 'null' },
     { type: 'integer', value: SQLITE_INT64_MAX.toString() },
     { type: 'integer', value: '-9223372036854775808' },
@@ -29,6 +29,27 @@ describe('SQLite value codec', () => {
     expect(encodeSqliteValue({ type: 'blob', base64: 'AP8=' })).toEqual(
       Buffer.concat([Buffer.of(BLOB_TAG), sqliteField(Buffer.of(0, MAX_BYTE))]),
     );
+  });
+
+  test('decodes unnamed parameters and unknown declared types as Hrana null fields', () => {
+    const count = Buffer.from([0, 0, 0, 1]);
+    const reader = new SqliteReplyReader(
+      Buffer.concat([
+        count,
+        sqliteField(''),
+        count,
+        sqliteField('value'),
+        sqliteField(''),
+        Buffer.of(1, 0),
+      ]),
+    );
+    expect(reader.description()).toEqual({
+      params: [{ name: null }],
+      cols: [{ name: 'value', decltype: null }],
+      is_readonly: true,
+      is_explain: false,
+    });
+    reader.finished();
   });
 
   test('rejects unknown tags, short fields, invalid UTF-8, and trailing bytes', () => {

@@ -1,9 +1,9 @@
 import { Buffer } from 'node:buffer';
 import {
-  type SqliteDescribeResult,
+  type HranaDescribeResult,
+  type HranaStmtResult,
   type SqliteOperation,
   SqliteOperationSchema,
-  type SqliteStatementResult,
   Value,
 } from '@repo/protocol';
 import { Either, Option } from 'effect';
@@ -33,10 +33,10 @@ export type SqliteGuestReply =
   | { readonly kind: 'ok' }
   | {
       readonly kind: 'result';
-      readonly result: SqliteStatementResult;
+      readonly result: HranaStmtResult;
       readonly autocommit: boolean;
     }
-  | { readonly kind: 'description'; readonly description: SqliteDescribeResult }
+  | { readonly kind: 'description'; readonly description: HranaDescribeResult }
   | { readonly kind: 'error'; readonly code: number; readonly message: string };
 
 function requestBody(operation: SqliteOperation) {
@@ -50,20 +50,20 @@ function requestBody(operation: SqliteOperation) {
       return Buffer.alloc(0);
     case 'execute': {
       const statement = operation.statement;
-      const parameters = [
+      const params = [
         ...statement.args.map((value) => ({ name: '', value })),
-        ...statement.namedArgs,
+        ...statement.named_args,
       ];
       const chunks: Buffer[] = [
         encodeSqliteField(statement.sql),
-        Buffer.of(statement.wantRows ? 1 : 0),
-        encodeSqliteCount(parameters.length),
+        Buffer.of(statement.want_rows ? 1 : 0),
+        encodeSqliteCount(params.length),
       ];
       let length = 0;
       for (const chunk of chunks) {
         length += chunk.byteLength;
       }
-      for (const parameter of parameters) {
+      for (const parameter of params) {
         const name = encodeSqliteField(parameter.name);
         const value = encodeSqliteValue(parameter.value);
         length += name.byteLength + value.byteLength;

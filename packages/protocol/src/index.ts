@@ -78,6 +78,8 @@ export {
   type SqliteQueryResult,
   SqliteQueryResultSchema,
   SqliteQuerySchema,
+  type SqliteStatement,
+  SqliteStatementSchema,
 } from '#control/sqlite-query.ts';
 export {
   AGENT_API_PREFIX,
@@ -310,18 +312,7 @@ export {
   SQLITE_MAX_ROWS,
   SQLITE_MAX_STATEMENT_LENGTH,
   SQLITE_MAX_VALUE_LENGTH,
-  type SqliteColumn,
-  SqliteColumnSchema,
-  type SqliteDescribeResult,
-  SqliteDescribeResultSchema,
-  SqliteSqlSchema,
-  type SqliteStatement,
-  type SqliteStatementResult,
-  SqliteStatementResultSchema,
-  SqliteStatementSchema,
-  type SqliteValue,
-  SqliteValueSchema,
-} from '#domain/sqlite.ts';
+} from '#domain/sqlite-limits.ts';
 export {
   DEFAULT_VOLUME_SIZE_BYTES,
   VOLUME_STATES,

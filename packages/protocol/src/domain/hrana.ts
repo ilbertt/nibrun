@@ -6,7 +6,7 @@ import {
   SQLITE_MAX_ROWS,
   SQLITE_MAX_STATEMENT_LENGTH,
   SQLITE_MAX_VALUE_LENGTH,
-} from '#domain/sqlite.ts';
+} from '#domain/sqlite-limits.ts';
 
 const MAX_PIPELINE_REQUESTS = 64;
 const MAX_BATCH_STEPS = 256;

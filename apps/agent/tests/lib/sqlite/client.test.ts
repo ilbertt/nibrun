@@ -16,7 +16,7 @@ import {
 const run = provided(platform);
 const EXPECTED_REQUEST_COUNT = 4;
 const PAST_RESPONSE_TIMEOUT_SECONDS = 11;
-const STATEMENT = { sql: 'SELECT 1', args: [], namedArgs: [], wantRows: true };
+const STATEMENT = { sql: 'SELECT 1', args: [], named_args: [], want_rows: true };
 
 describe('SQLite guest client', () => {
   test('serializes concurrent requests over one fragmented guest stream', () =>

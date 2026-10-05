@@ -17,6 +17,6 @@ export const SQLITE_OTHER_HOST_ID = Value.Parse(HostIdSchema, 'host-2');
 export const SQLITE_STATEMENT: SqliteStatement = {
   sql: 'SELECT 1',
   args: [],
-  namedArgs: [],
-  wantRows: true,
+  named_args: [],
+  want_rows: true,
 };

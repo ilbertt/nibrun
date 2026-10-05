@@ -1,4 +1,4 @@
-import type { SqliteDescribeResult, SqliteStatement, SqliteStatementResult } from '@repo/protocol';
+import type { HranaDescribeResult, HranaStmtResult, SqliteStatement } from '@repo/protocol';
 import { HranaError } from '#lib/hrana/errors.ts';
 import { SqliteExecutorContract } from '#lib/hrana/executor.ts';
 
@@ -12,24 +12,25 @@ export class RecordingSqliteExecutor extends SqliteExecutorContract {
   }: {
     statement: SqliteStatement;
     signal: AbortSignal;
-  }): Promise<SqliteStatementResult> {
+  }): Promise<HranaStmtResult> {
     this.statements.push(statement);
     if (statement.sql === 'fail') {
       return Promise.reject(new HranaError({ message: 'Statement failed', code: 'SQLITE_ERROR' }));
     }
     return Promise.resolve({
-      columns: [{ name: 'value' }],
-      rows: statement.wantRows ? [[{ type: 'integer', value: '1' }]] : [],
-      affectedRowCount: 0,
+      cols: [{ name: 'value', decltype: null }],
+      rows: statement.want_rows ? [[{ type: 'integer', value: '1' }]] : [],
+      affected_row_count: 0,
+      last_insert_rowid: null,
     });
   }
 
-  override describe(_input: { sql: string; signal: AbortSignal }): Promise<SqliteDescribeResult> {
+  override describe(_input: { sql: string; signal: AbortSignal }): Promise<HranaDescribeResult> {
     return Promise.resolve({
-      parameters: [{}],
-      columns: [{ name: 'value' }],
-      isExplain: false,
-      isReadonly: true,
+      params: [{ name: null }],
+      cols: [{ name: 'value', decltype: null }],
+      is_explain: false,
+      is_readonly: true,
     });
   }
 

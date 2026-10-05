@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import { Value } from '@sinclair/typebox/value';
+import { SqliteOperationSchema, SqliteOutcomeSchema } from '#control/sqlite-query.ts';
 import {
   HranaPipelineReqBodySchema,
   HranaStmtResultSchema,
   HranaValueSchema,
 } from '#domain/hrana.ts';
 import { HranaValueSchema as UpstreamValueSchema } from '#domain/hrana-v2.gen.ts';
-import { SQLITE_MAX_PARAMETERS, SQLITE_MAX_VALUE_LENGTH } from '#domain/sqlite.ts';
+import { SQLITE_MAX_PARAMETERS, SQLITE_MAX_VALUE_LENGTH } from '#domain/sqlite-limits.ts';
 
 describe('bounded upstream Hrana schemas', () => {
   test('keeps the wire representation lossless through JSON', () => {
@@ -22,6 +23,30 @@ describe('bounded upstream Hrana schemas', () => {
       last_insert_rowid: null,
     };
     expect(Value.Check(HranaStmtResultSchema, JSON.parse(JSON.stringify(result)))).toBe(true);
+  });
+
+  test('shares Hrana results with the relay while requiring resolved guest statements', () => {
+    const result = {
+      cols: [{ name: 'value', decltype: null }],
+      rows: [],
+      affected_row_count: 0,
+      last_insert_rowid: null,
+    };
+    expect(Value.Check(SqliteOutcomeSchema, { status: 'executed', result })).toBe(true);
+    expect(
+      Value.Check(SqliteOperationSchema, {
+        type: 'execute',
+        statement: {
+          sql: 'SELECT 1',
+          args: [],
+          named_args: [],
+          want_rows: true,
+        },
+      }),
+    ).toBe(true);
+    expect(Value.Check(SqliteOperationSchema, { type: 'execute', statement: { sql_id: 1 } })).toBe(
+      false,
+    );
   });
 
   test('adds value limits without mutating upstream schemas', () => {

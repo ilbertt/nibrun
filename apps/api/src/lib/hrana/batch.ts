@@ -1,14 +1,12 @@
-import type { HranaBatch, HranaBatchCond as HranaCondition } from '@repo/protocol';
+import type {
+  HranaBatch,
+  HranaBatchResult,
+  HranaBatchCond as HranaCondition,
+  HranaStmtResult,
+} from '@repo/protocol';
 import { HranaError, hranaError } from '#lib/hrana/errors.ts';
 import type { SqliteExecutorContract } from '#lib/hrana/executor.ts';
-import { type HranaStatementResult, hranaStatementResult } from '#lib/hrana/results.ts';
 import { hranaStatement } from '#lib/hrana/sql.ts';
-
-type StepError = ReturnType<typeof hranaError>;
-type BatchResult = {
-  step_results: (HranaStatementResult | null)[];
-  step_errors: (StepError | null)[];
-};
 
 export async function executeHranaBatch({
   batch,
@@ -20,20 +18,18 @@ export async function executeHranaBatch({
   executor: SqliteExecutorContract;
   storedSql: ReadonlyMap<number, string>;
   signal: AbortSignal;
-}): Promise<BatchResult> {
-  const result: BatchResult = { step_results: [], step_errors: [] };
+}): Promise<HranaBatchResult> {
+  const result: HranaBatchResult = { step_results: [], step_errors: [] };
   for (const step of batch.steps) {
-    let value: HranaStatementResult | null = null;
-    let error: StepError | null = null;
+    let value: HranaStmtResult | null = null;
+    let error: HranaBatchResult['step_errors'][number] = null;
     try {
       signal.throwIfAborted();
       if (step.condition == null || evaluateCondition({ condition: step.condition, result })) {
-        value = hranaStatementResult(
-          await executor.execute({
-            statement: hranaStatement({ statement: step.stmt, storedSql }),
-            signal,
-          }),
-        );
+        value = await executor.execute({
+          statement: hranaStatement({ statement: step.stmt, storedSql }),
+          signal,
+        });
       }
     } catch (caught) {
       signal.throwIfAborted();
@@ -50,7 +46,7 @@ function evaluateCondition({
   result,
 }: {
   condition: HranaCondition;
-  result: BatchResult;
+  result: HranaBatchResult;
 }): boolean {
   switch (condition.type) {
     case 'ok':

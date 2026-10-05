@@ -1,14 +1,13 @@
 import { Buffer } from 'node:buffer';
 import {
+  type HranaDescribeResult,
+  HranaDescribeResultSchema,
+  HranaStmtResultSchema,
+  type HranaValue,
   SQLITE_MAX_COLUMNS,
   SQLITE_MAX_PARAMETERS,
   SQLITE_MAX_ROWS,
   SQLITE_MAX_VALUE_LENGTH,
-  type SqliteColumn,
-  type SqliteDescribeResult,
-  SqliteDescribeResultSchema,
-  SqliteStatementResultSchema,
-  type SqliteValue,
   Value,
 } from '@repo/protocol';
 import { InvalidSqliteRequest, MalformedSqliteReply } from '#lib/sqlite/errors.ts';
@@ -44,7 +43,7 @@ function integer(value: string) {
   return bytes;
 }
 
-export function encodeSqliteValue(value: SqliteValue): Buffer {
+export function encodeSqliteValue(value: HranaValue): Buffer {
   switch (value.type) {
     case 'null':
       return Buffer.of(VALUE_TAGS.null);
@@ -102,18 +101,18 @@ export class SqliteReplyReader {
     return new TextDecoder('utf-8', { fatal: true }).decode(this.take(this.count()));
   }
 
-  columns(): SqliteColumn[] {
+  cols(): HranaDescribeResult['cols'] {
     const count = this.count();
     if (count > SQLITE_MAX_COLUMNS) {
       throw new MalformedSqliteReply();
     }
     return Array.from({ length: count }, () => ({
       name: this.text(),
-      declaredType: this.text() || undefined,
+      decltype: this.text() || null,
     }));
   }
 
-  value(): SqliteValue {
+  value(): HranaValue {
     switch (this.take(1)[0]) {
       case VALUE_TAGS.null:
         return { type: 'null' };
@@ -136,39 +135,39 @@ export class SqliteReplyReader {
   }
 
   result() {
-    const columns = this.columns();
+    const cols = this.cols();
     const rowCount = this.count();
-    if (rowCount > SQLITE_MAX_ROWS || rowCount > MAX_FIELD_BYTES / Math.max(1, columns.length)) {
+    if (rowCount > SQLITE_MAX_ROWS || rowCount > MAX_FIELD_BYTES / Math.max(1, cols.length)) {
       throw new MalformedSqliteReply();
     }
-    const rows = Array.from({ length: rowCount }, () => columns.map(() => this.value()));
+    const rows = Array.from({ length: rowCount }, () => cols.map(() => this.value()));
     const affected = this.take(INT64_BYTES).readBigUInt64BE();
     if (affected > BigInt(Number.MAX_SAFE_INTEGER)) {
       throw new MalformedSqliteReply();
     }
     const result = {
-      columns,
+      cols,
       rows,
-      affectedRowCount: Number(affected),
-      lastInsertRowid: this.take(INT64_BYTES).readBigInt64BE().toString(),
+      affected_row_count: Number(affected),
+      last_insert_rowid: this.take(INT64_BYTES).readBigInt64BE().toString(),
     };
-    if (!Value.Check(SqliteStatementResultSchema, result)) {
+    if (!Value.Check(HranaStmtResultSchema, result)) {
       throw new MalformedSqliteReply();
     }
     return { result, autocommit: this.flag() };
   }
 
-  description(): SqliteDescribeResult {
+  description(): HranaDescribeResult {
     const count = this.count();
     if (count > SQLITE_MAX_PARAMETERS) {
       throw new MalformedSqliteReply();
     }
-    const parameters = Array.from({ length: count }, () => ({
-      name: this.text() || undefined,
+    const params = Array.from({ length: count }, () => ({
+      name: this.text() || null,
     }));
-    const columns = this.columns();
-    const description = { parameters, columns, isReadonly: this.flag(), isExplain: this.flag() };
-    if (!Value.Check(SqliteDescribeResultSchema, description)) {
+    const cols = this.cols();
+    const description = { params, cols, is_readonly: this.flag(), is_explain: this.flag() };
+    if (!Value.Check(HranaDescribeResultSchema, description)) {
       throw new MalformedSqliteReply();
     }
     return description;
