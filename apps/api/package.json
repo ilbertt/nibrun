@@ -22,6 +22,7 @@
     "@ilbertt/better-auth-bun-sql": "^0.4.0",
     "@ilbertt/bun-sqlgen": "^0.6.2",
     "@repo/protocol": "workspace:*",
+    "@repo/sqlite": "workspace:*",
     "better-auth": "catalog:",
     "elysia": "^1.4.30",
     "tldts": "^7.4.13",
