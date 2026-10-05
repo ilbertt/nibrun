@@ -89,6 +89,12 @@ future timers: changing a crontab replaces timers while started commands finish 
 deployment scope. Its registry loop runs without waiting for a control-plane session;
 Effect schedules wait on Bun-calculated UTC occurrences and never retry a command.
 
+`SqliteSessions` owns read-only guest database streams through `lib/sqlite/` on port 51005.
+Its NBS1 codec preserves integer and blob values and bounds every frame. A stream holds
+`GuestActivity` until it closes or has been idle for 30 seconds; reconciliation closes obsolete
+deployment streams before stopping a VM. Requests serialize per socket, and no SQL operation
+is replayed after a disconnect or uncertain result.
+
 Cold boots pin kernel/rootfs paths to the immutable guest image adopted in the host bundle.
 Before snapshotting, the agent checks the running Firecracker's root drive through `/vm/config`;
 a symlink path, an older image or an unreadable configuration leaves the VM running. Image
