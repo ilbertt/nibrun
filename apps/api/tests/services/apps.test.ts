@@ -12,6 +12,7 @@ import {
   type ReportedInstance,
   type ReportedVolume,
   type TenantEnvironment,
+  TenantEnvironmentSchema,
   TimestampSchema,
   Value,
   VolumeIdSchema,
@@ -19,11 +20,7 @@ import {
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
 import { type AppName, AppNameSchema, type AppState, OWNED_APP_STATES } from '#domain/app.ts';
-import {
-  type TenantEnvironmentPatch,
-  TenantEnvironmentPatchSchema,
-  TenantEnvironmentSchema,
-} from '#domain/environment.ts';
+import { type TenantEnvironmentPatch, TenantEnvironmentPatchSchema } from '#domain/environment.ts';
 import { type OwnerId, OwnerIdSchema } from '#domain/identifiers.ts';
 import { type DnsLabel, DnsLabelSchema } from '#domain/wire.ts';
 import type { NewAppConfig, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';

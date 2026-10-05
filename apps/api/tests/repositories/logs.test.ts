@@ -2,12 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import {
   AppIdSchema,
   CronJobIdSchema,
+  CronRunIdSchema,
   DeploymentIdSchema,
   HostIdSchema,
   TimestampSchema,
   Value,
 } from '@repo/protocol';
-import { CronRunIdSchema } from '#domain/identifiers.ts';
 import type { QueryRequest } from '#lib/victorialogs/client.ts';
 import type { LogRow } from '#lib/victorialogs/parse.ts';
 import { LogsRepository, type TenantLogStore } from '#repositories/logs.repository.ts';

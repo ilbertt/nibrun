@@ -62,6 +62,13 @@ export {
   AgentSessionSchema,
 } from '#control/session.ts';
 export {
+  TENANT_LOG_STREAMS,
+  type TenantLogRecord,
+  TenantLogRecordSchema,
+  type TenantLogStream,
+  TenantLogStreamSchema,
+} from '#control/tenant-log.ts';
+export {
   AGENT_API_PREFIX,
   AGENT_ROUTES,
   type DesiredStateRequest,
@@ -82,6 +89,7 @@ export {
   IdleTimeoutMsSchema,
   MAX_IDLE_TIMEOUT_MS,
   MIN_IDLE_TIMEOUT_MS,
+  RUNTIME_ENVIRONMENT_VALUES,
   type TenantArguments,
   TenantArgumentsSchema,
   type TenantEnvironment,
@@ -139,6 +147,8 @@ export {
   CronJobIdSchema,
   type CronQueryId,
   CronQueryIdSchema,
+  type CronRunId,
+  CronRunIdSchema,
   type DeploymentId,
   DeploymentIdSchema,
   type ExportId,

@@ -26,8 +26,10 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
   `apps/api/src/domain/dns.ts`. Consumers and fixtures use those definitions
   and render record names and targets rather than reconstructing them.
 - `@repo/protocol` owns only API–agent requests, responses, and their wire schemas.
-  Public API models, validation policy, defaults, and log-store contracts belong to
-  `apps/api/src/domain/`, exposed to clients through `@repo/api/domain`. Guest protocols
+  Public API models, owner-only validation, defaults, and log queries belong to
+  `apps/api/src/domain/`, exposed to clients through `@repo/api/domain`. Shared environment
+  validation and agent-to-API tenant log messages stay in protocol. Neither app imports the
+  other app; the agent must not depend on `@repo/api`, including in tests. Guest protocols
   and agent persistence models belong to `apps/agent/src/lib/`. Biome restricts direct protocol
   imports to its owning apps and prevents protocol from importing another workspace package.
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object

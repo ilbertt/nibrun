@@ -1,4 +1,3 @@
-import { TenantEnvironmentSchema } from '@repo/api/domain';
 import {
   AppIdSchema,
   DeploymentIdSchema,
@@ -8,15 +7,7 @@ import {
 } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 
-export const CronJobDefinitionSchema = Type.Composite([
-  Type.Omit(RegisteredCronJobSchema, ['jobId', 'nextRunAt', 'environment']),
-  Type.Object({
-    environment: Type.Optional({
-      ...TenantEnvironmentSchema,
-      maxProperties: RegisteredCronJobSchema.properties.environment.maxProperties,
-    }),
-  }),
-]);
+export const CronJobDefinitionSchema = Type.Omit(RegisteredCronJobSchema, ['jobId', 'nextRunAt']);
 export type CronJobDefinition = typeof CronJobDefinitionSchema.static;
 export const CronJobDefinitionsSchema = Type.Array(CronJobDefinitionSchema, {
   maxItems: MAX_CRON_JOBS_PER_APP,

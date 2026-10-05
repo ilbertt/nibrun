@@ -1,7 +1,7 @@
-import { DEFAULT_AGENT_POLL_SETTINGS } from '@repo/api/domain';
 import type { AgentSession } from '@repo/protocol';
 import { Clock, Effect, Option, SynchronizedRef } from 'effect';
 import type { ControlPlaneError } from '#lib/control/client.ts';
+import { UNREGISTERED_POLL_SETTINGS } from '#lib/control/poll-settings.ts';
 import { isSessionExpiring, openSession } from '#lib/control/session.ts';
 import { readHostCapacity } from '#lib/report/capacity.ts';
 import { readHostVersions } from '#lib/report/versions.ts';
@@ -41,7 +41,7 @@ export class AgentSessionHolder extends Effect.Service<AgentSessionHolder>()('Ag
       pollSettings: Effect.map(
         SynchronizedRef.get(cached),
         Option.match({
-          onNone: () => DEFAULT_AGENT_POLL_SETTINGS,
+          onNone: () => UNREGISTERED_POLL_SETTINGS,
           onSome: (session: AgentSession) => session.poll,
         }),
       ),

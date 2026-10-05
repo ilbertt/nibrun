@@ -12,6 +12,8 @@ export const DeploymentIdSchema = identifierSchema<DeploymentId>(
 
 export type CronJobId = Identifier<'CronJobId'>;
 export const CronJobIdSchema = identifierSchema<CronJobId>('One registered cron job.');
+export type CronRunId = Identifier<'CronRunId'>;
+export const CronRunIdSchema = identifierSchema<CronRunId>('One execution of a cron job.');
 export type CronQueryId = Identifier<'CronQueryId'>;
 export const CronQueryIdSchema = identifierSchema<CronQueryId>('One live cron listing request.');
 export type HostId = Identifier<'HostId'>;

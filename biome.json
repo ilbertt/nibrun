@@ -264,6 +264,26 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/agent/**/*.ts", "apps/agent/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@repo/api", "@repo/api/*", "**/apps/api/**"],
+                    "message": "The agent must not import the API. Shared API-agent communication belongs in @repo/protocol."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import type { TenantLogStream } from '@repo/api/domain';
+import type { TenantLogStream } from '@repo/protocol';
 import { MAX_CRON_ENVIRONMENT_VARIABLES, Value } from '@repo/protocol';
 import { Data, Either, Option } from 'effect';
 import {

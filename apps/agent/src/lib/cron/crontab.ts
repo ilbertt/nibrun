@@ -1,8 +1,8 @@
-import { TenantEnvironmentSchema } from '@repo/api/domain';
 import {
   CRON_TIME_ZONE,
   parseMessage,
   type TenantEnvironment,
+  TenantEnvironmentSchema,
   type Timestamp,
 } from '@repo/protocol';
 import { Data, Effect } from 'effect';

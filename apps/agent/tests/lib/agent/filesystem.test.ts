@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_AGENT_POLL_SETTINGS } from '@repo/api/domain';
 import {
   type AgentSession,
   AppIdSchema,
@@ -22,6 +21,7 @@ import { FilesystemReader, NoDeviceForApp } from '#services/filesystem-reader.se
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { recordingCommands } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
+import { POLL_SETTINGS_FIXTURE } from '#tests/support/fixtures.ts';
 import { platform } from '#tests/support/run.ts';
 
 const APP = Value.Parse(AppIdSchema, 'app-pocketbase');
@@ -112,7 +112,7 @@ const SESSION = {
   hostId: 'host-1',
   sessionToken: 'session-token',
   expiresAt: '2026-08-03T11:00:00Z',
-  poll: DEFAULT_AGENT_POLL_SETTINGS,
+  poll: POLL_SETTINGS_FIXTURE,
 } as AgentSession;
 
 function unreached() {

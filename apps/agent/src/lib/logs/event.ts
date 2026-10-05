@@ -1,5 +1,4 @@
-import type { TenantLogRecord, TenantLogStream } from '@repo/api/domain';
-import type { HostId, Timestamp } from '@repo/protocol';
+import type { HostId, TenantLogRecord, TenantLogStream, Timestamp } from '@repo/protocol';
 import type { TenantLogSource } from '#lib/logs/vsock.ts';
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { isValidMessage, SecretStringSchema, Value } from '@repo/protocol';
-import { TenantEnvironmentPatchSchema, TenantEnvironmentSchema } from '#domain/environment.ts';
+import { isValidMessage, SecretStringSchema, TenantEnvironmentSchema, Value } from '@repo/protocol';
+import { TenantEnvironmentPatchSchema } from '#domain/environment.ts';
 import { namesExtraPublicPortValues } from '#domain/runtime-values.ts';
 
 const TENANT_SECRET = Value.Parse(SecretStringSchema, 'sk-live-do-not-log-this');

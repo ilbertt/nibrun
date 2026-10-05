@@ -1,4 +1,4 @@
-import { TENANT_LOG_STREAMS, type TenantLogRecord, type TenantLogStream } from '@repo/api/domain';
+import { TENANT_LOG_STREAMS, type TenantLogRecord, type TenantLogStream } from '@repo/protocol';
 import { Effect, Ref } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { runGuestCron } from '#lib/cron/execution-client.ts';

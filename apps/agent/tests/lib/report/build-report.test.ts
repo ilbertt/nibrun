@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_HTTP_PORT, DEFAULT_INSTANCE_RESOURCES } from '@repo/api/domain';
 import {
   type AppId,
   AppIdSchema,
@@ -21,8 +20,10 @@ import {
   EXPORT_ID,
   FIRST_HOST_PORT,
   HOST_ID,
+  HTTP_PORT_FIXTURE,
   instanceRecord,
   OBSERVED_AT,
+  RESOURCES_FIXTURE,
   VOLUME_ID,
   VOLUME_SIZE_BYTES,
 } from '#tests/support/fixtures.ts';
@@ -38,16 +39,16 @@ const HOST_CAPACITY = {
   memoryMib: HOST_MEMORY_MIB,
   cacheBytes: HOST_CACHE_BYTES,
 };
-const BOOTED = [DEFAULT_INSTANCE_RESOURCES, DEFAULT_INSTANCE_RESOURCES];
+const BOOTED = [RESOURCES_FIXTURE, RESOURCES_FIXTURE];
 /** The four states below with a microVM behind them, which is what the four of them hold. */
 const BOOTED_AND_SETTLING = [
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_INSTANCE_RESOURCES,
+  RESOURCES_FIXTURE,
+  RESOURCES_FIXTURE,
+  RESOURCES_FIXTURE,
+  RESOURCES_FIXTURE,
 ];
-const DEFAULT_INSTANCE_RESOURCES_AS_CAPACITY = {
-  ...DEFAULT_INSTANCE_RESOURCES,
+const RESOURCES_FIXTURE_AS_CAPACITY = {
+  ...RESOURCES_FIXTURE,
   cacheBytes: HOST_CACHE_BYTES,
 };
 
@@ -228,8 +229,8 @@ describe('allocatable capacity', () => {
         availableCacheBytes: FREE_CACHE_BYTES,
       }),
     ).toEqual({
-      vcpuCount: HOST_VCPUS - DEFAULT_INSTANCE_RESOURCES.vcpuCount * BOOTED.length,
-      memoryMib: HOST_MEMORY_MIB - DEFAULT_INSTANCE_RESOURCES.memoryMib * BOOTED.length,
+      vcpuCount: HOST_VCPUS - RESOURCES_FIXTURE.vcpuCount * BOOTED.length,
+      memoryMib: HOST_MEMORY_MIB - RESOURCES_FIXTURE.memoryMib * BOOTED.length,
       cacheBytes: FREE_CACHE_BYTES,
     });
   });
@@ -257,7 +258,7 @@ describe('allocatable capacity', () => {
   test('an oversubscribed host reports zero rather than a negative', () => {
     expect(
       allocatableCapacity({
-        capacity: DEFAULT_INSTANCE_RESOURCES_AS_CAPACITY,
+        capacity: RESOURCES_FIXTURE_AS_CAPACITY,
         committed: [HOST_CAPACITY],
         availableCacheBytes: FREE_CACHE_BYTES,
       }),
@@ -265,7 +266,7 @@ describe('allocatable capacity', () => {
   });
 
   test('HTTP ports are branded apart from host ports at the type level', () => {
-    const httpPort: HttpPort = DEFAULT_HTTP_PORT;
+    const httpPort: HttpPort = HTTP_PORT_FIXTURE;
     // @ts-expect-error an HttpPort is not a HostPort, which is what stops a routing bug type-checking
     const hostPort: HostPort = httpPort;
     expect(hostPort).toBe(Value.Parse(HostPortSchema, httpPort as unknown));

@@ -1,5 +1,11 @@
-import { type AppId, type DeploymentId, isValidMessage, type Timestamp } from '@repo/protocol';
-import { type TenantLogRecord, TenantLogRecordSchema } from '#domain/log.ts';
+import {
+  type AppId,
+  type DeploymentId,
+  isValidMessage,
+  type TenantLogRecord,
+  TenantLogRecordSchema,
+  type Timestamp,
+} from '@repo/protocol';
 import type { VictoriaLogsQuery } from '#lib/victorialogs/client.ts';
 import type { LogRow } from '#lib/victorialogs/parse.ts';
 

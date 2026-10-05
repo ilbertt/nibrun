@@ -10,6 +10,10 @@ listings through `lib/agent/cron-query.ts`, each on routes of its own. A read is
 anything converges on, so it carries no generation and cannot delay a stop. Cron listings read
 the durable registry and cached desired state without waking a guest, including suspended apps.
 
+**Never import `@repo/api` or `@repo/api/domain`, including in tests.** Shared API–agent
+message definitions come from `@repo/protocol`; agent mechanics and fallback policy stay here.
+Tests use agent fixtures, not API defaults. Biome enforces this boundary.
+
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
 test needs to substitute is a service. State that used to be
 mutable class fields lives in a `Ref`. The loops in `lib/agent/` are fibers, and their retry

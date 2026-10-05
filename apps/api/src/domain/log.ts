@@ -1,17 +1,5 @@
-import {
-  AppIdSchema,
-  CronJobIdSchema,
-  DeploymentIdSchema,
-  HostIdSchema,
-  stringEnum,
-  TimestampSchema,
-} from '@repo/protocol';
+import { stringEnum, type TenantLogRecord } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
-import { CronRunIdSchema } from '#domain/identifiers.ts';
-
-export const TENANT_LOG_STREAMS = ['stdout', 'stderr'] as const;
-export const TenantLogStreamSchema = stringEnum(TENANT_LOG_STREAMS);
-export type TenantLogStream = (typeof TENANT_LOG_STREAMS)[number];
 
 /**
  * Which component wrote a record, and the one field that answers it for the whole fleet.
@@ -25,39 +13,6 @@ export type TenantLogStream = (typeof TENANT_LOG_STREAMS)[number];
 export const LOG_SOURCES = ['tenant', 'agent', 'firecracker', 'zerofs', 'caddy'] as const;
 export const LogSourceSchema = stringEnum(LOG_SOURCES);
 export type LogSource = (typeof LOG_SOURCES)[number];
-
-/**
- * The fields that identify a record's stream, and the only ones that may.
- *
- * The store indexes every field, so filtering on any of them is cheap — but these form the stream
- * key, and a stream is meant to be long-lived. Instance and deployment ids are deliberately
- * absent: they change on every deploy, so naming them here would mint a new stream per release
- * and never stop.
- */
-export const LOG_STREAM_FIELDS = ['hostId', 'SOURCE', 'appId'] as const;
-const MAX_LOG_CHUNK_LENGTH = 65_536;
-const MAX_SAFE_WIRE_INTEGER = Number.MAX_SAFE_INTEGER;
-
-// `_msg` and `_time` are the store's own names for a record's message and timestamp. Everything
-// else is ours and stays camelCase.
-export const TenantLogRecordSchema = Type.Object({
-  _time: TimestampSchema,
-  _msg: Type.String({ maxLength: MAX_LOG_CHUNK_LENGTH }),
-  hostId: HostIdSchema,
-  SOURCE: Type.Literal('tenant'),
-  appId: AppIdSchema,
-  deploymentId: DeploymentIdSchema,
-  stream: TenantLogStreamSchema,
-  // Recreated with the host receiver. A gap in `sequence` within one `sourceId` means bounded
-  // buffering dropped records; a new `sourceId` means the receiver itself restarted.
-  sourceId: Type.String({ minLength: 1, maxLength: 64 }),
-  sequence: Type.Integer({ minimum: 0, maximum: MAX_SAFE_WIRE_INTEGER }),
-  cronJobId: Type.Optional(CronJobIdSchema),
-  cronRunId: Type.Optional(CronRunIdSchema),
-  droppedBytes: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_SAFE_WIRE_INTEGER })),
-});
-
-export type TenantLogRecord = typeof TenantLogRecordSchema.static;
 
 /**
  * What a reader has already been handed, so a record read twice is handed over once.

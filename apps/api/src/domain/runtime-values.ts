@@ -1,36 +1,34 @@
-// What opens a reference in a tenant value, and the whole of what expands. The format contract is
-// in apps/runtime/src/config.h, which is also what resolves one.
-const RUNTIME_VALUE_PREFIX = 'NIBRUN_';
+import { RUNTIME_ENVIRONMENT_VALUES, TenantEnvironmentSchema } from '@repo/protocol';
 
 /**
  * Every runtime value the guest sets, spelled as it is written, against what it holds. The value
  * is carried because a name on its own tells a reader nothing, and every end that lists them has
  * somewhere to say which is which.
  *
- * This is what every other end reads rather than restates, so adding one is this record and
- * whoever renders it. Two places cannot import it and have to be changed by hand:
+ * The wire names come from protocol; this record adds descriptions for API consumers.
+ * Two places cannot import it and have to be changed by hand:
  * `reference_value` in `apps/runtime/src/config.c`, which is what actually substitutes them, and
  * `skills/deploy-to-nibrun/SKILL.md`, which is what tells an agent they exist.
  */
 export const RUNTIME_VALUES = {
   DATA_DIR: {
-    name: `${RUNTIME_VALUE_PREFIX}DATA_DIR`,
+    name: RUNTIME_ENVIRONMENT_VALUES.DATA_DIR,
     description: 'the directory the volume is mounted at',
   },
   EXTRA_PUBLIC_PORT: {
-    name: `${RUNTIME_VALUE_PREFIX}EXTRA_PUBLIC_PORT`,
+    name: RUNTIME_ENVIRONMENT_VALUES.EXTRA_PUBLIC_PORT,
     description: 'the port to bind and announce',
   },
   HOSTNAME: {
-    name: `${RUNTIME_VALUE_PREFIX}HOSTNAME`,
+    name: RUNTIME_ENVIRONMENT_VALUES.HOSTNAME,
     description: "the app's own hostname",
   },
   HTTP_PORT: {
-    name: `${RUNTIME_VALUE_PREFIX}HTTP_PORT`,
+    name: RUNTIME_ENVIRONMENT_VALUES.HTTP_PORT,
     description: 'the port the binary must listen on',
   },
   PUBLIC_IPV4: {
-    name: `${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`,
+    name: RUNTIME_ENVIRONMENT_VALUES.PUBLIC_IPV4,
     description: 'the address it is reached at',
   },
 } as const;
@@ -63,21 +61,11 @@ export const EXTRA_PUBLIC_PORT_VALUES = [
   RUNTIME_VALUES.PUBLIC_IPV4,
 ] as const;
 
-const OFFERED = RUNTIME_VALUE_NAMES.join('|');
 const NEEDS_A_PORT = EXTRA_PUBLIC_PORT_VALUES.map((value) => value.name).join('|');
-const NAME_CHARACTER = '[A-Za-z0-9_]';
 
-// Match the guest's complete reference syntax so secrets with bare names or unmatched
-// braces remain literal. Complete references to unavailable names still fail validation.
-export const TENANT_VALUE_PATTERN = [
-  '^(?:',
-  '[^$]',
-  `|\\$(?!\\{${RUNTIME_VALUE_PREFIX}${NAME_CHARACTER}*\\})`,
-  `|\\$\\{(?:${OFFERED})\\}`,
-  ')*$',
-].join('');
+const TENANT_VALUE_PATTERN = Object.values(TenantEnvironmentSchema.patternProperties)[0]!.pattern;
 
-const TENANT_VALUE = new RegExp(TENANT_VALUE_PATTERN);
+const TENANT_VALUE = new RegExp(TENANT_VALUE_PATTERN!);
 
 /**
  * Whether every runtime value `value` names is one the guest offers, which most values name none

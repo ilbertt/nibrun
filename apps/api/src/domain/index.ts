@@ -8,6 +8,8 @@ export {
   CRON_TIME_ZONE,
   CronJobIdSchema,
   type CronListing,
+  type CronRunId,
+  CronRunIdSchema,
   DIRECTORY_ENTRY_LIMIT,
   type DirectoryListing,
   type ExportState,
@@ -29,7 +31,14 @@ export {
   SecretStringSchema,
   type Sha256Digest,
   Sha256DigestSchema,
+  TENANT_LOG_STREAMS,
   type TenantArguments,
+  type TenantEnvironment,
+  TenantEnvironmentSchema,
+  type TenantLogRecord,
+  TenantLogRecordSchema,
+  type TenantLogStream,
+  TenantLogStreamSchema,
   TimestampSchema,
 } from '@repo/protocol';
 export { AssertError, Value } from '@sinclair/typebox/value';
@@ -78,18 +87,14 @@ export {
   requiredDomainDnsRecords,
 } from '#domain/dns.ts';
 export {
-  type TenantEnvironment,
   type TenantEnvironmentPatch,
   TenantEnvironmentPatchSchema,
-  TenantEnvironmentSchema,
 } from '#domain/environment.ts';
 export { type Export, ExportSchema } from '#domain/export.ts';
 export { type Host, HostSchema } from '#domain/host.ts';
 export {
   type ArtifactId,
   ArtifactIdSchema,
-  type CronRunId,
-  CronRunIdSchema,
   type ImportId,
   ImportIdSchema,
   type OwnerId,
@@ -99,18 +104,12 @@ export { type Import, ImportSchema } from '#domain/import.ts';
 export {
   DEFAULT_LOG_TIMERANGE,
   LOG_SOURCES,
-  LOG_STREAM_FIELDS,
   LOG_TIMERANGE_PATTERN,
   type LogSource,
   LogSourceSchema,
   type LogTimerange,
   LogTimerangeSchema,
   SeenTenantLogs,
-  TENANT_LOG_STREAMS,
-  type TenantLogRecord,
-  TenantLogRecordSchema,
-  type TenantLogStream,
-  TenantLogStreamSchema,
 } from '#domain/log.ts';
 export {
   EXTRA_PUBLIC_PORT_VALUES,

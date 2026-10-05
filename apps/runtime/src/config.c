@@ -342,7 +342,7 @@ static bool names_key(const struct reference *reference, const char *key) {
  * reference and the variable exported beside it cannot disagree. `*out` is NULL for a
  * name this runtime offers but this instance was not given.
  *
- * Mirrored by RUNTIME_VALUE_NAMES in apps/api/src/domain/runtime-values.ts, which refuses a deploy naming
+ * Mirrored by RUNTIME_ENVIRONMENT_VALUES in packages/protocol, which refuses a deploy naming
  * anything else — so what reaches this is a value written before that rule, or by
  * something that never passed through it. */
 static bool reference_value(const struct instance_config *config, const struct reference *reference,

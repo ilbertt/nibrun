@@ -366,6 +366,20 @@ describe('version skew', () => {
  * instead, and `nibrun.app_config_environment` says the same thing in SQL.
  */
 describe('secret validation', () => {
+  test('desired state validates runtime references before the guest receives them', () => {
+    const state = desiredState();
+    const instance = state.instances[0]!;
+    instance.config.environment = {
+      CALLBACK_URL: Value.Parse(SecretStringSchema, `https://\${NIBRUN_HOSTNAME}/callback`),
+    };
+    expect(isValidMessage({ schema: HostDesiredStateSchema, value: state })).toBe(true);
+
+    instance.config.environment = {
+      CALLBACK_URL: Value.Parse(SecretStringSchema, `https://\${NIBRUN_HSOTNAME}/callback`),
+    };
+    expect(isValidMessage({ schema: HostDesiredStateSchema, value: state })).toBe(false);
+  });
+
   test('a validation failure never carries the offending value into its message', () => {
     const state = desiredState();
     // Cast rather than parsed: the value has to violate the schema for the rejection this test

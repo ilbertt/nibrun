@@ -1,10 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_INSTANCE_RESOURCES } from '@repo/api/domain';
 import { AppIdSchema, type InstanceState, Value } from '@repo/protocol';
 import { committedResources, guestMemoryMib, memoryShortfallMib } from '#lib/report/capacity.ts';
-import { instanceRecord } from '#tests/support/fixtures.ts';
+import { instanceRecord, RESOURCES_FIXTURE } from '#tests/support/fixtures.ts';
 
-const APP_MEMORY_MIB = DEFAULT_INSTANCE_RESOURCES.memoryMib;
+const APP_MEMORY_MIB = RESOURCES_FIXTURE.memoryMib;
 const NEIGHBOURS_THAT_FIT = 3;
 const HOST_MEMORY_MIB = APP_MEMORY_MIB * (NEIGHBOURS_THAT_FIT + 1);
 
@@ -21,7 +20,7 @@ function shortfall({ count, state }: { count: number; state: InstanceState }) {
   return memoryShortfallMib({
     hostMemoryMib: HOST_MEMORY_MIB,
     committed: committedResources(neighbours({ count, state })),
-    wanted: DEFAULT_INSTANCE_RESOURCES,
+    wanted: RESOURCES_FIXTURE,
   });
 }
 
@@ -97,7 +96,7 @@ describe('memory the host needs is not memory a guest may be given', () => {
       memoryShortfallMib({
         hostMemoryMib: available,
         committed: committedResources(neighbours({ count: fits, state: 'running' })),
-        wanted: DEFAULT_INSTANCE_RESOURCES,
+        wanted: RESOURCES_FIXTURE,
       }),
     ).toBeGreaterThan(0);
   });

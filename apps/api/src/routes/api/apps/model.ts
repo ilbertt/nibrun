@@ -4,11 +4,12 @@ import {
   ByteSizeSchema,
   ComputeUsageSchema,
   FilesystemUsageSchema,
+  TenantEnvironmentSchema,
   TimestampSchema,
 } from '@repo/protocol';
 import { t } from 'elysia';
 import { AppHostnameStateSchema, AppNameSchema, AppSchema, MIN_HOSTNAMES } from '#domain/app.ts';
-import { TenantEnvironmentPatchSchema, TenantEnvironmentSchema } from '#domain/environment.ts';
+import { TenantEnvironmentPatchSchema } from '#domain/environment.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 
 // Which variables are set, never what they hold: the values are sealed in the database and only

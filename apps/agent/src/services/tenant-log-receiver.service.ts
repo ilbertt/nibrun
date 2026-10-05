@@ -1,7 +1,6 @@
 import { FileSystem, Path, type Socket } from '@effect/platform';
 import { BunSocketServer } from '@effect/platform-bun';
-import type { TenantLogStream } from '@repo/api/domain';
-import type { AppId } from '@repo/protocol';
+import type { AppId, TenantLogStream } from '@repo/protocol';
 import { Deferred, Effect, Either, Exit, Ref, Scope } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { decodeFrames, EMPTY_BUFFER, type GuestLogFrame } from '#lib/logs/guest-protocol.ts';

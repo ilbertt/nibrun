@@ -1,14 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  CronRunIdSchema,
-  LOG_STREAM_FIELDS,
-  SeenTenantLogs,
-  TenantLogRecordSchema,
-} from '@repo/api/domain';
-import { CronJobIdSchema, Value } from '@repo/protocol';
+import { CronJobIdSchema, CronRunIdSchema, TenantLogRecordSchema, Value } from '@repo/protocol';
 import { Effect } from 'effect';
 import type { TenantLogEvent } from '#lib/logs/event.ts';
-import { makeLogStoreClient } from '#lib/logs/store-client.ts';
+import { LOG_STREAM_FIELDS, makeLogStoreClient } from '#lib/logs/store-client.ts';
 import { HOST_ID, tenantLogEvent } from '#tests/support/fixtures.ts';
 import { runScoped } from '#tests/support/run.ts';
 import { recordingServer } from '#tests/support/server.ts';
@@ -83,15 +77,15 @@ describe('cron context in tenant log uploads', () => {
         return server.received;
       }),
     );
-    const seen = new SeenTenantLogs();
-    const admitted = requests.flatMap((request) =>
+    const uploads = requests.map((request) =>
       request.body
         .trim()
         .split('\n')
-        .map((line) => Value.Parse(TenantLogRecordSchema, JSON.parse(line)))
-        .filter((record) => seen.admit(record)),
+        .map((line) => Value.Parse(TenantLogRecordSchema, JSON.parse(line))),
     );
-    expect(admitted).toHaveLength(2);
-    expect(admitted.map((record) => record.cronRunId)).toEqual([CRON_RUN_ID, CRON_RUN_ID]);
+    expect(uploads).toHaveLength(2);
+    expect(uploads[0]).toHaveLength(2);
+    expect(uploads[0]).toEqual(uploads[1]);
+    expect(uploads[0]?.map((record) => record.cronRunId)).toEqual([CRON_RUN_ID, CRON_RUN_ID]);
   });
 });

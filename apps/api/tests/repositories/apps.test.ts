@@ -9,6 +9,7 @@ import {
   ObjectKeySchema,
   Sha256DigestSchema,
   type TenantEnvironment,
+  TenantEnvironmentSchema,
   type Timestamp,
   TimestampSchema,
   Value,
@@ -16,7 +17,7 @@ import {
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { AppNameSchema, OWNED_APP_STATES } from '#domain/app.ts';
-import { TenantEnvironmentSchema } from '#domain/environment.ts';
+
 import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#domain/identifiers.ts';
 import { DnsLabelSchema } from '#domain/wire.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';

@@ -8,9 +8,11 @@ agent socket (see `@repo/protocol`).
 
 Bun + Elysia service.
 
-`src/domain/` owns public models, defaults, configuration validation and the log-store contract.
+`src/domain/` owns public models, defaults, owner-only validation, log queries and deduplication.
 Its `index.ts`, exported as `@repo/api/domain`, is safe for clients and contains no server setup.
-Reuse wire schemas from `@repo/protocol` where public responses carry the same values.
+Reuse wire schemas from `@repo/protocol` where public responses carry the same values. Shared
+environment validation and agent-produced tenant log records belong to protocol. The agent may
+not import `@repo/api/domain`; neither app imports the other app to share runtime code.
 
 ## Layering (keep strict)
 

@@ -1,7 +1,16 @@
-import { LOG_STREAM_FIELDS } from '@repo/api/domain';
 import type { HostId } from '@repo/protocol';
 import { Data, Effect } from 'effect';
 import { type TenantLogEvent, tenantLogRecord } from '#lib/logs/event.ts';
+
+/**
+ * The fields that identify a record's stream, and the only ones that may.
+ *
+ * The store indexes every field, so filtering on any of them is cheap — but these form the stream
+ * key, and a stream is meant to be long-lived. Instance and deployment ids are deliberately
+ * absent: they change on every deploy, so naming them here would mint a new stream per release
+ * and never stop.
+ */
+export const LOG_STREAM_FIELDS = ['hostId', 'SOURCE', 'appId'] as const;
 
 const INSERT_PATH = '/insert/jsonline';
 /** The store's own name for newline-delimited JSON; it does not answer to x-ndjson here. */
