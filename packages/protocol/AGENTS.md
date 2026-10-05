@@ -34,8 +34,9 @@ The directory names describe how the contract is organized:
 | Concern | Owner |
 | --- | --- |
 | Public API resource models, owner IDs, app names, app/deployment lifecycle states | `apps/api/src/domain/` |
-| DNS records, DNS construction, and domain verification | `apps/api/src/domain/` |
-| Configuration defaults, runtime reference metadata, and owner input validation | `apps/api/src/domain/` |
+| DNS record schemas and construction | `apps/api/src/domain/` |
+| Configuration defaults, runtime reference metadata, and shared owner input validation schemas | `apps/api/src/domain/` |
+| API business policy and domain verification | `apps/api/src/lib/` and `apps/api/src/services/` |
 | Log-store record schemas, log query schemas, and log deduplication | `apps/api/src/domain/` |
 | Guest protocols, cron registrations, crontab parsing, and persisted cron tables | `apps/agent/src/lib/` |
 | Reconciliation, cron dispatch, probe execution, and host mechanics | `apps/agent/src/lib/` and `apps/agent/src/services/` |
