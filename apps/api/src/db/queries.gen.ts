@@ -648,6 +648,33 @@ export interface ISelectCachedBinaryResult {
     original_file_name: ICachedBinariesColumns["original_file_name"];
 }
 
+/** Result of query `InsertDeployKey`. */
+export interface IInsertDeployKeyResult {
+    id: IDeployKeysColumns["id"];
+    app_id: IDeployKeysColumns["app_id"];
+    name: IDeployKeysColumns["name"];
+    /** Canonical OpenSSH public key without a comment or authorized_keys options. */
+    public_key: IDeployKeysColumns["public_key"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `SelectDeployKeysByApp`. */
+export interface ISelectDeployKeysByAppResult {
+    id: IDeployKeysColumns["id"];
+    app_id: IDeployKeysColumns["app_id"];
+    name: IDeployKeysColumns["name"];
+    /** Canonical OpenSSH public key without a comment or authorized_keys options. */
+    public_key: IDeployKeysColumns["public_key"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `DeleteDeployKey`. */
+export interface IDeleteDeployKeyResult {
+    id: IDeployKeysColumns["id"];
+}
+
 /** Result of query `SelectDeployableArtifact`. */
 export interface ISelectDeployableArtifactResult {
     id: IArtifactsColumns["id"];
@@ -1073,6 +1100,9 @@ export interface Queries {
     SelectArtifactsByApp: ISelectArtifactsByAppResult;
     SelectArtifactById: ISelectArtifactByIdResult;
     SelectCachedBinary: ISelectCachedBinaryResult;
+    InsertDeployKey: IInsertDeployKeyResult;
+    SelectDeployKeysByApp: ISelectDeployKeysByAppResult;
+    DeleteDeployKey: IDeleteDeployKeyResult;
     SelectDeployableArtifact: ISelectDeployableArtifactResult;
     InsertDeployment: IInsertDeploymentResult;
     SelectDeploymentToReplay: ISelectDeploymentToReplayResult;
