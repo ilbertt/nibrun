@@ -979,6 +979,38 @@ export interface ISelectSpentImportsResult {
 export interface IForgetImportObjectResult {
 }
 
+/** Result of query `InsertSqliteConnection`. */
+export interface IInsertSqliteConnectionResult {
+    id: ISqliteConnectionsColumns["id"];
+    app_id: ISqliteConnectionsColumns["app_id"];
+    sqlite_file_path: ISqliteConnectionsColumns["sqlite_file_path"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `SelectSqliteConnectionsByApp`. */
+export interface ISelectSqliteConnectionsByAppResult {
+    id: ISqliteConnectionsColumns["id"];
+    app_id: ISqliteConnectionsColumns["app_id"];
+    sqlite_file_path: ISqliteConnectionsColumns["sqlite_file_path"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `SelectSqliteConnectionById`. */
+export interface ISelectSqliteConnectionByIdResult {
+    id: ISqliteConnectionsColumns["id"];
+    app_id: ISqliteConnectionsColumns["app_id"];
+    sqlite_file_path: ISqliteConnectionsColumns["sqlite_file_path"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `DeleteSqliteConnection`. */
+export interface IDeleteSqliteConnectionResult {
+    id: ISqliteConnectionsColumns["id"];
+}
+
 export interface Queries {
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
@@ -1068,6 +1100,10 @@ export interface Queries {
     DeleteAbandonedImport: IDeleteAbandonedImportResult;
     SelectSpentImports: ISelectSpentImportsResult;
     ForgetImportObject: IForgetImportObjectResult;
+    InsertSqliteConnection: IInsertSqliteConnectionResult;
+    SelectSqliteConnectionsByApp: ISelectSqliteConnectionsByAppResult;
+    SelectSqliteConnectionById: ISelectSqliteConnectionByIdResult;
+    DeleteSqliteConnection: IDeleteSqliteConnectionResult;
 }
 
 /** Columns of `account`. */
@@ -1744,6 +1780,24 @@ export interface IPurgeableAppsTable {
     constraints: keyof (typeof schema)["purgeable_apps"]["_constraints"];
 }
 
+/** Columns of `sqlite_connections`. */
+export interface ISqliteConnectionsColumns {
+    id: import("#lib/api/identifiers.ts").SqliteConnectionId;
+    app_id: import("@repo/protocol").AppId;
+    sqlite_file_path: import("@repo/protocol").GuestPath;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+}
+
+/** Schema of `sqlite_connections`. */
+export interface ISqliteConnectionsTable {
+    columns: ISqliteConnectionsColumns;
+    relationType: (typeof schema)["sqlite_connections"]["_relationType"];
+    indexes: keyof (typeof schema)["sqlite_connections"]["_indexes"];
+    constraints: keyof (typeof schema)["sqlite_connections"]["_constraints"];
+}
+
 export const schema = {
     account: {
         _relationName: "account",
@@ -2383,6 +2437,25 @@ export const schema = {
         },
         _indexes: {},
         _constraints: {}
+    },
+    sqlite_connections: {
+        _relationName: "sqlite_connections",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { sqlite_connections_app_id_fkey: { _constraintName: "sqlite_connections_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            sqlite_file_path: { _columnName: "sqlite_file_path", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+        },
+        _indexes: {
+            sqlite_connections_app_id_idx: { _indexName: "sqlite_connections_app_id_idx" },
+            sqlite_connections_pkey: { _indexName: "sqlite_connections_pkey" }
+        },
+        _constraints: {
+            sqlite_connections_app_id_fkey: { _constraintName: "sqlite_connections_app_id_fkey" },
+            sqlite_connections_pkey: { _constraintName: "sqlite_connections_pkey" }
+        }
     }
 } as const;
 
@@ -2416,6 +2489,7 @@ export interface Tables {
     live_apps: ILiveAppsTable;
     profiles: IProfilesTable;
     purgeable_apps: IPurgeableAppsTable;
+    sqlite_connections: ISqliteConnectionsTable;
 }
 
 declare module "@ilbertt/bun-sqlgen" {

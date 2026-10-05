@@ -12,3 +12,8 @@ export type ImportId = Identifier<'ImportId'>;
 export const ImportIdSchema = identifierSchema<ImportId>(
   'One uploaded archive an app can be given as its starting data.',
 );
+
+export type SqliteConnectionId = Identifier<'SqliteConnectionId'>;
+export const SqliteConnectionIdSchema = identifierSchema<SqliteConnectionId>(
+  'One saved database connection.',
+);
