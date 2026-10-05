@@ -1,4 +1,4 @@
-import { DEFAULT_LOG_TIMERANGE } from '@repo/api/schemas/log-query';
+import { DEFAULT_LOG_TIMERANGE } from '@repo/api/lib/api/log-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { DeploymentLogs } from '#components/logs/deployment-logs.tsx';
 import { isLogTimerangeChoice, type LogTimerangeChoice } from '#lib/log-timeranges.ts';

@@ -1,4 +1,4 @@
-import type { AppState } from '@repo/api/schemas/app';
+import type { AppState } from '@repo/api/lib/api/app';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
 

@@ -1,5 +1,5 @@
+import { APP_HOSTNAME_STATES } from '@repo/api/lib/api/app';
 import { CNAME_RECORD_TYPE } from '@repo/api/lib/dns-records';
-import { APP_HOSTNAME_STATES } from '@repo/api/schemas/app';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { addDomain, appById, appFor, checkDomainDns, removeDomain } from '@repo/app-operations';
 import { APP_HOSTNAME_KINDS } from '@repo/protocol/schemas/app';

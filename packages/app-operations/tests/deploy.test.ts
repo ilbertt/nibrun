@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import type { Artifact } from '@repo/api/schemas/artifact';
+import type { Artifact } from '@repo/api/lib/api/artifact';
 import type { PublicApiClient } from '@repo/api-client/public';
 import type { Filename, Sha256Digest } from '@repo/protocol/lib/wire';
 import { MAX_IMPORT_SIZE_BYTES } from '#archive.ts';

@@ -1,4 +1,4 @@
-import type { OwnedAppState } from '@repo/api/schemas/app';
+import type { OwnedAppState } from '@repo/api/lib/api/app';
 import { type AppOperation, resumeApp, suspendApp } from '@repo/app-operations';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';

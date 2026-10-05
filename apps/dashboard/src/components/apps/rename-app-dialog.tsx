@@ -1,4 +1,4 @@
-import { AppNameSchema } from '@repo/api/schemas/app';
+import { AppNameSchema } from '@repo/api/lib/api/app';
 import { Button } from '@repo/ui/components/button';
 import {
   Dialog,

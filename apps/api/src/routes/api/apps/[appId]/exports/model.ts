@@ -1,5 +1,5 @@
 import { t } from 'elysia';
-import { ExportSchema } from '#schemas/export.ts';
+import { ExportSchema } from '#lib/api/export.ts';
 
 /**
  * `objectKey` is dropped and a signed URL put in its place: where the bundle sits is this end's

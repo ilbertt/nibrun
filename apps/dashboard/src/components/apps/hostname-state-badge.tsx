@@ -1,4 +1,4 @@
-import type { AppHostnameState } from '@repo/api/schemas/app';
+import type { AppHostnameState } from '@repo/api/lib/api/app';
 import { Badge } from '@repo/ui/components/badge';
 import type { ComponentProps } from 'react';
 

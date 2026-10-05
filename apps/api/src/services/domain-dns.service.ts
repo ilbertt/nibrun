@@ -1,4 +1,5 @@
 import type { AppId, Hostname } from '@repo/protocol';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import {
   dnsName,
   type RequiredDomainDnsRecord,
@@ -8,7 +9,6 @@ import type { DomainDnsRecord } from '#lib/domain-dns.ts';
 import { NotFoundError } from '#lib/errors.ts';
 import type { AppHostnamesRepositoryContract } from '#repositories/app-hostnames.repository.ts';
 import type { DnsRepositoryContract } from '#repositories/dns.repository.ts';
-import type { OwnerId } from '#schemas/identifiers.ts';
 import { Service } from '#services/service.ts';
 
 export type DomainDnsHostnamesRepositoryContract = Pick<

@@ -26,9 +26,9 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
   `apps/api/src/lib/dns-records.ts`. Consumers and fixtures use those definitions
   and render record names and targets rather than reconstructing them.
 - `@repo/protocol` owns only API–agent messages and their wire schemas. Public API
-  resource schemas and derived types belong to `apps/api/src/schemas/`; API defaults and
+  resource schemas and derived types belong to `apps/api/src/lib/api/`; API defaults and
   helpers belong to `apps/api/src/lib/`. Import each definition from its owning file,
-  such as `@repo/api/schemas/app` or `@repo/api/lib/runtime-values`; do not add API barrels.
+  such as `@repo/api/lib/api/app` or `@repo/api/lib/runtime-values`; do not add API barrels.
   Protocol values used by public consumers are imported from their defining protocol files.
   Shared environment validation and agent-to-API tenant log messages stay in protocol.
   Neither app imports the other app; the agent must not depend on `@repo/api`, including in

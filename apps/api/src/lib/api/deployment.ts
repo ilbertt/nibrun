@@ -10,7 +10,7 @@ import {
   TimestampSchema,
 } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
-import { ArtifactIdSchema } from '#schemas/identifiers.ts';
+import { ArtifactIdSchema } from '#lib/api/identifiers.ts';
 
 // `stopped` is the one an owner puts a release into and takes it back out of: a suspended app's
 // microVM is down and the release is still the app's current one, which is a different thing from

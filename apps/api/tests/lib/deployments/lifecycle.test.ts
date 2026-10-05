@@ -6,8 +6,8 @@ import {
   type ReportedInstance,
   Value,
 } from '@repo/protocol';
+import type { DeploymentState } from '#lib/api/deployment.ts';
 import { DeploymentLifecycle, STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
-import type { DeploymentState } from '#schemas/deployment.ts';
 
 const APP_ID = Value.Parse(AppIdSchema, 'app-1');
 const DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'deployment-1');

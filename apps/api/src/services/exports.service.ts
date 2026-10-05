@@ -1,10 +1,10 @@
 import type { AppId, ExportId, HostReportedState } from '@repo/protocol';
+import type { Export } from '#lib/api/export.ts';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { ExportStorageRepositoryContract } from '#repositories/export-storage.repository.ts';
 import type { ExportRow, ExportsRepositoryContract } from '#repositories/exports.repository.ts';
-import type { Export } from '#schemas/export.ts';
-import type { OwnerId } from '#schemas/identifiers.ts';
 import type { AppOwnershipRepositoryContract } from '#services/artifacts.service.ts';
 import { Service } from '#services/service.ts';
 

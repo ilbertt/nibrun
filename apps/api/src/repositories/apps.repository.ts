@@ -8,13 +8,13 @@ import type {
   ObjectKey,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import { APP_STATES, type AppHostnameState, type AppName, type AppState } from '#lib/api/app.ts';
+import type { DnsLabel } from '#lib/api/dns-label.ts';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
-import { APP_STATES, type AppHostnameState, type AppName, type AppState } from '#schemas/app.ts';
-import type { DnsLabel } from '#schemas/dns-label.ts';
-import type { OwnerId } from '#schemas/identifiers.ts';
 
 export type AppRow = Queries['SelectAppById'];
 

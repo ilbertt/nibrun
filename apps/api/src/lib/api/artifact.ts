@@ -7,7 +7,7 @@ import {
   TimestampSchema,
 } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
-import { ArtifactIdSchema } from '#schemas/identifiers.ts';
+import { ArtifactIdSchema } from '#lib/api/identifiers.ts';
 
 // The digest is what the agent verifies after pulling, so it is the artifact's identity as
 // far as a host is concerned; the key is only where to find the bytes.

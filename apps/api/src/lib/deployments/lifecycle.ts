@@ -1,5 +1,5 @@
 import type { ReportedInstance } from '@repo/protocol';
-import type { DeploymentState } from '#schemas/deployment.ts';
+import type { DeploymentState } from '#lib/api/deployment.ts';
 
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;

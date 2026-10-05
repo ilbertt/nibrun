@@ -1,5 +1,5 @@
-import { AppNameSchema } from '@repo/api/schemas/app';
-import type { TenantEnvironmentPatch } from '@repo/api/schemas/environment';
+import { AppNameSchema } from '@repo/api/lib/api/app';
+import type { TenantEnvironmentPatch } from '@repo/api/lib/api/environment';
 import { ApiError } from '@repo/api-client/unwrap';
 import { HttpPortSchema } from '@repo/protocol/lib/wire';
 import type { TenantArguments } from '@repo/protocol/schemas/app';

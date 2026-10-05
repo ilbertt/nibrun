@@ -8,14 +8,14 @@ import {
   Sha256DigestSchema,
   Value,
 } from '@repo/protocol';
+import type { ImportId, OwnerId } from '#lib/api/identifiers.ts';
+import type { Import } from '#lib/api/import.ts';
 import { isAppDataArchive, OPENING_BYTES } from '#lib/archive/app-data.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type { ImportRow, ImportsRepositoryContract } from '#repositories/imports.repository.ts';
-import type { ImportId, OwnerId } from '#schemas/identifiers.ts';
-import type { Import } from '#schemas/import.ts';
 import { Service } from '#services/service.ts';
 
 const NO_SUCH_APP = 'App not found.';

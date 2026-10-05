@@ -1,4 +1,4 @@
-import type { ImportId } from '@repo/api/schemas/identifiers';
+import type { ImportId } from '@repo/api/lib/api/identifiers';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import type { Filename } from '@repo/protocol/lib/wire';

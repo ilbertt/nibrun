@@ -1,5 +1,5 @@
 import { defineCommand } from '@parshjs/core';
-import { DEFAULT_LOG_TIMERANGE, LOG_TIMERANGE_PATTERN } from '@repo/api/schemas/log-query';
+import { DEFAULT_LOG_TIMERANGE, LOG_TIMERANGE_PATTERN } from '@repo/api/lib/api/log-query';
 import { z } from 'zod';
 import { SHARED_OPTIONS } from '#config.ts';
 import { announcedDeployment, selectApp, stillWriting } from '#lib/apps.ts';

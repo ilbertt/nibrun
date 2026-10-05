@@ -1,12 +1,12 @@
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap, t } from 'elysia';
+import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   AddHostnameRequestSchema,
   RemoveHostnameQuerySchema,
 } from '#routes/api/apps/[appId]/hostnames/model.ts';
 import { AppHostnameResponseSchema } from '#routes/api/apps/model.ts';
-import { OwnerIdSchema } from '#schemas/identifiers.ts';
 import { AuthPlugin, HostnamesServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdHostnamesController = new Elysia()

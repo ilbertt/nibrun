@@ -9,8 +9,8 @@ import {
   TimestampSchema,
 } from '@repo/protocol';
 import { type TString, Type } from '@sinclair/typebox';
-import { DnsLabelSchema } from '#schemas/dns-label.ts';
-import { OwnerIdSchema } from '#schemas/identifiers.ts';
+import { DnsLabelSchema } from '#lib/api/dns-label.ts';
+import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 
 // An app is always reachable at the hostname nibrun issued it, so every list of them has one.
 // Exported because the api narrows this array for its own response and would otherwise restate

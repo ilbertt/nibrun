@@ -13,6 +13,13 @@ import {
   TimestampSchema,
   Value,
 } from '@repo/protocol';
+import { ArtifactSchema } from '#lib/api/artifact.ts';
+import {
+  type ArtifactId,
+  ArtifactIdSchema,
+  type OwnerId,
+  OwnerIdSchema,
+} from '#lib/api/identifiers.ts';
 import { MAX_EXPANSION } from '#lib/archive/walk.ts';
 import {
   BadRequestError,
@@ -43,13 +50,6 @@ import type {
   PublishedDigest,
   ReleaseDigestRepositoryContract,
 } from '#repositories/release-digest.repository.ts';
-import { ArtifactSchema } from '#schemas/artifact.ts';
-import {
-  type ArtifactId,
-  ArtifactIdSchema,
-  type OwnerId,
-  OwnerIdSchema,
-} from '#schemas/identifiers.ts';
 import {
   type AppOwnershipRepositoryContract,
   ArtifactsService,

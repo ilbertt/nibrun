@@ -36,10 +36,10 @@ The directory names describe how the contract is organized:
 
 | Concern | Owner |
 | --- | --- |
-| Public API resource schemas, owner IDs, app names, app/deployment lifecycle states | `apps/api/src/schemas/` |
+| Public API resource schemas, owner IDs, app names, app/deployment lifecycle states | `apps/api/src/lib/api/` |
 | DNS record schemas and construction | `apps/api/src/lib/dns-records.ts` |
 | Configuration defaults and runtime reference descriptions | `apps/api/src/lib/` |
-| Owner-only input schemas and log query schemas | `apps/api/src/schemas/` |
+| Owner-only input schemas and log query schemas | `apps/api/src/lib/api/` |
 | API business policy and domain verification | `apps/api/src/lib/` and `apps/api/src/services/` |
 | Log deduplication | `apps/api/src/lib/seen-tenant-logs.ts` |
 | Log-store publishing and stream indexing, guest protocols, cron registrations, crontab parsing, and persisted cron tables | `apps/agent/src/lib/` |
@@ -64,7 +64,7 @@ Protocol must not depend on either app, and API must not import agent implementa
 Biome enforces the agent-to-API import boundary.
 
 Public consumers import API resource schemas and pure helpers from their defining files, such
-as `@repo/api/schemas/app` and `@repo/api/lib/runtime-values`. When a public response carries
+as `@repo/api/lib/api/app` and `@repo/api/lib/runtime-values`. When a public response carries
 protocol values, import their defining files directly, such as `@repo/protocol/schemas/cron`
 or `@repo/protocol/control/tenant-log`; do not hide their ownership behind API re-exports.
 This reuse does not make public API policy part of protocol. Do not duplicate field definitions,

@@ -1,8 +1,8 @@
 import { DeploymentIdSchema } from '@repo/protocol';
 import { t } from 'elysia';
+import { DeploymentSchema } from '#lib/api/deployment.ts';
+import { ArtifactIdSchema, ImportIdSchema } from '#lib/api/identifiers.ts';
 import { PublicAppConfigSchema } from '#routes/api/apps/model.ts';
-import { DeploymentSchema } from '#schemas/deployment.ts';
-import { ArtifactIdSchema, ImportIdSchema } from '#schemas/identifiers.ts';
 
 /**
  * An artifact to run, or a release to go back to — never both and never neither. A union rather

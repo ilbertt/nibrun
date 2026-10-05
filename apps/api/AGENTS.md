@@ -8,9 +8,9 @@ agent socket (see `@repo/protocol`).
 
 Bun + Elysia service.
 
-`src/schemas/` contains public resource schemas and their derived types. Defaults, DNS record
+`src/lib/api/` contains public resource schemas and their derived types. Defaults, DNS record
 construction, runtime reference descriptions, redaction and log deduplication live in `src/lib/`.
-Consumers import the defining file directly (`@repo/api/schemas/app`,
+Consumers import the defining file directly (`@repo/api/lib/api/app`,
 `@repo/api/lib/runtime-values`), never an API schema/helper barrel. Export only pure helpers
 needed by public consumers; server setup and clients remain private.
 

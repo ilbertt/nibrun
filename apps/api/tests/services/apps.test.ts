@@ -19,6 +19,10 @@ import {
 } from '@repo/protocol';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
+import { type AppName, AppNameSchema, type AppState, OWNED_APP_STATES } from '#lib/api/app.ts';
+import { type DnsLabel, DnsLabelSchema } from '#lib/api/dns-label.ts';
+import { type TenantEnvironmentPatch, TenantEnvironmentPatchSchema } from '#lib/api/environment.ts';
+import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import type { NewAppConfig, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import {
   BadRequestError,
@@ -45,10 +49,6 @@ import type {
   SealedAppPatch,
   StateChange,
 } from '#repositories/apps.repository.ts';
-import { type AppName, AppNameSchema, type AppState, OWNED_APP_STATES } from '#schemas/app.ts';
-import { type DnsLabel, DnsLabelSchema } from '#schemas/dns-label.ts';
-import { type TenantEnvironmentPatch, TenantEnvironmentPatchSchema } from '#schemas/environment.ts';
-import { type OwnerId, OwnerIdSchema } from '#schemas/identifiers.ts';
 import {
   type AppHostnameAccessRepositoryContract,
   AppsService,

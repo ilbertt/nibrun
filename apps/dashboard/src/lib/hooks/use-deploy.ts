@@ -1,5 +1,5 @@
 import { analyticsIdentityState, trackEvent } from '@repo/analytics';
-import type { TenantEnvironmentPatch } from '@repo/api/schemas/environment';
+import type { TenantEnvironmentPatch } from '@repo/api/lib/api/environment';
 import {
   awaitDeploymentSettled,
   type DeployableBinary,

@@ -1,4 +1,4 @@
-import { DEFAULT_LOG_TIMERANGE } from '@repo/api/schemas/log-query';
+import { DEFAULT_LOG_TIMERANGE } from '@repo/api/lib/api/log-query';
 import { GUEST_PATH_ROOT } from '@repo/protocol/schemas/filesystem';
 import { Tabs, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
 import { Link } from '@tanstack/react-router';

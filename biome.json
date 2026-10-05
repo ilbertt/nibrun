@@ -237,7 +237,7 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "@repo/protocol": "Import protocol values from their defining schema or helper file, and API definitions from @repo/api/schemas/* or the owning API helper."
+                  "@repo/protocol": "Import protocol values from their defining schema or helper file, and API definitions from @repo/api/lib/api/* or the owning API helper."
                 }
               }
             }

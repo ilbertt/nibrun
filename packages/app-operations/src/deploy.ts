@@ -1,5 +1,5 @@
-import { AppNameSchema } from '@repo/api/schemas/app';
-import type { DeploymentState } from '@repo/api/schemas/deployment';
+import { AppNameSchema } from '@repo/api/lib/api/app';
+import type { DeploymentState } from '@repo/api/lib/api/deployment';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import type { Filename, Sha256Digest } from '@repo/protocol/lib/wire';

@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test';
 import { AppIdSchema, HostnameSchema, Value } from '@repo/protocol';
+import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { certificateValidationName, requiredDomainDnsRecords } from '#lib/dns-records.ts';
 import { NotFoundError } from '#lib/errors.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import type { DnsRepositoryContract } from '#repositories/dns.repository.ts';
-import { OwnerIdSchema } from '#schemas/identifiers.ts';
 import { DomainDnsService } from '#services/domain-dns.service.ts';
 
 const OWNED_APP = {

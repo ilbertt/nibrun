@@ -1,4 +1,5 @@
 import { AppIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
+import { ArtifactIdSchema, ImportIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import {
   DEFAULT_HEALTH_CHECK,
@@ -12,7 +13,6 @@ import type {
   DeploymentLookupRepositoryContract,
   DeploymentRow,
 } from '#repositories/deployments.repository.ts';
-import { ArtifactIdSchema, ImportIdSchema, OwnerIdSchema } from '#schemas/identifiers.ts';
 
 export const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-1');
 export const OTHER_OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-2');

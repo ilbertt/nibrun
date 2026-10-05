@@ -13,6 +13,7 @@ import {
   VolumeIdSchema,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
+import type { DeploymentState } from '#lib/api/deployment.ts';
 import type { PublicAppConfig } from '#lib/app-config.ts';
 import {
   DEFAULT_HEALTH_CHECK,
@@ -33,7 +34,6 @@ import type {
   ReportedDeployment,
   RollbackDeploymentInput,
 } from '#repositories/deployments.repository.ts';
-import type { DeploymentState } from '#schemas/deployment.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
 import {
   APP_ID,

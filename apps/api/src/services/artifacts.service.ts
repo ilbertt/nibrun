@@ -7,6 +7,8 @@ import {
   type Sha256Digest,
   Value,
 } from '@repo/protocol';
+import type { Artifact } from '#lib/api/artifact.ts';
+import type { ArtifactId, OwnerId } from '#lib/api/identifiers.ts';
 import { unwrapExecutable } from '#lib/archive/unwrap.ts';
 import {
   ExpandsTooFarError,
@@ -54,8 +56,6 @@ import type {
   PublishedDigest,
   ReleaseDigestRepositoryContract,
 } from '#repositories/release-digest.repository.ts';
-import type { Artifact } from '#schemas/artifact.ts';
-import type { ArtifactId, OwnerId } from '#schemas/identifiers.ts';
 import { Service } from '#services/service.ts';
 
 // An app the caller does not own has to be indistinguishable from one that does not exist: a

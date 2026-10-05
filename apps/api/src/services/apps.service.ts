@@ -8,6 +8,8 @@ import type {
   Timestamp,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
+import { type App, type AppName, OWNED_APP_STATES, type OwnedAppState } from '#lib/api/app.ts';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import {
   type AppConfigPatch,
   configWithDefaults,
@@ -49,8 +51,6 @@ import {
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type { CustomHostnamesRepositoryContract } from '#repositories/custom-hostnames.repository.ts';
 import type { ExportsRepositoryContract } from '#repositories/exports.repository.ts';
-import { type App, type AppName, OWNED_APP_STATES, type OwnedAppState } from '#schemas/app.ts';
-import type { OwnerId } from '#schemas/identifiers.ts';
 import { Service } from '#services/service.ts';
 
 export type PublicApp = Omit<App, 'config' | 'hostnames'> & {

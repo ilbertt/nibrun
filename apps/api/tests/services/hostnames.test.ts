@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, setSystemTime, test } from 'bun:test';
 import { type AppId, AppIdSchema, type Hostname, HostnameSchema, Value } from '@repo/protocol';
+import type { AppHostnameState } from '#lib/api/app.ts';
+import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import type { DcvMethod } from '#lib/app-hostname.ts';
 import { CloudflareError } from '#lib/cloudflare/client.ts';
 import { MS_PER_DAY } from '#lib/duration.ts';
@@ -16,8 +18,6 @@ import {
   type EdgeHostname,
   type EdgeReport,
 } from '#repositories/custom-hostnames.repository.ts';
-import type { AppHostnameState } from '#schemas/app.ts';
-import { type OwnerId, OwnerIdSchema } from '#schemas/identifiers.ts';
 import { ADD_GRACE_MS, HostnamesService } from '#services/hostnames.service.ts';
 
 const APP_HOST_DOMAIN = 'apps.example.com';

@@ -1,5 +1,6 @@
 import type { AppConfig, SecretString, TenantEnvironment } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import type { TenantEnvironmentPatch } from '#lib/api/environment.ts';
 import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
@@ -9,7 +10,6 @@ import {
 } from '#lib/app-config-defaults.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
-import type { TenantEnvironmentPatch } from '#schemas/environment.ts';
 
 // An owner reads which variables are set, never what they hold: the values are sealed in the
 // database and only opened where desired state is built, so there is nothing here to return.

@@ -1,12 +1,12 @@
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
+import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   CreateArtifactBodySchema,
   CreateArtifactResponseSchema,
   ListArtifactsResponseSchema,
 } from '#routes/api/apps/[appId]/artifacts/model.ts';
-import { OwnerIdSchema } from '#schemas/identifiers.ts';
 import { ArtifactsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdArtifactsController = new Elysia()

@@ -1,4 +1,4 @@
-import type { TenantEnvironmentPatch } from '@repo/api/schemas/environment';
+import type { TenantEnvironmentPatch } from '@repo/api/lib/api/environment';
 import { InvalidEnvironmentError, parseEnvironment } from '@repo/app-operations';
 import { UsageError } from '#lib/errors.ts';
 
