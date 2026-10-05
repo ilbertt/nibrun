@@ -22,6 +22,7 @@
         "@effect/platform-bun": "0.91.2",
         "@repo/api-client": "workspace:*",
         "@repo/protocol": "workspace:*",
+        "@repo/sqlite": "workspace:*",
         "@sinclair/typebox": "catalog:",
         "effect": "3.22.1",
       },
