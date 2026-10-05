@@ -258,6 +258,24 @@ export {
   TenantLogStreamSchema,
 } from '#domain/log.ts';
 export {
+  SQLITE_MAX_COLUMNS,
+  SQLITE_MAX_PARAMETERS,
+  SQLITE_MAX_ROWS,
+  SQLITE_MAX_STATEMENT_LENGTH,
+  SQLITE_MAX_VALUE_LENGTH,
+  type SqliteColumn,
+  SqliteColumnSchema,
+  type SqliteDescribeResult,
+  SqliteDescribeResultSchema,
+  SqliteSqlSchema,
+  type SqliteStatement,
+  type SqliteStatementResult,
+  SqliteStatementResultSchema,
+  SqliteStatementSchema,
+  type SqliteValue,
+  SqliteValueSchema,
+} from '#domain/sqlite.ts';
+export {
   DEFAULT_VOLUME_SIZE_BYTES,
   VOLUME_STATES,
   type Volume,
