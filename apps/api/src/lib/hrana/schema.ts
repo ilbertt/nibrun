@@ -78,7 +78,7 @@ const StreamRequestSchema = t.Union([
 ]);
 
 export const HranaPipelineSchema = t.Object({
-  baton: t.Union([t.String({ minLength: 1, maxLength: MAX_BATON_LENGTH }), t.Null()]),
+  baton: t.Optional(t.Union([t.String({ minLength: 1, maxLength: MAX_BATON_LENGTH }), t.Null()])),
   requests: t.Array(StreamRequestSchema, { maxItems: MAX_PIPELINE_REQUESTS }),
 });
 
