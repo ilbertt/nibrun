@@ -18,7 +18,9 @@
       "!apps/dashboard/src/routeTree.gen.ts",
       "!apps/www/src/routeTree.gen.ts",
       "!apps/www/worker-configuration.d.ts",
-      "!packages/cli/src/command-tree.gen.ts"
+      "!packages/cli/src/command-tree.gen.ts",
+      "!packages/protocol/vendor",
+      "!packages/protocol/src/domain/hrana-v2.gen.ts"
     ]
   },
   "formatter": {
@@ -49,7 +51,9 @@
         "useAwaitThenable": "error",
         "useReactFunctionComponentDefinition": {
           "level": "error",
-          "options": { "namedComponents": "functionDeclaration" }
+          "options": {
+            "namedComponents": "functionDeclaration"
+          }
         },
         "noFloatingPromises": "error",
         "useSortedClasses": {
@@ -109,7 +113,9 @@
           "style": {
             "useConsistentTypeDefinitions": {
               "level": "error",
-              "options": { "style": "type" }
+              "options": {
+                "style": "type"
+              }
             }
           }
         }

@@ -10,13 +10,16 @@
   },
   "scripts": {
     "test": "bun test",
-    "check:types": "bun run --bun tsc"
+    "check:types": "bun codegen:hrana:check && bun run --bun tsc",
+    "codegen:hrana": "bun scripts/codegen-hrana.ts",
+    "codegen:hrana:check": "bun codegen:hrana --check"
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.52"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
+    "@sinclair/typebox-codegen": "0.11.1",
     "typescript": "catalog:"
   }
 }
