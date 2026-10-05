@@ -1,6 +1,6 @@
-import type { TenantArguments } from '@repo/api/domain';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { redeploy } from '@repo/app-operations';
+import type { TenantArguments } from '@repo/protocol/schemas/app';
 import { environmentEdit } from '#lib/environment.ts';
 import { announce, awaitServing, type Release } from '#lib/release.ts';
 import type { Ui } from '#lib/ui.ts';

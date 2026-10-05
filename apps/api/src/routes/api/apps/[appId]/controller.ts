@@ -1,8 +1,8 @@
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
-import { OwnerIdSchema } from '#domain/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { AppPatchSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
+import { OwnerIdSchema } from '#schemas/identifiers.ts';
 import { AppsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdController = new Elysia()

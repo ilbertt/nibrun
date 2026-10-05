@@ -1,4 +1,5 @@
-import type { CronListing, TenantLogRecord } from '@repo/api/domain';
+import type { TenantLogRecord } from '@repo/protocol/control/tenant-log';
+import type { CronListing } from '@repo/protocol/schemas/cron';
 import { ScrollArea } from '@repo/ui/components/scroll-area';
 import { LogLine } from '#components/logs/log-line.tsx';
 import { usePinnedViewport } from '#lib/hooks/use-pinned-viewport.ts';

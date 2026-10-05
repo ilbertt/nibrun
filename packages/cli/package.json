@@ -24,7 +24,9 @@
     "@repo/global-constants": "workspace:*",
     "better-auth": "catalog:",
     "zod": "^4.5.4",
-    "@repo/api": "workspace:*"
+    "@repo/api": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "@sinclair/typebox": "^0.34.52"
   },
   "devDependencies": {
     "@parshjs/codegen": "^0.0.5",

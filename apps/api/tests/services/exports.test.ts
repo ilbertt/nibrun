@@ -11,8 +11,6 @@ import {
   TimestampSchema,
   Value,
 } from '@repo/protocol';
-import type { OwnerId } from '#domain/identifiers.ts';
-import { DnsLabelSchema } from '#domain/wire.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
   ExportStorageRepositoryContract,
@@ -24,6 +22,8 @@ import type {
   ReportedExportRow,
   RequestExportInput,
 } from '#repositories/exports.repository.ts';
+import { DnsLabelSchema } from '#schemas/dns-label.ts';
+import type { OwnerId } from '#schemas/identifiers.ts';
 import type { AppOwnershipRepositoryContract } from '#services/artifacts.service.ts';
 import { ExportsService } from '#services/exports.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';

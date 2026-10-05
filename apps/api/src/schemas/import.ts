@@ -6,7 +6,7 @@ import {
   TimestampSchema,
 } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
-import { ImportIdSchema } from '#domain/identifiers.ts';
+import { ImportIdSchema } from '#schemas/identifiers.ts';
 
 // An archive an owner uploaded, which an app's filesystem can be created holding. A noun with no
 // notion of use: what it is for is said by whatever names it, exactly as a deployment says which

@@ -1,7 +1,7 @@
 import type { Hostname } from '@repo/protocol';
-import type { AppHostnameState } from '#domain/app.ts';
 import type { DcvMethod } from '#lib/app-hostname.ts';
 import type { CloudflareClient, CustomHostname } from '#lib/cloudflare/client.ts';
+import type { AppHostnameState } from '#schemas/app.ts';
 
 /**
  * Cloudflare answers a hostname's activation and its certificate separately, and traffic needs

@@ -1,6 +1,6 @@
 import { Type } from '@sinclair/typebox';
-import { DirectoryListingSchema, GuestPathSchema } from '#domain/filesystem.ts';
-import { AppIdSchema, FilesystemQueryIdSchema } from '#domain/identifiers.ts';
+import { DirectoryListingSchema, GuestPathSchema } from '#schemas/filesystem.ts';
+import { AppIdSchema, FilesystemQueryIdSchema } from '#schemas/identifiers.ts';
 
 /**
  * A channel of its own, beside desired state rather than inside it.

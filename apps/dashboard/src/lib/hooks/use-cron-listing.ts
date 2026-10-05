@@ -1,5 +1,5 @@
-import type { CronListing } from '@repo/api/domain';
 import { appStatus, operationRefusal } from '@repo/app-operations';
+import type { CronListing } from '@repo/protocol/schemas/cron';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useNewestDeployment } from '#lib/hooks/use-newest-deployment.ts';

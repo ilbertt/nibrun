@@ -1,4 +1,7 @@
-import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api/domain';
+import {
+  DEFAULT_INSTANCE_RESOURCES,
+  DEFAULT_VOLUME_SIZE_BYTES,
+} from '@repo/api/lib/app-config-defaults';
 import {
   CUSTOM_DOMAIN_PRICING_NOTICE,
   FREE_APPS_COUNT,

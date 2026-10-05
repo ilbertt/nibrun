@@ -1,5 +1,6 @@
 import { type AnalyticsEventData, SIGN_IN_REASONS } from '@repo/analytics';
-import { AppIdSchema, Value } from '@repo/api/domain';
+import { AppIdSchema } from '@repo/protocol/schemas/identifiers';
+import { Value } from '@sinclair/typebox/value';
 import type { QueryClient } from '@tanstack/react-query';
 import { SessionIdentity } from '#lib/session-identity.ts';
 import type { AppSummary } from '#queries/apps.ts';

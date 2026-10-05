@@ -1,7 +1,7 @@
 import type { AppId, Filename, ObjectKey, Sha256Digest } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
-import type { ImportId, OwnerId } from '#domain/identifiers.ts';
 import { Repository } from '#repositories/repository.ts';
+import type { ImportId, OwnerId } from '#schemas/identifiers.ts';
 
 export type ImportRow = Queries['SelectImportById'];
 export type PendingImportRow = Queries['SelectPendingImport'];

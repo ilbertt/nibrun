@@ -1,4 +1,4 @@
-import type { AppActivation } from '@repo/api/domain';
+import type { AppActivation } from '@repo/api/schemas/app';
 
 /**
  * The words each activation goes by where it is shown to an owner.

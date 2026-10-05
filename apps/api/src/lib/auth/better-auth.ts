@@ -3,9 +3,9 @@ import { Value } from '@repo/protocol';
 import { betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization } from 'better-auth/plugins';
 import { sql } from '#db/client.ts';
-import { type OwnerId, OwnerIdSchema } from '#domain/identifiers.ts';
 import { env } from '#lib/env.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
+import { type OwnerId, OwnerIdSchema } from '#schemas/identifiers.ts';
 import type { AppsService } from '#services/apps.service.ts';
 
 const AUTH_SCHEMA = 'auth';

@@ -126,7 +126,7 @@ export interface IClaimCustomAppHostnameResult {
     created: boolean | null;
     hostname: import("@repo/protocol").Hostname | null;
     kind: import("@repo/protocol").AppHostnameKind | null;
-    state: import("@repo/api/domain").AppHostnameState | null;
+    state: import("@repo/api/schemas/app").AppHostnameState | null;
     /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
     dcv_target: string | null;
     /** What the edge says is still missing, in its own words. Empty when nothing is, which is also what a platform hostname carries. */
@@ -1284,7 +1284,7 @@ export interface IAppHostnamesColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
-    state: import("@repo/api/domain").AppHostnameState;
+    state: import("@repo/api/schemas/app").AppHostnameState;
     /** The custom hostname this row is projected onto at the edge. Absent for a platform hostname, which the wildcard already covers. */
     cloudflare_id: string | null;
     /** What the owner points _acme-challenge at, so the edge can renew the certificate without asking them again. Absent for a platform hostname. */
@@ -1307,7 +1307,7 @@ export interface IAppHostnamesTable {
 
 /** Columns of `app_quotas`. */
 export interface IAppQuotasColumns {
-    owner_id: import("@repo/api/domain").OwnerId | null;
+    owner_id: import("@repo/api/schemas/identifiers").OwnerId | null;
     apps_held: number | null;
     apps_allowed: number | null;
     apps_left: number | null;
@@ -1355,18 +1355,18 @@ export interface IAppUsageTable {
 /** Columns of `apps`. */
 export interface IAppsColumns {
     id: import("@repo/protocol").AppId;
-    owner_id: import("@repo/api/domain").OwnerId;
-    slug: import("@repo/api/domain").DnsLabel;
-    state: import("@repo/api/domain").AppState;
+    owner_id: import("@repo/api/schemas/identifiers").OwnerId;
+    slug: import("@repo/api/schemas/dns-label").DnsLabel;
+    state: import("@repo/api/schemas/app").AppState;
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
-    activation: import("@repo/api/domain").AppActivation;
+    activation: import("@repo/api/schemas/app").AppActivation;
     idle_timeout_ms: number;
     /** When a host first reported this app's filesystem ready. Its presence is what makes the data no longer creatable. */
     data_initialized_at: Date | null;
     /** What its owner calls the app, and names it by. */
-    name: import("@repo/api/domain").AppName;
+    name: import("@repo/api/schemas/app").AppName;
 }
 
 /** Schema of `apps`. */
@@ -1379,7 +1379,7 @@ export interface IAppsTable {
 
 /** Columns of `artifacts`. */
 export interface IArtifactsColumns {
-    id: import("@repo/api/domain").ArtifactId;
+    id: import("@repo/api/schemas/identifiers").ArtifactId;
     app_id: import("@repo/protocol").AppId;
     /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: import("@repo/protocol").Sha256Digest | null;
@@ -1431,12 +1431,12 @@ export interface ICachedBinariesTable {
 export interface IDeploymentsColumns {
     id: import("@repo/protocol").DeploymentId;
     app_id: import("@repo/protocol").AppId;
-    artifact_id: import("@repo/api/domain").ArtifactId;
+    artifact_id: import("@repo/api/schemas/identifiers").ArtifactId;
     /** The app config version this deployment was launched with. */
     config_id: string;
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: import("@repo/protocol").DeploymentId | null;
-    state: import("@repo/api/domain").DeploymentState;
+    state: import("@repo/api/schemas/deployment").DeploymentState;
     host_port: import("@repo/protocol").HostPort | null;
     guest_ipv4: import("@repo/protocol").Ipv4Address | null;
     restart_count: number;
@@ -1452,7 +1452,7 @@ export interface IDeploymentsColumns {
     extra_public_port: import("@repo/protocol").HostPort | null;
     instance_state: import("@repo/protocol").InstanceState | null;
     /** The uploaded archive this release's filesystem is created from, where one was named. */
-    initial_data_import_id: import("@repo/api/domain").ImportId | null;
+    initial_data_import_id: import("@repo/api/schemas/identifiers").ImportId | null;
 }
 
 /** Schema of `deployments`. */
@@ -1467,7 +1467,7 @@ export interface IDeploymentsTable {
 export interface IDesiredDeploymentsColumns {
     id: import("@repo/protocol").DeploymentId | null;
     app_id: import("@repo/protocol").AppId | null;
-    state: import("@repo/api/domain").AppState | null;
+    state: import("@repo/api/schemas/app").AppState | null;
     /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: import("@repo/protocol").Sha256Digest | null;
     /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
@@ -1494,10 +1494,10 @@ export interface IDesiredDeploymentsColumns {
     /** The app config version this deployment was launched with. */
     config_id: string | null;
     has_extra_public_port: boolean | null;
-    activation: import("@repo/api/domain").AppActivation | null;
+    activation: import("@repo/api/schemas/app").AppActivation | null;
     idle_timeout_ms: number | null;
     /** The release's own state, beside the app's. A host reads it to tell a release it should run from one it is only answering for. */
-    deployment_state: import("@repo/api/domain").DeploymentState | null;
+    deployment_state: import("@repo/api/schemas/deployment").DeploymentState | null;
 }
 
 /** Schema of `desired_deployments`. */
@@ -1585,7 +1585,7 @@ export interface IDesiredHostnamesTable {
 /** Columns of `desired_volumes`. */
 export interface IDesiredVolumesColumns {
     app_id: import("@repo/protocol").AppId | null;
-    state: import("@repo/api/domain").AppState | null;
+    state: import("@repo/api/schemas/app").AppState | null;
     /** Absent until the api has hashed the uploaded object; its presence is what makes the row usable. */
     seed_digest: import("@repo/protocol").Sha256Digest | null;
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
@@ -1607,7 +1607,7 @@ export interface IDesiredVolumesTable {
 /** Columns of `expirable_apps`. */
 export interface IExpirableAppsColumns {
     app_id: import("@repo/protocol").AppId;
-    owner_id: import("@repo/api/domain").OwnerId;
+    owner_id: import("@repo/api/schemas/identifiers").OwnerId;
 }
 
 /** Schema of `expirable_apps`. */
@@ -1622,7 +1622,7 @@ export interface IExpirableAppsTable {
 export interface IExportsColumns {
     id: import("@repo/protocol").ExportId;
     app_id: import("@repo/protocol").AppId;
-    artifact_id: import("@repo/api/domain").ArtifactId;
+    artifact_id: import("@repo/api/schemas/identifiers").ArtifactId;
     state: import("@repo/protocol").ExportState;
     /** Where the host writes the bundle and the api signs its download URL. */
     object_key: import("@repo/protocol").ObjectKey;
@@ -1664,7 +1664,7 @@ export interface IFinishableDeletionsTable {
 
 /** Columns of `imports`. */
 export interface IImportsColumns {
-    id: import("@repo/api/domain").ImportId;
+    id: import("@repo/api/schemas/identifiers").ImportId;
     app_id: import("@repo/protocol").AppId;
     /** Absent until the api has hashed the uploaded object; its presence is what makes the row usable. */
     digest: import("@repo/protocol").Sha256Digest | null;
@@ -1690,17 +1690,17 @@ export interface IImportsTable {
 /** Columns of `live_apps`. */
 export interface ILiveAppsColumns {
     id: import("@repo/protocol").AppId | null;
-    owner_id: import("@repo/api/domain").OwnerId | null;
-    slug: import("@repo/api/domain").DnsLabel | null;
-    state: import("@repo/api/domain").AppState | null;
+    owner_id: import("@repo/api/schemas/identifiers").OwnerId | null;
+    slug: import("@repo/api/schemas/dns-label").DnsLabel | null;
+    state: import("@repo/api/schemas/app").AppState | null;
     created_at: Date | null;
     updated_at: Date | null;
-    activation: import("@repo/api/domain").AppActivation | null;
+    activation: import("@repo/api/schemas/app").AppActivation | null;
     idle_timeout_ms: number | null;
     /** When a host first reported this app's filesystem ready. Its presence is what makes the data no longer creatable. */
     data_initialized_at: Date | null;
     /** What its owner calls the app, and names it by. */
-    name: import("@repo/api/domain").AppName | null;
+    name: import("@repo/api/schemas/app").AppName | null;
 }
 
 /** Schema of `live_apps`. */
@@ -1714,7 +1714,7 @@ export interface ILiveAppsTable {
 /** Columns of `profiles`. */
 export interface IProfilesColumns {
     id: string;
-    owner_id: import("@repo/api/domain").OwnerId;
+    owner_id: import("@repo/api/schemas/identifiers").OwnerId;
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;

@@ -28,7 +28,7 @@ state an agent converges on and must not delay a stop.
 The directory names describe how the contract is organized:
 
 - `src/control/` defines the API–agent messages and transport metadata.
-- `src/domain/` defines the values those messages carry. It is not a shared domain-model layer.
+- `src/schemas/` defines the values those messages carry, with types derived from each schema.
 - `src/lib/` supports those wire definitions and their validation.
 - `src/index.ts` exports the contract; it must not become an application utility barrel.
 
@@ -36,11 +36,12 @@ The directory names describe how the contract is organized:
 
 | Concern | Owner |
 | --- | --- |
-| Public API resource models, owner IDs, app names, app/deployment lifecycle states | `apps/api/src/domain/` |
-| DNS record schemas and construction | `apps/api/src/domain/` |
-| Configuration defaults, runtime reference descriptions, and owner-only input schemas | `apps/api/src/domain/` |
+| Public API resource schemas, owner IDs, app names, app/deployment lifecycle states | `apps/api/src/schemas/` |
+| DNS record schemas and construction | `apps/api/src/lib/dns-records.ts` |
+| Configuration defaults and runtime reference descriptions | `apps/api/src/lib/` |
+| Owner-only input schemas and log query schemas | `apps/api/src/schemas/` |
 | API business policy and domain verification | `apps/api/src/lib/` and `apps/api/src/services/` |
-| Log queries, log source filters, and log deduplication | `apps/api/src/domain/` |
+| Log deduplication | `apps/api/src/lib/seen-tenant-logs.ts` |
 | Log-store publishing and stream indexing, guest protocols, cron registrations, crontab parsing, and persisted cron tables | `apps/agent/src/lib/` |
 | Reconciliation, cron dispatch, probe execution, and host mechanics | `apps/agent/src/lib/` and `apps/agent/src/services/` |
 
@@ -57,16 +58,18 @@ Environment values are carried to the agent and then interpreted by the guest. T
 names and validation belong to the wire contract; API descriptions and configuration-dependent
 checks belong to the API. Moving ownership must not relax validation or duplicate that vocabulary.
 
-**The agent must not depend on `@repo/api`, including `@repo/api/domain`, in source or tests.**
+**The agent must not depend on `@repo/api`, including every API subpath, in source or tests.**
 An import being pure or safe to bundle does not make an application dependency acceptable.
 Protocol must not depend on either app, and API must not import agent implementation code.
 Biome enforces the agent-to-API import boundary.
 
-Only the API and agent depend directly on this package. Public consumers import
-`@repo/api/domain`. The API reuses or derives from wire schemas when a public model carries the
-same values; moving ownership must not duplicate field definitions, enums, or validation bounds.
-Biome enforces the consumer boundary and prevents this package from importing another workspace
-package.
+Public consumers import API resource schemas and pure helpers from their defining files, such
+as `@repo/api/schemas/app` and `@repo/api/lib/runtime-values`. When a public response carries
+protocol values, import their defining files directly, such as `@repo/protocol/schemas/cron`
+or `@repo/protocol/control/tenant-log`; do not hide their ownership behind API re-exports.
+This reuse does not make public API policy part of protocol. Do not duplicate field definitions,
+enums or bounds, and do not add an API schema/helper barrel. Biome restricts the protocol root
+barrel to the API and agent and prevents protocol from importing another workspace package.
 
 ## Constraints on a change
 

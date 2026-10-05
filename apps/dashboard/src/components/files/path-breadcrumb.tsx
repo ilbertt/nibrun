@@ -1,4 +1,4 @@
-import { GUEST_PATH_ROOT } from '@repo/api/domain';
+import { GUEST_PATH_ROOT } from '@repo/protocol/schemas/filesystem';
 import {
   Breadcrumb,
   BreadcrumbItem,

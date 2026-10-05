@@ -1,4 +1,4 @@
-import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/api/domain';
+import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/api/lib/runtime-values';
 import type { DeployLink } from '#link.ts';
 import boopPage from '../content/boop.md?raw';
 import contextUsePage from '../content/context-use.md?raw';

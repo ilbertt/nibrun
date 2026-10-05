@@ -1,4 +1,4 @@
-import type { CronListing } from '@repo/api/domain';
+import type { CronListing } from '@repo/protocol/schemas/cron';
 import { Badge } from '@repo/ui/components/badge';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@repo/ui/components/empty';
 import {

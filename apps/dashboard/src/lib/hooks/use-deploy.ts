@@ -1,5 +1,5 @@
 import { analyticsIdentityState, trackEvent } from '@repo/analytics';
-import type { TenantArguments, TenantEnvironmentPatch } from '@repo/api/domain';
+import type { TenantEnvironmentPatch } from '@repo/api/schemas/environment';
 import {
   awaitDeploymentSettled,
   type DeployableBinary,
@@ -11,6 +11,7 @@ import {
   type UploadableArchive,
   type UploadProgress,
 } from '@repo/app-operations';
+import type { TenantArguments } from '@repo/protocol/schemas/app';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 import { browserUpload } from '#lib/browser-upload.ts';

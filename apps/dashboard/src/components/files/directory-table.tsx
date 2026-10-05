@@ -1,4 +1,4 @@
-import type { FilesystemEntry } from '@repo/api/domain';
+import type { FilesystemEntry } from '@repo/protocol/schemas/filesystem';
 import {
   Table,
   TableBody,

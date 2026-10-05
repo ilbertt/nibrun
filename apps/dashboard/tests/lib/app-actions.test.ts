@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  APP_STATES,
-  type AppState,
-  DEPLOYMENT_STATES,
-  type DeploymentState,
-} from '@repo/api/domain';
+import { APP_STATES, type AppState } from '@repo/api/schemas/app';
+import { DEPLOYMENT_STATES, type DeploymentState } from '@repo/api/schemas/deployment';
 import { appStatus } from '@repo/app-operations';
 import { APP_ACTIONS, type AppActions, appActions, withoutIdentity } from '#lib/app-actions.ts';
 

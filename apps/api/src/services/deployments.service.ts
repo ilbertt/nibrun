@@ -7,8 +7,6 @@ import type {
   Timestamp,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
-import type { Deployment, DeploymentState } from '#domain/deployment.ts';
-import type { ArtifactId, ImportId } from '#domain/identifiers.ts';
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { DeploymentLifecycle } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
@@ -25,6 +23,8 @@ import type {
   ReportedDeployment,
   RollbackDeploymentInput,
 } from '#repositories/deployments.repository.ts';
+import type { Deployment, DeploymentState } from '#schemas/deployment.ts';
+import type { ArtifactId, ImportId } from '#schemas/identifiers.ts';
 import { Service } from '#services/service.ts';
 
 const LIVE_DEPLOYMENT_CONSTRAINT = schema.deployments._indexes.deployments_live_idx._indexName;

@@ -1,4 +1,4 @@
-import { DIRECTORY_ENTRY_LIMIT } from '@repo/api/domain';
+import { DIRECTORY_ENTRY_LIMIT } from '@repo/protocol/schemas/filesystem';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@repo/ui/components/empty';
 import { Skeleton } from '@repo/ui/components/skeleton';
 import { TableContainer } from '@repo/ui/custom/table-container';

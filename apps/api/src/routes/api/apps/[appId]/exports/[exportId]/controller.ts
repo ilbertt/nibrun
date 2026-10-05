@@ -1,8 +1,8 @@
 import { AppIdSchema, ExportIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
-import { OwnerIdSchema } from '#domain/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { ExportResponseSchema } from '#routes/api/apps/[appId]/exports/model.ts';
+import { OwnerIdSchema } from '#schemas/identifiers.ts';
 import { AuthPlugin, ExportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 /**

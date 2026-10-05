@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox';
-import { TenantEnvironmentSchema } from '#domain/app.ts';
-import { AppIdSchema, CronJobIdSchema, DeploymentIdSchema } from '#domain/identifiers.ts';
 import { TimestampSchema } from '#lib/wire.ts';
+import { TenantEnvironmentSchema } from '#schemas/app.ts';
+import { AppIdSchema, CronJobIdSchema, DeploymentIdSchema } from '#schemas/identifiers.ts';
 
 export const MAX_CRON_JOBS_PER_APP = 10;
 export const CRON_TIME_ZONE = 'UTC';

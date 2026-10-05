@@ -7,9 +7,9 @@ import {
 } from '@repo/protocol';
 import { getDomain } from 'tldts';
 import type { Queries } from '#db/queries.gen.ts';
-import type { AppHostnameState } from '#domain/app.ts';
-import type { DnsLabel } from '#domain/wire.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
+import type { AppHostnameState } from '#schemas/app.ts';
+import type { DnsLabel } from '#schemas/dns-label.ts';
 
 /**
  * The app domain is a different registrable domain from the one the dashboard is served on, so

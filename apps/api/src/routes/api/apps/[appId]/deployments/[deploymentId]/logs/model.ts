@@ -1,5 +1,5 @@
 import { t } from 'elysia';
-import { LogTimerangeSchema } from '#domain/log.ts';
+import { LogTimerangeSchema } from '#schemas/log-query.ts';
 
 /**
  * How much history precedes the follow, defaulted at the handler like every other range this api

@@ -13,14 +13,13 @@ import {
   VolumeIdSchema,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
+import type { PublicAppConfig } from '#lib/app-config.ts';
 import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
   DEFAULT_VOLUME_SIZE_BYTES,
-} from '#domain/defaults.ts';
-import type { DeploymentState } from '#domain/deployment.ts';
-import type { PublicAppConfig } from '#lib/app-config.ts';
+} from '#lib/app-config-defaults.ts';
 import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import type {
@@ -34,6 +33,7 @@ import type {
   ReportedDeployment,
   RollbackDeploymentInput,
 } from '#repositories/deployments.repository.ts';
+import type { DeploymentState } from '#schemas/deployment.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
 import {
   APP_ID,

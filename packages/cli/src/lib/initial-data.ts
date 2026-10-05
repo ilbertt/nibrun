@@ -1,8 +1,9 @@
 import { mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
-import { type Filename, FilenameSchema, Value } from '@repo/api/domain';
 import { refusedArchiveBody, type UploadableArchive } from '@repo/app-operations';
+import { type Filename, FilenameSchema } from '@repo/protocol/lib/wire';
+import { Value } from '@sinclair/typebox/value';
 import { UsageError } from '#lib/errors.ts';
 import type { Ui } from '#lib/ui.ts';
 

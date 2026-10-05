@@ -19,7 +19,7 @@ import {
   DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
-} from '#domain/defaults.ts';
+} from '#lib/app-config-defaults.ts';
 import { REDACTED, redactSecrets } from '#lib/redact-secrets.ts';
 
 const TENANT_SECRET = Value.Parse(SecretStringSchema, 'sk-live-do-not-log-this');

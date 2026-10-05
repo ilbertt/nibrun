@@ -8,13 +8,6 @@ import type {
   Timestamp,
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
-import { type App, type AppName, OWNED_APP_STATES, type OwnedAppState } from '#domain/app.ts';
-import type { OwnerId } from '#domain/identifiers.ts';
-import {
-  EXTRA_PUBLIC_PORT_VALUES,
-  interpolableRuntimeValue,
-  namesExtraPublicPortValues,
-} from '#domain/runtime-values.ts';
 import {
   type AppConfigPatch,
   configWithDefaults,
@@ -36,6 +29,11 @@ import {
 } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
+import {
+  EXTRA_PUBLIC_PORT_VALUES,
+  interpolableRuntimeValue,
+  namesExtraPublicPortValues,
+} from '#lib/runtime-values.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {
@@ -51,6 +49,8 @@ import {
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type { CustomHostnamesRepositoryContract } from '#repositories/custom-hostnames.repository.ts';
 import type { ExportsRepositoryContract } from '#repositories/exports.repository.ts';
+import { type App, type AppName, OWNED_APP_STATES, type OwnedAppState } from '#schemas/app.ts';
+import type { OwnerId } from '#schemas/identifiers.ts';
 import { Service } from '#services/service.ts';
 
 export type PublicApp = Omit<App, 'config' | 'hostnames'> & {

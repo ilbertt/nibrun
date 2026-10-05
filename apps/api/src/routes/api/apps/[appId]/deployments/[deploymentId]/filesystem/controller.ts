@@ -6,9 +6,9 @@ import {
   Value,
 } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
-import { OwnerIdSchema } from '#domain/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { ReadDirectoryQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/model.ts';
+import { OwnerIdSchema } from '#schemas/identifiers.ts';
 import { AuthPlugin, FilesystemServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 /**

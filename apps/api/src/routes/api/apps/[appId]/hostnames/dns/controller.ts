@@ -1,11 +1,11 @@
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
-import { OwnerIdSchema } from '#domain/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   DomainDnsQuerySchema,
   DomainDnsResponseSchema,
 } from '#routes/api/apps/[appId]/hostnames/dns/model.ts';
+import { OwnerIdSchema } from '#schemas/identifiers.ts';
 import { AuthPlugin, DomainDnsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdHostnamesDnsController = new Elysia()

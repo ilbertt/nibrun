@@ -27,7 +27,9 @@
     "react-dom": "catalog:",
     "tailwindcss": "catalog:",
     "@repo/analytics": "workspace:*",
-    "@repo/api": "workspace:*"
+    "@repo/api": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "@sinclair/typebox": "^0.34.52"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.58.0",

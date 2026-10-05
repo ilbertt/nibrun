@@ -1,4 +1,4 @@
-import { APP_STATES } from '@repo/api/domain';
+import { APP_STATES } from '@repo/api/schemas/app';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
 import type { ListedApp } from '@repo/app-operations';

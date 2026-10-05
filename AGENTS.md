@@ -23,15 +23,17 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 - Imports use `#*` subpath mapping (e.g. `import { foo } from '#services/foo'`)
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
   DNS record names, type metadata, and required-record construction live in
-  `apps/api/src/domain/dns.ts`. Consumers and fixtures use those definitions
+  `apps/api/src/lib/dns-records.ts`. Consumers and fixtures use those definitions
   and render record names and targets rather than reconstructing them.
-- `@repo/protocol` owns only API–agent requests, responses, and their wire schemas.
-  Public API models, owner-only validation, defaults, and log queries belong to
-  `apps/api/src/domain/`, exposed to clients through `@repo/api/domain`. Shared environment
-  validation and agent-to-API tenant log messages stay in protocol. Neither app imports the
-  other app; the agent must not depend on `@repo/api`, including in tests. Guest protocols
-  and agent persistence models belong to `apps/agent/src/lib/`. Biome restricts direct protocol
-  imports to its owning apps and prevents protocol from importing another workspace package.
+- `@repo/protocol` owns only API–agent messages and their wire schemas. Public API
+  resource schemas and derived types belong to `apps/api/src/schemas/`; API defaults and
+  helpers belong to `apps/api/src/lib/`. Import each definition from its owning file,
+  such as `@repo/api/schemas/app` or `@repo/api/lib/runtime-values`; do not add API barrels.
+  Protocol values used by public consumers are imported from their defining protocol files.
+  Shared environment validation and agent-to-API tenant log messages stay in protocol.
+  Neither app imports the other app; the agent must not depend on `@repo/api`, including in
+  tests. Guest protocols and persistence models belong to `apps/agent/src/lib/`.
+  Biome prevents agent-to-API imports and protocol dependencies on other workspace packages.
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
 - Props are always passed — a component we wrote has no optional property. Declare
   `name: T | undefined` rather than `name?: T`, so a call site with nothing to pass says so.

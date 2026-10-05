@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import type { AppState, DeploymentState, InstanceState } from '@repo/api/domain';
+import type { AppState } from '@repo/api/schemas/app';
+import type { DeploymentState } from '@repo/api/schemas/deployment';
+import type { InstanceState } from '@repo/protocol/schemas/instance';
 import {
   APP_STATUS_LABELS,
   type AppStatus,

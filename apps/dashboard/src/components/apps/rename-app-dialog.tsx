@@ -1,4 +1,4 @@
-import { AppNameSchema, Value } from '@repo/api/domain';
+import { AppNameSchema } from '@repo/api/schemas/app';
 import { Button } from '@repo/ui/components/button';
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 import { Field, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Spinner } from '@repo/ui/components/spinner';
+import { Value } from '@sinclair/typebox/value';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { PencilIcon } from 'lucide-react';
 import { useState } from 'react';

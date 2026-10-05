@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@repo/app-operations": "workspace:*",
-    "@repo/api": "workspace:*"
+    "@repo/api": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "@sinclair/typebox": "^0.34.52"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

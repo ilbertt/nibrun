@@ -1,6 +1,6 @@
 import { Type } from '@sinclair/typebox';
-import { CronListingSchema } from '#domain/cron.ts';
-import { CronQueryIdSchema } from '#domain/identifiers.ts';
+import { CronListingSchema } from '#schemas/cron.ts';
+import { CronQueryIdSchema } from '#schemas/identifiers.ts';
 
 const MAX_SERVED_DEPLOYMENTS = 200;
 const MAX_QUERY_MESSAGE_LENGTH = 512;

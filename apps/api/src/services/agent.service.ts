@@ -9,7 +9,7 @@ import {
   TimestampSchema,
   Value,
 } from '@repo/protocol';
-import { DEFAULT_AGENT_POLL_SETTINGS } from '#domain/defaults.ts';
+import { DEFAULT_AGENT_POLL_SETTINGS } from '#lib/agent-poll-settings.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
 import type { AppsService } from '#services/apps.service.ts';

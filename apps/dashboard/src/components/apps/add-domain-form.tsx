@@ -1,9 +1,10 @@
-import { HostnameSchema, Value } from '@repo/api/domain';
 import { CUSTOM_DOMAIN_PRICING_NOTICE } from '@repo/global-constants';
+import { HostnameSchema } from '@repo/protocol/lib/wire';
 import { Button } from '@repo/ui/components/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Spinner } from '@repo/ui/components/spinner';
+import { Value } from '@sinclair/typebox/value';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { useAddDomain } from '#lib/hooks/use-app-domains.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';

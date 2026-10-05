@@ -5,10 +5,10 @@ import type {
   CronQueryResult,
   HostId,
 } from '@repo/protocol';
-import type { OwnerId } from '#domain/identifiers.ts';
 import { PendingCronQueries } from '#lib/cron/pending-queries.ts';
 import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import type { DeploymentLookupRepositoryContract } from '#repositories/deployments.repository.ts';
+import type { OwnerId } from '#schemas/identifiers.ts';
 import { Service } from '#services/service.ts';
 
 type CronReadRequest = Pick<CronQuery, 'appId' | 'deploymentId'> & {

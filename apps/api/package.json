@@ -8,7 +8,12 @@
   },
   "exports": {
     "./types": "./src/types.ts",
-    "./domain": "./src/domain/index.ts"
+    "./schemas/*": "./src/schemas/*.ts",
+    "./lib/app-config-defaults": "./src/lib/app-config-defaults.ts",
+    "./lib/dns-records": "./src/lib/dns-records.ts",
+    "./lib/redact-secrets": "./src/lib/redact-secrets.ts",
+    "./lib/runtime-values": "./src/lib/runtime-values.ts",
+    "./lib/seen-tenant-logs": "./src/lib/seen-tenant-logs.ts"
   },
   "scripts": {
     "build": "bun run scripts/build.ts",

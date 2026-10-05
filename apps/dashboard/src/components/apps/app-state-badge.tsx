@@ -1,4 +1,4 @@
-import type { AppState } from '@repo/api/domain';
+import type { AppState } from '@repo/api/schemas/app';
 import { Badge } from '@repo/ui/components/badge';
 import type { ComponentProps } from 'react';
 

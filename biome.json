@@ -237,7 +237,7 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "@repo/protocol": "Only the API and agent consume the wire protocol. Public consumers use @repo/api/domain."
+                  "@repo/protocol": "Import protocol values from their defining schema or helper file, and API definitions from @repo/api/schemas/* or the owning API helper."
                 }
               }
             }

@@ -1,4 +1,5 @@
-import { FilenameSchema, Value } from '@repo/api/domain';
+import { FilenameSchema } from '@repo/protocol/lib/wire';
+import { Value } from '@sinclair/typebox/value';
 
 const BYTES_PER_GIBIBYTE = 1_073_741_824;
 const MAX_IMPORT_GIBIBYTES = 1;

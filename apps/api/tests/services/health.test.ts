@@ -6,7 +6,7 @@ import {
   TimestampSchema,
   Value,
 } from '@repo/protocol';
-import { DEFAULT_AGENT_POLL_SETTINGS } from '#domain/defaults.ts';
+import { DEFAULT_AGENT_POLL_SETTINGS } from '#lib/agent-poll-settings.ts';
 import type { HostObservation } from '#repositories/agent.repository.ts';
 import type { HealthRepositoryContract } from '#repositories/health.repository.ts';
 import { HealthService, type SystemHealth } from '#services/health.service.ts';

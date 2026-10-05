@@ -1,6 +1,6 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test';
-import { CNAME_RECORD_TYPE } from '#domain/dns.ts';
 import { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
+import { CNAME_RECORD_TYPE } from '#lib/dns-records.ts';
 
 const HTTP_OK = 200;
 const HTTP_UNAVAILABLE = 503;

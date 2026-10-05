@@ -1,8 +1,8 @@
 import { ByteSizeSchema, FilenameSchema, Sha256DigestSchema } from '@repo/protocol';
 import { t } from 'elysia';
-import { ArtifactSchema } from '#domain/artifact.ts';
-import { ArtifactIdSchema } from '#domain/identifiers.ts';
 import { BINARY_URL_PATTERN, MAX_BINARY_URL_LENGTH } from '#lib/binary-url.ts';
+import { ArtifactSchema } from '#schemas/artifact.ts';
+import { ArtifactIdSchema } from '#schemas/identifiers.ts';
 
 // The bytes the caller holds. The name is theirs, not the store's: a content-addressed key carries
 // none, and this is what a host writes into an export archive. Refused here as a shape rather than

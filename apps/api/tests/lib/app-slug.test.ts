@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { isValidMessage } from '@repo/protocol';
-import { DnsLabelSchema, MAX_DNS_LABEL_LENGTH } from '#domain/wire.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
+import { DnsLabelSchema, MAX_DNS_LABEL_LENGTH } from '#schemas/dns-label.ts';
 
 const SEPARATOR = '-';
 const SUFFIX_LENGTH = 6;

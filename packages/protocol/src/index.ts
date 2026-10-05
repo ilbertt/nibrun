@@ -78,100 +78,6 @@ export {
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
 } from '#control/transport.ts';
-export {
-  APP_HOSTNAME_KINDS,
-  type AppConfig,
-  AppConfigSchema,
-  type AppHostname,
-  type AppHostnameKind,
-  AppHostnameKindSchema,
-  AppHostnameSchema,
-  IdleTimeoutMsSchema,
-  MAX_IDLE_TIMEOUT_MS,
-  MIN_IDLE_TIMEOUT_MS,
-  RUNTIME_ENVIRONMENT_VALUES,
-  type TenantArguments,
-  TenantArgumentsSchema,
-  type TenantEnvironment,
-  TenantEnvironmentSchema,
-} from '#domain/app.ts';
-export {
-  CHECKPOINT_STATES,
-  type CheckpointState,
-  CheckpointStateSchema,
-} from '#domain/checkpoint.ts';
-export { type ComputeUsage, ComputeUsageSchema } from '#domain/compute.ts';
-export {
-  CRON_TIME_ZONE,
-  CronCommandSchema,
-  type CronListing,
-  CronListingSchema,
-  CronScheduleSchema,
-  MAX_CRON_ENVIRONMENT_VARIABLES,
-  MAX_CRON_JOBS_PER_APP,
-  type RegisteredCronJob,
-  RegisteredCronJobSchema,
-} from '#domain/cron.ts';
-export { EXPORT_STATES, type ExportState, ExportStateSchema } from '#domain/export.ts';
-export {
-  DIRECTORY_ENTRY_LIMIT,
-  type DirectoryListing,
-  DirectoryListingSchema,
-  FILESYSTEM_ENTRY_KINDS,
-  type FilesystemEntry,
-  type FilesystemEntryKind,
-  FilesystemEntryKindSchema,
-  FilesystemEntryNameSchema,
-  FilesystemEntrySchema,
-  type FilesystemUsage,
-  FilesystemUsageSchema,
-  GUEST_PATH_ROOT,
-  type GuestPath,
-  GuestPathSchema,
-} from '#domain/filesystem.ts';
-export {
-  HOST_STATES,
-  type HostCapacity,
-  HostCapacitySchema,
-  type HostState,
-  HostStateSchema,
-  type HostVersions,
-  HostVersionsSchema,
-} from '#domain/host.ts';
-export {
-  type AppId,
-  AppIdSchema,
-  type CheckpointId,
-  CheckpointIdSchema,
-  type CronJobId,
-  CronJobIdSchema,
-  type CronQueryId,
-  CronQueryIdSchema,
-  type CronRunId,
-  CronRunIdSchema,
-  type DeploymentId,
-  DeploymentIdSchema,
-  type ExportId,
-  ExportIdSchema,
-  type FilesystemQueryId,
-  FilesystemQueryIdSchema,
-  type HostId,
-  HostIdSchema,
-  type VolumeId,
-  VolumeIdSchema,
-} from '#domain/identifiers.ts';
-export {
-  type HealthCheck,
-  HealthCheckSchema,
-  INSTANCE_STATES,
-  type InstanceResources,
-  InstanceResourcesSchema,
-  type InstanceState,
-  InstanceStateSchema,
-  type RestartPolicy,
-  RestartPolicySchema,
-} from '#domain/instance.ts';
-export { VOLUME_STATES, type VolumeState, VolumeStateSchema } from '#domain/volume.ts';
 export type { Brand, BrandedSchema } from '#lib/brand.ts';
 export {
   SECRET_ANNOTATION,
@@ -208,3 +114,97 @@ export {
   type Timestamp,
   TimestampSchema,
 } from '#lib/wire.ts';
+export {
+  APP_HOSTNAME_KINDS,
+  type AppConfig,
+  AppConfigSchema,
+  type AppHostname,
+  type AppHostnameKind,
+  AppHostnameKindSchema,
+  AppHostnameSchema,
+  IdleTimeoutMsSchema,
+  MAX_IDLE_TIMEOUT_MS,
+  MIN_IDLE_TIMEOUT_MS,
+  RUNTIME_ENVIRONMENT_VALUES,
+  type TenantArguments,
+  TenantArgumentsSchema,
+  type TenantEnvironment,
+  TenantEnvironmentSchema,
+} from '#schemas/app.ts';
+export {
+  CHECKPOINT_STATES,
+  type CheckpointState,
+  CheckpointStateSchema,
+} from '#schemas/checkpoint.ts';
+export { type ComputeUsage, ComputeUsageSchema } from '#schemas/compute.ts';
+export {
+  CRON_TIME_ZONE,
+  CronCommandSchema,
+  type CronListing,
+  CronListingSchema,
+  CronScheduleSchema,
+  MAX_CRON_ENVIRONMENT_VARIABLES,
+  MAX_CRON_JOBS_PER_APP,
+  type RegisteredCronJob,
+  RegisteredCronJobSchema,
+} from '#schemas/cron.ts';
+export { EXPORT_STATES, type ExportState, ExportStateSchema } from '#schemas/export.ts';
+export {
+  DIRECTORY_ENTRY_LIMIT,
+  type DirectoryListing,
+  DirectoryListingSchema,
+  FILESYSTEM_ENTRY_KINDS,
+  type FilesystemEntry,
+  type FilesystemEntryKind,
+  FilesystemEntryKindSchema,
+  FilesystemEntryNameSchema,
+  FilesystemEntrySchema,
+  type FilesystemUsage,
+  FilesystemUsageSchema,
+  GUEST_PATH_ROOT,
+  type GuestPath,
+  GuestPathSchema,
+} from '#schemas/filesystem.ts';
+export {
+  HOST_STATES,
+  type HostCapacity,
+  HostCapacitySchema,
+  type HostState,
+  HostStateSchema,
+  type HostVersions,
+  HostVersionsSchema,
+} from '#schemas/host.ts';
+export {
+  type AppId,
+  AppIdSchema,
+  type CheckpointId,
+  CheckpointIdSchema,
+  type CronJobId,
+  CronJobIdSchema,
+  type CronQueryId,
+  CronQueryIdSchema,
+  type CronRunId,
+  CronRunIdSchema,
+  type DeploymentId,
+  DeploymentIdSchema,
+  type ExportId,
+  ExportIdSchema,
+  type FilesystemQueryId,
+  FilesystemQueryIdSchema,
+  type HostId,
+  HostIdSchema,
+  type VolumeId,
+  VolumeIdSchema,
+} from '#schemas/identifiers.ts';
+export {
+  type HealthCheck,
+  HealthCheckSchema,
+  INSTANCE_STATES,
+  type InstanceResources,
+  InstanceResourcesSchema,
+  type InstanceState,
+  InstanceStateSchema,
+  type RestartPolicy,
+  RestartPolicySchema,
+} from '#schemas/instance.ts';
+export { VOLUME_STATES, type VolumeState, VolumeStateSchema } from '#schemas/volume.ts';

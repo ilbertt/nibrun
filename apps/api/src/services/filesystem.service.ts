@@ -6,10 +6,10 @@ import type {
   FilesystemQueryResult,
   GuestPath,
 } from '@repo/protocol';
-import type { OwnerId } from '#domain/identifiers.ts';
 import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import { PendingFilesystemQueries } from '#lib/filesystem/pending-queries.ts';
 import type { DeploymentLookupRepositoryContract } from '#repositories/deployments.repository.ts';
+import type { OwnerId } from '#schemas/identifiers.ts';
 import { Service } from '#services/service.ts';
 
 // A deployment the caller does not own has to be indistinguishable from one that does not exist.

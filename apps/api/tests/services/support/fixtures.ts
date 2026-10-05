@@ -1,18 +1,18 @@
 import { AppIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
+import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
   DEFAULT_VOLUME_SIZE_BYTES,
-} from '#domain/defaults.ts';
-import { ArtifactIdSchema, ImportIdSchema, OwnerIdSchema } from '#domain/identifiers.ts';
-import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
+} from '#lib/app-config-defaults.ts';
 import type {
   DeploymentByIdInput,
   DeploymentLookupRepositoryContract,
   DeploymentRow,
 } from '#repositories/deployments.repository.ts';
+import { ArtifactIdSchema, ImportIdSchema, OwnerIdSchema } from '#schemas/identifiers.ts';
 
 export const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-1');
 export const OTHER_OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-2');

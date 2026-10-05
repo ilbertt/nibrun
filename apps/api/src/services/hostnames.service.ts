@@ -1,6 +1,4 @@
 import type { AppId, Hostname } from '@repo/protocol';
-import type { AppHostnameState } from '#domain/app.ts';
-import type { OwnerId } from '#domain/identifiers.ts';
 import {
   dcvMethodFor,
   isPlatformHostname,
@@ -15,6 +13,8 @@ import type {
   CustomHostnameRow,
 } from '#repositories/app-hostnames.repository.ts';
 import type { CustomHostnamesRepositoryContract } from '#repositories/custom-hostnames.repository.ts';
+import type { AppHostnameState } from '#schemas/app.ts';
+import type { OwnerId } from '#schemas/identifiers.ts';
 import { Service } from '#services/service.ts';
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };

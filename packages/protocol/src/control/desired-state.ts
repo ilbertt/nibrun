@@ -1,10 +1,12 @@
 import { Type } from '@sinclair/typebox';
+import { stringEnum } from '#lib/string-enum.ts';
+import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } from '#lib/wire.ts';
 import {
   AppConfigSchema,
   AppHostnameSchema,
   IdleTimeoutMsSchema,
   TenantEnvironmentSchema,
-} from '#domain/app.ts';
+} from '#schemas/app.ts';
 import {
   AppIdSchema,
   CheckpointIdSchema,
@@ -12,9 +14,7 @@ import {
   ExportIdSchema,
   HostIdSchema,
   VolumeIdSchema,
-} from '#domain/identifiers.ts';
-import { stringEnum } from '#lib/string-enum.ts';
-import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } from '#lib/wire.ts';
+} from '#schemas/identifiers.ts';
 
 /**
  * `on-request` is `running` with the microVM left out until something asks for it: the app is

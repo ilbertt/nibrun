@@ -1,8 +1,8 @@
 import { Type } from '@sinclair/typebox';
-import { HostCapacitySchema, HostVersionsSchema } from '#domain/host.ts';
-import { HostIdSchema } from '#domain/identifiers.ts';
 import { SecretStringSchema } from '#lib/secret.ts';
 import { TimestampSchema } from '#lib/wire.ts';
+import { HostCapacitySchema, HostVersionsSchema } from '#schemas/host.ts';
+import { HostIdSchema } from '#schemas/identifiers.ts';
 
 const MIN_POLL_INTERVAL_MS = 100;
 

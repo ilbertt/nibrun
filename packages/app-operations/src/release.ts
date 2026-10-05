@@ -1,11 +1,9 @@
-import {
-  AppNameSchema,
-  HttpPortSchema,
-  type TenantArguments,
-  type TenantEnvironmentPatch,
-  Value,
-} from '@repo/api/domain';
+import { AppNameSchema } from '@repo/api/schemas/app';
+import type { TenantEnvironmentPatch } from '@repo/api/schemas/environment';
 import { ApiError } from '@repo/api-client/unwrap';
+import { HttpPortSchema } from '@repo/protocol/lib/wire';
+import type { TenantArguments } from '@repo/protocol/schemas/app';
+import { Value } from '@sinclair/typebox/value';
 
 /** Where a release landed and what to reach it at, whichever way it was asked for. */
 export type Deployed = {

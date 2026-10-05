@@ -1,12 +1,12 @@
 import { expect, test } from 'bun:test';
+import { SecretStringSchema } from '@repo/protocol/lib/secret';
+import { TimestampSchema } from '@repo/protocol/lib/wire';
 import {
   CRON_TIME_ZONE,
   type CronListing,
   type RegisteredCronJob,
-  SecretStringSchema,
-  TimestampSchema,
-  Value,
-} from '@repo/api/domain';
+} from '@repo/protocol/schemas/cron';
+import { Value } from '@sinclair/typebox/value';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CronSchedules } from '#components/crons/cron-schedules.tsx';
 

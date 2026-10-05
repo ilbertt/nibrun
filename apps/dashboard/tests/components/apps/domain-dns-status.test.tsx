@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { requiredDomainDnsRecords } from '@repo/api/domain';
+import { requiredDomainDnsRecords } from '@repo/api/lib/dns-records';
 import type { DomainDnsRecord } from '@repo/app-operations';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DomainDnsStatus } from '#components/apps/domain-dns-status.tsx';

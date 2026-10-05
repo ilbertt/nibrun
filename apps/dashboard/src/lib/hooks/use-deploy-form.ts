@@ -1,5 +1,5 @@
 import { trackEvent } from '@repo/analytics';
-import { DEFAULT_HTTP_PORT, FilenameSchema, Sha256DigestSchema, Value } from '@repo/api/domain';
+import { DEFAULT_HTTP_PORT } from '@repo/api/lib/app-config-defaults';
 import {
   type DeployableBinary,
   type FetchableBinary,
@@ -9,6 +9,8 @@ import {
   type UploadableArchive,
 } from '@repo/app-operations';
 import { type DeploySuggestion, namedByUrl, refusedChecksum, refusedUrl } from '@repo/deploy-link';
+import { FilenameSchema, Sha256DigestSchema } from '@repo/protocol/lib/wire';
+import { Value } from '@sinclair/typebox/value';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
 import {
   type BinarySource,

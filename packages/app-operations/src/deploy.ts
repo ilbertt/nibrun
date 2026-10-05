@@ -1,13 +1,10 @@
-import {
-  AppNameSchema,
-  type DeploymentState,
-  type Filename,
-  type Sha256Digest,
-  type TenantArguments,
-  Value,
-} from '@repo/api/domain';
+import { AppNameSchema } from '@repo/api/schemas/app';
+import type { DeploymentState } from '@repo/api/schemas/deployment';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import type { Filename, Sha256Digest } from '@repo/protocol/lib/wire';
+import type { TenantArguments } from '@repo/protocol/schemas/app';
+import { Value } from '@sinclair/typebox/value';
 import { appFor } from '#apps.ts';
 import { type UploadableArchive, uploadImport } from '#imports.ts';
 import {

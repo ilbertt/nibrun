@@ -1,13 +1,13 @@
 import { Type } from '@sinclair/typebox';
+import { stringEnum } from '#lib/string-enum.ts';
+import { TimestampSchema } from '#lib/wire.ts';
 import {
   AppIdSchema,
   CronJobIdSchema,
   CronRunIdSchema,
   DeploymentIdSchema,
   HostIdSchema,
-} from '#domain/identifiers.ts';
-import { stringEnum } from '#lib/string-enum.ts';
-import { TimestampSchema } from '#lib/wire.ts';
+} from '#schemas/identifiers.ts';
 
 export const TENANT_LOG_STREAMS = ['stdout', 'stderr'] as const;
 export const TenantLogStreamSchema = stringEnum(TENANT_LOG_STREAMS);

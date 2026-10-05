@@ -1,5 +1,5 @@
 import { note, text } from '@clack/prompts';
-import { APP_STATES } from '@repo/api/domain';
+import { APP_STATES } from '@repo/api/schemas/app';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { appFor, deleteApp as requestDeletion } from '@repo/app-operations';
 import { z } from 'zod';

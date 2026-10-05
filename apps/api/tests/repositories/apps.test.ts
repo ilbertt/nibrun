@@ -16,10 +16,6 @@ import {
 } from '@repo/protocol';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
-import { AppNameSchema, OWNED_APP_STATES } from '#domain/app.ts';
-
-import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#domain/identifiers.ts';
-import { DnsLabelSchema } from '#domain/wire.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import {
@@ -30,6 +26,9 @@ import {
 } from '#repositories/apps.repository.ts';
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { AppNameSchema, OWNED_APP_STATES } from '#schemas/app.ts';
+import { DnsLabelSchema } from '#schemas/dns-label.ts';
+import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#schemas/identifiers.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { refusedBy } from '#tests/support/postgres.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';

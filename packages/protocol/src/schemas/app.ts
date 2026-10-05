@@ -1,12 +1,12 @@
 import { Type } from '@sinclair/typebox';
+import { secretString } from '#lib/secret.ts';
+import { stringEnum } from '#lib/string-enum.ts';
+import { HostnameSchema, HttpPortSchema } from '#lib/wire.ts';
 import {
   HealthCheckSchema,
   InstanceResourcesSchema,
   RestartPolicySchema,
-} from '#domain/instance.ts';
-import { secretString } from '#lib/secret.ts';
-import { stringEnum } from '#lib/string-enum.ts';
-import { HostnameSchema, HttpPortSchema } from '#lib/wire.ts';
+} from '#schemas/instance.ts';
 
 /**
  * One name is carved out of what is otherwise the shell's own rule, because a JavaScript object is

@@ -3,7 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./schemas/*": "./src/schemas/*.ts",
+    "./control/*": "./src/control/*.ts",
+    "./lib/*": "./src/lib/*.ts"
   },
   "imports": {
     "#*": "./src/*"
