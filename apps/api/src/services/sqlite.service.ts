@@ -1,0 +1,102 @@
+import type { AppId, DeploymentId, GuestPath, OwnerId } from '@repo/protocol';
+import { ConflictError, NotFoundError } from '#lib/errors.ts';
+import type { SqliteExecutorContract } from '#lib/hrana/executor.ts';
+import { RoutePrefix } from '#lib/routes/prefixes.ts';
+import { type SqliteSelection, SqliteSelections } from '#lib/sqlite/selections.ts';
+import type { DeploymentsRepositoryContract } from '#repositories/deployments.repository.ts';
+import { Service } from '#services/service.ts';
+
+type OpenSqliteExecutor = (input: {
+  appId: AppId;
+  deploymentId: DeploymentId;
+  path: GuestPath;
+  signal: AbortSignal;
+}) => Promise<SqliteExecutorContract>;
+
+type SqliteDeploymentsRepositoryContract = Pick<
+  DeploymentsRepositoryContract,
+  'findById' | 'listByApp'
+>;
+
+export class SqliteService extends Service {
+  private readonly deploymentsRepo: SqliteDeploymentsRepositoryContract;
+  private readonly openExecutor: OpenSqliteExecutor;
+  private readonly baseUrl: URL;
+  private readonly selections = new SqliteSelections();
+
+  constructor({
+    deploymentsRepo,
+    openExecutor,
+    baseUrl,
+  }: {
+    deploymentsRepo: SqliteDeploymentsRepositoryContract;
+    openExecutor: OpenSqliteExecutor;
+    baseUrl: URL;
+  }) {
+    super();
+    this.deploymentsRepo = deploymentsRepo;
+    this.openExecutor = openExecutor;
+    this.baseUrl = baseUrl;
+  }
+
+  async select({
+    appId,
+    ownerId,
+    path,
+    signal,
+  }: {
+    appId: AppId;
+    ownerId: OwnerId;
+    path: GuestPath;
+    signal: AbortSignal;
+  }) {
+    const deployments = await this.deploymentsRepo.listByApp({ appId, ownerId });
+    if (deployments.length === 0) {
+      throw new NotFoundError('App deployment not found.');
+    }
+    const deployment = deployments.find(function running(row) {
+      return row.state === 'running';
+    });
+    if (!deployment) {
+      throw new ConflictError('The app needs a running deployment to query its databases.');
+    }
+    const selection = this.selections.create({
+      appId,
+      deploymentId: deployment.id,
+      ownerId,
+      path,
+      nowMs: Date.now(),
+    });
+    try {
+      const executor = await this.openExecutor({ ...selection, signal });
+      await executor.close();
+      signal.throwIfAborted();
+      await this.authorize(selection);
+      return {
+        id: selection.id,
+        appId,
+        deploymentId: selection.deploymentId,
+        path,
+        expiresAt: new Date(selection.expiresAt).toISOString(),
+        url: new URL(`${RoutePrefix.Api}/sqlite/connections/${selection.id}/`, this.baseUrl).href,
+      };
+    } catch (error) {
+      this.selections.remove({ id: selection.id, ownerId, nowMs: Date.now() });
+      throw error;
+    }
+  }
+
+  closeSelection({ id, ownerId }: { id: string; ownerId: OwnerId }): void {
+    this.selections.remove({ id, ownerId, nowMs: Date.now() });
+  }
+
+  private async authorize(selection: SqliteSelection): Promise<void> {
+    const deployment = await this.deploymentsRepo.findById(selection);
+    if (!deployment) {
+      throw new NotFoundError('App deployment not found.');
+    }
+    if (deployment.state !== 'running') {
+      throw new ConflictError('The selected database deployment is no longer running.');
+    }
+  }
+}
