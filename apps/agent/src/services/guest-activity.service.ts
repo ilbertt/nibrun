@@ -8,7 +8,7 @@ type Activity = {
   readonly users: number;
 };
 
-export class CronActivity extends Effect.Service<CronActivity>()('CronActivity', {
+export class GuestActivity extends Effect.Service<GuestActivity>()('GuestActivity', {
   effect: Effect.gen(function* () {
     const state = yield* AgentState;
     const activities = yield* Ref.make(new Map<AppId, Activity>());
