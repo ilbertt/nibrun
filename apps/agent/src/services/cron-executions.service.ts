@@ -6,8 +6,8 @@ import { CronDeploymentMismatch } from '#lib/cron/registry.ts';
 import { guestVsockPath } from '#lib/vm/vsock.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppWaker } from '#services/app-waker.service.ts';
-import { CronActivity } from '#services/cron-activity.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
+import { GuestActivity } from '#services/guest-activity.service.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 
@@ -20,7 +20,7 @@ export class CronExecutions extends Effect.Service<CronExecutions>()('CronExecut
   scoped: Effect.gen(function* () {
     const state = yield* AgentState;
     const cache = yield* DesiredStateCache;
-    const activity = yield* CronActivity;
+    const activity = yield* GuestActivity;
     const waker = yield* AppWaker;
     const vms = yield* VmManager;
     const logs = yield* TenantLogQueue;
@@ -131,7 +131,7 @@ export class CronExecutions extends Effect.Service<CronExecutions>()('CronExecut
   dependencies: [
     AgentState.Default,
     DesiredStateCache.Default,
-    CronActivity.Default,
+    GuestActivity.Default,
     AppWaker.Default,
     VmManager.Default,
     TenantLogQueue.Default,

@@ -2,16 +2,16 @@ import { describe, expect, test } from 'bun:test';
 import { AppIdSchema, Value } from '@repo/protocol';
 import { Clock, Deferred, Effect, Fiber, Layer, Ref, TestClock, TestContext } from 'effect';
 import { AgentState } from '#services/agent-state.service.ts';
-import { CronActivity } from '#services/cron-activity.service.ts';
+import { GuestActivity } from '#services/guest-activity.service.ts';
 import { APP_ID } from '#tests/support/fixtures.ts';
 import { provided } from '#tests/support/run.ts';
 
 const run = provided(
-  Layer.mergeAll(CronActivity.Default, AgentState.Default, TestContext.TestContext),
+  Layer.mergeAll(GuestActivity.Default, AgentState.Default, TestContext.TestContext),
 );
 const OTHER_APP = Value.Parse(AppIdSchema, 'other-app');
 
-function heldRun(activity: CronActivity) {
+function heldRun(activity: GuestActivity) {
   return Effect.gen(function* () {
     const started = yield* Deferred.make<void>();
     const release = yield* Deferred.make<void>();
@@ -33,7 +33,7 @@ describe('cron idle protection', () => {
   test('every overlapping run keeps its app awake until the last one finishes', () =>
     run(
       Effect.gen(function* () {
-        const activity = yield* CronActivity;
+        const activity = yield* GuestActivity;
         const slept = yield* Ref.make(0);
         const sleep = activity.whenIdle({
           appId: APP_ID,
@@ -54,7 +54,7 @@ describe('cron idle protection', () => {
   test('a run does not prevent another app from sleeping', () =>
     run(
       Effect.gen(function* () {
-        const activity = yield* CronActivity;
+        const activity = yield* GuestActivity;
         yield* heldRun(activity);
         const slept = yield* Ref.make(false);
         yield* activity.whenIdle({ appId: OTHER_APP, effect: Ref.set(slept, true) });
@@ -65,7 +65,7 @@ describe('cron idle protection', () => {
   test('a run arriving during capture waits until capture has finished', () =>
     run(
       Effect.gen(function* () {
-        const activity = yield* CronActivity;
+        const activity = yield* GuestActivity;
         const capturing = yield* Deferred.make<void>();
         const captured = yield* Deferred.make<void>();
         const started = yield* Ref.make(false);
@@ -93,7 +93,7 @@ describe('cron idle protection', () => {
   test('cancellation releases protection and restarts the idle interval', () =>
     run(
       Effect.gen(function* () {
-        const activity = yield* CronActivity;
+        const activity = yield* GuestActivity;
         const execution = yield* heldRun(activity);
         yield* TestClock.adjust('10 minutes');
         const now = yield* Clock.currentTimeMillis;
@@ -108,7 +108,7 @@ describe('cron idle protection', () => {
   test('a failed run releases protection and preserves its error', () =>
     run(
       Effect.gen(function* () {
-        const activity = yield* CronActivity;
+        const activity = yield* GuestActivity;
         expect(
           yield* activity.run({ appId: APP_ID, effect: Effect.fail('failed') }).pipe(Effect.flip),
         ).toBe('failed');

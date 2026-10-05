@@ -8,9 +8,9 @@ import { CronDeploymentMismatch } from '#lib/cron/registry.ts';
 import { guestVsockPath } from '#lib/vm/vsock.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppWaker } from '#services/app-waker.service.ts';
-import { CronActivity } from '#services/cron-activity.service.ts';
 import { CronExecutions } from '#services/cron-executions.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
+import { GuestActivity } from '#services/guest-activity.service.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
@@ -32,7 +32,7 @@ import { drainedEvents } from '#tests/support/logs.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const run = provided(
-  Layer.mergeAll(platform, AgentState.Default, CronActivity.Default, TenantLogQueue.Default),
+  Layer.mergeAll(platform, AgentState.Default, GuestActivity.Default, TenantLogQueue.Default),
 );
 const REQUEST = {
   context: {
@@ -54,7 +54,7 @@ const HELD_SCRIPT = cronGuestScript({
 function executionHost(script: CronGuestScript) {
   return Effect.gen(function* () {
     const state = yield* AgentState;
-    const activity = yield* CronActivity;
+    const activity = yield* GuestActivity;
     const queue = yield* TenantLogQueue;
     const directory = yield* temporaryDirectory;
     const guest = yield* servingCronGuest({ directory, script });
@@ -77,7 +77,7 @@ function executionHost(script: CronGuestScript) {
     const received = yield* Deferred.make<void>();
     const dependencies = Layer.mergeAll(
       Layer.succeed(AgentState, state),
-      Layer.succeed(CronActivity, activity),
+      Layer.succeed(GuestActivity, activity),
       Layer.succeed(DesiredStateCache, cache),
       Layer.succeed(
         TenantLogQueue,
@@ -154,7 +154,7 @@ describe('cron dispatch ownership', () => {
         yield* AgentState.putRecord(
           instanceRecord({ state: 'idle', stopRequested: true, onRequest: true }),
         );
-        const activity = yield* CronActivity;
+        const activity = yield* GuestActivity;
         const slept = yield* Ref.make(false);
         yield* Ref.set(
           host.onWake,
@@ -215,7 +215,7 @@ describe('cron dispatch ownership', () => {
             CronDeploymentMismatch,
           );
           const slept = yield* Ref.make(false);
-          yield* (yield* CronActivity).whenIdle({ appId: APP_ID, effect: Ref.set(slept, true) });
+          yield* (yield* GuestActivity).whenIdle({ appId: APP_ID, effect: Ref.set(slept, true) });
           expect(yield* Ref.get(slept)).toBe(true);
         }),
       ),

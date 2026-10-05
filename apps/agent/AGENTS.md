@@ -82,7 +82,7 @@ publishes into the shared tenant log queue. Its caller supplies the job and run 
 dispatch. Queue refusal drops output without stalling a command; sequence gaps identify
 missing records. Decoder remainders are flushed on completion, failure and interruption.
 
-`CronActivity` serializes idle capture against run admission and keeps each overlapping
+`GuestActivity` serializes idle capture against run admission and keeps each overlapping
 run protected until completion. `CronExecutions` owns deployment scopes, wakes idle apps,
 and drains old runs before reconcile replaces or suspends a VM. `CronScheduler` owns the
 future timers: changing a crontab replaces timers while started commands finish in their

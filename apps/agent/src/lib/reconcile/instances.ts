@@ -32,7 +32,7 @@ import { UNKNOWN_UNIT, type UnitStatus } from '#lib/vm/unit-status.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
-import { CronActivity } from '#services/cron-activity.service.ts';
+import { GuestActivity } from '#services/guest-activity.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
@@ -206,7 +206,7 @@ const captureIdleInstance = Effect.fn('captureIdleInstance')(function* ({
 export function suspendInstance(
   request: Parameters<typeof captureIdleInstance>[0] & { quietSinceMs: number | undefined },
 ) {
-  return Effect.flatMap(CronActivity, (activity) =>
+  return Effect.flatMap(GuestActivity, (activity) =>
     activity.whenIdle({
       appId: request.appId,
       effect: Effect.flatMap(AgentState.snapshot, (current) =>
