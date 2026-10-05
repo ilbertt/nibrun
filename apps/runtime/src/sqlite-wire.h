@@ -33,17 +33,17 @@ enum sqlite_wire_type {
 };
 
 struct sqlite_wire {
-  unsigned char *bytes;
+  unsigned char* bytes;
   size_t length;
   size_t position;
   bool failed;
 };
 
-uint64_t sqlite_wire_integer(struct sqlite_wire *wire, size_t width);
-const unsigned char *sqlite_wire_bytes(struct sqlite_wire *wire, size_t length);
-const unsigned char *sqlite_wire_string(struct sqlite_wire *wire, size_t *length);
-void sqlite_wire_write_integer(struct sqlite_wire *wire, uint64_t value, size_t width);
-void sqlite_wire_write_bytes(struct sqlite_wire *wire, const void *bytes, size_t length);
-void sqlite_wire_write_string(struct sqlite_wire *wire, const void *bytes, size_t length);
+uint64_t sqlite_wire_integer(struct sqlite_wire* wire, size_t width);
+const unsigned char* sqlite_wire_bytes(struct sqlite_wire* wire, size_t length);
+const unsigned char* sqlite_wire_string(struct sqlite_wire* wire, size_t* length);
+void sqlite_wire_write_integer(struct sqlite_wire* wire, uint64_t value, size_t width);
+void sqlite_wire_write_bytes(struct sqlite_wire* wire, const void* bytes, size_t length);
+void sqlite_wire_write_string(struct sqlite_wire* wire, const void* bytes, size_t length);
 
 #endif
