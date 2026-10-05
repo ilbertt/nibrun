@@ -1,0 +1,110 @@
+import { describe, expect, test } from 'bun:test';
+import {
+  AGENT_API_PREFIX,
+  AGENT_ROUTES,
+  PROTOCOL_VERSION,
+  PROTOCOL_VERSION_HEADER,
+  SecretStringSchema,
+  type SqliteQueryResult,
+  Value,
+} from '@repo/protocol';
+import { Deferred, Effect, Exit, Fiber } from 'effect';
+import { makeControlPlaneClient } from '#lib/control/client.ts';
+import { LOG_SOURCE } from '#tests/support/fixtures.ts';
+import { runScoped } from '#tests/support/run.ts';
+import { HTTP_NO_CONTENT, recordingServer, serving } from '#tests/support/server.ts';
+import { sqliteQuery } from '#tests/support/sqlite-sessions.ts';
+
+const SQLITE_QUERY = sqliteQuery({ type: 'close' });
+const SESSION_TOKEN = Value.Parse(SecretStringSchema, 'session-token');
+
+describe('SQLite query transport', () => {
+  test('polls carry served deployments and validate the query response', () =>
+    runScoped(
+      Effect.gen(function* () {
+        const { baseUrl, received } = yield* recordingServer({
+          body: { result: 'query', query: SQLITE_QUERY },
+        });
+        const response = yield* makeControlPlaneClient({ baseUrl }).fetchSqliteQuery({
+          sessionToken: SESSION_TOKEN,
+          request: { servedDeployments: [LOG_SOURCE] },
+        });
+        expect(response).toEqual({ result: 'query', query: SQLITE_QUERY });
+        expect(received[0]?.url).toBe(`${baseUrl}${AGENT_API_PREFIX}${AGENT_ROUTES.sqliteQuery}`);
+        expect(received[0]?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+        expect(received[0]?.headers[PROTOCOL_VERSION_HEADER]).toBe(String(PROTOCOL_VERSION));
+        expect(JSON.parse(received[0]!.body)).toEqual({ servedDeployments: [LOG_SOURCE] });
+      }),
+    ));
+
+  test('results are posted on their own route and acknowledge without a body', () =>
+    runScoped(
+      Effect.gen(function* () {
+        const { baseUrl, received } = yield* recordingServer({ status: HTTP_NO_CONTENT });
+        const result: SqliteQueryResult = {
+          queryId: SQLITE_QUERY.queryId,
+          outcome: { status: 'closed' },
+        };
+        expect(
+          yield* makeControlPlaneClient({ baseUrl }).sendSqliteQueryResult({
+            sessionToken: SESSION_TOKEN,
+            result,
+          }),
+        ).toBeUndefined();
+        expect(received[0]?.url).toBe(
+          `${baseUrl}${AGENT_API_PREFIX}${AGENT_ROUTES.sqliteQueryResult}`,
+        );
+        expect(JSON.parse(received[0]!.body)).toEqual(result);
+      }),
+    ));
+
+  test('a malformed deployment-scoped response is rejected at the boundary', () =>
+    runScoped(
+      Effect.gen(function* () {
+        const { baseUrl } = yield* recordingServer({
+          body: {
+            result: 'query',
+            query: { queryId: SQLITE_QUERY.queryId, appId: SQLITE_QUERY.appId },
+          },
+        });
+        const error = yield* Effect.flip(
+          makeControlPlaneClient({ baseUrl }).fetchSqliteQuery({
+            sessionToken: SESSION_TOKEN,
+            request: { servedDeployments: [LOG_SOURCE] },
+          }),
+        );
+        expect(String(error)).toContain('does not match the protocol');
+      }),
+    ));
+
+  test('interrupting a held poll closes the HTTP request, not just its waiting fiber', () =>
+    runScoped(
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>();
+        const disconnected = yield* Deferred.make<void>();
+        const { baseUrl } = yield* serving((request) => {
+          Effect.runSync(Deferred.succeed(started, undefined));
+          return new Promise<Response>((resolve) => {
+            request.signal.addEventListener(
+              'abort',
+              () => {
+                Effect.runSync(Deferred.succeed(disconnected, undefined));
+                resolve(new Response(null, { status: HTTP_NO_CONTENT }));
+              },
+              { once: true },
+            );
+          });
+        });
+        const poll = yield* Effect.forkScoped(
+          makeControlPlaneClient({ baseUrl }).fetchSqliteQuery({
+            sessionToken: SESSION_TOKEN,
+            request: { servedDeployments: [LOG_SOURCE] },
+          }),
+        );
+        yield* Deferred.await(started);
+        const exit = yield* Fiber.interrupt(poll);
+        yield* Deferred.await(disconnected).pipe(Effect.timeout('1 second'));
+        expect(Exit.isInterrupted(exit)).toBe(true);
+      }),
+    ));
+});
