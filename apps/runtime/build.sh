@@ -21,6 +21,8 @@ docker build \
   --platform=linux/amd64 \
   --build-arg BUILDER_IMAGE="$BUILDER_IMAGE" \
   --build-arg DEBIAN_SNAPSHOT="$DEBIAN_SNAPSHOT" \
+    --build-arg SQLITE_ARCHIVE="$SQLITE_ARCHIVE" \
+    --build-arg SQLITE_SHA256="$SQLITE_SHA256" \
   --target=init \
   --output "type=local,dest=$dist" \
   --progress=plain \
