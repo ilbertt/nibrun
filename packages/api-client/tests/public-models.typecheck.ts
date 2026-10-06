@@ -4,7 +4,6 @@ import type {
   CronListing,
   Filename,
   GuestPath,
-  RuntimeValueName,
   TenantEnvironmentPatch,
 } from '#models.ts';
 import type { PublicApiClient } from '#public.ts';
@@ -24,5 +23,4 @@ export type PublicModelAssertions = [
   Assert<Equal<GuestPath, string>>,
   Assert<Equal<App['createdAt'], string>>,
   Assert<'unknown' extends App['state'] ? false : true>,
-  Assert<'NIBRUN_UNKNOWN' extends RuntimeValueName ? false : true>,
 ];

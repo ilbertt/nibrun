@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./runtime-values": "./src/lib/runtime-values.ts"
   },
   "imports": {
     "#*": "./src/*"

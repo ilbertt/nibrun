@@ -1,4 +1,5 @@
 import { Type } from '@sinclair/typebox';
+import { RUNTIME_VALUE_NAMES, RUNTIME_VALUE_PREFIX } from '#lib/runtime-values.ts';
 import { secretString } from '#lib/secret.ts';
 import { stringEnum } from '#lib/string-enum.ts';
 import { HostnameSchema, HttpPortSchema } from '#lib/wire.ts';
@@ -15,15 +16,7 @@ import {
  * turns that into something an owner is told, rather than a variable they set and nobody carries.
  */
 const ENVIRONMENT_NAME_PATTERN = '^(?!__proto__$)[A-Za-z_][A-Za-z0-9_]*$';
-const RUNTIME_VALUE_PREFIX = 'NIBRUN_';
-export const RUNTIME_ENVIRONMENT_VALUES = {
-  DATA_DIR: `${RUNTIME_VALUE_PREFIX}DATA_DIR`,
-  EXTRA_PUBLIC_PORT: `${RUNTIME_VALUE_PREFIX}EXTRA_PUBLIC_PORT`,
-  HOSTNAME: `${RUNTIME_VALUE_PREFIX}HOSTNAME`,
-  HTTP_PORT: `${RUNTIME_VALUE_PREFIX}HTTP_PORT`,
-  PUBLIC_IPV4: `${RUNTIME_VALUE_PREFIX}PUBLIC_IPV4`,
-} as const;
-const OFFERED_RUNTIME_VALUES = Object.values(RUNTIME_ENVIRONMENT_VALUES).join('|');
+const OFFERED_RUNTIME_VALUES = RUNTIME_VALUE_NAMES.join('|');
 const NAME_CHARACTER = '[A-Za-z0-9_]';
 
 // Complete unknown references fail in the guest; bare names and unmatched braces stay literal.

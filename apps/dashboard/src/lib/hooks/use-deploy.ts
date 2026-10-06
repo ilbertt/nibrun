@@ -23,7 +23,7 @@ import { SessionIdentity } from '#lib/session-identity.ts';
 type Configured = {
   args: TenantArguments;
   environment?: TenantEnvironmentPatch | undefined;
-  port: number | undefined;
+  port: number;
 };
 
 export type DeployRequest = Configured & {

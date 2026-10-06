@@ -9,5 +9,7 @@ Runtime code must not import API or protocol implementation. Biome enforces this
 or policy here, and never generate a separate client contract. If Treaty loses information,
 fix the API route model. Public models expose JSON primitives, leaving brands inside the API.
 
-The API validates requests and exposes any defaults or metadata consumers need through HTTP
-responses. Consumers own presentation, input syntax, and operation orchestration.
+The API validates requests. Shared static defaults come from `@repo/api-constants`; clients that
+construct runtime references use `@repo/protocol/runtime-values`. Neither belongs in a generated
+client contract or a new configuration endpoint. Consumers own presentation, input syntax and
+operation orchestration.

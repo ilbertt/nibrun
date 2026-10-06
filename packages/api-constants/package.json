@@ -1,5 +1,5 @@
 {
-  "name": "@repo/deploy-link",
+  "name": "@repo/api-constants",
   "private": true,
   "type": "module",
   "exports": {
@@ -9,17 +9,10 @@
     "#*": "./src/*"
   },
   "scripts": {
-    "test": "bun test",
     "check:types": "bun run --bun tsc"
-  },
-  "dependencies": {
-    "@repo/app-operations": "workspace:*",
-    "@repo/api-client": "workspace:*",
-    "@repo/protocol": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
-    "@tanstack/react-router": "catalog:",
     "typescript": "catalog:"
   }
 }

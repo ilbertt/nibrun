@@ -1,0 +1,10 @@
+export const DEFAULT_HTTP_PORT = 3000;
+export const DEFAULT_VOLUME_SIZE_BYTES = 8_589_934_592;
+
+const DEFAULT_VCPU_COUNT = 1;
+const DEFAULT_MEMORY_MIB = 256;
+
+export const DEFAULT_INSTANCE_RESOURCES = {
+  vcpuCount: DEFAULT_VCPU_COUNT,
+  memoryMib: DEFAULT_MEMORY_MIB,
+} as const;

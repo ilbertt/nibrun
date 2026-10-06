@@ -1,12 +1,11 @@
+import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
 import { AppIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
 import { ArtifactIdSchema, ImportIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
-  DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
-  DEFAULT_VOLUME_SIZE_BYTES,
 } from '#lib/app-config-defaults.ts';
 import type {
   DeploymentByIdInput,

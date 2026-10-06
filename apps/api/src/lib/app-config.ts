@@ -1,12 +1,11 @@
+import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
 import type { AppConfig, SecretString, TenantEnvironment } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { TenantEnvironmentPatch } from '#lib/api/environment.ts';
 import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
-  DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
-  DEFAULT_VOLUME_SIZE_BYTES,
 } from '#lib/app-config-defaults.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';

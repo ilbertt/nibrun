@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
 import {
   type DeploymentId,
   HostPortSchema,
@@ -15,12 +16,7 @@ import {
 import { schema } from '#db/queries.gen.ts';
 import type { DeploymentState } from '#lib/api/deployment.ts';
 import type { PublicAppConfig } from '#lib/app-config.ts';
-import {
-  DEFAULT_HEALTH_CHECK,
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_RESTART_POLICY,
-  DEFAULT_VOLUME_SIZE_BYTES,
-} from '#lib/app-config-defaults.ts';
+import { DEFAULT_HEALTH_CHECK, DEFAULT_RESTART_POLICY } from '#lib/app-config-defaults.ts';
 import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import type {

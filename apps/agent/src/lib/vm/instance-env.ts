@@ -9,6 +9,10 @@ import type {
   TenantArguments,
   TenantEnvironment,
 } from '@repo/protocol';
+import {
+  RUNTIME_ENVIRONMENT_VALUES,
+  RUNTIME_VALUE_PREFIX as RUNTIME_PREFIX,
+} from '@repo/protocol/runtime-values';
 import { Data, Effect, Either } from 'effect';
 import { stdoutOf } from '#services/command-runner.service.ts';
 
@@ -20,7 +24,6 @@ const PRIVATE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
 
 /** The two namespaces the runtime parses, so a tenant variable called NIBRUN_HTTP_PORT stays the tenant's. */
-const RUNTIME_PREFIX = 'NIBRUN_';
 const TENANT_PREFIX = 'ENV_';
 
 const FORBIDDEN_VALUE_CHARACTERS = /[\n\r\0]/;
@@ -84,13 +87,13 @@ export function renderInstanceEnv({
 }: InstanceEnvContent): Either.Either<string, UnrepresentableEnvironment> {
   const hostname = platformHostname(hostnames);
   const lines = [
-    `${RUNTIME_PREFIX}HTTP_PORT=${httpPort}`,
-    ...(hostname === undefined ? [] : [`${RUNTIME_PREFIX}HOSTNAME=${hostname}`]),
+    `${RUNTIME_ENVIRONMENT_VALUES.HTTP_PORT}=${httpPort}`,
+    ...(hostname === undefined ? [] : [`${RUNTIME_ENVIRONMENT_VALUES.HOSTNAME}=${hostname}`]),
     ...(publicAddress === undefined
       ? []
       : [
-          `${RUNTIME_PREFIX}PUBLIC_IPV4=${publicAddress.ipv4}`,
-          `${RUNTIME_PREFIX}EXTRA_PUBLIC_PORT=${publicAddress.port}`,
+          `${RUNTIME_ENVIRONMENT_VALUES.PUBLIC_IPV4}=${publicAddress.ipv4}`,
+          `${RUNTIME_ENVIRONMENT_VALUES.EXTRA_PUBLIC_PORT}=${publicAddress.port}`,
         ]),
     `${RUNTIME_PREFIX}MAX_RESTARTS=${restartPolicy.maxRestarts}`,
     `${RUNTIME_PREFIX}INITIAL_BACKOFF_MS=${restartPolicy.initialBackoffMs}`,

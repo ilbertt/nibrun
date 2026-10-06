@@ -1,5 +1,6 @@
 import type { CommandOption } from '@parshjs/core';
 import { DASHBOARD_SITE } from '@repo/global-constants';
+import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime-values';
 import { z } from 'zod';
 import packageJson from '../package.json' with { type: 'json' };
 
@@ -46,7 +47,7 @@ export const SHARED_OPTIONS = {
     name: 'env',
     option: {
       schema: z.array(z.string()).optional(),
-      description: `Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. Runtime values are listed in the dashboard. Quote a reference, as in 'URL=https://\${NIBRUN_HOSTNAME}', or the shell expands it here instead. References to the assigned public port and address need --${EXTRA_PUBLIC_PORT_FLAG} on the same app.`,
+      description: `Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. Runtime values are listed in the dashboard. Quote a reference, as in 'URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}', or the shell expands it here instead. References to the assigned public port and address need --${EXTRA_PUBLIC_PORT_FLAG} on the same app.`,
     },
   },
   extraPublicPort: {

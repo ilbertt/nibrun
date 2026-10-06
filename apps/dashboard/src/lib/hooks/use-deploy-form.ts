@@ -1,4 +1,5 @@
 import { trackEvent } from '@repo/analytics';
+import { DEFAULT_HTTP_PORT } from '@repo/api-constants';
 import {
   type DeployableBinary,
   type FetchableBinary,
@@ -26,7 +27,6 @@ import {
 } from '#lib/environment-variables.ts';
 import { discardHandedOffBinary } from '#lib/handoff-store.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
-import { useConfiguration } from '#lib/hooks/use-configuration.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployFormAnalytics } from '#lib/hooks/use-deploy-form-analytics.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
@@ -176,7 +176,6 @@ export function useDeployForm({
   binary: File | undefined;
   suggested?: DeploySuggestion | undefined;
 }): DeployFormState {
-  const configuration = useConfiguration();
   const { start } = useDeployRun();
   useDeployFormAnalytics({ appId, suggested });
   const apps = useApps();
@@ -204,9 +203,7 @@ export function useDeployForm({
     locked,
     replacing,
     targetResolved,
-    defaultPort: String(
-      replacing?.config.httpPort ?? configuration.data?.appDefaults.httpPort ?? '',
-    ),
+    defaultPort: String(replacing?.config.httpPort ?? DEFAULT_HTTP_PORT),
     defaultExtraPublicPort: replacing?.config.hasExtraPublicPort ?? false,
     defaultArgs: replacing?.config.args.join('\n') ?? '',
     portOffered,
@@ -278,8 +275,8 @@ function asReleaseRequest({
   value: DeployFormValues;
   replacing: AppSummary | undefined;
 }): ReleaseRequest | undefined {
-  const port = value.port === undefined ? undefined : Number(value.port);
-  if (port !== undefined && !Number.isInteger(port)) {
+  const port = Number(value.port ?? replacing?.config.httpPort ?? DEFAULT_HTTP_PORT);
+  if (!Number.isInteger(port)) {
     return undefined;
   }
 

@@ -30,7 +30,9 @@
     "react-dom": "catalog:",
     "sonner": "catalog:",
     "tailwindcss": "catalog:",
-    "@repo/analytics": "workspace:*"
+    "@repo/analytics": "workspace:*",
+    "@repo/api-constants": "workspace:*",
+    "@repo/protocol": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

@@ -30,7 +30,6 @@ import { AgentService } from '#services/agent.service.ts';
 import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
-import { ConfigurationService } from '#services/configuration.service.ts';
 import { CronsService } from '#services/crons.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
 import { DomainDnsService } from '#services/domain-dns.service.ts';
@@ -222,9 +221,4 @@ export const ExportsServicePlugin = new Elysia({ name: 'service.exports' }).deco
 export const ImportsServicePlugin = new Elysia({ name: 'service.imports' }).decorate(
   'importsService',
   importsService,
-);
-
-export const ConfigurationServicePlugin = new Elysia({ name: 'configuration-service' }).decorate(
-  'configurationService',
-  new ConfigurationService(),
 );

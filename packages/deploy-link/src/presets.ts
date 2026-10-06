@@ -1,4 +1,4 @@
-import type { RuntimeValueName } from '@repo/api-client/models';
+import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime-values';
 import type { DeployLink } from '#link.ts';
 import boopPage from '../content/boop.md?raw';
 import contextUsePage from '../content/context-use.md?raw';
@@ -88,8 +88,8 @@ export const DEPLOY_PRESETS = {
       env: [
         'SHARKORD_DATA_PATH=data',
         'SHARKORD_AUTOUPDATE=false',
-        `SHARKORD_WEBRTC_PORT=${runtimeReference('NIBRUN_EXTRA_PUBLIC_PORT')}`,
-        `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS=${runtimeReference('NIBRUN_PUBLIC_IPV4')}`,
+        `SHARKORD_WEBRTC_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name)}`,
+        `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS=${interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}`,
       ],
       minimal: true,
     },
@@ -108,9 +108,9 @@ export const DEPLOY_PRESETS = {
       sha256: 'e68ea6a7dec4bf6f8fe6133735b0b1db4ccb4089d5e6b76e9813a1a63f4797a8',
       port: 8080,
       env: [
-        `BOOP_PORT=${runtimeReference('NIBRUN_HTTP_PORT')}`,
-        `BOOP_DATABASE_PATH=${runtimeReference('NIBRUN_DATA_DIR')}/boop.db`,
-        `BOOP_BASE_URL=https://${runtimeReference('NIBRUN_HOSTNAME')}`,
+        `BOOP_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+        `BOOP_DATABASE_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/boop.db`,
+        `BOOP_BASE_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
         // Carried without values: the pair is what stands between the admin api and everyone who
         // reaches the url, and a link is read by more people than the one who follows it.
         'BOOP_ADMIN_USER',
@@ -152,8 +152,8 @@ export const DEPLOY_PRESETS = {
       port: 3000,
       env: [
         'HOST=0.0.0.0',
-        `OOMOL_CONNECT_DATA_DIR=${runtimeReference('NIBRUN_DATA_DIR')}`,
-        `OOMOL_CONNECT_ORIGIN=https://${runtimeReference('NIBRUN_HOSTNAME')}`,
+        `OOMOL_CONNECT_DATA_DIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        `OOMOL_CONNECT_ORIGIN=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
         // The catalog held in memory is the largest allocation openconnector makes, and upstream
         // names the 256 MiB machine as the case for reading its schemas off disk instead.
         'OOMOL_CONNECT_CATALOG_LAZY_SCHEMAS=true',
@@ -214,7 +214,7 @@ export const DEPLOY_PRESETS = {
       port: 4001,
       arg: ['-db', '/app/data/store.db'],
       env: [
-        `PORT=${runtimeReference('NIBRUN_HTTP_PORT')}`,
+        `PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
         'PS_BEHIND_PROXY=true',
         'PS_SHARED_SECRET',
       ],
@@ -235,9 +235,9 @@ export const DEPLOY_PRESETS = {
       sha256: 'd99bf9de5e947cd41f7f1ae59e1e97d9af933d1bcc2d1316b3ab1ffe0a69e5c0',
       port: 5230,
       env: [
-        `MEMOS_PORT=${runtimeReference('NIBRUN_HTTP_PORT')}`,
+        `MEMOS_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
         'MEMOS_ADDR=0.0.0.0',
-        `MEMOS_DATA=${runtimeReference('NIBRUN_DATA_DIR')}`,
+        `MEMOS_DATA=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
       ],
       minimal: true,
     },
@@ -256,7 +256,7 @@ export const DEPLOY_PRESETS = {
       sha256: '20552c4d91c720dc9786d73a7f5b68abd9ed32addb177861f89ea5d4e5937d3f',
       port: 8080,
       arg: ['serve', '--address', '0.0.0.0', '--port', '8080'],
-      env: [`SHIORI_DIR=${runtimeReference('NIBRUN_DATA_DIR')}`],
+      env: [`SHIORI_DIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`],
       minimal: true,
     },
   },
@@ -273,8 +273,8 @@ export const DEPLOY_PRESETS = {
       sha256: '46bbc00d928eed56432a1a8d7bf75c6715b7fbc07594bc7128cbafee492d3dc6',
       port: 8080,
       env: [
-        `FUSION_PORT=${runtimeReference('NIBRUN_HTTP_PORT')}`,
-        `FUSION_DB_PATH=${runtimeReference('NIBRUN_DATA_DIR')}/fusion.db`,
+        `FUSION_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+        `FUSION_DB_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/fusion.db`,
         // Carried without a value: it is the whole of what stands between the feeds and everyone
         // else who reaches the url.
         'FUSION_PASSWORD',
@@ -345,11 +345,11 @@ export const DEPLOY_PRESETS = {
       sha256: '3d6285b4520340c0611875916a7b1dbfa880973541f044c3d18efce799725f45',
       port: 8080,
       env: [
-        `MICROBIN_PORT=${runtimeReference('NIBRUN_HTTP_PORT')}`,
+        `MICROBIN_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
         'MICROBIN_BIND=0.0.0.0',
-        `MICROBIN_DATA_DIR=${runtimeReference('NIBRUN_DATA_DIR')}`,
+        `MICROBIN_DATA_DIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
         // The address it prints into the links it hands out, which is the one the reader followed.
-        `MICROBIN_PUBLIC_PATH=https://${runtimeReference('NIBRUN_HOSTNAME')}`,
+        `MICROBIN_PUBLIC_PATH=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
         'MICROBIN_ADMIN_USERNAME',
         'MICROBIN_ADMIN_PASSWORD',
       ],
@@ -399,14 +399,14 @@ export const DEPLOY_PRESETS = {
       port: 8080,
       arg: ['server'],
       env: [
-        `REMARK_URL=https://${runtimeReference('NIBRUN_HOSTNAME')}`,
+        `REMARK_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
         'LISTEN=0.0.0.0:8080',
-        `STORE_BOLT_PATH=${runtimeReference('NIBRUN_DATA_DIR')}`,
-        `BACKUP_PATH=${runtimeReference('NIBRUN_DATA_DIR')}/backup`,
+        `STORE_BOLT_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        `BACKUP_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/backup`,
         // Both default under `./var`, which is the working directory the tenant cannot write: left
         // alone it panics on the first mkdir rather than starting.
-        `IMAGE_FS_PATH=${runtimeReference('NIBRUN_DATA_DIR')}/pictures`,
-        `AVATAR_FS_PATH=${runtimeReference('NIBRUN_DATA_DIR')}/avatars`,
+        `IMAGE_FS_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/pictures`,
+        `AVATAR_FS_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/avatars`,
         'SECRET',
       ],
       minimal: true,
@@ -426,9 +426,9 @@ export const DEPLOY_PRESETS = {
       sha256: 'c14012c5d4975c23e8214770bba02a106de7fa8fcf1d10c7a127ebec30536639',
       port: 3030,
       env: [
-        `TRAGGO_PORT=${runtimeReference('NIBRUN_HTTP_PORT')}`,
+        `TRAGGO_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
         'TRAGGO_DATABASE_DIALECT=sqlite3',
-        `TRAGGO_DATABASE_CONNECTION=${runtimeReference('NIBRUN_DATA_DIR')}/traggo.db`,
+        `TRAGGO_DATABASE_CONNECTION=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/traggo.db`,
         'TRAGGO_DEFAULT_USER_NAME',
         'TRAGGO_DEFAULT_USER_PASS',
       ],
@@ -448,11 +448,11 @@ export const DEPLOY_PRESETS = {
       sha256: 'd452faad071981d191d5c95f70d0f9520dc2ef2336b2b03055e12cfabfbae2d2',
       port: 8080,
       env: [
-        `GOTIFY_SERVER_PORT=${runtimeReference('NIBRUN_HTTP_PORT')}`,
+        `GOTIFY_SERVER_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
         'GOTIFY_DATABASE_DIALECT=sqlite3',
-        `GOTIFY_DATABASE_CONNECTION=${runtimeReference('NIBRUN_DATA_DIR')}/gotify.db`,
-        `GOTIFY_UPLOADEDIMAGESDIR=${runtimeReference('NIBRUN_DATA_DIR')}/images`,
-        `GOTIFY_PLUGINSDIR=${runtimeReference('NIBRUN_DATA_DIR')}/plugins`,
+        `GOTIFY_DATABASE_CONNECTION=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/gotify.db`,
+        `GOTIFY_UPLOADEDIMAGESDIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/images`,
+        `GOTIFY_PLUGINSDIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/plugins`,
         'GOTIFY_DEFAULTUSER_PASS',
       ],
       minimal: true,
@@ -474,10 +474,10 @@ export const DEPLOY_PRESETS = {
       arg: ['server'],
       env: [
         'FLIPT_SERVER_HOST=0.0.0.0',
-        `FLIPT_SERVER_HTTP_PORT=${runtimeReference('NIBRUN_HTTP_PORT')}`,
+        `FLIPT_SERVER_HTTP_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
         // v2 keeps the flags in a git repository it writes under `$HOME`, which is a directory the
         // tenant does not own — so it is given one it does.
-        `HOME=${runtimeReference('NIBRUN_DATA_DIR')}`,
+        `HOME=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
       ],
       minimal: true,
     },
@@ -529,7 +529,7 @@ export const DEPLOY_PRESETS = {
       port: 7070,
       env: [
         'YARR_ADDR=0.0.0.0:7070',
-        `YARR_DB=${runtimeReference('NIBRUN_DATA_DIR')}/yarr.db`,
+        `YARR_DB=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/yarr.db`,
         // Carried without a value, as `username:password`: yarr serves its api to anyone who
         // asks until this is set.
         'YARR_AUTH',
@@ -546,8 +546,4 @@ export const DEPLOY_PRESET_SLUGS = Object.keys(DEPLOY_PRESETS) as [DeploySlug, .
 
 export function findPreset(slug: string): DeployPreset | undefined {
   return Object.hasOwn(DEPLOY_PRESETS, slug) ? DEPLOY_PRESETS[slug as DeploySlug] : undefined;
-}
-
-function runtimeReference(name: RuntimeValueName): string {
-  return `\${${name}}`;
 }

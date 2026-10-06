@@ -1,3 +1,4 @@
+import { DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
 import {
   type AppConfig,
   type AppHostname,
@@ -11,7 +12,6 @@ import {
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import { toRunConfig } from '#lib/app-config.ts';
-import { DEFAULT_VOLUME_SIZE_BYTES } from '#lib/app-config-defaults.ts';
 import {
   openEnvironment,
   type SealedEnvironment,

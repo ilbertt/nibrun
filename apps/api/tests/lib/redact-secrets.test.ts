@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { DEFAULT_INSTANCE_RESOURCES } from '@repo/api-constants';
 import {
   AppIdSchema,
   DeploymentIdSchema,
@@ -17,7 +18,6 @@ import {
 import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
-  DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
 } from '#lib/app-config-defaults.ts';
 import { REDACTED, redactSecrets } from '#lib/redact-secrets.ts';

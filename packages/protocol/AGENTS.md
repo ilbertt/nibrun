@@ -7,7 +7,8 @@ around.
 
 ## What belongs here
 
-Before adding anything, name the API–agent message that carries it. Sharing code between the
+Before adding anything, name the API–agent message that carries it or the runtime-reference
+semantics needed to interpret an environment value in that message. Sharing code between the
 two apps is not enough to put it here. Sharing it with the dashboard, CLI or website is not
 enough either. Neither app may import the other app to share a definition; both ends of a
 communication contract import it from this package.
@@ -18,6 +19,8 @@ communication contract import it from this package.
 - Tenant log messages produced by the agent and consumed by the API, including their stream
   vocabulary and cron run IDs. The log store transports these messages; it does not own their shape.
 - Schemas, derived types, identifiers, state vocabularies, and bounds used by those messages.
+- Runtime-reference names, descriptions, extra-port requirements and interpolation syntax.
+  The environment schema, API, agent and client recipes derive from this one vocabulary.
 - Small helpers required to define or validate those wire schemas, including brands and secret
   annotations. General application utilities belong to their owning app.
 
@@ -29,7 +32,8 @@ The directory names describe how the contract is organized:
 
 - `src/control/` defines the API–agent messages and transport metadata.
 - `src/schemas/` defines the values those messages carry, with types derived from each schema.
-- `src/lib/` supports those wire definitions and their validation.
+- `src/lib/` supports those wire definitions and their validation. `runtime-values.ts` owns the
+  runtime-reference vocabulary and helpers and has no schema or application imports.
 - `src/index.ts` exports the contract; it must not become an application utility barrel.
 
 ## What belongs elsewhere
@@ -38,7 +42,8 @@ The directory names describe how the contract is organized:
 | --- | --- |
 | Public API resource schemas, owner IDs, app names, app/deployment lifecycle states | `apps/api/src/lib/api/` |
 | DNS record schemas and construction | `apps/api/src/lib/dns-records.ts` |
-| Configuration defaults and runtime reference descriptions | `apps/api/src/lib/` |
+| Shared static API defaults used by clients | `packages/api-constants/` |
+| API-only health, restart and business policy defaults | `apps/api/src/lib/` |
 | Owner-only input schemas and log query schemas | `apps/api/src/lib/api/` |
 | API business policy and domain verification | `apps/api/src/lib/` and `apps/api/src/services/` |
 | Log deduplication | `apps/api/src/lib/seen-tenant-logs.ts` |
@@ -55,8 +60,9 @@ Its shared schema belongs here; store clients, indexing choices, query defaults,
 do not. Log shipping uses its own path so a log burst cannot delay control traffic.
 
 Environment values are carried to the agent and then interpreted by the guest. Their reference
-names and validation belong to the wire contract; API descriptions and configuration-dependent
-checks belong to the API. Moving ownership must not relax validation or duplicate that vocabulary.
+names, descriptions, validation and interpolation belong to this wire contract. The API owns
+configuration-dependent enforcement, using the shared reference helpers. Moving ownership must
+not relax validation or duplicate that vocabulary.
 
 **The agent must not depend on `@repo/api`, including every API subpath, in source or tests.**
 An import being pure or safe to bundle does not make an application dependency acceptable.
@@ -64,9 +70,11 @@ Protocol must not depend on either app, and API must not import agent implementa
 Biome enforces the agent-to-API import boundary.
 
 Public consumers must use `@repo/api-client`, deriving request and response types from its
-exported Treaty client. They may not import API or protocol implementation files, including in
-tests. Fix incomplete Treaty inference in API route models; never generate a second public contract
-or export wire schemas to public consumers.
+exported Treaty client. They may not import API implementation or protocol schemas, including
+in tests. The only public protocol import is `@repo/protocol/runtime-values`, so clients can
+construct and explain runtime references without copying names or formatting helpers. Fix
+incomplete Treaty inference in API route models; never generate a second public contract or
+export wire schemas to public consumers.
 Do not duplicate field definitions, enums or bounds, and do not add an API schema/helper barrel.
 Biome enforces the public consumer boundary and prevents protocol dependencies on another workspace package.
 

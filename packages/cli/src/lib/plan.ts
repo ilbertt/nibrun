@@ -3,6 +3,7 @@ import { confirm, note, select, text } from '@clack/prompts';
 import type { TenantArguments } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
+import { DEFAULT_HTTP_PORT } from '@repo/api-constants';
 import { appFor } from '@repo/app-operations';
 import type { AddressedApp } from '#lib/apps.ts';
 import { CancelledError } from '#lib/errors.ts';
@@ -63,9 +64,7 @@ async function fillGaps({
   return {
     ...options,
     name: options.name ?? (await askName({ suggestion: basename(binarySource) })),
-    port:
-      options.port ??
-      (await askPort(unwrap(await api.api.configuration.get()).appDefaults.httpPort)),
+    port: options.port ?? (await askPort()),
   };
 }
 
@@ -105,10 +104,10 @@ async function askName({ suggestion }: { suggestion: string }): Promise<string> 
 }
 
 // Bounds are the api's to enforce; this only refuses what it could not send as a port at all.
-async function askPort(defaultPort: number): Promise<number> {
+async function askPort(): Promise<number> {
   const answer = await text({
     message: 'Which HTTP port does the binary listen on?',
-    initialValue: String(defaultPort),
+    initialValue: String(DEFAULT_HTTP_PORT),
     validate: validatePort,
   });
   return Number(answered(answer));

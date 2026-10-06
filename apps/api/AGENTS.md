@@ -8,8 +8,11 @@ agent socket (see `@repo/protocol`).
 
 Bun + Elysia service.
 
-`src/lib/api/` contains public resource schemas and their derived types. Defaults, DNS record
-construction, runtime reference descriptions, redaction and log deduplication live in `src/lib/`.
+`src/lib/api/` contains public resource schemas and their derived types. API-only defaults,
+DNS record construction, redaction and log deduplication live in `src/lib/`.
+Shared static defaults come from `@repo/api-constants`; runtime-reference names, descriptions
+and interpolation come from `@repo/protocol/runtime-values`. Derive from those sources rather
+than copying values or adding an endpoint to expose them.
 Internal consumers import the defining file directly (`#lib/api/app.ts`), never an API
 schema/helper barrel. Only route types are exported through `@repo/api/types` for api-client.
 Public consumers must use `@repo/api-client`, never API implementation files.
@@ -17,8 +20,7 @@ Public request and response types derive directly from Treaty.
 Keep public models faithful to JSON: `publicSchema` preserves runtime validation while exposing
 ordinary primitives to HTTP callers without internal TypeScript brands. Controllers parse inputs
 into internal brands before calling services. Fix incomplete Treaty inference in these models;
-never generate a separate client contract. Defaults and guest runtime metadata needed by consumers are served
-by `/api/configuration`.
+never generate a separate client contract.
 
 Reuse wire schemas from `@repo/protocol` where public responses carry the same values.
 Public consumers derive those types from the exported Treaty client.

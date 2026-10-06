@@ -1,3 +1,8 @@
+import {
+  EXTRA_PUBLIC_PORT_VALUES,
+  interpolableRuntimeValue,
+  RUNTIME_VALUE_NAMES,
+} from '@repo/protocol/runtime-values';
 import { Button } from '@repo/ui/components/button';
 import {
   Table,
@@ -11,7 +16,16 @@ import { PlusIcon } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
 import { EnvironmentRow } from '#components/apps/environment-row.tsx';
 import { blankVariable, type EnvironmentVariable } from '#lib/environment-variables.ts';
-import { useConfiguration } from '#lib/hooks/use-configuration.ts';
+
+// Named rather than "the last two": they are second and fifth in the list above, and a reader
+// counting from the wrong end sets a variable the deploy then refuses.
+const PORT_VALUE_NAMES = EXTRA_PUBLIC_PORT_VALUES.map((value) =>
+  interpolableRuntimeValue(value.name),
+).join(' and ');
+
+function separatorBefore(index: number): string {
+  return index === RUNTIME_VALUE_NAMES.length - 1 ? ' or ' : ', ';
+}
 
 export function EnvironmentTable({
   variables,
@@ -22,12 +36,6 @@ export function EnvironmentTable({
   onChange: (variables: EnvironmentVariable[]) => void;
   children: ReactNode;
 }) {
-  const { data } = useConfiguration();
-  const runtimeValues = data?.runtimeValues ?? [];
-  const portValueNames = runtimeValues
-    .filter((value) => value.requiresExtraPublicPort)
-    .map((value) => `\${${value.name}}`)
-    .join(' and ');
   function replace(replacement: EnvironmentVariable): void {
     onChange(
       variables.map((variable) => (variable.id === replacement.id ? replacement : variable)),
@@ -78,22 +86,16 @@ export function EnvironmentTable({
         </Button>
         {children}
       </div>
-      {runtimeValues.length === 0 ? (
-        <p className="text-muted-foreground text-xs">
-          Values can reference runtime variables provided by the guest.
-        </p>
-      ) : (
-        <p className="text-muted-foreground text-xs">
-          A value may name one the guest sets, and nothing else:{' '}
-          {[...runtimeValues.entries()].map(([index, { name }]) => (
-            <Fragment key={name}>
-              {index > 0 && (index === runtimeValues.length - 1 ? ' or ' : ', ')}
-              <code className="font-mono">{`\${${name}}`}</code>
-            </Fragment>
-          ))}
-          . {portValueNames} only on an app with an additional port.
-        </p>
-      )}
+      <p className="text-muted-foreground text-xs">
+        A value may name one the guest sets, and nothing else:{' '}
+        {[...RUNTIME_VALUE_NAMES.entries()].map(([index, name]) => (
+          <Fragment key={name}>
+            {index > 0 && separatorBefore(index)}
+            <code className="font-mono">{interpolableRuntimeValue(name)}</code>
+          </Fragment>
+        ))}
+        . {PORT_VALUE_NAMES} only on an app with an additional port.
+      </p>
     </div>
   );
 }

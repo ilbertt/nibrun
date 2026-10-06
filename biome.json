@@ -248,9 +248,10 @@
                     "group": [
                       "@repo/protocol",
                       "@repo/protocol/**",
+                      "!@repo/protocol/runtime-values",
                       "**/packages/protocol/**"
                     ],
-                    "message": "Only API-agent communication depends on protocol. Public consumers use @repo/api-client."
+                    "message": "Public API types come from @repo/api-client. Only the schema-free protocol/runtime-values subpath is public."
                   }
                 ]
               }

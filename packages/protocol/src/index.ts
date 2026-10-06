@@ -80,6 +80,17 @@ export {
 } from '#control/transport.ts';
 export type { Brand, BrandedSchema } from '#lib/brand.ts';
 export {
+  EXTRA_PUBLIC_PORT_VALUES,
+  interpolableRuntimeValue,
+  namesExtraPublicPortValues,
+  RUNTIME_ENVIRONMENT_VALUES,
+  RUNTIME_VALUE_NAMES,
+  RUNTIME_VALUE_PREFIX,
+  RUNTIME_VALUES,
+  type RuntimeValue,
+  type RuntimeValueName,
+} from '#lib/runtime-values.ts';
+export {
   SECRET_ANNOTATION,
   type SecretString,
   SecretStringSchema,
@@ -125,7 +136,6 @@ export {
   IdleTimeoutMsSchema,
   MAX_IDLE_TIMEOUT_MS,
   MIN_IDLE_TIMEOUT_MS,
-  RUNTIME_ENVIRONMENT_VALUES,
   type TenantArguments,
   TenantArgumentsSchema,
   type TenantEnvironment,

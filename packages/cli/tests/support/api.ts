@@ -1,4 +1,3 @@
-import type { Configuration } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { APP_ID, NAME, SLUG } from '#tests/support/app.ts';
 
@@ -9,8 +8,6 @@ export type ListedApp = {
   state?: string;
   hostnames?: Array<{ hostname: string }>;
 };
-
-const DEFAULT_HTTP_PORT_RESPONSE = 3000;
 
 export const RUNNING_DEPLOYMENT = { id: 'deployment-1', state: 'running' };
 
@@ -37,10 +34,8 @@ export function deploymentsHolding(
 export function apiHolding({
   apps,
   underApp = () => ({}),
-  httpPort = DEFAULT_HTTP_PORT_RESPONSE,
 }: {
   apps: ListedApp[] | (() => ListedApp[]);
-  httpPort?: Configuration['appDefaults']['httpPort'];
   underApp?: (addressed: { appId: string }) => object;
 }): PublicApiClient {
   const listing = typeof apps === 'function' ? apps : () => apps;
@@ -64,6 +59,6 @@ export function apiHolding({
   });
 
   return {
-    api: { apps: route, configuration: { get: answering({ appDefaults: { httpPort } }) } },
+    api: { apps: route },
   } as unknown as PublicApiClient;
 }

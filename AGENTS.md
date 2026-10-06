@@ -25,18 +25,19 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
   DNS record names, type metadata, and required-record construction live in
   `apps/api/src/lib/dns-records.ts`. Consumers render the DNS records returned by the API;
   client fixtures describe those responses instead of reconstructing records from templates.
-- `@repo/protocol` owns only API–agent messages and their wire schemas. Public API
-  resource schemas and derived types belong to `apps/api/src/lib/api/`; API defaults and
-  helpers belong to `apps/api/src/lib/`. Import each definition from its owning file,
-  such as `#lib/api/app.ts`; do not add API barrels. External consumers must not import
-  `@repo/api` or `@repo/protocol`; their request and response types derive from the Treaty
-  client exported by `@repo/api-client`. API route models must preserve complete Treaty
-  inference; do not generate a second public contract. Validation stays in the API, and
-  defaults or metadata needed by consumers are served through API responses.
-  Shared environment validation and agent-to-API tenant log messages stay in protocol.
-  Neither app imports the other app; the agent must not depend on `@repo/api`, including in
-  tests. Guest protocols and persistence models belong to `apps/agent/src/lib/`.
-  Biome enforces these import boundaries and prevents protocol dependencies on other workspace packages.
+- Single source of truth is the golden rule: put each definition in the package that owns its
+  meaning and derive every consumer from it. `@repo/protocol` owns API–agent messages, their wire
+  schemas, and runtime-reference names, metadata and interpolation. Public consumers may import
+  only its schema-free `@repo/protocol/runtime-values` subpath to construct those references;
+  their API request and response types derive from the Treaty client in `@repo/api-client`.
+  Shared static API defaults belong to `@repo/api-constants`. API-only defaults, validation,
+  business policy and helpers stay in `apps/api/src/lib/`; public resource schemas live in
+  `apps/api/src/lib/api/`. Import their owning files directly; do not add API barrels or generate
+  a second public contract. Moving shared constants does not justify adding an API endpoint.
+  External consumers must not import `@repo/api`; only api-client may type-import its route types.
+  Neither app imports the other app, including in tests. Guest mechanics and persistence models
+  belong to `apps/agent/src/lib/`. Biome enforces these boundaries and prevents protocol
+  dependencies on other workspace packages.
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
 - Props are always passed — a component we wrote has no optional property. Declare
   `name: T | undefined` rather than `name?: T`, so a call site with nothing to pass says so.

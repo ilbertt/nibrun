@@ -17,13 +17,11 @@ import { AppsAppIdImportsController } from '#routes/api/apps/[appId]/imports/con
 import { AppsAppIdStateController } from '#routes/api/apps/[appId]/state/controller.ts';
 import { AppsController } from '#routes/api/apps/controller.ts';
 import { AuthController } from '#routes/api/auth/controller.ts';
-import { ConfigurationController } from '#routes/api/configuration/controller.ts';
 import { HealthController } from '#routes/api/health/controller.ts';
 
 export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(AuthController)
   .use(HealthController)
-  .use(ConfigurationController)
   .use(AppsController)
   .use(AppsAppIdController)
   .use(AppsAppIdArtifactsController)
