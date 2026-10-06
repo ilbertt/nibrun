@@ -40,6 +40,7 @@
         "@ilbertt/bun-sqlgen": "^0.6.2",
         "@repo/api-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
+        "@repo/sqlite": "workspace:*",
         "@repo/typebox-extensions": "workspace:*",
         "@sinclair/typebox": "catalog:",
         "better-auth": "catalog:",
