@@ -2,12 +2,14 @@ name: build
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - main
 
 jobs:
   build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: build:required
     runs-on: ubuntu-latest
     steps:
