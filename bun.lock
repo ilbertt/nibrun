@@ -22,7 +22,7 @@
         "@effect/platform-bun": "0.91.2",
         "@repo/api-client": "workspace:*",
         "@repo/protocol": "workspace:*",
-        "@sinclair/typebox": "^0.34.52",
+        "@sinclair/typebox": "catalog:",
         "effect": "3.22.1",
       },
       "devDependencies": {
@@ -41,7 +41,7 @@
         "@repo/api-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
         "@repo/typebox-extensions": "workspace:*",
-        "@sinclair/typebox": "^0.34.52",
+        "@sinclair/typebox": "catalog:",
         "better-auth": "catalog:",
         "elysia": "^1.4.30",
         "tldts": "^7.4.13",
@@ -242,7 +242,7 @@
       "name": "@repo/protocol",
       "dependencies": {
         "@repo/typebox-extensions": "workspace:*",
-        "@sinclair/typebox": "^0.34.52",
+        "@sinclair/typebox": "catalog:",
       },
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
@@ -252,7 +252,7 @@
     "packages/typebox-extensions": {
       "name": "@repo/typebox-extensions",
       "dependencies": {
-        "@sinclair/typebox": "^0.34.52",
+        "@sinclair/typebox": "catalog:",
       },
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
@@ -289,6 +289,7 @@
     },
   },
   "catalog": {
+    "@sinclair/typebox": "^0.34.52",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "^1.170.32",
     "@tanstack/router-plugin": "^1.168.35",

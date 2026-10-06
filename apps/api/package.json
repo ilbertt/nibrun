@@ -25,7 +25,7 @@
     "better-auth": "catalog:",
     "elysia": "^1.4.30",
     "tldts": "^7.4.13",
-    "@sinclair/typebox": "^0.34.52",
+    "@sinclair/typebox": "catalog:",
     "@repo/api-constants": "workspace:*",
     "@repo/typebox-extensions": "workspace:*"
   },

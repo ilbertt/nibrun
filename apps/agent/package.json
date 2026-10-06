@@ -17,7 +17,7 @@
     "@repo/api-client": "workspace:*",
     "@repo/protocol": "workspace:*",
     "effect": "3.22.1",
-    "@sinclair/typebox": "^0.34.52"
+    "@sinclair/typebox": "catalog:"
   },
   "devDependencies": {
     "@repo/app-operations": "workspace:*",

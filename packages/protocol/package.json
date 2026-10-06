@@ -14,7 +14,7 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.52",
+    "@sinclair/typebox": "catalog:",
     "@repo/typebox-extensions": "workspace:*"
   },
   "devDependencies": {
