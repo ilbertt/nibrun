@@ -7,6 +7,8 @@ import { AgentFilesystemQueryController } from '#routes/internal/agent/filesyste
 import { AgentFilesystemQueryResultController } from '#routes/internal/agent/filesystem-query-result/controller.ts';
 import { AgentReportedStateController } from '#routes/internal/agent/reported-state/controller.ts';
 import { AgentSessionController } from '#routes/internal/agent/session/controller.ts';
+import { AgentSqliteQueryController } from '#routes/internal/agent/sqlite-query/controller.ts';
+import { AgentSqliteQueryResultController } from '#routes/internal/agent/sqlite-query-result/controller.ts';
 
 // Nothing under here is served to the internet: the public edge answers 404 for
 // the whole prefix and agents reach it over the VPC instead. See the private
@@ -18,4 +20,6 @@ export const InternalController = new Elysia({ prefix: RoutePrefix.Internal })
   .use(AgentFilesystemQueryController)
   .use(AgentFilesystemQueryResultController)
   .use(AgentCronQueryController)
-  .use(AgentCronQueryResultController);
+  .use(AgentCronQueryResultController)
+  .use(AgentSqliteQueryController)
+  .use(AgentSqliteQueryResultController);

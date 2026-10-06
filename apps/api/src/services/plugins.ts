@@ -39,6 +39,7 @@ import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
 import { LogsService } from '#services/logs.service.ts';
+import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
 
 // Read once, where every other piece of the environment is read: a key of the wrong length is a
 // deployment that fails to start rather than one that fails on the first secret written.
@@ -122,6 +123,7 @@ const healthService = new HealthService({
 });
 const filesystemService = new FilesystemService({ deploymentsRepo: deploymentsRepository });
 const cronsService = new CronsService({ deploymentsRepo: deploymentsRepository });
+const sqliteRelayService = new SqliteRelayService();
 const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,
@@ -221,4 +223,9 @@ export const ExportsServicePlugin = new Elysia({ name: 'service.exports' }).deco
 export const ImportsServicePlugin = new Elysia({ name: 'service.imports' }).decorate(
   'importsService',
   importsService,
+);
+
+export const SqliteRelayServicePlugin = new Elysia({ name: 'service.sqliteRelay' }).decorate(
+  'sqliteRelayService',
+  sqliteRelayService,
 );
