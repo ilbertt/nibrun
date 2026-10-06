@@ -37,7 +37,7 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
   External consumers must not import `@repo/api`; only api-client may type-import its route types.
   Neither app imports the other app, including in tests. Guest mechanics and persistence models
   belong to `apps/agent/src/lib/`. Biome enforces these boundaries and prevents protocol
-  dependencies on other workspace packages except `@repo/typebox-extensions`.
+  dependencies on other workspace packages except `@repo/typebox-extensions` and the shared database wire schemas in `@repo/sqlite`.
   Application-independent TypeBox schema construction, branding and public type inference
   belong to `@repo/typebox-extensions`; import them directly rather than re-exporting them
   through protocol. Do not use it for general TypeScript utilities or application schemas.

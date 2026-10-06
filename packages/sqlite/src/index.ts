@@ -36,3 +36,4 @@ export {
   SQLITE_MAX_STATEMENT_LENGTH,
   SQLITE_MAX_VALUE_LENGTH,
 } from '#limits.ts';
+export { SqliteSqlSchema, type SqliteStatement, SqliteStatementSchema } from '#statement.ts';

@@ -80,7 +80,7 @@ export wire schemas to public consumers.
 Do not duplicate field definitions, enums or bounds, and do not add an API schema/helper barrel.
 Generic TypeBox schema constructors, branding and public type inference come directly from
 `@repo/typebox-extensions`; protocol must not define or re-export them. Biome enforces the public consumer boundary and permits
-only that schema-construction package as a workspace runtime dependency.
+that schema-construction package and `@repo/sqlite` as workspace runtime dependencies.
 
 ## Constraints on a change
 
@@ -89,7 +89,7 @@ Import TypeBox runtime helpers such as `Value` and `AssertError` directly from
 
 - **Schemas come from `@sinclair/typebox` directly, never from Elysia's `t`.** Same library, but
   importing it through Elysia would drag a web framework into a binary with no HTTP server in it.
-  TypeBox and `@repo/typebox-extensions` are the only runtime dependencies. This package must
+  TypeBox, `@repo/typebox-extensions`, and `@repo/sqlite` are the only runtime dependencies. This package must
   acquire no application dependencies, side effects, clients, storage access, or runtime-specific
   behavior.
 - Types derive from schemas (`typeof XSchema.static`), state enums from one `const` array. Never
@@ -99,5 +99,11 @@ Import TypeBox runtime helpers such as `Value` and `AssertError` directly from
   whole message — so one instance in a state the reader has not heard of loses that host's entire
   report, not just that instance. The side that reads the enum ships first: a new value on a
   report means the control plane before the agents, and one on desired state means the reverse.
-- Absent means unknown or not applicable. **No field is ever `null`.** Owner environment patches
+- Absent means unknown or not applicable. **No field is ever `null`**, except upstream Hrana fields composed from `@repo/sqlite`. Owner environment patches
   belong to the public API and never travel to an agent.
+
+## SQLite relay
+
+SQLite query envelopes compose the Hrana wire schemas, limits, and resolved statements
+from `@repo/sqlite`. Deployment routing and query outcomes belong here; database models
+stay in that shared package.

@@ -14,8 +14,9 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
-    "@sinclair/typebox": "catalog:",
-    "@repo/typebox-extensions": "workspace:*"
+    "@repo/sqlite": "workspace:*",
+    "@repo/typebox-extensions": "workspace:*",
+    "@sinclair/typebox": "catalog:"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

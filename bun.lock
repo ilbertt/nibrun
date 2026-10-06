@@ -241,6 +241,7 @@
     "packages/protocol": {
       "name": "@repo/protocol",
       "dependencies": {
+        "@repo/sqlite": "workspace:*",
         "@repo/typebox-extensions": "workspace:*",
         "@sinclair/typebox": "catalog:",
       },
