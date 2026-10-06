@@ -1,0 +1,5 @@
+export const SQLITE_MAX_STATEMENT_LENGTH = 65536;
+export const SQLITE_MAX_VALUE_LENGTH = 65536;
+export const SQLITE_MAX_PARAMETERS = 256;
+export const SQLITE_MAX_COLUMNS = 256;
+export const SQLITE_MAX_ROWS = 1000;

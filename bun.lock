@@ -249,6 +249,16 @@
         "typescript": "catalog:",
       },
     },
+    "packages/sqlite": {
+      "name": "@repo/sqlite",
+      "dependencies": {
+        "@sinclair/typebox": "catalog:",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "packages/typebox-extensions": {
       "name": "@repo/typebox-extensions",
       "dependencies": {
@@ -829,6 +839,8 @@
     "@repo/protocol": ["@repo/protocol@workspace:packages/protocol"],
 
     "@repo/runtime": ["@repo/runtime@workspace:apps/runtime"],
+
+    "@repo/sqlite": ["@repo/sqlite@workspace:packages/sqlite"],
 
     "@repo/typebox-extensions": ["@repo/typebox-extensions@workspace:packages/typebox-extensions"],
 
