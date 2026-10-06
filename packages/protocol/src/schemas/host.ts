@@ -1,5 +1,5 @@
+import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
-import { stringEnum } from '#lib/string-enum.ts';
 import { ByteSizeSchema } from '#lib/wire.ts';
 
 const MAX_VERSION_LENGTH = 128;

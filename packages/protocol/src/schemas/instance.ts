@@ -1,5 +1,5 @@
+import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
-import { stringEnum } from '#lib/string-enum.ts';
 
 const MIN_VCPU_COUNT = 1;
 const MAX_VCPU_COUNT = 32;

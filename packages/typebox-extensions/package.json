@@ -1,21 +1,18 @@
 {
-  "name": "@repo/protocol",
+  "name": "@repo/typebox-extensions",
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./runtime-values": "./src/lib/runtime-values.ts"
+    ".": "./src/index.ts"
   },
   "imports": {
     "#*": "./src/*"
   },
   "scripts": {
-    "test": "bun test",
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.52",
-    "@repo/typebox-extensions": "workspace:*"
+    "@sinclair/typebox": "^0.34.52"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

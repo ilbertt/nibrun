@@ -5,9 +5,9 @@ import {
   type Brand,
   type BrandedSchema,
   IdleTimeoutMsSchema,
-  stringEnum,
   TimestampSchema,
 } from '@repo/protocol';
+import { stringEnum } from '@repo/typebox-extensions';
 import { type TString, Type } from '@sinclair/typebox';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';

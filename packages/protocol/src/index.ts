@@ -96,7 +96,6 @@ export {
   SecretStringSchema,
   secretString,
 } from '#lib/secret.ts';
-export { stringEnum } from '#lib/string-enum.ts';
 export {
   isValidMessage,
   type ProtocolIssue,

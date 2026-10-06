@@ -1,4 +1,4 @@
-import { stringEnum } from '#lib/string-enum.ts';
+import { stringEnum } from '@repo/typebox-extensions';
 
 // `deleted` is reported once the filesystem is actually gone, which is what lets the control
 // plane finish deleting an app rather than leave it saying `deleting` forever.

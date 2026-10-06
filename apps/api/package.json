@@ -26,7 +26,8 @@
     "elysia": "^1.4.30",
     "tldts": "^7.4.13",
     "@sinclair/typebox": "^0.34.52",
-    "@repo/api-constants": "workspace:*"
+    "@repo/api-constants": "workspace:*",
+    "@repo/typebox-extensions": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

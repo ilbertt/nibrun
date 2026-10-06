@@ -1,4 +1,4 @@
-import { stringEnum } from '@repo/protocol';
+import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
 
 /**

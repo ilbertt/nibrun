@@ -1,5 +1,5 @@
+import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
-import { stringEnum } from '#lib/string-enum.ts';
 import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } from '#lib/wire.ts';
 import {
   AppConfigSchema,

@@ -270,8 +270,8 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["@repo/**"],
-                    "message": "The API-agent wire contract must not depend on an application or another workspace package."
+                    "group": ["@repo/**", "!@repo/typebox-extensions"],
+                    "message": "The API-agent wire contract may depend only on TypeBox schema extensions, never on applications or other workspace packages."
                   }
                 ]
               }
@@ -325,6 +325,26 @@
                       "**/packages/protocol/**"
                     ],
                     "message": "Client runtime code must not depend on API or protocol implementation. Only type imports from @repo/api/types are allowed."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/typebox-extensions/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@repo/**", "**/apps/**", "**/packages/**"],
+                    "message": "TypeBox extensions must be application-independent and have no workspace runtime dependencies."
                   }
                 ]
               }

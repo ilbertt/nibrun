@@ -22,6 +22,9 @@ ordinary primitives to HTTP callers without internal TypeScript brands. Controll
 into internal brands before calling services. Fix incomplete Treaty inference in these models;
 never generate a separate client contract.
 
+Application-independent TypeBox schema constructors come directly from
+`@repo/typebox-extensions`, never through protocol.
+
 Reuse wire schemas from `@repo/protocol` where public responses carry the same values.
 Public consumers derive those types from the exported Treaty client.
 Shared environment validation and agent-produced tenant log records belong to protocol.

@@ -6,9 +6,9 @@ import {
   InstanceStateSchema,
   Ipv4AddressSchema,
   StateMessageSchema,
-  stringEnum,
   TimestampSchema,
 } from '@repo/protocol';
+import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
 import { ArtifactIdSchema } from '#lib/api/identifiers.ts';
 

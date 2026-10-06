@@ -1,5 +1,5 @@
+import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
-import { stringEnum } from '#lib/string-enum.ts';
 import { TimestampSchema } from '#lib/wire.ts';
 import {
   AppIdSchema,
