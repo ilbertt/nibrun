@@ -1,3 +1,4 @@
+import { LOG_TIMERANGE_PATTERN } from '@repo/api-constants';
 import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
 
@@ -18,10 +19,9 @@ export type LogSource = (typeof LOG_SOURCES)[number];
  * How much history a reader asks for before it starts following, as a duration such as `30s`.
  *
  * A duration rather than a number of lines, because the store is asked for a window of time and a
- * bound in rows is not one it could hold to. The pattern is exported beside the schema: a reader
- * whose validator is not TypeBox still has to refuse the same values this one does.
+ * bound in rows is not one it could hold to. The pattern comes from the shared API constants so
+ * readers with another validator refuse the same values this schema does.
  */
-export const LOG_TIMERANGE_PATTERN = '^[1-9][0-9]{0,3}[smh]$';
 const MAX_LOG_TIMERANGE_LENGTH = 5;
 
 export const LogTimerangeSchema = Type.String({
@@ -31,4 +31,3 @@ export const LogTimerangeSchema = Type.String({
 });
 
 export type LogTimerange = typeof LogTimerangeSchema.static;
-export const DEFAULT_LOG_TIMERANGE = '5m';

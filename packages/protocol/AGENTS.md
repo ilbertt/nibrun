@@ -43,7 +43,7 @@ The directory names describe how the contract is organized:
 | Public API resource schemas, owner IDs, app names, app/deployment lifecycle states | `apps/api/src/lib/api/` |
 | DNS record schemas and construction | `apps/api/src/lib/dns-records.ts` |
 | Application-independent TypeBox schema constructors such as `stringEnum` | `packages/typebox-extensions/` |
-| Shared static API defaults used by clients | `packages/api-constants/` |
+| Shared static API defaults and query syntax constants used by clients | `packages/api-constants/` |
 | API-only health, restart and business policy defaults | `apps/api/src/lib/` |
 | Owner-only input schemas and log query schemas | `apps/api/src/lib/api/` |
 | API business policy and domain verification | `apps/api/src/lib/` and `apps/api/src/services/` |

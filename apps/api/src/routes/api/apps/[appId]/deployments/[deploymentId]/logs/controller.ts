@@ -1,7 +1,7 @@
+import { DEFAULT_LOG_TIMERANGE } from '@repo/api-constants';
 import { AppIdSchema, DeploymentIdSchema, type TenantLogRecord, Value } from '@repo/protocol';
 import { Elysia, sse } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { DEFAULT_LOG_TIMERANGE } from '#lib/api/log-query.ts';
 import { type PublicValue, publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { StreamLogsQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';

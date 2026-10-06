@@ -30,7 +30,7 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
   schemas, and runtime-reference names, metadata and interpolation. Public consumers may import
   only its schema-free `@repo/protocol/runtime-values` subpath to construct those references;
   their API request and response types derive from the Treaty client in `@repo/api-client`.
-  Shared static API defaults belong to `@repo/api-constants`. API-only defaults, validation,
+  Shared static API defaults and query syntax constants belong to `@repo/api-constants`. API-only defaults, validation,
   business policy and helpers stay in `apps/api/src/lib/`; public resource schemas live in
   `apps/api/src/lib/api/`. Import their owning files directly; do not add API barrels or generate
   a second public contract. Moving shared constants does not justify adding an API endpoint.
