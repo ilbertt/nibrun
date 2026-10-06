@@ -1,7 +1,7 @@
 import type { AppId, DeploymentId, GuestPath } from '@repo/protocol';
 import type { SqliteExecutorContract } from '@repo/sqlite';
-import { HranaError } from '@repo/sqlite';
-import type { OwnerId } from '#lib/api/identifiers.ts';
+import { HranaError, HranaPipelineAdapter, HranaStreams } from '@repo/sqlite';
+import type { OwnerId, SqliteConnectionId } from '#lib/api/identifiers.ts';
 import type { SqliteConnection } from '#lib/api/sqlite-connection.ts';
 import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import { SQLITE_CONNECTIONS_BASE_PATH } from '#lib/sqlite/routes.ts';
@@ -9,6 +9,7 @@ import { toTimestamp } from '#lib/timestamp.ts';
 import type { DeploymentsRepositoryContract } from '#repositories/deployments.repository.ts';
 import type {
   DeleteSqliteConnectionInput,
+  SqliteConnectionByIdInput,
   SqliteConnectionRow,
   SqliteConnectionsByAppInput,
   SqliteConnectionsRepositoryContract,
@@ -29,6 +30,8 @@ export class SqliteService extends Service {
   private readonly connectionsRepo: SqliteConnectionsRepositoryContract;
   private readonly openExecutor: OpenSqliteExecutor;
   private readonly baseUrl: URL;
+  private readonly streams = new HranaStreams({ limit: undefined, idleTimeoutMs: undefined });
+  private readonly adapter = new HranaPipelineAdapter(this.streams);
 
   constructor({
     deploymentsRepo,
@@ -97,6 +100,66 @@ export class SqliteService extends Service {
     if (!(await this.connectionsRepo.remove(input))) {
       throw new NotFoundError('Database connection not found.');
     }
+    await this.closeConnectionStreams(input);
+  }
+
+  async checkConnection(input: SqliteConnectionByIdInput): Promise<void> {
+    await this.connected(input);
+  }
+
+  async pipeline({
+    id,
+    ownerId,
+    body,
+    signal,
+  }: SqliteConnectionByIdInput & {
+    body: unknown;
+    signal: AbortSignal;
+  }) {
+    const { connection, deployment } = await this.connected({ id, ownerId });
+    const prefix = connectionScopePrefix({ id, ownerId });
+    const scope = `${prefix}${deployment.id}`;
+    await this.streams.closeScopes({
+      matches(candidate) {
+        return candidate.startsWith(prefix) && candidate !== scope;
+      },
+    });
+    const openExecutor = this.openExecutor;
+    function open({ signal }: { signal: AbortSignal }) {
+      return openExecutor({
+        appId: connection.app_id,
+        deploymentId: deployment.id,
+        path: connection.sqlite_file_path,
+        signal,
+      });
+    }
+    return await this.adapter.handle({ body, scope, open, signal });
+  }
+
+  private async connected(input: SqliteConnectionByIdInput) {
+    try {
+      const connection = await this.connectionsRepo.findById(input);
+      if (!connection) {
+        throw new NotFoundError('Database connection not found.');
+      }
+      const deployment = await this.runningDeployment({
+        appId: connection.app_id,
+        ownerId: input.ownerId,
+      });
+      return { connection, deployment };
+    } catch (error) {
+      await this.closeConnectionStreams(input);
+      throw error;
+    }
+  }
+
+  private async closeConnectionStreams(input: SqliteConnectionByIdInput): Promise<void> {
+    const prefix = connectionScopePrefix(input);
+    await this.streams.closeScopes({
+      matches(scope) {
+        return scope.startsWith(prefix);
+      },
+    });
   }
 
   private async runningDeployment(input: SqliteConnectionsByAppInput) {
@@ -122,4 +185,14 @@ export class SqliteService extends Service {
       url: new URL(`${SQLITE_CONNECTIONS_BASE_PATH}${row.id}/`, this.baseUrl).href,
     };
   }
+}
+
+function connectionScopePrefix({
+  id,
+  ownerId,
+}: {
+  id: SqliteConnectionId;
+  ownerId: OwnerId;
+}): string {
+  return `${JSON.stringify([ownerId, id])}:`;
 }
