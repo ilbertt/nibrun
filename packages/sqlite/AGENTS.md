@@ -1,9 +1,15 @@
 # @repo/sqlite
 
-Shared SQLite wire schemas, resource limits, and resolved statements for the API
-and host agent. This package does not depend on `@repo/protocol`, either app, a
-SQL client, or a web framework. Deployment routing and agent query envelopes
-belong in `@repo/protocol`.
+Shared SQLite wire schemas, resource limits, and Hrana request processing for the
+API and host agent. Batch execution, stream lifecycle, and pipeline handling live
+here; app ownership, deployment selection, and HTTP authentication stay in the API.
+This package does not depend on `@repo/protocol`, either app, a SQL client at
+runtime, or a web framework. Deployment routing and agent query envelopes belong
+in `@repo/protocol`.
+
+Package test executors stay private in `tests/support/`. API tests own their
+connection lifecycle stubs. The libSQL client is a test-only dependency for
+protocol conformance.
 
 Schemas use TypeBox directly; types derive from schemas. `src/hrana-v2.ts`
 manually adapts the upstream Hrana v2 HTTP declarations. The pinned commit and
