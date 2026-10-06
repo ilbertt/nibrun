@@ -3,7 +3,9 @@ name: infra
 # No paths filter: infra-passed is a required check, and a check gated by a path
 # filter never reports on the PRs it skips, leaving them unmergeable. The plan
 # script decides for itself whether anything under infra/terraform changed.
-on: pull_request
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: infra-${{ github.ref }}
@@ -18,6 +20,7 @@ env:
 
 jobs:
   terraform-check:
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -37,7 +40,7 @@ jobs:
     # A pull request from a fork is handed neither repository variables nor an OIDC token, so the
     # role arn arrives empty and there is nothing to assume. `terraform-fork-guard` is what keeps
     # this skip from being silent on the pull requests where the plan was the point.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -88,7 +91,7 @@ jobs:
     # changed infra/terraform would merge on a green required check with nothing having read the
     # change. Spelled out here rather than in internal-scripts deliberately: a pull_request workflow
     # is taken from the base branch, so this is the one check a fork's own diff cannot edit.
-    if: github.event.pull_request.head.repo.full_name != github.repository
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -108,7 +111,7 @@ jobs:
           exit 1
 
   infra-passed:
-    if: always()
+    if: always() && github.event.pull_request.draft == false
     name: infra:required
     needs: [terraform-check, terraform-plan, terraform-fork-guard]
     runs-on: ubuntu-latest
