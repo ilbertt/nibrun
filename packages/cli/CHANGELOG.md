@@ -2,6 +2,26 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.10.6-1]
+
+### 🚀 Features
+
+- *(domains)* Show DNS checks and agent setup prompt (#697)
+
+### 🐛 Bug Fixes
+
+- *(domains)* Guide apex DNS provider changes (#718)
+- *(domains)* Keep DNS checks fresh (#705)
+
+### 🚜 Refactor
+
+- *(protocol)* Scope package to API-agent communication (#733)
+- *(domains)* Share DNS record definitions (#698)
+
+### ⚙️ Miscellaneous Tasks
+
+- Read Bun and Node versions from package.json (#725)
+
 ## [2026.10.1-2]
 
 ### 🚀 Features
