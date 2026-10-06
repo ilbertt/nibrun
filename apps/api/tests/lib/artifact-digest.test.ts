@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { isValidMessage, ObjectKeySchema, Sha256DigestSchema, Value } from '@repo/protocol';
+import { isValidMessage, ObjectKeySchema, Sha256DigestSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import {
   type ArtifactInspection,
   ArtifactTooLargeError,

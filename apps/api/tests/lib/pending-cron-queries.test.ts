@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { DeploymentIdSchema, HostIdSchema, Value } from '@repo/protocol';
+import { DeploymentIdSchema, HostIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { PendingCronQueries } from '#lib/cron/pending-queries.ts';
 import { CRON_DEPLOYMENT, CRON_LISTING } from '#tests/support/crons.ts';
 

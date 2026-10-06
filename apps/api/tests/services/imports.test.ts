@@ -7,8 +7,8 @@ import {
   isValidMessage,
   type ObjectKey,
   type Sha256Digest,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { type ImportId, ImportIdSchema, type OwnerId } from '#lib/api/identifiers.ts';
 import { ImportSchema } from '#lib/api/import.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';

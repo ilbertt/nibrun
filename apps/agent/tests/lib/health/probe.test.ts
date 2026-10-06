@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { FetchHttpClient } from '@effect/platform';
-import { type HealthCheck, HttpPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
+import { type HealthCheck, HttpPortSchema, Ipv4AddressSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
 import { probeInstance } from '#lib/health/probe.ts';
 import { HEALTH_CHECK_FIXTURE } from '#tests/support/fixtures.ts';

@@ -1,5 +1,5 @@
 import { bunSqlAdapter } from '@ilbertt/better-auth-bun-sql';
-import { Value } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization } from 'better-auth/plugins';
 import { sql } from '#db/client.ts';

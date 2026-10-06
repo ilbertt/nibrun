@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
-import { type AppId, AppIdSchema, type Hostname, HostnameSchema, Value } from '@repo/protocol';
+import { type AppId, AppIdSchema, type Hostname, HostnameSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';

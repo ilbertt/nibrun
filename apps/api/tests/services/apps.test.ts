@@ -14,9 +14,9 @@ import {
   type TenantEnvironment,
   TenantEnvironmentSchema,
   TimestampSchema,
-  Value,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
 import { type AppName, AppNameSchema, type AppState, OWNED_APP_STATES } from '#lib/api/app.ts';

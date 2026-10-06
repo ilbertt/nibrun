@@ -10,8 +10,8 @@ import {
   type HttpPort,
   Ipv4AddressSchema,
   isValidMessage,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { buildReportedState, toReportedInstance } from '#lib/report/build-report.ts';
 import { allocatableCapacity, committedResources } from '#lib/report/capacity.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';

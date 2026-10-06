@@ -5,8 +5,8 @@ import {
   HostPortSchema,
   HttpPortSchema,
   Ipv4AddressSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Either } from 'effect';
 import { renderInstanceEnv } from '#lib/vm/instance-env.ts';
 import {

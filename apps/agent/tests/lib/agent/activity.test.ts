@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { type AppId, AppIdSchema, Value } from '@repo/protocol';
+import { type AppId, AppIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { type Activity, activityAfter, readLastActive } from '#lib/agent/activity.ts';
 import { parseAppTraffic } from '#lib/network/counters.ts';
 import { appCounterName } from '#lib/network/firewall.ts';

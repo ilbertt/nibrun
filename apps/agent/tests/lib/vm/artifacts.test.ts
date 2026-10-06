@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { Path } from '@effect/platform';
 import { BunPath } from '@effect/platform-bun';
-import { type DesiredArtifact, Sha256DigestSchema, Value } from '@repo/protocol';
+import { type DesiredArtifact, Sha256DigestSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Either } from 'effect';
 import { artifactImagePath, downloadAndVerify } from '#lib/vm/artifacts.ts';
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST, artifactStore } from '#tests/support/artifacts.ts';

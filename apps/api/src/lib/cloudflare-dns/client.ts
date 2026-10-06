@@ -1,4 +1,4 @@
-import { Value } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { t } from 'elysia';
 import { CNAME_RECORD_TYPE } from '#lib/dns-records.ts';
 

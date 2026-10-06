@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { CronJobIdSchema, CronRunIdSchema, TenantLogRecordSchema, Value } from '@repo/protocol';
+import { CronJobIdSchema, CronRunIdSchema, TenantLogRecordSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
 import type { TenantLogEvent } from '#lib/logs/event.ts';
 import { LOG_STREAM_FIELDS, makeLogStoreClient } from '#lib/logs/store-client.ts';

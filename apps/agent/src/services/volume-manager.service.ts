@@ -3,10 +3,10 @@ import {
   type AppId,
   type DesiredVolume,
   type ReportedVolume,
-  Value,
   type VolumeId,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Array as Arr, Effect, Option } from 'effect';
 import type { AppSlot } from '#lib/network/slot.ts';
 import type { ObservedVolume } from '#lib/reconcile/plan.ts';

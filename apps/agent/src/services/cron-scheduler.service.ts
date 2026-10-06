@@ -1,4 +1,5 @@
-import { type AppId, CronRunIdSchema, Value } from '@repo/protocol';
+import { type AppId, CronRunIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Cause, Effect, Exit, Option, Scope, SynchronizedRef } from 'effect';
 import { registeredCronJobs } from '#lib/cron/jobs.ts';
 import type { CronTable } from '#lib/cron/model.ts';

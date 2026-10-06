@@ -5,8 +5,8 @@ import {
   FilenameSchema,
   ObjectKeySchema,
   Sha256DigestSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
 import {
   type DesiredExportRow,

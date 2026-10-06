@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type AppId, AppIdSchema, HostPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
+import { type AppId, AppIdSchema, HostPortSchema, Ipv4AddressSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Either, Layer, Option } from 'effect';
 import {
   assignmentsFrom,

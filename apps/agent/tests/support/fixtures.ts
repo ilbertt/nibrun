@@ -23,9 +23,9 @@ import {
   SecretStringSchema,
   type TenantEnvironment,
   TimestampSchema,
-  Value,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { initialTracker } from '#lib/health/state.ts';
 import type { TenantLogEvent } from '#lib/logs/event.ts';
 import { describeSlot, FIRST_SLOT, HOST_PORT_BASE } from '#lib/network/slot.ts';

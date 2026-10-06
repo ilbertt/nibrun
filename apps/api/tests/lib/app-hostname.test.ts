@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { type Hostname, HostnameSchema, isValidMessage, Value } from '@repo/protocol';
+import { type Hostname, HostnameSchema, isValidMessage } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { dcvMethodFor, isPlatformHostname, platformHostname } from '#lib/app-hostname.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
 

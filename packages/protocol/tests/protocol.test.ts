@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { Value } from '@sinclair/typebox/value';
 import {
   AppIdSchema,
   DeploymentIdSchema,
@@ -25,7 +26,6 @@ import {
   SecretStringSchema,
   Sha256DigestSchema,
   TimestampSchema,
-  Value,
   VolumeIdSchema,
 } from '#index.ts';
 import { FilenameSchema, HostPortSchema, HttpPortSchema } from '#lib/wire.ts';

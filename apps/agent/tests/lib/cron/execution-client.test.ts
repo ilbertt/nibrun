@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Buffer } from 'node:buffer';
 import { join } from 'node:path';
-import { Value } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Deferred, Duration, Effect, Fiber, TestClock, TestContext } from 'effect';
 import { runGuestCron } from '#lib/cron/execution-client.ts';
 import {

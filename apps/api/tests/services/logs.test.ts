@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { TenantLogRecord } from '@repo/protocol';
-import { HostIdSchema, type Timestamp, TimestampSchema, Value } from '@repo/protocol';
+import { HostIdSchema, type Timestamp, TimestampSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { NotFoundError } from '#lib/errors.ts';
 import type { DeploymentByIdInput, DeploymentRow } from '#repositories/deployments.repository.ts';
 import type { LogsRepositoryContract, TenantLogWindow } from '#repositories/logs.repository.ts';

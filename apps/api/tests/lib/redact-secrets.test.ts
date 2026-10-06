@@ -12,9 +12,9 @@ import {
   ObjectKeySchema,
   SecretStringSchema,
   Sha256DigestSchema,
-  Value,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,

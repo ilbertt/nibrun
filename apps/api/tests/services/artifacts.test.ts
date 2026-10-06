@@ -11,8 +11,8 @@ import {
   type Sha256Digest,
   Sha256DigestSchema,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { ArtifactSchema } from '#lib/api/artifact.ts';
 import {
   type ArtifactId,

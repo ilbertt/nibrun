@@ -1,5 +1,6 @@
 import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
-import { AppIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema, DeploymentIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { ArtifactIdSchema, ImportIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import {

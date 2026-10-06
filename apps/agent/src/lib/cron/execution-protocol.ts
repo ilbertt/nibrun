@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import type { TenantLogStream } from '@repo/protocol';
-import { MAX_CRON_ENVIRONMENT_VARIABLES, Value } from '@repo/protocol';
+import { MAX_CRON_ENVIRONMENT_VARIABLES } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Data, Either, Option } from 'effect';
 import {
   type CronJobDefinition,

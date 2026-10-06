@@ -6,8 +6,8 @@ import {
   DeploymentIdSchema,
   HostIdSchema,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { QueryRequest } from '#lib/victorialogs/client.ts';
 import type { LogRow } from '#lib/victorialogs/parse.ts';
 import { LogsRepository, type TenantLogStore } from '#repositories/logs.repository.ts';

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Buffer } from 'node:buffer';
-import { Value } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Either, Option } from 'effect';
 import {
   decodeCronConnect,

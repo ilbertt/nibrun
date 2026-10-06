@@ -7,8 +7,8 @@ import {
   type HostReportedState,
   SecretStringSchema,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { DEFAULT_AGENT_POLL_SETTINGS } from '#lib/agent-poll-settings.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';

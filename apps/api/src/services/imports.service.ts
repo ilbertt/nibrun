@@ -6,8 +6,8 @@ import {
   ObjectKeySchema,
   type Sha256Digest,
   Sha256DigestSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { ImportId, OwnerId } from '#lib/api/identifiers.ts';
 import type { Import } from '#lib/api/import.ts';
 import { isAppDataArchive, OPENING_BYTES } from '#lib/archive/app-data.ts';

@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { Buffer } from 'node:buffer';
 import { FileSystem } from '@effect/platform';
-import { CronJobIdSchema, CronRunIdSchema, DeploymentIdSchema, Value } from '@repo/protocol';
+import { CronJobIdSchema, CronRunIdSchema, DeploymentIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Context, Deferred, Effect, Exit, Fiber, Layer, Ref } from 'effect';
 import { CronExecutionUnavailable } from '#lib/cron/dispatch.ts';
 import { CronDeploymentMismatch } from '#lib/cron/registry.ts';

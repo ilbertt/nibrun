@@ -1,4 +1,5 @@
-import { CronQuerySchema, Value } from '@repo/protocol';
+import { CronQuerySchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Context, Effect, Layer } from 'effect';
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';

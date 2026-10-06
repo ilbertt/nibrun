@@ -84,6 +84,9 @@ only that schema-construction package as a workspace runtime dependency.
 
 ## Constraints on a change
 
+Import TypeBox runtime helpers such as `Value` and `AssertError` directly from
+`@sinclair/typebox/value`. Protocol must not re-export third-party library APIs.
+
 - **Schemas come from `@sinclair/typebox` directly, never from Elysia's `t`.** Same library, but
   importing it through Elysia would drag a web framework into a binary with no HTTP server in it.
   TypeBox and `@repo/typebox-extensions` are the only runtime dependencies. This package must

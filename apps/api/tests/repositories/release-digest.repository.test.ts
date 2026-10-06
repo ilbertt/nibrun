@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
-import { Sha256DigestSchema, Value } from '@repo/protocol';
+import { Sha256DigestSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
 
 const ASSET = 'pocketbase_linux_amd64.zip';

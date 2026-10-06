@@ -1,4 +1,5 @@
-import { Sha256DigestSchema, Value } from '@repo/protocol';
+import { Sha256DigestSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Layer } from 'effect';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 

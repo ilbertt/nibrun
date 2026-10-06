@@ -4,8 +4,8 @@ import {
   DeploymentIdSchema,
   type InstanceState,
   type ReportedInstance,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { DeploymentState } from '#lib/api/deployment.ts';
 import { DeploymentLifecycle, STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 

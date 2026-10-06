@@ -5,8 +5,8 @@ import {
   FilesystemQueryIdSchema,
   type FilesystemQueryResult,
   type GuestPath,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 
 type Outcome = FilesystemQueryResult['outcome'];
 

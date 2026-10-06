@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { AppIdSchema, Sha256DigestSchema, Value } from '@repo/protocol';
+import { AppIdSchema, Sha256DigestSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { InstanceCredentialsError } from '#lib/aws/credentials.ts';
 import { ControlPlaneError } from '#lib/control/client.ts';
 import { CommandFailed, CommandTimedOut } from '#lib/exec.ts';

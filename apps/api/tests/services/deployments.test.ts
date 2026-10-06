@@ -10,9 +10,9 @@ import {
   type ReportedInstance,
   type ReportedVolume,
   TimestampSchema,
-  Value,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { schema } from '#db/queries.gen.ts';
 import type { DeploymentState } from '#lib/api/deployment.ts';
 import type { PublicAppConfig } from '#lib/app-config.ts';

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { MAX_CRON_ENVIRONMENT_VARIABLES, MAX_CRON_JOBS_PER_APP, Value } from '@repo/protocol';
+import { MAX_CRON_ENVIRONMENT_VARIABLES, MAX_CRON_JOBS_PER_APP } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Either } from 'effect';
 import { parseCrontab } from '#lib/cron/crontab.ts';
 import { CrontabSchema, MAX_CRONTAB_BYTES } from '#lib/cron/model.ts';

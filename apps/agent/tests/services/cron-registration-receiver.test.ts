@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { Buffer } from 'node:buffer';
 import { FileSystem, type Path } from '@effect/platform';
-import { DeploymentIdSchema, Value } from '@repo/protocol';
+import { DeploymentIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Layer, Option } from 'effect';
 import { MAX_CRONTAB_BYTES } from '#lib/cron/model.ts';
 import { CronRegistrationReceiver } from '#services/cron-registration-receiver.service.ts';

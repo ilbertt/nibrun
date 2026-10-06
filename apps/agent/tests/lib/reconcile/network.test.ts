@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { AppIdSchema, INSTANCE_STATES, Value } from '@repo/protocol';
+import { AppIdSchema, INSTANCE_STATES } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Layer, Option } from 'effect';
 import { forwardedInstances } from '#lib/reconcile/network.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';

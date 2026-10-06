@@ -7,8 +7,8 @@ import {
   type HostReportedState,
   type ReportedVolume,
   type SecretString,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { AgentSessions } from '#lib/agent/sessions.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';

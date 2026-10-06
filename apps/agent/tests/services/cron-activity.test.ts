@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { AppIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Clock, Deferred, Effect, Fiber, Layer, Ref, TestClock, TestContext } from 'effect';
 import { AgentState } from '#services/agent-state.service.ts';
 import { CronActivity } from '#services/cron-activity.service.ts';

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { TenantLogRecord } from '@repo/protocol';
-import { TimestampSchema, Value } from '@repo/protocol';
+import { TimestampSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { SeenTenantLogs } from '#lib/seen-tenant-logs.ts';
 
 const AN_INSTANT = Value.Parse(TimestampSchema, '2026-08-07T09:51:56.687Z');

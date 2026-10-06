@@ -6,8 +6,8 @@ import {
   type CronQueryResult,
   DeploymentIdSchema,
   HostVersionsSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Layer, Ref, TestClock, TestContext } from 'effect';
 import { cronQueryLoop } from '#lib/agent/cron-query.ts';
 import { ControlPlaneError } from '#lib/control/client.ts';

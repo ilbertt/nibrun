@@ -3,9 +3,9 @@ import {
   DeploymentIdSchema,
   DirectoryListingSchema,
   GUEST_PATH_ROOT,
-  Value,
 } from '@repo/protocol';
 import { publicSchema } from '@repo/typebox-extensions';
+import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';

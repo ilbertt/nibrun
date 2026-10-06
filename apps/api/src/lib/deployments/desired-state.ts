@@ -6,10 +6,10 @@ import {
   type DesiredInstance,
   type DesiredInstanceState,
   type DesiredVolume,
-  Value,
   type VolumeId,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
 import { toRunConfig } from '#lib/app-config.ts';
 import {

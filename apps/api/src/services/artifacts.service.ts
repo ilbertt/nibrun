@@ -5,8 +5,8 @@ import {
   type ObjectKey,
   ObjectKeySchema,
   type Sha256Digest,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { Artifact } from '#lib/api/artifact.ts';
 import type { ArtifactId, OwnerId } from '#lib/api/identifiers.ts';
 import { unwrapExecutable } from '#lib/archive/unwrap.ts';

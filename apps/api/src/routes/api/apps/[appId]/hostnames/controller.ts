@@ -1,5 +1,6 @@
-import { AppIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema } from '@repo/protocol';
 import { publicSchema } from '@repo/typebox-extensions';
+import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap, t } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';

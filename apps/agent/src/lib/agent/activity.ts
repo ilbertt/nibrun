@@ -1,4 +1,5 @@
-import { type AppId, AppIdSchema, isValidMessage, Value } from '@repo/protocol';
+import { type AppId, AppIdSchema, isValidMessage } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Clock, Effect } from 'effect';
 import type { AppTraffic } from '#lib/network/counters.ts';
 import { AgentState } from '#services/agent-state.service.ts';

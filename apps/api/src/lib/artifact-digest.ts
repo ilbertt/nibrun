@@ -3,8 +3,8 @@ import {
   ObjectKeySchema,
   type Sha256Digest,
   Sha256DigestSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import {
   ELF_MAGIC_LENGTH,
   interpreterOf,

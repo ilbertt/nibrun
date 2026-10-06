@@ -1,6 +1,7 @@
 import { DEFAULT_LOG_TIMERANGE } from '@repo/api-constants';
-import { AppIdSchema, DeploymentIdSchema, type TenantLogRecord, Value } from '@repo/protocol';
+import { AppIdSchema, DeploymentIdSchema, type TenantLogRecord } from '@repo/protocol';
 import { type PublicValue, publicSchema } from '@repo/typebox-extensions';
+import { Value } from '@sinclair/typebox/value';
 import { Elysia, sse } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';

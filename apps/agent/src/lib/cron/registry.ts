@@ -1,4 +1,5 @@
-import { type AppId, parseMessage, TimestampSchema, Value } from '@repo/protocol';
+import { type AppId, parseMessage, TimestampSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Clock, Data, Effect, Option } from 'effect';
 import { type CronTable, CronTablesSchema } from '#lib/cron/model.ts';
 import { validateCronJobs } from '#lib/cron/schedule.ts';

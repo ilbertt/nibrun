@@ -6,8 +6,8 @@ import {
   DeploymentIdSchema,
   MAX_CRON_JOBS_PER_APP,
   SecretStringSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Deferred, Effect, Either, Exit, Fiber, Layer, Option, Ref } from 'effect';
 import { type CronJobDefinition, CrontabSchema } from '#lib/cron/model.ts';
 import { readJsonFile, writeJsonFile } from '#lib/json-store.ts';

@@ -1,4 +1,5 @@
-import { type Sha256Digest, Sha256DigestSchema, Value } from '@repo/protocol';
+import { type Sha256Digest, Sha256DigestSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { RELEASE_API, releaseApiPath, releaseAsset } from '#lib/github-release.ts';
 
 /**

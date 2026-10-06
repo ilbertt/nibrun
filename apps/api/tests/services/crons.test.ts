@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { HostIdSchema, Value } from '@repo/protocol';
+import { HostIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import type { DeploymentRow } from '#repositories/deployments.repository.ts';
 import { CronsService } from '#services/crons.service.ts';

@@ -10,8 +10,8 @@ import {
   GuestPathSchema,
   type HostVersions,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { type Duration, Effect, Fiber, Layer, TestClock, TestContext } from 'effect';
 import { answer, filesystemLoop } from '#lib/agent/filesystem.ts';
 import { GuestFilesystemRefused } from '#lib/filesystem/protocol.ts';

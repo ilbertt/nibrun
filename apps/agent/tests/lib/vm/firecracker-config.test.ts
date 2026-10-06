@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { Ipv4AddressSchema, Value } from '@repo/protocol';
+import { Ipv4AddressSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import {
   DRIVE_IDS,
   netmaskFor,
