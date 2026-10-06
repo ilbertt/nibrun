@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { AppIdSchema, DEFAULT_HTTP_PORT, INSTANCE_STATES, Value } from '@repo/protocol';
+import { AppIdSchema, INSTANCE_STATES } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Layer, Option } from 'effect';
 import { forwardedInstances } from '#lib/reconcile/network.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
-import { APP_ID, instanceRecord } from '#tests/support/fixtures.ts';
+import { APP_ID, HTTP_PORT_FIXTURE, instanceRecord } from '#tests/support/fixtures.ts';
 import { platform, provided } from '#tests/support/run.ts';
 
 const OTHER_APP_ID = Value.Parse(AppIdSchema, 'app-2');
@@ -53,7 +54,7 @@ describe('the forward is what decides whether a port reaches the guest', () => {
           {
             appId: APP_ID,
             hostPort: slot.hostPort,
-            httpPort: DEFAULT_HTTP_PORT,
+            httpPort: HTTP_PORT_FIXTURE,
             hostIpv4: slot.hostIpv4,
             guestIpv4: slot.guestIpv4,
           },

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { DeploymentIdSchema, Value } from '@repo/protocol';
+import { DeploymentIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { hasDeferredWork, planReconcile } from '#lib/reconcile/plan.ts';
 import {
   APP_ID,

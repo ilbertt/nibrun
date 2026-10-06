@@ -1,4 +1,5 @@
-import { type AppId, AppIdSchema, isValidMessage, Value } from '@repo/protocol';
+import { type AppId, AppIdSchema, isValidMessage } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { appCounterName } from '#lib/network/firewall.ts';
 
 /** What the kernel has counted against one app since the table it lives in was last written. */

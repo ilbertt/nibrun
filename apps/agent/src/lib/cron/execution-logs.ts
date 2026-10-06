@@ -1,13 +1,9 @@
-import {
-  type CronJobDefinition,
-  TENANT_LOG_STREAMS,
-  type TenantLogRecord,
-  type TenantLogStream,
-} from '@repo/protocol';
+import { TENANT_LOG_STREAMS, type TenantLogRecord, type TenantLogStream } from '@repo/protocol';
 import { Effect, Ref } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { runGuestCron } from '#lib/cron/execution-client.ts';
 import type { CronExecutionEvent } from '#lib/cron/execution-protocol.ts';
+import type { CronJobDefinition } from '#lib/cron/model.ts';
 import type { TenantLogSource } from '#lib/logs/vsock.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 

@@ -5,8 +5,8 @@ import {
   type CronQueryRequest,
   type CronQueryResult,
   type HostId,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 
 type Deployment = Pick<CronQuery, 'appId' | 'deploymentId'>;
 type Outcome = CronQueryResult['outcome'];

@@ -23,8 +23,26 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 - Imports use `#*` subpath mapping (e.g. `import { foo } from '#services/foo'`)
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
   DNS record names, type metadata, and required-record construction live in
-  `packages/protocol/src/domain/dns.ts`. Consumers and fixtures use those definitions
-  and render record names and targets rather than reconstructing them.
+  `apps/api/src/lib/dns-records.ts`. Consumers render the DNS records returned by the API;
+  client fixtures describe those responses instead of reconstructing records from templates.
+- Single source of truth is the golden rule: put each definition in the package that owns its
+  meaning and derive every consumer from it. `@repo/protocol` owns API–agent messages, their wire
+  schemas, and runtime-reference names, metadata and interpolation. Public consumers may import
+  only its schema-free `@repo/protocol/runtime-values` subpath to construct those references;
+  their API request and response types derive from the Treaty client in `@repo/api-client`.
+  Shared static API defaults and query syntax constants belong to `@repo/api-constants`. API-only defaults, validation,
+  business policy and helpers stay in `apps/api/src/lib/`; public resource schemas live in
+  `apps/api/src/lib/api/`. Import their owning files directly; do not add API barrels or generate
+  a second public contract. Moving shared constants does not justify adding an API endpoint.
+  External consumers must not import `@repo/api`; only api-client may type-import its route types.
+  Neither app imports the other app, including in tests. Guest mechanics and persistence models
+  belong to `apps/agent/src/lib/`. Biome enforces these boundaries and prevents protocol
+  dependencies on other workspace packages except `@repo/typebox-extensions`.
+  Application-independent TypeBox schema construction, branding and public type inference
+  belong to `@repo/typebox-extensions`; import them directly rather than re-exporting them
+  through protocol. Do not use it for general TypeScript utilities or application schemas.
+  Import built-in TypeBox APIs directly from `@sinclair/typebox` or `@sinclair/typebox/value`;
+  neither protocol nor typebox-extensions may re-export them.
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
 - Props are always passed — a component we wrote has no optional property. Declare
   `name: T | undefined` rather than `name?: T`, so a call site with nothing to pass says so.

@@ -1,4 +1,4 @@
-import { GUEST_PATH_ROOT } from '@repo/protocol';
+import { GUEST_PATH_ROOT } from '@repo/app-operations';
 import {
   Breadcrumb,
   BreadcrumbItem,

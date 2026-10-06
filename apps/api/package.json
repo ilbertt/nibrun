@@ -24,7 +24,10 @@
     "@repo/protocol": "workspace:*",
     "better-auth": "catalog:",
     "elysia": "^1.4.30",
-    "tldts": "^7.4.13"
+    "tldts": "^7.4.13",
+    "@sinclair/typebox": "catalog:",
+    "@repo/api-constants": "workspace:*",
+    "@repo/typebox-extensions": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

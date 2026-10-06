@@ -1,6 +1,5 @@
 import { expect, test } from 'bun:test';
 import type { DomainDnsRecord } from '@repo/app-operations';
-import { requiredDomainDnsRecords } from '@repo/protocol';
 import {
   APP_DOMAINS_OUTPUT,
   addAppDomain,
@@ -18,11 +17,14 @@ import { APP_ID, HOSTNAME } from '#tests/support/app.ts';
 import { writerRecording } from '#tests/support/output.ts';
 
 const CUSTOM = 'app.example.dev';
-const RECORDS: DomainDnsRecord[] = requiredDomainDnsRecords({
-  hostname: CUSTOM,
-  routingTarget: HOSTNAME,
-  dcvTarget: 'delegation.example.com',
-}).map((record) => ({
+const RECORDS: DomainDnsRecord[] = [
+  { hostname: CUSTOM, type: 'CNAME' as const, target: HOSTNAME },
+  {
+    hostname: `_acme-challenge.${CUSTOM}`,
+    type: 'CNAME' as const,
+    target: 'delegation.example.com',
+  },
+].map((record) => ({
   ...record,
   matched: record.hostname === CUSTOM ? true : null,
   observedTargets: record.hostname === CUSTOM ? [record.target] : [],

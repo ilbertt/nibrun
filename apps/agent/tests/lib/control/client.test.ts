@@ -7,8 +7,8 @@ import {
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
   SecretStringSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { type Duration, Effect, Exit, Fiber } from 'effect';
 import { ControlPlaneError, makeControlPlaneClient } from '#lib/control/client.ts';
 import { runScoped } from '#tests/support/run.ts';

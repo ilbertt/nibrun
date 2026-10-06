@@ -1,5 +1,5 @@
-import { CNAME_RECORD_TYPE, dnsName } from '@repo/protocol';
 import type { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
+import { CNAME_RECORD_TYPE, dnsName } from '#lib/dns-records.ts';
 
 export abstract class DnsRepositoryContract {
   abstract cnameTargets(input: { hostname: string }): Promise<string[]>;

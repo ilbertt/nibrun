@@ -1,5 +1,8 @@
-import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema } from '@repo/protocol';
+import { publicSchema } from '@repo/typebox-extensions';
+import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
+import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   DomainDnsQuerySchema,
@@ -16,7 +19,8 @@ export const AppsAppIdHostnamesDnsController = new Elysia()
   })
   .get(
     '/apps/:appId/hostnames/dns',
-    async ({ domainDnsService, params, query, user }) => {
+    async ({ domainDnsService, params, query: queryInput, user }) => {
+      const query = Value.Parse(DomainDnsQuerySchema, queryInput);
       const result = await domainDnsService.check({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
@@ -26,7 +30,7 @@ export const AppsAppIdHostnamesDnsController = new Elysia()
     },
     {
       auth: Identity.Required,
-      query: DomainDnsQuerySchema,
-      response: { [StatusMap.OK]: DomainDnsResponseSchema },
+      query: publicSchema(DomainDnsQuerySchema),
+      response: { [StatusMap.OK]: publicSchema(DomainDnsResponseSchema) },
     },
   );

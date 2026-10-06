@@ -1,6 +1,6 @@
+import type { AppState } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import type { AppState } from '@repo/protocol';
 
 /**
  * Delete an app: the hostnames it answered on, everything its binary ever wrote, every deployment

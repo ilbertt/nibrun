@@ -1,14 +1,9 @@
-import {
-  type AppHostname,
-  type AppHostnameState,
-  type DnsLabel,
-  type Hostname,
-  HostnameSchema,
-  type Timestamp,
-  Value,
-} from '@repo/protocol';
+import { type AppHostname, type Hostname, HostnameSchema, type Timestamp } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { getDomain } from 'tldts';
 import type { Queries } from '#db/queries.gen.ts';
+import type { AppHostnameState } from '#lib/api/app.ts';
+import type { DnsLabel } from '#lib/api/dns-label.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 
 /**

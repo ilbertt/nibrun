@@ -1,21 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 import { FetchHttpClient } from '@effect/platform';
-import {
-  DEFAULT_HEALTH_CHECK,
-  type HealthCheck,
-  HttpPortSchema,
-  Ipv4AddressSchema,
-  Value,
-} from '@repo/protocol';
+import { type HealthCheck, HttpPortSchema, Ipv4AddressSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
 import { probeInstance } from '#lib/health/probe.ts';
+import { HEALTH_CHECK_FIXTURE } from '#tests/support/fixtures.ts';
 import { provided } from '#tests/support/run.ts';
 import { HTTP_SERVER_ERROR, serving } from '#tests/support/server.ts';
 
 const LOOPBACK = Value.Parse(Ipv4AddressSchema, '127.0.0.1');
 // Nothing listens here, so a probe against it must fail rather than hang.
 const CLOSED_PORT = Value.Parse(HttpPortSchema, 1);
-const WITH_PATH: HealthCheck = { ...DEFAULT_HEALTH_CHECK, path: '/health' };
+const WITH_PATH: HealthCheck = { ...HEALTH_CHECK_FIXTURE, path: '/health' };
 
 const run = provided(FetchHttpClient.layer);
 
@@ -40,7 +36,7 @@ function probing({
 // that cannot be checked by asserting a call shape.
 describe('the default probe asks only whether the tenant accepts a connection', () => {
   test('a listening port is healthy', async () => {
-    expect(await run(probing({ healthCheck: DEFAULT_HEALTH_CHECK }))).toBe(true);
+    expect(await run(probing({ healthCheck: HEALTH_CHECK_FIXTURE }))).toBe(true);
   });
 
   test('a port nothing listens on is not', async () => {
@@ -49,7 +45,7 @@ describe('the default probe asks only whether the tenant accepts a connection', 
         probeInstance({
           guestIpv4: LOOPBACK,
           httpPort: CLOSED_PORT,
-          healthCheck: DEFAULT_HEALTH_CHECK,
+          healthCheck: HEALTH_CHECK_FIXTURE,
         }),
       ),
     ).toBe(false);

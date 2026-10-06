@@ -58,5 +58,7 @@ export function apiHolding({
     get: () => Promise.resolve({ data: { apps: listing() }, error: null }),
   });
 
-  return { api: { apps: route } } as unknown as PublicApiClient;
+  return {
+    api: { apps: route },
+  } as unknown as PublicApiClient;
 }

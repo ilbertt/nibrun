@@ -1,11 +1,5 @@
+import type { TenantArguments, TenantEnvironmentPatch } from '@repo/api-client/models';
 import { ApiError } from '@repo/api-client/unwrap';
-import {
-  AppNameSchema,
-  HttpPortSchema,
-  type TenantArguments,
-  type TenantEnvironmentPatch,
-  Value,
-} from '@repo/protocol';
 
 /** Where a release landed and what to reach it at, whichever way it was asked for. */
 export type Deployed = {
@@ -40,7 +34,7 @@ export type ConfigEdit = {
 export function configPatch({ args, port, extraPublicPort, environment }: ConfigEdit) {
   return {
     ...(args !== undefined && { args }),
-    ...(port !== undefined && { httpPort: Value.Parse(HttpPortSchema, port) }),
+    ...(port !== undefined && { httpPort: port }),
     ...(extraPublicPort !== undefined && { hasExtraPublicPort: extraPublicPort }),
     ...(environment !== undefined && { environment }),
   };
@@ -52,15 +46,10 @@ export type AppEdit = ConfigEdit & {
   name?: string | undefined;
 };
 
-/**
- * The body `PATCH /apps/:appId` takes. Parsed here rather than passed through, for the reason a
- * domain is: a name the api would refuse is refused by the caller that took it rather than by a
- * round trip.
- */
 export function appPatch({ name, ...edit }: AppEdit) {
   return {
     ...configPatch(edit),
-    ...(name !== undefined && { name: Value.Parse(AppNameSchema, name) }),
+    ...(name !== undefined && { name }),
   };
 }
 

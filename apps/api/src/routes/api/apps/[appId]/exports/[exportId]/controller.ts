@@ -1,5 +1,8 @@
-import { AppIdSchema, ExportIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema, ExportIdSchema } from '@repo/protocol';
+import { publicSchema } from '@repo/typebox-extensions';
+import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
+import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { ExportResponseSchema } from '#routes/api/apps/[appId]/exports/model.ts';
 import { AuthPlugin, ExportsServicePlugin, loggerPlugin } from '#services/plugins.ts';
@@ -25,6 +28,6 @@ export const AppsAppIdExportsExportIdController = new Elysia()
       return status(StatusMap.OK, found);
     },
     {
-      response: { [StatusMap.OK]: ExportResponseSchema },
+      response: { [StatusMap.OK]: publicSchema(ExportResponseSchema) },
     },
   );

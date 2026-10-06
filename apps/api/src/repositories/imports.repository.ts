@@ -1,5 +1,6 @@
-import type { AppId, Filename, ImportId, ObjectKey, OwnerId, Sha256Digest } from '@repo/protocol';
+import type { AppId, Filename, ObjectKey, Sha256Digest } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import type { ImportId, OwnerId } from '#lib/api/identifiers.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type ImportRow = Queries['SelectImportById'];

@@ -1,4 +1,5 @@
-import { type Filename, FilenameSchema, Value } from '@repo/protocol';
+import { type Filename, FilenameSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 
 // Where a binary may be fetched from rather than uploaded. `https` alone: the api is what follows
 // this, and a plaintext hop is one where what the guest ends up running was chosen by whoever sat

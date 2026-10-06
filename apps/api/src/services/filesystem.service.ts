@@ -5,8 +5,8 @@ import type {
   FilesystemQuery,
   FilesystemQueryResult,
   GuestPath,
-  OwnerId,
 } from '@repo/protocol';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import { PendingFilesystemQueries } from '#lib/filesystem/pending-queries.ts';
 import type { DeploymentLookupRepositoryContract } from '#repositories/deployments.repository.ts';

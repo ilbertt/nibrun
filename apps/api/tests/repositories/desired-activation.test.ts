@@ -61,7 +61,7 @@ describe('how an app comes up travels with what it should be doing', () => {
     expect((await desired()).idle_timeout_ms).toBe(SHORT_IDLE_MS);
   });
 
-  // Both columns repeat something @repo/protocol states and nothing compares the two, so the
+  // Both columns repeat something the domain schemas state and nothing compares the two, so the
   // check is the only thing standing between a typo and a host being told a policy it cannot act
   // on — which it would read as `always`, quietly keeping every such app up.
   test('an activation nothing implements is refused rather than stored', async () => {

@@ -1,10 +1,12 @@
+import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
+import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } from '#lib/wire.ts';
 import {
   AppConfigSchema,
   AppHostnameSchema,
   IdleTimeoutMsSchema,
   TenantEnvironmentSchema,
-} from '#domain/app.ts';
+} from '#schemas/app.ts';
 import {
   AppIdSchema,
   CheckpointIdSchema,
@@ -12,14 +14,7 @@ import {
   ExportIdSchema,
   HostIdSchema,
   VolumeIdSchema,
-} from '#domain/identifiers.ts';
-import { stringEnum } from '#lib/string-enum.ts';
-import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } from '#lib/wire.ts';
-
-// What a host should be running. There is deliberately nothing here shaped like `start(x)` or
-// `stop(x)`: the control plane describes a world and the agent converges on it, so a missed
-// message, an agent restart and a control-plane restart are all non-events — the next poll
-// re-reads the truth.
+} from '#schemas/identifiers.ts';
 
 /**
  * `on-request` is `running` with the microVM left out until something asks for it: the app is
@@ -32,15 +27,10 @@ import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } f
  * why that policy never has to travel separately.
  */
 export const DESIRED_INSTANCE_STATES = ['running', 'on-request', 'stopped'] as const;
-
 export const DesiredInstanceStateSchema = stringEnum(DESIRED_INSTANCE_STATES);
-
 export type DesiredInstanceState = typeof DesiredInstanceStateSchema.static;
-
 export const DESIRED_PRESENCE = ['present', 'absent'] as const;
-
 export const DesiredPresenceSchema = stringEnum(DESIRED_PRESENCE);
-
 export type DesiredPresence = typeof DesiredPresenceSchema.static;
 
 /**

@@ -25,7 +25,9 @@ export class ProtocolValidationError extends Error {
   }
 }
 
-const describe = (issue: ProtocolIssue) => `${issue.path || '/'} ${issue.message}`;
+function describe(issue: ProtocolIssue) {
+  return `${issue.path || '/'} ${issue.message}`;
+}
 
 export function isValidMessage({ schema, value }: { schema: TSchema; value: unknown }): boolean {
   return Value.Check(schema, value);

@@ -1,4 +1,5 @@
-import { type AppId, AppIdSchema, Value } from '@repo/protocol';
+import { type AppId, AppIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Data } from 'effect';
 import { FIRST_SLOT, SLOT_COUNT } from '#lib/network/slot.ts';
 

@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test';
 import {
   type AgentSession,
   AppIdSchema,
-  DEFAULT_AGENT_POLL_SETTINGS,
   type DirectoryListing,
   type FilesystemQuery,
   FilesystemQueryIdSchema,
@@ -11,8 +10,8 @@ import {
   GuestPathSchema,
   type HostVersions,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { type Duration, Effect, Fiber, Layer, TestClock, TestContext } from 'effect';
 import { answer, filesystemLoop } from '#lib/agent/filesystem.ts';
 import { GuestFilesystemRefused } from '#lib/filesystem/protocol.ts';
@@ -22,6 +21,7 @@ import { FilesystemReader, NoDeviceForApp } from '#services/filesystem-reader.se
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { recordingCommands } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
+import { POLL_SETTINGS_FIXTURE } from '#tests/support/fixtures.ts';
 import { platform } from '#tests/support/run.ts';
 
 const APP = Value.Parse(AppIdSchema, 'app-pocketbase');
@@ -112,7 +112,7 @@ const SESSION = {
   hostId: 'host-1',
   sessionToken: 'session-token',
   expiresAt: '2026-08-03T11:00:00Z',
-  poll: DEFAULT_AGENT_POLL_SETTINGS,
+  poll: POLL_SETTINGS_FIXTURE,
 } as AgentSession;
 
 function unreached() {

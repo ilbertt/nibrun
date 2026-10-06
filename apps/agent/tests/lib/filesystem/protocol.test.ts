@@ -8,8 +8,8 @@ import {
   GuestPathSchema,
   type Timestamp,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Either } from 'effect';
 import {
   decodeCompute,

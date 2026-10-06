@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { FilenameSchema, Value } from '@repo/protocol';
+import { FilenameSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import {
   filenameFromUrl,
   isBinaryUrl,

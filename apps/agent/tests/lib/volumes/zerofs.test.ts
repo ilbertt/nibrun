@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { CheckpointIdSchema, Value } from '@repo/protocol';
+import { CheckpointIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Option } from 'effect';
 import {
   cacheDiskGigabytes,

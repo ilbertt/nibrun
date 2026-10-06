@@ -10,6 +10,10 @@ listings through `lib/agent/cron-query.ts`, each on routes of its own. A read is
 anything converges on, so it carries no generation and cannot delay a stop. Cron listings read
 the durable registry and cached desired state without waking a guest, including suspended apps.
 
+**Never import `@repo/api` or any of its subpaths, including in tests.** Shared API–agent
+message definitions come from `@repo/protocol`; agent mechanics and fallback policy stay here.
+Tests use agent fixtures, not API defaults. Biome enforces this boundary.
+
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
 test needs to substitute is a service. State that used to be
 mutable class fields lives in a `Ref`. The loops in `lib/agent/` are fibers, and their retry
@@ -65,9 +69,9 @@ come back, so `lib/control/client.ts` still validates every response against `@r
 TypeBox, not `effect/Schema`, because the schemas are shared with the api.
 
 **Cron expressions are Bun's.** `lib/cron/schedule.ts` validates them and calculates the next
-occurrence with `Bun.cron.parse`, explicitly in the protocol's `CRON_TIME_ZONE`. The shared
-TypeBox schemas bound the table and its fields; expression syntax stays in Bun rather than a
-second parser. Waiting and dispatch belong to scoped Effect fibers so cancellation, supervision
+occurrence with `Bun.cron.parse`, explicitly in the protocol's `CRON_TIME_ZONE`.
+`lib/cron/model.ts` owns registrations and persisted tables, deriving job fields from the
+protocol's cron listing. Expression syntax stays in Bun rather than a second parser. Waiting and dispatch belong to scoped Effect fibers so cancellation, supervision
 and `TestClock` work like the agent's other loops. Schedule calculation does not register a
 timer or execute a tenant command.
 

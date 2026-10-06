@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { CronListingSchema, DeploymentIdSchema, isValidMessage, Value } from '@repo/protocol';
+import { CronListingSchema, DeploymentIdSchema, isValidMessage } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Either, Layer, TestClock, TestContext } from 'effect';
 import { registeredCronJobs } from '#lib/cron/jobs.ts';
 import { readCronListing } from '#lib/cron/listing.ts';

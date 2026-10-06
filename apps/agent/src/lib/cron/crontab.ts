@@ -1,14 +1,12 @@
 import {
   CRON_TIME_ZONE,
-  type CronJobDefinitions,
-  CrontabSchema,
-  MAX_CRONTAB_BYTES,
   parseMessage,
   type TenantEnvironment,
   TenantEnvironmentSchema,
   type Timestamp,
 } from '@repo/protocol';
 import { Data, Effect } from 'effect';
+import { type CronJobDefinitions, CrontabSchema, MAX_CRONTAB_BYTES } from '#lib/cron/model.ts';
 import { validateCronJobs } from '#lib/cron/schedule.ts';
 import { decode } from '#lib/protocol.ts';
 

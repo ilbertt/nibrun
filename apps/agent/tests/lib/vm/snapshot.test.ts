@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { DeploymentIdSchema, Value } from '@repo/protocol';
+import { DeploymentIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Option } from 'effect';
 import { writeJsonFile } from '#lib/json-store.ts';
 import { SLOT_COUNT } from '#lib/network/slot.ts';

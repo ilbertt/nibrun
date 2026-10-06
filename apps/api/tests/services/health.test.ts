@@ -1,12 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  DEFAULT_AGENT_POLL_SETTINGS,
-  HostIdSchema,
-  type HostState,
-  type Timestamp,
-  TimestampSchema,
-  Value,
-} from '@repo/protocol';
+import { HostIdSchema, type HostState, type Timestamp, TimestampSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
+import { DEFAULT_AGENT_POLL_SETTINGS } from '#lib/agent-poll-settings.ts';
 import type { HostObservation } from '#repositories/agent.repository.ts';
 import type { HealthRepositoryContract } from '#repositories/health.repository.ts';
 import { HealthService, type SystemHealth } from '#services/health.service.ts';

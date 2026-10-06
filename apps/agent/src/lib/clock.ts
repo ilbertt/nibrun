@@ -1,4 +1,5 @@
-import { type Timestamp, TimestampSchema, Value } from '@repo/protocol';
+import { type Timestamp, TimestampSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Clock, Effect } from 'effect';
 
 export const fromEpochMs = (value: number): Timestamp =>

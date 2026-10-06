@@ -1,4 +1,5 @@
-import { type DnsLabel, DnsLabelSchema, MAX_DNS_LABEL_LENGTH, Value } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
+import { type DnsLabel, DnsLabelSchema, MAX_DNS_LABEL_LENGTH } from '#lib/api/dns-label.ts';
 
 const SEPARATOR = '-';
 

@@ -1,4 +1,5 @@
-import { ObjectKeySchema, Value } from '@repo/protocol';
+import { ObjectKeySchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Layer } from 'effect';
 import { AgentConfig } from '#services/agent-config.service.ts';
 

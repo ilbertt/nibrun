@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import type { AppActivation, AppState, DeploymentState } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import type { AppActivation, AppState } from '#lib/api/app.ts';
+import type { DeploymentState } from '#lib/api/deployment.ts';
 import { environmentByDeployment, toDesiredInstance } from '#lib/deployments/desired-state.ts';
 import { sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';

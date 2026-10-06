@@ -1,13 +1,7 @@
-import {
-  CRON_TIME_ZONE,
-  type CronJobDefinitions,
-  CronJobDefinitionsSchema,
-  parseMessage,
-  type Timestamp,
-  TimestampSchema,
-  Value,
-} from '@repo/protocol';
+import { CRON_TIME_ZONE, parseMessage, type Timestamp, TimestampSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Data, Effect } from 'effect';
+import { type CronJobDefinitions, CronJobDefinitionsSchema } from '#lib/cron/model.ts';
 import { decode } from '#lib/protocol.ts';
 
 export class InvalidCronSchedule extends Data.TaggedError('InvalidCronSchedule')<{

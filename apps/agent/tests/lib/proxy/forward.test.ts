@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { HttpPortSchema, Ipv4AddressSchema, Value } from '@repo/protocol';
+import { HttpPortSchema, Ipv4AddressSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Duration, Effect, Fiber, TestClock, TestContext } from 'effect';
 import { forwardToGuest, GuestDidNotAnswer } from '#lib/proxy/forward.ts';
 import { runScoped } from '#tests/support/run.ts';

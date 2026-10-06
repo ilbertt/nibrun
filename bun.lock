@@ -22,6 +22,7 @@
         "@effect/platform-bun": "0.91.2",
         "@repo/api-client": "workspace:*",
         "@repo/protocol": "workspace:*",
+        "@sinclair/typebox": "catalog:",
         "effect": "3.22.1",
       },
       "devDependencies": {
@@ -37,7 +38,10 @@
         "@aws-sdk/s3-request-presigner": "^3.1127.0",
         "@ilbertt/better-auth-bun-sql": "^0.4.0",
         "@ilbertt/bun-sqlgen": "^0.6.2",
+        "@repo/api-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
+        "@repo/typebox-extensions": "workspace:*",
+        "@sinclair/typebox": "catalog:",
         "better-auth": "catalog:",
         "elysia": "^1.4.30",
         "tldts": "^7.4.13",
@@ -52,6 +56,7 @@
       "dependencies": {
         "@repo/analytics": "workspace:*",
         "@repo/api-client": "workspace:*",
+        "@repo/api-constants": "workspace:*",
         "@repo/app-operations": "workspace:*",
         "@repo/binary-handoff": "workspace:*",
         "@repo/deploy-link": "workspace:*",
@@ -91,10 +96,10 @@
       "name": "@repo/www",
       "dependencies": {
         "@repo/analytics": "workspace:*",
+        "@repo/api-constants": "workspace:*",
         "@repo/binary-handoff": "workspace:*",
         "@repo/deploy-link": "workspace:*",
         "@repo/global-constants": "workspace:*",
-        "@repo/protocol": "workspace:*",
         "@repo/ui": "workspace:*",
         "@tanstack/react-router": "catalog:",
         "@tanstack/react-start": "^1.168.49",
@@ -145,11 +150,17 @@
         "typescript": "catalog:",
       },
     },
+    "packages/api-constants": {
+      "name": "@repo/api-constants",
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "packages/app-operations": {
       "name": "@repo/app-operations",
       "dependencies": {
         "@repo/api-client": "workspace:*",
-        "@repo/protocol": "workspace:*",
       },
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
@@ -172,6 +183,7 @@
         "@parshjs/env": "^0.0.3",
         "@parshjs/files": "^0.0.4",
         "@repo/api-client": "workspace:*",
+        "@repo/api-constants": "workspace:*",
         "@repo/app-operations": "workspace:*",
         "@repo/global-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
@@ -188,6 +200,7 @@
     "packages/deploy-link": {
       "name": "@repo/deploy-link",
       "dependencies": {
+        "@repo/api-client": "workspace:*",
         "@repo/app-operations": "workspace:*",
         "@repo/protocol": "workspace:*",
       },
@@ -228,7 +241,18 @@
     "packages/protocol": {
       "name": "@repo/protocol",
       "dependencies": {
-        "@sinclair/typebox": "^0.34.52",
+        "@repo/typebox-extensions": "workspace:*",
+        "@sinclair/typebox": "catalog:",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/typebox-extensions": {
+      "name": "@repo/typebox-extensions",
+      "dependencies": {
+        "@sinclair/typebox": "catalog:",
       },
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
@@ -265,6 +289,7 @@
     },
   },
   "catalog": {
+    "@sinclair/typebox": "^0.34.52",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "^1.170.32",
     "@tanstack/router-plugin": "^1.168.35",
@@ -783,6 +808,8 @@
 
     "@repo/api-client": ["@repo/api-client@workspace:packages/api-client"],
 
+    "@repo/api-constants": ["@repo/api-constants@workspace:packages/api-constants"],
+
     "@repo/app-operations": ["@repo/app-operations@workspace:packages/app-operations"],
 
     "@repo/binary-handoff": ["@repo/binary-handoff@workspace:packages/binary-handoff"],
@@ -802,6 +829,8 @@
     "@repo/protocol": ["@repo/protocol@workspace:packages/protocol"],
 
     "@repo/runtime": ["@repo/runtime@workspace:apps/runtime"],
+
+    "@repo/typebox-extensions": ["@repo/typebox-extensions@workspace:packages/typebox-extensions"],
 
     "@repo/typescript-config": ["@repo/typescript-config@workspace:packages/typescript-config"],
 

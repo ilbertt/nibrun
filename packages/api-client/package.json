@@ -5,14 +5,15 @@
   "exports": {
     "./public": "./src/public.ts",
     "./internal": "./src/internal.ts",
-    "./unwrap": "./src/unwrap.ts"
+    "./unwrap": "./src/unwrap.ts",
+    "./models": "./src/models.ts"
   },
   "imports": {
     "#*": "./src/*"
   },
   "scripts": {
-    "test": "bun test",
-    "check:types": "bun run --bun tsc"
+    "check:types": "bun run --bun tsc",
+    "test": "bun test"
   },
   "dependencies": {
     "@elysiajs/eden": "^1.4.9"

@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  type HostId,
-  HostIdSchema,
-  type SecretString,
-  SecretStringSchema,
-  Value,
-} from '@repo/protocol';
+import { type HostId, HostIdSchema, type SecretString, SecretStringSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { AgentSessions } from '#lib/agent/sessions.ts';
 
 const HOST: HostId = Value.Parse(HostIdSchema, 'host-1');

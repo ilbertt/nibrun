@@ -1,4 +1,4 @@
-import { AssertError } from '@repo/protocol';
+import { AssertError } from '@sinclair/typebox/value';
 import { type ErrorHandler, StatusMap } from 'elysia';
 import { createLogger } from '#lib/logger.ts';
 import { isMalformedIdentifier } from '#lib/pg-errors.ts';

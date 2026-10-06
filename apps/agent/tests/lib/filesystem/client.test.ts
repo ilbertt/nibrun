@@ -9,8 +9,8 @@ import {
   GuestPathSchema,
   type Timestamp,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { SocketHandler } from 'bun';
 import { Effect } from 'effect';
 import { type GuestFilesystem, guestFilesystem } from '#lib/filesystem/client.ts';

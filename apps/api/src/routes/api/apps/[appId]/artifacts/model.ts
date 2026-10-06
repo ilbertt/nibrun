@@ -1,11 +1,7 @@
-import {
-  ArtifactIdSchema,
-  ArtifactSchema,
-  ByteSizeSchema,
-  FilenameSchema,
-  Sha256DigestSchema,
-} from '@repo/protocol';
+import { ByteSizeSchema, FilenameSchema, Sha256DigestSchema } from '@repo/protocol';
 import { t } from 'elysia';
+import { ArtifactSchema } from '#lib/api/artifact.ts';
+import { ArtifactIdSchema } from '#lib/api/identifiers.ts';
 import { BINARY_URL_PATTERN, MAX_BINARY_URL_LENGTH } from '#lib/binary-url.ts';
 
 // The bytes the caller holds. The name is theirs, not the store's: a content-addressed key carries

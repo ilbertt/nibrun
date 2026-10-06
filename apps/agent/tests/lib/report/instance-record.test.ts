@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { HttpPortSchema, Value } from '@repo/protocol';
+import { HttpPortSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { readInstanceRecords } from '#lib/report/instance-record.ts';
 
 const RENAMED_FROM_PORT = 3000;

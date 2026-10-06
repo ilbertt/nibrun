@@ -2,15 +2,11 @@ import { expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Sha256DigestSchema, Value } from '@repo/protocol';
 import { binaryFrom } from '#lib/deploy.ts';
 import { UsageError } from '#lib/errors.ts';
 
 const URL_SOURCE = 'https://releases.test/v1/my-server';
-const CHECKSUM = Value.Parse(
-  Sha256DigestSchema,
-  'd9403d88cdf0684fbb9d8e97cf3508e9fb4506cf309a34e42653a1c2bc04a298',
-);
+const CHECKSUM = 'd9403d88cdf0684fbb9d8e97cf3508e9fb4506cf309a34e42653a1c2bc04a298';
 
 /**
  * A url is handed on rather than opened: this machine is not the end that fetches it, so nothing

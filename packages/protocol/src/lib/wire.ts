@@ -1,6 +1,5 @@
+import type { Brand, BrandedSchema } from '@repo/typebox-extensions';
 import { type TInteger, type TString, Type } from '@sinclair/typebox';
-import { Value } from '@sinclair/typebox/value';
-import type { Brand, BrandedSchema } from '#lib/brand.ts';
 
 // Every schema in this package resolves to one of these. The wire format is JSON and only
 // JSON: ISO strings for timestamps, hex for digests, numbers for sizes. Conversion to richer
@@ -8,7 +7,6 @@ import type { Brand, BrandedSchema } from '#lib/brand.ts';
 
 const MAX_IDENTIFIER_LENGTH = 63;
 const IDENTIFIER_PATTERN = '^[0-9A-Za-z][0-9A-Za-z_-]{0,62}$';
-
 const SHA256_HEX_PATTERN = '^[0-9a-f]{64}$';
 const SHA256_HEX_LENGTH = 64;
 
@@ -17,19 +15,16 @@ const SHA256_HEX_LENGTH = 64;
 // validity is not checked — a well-formed 31st of February is not the skew this guards.
 const TIMESTAMP_PATTERN =
   '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?(Z|[+-]\\d{2}:\\d{2})$';
-const MAX_TIMESTAMP_LENGTH = 35;
 
-const DNS_LABEL_PATTERN = '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$';
-export const MAX_DNS_LABEL_LENGTH = 63;
+const MAX_TIMESTAMP_LENGTH = 35;
 
 const HOSTNAME_PATTERN =
   '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$';
-const MAX_HOSTNAME_LENGTH = 253;
 
+const MAX_HOSTNAME_LENGTH = 253;
 const IPV4_OCTET = '(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)';
 const IPV4_PATTERN = `^(${IPV4_OCTET}\\.){3}${IPV4_OCTET}$`;
 const MAX_IPV4_LENGTH = 15;
-
 const MAX_OBJECT_KEY_LENGTH = 1024;
 
 // A single path segment and nothing else. The value originates with whoever uploaded the
@@ -39,19 +34,18 @@ const MAX_OBJECT_KEY_LENGTH = 1024;
 // with a leading dash that would read as a flag to whatever unpacks it.
 const FILENAME_PATTERN = '^[0-9A-Za-z][0-9A-Za-z._-]{0,126}$';
 const MAX_FILENAME_LENGTH = 127;
-
 const MIN_PORT = 1;
 const MAX_PORT = 65_535;
-
 export type Identifier<Name extends string> = Brand<string, Name>;
 
-export const identifierSchema = <Value extends Identifier<string>>(description: string) =>
-  Type.String({
+export function identifierSchema<Value extends Identifier<string>>(description: string) {
+  return Type.String({
     description,
     pattern: IDENTIFIER_PATTERN,
     minLength: 1,
     maxLength: MAX_IDENTIFIER_LENGTH,
   }) as BrandedSchema<TString, Value>;
+}
 
 export type Timestamp = Brand<string, 'Timestamp'>;
 
@@ -71,15 +65,6 @@ export const Sha256DigestSchema = Type.String({
 }) as BrandedSchema<TString, Sha256Digest>;
 
 export const ByteSizeSchema = Type.Integer({ minimum: 0 });
-
-export type DnsLabel = Brand<string, 'DnsLabel'>;
-
-export const DnsLabelSchema = Type.String({
-  pattern: DNS_LABEL_PATTERN,
-  minLength: 1,
-  maxLength: MAX_DNS_LABEL_LENGTH,
-}) as BrandedSchema<TString, DnsLabel>;
-
 export type Hostname = Brand<string, 'Hostname'>;
 
 export const HostnameSchema = Type.String({
@@ -138,7 +123,3 @@ export const HostPortSchema = Type.Integer({
   minimum: MIN_PORT,
   maximum: MAX_PORT,
 }) as BrandedSchema<TInteger, HostPort>;
-
-const DEFAULT_HTTP_PORT_NUMBER = 3000;
-
-export const DEFAULT_HTTP_PORT = Value.Parse(HttpPortSchema, DEFAULT_HTTP_PORT_NUMBER);

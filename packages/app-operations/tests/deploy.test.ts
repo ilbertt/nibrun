@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import type { Artifact, Filename, Sha256Digest } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
-import type { Artifact, Filename, Sha256Digest } from '@repo/protocol';
 import { MAX_IMPORT_SIZE_BYTES } from '#archive.ts';
 import { deploy, describeUnservedDeployment } from '#deploy.ts';
 import { parseEnvironment } from '#environment.ts';
@@ -344,6 +344,21 @@ test('naming no app creates one, named after the binary when nothing else says',
 
 // The api refuses a value naming a port the app has not, so a first deploy asking for one and
 // naming it has to carry both in the request that creates the app rather than in two.
+test('a new app omits environment deletion markers', async () => {
+  const sent: Sent[] = [];
+  storeAnswering({ sent });
+  await deploy({
+    api: apiHolding({ apps: [], sent }),
+    binary: binary(),
+    args: [],
+    environment: { TOKEN: 'value', REMOVE: null },
+  });
+  expect(sent[0]).toMatchObject({
+    what: 'create',
+    body: { config: { environment: { TOKEN: 'value' } } },
+  });
+});
+
 test('an app created asking for a public port asks for it in the same request', async () => {
   const sent: Sent[] = [];
   storeAnswering({ sent });

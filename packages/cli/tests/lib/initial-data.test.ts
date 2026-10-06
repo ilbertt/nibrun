@@ -190,11 +190,11 @@ test('a file that is neither is refused before an app is created', async () => {
   await expect(opening(path)).rejects.toThrow('is not a .tar.gz or a .zip');
 });
 
-test('an archive named something the api would refuse costs a line rather than the upload', async () => {
+test('the original archive name is submitted for API validation', async () => {
   const source = await folderHolding({ 'pb_data/x.db': 'rows' });
   const path = join(source, '..', 'my data.tar.gz');
   await Bun.$`tar czf ${path} -C ${source} .`.quiet();
   made.push(path);
 
-  await expect(opening(path)).rejects.toThrow('is not a name nibrun takes');
+  expect((await opening(path)).archive.name).toBe('my data.tar.gz');
 });

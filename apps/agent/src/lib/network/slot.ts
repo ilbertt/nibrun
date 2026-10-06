@@ -4,8 +4,8 @@ import {
   HostPortSchema,
   type Ipv4Address,
   Ipv4AddressSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 
 /**
  * A host port, a tap, a /30 and an NBD minor all derive from one small integer, so there is one

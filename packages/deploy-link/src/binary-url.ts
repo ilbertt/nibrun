@@ -1,5 +1,4 @@
-import { FilenameSchema, Sha256DigestSchema, Value } from '@repo/protocol';
-
+const SPACE_CODE = 32;
 const SECURE_SCHEME = 'https://';
 
 /**
@@ -21,7 +20,7 @@ export function refusedUrl(url: string): string | undefined {
  * rather than ignored — the deploy it would let through is the unverified one.
  */
 export function refusedChecksum(sha256: string | undefined): string | undefined {
-  return sha256 === undefined || Value.Check(Sha256DigestSchema, sha256)
+  return sha256 === undefined || /^[0-9a-f]{64}$/.test(sha256)
     ? undefined
     : 'The link’s checksum is not a sha256: 64 hex characters.';
 }
@@ -29,7 +28,14 @@ export function refusedChecksum(sha256: string | undefined): string | undefined 
 /** What the binary at a url is called, which is the name an export would carry. */
 export function namedByUrl(url: string): string | undefined {
   const segment = lastSegment(url);
-  return segment !== undefined && Value.Check(FilenameSchema, segment) ? segment : undefined;
+  return segment !== undefined &&
+    segment.length > 0 &&
+    segment !== '.' &&
+    segment !== '..' &&
+    !/[\\/]/.test(segment) &&
+    ![...segment].some((character) => character.charCodeAt(0) < SPACE_CODE)
+    ? segment
+    : undefined;
 }
 
 function lastSegment(url: string): string | undefined {

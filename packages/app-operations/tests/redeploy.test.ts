@@ -13,6 +13,7 @@ import {
   SLUG,
 } from '#tests/support/app.ts';
 
+const HTTP_BAD_REQUEST = 400;
 const PORT = 8080;
 const TOKEN_SET = parseEnvironmentPatch([{ name: 'TOKEN', value: 'shh' }]);
 
@@ -44,6 +45,12 @@ function apiHolding({
     return {
       patch: (body: unknown) => {
         sent.push({ what: 'app patch', body });
+        if (typeof body === 'object' && body !== null && 'name' in body && body.name === '') {
+          return Promise.resolve({
+            data: null,
+            error: { status: HTTP_BAD_REQUEST, value: { error: 'Invalid app name.' } },
+          });
+        }
         return Promise.resolve({ data: { id: appId, name: NAME, hostnames }, error: null });
       },
       artifacts: artifact,
@@ -127,11 +134,14 @@ test('a new name goes in the same patch as the config, parsed', async () => {
   });
 });
 
-test('a name the api would refuse is refused before anything moves', async () => {
+test('a rejected config patch prevents the release', async () => {
   const sent: Sent[] = [];
 
-  await expect(redeploy({ api: apiHolding({ sent }), appId: APP_ID, name: '' })).rejects.toThrow();
-  expect(sent.map((each) => each.what)).not.toContain('app patch');
+  await expect(redeploy({ api: apiHolding({ sent }), appId: APP_ID, name: '' })).rejects.toThrow(
+    'Invalid app name.',
+  );
+  expect(sent).toContainEqual({ what: 'app patch', body: { name: '' } });
+  expect(sent.map((each) => each.what)).not.toContain('deployment');
 });
 
 // An app configured for a release nobody made is worse than one nothing happened to.

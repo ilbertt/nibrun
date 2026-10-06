@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_INSTANCE_RESOURCES, Ipv4AddressSchema, Value } from '@repo/protocol';
+import { Ipv4AddressSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import {
   DRIVE_IDS,
   netmaskFor,
   renderFirecrackerConfig,
   renderKernelArgs,
 } from '#lib/vm/firecracker-config.ts';
+import { RESOURCES_FIXTURE } from '#tests/support/fixtures.ts';
 
 const SUBNET_PREFIX_LENGTH = 30;
 const SLASH_24 = 24;
@@ -31,7 +33,7 @@ const paths = {
 
 function config() {
   return renderFirecrackerConfig({
-    resources: DEFAULT_INSTANCE_RESOURCES,
+    resources: RESOURCES_FIXTURE,
     paths,
     network,
     vsock: { guestCid: 6, path: 'logs.vsock' },
@@ -130,8 +132,8 @@ describe('netmaskFor', () => {
 describe('machine and network', () => {
   test('resources come from the app config and the tap from the allocated slot', () => {
     expect(config()['machine-config']).toEqual({
-      vcpu_count: DEFAULT_INSTANCE_RESOURCES.vcpuCount,
-      mem_size_mib: DEFAULT_INSTANCE_RESOURCES.memoryMib,
+      vcpu_count: RESOURCES_FIXTURE.vcpuCount,
+      mem_size_mib: RESOURCES_FIXTURE.memoryMib,
       smt: false,
     });
     expect(config()['network-interfaces']).toEqual([

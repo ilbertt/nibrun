@@ -1,4 +1,6 @@
-import type { AppHostnameState, AppId, Hostname, OwnerId } from '@repo/protocol';
+import type { AppId, Hostname } from '@repo/protocol';
+import type { AppHostnameState } from '#lib/api/app.ts';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import {
   dcvMethodFor,
   isPlatformHostname,

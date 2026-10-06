@@ -1,4 +1,4 @@
-import type { AppState, DeploymentState, InstanceState } from '@repo/protocol';
+import type { AppState, DeploymentState, InstanceState } from '@repo/api-client/models';
 
 /**
  * What an app is doing, from the two things that know: the app row, which is what its owner asked

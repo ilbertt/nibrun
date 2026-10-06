@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { AppIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { appIdFromUnit, lastGuestLine, parseUnitNames, vmUnitName } from '#lib/vm/systemd.ts';
 import { parseProperties, parsePropertyBlocks, unitStatusFrom } from '#lib/vm/unit-status.ts';
 

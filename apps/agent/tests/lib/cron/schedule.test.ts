@@ -1,11 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  type CronJobDefinition,
-  MAX_CRON_JOBS_PER_APP,
-  TimestampSchema,
-  Value,
-} from '@repo/protocol';
+import { MAX_CRON_JOBS_PER_APP, TimestampSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
+import type { CronJobDefinition } from '#lib/cron/model.ts';
 import { nextCronRun, validateCronJobs } from '#lib/cron/schedule.ts';
 import { runScoped } from '#tests/support/run.ts';
 

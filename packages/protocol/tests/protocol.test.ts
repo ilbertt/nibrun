@@ -1,11 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { Value } from '@sinclair/typebox/value';
 import {
   AppIdSchema,
-  DEFAULT_AGENT_POLL_SETTINGS,
-  DEFAULT_HEALTH_CHECK,
-  DEFAULT_HTTP_PORT,
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_RESTART_POLICY,
   DeploymentIdSchema,
   DesiredStateResponseSchema,
   DIRECTORY_ENTRY_LIMIT,
@@ -23,24 +19,34 @@ import {
   isValidMessage,
   MAX_IDLE_TIMEOUT_MS,
   MIN_IDLE_TIMEOUT_MS,
-  namesExtraPublicPortValues,
   ObjectKeySchema,
   ProtocolValidationError,
   parseMessage,
-  REDACTED,
-  redactSecrets,
   type SecretString,
   SecretStringSchema,
-  SeenTenantLogs,
   Sha256DigestSchema,
-  TenantEnvironmentPatchSchema,
-  TenantEnvironmentSchema,
-  type TenantLogRecord,
   TimestampSchema,
-  Value,
   VolumeIdSchema,
 } from '#index.ts';
 import { FilenameSchema, HostPortSchema, HttpPortSchema } from '#lib/wire.ts';
+
+const HTTP_PORT_NUMBER = 3000;
+const HTTP_PORT_FIXTURE = Value.Parse(HttpPortSchema, HTTP_PORT_NUMBER);
+const HEALTH_CHECK_FIXTURE = {
+  intervalMs: 5000,
+  timeoutMs: 2000,
+  gracePeriodMs: 30000,
+  healthyThreshold: 1,
+  unhealthyThreshold: 3,
+};
+const RESOURCES_FIXTURE = { vcpuCount: 1, memoryMib: 256 };
+const RESTART_POLICY_FIXTURE = {
+  maxRestarts: 5,
+  initialBackoffMs: 500,
+  maxBackoffMs: 30000,
+  backoffFactor: 2,
+  resetAfterMs: 60000,
+};
 
 const TENANT_SECRET = Value.Parse(SecretStringSchema, 'sk-live-do-not-log-this');
 
@@ -50,60 +56,68 @@ const OVERLONG_SECRET_LENGTH = 40_000;
 /** One past what ext4 itself stores, so the schema and the filesystem agree on the boundary. */
 const OVERLONG_ENTRY_NAME_LENGTH = 256;
 
-const hexDigest = (length: number = SHA256_HEX_LENGTH) => 'a'.repeat(length);
+function hexDigest(length: number = SHA256_HEX_LENGTH) {
+  return 'a'.repeat(length);
+}
 
-const desiredState = (): HostDesiredState => ({
-  hostId: Value.Parse(HostIdSchema, 'host_1'),
-  volumes: [
-    {
-      volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
-      appId: Value.Parse(AppIdSchema, 'app_1'),
-      sizeBytes: 1024,
-      desiredState: 'present',
-    },
-  ],
-  instances: [
-    {
-      appId: Value.Parse(AppIdSchema, 'app_1'),
-      deploymentId: Value.Parse(DeploymentIdSchema, 'dep_1'),
-      volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
-      desiredState: 'running',
-      artifact: {
-        digest: hexDigest() as never,
-        sizeBytes: 2048,
-        objectKey: Value.Parse(ObjectKeySchema, 'artifacts/app_1/a'),
-        filename: Value.Parse(FilenameSchema, 'server'),
+function desiredState(): HostDesiredState {
+  return {
+    hostId: Value.Parse(HostIdSchema, 'host_1'),
+    volumes: [
+      {
+        volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
+        appId: Value.Parse(AppIdSchema, 'app_1'),
+        sizeBytes: 1024,
+        desiredState: 'present',
       },
-      config: {
-        httpPort: DEFAULT_HTTP_PORT,
-        hasExtraPublicPort: true,
-        args: ['serve', '--http=0.0.0.0:8090'],
-        environment: { DATABASE_URL: TENANT_SECRET },
-        resources: DEFAULT_INSTANCE_RESOURCES,
-        healthCheck: DEFAULT_HEALTH_CHECK,
-        restartPolicy: DEFAULT_RESTART_POLICY,
+    ],
+    instances: [
+      {
+        appId: Value.Parse(AppIdSchema, 'app_1'),
+        deploymentId: Value.Parse(DeploymentIdSchema, 'dep_1'),
+        volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
+        desiredState: 'running',
+        artifact: {
+          digest: hexDigest() as never,
+          sizeBytes: 2048,
+          objectKey: Value.Parse(ObjectKeySchema, 'artifacts/app_1/a'),
+          filename: Value.Parse(FilenameSchema, 'server'),
+        },
+        config: {
+          httpPort: HTTP_PORT_FIXTURE,
+          hasExtraPublicPort: true,
+          args: ['serve', '--http=0.0.0.0:8090'],
+          environment: { DATABASE_URL: TENANT_SECRET },
+          resources: RESOURCES_FIXTURE,
+          healthCheck: HEALTH_CHECK_FIXTURE,
+          restartPolicy: RESTART_POLICY_FIXTURE,
+        },
+        hostnames: [
+          { hostname: Value.Parse(HostnameSchema, 'app-1.nibrun.app'), kind: 'platform' },
+        ],
       },
-      hostnames: [{ hostname: Value.Parse(HostnameSchema, 'app-1.nibrun.app'), kind: 'platform' }],
-    },
-  ],
-  checkpoints: [],
-  exports: [],
-});
+    ],
+    checkpoints: [],
+    exports: [],
+  };
+}
 
-const desiredExport = () => ({
-  exportId: Value.Parse(ExportIdSchema, 'exp_1'),
-  appId: Value.Parse(AppIdSchema, 'app_1'),
-  volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
-  objectKey: Value.Parse(ObjectKeySchema, 'exports/app_1/exp_1.tar.gz'),
-  artifact: {
-    digest: hexDigest(),
-    sizeBytes: 2048,
-    objectKey: Value.Parse(ObjectKeySchema, 'artifacts/app_1/a'),
-    filename: Value.Parse(FilenameSchema, 'server'),
-  },
-  environment: { API_KEY: TENANT_SECRET },
-  desiredState: 'present',
-});
+function desiredExport() {
+  return {
+    exportId: Value.Parse(ExportIdSchema, 'exp_1'),
+    appId: Value.Parse(AppIdSchema, 'app_1'),
+    volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
+    objectKey: Value.Parse(ObjectKeySchema, 'exports/app_1/exp_1.tar.gz'),
+    artifact: {
+      digest: hexDigest(),
+      sizeBytes: 2048,
+      objectKey: Value.Parse(ObjectKeySchema, 'artifacts/app_1/a'),
+      filename: Value.Parse(FilenameSchema, 'server'),
+    },
+    environment: { API_KEY: TENANT_SECRET },
+    desiredState: 'present',
+  };
+}
 
 // The moment an owner most wants their data out is after they have stopped the app, and a
 // stopped app puts no instance in desired state. The export naming its own binary is what
@@ -195,7 +209,9 @@ describe('branding leaves runtime validation intact', () => {
 // pair of suites below exist to keep that asymmetry deliberate: loosening the path or tightening
 // the name would each look like a small consistency fix in isolation.
 describe('a directory entry name describes what the tenant created', () => {
-  const accepts = (value: string) => isValidMessage({ schema: FilesystemEntryNameSchema, value });
+  function accepts(value: string) {
+    return isValidMessage({ schema: FilesystemEntryNameSchema, value });
+  }
 
   test('anything ext4 stores survives being described', () => {
     expect(accepts('pb_data')).toBe(true);
@@ -216,7 +232,9 @@ describe('a directory entry name describes what the tenant created', () => {
 });
 
 describe('a guest path is accepted rather than described', () => {
-  const accepts = (value: string) => isValidMessage({ schema: GuestPathSchema, value });
+  function accepts(value: string) {
+    return isValidMessage({ schema: GuestPathSchema, value });
+  }
 
   test('an absolute path inside the volume is addressable', () => {
     expect(accepts('/')).toBe(true);
@@ -279,7 +297,7 @@ test('a listing carries one flat directory and says when it held back', () => {
 });
 
 test('an HTTP port cannot be used where a host port belongs', () => {
-  const httpPort: HttpPort = DEFAULT_HTTP_PORT;
+  const httpPort: HttpPort = HTTP_PORT_FIXTURE;
   // @ts-expect-error the two ports mean different things and are branded apart
   const hostPort: HostPort = httpPort;
   expect(isValidMessage({ schema: HostPortSchema, value: hostPort })).toBe(true);
@@ -347,164 +365,19 @@ describe('version skew', () => {
  * then be quietly missing from everything that read it back. The schema is where an owner is told
  * instead, and `nibrun.app_config_environment` says the same thing in SQL.
  */
-describe('a variable named __proto__ is not one', () => {
-  // Built with fromEntries rather than a literal, which is the one way to give a plain object that
-  // key as a property at all — and the shape the api would receive from JSON.parse.
-  const named = (name: string) => Object.fromEntries([[name, TENANT_SECRET]]);
+describe('secret validation', () => {
+  test('desired state validates runtime references before the guest receives them', () => {
+    const state = desiredState();
+    const instance = state.instances[0]!;
+    instance.config.environment = {
+      CALLBACK_URL: Value.Parse(SecretStringSchema, `https://\${NIBRUN_HOSTNAME}/callback`),
+    };
+    expect(isValidMessage({ schema: HostDesiredStateSchema, value: state })).toBe(true);
 
-  test('setting one is refused', () => {
-    expect(isValidMessage({ schema: TenantEnvironmentSchema, value: named('__proto__') })).toBe(
-      false,
-    );
-  });
-
-  test('so is an edit that names one', () => {
-    expect(
-      isValidMessage({ schema: TenantEnvironmentPatchSchema, value: named('__proto__') }),
-    ).toBe(false);
-  });
-
-  test('a name that merely starts with it is a name like any other', () => {
-    expect(isValidMessage({ schema: TenantEnvironmentSchema, value: named('__proto__x') })).toBe(
-      true,
-    );
-    expect(isValidMessage({ schema: TenantEnvironmentSchema, value: named('_PROTO_') })).toBe(true);
-  });
-});
-
-/**
- * A tenant value may name a runtime value the guest sets, and apps/runtime fails the boot over a
- * name it does not offer. The schema is what turns a typo into a deploy nobody accepted, which is
- * the only end of this where whoever wrote it is still listening.
- */
-describe('a value naming a runtime value', () => {
-  const OFFERED = `\${NIBRUN_HOSTNAME}`;
-  const MISSPELLED = `\${NIBRUN_HSOTNAME}`;
-
-  function holding(value: string) {
-    return { CALLBACK_URL: value };
-  }
-
-  function accepts(value: string) {
-    return isValidMessage({ schema: TenantEnvironmentSchema, value: holding(value) });
-  }
-
-  test('complete runtime references are accepted', () => {
-    expect(accepts(`https://${OFFERED}/callback`)).toBe(true);
-    expect(accepts(`\${NIBRUN_HTTP_PORT}`)).toBe(true);
-  });
-
-  test('a name the guest does not offer is refused', () => {
-    expect(accepts(`https://${MISSPELLED}/callback`)).toBe(false);
-    expect(accepts(`\${NIBRUN_HTTP_PORTS}`)).toBe(false);
-  });
-
-  test('a brace nobody closed is literal', () => {
-    expect(accepts(`https://\${NIBRUN_HOSTNAME`)).toBe(true);
-  });
-
-  test('a $ that opens no reference is a $', () => {
-    expect(accepts('$2y$10$K3JqBQ8Rt7uVwXyZaBcDeF')).toBe(true);
-    expect(accepts('$HOME/bin')).toBe(true);
-    for (const literal of [
-      '$',
-      '{',
-      '}',
-      `\${`,
-      `\${}`,
-      '$NIBRUN_HTTP_PORT',
-      '$NIBRUN_NOTHING',
-      '$NIBRUN_PUBLIC_IPV4',
-      '$NIBRUN_EXTRA_PUBLIC_PORT',
-      `\${NIBRUN_NOTHING`,
-      '{NIBRUN_HTTP_PORT}',
-      `\${NIBRUN_HTTP_PORT!}`,
-      `\${NIBRUN_HTTP_PORT with spaces}`,
-      'secret$NIBRUN_HTTP_PORT}suffix',
-    ]) {
-      expect(accepts(literal)).toBe(true);
-      expect(
-        isValidMessage({ schema: TenantEnvironmentPatchSchema, value: holding(literal) }),
-      ).toBe(true);
-    }
-    expect(accepts(`$${OFFERED}|{${OFFERED}}|\${NIBRUN_BROKEN:${OFFERED}|$`)).toBe(true);
-    expect(accepts(`\${NIBRUN_BROKEN:${MISSPELLED}`)).toBe(false);
-  });
-
-  test('an edit is held to the same rule', () => {
-    expect(
-      isValidMessage({ schema: TenantEnvironmentPatchSchema, value: holding(`x${MISSPELLED}`) }),
-    ).toBe(false);
-    expect(
-      isValidMessage({ schema: TenantEnvironmentPatchSchema, value: { CALLBACK_URL: null } }),
-    ).toBe(true);
-  });
-});
-
-/**
- * Which of the offered names an app has to have asked for. The schema cannot answer this — whether
- * a value is allowed depends on the config beside it — so it is a question rather than a pattern.
- */
-describe('a value naming a runtime value only some apps are given', () => {
-  test('either name in a complete reference', () => {
-    expect(namesExtraPublicPortValues(`\${NIBRUN_PUBLIC_IPV4}`)).toBe(true);
-    expect(namesExtraPublicPortValues(`\${NIBRUN_EXTRA_PUBLIC_PORT}`)).toBe(true);
-    expect(namesExtraPublicPortValues(`\${NIBRUN_PUBLIC_IPV4}:\${NIBRUN_EXTRA_PUBLIC_PORT}`)).toBe(
-      true,
-    );
-  });
-
-  test('a name every app is given is not one of them', () => {
-    expect(namesExtraPublicPortValues('$NIBRUN_HOSTNAME')).toBe(false);
-    expect(namesExtraPublicPortValues(`\${NIBRUN_HTTP_PORT}`)).toBe(false);
-  });
-
-  test('a longer name is a different name', () => {
-    expect(namesExtraPublicPortValues(`\${NIBRUN_PUBLIC_IPV4X}`)).toBe(false);
-  });
-
-  test('a value naming nothing names none of them', () => {
-    expect(namesExtraPublicPortValues('$2y$10$K3JqBQ8Rt7uVwXyZaBcDeF')).toBe(false);
-    for (const literal of [
-      'NIBRUN_PUBLIC_IPV4',
-      '$NIBRUN_PUBLIC_IPV4',
-      '$NIBRUN_EXTRA_PUBLIC_PORT',
-      `\${NIBRUN_PUBLIC_IPV4`,
-      `\${NIBRUN_EXTRA_PUBLIC_PORT!}`,
-    ]) {
-      expect(namesExtraPublicPortValues(literal)).toBe(false);
-    }
-  });
-});
-
-describe('secrets', () => {
-  test('redaction reaches tenant environment values anywhere in a message', () => {
-    const redacted = redactSecrets({ schema: HostDesiredStateSchema, value: desiredState() });
-    expect(JSON.stringify(redacted)).not.toInclude(TENANT_SECRET);
-    expect(JSON.stringify(redacted)).toInclude(REDACTED);
-  });
-
-  // A second place tenant values cross the wire, so a message carrying an export has to be as
-  // safe to log as one carrying an instance.
-  test('redaction reaches the environment an export carries', () => {
-    const redacted = redactSecrets({
-      schema: HostDesiredStateSchema,
-      value: { ...desiredState(), instances: [], exports: [desiredExport()] },
-    });
-
-    expect(JSON.stringify(redacted)).not.toInclude(TENANT_SECRET);
-    expect(JSON.stringify(redacted)).toInclude(REDACTED);
-  });
-
-  test('redaction leaves everything else alone', () => {
-    const redacted = redactSecrets({
-      schema: HostDesiredStateSchema,
-      value: desiredState(),
-    }) as HostDesiredState;
-    expect(redacted.hostId).toBe(desiredState().hostId);
-    expect(redacted.instances[0]?.hostnames[0]?.hostname).toBe(
-      Value.Parse(HostnameSchema, 'app-1.nibrun.app'),
-    );
+    instance.config.environment = {
+      CALLBACK_URL: Value.Parse(SecretStringSchema, `https://\${NIBRUN_HSOTNAME}/callback`),
+    };
+    expect(isValidMessage({ schema: HostDesiredStateSchema, value: state })).toBe(false);
   });
 
   test('a validation failure never carries the offending value into its message', () => {
@@ -537,92 +410,15 @@ test('a fully populated desired state round-trips through JSON', () => {
   expect(parsed).toEqual(desiredState());
 });
 
-test('the poll settings the control plane hands out are themselves valid', () => {
-  expect(DEFAULT_AGENT_POLL_SETTINGS.minIntervalMs).toBeGreaterThan(0);
-  expect(DEFAULT_AGENT_POLL_SETTINGS.minIntervalMs).toBeLessThan(
-    DEFAULT_AGENT_POLL_SETTINGS.reportIntervalMs,
-  );
-});
-
 test('a timestamp brand is only obtained by parsing a plain string', () => {
   const now = Value.Parse(TimestampSchema, new Date().toISOString());
   expect(isValidMessage({ schema: TimestampSchema, value: now })).toBe(true);
 });
 
-const AN_INSTANT = Value.Parse(TimestampSchema, '2026-08-07T09:51:56.687Z');
-const A_LATER_INSTANT = Value.Parse(TimestampSchema, '2026-08-07T09:51:56.756Z');
-
-function logRecord(overrides: Partial<TenantLogRecord> = {}): TenantLogRecord {
-  return {
-    _time: AN_INSTANT,
-    _msg: 'Server started at http://0.0.0.0:8090',
-    hostId: 'host-1',
-    SOURCE: 'tenant',
-    appId: 'app-1',
-    deploymentId: 'deployment-1',
-    stream: 'stdout',
-    sourceId: 'source-1',
-    sequence: 0,
-    ...overrides,
-  } as TenantLogRecord;
-}
-
-describe('a record read twice is handed over once', () => {
-  test('the same record is not admitted a second time', () => {
-    const seen = new SeenTenantLogs();
-
-    expect(seen.admit(logRecord())).toBe(true);
-    expect(seen.admit(logRecord())).toBe(false);
-  });
-
-  /**
-   * The whole reason this is not a high-water mark. A program announcing itself writes several
-   * lines in one millisecond, and the store hands that instant back in an order of its own — so
-   * seeing the newest of them first must not condemn the rest as repeats.
-   */
-  test('the rest of an instant survives having seen its newest record first', () => {
-    const seen = new SeenTenantLogs();
-    seen.admit(logRecord({ sequence: 2 }));
-
-    expect(seen.admit(logRecord({ sequence: 1 }))).toBe(true);
-    expect(seen.admit(logRecord({ sequence: 0 }))).toBe(true);
-  });
-
-  test('the next record from the same source is new', () => {
-    const seen = new SeenTenantLogs();
-    seen.admit(logRecord());
-
-    expect(seen.admit(logRecord({ sequence: 1 }))).toBe(true);
-  });
-
-  // Sequence counts within one source, so the same number from another one is another record.
-  test('a source that restarted is not the source that stopped', () => {
-    const seen = new SeenTenantLogs();
-    seen.admit(logRecord());
-
-    expect(seen.admit(logRecord({ sourceId: 'source-2' }))).toBe(true);
-  });
-
-  // What a reconnect asks for: the seconds it was away, which carry what it did not miss.
-  test('an instant already passed is a repeat however it is numbered', () => {
-    const seen = new SeenTenantLogs();
-    seen.admit(logRecord({ _time: A_LATER_INSTANT, sequence: 5 }));
-
-    expect(seen.admit(logRecord({ _time: AN_INSTANT, sequence: 0 }))).toBe(false);
-  });
-
-  // Only the newest instant's keys are kept, so following an app for a day costs one instant.
-  test('moving on forgets the instant left behind', () => {
-    const seen = new SeenTenantLogs();
-    seen.admit(logRecord());
-    seen.admit(logRecord({ _time: A_LATER_INSTANT, sequence: 1 }));
-
-    expect(seen.admit(logRecord({ _time: A_LATER_INSTANT, sequence: 1 }))).toBe(false);
-  });
-});
-
 describe('how long an app may wait before it sleeps', () => {
-  const accepts = (value: number) => isValidMessage({ schema: IdleTimeoutMsSchema, value });
+  function accepts(value: number) {
+    return isValidMessage({ schema: IdleTimeoutMsSchema, value });
+  }
 
   // The floor is the cadence the host measures traffic on, so anything under it is a promise
   // the host cannot keep rather than an aggressive setting.

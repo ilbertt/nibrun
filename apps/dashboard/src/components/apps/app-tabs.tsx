@@ -1,9 +1,10 @@
-import { DEFAULT_LOG_TIMERANGE, GUEST_PATH_ROOT } from '@repo/protocol';
+import { GUEST_PATH_ROOT } from '@repo/app-operations';
 import { Tabs, TabsList, TabsTrigger } from '@repo/ui/components/tabs';
 import { Link } from '@tanstack/react-router';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useAppTab } from '#lib/hooks/use-app-tab.ts';
 import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
+import { DEFAULT_LOG_TIMERANGE } from '#lib/log-timeranges.ts';
 import { SessionIdentity } from '#lib/session-identity.ts';
 import { Route as CronsRoute } from '#routes/(dashboard)/apps/$appId/crons.tsx';
 import { Route as DomainsRoute } from '#routes/(dashboard)/apps/$appId/domains.tsx';

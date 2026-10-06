@@ -5,8 +5,8 @@ import {
   type FilesystemUsage,
   type Timestamp,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Layer } from 'effect';
 import { measureUsage } from '#lib/agent/usage.ts';
 import { AgentState } from '#services/agent-state.service.ts';

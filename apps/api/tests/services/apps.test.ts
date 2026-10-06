@@ -2,34 +2,27 @@ import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
   AppIdSchema,
-  type AppName,
-  AppNameSchema,
-  type AppState,
   type ComputeUsage,
-  type DnsLabel,
-  DnsLabelSchema,
   type FilesystemUsage,
   type Hostname,
   HostnameSchema,
   MIN_IDLE_TIMEOUT_MS,
   type ObjectKey,
   ObjectKeySchema,
-  OWNED_APP_STATES,
-  type OwnerId,
-  OwnerIdSchema,
-  REDACTED,
   type ReportedInstance,
   type ReportedVolume,
   type TenantEnvironment,
-  type TenantEnvironmentPatch,
-  TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
   TimestampSchema,
-  Value,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
+import { type AppName, AppNameSchema, type AppState, OWNED_APP_STATES } from '#lib/api/app.ts';
+import { type DnsLabel, DnsLabelSchema } from '#lib/api/dns-label.ts';
+import { type TenantEnvironmentPatch, TenantEnvironmentPatchSchema } from '#lib/api/environment.ts';
+import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import type { NewAppConfig, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import {
   BadRequestError,
@@ -38,6 +31,7 @@ import {
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
+import { REDACTED } from '#lib/redact-secrets.ts';
 import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {

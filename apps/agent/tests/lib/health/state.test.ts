@@ -1,10 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  DEFAULT_HEALTH_CHECK,
-  DEFAULT_HTTP_PORT,
-  type HealthCheck,
-  type InstanceState,
-} from '@repo/protocol';
+import type { HealthCheck, InstanceState } from '@repo/protocol';
 import {
   applyProbe,
   describeInstanceFailure,
@@ -14,15 +9,15 @@ import {
   STARTUP_PROBE_INTERVAL_MS,
 } from '#lib/health/state.ts';
 import type { UnitStatus } from '#lib/vm/unit-status.ts';
-import { OBSERVED_AT } from '#tests/support/fixtures.ts';
+import { HEALTH_CHECK_FIXTURE, HTTP_PORT_FIXTURE, OBSERVED_AT } from '#tests/support/fixtures.ts';
 
 const STARTED_AT_MS = 1_000_000;
-const GRACE_MS = DEFAULT_HEALTH_CHECK.gracePeriodMs;
+const GRACE_MS = HEALTH_CHECK_FIXTURE.gracePeriodMs;
 const WITHIN_GRACE_MS = STARTED_AT_MS + GRACE_MS - 1;
 const PAST_GRACE_MS = STARTED_AT_MS + GRACE_MS + 1;
 
-const UNHEALTHY_RUN = DEFAULT_HEALTH_CHECK.unhealthyThreshold;
-const HEALTHY_THRESHOLD = DEFAULT_HEALTH_CHECK.healthyThreshold;
+const UNHEALTHY_RUN = HEALTH_CHECK_FIXTURE.unhealthyThreshold;
+const HEALTHY_THRESHOLD = HEALTH_CHECK_FIXTURE.healthyThreshold;
 const TWO_SUCCESSES = 2;
 
 type Tracker = ReturnType<typeof initialTracker>;
@@ -50,7 +45,7 @@ const absent: UnitStatus = {
 };
 
 function check(overrides: Partial<HealthCheck> = {}): HealthCheck {
-  return { ...DEFAULT_HEALTH_CHECK, ...overrides };
+  return { ...HEALTH_CHECK_FIXTURE, ...overrides };
 }
 
 function probe({
@@ -144,13 +139,13 @@ describe('how soon a tenant is asked again', () => {
 
   test('one that has answered falls back to the liveness interval', () => {
     expect(delay({ tracker: healthyThen(0), nowMs: WITHIN_GRACE_MS })).toBe(
-      DEFAULT_HEALTH_CHECK.intervalMs,
+      HEALTH_CHECK_FIXTURE.intervalMs,
     );
   });
 
   test('past the grace period the startup grid is over, so a slow starter fails as it always did', () => {
     expect(delay({ tracker: initialTracker(), nowMs: PAST_GRACE_MS })).toBe(
-      DEFAULT_HEALTH_CHECK.intervalMs,
+      HEALTH_CHECK_FIXTURE.intervalMs,
     );
   });
 
@@ -442,7 +437,7 @@ describe('a failure accounts for itself', () => {
       unit,
       tracker,
       healthCheck: check(),
-      httpPort: DEFAULT_HTTP_PORT,
+      httpPort: HTTP_PORT_FIXTURE,
     });
   }
 
@@ -468,7 +463,7 @@ describe('a failure accounts for itself', () => {
         unit: exited,
         tracker: initialTracker(),
         healthCheck: check(),
-        httpPort: DEFAULT_HTTP_PORT,
+        httpPort: HTTP_PORT_FIXTURE,
         guestVerdict: 'the tenant used its 5 restarts without staying up; shutting the guest down',
       }),
     ).toBe('the tenant used its 5 restarts without staying up; shutting the guest down');
@@ -482,11 +477,11 @@ describe('a failure accounts for itself', () => {
         unit: active,
         tracker: { ...initialTracker(), consecutiveFailures: UNHEALTHY_RUN },
         healthCheck: check(),
-        httpPort: DEFAULT_HTTP_PORT,
+        httpPort: HTTP_PORT_FIXTURE,
         guestVerdict: 'the tenant has stopped; shutting the guest down',
       }),
     ).toBe(
-      `nothing answered on port ${DEFAULT_HTTP_PORT} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
+      `nothing answered on port ${HTTP_PORT_FIXTURE} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
     );
   });
 
@@ -494,7 +489,7 @@ describe('a failure accounts for itself', () => {
     const tracker = { ...initialTracker(), consecutiveFailures: UNHEALTHY_RUN };
 
     expect(failure({ unit: active, tracker })).toBe(
-      `nothing answered on port ${DEFAULT_HTTP_PORT} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
+      `nothing answered on port ${HTTP_PORT_FIXTURE} inside the guest: ${UNHEALTHY_RUN} health probes failed after the ${GRACE_MS}ms grace period`,
     );
   });
 });

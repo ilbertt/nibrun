@@ -1,13 +1,8 @@
-import {
-  type AppId,
-  type DeploymentId,
-  type OwnerId,
-  SeenTenantLogs,
-  type TenantLogRecord,
-  type Timestamp,
-} from '@repo/protocol';
+import type { AppId, DeploymentId, TenantLogRecord, Timestamp } from '@repo/protocol';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import { durationToMs } from '#lib/duration.ts';
 import { NotFoundError } from '#lib/errors.ts';
+import { SeenTenantLogs } from '#lib/seen-tenant-logs.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import { wait } from '#lib/wait.ts';
 import type { DeploymentLookupRepositoryContract } from '#repositories/deployments.repository.ts';

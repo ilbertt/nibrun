@@ -1,14 +1,16 @@
 import { expect, mock, test } from 'bun:test';
-import { requiredDomainDnsRecords } from '@repo/protocol';
 import { checkDomainDns, domainDnsPrompt } from '#domains.ts';
 import { apiHolding } from '#tests/support/api.ts';
 
 test('DNS checks request fresh results after a record becomes visible', async () => {
-  const records = requiredDomainDnsRecords({
-    hostname: 'app.example.com',
-    routingTarget: 'quiet-otter.nibrun.app',
-    dcvTarget: 'delegation.example.net',
-  });
+  const records = [
+    { hostname: 'app.example.com', type: 'CNAME' as const, target: 'quiet-otter.nibrun.app' },
+    {
+      hostname: '_acme-challenge.app.example.com',
+      type: 'CNAME' as const,
+      target: 'delegation.example.net',
+    },
+  ];
   const responses = [false, true].map((matched) => ({
     records: records.map((record) => ({
       ...record,
@@ -38,11 +40,14 @@ test('DNS checks request fresh results after a record becomes visible', async ()
 });
 
 test('the agent prompt carries routing and certificate records and asks for the DNS provider', () => {
-  const records = requiredDomainDnsRecords({
-    hostname: 'app.example.com',
-    routingTarget: 'quiet-otter.nibrun.app',
-    dcvTarget: 'delegation.example.net',
-  });
+  const records = [
+    { hostname: 'app.example.com', type: 'CNAME' as const, target: 'quiet-otter.nibrun.app' },
+    {
+      hostname: '_acme-challenge.app.example.com',
+      type: 'CNAME' as const,
+      target: 'delegation.example.net',
+    },
+  ];
   const prompt = domainDnsPrompt(records);
   for (const record of records) {
     expect(prompt).toContain(`${record.type} ${record.hostname} → ${record.target}`);

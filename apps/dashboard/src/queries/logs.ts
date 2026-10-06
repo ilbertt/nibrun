@@ -1,5 +1,5 @@
+import type { LogTimerange, TenantLogRecord } from '@repo/api-client/models';
 import { followLogs } from '@repo/app-operations';
-import type { LogTimerange, TenantLogRecord } from '@repo/protocol';
 import {
   queryOptions,
   skipToken,

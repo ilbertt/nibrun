@@ -1,11 +1,9 @@
-import {
-  AppIdSchema,
-  ArtifactIdSchema,
-  ArtifactSchema,
-  OwnerIdSchema,
-  Value,
-} from '@repo/protocol';
+import { AppIdSchema } from '@repo/protocol';
+import { publicSchema } from '@repo/typebox-extensions';
+import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap, t } from 'elysia';
+import { ArtifactSchema } from '#lib/api/artifact.ts';
+import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { UpdateArtifactBodySchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { ArtifactsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
@@ -26,12 +24,13 @@ export const AppsAppIdArtifactsArtifactIdController = new Elysia()
       return status(StatusMap.OK, artifact);
     },
     {
-      response: { [StatusMap.OK]: ArtifactSchema },
+      response: { [StatusMap.OK]: publicSchema(ArtifactSchema) },
     },
   )
   .patch(
     '/apps/:appId/artifacts/:artifactId',
-    async ({ artifactsService, params, body, user, status }) => {
+    async ({ artifactsService, params, body: bodyInput, user, status }) => {
+      const body = Value.Parse(UpdateArtifactBodySchema, bodyInput);
       const appId = Value.Parse(AppIdSchema, params.appId);
       const artifactId = Value.Parse(ArtifactIdSchema, params.artifactId);
       const ownerId = Value.Parse(OwnerIdSchema, user.id);
@@ -45,9 +44,9 @@ export const AppsAppIdArtifactsArtifactIdController = new Elysia()
       return status(StatusMap.OK, artifact);
     },
     {
-      body: UpdateArtifactBodySchema,
+      body: publicSchema(UpdateArtifactBodySchema),
       response: {
-        [StatusMap.OK]: ArtifactSchema,
+        [StatusMap.OK]: publicSchema(ArtifactSchema),
         [StatusMap['No Content']]: t.Void(),
       },
     },

@@ -1,5 +1,7 @@
-import type { AppHostnameKind, AppHostnameState, AppId, Hostname, OwnerId } from '@repo/protocol';
+import type { AppHostnameKind, AppId, Hostname } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import type { AppHostnameState } from '#lib/api/app.ts';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import type { EdgeReport } from '#repositories/custom-hostnames.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
@@ -122,7 +124,7 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
     hostname,
   }: OwnedApp & { hostname: Hostname }): Promise<CustomHostnameClaim | null> {
     const [row] = await this.sql.ClaimCustomAppHostname`
-      /* @type state import('@repo/protocol').AppHostnameState | null */
+      /* @type state import('#lib/api/app.ts').AppHostnameState | null */
       WITH app AS (
         SELECT a.id
         FROM nibrun.live_apps a

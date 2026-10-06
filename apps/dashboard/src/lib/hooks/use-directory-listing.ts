@@ -1,5 +1,5 @@
+import type { DirectoryListing, GuestPath } from '@repo/api-client/models';
 import { guestPath } from '@repo/app-operations';
-import type { DirectoryListing, GuestPath } from '@repo/protocol';
 import { useQuery } from '@tanstack/react-query';
 import { useNewestDeployment } from '#lib/hooks/use-newest-deployment.ts';
 import { directoryQueryOptions } from '#queries/filesystem.ts';

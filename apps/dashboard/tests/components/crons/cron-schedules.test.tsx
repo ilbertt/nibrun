@@ -1,12 +1,5 @@
 import { expect, test } from 'bun:test';
-import {
-  CRON_TIME_ZONE,
-  type CronListing,
-  type RegisteredCronJob,
-  SecretStringSchema,
-  TimestampSchema,
-  Value,
-} from '@repo/protocol';
+import type { CronListing, RegisteredCronJob } from '@repo/api-client/models';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CronSchedules } from '#components/crons/cron-schedules.tsx';
 
@@ -14,14 +7,14 @@ const FIRST_JOB = {
   jobId: 'cron-1',
   schedule: '*/5 * * * *',
   command: './app cleanup',
-  nextRunAt: Value.Parse(TimestampSchema, '2026-09-30T09:45:00.000Z'),
+  nextRunAt: '2026-09-30T09:45:00.000Z',
 } as RegisteredCronJob;
 
 const LISTING = {
   appId: 'app-1',
   deploymentId: 'deployment-1',
   enabled: true,
-  timeZone: CRON_TIME_ZONE,
+  timeZone: 'UTC' as const,
   jobs: [FIRST_JOB, { jobId: 'cron-2', schedule: '@daily', command: './app cleanup' }],
 } as CronListing;
 
@@ -65,7 +58,7 @@ test('tenant commands are escaped and environment values stay out of the page', 
   const job = {
     ...FIRST_JOB,
     command: 'echo "<script>alert(1)</script>"',
-    environment: { TOKEN: Value.Parse(SecretStringSchema, 'secret') },
+    environment: { TOKEN: 'secret' },
   };
   const markup = renderToStaticMarkup(<CronSchedules listing={{ ...LISTING, jobs: [job] }} />);
   expect(markup).toContain('&lt;script&gt;');

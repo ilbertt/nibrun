@@ -1,4 +1,4 @@
-import type { CronListing } from '@repo/protocol';
+import type { CronListing } from '@repo/api-client/models';
 import { Badge } from '@repo/ui/components/badge';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@repo/ui/components/empty';
 import {
@@ -14,7 +14,7 @@ import { ClockIcon } from 'lucide-react';
 import { useCronTimeZone } from '#lib/hooks/use-cron-time-zone.ts';
 
 export function CronSchedules({ listing }: { listing: CronListing }) {
-  const timeZone = useCronTimeZone();
+  const timeZone = useCronTimeZone(listing.timeZone);
 
   return (
     <div className="flex flex-col gap-4">

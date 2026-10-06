@@ -1,10 +1,10 @@
+import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
 import {
   CUSTOM_DOMAIN_PRICING_NOTICE,
   FREE_APPS_COUNT,
   HELLO_EMAIL,
   PRICE_PER_APP_USD,
 } from '@repo/global-constants';
-import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import { CpuIcon, HardDriveIcon, MemoryStickIcon, MinusIcon, PlusIcon } from 'lucide-react';
 import type { ReactNode } from 'react';

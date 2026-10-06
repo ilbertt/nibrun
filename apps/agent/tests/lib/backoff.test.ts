@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_RESTART_POLICY } from '@repo/protocol';
 import { backoffDelayMs, isReadyToRetry, nextAttemptWindow } from '#lib/backoff.ts';
+import { RESTART_POLICY_FIXTURE } from '#tests/support/fixtures.ts';
 
-const policy = DEFAULT_RESTART_POLICY;
+const policy = RESTART_POLICY_FIXTURE;
 const TWO_GROWTHS = 2;
 const THIRD_ATTEMPT = 3;
 const FAR_PAST_THE_CAP = 100;

@@ -49,7 +49,9 @@
         "useAwaitThenable": "error",
         "useReactFunctionComponentDefinition": {
           "level": "error",
-          "options": { "namedComponents": "functionDeclaration" }
+          "options": {
+            "namedComponents": "functionDeclaration"
+          }
         },
         "noFloatingPromises": "error",
         "useSortedClasses": {
@@ -109,7 +111,9 @@
           "style": {
             "useConsistentTypeDefinitions": {
               "level": "error",
-              "options": { "style": "type" }
+              "options": {
+                "style": "type"
+              }
             }
           }
         }
@@ -216,6 +220,135 @@
           },
           "complexity": {
             "useMaxParams": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/*.ts",
+        "**/*.tsx",
+        "!apps/api/**",
+        "!apps/agent/**",
+        "!packages/protocol/**",
+        "!packages/api-client/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@repo/api", "@repo/api/**", "**/apps/api/**"],
+                    "message": "Public consumers use @repo/api-client. Derive request and response types from its exported Treaty client."
+                  },
+                  {
+                    "group": [
+                      "@repo/protocol",
+                      "@repo/protocol/**",
+                      "!@repo/protocol/runtime-values",
+                      "**/packages/protocol/**"
+                    ],
+                    "message": "Public API types come from @repo/api-client. Only the schema-free protocol/runtime-values subpath is public."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/protocol/src/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@repo/**", "!@repo/typebox-extensions"],
+                    "message": "The API-agent wire contract may depend only on TypeBox schema extensions, never on applications or other workspace packages."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/agent/**/*.ts", "apps/agent/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@repo/api", "@repo/api/*", "**/apps/api/**"],
+                    "message": "The agent must not import the API. Shared API-agent communication belongs in @repo/protocol."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "packages/api-client/**/*.ts",
+        "packages/api-client/**/*.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@repo/api": "The client may reference only API route types."
+                },
+                "patterns": [
+                  {
+                    "group": [
+                      "@repo/api/**",
+                      "!@repo/api/types",
+                      "**/apps/api/**",
+                      "@repo/protocol",
+                      "@repo/protocol/**",
+                      "**/packages/protocol/**"
+                    ],
+                    "message": "Client runtime code must not depend on API or protocol implementation. Only type imports from @repo/api/types are allowed."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/typebox-extensions/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@repo/**", "**/apps/**", "**/packages/**"],
+                    "message": "TypeBox extensions must be application-independent and have no workspace runtime dependencies."
+                  }
+                ]
+              }
+            }
           }
         }
       }

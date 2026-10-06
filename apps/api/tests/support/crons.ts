@@ -4,8 +4,8 @@ import {
   CronJobIdSchema,
   type CronListing,
   DeploymentIdSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 
 export const CRON_DEPLOYMENT = {
   appId: Value.Parse(AppIdSchema, 'app-1'),

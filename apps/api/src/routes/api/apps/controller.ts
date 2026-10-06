@@ -1,5 +1,7 @@
-import { OwnerIdSchema, Value } from '@repo/protocol';
+import { publicSchema } from '@repo/typebox-extensions';
+import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
+import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   AppResponseSchema,
@@ -20,12 +22,13 @@ export const AppsController = new Elysia()
       return status(StatusMap.OK, { apps });
     },
     {
-      response: { [StatusMap.OK]: ListAppsResponseSchema },
+      response: { [StatusMap.OK]: publicSchema(ListAppsResponseSchema) },
     },
   )
   .post(
     '/apps',
-    async ({ appsService, body, user, status }) => {
+    async ({ appsService, body: bodyInput, user, status }) => {
+      const body = Value.Parse(CreateAppRequestSchema, bodyInput);
       const app = await appsService.create({
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         isAnonymous: user.isAnonymous,
@@ -35,7 +38,7 @@ export const AppsController = new Elysia()
       return status(StatusMap.Created, app);
     },
     {
-      body: CreateAppRequestSchema,
-      response: { [StatusMap.Created]: AppResponseSchema },
+      body: publicSchema(CreateAppRequestSchema),
+      response: { [StatusMap.Created]: publicSchema(AppResponseSchema) },
     },
   );

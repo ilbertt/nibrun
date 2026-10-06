@@ -1,14 +1,14 @@
 import { trackEvent } from '@repo/analytics';
+import { DEFAULT_HTTP_PORT } from '@repo/api-constants';
 import {
   type DeployableBinary,
   type FetchableBinary,
   InvalidEnvironmentError,
   parseEnvironmentPatch,
-  refusedArchive,
+  refusedArchiveBody,
   type UploadableArchive,
 } from '@repo/app-operations';
 import { type DeploySuggestion, namedByUrl, refusedChecksum, refusedUrl } from '@repo/deploy-link';
-import { DEFAULT_HTTP_PORT, FilenameSchema, Sha256DigestSchema, Value } from '@repo/protocol';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
 import {
   type BinarySource,
@@ -108,10 +108,7 @@ function validateBinarySource(source: BinarySource): string | undefined {
   if (fetched !== undefined) {
     return refusedUrl(fetched.url) ?? refusedChecksum(fetched.sha256);
   }
-  const file = pickedFile(source);
-  return file !== undefined && !Value.Check(FilenameSchema, file.name)
-    ? 'That file cannot be named inside an export. Rename it and pick it again.'
-    : undefined;
+  return undefined;
 }
 
 /**
@@ -125,7 +122,9 @@ export async function validateInitialData({
 }: {
   value: File | undefined;
 }): Promise<string | undefined> {
-  return value === undefined ? undefined : await refusedArchive({ name: value.name, body: value });
+  return value === undefined
+    ? undefined
+    : await refusedArchiveBody({ name: value.name, body: value });
 }
 
 export function validatePort({ value }: { value: string | undefined }): string | undefined {
@@ -327,7 +326,7 @@ function initialDataFrom({
   if (file === undefined || replacing !== undefined) {
     return undefined;
   }
-  return Value.Check(FilenameSchema, file.name) ? { name: file.name, body: file } : undefined;
+  return { name: file.name, body: file };
 }
 
 /**
@@ -343,7 +342,7 @@ function deployableFrom(source: BinarySource): DeployableBinary | undefined {
   if (file === undefined) {
     return undefined;
   }
-  return Value.Check(FilenameSchema, file.name) ? { name: file.name, body: file } : undefined;
+  return { name: file.name, body: file };
 }
 
 /** The url as the api takes it. Nothing at all where the checksum beside it is not one. */
@@ -351,7 +350,7 @@ function fetchable({ url, sha256 }: FetchedBinary): FetchableBinary | undefined 
   if (sha256 === undefined) {
     return { url };
   }
-  return Value.Check(Sha256DigestSchema, sha256) ? { url, sha256 } : undefined;
+  return refusedChecksum(sha256) === undefined ? { url, sha256 } : undefined;
 }
 
 /** The lines that are arguments: what a blank one is not, and what the trailing newline is not. */

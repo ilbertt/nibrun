@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
-import { MAX_CRONTAB_BYTES } from '@repo/protocol';
 import { Data, Either, Option } from 'effect';
+import { MAX_CRONTAB_BYTES } from '#lib/cron/model.ts';
 import { guestVsockPath } from '#lib/vm/vsock.ts';
 
 export const CRON_REGISTRATION_VSOCK_PORT = 51003;

@@ -11,8 +11,8 @@ import {
   isValidMessage,
   type Timestamp,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Data, Either } from 'effect';
 import { MKFS_ROOT_ENTRIES } from '#lib/volumes/ext4.ts';
 

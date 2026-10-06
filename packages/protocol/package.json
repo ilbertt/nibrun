@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./runtime-values": "./src/lib/runtime-values.ts"
   },
   "imports": {
     "#*": "./src/*"
@@ -13,7 +14,8 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.52"
+    "@sinclair/typebox": "catalog:",
+    "@repo/typebox-extensions": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

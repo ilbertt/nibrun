@@ -3,10 +3,11 @@ import {
   DeploymentIdSchema,
   DirectoryListingSchema,
   GUEST_PATH_ROOT,
-  OwnerIdSchema,
-  Value,
 } from '@repo/protocol';
+import { publicSchema } from '@repo/typebox-extensions';
+import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
+import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { ReadDirectoryQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/model.ts';
 import { AuthPlugin, FilesystemServicePlugin, loggerPlugin } from '#services/plugins.ts';
@@ -28,7 +29,8 @@ export const AppsAppIdDeploymentsDeploymentIdFilesystemController = new Elysia()
   .guard({ auth: Identity.Optional })
   .get(
     '/apps/:appId/deployments/:deploymentId/filesystem',
-    async ({ filesystemService, params, query, user, request, status }) => {
+    async ({ filesystemService, params, query: queryInput, user, request, status }) => {
+      const query = Value.Parse(ReadDirectoryQuerySchema, queryInput);
       const listing = await filesystemService.readDirectory({
         appId: Value.Parse(AppIdSchema, params.appId),
         deploymentId: Value.Parse(DeploymentIdSchema, params.deploymentId),
@@ -39,7 +41,7 @@ export const AppsAppIdDeploymentsDeploymentIdFilesystemController = new Elysia()
       return status(StatusMap.OK, listing);
     },
     {
-      query: ReadDirectoryQuerySchema,
-      response: { [StatusMap.OK]: DirectoryListingSchema },
+      query: publicSchema(ReadDirectoryQuerySchema),
+      response: { [StatusMap.OK]: publicSchema(DirectoryListingSchema) },
     },
   );

@@ -7,8 +7,8 @@ import {
   HostPortSchema,
   HttpPortSchema,
   Ipv4AddressSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Duration, Effect, Either, Layer, Logger } from 'effect';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppActivator } from '#services/app-activator.service.ts';

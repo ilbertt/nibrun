@@ -1,6 +1,7 @@
+import type { TenantLogRecord } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import { SeenTenantLogs, type TenantLogRecord } from '@repo/protocol';
+import { SeenTenantLogs } from '#seen-tenant-logs.ts';
 import { pause } from '#wait.ts';
 
 /**
@@ -19,7 +20,7 @@ export type FollowInput = {
   api: PublicApiClient;
   appId: string;
   deploymentId: string;
-  timerange: string;
+  timerange: string | undefined;
   /** Whether to wait on what the app has not written yet, which one that is not running never will. */
   following?: boolean | undefined;
   signal: AbortSignal;

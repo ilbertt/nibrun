@@ -1,22 +1,20 @@
+import type {
+  AppId,
+  ComputeUsage,
+  FilesystemUsage,
+  ReportedInstance,
+  ReportedVolume,
+  TenantEnvironment,
+  Timestamp,
+} from '@repo/protocol';
 import {
-  type App,
-  type AppId,
-  type AppName,
-  type ComputeUsage,
   EXTRA_PUBLIC_PORT_VALUES,
-  type FilesystemUsage,
   interpolableRuntimeValue,
   namesExtraPublicPortValues,
-  OWNED_APP_STATES,
-  type OwnedAppState,
-  type OwnerId,
-  REDACTED,
-  type ReportedInstance,
-  type ReportedVolume,
-  type TenantEnvironment,
-  type Timestamp,
-} from '@repo/protocol';
+} from '@repo/protocol/runtime-values';
 import { schema } from '#db/queries.gen.ts';
+import { type App, type AppName, OWNED_APP_STATES, type OwnedAppState } from '#lib/api/app.ts';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import {
   type AppConfigPatch,
   configWithDefaults,
@@ -37,6 +35,7 @@ import {
   TooManyRequestsError,
 } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
+import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {

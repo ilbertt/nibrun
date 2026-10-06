@@ -1,4 +1,4 @@
-import type { CronListing, TenantLogRecord } from '@repo/protocol';
+import type { CronListing, TenantLogRecord } from '@repo/api-client/models';
 import { ScrollArea } from '@repo/ui/components/scroll-area';
 import { LogLine } from '#components/logs/log-line.tsx';
 import { usePinnedViewport } from '#lib/hooks/use-pinned-viewport.ts';
@@ -20,6 +20,7 @@ export function LogStream({
             <LogLine
               key={`${record.sourceId}/${record.sequence}`}
               record={record}
+              cronTimeZone={cronListing?.timeZone}
               cronSchedule={
                 cronListing?.jobs.find((job) => job.jobId === record.cronJobId)?.schedule
               }

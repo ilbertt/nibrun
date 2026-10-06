@@ -1,19 +1,16 @@
 import {
   AppConfigSchema,
   AppHostnameSchema,
-  AppHostnameStateSchema,
-  AppNameSchema,
-  AppSchema,
   ByteSizeSchema,
   ComputeUsageSchema,
   FilesystemUsageSchema,
-  MIN_HOSTNAMES,
-  REDACTED,
-  TenantEnvironmentPatchSchema,
   TenantEnvironmentSchema,
   TimestampSchema,
 } from '@repo/protocol';
 import { t } from 'elysia';
+import { AppHostnameStateSchema, AppNameSchema, AppSchema, MIN_HOSTNAMES } from '#lib/api/app.ts';
+import { TenantEnvironmentPatchSchema } from '#lib/api/environment.ts';
+import { REDACTED } from '#lib/redact-secrets.ts';
 
 // Which variables are set, never what they hold: the values are sealed in the database and only
 // opened on their way to the host, so there is nothing here that could return one.

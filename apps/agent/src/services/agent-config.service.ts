@@ -1,5 +1,6 @@
 import { Path } from '@effect/platform';
-import { type Ipv4Address, Ipv4AddressSchema, Value } from '@repo/protocol';
+import { type Ipv4Address, Ipv4AddressSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Config, Effect } from 'effect';
 
 const DEFAULT_STATE_DIR = '/var/lib/nibrun';

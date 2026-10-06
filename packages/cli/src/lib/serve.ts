@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
-import { RUNTIME_VALUES } from '@repo/protocol';
+import { RUNTIME_ENVIRONMENT_VALUES } from '@repo/protocol/runtime-values';
 import type { Server } from 'bun';
 import { z } from 'zod';
 import { PROGRAM_NAME } from '#config.ts';
@@ -37,10 +37,10 @@ export function guestAddress(environment: GuestEnvironment): Address {
   const { httpPort, hostname } = environment;
 
   if (httpPort === null) {
-    throw offNibrun(RUNTIME_VALUES.HTTP_PORT.name);
+    throw offNibrun(RUNTIME_ENVIRONMENT_VALUES.HTTP_PORT);
   }
   if (hostname === null) {
-    throw offNibrun(RUNTIME_VALUES.HOSTNAME.name);
+    throw offNibrun(RUNTIME_ENVIRONMENT_VALUES.HOSTNAME);
   }
   return { hostname: EVERY_INTERFACE, port: httpPort, url: `https://${hostname}` };
 }

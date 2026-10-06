@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import { type AppId, AppIdSchema, Value } from '@repo/protocol';
+import { type AppId, AppIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
 import {
   parsePropertyBlocks,

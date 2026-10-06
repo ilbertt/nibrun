@@ -1,19 +1,4 @@
 import { Type } from '@sinclair/typebox';
-import { CheckpointStateSchema } from '#domain/checkpoint.ts';
-import { ComputeUsageSchema } from '#domain/compute.ts';
-import { ExportStateSchema } from '#domain/export.ts';
-import { FilesystemUsageSchema } from '#domain/filesystem.ts';
-import { HostCapacitySchema, HostStateSchema, HostVersionsSchema } from '#domain/host.ts';
-import {
-  AppIdSchema,
-  CheckpointIdSchema,
-  DeploymentIdSchema,
-  ExportIdSchema,
-  HostIdSchema,
-  VolumeIdSchema,
-} from '#domain/identifiers.ts';
-import { InstanceStateSchema } from '#domain/instance.ts';
-import { VolumeStateSchema } from '#domain/volume.ts';
 import {
   ByteSizeSchema,
   HostPortSchema,
@@ -23,6 +8,21 @@ import {
   StateMessageSchema,
   TimestampSchema,
 } from '#lib/wire.ts';
+import { CheckpointStateSchema } from '#schemas/checkpoint.ts';
+import { ComputeUsageSchema } from '#schemas/compute.ts';
+import { ExportStateSchema } from '#schemas/export.ts';
+import { FilesystemUsageSchema } from '#schemas/filesystem.ts';
+import { HostCapacitySchema, HostStateSchema, HostVersionsSchema } from '#schemas/host.ts';
+import {
+  AppIdSchema,
+  CheckpointIdSchema,
+  DeploymentIdSchema,
+  ExportIdSchema,
+  HostIdSchema,
+  VolumeIdSchema,
+} from '#schemas/identifiers.ts';
+import { InstanceStateSchema } from '#schemas/instance.ts';
+import { VolumeStateSchema } from '#schemas/volume.ts';
 
 const MAX_DEVICE_PATH_LENGTH = 256;
 

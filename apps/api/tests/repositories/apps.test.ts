@@ -3,25 +3,22 @@ import { withTypes } from '@ilbertt/bun-sqlgen';
 import {
   type AppId,
   AppIdSchema,
-  AppNameSchema,
-  type ArtifactId,
   type ComputeUsage,
-  DnsLabelSchema,
   FilenameSchema,
   HostnameSchema,
   ObjectKeySchema,
-  OWNED_APP_STATES,
-  type OwnerId,
-  OwnerIdSchema,
   Sha256DigestSchema,
   type TenantEnvironment,
   TenantEnvironmentSchema,
   type Timestamp,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
+import { AppNameSchema, OWNED_APP_STATES } from '#lib/api/app.ts';
+import { DnsLabelSchema } from '#lib/api/dns-label.ts';
+import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import {

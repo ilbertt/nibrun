@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { FilesystemEntry } from '@repo/protocol';
+import type { FilesystemEntry } from '@repo/api-client/models';
 import { UsageError } from '#lib/errors.ts';
 import { render, typedPath } from '#lib/filesystem.ts';
 

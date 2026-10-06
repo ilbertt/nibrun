@@ -12,8 +12,8 @@ import {
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
   parseMessage,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
 

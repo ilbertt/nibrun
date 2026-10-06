@@ -4,11 +4,10 @@ import {
   type CronQuery,
   type CronQueryRequest,
   type CronQueryResult,
-  DEFAULT_AGENT_POLL_SETTINGS,
   DeploymentIdSchema,
   HostVersionsSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect, Layer, Ref, TestClock, TestContext } from 'effect';
 import { cronQueryLoop } from '#lib/agent/cron-query.ts';
 import { ControlPlaneError } from '#lib/control/client.ts';
@@ -16,7 +15,13 @@ import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { CRON_JOB, CRON_QUERY, registeredCronHost } from '#tests/support/crons.ts';
-import { desiredInstance, desiredState, HOST_ID, LOG_SOURCE } from '#tests/support/fixtures.ts';
+import {
+  desiredInstance,
+  desiredState,
+  HOST_ID,
+  LOG_SOURCE,
+  POLL_SETTINGS_FIXTURE,
+} from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 import { HTTP_UNAUTHORIZED } from '#tests/support/server.ts';
 
@@ -25,7 +30,7 @@ const SESSION = Value.Parse(AgentSessionSchema, {
   hostId: HOST_ID,
   sessionToken: 'session-token',
   expiresAt: '2026-10-01T20:00:00Z',
-  poll: DEFAULT_AGENT_POLL_SETTINGS,
+  poll: POLL_SETTINGS_FIXTURE,
 });
 const VERSIONS = Value.Parse(HostVersionsSchema, {
   agent: 'a',

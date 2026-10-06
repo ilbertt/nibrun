@@ -1,5 +1,5 @@
+import type { OwnedAppState } from '@repo/api-client/models';
 import { type AppOperation, resumeApp, suspendApp } from '@repo/app-operations';
-import type { OwnedAppState } from '@repo/protocol';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 import { useAppAnalytics } from '#lib/hooks/use-app-analytics.ts';

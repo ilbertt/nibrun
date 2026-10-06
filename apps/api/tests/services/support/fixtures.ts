@@ -1,17 +1,13 @@
+import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
+import { AppIdSchema, DeploymentIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
+import { ArtifactIdSchema, ImportIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import {
-  AppIdSchema,
-  ArtifactIdSchema,
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
-  DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_RESTART_POLICY,
-  DEFAULT_VOLUME_SIZE_BYTES,
-  DeploymentIdSchema,
-  ImportIdSchema,
-  OwnerIdSchema,
-  Value,
-} from '@repo/protocol';
-import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
+} from '#lib/app-config-defaults.ts';
 import type {
   DeploymentByIdInput,
   DeploymentLookupRepositoryContract,

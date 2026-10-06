@@ -1,11 +1,8 @@
 import {
+  type AgentPollSettings,
   type AppHostname,
   AppIdSchema,
   CheckpointIdSchema,
-  DEFAULT_HEALTH_CHECK,
-  DEFAULT_HTTP_PORT,
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_RESTART_POLICY,
   DeploymentIdSchema,
   type DesiredArtifact,
   type DesiredCheckpoint,
@@ -14,17 +11,21 @@ import {
   type DesiredVolume,
   ExportIdSchema,
   FilenameSchema,
+  type HealthCheck,
   type HostDesiredState,
   HostIdSchema,
   HostnameSchema,
   HostPortSchema,
+  HttpPortSchema,
+  type InstanceResources,
   ObjectKeySchema,
+  type RestartPolicy,
   SecretStringSchema,
   type TenantEnvironment,
   TimestampSchema,
-  Value,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { initialTracker } from '#lib/health/state.ts';
 import type { TenantLogEvent } from '#lib/logs/event.ts';
 import { describeSlot, FIRST_SLOT, HOST_PORT_BASE } from '#lib/network/slot.ts';
@@ -32,6 +33,28 @@ import type { ObservedInstance, ObservedState, ObservedVolume } from '#lib/recon
 import { type InstanceRecord, newInstanceRecord } from '#lib/report/instance-record.ts';
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST } from '#tests/support/artifacts.ts';
 import { HOST_STORAGE_PREFIX } from '#tests/support/config.ts';
+
+const HTTP_PORT_NUMBER = 3000;
+export const HTTP_PORT_FIXTURE = Value.Parse(HttpPortSchema, HTTP_PORT_NUMBER);
+export const RESOURCES_FIXTURE: InstanceResources = { vcpuCount: 1, memoryMib: 256 };
+export const HEALTH_CHECK_FIXTURE: HealthCheck = {
+  intervalMs: 5_000,
+  timeoutMs: 2_000,
+  gracePeriodMs: 30_000,
+  healthyThreshold: 1,
+  unhealthyThreshold: 3,
+};
+export const RESTART_POLICY_FIXTURE: RestartPolicy = {
+  maxRestarts: 5,
+  initialBackoffMs: 500,
+  maxBackoffMs: 30_000,
+  backoffFactor: 2,
+  resetAfterMs: 60_000,
+};
+export const POLL_SETTINGS_FIXTURE: AgentPollSettings = {
+  minIntervalMs: 250,
+  reportIntervalMs: 15_000,
+};
 
 export const APP_ID = Value.Parse(AppIdSchema, 'app-1');
 export const VOLUME_ID = Value.Parse(VolumeIdSchema, 'vol-1');
@@ -75,13 +98,13 @@ export function desiredInstance(overrides: Partial<DesiredInstance> = {}): Desir
     desiredState: 'running',
     artifact: artifact(),
     config: {
-      httpPort: DEFAULT_HTTP_PORT,
+      httpPort: HTTP_PORT_FIXTURE,
       hasExtraPublicPort: false,
       args: [],
       environment: {},
-      resources: DEFAULT_INSTANCE_RESOURCES,
-      healthCheck: DEFAULT_HEALTH_CHECK,
-      restartPolicy: DEFAULT_RESTART_POLICY,
+      resources: RESOURCES_FIXTURE,
+      healthCheck: HEALTH_CHECK_FIXTURE,
+      restartPolicy: RESTART_POLICY_FIXTURE,
     },
     hostnames: [],
     ...overrides,
@@ -139,14 +162,14 @@ export function instanceRecord(overrides: Partial<InstanceRecord> = {}): Instanc
       volumeId: VOLUME_ID,
       hostnames: [APP_HOSTNAME],
       hostPort: FIRST_HOST_PORT,
-      httpPort: DEFAULT_HTTP_PORT,
+      httpPort: HTTP_PORT_FIXTURE,
       guestIpv4: describeSlot({ slot: FIRST_SLOT, appId: APP_ID }).guestIpv4,
       artifactDigest: ARTIFACT_DIGEST,
       state: 'running',
       onRequest: false,
       health: initialTracker(),
-      healthCheck: DEFAULT_HEALTH_CHECK,
-      resources: DEFAULT_INSTANCE_RESOURCES,
+      healthCheck: HEALTH_CHECK_FIXTURE,
+      resources: RESOURCES_FIXTURE,
       desiredRunning: true,
     }),
     ...overrides,

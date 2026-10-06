@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { Ipv4AddressSchema, Value } from '@repo/protocol';
+import { Ipv4AddressSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
 import type { CommandRequest } from '#lib/exec.ts';
 import { ensureTap, refreshNeighbour } from '#lib/network/tap.ts';

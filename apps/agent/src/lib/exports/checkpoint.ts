@@ -1,5 +1,6 @@
 import type { AppId, ExportId } from '@repo/protocol';
-import { type CheckpointId, CheckpointIdSchema, Value } from '@repo/protocol';
+import { type CheckpointId, CheckpointIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
 import { frozen } from '#lib/exports/freeze.ts';
 import {

@@ -1,4 +1,3 @@
-import { AppNameSchema, Value } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import {
   Dialog,
@@ -99,7 +98,5 @@ export function RenameAppDialog({ name }: { name: string }) {
 }
 
 function validateName({ value }: { value: string }): string | undefined {
-  return Value.Check(AppNameSchema, value.trim())
-    ? undefined
-    : `A name is 1 to ${AppNameSchema.maxLength} characters.`;
+  return value.trim() ? undefined : 'The app needs a name.';
 }

@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  AppIdSchema,
-  HostPortSchema,
-  HttpPortSchema,
-  Ipv4AddressSchema,
-  Value,
-} from '@repo/protocol';
+import { AppIdSchema, HostPortSchema, HttpPortSchema, Ipv4AddressSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import {
   appCounterName,
   type FirewallState,

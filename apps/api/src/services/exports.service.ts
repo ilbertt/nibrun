@@ -1,4 +1,6 @@
-import type { AppId, Export, ExportId, HostReportedState, OwnerId } from '@repo/protocol';
+import type { AppId, ExportId, HostReportedState } from '@repo/protocol';
+import type { Export } from '#lib/api/export.ts';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { ExportStorageRepositoryContract } from '#repositories/export-storage.repository.ts';

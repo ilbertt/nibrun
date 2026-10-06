@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  type AppHostname,
-  AppIdSchema,
-  type Hostname,
-  HostPortSchema,
-  Value,
-} from '@repo/protocol';
+import { type AppHostname, AppIdSchema, type Hostname, HostPortSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { renderAppSites } from '#lib/proxy/caddyfile.ts';
 import type { RouteTarget } from '#lib/report/routes.ts';
 import { APP_ID, FIRST_HOST_PORT } from '#tests/support/fixtures.ts';

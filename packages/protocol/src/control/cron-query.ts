@@ -1,12 +1,12 @@
 import { Type } from '@sinclair/typebox';
-import { CronListingSchema, CronTableSchema } from '#domain/cron.ts';
-import { CronQueryIdSchema } from '#domain/identifiers.ts';
+import { CronListingSchema } from '#schemas/cron.ts';
+import { CronQueryIdSchema } from '#schemas/identifiers.ts';
 
 const MAX_SERVED_DEPLOYMENTS = 200;
 const MAX_QUERY_MESSAGE_LENGTH = 512;
 
 export const CronQueryRequestSchema = Type.Object({
-  servedDeployments: Type.Array(Type.Pick(CronTableSchema, ['appId', 'deploymentId']), {
+  servedDeployments: Type.Array(Type.Pick(CronListingSchema, ['appId', 'deploymentId']), {
     maxItems: MAX_SERVED_DEPLOYMENTS,
   }),
 });
@@ -14,7 +14,7 @@ export const CronQueryRequestSchema = Type.Object({
 export type CronQueryRequest = typeof CronQueryRequestSchema.static;
 
 export const CronQuerySchema = Type.Composite([
-  Type.Pick(CronTableSchema, ['appId', 'deploymentId']),
+  Type.Pick(CronListingSchema, ['appId', 'deploymentId']),
   Type.Object({ queryId: CronQueryIdSchema }),
 ]);
 

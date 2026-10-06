@@ -1,5 +1,5 @@
+import type { GuestPath } from '@repo/api-client/models';
 import { readDirectory } from '@repo/app-operations';
-import type { GuestPath } from '@repo/protocol';
 import { queryOptions, skipToken } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 

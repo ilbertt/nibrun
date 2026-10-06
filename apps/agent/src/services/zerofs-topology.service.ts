@@ -1,4 +1,5 @@
-import { ObjectKeySchema, Value } from '@repo/protocol';
+import { ObjectKeySchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
 import type { ZerofsFilesystem } from '#lib/volumes/topology.ts';
 import { flush } from '#lib/volumes/zerofs.ts';

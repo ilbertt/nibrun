@@ -1,5 +1,8 @@
-import { AppIdSchema, OwnerIdSchema, Value } from '@repo/protocol';
+import { AppIdSchema } from '@repo/protocol';
+import { publicSchema } from '@repo/typebox-extensions';
+import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
+import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
   CreateImportBodySchema,
@@ -16,7 +19,8 @@ export const AppsAppIdImportsController = new Elysia()
   // the bytes to the url this answers with.
   .post(
     '/apps/:appId/imports',
-    async ({ importsService, params, body, user, status }) => {
+    async ({ importsService, params, body: bodyInput, user, status }) => {
+      const body = Value.Parse(CreateImportBodySchema, bodyInput);
       const created = await importsService.create({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
@@ -26,7 +30,7 @@ export const AppsAppIdImportsController = new Elysia()
       return status(StatusMap.Created, created);
     },
     {
-      body: CreateImportBodySchema,
-      response: { [StatusMap.Created]: CreateImportResponseSchema },
+      body: publicSchema(CreateImportBodySchema),
+      response: { [StatusMap.Created]: publicSchema(CreateImportResponseSchema) },
     },
   );

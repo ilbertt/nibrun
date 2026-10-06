@@ -1,5 +1,7 @@
-import { ByteSizeSchema, FilenameSchema, ImportIdSchema, ImportSchema } from '@repo/protocol';
+import { ByteSizeSchema, FilenameSchema } from '@repo/protocol';
 import { t } from 'elysia';
+import { ImportIdSchema } from '#lib/api/identifiers.ts';
+import { ImportSchema } from '#lib/api/import.ts';
 
 // The bytes the owner holds. The name is theirs, not the store's: keys here are assigned one per
 // row, so they carry none, and this is the only name anybody would recognise the archive by.

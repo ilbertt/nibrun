@@ -1,15 +1,15 @@
+import { DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
 import {
   type AppConfig,
   type AppHostname,
   type AppId,
-  DEFAULT_VOLUME_SIZE_BYTES,
   type DesiredInstance,
   type DesiredInstanceState,
   type DesiredVolume,
-  Value,
   type VolumeId,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
 import { toRunConfig } from '#lib/app-config.ts';
 import {

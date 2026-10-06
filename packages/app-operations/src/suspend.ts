@@ -1,6 +1,6 @@
+import type { AppState, OwnedAppState } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import type { AppState, OwnedAppState } from '@repo/protocol';
 
 type OwnedApp = { api: PublicApiClient; appId: string };
 

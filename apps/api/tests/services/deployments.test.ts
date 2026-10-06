@@ -1,11 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
 import {
-  DEFAULT_HEALTH_CHECK,
-  DEFAULT_INSTANCE_RESOURCES,
-  DEFAULT_RESTART_POLICY,
-  DEFAULT_VOLUME_SIZE_BYTES,
   type DeploymentId,
-  type DeploymentState,
   HostPortSchema,
   type HostReportedState,
   HttpPortSchema,
@@ -14,11 +10,13 @@ import {
   type ReportedInstance,
   type ReportedVolume,
   TimestampSchema,
-  Value,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { schema } from '#db/queries.gen.ts';
+import type { DeploymentState } from '#lib/api/deployment.ts';
 import type { PublicAppConfig } from '#lib/app-config.ts';
+import { DEFAULT_HEALTH_CHECK, DEFAULT_RESTART_POLICY } from '#lib/app-config-defaults.ts';
 import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import type {

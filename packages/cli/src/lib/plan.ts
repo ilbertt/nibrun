@@ -1,9 +1,10 @@
 import { basename } from 'node:path';
 import { confirm, note, select, text } from '@clack/prompts';
+import type { TenantArguments } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
+import { DEFAULT_HTTP_PORT } from '@repo/api-constants';
 import { appFor } from '@repo/app-operations';
-import { DEFAULT_HTTP_PORT, type TenantArguments } from '@repo/protocol';
 import type { AddressedApp } from '#lib/apps.ts';
 import { CancelledError } from '#lib/errors.ts';
 import type { InitialData } from '#lib/initial-data.ts';

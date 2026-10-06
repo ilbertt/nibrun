@@ -1,9 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { RUNTIME_VALUE_NAMES } from '@repo/protocol';
 import { parseEnvironment, parseEnvironmentPatch } from '#environment.ts';
 import { InvalidEnvironmentError } from '#errors.ts';
 
-// The values come back branded as secrets, which is not what a literal in an expectation is.
 function parsed({
   set = [],
   remove = [],
@@ -77,11 +75,6 @@ describe('what is refused as something that was typed wrong', () => {
   });
 });
 
-/**
- * The guest expands a value that names a runtime value it sets, and fails the boot over a name it
- * does not offer. Refused here, a typo costs a sentence rather than a deploy that never serves and
- * says why only in the instance's console.
- */
 describe('a value naming a runtime value', () => {
   // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being validated, not an interpolation
   const OFFERED = '${NIBRUN_HOSTNAME}';
@@ -95,16 +88,10 @@ describe('a value naming a runtime value', () => {
     });
   });
 
-  // The offered names are listed from the schema rather than restated, so a runtime value
-  // added later changes this message without also failing this test.
-  const offered = RUNTIME_VALUE_NAMES.map((name) => `\${${name}}`).join(', ');
-
-  test('one it does not is refused, and the variable holding it is named', () => {
-    expect(() => parsed({ set: [`URL=https://${MISSPELLED}`] })).toThrow(
-      new InvalidEnvironmentError(
-        `A value may name a runtime value the guest sets — ${offered} — and nothing else: URL`,
-      ),
-    );
+  test('reference validation is left to the API', () => {
+    expect(parsed({ set: [`URL=https://${MISSPELLED}`] })).toEqual({
+      URL: `https://${MISSPELLED}`,
+    });
   });
 
   // The prefix is the whole of what expands, so a secret that reads like a shell variable is a

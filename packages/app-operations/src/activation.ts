@@ -1,10 +1,10 @@
-import type { AppActivation } from '@repo/protocol';
+import type { AppActivation } from '@repo/api-client/models';
 
 /**
  * The words each activation goes by where it is shown to an owner.
  *
  * Written out rather than derived from the value, which is very nearly the same string, and
- * exhaustive for the reason `APP_STATUS_LABELS` is: an activation added to the protocol is a row
+ * exhaustive for the reason `APP_STATUS_LABELS` is: an activation added to the API domain is a row
  * missing from here, which is a type error rather than a surface printing an identifier.
  */
 export const APP_ACTIVATION_LABELS: Record<AppActivation, string> = {

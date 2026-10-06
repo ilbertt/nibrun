@@ -1,6 +1,6 @@
 import { defineCommand } from '@parshjs/core';
 import { createEnvContext } from '@parshjs/env';
-import { RUNTIME_VALUES } from '@repo/protocol';
+import { RUNTIME_ENVIRONMENT_VALUES } from '@repo/protocol/runtime-values';
 import { z } from 'zod';
 import { createOutput } from '#lib/output.ts';
 import {
@@ -16,12 +16,12 @@ import {
 const GUEST_ENV: GuestEnvironment = createEnvContext({
   vars: {
     httpPort: {
-      name: RUNTIME_VALUES.HTTP_PORT.name,
+      name: RUNTIME_ENVIRONMENT_VALUES.HTTP_PORT,
       schema: z.number().int().positive().nullable(),
       default: null,
     },
     hostname: {
-      name: RUNTIME_VALUES.HOSTNAME.name,
+      name: RUNTIME_ENVIRONMENT_VALUES.HOSTNAME,
       schema: z.string().min(1).nullable(),
       default: null,
     },

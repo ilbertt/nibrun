@@ -2,17 +2,17 @@ import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
   CheckpointIdSchema,
-  DnsLabelSchema,
   type ExportId,
   ExportIdSchema,
   type ExportState,
   type HostReportedState,
   type ObjectKey,
   ObjectKeySchema,
-  type OwnerId,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
+import { DnsLabelSchema } from '#lib/api/dns-label.ts';
+import type { OwnerId } from '#lib/api/identifiers.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import type {
   ExportStorageRepositoryContract,

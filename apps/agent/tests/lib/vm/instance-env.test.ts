@@ -1,17 +1,19 @@
 import { describe, expect, test } from 'bun:test';
 import {
   type AppHostname,
-  DEFAULT_HTTP_PORT,
-  DEFAULT_RESTART_POLICY,
   HostnameSchema,
   HostPortSchema,
   HttpPortSchema,
   Ipv4AddressSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Either } from 'effect';
 import { renderInstanceEnv } from '#lib/vm/instance-env.ts';
-import { tenantEnvironment } from '#tests/support/fixtures.ts';
+import {
+  HTTP_PORT_FIXTURE,
+  RESTART_POLICY_FIXTURE,
+  tenantEnvironment,
+} from '#tests/support/fixtures.ts';
 
 const NON_DEFAULT_PORT = 8080;
 
@@ -27,11 +29,11 @@ type Overrides = Partial<Parameters<typeof renderInstanceEnv>[0]>;
 
 function attempt(overrides: Overrides = {}) {
   return renderInstanceEnv({
-    httpPort: DEFAULT_HTTP_PORT,
+    httpPort: HTTP_PORT_FIXTURE,
     hostnames: [PLATFORM],
     args: [],
     environment: {},
-    restartPolicy: DEFAULT_RESTART_POLICY,
+    restartPolicy: RESTART_POLICY_FIXTURE,
     ...overrides,
   });
 }
@@ -58,13 +60,13 @@ const REACHED_AT = {
 describe('what apps/runtime parses off the config drive', () => {
   test('every key it writes is one the runtime knows', () => {
     expect(render().split('\n').filter(Boolean)).toEqual([
-      `NIBRUN_HTTP_PORT=${DEFAULT_HTTP_PORT}`,
+      `NIBRUN_HTTP_PORT=${HTTP_PORT_FIXTURE}`,
       `NIBRUN_HOSTNAME=${PLATFORM_HOSTNAME}`,
-      `NIBRUN_MAX_RESTARTS=${DEFAULT_RESTART_POLICY.maxRestarts}`,
-      `NIBRUN_INITIAL_BACKOFF_MS=${DEFAULT_RESTART_POLICY.initialBackoffMs}`,
-      `NIBRUN_MAX_BACKOFF_MS=${DEFAULT_RESTART_POLICY.maxBackoffMs}`,
-      `NIBRUN_BACKOFF_FACTOR=${DEFAULT_RESTART_POLICY.backoffFactor}`,
-      `NIBRUN_RESET_AFTER_MS=${DEFAULT_RESTART_POLICY.resetAfterMs}`,
+      `NIBRUN_MAX_RESTARTS=${RESTART_POLICY_FIXTURE.maxRestarts}`,
+      `NIBRUN_INITIAL_BACKOFF_MS=${RESTART_POLICY_FIXTURE.initialBackoffMs}`,
+      `NIBRUN_MAX_BACKOFF_MS=${RESTART_POLICY_FIXTURE.maxBackoffMs}`,
+      `NIBRUN_BACKOFF_FACTOR=${RESTART_POLICY_FIXTURE.backoffFactor}`,
+      `NIBRUN_RESET_AFTER_MS=${RESTART_POLICY_FIXTURE.resetAfterMs}`,
       'NIBRUN_DNS=1.1.1.1,1.0.0.1',
     ]);
   });
@@ -79,15 +81,15 @@ describe('what apps/runtime parses off the config drive', () => {
 
   test('an app that asked is told the address and the port together', () => {
     expect(render({ publicAddress: REACHED_AT }).split('\n').filter(Boolean)).toEqual([
-      `NIBRUN_HTTP_PORT=${DEFAULT_HTTP_PORT}`,
+      `NIBRUN_HTTP_PORT=${HTTP_PORT_FIXTURE}`,
       `NIBRUN_HOSTNAME=${PLATFORM_HOSTNAME}`,
       `NIBRUN_PUBLIC_IPV4=${RELAY_IPV4}`,
       `NIBRUN_EXTRA_PUBLIC_PORT=${EXTRA_PUBLIC_PORT}`,
-      `NIBRUN_MAX_RESTARTS=${DEFAULT_RESTART_POLICY.maxRestarts}`,
-      `NIBRUN_INITIAL_BACKOFF_MS=${DEFAULT_RESTART_POLICY.initialBackoffMs}`,
-      `NIBRUN_MAX_BACKOFF_MS=${DEFAULT_RESTART_POLICY.maxBackoffMs}`,
-      `NIBRUN_BACKOFF_FACTOR=${DEFAULT_RESTART_POLICY.backoffFactor}`,
-      `NIBRUN_RESET_AFTER_MS=${DEFAULT_RESTART_POLICY.resetAfterMs}`,
+      `NIBRUN_MAX_RESTARTS=${RESTART_POLICY_FIXTURE.maxRestarts}`,
+      `NIBRUN_INITIAL_BACKOFF_MS=${RESTART_POLICY_FIXTURE.initialBackoffMs}`,
+      `NIBRUN_MAX_BACKOFF_MS=${RESTART_POLICY_FIXTURE.maxBackoffMs}`,
+      `NIBRUN_BACKOFF_FACTOR=${RESTART_POLICY_FIXTURE.backoffFactor}`,
+      `NIBRUN_RESET_AFTER_MS=${RESTART_POLICY_FIXTURE.resetAfterMs}`,
       'NIBRUN_DNS=1.1.1.1,1.0.0.1',
     ]);
   });
@@ -101,7 +103,7 @@ describe('what apps/runtime parses off the config drive', () => {
   // variable named NIBRUN_HTTP_PORT, and drops it there rather than here.
   test('a tenant variable named after a runtime key is written under the tenant prefix', () => {
     const rendered = render({ environment: tenantEnvironment({ NIBRUN_HTTP_PORT: '9999' }) });
-    expect(rendered).toContain(`NIBRUN_HTTP_PORT=${DEFAULT_HTTP_PORT}\n`);
+    expect(rendered).toContain(`NIBRUN_HTTP_PORT=${HTTP_PORT_FIXTURE}\n`);
     expect(rendered).toContain('ENV_NIBRUN_HTTP_PORT=9999\n');
   });
 

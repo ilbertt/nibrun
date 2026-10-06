@@ -1,8 +1,9 @@
 import { bunSqlAdapter } from '@ilbertt/better-auth-bun-sql';
-import { type OwnerId, OwnerIdSchema, Value } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization } from 'better-auth/plugins';
 import { sql } from '#db/client.ts';
+import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { env } from '#lib/env.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import type { AppsService } from '#services/apps.service.ts';

@@ -8,8 +8,8 @@ import {
   type GuestPath,
   GuestPathSchema,
   TimestampSchema,
-  Value,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import type { DeploymentRow } from '#repositories/deployments.repository.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';

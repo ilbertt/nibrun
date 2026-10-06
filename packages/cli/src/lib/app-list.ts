@@ -1,7 +1,7 @@
+import type { AppState } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
 import type { ListedApp } from '@repo/app-operations';
-import { APP_STATES } from '@repo/protocol';
 import { z } from 'zod';
 import { NO_APPS } from '#lib/apps.ts';
 import { defineOutput } from '#lib/output.ts';
@@ -22,7 +22,7 @@ const AppRowSchema = z.object({
   name: z.string(),
   /** What the app is served under — and what tells two of one name apart, so `--app` takes it too. */
   slug: z.string(),
-  state: z.enum(APP_STATES),
+  state: z.custom<AppState>((value) => typeof value === 'string'),
   updatedAt: z.string(),
   cpuShare: z.number().nullable(),
   memory: MeasuredSchema,
@@ -51,13 +51,10 @@ const HEADINGS = {
   updated: 'LAST CHANGE',
 };
 
+const MIN_STATE_WIDTH = 9;
 const COLUMN_GAP = '  ';
 
 const BYTES_PER_MIB = 1_048_576;
-
-// Every state the column can ever hold, so a suspended app appearing in a later listing does not
-// move the columns of the one before it.
-const STATE_WIDTH = Math.max(HEADINGS.state.length, ...APP_STATES.map((state) => state.length));
 
 const PERCENT_SCALE = 100;
 const FULL = 1;
@@ -140,12 +137,13 @@ export function render(apps: readonly AppRow[]): string[] {
   const rows = [HEADINGS, ...apps.map(toColumns)];
   const nameWidth = Math.max(...rows.map((row) => row.name.length));
   const slugWidth = Math.max(...rows.map((row) => row.slug.length));
+  const stateWidth = Math.max(MIN_STATE_WIDTH, ...rows.map((row) => row.state.length));
 
   return rows.map((row) =>
     [
       row.name.padEnd(nameWidth),
       row.slug.padEnd(slugWidth),
-      row.state.padEnd(STATE_WIDTH),
+      row.state.padEnd(stateWidth),
       row.cpu.padStart(shareWidth(HEADINGS.cpu)),
       row.memory.padStart(shareWidth(HEADINGS.memory)),
       row.volume.padStart(shareWidth(HEADINGS.volume)),

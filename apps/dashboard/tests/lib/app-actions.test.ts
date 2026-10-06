@@ -1,7 +1,23 @@
 import { describe, expect, test } from 'bun:test';
+import type { AppState, DeploymentState } from '@repo/api-client/models';
 import { appStatus } from '@repo/app-operations';
-import { APP_STATES, type AppState, DEPLOYMENT_STATES, type DeploymentState } from '@repo/protocol';
 import { APP_ACTIONS, type AppActions, appActions, withoutIdentity } from '#lib/app-actions.ts';
+
+const DEPLOYMENT_STATES = Object.keys({
+  pending: true,
+  starting: true,
+  running: true,
+  stopped: true,
+  superseded: true,
+  failed: true,
+} satisfies Record<DeploymentState, true>) as DeploymentState[];
+
+const APP_STATES = Object.keys({
+  active: true,
+  suspended: true,
+  deleting: true,
+  deleted: true,
+} satisfies Record<AppState, true>) as AppState[];
 
 const ENABLED = { kind: 'enabled' } as const;
 const DISABLED = { kind: 'disabled' } as const;

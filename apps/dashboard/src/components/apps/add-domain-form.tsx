@@ -1,5 +1,4 @@
 import { CUSTOM_DOMAIN_PRICING_NOTICE } from '@repo/global-constants';
-import { HostnameSchema, Value } from '@repo/protocol';
 import { Button } from '@repo/ui/components/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
@@ -64,7 +63,5 @@ export function AddDomainForm() {
 }
 
 function validateHostname({ value }: { value: string }): string | undefined {
-  return Value.Check(HostnameSchema, value.trim())
-    ? undefined
-    : 'A domain looks like app.example.com.';
+  return value.trim() ? undefined : 'Enter the domain to add.';
 }
