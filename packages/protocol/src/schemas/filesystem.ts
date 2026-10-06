@@ -1,7 +1,6 @@
-import { stringEnum } from '@repo/typebox-extensions';
+import { type Brand, type BrandedSchema, stringEnum } from '@repo/typebox-extensions';
 import { type TString, Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
-import type { Brand, BrandedSchema } from '#lib/brand.ts';
 import { ByteSizeSchema, TimestampSchema } from '#lib/wire.ts';
 
 /**

@@ -1,7 +1,7 @@
 import { AppIdSchema, ExportIdSchema, Value } from '@repo/protocol';
+import { publicSchema } from '@repo/typebox-extensions';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { ExportResponseSchema } from '#routes/api/apps/[appId]/exports/model.ts';
 import { AuthPlugin, ExportsServicePlugin, loggerPlugin } from '#services/plugins.ts';

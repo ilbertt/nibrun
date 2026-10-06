@@ -17,13 +17,13 @@ Internal consumers import the defining file directly (`#lib/api/app.ts`), never 
 schema/helper barrel. Only route types are exported through `@repo/api/types` for api-client.
 Public consumers must use `@repo/api-client`, never API implementation files.
 Public request and response types derive directly from Treaty.
-Keep public models faithful to JSON: `publicSchema` preserves runtime validation while exposing
-ordinary primitives to HTTP callers without internal TypeScript brands. Controllers parse inputs
-into internal brands before calling services. Fix incomplete Treaty inference in these models;
+Keep public models faithful to JSON: `publicSchema` from `@repo/typebox-extensions` preserves
+runtime validation while exposing ordinary primitives to HTTP callers without internal TypeScript
+brands. Controllers parse inputs into internal brands before calling services. Fix incomplete Treaty inference in these models;
 never generate a separate client contract.
 
-Application-independent TypeBox schema constructors come directly from
-`@repo/typebox-extensions`, never through protocol.
+Application-independent TypeBox schema construction, branding and public type inference come
+directly from `@repo/typebox-extensions`, never through protocol.
 
 Reuse wire schemas from `@repo/protocol` where public responses carry the same values.
 Public consumers derive those types from the exported Treaty client.

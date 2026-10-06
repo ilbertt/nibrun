@@ -38,8 +38,9 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
   Neither app imports the other app, including in tests. Guest mechanics and persistence models
   belong to `apps/agent/src/lib/`. Biome enforces these boundaries and prevents protocol
   dependencies on other workspace packages except `@repo/typebox-extensions`.
-  Application-independent TypeBox schema constructors belong to `@repo/typebox-extensions`;
-  import them directly rather than re-exporting them through protocol. Do not use it for
+  Application-independent TypeBox schema construction, branding and public type inference
+  belong to `@repo/typebox-extensions`; import them directly rather than re-exporting them
+  through protocol. Do not use it for
   general TypeScript utilities or application schemas.
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
 - Props are always passed — a component we wrote has no optional property. Declare

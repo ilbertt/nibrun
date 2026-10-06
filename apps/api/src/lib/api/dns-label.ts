@@ -1,4 +1,4 @@
-import type { Brand, BrandedSchema } from '@repo/protocol';
+import type { Brand, BrandedSchema } from '@repo/typebox-extensions';
 import { type TString, Type } from '@sinclair/typebox';
 
 const DNS_LABEL_PATTERN = '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$';

@@ -1,5 +1,5 @@
+import type { Brand, BrandedSchema } from '@repo/typebox-extensions';
 import { type StringOptions, type TString, Type } from '@sinclair/typebox';
-import type { Brand, BrandedSchema } from '#lib/brand.ts';
 
 export const SECRET_ANNOTATION = 'x-nibrun-secret';
 const MAX_SECRET_LENGTH = 32_768;

@@ -1,5 +1,5 @@
+import { publicSchema } from '@repo/typebox-extensions';
 import { Elysia, StatusMap } from 'elysia';
-import { publicSchema } from '#lib/api/public-schema.ts';
 import { GetHealthResponseSchema } from '#routes/api/health/model.ts';
 import { HealthServicePlugin, loggerPlugin } from '#services/plugins.ts';
 

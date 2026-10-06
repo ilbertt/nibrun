@@ -1,5 +1,5 @@
-import type { Brand } from '@repo/protocol';
 import type { Static, TSchema, TUnsafe } from '@sinclair/typebox';
+import type { Brand } from '#brand.ts';
 
 export type PublicValue<Value> =
   Value extends Brand<string, string>
@@ -12,8 +12,7 @@ export type PublicValue<Value> =
           ? { [Key in keyof Value]: PublicValue<Value[Key]> }
           : Value;
 
-// Treaty preserves private brands from schema static types. Expose JSON primitives while
-// retaining the original runtime schema and its validation constraints.
+// Rebuilding with Type.Unsafe would change the runtime Kind and lose the original validator.
 export function publicSchema<Schema extends TSchema>(
   schema: Schema,
 ): TUnsafe<PublicValue<Static<Schema>>> {

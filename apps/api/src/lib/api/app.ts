@@ -2,12 +2,10 @@ import {
   AppConfigSchema,
   AppHostnameSchema,
   AppIdSchema,
-  type Brand,
-  type BrandedSchema,
   IdleTimeoutMsSchema,
   TimestampSchema,
 } from '@repo/protocol';
-import { stringEnum } from '@repo/typebox-extensions';
+import { type Brand, type BrandedSchema, stringEnum } from '@repo/typebox-extensions';
 import { type TString, Type } from '@sinclair/typebox';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';

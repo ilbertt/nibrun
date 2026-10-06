@@ -21,8 +21,9 @@ communication contract import it from this package.
 - Schemas, derived types, identifiers, state vocabularies, and bounds used by those messages.
 - Runtime-reference names, descriptions, extra-port requirements and interpolation syntax.
   The environment schema, API, agent and client recipes derive from this one vocabulary.
-- Small helpers required to define or validate those wire schemas, including brands and secret
-  annotations. General application utilities belong to their owning app.
+- Helpers specific to validating messages and annotating their secret fields. Generic schema
+  branding and public type inference belong to `@repo/typebox-extensions`. General application
+  utilities belong to their owning app.
 
 Operational work is expressed as desired state, never commands. Nothing here may be shaped
 like `start(x)`. Filesystem and cron reads use separate query contracts because a read is not
@@ -42,7 +43,7 @@ The directory names describe how the contract is organized:
 | --- | --- |
 | Public API resource schemas, owner IDs, app names, app/deployment lifecycle states | `apps/api/src/lib/api/` |
 | DNS record schemas and construction | `apps/api/src/lib/dns-records.ts` |
-| Application-independent TypeBox schema constructors such as `stringEnum` | `packages/typebox-extensions/` |
+| Application-independent TypeBox schema construction, branding and public type inference | `packages/typebox-extensions/` |
 | Shared static API defaults and query syntax constants used by clients | `packages/api-constants/` |
 | API-only health, restart and business policy defaults | `apps/api/src/lib/` |
 | Owner-only input schemas and log query schemas | `apps/api/src/lib/api/` |
@@ -77,8 +78,8 @@ construct and explain runtime references without copying names or formatting hel
 incomplete Treaty inference in API route models; never generate a second public contract or
 export wire schemas to public consumers.
 Do not duplicate field definitions, enums or bounds, and do not add an API schema/helper barrel.
-Generic TypeBox schema constructors come directly from `@repo/typebox-extensions`; protocol
-must not define or re-export them. Biome enforces the public consumer boundary and permits
+Generic TypeBox schema constructors, branding and public type inference come directly from
+`@repo/typebox-extensions`; protocol must not define or re-export them. Biome enforces the public consumer boundary and permits
 only that schema-construction package as a workspace runtime dependency.
 
 ## Constraints on a change
@@ -86,8 +87,8 @@ only that schema-construction package as a workspace runtime dependency.
 - **Schemas come from `@sinclair/typebox` directly, never from Elysia's `t`.** Same library, but
   importing it through Elysia would drag a web framework into a binary with no HTTP server in it.
   TypeBox and `@repo/typebox-extensions` are the only runtime dependencies. This package must
-  acquire no application dependencies,
-  side effects, clients, storage access, or runtime-specific behavior.
+  acquire no application dependencies, side effects, clients, storage access, or runtime-specific
+  behavior.
 - Types derive from schemas (`typeof XSchema.static`), state enums from one `const` array. Never
   hand-write a type a schema already describes.
 - **Adding a value to a state enum decides the deploy order.** Unknown *properties* are tolerated

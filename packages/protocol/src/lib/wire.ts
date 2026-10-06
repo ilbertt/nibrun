@@ -1,5 +1,5 @@
+import type { Brand, BrandedSchema } from '@repo/typebox-extensions';
 import { type TInteger, type TString, Type } from '@sinclair/typebox';
-import type { Brand, BrandedSchema } from '#lib/brand.ts';
 
 // Every schema in this package resolves to one of these. The wire format is JSON and only
 // JSON: ISO strings for timestamps, hex for digests, numbers for sizes. Conversion to richer

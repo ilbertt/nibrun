@@ -78,7 +78,6 @@ export {
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
 } from '#control/transport.ts';
-export type { Brand, BrandedSchema } from '#lib/brand.ts';
 export {
   EXTRA_PUBLIC_PORT_VALUES,
   interpolableRuntimeValue,

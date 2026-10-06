@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
+import { publicSchema } from '@repo/typebox-extensions';
 import { Kind } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
-import { publicSchema } from '#lib/api/public-schema.ts';
 import { AppPatchSchema, CreateAppRequestSchema } from '#routes/api/apps/model.ts';
 
 const patchSchema = publicSchema(AppPatchSchema);

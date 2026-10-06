@@ -1,7 +1,10 @@
 # @repo/typebox-extensions
 
-Owns application-independent TypeBox schema construction helpers. `stringEnum` derives a
-literal union schema and its static type from one readonly array.
+Owns application-independent TypeBox schema construction and static inference helpers. `stringEnum` derives a
+literal union schema and its static type from one readonly array. `Brand` and `BrandedSchema`
+own schema branding; `PublicValue` and `publicSchema` expose branded primitives as JSON types
+without changing the runtime schema object, Kind or validation. Keep their brand identity in
+one definition shared by schema authors and public type inference.
 
 Every export must extend TypeBox schema construction or inference. General TypeScript helpers,
 application schemas, wire contracts, constants and runtime-reference semantics belong to their

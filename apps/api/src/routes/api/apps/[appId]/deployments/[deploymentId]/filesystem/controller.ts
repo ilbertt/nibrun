@@ -5,9 +5,9 @@ import {
   GUEST_PATH_ROOT,
   Value,
 } from '@repo/protocol';
+import { publicSchema } from '@repo/typebox-extensions';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { publicSchema } from '#lib/api/public-schema.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { ReadDirectoryQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/model.ts';
 import { AuthPlugin, FilesystemServicePlugin, loggerPlugin } from '#services/plugins.ts';
