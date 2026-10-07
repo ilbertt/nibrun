@@ -1,8 +1,8 @@
 import { createCli } from '@parshjs/core';
+import type { SqlitePipelineResponse } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { commandTree } from '#command-tree.gen.ts';
 import type { SqliteConnection } from '#lib/sqlite/connections.ts';
-import type { PipelineResponse } from '#lib/sqlite/query.ts';
 import { answering, apiHolding, listedApp } from '#tests/support/api.ts';
 import { APP_ID } from '#tests/support/app.ts';
 
@@ -51,7 +51,7 @@ export const SQLITE_QUERY_RESPONSE = {
     },
     { type: 'ok', response: { type: 'close' } },
   ],
-} satisfies PipelineResponse;
+} satisfies SqlitePipelineResponse;
 
 export function sqliteQueryFixture({
   connections = [sqliteConnection()],
@@ -59,7 +59,7 @@ export function sqliteQueryFixture({
   failure = null,
 }: {
   connections?: SqliteConnection[];
-  response?: PipelineResponse;
+  response?: SqlitePipelineResponse;
   failure?: { status: number; value: { error: string } } | null;
 } = {}) {
   const addressedApps: string[] = [];

@@ -1,7 +1,7 @@
+import type { SqliteStatementResult } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
-import { unwrap } from '@repo/api-client/unwrap';
+import { executeSqliteQuery } from '@repo/app-operations';
 import { z } from 'zod';
-import { UsageError } from '#lib/errors.ts';
 import { defineOutput } from '#lib/output.ts';
 import {
   renderSqliteConnection,
@@ -9,13 +9,7 @@ import {
   SqliteConnectionSchema,
 } from '#lib/sqlite/connections.ts';
 
-type PipelineRoute = ReturnType<
-  PublicApiClient['api']['sqlite']['connections']
->['v2']['pipeline']['post'];
-export type PipelineResponse = NonNullable<Awaited<ReturnType<PipelineRoute>>['data']>;
-type StreamResponse = Extract<PipelineResponse['results'][number], { type: 'ok' }>['response'];
-type StatementResult = Extract<StreamResponse, { type: 'execute' }>['result'];
-type SqliteValue = StatementResult['rows'][number][number];
+type SqliteValue = SqliteStatementResult['rows'][number][number];
 
 const CellSchema = z.union([z.string(), z.number(), z.null(), z.object({ base64: z.string() })]);
 const QuerySchema = z.object({
@@ -46,13 +40,7 @@ export async function querySqlite({
   connection: SqliteConnection;
   sql: string;
 }): Promise<Query> {
-  const response = unwrap(
-    await api.api.sqlite.connections({ connectionId: connection.id }).v2.pipeline.post({
-      baton: null,
-      requests: [{ type: 'execute', stmt: { sql, want_rows: true } }, { type: 'close' }],
-    }),
-  );
-  const result = statementResult(response);
+  const result = await executeSqliteQuery({ api, connectionId: connection.id, sql });
   return {
     connection,
     columns: result.cols.map(function columnName(column) {
@@ -62,32 +50,6 @@ export async function querySqlite({
       return values.map(decodeSqliteValue);
     }),
   };
-}
-
-function statementResult(response: PipelineResponse): StatementResult {
-  const [execution, closing] = response.results;
-  if (execution?.type === 'error') {
-    throw new UsageError(sqliteError(execution.error));
-  }
-  if (closing?.type === 'error') {
-    throw new UsageError(sqliteError(closing.error));
-  }
-  if (
-    execution?.type !== 'ok' ||
-    execution.response.type !== 'execute' ||
-    closing?.type !== 'ok' ||
-    closing.response.type !== 'close' ||
-    response.baton !== null
-  ) {
-    throw new UsageError('The API returned an unexpected SQLite query response.');
-  }
-  return execution.response.result;
-}
-
-function sqliteError(
-  error: Extract<PipelineResponse['results'][number], { type: 'error' }>['error'],
-): string {
-  return error.code ? `${error.code}: ${error.message}` : error.message;
 }
 
 function decodeSqliteValue(value: SqliteValue): Cell {
