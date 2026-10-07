@@ -636,7 +636,8 @@ function settle({
     if (state === record.state) {
       return yield* AgentState.updateRecord({
         appId: record.appId,
-        change: (latest) => ({ ...latest, health }),
+        change: (latest) =>
+          latest.deploymentId === record.deploymentId ? { ...latest, health } : latest,
       });
     }
 
@@ -645,15 +646,20 @@ function settle({
     const message = yield* verdict({ state, status, health, record });
     yield* AgentState.updateRecord({
       appId: record.appId,
-      change: (latest) => ({
-        ...latest,
-        health,
-        state,
-        ...(status.exitCode !== undefined && !status.active
-          ? { lastExitCode: status.exitCode }
-          : {}),
-        message,
-      }),
+      change: (latest) =>
+        latest.deploymentId !== record.deploymentId ||
+        latest.state !== record.state ||
+        latest.stopRequested !== record.stopRequested
+          ? latest
+          : {
+              ...latest,
+              health,
+              state,
+              ...(status.exitCode !== undefined && !status.active
+                ? { lastExitCode: status.exitCode }
+                : {}),
+              message,
+            },
     });
     yield* Effect.logInfo('instance state changed').pipe(
       Effect.annotateLogs({
