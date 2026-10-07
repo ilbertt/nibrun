@@ -28,6 +28,7 @@ import { Reconciler } from '#services/reconciler.service.ts';
 import { RefreshSignal } from '#services/refresh-signal.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
+import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
 import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
@@ -49,6 +50,7 @@ const agent = Layer.mergeAll(
   CommandRunner.Default,
   ControlPlane.Default,
   GuestActivity.Default,
+  SqliteSessions.Default,
   CronExecutions.Default,
   CronRegistry.Default,
   CronScheduler.Default,
