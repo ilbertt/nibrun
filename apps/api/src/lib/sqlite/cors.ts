@@ -1,4 +1,4 @@
-import { type CORSConfig, cors } from '@elysia/cors';
+import { cors } from '@elysia/cors';
 import { SQLITE_CONNECTIONS_BASE_PATH } from '#lib/sqlite/routes.ts';
 
 export const SqliteClientCorsPlugin = cors({
@@ -12,4 +12,4 @@ export const SqliteClientCorsPlugin = cors({
   exposeHeaders: [],
   maxAge: 5,
   preflight: true,
-} satisfies Required<CORSConfig>);
+});
