@@ -26,6 +26,7 @@ import { CronExecutions } from '#services/cron-executions.service.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
+import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
 
@@ -41,6 +42,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
     const vms = yield* VmManager;
     const crons = yield* CronRegistry;
     const executions = yield* CronExecutions;
+    const sqlite = yield* SqliteSessions;
 
     const load = Effect.gen(function* () {
       const instances = readInstanceRecords(
@@ -239,6 +241,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       });
 
     const reconcile = Effect.fn('Reconciler.reconcile')(function* (desired: HostDesiredState) {
+      yield* sqlite.syncDeployments({ instances: desired.instances });
       yield* executions.syncDeployments({ instances: desired.instances });
       yield* crons.syncDeployments({ deployments: desired.instances });
       const observed = yield* observe(desired);
@@ -300,5 +303,6 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
     VmManager.Default,
     CronRegistry.Default,
     CronExecutions.Default,
+    SqliteSessions.Default,
   ],
 }) {}
