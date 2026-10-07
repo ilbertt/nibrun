@@ -17,6 +17,7 @@ import type { command as appsSqliteCmd } from './commands/apps/sqlite.ts';
 import type { command as appsSqliteConnectionsCmd } from './commands/apps/sqlite/connections.ts';
 import type { command as appsSqliteConnectionsCreatePathCmd } from './commands/apps/sqlite/connections/create/[path].ts';
 import type { command as appsSqliteConnectionsListCmd } from './commands/apps/sqlite/connections/list.ts';
+import type { command as appsSqliteConnectionsRemoveConnectionIdCmd } from './commands/apps/sqlite/connections/remove/[connectionId].ts';
 import type { command as appsStatusCmd } from './commands/apps/status.ts';
 import type { command as appsSuspendCmd } from './commands/apps/suspend.ts';
 import type { command as appsUpdateCmd } from './commands/apps/update.ts';
@@ -123,6 +124,14 @@ declare module '@parshjs/core' {
       rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps sqlite connections list': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+        'apps sqlite': { options: InferForwardedOptions<typeof appsSqliteCmd.options>; params: InferParams<typeof appsSqliteCmd.params> };
+        'apps sqlite connections': { options: InferForwardedOptions<typeof appsSqliteConnectionsCmd.options>; params: InferParams<typeof appsSqliteConnectionsCmd.params> };
+      };
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'apps sqlite connections remove [connectionId]': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
         'apps sqlite': { options: InferForwardedOptions<typeof appsSqliteCmd.options>; params: InferParams<typeof appsSqliteCmd.params> };
@@ -287,6 +296,17 @@ export const commandTree: RuntimeNode = {
                   command: { path: 'apps sqlite connections list', load: () => import('./commands/apps/sqlite/connections/list.ts').then((m) => m.command) },
                   literalChildren: {},
                   paramChild: null,
+                },
+                'remove': {
+                  segment: { kind: 'literal', value: 'remove' },
+                  command: null,
+                  literalChildren: {},
+                  paramChild: {
+                    segment: { kind: 'param', name: 'connectionId' },
+                    command: { path: 'apps sqlite connections remove [connectionId]', load: () => import('./commands/apps/sqlite/connections/remove/[connectionId].ts').then((m) => m.command) },
+                    literalChildren: {},
+                    paramChild: null,
+                  },
                 },
               },
               paramChild: null,
