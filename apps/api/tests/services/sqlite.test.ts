@@ -30,7 +30,7 @@ test('creating a saved connection verifies the file and returns a stable URL', a
   expect(fixture.opened).toEqual([
     { appId: APP_ID, deploymentId: DEPLOYMENT_ID, path: PATH, signal: SIGNAL },
   ]);
-  expect(fixture.executors[0]?.closed).toBe(true);
+  expect(fixture.sessions[0]?.closed).toBe(true);
   expect(await new SqliteService(fixture).list({ appId: APP_ID, ownerId: OWNER_ID })).toEqual([
     saved,
   ]);
@@ -85,7 +85,7 @@ test('a database that fails to open leaves no saved connection', async () => {
   const fixture = sqliteConnectionsFixture();
   const service = new SqliteService({
     ...fixture,
-    openExecutor() {
+    openSession() {
       return Promise.reject(new Error('not a database'));
     },
   });
@@ -99,7 +99,7 @@ test('a file that is not a database reports a client error', async () => {
   const fixture = sqliteConnectionsFixture();
   const service = new SqliteService({
     ...fixture,
-    openExecutor() {
+    openSession() {
       return Promise.reject(
         new HranaError({ code: 'SQLITE_26', message: 'file is not a database' }),
       );

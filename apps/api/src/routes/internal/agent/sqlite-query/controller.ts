@@ -1,4 +1,9 @@
-import { AGENT_ROUTES, SqliteQueryRequestSchema, SqliteQueryResponseSchema } from '@repo/protocol';
+import {
+  AGENT_ROUTES,
+  SqliteQueryRequestSchema,
+  type SqliteQueryResponse,
+  SqliteQueryResponseSchema,
+} from '@repo/protocol';
 import { Elysia, StatusMap } from 'elysia';
 import { assertProtocolVersion } from '#lib/agent/protocol-version.ts';
 import { agentRoutePath } from '#lib/agent/routes.ts';
@@ -22,7 +27,8 @@ export const AgentSqliteQueryController = new Elysia()
         hostId,
         signal: AbortSignal.any([request.signal, AbortSignal.timeout(HOLD_MS)]),
       });
-      return query ? { result: 'query' as const, query } : { result: 'none' as const };
+      const response: SqliteQueryResponse = query ? { result: 'query', query } : { result: 'none' };
+      return Response.json(response);
     },
     {
       body: SqliteQueryRequestSchema,

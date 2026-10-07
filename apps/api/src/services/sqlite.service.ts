@@ -1,6 +1,6 @@
 import type { AppId, DeploymentId, GuestPath } from '@repo/protocol';
-import type { SqliteExecutorContract } from '@repo/sqlite';
-import { HranaError, HranaPipelineAdapter, HranaStreams } from '@repo/sqlite';
+import type { HranaPipelineSessionContract } from '@repo/sqlite';
+import { HranaError, HranaPipelineRelay, HranaStreams } from '@repo/sqlite';
 import type { OwnerId, SqliteConnectionId } from '#lib/api/identifiers.ts';
 import type { SqliteConnection } from '#lib/api/sqlite-connection.ts';
 import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
@@ -16,38 +16,38 @@ import type {
 } from '#repositories/sqlite-connections.repository.ts';
 import { Service } from '#services/service.ts';
 
-type OpenSqliteExecutor = (input: {
+type OpenSqliteSession = (input: {
   appId: AppId;
   deploymentId: DeploymentId;
   path: GuestPath;
   signal: AbortSignal;
-}) => Promise<SqliteExecutorContract>;
+}) => Promise<HranaPipelineSessionContract>;
 
 type SqliteDeploymentsRepositoryContract = Pick<DeploymentsRepositoryContract, 'listByApp'>;
 
 export class SqliteService extends Service {
   private readonly deploymentsRepo: SqliteDeploymentsRepositoryContract;
   private readonly connectionsRepo: SqliteConnectionsRepositoryContract;
-  private readonly openExecutor: OpenSqliteExecutor;
+  private readonly openSession: OpenSqliteSession;
   private readonly baseUrl: URL;
   private readonly streams = new HranaStreams({ limit: undefined, idleTimeoutMs: undefined });
-  private readonly adapter = new HranaPipelineAdapter(this.streams);
+  private readonly pipelineRelay = new HranaPipelineRelay(this.streams);
 
   constructor({
     deploymentsRepo,
     connectionsRepo,
-    openExecutor,
+    openSession,
     baseUrl,
   }: {
     deploymentsRepo: SqliteDeploymentsRepositoryContract;
     connectionsRepo: SqliteConnectionsRepositoryContract;
-    openExecutor: OpenSqliteExecutor;
+    openSession: OpenSqliteSession;
     baseUrl: URL;
   }) {
     super();
     this.deploymentsRepo = deploymentsRepo;
     this.connectionsRepo = connectionsRepo;
-    this.openExecutor = openExecutor;
+    this.openSession = openSession;
     this.baseUrl = baseUrl;
   }
 
@@ -64,13 +64,13 @@ export class SqliteService extends Service {
   }): Promise<SqliteConnection> {
     const deployment = await this.runningDeployment({ appId, ownerId });
     try {
-      const executor = await this.openExecutor({
+      const session = await this.openSession({
         appId,
         deploymentId: deployment.id,
         path: sqlite_file_path,
         signal,
       });
-      await executor.close();
+      await session.close();
       signal.throwIfAborted();
       const current = await this.runningDeployment({ appId, ownerId });
       if (current.id !== deployment.id) {
@@ -124,16 +124,16 @@ export class SqliteService extends Service {
         return candidate.startsWith(prefix) && candidate !== scope;
       },
     });
-    const openExecutor = this.openExecutor;
+    const openSession = this.openSession;
     function open({ signal }: { signal: AbortSignal }) {
-      return openExecutor({
+      return openSession({
         appId: connection.app_id,
         deploymentId: deployment.id,
         path: connection.sqlite_file_path,
         signal,
       });
     }
-    return await this.adapter.handle({ body, scope, open, signal });
+    return await this.pipelineRelay.handle({ body, scope, open, signal });
   }
 
   private async connected(input: SqliteConnectionByIdInput) {

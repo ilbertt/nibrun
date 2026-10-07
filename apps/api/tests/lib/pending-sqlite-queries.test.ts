@@ -6,15 +6,15 @@ import {
   SQLITE_DEPLOYMENT,
   SQLITE_HOST_ID,
   SQLITE_OTHER_HOST_ID,
+  SQLITE_PIPELINE,
   SQLITE_SESSION_ID,
-  SQLITE_STATEMENT,
 } from '#tests/support/sqlite.ts';
 
 function open(pending: PendingSqliteQueries) {
   return pending.open({
     ...SQLITE_DEPLOYMENT,
     sessionId: SQLITE_SESSION_ID,
-    operation: { type: 'execute', statement: SQLITE_STATEMENT },
+    operation: { type: 'pipeline', body: SQLITE_PIPELINE },
     targetHostId: undefined,
     signal: new AbortController().signal,
   });
