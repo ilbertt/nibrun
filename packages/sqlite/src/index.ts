@@ -38,6 +38,7 @@ export { type HranaStream, HranaStreams } from '#hrana-streams.ts';
 export { parseHranaPipeline } from '#hrana-validation.ts';
 export {
   SQLITE_MAX_COLUMNS,
+  SQLITE_MAX_ERROR_MESSAGE_LENGTH,
   SQLITE_MAX_PARAMETERS,
   SQLITE_MAX_ROWS,
   SQLITE_MAX_STATEMENT_LENGTH,
