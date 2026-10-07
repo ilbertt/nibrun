@@ -21,7 +21,6 @@ import { AppsController } from '#routes/api/apps/controller.ts';
 import { AuthController } from '#routes/api/auth/controller.ts';
 import { HealthController } from '#routes/api/health/controller.ts';
 import { SqliteConnectionsConnectionIdV2Controller } from '#routes/api/sqlite/connections/[connectionId]/v2/controller.ts';
-import { SqliteConnectionsConnectionIdV2PipelineController } from '#routes/api/sqlite/connections/[connectionId]/v2/pipeline/controller.ts';
 
 export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(AuthController)
@@ -44,5 +43,4 @@ export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(AppsAppIdStateController)
   .use(AppsAppIdSqliteConnectionsController)
   .use(AppsAppIdSqliteConnectionsConnectionIdController)
-  .use(SqliteConnectionsConnectionIdV2Controller)
-  .use(SqliteConnectionsConnectionIdV2PipelineController);
+  .use(SqliteConnectionsConnectionIdV2Controller);

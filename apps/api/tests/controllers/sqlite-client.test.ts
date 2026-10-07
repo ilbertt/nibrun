@@ -1,25 +1,26 @@
-import { expect, test } from 'bun:test';
+import { afterEach, expect, mock, spyOn, test } from 'bun:test';
 import { createClient } from '@libsql/client/http';
 import type { SqliteOutcome, SqliteQuery } from '@repo/protocol';
 import { GuestPathSchema } from '@repo/protocol';
 import type { HranaStreamRequest, HranaStreamResult } from '@repo/sqlite';
 import { Value } from '@sinclair/typebox/value';
-import { Elysia } from 'elysia';
+import { StatusMap } from 'elysia';
 import type { Auth } from '#lib/auth/better-auth.ts';
-import { createAuthPlugin } from '#lib/auth/plugin.ts';
-import { elysiaErrorHandler } from '#lib/errors.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { openRemoteSqliteSession } from '#lib/sqlite/remote-session.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
-import '#tests/controllers/support/api.ts';
+import { sendRequest } from '#tests/controllers/support/api.ts';
 import { APP_ID, DEPLOYMENT_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 import { SQLITE_HOST_ID } from '#tests/support/sqlite.ts';
 import { sqliteConnectionsFixture } from '#tests/support/sqlite-connections.ts';
 
-const { createSqliteConnectionsConnectionIdV2PipelineController } = await import(
-  '#routes/api/sqlite/connections/[connectionId]/v2/pipeline/controller.ts'
-);
+const { auth, SqliteServicePlugin } = await import('#services/plugins.ts');
+
+afterEach(function restoreMocks() {
+  mock.restore();
+});
+
 const AUTHORIZATION = 'Bearer existing-account-session';
 const LARGE_INTEGER = '9223372036854775807';
 const BOUND_INTEGER = 7n;
@@ -124,22 +125,14 @@ async function fixture() {
       return openRemoteSqliteSession({ ...input, relay });
     },
   });
-  const app = new Elysia().onError(elysiaErrorHandler).group(RoutePrefix.Api, function routes(api) {
-    return api.use(
-      createSqliteConnectionsConnectionIdV2PipelineController({
-        authPlugin: createAuthPlugin(existingAccountAuth()),
-        sqliteServicePlugin: new Elysia({ name: 'service.sqlite' })
-          .decorate('sqliteService', service)
-          .decorate('sqliteOrigin', baseUrl.origin),
-      }),
-    );
-  });
+  spyOn(auth.api, 'getSession').mockImplementation(existingAccountAuth().api.getSession);
+  const sqliteService = SqliteServicePlugin.decorator.sqliteService;
+  spyOn(sqliteService, 'checkConnection').mockImplementation(service.checkConnection.bind(service));
+  spyOn(sqliteService, 'pipeline').mockImplementation(service.pipeline.bind(service));
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
-    fetch(request) {
-      return app.handle(request);
-    },
+    fetch: sendRequest,
   });
   baseUrl.port = String(server.port);
   const selected = await service.create({
@@ -202,6 +195,85 @@ test('the official SDK authenticates through the public controller and relays co
         return ['open', 'pipeline', 'close'].includes(query.operation.type);
       }),
     ).toBe(true);
+  } finally {
+    await connection.close();
+  }
+});
+
+test('SQLite browser clients can preflight and query with a bearer token without enabling cookie access', async () => {
+  const connection = await fixture();
+  const url = `${connection.selected.url}v2/pipeline`;
+  const origin = 'https://client.test';
+  try {
+    const discovery = await fetch(`${connection.selected.url}v2`, {
+      headers: { origin, authorization: AUTHORIZATION },
+    });
+    expect(discovery.status).toBe(StatusMap.OK);
+    expect(discovery.headers.get('access-control-allow-origin')).toBe(origin);
+    expect(await discovery.json()).toEqual({});
+    const preflight = await fetch(url, {
+      method: 'OPTIONS',
+      headers: {
+        origin,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'authorization,content-type',
+      },
+    });
+    expect(preflight.status).toBe(StatusMap['No Content']);
+    expect(preflight.headers.get('access-control-allow-origin')).toBe(origin);
+    expect(preflight.headers.get('access-control-allow-headers')).toBe(
+      'Authorization, Content-Type',
+    );
+    expect(preflight.headers.has('access-control-allow-credentials')).toBe(false);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { origin, authorization: AUTHORIZATION, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        baton: null,
+        requests: [
+          { type: 'execute', stmt: { sql: 'SELECT 1', want_rows: true } },
+          { type: 'close' },
+        ],
+      }),
+    });
+    expect(response.status).toBe(StatusMap.OK);
+    expect(response.headers.get('access-control-allow-origin')).toBe(origin);
+    const denied = await fetch(url, {
+      method: 'POST',
+      headers: {
+        origin,
+        authorization: AUTHORIZATION,
+        cookie: 'session=account-session',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ baton: null, requests: [] }),
+    });
+    expect(denied.status).toBe(StatusMap.Forbidden);
+    expect(denied.headers.has('access-control-allow-credentials')).toBe(false);
+    const unauthorized = await fetch(url, {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ baton: null, requests: [] }),
+    });
+    expect(unauthorized.status).toBe(StatusMap.Unauthorized);
+    expect(unauthorized.headers.get('access-control-allow-origin')).toBe(origin);
+    for (const authorization of [
+      'Bearer invalid-session',
+      'Bearer ',
+      'Basic existing-account-session',
+    ]) {
+      const invalid = await fetch(url, {
+        method: 'POST',
+        headers: { origin, authorization, 'content-type': 'application/json' },
+        body: JSON.stringify({ baton: null, requests: [] }),
+      });
+      expect(invalid.status).toBe(StatusMap.Unauthorized);
+      expect(invalid.headers.get('access-control-allow-origin')).toBe(origin);
+    }
+    const unrelated = await sendRequest(
+      new Request(new URL(`${RoutePrefix.Api}/unrelated`, connection.selected.url).href),
+    );
+    expect(unrelated.headers.has('access-control-allow-origin')).toBe(false);
   } finally {
     await connection.close();
   }

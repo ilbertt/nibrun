@@ -18,3 +18,9 @@ export function assertSqliteOrigin({
     throw new ForbiddenError('This origin cannot access SQLite connections.');
   }
 }
+
+export function assertSqliteCookieOrigin(input: { request: Request; allowedOrigin: string }): void {
+  if (input.request.headers.has('cookie')) {
+    assertSqliteOrigin(input);
+  }
+}
