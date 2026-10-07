@@ -94,6 +94,12 @@ VMM.
 SQLite is the pinned official amalgamation from `versions.env`, checked by SHA-256 before compilation.
 It links statically against musl, with extension loading omitted and temporary storage in memory.
 
+`src/guest-sqlite.c` listens on port 51005. Each connection owns one read-only database
+connection in a worker jailed to the data filesystem as the tenant uid. NBS1 framing
+is bounded to 64 KiB; the listener permits four workers, each with a 16 MiB SQLite heap,
+a 128 MiB address-space ceiling, a five-second query deadline and a 30-second idle lease.
+SQLite sidecars stay within the jail and may not be symlinks.
+
 On ARM Macs, `RUNTIME_TEST_PLATFORM=linux/arm64 bun run test` runs the Linux suites
 natively. Rosetta cannot enforce the SQLite worker address-space limit reliably.
 This test override does not change the production build target, which stays amd64.
