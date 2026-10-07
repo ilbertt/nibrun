@@ -1,5 +1,5 @@
 import { LLMS_TXT_PATH, PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
-import { APPS, appDeployPath, CATALOG, type CatalogApp, findApp } from '#lib/apps.ts';
+import { APPS, appDeployPath, CATALOG, type CatalogApp, findApp, projectLink } from '#lib/apps.ts';
 import { findPost } from '#lib/blog.ts';
 
 const BLOG_PATH = /^\/blog\/([a-z0-9-]+)\.md$/;
@@ -41,6 +41,8 @@ function written(pathname: string): string | undefined {
  * handed only the text gets them written out around the app's own copy instead.
  */
 function appPage(app: CatalogApp): string {
+  const project = projectLink(app);
+
   return `# Deploy ${app.title} on ${PRODUCT_NAME}
 
 > ${app.subtitle}
@@ -49,7 +51,7 @@ function appPage(app: CatalogApp): string {
 a microVM of its own, a persistent filesystem at \`data/\`, and an HTTPS URL.
 
 - Deploy on ${PRODUCT_NAME}: ${WWW_SITE.url}${appDeployPath(app)}
-- Repository: ${app.repositoryUrl}
+- ${project.label}: ${project.url}
 - Version: \`${app.version}\`
 
 ${app.markdownContent.trimEnd()}
@@ -67,12 +69,12 @@ ${OWN_APP_POINTER}
 function catalog(): string {
   const rows = APPS.map(
     (app) =>
-      `- [${app.title}](/apps/${app.slug}) — ${app.subtitle} \`${app.category}\`, \`${app.repositoryUrl}\`, \`${app.version}\``,
+      `- [${app.title}](/apps/${app.slug}) — ${app.subtitle} \`${app.category}\`, \`${app.projectUrl}\`, \`${app.version}\``,
   );
 
   return `# ${CATALOG.heading}
 
-Open source apps that already ship a single binary, deployed straight from their release assets.
+${CATALOG.description}
 Each one runs in a microVM of its own: 1 vCPU, 256 MiB, and an 8 GiB volume at \`data/\`.
 
 ${rows.join('\n')}

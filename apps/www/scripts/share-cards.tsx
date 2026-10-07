@@ -10,7 +10,7 @@ import { GithubMark } from '@repo/ui/custom/github-mark';
 import { Resvg } from '@resvg/resvg-js';
 import type { ReactElement, ReactNode } from 'react';
 import satori from 'satori';
-import { APPS, appCardPath, CATALOG, type CatalogApp, repoName } from '#lib/apps.ts';
+import { APPS, appCardPath, CATALOG, type CatalogApp, projectLink } from '#lib/apps.ts';
 import markSvg from '../../../brand/logo.svg?raw';
 
 const CLIENT_DIST_DIR = join(import.meta.dirname, '..', 'dist', 'client');
@@ -152,6 +152,8 @@ function Lede({ children }: { children: string }) {
 }
 
 function AppCard({ app }: { app: CatalogApp }) {
+  const project = projectLink(app);
+
   return (
     <Frame path={`/apps/${app.slug}`}>
       <Heading>{`Deploy ${app.title}`}</Heading>
@@ -174,8 +176,8 @@ function AppCard({ app }: { app: CatalogApp }) {
             color: COLOR.muted,
           }}
         >
-          <GithubMark width={28} height={28} fill={COLOR.muted} />
-          {`${repoName(app)} · ${app.version}`}
+          {project.isRepository && <GithubMark width={28} height={28} fill={COLOR.muted} />}
+          {`${project.name} · ${app.version}`}
         </div>
         <div
           style={{
