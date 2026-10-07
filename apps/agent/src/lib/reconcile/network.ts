@@ -54,21 +54,23 @@ export const forwardedInstances = Effect.gen(function* () {
  * in one transaction. Tearing down running tenants over a transient failure would be the bigger
  * outage — refusing to add new ones is the part that has to hold.
  */
-export const applyNetwork = Effect.gen(function* () {
+export const applyNetworkStrict = Effect.gen(function* () {
   const config = yield* AgentConfig;
   const firewall = yield* HostFirewall;
   yield* firewall
-    .apply({
-      instances: yield* forwardedInstances,
-      controlPlaneCidrsV4: config.controlPlaneCidrsV4,
-      controlPlaneCidrsV6: config.controlPlaneCidrsV6,
-    })
+    .apply(
+      Effect.map(forwardedInstances, (instances) => ({
+        instances,
+        controlPlaneCidrsV4: config.controlPlaneCidrsV4,
+        controlPlaneCidrsV6: config.controlPlaneCidrsV6,
+      })),
+    )
     .pipe(
-      Effect.andThen(AgentState.modify((current) => ({ ...current, isolated: true }))),
-      Effect.catchAll((error) =>
-        AgentState.modify((current) => ({ ...current, isolated: false })).pipe(
-          Effect.andThen(Effect.logError('firewall apply failed', error)),
-        ),
-      ),
+      Effect.tap(() => AgentState.modify((current) => ({ ...current, isolated: true }))),
+      Effect.tapError(() => AgentState.modify((current) => ({ ...current, isolated: false }))),
     );
 });
+
+export const applyNetwork = applyNetworkStrict.pipe(
+  Effect.catchAll((error) => Effect.logError('firewall apply failed', error)),
+);
