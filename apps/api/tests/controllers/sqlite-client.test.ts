@@ -4,7 +4,7 @@ import type { SqliteOutcome, SqliteQuery } from '@repo/protocol';
 import { GuestPathSchema } from '@repo/protocol';
 import type { HranaStreamRequest, HranaStreamResult } from '@repo/sqlite';
 import { Value } from '@sinclair/typebox/value';
-import { Elysia } from 'elysia';
+import { Elysia, StatusMap } from 'elysia';
 import type { Auth } from '#lib/auth/better-auth.ts';
 import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { elysiaErrorHandler } from '#lib/errors.ts';
@@ -164,7 +164,7 @@ async function fixture() {
     stopping.abort();
     await guest;
   }
-  return { client, selected, queries, close };
+  return { client, selected, queries, close, app };
 }
 
 test('the official SDK authenticates through the public controller and relays complete guest pipelines', async () => {
@@ -202,6 +202,66 @@ test('the official SDK authenticates through the public controller and relays co
         return ['open', 'pipeline', 'close'].includes(query.operation.type);
       }),
     ).toBe(true);
+  } finally {
+    await connection.close();
+  }
+});
+
+test('SQLite browser clients can preflight and query with a bearer token without enabling cookie access', async () => {
+  const connection = await fixture();
+  const url = `${connection.selected.url}v2/pipeline`;
+  const origin = 'https://client.test';
+  try {
+    const preflight = await fetch(url, {
+      method: 'OPTIONS',
+      headers: {
+        origin,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'authorization,content-type',
+      },
+    });
+    expect(preflight.status).toBe(StatusMap['No Content']);
+    expect(preflight.headers.get('access-control-allow-origin')).toBe('*');
+    expect(preflight.headers.get('access-control-allow-headers')).toBe(
+      'Authorization, Content-Type',
+    );
+    expect(preflight.headers.has('access-control-allow-credentials')).toBe(false);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { origin, authorization: AUTHORIZATION, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        baton: null,
+        requests: [
+          { type: 'execute', stmt: { sql: 'SELECT 1', want_rows: true } },
+          { type: 'close' },
+        ],
+      }),
+    });
+    expect(response.status).toBe(StatusMap.OK);
+    expect(response.headers.get('access-control-allow-origin')).toBe('*');
+    const denied = await fetch(url, {
+      method: 'POST',
+      headers: {
+        origin,
+        authorization: AUTHORIZATION,
+        cookie: 'session=account-session',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ baton: null, requests: [] }),
+    });
+    expect(denied.status).toBe(StatusMap.Forbidden);
+    expect(denied.headers.has('access-control-allow-credentials')).toBe(false);
+    const unauthorized = await fetch(url, {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ baton: null, requests: [] }),
+    });
+    expect(unauthorized.status).toBe(StatusMap.Unauthorized);
+    expect(unauthorized.headers.get('access-control-allow-origin')).toBe('*');
+    const unrelated = await connection.app.handle(
+      new Request(`${connection.selected.url}unrelated`),
+    );
+    expect(unrelated.headers.has('access-control-allow-origin')).toBe(false);
   } finally {
     await connection.close();
   }

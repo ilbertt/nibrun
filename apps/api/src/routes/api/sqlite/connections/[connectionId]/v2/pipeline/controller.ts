@@ -4,7 +4,12 @@ import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema, SqliteConnectionIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { pathBelow, RoutePrefix } from '#lib/routes/prefixes.ts';
-import { assertSqliteOrigin, sqliteRequestSignal } from '#lib/sqlite/http.ts';
+import {
+  assertSqliteClientOrigin,
+  SQLITE_CLIENT_CORS_HEADERS,
+  sqliteClientCors,
+  sqliteRequestSignal,
+} from '#lib/sqlite/http.ts';
 import { SQLITE_CONNECTIONS_BASE_PATH } from '#lib/sqlite/routes.ts';
 import {
   SqlitePipelineBodySchema,
@@ -21,16 +26,25 @@ export function createSqliteConnectionsConnectionIdV2PipelineController({
   authPlugin: typeof AuthPlugin;
   sqliteServicePlugin: typeof SqliteServicePlugin;
 }) {
+  const path = pathBelow({
+    path: `${SQLITE_CONNECTIONS_BASE_PATH}:connectionId/v2/pipeline`,
+    prefix: RoutePrefix.Api,
+  });
   return new Elysia()
     .use(authPlugin)
     .use(sqliteServicePlugin)
+    .options(
+      path,
+      () =>
+        new Response(null, {
+          status: StatusMap['No Content'],
+          headers: SQLITE_CLIENT_CORS_HEADERS,
+        }),
+    )
     .post(
-      pathBelow({
-        path: `${SQLITE_CONNECTIONS_BASE_PATH}:connectionId/v2/pipeline`,
-        prefix: RoutePrefix.Api,
-      }),
+      path,
       async function pipeline({ sqliteService, sqliteOrigin, params, body, user, request }) {
-        assertSqliteOrigin({ request, allowedOrigin: sqliteOrigin });
+        assertSqliteClientOrigin({ request, allowedOrigin: sqliteOrigin });
         try {
           return Response.json(
             await sqliteService.pipeline({
@@ -49,6 +63,8 @@ export function createSqliteConnectionsConnectionIdV2PipelineController({
       },
       {
         auth: Identity.Optional,
+        transform: sqliteClientCors,
+        error: sqliteClientCors,
         params: SqliteConnectionParamsSchema,
         body: SqlitePipelineBodySchema,
         response: {
