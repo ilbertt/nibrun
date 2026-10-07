@@ -26,3 +26,34 @@ test('SQLite connection rejects paths outside the volume at the HTTP boundary', 
     ).toBe(StatusMap['Bad Request']);
   }
 });
+
+test('SQLite discovery supports browser preflights and exposes authentication failures through CORS', async () => {
+  const url = `${CONNECTION_URL}/v2`;
+  const origin = 'https://client.test';
+  const preflight = await send({
+    method: 'OPTIONS',
+    url,
+    headers: {
+      origin,
+      'access-control-request-method': 'GET',
+      'access-control-request-headers': 'authorization',
+    },
+  });
+  expect(preflight.status).toBe(StatusMap['No Content']);
+  expect(preflight.headers.get('access-control-allow-origin')).toBe(origin);
+  expect(preflight.headers.get('access-control-allow-headers')).toBe('Authorization, Content-Type');
+  expect(preflight.headers.has('access-control-allow-credentials')).toBe(false);
+  const denied = await send({ url, headers: { origin } });
+  expect(denied.status).toBe(StatusMap.Unauthorized);
+  expect(denied.headers.get('access-control-allow-origin')).toBe(origin);
+  for (const unrelatedUrl of [CREATE_URL, `${ORIGIN}/api/health`]) {
+    const unrelated = await send({ url: unrelatedUrl, headers: { origin } });
+    expect(unrelated.headers.has('access-control-allow-origin')).toBe(false);
+    const unrelatedPreflight = await send({
+      method: 'OPTIONS',
+      url: unrelatedUrl,
+      headers: { origin, 'access-control-request-method': 'GET' },
+    });
+    expect(unrelatedPreflight.headers.has('access-control-allow-origin')).toBe(false);
+  }
+});
