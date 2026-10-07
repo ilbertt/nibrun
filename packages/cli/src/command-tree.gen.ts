@@ -15,6 +15,7 @@ import type { command as appsLogsCmd } from './commands/apps/logs.ts';
 import type { command as appsResumeCmd } from './commands/apps/resume.ts';
 import type { command as appsSqliteCmd } from './commands/apps/sqlite.ts';
 import type { command as appsSqliteConnectionsCmd } from './commands/apps/sqlite/connections.ts';
+import type { command as appsSqliteConnectionsCreatePathCmd } from './commands/apps/sqlite/connections/create/[path].ts';
 import type { command as appsSqliteConnectionsListCmd } from './commands/apps/sqlite/connections/list.ts';
 import type { command as appsStatusCmd } from './commands/apps/status.ts';
 import type { command as appsSuspendCmd } from './commands/apps/suspend.ts';
@@ -110,6 +111,14 @@ declare module '@parshjs/core' {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
         'apps sqlite': { options: InferForwardedOptions<typeof appsSqliteCmd.options>; params: InferParams<typeof appsSqliteCmd.params> };
+      };
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'apps sqlite connections create [path]': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+        'apps sqlite': { options: InferForwardedOptions<typeof appsSqliteCmd.options>; params: InferParams<typeof appsSqliteCmd.params> };
+        'apps sqlite connections': { options: InferForwardedOptions<typeof appsSqliteConnectionsCmd.options>; params: InferParams<typeof appsSqliteConnectionsCmd.params> };
       };
       rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
@@ -262,6 +271,17 @@ export const commandTree: RuntimeNode = {
               segment: { kind: 'literal', value: 'connections' },
               command: { path: 'apps sqlite connections', load: () => import('./commands/apps/sqlite/connections.ts').then((m) => m.command) },
               literalChildren: {
+                'create': {
+                  segment: { kind: 'literal', value: 'create' },
+                  command: null,
+                  literalChildren: {},
+                  paramChild: {
+                    segment: { kind: 'param', name: 'path' },
+                    command: { path: 'apps sqlite connections create [path]', load: () => import('./commands/apps/sqlite/connections/create/[path].ts').then((m) => m.command) },
+                    literalChildren: {},
+                    paramChild: null,
+                  },
+                },
                 'list': {
                   segment: { kind: 'literal', value: 'list' },
                   command: { path: 'apps sqlite connections list', load: () => import('./commands/apps/sqlite/connections/list.ts').then((m) => m.command) },
