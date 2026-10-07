@@ -19,7 +19,7 @@ export class SqliteDisconnected extends Data.TaggedError('SqliteDisconnected') {
 }
 
 export class GuestSqliteFailed extends Data.TaggedError('GuestSqliteFailed')<{
-  readonly code: number;
+  readonly code: string;
   readonly reason: string;
 }> {
   override get message() {
