@@ -2,6 +2,7 @@ import type { AppId, HostPort } from '@repo/protocol';
 import { Clock, Duration, Effect, Ref, Runtime } from 'effect';
 import type { AppSlot } from '#lib/network/slot.ts';
 import { forwardToGuest } from '#lib/proxy/forward.ts';
+import { waitForApp } from '#lib/proxy/readiness.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppWaker } from '#services/app-waker.service.ts';
 
@@ -78,34 +79,26 @@ type Listener = {
  * Bound for the life of the slot rather than the life of the microVM: the rule is what switches
  * between the two, so there is no bind to race the reconciler and no window the port is nobody's.
  *
- * For an app that runs on request this is the front door: the request that finds no microVM is
- * what starts one, and it is held here and answered from the guest once that guest is up. For
- * every other app a stopped microVM is somebody's decision or somebody's bug, and a request is
- * not the thing that resolves either — so it is told so.
+ * Requests that arrive during startup wait here until the guest is healthy. An idle
+ * app is woken by its request; a suspended or failed app answers without starting anything.
  */
 export class AppActivator extends Effect.Service<AppActivator>()('AppActivator', {
   scoped: Effect.gen(function* () {
     const waker = yield* AppWaker;
     const listeners = yield* Ref.make(new Map<AppId, Listener>());
 
-    /**
-     * A request that finds no microVM. For an app that runs on request it is the thing that
-     * brings one back, and it waits here until the guest answers — which is a snapshot restore
-     * where there is one to restore and a cold boot where there is not, and the second is the
-     * reason the request is held rather than refused.
-     *
-     * The record is read again after the wake because the wake is what wrote it: the port and
-     * address to forward to are the ones the microVM that just came up is on.
-     */
-    const handle = ({ appId, request }: { appId: AppId; request: Request }) =>
-      Effect.gen(function* () {
-        const record = (yield* AgentState.snapshot).records.get(appId);
-        if (!record?.onRequest || !record.desiredRunning) {
-          return sayAppIsDown();
-        }
-        yield* AgentState.markActive({ appId, nowMs: yield* Clock.currentTimeMillis });
-        const [woke] = yield* Effect.timed(waker.wake(appId));
-
+    function serveGuest({
+      appId,
+      request,
+      waking,
+      woke,
+    }: {
+      appId: AppId;
+      request: Request;
+      waking: boolean;
+      woke: Duration.Duration;
+    }) {
+      return Effect.gen(function* () {
         const woken = (yield* AgentState.snapshot).records.get(appId);
         if (!woken) {
           return sayAppWouldNotStart();
@@ -130,7 +123,11 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
          * time from a start to the first probe it passed, which is a different quantity on a
          * different scale — sharing the name makes any reading of either a mix of the two.
          */
-        yield* Effect.logInfo('app answered the request that woke it').pipe(
+        yield* Effect.logInfo(
+          waking
+            ? 'app answered the request that woke it'
+            : 'app answered a request held during startup',
+        ).pipe(
           Effect.annotateLogs({
             appId,
             wokeMs: Duration.toMillis(woke),
@@ -138,6 +135,23 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
           }),
         );
         return response;
+      });
+    }
+
+    const handle = ({ appId, request }: { appId: AppId; request: Request }) =>
+      Effect.gen(function* () {
+        const record = yield* waitForApp(appId);
+        if (!record?.desiredRunning) {
+          return sayAppIsDown();
+        }
+        if (record.state !== 'running' && !(record.onRequest && record.state === 'idle')) {
+          return sayAppWouldNotStart();
+        }
+        yield* AgentState.markActive({ appId, nowMs: yield* Clock.currentTimeMillis });
+        const waking = record.state === 'idle';
+        const [woke] = yield* Effect.timed(waking ? waker.wake(appId) : Effect.void);
+
+        return yield* serveGuest({ appId, request, waking, woke });
       }).pipe(
         Effect.catchTag('GuestDidNotAnswer', (error) =>
           Effect.logWarning('an app did not answer the request that woke it', error)

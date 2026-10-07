@@ -9,7 +9,7 @@ import {
   Ipv4AddressSchema,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Duration, Effect, Either, Layer, Logger } from 'effect';
+import { Duration, Effect, Either, Fiber, Layer, Logger, Option } from 'effect';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppActivator } from '#services/app-activator.service.ts';
 import { AppWaker, HostHasNoRoom, WakeFailed } from '#services/app-waker.service.ts';
@@ -304,4 +304,63 @@ describe('an app that runs on request is started by the request that wanted it',
       }),
     );
   });
+});
+
+describe('requests wait for startup without starting a competing guest', () => {
+  test.each([false, true])('a POST waits and is sent once with onRequest=%s', (onRequest) =>
+    run(
+      Effect.gen(function* () {
+        const bodies: string[] = [];
+        const { port } = yield* serving(async function receive(request) {
+          bodies.push(await request.text());
+          return new Response('new release');
+        });
+        const record = instanceRecord({
+          onRequest,
+          guestIpv4: Value.Parse(Ipv4AddressSchema, LOOPBACK),
+          httpPort: Value.Parse(HttpPortSchema, port),
+        });
+        yield* AgentState.putRecord({ ...record, state: 'pending' });
+        const app = yield* AppActivator;
+        const hostPort = unusedPort();
+        yield* app.serve([{ appId: APP_ID, hostPort }]);
+        const pending = yield* Effect.forkScoped(
+          Effect.tryPromise(() =>
+            fetch(`http://${LOOPBACK}:${hostPort}/write?version=2`, {
+              method: 'POST',
+              body: 'one write',
+            }),
+          ),
+        );
+        yield* Effect.sleep('75 millis');
+        expect(Option.isNone(yield* Fiber.poll(pending))).toBe(true);
+        expect(bodies).toEqual([]);
+        yield* AgentState.putRecord({ ...record, state: 'starting' });
+        yield* Effect.sleep('50 millis');
+        expect(Option.isNone(yield* Fiber.poll(pending))).toBe(true);
+        yield* AgentState.putRecord(record);
+        const response = yield* Fiber.join(pending);
+        expect(response.status).toBe(HTTP_OK);
+        expect(yield* Effect.promise(() => response.text())).toBe('new release');
+        expect(bodies).toEqual(['one write']);
+      }),
+    ),
+  );
+
+  test('a failed startup releases the waiting request with an error', () =>
+    run(
+      Effect.gen(function* () {
+        const app = yield* AppActivator;
+        yield* AgentState.putRecord(instanceRecord({ state: 'starting' }));
+        const hostPort = unusedPort();
+        yield* app.serve([{ appId: APP_ID, hostPort }]);
+        const pending = yield* Effect.forkScoped(get(hostPort));
+        yield* Effect.sleep('50 millis');
+        expect(Option.isNone(yield* Fiber.poll(pending))).toBe(true);
+        yield* AgentState.putRecord(instanceRecord({ state: 'failed' }));
+        const response = yield* Fiber.join(pending);
+        expect(response.status).toBe(HTTP_UNAVAILABLE);
+        expect(yield* Effect.promise(() => response.text())).toContain('could not be started');
+      }),
+    ));
 });
