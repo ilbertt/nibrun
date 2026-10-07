@@ -46,11 +46,20 @@ int main(void) {
                 "x) SELECT sum(n) FROM x",
                 SQLITE_INTERRUPT);
   stream.query.deadline_ms = clock_monotonic_ms() + SQLITE_QUERY_TIMEOUT_MS;
+  json_t *invalid = json_loads("{\"requests\":[{\"type\":\"sequence\",\"sql\":"
+                               "\"BEGIN\"},{\"type\":\"unknown\"}]}",
+                               0, NULL);
+  int status;
+  json_t *reply = sqlite_hrana_pipeline(&stream, invalid, &status);
+  EXPECT(status == 400);
+  EXPECT(sqlite3_get_autocommit(stream.query.database));
+  json_decref(reply);
+  json_decref(invalid);
   EXPECT(sqlite3_exec(stream.query.database, "BEGIN; SELECT * FROM items", NULL,
                       NULL, NULL) == SQLITE_OK);
   EXPECT(sqlite3_exec(writer, "INSERT INTO items VALUES(2)", NULL, NULL,
                       NULL) == SQLITE_OK);
-  EXPECT(sqlite3_close(stream.query.database) == SQLITE_OK);
+  sqlite_hrana_clear(&stream);
   EXPECT(sqlite3_exec(writer, "PRAGMA wal_checkpoint(TRUNCATE)", NULL, NULL,
                       NULL) == SQLITE_OK);
   EXPECT(sqlite3_close(writer) == SQLITE_OK);
