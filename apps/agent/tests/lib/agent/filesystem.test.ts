@@ -130,6 +130,8 @@ function immediateApi(queued: FilesystemQuery[]) {
   const layer = Layer.succeed(
     ControlPlane,
     ControlPlane.make({
+      fetchSqliteQuery: unreached,
+      sendSqliteQueryResult: unreached,
       openSession: unreached,
       fetchDesiredState: unreached,
       sendReportedState: unreached,
