@@ -3,27 +3,19 @@ import { Value } from '@sinclair/typebox/value';
 import { SqliteOperationSchema, SqliteOutcomeSchema } from '#control/sqlite-query.ts';
 
 describe('SQLite relay contracts', () => {
-  test('shares Hrana results with the relay while requiring resolved guest statements', () => {
-    const result = {
-      cols: [{ name: 'value', decltype: null }],
-      rows: [],
-      affected_row_count: 0,
-      last_insert_rowid: null,
-    };
-    expect(Value.Check(SqliteOutcomeSchema, { status: 'executed', result })).toBe(true);
+  test('relays complete Hrana pipelines and results without resolving statements', () => {
+    const body = { baton: null, requests: [{ type: 'execute', stmt: { sql_id: 1 } }] };
+    const result = { baton: 'next', base_url: null, results: [] };
+    expect(Value.Check(SqliteOperationSchema, { type: 'pipeline', body })).toBe(true);
+    expect(Value.Check(SqliteOutcomeSchema, { status: 'pipelined', result })).toBe(true);
+    expect(
+      Value.Check(SqliteOperationSchema, { type: 'execute', statement: { sql: 'SELECT 1' } }),
+    ).toBe(false);
     expect(
       Value.Check(SqliteOperationSchema, {
-        type: 'execute',
-        statement: {
-          sql: 'SELECT 1',
-          args: [],
-          named_args: [],
-          want_rows: true,
-        },
+        type: 'pipeline',
+        body: { requests: [{ type: 'unknown' }] },
       }),
-    ).toBe(true);
-    expect(Value.Check(SqliteOperationSchema, { type: 'execute', statement: { sql_id: 1 } })).toBe(
-      false,
-    );
+    ).toBe(false);
   });
 });

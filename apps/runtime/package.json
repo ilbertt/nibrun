@@ -7,6 +7,6 @@
     "test": "bash test.sh"
   },
   "devDependencies": {
-    "@libsql/client": "^0.18.0"
+    "@libsql/client": "catalog:"
   }
 }

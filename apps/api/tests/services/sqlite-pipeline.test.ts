@@ -47,10 +47,10 @@ test('each pipeline checks ownership and keeps its selected connection', async (
     signal: SIGNAL,
   });
   expect(second.baton).not.toBe(first.baton);
-  expect(fixture.executors).toHaveLength(2);
-  expect(fixture.executors[1]?.statements).toHaveLength(2);
+  expect(fixture.sessions).toHaveLength(2);
+  expect(fixture.sessions[1]?.pipelines).toHaveLength(2);
   await service.removeConnection({ appId: APP_ID, id, ownerId: OWNER_ID });
-  expect(fixture.executors[1]?.closed).toBe(true);
+  expect(fixture.sessions[1]?.closed).toBe(true);
 });
 
 test('redeployment invalidates batons before any further SQL runs', async () => {
@@ -71,8 +71,8 @@ test('redeployment invalidates batons before any further SQL runs', async () => 
       signal: SIGNAL,
     }),
   ).rejects.toBeInstanceOf(ConflictError);
-  expect(fixture.executors[1]?.closed).toBe(true);
-  expect(fixture.executors[1]?.statements).toHaveLength(1);
+  expect(fixture.sessions[1]?.closed).toBe(true);
+  expect(fixture.sessions[1]?.pipelines).toHaveLength(1);
   await service.removeConnection({ appId: APP_ID, id, ownerId: OWNER_ID });
 });
 
@@ -111,7 +111,7 @@ test('closing a connection invalidates all its streams', async () => {
   await expect(
     service.pipeline({ id, ownerId: OWNER_ID, body: { requests: [SELECT] }, signal: SIGNAL }),
   ).rejects.toBeInstanceOf(NotFoundError);
-  expect(fixture.executors[1]?.closed).toBe(true);
+  expect(fixture.sessions[1]?.closed).toBe(true);
 });
 
 test('the saved URL survives redeployment while old batons expire', async () => {
@@ -133,7 +133,7 @@ test('the saved URL survives redeployment while old batons expire', async () => 
       signal: SIGNAL,
     }),
   ).rejects.toBeInstanceOf(HranaError);
-  expect(fixture.executors[1]?.closed).toBe(true);
+  expect(fixture.sessions[1]?.closed).toBe(true);
   await service.pipeline({ id, ownerId: OWNER_ID, body: { requests: [SELECT] }, signal: SIGNAL });
   expect(fixture.opened.at(-1)?.deploymentId).toBe(fixture.deployment.id);
   expect(await service.list({ appId: APP_ID, ownerId: OWNER_ID })).toEqual(saved);

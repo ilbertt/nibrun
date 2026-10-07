@@ -94,7 +94,7 @@
     "apps/runtime": {
       "name": "@repo/runtime",
       "devDependencies": {
-        "@libsql/client": "^0.18.0",
+        "@libsql/client": "catalog:",
       },
     },
     "apps/www": {
@@ -261,7 +261,6 @@
         "@sinclair/typebox": "catalog:",
       },
       "devDependencies": {
-        "@libsql/client": "^0.18.0",
         "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",
       },
@@ -306,6 +305,7 @@
     },
   },
   "catalog": {
+    "@libsql/client": "^0.18.0",
     "@sinclair/typebox": "^0.34.52",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "^1.170.32",

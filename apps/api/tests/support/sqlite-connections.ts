@@ -1,5 +1,11 @@
 import type { AppId, DeploymentId, GuestPath } from '@repo/protocol';
-import { SqliteExecutorContract, type SqliteStatement } from '@repo/sqlite';
+import {
+  type HranaPipelineReqBody,
+  type HranaPipelineRespBody,
+  HranaPipelineSessionContract,
+  type HranaStreamRequest,
+  type HranaStreamResult,
+} from '@repo/sqlite';
 import { Value } from '@sinclair/typebox/value';
 import { SqliteConnectionIdSchema } from '#lib/api/identifiers.ts';
 import type { DeploymentRow, DeploymentsByAppInput } from '#repositories/deployments.repository.ts';
@@ -29,13 +35,13 @@ export function sqliteConnectionsFixture() {
   const records: SqliteConnectionRow[] = [];
   const asked: DeploymentsByAppInput[] = [];
   const opened: OpenInput[] = [];
-  const executors: SqliteConnectionTestExecutor[] = [];
+  const sessions: SqliteConnectionTestSession[] = [];
   return {
     deployment,
     records,
     asked,
     opened,
-    executors,
+    sessions,
     baseUrl: new URL('https://api.test'),
     connectionsRepo: {
       create({ appId, ownerId, path }: CreateSqliteConnectionInput) {
@@ -80,43 +86,55 @@ export function sqliteConnectionsFixture() {
         );
       },
     },
-    openExecutor(input: OpenInput) {
+    openSession(input: OpenInput) {
       opened.push(input);
-      const executor = new SqliteConnectionTestExecutor();
-      executors.push(executor);
-      return Promise.resolve(executor);
+      const session = new SqliteConnectionTestSession();
+      sessions.push(session);
+      return Promise.resolve(session);
     },
   };
 }
 
-class SqliteConnectionTestExecutor extends SqliteExecutorContract {
-  readonly statements: SqliteStatement[] = [];
+class SqliteConnectionTestSession extends HranaPipelineSessionContract {
+  readonly pipelines: HranaPipelineReqBody[] = [];
   closed = false;
 
-  override execute({ statement }: Parameters<SqliteExecutorContract['execute']>[0]) {
-    this.statements.push(statement);
+  override pipeline({
+    body,
+  }: Parameters<HranaPipelineSessionContract['pipeline']>[0]): Promise<HranaPipelineRespBody> {
+    this.pipelines.push(body);
+    if (
+      body.requests.some(function closing(request) {
+        return request.type === 'close';
+      })
+    ) {
+      this.closed = true;
+    }
     return Promise.resolve({
-      cols: [],
-      rows: [],
-      affected_row_count: 0,
-      last_insert_rowid: null,
+      baton: this.closed ? null : 'guest-baton',
+      base_url: null,
+      results: body.requests.map(response),
     });
-  }
-
-  override describe(
-    _input: Parameters<SqliteExecutorContract['describe']>[0],
-  ): ReturnType<SqliteExecutorContract['describe']> {
-    throw new Error('Unexpected description in connection lifecycle tests');
-  }
-
-  override sequence(
-    _input: Parameters<SqliteExecutorContract['sequence']>[0],
-  ): ReturnType<SqliteExecutorContract['sequence']> {
-    throw new Error('Unexpected sequence in connection lifecycle tests');
   }
 
   override close(): Promise<void> {
     this.closed = true;
     return Promise.resolve();
   }
+}
+
+function response(request: HranaStreamRequest): HranaStreamResult {
+  if (request.type === 'execute') {
+    return {
+      type: 'ok',
+      response: {
+        type: 'execute',
+        result: { cols: [], rows: [], affected_row_count: 0, last_insert_rowid: null },
+      },
+    };
+  }
+  if (request.type === 'close') {
+    return { type: 'ok', response: { type: 'close' } };
+  }
+  throw new Error('Unexpected request in connection lifecycle tests');
 }
