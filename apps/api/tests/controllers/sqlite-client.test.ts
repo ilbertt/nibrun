@@ -9,6 +9,7 @@ import type { Auth } from '#lib/auth/better-auth.ts';
 import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { elysiaErrorHandler } from '#lib/errors.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
+import { SqliteClientCorsPlugin } from '#lib/sqlite/cors.ts';
 import { openRemoteSqliteSession } from '#lib/sqlite/remote-session.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
@@ -124,16 +125,19 @@ async function fixture() {
       return openRemoteSqliteSession({ ...input, relay });
     },
   });
-  const app = new Elysia().onError(elysiaErrorHandler).group(RoutePrefix.Api, function routes(api) {
-    return api.use(
-      createSqliteConnectionsConnectionIdV2PipelineController({
-        authPlugin: createAuthPlugin(existingAccountAuth()),
-        sqliteServicePlugin: new Elysia({ name: 'service.sqlite' })
-          .decorate('sqliteService', service)
-          .decorate('sqliteOrigin', baseUrl.origin),
-      }),
-    );
-  });
+  const app = new Elysia()
+    .use(SqliteClientCorsPlugin)
+    .onError(elysiaErrorHandler)
+    .group(RoutePrefix.Api, function routes(api) {
+      return api.use(
+        createSqliteConnectionsConnectionIdV2PipelineController({
+          authPlugin: createAuthPlugin(existingAccountAuth()),
+          sqliteServicePlugin: new Elysia({ name: 'service.sqlite' })
+            .decorate('sqliteService', service)
+            .decorate('sqliteOrigin', baseUrl.origin),
+        }),
+      );
+    });
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
@@ -221,7 +225,7 @@ test('SQLite browser clients can preflight and query with a bearer token without
       },
     });
     expect(preflight.status).toBe(StatusMap['No Content']);
-    expect(preflight.headers.get('access-control-allow-origin')).toBe('*');
+    expect(preflight.headers.get('access-control-allow-origin')).toBe(origin);
     expect(preflight.headers.get('access-control-allow-headers')).toBe(
       'Authorization, Content-Type',
     );
@@ -238,7 +242,7 @@ test('SQLite browser clients can preflight and query with a bearer token without
       }),
     });
     expect(response.status).toBe(StatusMap.OK);
-    expect(response.headers.get('access-control-allow-origin')).toBe('*');
+    expect(response.headers.get('access-control-allow-origin')).toBe(origin);
     const denied = await fetch(url, {
       method: 'POST',
       headers: {
@@ -257,9 +261,22 @@ test('SQLite browser clients can preflight and query with a bearer token without
       body: JSON.stringify({ baton: null, requests: [] }),
     });
     expect(unauthorized.status).toBe(StatusMap.Unauthorized);
-    expect(unauthorized.headers.get('access-control-allow-origin')).toBe('*');
+    expect(unauthorized.headers.get('access-control-allow-origin')).toBe(origin);
+    for (const authorization of [
+      'Bearer invalid-session',
+      'Bearer ',
+      'Basic existing-account-session',
+    ]) {
+      const invalid = await fetch(url, {
+        method: 'POST',
+        headers: { origin, authorization, 'content-type': 'application/json' },
+        body: JSON.stringify({ baton: null, requests: [] }),
+      });
+      expect(invalid.status).toBe(StatusMap.Unauthorized);
+      expect(invalid.headers.get('access-control-allow-origin')).toBe(origin);
+    }
     const unrelated = await connection.app.handle(
-      new Request(`${connection.selected.url}unrelated`),
+      new Request(new URL(`${RoutePrefix.Api}/unrelated`, connection.selected.url).href),
     );
     expect(unrelated.headers.has('access-control-allow-origin')).toBe(false);
   } finally {

@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
+import { SqliteClientCorsPlugin } from '#lib/sqlite/cors.ts';
 import { AppsAppIdArtifactsArtifactIdController } from '#routes/api/apps/[appId]/artifacts/[artifactId]/controller.ts';
 import { AppsAppIdArtifactsController } from '#routes/api/apps/[appId]/artifacts/controller.ts';
 import { AppsAppIdController } from '#routes/api/apps/[appId]/controller.ts';
@@ -24,6 +25,7 @@ import { SqliteConnectionsConnectionIdV2Controller } from '#routes/api/sqlite/co
 import { SqliteConnectionsConnectionIdV2PipelineController } from '#routes/api/sqlite/connections/[connectionId]/v2/pipeline/controller.ts';
 
 export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
+  .use(SqliteClientCorsPlugin)
   .use(AuthController)
   .use(HealthController)
   .use(AppsController)
