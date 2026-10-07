@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { FetchHttpClient } from '@effect/platform';
+import { DeploymentIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Deferred, Effect, Fiber, Layer } from 'effect';
 import { refreshStates, resumeInstance, suspendInstance } from '#lib/reconcile/instances.ts';
 import { SleepRefused, SnapshotUnusable } from '#lib/vm/snapshot.ts';
@@ -135,6 +137,26 @@ describe('a settle writes back only what it measured', () => {
         // Were this put back, the instance would read `stopping` for as long as its unit stayed
         // up: never forwarded, and never started again, because the planner lets it be.
         expect((yield* recordOf)?.stopRequested).toBe(false);
+      }),
+    ));
+
+  test('a pass for the outgoing release cannot overwrite the incoming release health or state', () =>
+    run(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(instanceRecord({ state: 'stopped', stopRequested: true }));
+        yield* AgentState.modify((current) => ({
+          ...current,
+          nextProbeAtMs: new Map([[APP_ID, NEVER_DUE]]),
+        }));
+        const pass = yield* passHeldOpen();
+        const incoming = instanceRecord({
+          deploymentId: Value.Parse(DeploymentIdSchema, 'dep-2'),
+          state: 'starting',
+          health: { consecutiveSuccesses: 0, consecutiveFailures: 0, everHealthy: false },
+        });
+        yield* AgentState.putRecord(incoming);
+        yield* pass.finish;
+        expect(yield* recordOf).toEqual(incoming);
       }),
     ));
 
