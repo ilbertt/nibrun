@@ -17,7 +17,7 @@ function createRootController() {
   // only once no other route has matched, which is what a fallback means.
   controller.mount((request) => {
     const { pathname } = new URL(request.url);
-    const response = isClientRoutePath(pathname) ? assetsService.fallback(pathname) : null;
+    const response = isClientRoutePath(pathname) ? assetsService.fallback(request) : null;
     if (!response) {
       throw new NotFoundError();
     }
