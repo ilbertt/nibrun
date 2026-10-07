@@ -21,7 +21,7 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources; \
 # multiplied by how many VMs a host packs. Only the tenant's own binary needs glibc,
 # and the rootfs carries glibc for exactly that reason.
 ENV CFLAGS="-std=c11 -D_GNU_SOURCE -Os -static -Wall -Wextra -Werror -Wshadow -Wvla -fno-common -Wl,--build-id=none"
-ENV RUNTIME_SOURCES="/build/src/clock.c /build/src/config.c /build/src/cron-command.c /build/src/crontab.c /build/src/guest-control.c /build/src/guest-cron.c /build/src/guest-filesystem.c /build/src/guest-sqlite.c /build/src/guest-sqlite-worker.c /build/src/guest-logs.c /build/src/log.c /build/src/mounts.c /build/src/sqlite-values.c /build/src/sqlite-hrana-statements.c /build/src/sqlite-hrana-batch.c /build/src/sqlite-hrana-pipeline.c /build/src/sqlite-query.c /build/src/sqlite-database.c /build/src/sqlite-wire.c /build/src/supervise.c /build/src/tenant-process.c"
+ENV RUNTIME_SOURCES="/build/src/clock.c /build/src/config.c /build/src/cron-command.c /build/src/crontab.c /build/src/guest-control.c /build/src/guest-cron.c /build/src/guest-filesystem.c /build/src/guest-sqlite.c /build/src/guest-sqlite-worker.c /build/src/guest-logs.c /build/src/log.c /build/src/mounts.c /build/src/sqlite-hrana-statements.c /build/src/sqlite-hrana-batch.c /build/src/sqlite-hrana-pipeline.c /build/src/sqlite-values.c /build/src/sqlite-database.c /build/src/supervise.c /build/src/tenant-process.c"
 ARG SQLITE_ARCHIVE
 ARG SQLITE_SHA256
 ADD --checksum=sha256:${SQLITE_SHA256} https://www.sqlite.org/2026/${SQLITE_ARCHIVE} /sqlite.zip
@@ -53,11 +53,9 @@ COPY --from=build /init /init
 FROM toolchain AS tests
 COPY tests/ /build/tests/
 RUN musl-gcc ${CFLAGS} -o /test-sqlite-hrana /build/tests/test-sqlite-hrana.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
-    musl-gcc ${CFLAGS} -o /test-sqlite-listener /build/tests/test-sqlite-listener.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
+    musl-gcc ${CFLAGS} -o /test-hrana-server /build/tests/test-hrana-server.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
     musl-gcc ${CFLAGS} -o /test-guest-sqlite /build/tests/test-guest-sqlite.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
-    musl-gcc ${CFLAGS} -o /test-sqlite-query /build/tests/test-sqlite-query.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
     musl-gcc ${CFLAGS} -o /test-sqlite-database /build/tests/test-sqlite-database.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
-    musl-gcc ${CFLAGS} -o /test-sqlite-wire /build/tests/test-sqlite-wire.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
     musl-gcc ${CFLAGS} -o /fake-tenant /build/tests/fake-tenant.c; \
     musl-gcc ${CFLAGS} -o /test-guest-cron /build/tests/test-guest-cron.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
     musl-gcc ${CFLAGS} -o /test-cron-command /build/tests/test-cron-command.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
@@ -67,9 +65,12 @@ RUN musl-gcc ${CFLAGS} -o /test-sqlite-hrana /build/tests/test-sqlite-hrana.c ${
     musl-gcc ${CFLAGS} -o /test-filesystem /build/tests/test-filesystem.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
     musl-gcc ${CFLAGS} -o /test-mounts /build/tests/test-mounts.c ${RUNTIME_SOURCES} ${SQLITE_LINK}
 
+FROM tests AS hrana-test-server
+ENTRYPOINT ["/test-hrana-server"]
+
 FROM tests AS unit-test
 COPY --from=build /init /init
-RUN /test-sqlite-hrana && /test-sqlite-listener && /test-guest-sqlite && /test-sqlite-query && /test-sqlite-database && /test-sqlite-wire && /test-guest-cron && /test-cron-command && /test-crontab && /test-config && /test-supervise && /test-filesystem
+RUN /test-sqlite-hrana && /test-guest-sqlite && /test-sqlite-database && /test-guest-cron && /test-cron-command && /test-crontab && /test-config && /test-supervise && /test-filesystem
 RUN ln -s /init /crontab; \
     status=0; /crontab -e 2>/tmp/crontab-usage || status=$?; \
     test "$status" = 1; grep -q '^Usage: crontab ' /tmp/crontab-usage

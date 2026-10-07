@@ -58,6 +58,10 @@ echo '=== unit tests ==='
 # assert on real elapsed time.
 build --target=unit-test --no-cache-filter=unit-test --output type=cacheonly
 
+echo '=== official Hrana client tests ==='
+build --target=hrana-test-server --tag "$image_prefix-hrana-test"
+bun test "$runtime_dir/tests/hrana-client.test.ts"
+
 echo '=== mount tests ==='
 build --target=mount-test --tag "$image_prefix-mount-test"
 docker run --rm --privileged --platform="$test_platform" "$image_prefix-mount-test"
