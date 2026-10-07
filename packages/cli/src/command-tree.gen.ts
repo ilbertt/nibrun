@@ -13,6 +13,9 @@ import type { command as appsFilesLsPathCmd } from './commands/apps/files/ls/[pa
 import type { command as appsListCmd } from './commands/apps/list.ts';
 import type { command as appsLogsCmd } from './commands/apps/logs.ts';
 import type { command as appsResumeCmd } from './commands/apps/resume.ts';
+import type { command as appsSqliteCmd } from './commands/apps/sqlite.ts';
+import type { command as appsSqliteConnectionsCmd } from './commands/apps/sqlite/connections.ts';
+import type { command as appsSqliteConnectionsListCmd } from './commands/apps/sqlite/connections/list.ts';
 import type { command as appsStatusCmd } from './commands/apps/status.ts';
 import type { command as appsSuspendCmd } from './commands/apps/suspend.ts';
 import type { command as appsUpdateCmd } from './commands/apps/update.ts';
@@ -94,6 +97,27 @@ declare module '@parshjs/core' {
     'apps resume': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'apps sqlite': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'apps sqlite connections': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+        'apps sqlite': { options: InferForwardedOptions<typeof appsSqliteCmd.options>; params: InferParams<typeof appsSqliteCmd.params> };
+      };
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'apps sqlite connections list': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+        'apps sqlite': { options: InferForwardedOptions<typeof appsSqliteCmd.options>; params: InferParams<typeof appsSqliteCmd.params> };
+        'apps sqlite connections': { options: InferForwardedOptions<typeof appsSqliteConnectionsCmd.options>; params: InferParams<typeof appsSqliteConnectionsCmd.params> };
       };
       rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
@@ -228,6 +252,26 @@ export const commandTree: RuntimeNode = {
           segment: { kind: 'literal', value: 'resume' },
           command: { path: 'apps resume', load: () => import('./commands/apps/resume.ts').then((m) => m.command) },
           literalChildren: {},
+          paramChild: null,
+        },
+        'sqlite': {
+          segment: { kind: 'literal', value: 'sqlite' },
+          command: { path: 'apps sqlite', load: () => import('./commands/apps/sqlite.ts').then((m) => m.command) },
+          literalChildren: {
+            'connections': {
+              segment: { kind: 'literal', value: 'connections' },
+              command: { path: 'apps sqlite connections', load: () => import('./commands/apps/sqlite/connections.ts').then((m) => m.command) },
+              literalChildren: {
+                'list': {
+                  segment: { kind: 'literal', value: 'list' },
+                  command: { path: 'apps sqlite connections list', load: () => import('./commands/apps/sqlite/connections/list.ts').then((m) => m.command) },
+                  literalChildren: {},
+                  paramChild: null,
+                },
+              },
+              paramChild: null,
+            },
+          },
           paramChild: null,
         },
         'status': {
