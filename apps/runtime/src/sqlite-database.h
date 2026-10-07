@@ -1,0 +1,16 @@
+#ifndef NIBRUN_SQLITE_DATABASE_H
+#define NIBRUN_SQLITE_DATABASE_H
+#include <signal.h>
+#include <sqlite3.h>
+#include "sqlite-wire.h"
+#define SQLITE_QUERY_TIMEOUT_MS 5000
+struct sqlite_query {
+  sqlite3* database;
+  int connection;
+  uint64_t deadline_ms;
+  volatile sig_atomic_t* stopping;
+};
+/* Workers must chroot to the data filesystem and drop privileges before opening. */
+int sqlite_query_open(struct sqlite_query* query, const char* path);
+void sqlite_query_error(struct sqlite_query* query, int code, struct sqlite_wire* reply);
+#endif

@@ -11,7 +11,7 @@ int main(void) {
   struct sqlite_wire reader = {.bytes = bytes, .length = writer.position};
   EXPECT(sqlite_wire_integer(&reader, 8) == UINT64_MAX - 4);
   size_t length;
-  const unsigned char *text = sqlite_wire_string(&reader, &length);
+  const unsigned char* text = sqlite_wire_string(&reader, &length);
   EXPECT(length == 3 && memcmp(text, "a\0b", 3) == 0);
   EXPECT(sqlite_wire_bytes(&reader, 1) == NULL && reader.failed);
   writer.position = sizeof(bytes) - 1;
