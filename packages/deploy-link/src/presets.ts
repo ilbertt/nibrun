@@ -148,7 +148,7 @@ export const DEPLOY_PRESETS = {
       binary: 'https://pub-e240a4fd7085425baf4a7951e7611520.r2.dev/drizzle-gateway-1.6.0-linux-x64',
       sha256: '793aaf0acb8db9d90b83cc9db78df82009051862acb995419b39d9497ddb51a5',
       port: 4983,
-      env: [`STORE_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`, 'MASTERPASS'],
+      env: [`STORE_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`],
       minimal: true,
     },
   },

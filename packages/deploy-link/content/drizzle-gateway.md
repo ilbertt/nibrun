@@ -3,12 +3,19 @@ your databases from one web interface. See the [Gateway docs](https://gateway.dr
 
 ## Quick start
 
-1. Enter a strong master password in the deploy form. You will use it to sign in as the administrator.
-2. Click **Deploy on nibrun**.
-3. Open the URL, sign in with your master password, and add your first database connection.
+1. Click **Deploy on nibrun**. There is nothing to fill in.
+2. Open the URL and add your first database connection.
 
-Saved connections and sessions live on the persistent volume and survive a redeploy. You can
-create passcodes to share access with other people.
+Saved connections and sessions live on the persistent volume and survive a redeploy.
+
+## Optional password protection
+
+Gateway opens without a password by default. To require administrator sign-in, add a `MASTERPASS`
+environment variable with a strong password under **Advanced configuration → Environment variables**
+before deploying. Sign in with that password when you open the app.
+
+Setting `MASTERPASS` also enables passcodes for sharing access with other people. The preset
+leaves it unset. See the [Docker configuration docs](https://gateway.drizzle.team/docs/docker).
 
 ## Good to know
 
