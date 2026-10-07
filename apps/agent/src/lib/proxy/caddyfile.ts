@@ -31,6 +31,8 @@ function siteBlock(route: RouteTarget): string | undefined {
     '\timport origin_tls',
     `\treverse_proxy ${LOOPBACK}:${route.hostPort} {`,
     '\t\tlb_try_duration 5s',
+    // Give unrelated streams a grace period while bounding retention of old proxy configs.
+    '\t\tstream_close_delay 5m',
     '\t}',
     '}',
     '',
