@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "@libsql/client": "catalog:"
   }
 }
