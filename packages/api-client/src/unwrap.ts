@@ -45,14 +45,16 @@ function bodyMessage(value: unknown): string {
   if (typeof value === 'object' && value !== null && 'error' in value) {
     return String(value.error);
   }
-  // A body Eden hands back unread, because it arrived chunked and as text: an error page from
-  // something between here and the api rather than the api's own answer. Reading it would make
-  // every call site async to quote a page of HTML, so the status is left to say it — and it is
-  // the status that identifies the hop, since the api answers in JSON.
-  if (isAsyncIterable(value)) {
-    return 'a page, not this api — something between here and it refused the request';
+  // Eden can leave chunked error bodies unread. Consuming one would make every caller async
+  // just to quote a proxy page, so neither streamed nor buffered HTML is repeated here.
+  if (isHtmlPage(value) || isAsyncIterable(value)) {
+    return 'an error page instead of an API response';
   }
   return String(value);
+}
+
+function isHtmlPage(value: unknown): boolean {
+  return typeof value === 'string' && /^\s*(?:<!doctype\s+html\b|<html\b)/i.test(value);
 }
 
 function isAsyncIterable(value: unknown): boolean {
