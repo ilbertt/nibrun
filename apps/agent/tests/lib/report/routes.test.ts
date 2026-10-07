@@ -1,35 +1,38 @@
 import { describe, expect, test } from 'bun:test';
 import { INSTANCE_STATES } from '@repo/protocol';
 import { renderAppSites } from '#lib/proxy/caddyfile.ts';
+import { waitingPort } from '#lib/proxy/listener.ts';
 import { renderableRoutes } from '#lib/report/routes.ts';
-import { APP_HOSTNAME, instanceRecord } from '#tests/support/fixtures.ts';
+import { FIRST_HOST_PORT, instanceRecord } from '#tests/support/fixtures.ts';
 
-/** Everything a record can say other than that the tenant has answered. */
 const DOWN_STATES = INSTANCE_STATES.filter((state) => state !== 'running');
 
-describe('a host answers for the apps it holds, not the ones that happen to be up', () => {
+function routesFor(state: (typeof INSTANCE_STATES)[number]) {
+  return renderableRoutes([instanceRecord({ state })]);
+}
+
+describe('a host answers for every app it holds', () => {
   test.each(DOWN_STATES)('a %s app is still routed here', (state) => {
-    expect(renderableRoutes([instanceRecord({ state })])).toHaveLength(1);
+    expect(routesFor(state)).toHaveLength(1);
   });
 
   test('an app with no hostname has nothing to answer on', () => {
     expect(renderableRoutes([instanceRecord({ hostnames: [] })])).toEqual([]);
   });
 
-  test('an app is reached on the same port whether or not its microVM is up', () => {
-    const [running] = renderableRoutes([instanceRecord()]);
-    const [stopped] = renderableRoutes([instanceRecord({ state: 'stopped' })]);
+  test.each(['pending', 'starting'] as const)(
+    '%s traffic goes to the waiting listener',
+    (state) => {
+      expect(routesFor(state)[0]?.hostPort).toBe(waitingPort(FIRST_HOST_PORT));
+    },
+  );
 
-    expect(running?.hostPort).toBe(stopped?.hostPort);
+  test('a healthy app uses its forwarded port', () => {
+    expect(routesFor('running')[0]?.hostPort).toBe(FIRST_HOST_PORT);
+    expect(renderAppSites(routesFor('running'))).not.toContain('keepalive off');
   });
-});
 
-describe('stopping an app moves nothing the proxy would have to reload for', () => {
-  test('the rendered config is byte-identical whether the app is up or down', () => {
-    const up = renderAppSites(renderableRoutes([instanceRecord()]));
-    const down = renderAppSites(renderableRoutes([instanceRecord({ state: 'stopped' })]));
-
-    expect(up).toBe(down);
-    expect(up).toContain(`https://${APP_HOSTNAME.hostname} {`);
+  test('a stopped app keeps its original route for on-request activation', () => {
+    expect(renderAppSites(routesFor('running'))).toBe(renderAppSites(routesFor('stopped')));
   });
 });

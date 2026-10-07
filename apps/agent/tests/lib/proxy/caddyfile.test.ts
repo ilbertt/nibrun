@@ -33,9 +33,16 @@ describe('the rendered config is a projection of what is running', () => {
     expect(sites).toContain('reverse_proxy 127.0.0.1:21000');
   });
 
+  test('healthy traffic retains connection pooling and a dial failure can wait briefly', () => {
+    const sites = renderAppSites([route()]);
+    expect(sites).not.toContain('keepalive off');
+    expect(sites).toContain('lb_try_duration 5s');
+    expect(sites).not.toContain('lb_retry_match');
+  });
+
   test('every site authenticates the edge, so none can be reached from the origin address', () => {
     const sites = renderAppSites([route(), route({ appId: Value.Parse(AppIdSchema, 'app-b') })]);
-    const blocks = sites.split('{').length - 1;
+    const blocks = sites.split('reverse_proxy').length - 1;
     expect(sites.split('import origin_tls').length - 1).toBe(blocks);
   });
 
