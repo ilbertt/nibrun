@@ -23,6 +23,8 @@ docker build \
   --build-arg DEBIAN_SNAPSHOT="$DEBIAN_SNAPSHOT" \
     --build-arg SQLITE_ARCHIVE="$SQLITE_ARCHIVE" \
     --build-arg SQLITE_SHA256="$SQLITE_SHA256" \
+    --build-arg JANSSON_VERSION="$JANSSON_VERSION" \
+    --build-arg JANSSON_SHA256="$JANSSON_SHA256" \
   --target=init \
   --output "type=local,dest=$dist" \
   --progress=plain \

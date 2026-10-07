@@ -15,7 +15,7 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources; \
     echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT} trixie main" \
       >/etc/apt/sources.list; \
     apt-get -o Acquire::Retries=5 update; \
-    apt-get install -y --no-install-recommends binutils file musl-dev musl-tools unzip
+    apt-get install -y --no-install-recommends binutils file musl-dev musl-tools unzip make bzip2
 
 # musl, not glibc: this is PID 1 in every microVM, so its resident memory is
 # multiplied by how many VMs a host packs. Only the tenant's own binary needs glibc,
@@ -29,7 +29,13 @@ RUN unzip -q /sqlite.zip -d /sqlite; \
     musl-gcc -std=c11 -D_GNU_SOURCE -Os -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION \
       -DSQLITE_TEMP_STORE=3 -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_ENABLE_COLUMN_METADATA \
       -DSQLITE_ENABLE_FTS5 -c /sqlite/sqlite-amalgamation-3530400/sqlite3.c -o /sqlite.o
-ENV SQLITE_LINK="-I/sqlite/sqlite-amalgamation-3530400 /sqlite.o -lm"
+ARG JANSSON_VERSION
+ARG JANSSON_SHA256
+ADD --checksum=sha256:${JANSSON_SHA256} https://github.com/akheron/jansson/releases/download/v${JANSSON_VERSION}/jansson-${JANSSON_VERSION}.tar.bz2 /jansson.tar.bz2
+RUN mkdir /jansson; tar -xjf /jansson.tar.bz2 -C /jansson --strip-components=1; \
+    cd /jansson; CC=musl-gcc CFLAGS="-Os" ./configure --disable-shared --enable-static --prefix=/jansson-built; \
+    make -j2; make install
+ENV SQLITE_LINK="-I/sqlite/sqlite-amalgamation-3530400 -I/jansson-built/include /sqlite.o /jansson-built/lib/libjansson.a -lm"
 WORKDIR /build
 COPY src/ /build/src/
 
