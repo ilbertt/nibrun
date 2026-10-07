@@ -42,14 +42,17 @@ export function renderApp(app: CatalogApp): string {
   return renderMarkdown(app.markdownContent);
 }
 
-export function projectLink(app: CatalogApp) {
+export function projectLink(app: CatalogApp): {
+  url: string;
+  label: 'Repository' | 'Website';
+  name: string;
+} {
   const url = new URL(app.projectUrl);
-  const isRepository = url.hostname === 'github.com';
+  const label = url.hostname === 'github.com' ? 'Repository' : 'Website';
 
   return {
     url: app.projectUrl,
-    isRepository,
-    label: isRepository ? 'Repository' : 'Website',
-    name: isRepository ? url.pathname.slice(1) : url.hostname,
+    label,
+    name: label === 'Repository' ? url.pathname.slice(1) : url.hostname,
   };
 }

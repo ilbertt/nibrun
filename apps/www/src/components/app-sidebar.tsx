@@ -17,7 +17,7 @@ export function AppSidebar({ app }: { app: CatalogApp }) {
             target="_blank"
             rel="noreferrer"
           >
-            {project.isRepository ? (
+            {project.label === 'Repository' ? (
               <GithubMark className="size-4" />
             ) : (
               <Globe className="size-4" />

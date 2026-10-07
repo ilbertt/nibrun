@@ -176,7 +176,9 @@ function AppCard({ app }: { app: CatalogApp }) {
             color: COLOR.muted,
           }}
         >
-          {project.isRepository && <GithubMark width={28} height={28} fill={COLOR.muted} />}
+          {project.label === 'Repository' && (
+            <GithubMark width={28} height={28} fill={COLOR.muted} />
+          )}
           {`${project.name} · ${app.version}`}
         </div>
         <div
