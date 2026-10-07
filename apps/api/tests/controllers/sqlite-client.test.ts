@@ -1,25 +1,26 @@
-import { expect, test } from 'bun:test';
+import { afterEach, expect, mock, spyOn, test } from 'bun:test';
 import { createClient } from '@libsql/client/http';
 import type { SqliteOutcome, SqliteQuery } from '@repo/protocol';
 import { GuestPathSchema } from '@repo/protocol';
 import type { HranaStreamRequest, HranaStreamResult } from '@repo/sqlite';
 import { Value } from '@sinclair/typebox/value';
-import { Elysia, StatusMap } from 'elysia';
+import { StatusMap } from 'elysia';
 import type { Auth } from '#lib/auth/better-auth.ts';
-import { createAuthPlugin } from '#lib/auth/plugin.ts';
-import { elysiaErrorHandler } from '#lib/errors.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { openRemoteSqliteSession } from '#lib/sqlite/remote-session.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
-import '#tests/controllers/support/api.ts';
+import { sendRequest } from '#tests/controllers/support/api.ts';
 import { APP_ID, DEPLOYMENT_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 import { SQLITE_HOST_ID } from '#tests/support/sqlite.ts';
 import { sqliteConnectionsFixture } from '#tests/support/sqlite-connections.ts';
 
-const { createSqliteConnectionsConnectionIdV2Controller } = await import(
-  '#routes/api/sqlite/connections/[connectionId]/v2/controller.ts'
-);
+const { auth, SqliteServicePlugin } = await import('#services/plugins.ts');
+
+afterEach(function restoreMocks() {
+  mock.restore();
+});
+
 const AUTHORIZATION = 'Bearer existing-account-session';
 const LARGE_INTEGER = '9223372036854775807';
 const BOUND_INTEGER = 7n;
@@ -124,21 +125,14 @@ async function fixture() {
       return openRemoteSqliteSession({ ...input, relay });
     },
   });
-  const ApiController = new Elysia({ prefix: RoutePrefix.Api }).use(
-    createSqliteConnectionsConnectionIdV2Controller({
-      authPlugin: createAuthPlugin(existingAccountAuth()),
-      sqliteServicePlugin: new Elysia({ name: 'service.sqlite' })
-        .decorate('sqliteService', service)
-        .decorate('sqliteOrigin', baseUrl.origin),
-    }),
-  );
-  const app = new Elysia().onError(elysiaErrorHandler).use(ApiController);
+  spyOn(auth.api, 'getSession').mockImplementation(existingAccountAuth().api.getSession);
+  const sqliteService = SqliteServicePlugin.decorator.sqliteService;
+  spyOn(sqliteService, 'checkConnection').mockImplementation(service.checkConnection.bind(service));
+  spyOn(sqliteService, 'pipeline').mockImplementation(service.pipeline.bind(service));
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
-    fetch(request) {
-      return app.handle(request);
-    },
+    fetch: sendRequest,
   });
   baseUrl.port = String(server.port);
   const selected = await service.create({
@@ -163,7 +157,7 @@ async function fixture() {
     stopping.abort();
     await guest;
   }
-  return { client, selected, queries, close, app };
+  return { client, selected, queries, close };
 }
 
 test('the official SDK authenticates through the public controller and relays complete guest pipelines', async () => {
@@ -276,7 +270,7 @@ test('SQLite browser clients can preflight and query with a bearer token without
       expect(invalid.status).toBe(StatusMap.Unauthorized);
       expect(invalid.headers.get('access-control-allow-origin')).toBe(origin);
     }
-    const unrelated = await connection.app.handle(
+    const unrelated = await sendRequest(
       new Request(new URL(`${RoutePrefix.Api}/unrelated`, connection.selected.url).href),
     );
     expect(unrelated.headers.has('access-control-allow-origin')).toBe(false);

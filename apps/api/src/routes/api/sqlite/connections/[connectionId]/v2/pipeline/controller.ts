@@ -12,49 +12,41 @@ import {
   SqlitePipelineResponseSchema,
 } from '#routes/api/sqlite/connections/[connectionId]/v2/pipeline/model.ts';
 import { SqliteConnectionParamsSchema } from '#routes/api/sqlite/connections/model.ts';
-import type { AuthPlugin, SqliteServicePlugin } from '#services/plugins.ts';
+import { AuthPlugin, SqliteServicePlugin } from '#services/plugins.ts';
 
-export function createSqliteConnectionsConnectionIdV2PipelineController({
-  authPlugin,
-  sqliteServicePlugin,
-}: {
-  authPlugin: typeof AuthPlugin;
-  sqliteServicePlugin: typeof SqliteServicePlugin;
-}) {
-  return new Elysia()
-    .use(authPlugin)
-    .use(sqliteServicePlugin)
-    .post(
-      pathBelow({
-        path: `${SQLITE_CONNECTIONS_BASE_PATH}:connectionId/v2/pipeline`,
-        prefix: RoutePrefix.Api,
-      }),
-      async function pipeline({ sqliteService, sqliteOrigin, params, body, user, request }) {
-        assertSqliteCookieOrigin({ request, allowedOrigin: sqliteOrigin });
-        try {
-          return Response.json(
-            await sqliteService.pipeline({
-              id: Value.Parse(SqliteConnectionIdSchema, params.connectionId),
-              ownerId: Value.Parse(OwnerIdSchema, user.id),
-              body,
-              signal: sqliteRequestSignal(request),
-            }),
-          );
-        } catch (error) {
-          if (error instanceof HranaError) {
-            return Response.json(hranaError(error), { status: StatusMap['Bad Request'] });
-          }
-          throw error;
+export const SqliteConnectionsConnectionIdV2PipelineController = new Elysia()
+  .use(AuthPlugin)
+  .use(SqliteServicePlugin)
+  .post(
+    pathBelow({
+      path: `${SQLITE_CONNECTIONS_BASE_PATH}:connectionId/v2/pipeline`,
+      prefix: RoutePrefix.Api,
+    }),
+    async function pipeline({ sqliteService, sqliteOrigin, params, body, user, request }) {
+      assertSqliteCookieOrigin({ request, allowedOrigin: sqliteOrigin });
+      try {
+        return Response.json(
+          await sqliteService.pipeline({
+            id: Value.Parse(SqliteConnectionIdSchema, params.connectionId),
+            ownerId: Value.Parse(OwnerIdSchema, user.id),
+            body,
+            signal: sqliteRequestSignal(request),
+          }),
+        );
+      } catch (error) {
+        if (error instanceof HranaError) {
+          return Response.json(hranaError(error), { status: StatusMap['Bad Request'] });
         }
+        throw error;
+      }
+    },
+    {
+      auth: Identity.Optional,
+      params: SqliteConnectionParamsSchema,
+      body: SqlitePipelineBodySchema,
+      response: {
+        [StatusMap.OK]: SqlitePipelineResponseSchema,
+        [StatusMap['Bad Request']]: SqlitePipelineErrorSchema,
       },
-      {
-        auth: Identity.Optional,
-        params: SqliteConnectionParamsSchema,
-        body: SqlitePipelineBodySchema,
-        response: {
-          [StatusMap.OK]: SqlitePipelineResponseSchema,
-          [StatusMap['Bad Request']]: SqlitePipelineErrorSchema,
-        },
-      },
-    );
-}
+    },
+  );
