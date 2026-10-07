@@ -29,7 +29,9 @@ function siteBlock(route: RouteTarget): string | undefined {
   return [
     `${addresses.join(', ')} {`,
     '\timport origin_tls',
-    `\treverse_proxy ${LOOPBACK}:${route.hostPort}`,
+    `\treverse_proxy ${LOOPBACK}:${route.hostPort} {`,
+    '\t\tlb_try_duration 5s',
+    '\t}',
     '}',
     '',
   ].join('\n');
