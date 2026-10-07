@@ -27,6 +27,7 @@ export class HostFirewall extends Effect.Service<HostFirewall>()('HostFirewall',
     // Never applied by this process yet, so the first apply always runs: what is in the kernel
     // came from whichever agent ran before, and the host may have changed since.
     const applied = yield* Ref.make(Option.none<Applied>());
+    const routing = yield* Effect.makeSemaphore(1);
 
     /**
      * `none` when nft could not be asked at all, which has to stay apart from a host holding no
@@ -38,25 +39,32 @@ export class HostFirewall extends Effect.Service<HostFirewall>()('HostFirewall',
       Effect.catchAll(() => Effect.succeedNone),
     );
 
-    return {
-      apply: Effect.fn('HostFirewall.apply')(function* (state: FirewallState) {
-        const ruleset = renderRuleset(state);
-        const last = yield* Ref.get(applied);
-        if (Option.isSome(last) && last.value.ruleset === ruleset) {
-          const current = yield* kernelTables;
-          if (Option.isSome(current) && current.value === last.value.tables) {
-            return;
-          }
+    const write = Effect.fn('HostFirewall.apply')(function* (state: FirewallState) {
+      const ruleset = renderRuleset(state);
+      const last = yield* Ref.get(applied);
+      if (Option.isSome(last) && last.value.ruleset === ruleset) {
+        const current = yield* kernelTables;
+        if (Option.isSome(current) && current.value === last.value.tables) {
+          return;
         }
-        yield* stdoutOf({ command: ['nft', '-f', '-'], stdin: ruleset });
-        // Tables that cannot be read back leave the next pass nothing to compare against, so it
-        // writes them again rather than taking this pass's success as proof they are in place.
-        yield* Ref.set(
-          applied,
-          Option.map(yield* kernelTables, (tables) => ({ ruleset, tables })),
-        );
-      }),
+      }
+      yield* stdoutOf({ command: ['nft', '-f', '-'], stdin: ruleset });
+      // Tables that cannot be read back leave the next pass nothing to compare against, so it
+      // writes them again rather than taking this pass's success as proof they are in place.
+      yield* Ref.set(
+        applied,
+        Option.map(yield* kernelTables, (tables) => ({ ruleset, tables })),
+      );
+    });
 
+    function apply<R>(state: Effect.Effect<FirewallState, never, R>) {
+      // Read the routes under the same lock as the write: an older refresh must not restore a
+      // forward after a replacement has withdrawn it and is about to stop the guest.
+      return routing.withPermits(1)(Effect.flatMap(state, write));
+    }
+
+    return {
+      apply,
       /**
        * What the kernel has counted against each app, which is a different question from what
        * this process last wrote: the rules are ours, the counts are traffic's.

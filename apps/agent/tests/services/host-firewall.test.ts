@@ -67,7 +67,7 @@ function applying({
     Effect.gen(function* () {
       const firewall = yield* HostFirewall;
       for (const each of states) {
-        yield* firewall.apply(each);
+        yield* firewall.apply(Effect.succeed(each));
       }
       return stepsOf(recorder.commands);
     }).pipe(Effect.provide(layer)),
