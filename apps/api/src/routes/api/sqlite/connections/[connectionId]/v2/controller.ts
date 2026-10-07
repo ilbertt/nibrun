@@ -34,4 +34,6 @@ export const SqliteConnectionsConnectionIdV2Controller = new Elysia()
       response: { [StatusMap.OK]: SqliteVersionResponseSchema },
     },
   )
+  // Mount the pipeline here instead of in ApiController to share SqliteClientCorsPlugin
+  // across both v2 endpoints.
   .use(SqliteConnectionsConnectionIdV2PipelineController);
