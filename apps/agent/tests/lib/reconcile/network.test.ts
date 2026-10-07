@@ -43,6 +43,21 @@ describe('the forward is what decides whether a port reaches the guest', () => {
     ),
   );
 
+  test('a replacing instance is withdrawn while its neighbours keep serving', () =>
+    run(
+      Effect.gen(function* () {
+        yield* AgentState.modify((current) => ({
+          ...current,
+          replacing: new Map([[APP_ID, instanceRecord()]]),
+        }));
+        const forwarded = yield* forwardsFor([
+          instanceRecord(),
+          instanceRecord({ appId: OTHER_APP_ID }),
+        ]);
+        expect(forwarded.map((instance) => instance.appId)).toEqual([OTHER_APP_ID]);
+      }),
+    ));
+
   test('a running instance is forwarded onto the guest its slot describes', () =>
     run(
       Effect.gen(function* () {

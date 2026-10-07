@@ -343,7 +343,7 @@ describe('an app that runs on request is started by the request that wanted it',
   });
 });
 
-describe('requests wait for startup without starting a competing guest', () => {
+describe('requests wait through replacement without starting a competing guest', () => {
   test.each([false, true])('a POST waits and is sent once with onRequest=%s', (onRequest) =>
     run(
       Effect.gen(function* () {
@@ -357,7 +357,11 @@ describe('requests wait for startup without starting a competing guest', () => {
           guestIpv4: Value.Parse(Ipv4AddressSchema, LOOPBACK),
           httpPort: Value.Parse(HttpPortSchema, port),
         });
-        yield* AgentState.putRecord({ ...record, state: 'pending' });
+        yield* AgentState.putRecord(record);
+        yield* AgentState.modify((current) => ({
+          ...current,
+          replacing: new Map([[APP_ID, instanceRecord()]]),
+        }));
         const app = yield* AppActivator;
         const hostPort = unusedPort();
         yield* app.serve([{ appId: APP_ID, hostPort }]);
@@ -372,7 +376,11 @@ describe('requests wait for startup without starting a competing guest', () => {
         yield* Effect.sleep('75 millis');
         expect(Option.isNone(yield* Fiber.poll(pending))).toBe(true);
         expect(bodies).toEqual([]);
+        yield* AgentState.dropRecord(APP_ID);
+        yield* Effect.sleep('50 millis');
+        expect(Option.isNone(yield* Fiber.poll(pending))).toBe(true);
         yield* AgentState.putRecord({ ...record, state: 'starting' });
+        yield* AgentState.modify((current) => ({ ...current, replacing: new Map() }));
         yield* Effect.sleep('50 millis');
         expect(Option.isNone(yield* Fiber.poll(pending))).toBe(true);
         yield* AgentState.putRecord(record);
@@ -384,7 +392,7 @@ describe('requests wait for startup without starting a competing guest', () => {
     ),
   );
 
-  test('a failed startup releases the waiting request with an error', () =>
+  test('a failed replacement releases the waiting request with an error', () =>
     run(
       Effect.gen(function* () {
         const app = yield* AppActivator;
