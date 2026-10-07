@@ -5,7 +5,7 @@ import { refreshStates, resumeInstance, suspendInstance } from '#lib/reconcile/i
 import { SleepRefused, SnapshotUnusable } from '#lib/vm/snapshot.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
-import { CronActivity } from '#services/cron-activity.service.ts';
+import { GuestActivity } from '#services/guest-activity.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
@@ -37,7 +37,7 @@ const NEVER_DUE = Number.MAX_SAFE_INTEGER;
 const run = provided(
   Layer.mergeAll(
     AgentState.Default,
-    CronActivity.Default,
+    GuestActivity.Default,
     ReportSignal.Default,
     FetchHttpClient.layer,
   ).pipe(Layer.provideMerge(platform)),
@@ -218,7 +218,7 @@ function onHost({ vms, unit }: { vms: ReturnType<typeof recordingVms>; unit: str
   return provided(
     Layer.mergeAll(
       AgentState.Default,
-      CronActivity.Default,
+      GuestActivity.Default,
       ReportSignal.Default,
       SlotAllocator.DefaultWithoutDependencies,
       ZerofsTopology.DefaultWithoutDependencies,
@@ -365,7 +365,7 @@ describe('an app that has gone quiet is put down where it can be picked up', () 
     return withMicroVmDown(vms)(
       Effect.gen(function* () {
         yield* AgentState.putRecord(instanceRecord({ onRequest: true, state: 'running' }));
-        const activity = yield* CronActivity;
+        const activity = yield* GuestActivity;
         yield* activity.run({ appId: APP_ID, effect: suspend });
         expect(vms.calls).toEqual([]);
         expect((yield* recordOf)?.state).toBe('running');
@@ -378,7 +378,7 @@ describe('an app that has gone quiet is put down where it can be picked up', () 
     return withMicroVmDown(vms)(
       Effect.gen(function* () {
         yield* AgentState.putRecord(instanceRecord({ onRequest: true, state: 'running' }));
-        const activity = yield* CronActivity;
+        const activity = yield* GuestActivity;
         yield* AgentState.markActive({ appId: APP_ID, nowMs: 0 });
         yield* activity.run({ appId: APP_ID, effect: Effect.void });
         yield* suspendInstance({
