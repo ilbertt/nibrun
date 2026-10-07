@@ -13,7 +13,7 @@ export const routes = Effect.map(AgentState.records, renderableRoutes);
 export const applyRoutes = Effect.gen(function* () {
   const proxy = yield* CaddyProxy;
   yield* proxy
-    .apply(yield* routes)
+    .apply(routes)
     .pipe(Effect.catchAll((error) => Effect.logError('proxy reload failed', error)));
 });
 
