@@ -8,14 +8,24 @@ export type RouteTarget = {
   readonly hostPort: HostPort;
 };
 
-export function renderableRoutes(records: readonly InstanceRecord[]): RouteTarget[] {
-  return records
+export function renderableRoutes({
+  records,
+  replacing,
+}: {
+  records: readonly InstanceRecord[];
+  replacing: ReadonlyMap<AppId, InstanceRecord>;
+}): RouteTarget[] {
+  const held = new Map(replacing);
+  for (const record of records) {
+    held.set(record.appId, record);
+  }
+  return [...held.values()]
     .filter((record) => record.hostnames.length > 0)
     .map((record) => ({
       appId: record.appId,
       hostnames: record.hostnames,
       hostPort:
-        record.state === 'pending' || record.state === 'starting'
+        replacing.has(record.appId) || record.state === 'pending' || record.state === 'starting'
           ? waitingPort(record.hostPort)
           : record.hostPort,
     }));

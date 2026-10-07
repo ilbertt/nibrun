@@ -8,14 +8,21 @@ import { CaddyProxy } from '#services/caddy-proxy.service.ts';
 import { HostFirewall } from '#services/host-firewall.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
-export const routes = Effect.map(AgentState.records, renderableRoutes);
+export const routes = Effect.map(AgentState.snapshot, (current) =>
+  renderableRoutes({
+    records: [...current.records.values()],
+    replacing: current.replacing,
+  }),
+);
 
-export const applyRoutes = Effect.gen(function* () {
+export const applyRoutesStrict = Effect.gen(function* () {
   const proxy = yield* CaddyProxy;
-  yield* proxy
-    .apply(routes)
-    .pipe(Effect.catchAll((error) => Effect.logError('proxy reload failed', error)));
+  yield* proxy.apply(routes);
 });
+
+export const applyRoutes = applyRoutesStrict.pipe(
+  Effect.catchAll((error) => Effect.logError('proxy reload failed', error)),
+);
 
 /** A listener on every port this host holds a slot for, so one with no forward still answers. */
 export const applyActivators = Effect.gen(function* () {
@@ -31,9 +38,12 @@ export const applyActivators = Effect.gen(function* () {
  */
 export const forwardedInstances = Effect.gen(function* () {
   const allocator = yield* SlotAllocator;
-  const all = yield* AgentState.records;
+  const current = yield* AgentState.snapshot;
+  const all = [...current.records.values()];
   const forwarded: ForwardedInstance[] = [];
-  for (const record of all.filter((one) => one.state === 'running')) {
+  for (const record of all.filter(
+    (one) => one.state === 'running' && !current.replacing.has(one.appId),
+  )) {
     const slot = yield* allocator.lookup(record.appId);
     if (Option.isSome(slot)) {
       forwarded.push({

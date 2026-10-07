@@ -29,6 +29,8 @@ export type AgentSnapshot = {
    * finished.
    */
   readonly snapshotting: ReadonlySet<AppId>;
+  /** A replacement keeps waiting requests alive even between the outgoing and incoming records. */
+  readonly replacing: ReadonlyMap<AppId, InstanceRecord>;
   /**
    * The last reading taken of each volume this host holds a slot for, which is not the same as
    * each volume a guest can currently be asked about: a suspended app keeps its slot, so its last
@@ -69,6 +71,7 @@ const EMPTY: AgentSnapshot = {
   deletedVolumes: new Map(),
   nextProbeAtMs: new Map(),
   snapshotting: new Set(),
+  replacing: new Map(),
   volumeUsage: new Map(),
   computeUsage: new Map(),
   computeTicks: new Map(),

@@ -7,10 +7,13 @@ import { provided } from '#tests/support/run.ts';
 
 const run = provided(Layer.mergeAll(AgentState.Default, TestContext.TestContext));
 
-test('a startup that never completes cannot hold a request forever', () =>
+test('a replacement that never completes cannot hold a request forever', () =>
   run(
     Effect.gen(function* () {
-      yield* AgentState.putRecord(instanceRecord({ state: 'starting' }));
+      yield* AgentState.modify((current) => ({
+        ...current,
+        replacing: new Map([[APP_ID, instanceRecord()]]),
+      }));
       const waiting = yield* Effect.fork(Effect.either(waitForApp(APP_ID)));
       yield* TestClock.adjust('60 seconds');
       const result = yield* Fiber.join(waiting);

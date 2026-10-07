@@ -24,8 +24,9 @@ export function waitForApp(appId: AppId) {
   return Effect.map(AgentState.snapshot, (current) => {
     const record = current.records.get(appId);
     const waiting =
-      record?.desiredRunning === true &&
-      (record.state === 'pending' || record.state === 'starting');
+      current.replacing.has(appId) ||
+      (record?.desiredRunning === true &&
+        (record.state === 'pending' || record.state === 'starting'));
     return { record, waiting };
   }).pipe(
     Effect.repeat({

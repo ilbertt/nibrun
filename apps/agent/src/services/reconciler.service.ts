@@ -14,6 +14,7 @@ import {
 } from '#lib/reconcile/instances.ts';
 import { applyActivators, applyNetwork, applyRoutes } from '#lib/reconcile/network.ts';
 import { hasDeferredWork, type ObservedState, planReconcile } from '#lib/reconcile/plan.ts';
+import { duringReplacements } from '#lib/reconcile/replacements.ts';
 import { applyTeardowns, applyVolumes, volumeOwners } from '#lib/reconcile/volumes.ts';
 import { readInstanceRecords } from '#lib/report/instance-record.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
@@ -252,20 +253,20 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       }));
       yield* syncDesired(desired);
 
-      yield* Effect.all(
-        [prefetchArtifacts(plan), applyStops(plan).pipe(Effect.withSpan('reconcile.stops'))],
-        { concurrency: 'unbounded', discard: true },
-      );
-      yield* applyVolumes({ plan, observed, desired }).pipe(Effect.withSpan('reconcile.volumes'));
-      // Before the activators below, because the slot one binds on is allocated here.
-      yield* applySleeps(plan).pipe(Effect.withSpan('reconcile.sleeps'));
-      // Before the forwards below are withdrawn from a tenant that has just stopped, so the port
-      // it was reached on is answered rather than closed.
-      yield* applyActivators.pipe(Effect.withSpan('reconcile.activators'));
-      // Before anything boots: nothing persists the ruleset across a reboot, so a host that
-      // started its VMs first would serve tenants through a kernel with no `nibrun` table.
-      yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
-      yield* applyStarts(plan).pipe(Effect.withSpan('reconcile.starts'));
+      yield* prefetchArtifacts(plan);
+      yield* duringReplacements({
+        plan,
+        effect: Effect.gen(function* () {
+          yield* applyStops(plan).pipe(Effect.withSpan('reconcile.stops'));
+          yield* applyVolumes({ plan, observed, desired }).pipe(
+            Effect.withSpan('reconcile.volumes'),
+          );
+          yield* applySleeps(plan).pipe(Effect.withSpan('reconcile.sleeps'));
+          yield* applyActivators.pipe(Effect.withSpan('reconcile.activators'));
+          yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
+          yield* applyStarts(plan).pipe(Effect.withSpan('reconcile.starts'));
+        }),
+      });
       yield* applyCheckpoints({ plan, desired }).pipe(Effect.withSpan('reconcile.checkpoints'));
       // After starts, so an export never competes with a boot for the device it reads, and
       // before teardowns, so a volume marked absent this generation is still there to read.
