@@ -9,7 +9,6 @@ import type { Auth } from '#lib/auth/better-auth.ts';
 import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { elysiaErrorHandler } from '#lib/errors.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
-import { SqliteClientCorsPlugin } from '#lib/sqlite/cors.ts';
 import { openRemoteSqliteSession } from '#lib/sqlite/remote-session.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
@@ -125,19 +124,15 @@ async function fixture() {
       return openRemoteSqliteSession({ ...input, relay });
     },
   });
-  const app = new Elysia()
-    .use(SqliteClientCorsPlugin)
-    .onError(elysiaErrorHandler)
-    .group(RoutePrefix.Api, function routes(api) {
-      return api.use(
-        createSqliteConnectionsConnectionIdV2PipelineController({
-          authPlugin: createAuthPlugin(existingAccountAuth()),
-          sqliteServicePlugin: new Elysia({ name: 'service.sqlite' })
-            .decorate('sqliteService', service)
-            .decorate('sqliteOrigin', baseUrl.origin),
-        }),
-      );
-    });
+  const ApiController = new Elysia({ prefix: RoutePrefix.Api }).use(
+    createSqliteConnectionsConnectionIdV2PipelineController({
+      authPlugin: createAuthPlugin(existingAccountAuth()),
+      sqliteServicePlugin: new Elysia({ name: 'service.sqlite' })
+        .decorate('sqliteService', service)
+        .decorate('sqliteOrigin', baseUrl.origin),
+    }),
+  );
+  const app = new Elysia().onError(elysiaErrorHandler).use(ApiController);
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,

@@ -41,11 +41,13 @@ test('SQLite discovery supports browser preflights and exposes authentication fa
   });
   expect(preflight.status).toBe(StatusMap['No Content']);
   expect(preflight.headers.get('access-control-allow-origin')).toBe(origin);
+  expect(preflight.headers.get('access-control-allow-headers')).toBe('Authorization, Content-Type');
+  expect(preflight.headers.has('access-control-allow-credentials')).toBe(false);
   const denied = await send({ url, headers: { origin } });
   expect(denied.status).toBe(StatusMap.Unauthorized);
   expect(denied.headers.get('access-control-allow-origin')).toBe(origin);
   for (const unrelatedUrl of [CREATE_URL, `${ORIGIN}/api/health`]) {
-    const unrelated = await send({ url: unrelatedUrl });
+    const unrelated = await send({ url: unrelatedUrl, headers: { origin } });
     expect(unrelated.headers.has('access-control-allow-origin')).toBe(false);
     const unrelatedPreflight = await send({
       method: 'OPTIONS',
