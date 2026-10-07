@@ -7,6 +7,7 @@ import { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
 import { artifactsS3, exportsS3, importsS3, uploadSigner } from '#lib/s3/client.ts';
+import { openRemoteSqliteSession } from '#lib/sqlite/remote-session.ts';
 import { readSecretsKey } from '#lib/tenant-secrets.ts';
 import { VictoriaLogsClient } from '#lib/victorialogs/client.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
@@ -26,6 +27,7 @@ import { HealthRepository } from '#repositories/health.repository.ts';
 import { ImportsRepository } from '#repositories/imports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
 import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
+import { SqliteConnectionsRepository } from '#repositories/sqlite-connections.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
 import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
@@ -39,6 +41,7 @@ import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
 import { LogsService } from '#services/logs.service.ts';
+import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
 
 // Read once, where every other piece of the environment is read: a key of the wrong length is a
@@ -124,6 +127,14 @@ const healthService = new HealthService({
 const filesystemService = new FilesystemService({ deploymentsRepo: deploymentsRepository });
 const cronsService = new CronsService({ deploymentsRepo: deploymentsRepository });
 const sqliteRelayService = new SqliteRelayService();
+const sqliteService = new SqliteService({
+  connectionsRepo: new SqliteConnectionsRepository(sql),
+  deploymentsRepo: deploymentsRepository,
+  baseUrl: env.BASE_URL,
+  openSession: function open(input) {
+    return openRemoteSqliteSession({ ...input, relay: sqliteRelayService });
+  },
+});
 const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,
@@ -229,3 +240,7 @@ export const SqliteRelayServicePlugin = new Elysia({ name: 'service.sqliteRelay'
   'sqliteRelayService',
   sqliteRelayService,
 );
+
+export const SqliteServicePlugin = new Elysia({ name: 'service.sqlite' })
+  .decorate('sqliteService', sqliteService)
+  .decorate('sqliteOrigin', env.BASE_URL.origin);

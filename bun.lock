@@ -49,6 +49,7 @@
         "tldts": "^7.4.13",
       },
       "devDependencies": {
+        "@libsql/client": "catalog:",
         "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",
       },
