@@ -2,6 +2,7 @@ import type { AppId, HostPort } from '@repo/protocol';
 import { Clock, Duration, Effect, Ref, Runtime } from 'effect';
 import type { AppSlot } from '#lib/network/slot.ts';
 import { forwardToGuest } from '#lib/proxy/forward.ts';
+import { AppListenerFailed, waitingPort } from '#lib/proxy/listener.ts';
 import { waitForApp } from '#lib/proxy/readiness.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppWaker } from '#services/app-waker.service.ts';
@@ -68,7 +69,7 @@ const sayToComeBack = () =>
 
 type Listener = {
   readonly hostPort: HostPort;
-  readonly server: ReturnType<typeof Bun.serve>;
+  readonly servers: readonly ReturnType<typeof Bun.serve>[];
 };
 
 /**
@@ -76,10 +77,10 @@ type Listener = {
  * before local delivery, so while the microVM is up nothing here is reached — and while it is
  * down this is what the proxy finds instead of a refused connection.
  *
- * Bound for the life of the slot rather than the life of the microVM: the rule is what switches
- * between the two, so there is no bind to race the reconciler and no window the port is nobody's.
+ * Both listeners outlive the microVM. The second port is never forwarded, so Caddy can switch
+ * to it before stopping a guest without reusing a connection routed into the outgoing guest.
  *
- * Requests that arrive during startup wait here until the guest is healthy. An idle
+ * Requests that arrive during replacement wait here until the new guest is healthy. An idle
  * app is woken by its request; a suspended or failed app answers without starting anything.
  */
 export class AppActivator extends Effect.Service<AppActivator>()('AppActivator', {
@@ -185,7 +186,11 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
         });
         // Not awaited: `stop` settles only once every handler has, and one holding a connection
         // open would have the agent's own shutdown wait on a tenant's client.
-        yield* Effect.asVoid(Effect.sync(() => listener.server.stop(true)));
+        yield* Effect.sync(() => {
+          for (const server of listener.servers) {
+            server.stop(true);
+          }
+        });
       });
 
     const listen = ({
@@ -197,21 +202,34 @@ export class AppActivator extends Effect.Service<AppActivator>()('AppActivator',
       hostPort: HostPort;
       answer: Handler;
     }) =>
-      Effect.try(() =>
-        Bun.serve({
-          hostname: LOOPBACK,
-          port: hostPort,
-          // A cold boot outlasts Bun's own idle ceiling, and a request abandoned while the
-          // microVM it asked for is still coming up is the one thing this must not do.
-          idleTimeout: 0,
-          fetch: (request) => answer({ appId, request }),
-        }),
-      ).pipe(
-        Effect.tap((server) =>
-          Ref.update(listeners, (current) => new Map(current).set(appId, { hostPort, server })),
+      Effect.try({
+        try: () => {
+          const servers: ReturnType<typeof Bun.serve>[] = [];
+          try {
+            for (const port of [hostPort, waitingPort(hostPort)]) {
+              servers.push(
+                Bun.serve({
+                  hostname: LOOPBACK,
+                  port,
+                  idleTimeout: 0,
+                  fetch: (request) => answer({ appId, request }),
+                }),
+              );
+            }
+            return servers;
+          } catch (cause) {
+            for (const server of servers) {
+              server.stop(true);
+            }
+            throw cause;
+          }
+        },
+        catch: (cause) => new AppListenerFailed({ hostPort, cause }),
+      }).pipe(
+        Effect.tap((servers) =>
+          Ref.update(listeners, (current) => new Map(current).set(appId, { hostPort, servers })),
         ),
         Effect.andThen(Effect.logInfo('app activator listening')),
-        Effect.catchAll((error) => Effect.logWarning('app activator bind failed', error)),
         Effect.annotateLogs({ appId, hostPort }),
       );
 
