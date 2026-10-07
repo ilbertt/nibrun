@@ -4,7 +4,6 @@ import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema, SqliteConnectionIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import { pathBelow, RoutePrefix } from '#lib/routes/prefixes.ts';
-import { SqliteClientCorsPlugin } from '#lib/sqlite/cors.ts';
 import { assertSqliteCookieOrigin, sqliteRequestSignal } from '#lib/sqlite/http.ts';
 import { SQLITE_CONNECTIONS_BASE_PATH } from '#lib/sqlite/routes.ts';
 import {
@@ -13,7 +12,7 @@ import {
   SqlitePipelineResponseSchema,
 } from '#routes/api/sqlite/connections/[connectionId]/v2/pipeline/model.ts';
 import { SqliteConnectionParamsSchema } from '#routes/api/sqlite/connections/model.ts';
-import { AuthPlugin, SqliteServicePlugin } from '#services/plugins.ts';
+import type { AuthPlugin, SqliteServicePlugin } from '#services/plugins.ts';
 
 export function createSqliteConnectionsConnectionIdV2PipelineController({
   authPlugin,
@@ -23,7 +22,6 @@ export function createSqliteConnectionsConnectionIdV2PipelineController({
   sqliteServicePlugin: typeof SqliteServicePlugin;
 }) {
   return new Elysia()
-    .use(SqliteClientCorsPlugin)
     .use(authPlugin)
     .use(sqliteServicePlugin)
     .post(
@@ -60,9 +58,3 @@ export function createSqliteConnectionsConnectionIdV2PipelineController({
       },
     );
 }
-
-export const SqliteConnectionsConnectionIdV2PipelineController =
-  createSqliteConnectionsConnectionIdV2PipelineController({
-    authPlugin: AuthPlugin,
-    sqliteServicePlugin: SqliteServicePlugin,
-  });

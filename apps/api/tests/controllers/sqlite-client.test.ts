@@ -17,8 +17,8 @@ import { APP_ID, DEPLOYMENT_ID, OWNER_ID } from '#tests/services/support/fixture
 import { SQLITE_HOST_ID } from '#tests/support/sqlite.ts';
 import { sqliteConnectionsFixture } from '#tests/support/sqlite-connections.ts';
 
-const { createSqliteConnectionsConnectionIdV2PipelineController } = await import(
-  '#routes/api/sqlite/connections/[connectionId]/v2/pipeline/controller.ts'
+const { createSqliteConnectionsConnectionIdV2Controller } = await import(
+  '#routes/api/sqlite/connections/[connectionId]/v2/controller.ts'
 );
 const AUTHORIZATION = 'Bearer existing-account-session';
 const LARGE_INTEGER = '9223372036854775807';
@@ -125,7 +125,7 @@ async function fixture() {
     },
   });
   const ApiController = new Elysia({ prefix: RoutePrefix.Api }).use(
-    createSqliteConnectionsConnectionIdV2PipelineController({
+    createSqliteConnectionsConnectionIdV2Controller({
       authPlugin: createAuthPlugin(existingAccountAuth()),
       sqliteServicePlugin: new Elysia({ name: 'service.sqlite' })
         .decorate('sqliteService', service)
@@ -211,6 +211,12 @@ test('SQLite browser clients can preflight and query with a bearer token without
   const url = `${connection.selected.url}v2/pipeline`;
   const origin = 'https://client.test';
   try {
+    const discovery = await fetch(`${connection.selected.url}v2`, {
+      headers: { origin, authorization: AUTHORIZATION },
+    });
+    expect(discovery.status).toBe(StatusMap.OK);
+    expect(discovery.headers.get('access-control-allow-origin')).toBe(origin);
+    expect(await discovery.json()).toEqual({});
     const preflight = await fetch(url, {
       method: 'OPTIONS',
       headers: {
