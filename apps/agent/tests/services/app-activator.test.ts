@@ -10,6 +10,7 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Duration, Effect, Either, Fiber, Layer, Logger, Option } from 'effect';
+import { waitingPort } from '#lib/proxy/listener.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppActivator } from '#services/app-activator.service.ts';
 import { AppWaker, HostHasNoRoom, WakeFailed } from '#services/app-waker.service.ts';
@@ -108,6 +109,42 @@ describe('an app that is down answers for itself', () => {
         yield* activator.serve([{ appId: OTHER_APP_ID, hostPort: unusedPort() }]);
 
         expect(Either.isLeft(yield* Effect.either(get(hostPort)))).toBe(true);
+        expect(Either.isLeft(yield* Effect.either(get(waitingPort(hostPort))))).toBe(true);
+      }),
+    ));
+
+  test('the separate waiting port answers without relying on the guest forward', () =>
+    run(
+      Effect.gen(function* () {
+        const app = yield* AppActivator;
+        const hostPort = unusedPort();
+        yield* app.serve([{ appId: APP_ID, hostPort }]);
+        expect((yield* get(waitingPort(hostPort))).status).toBe(HTTP_UNAVAILABLE);
+      }),
+    ));
+
+  test('a blocked waiting port refuses the handoff and closes the partial listener', () =>
+    run(
+      Effect.gen(function* () {
+        const app = yield* AppActivator;
+        const hostPort = unusedPort();
+        const occupied = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            Bun.serve({
+              hostname: LOOPBACK,
+              port: waitingPort(hostPort),
+              fetch: () => new Response('occupied'),
+            }),
+          ),
+          (server) => Effect.sync(() => server.stop(true)),
+        );
+        const result = yield* Effect.either(app.serve([{ appId: APP_ID, hostPort }]));
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left._tag).toBe('AppListenerFailed');
+        }
+        expect(Either.isLeft(yield* Effect.either(get(hostPort)))).toBe(true);
+        expect(occupied.port).toBe(waitingPort(hostPort));
       }),
     ));
 
@@ -326,7 +363,7 @@ describe('requests wait for startup without starting a competing guest', () => {
         yield* app.serve([{ appId: APP_ID, hostPort }]);
         const pending = yield* Effect.forkScoped(
           Effect.tryPromise(() =>
-            fetch(`http://${LOOPBACK}:${hostPort}/write?version=2`, {
+            fetch(`http://${LOOPBACK}:${waitingPort(hostPort)}/write?version=2`, {
               method: 'POST',
               body: 'one write',
             }),
