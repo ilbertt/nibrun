@@ -9,6 +9,7 @@ import {
   rememberSignIn,
   type SignInReason,
 } from '#lib/sign-in-analytics.ts';
+import { signInFailureData } from '#lib/sign-in-failure.ts';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 type SignInResult = Awaited<ReturnType<typeof authClient.signIn.social>>;
@@ -21,7 +22,7 @@ export function useSignIn({
 }: {
   callbackURL: string;
   reason: SignInReason;
-}): UseMutationResult<SignInResult, Error, void> {
+}): UseMutationResult<SignInResult, unknown, void> {
   const landing = sameOriginPath(callbackURL) ?? IndexRoute.to;
   const identity = useSessionIdentity();
   const queryClient = useQueryClient();
@@ -37,9 +38,12 @@ export function useSignIn({
       }
       return result;
     },
-    onError: () => {
+    onError: (error) => {
       forgetSignIn();
-      trackEvent({ name: 'sign_in_failed', data: { identity_state: identity, reason } });
+      trackEvent({
+        name: 'sign_in_failed',
+        data: { identity_state: identity, reason, ...signInFailureData(error) },
+      });
     },
   });
 }
