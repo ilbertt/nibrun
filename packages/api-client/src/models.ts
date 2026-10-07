@@ -50,3 +50,13 @@ export type CronJobId = RegisteredCronJob['jobId'];
 export type LogSource = TenantLogRecord['SOURCE'];
 
 export type TenantLogStream = TenantLogRecord['stream'];
+
+type SqlitePipelineRoute = ReturnType<
+  PublicApiClient['api']['sqlite']['connections']
+>['v2']['pipeline']['post'];
+export type SqlitePipelineResponse = Treaty.Data<SqlitePipelineRoute>;
+type SqliteStreamResponse = Extract<
+  SqlitePipelineResponse['results'][number],
+  { type: 'ok' }
+>['response'];
+export type SqliteStatementResult = Extract<SqliteStreamResponse, { type: 'execute' }>['result'];
