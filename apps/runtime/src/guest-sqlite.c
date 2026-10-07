@@ -4,6 +4,7 @@
 #include <grp.h>
 #include <poll.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
@@ -13,7 +14,6 @@
 #include "clock.h"
 #include "log.h"
 #include "paths.h"
-#include "sqlite-query.h"
 #include "vsock.h"
 
 #define SQLITE_MAX_WORKERS 4

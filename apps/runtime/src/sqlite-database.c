@@ -9,16 +9,16 @@
 #include "clock.h"
 
 static sqlite3_vfs jailed_vfs;
-static sqlite3_vfs* unix_vfs;
+static sqlite3_vfs *unix_vfs;
 
-static int open_without_symlinks(sqlite3_vfs* vfs, const char* name, sqlite3_file* file, int flags,
-                                 int* actual) {
+static int open_without_symlinks(sqlite3_vfs *vfs, const char *name, sqlite3_file *file, int flags,
+                                 int *actual) {
   (void)vfs;
   return unix_vfs->xOpen(unix_vfs, name, file, flags | SQLITE_OPEN_NOFOLLOW, actual);
 }
 
-static bool allowed_pragma(const char* name, const char* argument) {
-  static const char* const names[] = {"table_info",  "table_xinfo",      "index_list", "index_info",
+static bool allowed_pragma(const char *name, const char *argument) {
+  static const char *const names[] = {"table_info",  "table_xinfo",      "index_list", "index_info",
                                       "index_xinfo", "foreign_key_list", "table_list"};
   for (size_t index = 0; index < sizeof(names) / sizeof(names[0]); index++) {
     if (sqlite3_stricmp(name, names[index]) == 0)
@@ -30,8 +30,8 @@ static bool allowed_pragma(const char* name, const char* argument) {
           sqlite3_stricmp(name, "user_version") == 0 || sqlite3_stricmp(name, "encoding") == 0);
 }
 
-static int authorize(void* context, int operation, const char* first, const char* second,
-                     const char* database, const char* trigger) {
+static int authorize(void *context, int operation, const char *first, const char *second,
+                     const char *database, const char *trigger) {
   (void)context;
   (void)database;
   (void)trigger;
@@ -50,8 +50,8 @@ static int authorize(void* context, int operation, const char* first, const char
   }
 }
 
-static int cancelled(void* context) {
-  struct sqlite_query* query = context;
+static int cancelled(void *context) {
+  struct sqlite_query *query = context;
   if ((query->stopping != NULL && *query->stopping) || clock_monotonic_ms() >= query->deadline_ms)
     return 1;
   if (query->connection < 0)
@@ -66,13 +66,13 @@ static int cancelled(void* context) {
   return 0;
 }
 
-static bool safe_path(const char* path) {
+static bool safe_path(const char *path) {
   if (*path == '/')
     path++;
   if (*path == '\0')
     return false;
-  const char* component = path;
-  for (const char* position = path;; position++) {
+  const char *component = path;
+  for (const char *position = path;; position++) {
     if (*position != '/' && *position != '\0')
       continue;
     size_t length = (size_t)(position - component);
@@ -85,7 +85,7 @@ static bool safe_path(const char* path) {
   }
 }
 
-int sqlite_query_open(struct sqlite_query* query, const char* path) {
+int sqlite_query_open(struct sqlite_query *query, const char *path) {
   if (!safe_path(path))
     return SQLITE_CANTOPEN;
   if (strlen(path) >= PATH_MAX)
@@ -102,7 +102,7 @@ int sqlite_query_open(struct sqlite_query* query, const char* path) {
     return SQLITE_CANTOPEN;
   if (!valid)
     return SQLITE_NOTADB;
-  static const char* const suffixes[] = {"-wal", "-shm", "-journal"};
+  static const char *const suffixes[] = {"-wal", "-shm", "-journal"};
   for (size_t index = 0; index < sizeof(suffixes) / sizeof(suffixes[0]); index++) {
     char sidecar[PATH_MAX + 9];
     sqlite3_snprintf(sizeof(sidecar), sidecar, "%s%s", path, suffixes[index]);
@@ -125,8 +125,8 @@ int sqlite_query_open(struct sqlite_query* query, const char* path) {
     return code;
   sqlite3_extended_result_codes(query->database, 1);
   sqlite3_busy_timeout(query->database, 250);
-  sqlite3_limit(query->database, SQLITE_LIMIT_LENGTH, SQLITE_WIRE_MAX_BYTES);
-  sqlite3_limit(query->database, SQLITE_LIMIT_SQL_LENGTH, SQLITE_WIRE_MAX_BYTES);
+  sqlite3_limit(query->database, SQLITE_LIMIT_LENGTH, SQLITE_REQUEST_MAX_BYTES);
+  sqlite3_limit(query->database, SQLITE_LIMIT_SQL_LENGTH, SQLITE_REQUEST_MAX_BYTES);
   sqlite3_limit(query->database, SQLITE_LIMIT_COLUMN, 256);
   sqlite3_limit(query->database, SQLITE_LIMIT_VARIABLE_NUMBER, 256);
   sqlite3_db_config(query->database, SQLITE_DBCONFIG_DEFENSIVE, 1, NULL);
@@ -135,14 +135,4 @@ int sqlite_query_open(struct sqlite_query* query, const char* path) {
   sqlite3_progress_handler(query->database, 1000, cancelled, query);
   query->deadline_ms = clock_monotonic_ms() + SQLITE_QUERY_TIMEOUT_MS;
   return sqlite3_exec(query->database, "SELECT name FROM sqlite_schema LIMIT 1", NULL, NULL, NULL);
-}
-
-void sqlite_query_error(struct sqlite_query* query, int code, struct sqlite_wire* reply) {
-  reply->position = 0;
-  reply->failed = false;
-  sqlite_wire_write_integer(reply, (uint32_t)code, 4);
-  const char* message = query->database != NULL && sqlite3_errcode(query->database) == (code & 255)
-                            ? sqlite3_errmsg(query->database)
-                            : sqlite3_errstr(code);
-  sqlite_wire_write_bytes(reply, message, strlen(message));
 }

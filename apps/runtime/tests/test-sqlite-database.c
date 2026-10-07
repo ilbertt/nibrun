@@ -1,28 +1,30 @@
+#include "../src/sqlite-database.h"
+#include "expect.h"
 #include <stdlib.h>
 #include <unistd.h>
-#include "expect.h"
-#include "../src/sqlite-database.h"
 
 int main(void) {
   char directory[] = "/tmp/nibrun-sqlite-database-XXXXXX";
   EXPECT(mkdtemp(directory) != NULL);
   EXPECT(chdir(directory) == 0);
-  sqlite3* writer = NULL;
+  sqlite3 *writer = NULL;
   EXPECT(sqlite3_open("app.db", &writer) == SQLITE_OK);
-  EXPECT(sqlite3_exec(
-             writer,
-             "PRAGMA journal_mode=WAL; CREATE TABLE items(value); INSERT INTO items VALUES(1)",
-             NULL, NULL, NULL) == SQLITE_OK);
+  EXPECT(sqlite3_exec(writer,
+                      "PRAGMA journal_mode=WAL; CREATE TABLE items(value); "
+                      "INSERT INTO items VALUES(1)",
+                      NULL, NULL, NULL) == SQLITE_OK);
   struct sqlite_query query = {.connection = -1};
   EXPECT(sqlite_query_open(&query, "app.db") == SQLITE_OK);
-  EXPECT(sqlite3_exec(query.database, "SELECT * FROM items", NULL, NULL, NULL) == SQLITE_OK);
-  EXPECT(sqlite3_exec(query.database, "INSERT INTO items VALUES(2)", NULL, NULL, NULL) ==
-         SQLITE_AUTH);
-  EXPECT(sqlite3_exec(query.database, "ATTACH 'other.db' AS other", NULL, NULL, NULL) ==
-         SQLITE_AUTH);
-  EXPECT(sqlite3_exec(query.database, "PRAGMA writable_schema=ON", NULL, NULL, NULL) ==
-         SQLITE_AUTH);
-  EXPECT(sqlite3_exec(query.database, "PRAGMA table_info(items)", NULL, NULL, NULL) == SQLITE_OK);
+  EXPECT(sqlite3_exec(query.database, "SELECT * FROM items", NULL, NULL,
+                      NULL) == SQLITE_OK);
+  EXPECT(sqlite3_exec(query.database, "INSERT INTO items VALUES(2)", NULL, NULL,
+                      NULL) == SQLITE_AUTH);
+  EXPECT(sqlite3_exec(query.database, "ATTACH 'other.db' AS other", NULL, NULL,
+                      NULL) == SQLITE_AUTH);
+  EXPECT(sqlite3_exec(query.database, "PRAGMA writable_schema=ON", NULL, NULL,
+                      NULL) == SQLITE_AUTH);
+  EXPECT(sqlite3_exec(query.database, "PRAGMA table_info(items)", NULL, NULL,
+                      NULL) == SQLITE_OK);
   EXPECT(sqlite3_close(query.database) == SQLITE_OK);
   EXPECT(sqlite3_close(writer) == SQLITE_OK);
   struct sqlite_query invalid = {.connection = -1};
@@ -32,6 +34,12 @@ int main(void) {
   EXPECT(symlink("app.db", "link.db") == 0);
   EXPECT(sqlite_query_open(&invalid, "link.db") == SQLITE_CANTOPEN);
   unlink("link.db");
+  EXPECT(symlink("app.db", "app.db-wal") == 0);
+  EXPECT(sqlite_query_open(&invalid, "app.db") == SQLITE_CANTOPEN);
+  unlink("app.db-wal");
+  EXPECT(symlink(".", "directory") == 0);
+  EXPECT(sqlite_query_open(&invalid, "directory/app.db") == SQLITE_CANTOPEN);
+  unlink("directory");
   unlink("app.db");
   chdir("/");
   rmdir(directory);

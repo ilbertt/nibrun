@@ -41,16 +41,12 @@ listener is another fork of PID 1, and its memory is part of what the second one
 
 Both answer in a child of PID 1, not on the supervisor's poll loop, which does not run while the
 tenant is between restarts. Neither allocates: `getdents` rather than `opendir`, two bounded
-buffers on the stack of whoever is answering, and a request that cannot make either grow. The
-tenant is meant to be the only thing in this guest that allocates, which is what makes it the
-right thing for the OOM killer to reach for.
+buffers on the stack of whoever is answering, and a request that cannot make either grow. SQLite query workers allocate under their own resource limits and have a higher OOM
+score than the supervisor.
 
-C, static, musl, because this is resident in every microVM and its cost is multiplied by how many
-a host packs: measured **1.3 MiB RSS, 69 KiB on disk**. Both channels are forks of PID 1 rather
-than separate binaries, so each adds its own private pages and not another copy — the three
-together measure **1.3 MiB PSS**, barely more than PID 1 costs alone and a fifth more than the
-pair did before the filesystem channel existed. Only the tenant's binary needs glibc, which is why
-the rootfs carries it and this does not link against it.
+C, static, musl, because this runtime is resident in every microVM. SQLite and JSON
+allocation is confined to bounded guest workers; the supervisor never initializes either engine.
+Only the tenant binary needs glibc, which is why the rootfs carries it.
 
 ## Building
 
@@ -94,11 +90,20 @@ VMM.
 SQLite is the pinned official amalgamation from `versions.env`, checked by SHA-256 before compilation.
 It links statically against musl, with extension loading omitted and temporary storage in memory.
 
-`src/guest-sqlite.c` listens on port 51005. Each connection owns one read-only database
-connection in a worker jailed to the data filesystem as the tenant uid. NBS1 framing
-is bounded to 64 KiB; the listener permits four workers, each with a 16 MiB SQLite heap,
-a 128 MiB address-space ceiling, a five-second query deadline and a 30-second idle lease.
-SQLite sidecars stay within the jail and may not be symlinks.
+`src/guest-sqlite.c` serves standard Hrana v2 HTTP on vsock port 51005. One keep-alive
+connection owns one read-only database in a worker jailed to the data filesystem as the tenant uid.
+HTTP bodies and JSON replies are bounded to 4 MiB, individual SQL/value fields to 64 KiB,
+JSON depth to 32 and nodes to 16384. The listener permits four workers, each with a
+16 MiB SQLite heap, a 128 MiB address-space ceiling, a five-second pipeline deadline and
+a 30-second idle lease. SQLite sidecars stay within the jail and may not be symlinks.
+
+Jansson 2.15.1 is the upstream MIT-licensed JSON parser, pinned by checksum in `versions.env`;
+Hrana execution is our adapter over SQLite, not an upstream server implementation.
+Upstream [sqld](https://github.com/tursodatabase/libsql/blob/d6c75af6353bb1c34985399608e37cd272a35aa1/libsql-server/src/connection/legacy.rs#L284)
+opens managed namespace directories with read-write/create flags and its own WAL lifecycle,
+which does not match exploration of arbitrary files concurrently owned by tenant applications.
+The [Hrana specification](https://github.com/tursodatabase/libsql/blob/d6c75af6353bb1c34985399608e37cd272a35aa1/docs/HRANA_2_SPEC.md)
+and maintained JSON parser avoid inventing another agent–guest SQL protocol.
 
 On ARM Macs, `RUNTIME_TEST_PLATFORM=linux/arm64 bun run test` runs the Linux suites
 natively. Rosetta cannot enforce the SQLite worker address-space limit reliably.
