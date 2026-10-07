@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { parseHranaPipeline } from '#hrana-validation.ts';
+import { parseHranaPipeline, parseHranaPipelineResponse } from '#hrana-validation.ts';
+import { SQLITE_MAX_REQUEST_BYTES } from '#limits.ts';
 
 describe('Hrana pipeline validation', () => {
   test('accepts typed arguments and ignores future protocol fields', () => {
@@ -50,4 +51,31 @@ describe('Hrana pipeline validation', () => {
       });
     }).toThrow('too complex');
   });
+});
+
+test('response nesting is bounded before recursive schema validation', () => {
+  const TOO_DEEP = 40;
+  let nested: unknown = {};
+  for (let depth = 0; depth < TOO_DEEP; depth += 1) {
+    nested = { nested };
+  }
+  expect(() => {
+    parseHranaPipelineResponse({
+      body: { baton: null, base_url: null, results: [], nested },
+      requestCount: 0,
+    });
+  }).toThrow('too complex');
+});
+
+test('whole-pipeline limits bound ignored extension fields as well as SQL values', () => {
+  const extra = 'x'.repeat(SQLITE_MAX_REQUEST_BYTES);
+  expect(() => {
+    parseHranaPipeline({ requests: [], extra });
+  }).toThrow('byte limit');
+  expect(() => {
+    parseHranaPipelineResponse({
+      body: { baton: null, base_url: null, results: [], extra },
+      requestCount: 0,
+    });
+  }).toThrow('byte limit');
 });

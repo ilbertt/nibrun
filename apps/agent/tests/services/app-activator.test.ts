@@ -9,7 +9,8 @@ import {
   Ipv4AddressSchema,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Duration, Effect, Either, Layer, Logger } from 'effect';
+import { Duration, Effect, Either, Fiber, Layer, Logger, Option } from 'effect';
+import { waitingPort } from '#lib/proxy/listener.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppActivator } from '#services/app-activator.service.ts';
 import { AppWaker, HostHasNoRoom, WakeFailed } from '#services/app-waker.service.ts';
@@ -108,6 +109,42 @@ describe('an app that is down answers for itself', () => {
         yield* activator.serve([{ appId: OTHER_APP_ID, hostPort: unusedPort() }]);
 
         expect(Either.isLeft(yield* Effect.either(get(hostPort)))).toBe(true);
+        expect(Either.isLeft(yield* Effect.either(get(waitingPort(hostPort))))).toBe(true);
+      }),
+    ));
+
+  test('the separate waiting port answers without relying on the guest forward', () =>
+    run(
+      Effect.gen(function* () {
+        const app = yield* AppActivator;
+        const hostPort = unusedPort();
+        yield* app.serve([{ appId: APP_ID, hostPort }]);
+        expect((yield* get(waitingPort(hostPort))).status).toBe(HTTP_UNAVAILABLE);
+      }),
+    ));
+
+  test('a blocked waiting port refuses the handoff and closes the partial listener', () =>
+    run(
+      Effect.gen(function* () {
+        const app = yield* AppActivator;
+        const hostPort = unusedPort();
+        const occupied = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            Bun.serve({
+              hostname: LOOPBACK,
+              port: waitingPort(hostPort),
+              fetch: () => new Response('occupied'),
+            }),
+          ),
+          (server) => Effect.sync(() => server.stop(true)),
+        );
+        const result = yield* Effect.either(app.serve([{ appId: APP_ID, hostPort }]));
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left._tag).toBe('AppListenerFailed');
+        }
+        expect(Either.isLeft(yield* Effect.either(get(hostPort)))).toBe(true);
+        expect(occupied.port).toBe(waitingPort(hostPort));
       }),
     ));
 
@@ -304,4 +341,71 @@ describe('an app that runs on request is started by the request that wanted it',
       }),
     );
   });
+});
+
+describe('requests wait through replacement without starting a competing guest', () => {
+  test.each([false, true])('a POST waits and is sent once with onRequest=%s', (onRequest) =>
+    run(
+      Effect.gen(function* () {
+        const bodies: string[] = [];
+        const { port } = yield* serving(async function receive(request) {
+          bodies.push(await request.text());
+          return new Response('new release');
+        });
+        const record = instanceRecord({
+          onRequest,
+          guestIpv4: Value.Parse(Ipv4AddressSchema, LOOPBACK),
+          httpPort: Value.Parse(HttpPortSchema, port),
+        });
+        yield* AgentState.putRecord(record);
+        yield* AgentState.modify((current) => ({
+          ...current,
+          replacing: new Map([[APP_ID, instanceRecord()]]),
+        }));
+        const app = yield* AppActivator;
+        const hostPort = unusedPort();
+        yield* app.serve([{ appId: APP_ID, hostPort }]);
+        const pending = yield* Effect.forkScoped(
+          Effect.tryPromise(() =>
+            fetch(`http://${LOOPBACK}:${waitingPort(hostPort)}/write?version=2`, {
+              method: 'POST',
+              body: 'one write',
+            }),
+          ),
+        );
+        yield* Effect.sleep('75 millis');
+        expect(Option.isNone(yield* Fiber.poll(pending))).toBe(true);
+        expect(bodies).toEqual([]);
+        yield* AgentState.dropRecord(APP_ID);
+        yield* Effect.sleep('50 millis');
+        expect(Option.isNone(yield* Fiber.poll(pending))).toBe(true);
+        yield* AgentState.putRecord({ ...record, state: 'starting' });
+        yield* AgentState.modify((current) => ({ ...current, replacing: new Map() }));
+        yield* Effect.sleep('50 millis');
+        expect(Option.isNone(yield* Fiber.poll(pending))).toBe(true);
+        yield* AgentState.putRecord(record);
+        const response = yield* Fiber.join(pending);
+        expect(response.status).toBe(HTTP_OK);
+        expect(yield* Effect.promise(() => response.text())).toBe('new release');
+        expect(bodies).toEqual(['one write']);
+      }),
+    ),
+  );
+
+  test('a failed replacement releases the waiting request with an error', () =>
+    run(
+      Effect.gen(function* () {
+        const app = yield* AppActivator;
+        yield* AgentState.putRecord(instanceRecord({ state: 'starting' }));
+        const hostPort = unusedPort();
+        yield* app.serve([{ appId: APP_ID, hostPort }]);
+        const pending = yield* Effect.forkScoped(get(hostPort));
+        yield* Effect.sleep('50 millis');
+        expect(Option.isNone(yield* Fiber.poll(pending))).toBe(true);
+        yield* AgentState.putRecord(instanceRecord({ state: 'failed' }));
+        const response = yield* Fiber.join(pending);
+        expect(response.status).toBe(HTTP_UNAVAILABLE);
+        expect(yield* Effect.promise(() => response.text())).toContain('could not be started');
+      }),
+    ));
 });

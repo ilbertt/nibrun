@@ -1,15 +1,14 @@
-import type { SqliteExecutorContract } from '#executor.ts';
 import { HranaError } from '#hrana-error.ts';
+import type { HranaPipelineSessionContract } from '#hrana-session.ts';
 
 const DEFAULT_STREAM_LIMIT = 64;
 const DEFAULT_IDLE_TIMEOUT_MS = 30_000;
 
-type OpenExecutor = (input: { signal: AbortSignal }) => Promise<SqliteExecutorContract>;
+type OpenSession = (input: { signal: AbortSignal }) => Promise<HranaPipelineSessionContract>;
 
 export type HranaStream = {
   readonly scope: string;
-  readonly executor: SqliteExecutorContract;
-  readonly storedSql: Map<number, string>;
+  readonly session: HranaPipelineSessionContract;
   closed: boolean;
   timer: ReturnType<typeof setTimeout> | undefined;
 };
@@ -41,7 +40,7 @@ export class HranaStreams {
   }: {
     baton: string | null;
     scope: string;
-    open: OpenExecutor;
+    open: OpenSession;
     signal: AbortSignal;
   }): Promise<HranaStream> {
     signal.throwIfAborted();
@@ -70,7 +69,7 @@ export class HranaStreams {
     const streams = this;
     stream.timer = setTimeout(function expire() {
       streams.#batons.delete(baton);
-      void streams.close(stream).catch(function ignoreClosedExecutor() {});
+      void streams.close(stream).catch(function ignoreClosedSession() {});
     }, this.#idleTimeoutMs);
     stream.timer.unref();
     return baton;
@@ -83,13 +82,12 @@ export class HranaStreams {
     stream.closed = true;
     clearTimeout(stream.timer);
     this.#live.delete(stream);
-    stream.storedSql.clear();
     for (const [baton, candidate] of this.#batons) {
       if (candidate === stream) {
         this.#batons.delete(baton);
       }
     }
-    await stream.executor.close();
+    await stream.session.close();
   }
 
   async closeScope(scope: string): Promise<void> {
@@ -141,7 +139,7 @@ export class HranaStreams {
     signal,
   }: {
     scope: string;
-    open: OpenExecutor;
+    open: OpenSession;
     signal: AbortSignal;
   }): Promise<HranaStream> {
     if (this.#live.size + this.#opening.size >= this.#limit) {
@@ -150,11 +148,10 @@ export class HranaStreams {
     const opening = { scope, invalidated: false };
     this.#opening.add(opening);
     try {
-      const executor = await open({ signal });
+      const session = await open({ signal });
       const stream: HranaStream = {
         scope,
-        executor,
-        storedSql: new Map(),
+        session,
         closed: false,
         timer: undefined,
       };

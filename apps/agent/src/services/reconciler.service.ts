@@ -14,6 +14,7 @@ import {
 } from '#lib/reconcile/instances.ts';
 import { applyActivators, applyNetwork, applyRoutes } from '#lib/reconcile/network.ts';
 import { hasDeferredWork, type ObservedState, planReconcile } from '#lib/reconcile/plan.ts';
+import { duringReplacements } from '#lib/reconcile/replacements.ts';
 import { applyTeardowns, applyVolumes, volumeOwners } from '#lib/reconcile/volumes.ts';
 import { readInstanceRecords } from '#lib/report/instance-record.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
@@ -26,6 +27,7 @@ import { CronExecutions } from '#services/cron-executions.service.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
+import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
 
@@ -41,6 +43,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
     const vms = yield* VmManager;
     const crons = yield* CronRegistry;
     const executions = yield* CronExecutions;
+    const sqlite = yield* SqliteSessions;
 
     const load = Effect.gen(function* () {
       const instances = readInstanceRecords(
@@ -239,6 +242,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       });
 
     const reconcile = Effect.fn('Reconciler.reconcile')(function* (desired: HostDesiredState) {
+      yield* sqlite.syncDeployments({ instances: desired.instances });
       yield* executions.syncDeployments({ instances: desired.instances });
       yield* crons.syncDeployments({ deployments: desired.instances });
       const observed = yield* observe(desired);
@@ -249,20 +253,20 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       }));
       yield* syncDesired(desired);
 
-      yield* Effect.all(
-        [prefetchArtifacts(plan), applyStops(plan).pipe(Effect.withSpan('reconcile.stops'))],
-        { concurrency: 'unbounded', discard: true },
-      );
-      yield* applyVolumes({ plan, observed, desired }).pipe(Effect.withSpan('reconcile.volumes'));
-      // Before the activators below, because the slot one binds on is allocated here.
-      yield* applySleeps(plan).pipe(Effect.withSpan('reconcile.sleeps'));
-      // Before the forwards below are withdrawn from a tenant that has just stopped, so the port
-      // it was reached on is answered rather than closed.
-      yield* applyActivators.pipe(Effect.withSpan('reconcile.activators'));
-      // Before anything boots: nothing persists the ruleset across a reboot, so a host that
-      // started its VMs first would serve tenants through a kernel with no `nibrun` table.
-      yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
-      yield* applyStarts(plan).pipe(Effect.withSpan('reconcile.starts'));
+      yield* prefetchArtifacts(plan);
+      yield* duringReplacements({
+        plan,
+        effect: Effect.gen(function* () {
+          yield* applyStops(plan).pipe(Effect.withSpan('reconcile.stops'));
+          yield* applyVolumes({ plan, observed, desired }).pipe(
+            Effect.withSpan('reconcile.volumes'),
+          );
+          yield* applySleeps(plan).pipe(Effect.withSpan('reconcile.sleeps'));
+          yield* applyActivators.pipe(Effect.withSpan('reconcile.activators'));
+          yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
+          yield* applyStarts(plan).pipe(Effect.withSpan('reconcile.starts'));
+        }),
+      });
       yield* applyCheckpoints({ plan, desired }).pipe(Effect.withSpan('reconcile.checkpoints'));
       // After starts, so an export never competes with a boot for the device it reads, and
       // before teardowns, so a volume marked absent this generation is still there to read.
@@ -300,5 +304,6 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
     VmManager.Default,
     CronRegistry.Default,
     CronExecutions.Default,
+    SqliteSessions.Default,
   ],
 }) {}

@@ -6,6 +6,7 @@ import { heartbeatLoop } from '#lib/agent/heartbeat.ts';
 import { logLoop } from '#lib/agent/logs.ts';
 import { pollLoop, reconcileSafely } from '#lib/agent/poll.ts';
 import { reportLoop } from '#lib/agent/report.ts';
+import { sqliteQueryLoop } from '#lib/agent/sqlite-query.ts';
 import { statusLoop } from '#lib/agent/status.ts';
 import { usageLoop } from '#lib/agent/usage.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
@@ -60,6 +61,7 @@ export const run = Effect.gen(function* () {
       heartbeatLoop,
       filesystemLoop,
       cronQueryLoop,
+      sqliteQueryLoop,
       usageLoop,
     ],
     { concurrency: 'unbounded' },

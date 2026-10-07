@@ -21,23 +21,29 @@ export class CaddyProxy extends Effect.Service<CaddyProxy>()('CaddyProxy', {
     // Never written by this process yet, so the first apply always writes: what is on disk came
     // from whichever agent ran before, and the host may have changed since.
     const applied = yield* Ref.make(Option.none<string>());
+    const routing = yield* Effect.makeSemaphore(1);
 
-    return {
-      apply: Effect.fn('CaddyProxy.apply')(function* (routes: readonly RouteTarget[]) {
-        const sites = renderAppSites(routes);
-        if (Option.getOrUndefined(yield* Ref.get(applied)) === sites) {
-          return;
-        }
-        yield* writeTextFile({
-          path: config.caddySitesFile,
-          value: sites,
-          mode: SITE_FILE_MODE,
-        });
-        // Reloaded, not restarted: one app's route must not interrupt the others.
-        yield* stdoutOf({ command: [SYSTEMCTL, 'reload', CADDY_UNIT] });
-        yield* Ref.set(applied, Option.some(sites));
-      }),
-    };
+    function apply<R>(routes: Effect.Effect<readonly RouteTarget[], never, R>) {
+      return routing.withPermits(1)(
+        Effect.gen(function* () {
+          const sites = renderAppSites(yield* routes);
+          if (Option.getOrUndefined(yield* Ref.get(applied)) === sites) {
+            return;
+          }
+          yield* Ref.set(applied, Option.none());
+          yield* writeTextFile({
+            path: config.caddySitesFile,
+            value: sites,
+            mode: SITE_FILE_MODE,
+          });
+          // Reloaded, not restarted: one app's route must not interrupt the others.
+          yield* stdoutOf({ command: [SYSTEMCTL, 'reload', CADDY_UNIT] });
+          yield* Ref.set(applied, Option.some(sites));
+        }),
+      );
+    }
+
+    return { apply };
   }),
   dependencies: [AgentConfig.Default],
 }) {}

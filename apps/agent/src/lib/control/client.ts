@@ -16,6 +16,9 @@ import {
   PROTOCOL_VERSION_HEADER,
   parseMessage,
   type SecretString,
+  type SqliteQueryRequest,
+  SqliteQueryResponseSchema,
+  type SqliteQueryResult,
 } from '@repo/protocol';
 import { Data, Effect } from 'effect';
 import { decode } from '#lib/protocol.ts';
@@ -193,6 +196,44 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
           route: AGENT_ROUTES.filesystemQueryResult,
           send: () =>
             api.internal.agent['filesystem-query-result'].post(result, options({ sessionToken })),
+        }),
+      ),
+
+    fetchSqliteQuery: ({
+      sessionToken,
+      request,
+    }: {
+      sessionToken: SecretString;
+      request: SqliteQueryRequest;
+    }) =>
+      call({
+        route: AGENT_ROUTES.sqliteQuery,
+        send: (signal) =>
+          api.internal.agent['sqlite-query'].post(
+            request,
+            options({ sessionToken, timeoutMs: HELD_QUERY_TIMEOUT_MS, signal }),
+          ),
+      }).pipe(
+        Effect.flatMap((value) =>
+          decode(() => parseMessage({ schema: SqliteQueryResponseSchema, value })),
+        ),
+      ),
+
+    sendSqliteQueryResult: ({
+      sessionToken,
+      result,
+    }: {
+      sessionToken: SecretString;
+      result: SqliteQueryResult;
+    }) =>
+      Effect.asVoid(
+        call({
+          route: AGENT_ROUTES.sqliteQueryResult,
+          send: (signal) =>
+            api.internal.agent['sqlite-query-result'].post(
+              result,
+              options({ sessionToken, signal }),
+            ),
         }),
       ),
 
