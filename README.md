@@ -13,7 +13,7 @@ Small apps don't need to scale. They need a machine and a disk.
 
 ## Try it out
 
-Visit [nibrun.com/apps](https://nibrun.com/apps) to see the available open source projects you can deploy in one click.
+Visit [nibrun.com/apps](https://nibrun.com/apps) to see the available apps you can deploy in one click.
 
 ## Why
 
