@@ -1,7 +1,6 @@
 import { SqliteExplorer } from '@repo/sqlite-explorer';
 import { createFileRoute } from '@tanstack/react-router';
 import { SiteHeader } from '#components/site-header.tsx';
-import '@repo/sqlite-explorer/styles.css';
 import { pageTitle } from '#lib/page-title.ts';
 
 export const Route = createFileRoute('/sqlite-studio')({

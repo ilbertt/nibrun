@@ -1,10 +1,10 @@
 import { useAnalytics } from '@repo/analytics';
 import { PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 import { Toaster } from '@repo/ui/components/sonner';
-import appCss from '@repo/ui/globals.css?url';
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { themeScript } from '#lib/theme-script.ts';
+import appCss from '#styles/globals.css?url';
 
 export const Route = createRootRoute({
   head: () => ({
