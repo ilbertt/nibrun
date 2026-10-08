@@ -2,7 +2,7 @@ import { Button } from '@repo/ui/components/button';
 import { Input } from '@repo/ui/components/input';
 import { Label } from '@repo/ui/components/label';
 import { DatabaseIcon, LoaderCircleIcon } from 'lucide-react';
-import { type SubmitEvent, useId } from 'react';
+import { type SubmitEvent, useEffect, useId, useState } from 'react';
 import type { SqliteConnection } from '#lib/connection.ts';
 
 export function ConnectionForm({
@@ -15,6 +15,10 @@ export function ConnectionForm({
   connect: (connection: SqliteConnection) => void;
 }) {
   const formId = useId();
+  const [interactive, setInteractive] = useState(false);
+  // Native submission before hydration would put credentials in the URL.
+  useEffect(() => setInteractive(true), []);
+  const disabled = connecting || !interactive;
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -43,7 +47,7 @@ export function ConnectionForm({
               autoComplete="off"
               spellCheck={false}
               placeholder="libsql://your-database.turso.io"
-              disabled={connecting}
+              disabled={disabled}
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -54,7 +58,7 @@ export function ConnectionForm({
               type="password"
               autoComplete="off"
               placeholder="Paste your token"
-              disabled={connecting}
+              disabled={disabled}
             />
           </div>
           <p className="text-muted-foreground text-xs">
@@ -66,7 +70,7 @@ export function ConnectionForm({
               {error}
             </p>
           ) : null}
-          <Button type="submit" disabled={connecting}>
+          <Button type="submit" disabled={disabled}>
             {connecting ? (
               <LoaderCircleIcon aria-hidden="true" className="animate-spin" />
             ) : (
