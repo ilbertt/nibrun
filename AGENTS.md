@@ -90,7 +90,7 @@ Packages fall in two buckets:
 - **Published packages** (have a `pkg/` directory) carry **two** READMEs:
   - **`packages/<package>/pkg/README.md`** — public, user-facing. Ships to npm as part of `@<my-org>/<package>` (listed under `"files"` in `pkg/package.json`). This is what users see on the npm page. Covers install, usage, and public API. Must use the published name (`@<my-org>/...`), not the workspace name (`@repo/...`).
   - **`packages/<package>/README.md`** — internal contributor doc. Covers source layout, dev scripts, and constraints. **Must link to `pkg/README.md`** and **must not duplicate install/usage** — when in doubt, the public README wins and the internal one points to it.
-- **Internal-only packages** (no `pkg/`) may not need a README at all. Add one only when there's contributor-relevant context that isn't obvious from the source.
+- **Internal-only packages** (no `pkg/`) keep contributor instructions in `AGENTS.md`, not `README.md`.
 
 When editing a published package, decide which audience the change is for and update only that file. If something belongs to both (e.g. a renamed export), update them in lockstep.
 
