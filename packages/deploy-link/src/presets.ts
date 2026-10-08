@@ -13,6 +13,7 @@ import microbinPage from '../content/microbin.md?raw';
 import nibrunVitalsPage from '../content/nibrun-vitals.md?raw';
 import openConnectorPage from '../content/open-connector.md?raw';
 import openSyncPage from '../content/open-sync.md?raw';
+import openbaoPage from '../content/openbao.md?raw';
 import pdfSignerPage from '../content/pdf-signer.md?raw';
 import picosharePage from '../content/picoshare.md?raw';
 import pocketbasePage from '../content/pocketbase.md?raw';
@@ -70,6 +71,29 @@ export const DEPLOY_PRESETS = {
       port: 8090,
       arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data', '--publicDir=./data/pb_public'],
       minimal: true,
+    },
+  },
+  openbao: {
+    repositoryUrl: 'https://github.com/openbao/openbao',
+    version: 'v2.7.1',
+    markdownContent: openbaoPage,
+    category: DeployCategory.DeveloperTools,
+    title: 'OpenBao',
+    subtitle: 'A secrets manager with encrypted storage, access policies and a web UI.',
+    deployLink: {
+      name: 'openbao',
+      binary:
+        'https://github.com/openbao/openbao/releases/download/v2.7.1/openbao_2.7.1_linux_amd64.tar.gz',
+      sha256: '0e2f1ce10d124e03112b50dd2fbec6b78003783253bc3a91587938f39d1e2243',
+      port: 8200,
+      arg: ['server', '-config=/app/data/openbao.hcl'],
+      env: [
+        `HOME=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        `BAO_API_ADDR=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
+        'GOMEMLIMIT=128MiB',
+      ],
+      // The upstream server needs a configuration file supplied through Initial data.
+      minimal: false,
     },
   },
   sharkord: {
