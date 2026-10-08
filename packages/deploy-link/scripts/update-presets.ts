@@ -8,7 +8,6 @@ import { findUpdate, type PresetUpdate, requestRelease } from '#scripts/updates/
 import { updatePresetSource } from '#scripts/updates/source.ts';
 
 const updates: PresetUpdate[] = [];
-const checkOnly = process.argv.includes('--check');
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
 for (const [slug, preset] of Object.entries(DEPLOY_PRESETS)) {
@@ -19,13 +18,13 @@ for (const [slug, preset] of Object.entries(DEPLOY_PRESETS)) {
   }
 }
 
-if (!checkOnly && updates.length > 0) {
+if (updates.length > 0) {
   const sourceFile = Bun.file(new URL('../src/presets.ts', import.meta.url));
   await Bun.write(sourceFile, updatePresetSource({ source: await sourceFile.text(), updates }));
   await $`bun fix:codestyle`.cwd(repoRoot);
 }
 
-if (process.env.GITHUB_OUTPUT && !checkOnly) {
+if (process.env.GITHUB_OUTPUT) {
   const { branch, body } = presetUpdateProposal(updates);
   const delimiter = randomUUID();
   await appendFile(
