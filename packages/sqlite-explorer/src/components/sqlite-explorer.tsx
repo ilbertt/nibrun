@@ -1,22 +1,14 @@
 import { cn } from '@repo/ui/lib/utils';
-import { ConnectionForm } from '#components/connection-form.tsx';
-import { ExplorerHeader } from '#components/explorer-header.tsx';
 import { StudioWorkspace } from '#components/studio-workspace.tsx';
-import { useSqliteExplorer } from '#hooks/use-sqlite-explorer.ts';
+import type { SqliteWorkspace } from '#lib/workspace.ts';
 
-export function SqliteExplorer({ className }: { className: string | undefined }) {
-  const explorer = useSqliteExplorer();
-  if (!explorer.workspace) {
-    return (
-      <div className={className}>
-        <ConnectionForm
-          connecting={explorer.connecting}
-          error={explorer.error}
-          connect={explorer.connect}
-        />
-      </div>
-    );
-  }
+export function SqliteExplorer({
+  workspace,
+  className,
+}: {
+  workspace: SqliteWorkspace;
+  className: string | undefined;
+}) {
   return (
     <section
       className={cn(
@@ -24,8 +16,7 @@ export function SqliteExplorer({ className }: { className: string | undefined })
         className,
       )}
     >
-      <ExplorerHeader url={explorer.workspace.url} disconnect={explorer.disconnect} />
-      <StudioWorkspace workspace={explorer.workspace} />
+      <StudioWorkspace workspace={workspace} />
     </section>
   );
 }
