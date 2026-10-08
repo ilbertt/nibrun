@@ -10,7 +10,7 @@ export function SqliteBrowser() {
     <main className="flex h-svh min-h-96 flex-col gap-3 bg-background p-4 md:p-6">
       <h1 className="flex items-center gap-2 font-medium">
         <DatabaseIcon className="size-4 text-muted-foreground" />
-        <span className="truncate" title={view.path}>
+        <span className="truncate" title={view.fileName}>
           {view.fileName ?? 'SQLite explorer'}
         </span>
       </h1>

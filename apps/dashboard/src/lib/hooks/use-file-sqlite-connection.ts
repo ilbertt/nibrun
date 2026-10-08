@@ -13,7 +13,14 @@ export function useFileSqliteConnection(
 ): SqliteConnectionSummary | undefined {
   const connections = useQuery(sqliteConnectionsQueryOptions(useAppId()));
   const path = childPath({ path: useDirectoryPath(), name: entry.name });
-  return entry.kind === 'file'
-    ? connections.data?.find((connection) => connection.sqlite_file_path === path)
-    : undefined;
+  const connection =
+    entry.kind === 'file'
+      ? connections.data?.find((connection) => connection.sqlite_file_path === path)
+      : undefined;
+  if (connection === undefined) {
+    return undefined;
+  }
+  // The development dashboard proxies the API on a different port.
+  const url = new URL(new URL(connection.url).pathname, window.location.origin).href;
+  return { ...connection, url };
 }
