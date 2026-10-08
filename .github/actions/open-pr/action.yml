@@ -20,10 +20,8 @@ inputs:
     required: true
   token:
     description: >-
-      Token to open the pull request with. GitHub fires no events for what
-      GITHUB_TOKEN does, so the default opens a pull request none of main's
-      required checks will ever run on. Pass a PAT or app token to get one that
-      can merge.
+      Token used to push the branch and open the pull request. Defaults to the
+      workflow's built-in GITHUB_TOKEN.
     default: ${{ github.token }}
 
 outputs:

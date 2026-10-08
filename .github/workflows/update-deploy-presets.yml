@@ -1,0 +1,42 @@
+name: update-deploy-presets
+
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: update-deploy-presets
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-deploy-presets:
+    if: github.event_name != 'schedule' || github.repository == 'ilbertt/nibrun'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - uses: ./.github/actions/prepare
+
+      - name: Update deploy presets
+        id: updates
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun run --filter @repo/deploy-link update:presets
+
+      - name: Open the update pull request
+        if: steps.updates.outputs.has-updates == 'true'
+        uses: ./.github/actions/open-pr
+        with:
+          branch: ${{ steps.updates.outputs.branch }}
+          title: 'chore(deploy-link): update deploy presets'
+          body: ${{ steps.updates.outputs.body }}
+          paths: packages/deploy-link/src/presets.ts
