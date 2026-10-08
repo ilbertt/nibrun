@@ -40,7 +40,7 @@ export async function executeWorkspaceQuery({
       ),
     ),
     rowCount: rows.length,
-    executionTime: performance.now() - started,
+    executionTime: Math.round(performance.now() - started),
     ...(page
       ? {
           pagination: {

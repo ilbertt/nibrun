@@ -19,7 +19,7 @@ function openWorkspace() {
   const server = startDatabaseServer(setup);
   const workspace = createSqliteWorkspace({ url: server.url, authToken: '' });
   disposables.push(workspace, server);
-  return { workspace, ...workspace.props };
+  return { server, workspace, ...workspace.props };
 }
 
 describe('LibreDB SQLite catalog adapter', () => {
@@ -37,8 +37,9 @@ describe('LibreDB SQLite catalog adapter', () => {
     ]);
   });
   test('provides columns, indexes and foreign keys for the workspace and ER diagram', async () => {
-    const { workspace, onSchemaFetch } = openWorkspace();
+    const { server, workspace, onSchemaFetch } = openWorkspace();
     const schema = await onSchemaFetch(workspace.url);
+    expect(server.peakConcurrentRequests).toBe(1);
     const orders = schema.find((object) => object.name === 'orders');
     expect(orders?.columns).toContainEqual({
       name: 'id',

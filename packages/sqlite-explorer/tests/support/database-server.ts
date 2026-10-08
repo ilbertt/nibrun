@@ -7,11 +7,15 @@ import type {
 } from '@repo/sqlite';
 import { decodeValue, encodeValue } from '#tests/support/hrana-values.ts';
 
+const RESPONSE_DELAY_MS = 5;
+
 export function startDatabaseServer(setup: string) {
   const database = new Database(':memory:', { safeIntegers: true });
   database.exec(setup);
   const statements: string[] = [];
   const headers: Headers[] = [];
+  let activeRequests = 0;
+  let peakConcurrentRequests = 0;
 
   function execute(request: HranaStreamRequest): HranaStreamResult {
     if (request.type === 'close') {
@@ -57,14 +61,21 @@ export function startDatabaseServer(setup: string) {
     hostname: '127.0.0.1',
     port: 0,
     async fetch(request) {
-      headers.push(request.headers);
-      const body = (await request.json()) as HranaPipelineReqBody;
-      const response: HranaPipelineRespBody = {
-        baton: null,
-        base_url: null,
-        results: body.requests.map(execute),
-      };
-      return Response.json(response);
+      activeRequests += 1;
+      peakConcurrentRequests = Math.max(peakConcurrentRequests, activeRequests);
+      try {
+        await Bun.sleep(RESPONSE_DELAY_MS);
+        headers.push(request.headers);
+        const body = (await request.json()) as HranaPipelineReqBody;
+        const response: HranaPipelineRespBody = {
+          baton: null,
+          base_url: null,
+          results: body.requests.map(execute),
+        };
+        return Response.json(response);
+      } finally {
+        activeRequests -= 1;
+      }
     },
   });
 
@@ -73,5 +84,13 @@ export function startDatabaseServer(setup: string) {
     database.close();
   }
 
-  return { url: server.url.href, statements, headers, close };
+  return {
+    url: server.url.href,
+    statements,
+    headers,
+    close,
+    get peakConcurrentRequests() {
+      return peakConcurrentRequests;
+    },
+  };
 }

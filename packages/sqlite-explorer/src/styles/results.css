@@ -5,7 +5,8 @@
 
 .sqlite-explorer :has(> [data-desktop-grid]) > .md\:hidden,
 .sqlite-explorer [aria-label="Card view"],
-.sqlite-explorer [aria-label="Table view"] {
+.sqlite-explorer [aria-label="Table view"],
+.sqlite-explorer [aria-label="New connection"] {
   display: none;
 }
 

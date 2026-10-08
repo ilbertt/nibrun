@@ -11,7 +11,13 @@ function fetchDatabase(request: Request): Promise<Response> {
 }
 
 export function createSqliteDatabase(connection: SqliteConnection) {
-  const client = createClient({ ...connection, intMode: 'bigint', fetch: fetchDatabase });
+  // Catalog reads fan out; one request at a time leaves guest sessions available to other clients.
+  const client = createClient({
+    ...connection,
+    intMode: 'bigint',
+    concurrency: 1,
+    fetch: fetchDatabase,
+  });
 
   async function execute(statement: InStatement) {
     try {
