@@ -9,6 +9,8 @@ export const SQLITE_OBJECT_KINDS = [
 export const SQLITE_WORKSPACE_CAPABILITIES: ProviderCapabilities = {
   queryLanguage: 'sql',
   identifierQuoting: 'double-always',
+  // Table previews become subqueries, so generated SQL must omit its statement terminator.
+  statementTerminator: 'none',
   supportsExplain: false,
   supportsExternalQueryLimiting: true,
   supportsResultPagination: true,
