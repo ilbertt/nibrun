@@ -58,7 +58,7 @@ export type DeployPreset = {
 export const DEPLOY_PRESETS = {
   pocketbase: {
     projectUrl: 'https://github.com/pocketbase/pocketbase',
-    version: 'v0.40.3',
+    version: 'v0.40.4',
     markdownContent: pocketbasePage,
     category: DeployCategory.Backends,
     title: 'PocketBase',
@@ -66,8 +66,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'pocketbase',
       binary:
-        'https://github.com/pocketbase/pocketbase/releases/download/v0.40.3/pocketbase_0.40.3_linux_amd64.zip',
-      sha256: '8d81b6b79add0e219373e922ebe1dddbee7f57fcff602e3585e0d2c654b983ce',
+        'https://github.com/pocketbase/pocketbase/releases/download/v0.40.4/pocketbase_0.40.4_linux_amd64.zip',
+      sha256: '9042ec818570e79c3628dadcd0a756c1496d9e1173918ec409d133c02f82e5fa',
       port: 8090,
       arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data', '--publicDir=./data/pb_public'],
       minimal: true,
@@ -145,7 +145,7 @@ export const DEPLOY_PRESETS = {
   },
   gitea: {
     projectUrl: 'https://github.com/go-gitea/gitea',
-    version: 'v1.28.0-dev-nibrun.3',
+    version: 'v1.28.0-dev-nibrun.4',
     markdownContent: giteaPage,
     category: DeployCategory.DeveloperTools,
     title: 'Gitea',
@@ -154,8 +154,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'gitea',
       binary:
-        'https://github.com/ilbertt/gitea/releases/download/v1.28.0-dev-nibrun.3/gitea-nibrun-linux-amd64',
-      sha256: 'f7a3b71523a60be16772b82240a74e4fead1a5e7162008d6e5cf85cdd97ceff6',
+        'https://github.com/ilbertt/gitea/releases/download/v1.28.0-dev-nibrun.4/gitea-nibrun-linux-amd64',
+      sha256: '22c6dbf7b76b60e92a1f5a37370d8de546de1a8a44d53e19483163260d448ba3',
       port: 3000,
       arg: ['nibrun'],
       minimal: true,
@@ -179,7 +179,7 @@ export const DEPLOY_PRESETS = {
   },
   'open-connector': {
     projectUrl: 'https://github.com/oomol-lab/open-connector',
-    version: 'v1.5.0',
+    version: 'v1.8.0',
     markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
@@ -187,8 +187,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'open-connector',
       binary:
-        'https://github.com/oomol-lab/open-connector/releases/download/v1.5.0/open-connector-linux-x64',
-      sha256: '127c17d6dcdbd646733ddcb714509996e75cbede1f0eaca6ded9b26fa9115ee2',
+        'https://github.com/oomol-lab/open-connector/releases/download/v1.8.0/open-connector-linux-x64',
+      sha256: '042221049835b67c328f2bb948c864106944ace59bc2f125061251da272809a4',
       port: 3000,
       env: [
         'HOST=0.0.0.0',
@@ -224,7 +224,7 @@ export const DEPLOY_PRESETS = {
   },
   'nibrun-vitals': {
     projectUrl: 'https://github.com/ilbertt/nibrun-vitals',
-    version: 'v2026.9.15-1',
+    version: 'v2026.9.16-1',
     markdownContent: nibrunVitalsPage,
     category: DeployCategory.Analytics,
     title: 'nibrun-vitals',
@@ -233,8 +233,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'nibrun-vitals',
       binary:
-        'https://github.com/ilbertt/nibrun-vitals/releases/download/v2026.9.15-1/vitals-linux-x64',
-      sha256: '7dc1910531f9bec63c190abfec06de661348b0885d391982cc333fac312b1f42',
+        'https://github.com/ilbertt/nibrun-vitals/releases/download/v2026.9.16-1/vitals-linux-x64',
+      sha256: '3131c0fc4e7bdc1954045f0844f189e2e31e3701d092633bd5dacda9c7d51446',
       port: 3000,
       minimal: true,
     },
@@ -302,15 +302,15 @@ export const DEPLOY_PRESETS = {
   },
   fusion: {
     projectUrl: 'https://github.com/0x2E/fusion',
-    version: 'v1.2.1',
+    version: 'v1.3.0',
     markdownContent: fusionPage,
     category: DeployCategory.Feeds,
     title: 'Fusion',
     subtitle: 'An RSS reader for your own feeds, behind a password.',
     deployLink: {
       name: 'fusion',
-      binary: 'https://github.com/0x2E/fusion/releases/download/v1.2.1/fusion-linux-amd64',
-      sha256: '46bbc00d928eed56432a1a8d7bf75c6715b7fbc07594bc7128cbafee492d3dc6',
+      binary: 'https://github.com/0x2E/fusion/releases/download/v1.3.0/fusion-linux-amd64',
+      sha256: 'fc2e52b878a1eaa7a5359bf0504feab7538be25a5a28e97292f1fcd0241e10f8',
       port: 8080,
       env: [
         `FUSION_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
@@ -524,7 +524,7 @@ export const DEPLOY_PRESETS = {
   },
   flipt: {
     projectUrl: 'https://github.com/flipt-io/flipt',
-    version: 'v2.13.0',
+    version: 'v2.13.1',
     markdownContent: fliptPage,
     title: 'Flipt',
     subtitle: 'Feature flags with a UI, evaluated over HTTP or gRPC.',
@@ -532,8 +532,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'flipt',
       binary:
-        'https://github.com/flipt-io/flipt/releases/download/v2.13.0/flipt_linux_x86_64.tar.gz',
-      sha256: 'c701751a28e0ffa6a5a0135917673becc435fedcb9b563d29a6ee754de019e45',
+        'https://github.com/flipt-io/flipt/releases/download/v2.13.1/flipt_linux_x86_64.tar.gz',
+      sha256: '5cefdf507eb4d2b5bb8fe3e167e2f7bf5ac83fbaed2b065693067beb2f96327a',
       port: 8080,
       arg: ['server'],
       env: [
