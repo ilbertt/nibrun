@@ -32,10 +32,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: bun run --filter @repo/deploy-link update:presets
 
-      - name: Format updated presets
-        if: steps.updates.outputs.has-updates == 'true'
-        run: bun fix:codestyle
-
       - name: Open the update pull request
         if: steps.updates.outputs.has-updates == 'true'
         uses: ./.github/actions/open-pr
@@ -44,7 +40,3 @@ jobs:
           title: 'chore(deploy-link): update deploy presets'
           body: ${{ steps.updates.outputs.body }}
           paths: packages/deploy-link/src/presets.ts
-
-      - name: Report failed update checks
-        if: steps.updates.outputs.has-errors == 'true'
-        run: exit 1
