@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { newestDeploymentQueryOptions } from '#queries/deployments.ts';
 import { filesystemQueryKey } from '#queries/filesystem.ts';
+import { sqliteConnectionsQueryOptions } from '#queries/sqlite-connections.ts';
 
 export type DirectoryRefresh = {
   isRefreshing: boolean;
@@ -20,7 +21,10 @@ export function useDirectoryRefresh(): DirectoryRefresh {
       await queryClient.invalidateQueries({
         queryKey: newestDeploymentQueryOptions(appId).queryKey,
       });
-      await queryClient.invalidateQueries({ queryKey: filesystemQueryKey(appId) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: filesystemQueryKey(appId) }),
+        queryClient.invalidateQueries({ queryKey: sqliteConnectionsQueryOptions(appId).queryKey }),
+      ]);
     },
   });
 
