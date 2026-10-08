@@ -49,6 +49,15 @@ ORDER BY notes DESC;
 The explorer header shows the app name and the database's path relative to `/app/data`.
 **Back to app** returns to the app overview.
 
+## Built on LibreDB Studio and libSQL
+
+The explorer embeds [LibreDB Studio](https://github.com/libredb/libredb-studio) for table browsing,
+row details and the SQL editor. We adapt its styles to the dashboard and add foreign-key navigation.
+
+Queries use [libSQL's Hrana HTTP v2 protocol](https://github.com/tursodatabase/libsql/blob/main/docs/HTTP_V2_SPEC.md)
+through `@libsql/client` in the browser. nibrun's API relays them to a read-only SQLite connection
+inside your app's microVM.
+
 ## Your app's file, opened read-only
 
 Explorer connections are read-only. You can inspect data while your app keeps using the
