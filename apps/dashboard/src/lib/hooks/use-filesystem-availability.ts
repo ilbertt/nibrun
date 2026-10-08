@@ -16,8 +16,8 @@ export type FilesystemAvailability =
 const BROWSABLE: FilesystemAvailability = { kind: 'browsable' };
 
 /**
- * A directory is read inside the microVM that has the volume mounted, so an app running none has
- * nothing to answer a browse with. Decided here rather than waited for, because the api holds the
+ * A suspended app or failed release has no microVM to answer a browse with. Idle apps wake when
+ * asked for their files. Decided here rather than waited for, because the api holds the
  * request open for half a minute in the hope of a host that is never going to poll — and what
  * comes back then names neither the app nor why.
  *

@@ -36,22 +36,15 @@ type AppState = {
  * A state added to `AppStatusKey` is a row missing from here, which is a type error rather than a
  * command someone finds hanging on an app that was never going to answer it.
  */
-const STATE: Record<AppStatusKey, AppState> = {
+const STATE: Record<AppStatusKey, AppState | undefined> = {
   'never-deployed': {
     because: 'has never been deployed',
     refuses: ['logs', 'crons', 'files', 'export'],
   },
-  pending: { because: 'is staging a release', refuses: [] },
-  starting: { because: 'is starting', refuses: [] },
-  running: { because: 'is running', refuses: [] },
-  // Refuses only what has to reach inside a microVM: there is none until a visitor causes one,
-  // and a browse is not a visit. Everything else is asked of the app rather than of the guest,
-  // and an app waiting to be asked for is one an owner may still release, export or suspend.
-  idle: {
-    because: 'is idle until something asks for it',
-    hint: 'Open it to wake it.',
-    refuses: ['files'],
-  },
+  pending: undefined,
+  starting: undefined,
+  running: undefined,
+  idle: undefined,
   // The volume outlives the release that failed on it, so everything but reading it from inside
   // a microVM still works — including the export that is how you get at it instead.
   failed: { because: 'is on a release that failed', refuses: ['files'] },
@@ -64,7 +57,7 @@ const STATE: Record<AppStatusKey, AppState> = {
     hint: 'Resume it once it has stopped.',
     refuses: ['release', 'files'],
   },
-  resuming: { because: 'is resuming', refuses: [] },
+  resuming: undefined,
   // Its output is the exception: what an app wrote is worth reading right up to the moment it
   // goes, and reading it asks nothing of the host that is tearing the app down.
   deleting: {
@@ -104,7 +97,7 @@ export function operationRefusal({
   release?: SettledDeployment | undefined;
 }): string | undefined {
   const state = STATE[statusKey(status)];
-  if (!state.refuses.includes(operation)) {
+  if (state === undefined || !state.refuses.includes(operation)) {
     return undefined;
   }
   const refusal = `App ${name} ${state.because}, so ${CANNOT[operation]}`;
