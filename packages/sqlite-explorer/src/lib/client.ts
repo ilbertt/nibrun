@@ -4,7 +4,7 @@ import type { SqliteConnection } from '#lib/connection.ts';
 const QUERY_TIMEOUT_MS = 15_000;
 function fetchDatabase(request: Request): Promise<Response> {
   return fetch(request, {
-    credentials: 'omit',
+    credentials: 'same-origin',
     redirect: 'error',
     signal: AbortSignal.timeout(QUERY_TIMEOUT_MS),
   });
@@ -13,7 +13,8 @@ function fetchDatabase(request: Request): Promise<Response> {
 export function createSqliteDatabase(connection: SqliteConnection) {
   // Catalog reads fan out; one request at a time leaves guest sessions available to other clients.
   const client = createClient({
-    ...connection,
+    url: connection.url,
+    authToken: connection.authToken || undefined,
     intMode: 'bigint',
     concurrency: 1,
     fetch: fetchDatabase,

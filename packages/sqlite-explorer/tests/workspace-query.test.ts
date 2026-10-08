@@ -22,6 +22,13 @@ function openWorkspace(sql: string) {
 }
 
 describe('LibreDB query adapter', () => {
+  test('does not send an empty bearer header for session authentication', async () => {
+    const server = startDatabaseServer(setup);
+    const workspace = createSqliteWorkspace({ url: server.url, authToken: '' });
+    disposables.push(workspace, server);
+    await workspace.props.onQueryExecute(workspace.url, 'SELECT id FROM users LIMIT 1');
+    expect(server.headers[0]?.has('authorization')).toBe(false);
+  });
   test('sends SQL editor queries unchanged and returns all rows without pagination', async () => {
     const { server, workspace, onQueryExecute } = openWorkspace(setup);
     const sql = '  SELECT id FROM users ORDER BY id; -- keep the comment\n';
