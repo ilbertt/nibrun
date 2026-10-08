@@ -1,41 +1,37 @@
-import { parse } from '@babel/parser';
-import {
-  isExportNamedDeclaration,
-  isIdentifier,
-  isObjectExpression,
-  isObjectProperty,
-  isStringLiteral,
-  isTSSatisfiesExpression,
-  isVariableDeclaration,
-  type ObjectExpression,
-  type ObjectProperty,
-} from '@babel/types';
+import ts from '@typescript/typescript6';
 import type { PresetUpdate } from '#scripts/updates/releases.ts';
 
 type Edit = { start: number; end: number; text: string };
 
 export function updatePresetSource(options: { source: string; updates: PresetUpdate[] }): string {
   const { source, updates } = options;
-  const file = parse(source, { sourceType: 'module', plugins: ['typescript'] });
-  const declaration = file.program.body
-    .filter((statement) => isExportNamedDeclaration(statement))
-    .map((statement) => statement.declaration)
-    .filter((statement) => isVariableDeclaration(statement))
-    .flatMap((statement) => statement.declarations)
-    .find((candidate) => isIdentifier(candidate.id) && candidate.id.name === 'DEPLOY_PRESETS');
-  const initializer = declaration?.init;
-  const presets = isTSSatisfiesExpression(initializer) ? initializer.expression : initializer;
-  if (!isObjectExpression(presets)) {
+  const file = ts.createSourceFile(
+    'presets.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const declaration = file.statements
+    .filter(ts.isVariableStatement)
+    .flatMap((statement) => [...statement.declarationList.declarations])
+    .find(
+      (candidate) => ts.isIdentifier(candidate.name) && candidate.name.text === 'DEPLOY_PRESETS',
+    );
+  const initializer = declaration?.initializer;
+  const presets =
+    initializer && ts.isSatisfiesExpression(initializer) ? initializer.expression : initializer;
+  if (!presets || !ts.isObjectLiteralExpression(presets)) {
     throw new Error('DEPLOY_PRESETS must be an object literal');
   }
   const edits: Edit[] = [];
   for (const update of updates) {
-    const preset = property({ object: presets, name: update.slug }).value;
-    if (!isObjectExpression(preset)) {
+    const preset = property({ object: presets, name: update.slug }).initializer;
+    if (!ts.isObjectLiteralExpression(preset)) {
       throw new Error(`Expected an object for ${update.slug}`);
     }
-    const link = property({ object: preset, name: 'deployLink' }).value;
-    if (!isObjectExpression(link)) {
+    const link = property({ object: preset, name: 'deployLink' }).initializer;
+    if (!ts.isObjectLiteralExpression(link)) {
       throw new Error(`Expected a deploy link for ${update.slug}`);
     }
     edits.push(
@@ -71,14 +67,13 @@ function descendingPosition(...[left, right]: [Edit, Edit]): number {
   return right.start - left.start;
 }
 
-function property(options: { object: ObjectExpression; name: string }): ObjectProperty {
-  const found = options.object.properties.filter(isObjectProperty).find((candidate) => {
-    const name = candidate.key;
-    return (
-      !candidate.computed &&
-      ((isIdentifier(name) && name.name === options.name) ||
-        (isStringLiteral(name) && name.value === options.name))
-    );
+function property(options: {
+  object: ts.ObjectLiteralExpression;
+  name: string;
+}): ts.PropertyAssignment {
+  const found = options.object.properties.filter(ts.isPropertyAssignment).find((candidate) => {
+    const name = candidate.name;
+    return (ts.isIdentifier(name) || ts.isStringLiteral(name)) && name.text === options.name;
   });
   if (!found) {
     throw new Error(`Missing preset property: ${options.name}`);
@@ -87,20 +82,14 @@ function property(options: { object: ObjectExpression; name: string }): ObjectPr
 }
 
 function replacement(options: {
-  object: ObjectExpression;
+  object: ts.ObjectLiteralExpression;
   name: string;
   previous: string | undefined;
   next: string | undefined;
 }): Edit {
-  const value = property(options).value;
-  if (
-    !isStringLiteral(value) ||
-    value.value !== options.previous ||
-    options.next === undefined ||
-    value.start == null ||
-    value.end == null
-  ) {
+  const value = property(options).initializer;
+  if (!ts.isStringLiteral(value) || value.text !== options.previous || options.next === undefined) {
     throw new Error(`Unexpected preset value for ${options.name}`);
   }
-  return { start: value.start, end: value.end, text: JSON.stringify(options.next) };
+  return { start: value.getStart(), end: value.getEnd(), text: JSON.stringify(options.next) };
 }
