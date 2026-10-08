@@ -1,0 +1,6 @@
+@import "@libredb/studio/styles.css";
+@import "./styles/editor.css";
+@import "./styles/table.css";
+@import "./styles/row-details.css";
+@source "./";
+@source "../node_modules/@libredb/studio/dist/*.mjs";

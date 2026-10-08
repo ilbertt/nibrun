@@ -1,0 +1,23 @@
+.sqlite-row-value {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  cursor: pointer;
+}
+
+.sqlite-row-value::-webkit-details-marker {
+  display: none;
+}
+
+details[open] > .sqlite-row-value {
+  display: block;
+  -webkit-line-clamp: unset;
+  max-height: 12rem;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  text-overflow: clip;
+}
