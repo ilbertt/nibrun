@@ -18,6 +18,19 @@ int main(void) {
   EXPECT(sqlite3_exec(query.database, "SELECT * FROM items", NULL, NULL,
                       NULL) == SQLITE_OK);
   EXPECT(sqlite3_exec(query.database, "INSERT INTO items VALUES(2)", NULL, NULL,
+                      NULL) == SQLITE_READONLY);
+  EXPECT(sqlite3_db_readonly(query.database, "main") == 1);
+  EXPECT(sqlite3_exec(query.database, "UPDATE items SET value=2", NULL, NULL,
+                      NULL) == SQLITE_READONLY);
+  EXPECT(sqlite3_exec(query.database, "DELETE FROM items", NULL, NULL,
+                      NULL) == SQLITE_READONLY);
+  EXPECT(sqlite3_exec(query.database, "CREATE TABLE forbidden(value)", NULL, NULL,
+                      NULL) == SQLITE_READONLY);
+  EXPECT(sqlite3_exec(query.database, "CREATE TEMP TABLE forbidden(value)", NULL, NULL,
+                      NULL) == SQLITE_READONLY);
+  EXPECT(sqlite3_exec(query.database, "DROP TABLE items", NULL, NULL,
+                      NULL) == SQLITE_READONLY);
+  EXPECT(sqlite3_exec(query.database, "PRAGMA query_only=OFF", NULL, NULL,
                       NULL) == SQLITE_AUTH);
   EXPECT(sqlite3_exec(query.database, "ATTACH 'other.db' AS other", NULL, NULL,
                       NULL) == SQLITE_AUTH);

@@ -27,7 +27,8 @@ static bool allowed_pragma(const char *name, const char *argument) {
   return argument == NULL &&
          (sqlite3_stricmp(name, "database_list") == 0 ||
           sqlite3_stricmp(name, "schema_version") == 0 ||
-          sqlite3_stricmp(name, "user_version") == 0 || sqlite3_stricmp(name, "encoding") == 0);
+          sqlite3_stricmp(name, "user_version") == 0 || sqlite3_stricmp(name, "encoding") == 0 ||
+          sqlite3_stricmp(name, "query_only") == 0);
 }
 
 static int authorize(void *context, int operation, const char *first, const char *second,
@@ -42,6 +43,29 @@ static int authorize(void *context, int operation, const char *first, const char
     case SQLITE_RECURSIVE:
     case SQLITE_TRANSACTION:
     case SQLITE_SAVEPOINT:
+    /* Let query_only produce SQLite's native errors for data and schema writes. */
+    case SQLITE_INSERT:
+    case SQLITE_UPDATE:
+    case SQLITE_DELETE:
+    case SQLITE_CREATE_INDEX:
+    case SQLITE_CREATE_TABLE:
+    case SQLITE_CREATE_TRIGGER:
+    case SQLITE_CREATE_VIEW:
+    case SQLITE_CREATE_TEMP_INDEX:
+    case SQLITE_CREATE_TEMP_TABLE:
+    case SQLITE_CREATE_TEMP_TRIGGER:
+    case SQLITE_CREATE_TEMP_VIEW:
+    case SQLITE_DROP_INDEX:
+    case SQLITE_DROP_TABLE:
+    case SQLITE_DROP_TRIGGER:
+    case SQLITE_DROP_VIEW:
+    case SQLITE_DROP_TEMP_INDEX:
+    case SQLITE_DROP_TEMP_TABLE:
+    case SQLITE_DROP_TEMP_TRIGGER:
+    case SQLITE_DROP_TEMP_VIEW:
+    case SQLITE_ALTER_TABLE:
+    case SQLITE_REINDEX:
+    case SQLITE_ANALYZE:
       return SQLITE_OK;
     case SQLITE_PRAGMA:
       return allowed_pragma(first, second) ? SQLITE_OK : SQLITE_DENY;
@@ -131,6 +155,9 @@ int sqlite_query_open(struct sqlite_query *query, const char *path) {
   sqlite3_limit(query->database, SQLITE_LIMIT_VARIABLE_NUMBER, 256);
   sqlite3_db_config(query->database, SQLITE_DBCONFIG_DEFENSIVE, 1, NULL);
   sqlite3_db_config(query->database, SQLITE_DBCONFIG_TRUSTED_SCHEMA, 0, NULL);
+  code = sqlite3_exec(query->database, "PRAGMA query_only=ON", NULL, NULL, NULL);
+  if (code != SQLITE_OK)
+    return code;
   sqlite3_set_authorizer(query->database, authorize, NULL);
   sqlite3_progress_handler(query->database, 1000, cancelled, query);
   query->deadline_ms = clock_monotonic_ms() + SQLITE_QUERY_TIMEOUT_MS;

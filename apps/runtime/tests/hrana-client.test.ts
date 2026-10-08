@@ -10,6 +10,7 @@ const READINESS_ATTEMPTS = 50;
 const READINESS_INTERVAL_MS = 100;
 const STARTUP_TIMEOUT_MS = 30_000;
 const SEQUENCE_RESULT = 3n;
+const INITIAL_ITEM_VALUE = 42n;
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
 let container: string | undefined;
@@ -180,12 +181,33 @@ describe('native guest with the official libSQL HTTP client', () => {
     expect(batch.step_results[2]).toBeNull();
   });
 
-  test('refuses writes, attached databases, and unsafe pragmas', async () => {
+  test.each([
+    'INSERT INTO items VALUES(43)',
+    'UPDATE items SET value=43',
+    'DELETE FROM items',
+    'CREATE TABLE forbidden(value)',
+    'CREATE TEMP TABLE forbidden(value)',
+    'DROP TABLE items',
+    'WITH selected AS (SELECT 43) INSERT INTO items SELECT * FROM selected',
+  ])('relays SQLite read-only errors for %s', async function refusesWrite(sql) {
     const client = connection('/app.db');
     try {
-      await expect(client.execute('CREATE TABLE forbidden(value)')).rejects.toThrow();
-      await expect(client.execute("ATTACH '/other.db' AS other")).rejects.toThrow();
-      await expect(client.execute('PRAGMA writable_schema=ON')).rejects.toThrow();
+      await expect(client.execute(sql)).rejects.toThrow('SQLITE_READONLY');
+      expect((await client.execute('SELECT value FROM items')).rows[0]?.value).toBe(
+        INITIAL_ITEM_VALUE,
+      );
+    } finally {
+      client.close();
+    }
+  });
+
+  test('refuses attached databases, unsafe pragmas and disabling query-only mode', async () => {
+    const client = connection('/app.db');
+    try {
+      await expect(client.execute("ATTACH '/other.db' AS other")).rejects.toThrow('SQLITE_AUTH');
+      await expect(client.execute('PRAGMA writable_schema=ON')).rejects.toThrow('SQLITE_AUTH');
+      await expect(client.execute('PRAGMA query_only=OFF')).rejects.toThrow('SQLITE_AUTH');
+      await expect(client.execute('DELETE FROM items')).rejects.toThrow('SQLITE_READONLY');
     } finally {
       client.close();
     }
