@@ -1,11 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
-import { type AppSummary, appQueryOptions } from '#queries/apps.ts';
-import { Route } from '#routes/sqlite.tsx';
+import { useApp } from '#lib/hooks/use-app.ts';
+import { useSqliteConnection } from '#lib/hooks/use-sqlite-connection.ts';
+import type { AppSummary } from '#queries/apps.ts';
 
 export function useSqliteApp(): AppSummary | undefined {
-  const { appId } = Route.useSearch();
-  return useQuery({
-    ...appQueryOptions(appId ?? ''),
-    enabled: Boolean(appId),
-  }).data;
+  const connection = useSqliteConnection();
+  return useApp(connection.data?.appId).data;
 }
