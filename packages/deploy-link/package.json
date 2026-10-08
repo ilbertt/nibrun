@@ -22,7 +22,6 @@
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@tanstack/react-router": "catalog:",
-    "@typescript/typescript6": "^6.0.2",
     "typescript": "catalog:"
   }
 }

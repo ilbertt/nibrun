@@ -1,17 +1,17 @@
-import ts from '@typescript/typescript6';
+import { resolve } from 'node:path';
+import * as ts from 'typescript/unstable/ast';
+import { API } from 'typescript/unstable/async';
+import { createVirtualFileSystem } from 'typescript/unstable/fs';
 import type { PresetUpdate } from '#scripts/updates/releases.ts';
 
 type Edit = { start: number; end: number; text: string };
 
-export function updatePresetSource(options: { source: string; updates: PresetUpdate[] }): string {
+export async function updatePresetSource(options: {
+  source: string;
+  updates: PresetUpdate[];
+}): Promise<string> {
   const { source, updates } = options;
-  const file = ts.createSourceFile(
-    'presets.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
+  const file = await parseSource(source);
   const declaration = file.statements
     .filter(ts.isVariableStatement)
     .flatMap((statement) => [...statement.declarationList.declarations])
@@ -61,6 +61,32 @@ export function updatePresetSource(options: { source: string; updates: PresetUpd
     written = written.slice(0, edit.start) + edit.text + written.slice(edit.end);
   }
   return written;
+}
+
+async function parseSource(source: string): Promise<ts.SourceFile> {
+  const directory = resolve('deploy-preset-source');
+  const sourcePath = resolve(directory, 'presets.ts');
+  const configPath = resolve(directory, 'tsconfig.json');
+  const api = new API({
+    cwd: directory,
+    fs: createVirtualFileSystem({
+      [sourcePath]: source,
+      [configPath]: JSON.stringify({
+        files: [sourcePath],
+        compilerOptions: { noLib: true, noResolve: true },
+      }),
+    }),
+  });
+  try {
+    const snapshot = await api.updateSnapshot({ openProjects: [configPath] });
+    const file = await snapshot.getProject(configPath)?.program.getSourceFile(sourcePath);
+    if (!file) {
+      throw new Error('Could not parse deploy preset source');
+    }
+    return file;
+  } finally {
+    await api.close();
+  }
 }
 
 function descendingPosition(...[left, right]: [Edit, Edit]): number {

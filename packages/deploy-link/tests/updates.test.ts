@@ -223,6 +223,7 @@ test('a missing Drizzle download is reported instead of treated as up to date', 
 
 const source = `export const DEPLOY_PRESETS = {
   "pocketbase": {
+    title: "PocketBase 🚀",
     version: "v0.40.3",
     subtitle: "v0.40.3",
     deployLink: {
@@ -247,31 +248,32 @@ function sourceUpdate(): PresetUpdate {
   };
 }
 
-test('source editing preserves unrelated fields, presets and runtime settings', () => {
+test('source editing preserves unrelated fields, presets and runtime settings', async () => {
   const update = sourceUpdate();
-  const written = updatePresetSource({ source, updates: [update] });
+  const written = await updatePresetSource({ source, updates: [update] });
   expect(written).toContain(`version: "${nextVersion}"`);
   expect(written).toContain(`binary: "${nextBinary}"`);
   expect(written).toContain(`sha256: "${nextChecksum}"`);
+  expect(written).toContain('title: "PocketBase 🚀"');
   expect(written).toContain('subtitle: "v0.40.3"');
   expect(written).toContain('env: ["VERSION=v0.40.3"]');
   expect(written).toContain('"another": { version: "v0.40.3" }');
   expect(
-    updatePresetSource({
+    await updatePresetSource({
       source: written,
       updates: [{ ...update, previous: update.next, next: update.previous }],
     }),
   ).toBe(source);
 });
 
-test('source editing refuses stale input instead of changing the wrong literal', () => {
+test('source editing refuses stale input instead of changing the wrong literal', async () => {
   const update = sourceUpdate();
-  expect(() =>
-    updatePresetSource({
-      source,
-      updates: [{ ...update, previous: { ...update.previous, version: 'v0.1.0' } }],
-    }),
-  ).toThrow('Unexpected preset value for version');
+  const error = await updatePresetSource({
+    source,
+    updates: [{ ...update, previous: { ...update.previous, version: 'v0.1.0' } }],
+  }).catch((cause: unknown) => cause);
+  expect(error).toBeInstanceOf(Error);
+  expect(String(error)).toContain('Unexpected preset value for version');
 });
 
 test('the same target pins keep their proposal identity across checks and ordering changes', () => {

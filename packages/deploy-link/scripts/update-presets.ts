@@ -20,7 +20,10 @@ for (const [slug, preset] of Object.entries(DEPLOY_PRESETS)) {
 
 if (updates.length > 0) {
   const sourceFile = Bun.file(new URL('../src/presets.ts', import.meta.url));
-  await Bun.write(sourceFile, updatePresetSource({ source: await sourceFile.text(), updates }));
+  await Bun.write(
+    sourceFile,
+    await updatePresetSource({ source: await sourceFile.text(), updates }),
+  );
   await $`bun fix:codestyle`.cwd(repoRoot);
 }
 

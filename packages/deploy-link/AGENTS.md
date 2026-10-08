@@ -3,8 +3,9 @@
 `src/presets.ts` owns the deploy catalog and its version, binary URL and checksum pins.
 Keep preset maintenance in `scripts/update-presets.ts` and its helpers. Import the
 catalog instead of maintaining a separate list of release sources or asset names.
-Use `@typescript/typescript6` for source parsing, matching `bun-sqlgen`'s compiler
-API dependency. The workspace's TypeScript 7 remains the type-checking compiler.
+Use TypeScript 7's `typescript/unstable/async` API and `typescript/unstable/ast`
+for source parsing. Parse with an isolated virtual filesystem and close the native
+compiler process in `finally`.
 
 Run `bun run --filter @repo/deploy-link update:presets` from the repository root to
 update the pins. The updater has no command-line options.
