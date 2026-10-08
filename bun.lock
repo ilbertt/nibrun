@@ -332,7 +332,7 @@
     },
   },
   "patchedDependencies": {
-    "@libredb/studio@0.18.0": "patches/@libredb%2Fstudio@0.18.0.patch",
+    "@libredb/studio@0.18.0": "packages/sqlite-explorer/patches/@libredb%2Fstudio@0.18.0.patch",
   },
   "catalog": {
     "@libsql/client": "^0.18.0",

@@ -5,4 +5,4 @@
 - Relay database errors. Execute editor SQL unchanged and without pagination; page only table previews.
 - Import package CSS into the host’s Tailwind stylesheet after its theme.
 - Bundle Monaco with Vite and configure its loader after importing LibreDB. Hosts must define `process.env.NEXT_PUBLIC_BASE_PATH` and `process.env.NEXT_PUBLIC_MONACO_VS_PATH` as empty strings.
-- The Bun patch adds FK navigation to LibreDB’s ESM workspace. Recheck it when upgrading LibreDB; composite/ambiguous constraints and blob keys are excluded from this prototype.
+- Keep LibreDB patches here, registered in the root package.json because Bun ignores workspace registrations. Recheck them on upgrades; composite/ambiguous constraints and blob keys have no navigation.

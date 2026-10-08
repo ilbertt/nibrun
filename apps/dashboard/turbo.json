@@ -3,11 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/packages/sqlite-explorer/**",
-        "$TURBO_ROOT$/patches/**"
-      ]
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/sqlite-explorer/**"]
     }
   }
 }
