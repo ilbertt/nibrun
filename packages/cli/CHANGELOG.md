@@ -2,6 +2,25 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.10.8-1]
+
+### 🚀 Features
+
+- *(cli)* Query saved SQLite connections (#801)
+- *(cli)* Remove saved SQLite connections (#800)
+- *(cli)* Create saved SQLite connections (#799)
+- *(cli)* List saved SQLite connections (#798)
+- *(protocol)* Define live SQLite query exchanges (#735)
+
+### 🐛 Bug Fixes
+
+- *(api-client)* Summarize HTML error responses (#793)
+
+### 🚜 Refactor
+
+- *(sqlite)* Relay Hrana pipelines through scoped sessions (#761)
+- *(sqlite)* Share the SQLite error message limit (#756)
+
 ## [2026.10.6-1]
 
 ### 🚀 Features
