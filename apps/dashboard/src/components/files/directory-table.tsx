@@ -1,17 +1,11 @@
 import type { FilesystemEntry } from '@repo/api-client/models';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@repo/ui/components/table';
-import { EntryName } from '#components/files/entry-name.tsx';
-import { formatBytes } from '#lib/format-bytes.ts';
-import { dayAndMinute } from '#lib/format-timestamp.ts';
+import { Table, TableBody, TableHead, TableHeader, TableRow } from '@repo/ui/components/table';
+import { DirectoryEntryRow } from '#components/files/directory-entry-row.tsx';
+import { childPath } from '#lib/child-path.ts';
+import { useDirectoryPath } from '#lib/hooks/use-directory-path.ts';
 
 export function DirectoryTable({ entries }: { entries: readonly FilesystemEntry[] }) {
+  const path = useDirectoryPath();
   return (
     <Table>
       <TableHeader>
@@ -19,25 +13,14 @@ export function DirectoryTable({ entries }: { entries: readonly FilesystemEntry[
           <TableHead>Name</TableHead>
           <TableHead className="text-right">Size</TableHead>
           <TableHead>Modified</TableHead>
+          <TableHead>
+            <span className="sr-only">Actions</span>
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {inBrowsingOrder(entries).map((entry) => (
-          <TableRow key={entry.name}>
-            <TableCell className="w-full max-w-0 font-mono">
-              <EntryName entry={entry} />
-            </TableCell>
-            <TableCell className="text-right font-mono tabular-nums">
-              {entry.kind === 'directory' ? (
-                <span className="text-muted-foreground">—</span>
-              ) : (
-                <span title={`${entry.sizeBytes} bytes`}>{formatBytes(entry.sizeBytes)}</span>
-              )}
-            </TableCell>
-            <TableCell className="text-muted-foreground tabular-nums">
-              {dayAndMinute(entry.modifiedAt)}
-            </TableCell>
-          </TableRow>
+          <DirectoryEntryRow key={childPath({ path, name: entry.name })} entry={entry} />
         ))}
       </TableBody>
     </Table>
