@@ -754,6 +754,7 @@ describe('the api records the digest of what was stored', () => {
 
     expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
     expect(artifact.sizeBytes).toBe(BINARY_TEXT.length);
+    expect(artifact.originalFileUrl).toBeUndefined();
     expect(storage.objects.get(artifact.objectKey)).toEqual(bytesOf(BINARY_TEXT));
   });
 
@@ -1143,6 +1144,7 @@ describe('a release nibrun already holds is not fetched twice', () => {
 
     expect(artifactsRepo.rows.get(artifact.id)?.app_id).toBe(APP_ID);
     expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(CACHED_URL);
+    expect(artifact.originalFileUrl).toBe(CACHED_URL);
   });
 
   /**
@@ -1444,9 +1446,7 @@ describe('a binary is fetched from the url it was given', () => {
     expect(storage.objects.size).toBe(0);
   });
 
-  // Kept where the bytes are described rather than answered with: nothing downstream is told
-  // where a binary was found, and a host least of all.
-  test('where it came from is written down beside the name it was given', async () => {
+  test('the original source is returned when creating, listing and reading a binary', async () => {
     const { service, sourceRepo, artifactsRepo } = build();
     sourceRepo.serves({ text: BINARY_TEXT });
 
@@ -1458,7 +1458,11 @@ describe('a binary is fetched from the url it was given', () => {
     });
 
     expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(BINARY_URL);
-    expect(Object.keys(artifact)).not.toContain('originalFileUrl');
+    expect(artifact.originalFileUrl).toBe(BINARY_URL);
+    expect(await service.list({ appId: APP_ID, ownerId: OWNER_ID })).toEqual([artifact]);
+    expect(
+      await service.get({ appId: APP_ID, artifactId: artifact.id, ownerId: OWNER_ID }),
+    ).toEqual(artifact);
   });
 
   test('the staging slot it came through is given up', async () => {
@@ -1668,6 +1672,7 @@ describe('a binary is fetched from the url it was given', () => {
     expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(
       'https://releases.test/v1/my-server',
     );
+    expect(artifact.originalFileUrl).toBe('https://releases.test/v1/my-server');
   });
 
   /**
@@ -1693,6 +1698,7 @@ describe('a binary is fetched from the url it was given', () => {
     expect(artifact.digest).toBe(Value.Parse(Sha256DigestSchema, BINARY_DIGEST));
     expect(storage.objects.has(Value.Parse(ObjectKeySchema, BINARY_DIGEST))).toBe(true);
     expect(artifactsRepo.rows.get(artifact.id)?.original_file_url).toBe(ARCHIVE_URL);
+    expect(artifact.originalFileUrl).toBe(ARCHIVE_URL);
   });
 
   /**
