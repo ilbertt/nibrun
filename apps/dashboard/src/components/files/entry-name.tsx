@@ -1,33 +1,26 @@
-import type { FilesystemEntry, FilesystemEntryKind } from '@repo/api-client/models';
+import type { FilesystemEntry } from '@repo/api-client/models';
 import { Link } from '@tanstack/react-router';
-import {
-  DatabaseIcon,
-  FileIcon,
-  FileQuestionMarkIcon,
-  FolderIcon,
-  type LucideIcon,
-} from 'lucide-react';
+import { EntryIcon } from '#components/files/entry-icon.tsx';
 import { childPath } from '#lib/child-path.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDirectoryPath } from '#lib/hooks/use-directory-path.ts';
-import { useFileSqliteConnection } from '#lib/hooks/use-file-sqlite-connection.ts';
+import type { FileSqliteConnection } from '#lib/hooks/use-file-sqlite-connection.ts';
 import { Route as FilesRoute } from '#routes/(dashboard)/apps/$appId/files.tsx';
 import { Route as SqliteRoute } from '#routes/sqlite.tsx';
 
-const KIND_ICONS: Record<FilesystemEntryKind, LucideIcon> = {
-  directory: FolderIcon,
-  file: FileIcon,
-  other: FileQuestionMarkIcon,
-};
-
-export function EntryName({ entry }: { entry: FilesystemEntry }) {
+export function EntryName({
+  entry,
+  sqlite,
+}: {
+  entry: FilesystemEntry;
+  sqlite: FileSqliteConnection;
+}) {
   const appId = useAppId();
   const path = useDirectoryPath();
-  const connection = useFileSqliteConnection(entry);
-  const Icon = connection === undefined ? KIND_ICONS[entry.kind] : DatabaseIcon;
+  const { connection } = sqlite;
   const name = (
     <>
-      <Icon className="size-4 shrink-0 text-muted-foreground" />
+      <EntryIcon entry={entry} sqlite={sqlite} />
       <span className="truncate" title={entry.name}>
         {entry.name}
       </span>
