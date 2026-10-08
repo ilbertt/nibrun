@@ -1,0 +1,214 @@
+diff --git a/dist/chunk-FA3AXNXJ.mjs b/dist/chunk-FA3AXNXJ.mjs
+index 352c9d55520c1440b8f273a703327e7a1474bb83..a0f4adb9b0884af9947a63ed513441314555e3dc 100644
+--- a/dist/chunk-FA3AXNXJ.mjs
++++ b/dist/chunk-FA3AXNXJ.mjs
+@@ -1,3 +1,4 @@
++import { sqliteReferenceQuery } from "./sqlite-foreign-key-navigation.mjs";
+ import { buildConnectionPayload } from './chunk-OIOXHMLS.mjs';
+ import { loadMaskingConfig, maskingInForce, canToggleMasking, canReveal, detectSensitiveColumnsFromConfig, maskValueByPattern } from './chunk-JPKEV35O.mjs';
+ import { useEffectiveTheme } from './chunk-TY7J2K7F.mjs';
+@@ -30,7 +31,7 @@ import { __spreadValues, __spreadProps, __objRest } from './chunk-Y6DZ2E7I.mjs';
+ import * as React10 from 'react';
+ import { forwardRef, useRef, useState, useEffect, useMemo, useImperativeHandle, useCallback, useSyncExternalStore, useId, useLayoutEffect } from 'react';
+ import Editor, { loader } from '@monaco-editor/react';
+-import { Play, TextAlignStart, Copy, Trash2, Hash, Zap, LoaderCircle, XIcon, Eye, Lock, ArrowUp, ArrowDown, ArrowUpDown, Funnel, Code, X, ChevronDown, WandSparkles, RefreshCw, ChartColumn, Download, CircleAlert, Sparkles, ShieldAlert, TriangleAlert, ShieldCheck, Info, Rows3, EyeOff, WrapText, Save, LayoutGrid, Table2, ChevronRight, FileBraces, Check } from 'lucide-react';
++import { Play, TextAlignStart, Copy, Trash2, Hash, Zap, LoaderCircle, XIcon, Eye, Lock, ArrowUp, ArrowDown, ArrowUpDown, Funnel, Code, X, ChevronDown, WandSparkles, RefreshCw, ChartColumn, Download, CircleAlert, Sparkles, ShieldAlert, TriangleAlert, ShieldCheck, Info, Rows3, EyeOff, WrapText, Save, LayoutGrid, Table2, ChevronRight, FileBraces, Check, ExternalLink } from 'lucide-react';
+ import { format } from 'sql-formatter';
+ import { toast } from 'sonner';
+ import { jsxs, jsx, Fragment } from 'react/jsx-runtime';
+@@ -3963,12 +3964,30 @@ function ScrollBar(_a) {
+     })
+   );
+ }
++function ForeignKeyButton({ field, value, links, onNavigate }) {
++  const link = links?.get(field);
++  const query = link && sqliteReferenceQuery({ link, value });
++  if (!query || !onNavigate) return null;
++  const label = `View referenced row in ${link.table}.${link.column}`;
++  function navigate(event) {
++    event.stopPropagation();
++    onNavigate({ link, query });
++  }
++  return jsx("button", {
++    type: "button", title: label, "aria-label": label,
++    className: "ml-1 shrink-0 rounded p-0.5 text-fg-muted hover:text-brand focus-visible:outline-2 focus-visible:outline-brand",
++    onClick: navigate,
++    children: jsx(ExternalLink, { "aria-hidden": "true", className: "h-3.5 w-3.5" })
++  });
++}
+ function RowDetailSheet({
+   row,
+   fields,
+   isOpen,
+   onClose,
+   rowIndex,
++  foreignKeyLinks,
++  onForeignKeyNavigate,
+   maskingActive,
+   sensitiveColumns,
+   allowReveal,
+@@ -4093,6 +4112,7 @@ function RowDetailSheet({
+               }
+             ),
+             /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1 shrink-0", children: [
++              !isMasked && jsx(ForeignKeyButton, { field, value: row[field], links: foreignKeyLinks, onNavigate: onForeignKeyNavigate }),
+               isMasked && allowReveal && /* @__PURE__ */ jsx(
+                 Button,
+                 {
+@@ -4611,6 +4631,8 @@ function detectIdColumn(fields) {
+ }
+ function ResultsGrid({
+   result,
++  foreignKeyLinks,
++  onForeignKeyNavigate,
+   onLoadMore,
+   isLoadingMore,
+   supportsResultPagination,
+@@ -4634,6 +4656,10 @@ function ResultsGrid({
+   const [viewMode, setViewMode] = useState("card");
+   const [wrapText, setWrapText] = useState(false);
+   const [selectedRow, setSelectedRow] = useState(null);
++  function navigateForeignKey(input) {
++    setSelectedRow(null);
++    onForeignKeyNavigate?.(input);
++  }
+   const [typedFilters, setColumnFilters] = useState(/* @__PURE__ */ new Map());
+   const [activeFilterCol, setActiveFilterCol] = useState(null);
+   const [columnVisibility, setColumnVisibility] = useState({});
+@@ -5374,7 +5400,7 @@ function ResultsGrid({
+                   },
+                   children: row.getVisibleCells().map((cell) => {
+                     const isRowDetail = cell.column.id === detailColumnId;
+-                    return /* @__PURE__ */ jsx(
++                    return /* @__PURE__ */ jsxs(
+                       "div",
+                       {
+                         style: { width: cell.column.getSize(), minWidth: cell.column.getSize() },
+@@ -5386,7 +5412,10 @@ function ResultsGrid({
+                           isRowDetail ? "px-1 justify-center sticky left-0 z-10 bg-sunken" : "px-4"
+                         ),
+                         onContextMenu: () => setContextCell(isRowDetail ? null : { rowIndex: sourceIndex, field: cell.column.id }),
+-                        children: flexRender(cell.column.columnDef.cell, cell.getContext())
++                        children: [
++                          isRowDetail ? flexRender(cell.column.columnDef.cell, cell.getContext()) : jsx("div", { className: "min-w-0", children: flexRender(cell.column.columnDef.cell, cell.getContext()) }),
++                          !isRowDetail && !effectiveMaskingEnabled && jsx(ForeignKeyButton, { field: cell.column.id, value: row.original[cell.column.id], links: foreignKeyLinks, onNavigate: navigateForeignKey })
++                        ]
+                       },
+                       cell.id
+                     );
+@@ -5407,6 +5436,8 @@ function ResultsGrid({
+         isOpen: !!selectedRow,
+         onClose: () => setSelectedRow(null),
+         rowIndex: selectedRow.index,
++        foreignKeyLinks,
++        onForeignKeyNavigate: navigateForeignKey,
+         maskingActive: effectiveMaskingEnabled,
+         sensitiveColumns,
+         allowReveal: userCanReveal,
+diff --git a/node_modules/@libredb/studio/dist/sqlite-foreign-key-navigation.mjs b/dist/sqlite-foreign-key-navigation.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..c351d9d0a8209a1d92964042cda7d4b4a9e210b1
+--- /dev/null
++++ b/dist/sqlite-foreign-key-navigation.mjs
+@@ -0,0 +1,44 @@
++export function sqliteForeignKeyLinks({ type, connectionId, origin, query, schema }) {
++  const links = new Map();
++  if (type !== "sqlite" || !origin || origin.connectionId !== connectionId || origin.query !== query) return links;
++  const source = schema.find((object) => object.kind === "table" && samePath({ left: object.path, right: origin.path }));
++  if (!source) return links;
++  for (const foreignKey of source.foreignKeys ?? []) {
++    // The published flat FK metadata loses constraint grouping; ambiguous compound links stay hidden.
++    const siblings = source.foreignKeys.filter((key) => key.referencedTable.toLowerCase() === foreignKey.referencedTable.toLowerCase());
++    if (siblings.length !== 1) continue;
++    const column = source.columns.find((column) => column.name === foreignKey.columnName);
++    // The host displays blobs as text; their original bytes cannot be recovered from that display.
++    if (!column || column.type.toUpperCase().includes("BLOB")) continue;
++    const target = schema.find((object) => object.kind === "table" && object.name.toLowerCase() === foreignKey.referencedTable.toLowerCase());
++    const referencedColumn = target?.columns.find((column) => column.name.toLowerCase() === foreignKey.referencedColumn.toLowerCase());
++    if (target && referencedColumn) links.set(column.name, { path: target.path, table: target.name, column: referencedColumn.name });
++  }
++  return links;
++}
++
++function samePath({ left, right }) {
++  return left.length === right.length && left.every((part, index) => part === right[index]);
++}
++
++function quoteIdentifier(identifier) {
++  return `"${identifier.replaceAll('"', '""')}"`;
++}
++
++export function sqliteReferenceQuery({ link, value }) {
++  let literal;
++  if (typeof value === "number" && Number.isFinite(value)) {
++    literal = String(value);
++  } else if (typeof value === "string" || typeof value === "bigint") {
++    // Hex text preserves embedded NULs and exact integer strings without interpolating SQL tokens.
++    const hex = Array.from(new TextEncoder().encode(String(value)), (byte) => byte.toString(16).padStart(2, "0")).join("");
++    literal = `CAST(X'${hex}' AS TEXT)`;
++  } else {
++    return undefined;
++  }
++  return `SELECT * FROM ${quoteIdentifier(link.table)} WHERE ${quoteIdentifier(link.column)} = ${literal}`;
++}
++
++export function referencedRowTab({ id, connectionId, link, query }) {
++  return { id, name: link.table, query, result: null, isExecuting: false, type: "sql", origin: { path: link.path, connectionId, query } };
++}
+diff --git a/dist/workspace.mjs b/dist/workspace.mjs
+index 7652ef21a9e55799d00a3d51f62d131b6f7325cd..640fef00a18ff2756b459f1b6568739b26f1b8a5 100644
+--- a/dist/workspace.mjs
++++ b/dist/workspace.mjs
+@@ -1,3 +1,4 @@
++import { sqliteForeignKeyLinks, referencedRowTab } from "./sqlite-foreign-key-navigation.mjs";
+ import { useReadGeneration } from './chunk-QDEE5XGR.mjs';
+ import { hasGraphValues, ChunkBoundary, ViewLoading } from './chunk-XOTEM6ZR.mjs';
+ import './chunk-EA7LHJS7.mjs';
+@@ -6856,6 +6857,8 @@ var BottomPanel = React13.memo(function BottomPanel2({
+   explainPlan,
+   explainQuery,
+   resultQuery,
++  foreignKeyLinks,
++  onForeignKeyNavigate,
+   runError,
+   schema,
+   schemaContext,
+@@ -7183,6 +7186,8 @@ var BottomPanel = React13.memo(function BottomPanel2({
+           ResultsGrid,
+           {
+             result: displayedResult,
++            foreignKeyLinks: hydratedHere ? undefined : foreignKeyLinks,
++            onForeignKeyNavigate,
+             onLoadMore: hydratedHere ? void 0 : onLoadMore,
+             isLoadingMore,
+             supportsResultPagination: metadata == null ? void 0 : metadata.capabilities.supportsResultPagination,
+@@ -10403,6 +10408,20 @@ function StudioWorkspace({
+     fetchSchema: conn.fetchSchema,
+     features
+   });
++  const foreignKeyLinks = useMemo(() => sqliteForeignKeyLinks({
++    type: conn.activeConnection?.type,
++    connectionId: conn.activeConnection?.id,
++    origin: tabMgr.currentTab.origin,
++    query: tabMgr.currentTab.resultQuery,
++    schema: conn.schema
++  }), [conn.activeConnection, conn.schema, tabMgr.currentTab.origin, tabMgr.currentTab.resultQuery]);
++  function openReferencedRow(input) {
++    if (!conn.activeConnection) return;
++    const tab = referencedRowTab({ ...input, id: newLocalId(), connectionId: conn.activeConnection.id });
++    tabMgr.setTabs((tabs) => [...tabs, tab]);
++    tabMgr.setActiveTabId(tab.id);
++    setTimeout(() => queryExec.executeQuery(tab.query, tab.id, false, { limit: PREVIEW_PAGE_SIZE }), 100);
++  }
+   useStudioTheme();
+   useEffect(() => {
+     if (conn.activeConnection) {
+@@ -10750,6 +10769,8 @@ function StudioWorkspace({
+                     explainPlan: tabMgr.currentTab.explainPlan,
+                     explainQuery: queryExec.bottomPanelMode === "explain" ? tabMgr.currentTab.query : void 0,
+                     resultQuery: tabMgr.currentTab.resultQuery,
++                    foreignKeyLinks,
++                    onForeignKeyNavigate: openReferencedRow,
+                     runError: tabMgr.currentTab.runError,
+                     schema: conn.schema,
+                     schemaContext: conn.schemaContext,
