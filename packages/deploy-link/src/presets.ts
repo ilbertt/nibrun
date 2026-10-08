@@ -14,6 +14,7 @@ import microbinPage from '../content/microbin.md?raw';
 import nibrunVitalsPage from '../content/nibrun-vitals.md?raw';
 import openConnectorPage from '../content/open-connector.md?raw';
 import openSyncPage from '../content/open-sync.md?raw';
+import openlistPage from '../content/openlist.md?raw';
 import pdfSignerPage from '../content/pdf-signer.md?raw';
 import picosharePage from '../content/picoshare.md?raw';
 import pocketbasePage from '../content/pocketbase.md?raw';
@@ -313,6 +314,30 @@ export const DEPLOY_PRESETS = {
       // Rooted at the volume rather than the working directory, which is the one place a file put
       // here is still here after a redeploy.
       arg: ['-r', '/app/data', '-d', '/app/data/filebrowser.db', '-a', '0.0.0.0', '-p', '8080'],
+      minimal: true,
+    },
+  },
+  openlist: {
+    projectUrl: 'https://github.com/OpenListTeam/OpenList',
+    version: 'v4.2.6',
+    markdownContent: openlistPage,
+    category: DeployCategory.FilesAndSharing,
+    title: 'OpenList',
+    subtitle: 'A file browser and WebDAV gateway for local files and cloud storage.',
+    deployLink: {
+      name: 'openlist',
+      binary:
+        'https://github.com/OpenListTeam/OpenList/releases/download/v4.2.6/openlist-linux-amd64.tar.gz',
+      sha256: '2f2a5008efe45895292018479cb05556c83e828c3eed68a8b8cd3d35e82f03cb',
+      port: 5244,
+      arg: ['server', '--data', '/app/data', '--log-std'],
+      env: [
+        `HOME=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        `OPENLIST_HTTP_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+        `OPENLIST_SITE_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
+        'GOMEMLIMIT=128MiB',
+        'OPENLIST_ADMIN_PASSWORD',
+      ],
       minimal: true,
     },
   },
