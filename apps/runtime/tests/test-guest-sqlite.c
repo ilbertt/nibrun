@@ -101,7 +101,7 @@ static void session(const char *directory) {
   json_decref(reply);
   reply = exchange(connection, "POST", "/sqlite/%2Fapp.db/v2/pipeline", body);
   EXPECT(status == 200);
-  EXPECT(strstr(output, "SQLITE_AUTH") != NULL);
+  EXPECT(strstr(output, "SQLITE_READONLY") != NULL);
   EXPECT(json_is_null(json_object_get(reply, "baton")));
   json_decref(reply);
   finish(process, connection);

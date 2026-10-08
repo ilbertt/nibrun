@@ -130,8 +130,6 @@ static int prepare(struct sqlite_hrana *stream, const char *sql,
       sqlite3_prepare_v3(stream->query.database, sql, -1, 0, statement, &tail);
   if (code != SQLITE_OK || *statement == NULL)
     return code == SQLITE_OK ? SQLITE_MISUSE : code;
-  if (!sqlite3_stmt_readonly(*statement))
-    return SQLITE_READONLY;
   sqlite3_stmt *extra = NULL;
   code = sqlite3_prepare_v3(stream->query.database, tail, -1, 0, &extra, NULL);
   bool single = extra == NULL;
@@ -348,7 +346,7 @@ int sqlite_hrana_describe(struct sqlite_hrana *stream, const json_t *json,
     }
     json_object_set_new(object, "params", params);
     json_object_set_new(object, "cols", columns(statement));
-    json_object_set_new(object, "is_readonly", json_boolean(true));
+    json_object_set_new(object, "is_readonly", json_boolean(sqlite3_stmt_readonly(statement)));
     json_object_set_new(object, "is_explain",
                         json_boolean(sqlite3_stmt_isexplain(statement) != 0));
     if (json_object_get(object, "cols") == NULL) {
@@ -374,14 +372,10 @@ int sqlite_hrana_sequence(struct sqlite_hrana *stream, const json_t *json) {
     int code = sqlite3_prepare_v3(stream->query.database, position, -1, 0,
                                   &statement, &tail);
     if (code == SQLITE_OK && statement != NULL) {
-      if (!sqlite3_stmt_readonly(statement))
-        code = SQLITE_READONLY;
-      else {
-        while ((code = sqlite3_step(statement)) == SQLITE_ROW) {
-        }
-        if (code == SQLITE_DONE)
-          code = SQLITE_OK;
+      while ((code = sqlite3_step(statement)) == SQLITE_ROW) {
       }
+      if (code == SQLITE_DONE)
+        code = SQLITE_OK;
     }
     sqlite3_finalize(statement);
     if (code != SQLITE_OK)

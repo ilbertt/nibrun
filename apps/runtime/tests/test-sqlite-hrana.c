@@ -31,6 +31,21 @@ int main(void) {
   execute_error(&stream, "SELECT 1e999", SQLITE_MISMATCH);
   execute_error(&stream, "SELECT 1; SELECT 2", SQLITE_MISUSE);
   execute_error(&stream, "BEGIN IMMEDIATE", SQLITE_READONLY);
+  execute_error(&stream, "INSERT INTO items VALUES(2)", SQLITE_READONLY);
+  execute_error(&stream, "UPDATE items SET value=2", SQLITE_READONLY);
+  execute_error(&stream, "DELETE FROM items", SQLITE_READONLY);
+  execute_error(&stream, "WITH selected AS (SELECT 2) INSERT INTO items SELECT * FROM selected",
+                SQLITE_READONLY);
+  execute_error(&stream, "SELECT FROM items", SQLITE_ERROR);
+  json_t *sequence = json_pack("{s:s}", "sql", "DELETE FROM items");
+  EXPECT(sqlite_hrana_sequence(&stream, sequence) == SQLITE_READONLY);
+  json_decref(sequence);
+  json_t *description = json_pack("{s:s}", "sql", "INSERT INTO items VALUES(2)");
+  json_t *metadata = NULL;
+  EXPECT(sqlite_hrana_describe(&stream, description, &metadata) == SQLITE_OK);
+  EXPECT(json_is_false(json_object_get(metadata, "is_readonly")));
+  json_decref(metadata);
+  json_decref(description);
   execute_error(&stream,
                 "WITH RECURSIVE x(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM x "
                 "WHERE n<1001) SELECT n FROM x",
