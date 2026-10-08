@@ -21,7 +21,9 @@ body:has(.sqlite-explorer [data-studio-workspace])
   padding: 0.5rem 0.75rem;
 }
 
-body:has(.sqlite-explorer [data-studio-workspace]) [data-slot="sheet-header"] {
+body:has(.sqlite-explorer [data-studio-workspace])
+  [data-slot="sheet-content"]
+  [data-slot="sheet-header"] {
   padding-right: 3.5rem;
 }
 
