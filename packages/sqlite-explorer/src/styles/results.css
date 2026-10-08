@@ -20,3 +20,18 @@ body:has(.sqlite-explorer [data-studio-workspace])
   .p-4 {
   padding: 0.5rem 0.75rem;
 }
+
+body:has(.sqlite-explorer [data-studio-workspace]) [data-slot="sheet-header"] {
+  padding-right: 3.5rem;
+}
+
+body:has(.sqlite-explorer [data-studio-workspace])
+  [data-slot="sheet-content"]
+  > button {
+  top: 0.5rem;
+  right: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+}
