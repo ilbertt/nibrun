@@ -9,7 +9,7 @@ import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 export function SiteHeader() {
   return (
     <header className="flex h-12 shrink-0 items-center border-b">
-      <div className="flex w-full items-center gap-3 px-4 lg:px-6">
+      <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 md:px-6">
         <Link to={IndexRoute.to}>
           <BrandMark />
         </Link>

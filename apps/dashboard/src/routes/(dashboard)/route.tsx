@@ -8,7 +8,7 @@ function RouteComponent() {
   return (
     <div className="flex h-svh w-full flex-col overflow-hidden bg-background">
       <SiteHeader />
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <main className="mx-auto min-h-0 w-full max-w-7xl flex-1 overflow-y-auto">
         <Outlet />
       </main>
       <Toaster />
