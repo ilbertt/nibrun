@@ -40,7 +40,6 @@ jobs:
         if: steps.updates.outputs.has-updates == 'true'
         uses: ./.github/actions/open-pr
         with:
-          token: ${{ secrets.OPEN_PR_TOKEN || github.token }}
           branch: ${{ steps.updates.outputs.branch }}
           title: 'chore(deploy-link): update deploy presets'
           body: ${{ steps.updates.outputs.body }}

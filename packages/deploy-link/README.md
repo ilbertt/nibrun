@@ -11,6 +11,5 @@ checksums already follow upstream builds and remain unpinned.
 
 The `update-deploy-presets` workflow runs daily at 06:23 UTC or on manual dispatch.
 It uses the repository's `open-pr` action, with a branch derived from the target pins
-so the same updates are proposed only once. Configure `OPEN_PR_TOKEN` with a PAT or
-GitHub App token so the resulting PR triggers the repository's required checks.
+so the same updates are proposed only once. It uses the built-in workflow token.
 Failed upstream checks fail the workflow after successful updates have been proposed.
