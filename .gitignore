@@ -60,3 +60,5 @@ dozzle/data/
 *.tfstate.*
 *.auto.tfvars.json
 crash.log
+
+apps/www/public/monaco/

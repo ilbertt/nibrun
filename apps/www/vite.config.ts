@@ -10,6 +10,10 @@ import { defineConfig } from 'vite';
 // build as in production, not because a page view needs compute.
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
+  define: {
+    'process.env.NEXT_PUBLIC_BASE_PATH': JSON.stringify(''),
+    'process.env.NEXT_PUBLIC_MONACO_VS_PATH': JSON.stringify('/monaco/vs'),
+  },
   plugins: [
     cloudflare({ viteEnvironment: { name: 'ssr' } }),
     tailwindcss(),

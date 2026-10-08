@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SqliteStudioRouteImport } from './routes/sqlite-studio'
 import { Route as AppsIndexRouteImport } from './routes/apps/index'
 import { Route as AppsSlugRouteImport } from './routes/apps/$slug'
 import { Route as BlogIndexRouteImport } from './routes/blog/index'
@@ -18,6 +19,11 @@ import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SqliteStudioRoute = SqliteStudioRouteImport.update({
+  id: '/sqlite-studio',
+  path: '/sqlite-studio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppsIndexRoute = AppsIndexRouteImport.update({
@@ -43,6 +49,7 @@ const BlogSlugRoute = BlogSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/sqlite-studio': typeof SqliteStudioRoute
   '/apps/$slug': typeof AppsSlugRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/apps/': typeof AppsIndexRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/sqlite-studio': typeof SqliteStudioRoute
   '/apps/$slug': typeof AppsSlugRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/apps': typeof AppsIndexRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/sqlite-studio': typeof SqliteStudioRoute
   '/apps/$slug': typeof AppsSlugRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/apps/': typeof AppsIndexRoute
@@ -65,14 +74,23 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/apps/$slug' | '/blog/$slug' | '/apps/' | '/blog/'
+  fullPaths:
+    '/' | '/sqlite-studio' | '/apps/$slug' | '/blog/$slug' | '/apps/' | '/blog/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/apps/$slug' | '/blog/$slug' | '/apps' | '/blog'
-  id: '__root__' | '/' | '/apps/$slug' | '/blog/$slug' | '/apps/' | '/blog/'
+  to: '/' | '/sqlite-studio' | '/apps/$slug' | '/blog/$slug' | '/apps' | '/blog'
+  id:
+    | '__root__'
+    | '/'
+    | '/sqlite-studio'
+    | '/apps/$slug'
+    | '/blog/$slug'
+    | '/apps/'
+    | '/blog/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SqliteStudioRoute: typeof SqliteStudioRoute
   AppsSlugRoute: typeof AppsSlugRoute
   BlogSlugRoute: typeof BlogSlugRoute
   AppsIndexRoute: typeof AppsIndexRoute
@@ -86,6 +104,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sqlite-studio': {
+      id: '/sqlite-studio'
+      path: '/sqlite-studio'
+      fullPath: '/sqlite-studio'
+      preLoaderRoute: typeof SqliteStudioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/apps/': {
@@ -121,6 +146,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SqliteStudioRoute: SqliteStudioRoute,
   AppsSlugRoute: AppsSlugRoute,
   BlogSlugRoute: BlogSlugRoute,
   AppsIndexRoute: AppsIndexRoute,

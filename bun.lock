@@ -108,6 +108,7 @@
         "@repo/binary-handoff": "workspace:*",
         "@repo/deploy-link": "workspace:*",
         "@repo/global-constants": "workspace:*",
+        "@repo/sqlite-explorer": "workspace:*",
         "@repo/ui": "workspace:*",
         "@tanstack/react-router": "catalog:",
         "@tanstack/react-start": "^1.168.49",

@@ -6,8 +6,8 @@
     "#*": "./src/*"
   },
   "scripts": {
-    "dev": "vite dev --port 3002",
-    "build": "vite build && bun run scripts/share-cards.tsx",
+    "dev": "bun run scripts/monaco-assets.ts && vite dev --port 3002",
+    "build": "bun run scripts/monaco-assets.ts && vite build && bun run scripts/share-cards.tsx",
     "preview": "vite preview",
     "cf:typegen": "wrangler types",
     "cf:deploy": "bun run build && wrangler deploy",
@@ -27,7 +27,8 @@
     "react-dom": "catalog:",
     "tailwindcss": "catalog:",
     "@repo/analytics": "workspace:*",
-    "@repo/api-constants": "workspace:*"
+    "@repo/api-constants": "workspace:*",
+    "@repo/sqlite-explorer": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.58.0",
