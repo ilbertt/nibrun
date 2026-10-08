@@ -12,6 +12,7 @@ import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDirectoryPath } from '#lib/hooks/use-directory-path.ts';
 import { useFileSqliteConnection } from '#lib/hooks/use-file-sqlite-connection.ts';
 import { Route as FilesRoute } from '#routes/(dashboard)/apps/$appId/files.tsx';
+import { Route as SqliteRoute } from '#routes/sqlite/$appId/index.tsx';
 
 const KIND_ICONS: Record<FilesystemEntryKind, LucideIcon> = {
   directory: FolderIcon,
@@ -32,6 +33,22 @@ export function EntryName({ entry }: { entry: FilesystemEntry }) {
       </span>
     </>
   );
+
+  if (connection !== undefined) {
+    return (
+      <Link
+        to={SqliteRoute.to}
+        params={{ appId }}
+        search={{ url: connection.url }}
+        target="_blank"
+        rel="noopener"
+        className="flex items-center gap-2 hover:underline"
+        aria-label={`Open ${entry.name} in SQLite explorer (new tab)`}
+      >
+        {name}
+      </Link>
+    );
+  }
 
   if (entry.kind !== 'directory') {
     return <span className="flex items-center gap-2">{name}</span>;

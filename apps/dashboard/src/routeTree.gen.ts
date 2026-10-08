@@ -17,6 +17,7 @@ import { Route as authLoginRouteImport } from './routes/(auth)/login'
 import { Route as dashboardIndexRouteImport } from './routes/(dashboard)/index'
 import { Route as dashboardAppsIndexRouteImport } from './routes/(dashboard)/apps/index'
 import { Route as dashboardAppsAppIdRouteRouteImport } from './routes/(dashboard)/apps/$appId/route'
+import { Route as SqliteAppIdIndexRouteImport } from './routes/sqlite/$appId/index'
 import { Route as dashboardAppsAppIdIndexRouteImport } from './routes/(dashboard)/apps/$appId/index'
 import { Route as dashboardAppsAppIdCronsRouteImport } from './routes/(dashboard)/apps/$appId/crons'
 import { Route as dashboardAppsAppIdDomainsRouteImport } from './routes/(dashboard)/apps/$appId/domains'
@@ -61,6 +62,11 @@ const dashboardAppsAppIdRouteRoute = dashboardAppsAppIdRouteRouteImport.update({
   path: '/apps/$appId',
   getParentRoute: () => dashboardRouteRoute,
 } as any)
+const SqliteAppIdIndexRoute = SqliteAppIdIndexRouteImport.update({
+  id: '/sqlite/$appId/',
+  path: '/sqlite/$appId/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const dashboardAppsAppIdIndexRoute = dashboardAppsAppIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/': typeof dashboardIndexRoute
   '/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
   '/apps/': typeof dashboardAppsIndexRoute
+  '/sqlite/$appId/': typeof SqliteAppIdIndexRoute
   '/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
   '/apps/$appId/files': typeof dashboardAppsAppIdFilesRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
   '/apps': typeof dashboardAppsIndexRoute
+  '/sqlite/$appId': typeof SqliteAppIdIndexRoute
   '/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
   '/apps/$appId/files': typeof dashboardAppsAppIdFilesRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/(dashboard)/': typeof dashboardIndexRoute
   '/(dashboard)/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
   '/(dashboard)/apps/': typeof dashboardAppsIndexRoute
+  '/sqlite/$appId/': typeof SqliteAppIdIndexRoute
   '/(dashboard)/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/(dashboard)/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
   '/(dashboard)/apps/$appId/files': typeof dashboardAppsAppIdFilesRoute
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/'
     | '/apps/$appId'
     | '/apps/'
+    | '/sqlite/$appId/'
     | '/apps/$appId/crons'
     | '/apps/$appId/domains'
     | '/apps/$appId/files'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/'
     | '/apps'
+    | '/sqlite/$appId'
     | '/apps/$appId/crons'
     | '/apps/$appId/domains'
     | '/apps/$appId/files'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/(dashboard)/'
     | '/(dashboard)/apps/$appId'
     | '/(dashboard)/apps/'
+    | '/sqlite/$appId/'
     | '/(dashboard)/apps/$appId/crons'
     | '/(dashboard)/apps/$appId/domains'
     | '/(dashboard)/apps/$appId/files'
@@ -176,6 +188,7 @@ export interface RootRouteChildren {
   authRouteRoute: typeof authRouteRouteWithChildren
   dashboardRouteRoute: typeof dashboardRouteRouteWithChildren
   DeployRoute: typeof DeployRoute
+  SqliteAppIdIndexRoute: typeof SqliteAppIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -235,6 +248,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/apps/$appId'
       preLoaderRoute: typeof dashboardAppsAppIdRouteRouteImport
       parentRoute: typeof dashboardRouteRoute
+    }
+    '/sqlite/$appId/': {
+      id: '/sqlite/$appId/'
+      path: '/sqlite/$appId'
+      fullPath: '/sqlite/$appId/'
+      preLoaderRoute: typeof SqliteAppIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/(dashboard)/apps/$appId/': {
       id: '/(dashboard)/apps/$appId/'
@@ -330,6 +350,7 @@ const rootRouteChildren: RootRouteChildren = {
   authRouteRoute: authRouteRouteWithChildren,
   dashboardRouteRoute: dashboardRouteRouteWithChildren,
   DeployRoute: DeployRoute,
+  SqliteAppIdIndexRoute: SqliteAppIdIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
