@@ -7,7 +7,8 @@
     "./styles.css": "./src/styles.css"
   },
   "imports": {
-    "#*": "./src/*"
+    "#*": "./src/*",
+    "#tests/*": "./tests/*"
   },
   "scripts": {
     "check:types": "bun run --bun tsc",
@@ -30,6 +31,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "@repo/sqlite": "workspace:*"
   }
 }

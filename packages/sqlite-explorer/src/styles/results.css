@@ -1,0 +1,21 @@
+/* LibreDB offers mobile cards; this explorer keeps its grid at every viewport size. */
+.sqlite-explorer [data-desktop-grid] {
+  display: block;
+}
+
+.sqlite-explorer :has(> [data-desktop-grid]) > .md\:hidden,
+.sqlite-explorer [aria-label="Card view"],
+.sqlite-explorer [aria-label="Table view"] {
+  display: none;
+}
+
+body:has(.sqlite-explorer [data-studio-workspace]) [data-slot="sheet-content"] {
+  max-width: 48rem;
+  margin-inline: auto;
+}
+
+body:has(.sqlite-explorer [data-studio-workspace])
+  [data-slot="sheet-content"]
+  .p-4 {
+  padding: 0.5rem 0.75rem;
+}

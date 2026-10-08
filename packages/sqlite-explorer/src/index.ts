@@ -2,4 +2,5 @@
 
 export { SqliteExplorer } from '#components/sqlite-explorer.tsx';
 export { useSqliteExplorer } from '#hooks/use-sqlite-explorer.ts';
-export type { SqliteConnection } from '#lib/query.ts';
+export type { SqliteConnection } from '#lib/connection.ts';
+export { createSqliteWorkspace } from '#lib/workspace.ts';

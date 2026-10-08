@@ -279,6 +279,7 @@
         "monaco-editor": "0.57.0",
       },
       "devDependencies": {
+        "@repo/sqlite": "workspace:*",
         "@repo/typescript-config": "workspace:*",
         "@types/react": "catalog:",
         "@types/react-dom": "catalog:",

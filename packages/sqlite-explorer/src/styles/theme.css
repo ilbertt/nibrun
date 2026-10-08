@@ -1,4 +1,5 @@
-.sqlite-explorer {
+.sqlite-explorer,
+body:has(.sqlite-explorer [data-studio-workspace]) {
   --studio-canvas: var(--background);
   --studio-sunken: var(--muted);
   --studio-surface: var(--card);
@@ -21,4 +22,29 @@
     var(--primary) 90%,
     var(--foreground)
   );
+}
+
+.sqlite-explorer [data-studio-workspace],
+.dark .sqlite-explorer [data-studio-workspace] {
+  --background: inherit;
+  --foreground: inherit;
+  --card: inherit;
+  --card-foreground: inherit;
+  --popover: inherit;
+  --popover-foreground: inherit;
+  --primary: inherit;
+  --primary-foreground: inherit;
+  --secondary: inherit;
+  --secondary-foreground: inherit;
+  --muted: inherit;
+  --muted-foreground: inherit;
+  --accent: inherit;
+  --accent-foreground: inherit;
+  --destructive: inherit;
+  --border: inherit;
+  --input: inherit;
+  --ring: inherit;
+  --radius: inherit;
+  font-family: var(--font-sans);
+  --font-geist-mono: var(--font-mono);
 }

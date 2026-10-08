@@ -3,7 +3,7 @@ import { Input } from '@repo/ui/components/input';
 import { Label } from '@repo/ui/components/label';
 import { DatabaseIcon, LoaderCircleIcon } from 'lucide-react';
 import { type SubmitEvent, useId } from 'react';
-import type { SqliteConnection } from '#lib/query.ts';
+import type { SqliteConnection } from '#lib/connection.ts';
 
 export function ConnectionForm({
   connecting,
