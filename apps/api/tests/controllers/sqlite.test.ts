@@ -8,6 +8,7 @@ const CONNECTION_URL = `${ORIGIN}/api/sqlite/connections/connection-1`;
 test('all SQLite connection endpoints require the existing account session', async () => {
   const responses = await Promise.all([
     sendJson({ method: 'POST', url: CREATE_URL, body: { sqlite_file_path: '/app.db' } }),
+    send({ method: 'GET', url: CONNECTION_URL }),
     send({ method: 'GET', url: `${CONNECTION_URL}/v2` }),
     sendJson({ method: 'POST', url: `${CONNECTION_URL}/v2/pipeline`, body: { requests: [] } }),
     send({ method: 'DELETE', url: `${CREATE_URL}/connection-1` }),
