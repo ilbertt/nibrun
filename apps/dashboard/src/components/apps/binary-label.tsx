@@ -1,5 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui/components/tooltip';
 import { useClipboardCopy } from '@repo/ui/hooks/use-clipboard-copy';
+import { BinaryOrigin } from '#components/apps/binary-origin.tsx';
 import type { ArtifactSummary } from '#queries/artifacts.ts';
 
 // Docker's abbreviation of a SHA-256: enough to tell two binaries apart at a glance, short enough
@@ -24,6 +25,7 @@ export function BinaryLabel({ artifact }: { artifact: ArtifactSummary }) {
         </Tooltip>
         )
       </span>
+      <BinaryOrigin originalFileUrl={artifact.originalFileUrl} />
     </>
   );
 }

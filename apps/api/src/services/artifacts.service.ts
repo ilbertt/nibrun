@@ -277,6 +277,7 @@ function toArtifact(row: ArtifactRow): Artifact {
     sizeBytes: Number(row.size_bytes),
     objectKey: row.object_key,
     originalFileName: row.original_file_name,
+    originalFileUrl: row.original_file_url ?? undefined,
     createdAt: toTimestamp(row.created_at),
   };
 }

@@ -23,6 +23,9 @@ export const ArtifactSchema = Type.Object({
   // Kept because the key cannot answer it: keys are content-addressed, so they carry no name.
   // It is what the binary is called inside an export, which is where a person meets it again.
   originalFileName: FilenameSchema,
+  originalFileUrl: Type.Optional(
+    Type.String({ description: 'Original download URL, absent for uploaded binaries.' }),
+  ),
   createdAt: TimestampSchema,
 });
 
