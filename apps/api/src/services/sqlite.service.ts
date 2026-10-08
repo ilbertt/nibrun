@@ -91,6 +91,10 @@ export class SqliteService extends Service {
     }
   }
 
+  async getConnection(input: SqliteConnectionByIdInput): Promise<SqliteConnection> {
+    return this.toConnection(await this.findConnection(input));
+  }
+
   async list(input: SqliteConnectionsByAppInput): Promise<SqliteConnection[]> {
     const rows = await this.connectionsRepo.listByApp(input);
     return rows.map((row) => this.toConnection(row));
@@ -136,12 +140,17 @@ export class SqliteService extends Service {
     return await this.pipelineRelay.handle({ body, scope, open, signal });
   }
 
+  private async findConnection(input: SqliteConnectionByIdInput): Promise<SqliteConnectionRow> {
+    const connection = await this.connectionsRepo.findById(input);
+    if (!connection) {
+      throw new NotFoundError('Database connection not found.');
+    }
+    return connection;
+  }
+
   private async connected(input: SqliteConnectionByIdInput) {
     try {
-      const connection = await this.connectionsRepo.findById(input);
-      if (!connection) {
-        throw new NotFoundError('Database connection not found.');
-      }
+      const connection = await this.findConnection(input);
       const deployment = await this.runningDeployment({
         appId: connection.app_id,
         ownerId: input.ownerId,

@@ -110,3 +110,26 @@ test('a file that is not a database reports a client error', async () => {
   ).rejects.toBeInstanceOf(BadRequestError);
   expect(fixture.records).toHaveLength(0);
 });
+
+test('saved connection metadata is owner-scoped and does not require a running deployment', async () => {
+  const fixture = sqliteConnectionsFixture();
+  const service = new SqliteService(fixture);
+  const saved = await service.create({
+    appId: APP_ID,
+    ownerId: OWNER_ID,
+    sqlite_file_path: PATH,
+    signal: SIGNAL,
+  });
+  fixture.deployment.state = 'stopped';
+  const deploymentLookups = fixture.asked.length;
+  expect(await service.getConnection({ id: saved.id, ownerId: OWNER_ID })).toEqual(saved);
+  expect(fixture.asked).toHaveLength(deploymentLookups);
+  expect(fixture.opened).toHaveLength(1);
+  await expect(
+    service.getConnection({ id: saved.id, ownerId: OTHER_OWNER_ID }),
+  ).rejects.toBeInstanceOf(NotFoundError);
+  await service.removeConnection({ appId: APP_ID, id: saved.id, ownerId: OWNER_ID });
+  await expect(service.getConnection({ id: saved.id, ownerId: OWNER_ID })).rejects.toBeInstanceOf(
+    NotFoundError,
+  );
+});

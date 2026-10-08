@@ -127,6 +127,7 @@ async function fixture() {
   });
   spyOn(auth.api, 'getSession').mockImplementation(existingAccountAuth().api.getSession);
   const sqliteService = SqliteServicePlugin.decorator.sqliteService;
+  spyOn(sqliteService, 'getConnection').mockImplementation(service.getConnection.bind(service));
   spyOn(sqliteService, 'checkConnection').mockImplementation(service.checkConnection.bind(service));
   spyOn(sqliteService, 'pipeline').mockImplementation(service.pipeline.bind(service));
   const server = Bun.serve({
@@ -274,6 +275,21 @@ test('SQLite browser clients can preflight and query with a bearer token without
       new Request(new URL(`${RoutePrefix.Api}/unrelated`, connection.selected.url).href),
     );
     expect(unrelated.headers.has('access-control-allow-origin')).toBe(false);
+  } finally {
+    await connection.close();
+  }
+});
+
+test('the connection URL returns saved metadata using the existing account session', async () => {
+  const connection = await fixture();
+  try {
+    expect((await fetch(connection.selected.url)).status).toBe(StatusMap.Unauthorized);
+    const response = await fetch(connection.selected.url, {
+      headers: { authorization: AUTHORIZATION },
+    });
+    expect(response.status).toBe(StatusMap.OK);
+    expect(await response.json()).toEqual(connection.selected);
+    expect(connection.queries).toHaveLength(2);
   } finally {
     await connection.close();
   }
