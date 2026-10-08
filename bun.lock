@@ -213,6 +213,8 @@
         "@repo/protocol": "workspace:*",
       },
       "devDependencies": {
+        "@babel/parser": "^7.29.8",
+        "@babel/types": "^7.29.8",
         "@repo/typescript-config": "workspace:*",
         "@tanstack/react-router": "catalog:",
         "typescript": "catalog:",

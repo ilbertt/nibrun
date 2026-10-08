@@ -1,0 +1,51 @@
+name: update-deploy-presets
+
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: update-deploy-presets
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-deploy-presets:
+    if: github.event_name != 'schedule' || github.repository == 'ilbertt/nibrun'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - uses: ./.github/actions/prepare
+
+      - name: Update deploy presets
+        id: updates
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun run --filter @repo/deploy-link update:presets
+
+      - name: Format updated presets
+        run: bun fix:codestyle
+
+      - name: Open or update the pull request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.OPEN_PR_TOKEN || github.token }}
+          branch: codex/update-deploy-presets
+          delete-branch: true
+          title: 'chore(deploy-link): update deploy presets'
+          commit-message: 'chore(deploy-link): update deploy presets'
+          body-path: ${{ steps.updates.outputs.body-path }}
+          add-paths: packages/deploy-link/src/presets.ts
+
+      - name: Report failed update checks
+        if: steps.updates.outputs.has-errors == 'true'
+        run: exit 1

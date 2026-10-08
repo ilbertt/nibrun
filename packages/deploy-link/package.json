@@ -9,6 +9,7 @@
     "#*": "./src/*"
   },
   "scripts": {
+    "update:presets": "bun run src/update-presets.ts",
     "test": "bun test",
     "check:types": "bun run --bun tsc"
   },
@@ -18,6 +19,8 @@
     "@repo/protocol": "workspace:*"
   },
   "devDependencies": {
+    "@babel/parser": "^7.29.8",
+    "@babel/types": "^7.29.8",
     "@repo/typescript-config": "workspace:*",
     "@tanstack/react-router": "catalog:",
     "typescript": "catalog:"
