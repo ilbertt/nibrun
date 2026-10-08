@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as authRouteRouteImport } from './routes/(auth)/route'
 import { Route as dashboardRouteRouteImport } from './routes/(dashboard)/route'
 import { Route as DeployRouteImport } from './routes/deploy'
+import { Route as SqliteRouteImport } from './routes/sqlite'
 import { Route as authDeviceRouteImport } from './routes/(auth)/device'
 import { Route as authLoginRouteImport } from './routes/(auth)/login'
 import { Route as dashboardIndexRouteImport } from './routes/(dashboard)/index'
@@ -34,6 +35,11 @@ const dashboardRouteRoute = dashboardRouteRouteImport.update({
 const DeployRoute = DeployRouteImport.update({
   id: '/deploy',
   path: '/deploy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SqliteRoute = SqliteRouteImport.update({
+  id: '/sqlite',
+  path: '/sqlite',
   getParentRoute: () => rootRouteImport,
 } as any)
 const authDeviceRoute = authDeviceRouteImport.update({
@@ -90,6 +96,7 @@ const dashboardAppsAppIdLogsRoute = dashboardAppsAppIdLogsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/deploy': typeof DeployRoute
+  '/sqlite': typeof SqliteRoute
   '/device': typeof authDeviceRoute
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/deploy': typeof DeployRoute
+  '/sqlite': typeof SqliteRoute
   '/device': typeof authDeviceRoute
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/(auth)': typeof authRouteRouteWithChildren
   '/(dashboard)': typeof dashboardRouteRouteWithChildren
   '/deploy': typeof DeployRoute
+  '/sqlite': typeof SqliteRoute
   '/(auth)/device': typeof authDeviceRoute
   '/(auth)/login': typeof authLoginRoute
   '/(dashboard)/': typeof dashboardIndexRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/deploy'
+    | '/sqlite'
     | '/device'
     | '/login'
     | '/'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/deploy'
+    | '/sqlite'
     | '/device'
     | '/login'
     | '/'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/(auth)'
     | '/(dashboard)'
     | '/deploy'
+    | '/sqlite'
     | '/(auth)/device'
     | '/(auth)/login'
     | '/(dashboard)/'
@@ -176,6 +188,7 @@ export interface RootRouteChildren {
   authRouteRoute: typeof authRouteRouteWithChildren
   dashboardRouteRoute: typeof dashboardRouteRouteWithChildren
   DeployRoute: typeof DeployRoute
+  SqliteRoute: typeof SqliteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -199,6 +212,13 @@ declare module '@tanstack/react-router' {
       path: '/deploy'
       fullPath: '/deploy'
       preLoaderRoute: typeof DeployRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sqlite': {
+      id: '/sqlite'
+      path: '/sqlite'
+      fullPath: '/sqlite'
+      preLoaderRoute: typeof SqliteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth)/device': {
@@ -330,6 +350,7 @@ const rootRouteChildren: RootRouteChildren = {
   authRouteRoute: authRouteRouteWithChildren,
   dashboardRouteRoute: dashboardRouteRouteWithChildren,
   DeployRoute: DeployRoute,
+  SqliteRoute: SqliteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

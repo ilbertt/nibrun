@@ -13,6 +13,8 @@ const config = defineConfig({
   // Vite substitutes `%NAME%` in index.html from these, which is the only way the static head
   // reaches a constant.
   define: {
+    'process.env.NEXT_PUBLIC_BASE_PATH': JSON.stringify(''),
+    'process.env.NEXT_PUBLIC_MONACO_VS_PATH': JSON.stringify(''),
     'import.meta.env.PRODUCT_NAME': JSON.stringify(PRODUCT_NAME),
     'import.meta.env.SITE_TITLE': JSON.stringify(DASHBOARD_SITE.title),
     'import.meta.env.SITE_DESCRIPTION': JSON.stringify(DASHBOARD_SITE.description),

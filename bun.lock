@@ -67,6 +67,7 @@
         "@repo/deploy-link": "workspace:*",
         "@repo/global-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
+        "@repo/sqlite-explorer": "workspace:*",
         "@repo/ui": "workspace:*",
         "@tanstack/react-devtools": "^0.10.12",
         "@tanstack/react-form": "^1.33.5",

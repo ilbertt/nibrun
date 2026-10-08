@@ -33,7 +33,8 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "sonner": "catalog:",
-    "tailwindcss": "catalog:"
+    "tailwindcss": "catalog:",
+    "@repo/sqlite-explorer": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
