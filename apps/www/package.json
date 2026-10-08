@@ -6,8 +6,8 @@
     "#*": "./src/*"
   },
   "scripts": {
-    "dev": "bun run scripts/monaco-assets.ts && vite dev --port 3002",
-    "build": "bun run scripts/monaco-assets.ts && vite build && bun run scripts/share-cards.tsx",
+    "dev": "vite dev --port 3002",
+    "build": "vite build && bun run scripts/share-cards.tsx",
     "preview": "vite preview",
     "cf:typegen": "wrangler types",
     "cf:deploy": "bun run build && wrangler deploy",
