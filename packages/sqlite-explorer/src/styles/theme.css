@@ -1,0 +1,50 @@
+.sqlite-explorer,
+body:has(.sqlite-explorer [data-studio-workspace]) {
+  --studio-canvas: var(--background);
+  --studio-sunken: var(--muted);
+  --studio-surface: var(--card);
+  --studio-raised: var(--card);
+  --studio-overlay: var(--popover);
+  --studio-fg: var(--foreground);
+  --studio-fg-bright: var(--foreground);
+  --studio-fg-secondary: var(--foreground);
+  --studio-fg-tertiary: var(--muted-foreground);
+  --studio-fg-muted: var(--muted-foreground);
+  --studio-fg-subtle: var(--muted-foreground);
+  --studio-hairline: color-mix(in oklch, var(--border) 15%, transparent);
+  --studio-hairline-strong: color-mix(in oklch, var(--border) 25%, transparent);
+  --studio-brand: var(--primary);
+  --studio-brand-bright: var(--primary);
+  --studio-brand-tint: var(--primary);
+  --studio-brand-solid: var(--primary);
+  --studio-brand-solid-hover: color-mix(
+    in oklch,
+    var(--primary) 90%,
+    var(--foreground)
+  );
+}
+
+.sqlite-explorer [data-studio-workspace],
+.dark .sqlite-explorer [data-studio-workspace] {
+  --background: inherit;
+  --foreground: inherit;
+  --card: inherit;
+  --card-foreground: inherit;
+  --popover: inherit;
+  --popover-foreground: inherit;
+  --primary: inherit;
+  --primary-foreground: inherit;
+  --secondary: inherit;
+  --secondary-foreground: inherit;
+  --muted: inherit;
+  --muted-foreground: inherit;
+  --accent: inherit;
+  --accent-foreground: inherit;
+  --destructive: inherit;
+  --border: inherit;
+  --input: inherit;
+  --ring: inherit;
+  --radius: inherit;
+  font-family: var(--font-sans);
+  --font-geist-mono: var(--font-mono);
+}
