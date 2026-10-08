@@ -189,6 +189,13 @@ curl -fsS https://my-app.nibrun.app/
 `--timerange 2h` to read further back. It says why an app never came up, and what one that did is
 complaining about. `nib --help` lists the rest — status, domains, filesystem, export, delete.
 
+## Inspecting SQLite databases
+
+Read SQLite databases in an app's `data/` through the CLI or dashboard without downloading them.
+In the dashboard's **Files** tab, choose **Mark as SQLite database** from the file menu, then
+click the database file to open the explorer. Connections are read-only; the app can continue
+writing to its database.
+
 ## Copying an app
 
 An export is a `.tar.gz` holding `data/`, the binary that ran against it, and a `.env` of the
