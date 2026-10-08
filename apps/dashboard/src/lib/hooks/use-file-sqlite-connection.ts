@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { childPath } from '#lib/child-path.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDirectoryPath } from '#lib/hooks/use-directory-path.ts';
+import { sameOriginSqliteUrl } from '#lib/same-origin-sqlite-url.ts';
 import {
   type SqliteConnectionSummary,
   sqliteConnectionsQueryOptions,
@@ -20,7 +21,6 @@ export function useFileSqliteConnection(
   if (connection === undefined) {
     return undefined;
   }
-  // The development dashboard proxies the API on a different port.
-  const url = new URL(new URL(connection.url).pathname, window.location.origin).href;
+  const url = sameOriginSqliteUrl(connection.url);
   return { ...connection, url };
 }

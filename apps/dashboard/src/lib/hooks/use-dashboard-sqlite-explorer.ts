@@ -1,5 +1,6 @@
 import { createSqliteWorkspace, type SqliteWorkspace } from '@repo/sqlite-explorer';
 import { useEffect, useState } from 'react';
+import { useSqliteConnection } from '#lib/hooks/use-sqlite-connection.ts';
 import { Route } from '#routes/sqlite.tsx';
 
 type OpenedWorkspace = {
@@ -13,7 +14,9 @@ export type DashboardSqliteExplorer = {
 };
 
 export function useDashboardSqliteExplorer(): DashboardSqliteExplorer {
-  const { url } = Route.useSearch();
+  const { url: requestedUrl } = Route.useSearch();
+  const connection = useSqliteConnection();
+  const url = connection.data?.url ?? '';
   const [opened, setOpened] = useState<OpenedWorkspace>();
 
   useEffect(() => {
@@ -48,7 +51,10 @@ export function useDashboardSqliteExplorer(): DashboardSqliteExplorer {
   }, [url]);
 
   const current = opened?.url === url ? opened : undefined;
-  const error = url === '' ? 'A SQLite connection URL is required.' : current?.error;
+  const error =
+    requestedUrl === ''
+      ? 'A SQLite connection URL is required.'
+      : (connection.error?.message ?? current?.error);
   return {
     workspace: current?.workspace,
     error,

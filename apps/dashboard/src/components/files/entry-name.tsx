@@ -38,7 +38,7 @@ export function EntryName({ entry }: { entry: FilesystemEntry }) {
     return (
       <Link
         to={SqliteRoute.to}
-        search={{ url: connection.url, appId }}
+        search={{ url: connection.url }}
         target="_blank"
         rel="noopener"
         className="flex items-center gap-2 hover:underline"
