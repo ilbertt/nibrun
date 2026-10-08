@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { appendFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { DEPLOY_PRESETS } from '#presets.ts';
+import { presetUpdateProposal } from '#updates/proposal.ts';
 import { findUpdate, type PresetUpdate, requestRelease } from '#updates/releases.ts';
 import { updatePresetSource } from '#updates/source.ts';
 
@@ -26,21 +27,20 @@ if (!process.argv.includes('--check') && updates.length > 0) {
   await Bun.write(sourceFile, updatePresetSource({ source: await sourceFile.text(), updates }));
 }
 
-const body = [
-  'Updates the deploy presets to their latest upstream releases.',
-  '',
-  ...updates.map(
-    (update) =>
-      `- ${update.slug}: ${update.previous.version} → [${update.next.version}](${update.releaseUrl})`,
-  ),
-].join('\n');
-
 if (process.env.GITHUB_OUTPUT && !process.argv.includes('--check')) {
-  const bodyPath = join(process.env.RUNNER_TEMP ?? '/tmp', 'deploy-preset-updates.md');
-  await Bun.write(bodyPath, `${body}\n`);
+  const { branch, body } = presetUpdateProposal(updates);
+  const delimiter = randomUUID();
   await appendFile(
     process.env.GITHUB_OUTPUT,
-    `body-path=${bodyPath}\nhas-errors=${failures.length > 0}\n`,
+    [
+      `has-updates=${updates.length > 0}`,
+      `has-errors=${failures.length > 0}`,
+      `branch=${branch}`,
+      `body<<${delimiter}`,
+      body,
+      delimiter,
+      '',
+    ].join('\n'),
   );
 } else {
   process.exitCode = failures.length > 0 ? 1 : 0;

@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { DEPLOY_PRESETS } from '#presets.ts';
+import { presetUpdateProposal } from '#updates/proposal.ts';
 import {
   findUpdate,
   type PresetUpdate,
@@ -271,4 +272,30 @@ test('source editing refuses stale input instead of changing the wrong literal',
       updates: [{ ...update, previous: { ...update.previous, version: 'v0.1.0' } }],
     }),
   ).toThrow('Unexpected preset value for version');
+});
+
+test('the same target pins keep their proposal identity across checks and ordering changes', () => {
+  const update = sourceUpdate();
+  const another = { ...update, slug: 'another' };
+  const proposal = presetUpdateProposal([update, another]);
+  expect(
+    presetUpdateProposal([
+      another,
+      { ...update, previous: { ...update.previous, version: 'v0.40.2' } },
+    ]).branch,
+  ).toBe(proposal.branch);
+  expect(proposal.body).toContain(`[${nextVersion}](${update.releaseUrl})`);
+});
+
+test('a new version or checksum creates a distinct proposal', () => {
+  const update = sourceUpdate();
+  const proposal = presetUpdateProposal([update]);
+  expect(
+    presetUpdateProposal([{ ...update, next: { ...update.next, version: 'v0.40.5' } }]).branch,
+  ).not.toBe(proposal.branch);
+  expect(
+    presetUpdateProposal([
+      { ...update, next: { ...update.next, sha256: 'b'.repeat(SHA256_HEX_LENGTH) } },
+    ]).branch,
+  ).not.toBe(proposal.branch);
 });

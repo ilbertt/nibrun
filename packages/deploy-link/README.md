@@ -10,6 +10,7 @@ Drizzle Gateway uses its published Linux x64 download page. Rolling presets with
 checksums already follow upstream builds and remain unpinned.
 
 The `update-deploy-presets` workflow runs daily at 06:23 UTC or on manual dispatch.
-It creates or refreshes one PR. Configure `OPEN_PR_TOKEN` with a PAT or GitHub App
-token so the resulting PR triggers the repository's required checks. Failed upstream
-checks fail the workflow after successful updates have been proposed.
+It uses the repository's `open-pr` action, with a branch derived from the target pins
+so the same updates are proposed only once. Configure `OPEN_PR_TOKEN` with a PAT or
+GitHub App token so the resulting PR triggers the repository's required checks.
+Failed upstream checks fail the workflow after successful updates have been proposed.

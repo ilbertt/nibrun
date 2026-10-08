@@ -33,18 +33,18 @@ jobs:
         run: bun run --filter @repo/deploy-link update:presets
 
       - name: Format updated presets
+        if: steps.updates.outputs.has-updates == 'true'
         run: bun fix:codestyle
 
-      - name: Open or update the pull request
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+      - name: Open the update pull request
+        if: steps.updates.outputs.has-updates == 'true'
+        uses: ./.github/actions/open-pr
         with:
           token: ${{ secrets.OPEN_PR_TOKEN || github.token }}
-          branch: codex/update-deploy-presets
-          delete-branch: true
+          branch: ${{ steps.updates.outputs.branch }}
           title: 'chore(deploy-link): update deploy presets'
-          commit-message: 'chore(deploy-link): update deploy presets'
-          body-path: ${{ steps.updates.outputs.body-path }}
-          add-paths: packages/deploy-link/src/presets.ts
+          body: ${{ steps.updates.outputs.body }}
+          paths: packages/deploy-link/src/presets.ts
 
       - name: Report failed update checks
         if: steps.updates.outputs.has-errors == 'true'
