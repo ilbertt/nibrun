@@ -273,6 +273,7 @@
       "dependencies": {
         "@libredb/studio": "0.18.0",
         "@libsql/client": "catalog:",
+        "@monaco-editor/react": "^4.7.0",
         "@repo/ui": "workspace:*",
         "lucide-react": "catalog:",
         "monaco-editor": "0.57.0",
@@ -282,6 +283,7 @@
         "@types/react": "catalog:",
         "@types/react-dom": "catalog:",
         "typescript": "catalog:",
+        "vite": "catalog:",
       },
       "peerDependencies": {
         "react": "catalog:",

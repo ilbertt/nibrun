@@ -4,6 +4,8 @@ Import `SqliteExplorer` from `@repo/sqlite-explorer` and supply `className` for 
 
 Import `@repo/sqlite-explorer/styles.css` into the host's Tailwind stylesheet after its theme. Styles use the shared UI theme variables; the package stylesheet registers its own Tailwind sources.
 
-The LibreDB SQL editor loads Monaco from `/monaco/vs`. Call `copyMonacoAssets({ destination })` from `@repo/sqlite-explorer/monaco-assets` during the host build to copy the locally installed assets to that public directory. The bundler must define `process.env.NEXT_PUBLIC_BASE_PATH` as an empty string and `process.env.NEXT_PUBLIC_MONACO_VS_PATH` as `/monaco/vs` because LibreDB reads these Next.js variables in its browser bundle.
+The SQL editor bundles Monaco's ESM API, SQL language and editor worker through Vite. Its setup is loaded only when the SQL editor opens, after LibreDB configures the shared Monaco loader. The host does not need an asset-copy step or a public Monaco directory.
+
+LibreDB still reads Next.js environment variables at module load. Define `process.env.NEXT_PUBLIC_BASE_PATH` and `process.env.NEXT_PUBLIC_MONACO_VS_PATH` as empty strings in the host bundler. The injected Monaco instance bypasses the URL-based loader. This follows [Monaco React's Vite integration](https://github.com/suren-atoyan/monaco-react#use-monaco-editor-as-an-npm-package).
 
 Run `bun run check:types` and `bun run test` in this package. This is an internal workspace package; npm packaging can be added when its public API is ready.

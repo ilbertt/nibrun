@@ -5,9 +5,14 @@ import { lazy, Suspense, useEffect, useRef } from 'react';
 import { LoadingEditor } from '#components/loading-editor.tsx';
 import type { useSqliteExplorer } from '#hooks/use-sqlite-explorer.ts';
 
-const QueryEditor = lazy(async () => ({
-  default: (await import('@libredb/studio/components')).QueryEditor,
-}));
+const QueryEditor = lazy(loadQueryEditor);
+
+async function loadQueryEditor() {
+  const { QueryEditor } = await import('@libredb/studio/components');
+  // LibreDB configures the shared loader at module load, so inject Monaco afterward.
+  await import('#lib/monaco.ts');
+  return { default: QueryEditor };
+}
 
 export function SqlEditor({
   query,

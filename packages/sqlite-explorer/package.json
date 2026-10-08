@@ -4,8 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./styles.css": "./src/styles.css",
-    "./monaco-assets": "./scripts/monaco-assets.ts"
+    "./styles.css": "./src/styles.css"
   },
   "imports": {
     "#*": "./src/*"
@@ -19,7 +18,8 @@
     "@libsql/client": "catalog:",
     "@repo/ui": "workspace:*",
     "lucide-react": "catalog:",
-    "monaco-editor": "0.57.0"
+    "monaco-editor": "0.57.0",
+    "@monaco-editor/react": "^4.7.0"
   },
   "peerDependencies": {
     "react": "catalog:",
@@ -29,6 +29,7 @@
     "@repo/typescript-config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite": "catalog:"
   }
 }
