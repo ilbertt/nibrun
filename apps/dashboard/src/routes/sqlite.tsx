@@ -5,9 +5,9 @@ import { SqliteBrowser } from '#components/sqlite/sqlite-browser.tsx';
 export const Route = createFileRoute('/sqlite')({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { url: string; fileName: string | undefined } => ({
+  ): { url: string; appId: string | undefined } => ({
     url: typeof search.url === 'string' ? search.url : '',
-    fileName: typeof search.fileName === 'string' ? search.fileName : undefined,
+    appId: typeof search.appId === 'string' ? search.appId : undefined,
   }),
   component: RouteComponent,
 });

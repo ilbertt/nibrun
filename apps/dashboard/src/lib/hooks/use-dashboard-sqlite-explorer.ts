@@ -10,11 +10,10 @@ type OpenedWorkspace = {
 export type DashboardSqliteExplorer = {
   workspace: SqliteWorkspace | undefined;
   error: string | undefined;
-  fileName: string | undefined;
 };
 
 export function useDashboardSqliteExplorer(): DashboardSqliteExplorer {
-  const { url, fileName } = Route.useSearch();
+  const { url } = Route.useSearch();
   const [opened, setOpened] = useState<OpenedWorkspace>();
 
   useEffect(() => {
@@ -53,6 +52,5 @@ export function useDashboardSqliteExplorer(): DashboardSqliteExplorer {
   return {
     workspace: current?.workspace,
     error,
-    fileName: fileName || undefined,
   };
 }
