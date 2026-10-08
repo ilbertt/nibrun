@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/sqlite-explorer/src/**",
+        "$TURBO_ROOT$/packages/sqlite-explorer/package.json"
+      ]
+    }
+  }
+}
