@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { PresetUpdate } from '#updates/releases.ts';
+import type { PresetUpdate } from '#scripts/updates/releases.ts';
 
 export function presetUpdateProposal(updates: PresetUpdate[]): { branch: string; body: string } {
   const targets = updates

@@ -1,7 +1,7 @@
 # Deploy links and presets
 
 `src/presets.ts` owns the deploy catalog and its version, binary URL and checksum pins.
-Preset update tooling stays in this package and imports that catalog.
+`scripts/update-presets.ts` and its helpers maintain the pins by importing that catalog.
 
 Run `bun run --filter @repo/deploy-link update:presets` from the repository root to
 update the pins, or append `--check` to report updates without writing them.

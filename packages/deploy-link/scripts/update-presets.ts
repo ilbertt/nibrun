@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { appendFile } from 'node:fs/promises';
 import { DEPLOY_PRESETS } from '#presets.ts';
-import { presetUpdateProposal } from '#updates/proposal.ts';
-import { findUpdate, type PresetUpdate, requestRelease } from '#updates/releases.ts';
-import { updatePresetSource } from '#updates/source.ts';
+import { presetUpdateProposal } from '#scripts/updates/proposal.ts';
+import { findUpdate, type PresetUpdate, requestRelease } from '#scripts/updates/releases.ts';
+import { updatePresetSource } from '#scripts/updates/source.ts';
 
 const updates: PresetUpdate[] = [];
 const failures: string[] = [];
@@ -23,7 +23,7 @@ for (const [slug, preset] of Object.entries(DEPLOY_PRESETS)) {
 }
 
 if (!process.argv.includes('--check') && updates.length > 0) {
-  const sourceFile = Bun.file(new URL('./presets.ts', import.meta.url));
+  const sourceFile = Bun.file(new URL('../src/presets.ts', import.meta.url));
   await Bun.write(sourceFile, updatePresetSource({ source: await sourceFile.text(), updates }));
 }
 

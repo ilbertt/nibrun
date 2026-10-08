@@ -10,7 +10,7 @@ import {
   type ObjectExpression,
   type ObjectProperty,
 } from '@babel/types';
-import type { PresetUpdate } from '#updates/releases.ts';
+import type { PresetUpdate } from '#scripts/updates/releases.ts';
 
 type Edit = { start: number; end: number; text: string };
 

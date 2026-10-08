@@ -1,14 +1,14 @@
 import { expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { DEPLOY_PRESETS } from '#presets.ts';
-import { presetUpdateProposal } from '#updates/proposal.ts';
+import { presetUpdateProposal } from '#scripts/updates/proposal.ts';
 import {
   findUpdate,
   type PresetUpdate,
   type Release,
   updatedAssetName,
-} from '#updates/releases.ts';
-import { updatePresetSource } from '#updates/source.ts';
+} from '#scripts/updates/releases.ts';
+import { updatePresetSource } from '#scripts/updates/source.ts';
 
 const preset = DEPLOY_PRESETS.pocketbase;
 const currentUrl = new URL(preset.deployLink.binary);

@@ -6,10 +6,11 @@
     ".": "./src/index.ts"
   },
   "imports": {
+    "#scripts/*": "./scripts/*",
     "#*": "./src/*"
   },
   "scripts": {
-    "update:presets": "bun run src/update-presets.ts",
+    "update:presets": "bun run scripts/update-presets.ts",
     "test": "bun test",
     "check:types": "bun run --bun tsc"
   },
