@@ -1,5 +1,5 @@
 diff --git a/dist/chunk-FA3AXNXJ.mjs b/dist/chunk-FA3AXNXJ.mjs
-index 352c9d55520c1440b8f273a703327e7a1474bb83..a0f4adb9b0884af9947a63ed513441314555e3dc 100644
+index 352c9d55520c1440b8f273a703327e7a1474bb83..674f5c2e99735b6c85ca69a83037edf507dfd324 100644
 --- a/dist/chunk-FA3AXNXJ.mjs
 +++ b/dist/chunk-FA3AXNXJ.mjs
 @@ -1,3 +1,4 @@
@@ -16,11 +16,11 @@ index 352c9d55520c1440b8f273a703327e7a1474bb83..a0f4adb9b0884af9947a63ed51344131
  import { format } from 'sql-formatter';
  import { toast } from 'sonner';
  import { jsxs, jsx, Fragment } from 'react/jsx-runtime';
-@@ -3963,12 +3964,30 @@ function ScrollBar(_a) {
+@@ -3963,12 +3964,37 @@ function ScrollBar(_a) {
      })
    );
  }
-+function ForeignKeyButton({ field, value, links, onNavigate }) {
++function ForeignKeyButton({ field, value, links, onNavigate, showLabel }) {
 +  const link = links?.get(field);
 +  const query = link && sqliteReferenceQuery({ link, value });
 +  if (!query || !onNavigate) return null;
@@ -28,6 +28,13 @@ index 352c9d55520c1440b8f273a703327e7a1474bb83..a0f4adb9b0884af9947a63ed51344131
 +  function navigate(event) {
 +    event.stopPropagation();
 +    onNavigate({ link, query });
++  }
++  if (showLabel) {
++    return jsx(Button, {
++      type: "button", variant: "outline", size: "sm", title: label,
++      className: "h-7 shrink-0 px-2 text-xs", onClick: navigate,
++      children: "View row"
++    });
 +  }
 +  return jsx("button", {
 +    type: "button", title: label, "aria-label": label,
@@ -47,15 +54,15 @@ index 352c9d55520c1440b8f273a703327e7a1474bb83..a0f4adb9b0884af9947a63ed51344131
    maskingActive,
    sensitiveColumns,
    allowReveal,
-@@ -4093,6 +4112,7 @@ function RowDetailSheet({
+@@ -4093,6 +4119,7 @@ function RowDetailSheet({
                }
              ),
              /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1 shrink-0", children: [
-+              !isMasked && jsx(ForeignKeyButton, { field, value: row[field], links: foreignKeyLinks, onNavigate: onForeignKeyNavigate }),
++              !isMasked && jsx(ForeignKeyButton, { field, value: row[field], links: foreignKeyLinks, onNavigate: onForeignKeyNavigate, showLabel: true }),
                isMasked && allowReveal && /* @__PURE__ */ jsx(
                  Button,
                  {
-@@ -4611,6 +4631,8 @@ function detectIdColumn(fields) {
+@@ -4611,6 +4638,8 @@ function detectIdColumn(fields) {
  }
  function ResultsGrid({
    result,
@@ -64,7 +71,7 @@ index 352c9d55520c1440b8f273a703327e7a1474bb83..a0f4adb9b0884af9947a63ed51344131
    onLoadMore,
    isLoadingMore,
    supportsResultPagination,
-@@ -4634,6 +4656,10 @@ function ResultsGrid({
+@@ -4634,6 +4663,10 @@ function ResultsGrid({
    const [viewMode, setViewMode] = useState("card");
    const [wrapText, setWrapText] = useState(false);
    const [selectedRow, setSelectedRow] = useState(null);
@@ -75,7 +82,7 @@ index 352c9d55520c1440b8f273a703327e7a1474bb83..a0f4adb9b0884af9947a63ed51344131
    const [typedFilters, setColumnFilters] = useState(/* @__PURE__ */ new Map());
    const [activeFilterCol, setActiveFilterCol] = useState(null);
    const [columnVisibility, setColumnVisibility] = useState({});
-@@ -5374,7 +5400,7 @@ function ResultsGrid({
+@@ -5374,7 +5407,7 @@ function ResultsGrid({
                    },
                    children: row.getVisibleCells().map((cell) => {
                      const isRowDetail = cell.column.id === detailColumnId;
@@ -84,19 +91,19 @@ index 352c9d55520c1440b8f273a703327e7a1474bb83..a0f4adb9b0884af9947a63ed51344131
                        "div",
                        {
                          style: { width: cell.column.getSize(), minWidth: cell.column.getSize() },
-@@ -5386,7 +5412,10 @@ function ResultsGrid({
+@@ -5386,7 +5419,10 @@ function ResultsGrid({
                            isRowDetail ? "px-1 justify-center sticky left-0 z-10 bg-sunken" : "px-4"
                          ),
                          onContextMenu: () => setContextCell(isRowDetail ? null : { rowIndex: sourceIndex, field: cell.column.id }),
 -                        children: flexRender(cell.column.columnDef.cell, cell.getContext())
 +                        children: [
 +                          isRowDetail ? flexRender(cell.column.columnDef.cell, cell.getContext()) : jsx("div", { className: "min-w-0", children: flexRender(cell.column.columnDef.cell, cell.getContext()) }),
-+                          !isRowDetail && !effectiveMaskingEnabled && jsx(ForeignKeyButton, { field: cell.column.id, value: row.original[cell.column.id], links: foreignKeyLinks, onNavigate: navigateForeignKey })
++                          !isRowDetail && !effectiveMaskingEnabled && jsx(ForeignKeyButton, { field: cell.column.id, value: row.original[cell.column.id], links: foreignKeyLinks, onNavigate: navigateForeignKey, showLabel: false })
 +                        ]
                        },
                        cell.id
                      );
-@@ -5407,6 +5436,8 @@ function ResultsGrid({
+@@ -5407,6 +5443,8 @@ function ResultsGrid({
          isOpen: !!selectedRow,
          onClose: () => setSelectedRow(null),
          rowIndex: selectedRow.index,
