@@ -1,7 +1,5 @@
 /** biome-ignore-all lint/performance/noBarrelFile: index is the only allowed file where we can export other files */
 
-export { Value } from '@sinclair/typebox/value';
-export { SqliteExecutorContract } from '#executor.ts';
 export {
   type HranaBatch,
   type HranaBatchCond,
@@ -13,6 +11,7 @@ export {
   HranaColSchema,
   type HranaDescribeResult,
   HranaDescribeResultSchema,
+  HranaErrorSchema,
   type HranaPipelineReqBody,
   HranaPipelineReqBodySchema,
   type HranaPipelineRespBody,
@@ -30,14 +29,18 @@ export {
   type HranaValue,
   HranaValueSchema,
 } from '#hrana.ts';
-export { HranaError } from '#hrana-error.ts';
-export { hranaStatement, resolveHranaSql } from '#hrana-sql.ts';
-export { parseHranaPipeline } from '#hrana-validation.ts';
+export { HranaError, hranaError } from '#hrana-error.ts';
+export { HranaPipelineRelay } from '#hrana-relay.ts';
+export { HranaPipelineSessionContract } from '#hrana-session.ts';
+export { type HranaStream, HranaStreams } from '#hrana-streams.ts';
+export { parseHranaPipeline, parseHranaPipelineResponse } from '#hrana-validation.ts';
 export {
   SQLITE_MAX_COLUMNS,
+  SQLITE_MAX_ERROR_MESSAGE_LENGTH,
   SQLITE_MAX_PARAMETERS,
+  SQLITE_MAX_REQUEST_BYTES,
+  SQLITE_MAX_RESPONSE_BYTES,
   SQLITE_MAX_ROWS,
   SQLITE_MAX_STATEMENT_LENGTH,
   SQLITE_MAX_VALUE_LENGTH,
 } from '#limits.ts';
-export { SqliteSqlSchema, type SqliteStatement, SqliteStatementSchema } from '#statement.ts';

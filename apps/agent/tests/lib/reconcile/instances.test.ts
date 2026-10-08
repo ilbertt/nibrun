@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import { FetchHttpClient } from '@effect/platform';
+import { DeploymentIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Deferred, Effect, Fiber, Layer } from 'effect';
 import { refreshStates, resumeInstance, suspendInstance } from '#lib/reconcile/instances.ts';
 import { SleepRefused, SnapshotUnusable } from '#lib/vm/snapshot.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
-import { CronActivity } from '#services/cron-activity.service.ts';
+import { GuestActivity } from '#services/guest-activity.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
@@ -37,7 +39,7 @@ const NEVER_DUE = Number.MAX_SAFE_INTEGER;
 const run = provided(
   Layer.mergeAll(
     AgentState.Default,
-    CronActivity.Default,
+    GuestActivity.Default,
     ReportSignal.Default,
     FetchHttpClient.layer,
   ).pipe(Layer.provideMerge(platform)),
@@ -138,6 +140,26 @@ describe('a settle writes back only what it measured', () => {
       }),
     ));
 
+  test('a pass for the outgoing release cannot overwrite the incoming release health or state', () =>
+    run(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(instanceRecord({ state: 'stopped', stopRequested: true }));
+        yield* AgentState.modify((current) => ({
+          ...current,
+          nextProbeAtMs: new Map([[APP_ID, NEVER_DUE]]),
+        }));
+        const pass = yield* passHeldOpen();
+        const incoming = instanceRecord({
+          deploymentId: Value.Parse(DeploymentIdSchema, 'dep-2'),
+          state: 'starting',
+          health: { consecutiveSuccesses: 0, consecutiveFailures: 0, everHealthy: false },
+        });
+        yield* AgentState.putRecord(incoming);
+        yield* pass.finish;
+        expect(yield* recordOf).toEqual(incoming);
+      }),
+    ));
+
   test('an instance dropped mid-pass is not brought back', () =>
     run(
       Effect.gen(function* () {
@@ -218,7 +240,7 @@ function onHost({ vms, unit }: { vms: ReturnType<typeof recordingVms>; unit: str
   return provided(
     Layer.mergeAll(
       AgentState.Default,
-      CronActivity.Default,
+      GuestActivity.Default,
       ReportSignal.Default,
       SlotAllocator.DefaultWithoutDependencies,
       ZerofsTopology.DefaultWithoutDependencies,
@@ -365,7 +387,7 @@ describe('an app that has gone quiet is put down where it can be picked up', () 
     return withMicroVmDown(vms)(
       Effect.gen(function* () {
         yield* AgentState.putRecord(instanceRecord({ onRequest: true, state: 'running' }));
-        const activity = yield* CronActivity;
+        const activity = yield* GuestActivity;
         yield* activity.run({ appId: APP_ID, effect: suspend });
         expect(vms.calls).toEqual([]);
         expect((yield* recordOf)?.state).toBe('running');
@@ -378,7 +400,7 @@ describe('an app that has gone quiet is put down where it can be picked up', () 
     return withMicroVmDown(vms)(
       Effect.gen(function* () {
         yield* AgentState.putRecord(instanceRecord({ onRequest: true, state: 'running' }));
-        const activity = yield* CronActivity;
+        const activity = yield* GuestActivity;
         yield* AgentState.markActive({ appId: APP_ID, nowMs: 0 });
         yield* activity.run({ appId: APP_ID, effect: Effect.void });
         yield* suspendInstance({

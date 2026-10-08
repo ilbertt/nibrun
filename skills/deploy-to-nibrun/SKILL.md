@@ -297,7 +297,9 @@ Worth saying out loud before recommending it:
   the CLI, API or dashboard. For an always-on app, email [hello@nibrun.com](mailto:hello@nibrun.com).
 - **One microVM per app, one size.** No horizontal scaling, no load balancing, no resizing.
 - **A deploy is a replace.** The old VM is stopped before the new one starts, because they share
-  one volume — so there are a few seconds of downtime, and no blue/green or canary.
+  one volume. New HTTP requests wait for up to 60 seconds for the replacement to become healthy;
+  a failed or slower deployment returns an error. In-flight requests and existing WebSockets can
+  still disconnect. No blue/green or canary.
 - **A local disk, not a distributed one.** Ideal for SQLite, uploads, caches. It is not
   replicated, so an export (`nib apps export`) is your backup.
 - **The binary is the unit.** The guest boots yours and nothing else — no sidecar, no cron

@@ -14,10 +14,13 @@ import { AppsAppIdHostnamesController } from '#routes/api/apps/[appId]/hostnames
 import { AppsAppIdHostnamesDnsController } from '#routes/api/apps/[appId]/hostnames/dns/controller.ts';
 import { AppsAppIdImportsImportIdController } from '#routes/api/apps/[appId]/imports/[importId]/controller.ts';
 import { AppsAppIdImportsController } from '#routes/api/apps/[appId]/imports/controller.ts';
+import { AppsAppIdSqliteConnectionsConnectionIdController } from '#routes/api/apps/[appId]/sqlite/connections/[connectionId]/controller.ts';
+import { AppsAppIdSqliteConnectionsController } from '#routes/api/apps/[appId]/sqlite/connections/controller.ts';
 import { AppsAppIdStateController } from '#routes/api/apps/[appId]/state/controller.ts';
 import { AppsController } from '#routes/api/apps/controller.ts';
 import { AuthController } from '#routes/api/auth/controller.ts';
 import { HealthController } from '#routes/api/health/controller.ts';
+import { SqliteConnectionsConnectionIdV2Controller } from '#routes/api/sqlite/connections/[connectionId]/v2/controller.ts';
 
 export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(AuthController)
@@ -37,4 +40,7 @@ export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(AppsAppIdImportsImportIdController)
   .use(AppsAppIdHostnamesController)
   .use(AppsAppIdHostnamesDnsController)
-  .use(AppsAppIdStateController);
+  .use(AppsAppIdStateController)
+  .use(AppsAppIdSqliteConnectionsController)
+  .use(AppsAppIdSqliteConnectionsConnectionIdController)
+  .use(SqliteConnectionsConnectionIdV2Controller);

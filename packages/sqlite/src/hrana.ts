@@ -18,6 +18,7 @@ const MAX_INTEGER_LENGTH = 20;
 const BASE64_INPUT_BYTES = 3;
 const BASE64_OUTPUT_CHARACTERS = 4;
 
+export const HranaErrorSchema = bounded(Hrana.HranaErrorSchema);
 export const HranaValueSchema = bounded(Hrana.HranaValueSchema);
 export type HranaValue = typeof HranaValueSchema.static;
 export const HranaColSchema = bounded(Hrana.HranaColSchema);

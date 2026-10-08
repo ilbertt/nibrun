@@ -38,6 +38,10 @@ export function routesUnder(prefix: string): Route[] {
     .map(({ method, path }) => ({ method, path }));
 }
 
+export function sendRequest(request: Request): Promise<Response> {
+  return api.handle(request);
+}
+
 // `signal` is the caller going away, exactly as it is for a request off a socket: a route that
 // holds one open has nothing else to end it inside a test.
 export function send({
@@ -53,7 +57,7 @@ export function send({
   headers?: Record<string, string>;
   signal?: AbortSignal;
 }): Promise<Response> {
-  return api.handle(new Request(url, { method, headers, body, signal }));
+  return sendRequest(new Request(url, { method, headers, body, signal }));
 }
 
 export function sendJson({

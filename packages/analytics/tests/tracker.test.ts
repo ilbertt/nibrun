@@ -316,6 +316,28 @@ test('authentication state changes keep the browser identifier intact', async ()
   expect(events.at(-1)?.data).toMatchObject({ identity_state: authenticated });
 });
 
+test('sign-in failure diagnostics reach the tracker with the original sign-in context', async () => {
+  const count = events.length;
+  trackEvent({
+    name: 'sign_in_failed',
+    data: {
+      identity_state: 'anonymous',
+      reason: 'keep-app',
+      error_code: 'INVALID_ORIGIN',
+      http_status: 403,
+    },
+  });
+  await Promise.resolve();
+  expect(events).toHaveLength(count + 1);
+  expect(events.at(-1)?.name).toBe('sign_in_failed');
+  expect(events.at(-1)?.data).toMatchObject({
+    identity_state: 'anonymous',
+    reason: 'keep-app',
+    error_code: 'INVALID_ORIGIN',
+    http_status: 403,
+  });
+});
+
 test('account identification preserves the anonymous journey and excludes personal session data', async () => {
   const accountId = crypto.randomUUID();
   expect(setAnalyticsAccountId(accountId)).toBe(true);

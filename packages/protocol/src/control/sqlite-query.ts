@@ -1,8 +1,7 @@
 import {
-  HranaDescribeResultSchema,
-  HranaStmtResultSchema,
-  SqliteSqlSchema,
-  SqliteStatementSchema,
+  HranaPipelineReqBodySchema,
+  HranaPipelineRespBodySchema,
+  SQLITE_MAX_ERROR_MESSAGE_LENGTH,
 } from '@repo/sqlite';
 import { Type } from '@sinclair/typebox';
 import { GuestPathSchema } from '#schemas/filesystem.ts';
@@ -15,13 +14,10 @@ import {
 
 const MAX_SERVED_DEPLOYMENTS = 200;
 const MAX_ERROR_CODE_LENGTH = 128;
-const MAX_ERROR_MESSAGE_LENGTH = 1024;
 
 export const SqliteOperationSchema = Type.Union([
   Type.Object({ type: Type.Literal('open'), path: GuestPathSchema }),
-  Type.Object({ type: Type.Literal('execute'), statement: SqliteStatementSchema }),
-  Type.Object({ type: Type.Literal('describe'), sql: SqliteSqlSchema }),
-  Type.Object({ type: Type.Literal('sequence'), sql: SqliteSqlSchema }),
+  Type.Object({ type: Type.Literal('pipeline'), body: HranaPipelineReqBodySchema }),
   Type.Object({ type: Type.Literal('close') }),
 ]);
 export type SqliteOperation = typeof SqliteOperationSchema.static;
@@ -50,14 +46,12 @@ export type SqliteQueryResponse = typeof SqliteQueryResponseSchema.static;
 
 export const SqliteOutcomeSchema = Type.Union([
   Type.Object({ status: Type.Literal('opened') }),
-  Type.Object({ status: Type.Literal('executed'), result: HranaStmtResultSchema }),
-  Type.Object({ status: Type.Literal('described'), result: HranaDescribeResultSchema }),
-  Type.Object({ status: Type.Literal('sequenced') }),
+  Type.Object({ status: Type.Literal('pipelined'), result: HranaPipelineRespBodySchema }),
   Type.Object({ status: Type.Literal('closed') }),
   Type.Object({
     status: Type.Literal('failed'),
     code: Type.String({ maxLength: MAX_ERROR_CODE_LENGTH }),
-    message: Type.String({ maxLength: MAX_ERROR_MESSAGE_LENGTH }),
+    message: Type.String({ maxLength: SQLITE_MAX_ERROR_MESSAGE_LENGTH }),
   }),
 ]);
 export type SqliteOutcome = typeof SqliteOutcomeSchema.static;

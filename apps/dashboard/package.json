@@ -12,11 +12,15 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
+    "@better-auth/core": "1.7.2",
+    "@repo/analytics": "workspace:*",
     "@repo/api-client": "workspace:*",
+    "@repo/api-constants": "workspace:*",
     "@repo/app-operations": "workspace:*",
     "@repo/binary-handoff": "workspace:*",
     "@repo/deploy-link": "workspace:*",
     "@repo/global-constants": "workspace:*",
+    "@repo/protocol": "workspace:*",
     "@repo/ui": "workspace:*",
     "@tanstack/react-devtools": "^0.10.12",
     "@tanstack/react-form": "^1.33.5",
@@ -29,10 +33,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "sonner": "catalog:",
-    "tailwindcss": "catalog:",
-    "@repo/analytics": "workspace:*",
-    "@repo/api-constants": "workspace:*",
-    "@repo/protocol": "workspace:*"
+    "tailwindcss": "catalog:"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

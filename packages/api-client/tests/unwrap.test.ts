@@ -39,3 +39,45 @@ test('an api that could not be reached is not one that answered', () => {
 
   expect(describeFailure(failure)).toBe('Unable to connect');
 });
+
+test.each([
+  '<!DOCTYPE html>\n<html><head><title>Bad gateway</title></head><body>Proxy error</body></html>',
+  '\n  <!doctype HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n<html>Proxy error</html>',
+  '\uFEFF<HTML lang="en"><body>Proxy error</body></HTML>',
+])('an HTML error page is summarized without printing its markup: %s', (page) => {
+  const failure = { status: 502, value: page };
+
+  expect(describeFailure(failure)).toBe(
+    'The api answered 502: an error page instead of an API response',
+  );
+});
+
+test('markup inside an API error remains the API message', () => {
+  const failure = { status: 400, value: { error: '<html> is not an accepted value' } };
+
+  expect(describeFailure(failure)).toBe('The api answered 400: <html> is not an accepted value');
+});
+
+test('plain text mentioning markup is not mistaken for an HTML page', () => {
+  const failure = { status: 400, value: 'Expected <html> at the start of the document' };
+
+  expect(describeFailure(failure)).toBe(
+    'The api answered 400: Expected <html> at the start of the document',
+  );
+});
+
+test('a streamed error body is summarized without consuming it', () => {
+  let consumed = false;
+
+  async function* errorPage() {
+    consumed = true;
+    yield await Promise.resolve('<!DOCTYPE html><html>Proxy error</html>');
+  }
+
+  const failure = { status: 504, value: errorPage() };
+
+  expect(describeFailure(failure)).toBe(
+    'The api answered 504: an error page instead of an API response',
+  );
+  expect(consumed).toBe(false);
+});

@@ -3,6 +3,8 @@ import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import type { AssetsRepository } from '#repositories/assets.repository.ts';
 import { Service } from '#services/service.ts';
 
+type AssetsRepositoryContract = Pick<AssetsRepository, 'list'>;
+
 const INDEX_HTML_PATH = '/index.html';
 // Vite content-hashes the filenames in this folder, so they never change.
 const IMMUTABLE_PATH_PREFIX = '/assets/';
@@ -10,9 +12,9 @@ const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 const REVALIDATE_CACHE_CONTROL = 'no-cache';
 
 export class AssetsService extends Service {
-  private readonly assetsRepo: AssetsRepository;
+  private readonly assetsRepo: AssetsRepositoryContract;
 
-  constructor(assetsRepo: AssetsRepository) {
+  constructor(assetsRepo: AssetsRepositoryContract) {
     super();
     this.assetsRepo = assetsRepo;
   }
@@ -34,9 +36,11 @@ export class AssetsService extends Service {
     return routes;
   }
 
-  fallback(path: string): Response | null {
-    // Only client-side routes fall back to the app, a missing file must 404.
-    if (extname(path) !== '') {
+  fallback(request: Request): Response | null {
+    const path = new URL(request.url).pathname;
+    const acceptsHtml = request.headers.get('accept')?.includes('text/html') ?? false;
+    const readsPage = request.method === 'GET' || request.method === 'HEAD';
+    if (!readsPage || !acceptsHtml || extname(path) !== '') {
       return null;
     }
 

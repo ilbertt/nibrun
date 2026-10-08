@@ -21,6 +21,7 @@
 #include "guest-cron.h"
 #include "guest-filesystem.h"
 #include "guest-logs.h"
+#include "guest-sqlite.h"
 #include "log.h"
 #include "mounts.h"
 #include "paths.h"
@@ -36,6 +37,7 @@ struct guest_channels {
   struct guest_control control;
   struct guest_filesystem files;
   struct guest_cron cron;
+  struct guest_sqlite sqlite;
 };
 
 static _Noreturn void shutdown_guest(const struct guest_channels *channels) {
@@ -44,6 +46,7 @@ static _Noreturn void shutdown_guest(const struct guest_channels *channels) {
   guest_control_stop(&channels->control);
   guest_filesystem_stop(&channels->files);
   guest_cron_stop(&channels->cron);
+  guest_sqlite_stop(&channels->sqlite);
   /* Unmounted rather than only synced, so the next boot finds a clean filesystem
    * instead of replaying a journal. */
   if (umount(DATA_DIR) < 0 && errno != EINVAL && errno != ENOENT) {
@@ -168,6 +171,7 @@ int main(int argc, char **argv) {
       .control = {.process = -1, .mount_point = DATA_DIR},
       .files = {.process = -1, .mount_point = DATA_DIR},
       .cron = {.process = -1},
+      .sqlite = {.process = -1, .mount_point = DATA_DIR},
   };
 
   if (!mounts_dev()) {
@@ -190,6 +194,7 @@ int main(int argc, char **argv) {
   guest_filesystem_start(&channels.files);
   channels.cron.config = &config;
   guest_cron_start(&channels.cron);
+  guest_sqlite_start(&channels.sqlite);
 
   struct supervisor supervisor = {
       .tenant =

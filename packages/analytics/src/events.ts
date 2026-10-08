@@ -48,7 +48,12 @@ export type AnalyticsEventData = {
     previous_identity_state: string | undefined;
     reason: (typeof SIGN_IN_REASONS)[number];
   };
-  sign_in_failed: { identity_state: string; reason: (typeof SIGN_IN_REASONS)[number] };
+  sign_in_failed: {
+    identity_state: string;
+    reason: (typeof SIGN_IN_REASONS)[number];
+    error_code: string | undefined;
+    http_status: number | undefined;
+  };
   app_claimed: { identity_state: string; app_id: string };
   app_viewed: { identity_state: string; app_id: string; tab: string };
   app_action_completed: { identity_state: string; app_id: string; action: string };

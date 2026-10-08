@@ -6,7 +6,9 @@ is never sent a command. Read `lib/reconcile/`, `lib/volumes/topology.ts` and
 `lib/network/slot.ts` first.
 
 Besides converging, it answers directory reads through `lib/agent/filesystem.ts` and cron
-listings through `lib/agent/cron-query.ts`, each on routes of its own. A read is not a state
+listings through `lib/agent/cron-query.ts`, each on routes of its own.
+`lib/agent/sqlite-query.ts` polls live SQLite operations on separate routes, bounds dispatched
+queries, and admits session close while queries are executing. SQL is never retried by the agent. A read is not a state
 anything converges on, so it carries no generation and cannot delay a stop. Cron listings read
 the durable registry and cached desired state without waking a guest, including suspended apps.
 
@@ -86,12 +88,18 @@ publishes into the shared tenant log queue. Its caller supplies the job and run 
 dispatch. Queue refusal drops output without stalling a command; sequence gaps identify
 missing records. Decoder remainders are flushed on completion, failure and interruption.
 
-`CronActivity` serializes idle capture against run admission and keeps each overlapping
+`GuestActivity` serializes idle capture against run admission and keeps each overlapping
 run protected until completion. `CronExecutions` owns deployment scopes, wakes idle apps,
 and drains old runs before reconcile replaces or suspends a VM. `CronScheduler` owns the
 future timers: changing a crontab replaces timers while started commands finish in their
 deployment scope. Its registry loop runs without waiting for a control-plane session;
 Effect schedules wait on Bun-calculated UTC occurrences and never retry a command.
+
+`SqliteSessions` owns read-only guest database streams through `lib/sqlite/` on port 51005.
+Its Hrana v2 HTTP client relays complete pipelines, preserving integer and blob values and bounding request and response bodies. A stream holds
+`GuestActivity` until it closes or has been idle for 30 seconds; reconciliation closes obsolete
+deployment streams before stopping a VM. Requests serialize per socket, and no SQL operation
+is replayed after a disconnect or uncertain result.
 
 Cold boots pin kernel/rootfs paths to the immutable guest image adopted in the host bundle.
 Before snapshotting, the agent checks the running Firecracker's root drive through `/vm/config`;

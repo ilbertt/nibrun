@@ -58,6 +58,7 @@ export {
   type DeployStep,
   servingHostname,
 } from '#release.ts';
+export { executeSqliteQuery } from '#sqlite.ts';
 export {
   APP_STATUS_LABELS,
   type AppStatus,

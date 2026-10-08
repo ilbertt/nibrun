@@ -2,6 +2,7 @@ import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime
 import type { DeployLink } from '#link.ts';
 import boopPage from '../content/boop.md?raw';
 import contextUsePage from '../content/context-use.md?raw';
+import drizzleGatewayPage from '../content/drizzle-gateway.md?raw';
 import filebrowserPage from '../content/filebrowser.md?raw';
 import fliptPage from '../content/flipt.md?raw';
 import fusionPage from '../content/fusion.md?raw';
@@ -14,6 +15,7 @@ import nibrunVitalsPage from '../content/nibrun-vitals.md?raw';
 import openConnectorPage from '../content/open-connector.md?raw';
 import openSyncPage from '../content/open-sync.md?raw';
 import openbaoPage from '../content/openbao.md?raw';
+import openlistPage from '../content/openlist.md?raw';
 import pdfSignerPage from '../content/pdf-signer.md?raw';
 import picosharePage from '../content/picoshare.md?raw';
 import pocketbasePage from '../content/pocketbase.md?raw';
@@ -46,18 +48,16 @@ export type DeployPreset = {
   title: string;
   subtitle: string;
   category: DeployCategory;
-  repositoryUrl: string;
+  projectUrl: string;
   /** The upstream release the link pins, so anything offering it says what it would deploy. */
   version: string;
   markdownContent: string;
   deployLink: DeployLink;
 };
 
-// Written in the order the root README lists them, which is the order the roller shows. Update
-// that table when changing any entry here.
 export const DEPLOY_PRESETS = {
   pocketbase: {
-    repositoryUrl: 'https://github.com/pocketbase/pocketbase',
+    projectUrl: 'https://github.com/pocketbase/pocketbase',
     version: 'v0.40.3',
     markdownContent: pocketbasePage,
     category: DeployCategory.Backends,
@@ -74,7 +74,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   openbao: {
-    repositoryUrl: 'https://github.com/openbao/openbao',
+    projectUrl: 'https://github.com/openbao/openbao',
     version: 'v2.7.1',
     markdownContent: openbaoPage,
     category: DeployCategory.DeveloperTools,
@@ -97,7 +97,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   sharkord: {
-    repositoryUrl: 'https://github.com/sharkord/sharkord',
+    projectUrl: 'https://github.com/sharkord/sharkord',
     version: 'v0.0.25',
     markdownContent: sharkordPage,
     category: DeployCategory.Communication,
@@ -119,7 +119,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   boop: {
-    repositoryUrl: 'https://github.com/chrisgreg/boop',
+    projectUrl: 'https://github.com/chrisgreg/boop',
     version: 'v1.3.0',
     markdownContent: boopPage,
     category: DeployCategory.Communication,
@@ -144,7 +144,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   gitea: {
-    repositoryUrl: 'https://github.com/go-gitea/gitea',
+    projectUrl: 'https://github.com/go-gitea/gitea',
     version: 'v1.28.0-dev-nibrun.3',
     markdownContent: giteaPage,
     category: DeployCategory.DeveloperTools,
@@ -161,8 +161,24 @@ export const DEPLOY_PRESETS = {
       minimal: true,
     },
   },
+  'drizzle-gateway': {
+    projectUrl: 'https://gateway.drizzle.team',
+    version: 'v1.6.0',
+    markdownContent: drizzleGatewayPage,
+    category: DeployCategory.DeveloperTools,
+    title: 'Drizzle Gateway',
+    subtitle: 'A self-hosted Drizzle Studio for browsing and managing your SQL databases.',
+    deployLink: {
+      name: 'drizzle-gateway',
+      binary: 'https://pub-e240a4fd7085425baf4a7951e7611520.r2.dev/drizzle-gateway-1.6.0-linux-x64',
+      sha256: '793aaf0acb8db9d90b83cc9db78df82009051862acb995419b39d9497ddb51a5',
+      port: 4983,
+      env: [`STORE_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`],
+      minimal: true,
+    },
+  },
   'open-connector': {
-    repositoryUrl: 'https://github.com/oomol-lab/open-connector',
+    projectUrl: 'https://github.com/oomol-lab/open-connector',
     version: 'v1.5.0',
     markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
@@ -189,7 +205,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'context-use': {
-    repositoryUrl: 'https://github.com/massimoalbarello/context-use',
+    projectUrl: 'https://github.com/massimoalbarello/context-use',
     version: 'nibrun-latest',
     markdownContent: contextUsePage,
     category: DeployCategory.NotesAndKnowledge,
@@ -207,7 +223,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'nibrun-vitals': {
-    repositoryUrl: 'https://github.com/ilbertt/nibrun-vitals',
+    projectUrl: 'https://github.com/ilbertt/nibrun-vitals',
     version: 'v2026.9.15-1',
     markdownContent: nibrunVitalsPage,
     category: DeployCategory.Analytics,
@@ -224,7 +240,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   picoshare: {
-    repositoryUrl: 'https://github.com/mtlynch/picoshare',
+    projectUrl: 'https://github.com/mtlynch/picoshare',
     version: 'v1.5.4',
     markdownContent: picosharePage,
     category: DeployCategory.FilesAndSharing,
@@ -246,7 +262,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   memos: {
-    repositoryUrl: 'https://github.com/usememos/memos',
+    projectUrl: 'https://github.com/usememos/memos',
     version: 'v0.31.0',
     markdownContent: memosPage,
     category: DeployCategory.NotesAndKnowledge,
@@ -267,7 +283,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   shiori: {
-    repositoryUrl: 'https://github.com/go-shiori/shiori',
+    projectUrl: 'https://github.com/go-shiori/shiori',
     version: 'v1.8.0',
     markdownContent: shioriPage,
     category: DeployCategory.NotesAndKnowledge,
@@ -285,7 +301,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   fusion: {
-    repositoryUrl: 'https://github.com/0x2E/fusion',
+    projectUrl: 'https://github.com/0x2E/fusion',
     version: 'v1.2.1',
     markdownContent: fusionPage,
     category: DeployCategory.Feeds,
@@ -307,7 +323,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   filebrowser: {
-    repositoryUrl: 'https://github.com/filebrowser/filebrowser',
+    projectUrl: 'https://github.com/filebrowser/filebrowser',
     version: 'v2.63.23',
     markdownContent: filebrowserPage,
     category: DeployCategory.FilesAndSharing,
@@ -325,8 +341,32 @@ export const DEPLOY_PRESETS = {
       minimal: true,
     },
   },
+  openlist: {
+    projectUrl: 'https://github.com/OpenListTeam/OpenList',
+    version: 'v4.2.6',
+    markdownContent: openlistPage,
+    category: DeployCategory.FilesAndSharing,
+    title: 'OpenList',
+    subtitle: 'A file browser and WebDAV gateway for local files and cloud storage.',
+    deployLink: {
+      name: 'openlist',
+      binary:
+        'https://github.com/OpenListTeam/OpenList/releases/download/v4.2.6/openlist-linux-amd64.tar.gz',
+      sha256: '2f2a5008efe45895292018479cb05556c83e828c3eed68a8b8cd3d35e82f03cb',
+      port: 5244,
+      arg: ['server', '--data', '/app/data', '--log-std'],
+      env: [
+        `HOME=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        `OPENLIST_HTTP_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+        `OPENLIST_SITE_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
+        'GOMEMLIMIT=128MiB',
+        'OPENLIST_ADMIN_PASSWORD',
+      ],
+      minimal: true,
+    },
+  },
   webdav: {
-    repositoryUrl: 'https://github.com/rclone/rclone',
+    projectUrl: 'https://github.com/rclone/rclone',
     version: 'v1.75.1',
     markdownContent: webdavPage,
     category: DeployCategory.FilesAndSharing,
@@ -356,7 +396,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   microbin: {
-    repositoryUrl: 'https://github.com/szabodanika/microbin',
+    projectUrl: 'https://github.com/szabodanika/microbin',
     version: 'v2.1.0',
     markdownContent: microbinPage,
     category: DeployCategory.FilesAndSharing,
@@ -381,7 +421,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   goatcounter: {
-    repositoryUrl: 'https://github.com/arp242/goatcounter',
+    projectUrl: 'https://github.com/arp242/goatcounter',
     version: 'v2.7.0',
     markdownContent: goatcounterPage,
     category: DeployCategory.Analytics,
@@ -409,7 +449,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   remark42: {
-    repositoryUrl: 'https://github.com/umputun/remark42',
+    projectUrl: 'https://github.com/umputun/remark42',
     version: 'v1.17.1',
     markdownContent: remark42Page,
     category: DeployCategory.Communication,
@@ -437,7 +477,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   traggo: {
-    repositoryUrl: 'https://github.com/traggo/server',
+    projectUrl: 'https://github.com/traggo/server',
     version: 'v0.8.3',
     markdownContent: traggoPage,
     title: 'Traggo',
@@ -460,7 +500,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   gotify: {
-    repositoryUrl: 'https://github.com/gotify/server',
+    projectUrl: 'https://github.com/gotify/server',
     version: 'v3.1.1',
     markdownContent: gotifyPage,
     title: 'Gotify',
@@ -483,7 +523,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   flipt: {
-    repositoryUrl: 'https://github.com/flipt-io/flipt',
+    projectUrl: 'https://github.com/flipt-io/flipt',
     version: 'v2.13.0',
     markdownContent: fliptPage,
     title: 'Flipt',
@@ -507,7 +547,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'open-sync': {
-    repositoryUrl: 'https://github.com/massimoalbarello/open-sync',
+    projectUrl: 'https://github.com/massimoalbarello/open-sync',
     version: 'nibrun-latest',
     markdownContent: openSyncPage,
     title: 'Open Sync',
@@ -524,7 +564,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'pdf-signer': {
-    repositoryUrl: 'https://github.com/massimoalbarello/pdf-signer',
+    projectUrl: 'https://github.com/massimoalbarello/pdf-signer',
     version: 'nibrun-latest',
     markdownContent: pdfSignerPage,
     title: 'PDF Signer',
@@ -540,7 +580,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   yarr: {
-    repositoryUrl: 'https://github.com/nkanaev/yarr',
+    projectUrl: 'https://github.com/nkanaev/yarr',
     version: 'v2.9',
     markdownContent: yarrPage,
     title: 'yarr',
