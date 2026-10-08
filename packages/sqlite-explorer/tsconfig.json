@@ -1,0 +1,8 @@
+{
+  "extends": "@repo/typescript-config/react.json",
+  "compilerOptions": {
+    "types": ["vite/client", "bun", "react", "react-dom"]
+  },
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", "dist"]
+}
