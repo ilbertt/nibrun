@@ -12,17 +12,20 @@ import {
   TimestampSchema,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { type Duration, Effect, Fiber, Layer, TestClock, TestContext } from 'effect';
+import { Deferred, type Duration, Effect, Fiber, Layer, Ref, TestClock, TestContext } from 'effect';
 import { answer, filesystemLoop } from '#lib/agent/filesystem.ts';
 import { GuestFilesystemRefused } from '#lib/filesystem/protocol.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
+import { AgentState } from '#services/agent-state.service.ts';
+import { AppWaker, WakeFailed } from '#services/app-waker.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
 import { FilesystemReader, NoDeviceForApp } from '#services/filesystem-reader.service.ts';
+import { GuestActivity } from '#services/guest-activity.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { recordingCommands } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
-import { POLL_SETTINGS_FIXTURE } from '#tests/support/fixtures.ts';
-import { platform } from '#tests/support/run.ts';
+import { instanceRecord, POLL_SETTINGS_FIXTURE } from '#tests/support/fixtures.ts';
+import { platform, provided } from '#tests/support/run.ts';
 
 const APP = Value.Parse(AppIdSchema, 'app-pocketbase');
 /** What the guest answers when nothing is at the path it was given. */
@@ -49,14 +52,27 @@ const LISTING: DirectoryListing = {
   truncated: false,
 };
 
+const guestActivity = Layer.mergeAll(AgentState.Default, GuestActivity.Default);
+const noWake = Layer.succeed(AppWaker, AppWaker.make({ wake: () => Effect.void }));
+const run = provided(guestActivity);
+
+function readingWith({ list, wake }: { list: FilesystemReader['list']; wake: AppWaker['wake'] }) {
+  return Layer.mergeAll(
+    Layer.succeed(FilesystemReader, FilesystemReader.make({ list, measure: unmeasured })),
+    Layer.succeed(AppWaker, AppWaker.make({ wake })),
+  );
+}
+
 /**
  * `CommandRunner` comes along because a real read shells out, and the stub keeps its signature.
  * Nothing here reaches it — a test that ran a subprocess would be testing the host, not this.
  */
 function answering(list: FilesystemReader['list']) {
-  const layer = Layer.merge(
+  const layer = Layer.mergeAll(
     Layer.succeed(FilesystemReader, FilesystemReader.make({ list, measure: unmeasured })),
     recordingCommands().layer,
+    guestActivity,
+    noWake,
   );
   return Effect.runPromise(Effect.provide(answer(QUERY), layer));
 }
@@ -101,6 +117,110 @@ describe('a query is answered whatever the read did', () => {
     expect(result.outcome.message).toContain(APP);
     expect(result.outcome.message).not.toContain('GuestFilesystemRefused');
   });
+});
+
+describe('browsing is a request for an idle app', () => {
+  test('wakes before reading and prevents sleeping until the listing finishes', () =>
+    run(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(instanceRecord({ appId: APP, state: 'idle', onRequest: true }));
+        const activity = yield* GuestActivity;
+        const events: string[] = [];
+        const layer = readingWith({
+          wake: (appId) =>
+            Effect.gen(function* () {
+              expect(appId).toBe(APP);
+              events.push('wake');
+              yield* activity.whenIdle({
+                appId,
+                effect: Effect.sync(() => events.push('sleep during wake')),
+              });
+            }),
+          list: ({ appId, path }) =>
+            Effect.gen(function* () {
+              expect({ appId, path }).toEqual({ appId: APP, path: QUERY.path });
+              events.push('read');
+              yield* activity.whenIdle({
+                appId,
+                effect: Effect.sync(() => events.push('sleep during read')),
+              });
+              return LISTING;
+            }),
+        });
+
+        expect(yield* answer(QUERY).pipe(Effect.provide(layer))).toEqual({
+          queryId: QUERY.queryId,
+          outcome: { status: 'listed', listing: LISTING },
+        });
+        yield* activity.whenIdle({
+          appId: APP,
+          effect: Effect.sync(() => events.push('sleep after read')),
+        });
+        expect(events).toEqual(['wake', 'read', 'sleep after read']);
+        expect((yield* AgentState.snapshot).lastActiveAtMs.has(APP)).toBe(true);
+      }),
+    ));
+
+  for (const state of ['running', 'stopped'] as const) {
+    test(`does not wake a ${state} app`, () =>
+      run(
+        Effect.gen(function* () {
+          yield* AgentState.putRecord(instanceRecord({ appId: APP, state }));
+          const layer = readingWith({
+            wake: () => Effect.die('only idle apps should wake'),
+            list: () =>
+              state === 'running' ? Effect.succeed(LISTING) : new NoDeviceForApp({ appId: APP }),
+          });
+
+          const result = yield* answer(QUERY).pipe(Effect.provide(layer));
+          expect(result.outcome.status).toBe(state === 'running' ? 'listed' : 'failed');
+        }),
+      ));
+  }
+
+  test('a failed wake answers with a failure and releases idle protection', () =>
+    run(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(instanceRecord({ appId: APP, state: 'idle', onRequest: true }));
+        const failure = new WakeFailed({ appId: APP, reason: 'the control plane stopped it' });
+        const layer = readingWith({
+          wake: () => failure,
+          list: () => Effect.die('a failed wake must not attempt a read'),
+        });
+
+        expect(yield* answer(QUERY).pipe(Effect.provide(layer))).toEqual({
+          queryId: QUERY.queryId,
+          outcome: { status: 'failed', message: failure.message },
+        });
+        const released = yield* Ref.make(false);
+        yield* (yield* GuestActivity).whenIdle({
+          appId: APP,
+          effect: Ref.set(released, true),
+        });
+        expect(yield* Ref.get(released)).toBe(true);
+      }),
+    ));
+
+  test('an interrupted read releases idle protection', () =>
+    run(
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>();
+        const layer = readingWith({
+          wake: () => Effect.void,
+          list: () => Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)),
+        });
+        const reading = yield* answer(QUERY).pipe(Effect.provide(layer), Effect.fork);
+        yield* Deferred.await(started);
+        const activity = yield* GuestActivity;
+        const released = yield* Ref.make(false);
+        yield* activity.whenIdle({ appId: APP, effect: Ref.set(released, true) });
+        expect(yield* Ref.get(released)).toBe(false);
+
+        yield* Fiber.interrupt(reading);
+        yield* activity.whenIdle({ appId: APP, effect: Ref.set(released, true) });
+        expect(yield* Ref.get(released)).toBe(true);
+      }),
+    ));
 });
 
 // Virtual time, so a test that spans three polls of a five-second floor still runs in an instant.
@@ -164,7 +284,13 @@ const sessionHolder = Layer.succeed(
 
 // What a read would reach for on a host, none of which is reached here: the stub above keeps the
 // reader's signature, and a signature that shells out is one the layer has to satisfy.
-const host = Layer.mergeAll(agentConfig(), platform, recordingCommands().layer);
+const host = Layer.mergeAll(
+  agentConfig(),
+  platform,
+  recordingCommands().layer,
+  guestActivity,
+  noWake,
+);
 
 // The real allocator over a slots file nothing wrote: a host holding no volume serves no app,
 // which is what an idle poll carries.

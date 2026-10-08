@@ -152,12 +152,8 @@ describe('an app on its way out', () => {
 describe('an app idle between requests', () => {
   const idle = { deploymentState: 'running', instanceState: 'idle' } as const;
 
-  // The one thing that has to reach inside a microVM, and there is none until a visitor causes
-  // one — which a browse is not.
-  test('has no microVM mounting its filesystem, and says what would make one', () => {
-    expect(refusal({ operation: 'files', ...idle })).toBe(
-      'App Quiet Otter is idle until something asks for it, so nothing is mounting its filesystem to read. Open it to wake it.',
-    );
+  test('allows browsing its files, which wakes its microVM', () => {
+    expect(refusal({ operation: 'files', ...idle })).toBeUndefined();
   });
 
   const still: AppOperation[] = [

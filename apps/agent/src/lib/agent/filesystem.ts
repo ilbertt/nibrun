@@ -4,8 +4,11 @@ import { CONTROL_PLANE_BACKOFF } from '#lib/agent/backoff.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import { reportedMessage } from '#lib/failure.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
+import { AgentState } from '#services/agent-state.service.ts';
+import { AppWaker } from '#services/app-waker.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
 import { FilesystemReader } from '#services/filesystem-reader.service.ts';
+import { GuestActivity } from '#services/guest-activity.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
 /**
@@ -34,33 +37,50 @@ const servedAppIds = Effect.map(
   (slots) => slots.map((slot) => slot.appId),
 );
 
+function readDirectory(query: FilesystemQuery) {
+  return Effect.gen(function* () {
+    const reader = yield* FilesystemReader;
+    const state = yield* AgentState;
+    const waker = yield* AppWaker;
+    const activity = yield* GuestActivity;
+    return yield* activity.run({
+      appId: query.appId,
+      effect: Effect.gen(function* () {
+        const record = (yield* state.snapshot).records.get(query.appId);
+        if (record?.state === 'idle') {
+          yield* waker.wake(query.appId);
+        }
+        return yield* reader.list({ appId: query.appId, path: query.path });
+      }),
+    });
+  });
+}
+
 /**
  * Answered whatever happens, because the failure is the answer as far as the caller is concerned.
  * A host that stays quiet about a device it could not read turns a refusal somebody could act on
  * into a timeout they cannot.
  */
-export const answer = (query: FilesystemQuery) =>
-  Effect.gen(function* () {
-    const reader = yield* FilesystemReader;
-    return yield* reader.list({ appId: query.appId, path: query.path }).pipe(
-      Effect.map(
-        (listing) =>
-          ({
-            queryId: query.queryId,
-            outcome: { status: 'listed', listing },
-          }) satisfies FilesystemQueryResult,
+export function answer(query: FilesystemQuery) {
+  return readDirectory(query).pipe(
+    Effect.map(
+      (listing) =>
+        ({
+          queryId: query.queryId,
+          outcome: { status: 'listed', listing },
+        }) satisfies FilesystemQueryResult,
+    ),
+    Effect.catchAll((error) =>
+      Effect.logWarning('filesystem read failed', error).pipe(
+        Effect.annotateLogs({ queryId: query.queryId, appId: query.appId }),
+        Effect.as({
+          queryId: query.queryId,
+          outcome: { status: 'failed', message: reportedMessage(error) },
+        } satisfies FilesystemQueryResult),
       ),
-      Effect.catchAll((error) =>
-        Effect.logWarning('filesystem read failed', error).pipe(
-          Effect.annotateLogs({ queryId: query.queryId, appId: query.appId }),
-          Effect.as({
-            queryId: query.queryId,
-            outcome: { status: 'failed', message: reportedMessage(error) },
-          } satisfies FilesystemQueryResult),
-        ),
-      ),
-    );
-  });
+    ),
+  );
+}
 
 /** One poll: ask for a read, and either answer it or wait out what is left of the floor. */
 export const pollForRead = Effect.gen(function* () {

@@ -67,7 +67,7 @@ export type ListInput = {
  *
  * The request is held open by the api until a host next polls, so this is a wait rather than a
  * read — hence the deployment being named before it starts rather than alongside the answer, and
- * hence an app with nothing mounting its filesystem being answered before it: the wait is the
+ * hence a suspended app or failed release being answered before it: the wait is the
  * expensive part, and what it buys is a refusal that names neither the app nor why.
  */
 export async function listDirectory({

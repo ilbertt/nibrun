@@ -7,6 +7,8 @@ is never sent a command. Read `lib/reconcile/`, `lib/volumes/topology.ts` and
 
 Besides converging, it answers directory reads through `lib/agent/filesystem.ts` and cron
 listings through `lib/agent/cron-query.ts`, each on routes of its own.
+Directory reads wake idle apps through `AppWaker` and hold `GuestActivity` through the wake
+and listing; periodic filesystem measurements do neither.
 `lib/agent/sqlite-query.ts` polls live SQLite operations on separate routes, bounds dispatched
 queries, and admits session close while queries are executing. SQL is never retried by the agent. A read is not a state
 anything converges on, so it carries no generation and cannot delay a stop. Cron listings read
