@@ -901,6 +901,37 @@ export interface ISelectInFlightExportResult {
     app_slug: IAppsColumns["slug"];
 }
 
+/** Result of query `SelectGitHubWorkflowTrust`. */
+export interface ISelectGitHubWorkflowTrustResult {
+    id: IGithubTrustedDeploymentWorkflowsColumns["id"];
+    revision: IGithubTrustedDeploymentWorkflowsColumns["revision"];
+    repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
+    workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
+    branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
+    environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
+    owner_id: IAppsColumns["owner_id"];
+}
+
+/** Result of query `InsertGitHubDeploymentGrant`. */
+export interface IInsertGitHubDeploymentGrantResult {
+    id: IGithubDeploymentGrantsColumns["id"];
+    app_id: IGithubDeploymentGrantsColumns["app_id"];
+    owner_id: IGithubDeploymentGrantsColumns["owner_id"];
+    workflow_id: IGithubDeploymentGrantsColumns["workflow_id"];
+    identity: IGithubDeploymentGrantsColumns["identity"];
+    expires_at: IGithubDeploymentGrantsColumns["expires_at"];
+}
+
+/** Result of query `SelectValidGitHubDeploymentGrant`. */
+export interface ISelectValidGitHubDeploymentGrantResult {
+    id: IGithubDeploymentGrantsColumns["id"];
+    app_id: IGithubDeploymentGrantsColumns["app_id"];
+    owner_id: IGithubDeploymentGrantsColumns["owner_id"];
+    workflow_id: IGithubDeploymentGrantsColumns["workflow_id"];
+    identity: IGithubDeploymentGrantsColumns["identity"];
+    expires_at: IGithubDeploymentGrantsColumns["expires_at"];
+}
+
 /** Result of query `SelectHealthPing`. */
 export interface ISelectHealthPingResult {
     ok: number | null;
@@ -1122,6 +1153,9 @@ export interface Queries {
     ApplyReportedExport: IApplyReportedExportResult;
     FailInFlightExports: IFailInFlightExportsResult;
     SelectInFlightExport: ISelectInFlightExportResult;
+    SelectGitHubWorkflowTrust: ISelectGitHubWorkflowTrustResult;
+    InsertGitHubDeploymentGrant: IInsertGitHubDeploymentGrantResult;
+    SelectValidGitHubDeploymentGrant: ISelectValidGitHubDeploymentGrantResult;
     SelectHealthPing: ISelectHealthPingResult;
     InsertPendingImport: IInsertPendingImportResult;
     CompleteImport: ICompleteImportResult;
@@ -1734,6 +1768,29 @@ export interface IFinishableDeletionsTable {
     constraints: keyof (typeof schema)["finishable_deletions"]["_constraints"];
 }
 
+/** Columns of `github_deployment_grants`. */
+export interface IGithubDeploymentGrantsColumns {
+    id: import("#lib/api/identifiers.ts").DeploymentGrantId;
+    app_id: import("@repo/protocol").AppId;
+    owner_id: import("#lib/api/identifiers.ts").OwnerId;
+    workflow_id: import("#lib/api/identifiers.ts").TrustedWorkflowId;
+    workflow_revision: string;
+    token_hash: string;
+    identity: import("#lib/github-actions-oidc.ts").GitHubActionsOidcClaims;
+    expires_at: Date;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+}
+
+/** Schema of `github_deployment_grants`. */
+export interface IGithubDeploymentGrantsTable {
+    columns: IGithubDeploymentGrantsColumns;
+    relationType: (typeof schema)["github_deployment_grants"]["_relationType"];
+    indexes: keyof (typeof schema)["github_deployment_grants"]["_indexes"];
+    constraints: keyof (typeof schema)["github_deployment_grants"]["_constraints"];
+}
+
 /** Columns of `github_trusted_deployment_workflows`. */
 export interface IGithubTrustedDeploymentWorkflowsColumns {
     id: import("#lib/api/identifiers.ts").TrustedWorkflowId;
@@ -1746,6 +1803,7 @@ export interface IGithubTrustedDeploymentWorkflowsColumns {
     created_at: Date;
     updated_at: Date;
     deleted_at: Date | null;
+    revision: string;
 }
 
 /** Schema of `github_trusted_deployment_workflows`. */
@@ -2423,6 +2481,33 @@ export const schema = {
         _indexes: {},
         _constraints: {}
     },
+    github_deployment_grants: {
+        _relationName: "github_deployment_grants",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { github_deployment_grants_app_id_fkey: { _constraintName: "github_deployment_grants_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            owner_id: { _columnName: "owner_id", _foreignKeys: {} },
+            workflow_id: { _columnName: "workflow_id", _foreignKeys: {} },
+            workflow_revision: { _columnName: "workflow_revision", _foreignKeys: {} },
+            token_hash: { _columnName: "token_hash", _foreignKeys: {} },
+            identity: { _columnName: "identity", _foreignKeys: {} },
+            expires_at: { _columnName: "expires_at", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+        },
+        _indexes: {
+            github_deployment_grants_identity_once_idx: { _indexName: "github_deployment_grants_identity_once_idx" },
+            github_deployment_grants_pkey: { _indexName: "github_deployment_grants_pkey" },
+            github_deployment_grants_token_hash_key: { _indexName: "github_deployment_grants_token_hash_key" }
+        },
+        _constraints: {
+            github_deployment_grants_app_id_fkey: { _constraintName: "github_deployment_grants_app_id_fkey" },
+            github_deployment_grants_identity_check: { _constraintName: "github_deployment_grants_identity_check" },
+            github_deployment_grants_pkey: { _constraintName: "github_deployment_grants_pkey" },
+            github_deployment_grants_token_hash_key: { _constraintName: "github_deployment_grants_token_hash_key" }
+        }
+    },
     github_trusted_deployment_workflows: {
         _relationName: "github_trusted_deployment_workflows",
         _relationType: "table",
@@ -2435,7 +2520,8 @@ export const schema = {
             environment: { _columnName: "environment", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
-            deleted_at: { _columnName: "deleted_at", _foreignKeys: {} }
+            deleted_at: { _columnName: "deleted_at", _foreignKeys: {} },
+            revision: { _columnName: "revision", _foreignKeys: {} }
         },
         _indexes: {
             github_trusted_deployment_workflows_live_app_idx: { _indexName: "github_trusted_deployment_workflows_live_app_idx" },
@@ -2566,6 +2652,7 @@ export interface Tables {
     expirable_apps: IExpirableAppsTable;
     exports: IExportsTable;
     finishable_deletions: IFinishableDeletionsTable;
+    github_deployment_grants: IGithubDeploymentGrantsTable;
     github_trusted_deployment_workflows: IGithubTrustedDeploymentWorkflowsTable;
     imports: IImportsTable;
     live_apps: ILiveAppsTable;

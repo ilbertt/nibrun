@@ -24,6 +24,7 @@ import { DnsRepository } from '#repositories/dns.repository.ts';
 import { ExportStorageRepository } from '#repositories/export-storage.repository.ts';
 import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { GitHubActionsOidcRepository } from '#repositories/github-actions-oidc.repository.ts';
+import { GitHubDeploymentGrantsRepository } from '#repositories/github-deployment-grants.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { ImportsRepository } from '#repositories/imports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
@@ -40,6 +41,7 @@ import { DomainDnsService } from '#services/domain-dns.service.ts';
 import { ExportsService } from '#services/exports.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
 import { GitHubActionsOidcService } from '#services/github-actions-oidc.service.ts';
+import { GitHubDeploymentGrantsService } from '#services/github-deployment-grants.service.ts';
 import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
@@ -95,9 +97,14 @@ const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient
 const dnsRepository = new DnsRepository(cloudflareDnsClient);
 const logsRepository = new LogsRepository(victoriaLogsClient);
 const githubActionsOidcRepository = new GitHubActionsOidcRepository();
+const githubDeploymentGrantsRepository = new GitHubDeploymentGrantsRepository(sql);
 const trustedWorkflowsRepository = new TrustedWorkflowsRepository(sql);
 
 const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);
+const githubDeploymentGrantsService = new GitHubDeploymentGrantsService({
+  identityService: githubActionsOidcService,
+  grantsRepo: githubDeploymentGrantsRepository,
+});
 const trustedWorkflowsService = new TrustedWorkflowsService({
   workflowsRepo: trustedWorkflowsRepository,
 });
@@ -263,3 +270,7 @@ export const GitHubActionsOidcServicePlugin = new Elysia({
 export const TrustedWorkflowsServicePlugin = new Elysia({
   name: 'service.trustedWorkflows',
 }).decorate('trustedWorkflowsService', trustedWorkflowsService);
+
+export const GitHubDeploymentGrantsServicePlugin = new Elysia({
+  name: 'service.githubDeploymentGrants',
+}).decorate('githubDeploymentGrantsService', githubDeploymentGrantsService);

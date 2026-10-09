@@ -51,6 +51,11 @@ Controllers end in `Controller`.
 Every statement touching a tenant row takes an `ownerId` and scopes on it in the
 `WHERE` clause. Never filter by owner after the row comes back.
 
+GitHub OIDC authentication starts without an account owner id. Its bootstrap read may resolve
+only a live app's trusted workflow and owner from the app id and verified repository claim.
+The service must match the full trust rule before issuing a grant. Every grant write and
+subsequent authenticated lookup takes the resolved owner id and scopes SQL on it.
+
 Deleting an object from a bucket and deleting the row naming it cannot be one
 transaction, so the row goes **last**: a row removed first leaves bytes nothing
 names, while an object removed first leaves work the next pass finds and repeats.
