@@ -15,6 +15,7 @@ import nibrunVitalsPage from '../content/nibrun-vitals.md?raw';
 import openConnectorPage from '../content/open-connector.md?raw';
 import openSyncPage from '../content/open-sync.md?raw';
 import openbaoPage from '../content/openbao.md?raw';
+import opencloudPage from '../content/opencloud.md?raw';
 import openlistPage from '../content/openlist.md?raw';
 import pdfSignerPage from '../content/pdf-signer.md?raw';
 import picosharePage from '../content/picoshare.md?raw';
@@ -93,6 +94,42 @@ export const DEPLOY_PRESETS = {
         'GOMEMLIMIT=128MiB',
       ],
       // The upstream server needs a configuration file supplied through Initial data.
+      minimal: false,
+    },
+  },
+  opencloud: {
+    projectUrl: 'https://github.com/opencloud-eu/opencloud',
+    version: 'v8.1.0',
+    markdownContent: opencloudPage,
+    category: DeployCategory.FilesAndSharing,
+    title: 'OpenCloud',
+    subtitle: 'A private file cloud with a web interface, sharing and WebDAV access.',
+    deployLink: {
+      name: 'opencloud',
+      binary:
+        'https://github.com/opencloud-eu/opencloud/releases/download/v8.1.0/opencloud-8.1.0-linux-amd64',
+      sha256: 'dcc57274dc9d66c02314f1bc45387bf41fd77a8662452c549adfb2e1a05783eb',
+      port: 9200,
+      arg: ['server'],
+      env: [
+        `HOME=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        `OC_CONFIG_DIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        `OC_BASE_DATA_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/opencloud`,
+        `OC_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
+        'OC_INSECURE=true',
+        'PROXY_TLS=false',
+        'PROXY_INSECURE_BACKENDS=true',
+        `PROXY_HTTP_ADDR=0.0.0.0:${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+        'IDM_CREATE_DEMO_USERS=false',
+        'STORAGE_USERS_POSIX_WATCH_FS=false',
+        'OC_LOG_LEVEL=warn',
+        'OC_MAX_CONCURRENCY=4',
+        'GOMEMLIMIT=160MiB',
+        'GOGC=50',
+        'GOMAXPROCS=1',
+        'AUTOMEMLIMIT=off',
+      ],
+      // Each installation needs its own initialized configuration supplied through Initial data.
       minimal: false,
     },
   },
