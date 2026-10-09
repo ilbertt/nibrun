@@ -16,21 +16,23 @@ export const AppsAppIdTrustedWorkflowController = new Elysia()
   .guard({ auth: Identity.Required })
   .get(
     '/apps/:appId/trusted-workflow',
-    ({ trustedWorkflowsService, params, user }) =>
-      trustedWorkflowsService.find({
+    function findTrustedWorkflow({ trustedWorkflowsService, params, user }) {
+      return trustedWorkflowsService.find({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
-      }),
+      });
+    },
     { response: publicSchema(TrustedWorkflowResponseSchema) },
   )
   .put(
     '/apps/:appId/trusted-workflow',
-    ({ trustedWorkflowsService, params, user, body }) =>
-      trustedWorkflowsService.save({
+    function saveTrustedWorkflow({ trustedWorkflowsService, params, user, body }) {
+      return trustedWorkflowsService.save({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         workflow: Value.Parse(SaveTrustedWorkflowRequestSchema, body),
-      }),
+      });
+    },
     {
       body: publicSchema(SaveTrustedWorkflowRequestSchema),
       response: publicSchema(TrustedWorkflowResponseSchema),
@@ -38,7 +40,7 @@ export const AppsAppIdTrustedWorkflowController = new Elysia()
   )
   .delete(
     '/apps/:appId/trusted-workflow',
-    async ({ trustedWorkflowsService, params, user, status }) => {
+    async function removeTrustedWorkflow({ trustedWorkflowsService, params, user, status }) {
       await trustedWorkflowsService.remove({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
