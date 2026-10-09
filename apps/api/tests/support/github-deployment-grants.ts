@@ -1,7 +1,9 @@
 import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { DeploymentGrantIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import type { GitHubActionsOidcClaims } from '#lib/github-actions-oidc.ts';
 import type {
+  CreatedGitHubDeploymentGrantRow,
   CreateGitHubDeploymentGrantInput,
   FindGitHubDeploymentGrantInput,
   FindGitHubWorkflowTrustInput,
@@ -21,7 +23,7 @@ export class StubGitHubDeploymentGrantsRepository
   trust: GitHubWorkflowTrustRow | null = {
     ...trustedWorkflowResource(),
     owner_id: GRANT_OWNER_ID,
-    revision: 'revision-1',
+    current_revision: 'revision-1',
   };
   readonly lookups: FindGitHubWorkflowTrustInput[] = [];
   readonly writes: CreateGitHubDeploymentGrantInput[] = [];
@@ -34,7 +36,7 @@ export class StubGitHubDeploymentGrantsRepository
     return Promise.resolve(this.trust?.repository === input.repository ? this.trust : null);
   }
 
-  create(input: CreateGitHubDeploymentGrantInput): Promise<GitHubDeploymentGrantRow | null> {
+  create(input: CreateGitHubDeploymentGrantInput): Promise<CreatedGitHubDeploymentGrantRow | null> {
     this.writes.push(input);
     if (!this.writable) {
       return Promise.resolve(null);
@@ -44,7 +46,7 @@ export class StubGitHubDeploymentGrantsRepository
       app_id: input.appId,
       owner_id: input.ownerId,
       workflow_id: input.trust.id,
-      identity: input.identity,
+      ...githubGrantProvenance(input.identity),
       expires_at: input.expiresAt,
     };
     return Promise.resolve(this.grant);
@@ -60,4 +62,22 @@ export class StubGitHubDeploymentGrantsRepository
       this.grant.expires_at.getTime() > Date.now();
     return Promise.resolve(valid ? this.grant : null);
   }
+}
+
+export function githubGrantProvenance(identity: GitHubActionsOidcClaims) {
+  return {
+    github_token_jti: identity.jti,
+    github_repository: identity.repository,
+    github_repository_id: identity.repository_id,
+    github_repository_owner_id: identity.repository_owner_id,
+    github_workflow_ref: identity.workflow_ref,
+    github_ref: identity.ref,
+    github_event_name: identity.event_name,
+    github_commit_sha: identity.sha,
+    github_run_id: identity.run_id,
+    github_run_attempt: identity.run_attempt,
+    github_environment: identity.environment ?? null,
+    github_job_workflow_ref: identity.job_workflow_ref ?? null,
+    github_job_workflow_sha: identity.job_workflow_sha ?? null,
+  };
 }

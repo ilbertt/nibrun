@@ -15,6 +15,7 @@ import {
 import {
   GRANT_APP_ID,
   GRANT_OWNER_ID,
+  githubGrantProvenance,
   StubGitHubDeploymentGrantsRepository,
 } from '#tests/support/github-deployment-grants.ts';
 
@@ -53,7 +54,7 @@ test('verified GitHub identity receives an app and run-attempt scoped grant with
   expect(JSON.stringify(grantsRepo.writes)).not.toContain(grant.token);
   expect(JSON.stringify(grantsRepo.writes)).not.toContain(identityToken);
   const authorized = await service.authenticate({ appId: GRANT_APP_ID, token: grant.token });
-  expect(authorized.identity).toEqual(identity);
+  expect(authorized).toMatchObject(githubGrantProvenance(identity));
   expect(authorized.owner_id).toBe(GRANT_OWNER_ID);
 });
 

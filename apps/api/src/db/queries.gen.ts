@@ -904,7 +904,7 @@ export interface ISelectInFlightExportResult {
 /** Result of query `SelectGitHubWorkflowTrust`. */
 export interface ISelectGitHubWorkflowTrustResult {
     id: IGithubTrustedDeploymentWorkflowsColumns["id"];
-    revision: IGithubTrustedDeploymentWorkflowsColumns["revision"];
+    current_revision: IGithubTrustedDeploymentWorkflowsColumns["current_revision"];
     repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
     workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
     branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
@@ -915,10 +915,6 @@ export interface ISelectGitHubWorkflowTrustResult {
 /** Result of query `InsertGitHubDeploymentGrant`. */
 export interface IInsertGitHubDeploymentGrantResult {
     id: IGithubDeploymentGrantsColumns["id"];
-    app_id: IGithubDeploymentGrantsColumns["app_id"];
-    owner_id: IGithubDeploymentGrantsColumns["owner_id"];
-    workflow_id: IGithubDeploymentGrantsColumns["workflow_id"];
-    identity: IGithubDeploymentGrantsColumns["identity"];
     expires_at: IGithubDeploymentGrantsColumns["expires_at"];
 }
 
@@ -927,9 +923,21 @@ export interface ISelectValidGitHubDeploymentGrantResult {
     id: IGithubDeploymentGrantsColumns["id"];
     app_id: IGithubDeploymentGrantsColumns["app_id"];
     owner_id: IGithubDeploymentGrantsColumns["owner_id"];
-    workflow_id: IGithubDeploymentGrantsColumns["workflow_id"];
-    identity: IGithubDeploymentGrantsColumns["identity"];
+    workflow_id: IGithubTrustedDeploymentWorkflowsColumns["id"];
     expires_at: IGithubDeploymentGrantsColumns["expires_at"];
+    github_token_jti: IGithubDeploymentGrantsColumns["github_token_jti"];
+    github_repository: IGithubDeploymentGrantsColumns["github_repository"];
+    github_repository_id: IGithubDeploymentGrantsColumns["github_repository_id"];
+    github_repository_owner_id: IGithubDeploymentGrantsColumns["github_repository_owner_id"];
+    github_workflow_ref: IGithubDeploymentGrantsColumns["github_workflow_ref"];
+    github_ref: IGithubDeploymentGrantsColumns["github_ref"];
+    github_event_name: IGithubDeploymentGrantsColumns["github_event_name"];
+    github_commit_sha: IGithubDeploymentGrantsColumns["github_commit_sha"];
+    github_run_id: IGithubDeploymentGrantsColumns["github_run_id"];
+    github_run_attempt: IGithubDeploymentGrantsColumns["github_run_attempt"];
+    github_environment: IGithubDeploymentGrantsColumns["github_environment"];
+    github_job_workflow_ref: IGithubDeploymentGrantsColumns["github_job_workflow_ref"];
+    github_job_workflow_sha: IGithubDeploymentGrantsColumns["github_job_workflow_sha"];
 }
 
 /** Result of query `SelectHealthPing`. */
@@ -1773,10 +1781,22 @@ export interface IGithubDeploymentGrantsColumns {
     id: import("#lib/api/identifiers.ts").DeploymentGrantId;
     app_id: import("@repo/protocol").AppId;
     owner_id: import("#lib/api/identifiers.ts").OwnerId;
-    workflow_id: import("#lib/api/identifiers.ts").TrustedWorkflowId;
+    workflow_id: import("#lib/api/identifiers.ts").TrustedWorkflowId | null;
     workflow_revision: string;
     token_hash: string;
-    identity: import("#lib/github-actions-oidc.ts").GitHubActionsOidcClaims;
+    github_token_jti: string;
+    github_repository: string;
+    github_repository_id: string;
+    github_repository_owner_id: string;
+    github_workflow_ref: string;
+    github_ref: string;
+    github_event_name: string;
+    github_commit_sha: string;
+    github_run_id: string;
+    github_run_attempt: string;
+    github_environment: string | null;
+    github_job_workflow_ref: string | null;
+    github_job_workflow_sha: string | null;
     expires_at: Date;
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
@@ -1803,7 +1823,7 @@ export interface IGithubTrustedDeploymentWorkflowsColumns {
     created_at: Date;
     updated_at: Date;
     deleted_at: Date | null;
-    revision: string;
+    current_revision: string;
 }
 
 /** Schema of `github_trusted_deployment_workflows`. */
@@ -2488,24 +2508,37 @@ export const schema = {
             id: { _columnName: "id", _foreignKeys: {} },
             app_id: { _columnName: "app_id", _foreignKeys: { github_deployment_grants_app_id_fkey: { _constraintName: "github_deployment_grants_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
             owner_id: { _columnName: "owner_id", _foreignKeys: {} },
-            workflow_id: { _columnName: "workflow_id", _foreignKeys: {} },
+            workflow_id: { _columnName: "workflow_id", _foreignKeys: { github_deployment_grants_workflow_id_fkey: { _constraintName: "github_deployment_grants_workflow_id_fkey", _references: { _relationName: "github_trusted_deployment_workflows", _columnName: "id" } } } },
             workflow_revision: { _columnName: "workflow_revision", _foreignKeys: {} },
             token_hash: { _columnName: "token_hash", _foreignKeys: {} },
-            identity: { _columnName: "identity", _foreignKeys: {} },
+            github_token_jti: { _columnName: "github_token_jti", _foreignKeys: {} },
+            github_repository: { _columnName: "github_repository", _foreignKeys: {} },
+            github_repository_id: { _columnName: "github_repository_id", _foreignKeys: {} },
+            github_repository_owner_id: { _columnName: "github_repository_owner_id", _foreignKeys: {} },
+            github_workflow_ref: { _columnName: "github_workflow_ref", _foreignKeys: {} },
+            github_ref: { _columnName: "github_ref", _foreignKeys: {} },
+            github_event_name: { _columnName: "github_event_name", _foreignKeys: {} },
+            github_commit_sha: { _columnName: "github_commit_sha", _foreignKeys: {} },
+            github_run_id: { _columnName: "github_run_id", _foreignKeys: {} },
+            github_run_attempt: { _columnName: "github_run_attempt", _foreignKeys: {} },
+            github_environment: { _columnName: "github_environment", _foreignKeys: {} },
+            github_job_workflow_ref: { _columnName: "github_job_workflow_ref", _foreignKeys: {} },
+            github_job_workflow_sha: { _columnName: "github_job_workflow_sha", _foreignKeys: {} },
             expires_at: { _columnName: "expires_at", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} }
         },
         _indexes: {
-            github_deployment_grants_identity_once_idx: { _indexName: "github_deployment_grants_identity_once_idx" },
             github_deployment_grants_pkey: { _indexName: "github_deployment_grants_pkey" },
-            github_deployment_grants_token_hash_key: { _indexName: "github_deployment_grants_token_hash_key" }
+            github_deployment_grants_token_hash_key: { _indexName: "github_deployment_grants_token_hash_key" },
+            github_deployment_grants_token_once_idx: { _indexName: "github_deployment_grants_token_once_idx" }
         },
         _constraints: {
             github_deployment_grants_app_id_fkey: { _constraintName: "github_deployment_grants_app_id_fkey" },
-            github_deployment_grants_identity_check: { _constraintName: "github_deployment_grants_identity_check" },
+            github_deployment_grants_github_token_jti_check: { _constraintName: "github_deployment_grants_github_token_jti_check" },
             github_deployment_grants_pkey: { _constraintName: "github_deployment_grants_pkey" },
-            github_deployment_grants_token_hash_key: { _constraintName: "github_deployment_grants_token_hash_key" }
+            github_deployment_grants_token_hash_key: { _constraintName: "github_deployment_grants_token_hash_key" },
+            github_deployment_grants_workflow_id_fkey: { _constraintName: "github_deployment_grants_workflow_id_fkey" }
         }
     },
     github_trusted_deployment_workflows: {
@@ -2521,7 +2554,7 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             deleted_at: { _columnName: "deleted_at", _foreignKeys: {} },
-            revision: { _columnName: "revision", _foreignKeys: {} }
+            current_revision: { _columnName: "current_revision", _foreignKeys: {} }
         },
         _indexes: {
             github_trusted_deployment_workflows_live_app_idx: { _indexName: "github_trusted_deployment_workflows_live_app_idx" },

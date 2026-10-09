@@ -3,7 +3,7 @@ import { withTypes } from '@ilbertt/bun-sqlgen';
 import { type AppId, AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
-import type { Queries } from '#db/queries.gen.ts';
+import { type Queries, schema } from '#db/queries.gen.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
 import {
@@ -23,6 +23,7 @@ import {
   signingKey,
   signToken,
 } from '#tests/support/github-actions-oidc.ts';
+import { githubGrantProvenance } from '#tests/support/github-deployment-grants.ts';
 import { trustedWorkflow } from '#tests/support/trusted-workflows.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
@@ -89,10 +90,16 @@ async function grant({
 
 test('independent API instances share hashed grants and their immutable GitHub run-attempt provenance', async () => {
   const appId = await configuredApp();
-  const claims = { ...identity(), run_attempt: '2', environment: 'production' };
+  const claims = {
+    ...identity(),
+    run_attempt: '2',
+    environment: 'production',
+    job_workflow_ref: 'acme/workflows/.github/workflows/deploy.yml@refs/heads/main',
+    job_workflow_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  };
   const issued = await grant({ appId, claims });
   const authorized = await service().authenticate({ appId, token: issued.token });
-  expect(authorized.identity).toEqual(claims);
+  expect(authorized).toMatchObject(githubGrantProvenance(claims));
   expect(authorized.owner_id).toBe(OWNER_ID);
   expect(authorized.app_id).toBe(appId);
   const rows = await sql.unsafe(
@@ -149,7 +156,7 @@ test('even an unchanged workflow update rotates authorization and revokes existi
     workflow: trustedWorkflow(),
   });
   const updated = await grantsRepository().findTrust({ appId, repository: 'acme/backend' });
-  expect(updated?.revision).not.toBe(trust.revision);
+  expect(updated?.current_revision).not.toBe(trust.current_revision);
   await expect(service().authenticate({ appId, token: issued.token })).rejects.toBeInstanceOf(
     UnauthorizedError,
   );
@@ -165,6 +172,13 @@ test('revocation and recreation preserve replay protection without reviving an o
     ownerId: OWNER_ID,
     workflowId: authorized.workflow_id,
   });
+  const retainedGrants = await sql.unsafe(
+    'SELECT workflow_id, github_token_jti FROM nibrun.github_deployment_grants WHERE id = $1 AND owner_id = $2',
+    [issued.id, OWNER_ID],
+  );
+  expect(retainedGrants).toEqual([
+    { workflow_id: null, github_token_jti: authorized.github_token_jti },
+  ]);
   await expect(service().authenticate({ appId, token: issued.token })).rejects.toBeInstanceOf(
     UnauthorizedError,
   );
@@ -244,4 +258,22 @@ test('ownership transfer and app deletion invalidate existing deployment capabil
     service().authenticate({ appId: deletedApp, token: deletedGrant.token }),
   ).rejects.toBeInstanceOf(UnauthorizedError);
   await expect(grant({ appId: deletedApp })).rejects.toBeInstanceOf(UnauthorizedError);
+});
+
+test('the workflow foreign key rejects references to a nonexistent trust rule', async () => {
+  const appId = await configuredApp();
+  const issued = await grant({ appId });
+  async function referenceMissingWorkflow() {
+    await sql.unsafe(
+      'UPDATE nibrun.github_deployment_grants SET workflow_id = $1 WHERE id = $2 AND owner_id = $3',
+      [Bun.randomUUIDv7(), issued.id, OWNER_ID],
+    );
+  }
+  await expect(referenceMissingWorkflow()).rejects.toMatchObject({
+    errno: '23503',
+    constraint:
+      schema.github_deployment_grants._constraints.github_deployment_grants_workflow_id_fkey
+        ._constraintName,
+  });
+  expect((await service().authenticate({ appId, token: issued.token })).id).toBe(issued.id);
 });

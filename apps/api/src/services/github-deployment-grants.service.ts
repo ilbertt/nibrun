@@ -21,8 +21,8 @@ import type { GitHubActionsOidcService } from '#services/github-actions-oidc.ser
 import { Service } from '#services/service.ts';
 
 type GitHubActionsIdentityServiceContract = Pick<GitHubActionsOidcService, 'verify'>;
-const IDENTITY_ONCE_CONSTRAINT =
-  schema.github_deployment_grants._indexes.github_deployment_grants_identity_once_idx._indexName;
+const TOKEN_ONCE_CONSTRAINT =
+  schema.github_deployment_grants._indexes.github_deployment_grants_token_once_idx._indexName;
 const INVALID_GRANT = 'Invalid or expired GitHub deployment grant.';
 const UNTRUSTED_IDENTITY = 'GitHub identity is not authorized to deploy this app.';
 
@@ -111,7 +111,7 @@ export class GitHubDeploymentGrantsService extends Service {
         expiresAt,
       })
       .catch(function rejectReplay(error: unknown) {
-        if (isUniqueViolation({ error, constraint: IDENTITY_ONCE_CONSTRAINT })) {
+        if (isUniqueViolation({ error, constraint: TOKEN_ONCE_CONSTRAINT })) {
           throw new UnauthorizedError(
             'GitHub identity token has already been exchanged for this app.',
           );
