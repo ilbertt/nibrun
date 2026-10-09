@@ -1781,7 +1781,7 @@ export interface IGithubDeploymentGrantsColumns {
     id: import("#lib/api/identifiers.ts").DeploymentGrantId;
     app_id: import("@repo/protocol").AppId;
     owner_id: import("#lib/api/identifiers.ts").OwnerId;
-    workflow_id: import("#lib/api/identifiers.ts").TrustedWorkflowId | null;
+    workflow_id: import("#lib/api/identifiers.ts").TrustedWorkflowId;
     workflow_revision: string;
     token_hash: string;
     github_token_jti: string;

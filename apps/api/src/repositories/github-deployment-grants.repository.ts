@@ -41,7 +41,7 @@ export class GitHubDeploymentGrantsRepository
       SELECT w.id, w.current_revision, w.repository, w.workflow, w.branch, w.environment, a.owner_id
       FROM nibrun.github_trusted_deployment_workflows w
       JOIN nibrun.live_apps a ON a.id = w.app_id
-      WHERE w.app_id = ${appId} AND w.repository = ${repository}
+      WHERE w.app_id = ${appId} AND w.repository = ${repository} AND w.deleted_at IS NULL
     `;
     return row ?? null;
   }
@@ -70,6 +70,7 @@ export class GitHubDeploymentGrantsRepository
       JOIN nibrun.github_trusted_deployment_workflows w ON w.app_id = a.id
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
         AND w.id = ${trust.id} AND w.current_revision = ${trust.current_revision}
+        AND w.deleted_at IS NULL
         AND to_timestamp(${identity.exp}) > statement_timestamp()
         AND ${expiresAt}::timestamptz > statement_timestamp()
       RETURNING id, expires_at
@@ -92,6 +93,7 @@ export class GitHubDeploymentGrantsRepository
       JOIN nibrun.live_apps a ON a.id = g.app_id AND a.owner_id = g.owner_id
       JOIN nibrun.github_trusted_deployment_workflows w
         ON w.id = g.workflow_id AND w.app_id = g.app_id AND w.current_revision = g.workflow_revision
+        AND w.deleted_at IS NULL
       WHERE g.app_id = ${appId} AND g.owner_id = ${ownerId} AND g.token_hash = ${tokenHash}
         AND g.expires_at > statement_timestamp()
     `;

@@ -16,8 +16,7 @@ CREATE TABLE nibrun.github_deployment_grants (
   id uuid PRIMARY KEY DEFAULT uuidv7(),
   app_id uuid NOT NULL REFERENCES nibrun.apps (id) ON DELETE CASCADE,
   owner_id text NOT NULL,
-  -- Preserve consumed GitHub token ids when the authorizing workflow is deleted.
-  workflow_id uuid REFERENCES nibrun.github_trusted_deployment_workflows (id) ON DELETE SET NULL,
+  workflow_id uuid NOT NULL REFERENCES nibrun.github_trusted_deployment_workflows (id) ON DELETE RESTRICT,
   workflow_revision uuid NOT NULL,
   token_hash text NOT NULL UNIQUE,
   github_token_jti text NOT NULL CHECK (github_token_jti <> ''),
