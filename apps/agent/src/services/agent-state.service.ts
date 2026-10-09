@@ -29,6 +29,7 @@ export type AgentSnapshot = {
    * finished.
    */
   readonly snapshotting: ReadonlySet<AppId>;
+  readonly starting: ReadonlySet<AppId>;
   /** A replacement keeps waiting requests alive even between the outgoing and incoming records. */
   readonly replacing: ReadonlyMap<AppId, InstanceRecord>;
   /**
@@ -71,6 +72,7 @@ const EMPTY: AgentSnapshot = {
   deletedVolumes: new Map(),
   nextProbeAtMs: new Map(),
   snapshotting: new Set(),
+  starting: new Set(),
   replacing: new Map(),
   volumeUsage: new Map(),
   computeUsage: new Map(),
@@ -98,6 +100,18 @@ export class AgentState extends Effect.Service<AgentState>()('AgentState', {
       snapshot,
       modify,
       records,
+      claimStart: (appId: AppId) =>
+        Ref.modify(state, (current) =>
+          current.starting.has(appId)
+            ? ([false, current] as const)
+            : ([true, { ...current, starting: new Set(current.starting).add(appId) }] as const),
+        ),
+      releaseStart: (appId: AppId) =>
+        modify((current) => {
+          const starting = new Set(current.starting);
+          starting.delete(appId);
+          return { ...current, starting };
+        }),
 
       /**
        * A request is evidence of use before any counter has seen it. The counters are read on

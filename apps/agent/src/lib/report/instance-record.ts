@@ -12,11 +12,10 @@ import type {
   Timestamp,
   VolumeId,
 } from '@repo/protocol';
-import type { AttemptWindow } from '#lib/backoff.ts';
 import type { GraceInputs, HealthTracker } from '#lib/health/state.ts';
+import { isVmRecovery, type VmRecovery } from '#lib/vm/recovery.ts';
 
 const NO_RESTARTS = 0;
-const NO_ATTEMPTS = 0;
 
 /**
  * A cache, not an authority: systemd is what is actually running, and a record that cannot be
@@ -45,27 +44,19 @@ export type InstanceRecord = {
    * app is `stopped` whatever its activation policy says, so the policy never reaches the host.
    */
   readonly onRequest: boolean;
-  readonly startAttempts: AttemptWindow;
   readonly restartCount: number;
+  readonly recovery?: VmRecovery;
   readonly stopRequested: boolean;
   readonly startedAt?: Timestamp;
   readonly lastExitCode?: number;
   readonly message?: string;
 };
 
-/**
- * A budget nothing has spent: what an instance is born with, and what a deliberate stop gives
- * back. Frozen because every record holds this one object, so a window edited in place rather
- * than replaced would spend every other instance's budget along with its own.
- */
-export const NO_START_ATTEMPTS: AttemptWindow = Object.freeze({ attempts: NO_ATTEMPTS });
-
 export const newInstanceRecord = (
-  fields: Omit<InstanceRecord, 'restartCount' | 'startAttempts' | 'stopRequested'>,
+  fields: Omit<InstanceRecord, 'restartCount' | 'stopRequested'>,
 ): InstanceRecord => ({
   ...fields,
   restartCount: NO_RESTARTS,
-  startAttempts: NO_START_ATTEMPTS,
   stopRequested: false,
 });
 
@@ -122,7 +113,8 @@ export function isInstanceRecord(value: unknown): value is InstanceRecord {
     REQUIRED_STRING_FIELDS.every((field) => typeof value[field] === 'string') &&
     REQUIRED_NUMBER_FIELDS.every((field) => typeof value[field] === 'number') &&
     Array.isArray(value.hostnames) &&
-    isObject(value.health)
+    isObject(value.health) &&
+    (value.recovery === undefined || isVmRecovery(value.recovery))
   );
 }
 

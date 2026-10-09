@@ -2,8 +2,15 @@ import { describe, expect, test } from 'bun:test';
 import { FetchHttpClient } from '@effect/platform';
 import { DeploymentIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Deferred, Effect, Fiber, Layer } from 'effect';
-import { refreshStates, resumeInstance, suspendInstance } from '#lib/reconcile/instances.ts';
+import { Deferred, Duration, Effect, Fiber, Layer, TestClock, TestContext } from 'effect';
+import { CommandFailed } from '#lib/exec.ts';
+import {
+  refreshStates,
+  resumeInstance,
+  startInstance,
+  suspendInstance,
+} from '#lib/reconcile/instances.ts';
+import { VM_RECOVERY_POLICY } from '#lib/vm/recovery.ts';
 import { SleepRefused, SnapshotUnusable } from '#lib/vm/snapshot.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
@@ -100,7 +107,7 @@ describe('a pass that lands while a snapshot is being taken', () => {
       }),
     ));
 
-  test('and fails it once the snapshot is no longer in flight', () =>
+  test('and schedules recovery once the snapshot is no longer in flight', () =>
     run(
       Effect.gen(function* () {
         yield* AgentState.putRecord(
@@ -109,7 +116,8 @@ describe('a pass that lands while a snapshot is being taken', () => {
 
         yield* refreshStates.pipe(Effect.provide(reporting(INACTIVE_UNIT)));
 
-        expect((yield* recordOf)?.state).toBe('failed');
+        expect((yield* recordOf)?.state).toBe('starting');
+        expect((yield* recordOf)?.recovery?.nextAttemptAtMs).toBeDefined();
       }),
     ));
 });
@@ -192,7 +200,6 @@ const VM_DIR = '/nonexistent/nibrun-test/vm';
 
 /** Enough that a wake counting one more would be visible, and few enough to leave budget. */
 const RESTARTS_SO_FAR = 4;
-const NO_ATTEMPTS = 0;
 
 type VmCall = 'boot' | 'sleep' | 'wake' | 'stop' | 'discard';
 
@@ -204,9 +211,11 @@ type VmCall = 'boot' | 'sleep' | 'wake' | 'stop' | 'discard';
 function recordingVms({
   onSleep = Effect.succeed(undefined),
   onWake = Effect.void,
+  onBoot = Effect.void,
 }: {
   onSleep?: Effect.Effect<undefined, SleepRefused>;
-  onWake?: Effect.Effect<void, SnapshotUnusable>;
+  onWake?: Effect.Effect<void, SnapshotUnusable | CommandFailed>;
+  onBoot?: Effect.Effect<void, CommandFailed>;
 } = {}) {
   const calls: VmCall[] = [];
   function taking<A, E>({ call, outcome }: { call: VmCall; outcome: Effect.Effect<A, E> }) {
@@ -222,7 +231,7 @@ function recordingVms({
       VmManager.make({
         workingDir: () => VM_DIR,
         attachReceivers: () => Effect.void,
-        boot: () => taking({ call: 'boot', outcome: Effect.void }),
+        boot: () => taking({ call: 'boot', outcome: onBoot }),
         sleep: () => taking({ call: 'sleep', outcome: onSleep }),
         wake: () => taking({ call: 'wake', outcome: onWake }),
         stop: () => taking({ call: 'stop', outcome: Effect.void }),
@@ -232,16 +241,30 @@ function recordingVms({
   };
 }
 
-function onHost({ vms, unit }: { vms: ReturnType<typeof recordingVms>; unit: string }) {
+function onHost({
+  vms,
+  unit,
+  console = '',
+}: {
+  vms: ReturnType<typeof recordingVms>;
+  unit: string;
+  console?: string;
+}) {
   const host = Layer.mergeAll(
     agentConfig({ vmDir: VM_DIR }),
-    Layer.succeed(CommandRunner, CommandRunner.make({ run: () => succeeding({ stdout: unit }) })),
+    Layer.succeed(
+      CommandRunner,
+      CommandRunner.make({
+        run: ({ command }) => succeeding({ stdout: command[0] === 'journalctl' ? console : unit }),
+      }),
+    ),
   );
   return provided(
     Layer.mergeAll(
       AgentState.Default,
       GuestActivity.Default,
       ReportSignal.Default,
+      FetchHttpClient.layer,
       SlotAllocator.DefaultWithoutDependencies,
       ZerofsTopology.DefaultWithoutDependencies,
       vms.layer,
@@ -252,6 +275,169 @@ function onHost({ vms, unit }: { vms: ReturnType<typeof recordingVms>; unit: str
 function withMicroVmDown(vms: ReturnType<typeof recordingVms>) {
   return onHost({ vms, unit: INACTIVE_UNIT });
 }
+
+const KVM_CONSOLE =
+  '2026-10-08T16:31:45.422502 [anonymous-instance:vcpu 0] Received KVM_EXIT_FAIL_ENTRY signal: 7 on cpu 1';
+const FAILED_UNIT = INACTIVE_UNIT.replace('ActiveState=inactive', 'ActiveState=failed').replace(
+  'ExecMainStatus=0',
+  'ExecMainStatus=1',
+);
+
+describe('unexpected VM exits recover within a separate budget', () => {
+  test('a visitor cannot reboot a crashed VM before the health loop classifies its exit', () => {
+    const vms = recordingVms();
+    return withMicroVmDown(vms)(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(
+          instanceRecord({ state: 'running', startedAt: OBSERVED_AT, onRequest: true }),
+        );
+        expect(yield* resumeInstance(desiredInstance({ desiredState: 'on-request' }))).toBe(
+          'recovering',
+        );
+        expect(vms.calls).toEqual([]);
+        yield* refreshStates;
+        expect((yield* recordOf)?.recovery?.nextAttemptAtMs).toBeDefined();
+      }),
+    );
+  });
+
+  test('a failed snapshot restore schedules a cold boot even when the idle VM was deliberately stopped', () => {
+    const vms = recordingVms({
+      onWake: new CommandFailed({
+        command: ['systemctl', 'start'],
+        result: { code: 1, stdout: '', stderr: 'restore failed' },
+      }),
+    });
+    return withMicroVmDown(vms)(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(
+          instanceRecord({ state: 'idle', onRequest: true, stopRequested: true }),
+        );
+        yield* Effect.either(resumeInstance(desiredInstance({ desiredState: 'on-request' })));
+        expect((yield* recordOf)?.state).toBe('starting');
+        expect((yield* recordOf)?.stopRequested).toBe(false);
+        yield* TestClock.adjust(Duration.millis(VM_RECOVERY_POLICY.initialBackoffMs));
+        yield* startInstance(desiredInstance({ desiredState: 'on-request' }));
+        expect(vms.calls).toEqual(['wake', 'boot']);
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+  });
+
+  for (const unit of [INACTIVE_UNIT, FAILED_UNIT]) {
+    test(`a KVM exit is retried three times even when systemd says ${unit === INACTIVE_UNIT ? 'success' : 'failure'}`, () => {
+      const vms = recordingVms();
+      return onHost({ vms, unit, console: KVM_CONSOLE })(
+        Effect.gen(function* () {
+          yield* AgentState.putRecord(
+            instanceRecord({ state: 'running', startedAt: OBSERVED_AT, onRequest: true }),
+          );
+          for (let attempt = 0; attempt < VM_RECOVERY_POLICY.maxRetries; attempt++) {
+            yield* refreshStates;
+            const recovering = yield* recordOf;
+            expect(recovering?.state).toBe('starting');
+            expect(recovering?.recovery?.attempts).toBe(attempt);
+            expect((yield* AgentState.snapshot).deferredWork).toBe(true);
+            yield* startInstance(desiredInstance({ desiredState: 'on-request' }));
+            yield* resumeInstance(desiredInstance({ desiredState: 'on-request' }));
+            expect(vms.calls).toHaveLength(attempt);
+            yield* TestClock.adjust(Duration.millis(VM_RECOVERY_POLICY.maxBackoffMs));
+            yield* startInstance(desiredInstance({ desiredState: 'on-request' }));
+            expect(vms.calls).toHaveLength(attempt + 1);
+          }
+          yield* refreshStates;
+          expect((yield* recordOf)?.state).toBe('failed');
+          expect((yield* recordOf)?.message).toContain('reason 7 on CPU 1');
+          yield* TestClock.adjust('1 day');
+          yield* startInstance(desiredInstance({ desiredState: 'on-request' }));
+          yield* resumeInstance(desiredInstance({ desiredState: 'on-request' }));
+          expect(vms.calls).toEqual(['boot', 'boot', 'boot']);
+        }).pipe(Effect.provide(TestContext.TestContext)),
+      );
+    });
+  }
+
+  test('a tenant that exhausted its own retries is terminal', () => {
+    const vms = recordingVms();
+    return onHost({
+      vms,
+      unit: INACTIVE_UNIT,
+      console:
+        '[nibrun] the tenant used its 5 restarts without staying up; shutting the guest down',
+    })(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(instanceRecord({ startedAt: OBSERVED_AT }));
+        yield* refreshStates;
+        expect((yield* recordOf)?.state).toBe('failed');
+        yield* startInstance(desiredInstance());
+        expect(vms.calls).toEqual([]);
+      }),
+    );
+  });
+
+  test('boot failures receive the same bounded retries instead of immediately failing the deployment', () => {
+    const vms = recordingVms({
+      onBoot: new CommandFailed({
+        command: ['systemctl', 'start'],
+        result: { code: 1, stdout: '', stderr: 'VM start failed' },
+      }),
+    });
+    return withMicroVmDown(vms)(
+      Effect.gen(function* () {
+        yield* startInstance(desiredInstance());
+        expect((yield* recordOf)?.state).toBe('starting');
+        for (let retry = 0; retry < VM_RECOVERY_POLICY.maxRetries; retry++) {
+          yield* refreshStates;
+          expect((yield* recordOf)?.state).toBe('starting');
+          yield* TestClock.adjust(Duration.millis(VM_RECOVERY_POLICY.maxBackoffMs));
+          yield* startInstance(desiredInstance());
+        }
+        expect((yield* recordOf)?.state).toBe('failed');
+        expect((yield* recordOf)?.message).toContain('VM start failed');
+        expect(vms.calls).toEqual(['boot', 'boot', 'boot', 'boot']);
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+  });
+
+  test('a deliberate stop is never recovered even if systemd leaves a failed unit', () => {
+    const vms = recordingVms();
+    return onHost({ vms, unit: FAILED_UNIT, console: KVM_CONSOLE })(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(
+          instanceRecord({ startedAt: OBSERVED_AT, desiredRunning: false, stopRequested: true }),
+        );
+        yield* refreshStates;
+        expect((yield* recordOf)?.state).toBe('stopped');
+        expect((yield* recordOf)?.recovery).toBeUndefined();
+        expect(vms.calls).toEqual([]);
+      }),
+    );
+  });
+
+  test('overlapping reconcile and request starts share a single boot', () => {
+    return withMicroVmDown(recordingVms())(
+      Effect.gen(function* () {
+        const entered = yield* Deferred.make<void>();
+        const held = yield* Deferred.make<void>();
+        const vms = recordingVms({
+          onBoot: Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(held))),
+        });
+        yield* AgentState.putRecord(instanceRecord({ state: 'pending' }));
+        const boot = yield* Effect.fork(
+          startInstance(desiredInstance()).pipe(Effect.provide(vms.layer)),
+        );
+        yield* Deferred.await(entered);
+        yield* startInstance(desiredInstance()).pipe(Effect.provide(vms.layer));
+        yield* resumeInstance(desiredInstance()).pipe(Effect.provide(vms.layer));
+        yield* refreshStates;
+        expect((yield* recordOf)?.state).toBe('pending');
+        expect(vms.calls).toEqual(['boot']);
+        yield* Deferred.succeed(held, undefined);
+        yield* Fiber.join(boot);
+        expect((yield* AgentState.snapshot).starting.size).toBe(0);
+      }),
+    );
+  });
+});
 
 /**
  * A wake is a restore, and a cold boot is only what is left when there is nothing to restore.
@@ -306,7 +492,7 @@ describe('an app is woken by putting back the microVM it had', () => {
 
         const record = yield* recordOf;
         expect(record?.restartCount).toBe(RESTARTS_SO_FAR);
-        expect(record?.startAttempts.attempts).toBe(NO_ATTEMPTS);
+        expect(record?.recovery).toBeUndefined();
       }),
     );
   });

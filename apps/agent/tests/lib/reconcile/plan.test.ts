@@ -20,6 +20,46 @@ import {
 
 const GROWN_VOLUME_SIZE_BYTES = VOLUME_SIZE_BYTES * 2;
 
+describe('VM recovery planning', () => {
+  for (const desiredState of ['running', 'on-request'] as const) {
+    test(`a ${desiredState} app with a queued VM retry is started on another pass`, () => {
+      const wanted = desiredInstance({ desiredState });
+      const plan = planReconcile({
+        desired: { ...desiredStateFixture(), instances: [wanted] },
+        observed: observedState({
+          instances: [observedInstance({ running: false, exited: true, recoveryRequested: true })],
+        }),
+      });
+      expect(plan.instances).toEqual([{ action: 'start', desired: wanted }]);
+      expect(hasDeferredWork(plan)).toBe(true);
+    });
+  }
+
+  test('an exhausted recovery budget is terminal for an on-request app', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [desiredInstance({ desiredState: 'on-request' })] }),
+      observed: observedState({
+        instances: [observedInstance({ running: false, exited: true, terminalFailure: true })],
+      }),
+    });
+    expect(plan.instances).toEqual([{ action: 'none', appId: APP_ID }]);
+  });
+
+  test('a stop cancels a queued recovery', () => {
+    const plan = planReconcile({
+      desired: desiredState({ instances: [desiredInstance({ desiredState: 'stopped' })] }),
+      observed: observedState({
+        instances: [observedInstance({ running: false, recoveryRequested: true })],
+      }),
+    });
+    expect(plan.instances).toEqual([{ action: 'none', appId: APP_ID }]);
+  });
+});
+
+function desiredStateFixture() {
+  return desiredState();
+}
+
 describe('instances are authoritative', () => {
   test('a desired instance nothing is running is started', () => {
     const plan = planReconcile({
