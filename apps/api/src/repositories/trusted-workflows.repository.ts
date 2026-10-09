@@ -21,7 +21,7 @@ export class TrustedWorkflowsRepository
   async find({ appId, ownerId }: OwnedApp): Promise<TrustedWorkflowRow | null> {
     const [row] = await this.sql.SelectTrustedWorkflow`
       SELECT w.repository, w.workflow, w.branch, w.environment
-      FROM nibrun.trusted_workflows w
+      FROM nibrun.github_trusted_deployment_workflows w
       JOIN nibrun.live_apps a ON a.id = w.app_id
       WHERE w.app_id = ${appId} AND a.owner_id = ${ownerId}
     `;
@@ -34,7 +34,7 @@ export class TrustedWorkflowsRepository
     workflow,
   }: SaveTrustedWorkflowInput): Promise<TrustedWorkflowRow | null> {
     const [row] = await this.sql.UpsertTrustedWorkflow`
-      INSERT INTO nibrun.trusted_workflows AS w (app_id, repository, workflow, branch, environment)
+      INSERT INTO nibrun.github_trusted_deployment_workflows AS w (app_id, repository, workflow, branch, environment)
       SELECT a.id, ${workflow.repository}, ${workflow.workflow}, ${workflow.branch}, ${workflow.environment}
       FROM nibrun.live_apps a
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
@@ -51,7 +51,7 @@ export class TrustedWorkflowsRepository
 
   async remove({ appId, ownerId }: OwnedApp): Promise<boolean> {
     const rows = await this.sql.DeleteTrustedWorkflow`
-      DELETE FROM nibrun.trusted_workflows w USING nibrun.live_apps a
+      DELETE FROM nibrun.github_trusted_deployment_workflows w USING nibrun.live_apps a
       WHERE w.app_id = ${appId} AND a.id = w.app_id AND a.owner_id = ${ownerId}
       RETURNING w.id
     `;

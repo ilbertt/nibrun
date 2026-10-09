@@ -52,7 +52,7 @@ test('independent instances share one replaceable workflow per app', async () =>
   );
   expect(await repository().find({ appId, ownerId: OWNER_ID })).toEqual(replacement);
   const rows = await sql.unsafe(
-    'SELECT id, created_at, updated_at FROM nibrun.trusted_workflows WHERE app_id = $1',
+    'SELECT id, created_at, updated_at FROM nibrun.github_trusted_deployment_workflows WHERE app_id = $1',
     [appId],
   );
   expect(rows).toHaveLength(1);
