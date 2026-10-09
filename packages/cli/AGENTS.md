@@ -9,9 +9,11 @@ the layout under `src/commands/` is the command tree.
 - `--help` loads every command it lists, so a heavy top-level import is paid on
   every help invocation. Not worth avoiding at this size; move imports into the
   handler once the tree is big enough to feel it.
-- `NIBRUN_API_URL` is read through `@parshjs/env` inside `createCli`'s context
+- `NIBRUN_API_URL` and `NIBRUN_API_KEY` are read through `@parshjs/env` inside `createCli`'s context
   factory, never `process.env`. Handlers ask for the ready client as
   `ctx.context.api`.
+- An API key takes precedence over saved credentials and skips reading the credentials file.
+  `requireSignedIn` accepts either authentication source; handlers use the same API client.
 - `nib login` is the device-authorization flow: the CLI shows a code, the owner
   approves it on the dashboard's `/device`, and the token that comes back is
   written by `@parshjs/files` to `~/.config/nib/credentials.json`. It is stored

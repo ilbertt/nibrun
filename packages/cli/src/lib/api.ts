@@ -1,13 +1,15 @@
 import { createPublicApiClient, type PublicApiClient } from '@repo/api-client/public';
+import { API_KEY_HEADER } from '@repo/api-constants';
 import type { Credentials } from '#lib/credentials.ts';
 
 export type ApiInput = {
   baseUrl: string;
   credentials: Credentials | null;
+  apiKey: string | undefined;
 };
 
-export function createApi({ baseUrl, credentials }: ApiInput): PublicApiClient {
-  return createPublicApiClient({ baseUrl, headers: authHeaders({ baseUrl, credentials }) });
+export function createApi(input: ApiInput): PublicApiClient {
+  return createPublicApiClient({ baseUrl: input.baseUrl, headers: authHeaders(input) });
 }
 
 /**
@@ -18,7 +20,10 @@ export function createApi({ baseUrl, credentials }: ApiInput): PublicApiClient {
  * A token issued by a different api is no credential here, so it is left behind rather than sent
  * somewhere it can only be refused.
  */
-export function authHeaders({ baseUrl, credentials }: ApiInput): Record<string, string> {
+export function authHeaders({ baseUrl, credentials, apiKey }: ApiInput): Record<string, string> {
+  if (apiKey !== undefined) {
+    return { [API_KEY_HEADER]: apiKey };
+  }
   if (!credentials || credentials.apiUrl !== baseUrl) {
     return {};
   }

@@ -44,7 +44,7 @@ test('signed-out queries fail before app selection or SQL execution', async () =
   const fixture = sqliteQueryFixture();
   const { cli, errors } = sqliteCli({ api: fixture.api, signedIn: false });
   expect(await cli.run(['apps', 'sqlite', 'query', 'SELECT 1', '--app', NAME, '--json'])).toBe(1);
-  expect(errors).toEqual(['Not signed in. Run `nib login`.']);
+  expect(errors).toEqual(['Not signed in. Run `nib login` or set NIBRUN_API_KEY.']);
   expect(fixture.addressedApps).toEqual([]);
   expect(fixture.pipelines).toEqual([]);
 });

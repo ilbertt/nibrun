@@ -14,7 +14,10 @@ const CREDENTIALS_FILENAME = 'credentials.json';
  */
 export async function createCliContext() {
   const env = createEnvContext({
-    vars: { NIBRUN_API_URL: { schema: z.url(), default: DEFAULT_API_URL } },
+    vars: {
+      NIBRUN_API_URL: { schema: z.url(), default: DEFAULT_API_URL },
+      NIBRUN_API_KEY: { schema: z.string().trim().min(1), default: '' },
+    },
   });
   const apiUrl = env.NIBRUN_API_URL;
 
@@ -25,8 +28,9 @@ export async function createCliContext() {
     },
   });
 
-  const credentials = await files.credentials.maybeRead();
-  const api = createApi({ baseUrl: apiUrl, credentials });
+  const apiKey = env.NIBRUN_API_KEY || undefined;
+  const credentials = apiKey === undefined ? await files.credentials.maybeRead() : null;
+  const api = createApi({ baseUrl: apiUrl, credentials, apiKey });
 
-  return { apiUrl, files, api };
+  return { apiUrl, apiKey, files, api };
 }
