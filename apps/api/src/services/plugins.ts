@@ -29,6 +29,7 @@ import { ImportsRepository } from '#repositories/imports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
 import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
 import { SqliteConnectionsRepository } from '#repositories/sqlite-connections.repository.ts';
+import { TrustedWorkflowsRepository } from '#repositories/trusted-workflows.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
 import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
@@ -45,6 +46,7 @@ import { ImportsService } from '#services/imports.service.ts';
 import { LogsService } from '#services/logs.service.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
+import { TrustedWorkflowsService } from '#services/trusted-workflows.service.ts';
 
 // Read once, where every other piece of the environment is read: a key of the wrong length is a
 // deployment that fails to start rather than one that fails on the first secret written.
@@ -253,3 +255,10 @@ export const SqliteServicePlugin = new Elysia({ name: 'service.sqlite' })
 export const GitHubActionsOidcServicePlugin = new Elysia({
   name: 'service.githubActionsOidc',
 }).decorate('githubActionsOidcService', githubActionsOidcService);
+
+export const TrustedWorkflowsServicePlugin = new Elysia({
+  name: 'service.trustedWorkflows',
+}).decorate(
+  'trustedWorkflowsService',
+  new TrustedWorkflowsService({ workflowsRepo: new TrustedWorkflowsRepository(sql) }),
+);

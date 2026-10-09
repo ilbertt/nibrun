@@ -1011,6 +1011,27 @@ export interface IDeleteSqliteConnectionResult {
     id: ISqliteConnectionsColumns["id"];
 }
 
+/** Result of query `SelectTrustedWorkflow`. */
+export interface ISelectTrustedWorkflowResult {
+    repository: ITrustedWorkflowsColumns["repository"];
+    workflow: ITrustedWorkflowsColumns["workflow"];
+    branch: ITrustedWorkflowsColumns["branch"];
+    environment: ITrustedWorkflowsColumns["environment"];
+}
+
+/** Result of query `UpsertTrustedWorkflow`. */
+export interface IUpsertTrustedWorkflowResult {
+    repository: ITrustedWorkflowsColumns["repository"];
+    workflow: ITrustedWorkflowsColumns["workflow"];
+    branch: ITrustedWorkflowsColumns["branch"];
+    environment: ITrustedWorkflowsColumns["environment"];
+}
+
+/** Result of query `DeleteTrustedWorkflow`. */
+export interface IDeleteTrustedWorkflowResult {
+    id: ITrustedWorkflowsColumns["id"];
+}
+
 export interface Queries {
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
@@ -1104,6 +1125,9 @@ export interface Queries {
     SelectSqliteConnectionsByApp: ISelectSqliteConnectionsByAppResult;
     SelectSqliteConnectionById: ISelectSqliteConnectionByIdResult;
     DeleteSqliteConnection: IDeleteSqliteConnectionResult;
+    SelectTrustedWorkflow: ISelectTrustedWorkflowResult;
+    UpsertTrustedWorkflow: IUpsertTrustedWorkflowResult;
+    DeleteTrustedWorkflow: IDeleteTrustedWorkflowResult;
 }
 
 /** Columns of `account`. */
@@ -1798,6 +1822,27 @@ export interface ISqliteConnectionsTable {
     constraints: keyof (typeof schema)["sqlite_connections"]["_constraints"];
 }
 
+/** Columns of `trusted_workflows`. */
+export interface ITrustedWorkflowsColumns {
+    id: string;
+    app_id: import("@repo/protocol").AppId;
+    repository: string;
+    workflow: string;
+    branch: string;
+    environment: string | null;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+}
+
+/** Schema of `trusted_workflows`. */
+export interface ITrustedWorkflowsTable {
+    columns: ITrustedWorkflowsColumns;
+    relationType: (typeof schema)["trusted_workflows"]["_relationType"];
+    indexes: keyof (typeof schema)["trusted_workflows"]["_indexes"];
+    constraints: keyof (typeof schema)["trusted_workflows"]["_constraints"];
+}
+
 export const schema = {
     account: {
         _relationName: "account",
@@ -2456,6 +2501,29 @@ export const schema = {
             sqlite_connections_app_id_fkey: { _constraintName: "sqlite_connections_app_id_fkey" },
             sqlite_connections_pkey: { _constraintName: "sqlite_connections_pkey" }
         }
+    },
+    trusted_workflows: {
+        _relationName: "trusted_workflows",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { trusted_workflows_app_id_fkey: { _constraintName: "trusted_workflows_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            repository: { _columnName: "repository", _foreignKeys: {} },
+            workflow: { _columnName: "workflow", _foreignKeys: {} },
+            branch: { _columnName: "branch", _foreignKeys: {} },
+            environment: { _columnName: "environment", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+        },
+        _indexes: {
+            trusted_workflows_app_id_key: { _indexName: "trusted_workflows_app_id_key" },
+            trusted_workflows_pkey: { _indexName: "trusted_workflows_pkey" }
+        },
+        _constraints: {
+            trusted_workflows_app_id_fkey: { _constraintName: "trusted_workflows_app_id_fkey" },
+            trusted_workflows_app_id_key: { _constraintName: "trusted_workflows_app_id_key" },
+            trusted_workflows_pkey: { _constraintName: "trusted_workflows_pkey" }
+        }
     }
 } as const;
 
@@ -2490,6 +2558,7 @@ export interface Tables {
     profiles: IProfilesTable;
     purgeable_apps: IPurgeableAppsTable;
     sqlite_connections: ISqliteConnectionsTable;
+    trusted_workflows: ITrustedWorkflowsTable;
 }
 
 declare module "@ilbertt/bun-sqlgen" {
