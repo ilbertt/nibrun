@@ -11,6 +11,12 @@ exporting the data and opening a local copy.
 You can now explore it from the dashboard. Pick the file, mark it as a SQLite database, and
 open it in a new tab. The queries run against the database your app is using.
 
+> **Already running an app?** If it was running before the SQLite explorer launched, you
+> may get a 502 when marking a database. Click **Suspend**, wait until the app shows
+> **Suspended**, then click **Resume**. This briefly takes the app offline and brings it
+> back with SQLite support. Your binary and persistent `data/` stay intact. Once the app
+> is running again, retry **Mark as SQLite database**.
+
 ## From a file to a database
 
 Open your app's **Files** tab. Find the database, open its three-dot menu, and choose
@@ -68,5 +74,12 @@ password or token to create before opening the explorer.
 
 The database stays in your app's persistent directory. Your binary still opens the same file,
 and you can still export it with the rest of your app's data.
+
+## Explore with your AI agent
+
+An AI agent with access to your signed-in `nib` CLI can query the live database too.
+Connections are read-only, so it can explore without changing data or schema. Give it the
+[nibrun skill](https://github.com/ilbertt/nibrun/blob/main/skills/deploy-to-nibrun/SKILL.md#inspecting-sqlite-databases)
+for the CLI workflow.
 
 [Open your apps](https://app.nibrun.com/apps), pick a database file, and take a look inside.

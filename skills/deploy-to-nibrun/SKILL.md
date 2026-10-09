@@ -192,9 +192,24 @@ complaining about. `nib --help` lists the rest — status, domains, filesystem, 
 ## Inspecting SQLite databases
 
 Read SQLite databases in an app's `data/` through the CLI or dashboard without downloading them.
+When a task calls for inspecting an app's database, use `nib apps sqlite` to discover its
+subcommands:
+
+```sh
+nib apps sqlite --help
+```
+
+Explore the subcommands and their `--help` to list saved connections, create a connection to
+the database file, and query it. Paths match `nib apps files ls`: `/app.db` names the guest's
+`/app/data/app.db`. Reuse a saved connection when available, or create one for the file the app
+actually uses. Pass `--app` and the saved `--connection` ID when querying; use `--json` for
+structured results. The app needs a running deployment. Queries read the actual database in
+the guest, including committed changes in its WAL.
+
 In the dashboard's **Files** tab, choose **Mark as SQLite database** from the file menu, then
-click the database file to open the explorer. Connections are read-only; the app can continue
-writing to its database.
+click the database file to open the explorer. Both CLI and dashboard connections are read-only:
+SQLite rejects data and schema writes, so an AI agent can explore without modifying the database.
+The app can continue writing to its database.
 
 ## Copying an app
 
