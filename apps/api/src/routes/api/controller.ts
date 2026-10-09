@@ -17,6 +17,8 @@ import { AppsAppIdImportsController } from '#routes/api/apps/[appId]/imports/con
 import { AppsAppIdSqliteConnectionsConnectionIdController } from '#routes/api/apps/[appId]/sqlite/connections/[connectionId]/controller.ts';
 import { AppsAppIdSqliteConnectionsController } from '#routes/api/apps/[appId]/sqlite/connections/controller.ts';
 import { AppsAppIdStateController } from '#routes/api/apps/[appId]/state/controller.ts';
+import { AppsAppIdTrustedWorkflowsWorkflowIdController } from '#routes/api/apps/[appId]/trusted-workflows/[workflowId]/controller.ts';
+import { AppsAppIdTrustedWorkflowsController } from '#routes/api/apps/[appId]/trusted-workflows/controller.ts';
 import { AppsController } from '#routes/api/apps/controller.ts';
 import { AuthController } from '#routes/api/auth/controller.ts';
 import { HealthController } from '#routes/api/health/controller.ts';
@@ -42,6 +44,8 @@ export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(AppsAppIdHostnamesController)
   .use(AppsAppIdHostnamesDnsController)
   .use(AppsAppIdStateController)
+  .use(AppsAppIdTrustedWorkflowsController)
+  .use(AppsAppIdTrustedWorkflowsWorkflowIdController)
   .use(AppsAppIdSqliteConnectionsController)
   .use(AppsAppIdSqliteConnectionsConnectionIdController)
   .use(SqliteConnectionsConnectionIdController)

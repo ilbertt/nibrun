@@ -17,3 +17,8 @@ export type SqliteConnectionId = Identifier<'SqliteConnectionId'>;
 export const SqliteConnectionIdSchema = identifierSchema<SqliteConnectionId>(
   'One saved database connection.',
 );
+
+export type TrustedWorkflowId = Identifier<'TrustedWorkflowId'>;
+export const TrustedWorkflowIdSchema = identifierSchema<TrustedWorkflowId>(
+  'One trusted GitHub deployment workflow.',
+);

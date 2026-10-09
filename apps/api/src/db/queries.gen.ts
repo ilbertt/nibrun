@@ -1011,6 +1011,38 @@ export interface IDeleteSqliteConnectionResult {
     id: ISqliteConnectionsColumns["id"];
 }
 
+/** Result of query `SelectTrustedWorkflow`. */
+export interface ISelectTrustedWorkflowResult {
+    id: IGithubTrustedDeploymentWorkflowsColumns["id"];
+    repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
+    workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
+    branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
+    environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
+}
+
+/** Result of query `InsertTrustedWorkflow`. */
+export interface IInsertTrustedWorkflowResult {
+    id: IGithubTrustedDeploymentWorkflowsColumns["id"];
+    repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
+    workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
+    branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
+    environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
+}
+
+/** Result of query `UpdateTrustedWorkflow`. */
+export interface IUpdateTrustedWorkflowResult {
+    id: IGithubTrustedDeploymentWorkflowsColumns["id"];
+    repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
+    workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
+    branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
+    environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
+}
+
+/** Result of query `DeleteTrustedWorkflow`. */
+export interface IDeleteTrustedWorkflowResult {
+    id: IGithubTrustedDeploymentWorkflowsColumns["id"];
+}
+
 export interface Queries {
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
@@ -1104,6 +1136,10 @@ export interface Queries {
     SelectSqliteConnectionsByApp: ISelectSqliteConnectionsByAppResult;
     SelectSqliteConnectionById: ISelectSqliteConnectionByIdResult;
     DeleteSqliteConnection: IDeleteSqliteConnectionResult;
+    SelectTrustedWorkflow: ISelectTrustedWorkflowResult;
+    InsertTrustedWorkflow: IInsertTrustedWorkflowResult;
+    UpdateTrustedWorkflow: IUpdateTrustedWorkflowResult;
+    DeleteTrustedWorkflow: IDeleteTrustedWorkflowResult;
 }
 
 /** Columns of `account`. */
@@ -1696,6 +1732,27 @@ export interface IFinishableDeletionsTable {
     relationType: (typeof schema)["finishable_deletions"]["_relationType"];
     indexes: keyof (typeof schema)["finishable_deletions"]["_indexes"];
     constraints: keyof (typeof schema)["finishable_deletions"]["_constraints"];
+}
+
+/** Columns of `github_trusted_deployment_workflows`. */
+export interface IGithubTrustedDeploymentWorkflowsColumns {
+    id: import("#lib/api/identifiers.ts").TrustedWorkflowId;
+    app_id: import("@repo/protocol").AppId;
+    repository: string;
+    workflow: string;
+    branch: string;
+    environment: string | null;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+}
+
+/** Schema of `github_trusted_deployment_workflows`. */
+export interface IGithubTrustedDeploymentWorkflowsTable {
+    columns: IGithubTrustedDeploymentWorkflowsColumns;
+    relationType: (typeof schema)["github_trusted_deployment_workflows"]["_relationType"];
+    indexes: keyof (typeof schema)["github_trusted_deployment_workflows"]["_indexes"];
+    constraints: keyof (typeof schema)["github_trusted_deployment_workflows"]["_constraints"];
 }
 
 /** Columns of `imports`. */
@@ -2365,6 +2422,29 @@ export const schema = {
         _indexes: {},
         _constraints: {}
     },
+    github_trusted_deployment_workflows: {
+        _relationName: "github_trusted_deployment_workflows",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { github_trusted_deployment_workflows_app_id_fkey: { _constraintName: "github_trusted_deployment_workflows_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            repository: { _columnName: "repository", _foreignKeys: {} },
+            workflow: { _columnName: "workflow", _foreignKeys: {} },
+            branch: { _columnName: "branch", _foreignKeys: {} },
+            environment: { _columnName: "environment", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+        },
+        _indexes: {
+            github_trusted_deployment_workflows_app_id_key: { _indexName: "github_trusted_deployment_workflows_app_id_key" },
+            github_trusted_deployment_workflows_pkey: { _indexName: "github_trusted_deployment_workflows_pkey" }
+        },
+        _constraints: {
+            github_trusted_deployment_workflows_app_id_fkey: { _constraintName: "github_trusted_deployment_workflows_app_id_fkey" },
+            github_trusted_deployment_workflows_app_id_key: { _constraintName: "github_trusted_deployment_workflows_app_id_key" },
+            github_trusted_deployment_workflows_pkey: { _constraintName: "github_trusted_deployment_workflows_pkey" }
+        }
+    },
     imports: {
         _relationName: "imports",
         _relationType: "table",
@@ -2485,6 +2565,7 @@ export interface Tables {
     expirable_apps: IExpirableAppsTable;
     exports: IExportsTable;
     finishable_deletions: IFinishableDeletionsTable;
+    github_trusted_deployment_workflows: IGithubTrustedDeploymentWorkflowsTable;
     imports: IImportsTable;
     live_apps: ILiveAppsTable;
     profiles: IProfilesTable;
