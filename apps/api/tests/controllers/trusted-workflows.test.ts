@@ -7,7 +7,7 @@ import { ORIGIN, routesUnder, send, sendJson } from '#tests/controllers/support/
 import { trustedWorkflow, trustedWorkflowResource } from '#tests/support/trusted-workflows.ts';
 
 const { auth, TrustedWorkflowsServicePlugin } = await import('#services/plugins.ts');
-const URL = `${ORIGIN}/api/apps/app-1/trusted-workflow`;
+const URL = `${ORIGIN}/api/apps/app-1/trusted-workflows`;
 const RESOURCE_URL = `${URL}/workflow-1`;
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'workflow-owner');
 const SESSION_LIFETIME_MS = 60_000;
@@ -43,11 +43,11 @@ afterEach(function restoreMocks() {
 });
 
 test('trusted workflow creation and identified updates are separate routes', () => {
-  expect(routesUnder('/api/apps/:appId/trusted-workflow')).toEqual([
-    { method: 'GET', path: '/api/apps/:appId/trusted-workflow' },
-    { method: 'POST', path: '/api/apps/:appId/trusted-workflow' },
-    { method: 'PUT', path: '/api/apps/:appId/trusted-workflow/:workflowId' },
-    { method: 'DELETE', path: '/api/apps/:appId/trusted-workflow/:workflowId' },
+  expect(routesUnder('/api/apps/:appId/trusted-workflows')).toEqual([
+    { method: 'GET', path: '/api/apps/:appId/trusted-workflows' },
+    { method: 'POST', path: '/api/apps/:appId/trusted-workflows' },
+    { method: 'PUT', path: '/api/apps/:appId/trusted-workflows/:workflowId' },
+    { method: 'DELETE', path: '/api/apps/:appId/trusted-workflows/:workflowId' },
   ]);
 });
 

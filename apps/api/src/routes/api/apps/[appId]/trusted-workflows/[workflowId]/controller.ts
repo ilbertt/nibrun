@@ -9,15 +9,15 @@ import {
   TrustedWorkflowParamsSchema,
   UpdateTrustedWorkflowRequestSchema,
   UpdateTrustedWorkflowResponseSchema,
-} from '#routes/api/apps/[appId]/trusted-workflow/[workflowId]/model.ts';
+} from '#routes/api/apps/[appId]/trusted-workflows/[workflowId]/model.ts';
 import { AuthPlugin, TrustedWorkflowsServicePlugin } from '#services/plugins.ts';
 
-export const AppsAppIdTrustedWorkflowWorkflowIdController = new Elysia()
+export const AppsAppIdTrustedWorkflowsWorkflowIdController = new Elysia()
   .use(AuthPlugin)
   .use(TrustedWorkflowsServicePlugin)
   .guard({ auth: Identity.Required })
   .put(
-    '/apps/:appId/trusted-workflow/:workflowId',
+    '/apps/:appId/trusted-workflows/:workflowId',
     function updateTrustedWorkflow({ trustedWorkflowsService, params, user, body }) {
       return trustedWorkflowsService.update({
         appId: Value.Parse(AppIdSchema, params.appId),
@@ -33,7 +33,7 @@ export const AppsAppIdTrustedWorkflowWorkflowIdController = new Elysia()
     },
   )
   .delete(
-    '/apps/:appId/trusted-workflow/:workflowId',
+    '/apps/:appId/trusted-workflows/:workflowId',
     async function removeTrustedWorkflow({ trustedWorkflowsService, params, user, status }) {
       await trustedWorkflowsService.remove({
         appId: Value.Parse(AppIdSchema, params.appId),
