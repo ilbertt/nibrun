@@ -23,6 +23,7 @@ import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { DnsRepository } from '#repositories/dns.repository.ts';
 import { ExportStorageRepository } from '#repositories/export-storage.repository.ts';
 import { ExportsRepository } from '#repositories/exports.repository.ts';
+import { GitHubActionsOidcRepository } from '#repositories/github-actions-oidc.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { ImportsRepository } from '#repositories/imports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
@@ -37,6 +38,7 @@ import { DeploymentsService } from '#services/deployments.service.ts';
 import { DomainDnsService } from '#services/domain-dns.service.ts';
 import { ExportsService } from '#services/exports.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
+import { GitHubActionsOidcService } from '#services/github-actions-oidc.service.ts';
 import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
@@ -90,6 +92,8 @@ const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient);
 const dnsRepository = new DnsRepository(cloudflareDnsClient);
 const logsRepository = new LogsRepository(victoriaLogsClient);
+
+const githubActionsOidcService = new GitHubActionsOidcService(new GitHubActionsOidcRepository());
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
@@ -244,3 +248,7 @@ export const SqliteRelayServicePlugin = new Elysia({ name: 'service.sqliteRelay'
 export const SqliteServicePlugin = new Elysia({ name: 'service.sqlite' })
   .decorate('sqliteService', sqliteService)
   .decorate('sqliteOrigin', env.BASE_URL.origin);
+
+export const GitHubActionsOidcServicePlugin = new Elysia({
+  name: 'service.githubActionsOidc',
+}).decorate('githubActionsOidcService', githubActionsOidcService);

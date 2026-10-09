@@ -47,6 +47,7 @@
         "@sinclair/typebox": "catalog:",
         "better-auth": "catalog:",
         "elysia": "^1.4.30",
+        "jose": "^6.2.12",
         "tldts": "^7.4.13",
       },
       "devDependencies": {
