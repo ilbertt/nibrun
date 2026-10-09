@@ -11,6 +11,12 @@ exporting the data and opening a local copy.
 You can now explore it from the dashboard. Pick the file, mark it as a SQLite database, and
 open it in a new tab. The queries run against the database your app is using.
 
+> **Already running an app?** If it was running before the SQLite explorer launched, you
+> may get a 502 when marking a database. Click **Suspend**, wait until the app shows
+> **Suspended**, then click **Resume**. This briefly takes the app offline and brings it
+> back with SQLite support. Your binary and persistent `data/` stay intact. Once the app
+> is running again, retry **Mark as SQLite database**.
+
 ## From a file to a database
 
 Open your app's **Files** tab. Find the database, open its three-dot menu, and choose
