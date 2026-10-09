@@ -1,13 +1,15 @@
 import { AppIdSchema } from '@repo/protocol';
 import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
-import { Elysia, StatusMap, t } from 'elysia';
+import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema, TrustedWorkflowIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
-  SaveTrustedWorkflowRequestSchema,
-  TrustedWorkflowResponseSchema,
-} from '#routes/api/apps/[appId]/trusted-workflow/model.ts';
+  DeleteTrustedWorkflowResponseSchema,
+  TrustedWorkflowParamsSchema,
+  UpdateTrustedWorkflowRequestSchema,
+  UpdateTrustedWorkflowResponseSchema,
+} from '#routes/api/apps/[appId]/trusted-workflow/[workflowId]/model.ts';
 import { AuthPlugin, TrustedWorkflowsServicePlugin } from '#services/plugins.ts';
 
 export const AppsAppIdTrustedWorkflowWorkflowIdController = new Elysia()
@@ -21,12 +23,13 @@ export const AppsAppIdTrustedWorkflowWorkflowIdController = new Elysia()
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         workflowId: Value.Parse(TrustedWorkflowIdSchema, params.workflowId),
-        workflow: Value.Parse(SaveTrustedWorkflowRequestSchema, body),
+        workflow: Value.Parse(UpdateTrustedWorkflowRequestSchema, body),
       });
     },
     {
-      body: publicSchema(SaveTrustedWorkflowRequestSchema),
-      response: publicSchema(TrustedWorkflowResponseSchema),
+      params: publicSchema(TrustedWorkflowParamsSchema),
+      body: publicSchema(UpdateTrustedWorkflowRequestSchema),
+      response: publicSchema(UpdateTrustedWorkflowResponseSchema),
     },
   )
   .delete(
@@ -39,5 +42,8 @@ export const AppsAppIdTrustedWorkflowWorkflowIdController = new Elysia()
       });
       return status(StatusMap['No Content'], undefined);
     },
-    { response: { [StatusMap['No Content']]: t.Void() } },
+    {
+      params: publicSchema(TrustedWorkflowParamsSchema),
+      response: { [StatusMap['No Content']]: DeleteTrustedWorkflowResponseSchema },
+    },
   );

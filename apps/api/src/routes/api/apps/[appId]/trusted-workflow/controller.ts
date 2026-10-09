@@ -5,7 +5,7 @@ import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
-  SaveTrustedWorkflowRequestSchema,
+  CreateTrustedWorkflowRequestSchema,
   TrustedWorkflowResponseSchema,
 } from '#routes/api/apps/[appId]/trusted-workflow/model.ts';
 import { AuthPlugin, TrustedWorkflowsServicePlugin } from '#services/plugins.ts';
@@ -30,12 +30,12 @@ export const AppsAppIdTrustedWorkflowController = new Elysia()
       const workflow = await trustedWorkflowsService.create({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
-        workflow: Value.Parse(SaveTrustedWorkflowRequestSchema, body),
+        workflow: Value.Parse(CreateTrustedWorkflowRequestSchema, body),
       });
       return status(StatusMap.Created, workflow);
     },
     {
-      body: publicSchema(SaveTrustedWorkflowRequestSchema),
+      body: publicSchema(CreateTrustedWorkflowRequestSchema),
       response: { [StatusMap.Created]: publicSchema(TrustedWorkflowResponseSchema) },
     },
   );
