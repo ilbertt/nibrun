@@ -439,7 +439,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   goatcounter: {
-    isRecommended: false,
+    isRecommended: true,
     projectUrl: 'https://github.com/arp242/goatcounter',
     version: 'v2.7.0',
     markdownContent: goatcounterPage,
@@ -570,7 +570,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'open-sync': {
-    isRecommended: true,
+    isRecommended: false,
     projectUrl: 'https://github.com/massimoalbarello/open-sync',
     version: 'nibrun-latest',
     markdownContent: openSyncPage,
