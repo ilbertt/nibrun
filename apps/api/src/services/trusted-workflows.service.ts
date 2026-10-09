@@ -12,8 +12,8 @@ import type {
 import { Service } from '#services/service.ts';
 
 const APP_WORKFLOW_CONSTRAINT =
-  schema.github_trusted_deployment_workflows._constraints
-    .github_trusted_deployment_workflows_app_id_key._constraintName;
+  schema.github_trusted_deployment_workflows._indexes
+    .github_trusted_deployment_workflows_live_app_idx._indexName;
 
 export class TrustedWorkflowsService extends Service {
   private readonly workflowsRepo: TrustedWorkflowsRepositoryContract;
