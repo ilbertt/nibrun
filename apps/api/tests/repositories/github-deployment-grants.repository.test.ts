@@ -177,9 +177,13 @@ test('revocation and recreation preserve replay protection without reviving an o
     [issued.id, OWNER_ID],
   );
   expect(retainedGrants).toEqual([
-    { workflow_id: null, github_token_jti: authorized.github_token_jti },
+    { workflow_id: authorized.workflow_id, github_token_jti: authorized.github_token_jti },
   ]);
   await expect(service().authenticate({ appId, token: issued.token })).rejects.toBeInstanceOf(
+    UnauthorizedError,
+  );
+  expect(await grantsRepository().findTrust({ appId, repository: 'acme/backend' })).toBeNull();
+  await expect(service().exchange({ appId, identityToken })).rejects.toBeInstanceOf(
     UnauthorizedError,
   );
   await workflowsRepository().create({ appId, ownerId: OWNER_ID, workflow: trustedWorkflow() });
