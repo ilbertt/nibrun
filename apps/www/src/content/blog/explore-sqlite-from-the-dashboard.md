@@ -75,4 +75,28 @@ password or token to create before opening the explorer.
 The database stays in your app's persistent directory. Your binary still opens the same file,
 and you can still export it with the rest of your app's data.
 
+## Explore with your AI agent
+
+An AI agent with access to your signed-in `nib` CLI can explore the same database: inspect
+tables, look up records and run SQL against the file your app is using. CLI connections are
+read-only too, so the agent can investigate without changing your database's data or schema.
+SQLite rejects write statements through these connections.
+
+Start with `nib apps sqlite --help` to discover the commands. For a database at
+`/app/data/app.db`, create a connection using its path within the persistent volume:
+
+```sh
+nib apps sqlite connections create /app.db --app my-app
+```
+
+Use the returned connection ID to query it, or run `nib apps sqlite connections list --app my-app`
+to find a connection already saved through the CLI or dashboard:
+
+```sh
+nib apps sqlite query "SELECT name FROM sqlite_schema WHERE type = 'table'" --app my-app --connection connection-id --json
+```
+
+Replace `connection-id` with the saved ID. `--json` gives the agent structured results to work
+with. The app needs a running deployment; queries read its live database without downloading a copy.
+
 [Open your apps](https://app.nibrun.com/apps), pick a database file, and take a look inside.
