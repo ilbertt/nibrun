@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { RecommendedBadge } from '#components/recommended-badge.tsx';
 import { APPS, type CatalogApp } from '#lib/apps.ts';
 
 const RELATED_SHOWN = 4;
@@ -29,7 +30,10 @@ export function RelatedApps({ app }: { app: CatalogApp }) {
               params={{ slug: other.slug }}
               className="group flex flex-col gap-1"
             >
-              <span className="font-medium group-hover:text-primary">{other.title}</span>
+              <span className="flex items-center gap-2 font-medium group-hover:text-primary">
+                {other.title}
+                {other.isRecommended ? <RecommendedBadge iconOnly={true} /> : null}
+              </span>
               <span className="text-muted-foreground text-sm">{other.subtitle}</span>
             </Link>
           </li>

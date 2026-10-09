@@ -4,6 +4,7 @@ import { Input } from '@repo/ui/components/input';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { SearchIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AppCard } from '#components/app-card.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { APPS, CATALOG } from '#lib/apps.ts';
@@ -18,6 +19,8 @@ import {
 import { pageHead } from '#lib/page-head.ts';
 import { pageTitle } from '#lib/page-title.ts';
 import '#styles/panel.css';
+
+const RECOMMENDED_APPS = APPS.filter((app) => app.isRecommended);
 
 export const Route = createFileRoute('/apps/')({
   validateSearch: (search: Record<string, unknown>): CatalogSearch => ({
@@ -38,6 +41,7 @@ function RouteComponent() {
   const [query, setQuery] = useState('');
   const { category } = Route.useSearch();
   const selected: Chip = category ?? ALL;
+  const showRecommended = query.trim() === '' && category === undefined;
   // Only the ones something is actually in, so the row never offers a filter that empties the
   // page. Annotated because a literal spreading the members beside `ALL` widens to `string`.
   const chips: readonly Chip[] = [
@@ -140,38 +144,38 @@ function RouteComponent() {
           ))}
         </fieldset>
 
-        {/* A tally rather than a heading: the set is small and fixed, so what is worth saying
-            above the grid is how much of it is on screen. */}
-        <p className="pb-8 font-mono text-muted-foreground text-sm">
-          <span className="text-foreground tabular-nums">{shown.length}</span>
-          {shown.length === 1 ? ' app' : ' apps'}
-          {shown.length === APPS.length ? null : (
-            <>
-              {' of '}
-              <span className="tabular-nums">{APPS.length}</span>
-            </>
-          )}
-        </p>
+        {showRecommended && RECOMMENDED_APPS.length > 0 ? (
+          <section aria-labelledby="recommended-heading" className="pb-10">
+            <h2 id="recommended-heading" className="pb-4 font-semibold text-xl tracking-tight">
+              Recommended
+            </h2>
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {RECOMMENDED_APPS.map((app) => (
+                <AppCard key={app.slug} app={app} />
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
-        {/* Bordered cards rather than one-pixel gaps over a coloured parent: a row that does not
-            fill every column leaves the parent showing through, which reads as an empty grey card. */}
+        <div className="flex items-baseline justify-between gap-4 pb-8">
+          {showRecommended ? (
+            <h2 className="font-semibold text-xl tracking-tight">All apps</h2>
+          ) : null}
+          <p className="font-mono text-muted-foreground text-sm">
+            <span className="text-foreground tabular-nums">{shown.length}</span>
+            {shown.length === 1 ? ' app' : ' apps'}
+            {shown.length === APPS.length ? null : (
+              <>
+                {' of '}
+                <span className="tabular-nums">{APPS.length}</span>
+              </>
+            )}
+          </p>
+        </div>
+
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((app) => (
-            <li key={app.slug} className="panel rounded-lg border border-border/60">
-              <Link
-                to="/apps/$slug"
-                params={{ slug: app.slug }}
-                className="group flex h-full flex-col gap-2 rounded-lg p-5 pt-6"
-              >
-                <span className="font-medium text-lg tracking-tight group-hover:text-primary">
-                  {app.title}
-                </span>
-                <span className="text-pretty text-muted-foreground text-sm">{app.subtitle}</span>
-                <span className="mt-auto pt-3 text-muted-foreground/70 text-xs">
-                  {app.category}
-                </span>
-              </Link>
-            </li>
+            <AppCard key={app.slug} app={app} />
           ))}
         </ul>
 

@@ -48,6 +48,7 @@ export type DeployPreset = {
   title: string;
   subtitle: string;
   category: DeployCategory;
+  isRecommended: boolean;
   projectUrl: string;
   /** The upstream release the link pins, so anything offering it says what it would deploy. */
   version: string;
@@ -57,6 +58,7 @@ export type DeployPreset = {
 
 export const DEPLOY_PRESETS = {
   pocketbase: {
+    isRecommended: true,
     projectUrl: 'https://github.com/pocketbase/pocketbase',
     version: 'v0.40.4',
     markdownContent: pocketbasePage,
@@ -74,6 +76,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   openbao: {
+    isRecommended: false,
     projectUrl: 'https://github.com/openbao/openbao',
     version: 'v2.7.1',
     markdownContent: openbaoPage,
@@ -97,6 +100,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   sharkord: {
+    isRecommended: false,
     projectUrl: 'https://github.com/sharkord/sharkord',
     version: 'v0.0.25',
     markdownContent: sharkordPage,
@@ -119,6 +123,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   boop: {
+    isRecommended: false,
     projectUrl: 'https://github.com/chrisgreg/boop',
     version: 'v1.3.0',
     markdownContent: boopPage,
@@ -144,6 +149,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   gitea: {
+    isRecommended: false,
     projectUrl: 'https://github.com/go-gitea/gitea',
     version: 'v1.28.0-dev-nibrun.4',
     markdownContent: giteaPage,
@@ -162,6 +168,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'drizzle-gateway': {
+    isRecommended: false,
     projectUrl: 'https://gateway.drizzle.team',
     version: 'v1.6.0',
     markdownContent: drizzleGatewayPage,
@@ -178,6 +185,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'open-connector': {
+    isRecommended: false,
     projectUrl: 'https://github.com/oomol-lab/open-connector',
     version: 'v1.8.0',
     markdownContent: openConnectorPage,
@@ -205,6 +213,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'context-use': {
+    isRecommended: true,
     projectUrl: 'https://github.com/massimoalbarello/context-use',
     version: 'nibrun-latest',
     markdownContent: contextUsePage,
@@ -223,6 +232,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'nibrun-vitals': {
+    isRecommended: false,
     projectUrl: 'https://github.com/ilbertt/nibrun-vitals',
     version: 'v2026.9.16-1',
     markdownContent: nibrunVitalsPage,
@@ -240,6 +250,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   picoshare: {
+    isRecommended: false,
     projectUrl: 'https://github.com/mtlynch/picoshare',
     version: 'v1.5.4',
     markdownContent: picosharePage,
@@ -262,6 +273,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   memos: {
+    isRecommended: false,
     projectUrl: 'https://github.com/usememos/memos',
     version: 'v0.31.0',
     markdownContent: memosPage,
@@ -283,6 +295,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   shiori: {
+    isRecommended: false,
     projectUrl: 'https://github.com/go-shiori/shiori',
     version: 'v1.8.0',
     markdownContent: shioriPage,
@@ -301,6 +314,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   fusion: {
+    isRecommended: false,
     projectUrl: 'https://github.com/0x2E/fusion',
     version: 'v1.3.0',
     markdownContent: fusionPage,
@@ -323,6 +337,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   filebrowser: {
+    isRecommended: false,
     projectUrl: 'https://github.com/filebrowser/filebrowser',
     version: 'v2.63.23',
     markdownContent: filebrowserPage,
@@ -342,6 +357,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   openlist: {
+    isRecommended: false,
     projectUrl: 'https://github.com/OpenListTeam/OpenList',
     version: 'v4.2.6',
     markdownContent: openlistPage,
@@ -366,6 +382,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   webdav: {
+    isRecommended: false,
     projectUrl: 'https://github.com/rclone/rclone',
     version: 'v1.75.1',
     markdownContent: webdavPage,
@@ -396,6 +413,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   microbin: {
+    isRecommended: false,
     projectUrl: 'https://github.com/szabodanika/microbin',
     version: 'v2.1.0',
     markdownContent: microbinPage,
@@ -421,6 +439,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   goatcounter: {
+    isRecommended: false,
     projectUrl: 'https://github.com/arp242/goatcounter',
     version: 'v2.7.0',
     markdownContent: goatcounterPage,
@@ -449,6 +468,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   remark42: {
+    isRecommended: false,
     projectUrl: 'https://github.com/umputun/remark42',
     version: 'v1.17.1',
     markdownContent: remark42Page,
@@ -477,6 +497,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   traggo: {
+    isRecommended: false,
     projectUrl: 'https://github.com/traggo/server',
     version: 'v0.8.3',
     markdownContent: traggoPage,
@@ -500,6 +521,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   gotify: {
+    isRecommended: false,
     projectUrl: 'https://github.com/gotify/server',
     version: 'v3.1.1',
     markdownContent: gotifyPage,
@@ -523,6 +545,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   flipt: {
+    isRecommended: false,
     projectUrl: 'https://github.com/flipt-io/flipt',
     version: 'v2.13.1',
     markdownContent: fliptPage,
@@ -547,6 +570,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'open-sync': {
+    isRecommended: true,
     projectUrl: 'https://github.com/massimoalbarello/open-sync',
     version: 'nibrun-latest',
     markdownContent: openSyncPage,
@@ -564,6 +588,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   'pdf-signer': {
+    isRecommended: false,
     projectUrl: 'https://github.com/massimoalbarello/pdf-signer',
     version: 'nibrun-latest',
     markdownContent: pdfSignerPage,
@@ -580,6 +605,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   yarr: {
+    isRecommended: false,
     projectUrl: 'https://github.com/nkanaev/yarr',
     version: 'v2.9',
     markdownContent: yarrPage,
