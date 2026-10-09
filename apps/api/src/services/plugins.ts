@@ -95,8 +95,12 @@ const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient
 const dnsRepository = new DnsRepository(cloudflareDnsClient);
 const logsRepository = new LogsRepository(victoriaLogsClient);
 const githubActionsOidcRepository = new GitHubActionsOidcRepository();
+const trustedWorkflowsRepository = new TrustedWorkflowsRepository(sql);
 
 const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);
+const trustedWorkflowsService = new TrustedWorkflowsService({
+  workflowsRepo: trustedWorkflowsRepository,
+});
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
@@ -258,7 +262,4 @@ export const GitHubActionsOidcServicePlugin = new Elysia({
 
 export const TrustedWorkflowsServicePlugin = new Elysia({
   name: 'service.trustedWorkflows',
-}).decorate(
-  'trustedWorkflowsService',
-  new TrustedWorkflowsService({ workflowsRepo: new TrustedWorkflowsRepository(sql) }),
-);
+}).decorate('trustedWorkflowsService', trustedWorkflowsService);
