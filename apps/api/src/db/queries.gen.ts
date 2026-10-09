@@ -1132,6 +1132,40 @@ export interface IAccountTable {
     constraints: keyof (typeof schema)["account"]["_constraints"];
 }
 
+/** Columns of `apikey`. */
+export interface IApikeyColumns {
+    id: string;
+    configId: string;
+    name: string | null;
+    start: string | null;
+    referenceId: string;
+    prefix: string | null;
+    key: string;
+    refillInterval: number | null;
+    refillAmount: number | null;
+    lastRefillAt: Date | null;
+    enabled: boolean | null;
+    rateLimitEnabled: boolean | null;
+    rateLimitTimeWindow: number | null;
+    rateLimitMax: number | null;
+    requestCount: number | null;
+    remaining: number | null;
+    lastRequest: Date | null;
+    expiresAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    permissions: string | null;
+    metadata: string | null;
+}
+
+/** Schema of `apikey`. */
+export interface IApikeyTable {
+    columns: IApikeyColumns;
+    relationType: (typeof schema)["apikey"]["_relationType"];
+    indexes: keyof (typeof schema)["apikey"]["_indexes"];
+    constraints: keyof (typeof schema)["apikey"]["_constraints"];
+}
+
 /** Columns of `deviceCode`. */
 export interface IDeviceCodeColumns {
     id: string;
@@ -1828,6 +1862,43 @@ export const schema = {
             account_userId_fkey: { _constraintName: "account_userId_fkey" }
         }
     },
+    apikey: {
+        _relationName: "apikey",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            configId: { _columnName: "configId", _foreignKeys: {} },
+            name: { _columnName: "name", _foreignKeys: {} },
+            start: { _columnName: "start", _foreignKeys: {} },
+            referenceId: { _columnName: "referenceId", _foreignKeys: {} },
+            prefix: { _columnName: "prefix", _foreignKeys: {} },
+            key: { _columnName: "key", _foreignKeys: {} },
+            refillInterval: { _columnName: "refillInterval", _foreignKeys: {} },
+            refillAmount: { _columnName: "refillAmount", _foreignKeys: {} },
+            lastRefillAt: { _columnName: "lastRefillAt", _foreignKeys: {} },
+            enabled: { _columnName: "enabled", _foreignKeys: {} },
+            rateLimitEnabled: { _columnName: "rateLimitEnabled", _foreignKeys: {} },
+            rateLimitTimeWindow: { _columnName: "rateLimitTimeWindow", _foreignKeys: {} },
+            rateLimitMax: { _columnName: "rateLimitMax", _foreignKeys: {} },
+            requestCount: { _columnName: "requestCount", _foreignKeys: {} },
+            remaining: { _columnName: "remaining", _foreignKeys: {} },
+            lastRequest: { _columnName: "lastRequest", _foreignKeys: {} },
+            expiresAt: { _columnName: "expiresAt", _foreignKeys: {} },
+            createdAt: { _columnName: "createdAt", _foreignKeys: {} },
+            updatedAt: { _columnName: "updatedAt", _foreignKeys: {} },
+            permissions: { _columnName: "permissions", _foreignKeys: {} },
+            metadata: { _columnName: "metadata", _foreignKeys: {} }
+        },
+        _indexes: {
+            apikey_configId_idx: { _indexName: "apikey_configId_idx" },
+            apikey_key_idx: { _indexName: "apikey_key_idx" },
+            apikey_pkey: { _indexName: "apikey_pkey" },
+            apikey_referenceId_idx: { _indexName: "apikey_referenceId_idx" }
+        },
+        _constraints: {
+            apikey_pkey: { _constraintName: "apikey_pkey" }
+        }
+    },
     deviceCode: {
         _relationName: "deviceCode",
         _relationType: "table",
@@ -2461,6 +2532,7 @@ export const schema = {
 
 export interface Tables {
     account: IAccountTable;
+    apikey: IApikeyTable;
     deviceCode: IDeviceCodeTable;
     session: ISessionTable;
     user: IUserTable;

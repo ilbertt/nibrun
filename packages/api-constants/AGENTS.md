@@ -10,3 +10,5 @@ Runtime-reference names, metadata and interpolation belong to `@repo/protocol/ru
 
 Log timerange defaults and pattern text live in `src/log-query.ts`; API schemas and CLI option
 validation use them directly. Do not duplicate this grammar or expose a configuration endpoint.
+
+API key header and app permission naming live in `src/auth.ts`; authentication plugins and clients use the same constants.

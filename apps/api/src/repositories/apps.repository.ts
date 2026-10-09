@@ -55,6 +55,7 @@ export type AppCreation =
 export type Leftovers = { artifacts: ObjectKey[]; exports: ObjectKey[]; imports: ObjectKey[] };
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
+export type AppListingInput = { ownerId: OwnerId; appIds?: readonly AppId[] };
 
 /**
  * `from` is the whole of what makes one state change different from another: a teardown is not
@@ -78,7 +79,7 @@ export const LIVE_APP_STATES: readonly AppState[] = APP_STATES.filter(
 export abstract class AppsRepositoryContract {
   abstract create(input: NewApp): Promise<AppCreation>;
   abstract appsAllowed(input: { ownerId: OwnerId }): Promise<number | null>;
-  abstract listByOwner(input: { ownerId: OwnerId }): Promise<AppRow[]>;
+  abstract listByOwner(input: AppListingInput): Promise<AppRow[]>;
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
   abstract recordVolumeUsage(input: {
     readings: ReadonlyMap<AppId, FilesystemUsage>;
@@ -250,7 +251,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     });
   }
 
-  listByOwner({ ownerId }: { ownerId: OwnerId }): Promise<AppRow[]> {
+  listByOwner({ ownerId, appIds }: AppListingInput): Promise<AppRow[]> {
+    const scopedAppIds = [...(appIds ?? [])];
     return this.sql.SelectAppsByOwner`
       /* @notNull environment_names */
       SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
@@ -272,6 +274,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
       LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
       WHERE a.owner_id = ${ownerId}
+        AND (${appIds === undefined} OR a.id::text IN (
+          SELECT jsonb_array_elements_text(${scopedAppIds}::jsonb)
+        ))
       ORDER BY a.created_at DESC
     `;
   }

@@ -14,7 +14,14 @@ function authAnswering(session: Session): Auth {
 function appBehind(auth: Auth) {
   return new Elysia()
     .onError(elysiaErrorHandler)
-    .use(createAuthPlugin(auth))
+    .use(
+      createAuthPlugin({
+        auth,
+        sqliteService: {
+          getConnection: () => Promise.reject(new Error('No SQLite route in this test.')),
+        },
+      }),
+    )
     .get('/either', () => 'ok', { auth: Identity.Optional })
     .get('/identified', () => 'ok', { auth: Identity.Required });
 }
