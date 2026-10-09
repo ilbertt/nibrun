@@ -101,6 +101,15 @@ test('stale workflow IDs cannot update or delete a replacement configuration', a
   const first = await service().create({ ...owner, workflow: trustedWorkflow() });
   const stale = { ...owner, workflowId: first.id };
   await service().remove(stale);
+  const deleted = await sql.unsafe(
+    `SELECT w.id, w.deleted_at FROM nibrun.github_trusted_deployment_workflows w
+     JOIN nibrun.live_apps a ON a.id = w.app_id
+     WHERE w.id = $1 AND w.app_id = $2 AND a.owner_id = $3`,
+    [first.id, appId, OWNER_ID],
+  );
+  expect(deleted).toEqual([{ id: first.id, deleted_at: expect.any(Date) }]);
+  expect(await repository().find(owner)).toBeNull();
+  await expect(service().remove(stale)).rejects.toBeInstanceOf(NotFoundError);
   await expect(service().update({ ...stale, workflow: trustedWorkflow() })).rejects.toBeInstanceOf(
     NotFoundError,
   );
@@ -133,4 +142,27 @@ test('a deleted app cannot read, update, create, or remove a trusted workflow', 
     await repository().update({ ...ownedWorkflow, workflow: trustedWorkflow({ branch: 'other' }) }),
   ).toBeNull();
   expect(await repository().remove(ownedWorkflow)).toBe(false);
+});
+
+test('physical deletion is refused for active and deleted workflows without grants', async () => {
+  const owner = { appId, ownerId: OWNER_ID };
+  const created = await service().create({ ...owner, workflow: trustedWorkflow() });
+  async function permanentlyDeleteWorkflow() {
+    await sql.unsafe(
+      `DELETE FROM nibrun.github_trusted_deployment_workflows w USING nibrun.live_apps a
+       WHERE w.id = $1 AND w.app_id = $2 AND a.id = w.app_id AND a.owner_id = $3`,
+      [created.id, appId, OWNER_ID],
+    );
+  }
+  await expect(permanentlyDeleteWorkflow()).rejects.toThrow('must be soft-deleted');
+  expect(await service().find(owner)).toEqual(created);
+  await service().remove({ ...owner, workflowId: created.id });
+  await expect(permanentlyDeleteWorkflow()).rejects.toThrow('must be soft-deleted');
+  const rows = await sql.unsafe(
+    `SELECT w.id, w.deleted_at FROM nibrun.github_trusted_deployment_workflows w
+     JOIN nibrun.live_apps a ON a.id = w.app_id
+     WHERE w.id = $1 AND a.owner_id = $2`,
+    [created.id, OWNER_ID],
+  );
+  expect(rows).toEqual([{ id: created.id, deleted_at: expect.any(Date) }]);
 });
