@@ -28,7 +28,7 @@ export class TrustedWorkflowsRepository
       SELECT w.id, w.repository, w.workflow, w.branch, w.environment
       FROM nibrun.github_trusted_deployment_workflows w
       JOIN nibrun.live_apps a ON a.id = w.app_id
-      WHERE w.app_id = ${appId} AND a.owner_id = ${ownerId}
+      WHERE w.app_id = ${appId} AND a.owner_id = ${ownerId} AND w.deleted_at IS NULL
     `;
     return row ?? null;
   }
@@ -60,17 +60,19 @@ export class TrustedWorkflowsRepository
           branch = ${workflow.branch}, environment = ${workflow.environment}
       FROM nibrun.live_apps a
       WHERE w.id = ${workflowId} AND w.app_id = ${appId}
-        AND a.id = w.app_id AND a.owner_id = ${ownerId}
+        AND a.id = w.app_id AND a.owner_id = ${ownerId} AND w.deleted_at IS NULL
       RETURNING w.id, w.repository, w.workflow, w.branch, w.environment
     `;
     return row ?? null;
   }
 
   async remove({ appId, ownerId, workflowId }: TrustedWorkflowByIdInput): Promise<boolean> {
-    const rows = await this.sql.DeleteTrustedWorkflow`
-      DELETE FROM nibrun.github_trusted_deployment_workflows w USING nibrun.live_apps a
+    const rows = await this.sql.SoftDeleteTrustedWorkflow`
+      UPDATE nibrun.github_trusted_deployment_workflows w
+      SET deleted_at = statement_timestamp()
+      FROM nibrun.live_apps a
       WHERE w.id = ${workflowId} AND w.app_id = ${appId}
-        AND a.id = w.app_id AND a.owner_id = ${ownerId}
+        AND a.id = w.app_id AND a.owner_id = ${ownerId} AND w.deleted_at IS NULL
       RETURNING w.id
     `;
     return rows.length > 0;
