@@ -61,7 +61,7 @@ export const DEPLOY_PRESETS = {
   pocketbase: {
     isRecommended: true,
     projectUrl: 'https://github.com/pocketbase/pocketbase',
-    version: 'v0.40.4',
+    version: 'v0.40.5',
     markdownContent: pocketbasePage,
     category: DeployCategory.Backends,
     title: 'PocketBase',
@@ -69,8 +69,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'pocketbase',
       binary:
-        'https://github.com/pocketbase/pocketbase/releases/download/v0.40.4/pocketbase_0.40.4_linux_amd64.zip',
-      sha256: '9042ec818570e79c3628dadcd0a756c1496d9e1173918ec409d133c02f82e5fa',
+        'https://github.com/pocketbase/pocketbase/releases/download/v0.40.5/pocketbase_0.40.5_linux_amd64.zip',
+      sha256: '1dbea1b01eb3dfe64953513859d01e759c96650c4e3264fa4eecd54b769382e4',
       port: 8090,
       arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data', '--publicDir=./data/pb_public'],
       minimal: true,
@@ -189,7 +189,7 @@ export const DEPLOY_PRESETS = {
   gitea: {
     isRecommended: false,
     projectUrl: 'https://github.com/go-gitea/gitea',
-    version: 'v1.28.0-dev-nibrun.4',
+    version: 'v28.1.0-nibrun.1',
     markdownContent: giteaPage,
     category: DeployCategory.DeveloperTools,
     title: 'Gitea',
@@ -198,8 +198,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'gitea',
       binary:
-        'https://github.com/ilbertt/gitea/releases/download/v1.28.0-dev-nibrun.4/gitea-nibrun-linux-amd64',
-      sha256: '22c6dbf7b76b60e92a1f5a37370d8de546de1a8a44d53e19483163260d448ba3',
+        'https://github.com/ilbertt/gitea/releases/download/v28.1.0-nibrun.1/gitea-nibrun-linux-amd64',
+      sha256: 'af760ba79cc9633ab686433806344227d6c8d1dd69536026a3c03281a72ccaf6',
       port: 3000,
       arg: ['nibrun'],
       minimal: true,
@@ -422,7 +422,7 @@ export const DEPLOY_PRESETS = {
   webdav: {
     isRecommended: false,
     projectUrl: 'https://github.com/rclone/rclone',
-    version: 'v1.75.1',
+    version: 'v1.75.2',
     markdownContent: webdavPage,
     category: DeployCategory.FilesAndSharing,
     title: 'WebDAV',
@@ -430,8 +430,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'webdav',
       binary:
-        'https://github.com/rclone/rclone/releases/download/v1.75.1/rclone-v1.75.1-linux-amd64.zip',
-      sha256: '982b5aa772841168f8e380f139e9e787b2a105403e32b94da8676a0e1c0a13ab',
+        'https://github.com/rclone/rclone/releases/download/v1.75.2/rclone-v1.75.2-linux-amd64.zip',
+      sha256: '349ac8fba6ff65d6247043f1750cdcb518ec5d500ef91463a10d37c0ccdf3702',
       port: 8080,
       arg: [
         'serve',
