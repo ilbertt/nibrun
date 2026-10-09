@@ -22,14 +22,15 @@
     "@elysia/cors": "^1.4.2",
     "@ilbertt/better-auth-bun-sql": "^0.4.0",
     "@ilbertt/bun-sqlgen": "^0.6.2",
+    "@repo/api-constants": "workspace:*",
     "@repo/protocol": "workspace:*",
     "@repo/sqlite": "workspace:*",
+    "@repo/typebox-extensions": "workspace:*",
+    "@sinclair/typebox": "catalog:",
     "better-auth": "catalog:",
     "elysia": "^1.4.30",
-    "tldts": "^7.4.13",
-    "@sinclair/typebox": "catalog:",
-    "@repo/api-constants": "workspace:*",
-    "@repo/typebox-extensions": "workspace:*"
+    "jose": "^6.2.12",
+    "tldts": "^7.4.13"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
