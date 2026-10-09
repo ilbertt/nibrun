@@ -92,8 +92,9 @@ const exportStorageRepository = new ExportStorageRepository(exportsS3);
 const customHostnamesRepository = new CustomHostnamesRepository(cloudflareClient);
 const dnsRepository = new DnsRepository(cloudflareDnsClient);
 const logsRepository = new LogsRepository(victoriaLogsClient);
+const githubActionsOidcRepository = new GitHubActionsOidcRepository();
 
-const githubActionsOidcService = new GitHubActionsOidcService(new GitHubActionsOidcRepository());
+const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
