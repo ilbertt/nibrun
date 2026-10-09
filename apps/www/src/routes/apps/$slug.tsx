@@ -6,6 +6,7 @@ import { AppBody } from '#components/app-body.tsx';
 import { AppSidebar } from '#components/app-sidebar.tsx';
 import { AskYourAgent } from '#components/ask-your-agent.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
+import { RecommendedBadge } from '#components/recommended-badge.tsx';
 import { RelatedApps } from '#components/related-apps.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
 import { appCardPath, appDeployPath, appMarkdownPath, findApp } from '#lib/apps.ts';
@@ -61,7 +62,12 @@ function RouteComponent() {
           All apps
         </Button>
         <header className="flex flex-col gap-4 py-8">
-          <h1 className="text-balance font-semibold text-4xl tracking-tight">Deploy {app.title}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-balance font-semibold text-4xl tracking-tight">
+              Deploy {app.title}
+            </h1>
+            {app.isRecommended ? <RecommendedBadge iconOnly={false} /> : null}
+          </div>
           <p className="max-w-2xl text-balance text-lg text-muted-foreground">{app.subtitle}</p>
           <div className="flex flex-wrap items-center gap-2">
             {/* The short link the README hands out, not the deploy it expands to: the worker
