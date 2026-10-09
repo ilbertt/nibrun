@@ -27,14 +27,19 @@ type CredentialsStore = { credentials: Pick<FileHandle<Credentials>, 'maybeRead'
 export async function requireSignedIn({
   files,
   apiUrl,
+  apiKey,
 }: {
   files: CredentialsStore;
   apiUrl: string;
+  apiKey: string | undefined;
 }): Promise<void> {
+  if (apiKey !== undefined) {
+    return;
+  }
   const credentials = await files.credentials.maybeRead();
 
   if (!credentials) {
-    throw new UsageError('Not signed in. Run `nib login`.');
+    throw new UsageError('Not signed in. Run `nib login` or set NIBRUN_API_KEY.');
   }
   if (credentials.apiUrl !== apiUrl) {
     throw new UsageError(
