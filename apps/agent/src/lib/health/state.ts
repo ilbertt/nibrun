@@ -193,8 +193,7 @@ function evaluateStoppedState({
  * A booted microVM is not a running app: `starting` has not accepted a connection and `running`
  * has, and collapsing the two would let a deploy swap traffic onto a booted-but-dead VM.
  *
- * A VM that exited unasked is `failed` and never restarted here — the guest owns the tenant's
- * restart budget, and whether to try elsewhere is the reconciler's call.
+ * Recovery of an unasked exit is the reconciler's policy; this only measures what happened.
  */
 export function evaluateInstanceState({
   unit,
@@ -208,7 +207,7 @@ export function evaluateInstanceState({
   nowMs,
   current,
 }: LifecycleInputs): InstanceState {
-  if (unit.failed) {
+  if (unit.failed && desiredRunning && !stopRequested && !snapshotting) {
     return 'failed';
   }
   if (!unit.active) {

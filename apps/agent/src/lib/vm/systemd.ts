@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { type AppId, AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
+import { consoleFailure, GUEST_LOG_PREFIX } from '#lib/vm/failure.ts';
 import {
   parsePropertyBlocks,
   SHOWN_PROPERTIES,
@@ -113,12 +114,6 @@ export const forget = Effect.fn('systemd.forget')((appId: AppId) =>
 
 const JOURNALCTL = 'journalctl';
 
-/**
- * The prefix `apps/runtime` writes its console diagnostics with, from `src/log.c`. Nothing
- * compares the two, so renaming it there is also a change here.
- */
-const GUEST_LOG_PREFIX = '[nibrun] ';
-
 /** Only the tail is ever wanted, and a guest that crash-looped can have written a great many. */
 const CONSOLE_TAIL_LINES = 200;
 const MS_PER_SECOND = 1000;
@@ -142,14 +137,14 @@ export function lastGuestLine(output: string): string | undefined {
 }
 
 /**
- * Why the guest powered itself off, off the console systemd captured for this microVM.
+ * The VMM or guest failure from the console systemd captured for this microVM.
  *
  * Bounded to the run that began at `sinceMs`: a redeploy reuses the unit name, so this unit's
  * journal still holds every earlier deployment's console and the newest line in it may belong to
  * one of those. Answers `undefined` rather than failing — a verdict is an improvement on the exit
  * code, not something the reconciler can be blocked on.
  */
-export const guestVerdict = Effect.fn('systemd.guestVerdict')(
+export const failure = Effect.fn('systemd.failure')(
   ({ appId, sinceMs }: { appId: AppId; sinceMs: number }) =>
     run({
       command: [
@@ -157,7 +152,7 @@ export const guestVerdict = Effect.fn('systemd.guestVerdict')(
         '--unit',
         vmUnitName(appId),
         '--since',
-        `@${Math.floor(sinceMs / MS_PER_SECOND)}`,
+        `@${sinceMs / MS_PER_SECOND}`,
         '--lines',
         String(CONSOLE_TAIL_LINES),
         '--output',
@@ -165,7 +160,7 @@ export const guestVerdict = Effect.fn('systemd.guestVerdict')(
         '--no-pager',
       ],
     }).pipe(
-      Effect.map((result) => lastGuestLine(result.stdout)),
+      Effect.map((result) => consoleFailure(result.stdout)),
       Effect.orElseSucceed(() => undefined),
     ),
 );
