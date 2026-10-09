@@ -101,6 +101,7 @@ export const DEPLOY_PRESETS = {
     },
   },
   opencloud: {
+    isRecommended: false,
     projectUrl: 'https://github.com/opencloud-eu/opencloud',
     version: 'v8.1.0',
     markdownContent: opencloudPage,
