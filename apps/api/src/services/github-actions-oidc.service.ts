@@ -56,7 +56,7 @@ export class GitHubActionsOidcService extends Service {
   private validateIssuedAt(issuedAt: number): void {
     const now = Math.floor(Date.now() / MS_PER_SECOND);
     if (issuedAt > now) {
-      throw new UnauthorizedError();
+      throw new UnauthorizedError('GitHub Actions identity token was issued in the future.');
     }
   }
 }
