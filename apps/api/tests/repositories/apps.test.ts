@@ -120,6 +120,25 @@ async function storedState(appId: AppId): Promise<string | undefined> {
   return row?.state;
 }
 
+test('listing for an API key filters by both selected apps and their current owner in SQL', async () => {
+  const first = await createApp('scope-first');
+  const second = await createApp('scope-second');
+  await createApp('scope-unselected');
+  const foreign = requireCreated(
+    await repo.create({
+      anonymousAppsAtMost: null,
+      ownerId: STRANGER_ID,
+      name: Value.Parse(AppNameSchema, 'scope-foreign'),
+      slug: Value.Parse(DnsLabelSchema, 'scope-foreign'),
+      hostname: Value.Parse(HostnameSchema, 'scope-foreign.apps.example.com'),
+      config: { ...configWithDefaults(), environment: {} },
+    }),
+  ).app.id;
+  const selected = await repo.listByOwner({ ownerId: OWNER_ID, appIds: [first, second, foreign] });
+  expect(new Set(selected.map((app) => app.id))).toEqual(new Set([first, second]));
+  expect(await repo.listByOwner({ ownerId: OWNER_ID, appIds: [] })).toEqual([]);
+});
+
 /**
  * The column's own default and nothing else: `create` names `owner_id` and `slug`, so what a new
  * app comes up as is decided by the migration rather than by anything a caller could pass.

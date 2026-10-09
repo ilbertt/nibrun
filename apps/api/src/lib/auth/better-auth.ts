@@ -4,6 +4,11 @@ import { betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization } from 'better-auth/plugins';
 import { sql } from '#db/client.ts';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import {
+  type ApiKeyAppsServiceContract,
+  apiKeyAccess,
+  createApiKeyPlugin,
+} from '#lib/auth/api-keys.ts';
 import { env } from '#lib/env.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import type { AppsService } from '#services/apps.service.ts';
@@ -32,12 +37,17 @@ export type AppClaimServiceContract = Pick<AppsService, 'claim'>;
  * reached for from here. The one instance the api serves is made there; the schema the CLI
  * prints is read off another, in `scripts/auth-schema.ts`, with nothing behind it.
  */
-export function createAuth({ appsService }: { appsService: AppClaimServiceContract }) {
+export function createAuth({
+  appsService,
+}: {
+  appsService: AppClaimServiceContract & ApiKeyAppsServiceContract;
+}) {
   return betterAuth({
     database: bunSqlAdapter({ sql, pgSchema: AUTH_SCHEMA }),
     baseURL: env.BASE_URL.origin,
     basePath: AUTH_BASE_PATH,
     secret: env.BETTER_AUTH_SECRET,
+    hooks: { before: apiKeyAccess },
     socialProviders: {
       github: {
         clientId: env.GITHUB_CLIENT_ID,
@@ -47,6 +57,7 @@ export function createAuth({ appsService }: { appsService: AppClaimServiceContra
     plugins: [
       deviceAuthorization({ verificationUri: DEVICE_VERIFICATION_PATH }),
       bearer(),
+      createApiKeyPlugin({ appsService }),
       anonymous({
         async onLinkAccount({ anonymousUser, newUser }) {
           await appsService.claim({

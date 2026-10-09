@@ -164,7 +164,7 @@ const logsService = new LogsService({
 
 export const auth = createAuth({ appsService });
 
-export const AuthPlugin = createAuthPlugin(auth);
+export const AuthPlugin = createAuthPlugin({ auth, sqliteService });
 
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);

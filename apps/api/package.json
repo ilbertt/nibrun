@@ -29,7 +29,8 @@
     "tldts": "^7.4.13",
     "@sinclair/typebox": "catalog:",
     "@repo/api-constants": "workspace:*",
-    "@repo/typebox-extensions": "workspace:*"
+    "@repo/typebox-extensions": "workspace:*",
+    "@better-auth/api-key": "catalog:"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

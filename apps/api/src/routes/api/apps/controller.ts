@@ -17,8 +17,8 @@ export const AppsController = new Elysia()
   .guard({ auth: Identity.Optional })
   .get(
     '/apps',
-    async ({ appsService, user, status }) => {
-      const apps = await appsService.list({ ownerId: Value.Parse(OwnerIdSchema, user.id) });
+    async ({ appsService, user, appIds, status }) => {
+      const apps = await appsService.list({ ownerId: Value.Parse(OwnerIdSchema, user.id), appIds });
       return status(StatusMap.OK, { apps });
     },
     {

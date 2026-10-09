@@ -33,7 +33,8 @@
       "sonner": "^2.0.8",
       "tailwindcss": "^4.3.3",
       "typescript": "^7.0.2",
-      "vite": "^8.2.2"
+      "vite": "^8.2.2",
+      "@better-auth/api-key": "1.7.2"
     }
   },
   "devDependencies": {

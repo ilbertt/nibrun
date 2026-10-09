@@ -43,6 +43,7 @@ import type {
   AppHostnamesRepositoryContract,
 } from '#repositories/app-hostnames.repository.ts';
 import {
+  type AppListingInput,
   type AppRow,
   type AppsRepositoryContract,
   LIVE_APP_STATES,
@@ -301,9 +302,9 @@ export class AppsService extends Service {
     };
   }
 
-  async list({ ownerId }: { ownerId: OwnerId }): Promise<PublicApp[]> {
+  async list({ ownerId, appIds }: AppListingInput): Promise<PublicApp[]> {
     const [apps, hostnames] = await Promise.all([
-      this.appsRepo.listByOwner({ ownerId }),
+      this.appsRepo.listByOwner({ ownerId, ...(appIds !== undefined && { appIds }) }),
       this.hostnamesRepo.listByOwner({ ownerId }),
     ]);
     const byApp = Map.groupBy(hostnames, (row) => row.app_id);
