@@ -8,11 +8,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@repo/ui/components/dropdown-menu';
-import { LogOutIcon } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { KeyRoundIcon, LogOutIcon } from 'lucide-react';
 import { KeepAppsButton } from '#components/login/keep-apps-button.tsx';
 import { UserAvatar } from '#components/user-avatar.tsx';
 import { useSession } from '#lib/hooks/use-session.ts';
 import { useSignOut } from '#lib/hooks/use-sign-out.ts';
+import { Route as ApiKeysRoute } from '#routes/(dashboard)/api-keys.tsx';
 
 export function UserMenu() {
   const session = useSession();
@@ -53,6 +55,10 @@ export function UserMenu() {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem render={<Link to={ApiKeysRoute.to} />}>
+          <KeyRoundIcon />
+          API keys
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => signOut.mutate()} disabled={signOut.isPending}>
           <LogOutIcon />
           Sign out
