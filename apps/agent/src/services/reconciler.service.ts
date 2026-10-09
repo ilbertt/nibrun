@@ -60,7 +60,17 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       );
       yield* AgentState.modify((current) => ({
         ...current,
-        records: new Map(instances.map((record) => [record.appId, record])),
+        records: new Map(
+          instances.map((record) => [
+            record.appId,
+            {
+              ...record,
+              recovery: record.recovery
+                ? { ...record.recovery, healthySinceMs: undefined }
+                : undefined,
+            },
+          ]),
+        ),
         exportReports: new Map(exports.map((report) => [report.exportId, report])),
         deletedVolumes: new Map(deletedVolumes.map((report) => [report.volumeId, report])),
         lastActiveAtMs,
@@ -107,12 +117,14 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
                 }
               : {}),
             present: status.loaded || record !== undefined,
-            running: status.active,
+            running: status.active || current.starting.has(appId),
+            recoveryRequested: record?.recovery?.nextAttemptAtMs !== undefined,
+            terminalFailure: record?.state === 'failed',
             // `startedThisBoot` keeps a reboot out of this: the record survives on disk, so
             // without it every instance would look exited after a reboot and be left alone.
             exited:
               !status.active &&
-              status.startedThisBoot &&
+              (status.startedThisBoot || record?.state === 'pending') &&
               record?.startedAt !== undefined &&
               !record.stopRequested,
           };
@@ -249,7 +261,11 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       const plan = planReconcile({ desired, observed });
       yield* AgentState.modify((current) => ({
         ...current,
-        deferredWork: hasDeferredWork(plan),
+        deferredWork:
+          hasDeferredWork(plan) ||
+          [...current.records.values()].some(
+            (record) => record.recovery?.nextAttemptAtMs !== undefined,
+          ),
       }));
       yield* syncDesired(desired);
 

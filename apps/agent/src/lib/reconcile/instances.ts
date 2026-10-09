@@ -6,7 +6,6 @@ import type {
   Timestamp,
 } from '@repo/protocol';
 import { Clock, Duration, Effect, Option } from 'effect';
-import { isReadyToRetry, nextAttemptWindow } from '#lib/backoff.ts';
 import { nowTimestamp } from '#lib/clock.ts';
 import { frozen } from '#lib/exports/freeze.ts';
 import { reportedMessage } from '#lib/failure.ts';
@@ -24,9 +23,15 @@ import type { ReconcilePlan } from '#lib/reconcile/plan.ts';
 import {
   graceInputs,
   type InstanceRecord,
-  NO_START_ATTEMPTS,
   newInstanceRecord,
 } from '#lib/report/instance-record.ts';
+import type { VmFailure } from '#lib/vm/failure.ts';
+import {
+  afterVmFailure,
+  afterVmHealth,
+  beginVmRetry,
+  VM_RECOVERY_POLICY,
+} from '#lib/vm/recovery.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT, type UnitStatus } from '#lib/vm/unit-status.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
@@ -123,7 +128,11 @@ export const stopInstance = Effect.fn('stopInstance')(function* ({
   // suspended while it was struggling to boot would otherwise be one nothing could resume.
   yield* AgentState.updateRecord({
     appId,
-    change: (record) => ({ ...record, state: 'stopped', startAttempts: NO_START_ATTEMPTS }),
+    change: (record) => ({
+      ...record,
+      state: 'stopped',
+      recovery: undefined,
+    }),
   });
 });
 
@@ -180,8 +189,8 @@ const captureIdleInstance = Effect.fn('captureIdleInstance')(function* ({
           ...record,
           state: 'idle',
           stopRequested: true,
-          startAttempts: NO_START_ATTEMPTS,
           message: undefined,
+          recovery: record.recovery ? { ...record.recovery, healthySinceMs: undefined } : undefined,
         }),
       }),
     ),
@@ -250,20 +259,20 @@ function restarted(existing: InstanceRecord | undefined): boolean {
 function isStartable({
   existing,
   nowMs,
-  desired,
 }: {
   existing: InstanceRecord | undefined;
   nowMs: number;
-  desired: DesiredInstance;
 }): boolean {
   if (!existing) {
     return true;
   }
-  const policy = desired.config.restartPolicy;
-  return (
-    existing.startAttempts.attempts <= policy.maxRestarts &&
-    isReadyToRetry({ window: existing.startAttempts, nowMs, policy })
-  );
+  if (existing.state === 'failed') {
+    return false;
+  }
+  if (existing.recovery?.nextAttemptAtMs !== undefined) {
+    return nowMs >= existing.recovery.nextAttemptAtMs;
+  }
+  return true;
 }
 
 /**
@@ -390,13 +399,15 @@ function probeAtOnce(appId: AppId) {
   });
 }
 
-export const startInstance = Effect.fn('startInstance')(function* (desired: DesiredInstance) {
+const attemptStartInstance = Effect.fn('attemptStartInstance')(function* (
+  desired: DesiredInstance,
+) {
   yield* Effect.annotateCurrentSpan({ appId: desired.appId });
   const allocator = yield* SlotAllocator;
   const vms = yield* VmManager;
   const nowMs = yield* Clock.currentTimeMillis;
   const existing = (yield* AgentState.snapshot).records.get(desired.appId);
-  if (!isStartable({ existing, nowMs, desired })) {
+  if (!isStartable({ existing, nowMs })) {
     return;
   }
 
@@ -408,11 +419,13 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
         state: 'pending',
         health: initialTracker(),
       })),
-    startAttempts: nextAttemptWindow({
-      window: existing?.startAttempts ?? NO_START_ATTEMPTS,
-      nowMs,
-      resetAfterMs: desired.config.restartPolicy.resetAfterMs,
-    }),
+    state: 'pending',
+    health: initialTracker(),
+    startedAt: yield* nowTimestamp,
+    recovery:
+      existing?.recovery?.nextAttemptAtMs !== undefined
+        ? beginVmRetry(existing.recovery)
+        : existing?.recovery,
     // Whatever asked for the stop has been overtaken by whatever asked for this: an instance
     // being started is one nobody is waiting to see go down, and leaving the flag set would have
     // a wake that failed read as a sleeping app rather than a broken one.
@@ -445,20 +458,38 @@ export const startInstance = Effect.fn('startInstance')(function* (desired: Desi
       }),
     onFailure: (error) =>
       Effect.gen(function* () {
-        yield* AgentState.putRecord({
-          ...attempted,
-          state: 'failed',
-          message: reportedMessage(error),
+        yield* recordVmFailure({
+          record: attempted,
+          failure: { kind: 'boot', retryable: true, message: reportedMessage(error) },
+          nowMs: yield* Clock.currentTimeMillis,
         });
-        yield* Effect.logError('instance start failed', error).pipe(
-          Effect.annotateLogs({
-            appId: desired.appId,
-            attempt: attempted.startAttempts.attempts,
-          }),
-        );
       }),
   });
 });
+
+function withStartClaim<A, E, R>({
+  appId,
+  effect,
+  skipped,
+}: {
+  appId: AppId;
+  effect: Effect.Effect<A, E, R>;
+  skipped: A;
+}) {
+  return Effect.acquireUseRelease(
+    AgentState.claimStart(appId),
+    (claimed) => (claimed ? effect : Effect.succeed(skipped)),
+    (claimed) => (claimed ? AgentState.releaseStart(appId) : Effect.void),
+  );
+}
+
+export function startInstance(desired: DesiredInstance) {
+  return withStartClaim({
+    appId: desired.appId,
+    effect: attemptStartInstance(desired),
+    skipped: undefined,
+  });
+}
 
 /**
  * What a restore writes back, which is a great deal less than a start does.
@@ -487,25 +518,29 @@ function restored({ appId, startedAt }: { appId: AppId; startedAt: Timestamp }) 
  *
  * None of the accounting a start does. No attempt is charged to the restart budget and
  * `restartCount` does not move, because a wake is not a restart: an app woken every morning for a
- * year would otherwise report three hundred crashes. The budget still bounds the damage, because
- * the fallback below is a start and a start is what spends it — so a snapshot that will never
- * load degrades into cold boots that give up, while a restore that works costs nothing.
+ * year would otherwise report three hundred crashes.
  *
  * `SnapshotUnusable` is the only failure that boots instead. Every other one leaves the app down
- * with the reason on its record: `VmManager.wake` discards the snapshot on its way out, so the
- * request after this one is the cold boot rather than a second attempt at the same restore.
+ * with a bounded cold boot queued: `VmManager.wake` discards the snapshot on its way out, so
+ * recovery boots instead of repeating the same failed restore.
  */
 /**
- * Which of the three ways a wake can end. Returned rather than inferred from the record, because
+ * How a wake ended. Returned rather than inferred from the record, because
  * a cold boot and a restore leave the same record behind and only this can tell them apart —
  * which is the difference between the feature working and it quietly not.
  */
-export type WakeOutcome = 'restored' | 'already-running' | 'cold-boot';
+export type WakeOutcome = 'restored' | 'already-running' | 'cold-boot' | 'recovering';
 
-export const resumeInstance = Effect.fn('resumeInstance')(function* (desired: DesiredInstance) {
+const attemptResumeInstance = Effect.fn('attemptResumeInstance')(function* (
+  desired: DesiredInstance,
+) {
   yield* Effect.annotateCurrentSpan({ appId: desired.appId });
   const allocator = yield* SlotAllocator;
   const vms = yield* VmManager;
+  const record = (yield* AgentState.snapshot).records.get(desired.appId);
+  if (record?.state === 'failed' || record?.recovery?.nextAttemptAtMs !== undefined) {
+    return 'recovering' as const;
+  }
   const slot = yield* allocator.allocate(desired.appId);
 
   // Asked of systemd rather than of the record, because the record is a cache and this is a
@@ -516,6 +551,9 @@ export const resumeInstance = Effect.fn('resumeInstance')(function* (desired: De
   const unit = (yield* Systemd.statuses([desired.appId])).get(desired.appId) ?? UNKNOWN_UNIT;
   if (unit.active) {
     return 'already-running' as const;
+  }
+  if (record && record.state !== 'idle' && record.state !== 'stopped') {
+    return 'recovering' as const;
   }
 
   // For the reason `startInstance` marks one before its boot: the clock this starts is the one
@@ -533,17 +571,40 @@ export const resumeInstance = Effect.fn('resumeInstance')(function* (desired: De
     Effect.catchTag('SnapshotUnusable', (unusable) =>
       Effect.logInfo('nothing to wake this app from; booting it instead', unusable)
         .pipe(Effect.annotateLogs({ appId: desired.appId }))
-        .pipe(Effect.andThen(startInstance(desired)))
+        .pipe(Effect.andThen(attemptStartInstance(desired)))
         .pipe(Effect.as('cold-boot' as const)),
     ),
     Effect.tapError((error) =>
-      AgentState.updateRecord({
-        appId: desired.appId,
-        change: (record) => ({ ...record, message: reportedMessage(error) }),
+      Effect.gen(function* () {
+        const latest = (yield* AgentState.snapshot).records.get(desired.appId);
+        if (
+          latest &&
+          latest.deploymentId === desired.deploymentId &&
+          latest.desiredRunning &&
+          latest.state !== 'stopped'
+        ) {
+          yield* AgentState.updateRecord({
+            appId: desired.appId,
+            change: (current) => ({ ...current, stopRequested: false }),
+          });
+          yield* recordVmFailure({
+            record: { ...latest, stopRequested: false },
+            failure: { kind: 'boot', retryable: true, message: reportedMessage(error) },
+            nowMs: yield* Clock.currentTimeMillis,
+          });
+        }
       }),
     ),
   );
 });
+
+export function resumeInstance(desired: DesiredInstance) {
+  return withStartClaim({
+    appId: desired.appId,
+    effect: attemptResumeInstance(desired),
+    skipped: 'recovering' as const,
+  });
+}
 
 /** Only a failure has anything to say: every other state is its own account of itself. */
 const verdict = Effect.fn('verdict')(function* ({
@@ -562,18 +623,91 @@ const verdict = Effect.fn('verdict')(function* ({
   }
   // Only a VM that stopped has left a console to read, and only one this agent started has a run
   // to bound that read to.
-  const guestVerdict =
+  const consoleFailure =
     status.active || record.startedAt === undefined
       ? undefined
-      : yield* Systemd.guestVerdict({ appId: record.appId, sinceMs: Date.parse(record.startedAt) });
-  return describeInstanceFailure({
-    unit: status,
-    tracker: health,
-    healthCheck: record.healthCheck,
-    httpPort: record.httpPort,
-    ...(guestVerdict !== undefined ? { guestVerdict } : {}),
-  });
+      : yield* Systemd.failure({ appId: record.appId, sinceMs: Date.parse(record.startedAt) });
+  if (consoleFailure) {
+    return consoleFailure;
+  }
+  return {
+    kind: status.active ? 'health' : 'unexpected-exit',
+    retryable: !status.active,
+    message: describeInstanceFailure({
+      unit: status,
+      tracker: health,
+      healthCheck: record.healthCheck,
+      httpPort: record.httpPort,
+    }),
+  } satisfies VmFailure;
 });
+
+function recordVmFailure({
+  record,
+  failure,
+  nowMs,
+}: {
+  record: InstanceRecord;
+  failure: VmFailure;
+  nowMs: number;
+}) {
+  return Effect.gen(function* () {
+    const recovery = afterVmFailure({ recovery: record.recovery, failure, nowMs });
+    const retry = recovery.nextAttemptAtMs !== undefined;
+    let applied = false;
+    yield* AgentState.modify((current) => {
+      const latest = current.records.get(record.appId);
+      if (
+        !latest ||
+        latest.deploymentId !== record.deploymentId ||
+        latest.state !== record.state ||
+        latest.startedAt !== record.startedAt ||
+        latest.stopRequested !== record.stopRequested ||
+        !latest.desiredRunning ||
+        latest.stopRequested ||
+        (failure.kind !== 'boot' && current.starting.has(record.appId))
+      ) {
+        return current;
+      }
+      applied = true;
+      return {
+        ...current,
+        deferredWork: current.deferredWork || retry,
+        records: new Map(current.records).set(record.appId, {
+          ...latest,
+          recovery,
+          lastExitCode: record.lastExitCode,
+          state: retry ? 'starting' : 'failed',
+          message: retry
+            ? `${failure.message}; retrying the microVM (${recovery.attempts + 1} of ${VM_RECOVERY_POLICY.maxRetries})`
+            : failure.message,
+        }),
+      };
+    });
+    if (!applied) {
+      return;
+    }
+    yield* (
+      retry
+        ? Effect.logWarning('microVM recovery scheduled')
+        : Effect.logError('microVM recovery stopped')
+    ).pipe(
+      Effect.annotateLogs({
+        appId: record.appId,
+        deploymentId: record.deploymentId,
+        failureKind: failure.kind,
+        failureReason: failure.message,
+        retryAttempts: recovery.attempts,
+        maxRetries: VM_RECOVERY_POLICY.maxRetries,
+        nextAttemptAtMs: recovery.nextAttemptAtMs,
+        exitCode: record.lastExitCode,
+        kvmReason: failure.kvmReason,
+        cpu: failure.cpu,
+      }),
+    );
+    yield* ReportSignal.raise;
+  });
+}
 
 function probed({ record, nowMs }: { record: InstanceRecord; nowMs: number }) {
   return Effect.gen(function* () {
@@ -621,6 +755,9 @@ function settle({
   nowMs: number;
 }) {
   return Effect.gen(function* () {
+    if (isAwaitingRecovery(record)) {
+      return;
+    }
     const health = status.active && due ? yield* probed({ record, nowMs }) : record.health;
     const state = evaluateInstanceState({
       unit: status,
@@ -633,27 +770,52 @@ function settle({
       ...graceInputs({ record, nowMs }),
     });
 
+    const recovery = record.desiredRunning
+      ? afterVmHealth({
+          recovery: record.recovery,
+          healthy: state === 'running' && health.consecutiveFailures === 0,
+          nowMs,
+        })
+      : undefined;
+    if (shouldRecover({ record, state, snapshotting })) {
+      const failure = yield* verdict({ state, status, health, record });
+      if (failure) {
+        return yield* recordVmFailure({
+          record: { ...record, lastExitCode: status.exitCode },
+          failure,
+          nowMs,
+        });
+      }
+    }
     if (state === record.state) {
       return yield* AgentState.updateRecord({
         appId: record.appId,
         change: (latest) =>
-          latest.deploymentId === record.deploymentId ? { ...latest, health } : latest,
+          latest.deploymentId === record.deploymentId &&
+          latest.startedAt === record.startedAt &&
+          latest.state === record.state &&
+          latest.stopRequested === record.stopRequested
+            ? { ...latest, health, recovery }
+            : latest,
       });
     }
 
     // Cleared as readily as it is written: a message outliving the state it explains is
     // read as an account of the state that replaced it.
-    const message = yield* verdict({ state, status, health, record });
+    const failure = yield* verdict({ state, status, health, record });
+    const message = failure?.message;
     yield* AgentState.updateRecord({
       appId: record.appId,
       change: (latest) =>
         latest.deploymentId !== record.deploymentId ||
         latest.state !== record.state ||
+        latest.startedAt !== record.startedAt ||
         latest.stopRequested !== record.stopRequested
           ? latest
           : {
               ...latest,
               health,
+              recovery,
               state,
               ...(status.exitCode !== undefined && !status.active
                 ? { lastExitCode: status.exitCode }
@@ -669,8 +831,50 @@ function settle({
         ...answeredAfter({ record, state, atMs: yield* Clock.currentTimeMillis }),
       }),
     );
+    yield* logVmRecovery({ record, state });
     yield* ReportSignal.raise;
   });
+}
+
+function isAwaitingRecovery(record: InstanceRecord): boolean {
+  return (
+    (record.recovery?.nextAttemptAtMs !== undefined || record.state === 'failed') &&
+    record.desiredRunning &&
+    !record.stopRequested
+  );
+}
+
+function shouldRecover({
+  record,
+  state,
+  snapshotting,
+}: {
+  record: InstanceRecord;
+  state: InstanceState;
+  snapshotting: boolean;
+}): boolean {
+  return (
+    state === 'failed' &&
+    record.state !== 'failed' &&
+    record.desiredRunning &&
+    !record.stopRequested &&
+    !snapshotting
+  );
+}
+
+function logVmRecovery({ record, state }: { record: InstanceRecord; state: InstanceState }) {
+  if (state !== 'running' || !record.recovery?.failure) {
+    return Effect.void;
+  }
+  return Effect.logInfo('microVM recovered').pipe(
+    Effect.annotateLogs({
+      appId: record.appId,
+      deploymentId: record.deploymentId,
+      retryAttempts: record.recovery.attempts,
+      failureKind: record.recovery.failure.kind,
+      failureReason: record.recovery.failure.message,
+    }),
+  );
 }
 
 /**
@@ -694,7 +898,7 @@ export const refreshStates = Effect.gen(function* () {
   const nowMs = yield* Clock.currentTimeMillis;
 
   yield* Effect.forEach(
-    [...current.records.values()],
+    [...current.records.values()].filter((record) => !current.starting.has(record.appId)),
     (record) =>
       settle({
         record,

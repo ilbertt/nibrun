@@ -15,6 +15,7 @@ import { AgentState } from '#services/agent-state.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { RefreshSignal } from '#services/refresh-signal.service.ts';
+import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 
@@ -249,6 +250,7 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
     CommandRunner.Default,
     DesiredStateCache.Default,
     RefreshSignal.Default,
+    ReportSignal.Default,
     SlotAllocator.Default,
     VmManager.Default,
   ],

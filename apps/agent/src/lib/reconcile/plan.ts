@@ -19,8 +19,10 @@ export type ObservedInstance = {
   readonly deploymentId?: DeploymentId;
   readonly present: boolean;
   readonly running: boolean;
-  /** Stopped without being asked to: left alone, because rebooting would hide a broken deploy. */
+  /** Recovery is admitted separately from the exit itself. */
   readonly exited: boolean;
+  readonly recoveryRequested?: boolean;
+  readonly terminalFailure?: boolean;
 };
 
 export type ObservedVolume = {
@@ -113,11 +115,13 @@ export type ReconcilePlan = {
 };
 
 /**
- * A blocked teardown converges on a later pass, and nothing else would run one: only desired
- * state moving triggers a reconcile, and deferred work does not move it.
+ * Delayed starts and blocked teardowns need another pass even when desired state is unchanged.
  */
 export function hasDeferredWork(plan: ReconcilePlan): boolean {
-  return plan.volumes.some((action) => action.action === 'blocked');
+  return (
+    plan.volumes.some((action) => action.action === 'blocked') ||
+    plan.instances.some((action) => action.action === 'start' || action.action === 'replace')
+  );
 }
 
 const byId = <Item, Key extends string>({
@@ -165,25 +169,20 @@ function planInstance({
   // one moment an owner is watching and the only one where the health check runs at all — an app
   // first booted by a visitor reports a broken binary to them. Sleep is what a release that has
   // already had its microVM does between requests.
-  if (wanted.desiredState === 'on-request') {
-    if (!current?.present) {
-      return { action: 'start', desired: wanted };
-    }
-    if (current.deploymentId !== wanted.deploymentId) {
-      return { action: 'replace', desired: wanted };
-    }
-    return current.running
-      ? { action: 'none', appId: wanted.appId }
-      : { action: 'sleep', desired: wanted };
-  }
   if (!current?.present) {
     return { action: 'start', desired: wanted };
   }
   if (current.deploymentId !== wanted.deploymentId) {
     return { action: 'replace', desired: wanted };
   }
-  if (current.running) {
+  if (current.running || current.terminalFailure) {
     return { action: 'none', appId: wanted.appId };
+  }
+  if (current.recoveryRequested) {
+    return { action: 'start', desired: wanted };
+  }
+  if (wanted.desiredState === 'on-request') {
+    return { action: 'sleep', desired: wanted };
   }
   return current.exited
     ? { action: 'none', appId: wanted.appId }

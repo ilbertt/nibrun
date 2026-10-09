@@ -1038,8 +1038,8 @@ export interface IUpdateTrustedWorkflowResult {
     environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
 }
 
-/** Result of query `DeleteTrustedWorkflow`. */
-export interface IDeleteTrustedWorkflowResult {
+/** Result of query `SoftDeleteTrustedWorkflow`. */
+export interface ISoftDeleteTrustedWorkflowResult {
     id: IGithubTrustedDeploymentWorkflowsColumns["id"];
 }
 
@@ -1139,7 +1139,7 @@ export interface Queries {
     SelectTrustedWorkflow: ISelectTrustedWorkflowResult;
     InsertTrustedWorkflow: IInsertTrustedWorkflowResult;
     UpdateTrustedWorkflow: IUpdateTrustedWorkflowResult;
-    DeleteTrustedWorkflow: IDeleteTrustedWorkflowResult;
+    SoftDeleteTrustedWorkflow: ISoftDeleteTrustedWorkflowResult;
 }
 
 /** Columns of `account`. */
@@ -1745,6 +1745,7 @@ export interface IGithubTrustedDeploymentWorkflowsColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
+    deleted_at: Date | null;
 }
 
 /** Schema of `github_trusted_deployment_workflows`. */
@@ -2433,15 +2434,15 @@ export const schema = {
             branch: { _columnName: "branch", _foreignKeys: {} },
             environment: { _columnName: "environment", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            deleted_at: { _columnName: "deleted_at", _foreignKeys: {} }
         },
         _indexes: {
-            github_trusted_deployment_workflows_app_id_key: { _indexName: "github_trusted_deployment_workflows_app_id_key" },
+            github_trusted_deployment_workflows_live_app_idx: { _indexName: "github_trusted_deployment_workflows_live_app_idx" },
             github_trusted_deployment_workflows_pkey: { _indexName: "github_trusted_deployment_workflows_pkey" }
         },
         _constraints: {
             github_trusted_deployment_workflows_app_id_fkey: { _constraintName: "github_trusted_deployment_workflows_app_id_fkey" },
-            github_trusted_deployment_workflows_app_id_key: { _constraintName: "github_trusted_deployment_workflows_app_id_key" },
             github_trusted_deployment_workflows_pkey: { _constraintName: "github_trusted_deployment_workflows_pkey" }
         }
     },
