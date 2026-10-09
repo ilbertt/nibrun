@@ -59,6 +59,7 @@
     "apps/dashboard": {
       "name": "@repo/dashboard",
       "dependencies": {
+        "@better-auth/api-key": "catalog:",
         "@better-auth/core": "1.7.2",
         "@repo/analytics": "workspace:*",
         "@repo/api-client": "workspace:*",

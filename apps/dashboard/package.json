@@ -34,7 +34,8 @@
     "react-dom": "catalog:",
     "sonner": "catalog:",
     "tailwindcss": "catalog:",
-    "@repo/sqlite-explorer": "workspace:*"
+    "@repo/sqlite-explorer": "workspace:*",
+    "@better-auth/api-key": "catalog:"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
