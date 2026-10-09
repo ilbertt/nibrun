@@ -75,25 +75,6 @@ curl -fsSL https://nibrun.com/install.sh | sh
 nib run ./my-server
 ```
 
-**Deploy from GitHub Actions**
-
-Create a key from **Account → API keys** in the dashboard, select the apps it can deploy to, and save it as a
-[GitHub Actions secret](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)
-named `NIBRUN_API_KEY`. After your workflow builds a Linux x86_64 binary, add:
-
-```yaml
-- name: Install nib
-  run: curl -fsSL https://nibrun.com/install.sh | sh
-- name: Deploy
-  env:
-    NIBRUN_API_KEY: ${{ secrets.NIBRUN_API_KEY }}
-  run: $HOME/.local/bin/nib run ./my-server --app my-app
-```
-
-`--app` redeploys an existing app by name or slug. Create the app first through the dashboard or
-with `nib login` followed by `nib run ./my-server --name my-app`.
-The key takes precedence over a saved CLI login and can manage one or more selected apps.
-
 ## Take it with you
 
 ```sh
