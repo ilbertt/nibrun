@@ -23,7 +23,7 @@ export class GitHubActionsOidcService extends Service {
   async verify({ token }: { token: string }): Promise<GitHubActionsOidcClaims> {
     try {
       const repository = this.repository;
-      const { payload } = await jwtVerify(
+      const { payload: claims } = await jwtVerify(
         token,
         // biome-ignore lint/complexity/useMaxParams: jose passes the header and signed token separately.
         function signingKey(protectedHeader: JWSHeaderParameters, signedToken: FlattenedJWSInput) {
@@ -36,10 +36,9 @@ export class GitHubActionsOidcService extends Service {
           requiredClaims: GitHubActionsOidcClaimsSchema.required,
         },
       );
-      Value.Assert(GitHubActionsOidcClaimsSchema, payload);
-      const claims = payload;
+      Value.Assert(GitHubActionsOidcClaimsSchema, claims);
       const now = Math.floor(Date.now() / MS_PER_SECOND);
-      if (claims.iat > now || claims.exp <= claims.iat || claims.exp <= claims.nbf) {
+      if (claims.iat > now) {
         throw new UnauthorizedError();
       }
       return claims;
