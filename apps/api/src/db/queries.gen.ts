@@ -1013,14 +1013,25 @@ export interface IDeleteSqliteConnectionResult {
 
 /** Result of query `SelectTrustedWorkflow`. */
 export interface ISelectTrustedWorkflowResult {
+    id: IGithubTrustedDeploymentWorkflowsColumns["id"];
     repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
     workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
     branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
     environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
 }
 
-/** Result of query `UpsertTrustedWorkflow`. */
-export interface IUpsertTrustedWorkflowResult {
+/** Result of query `InsertTrustedWorkflow`. */
+export interface IInsertTrustedWorkflowResult {
+    id: IGithubTrustedDeploymentWorkflowsColumns["id"];
+    repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
+    workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
+    branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
+    environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
+}
+
+/** Result of query `UpdateTrustedWorkflow`. */
+export interface IUpdateTrustedWorkflowResult {
+    id: IGithubTrustedDeploymentWorkflowsColumns["id"];
     repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
     workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
     branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
@@ -1126,7 +1137,8 @@ export interface Queries {
     SelectSqliteConnectionById: ISelectSqliteConnectionByIdResult;
     DeleteSqliteConnection: IDeleteSqliteConnectionResult;
     SelectTrustedWorkflow: ISelectTrustedWorkflowResult;
-    UpsertTrustedWorkflow: IUpsertTrustedWorkflowResult;
+    InsertTrustedWorkflow: IInsertTrustedWorkflowResult;
+    UpdateTrustedWorkflow: IUpdateTrustedWorkflowResult;
     DeleteTrustedWorkflow: IDeleteTrustedWorkflowResult;
 }
 
@@ -1724,7 +1736,7 @@ export interface IFinishableDeletionsTable {
 
 /** Columns of `github_trusted_deployment_workflows`. */
 export interface IGithubTrustedDeploymentWorkflowsColumns {
-    id: string;
+    id: import("#lib/api/identifiers.ts").TrustedWorkflowId;
     app_id: import("@repo/protocol").AppId;
     repository: string;
     workflow: string;

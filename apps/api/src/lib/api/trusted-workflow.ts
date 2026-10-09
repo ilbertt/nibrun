@@ -1,4 +1,5 @@
 import { type Static, Type } from '@sinclair/typebox';
+import { TrustedWorkflowIdSchema } from '#lib/api/identifiers.ts';
 
 const REPOSITORY_PATTERN =
   '^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?/[a-zA-Z0-9_-][a-zA-Z0-9._-]*$';
@@ -24,3 +25,10 @@ export const TrustedWorkflowSchema = Type.Object(
 );
 
 export type TrustedWorkflow = Static<typeof TrustedWorkflowSchema>;
+
+export const TrustedWorkflowResourceSchema = Type.Object(
+  { id: TrustedWorkflowIdSchema, ...TrustedWorkflowSchema.properties },
+  { additionalProperties: false },
+);
+
+export type TrustedWorkflowResource = Static<typeof TrustedWorkflowResourceSchema>;

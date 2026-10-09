@@ -1,7 +1,7 @@
 import { AppIdSchema } from '@repo/protocol';
 import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
-import { Elysia, StatusMap, t } from 'elysia';
+import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { Identity } from '#lib/auth/plugin.ts';
 import {
@@ -24,28 +24,18 @@ export const AppsAppIdTrustedWorkflowController = new Elysia()
     },
     { response: publicSchema(TrustedWorkflowResponseSchema) },
   )
-  .put(
+  .post(
     '/apps/:appId/trusted-workflow',
-    function saveTrustedWorkflow({ trustedWorkflowsService, params, user, body }) {
-      return trustedWorkflowsService.save({
+    async function createTrustedWorkflow({ trustedWorkflowsService, params, user, body, status }) {
+      const workflow = await trustedWorkflowsService.create({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         workflow: Value.Parse(SaveTrustedWorkflowRequestSchema, body),
       });
+      return status(StatusMap.Created, workflow);
     },
     {
       body: publicSchema(SaveTrustedWorkflowRequestSchema),
-      response: publicSchema(TrustedWorkflowResponseSchema),
+      response: { [StatusMap.Created]: publicSchema(TrustedWorkflowResponseSchema) },
     },
-  )
-  .delete(
-    '/apps/:appId/trusted-workflow',
-    async function removeTrustedWorkflow({ trustedWorkflowsService, params, user, status }) {
-      await trustedWorkflowsService.remove({
-        appId: Value.Parse(AppIdSchema, params.appId),
-        ownerId: Value.Parse(OwnerIdSchema, user.id),
-      });
-      return status(StatusMap['No Content'], undefined);
-    },
-    { response: { [StatusMap['No Content']]: t.Void() } },
   );

@@ -1,4 +1,4 @@
-import { TrustedWorkflowSchema } from '#lib/api/trusted-workflow.ts';
+import { TrustedWorkflowResourceSchema, TrustedWorkflowSchema } from '#lib/api/trusted-workflow.ts';
 
 export const SaveTrustedWorkflowRequestSchema = TrustedWorkflowSchema;
-export const TrustedWorkflowResponseSchema = TrustedWorkflowSchema;
+export const TrustedWorkflowResponseSchema = TrustedWorkflowResourceSchema;

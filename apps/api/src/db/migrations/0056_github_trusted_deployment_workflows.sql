@@ -9,6 +9,7 @@ CREATE TABLE nibrun.github_trusted_deployment_workflows (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+COMMENT ON COLUMN nibrun.github_trusted_deployment_workflows.id IS $c$@type import('#lib/api/identifiers.ts').TrustedWorkflowId$c$;
 COMMENT ON COLUMN nibrun.github_trusted_deployment_workflows.app_id IS $c$@type import('@repo/protocol').AppId$c$;
 COMMENT ON COLUMN nibrun.github_trusted_deployment_workflows.created_at IS 'Derived from the uuidv7 id; the moment the row was created. @notNull';
 
