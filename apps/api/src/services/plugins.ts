@@ -19,6 +19,7 @@ import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { BinarySourceRepository } from '#repositories/binary-source.repository.ts';
 import { CachedBinariesRepository } from '#repositories/cached-binaries.repository.ts';
 import { CustomHostnamesRepository } from '#repositories/custom-hostnames.repository.ts';
+import { DeployKeysRepository } from '#repositories/deploy-keys.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { DnsRepository } from '#repositories/dns.repository.ts';
 import { ExportStorageRepository } from '#repositories/export-storage.repository.ts';
@@ -35,6 +36,7 @@ import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
 import { CronsService } from '#services/crons.service.ts';
+import { DeployKeysService } from '#services/deploy-keys.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
 import { DomainDnsService } from '#services/domain-dns.service.ts';
 import { ExportsService } from '#services/exports.service.ts';
@@ -75,6 +77,7 @@ const appsRepository = new AppsRepository(sql);
 const appHostnamesRepository = new AppHostnamesRepository(sql);
 const artifactsRepository = new ArtifactsRepository(sql);
 const deploymentsRepository = new DeploymentsRepository(sql);
+const deployKeysRepository = new DeployKeysRepository(sql);
 const artifactStorageRepository = new ArtifactStorageRepository({
   client: artifactsS3,
   signer: uploadSigner,
@@ -103,6 +106,10 @@ const trustedWorkflowsService = new TrustedWorkflowsService({
 });
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
+const deployKeysService = new DeployKeysService({
+  keysRepo: deployKeysRepository,
+  appsRepo: appsRepository,
+});
 const appsService = new AppsService({
   appsRepo: appsRepository,
   hostnamesRepo: appHostnamesRepository,
@@ -220,6 +227,11 @@ export const ArtifactsServicePlugin = new Elysia({ name: 'service.artifacts' }).
 export const DeploymentsServicePlugin = new Elysia({ name: 'service.deployments' }).decorate(
   'deploymentsService',
   deploymentsService,
+);
+
+export const DeployKeysServicePlugin = new Elysia({ name: 'service.deployKeys' }).decorate(
+  'deployKeysService',
+  deployKeysService,
 );
 
 export const LogsServicePlugin = new Elysia({ name: 'service.logs' }).decorate(

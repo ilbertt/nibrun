@@ -3,6 +3,8 @@ import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { AppsAppIdArtifactsArtifactIdController } from '#routes/api/apps/[appId]/artifacts/[artifactId]/controller.ts';
 import { AppsAppIdArtifactsController } from '#routes/api/apps/[appId]/artifacts/controller.ts';
 import { AppsAppIdController } from '#routes/api/apps/[appId]/controller.ts';
+import { AppsAppIdDeployKeysDeployKeyIdController } from '#routes/api/apps/[appId]/deploy-keys/[deployKeyId]/controller.ts';
+import { AppsAppIdDeployKeysController } from '#routes/api/apps/[appId]/deploy-keys/controller.ts';
 import { AppsAppIdDeploymentsDeploymentIdController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/controller.ts';
 import { AppsAppIdDeploymentsDeploymentIdCronsController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/crons/controller.ts';
 import { AppsAppIdDeploymentsDeploymentIdFilesystemController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/controller.ts';
@@ -30,6 +32,8 @@ export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(HealthController)
   .use(AppsController)
   .use(AppsAppIdController)
+  .use(AppsAppIdDeployKeysController)
+  .use(AppsAppIdDeployKeysDeployKeyIdController)
   .use(AppsAppIdArtifactsController)
   .use(AppsAppIdArtifactsArtifactIdController)
   .use(AppsAppIdDeploymentsController)
