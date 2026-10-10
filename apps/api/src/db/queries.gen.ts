@@ -425,6 +425,10 @@ export interface ISelectImportKeysByAppResult {
 export interface IDeleteExportsByAppResult {
 }
 
+/** Result of query `DeleteDeployKeysByApp`. */
+export interface IDeleteDeployKeysByAppResult {
+}
+
 /** Result of query `DeleteDeploymentsByApp`. */
 export interface IDeleteDeploymentsByAppResult {
 }
@@ -1079,6 +1083,7 @@ export interface Queries {
     SelectExportKeysByApp: ISelectExportKeysByAppResult;
     SelectImportKeysByApp: ISelectImportKeysByAppResult;
     DeleteExportsByApp: IDeleteExportsByAppResult;
+    DeleteDeployKeysByApp: IDeleteDeployKeysByAppResult;
     DeleteDeploymentsByApp: IDeleteDeploymentsByAppResult;
     DeleteImportsByApp: IDeleteImportsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
@@ -1497,6 +1502,26 @@ export interface ICachedBinariesTable {
     relationType: (typeof schema)["cached_binaries"]["_relationType"];
     indexes: keyof (typeof schema)["cached_binaries"]["_indexes"];
     constraints: keyof (typeof schema)["cached_binaries"]["_constraints"];
+}
+
+/** Columns of `deploy_keys`. */
+export interface IDeployKeysColumns {
+    id: import("#lib/api/identifiers.ts").DeployKeyId;
+    app_id: import("@repo/protocol").AppId;
+    name: string;
+    /** Canonical OpenSSH public key without a comment or authorized_keys options. */
+    public_key: string;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+}
+
+/** Schema of `deploy_keys`. */
+export interface IDeployKeysTable {
+    columns: IDeployKeysColumns;
+    relationType: (typeof schema)["deploy_keys"]["_relationType"];
+    indexes: keyof (typeof schema)["deploy_keys"]["_indexes"];
+    constraints: keyof (typeof schema)["deploy_keys"]["_constraints"];
 }
 
 /** Columns of `deployments`. */
@@ -2227,6 +2252,27 @@ export const schema = {
         _indexes: {},
         _constraints: {}
     },
+    deploy_keys: {
+        _relationName: "deploy_keys",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { deploy_keys_app_id_fkey: { _constraintName: "deploy_keys_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            name: { _columnName: "name", _foreignKeys: {} },
+            public_key: { _columnName: "public_key", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+        },
+        _indexes: {
+            deploy_keys_app_public_key_key: { _indexName: "deploy_keys_app_public_key_key" },
+            deploy_keys_pkey: { _indexName: "deploy_keys_pkey" }
+        },
+        _constraints: {
+            deploy_keys_app_id_fkey: { _constraintName: "deploy_keys_app_id_fkey" },
+            deploy_keys_app_public_key_key: { _constraintName: "deploy_keys_app_public_key_key" },
+            deploy_keys_pkey: { _constraintName: "deploy_keys_pkey" }
+        }
+    },
     deployments: {
         _relationName: "deployments",
         _relationType: "table",
@@ -2556,6 +2602,7 @@ export interface Tables {
     apps: IAppsTable;
     artifacts: IArtifactsTable;
     cached_binaries: ICachedBinariesTable;
+    deploy_keys: IDeployKeysTable;
     deployments: IDeploymentsTable;
     desired_deployments: IDesiredDeploymentsTable;
     desired_environment: IDesiredEnvironmentTable;
