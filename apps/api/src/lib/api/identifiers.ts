@@ -22,3 +22,8 @@ export type TrustedWorkflowId = Identifier<'TrustedWorkflowId'>;
 export const TrustedWorkflowIdSchema = identifierSchema<TrustedWorkflowId>(
   'One trusted GitHub deployment workflow.',
 );
+
+export type DeploymentGrantId = Identifier<'DeploymentGrantId'>;
+export const DeploymentGrantIdSchema = identifierSchema<DeploymentGrantId>(
+  'One short-lived deployment authorization.',
+);
