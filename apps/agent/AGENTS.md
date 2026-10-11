@@ -129,6 +129,19 @@ Owned by `infra/app-host/`, not fixable here.
   request — and nothing collects them, so they go nowhere. Where they are exported to is a
   deployment decision, not one the binary should hold.
 
+## Host memory admission
+
+`HostMemory` owns Linux memory accounting and serializes all VM starts and restores. Its storage
+reserve covers the total ZeroFS process, rather than treating `[cache].memory_size_gb` as a process
+limit. `AGENT_ZEROFS_MEMORY_RESERVE_MIB` defaults to 6144 MiB after the October 11 storage OOM;
+reserve another 1024 MiB for host services. Size the app host for these reserves plus all running
+guests before deploying. The current 8 GiB host cannot carry its existing workload under this budget.
+
+Missing or invalid `/proc/meminfo`, ZeroFS cgroup accounting, or cache configuration defers starts.
+A memory deferral preserves the VM recovery budget and stays retryable. Logs record host memory
+and the ZeroFS cgroup footprint at most every 30 seconds; heap profiling and storage failure tests
+are still needed to diagnose storage growth and validate changing the VM's `BindsTo` dependency.
+
 ## What is not tested
 
 Everything that needs a hypervisor, a Linux kernel or AWS — this was written on macOS with no AWS

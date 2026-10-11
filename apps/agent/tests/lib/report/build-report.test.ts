@@ -227,6 +227,7 @@ describe('allocatable capacity', () => {
         capacity: HOST_CAPACITY,
         committed: BOOTED,
         availableCacheBytes: FREE_CACHE_BYTES,
+        availableMemoryMib: Number.MAX_SAFE_INTEGER,
       }),
     ).toEqual({
       vcpuCount: HOST_VCPUS - RESOURCES_FIXTURE.vcpuCount * BOOTED.length,
@@ -261,6 +262,7 @@ describe('allocatable capacity', () => {
         capacity: RESOURCES_FIXTURE_AS_CAPACITY,
         committed: [HOST_CAPACITY],
         availableCacheBytes: FREE_CACHE_BYTES,
+        availableMemoryMib: Number.MAX_SAFE_INTEGER,
       }),
     ).toEqual({ vcpuCount: 0, memoryMib: 0, cacheBytes: FREE_CACHE_BYTES });
   });

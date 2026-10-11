@@ -23,6 +23,7 @@ import { ExportUploader } from '#services/export-uploader.service.ts';
 import { FilesystemReader } from '#services/filesystem-reader.service.ts';
 import { GuestActivity } from '#services/guest-activity.service.ts';
 import { HostFirewall } from '#services/host-firewall.service.ts';
+import { HostMemory } from '#services/host-memory.service.ts';
 import { LogStore } from '#services/log-store.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
 import { RefreshSignal } from '#services/refresh-signal.service.ts';
@@ -44,6 +45,7 @@ const platform = Layer.mergeAll(BunContext.layer, FetchHttpClient.layer);
  */
 const agent = Layer.mergeAll(
   AgentConfig.Default,
+  HostMemory.Default,
   AgentState.Default,
   ReportSignal.Default,
   RefreshSignal.Default,

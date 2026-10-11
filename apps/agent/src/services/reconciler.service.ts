@@ -25,6 +25,7 @@ import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { CronExecutions } from '#services/cron-executions.service.ts';
 import { CronRegistry } from '#services/cron-registry.service.ts';
+import { HostMemory } from '#services/host-memory.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
@@ -315,6 +316,7 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
   }),
   dependencies: [
     AgentConfig.Default,
+    HostMemory.Default,
     SlotAllocator.Default,
     VolumeManager.Default,
     VmManager.Default,

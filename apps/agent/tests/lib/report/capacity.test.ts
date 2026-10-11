@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { AppIdSchema, type InstanceState } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { committedResources, guestMemoryMib, memoryShortfallMib } from '#lib/report/capacity.ts';
+import { committedResources, memoryShortfallMib } from '#lib/report/capacity.ts';
+import { guestMemoryMib, HOST_MEMORY_POLICY } from '#lib/report/memory.ts';
 import { instanceRecord, RESOURCES_FIXTURE } from '#tests/support/fixtures.ts';
+import { HOST_MEMORY_SAMPLE } from '#tests/support/memory.ts';
 
 const APP_MEMORY_MIB = RESOURCES_FIXTURE.memoryMib;
 const NEIGHBOURS_THAT_FIT = 3;
@@ -20,6 +22,7 @@ function neighbours({ count, state }: { count: number; state: InstanceState }) {
 function shortfall({ count, state }: { count: number; state: InstanceState }) {
   return memoryShortfallMib({
     hostMemoryMib: HOST_MEMORY_MIB,
+    availableMemoryMib: Number.MAX_SAFE_INTEGER,
     committed: committedResources(neighbours({ count, state })),
     wanted: RESOURCES_FIXTURE,
   });
@@ -53,9 +56,8 @@ describe('a host has room for one more microVM until it does not', () => {
 const A_GIB_IN_MIB = 1024;
 /** What an m8id.large reports once the kernel has taken its own share of the 8 GiB it is sold as. */
 const HOST_MIB = 7779;
-const ZEROFS_CACHE_MIB = 2 * A_GIB_IN_MIB;
-/** `HOST_BASELINE_MIB`, restated so that moving it has to be a deliberate edit in two places. */
-const HOST_BASELINE_MIB = 640;
+const ZEROFS_RESERVE_MIB = HOST_MEMORY_POLICY.zerofsReserveMib;
+const HOST_BASELINE_MIB = HOST_MEMORY_POLICY.baselineMib;
 
 /**
  * The host's own needs come off the top before anything is placed. Reporting the whole of an
@@ -64,17 +66,20 @@ const HOST_BASELINE_MIB = 640;
  * picks instead.
  */
 describe('memory the host needs is not memory a guest may be given', () => {
-  test('what is left is the total less what ZeroFS will grow into, less the host itself', () => {
-    expect(guestMemoryMib({ hostMemoryMib: HOST_MIB, zerofsCacheMib: ZEROFS_CACHE_MIB })).toBe(
-      HOST_MIB - ZEROFS_CACHE_MIB - HOST_BASELINE_MIB,
+  test('what is left is the total less the ZeroFS process reserve, less the host itself', () => {
+    expect(guestMemoryMib({ hostMemoryMib: HOST_MIB, zerofsReserveMib: ZEROFS_RESERVE_MIB })).toBe(
+      HOST_MIB - ZEROFS_RESERVE_MIB - HOST_BASELINE_MIB,
     );
   });
 
-  test('a bigger ZeroFS cache is memory the guests do not get', () => {
-    const roomier = guestMemoryMib({ hostMemoryMib: HOST_MIB, zerofsCacheMib: ZEROFS_CACHE_MIB });
+  test('a bigger ZeroFS process reserve is memory the guests do not get', () => {
+    const roomier = guestMemoryMib({
+      hostMemoryMib: HOST_MEMORY_SAMPLE.totalMib,
+      zerofsReserveMib: ZEROFS_RESERVE_MIB,
+    });
     const tighter = guestMemoryMib({
-      hostMemoryMib: HOST_MIB,
-      zerofsCacheMib: ZEROFS_CACHE_MIB + A_GIB_IN_MIB,
+      hostMemoryMib: HOST_MEMORY_SAMPLE.totalMib,
+      zerofsReserveMib: ZEROFS_RESERVE_MIB + A_GIB_IN_MIB,
     });
 
     expect(roomier - tighter).toBe(A_GIB_IN_MIB);
@@ -83,22 +88,38 @@ describe('memory the host needs is not memory a guest may be given', () => {
   // Floored rather than negative: an oversubscribed host is a fact to report, and a shortfall
   // computed against a negative total would read as room.
   test('a host too small for what is already spoken for offers nothing rather than less', () => {
-    expect(guestMemoryMib({ hostMemoryMib: 512, zerofsCacheMib: ZEROFS_CACHE_MIB })).toBe(0);
+    expect(guestMemoryMib({ hostMemoryMib: 512, zerofsReserveMib: ZEROFS_RESERVE_MIB })).toBe(0);
   });
 
   test('and it is the number a wake is refused on, so the two cannot drift apart', () => {
     const available = guestMemoryMib({
       hostMemoryMib: HOST_MIB,
-      zerofsCacheMib: ZEROFS_CACHE_MIB,
+      zerofsReserveMib: ZEROFS_RESERVE_MIB,
     });
     const fits = Math.floor(available / APP_MEMORY_MIB);
 
     expect(
       memoryShortfallMib({
         hostMemoryMib: available,
+        availableMemoryMib: Number.MAX_SAFE_INTEGER,
         committed: committedResources(neighbours({ count: fits, state: 'running' })),
         wanted: RESOURCES_FIXTURE,
       }),
     ).toBeGreaterThan(0);
   });
+});
+
+test('live headroom can refuse a VM that fits the nominal capacity', () => {
+  expect(
+    memoryShortfallMib({
+      hostMemoryMib: HOST_MEMORY_MIB,
+      availableMemoryMib: 0,
+      committed: [],
+      wanted: RESOURCES_FIXTURE,
+    }),
+  ).toBe(APP_MEMORY_MIB);
+});
+
+test('a boot deferred before it starts holds no guest memory', () => {
+  expect(committedResources([instanceRecord({ state: 'pending' })])).toEqual([]);
 });

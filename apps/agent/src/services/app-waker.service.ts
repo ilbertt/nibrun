@@ -1,19 +1,16 @@
 import type { HttpClient } from '@effect/platform';
-import type { AppId, DesiredInstance } from '@repo/protocol';
+import type { AppId } from '@repo/protocol';
 import { Clock, Data, Deferred, Duration, Effect, Option, Ref, Schedule } from 'effect';
 import { reportedMessage } from '#lib/failure.ts';
 import { probeInstance } from '#lib/health/probe.ts';
 import { resumeInstance } from '#lib/reconcile/instances.ts';
-import {
-  committedResources,
-  memoryShortfallMib,
-  readGuestMemoryMib,
-} from '#lib/report/capacity.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
+import type { HostHasNoRoom } from '#lib/report/memory.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
+import { HostMemory } from '#services/host-memory.service.ts';
 import { RefreshSignal } from '#services/refresh-signal.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -28,8 +25,6 @@ import { VmManager } from '#services/vm-manager.service.ts';
  */
 const PROBE_INTERVAL_MS = 5;
 const PROBE_INTERVAL = Duration.millis(PROBE_INTERVAL_MS);
-
-const NO_SHORTFALL = 0;
 
 /**
  * Everything waking a microVM touches, taken from where this service is built rather than left
@@ -54,25 +49,6 @@ export class WakeFailed extends Data.TaggedError('WakeFailed')<{
 }
 
 /**
- * Its own failure and not a `WakeFailed`, because it is not about this app at all: nothing is
- * wrong with it, and nothing it or its owner can do will make it start here.
- *
- * The alternative was to evict a neighbour, and it is not one. Evicting makes one tenant's
- * traffic a reason to take another tenant's app offline, and on a host that is already over its
- * memory every wake evicts somebody whose next visitor evicts somebody else — it never settles.
- * Refusing converges: the app stays down, its owner is told why, and the repair is to move it,
- * which is placement's to make and not something a request can bring about.
- */
-export class HostHasNoRoom extends Data.TaggedError('HostHasNoRoom')<{
-  readonly appId: AppId;
-  readonly shortfallMib: number;
-}> {
-  override get message() {
-    return `${this.appId} could not be woken: its host is ${this.shortfallMib} MiB short of the memory it needs`;
-  }
-}
-
-/**
  * Brings an `on-request` app's microVM back because something asked for it, and does not come
  * back until the guest is answering — the request that caused this is waiting on it.
  *
@@ -86,7 +62,6 @@ export class HostHasNoRoom extends Data.TaggedError('HostHasNoRoom')<{
  */
 export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
   effect: Effect.gen(function* () {
-    const config = yield* AgentConfig;
     const cache = yield* DesiredStateCache;
     const refresh = yield* RefreshSignal;
     const context = yield* Effect.context<WakeContext>();
@@ -122,25 +97,6 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
         Effect.asVoid,
       );
 
-    /**
-     * Whether this host can find the memory for one more microVM, asked of everything *else* it
-     * is holding: the app being woken is `idle`, so it commits nothing until it is up, and one
-     * that is somehow already running would otherwise be counted twice and refused its own room.
-     */
-    const refusalForRoom = Effect.fn('AppWaker.refusalForRoom')(function* (
-      wanted: DesiredInstance,
-    ) {
-      const others = (yield* AgentState.records).filter((record) => record.appId !== wanted.appId);
-      const shortfallMib = memoryShortfallMib({
-        hostMemoryMib: yield* readGuestMemoryMib(config.zerofsConfigFile),
-        committed: committedResources(others),
-        wanted: wanted.config.resources,
-      });
-      return shortfallMib > NO_SHORTFALL
-        ? new HostHasNoRoom({ appId: wanted.appId, shortfallMib })
-        : undefined;
-    });
-
     const boot = Effect.fn('AppWaker.boot')(function* ({
       appId,
       joined,
@@ -165,22 +121,14 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
         return yield* new WakeFailed({ appId, reason: 'the isolation ruleset is not applied' });
       }
 
-      const noRoom = yield* refusalForRoom(wanted);
-      if (noRoom) {
-        // The record is the only account of this its owner will ever see, and left to say nothing
-        // it reads as an app asleep between requests — which is the one thing it is not.
-        yield* AgentState.updateRecord({
-          appId,
-          change: (record) => ({ ...record, message: noRoom.message }),
-        });
-        return yield* noRoom;
-      }
-
-      // A slot table with nothing free is the one start failure a request can cause, and it is
-      // this host's problem rather than this app's — so it is said in the same breath as any
-      // other reason the microVM is not there.
       const outcome = yield* resumeInstance(wanted).pipe(
-        Effect.catchAll((error) => new WakeFailed({ appId, reason: reportedMessage(error) })),
+        Effect.catchAll((error) =>
+          Effect.fail(
+            error._tag === 'HostHasNoRoom'
+              ? error
+              : new WakeFailed({ appId, reason: reportedMessage(error) }),
+          ),
+        ),
       );
 
       const record = (yield* AgentState.snapshot).records.get(appId);
@@ -246,6 +194,7 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
   }),
   dependencies: [
     AgentConfig.Default,
+    HostMemory.Default,
     AgentState.Default,
     CommandRunner.Default,
     DesiredStateCache.Default,

@@ -2,6 +2,7 @@ import { ObjectKeySchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Layer } from 'effect';
 import { AgentConfig } from '#services/agent-config.service.ts';
+import { hostMemory } from '#tests/support/memory.ts';
 
 export const HOST_STORAGE_PREFIX = Value.Parse(ObjectKeySchema, 'filesystems/host-1');
 
@@ -14,6 +15,7 @@ export const AGENT_CONFIG = {
   zerofsMount: '/mnt/zerofs',
   zerofsNbdSocket: '/run/zerofs/nbd.sock',
   zerofsCheckpointRuntimeDir: '/run/zerofs-checkpoint',
+  zerofsMemoryReserveMib: 6144,
   zerofsBinary: '/opt/nibrun/bin/zerofs/zerofs',
   zerofsConfigFile: '/etc/zerofs/config.toml',
   artifactBucket: 'nibrun-artifacts',
@@ -22,5 +24,8 @@ export const AGENT_CONFIG = {
 } as const;
 
 export function agentConfig(overrides: Partial<AgentConfig> = {}) {
-  return Layer.succeed(AgentConfig, { ...AGENT_CONFIG, ...overrides } as unknown as AgentConfig);
+  return Layer.merge(
+    hostMemory(),
+    Layer.succeed(AgentConfig, { ...AGENT_CONFIG, ...overrides } as unknown as AgentConfig),
+  );
 }

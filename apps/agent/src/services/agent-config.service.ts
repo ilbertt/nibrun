@@ -2,6 +2,7 @@ import { Path } from '@effect/platform';
 import { type Ipv4Address, Ipv4AddressSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Config, Effect } from 'effect';
+import { HOST_MEMORY_POLICY } from '#lib/report/memory.ts';
 
 const DEFAULT_STATE_DIR = '/var/lib/nibrun';
 const DEFAULT_RUNTIME_DIR = '/run/nibrun';
@@ -119,6 +120,13 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
         name: 'AGENT_FIRECRACKER_DIR',
         fallback: DEFAULT_FIRECRACKER_DIR,
       }),
+      zerofsMemoryReserveMib: yield* Config.integer('AGENT_ZEROFS_MEMORY_RESERVE_MIB').pipe(
+        Config.withDefault(HOST_MEMORY_POLICY.zerofsReserveMib),
+        Config.validate({
+          message: 'ZeroFS memory reserve must be positive',
+          validation: (value) => value > 0,
+        }),
+      ),
       zerofsBinary: yield* optional({
         name: 'AGENT_ZEROFS_BINARY',
         fallback: DEFAULT_ZEROFS_BINARY,
