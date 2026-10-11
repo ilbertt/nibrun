@@ -15,6 +15,7 @@ export const AGENT_CONFIG = {
   zerofsMount: '/mnt/zerofs',
   zerofsNbdSocket: '/run/zerofs/nbd.sock',
   zerofsCheckpointRuntimeDir: '/run/zerofs-checkpoint',
+  zerofsMetricsUrl: 'http://127.0.0.1:9091/metrics',
   zerofsMemoryReserveMib: 6144,
   zerofsBinary: '/opt/nibrun/bin/zerofs/zerofs',
   zerofsConfigFile: '/etc/zerofs/config.toml',

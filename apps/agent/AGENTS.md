@@ -139,8 +139,11 @@ guests before deploying. The current 8 GiB host cannot carry its existing worklo
 
 Missing or invalid `/proc/meminfo`, ZeroFS cgroup accounting, or cache configuration defers starts.
 A memory deferral preserves the VM recovery budget and stays retryable. Logs record host memory
-and the ZeroFS cgroup footprint at most every 30 seconds; heap profiling and storage failure tests
-are still needed to diagnose storage growth and validate changing the VM's `BindsTo` dependency.
+and the ZeroFS cgroup footprint at most every 30 seconds. A separate bounded diagnostic read
+records process RSS, cgroup anonymous/file/kernel bytes and existing jemalloc/LSM counters from
+`AGENT_ZEROFS_METRICS_URL` (default `http://127.0.0.1:9091/metrics`). Missing diagnostics never
+change admission decisions. Jemalloc retained bytes describe virtual mappings, not resident RAM.
+Heap profiling and storage failure tests are still needed to diagnose storage growth and validate changing the VM's `BindsTo` dependency.
 
 ## What is not tested
 

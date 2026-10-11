@@ -1,6 +1,6 @@
 import { FileSystem } from '@effect/platform';
 import { Clock, Effect, Either, Ref } from 'effect';
-import { HOST_MEMORY_POLICY, readMemorySample } from '#lib/report/memory.ts';
+import { HOST_MEMORY_POLICY, readMemorySample, ZEROFS_CGROUP_PATH } from '#lib/report/memory.ts';
 import { readCacheMemoryBytes } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
@@ -14,9 +14,7 @@ export class HostMemory extends Effect.Service<HostMemory>()('HostMemory', {
       const result = yield* Effect.either(
         Effect.all({
           meminfo: fs.readFileString('/proc/meminfo'),
-          zerofsCurrentBytes: fs.readFileString(
-            '/sys/fs/cgroup/system.slice/nibrun-zerofs.service/memory.current',
-          ),
+          zerofsCurrentBytes: fs.readFileString(`${ZEROFS_CGROUP_PATH}/memory.current`),
           zerofsCacheBytes: readCacheMemoryBytes(config.zerofsConfigFile).pipe(
             Effect.provideService(FileSystem.FileSystem, fs),
           ),

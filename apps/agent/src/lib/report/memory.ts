@@ -1,6 +1,8 @@
 import type { AppId } from '@repo/protocol';
 import { Data } from 'effect';
 
+export const ZEROFS_CGROUP_PATH = '/sys/fs/cgroup/system.slice/nibrun-zerofs.service';
+
 export const HOST_MEMORY_POLICY = {
   baselineMib: 1024,
   // ZeroFS reached 5.46 GiB RSS with a 2 GB cache during the October 11 OOM.

@@ -120,6 +120,10 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
         name: 'AGENT_FIRECRACKER_DIR',
         fallback: DEFAULT_FIRECRACKER_DIR,
       }),
+      zerofsMetricsUrl: yield* optional({
+        name: 'AGENT_ZEROFS_METRICS_URL',
+        fallback: 'http://127.0.0.1:9091/metrics',
+      }),
       zerofsMemoryReserveMib: yield* Config.integer('AGENT_ZEROFS_MEMORY_RESERVE_MIB').pipe(
         Config.withDefault(HOST_MEMORY_POLICY.zerofsReserveMib),
         Config.validate({
