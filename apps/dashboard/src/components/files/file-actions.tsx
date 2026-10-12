@@ -24,16 +24,16 @@ export function FileActions({
             variant="ghost"
             size="icon-sm"
             aria-label={`Actions for ${entry.name}`}
-            disabled={sqlite.isPending || !sqlite.canCreate}
+            disabled={!sqlite.canOpen}
           />
         }
       >
         <EllipsisIcon />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto">
-        <DropdownMenuItem onClick={sqlite.create}>
+        <DropdownMenuItem onClick={sqlite.open}>
           <DatabaseIcon />
-          Mark as SQLite database
+          {sqlite.isDatabase ? 'Open SQLite database' : 'Query as SQLite'}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

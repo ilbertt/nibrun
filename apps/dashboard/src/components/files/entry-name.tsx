@@ -43,6 +43,23 @@ export function EntryName({
   }
 
   if (entry.kind !== 'directory') {
+    if (sqlite.isDatabase) {
+      return (
+        <span className="flex items-center gap-2">
+          <EntryIcon entry={entry} sqlite={sqlite} />
+          <button
+            type="button"
+            onClick={sqlite.open}
+            disabled={!sqlite.canOpen}
+            className="truncate text-left enabled:cursor-pointer enabled:hover:underline"
+            title={entry.name}
+            aria-label={`Open ${entry.name} in SQLite explorer (new tab)`}
+          >
+            {entry.name}
+          </button>
+        </span>
+      );
+    }
     return <span className="flex items-center gap-2">{name}</span>;
   }
 
