@@ -12,10 +12,9 @@ export const AppsAppIdArtifactsArtifactIdController = new Elysia()
   .use(loggerPlugin('appsAppIdArtifactsArtifactIdController'))
   .use(AuthPlugin)
   .use(ArtifactsServicePlugin)
-  .guard({ auth: Identity.Optional })
   .get(
     '/apps/:appId/artifacts/:artifactId',
-    async ({ artifactsService, params, user, status }) => {
+    async function getArtifact({ artifactsService, params, user, status }) {
       const artifact = await artifactsService.get({
         appId: Value.Parse(AppIdSchema, params.appId),
         artifactId: Value.Parse(ArtifactIdSchema, params.artifactId),
@@ -24,26 +23,37 @@ export const AppsAppIdArtifactsArtifactIdController = new Elysia()
       return status(StatusMap.OK, artifact);
     },
     {
+      auth: Identity.Optional,
       response: { [StatusMap.OK]: publicSchema(ArtifactSchema) },
     },
   )
   .patch(
     '/apps/:appId/artifacts/:artifactId',
-    async ({ artifactsService, params, body: bodyInput, user, status }) => {
+    async function reportArtifactUpload({
+      artifactsService,
+      params,
+      body: bodyInput,
+      deploymentAccess,
+      status,
+    }) {
       const body = Value.Parse(UpdateArtifactBodySchema, bodyInput);
       const appId = Value.Parse(AppIdSchema, params.appId);
       const artifactId = Value.Parse(ArtifactIdSchema, params.artifactId);
-      const ownerId = Value.Parse(OwnerIdSchema, user.id);
 
       if (body.upload === 'failed') {
-        await artifactsService.failUpload({ appId, artifactId, ownerId });
+        await artifactsService.failUpload({ appId, artifactId, ownerId: deploymentAccess.ownerId });
         return status(StatusMap['No Content'], undefined);
       }
 
-      const artifact = await artifactsService.completeUpload({ appId, artifactId, ownerId });
+      const artifact = await artifactsService.completeUpload({
+        appId,
+        artifactId,
+        ownerId: deploymentAccess.ownerId,
+      });
       return status(StatusMap.OK, artifact);
     },
     {
+      appDeploymentAuth: true,
       body: publicSchema(UpdateArtifactBodySchema),
       response: {
         [StatusMap.OK]: publicSchema(ArtifactSchema),

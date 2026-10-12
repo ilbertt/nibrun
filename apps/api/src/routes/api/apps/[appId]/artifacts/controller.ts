@@ -15,10 +15,9 @@ export const AppsAppIdArtifactsController = new Elysia()
   .use(loggerPlugin('appsAppIdArtifactsController'))
   .use(AuthPlugin)
   .use(ArtifactsServicePlugin)
-  .guard({ auth: Identity.Optional })
   .get(
     '/apps/:appId/artifacts',
-    async ({ artifactsService, params, user, status }) => {
+    async function listArtifacts({ artifactsService, params, user, status }) {
       const artifacts = await artifactsService.list({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
@@ -26,39 +25,39 @@ export const AppsAppIdArtifactsController = new Elysia()
       return status(StatusMap.OK, { artifacts });
     },
     {
+      auth: Identity.Optional,
       response: { [StatusMap.OK]: publicSchema(ListArtifactsResponseSchema) },
     },
   )
-  // Created rather than OK: the artifact exists from here on. What is left to do with it is what
-  // differs — an upload is told where to send the bytes, while a url has already been followed by
-  // the time this answers, and the request the caller is waiting on is the one that fetched it.
   .post(
     '/apps/:appId/artifacts',
-    async ({ artifactsService, params, body: bodyInput, user, status }) => {
+    async function createArtifact({
+      artifactsService,
+      params,
+      body: bodyInput,
+      deploymentAccess,
+      status,
+    }) {
       const body = Value.Parse(CreateArtifactBodySchema, bodyInput);
       const appId = Value.Parse(AppIdSchema, params.appId);
-      const ownerId = Value.Parse(OwnerIdSchema, user.id);
       const created =
         'url' in body
           ? await artifactsService.createFromUrl({
-              deploymentGrant: null,
               appId,
-              ownerId,
-              isAnonymous: user.isAnonymous,
+              ...deploymentAccess,
               url: body.url,
               sha256: body.sha256,
             })
           : await artifactsService.create({
-              deploymentGrant: null,
               appId,
-              ownerId,
-              isAnonymous: user.isAnonymous,
+              ...deploymentAccess,
               filename: body.filename,
               sizeBytes: body.sizeBytes,
             });
       return status(StatusMap.Created, created);
     },
     {
+      appDeploymentAuth: true,
       body: publicSchema(CreateArtifactBodySchema),
       response: { [StatusMap.Created]: publicSchema(CreateArtifactResponseSchema) },
     },
