@@ -21,7 +21,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1127.0",
     "@elysia/cors": "^1.4.2",
     "@ilbertt/better-auth-bun-sql": "^0.4.0",
-    "@ilbertt/bun-sqlgen": "^0.6.2",
+    "@ilbertt/bun-sqlgen": "^0.6.3",
     "@repo/api-constants": "workspace:*",
     "@repo/protocol": "workspace:*",
     "@repo/sqlite": "workspace:*",

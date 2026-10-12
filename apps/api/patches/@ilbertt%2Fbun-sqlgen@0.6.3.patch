@@ -1,0 +1,38 @@
+diff --git a/dist/cli/main.js b/dist/cli/main.js
+index 9936a1430218c2f029d7728d9e8eedd14241b79a..8cc9672f463c59f3c915044605fc291965bf23c1 100755
+--- a/dist/cli/main.js
++++ b/dist/cli/main.js
+@@ -2051,8 +2051,9 @@ async function createPostgresIntrospector(opts) {
+       WHERE c.relkind IN ('r', 'p', 'v', 'm')
+         AND a.attnum > 0 AND NOT a.attisdropped
+         AND n.nspname NOT IN ('pg_catalog', 'information_schema')
++        AND ($1::text[] IS NULL OR n.nspname = ANY($1::text[]))
+       ORDER BY n.nspname, c.relname, a.attnum
+-    `);
++    `, [opts.schemas ?? null]);
+     const byRelation = new Map;
+     const byColumn = new Map;
+     for (const row of cols.rows) {
+@@ -2689,7 +2690,8 @@ async function generate(options) {
+     migrationsDir,
+     prelude: config.prelude,
+     transformMigration: config.transformMigration,
+-    extensions: config.dialect === "sqlite" ? undefined : config.extensions
++    extensions: config.dialect === "sqlite" ? undefined : config.extensions,
++    schemas: config.dialect === "sqlite" ? undefined : config.schemas
+   });
+   const failures = [];
+   const emitModels = [];
+diff --git a/dist/config.d.ts b/dist/config.d.ts
+index a0c2e1f005f10b0bbbe7e8f541bcc1b7db46de8a..7db15192b0e48aa506271ffa9020a5b78576ae3c 100644
+--- a/dist/config.d.ts
++++ b/dist/config.d.ts
+@@ -36,6 +36,8 @@ interface BaseConfig {
+ /** Postgres config: introspection runs against an in-process PGlite. */
+ export interface PostgresConfig extends BaseConfig {
+     dialect?: 'postgres';
++    /** Postgres schemas whose relations are emitted; all migrations still run. */
++    schemas?: readonly string[];
+     /** PGlite extensions to load before applying migrations. */
+     extensions?: () => Extensions | Promise<Extensions>;
+ }

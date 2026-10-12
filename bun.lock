@@ -39,7 +39,7 @@
         "@aws-sdk/s3-request-presigner": "^3.1127.0",
         "@elysia/cors": "^1.4.2",
         "@ilbertt/better-auth-bun-sql": "^0.4.0",
-        "@ilbertt/bun-sqlgen": "^0.6.2",
+        "@ilbertt/bun-sqlgen": "^0.6.3",
         "@repo/api-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
         "@repo/sqlite": "workspace:*",
@@ -333,6 +333,7 @@
     },
   },
   "patchedDependencies": {
+    "@ilbertt/bun-sqlgen@0.6.3": "apps/api/patches/@ilbertt%2Fbun-sqlgen@0.6.3.patch",
     "@libredb/studio@0.18.0": "packages/sqlite-explorer/patches/@libredb%2Fstudio@0.18.0.patch",
   },
   "catalog": {
@@ -724,7 +725,7 @@
 
     "@ilbertt/better-auth-bun-sql": ["@ilbertt/better-auth-bun-sql@0.4.0", "", { "peerDependencies": { "better-auth": ">=1.6.0" } }, "sha512-g6az7IO5XpnZhA3h1REoHRND0VhojADcqWSu5LX+jl6/l5be0o9JlJHQnceisUFQWsYDMJDoQbZu2vX8sMbCQQ=="],
 
-    "@ilbertt/bun-sqlgen": ["@ilbertt/bun-sqlgen@0.6.2", "", { "dependencies": { "@electric-sql/pglite": "^0.5.5", "@typescript/typescript6": "^6.0.2" }, "bin": { "bun-sqlgen": "dist/cli/main.js" } }, "sha512-ZT8+vDV54UtRqGeXSpveA4BcowMRMvXBRpMJ7ClhHVSnLbhGBJd075CNnGP+HUED02JzbXzt+0s6TG890yCr7Q=="],
+    "@ilbertt/bun-sqlgen": ["@ilbertt/bun-sqlgen@0.6.3", "", { "dependencies": { "@electric-sql/pglite": "^0.5.8", "@typescript/typescript6": "^6.0.2" }, "bin": { "bun-sqlgen": "dist/cli/main.js" } }, "sha512-x8POtyzmvDUlLkM1BdfUoSN++yV8z++4x4jYDmGL/gwN91BtZTFyn64elfWIwhfwWr9dSjEEpDMAuz3K2c9rzQ=="],
 
     "@img/colour": ["@img/colour@1.1.0", "", {}, "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ=="],
 
