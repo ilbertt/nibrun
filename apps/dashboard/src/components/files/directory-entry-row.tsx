@@ -24,9 +24,7 @@ export function DirectoryEntryRow({ entry }: { entry: FilesystemEntry }) {
         {dayAndMinute(entry.modifiedAt)}
       </TableCell>
       <TableCell>
-        {entry.kind === 'file' && sqlite.connection === undefined && (
-          <FileActions entry={entry} sqlite={sqlite} />
-        )}
+        {entry.kind === 'file' && <FileActions entry={entry} sqlite={sqlite} />}
       </TableCell>
     </TableRow>
   );

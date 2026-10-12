@@ -14,7 +14,7 @@ export type DashboardSqliteExplorer = {
 };
 
 export function useDashboardSqliteExplorer(): DashboardSqliteExplorer {
-  const { url: requestedUrl } = Route.useSearch();
+  const { url: requestedUrl, appId, path } = Route.useSearch();
   const connection = useSqliteConnection();
   const url = connection.data?.url ?? '';
   const [opened, setOpened] = useState<OpenedWorkspace>();
@@ -52,7 +52,7 @@ export function useDashboardSqliteExplorer(): DashboardSqliteExplorer {
 
   const current = opened?.url === url ? opened : undefined;
   const error =
-    requestedUrl === ''
+    requestedUrl === '' && (appId === '' || path === '')
       ? 'A SQLite connection URL is required.'
       : (connection.error?.message ?? current?.error);
   return {

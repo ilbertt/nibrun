@@ -2,7 +2,7 @@ import { unwrap } from '@repo/api-client/unwrap';
 import { queryOptions } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 
-async function fetchSqliteConnections(appId: string) {
+export async function fetchSqliteConnections(appId: string) {
   return unwrap(await api.api.apps({ appId }).sqlite.connections.get()).connections;
 }
 
