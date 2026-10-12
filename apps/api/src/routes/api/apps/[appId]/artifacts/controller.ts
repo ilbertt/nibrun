@@ -41,6 +41,7 @@ export const AppsAppIdArtifactsController = new Elysia()
       const created =
         'url' in body
           ? await artifactsService.createFromUrl({
+              deploymentGrant: null,
               appId,
               ownerId,
               isAnonymous: user.isAnonymous,
@@ -48,6 +49,7 @@ export const AppsAppIdArtifactsController = new Elysia()
               sha256: body.sha256,
             })
           : await artifactsService.create({
+              deploymentGrant: null,
               appId,
               ownerId,
               isAnonymous: user.isAnonymous,

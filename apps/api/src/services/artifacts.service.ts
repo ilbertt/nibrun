@@ -52,11 +52,14 @@ import type {
   CachedBinariesRepositoryContract,
   CachedBinaryRow,
 } from '#repositories/cached-binaries.repository.ts';
+import type { GitHubDeploymentGrantRow } from '#repositories/github-deployment-grants.repository.ts';
 import type {
   PublishedDigest,
   ReleaseDigestRepositoryContract,
 } from '#repositories/release-digest.repository.ts';
 import { Service } from '#services/service.ts';
+
+export type ArtifactUploadGrant = Pick<GitHubDeploymentGrantRow, 'expires_at'>;
 
 // An app the caller does not own has to be indistinguishable from one that does not exist: a
 // 403 confirms the app to a stranger.
@@ -330,12 +333,14 @@ export class ArtifactsService extends Service {
   async create({
     appId,
     ownerId,
+    deploymentGrant,
     isAnonymous,
     filename,
     sizeBytes,
   }: {
     appId: AppId;
     ownerId: OwnerId;
+    deploymentGrant: ArtifactUploadGrant | null;
     isAnonymous: boolean;
     filename: Filename;
     sizeBytes: number;
@@ -359,7 +364,7 @@ export class ArtifactsService extends Service {
     );
 
     const url = await this.storageRepo.signUpload({
-      expiresAt: null,
+      expiresAt: deploymentGrant?.expires_at ?? null,
       objectKey: stagingKey({ appId, artifactId: pending.id }),
       sizeBytes,
     });
@@ -425,16 +430,21 @@ export class ArtifactsService extends Service {
   async createFromUrl({
     appId,
     ownerId,
+    deploymentGrant,
     isAnonymous,
     url,
     sha256,
   }: {
     appId: AppId;
     ownerId: OwnerId;
+    deploymentGrant: ArtifactUploadGrant | null;
     isAnonymous: boolean;
     url: string;
     sha256?: Sha256Digest | undefined;
   }): Promise<Artifact> {
+    if (deploymentGrant !== null) {
+      throw new ForbiddenError('Deployment grants can only upload binaries.');
+    }
     if (!(await this.appsRepo.isOwnedBy({ appId, ownerId }))) {
       throw new NotFoundError(NO_SUCH_APP);
     }
