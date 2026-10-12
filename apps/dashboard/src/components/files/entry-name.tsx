@@ -17,7 +17,6 @@ export function EntryName({
 }) {
   const appId = useAppId();
   const path = useDirectoryPath();
-  const { connection } = sqlite;
   const name = (
     <>
       <EntryIcon entry={entry} sqlite={sqlite} />
@@ -27,39 +26,27 @@ export function EntryName({
     </>
   );
 
-  if (connection !== undefined) {
+  if (sqlite.isDatabase) {
     return (
-      <Link
-        to={SqliteRoute.to}
-        search={{ url: connection.url }}
-        target="_blank"
-        rel="noopener"
-        className="flex items-center gap-2 hover:underline"
-        aria-label={`Open ${entry.name} in SQLite explorer (new tab)`}
-      >
-        {name}
-      </Link>
+      <span className="flex items-center gap-2">
+        <EntryIcon entry={entry} sqlite={sqlite} />
+        <Link
+          to={SqliteRoute.to}
+          search={sqlite.search}
+          target="_blank"
+          rel="noopener"
+          preload={false}
+          className="truncate hover:underline"
+          title={entry.name}
+          aria-label={`Open ${entry.name} in SQLite explorer (new tab)`}
+        >
+          {entry.name}
+        </Link>
+      </span>
     );
   }
 
   if (entry.kind !== 'directory') {
-    if (sqlite.isDatabase) {
-      return (
-        <span className="flex items-center gap-2">
-          <EntryIcon entry={entry} sqlite={sqlite} />
-          <button
-            type="button"
-            onClick={sqlite.open}
-            disabled={!sqlite.canOpen}
-            className="truncate text-left enabled:cursor-pointer enabled:hover:underline"
-            title={entry.name}
-            aria-label={`Open ${entry.name} in SQLite explorer (new tab)`}
-          >
-            {entry.name}
-          </button>
-        </span>
-      );
-    }
     return <span className="flex items-center gap-2">{name}</span>;
   }
 

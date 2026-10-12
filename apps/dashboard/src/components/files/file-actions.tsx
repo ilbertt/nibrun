@@ -6,8 +6,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@repo/ui/components/dropdown-menu';
+import { Link } from '@tanstack/react-router';
 import { DatabaseIcon, EllipsisIcon } from 'lucide-react';
 import type { FileSqliteConnection } from '#lib/hooks/use-file-sqlite-connection.ts';
+import { Route as SqliteRoute } from '#routes/sqlite.tsx';
 
 export function FileActions({
   entry,
@@ -19,19 +21,22 @@ export function FileActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Actions for ${entry.name}`}
-            disabled={!sqlite.canOpen}
-          />
-        }
+        render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${entry.name}`} />}
       >
         <EllipsisIcon />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto">
-        <DropdownMenuItem onClick={sqlite.open}>
+        <DropdownMenuItem
+          render={
+            <Link
+              to={SqliteRoute.to}
+              search={sqlite.search}
+              target="_blank"
+              rel="noopener"
+              preload={false}
+            />
+          }
+        >
           <DatabaseIcon />
           {sqlite.isDatabase ? 'Open SQLite database' : 'Query as SQLite'}
         </DropdownMenuItem>
