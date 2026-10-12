@@ -84,6 +84,7 @@ export const forwardToGuest = Effect.fn('forwardToGuest')(
         headers: without({ headers: request.headers, drop: ENCODING_REQUEST_HEADERS }),
         body: request.body,
         redirect: 'manual',
+        proxy: false,
         duplex: 'half',
         // Giving up here has to reach the socket too, or the guest goes on being asked for an
         // answer nobody is waiting for and the connection to it is never released.

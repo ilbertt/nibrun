@@ -168,7 +168,7 @@ async function get({
   address: string;
   deadline: AbortSignal;
 }): Promise<Response | undefined> {
-  const request: BunFetchRequestInit = { redirect: 'manual', signal: deadline };
+  const request: BunFetchRequestInit = { redirect: 'manual', signal: deadline, proxy: false };
   const dialled = pinnedTo({ url, address });
   if (dialled.hostname !== url.hostname) {
     request.headers = { host: url.host };
