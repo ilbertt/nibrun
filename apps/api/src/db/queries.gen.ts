@@ -923,7 +923,7 @@ export interface ISelectValidGitHubDeploymentGrantResult {
     id: IGithubDeploymentGrantsColumns["id"];
     app_id: IGithubDeploymentGrantsColumns["app_id"];
     owner_id: IGithubDeploymentGrantsColumns["owner_id"];
-    workflow_id: IGithubTrustedDeploymentWorkflowsColumns["id"];
+    workflow_id: IGithubDeploymentGrantsColumns["workflow_id"];
     expires_at: IGithubDeploymentGrantsColumns["expires_at"];
     github_token_jti: IGithubDeploymentGrantsColumns["github_token_jti"];
     github_repository: IGithubDeploymentGrantsColumns["github_repository"];
@@ -1934,6 +1934,41 @@ export interface ISqliteConnectionsTable {
     constraints: keyof (typeof schema)["sqlite_connections"]["_constraints"];
 }
 
+/** Columns of `valid_github_deployment_grants`. */
+export interface IValidGithubDeploymentGrantsColumns {
+    id: import("#lib/api/identifiers.ts").DeploymentGrantId | null;
+    app_id: import("@repo/protocol").AppId | null;
+    owner_id: import("#lib/api/identifiers.ts").OwnerId | null;
+    workflow_id: import("#lib/api/identifiers.ts").TrustedWorkflowId | null;
+    workflow_revision: string | null;
+    token_hash: string | null;
+    github_token_jti: string | null;
+    github_repository: string | null;
+    github_repository_id: string | null;
+    github_repository_owner_id: string | null;
+    github_workflow_ref: string | null;
+    github_ref: string | null;
+    github_event_name: string | null;
+    github_commit_sha: string | null;
+    github_run_id: string | null;
+    github_run_attempt: string | null;
+    github_environment: string | null;
+    github_job_workflow_ref: string | null;
+    github_job_workflow_sha: string | null;
+    expires_at: Date | null;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date | null;
+}
+
+/** Schema of `valid_github_deployment_grants`. */
+export interface IValidGithubDeploymentGrantsTable {
+    columns: IValidGithubDeploymentGrantsColumns;
+    relationType: (typeof schema)["valid_github_deployment_grants"]["_relationType"];
+    indexes: keyof (typeof schema)["valid_github_deployment_grants"]["_indexes"];
+    constraints: keyof (typeof schema)["valid_github_deployment_grants"]["_constraints"];
+}
+
 export const schema = {
     account: {
         _relationName: "account",
@@ -2656,6 +2691,36 @@ export const schema = {
             sqlite_connections_app_id_fkey: { _constraintName: "sqlite_connections_app_id_fkey" },
             sqlite_connections_pkey: { _constraintName: "sqlite_connections_pkey" }
         }
+    },
+    valid_github_deployment_grants: {
+        _relationName: "valid_github_deployment_grants",
+        _relationType: "view",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: {} },
+            owner_id: { _columnName: "owner_id", _foreignKeys: {} },
+            workflow_id: { _columnName: "workflow_id", _foreignKeys: {} },
+            workflow_revision: { _columnName: "workflow_revision", _foreignKeys: {} },
+            token_hash: { _columnName: "token_hash", _foreignKeys: {} },
+            github_token_jti: { _columnName: "github_token_jti", _foreignKeys: {} },
+            github_repository: { _columnName: "github_repository", _foreignKeys: {} },
+            github_repository_id: { _columnName: "github_repository_id", _foreignKeys: {} },
+            github_repository_owner_id: { _columnName: "github_repository_owner_id", _foreignKeys: {} },
+            github_workflow_ref: { _columnName: "github_workflow_ref", _foreignKeys: {} },
+            github_ref: { _columnName: "github_ref", _foreignKeys: {} },
+            github_event_name: { _columnName: "github_event_name", _foreignKeys: {} },
+            github_commit_sha: { _columnName: "github_commit_sha", _foreignKeys: {} },
+            github_run_id: { _columnName: "github_run_id", _foreignKeys: {} },
+            github_run_attempt: { _columnName: "github_run_attempt", _foreignKeys: {} },
+            github_environment: { _columnName: "github_environment", _foreignKeys: {} },
+            github_job_workflow_ref: { _columnName: "github_job_workflow_ref", _foreignKeys: {} },
+            github_job_workflow_sha: { _columnName: "github_job_workflow_sha", _foreignKeys: {} },
+            expires_at: { _columnName: "expires_at", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
     }
 } as const;
 
@@ -2692,6 +2757,7 @@ export interface Tables {
     profiles: IProfilesTable;
     purgeable_apps: IPurgeableAppsTable;
     sqlite_connections: ISqliteConnectionsTable;
+    valid_github_deployment_grants: IValidGithubDeploymentGrantsTable;
 }
 
 declare module "@ilbertt/bun-sqlgen" {

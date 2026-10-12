@@ -84,18 +84,13 @@ export class GitHubDeploymentGrantsRepository
     tokenHash,
   }: FindGitHubDeploymentGrantInput): Promise<GitHubDeploymentGrantRow | null> {
     const [row] = await this.sql.SelectValidGitHubDeploymentGrant`
-      SELECT g.id, g.app_id, g.owner_id, w.id AS workflow_id, g.expires_at,
+      SELECT g.id, g.app_id, g.owner_id, g.workflow_id, g.expires_at,
         g.github_token_jti, g.github_repository, g.github_repository_id, g.github_repository_owner_id,
         g.github_workflow_ref, g.github_ref, g.github_event_name, g.github_commit_sha,
         g.github_run_id, g.github_run_attempt, g.github_environment,
         g.github_job_workflow_ref, g.github_job_workflow_sha
-      FROM nibrun.github_deployment_grants g
-      JOIN nibrun.live_apps a ON a.id = g.app_id AND a.owner_id = g.owner_id
-      JOIN nibrun.github_trusted_deployment_workflows w
-        ON w.id = g.workflow_id AND w.app_id = g.app_id AND w.current_revision = g.workflow_revision
-        AND w.deleted_at IS NULL
+      FROM nibrun.valid_github_deployment_grants g
       WHERE g.app_id = ${appId} AND g.owner_id = ${ownerId} AND g.token_hash = ${tokenHash}
-        AND g.expires_at > statement_timestamp()
     `;
     return row ?? null;
   }
