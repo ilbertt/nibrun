@@ -140,15 +140,15 @@ export const DEPLOY_PRESETS = {
   sharkord: {
     isRecommended: false,
     projectUrl: 'https://github.com/sharkord/sharkord',
-    version: 'v0.0.26',
+    version: 'v0.0.27',
     markdownContent: sharkordPage,
     category: DeployCategory.Communication,
     title: 'Sharkord',
     subtitle: 'A self-hosted chat server with voice, video and screen sharing.',
     deployLink: {
       name: 'sharkord',
-      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.26/sharkord-linux-x64',
-      sha256: 'fd9f0962c93002d1a20685e51e60cd92d67e1effeafc522df3ade240ecd743c1',
+      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.27/sharkord-linux-x64',
+      sha256: '49dbfd371dc72191e8fc6388652752fd772c3365e081f740ed55e9b57cbab47c',
       port: 4991,
       'extra-public-port': true,
       env: [
@@ -272,7 +272,7 @@ export const DEPLOY_PRESETS = {
   'nibrun-vitals': {
     isRecommended: false,
     projectUrl: 'https://github.com/ilbertt/nibrun-vitals',
-    version: 'v2026.9.16-1',
+    version: 'v2026.10.12-1',
     markdownContent: nibrunVitalsPage,
     category: DeployCategory.Analytics,
     title: 'nibrun-vitals',
@@ -281,8 +281,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'nibrun-vitals',
       binary:
-        'https://github.com/ilbertt/nibrun-vitals/releases/download/v2026.9.16-1/vitals-linux-x64',
-      sha256: '3131c0fc4e7bdc1954045f0844f189e2e31e3701d092633bd5dacda9c7d51446',
+        'https://github.com/ilbertt/nibrun-vitals/releases/download/v2026.10.12-1/vitals-linux-x64',
+      sha256: '592323009995e239da2cc4307cd6e40f6ddba5785ba83aa5c90c6a220d157348',
       port: 3000,
       minimal: true,
     },
@@ -508,7 +508,7 @@ export const DEPLOY_PRESETS = {
   remark42: {
     isRecommended: false,
     projectUrl: 'https://github.com/umputun/remark42',
-    version: 'v1.17.1',
+    version: 'v1.18.0',
     markdownContent: remark42Page,
     category: DeployCategory.Communication,
     title: 'Remark42',
@@ -516,8 +516,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'remark42',
       binary:
-        'https://github.com/umputun/remark42/releases/download/v1.17.1/remark42.linux-amd64.tar.gz',
-      sha256: '434e64fc0903d028e8506c4047e99260446d6a51573c8b2dc2492e43558519d4',
+        'https://github.com/umputun/remark42/releases/download/v1.18.0/remark42.linux-amd64.tar.gz',
+      sha256: '0f7fa39f30e30123bbbeaf2956fc335ea13d7b5d6799cee20060a303be730d9a',
       port: 8080,
       arg: ['server'],
       env: [
