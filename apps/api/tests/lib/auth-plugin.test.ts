@@ -161,7 +161,7 @@ test('app deployment policy preserves the same account normalization as account 
         function upload({ deploymentAccess }) {
           return deploymentAccess;
         },
-        { appDeploymentAuth: true },
+        { auth: { deploymentGrant: true } },
       );
     const response = await app.handle(
       new Request('http://localhost/apps/app-1/artifacts', { method: 'POST' }),
@@ -192,7 +192,7 @@ test('grant authentication requires an explicit app scope', async function requi
       function upload() {
         return 'ok';
       },
-      { appDeploymentAuth: true },
+      { auth: { deploymentGrant: true } },
     );
   const response = await app.handle(
     new Request('http://localhost/unscoped', {
@@ -222,7 +222,7 @@ test('app deployment policy accepts standard bearer scheme casing and spacing', 
       function upload({ deploymentAccess }) {
         return deploymentAccess;
       },
-      { appDeploymentAuth: true },
+      { auth: { deploymentGrant: true } },
     );
   const token = deploymentGrantToken();
   for (const scheme of ['Bearer ', 'bearer ', 'bEaReR   ']) {
