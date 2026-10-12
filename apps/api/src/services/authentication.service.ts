@@ -3,7 +3,6 @@ import { Identity } from '#lib/auth/identity.ts';
 import { ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
 import { Service } from '#services/service.ts';
 
-type AccountSessionServiceContract = Pick<Auth['api'], 'getSession'>;
 type AccountSession = NonNullable<Awaited<ReturnType<Auth['api']['getSession']>>>;
 
 export type AuthenticateAccountInput = {
@@ -21,18 +20,18 @@ export interface AuthenticationServiceContract {
 }
 
 export class AuthenticationService extends Service implements AuthenticationServiceContract {
-  private readonly accountSessions: AccountSessionServiceContract;
+  private readonly auth: Auth['api'];
 
-  constructor(accountSessions: AccountSessionServiceContract) {
+  constructor(auth: Auth['api']) {
     super();
-    this.accountSessions = accountSessions;
+    this.auth = auth;
   }
 
   async authenticateAccount({
     headers,
     identity,
   }: AuthenticateAccountInput): Promise<AuthenticatedAccount> {
-    const session = await this.accountSessions.getSession({ headers });
+    const session = await this.auth.getSession({ headers });
     if (!session) {
       throw new UnauthorizedError();
     }
