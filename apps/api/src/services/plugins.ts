@@ -182,9 +182,7 @@ const logsService = new LogsService({
 });
 
 export const auth = createAuth({ appsService });
-
 const authenticationService = new AuthenticationService(auth.api);
-
 export const AuthPlugin = createAuthPlugin(authenticationService);
 
 export function loggerPlugin(name: string) {
