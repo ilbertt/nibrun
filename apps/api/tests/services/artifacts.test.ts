@@ -130,6 +130,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
     originalFileUrl,
     sourceDigest,
     onlyOne,
+    deploymentGrantId,
   }: InsertPendingArtifactInput): Promise<PendingArtifactInsert> {
     if (ownerId !== this.ownedBy || this.refuses) {
       return Promise.resolve({ outcome: 'no-app' });
@@ -147,6 +148,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
       original_file_name: originalFileName,
       original_file_url: originalFileUrl,
       source_digest: sourceDigest,
+      github_deployment_grant_id: deploymentGrantId,
       created_at: SEEDED_CREATED_AT,
     };
     this.rows.set(row.id, row);
@@ -158,6 +160,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
         original_file_name: row.original_file_name,
         original_file_url: row.original_file_url,
         created_at: row.created_at,
+        github_deployment_grant_id: row.github_deployment_grant_id,
       },
     });
   }
@@ -219,6 +222,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
       original_file_name: row.original_file_name,
       original_file_url: row.original_file_url,
       created_at: row.created_at,
+      github_deployment_grant_id: row.github_deployment_grant_id,
     });
   }
 
@@ -279,6 +283,7 @@ class FakeArtifactsRepository implements ArtifactsRepositoryContract {
       original_file_name: UPLOADED_NAME,
       original_file_url: null,
       source_digest: null,
+      github_deployment_grant_id: null,
       created_at: SEEDED_CREATED_AT,
     };
     this.rows.set(row.id, row);

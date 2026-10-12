@@ -1,6 +1,6 @@
 import type { AppId, Filename, ObjectKey, Sha256Digest } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
-import type { ArtifactId, OwnerId } from '#lib/api/identifiers.ts';
+import type { ArtifactId, DeploymentGrantId, OwnerId } from '#lib/api/identifiers.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type ArtifactRow = Queries['SelectArtifactById'];
@@ -19,6 +19,7 @@ export type InsertPendingArtifactInput = {
   sourceDigest: Sha256Digest | null;
   // Whether the app takes this one artifact and no other, pending or not.
   onlyOne: boolean;
+  deploymentGrantId: DeploymentGrantId | null;
 };
 
 /** `held` is an app asked to take only one artifact that already has one. */
@@ -34,6 +35,7 @@ export type CompleteArtifactInput = {
   digest: Sha256Digest;
   sizeBytes: number;
   objectKey: ObjectKey;
+  deploymentGrantId: DeploymentGrantId | null;
 };
 
 export abstract class ArtifactsRepositoryContract {
@@ -77,6 +79,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     originalFileUrl,
     sourceDigest,
     onlyOne,
+    deploymentGrantId,
   }: InsertPendingArtifactInput): Promise<PendingArtifactInsert> {
     return this.sql.begin(async (tx): Promise<PendingArtifactInsert> => {
       if (onlyOne) {
@@ -96,11 +99,16 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
         }
       }
       const [row] = await tx.InsertPendingArtifact`
-        INSERT INTO nibrun.artifacts (app_id, original_file_name, original_file_url, source_digest)
-        SELECT a.id, ${originalFileName}, ${originalFileUrl}, ${sourceDigest}
+        INSERT INTO nibrun.artifacts
+          (app_id, original_file_name, original_file_url, source_digest, github_deployment_grant_id)
+        SELECT a.id, ${originalFileName}, ${originalFileUrl}, ${sourceDigest}, ${deploymentGrantId}
         FROM nibrun.live_apps a
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-        RETURNING id, app_id, original_file_name, original_file_url, created_at
+          AND (${deploymentGrantId}::uuid IS NULL OR EXISTS (
+            SELECT 1 FROM nibrun.valid_github_deployment_grants g
+            WHERE g.id = ${deploymentGrantId} AND g.app_id = a.id AND g.owner_id = ${ownerId}
+          ))
+        RETURNING id, app_id, original_file_name, original_file_url, created_at, github_deployment_grant_id
       `;
       return row ? { outcome: 'created', row } : { outcome: 'no-app' };
     });
@@ -117,6 +125,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     digest,
     sizeBytes,
     objectKey,
+    deploymentGrantId,
   }: CompleteArtifactInput): Promise<ArtifactRow | null> {
     const [row] = await this.sql.CompleteArtifact`
       /* @notNull digest */
@@ -127,8 +136,13 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       FROM nibrun.live_apps a
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.id = ar.app_id
         AND a.owner_id = ${ownerId} AND ar.digest IS NULL
+        AND ar.github_deployment_grant_id IS NOT DISTINCT FROM ${deploymentGrantId}::uuid
+        AND (${deploymentGrantId}::uuid IS NULL OR EXISTS (
+          SELECT 1 FROM nibrun.valid_github_deployment_grants g
+          WHERE g.id = ${deploymentGrantId} AND g.app_id = a.id AND g.owner_id = ${ownerId}
+        ))
       RETURNING ar.id, ar.app_id, ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
-                ar.original_file_url, ar.created_at
+                ar.original_file_url, ar.created_at, ar.github_deployment_grant_id
     `;
     return row ?? null;
   }
@@ -160,7 +174,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     ownerId: OwnerId;
   }): Promise<PendingArtifactRow | null> {
     const [row] = await this.sql.SelectPendingArtifact`
-      SELECT ar.id, ar.app_id, ar.original_file_name, ar.original_file_url, ar.created_at
+      SELECT ar.id, ar.app_id, ar.original_file_name, ar.original_file_url, ar.created_at, ar.github_deployment_grant_id
       FROM nibrun.artifacts ar
       JOIN nibrun.live_apps a ON a.id = ar.app_id
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}
@@ -204,7 +218,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       /* @notNull size_bytes */
       /* @notNull object_key */
       SELECT ar.id, ar.app_id, ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
-             ar.original_file_url, ar.created_at
+             ar.original_file_url, ar.created_at, ar.github_deployment_grant_id
       FROM nibrun.artifacts ar
       JOIN nibrun.live_apps a ON a.id = ar.app_id
       WHERE ar.app_id = ${appId} AND a.owner_id = ${ownerId} AND ar.digest IS NOT NULL
@@ -226,7 +240,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       /* @notNull size_bytes */
       /* @notNull object_key */
       SELECT ar.id, ar.app_id, ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
-             ar.original_file_url, ar.created_at
+             ar.original_file_url, ar.created_at, ar.github_deployment_grant_id
       FROM nibrun.artifacts ar
       JOIN nibrun.live_apps a ON a.id = ar.app_id
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}

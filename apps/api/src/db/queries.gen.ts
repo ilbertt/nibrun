@@ -552,6 +552,7 @@ export interface IInsertPendingArtifactResult {
     original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
+    github_deployment_grant_id: IArtifactsColumns["github_deployment_grant_id"];
 }
 
 /** Result of query `CompleteArtifact`. */
@@ -569,6 +570,7 @@ export interface ICompleteArtifactResult {
     original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
+    github_deployment_grant_id: IArtifactsColumns["github_deployment_grant_id"];
 }
 
 /** Result of query `DeleteArtifact`. */
@@ -584,6 +586,7 @@ export interface ISelectPendingArtifactResult {
     original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
+    github_deployment_grant_id: IArtifactsColumns["github_deployment_grant_id"];
 }
 
 /** Result of query `SelectAbandonedArtifacts`. */
@@ -611,6 +614,7 @@ export interface ISelectArtifactsByAppResult {
     original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
+    github_deployment_grant_id: IArtifactsColumns["github_deployment_grant_id"];
 }
 
 /** Result of query `SelectArtifactById`. */
@@ -628,6 +632,7 @@ export interface ISelectArtifactByIdResult {
     original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
+    github_deployment_grant_id: IArtifactsColumns["github_deployment_grant_id"];
 }
 
 /** Result of query `SelectCachedBinary`. */
@@ -1509,6 +1514,7 @@ export interface IArtifactsColumns {
     original_file_url: string | null;
     /** The digest the url's own download was held to, which for an archive is the archive's. */
     source_digest: import("@repo/protocol").Sha256Digest | null;
+    github_deployment_grant_id: import("#lib/api/identifiers.ts").DeploymentGrantId | null;
 }
 
 /** Schema of `artifacts`. */
@@ -2306,7 +2312,7 @@ export const schema = {
         _relationType: "table",
         _columns: {
             id: { _columnName: "id", _foreignKeys: {} },
-            app_id: { _columnName: "app_id", _foreignKeys: { artifacts_app_id_fkey: { _constraintName: "artifacts_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            app_id: { _columnName: "app_id", _foreignKeys: { artifacts_app_id_fkey: { _constraintName: "artifacts_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } }, artifacts_github_deployment_grant_fk: { _constraintName: "artifacts_github_deployment_grant_fk", _references: { _relationName: "github_deployment_grants", _columnName: "app_id" } } } },
             digest: { _columnName: "digest", _foreignKeys: {} },
             size_bytes: { _columnName: "size_bytes", _foreignKeys: {} },
             object_key: { _columnName: "object_key", _foreignKeys: {} },
@@ -2314,16 +2320,19 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             original_file_url: { _columnName: "original_file_url", _foreignKeys: {} },
-            source_digest: { _columnName: "source_digest", _foreignKeys: {} }
+            source_digest: { _columnName: "source_digest", _foreignKeys: {} },
+            github_deployment_grant_id: { _columnName: "github_deployment_grant_id", _foreignKeys: { artifacts_github_deployment_grant_fk: { _constraintName: "artifacts_github_deployment_grant_fk", _references: { _relationName: "github_deployment_grants", _columnName: "id" } } } }
         },
         _indexes: {
             artifacts_app_id_idx: { _indexName: "artifacts_app_id_idx" },
+            artifacts_github_deployment_grant_idx: { _indexName: "artifacts_github_deployment_grant_idx" },
             artifacts_pending_idx: { _indexName: "artifacts_pending_idx" },
             artifacts_pkey: { _indexName: "artifacts_pkey" },
             artifacts_source_digest_idx: { _indexName: "artifacts_source_digest_idx" }
         },
         _constraints: {
             artifacts_app_id_fkey: { _constraintName: "artifacts_app_id_fkey" },
+            artifacts_github_deployment_grant_fk: { _constraintName: "artifacts_github_deployment_grant_fk" },
             artifacts_pkey: { _constraintName: "artifacts_pkey" }
         }
     },
@@ -2564,12 +2573,14 @@ export const schema = {
             updated_at: { _columnName: "updated_at", _foreignKeys: {} }
         },
         _indexes: {
+            github_deployment_grants_app_id_id_key: { _indexName: "github_deployment_grants_app_id_id_key" },
             github_deployment_grants_pkey: { _indexName: "github_deployment_grants_pkey" },
             github_deployment_grants_token_hash_key: { _indexName: "github_deployment_grants_token_hash_key" },
             github_deployment_grants_token_once_idx: { _indexName: "github_deployment_grants_token_once_idx" }
         },
         _constraints: {
             github_deployment_grants_app_id_fkey: { _constraintName: "github_deployment_grants_app_id_fkey" },
+            github_deployment_grants_app_id_id_key: { _constraintName: "github_deployment_grants_app_id_id_key" },
             github_deployment_grants_github_token_jti_check: { _constraintName: "github_deployment_grants_github_token_jti_check" },
             github_deployment_grants_pkey: { _constraintName: "github_deployment_grants_pkey" },
             github_deployment_grants_token_hash_key: { _constraintName: "github_deployment_grants_token_hash_key" },

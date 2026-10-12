@@ -349,6 +349,7 @@ export class ArtifactsService extends Service {
 
     const pending = takenPlace(
       await this.artifactsRepo.insertPending({
+        deploymentGrantId: null,
         appId,
         ownerId,
         originalFileName: filename,
@@ -622,6 +623,7 @@ export class ArtifactsService extends Service {
   }): Promise<Artifact> {
     const pending = takenPlace(
       await this.artifactsRepo.insertPending({
+        deploymentGrantId: null,
         appId,
         ownerId,
         originalFileName: cached.original_file_name,
@@ -632,6 +634,7 @@ export class ArtifactsService extends Service {
     );
 
     const stored = await this.artifactsRepo.complete({
+      deploymentGrantId: null,
       appId,
       artifactId: pending.id,
       ownerId,
@@ -691,6 +694,7 @@ export class ArtifactsService extends Service {
     const held = await unwrapped({ source: fetched, named: filename, url: said });
 
     const inserted = await this.artifactsRepo.insertPending({
+      deploymentGrantId: null,
       appId,
       ownerId,
       originalFileName: held.filename,
@@ -830,6 +834,7 @@ export class ArtifactsService extends Service {
     }
 
     const stored = await this.artifactsRepo.complete({
+      deploymentGrantId: null,
       appId,
       artifactId,
       ownerId,

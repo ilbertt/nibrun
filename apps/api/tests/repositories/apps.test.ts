@@ -1042,6 +1042,7 @@ describe("a stranger's app takes one binary and one deployment", () => {
 
   function pending({ appId, onlyOne }: { appId: AppId; onlyOne: boolean }) {
     return artifacts.insertPending({
+      deploymentGrantId: null,
       appId,
       ownerId: STRANGER_ID,
       originalFileName: Value.Parse(FilenameSchema, 'server'),
@@ -1058,6 +1059,7 @@ describe("a stranger's app takes one binary and one deployment", () => {
       throw new Error('The artifact was not created.');
     }
     const row = await artifacts.complete({
+      deploymentGrantId: null,
       appId,
       artifactId: inserted.row.id,
       ownerId: STRANGER_ID,

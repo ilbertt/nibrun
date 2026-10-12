@@ -1,10 +1,16 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
-import { type AppId, AppIdSchema } from '@repo/protocol';
+import {
+  type AppId,
+  AppIdSchema,
+  FilenameSchema,
+  ObjectKeySchema,
+  Sha256DigestSchema,
+} from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
-import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { type DeploymentGrantId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
 import {
   createDeploymentGrantToken,
@@ -12,6 +18,7 @@ import {
 } from '#lib/deployment-grant-token.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { GitHubActionsOidcClaims } from '#lib/github-actions-oidc.ts';
+import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { GitHubDeploymentGrantsRepository } from '#repositories/github-deployment-grants.repository.ts';
 import { TrustedWorkflowsRepository } from '#repositories/trusted-workflows.repository.ts';
 import { GitHubDeploymentGrantsService } from '#services/github-deployment-grants.service.ts';
@@ -27,6 +34,7 @@ import { githubGrantProvenance } from '#tests/support/github-deployment-grants.t
 import { trustedWorkflow } from '#tests/support/trusted-workflows.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
+const FIXTURE_DIGEST = new Bun.CryptoHasher('sha256').update('binary').digest('hex');
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'grant-owner');
 const OTHER_OWNER_ID = Value.Parse(OwnerIdSchema, 'grant-stranger');
 let sql: SQL;
@@ -280,4 +288,135 @@ test('the workflow foreign key rejects references to a nonexistent trust rule', 
         ._constraintName,
   });
   expect((await service().authenticate({ appId, token: issued.token })).id).toBe(issued.id);
+});
+
+function artifactsRepository() {
+  return new ArtifactsRepository(withTypes<Queries>(sql));
+}
+
+async function pendingUpload({
+  appId,
+  deploymentGrantId,
+}: {
+  appId: AppId;
+  deploymentGrantId: DeploymentGrantId | null;
+}) {
+  const input = {
+    appId,
+    ownerId: OWNER_ID,
+    deploymentGrantId,
+    originalFileName: Value.Parse(FilenameSchema, 'server'),
+    originalFileUrl: null,
+    sourceDigest: null,
+    onlyOne: false,
+  };
+  const created = await artifactsRepository().insertPending(input);
+  if (created.outcome !== 'created') {
+    throw new Error('Missing fixture upload');
+  }
+  return {
+    ...input,
+    artifactId: created.row.id,
+    digest: Value.Parse(Sha256DigestSchema, FIXTURE_DIGEST),
+    sizeBytes: 1024,
+    objectKey: Value.Parse(ObjectKeySchema, 'sha256/server'),
+  };
+}
+
+test('grant uploads are bound to their app, tenant, and issuing grant', async () => {
+  const appId = await configuredApp();
+  const issued = await grant({ appId });
+  const secondGrant = await grant({ appId });
+  const input = await pendingUpload({ appId, deploymentGrantId: issued.id });
+  expect(
+    await artifactsRepository().complete({ ...input, deploymentGrantId: secondGrant.id }),
+  ).toBeNull();
+  expect(await artifactsRepository().complete({ ...input, deploymentGrantId: null })).toBeNull();
+  expect(await artifactsRepository().complete({ ...input, ownerId: OTHER_OWNER_ID })).toBeNull();
+  const stored = await artifactsRepository().complete(input);
+  expect(stored?.github_deployment_grant_id).toBe(issued.id);
+  expect(stored?.digest).toBe(input.digest);
+  expect(await artifactsRepository().complete(input)).toBeNull();
+  const otherApp = await configuredApp();
+  const refused = await artifactsRepository().insertPending({ ...input, appId: otherApp });
+  expect(refused.outcome).toBe('no-app');
+});
+
+test('the composite foreign key rejects linking an artifact to another app grant', async () => {
+  const appId = await configuredApp();
+  const otherApp = await configuredApp();
+  const otherGrant = await grant({ appId: otherApp });
+  const upload = await pendingUpload({ appId, deploymentGrantId: null });
+  async function crossAppReference() {
+    await sql.unsafe(
+      'UPDATE nibrun.artifacts SET github_deployment_grant_id = $1 WHERE id = $2 AND app_id = $3',
+      [otherGrant.id, upload.artifactId, appId],
+    );
+  }
+  await expect(crossAppReference()).rejects.toMatchObject({
+    errno: '23503',
+    constraint: schema.artifacts._constraints.artifacts_github_deployment_grant_fk._constraintName,
+  });
+});
+
+test('expiry during upload inspection prevents completion and subsequent upload creation', async () => {
+  const appId = await configuredApp();
+  const issued = await grant({ appId });
+  const input = await pendingUpload({ appId, deploymentGrantId: issued.id });
+  await sql.unsafe(
+    "UPDATE nibrun.github_deployment_grants SET expires_at = now() - interval '1 second' WHERE id = $1 AND owner_id = $2",
+    [issued.id, OWNER_ID],
+  );
+  expect(await artifactsRepository().complete(input)).toBeNull();
+  expect((await artifactsRepository().insertPending(input)).outcome).toBe('no-app');
+  expect((await artifactsRepository().findPending(input))?.id).toBe(input.artifactId);
+});
+
+test('workflow changes and soft deletion revoke in-flight uploads', async () => {
+  for (const deletion of [false, true]) {
+    const appId = await configuredApp();
+    const issued = await grant({ appId });
+    const authorized = await service().authenticate({ appId, token: issued.token });
+    const input = await pendingUpload({ appId, deploymentGrantId: issued.id });
+    const workflow = { appId, ownerId: OWNER_ID, workflowId: authorized.workflow_id };
+    if (deletion) {
+      await workflowsRepository().remove(workflow);
+    } else {
+      await workflowsRepository().update({ ...workflow, workflow: trustedWorkflow() });
+    }
+    expect(await artifactsRepository().complete(input)).toBeNull();
+    expect((await artifactsRepository().insertPending(input)).outcome).toBe('no-app');
+  }
+});
+
+test('account uploads still complete without a deployment grant', async () => {
+  const appId = await configuredApp();
+  const input = await pendingUpload({ appId, deploymentGrantId: null });
+  expect((await artifactsRepository().complete(input))?.github_deployment_grant_id).toBeNull();
+});
+
+test('app deletion and ownership transfer revoke in-flight grant uploads for both owners', async () => {
+  for (const deletion of [false, true]) {
+    const appId = await configuredApp();
+    const issued = await grant({ appId });
+    const input = await pendingUpload({ appId, deploymentGrantId: issued.id });
+    if (deletion) {
+      await sql.unsafe("UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1 AND owner_id = $2", [
+        appId,
+        OWNER_ID,
+      ]);
+    } else {
+      await sql.unsafe('UPDATE nibrun.apps SET owner_id = $1 WHERE id = $2 AND owner_id = $3', [
+        OTHER_OWNER_ID,
+        appId,
+        OWNER_ID,
+      ]);
+    }
+    for (const ownerId of [OWNER_ID, OTHER_OWNER_ID]) {
+      expect(await artifactsRepository().complete({ ...input, ownerId })).toBeNull();
+      expect((await artifactsRepository().insertPending({ ...input, ownerId })).outcome).toBe(
+        'no-app',
+      );
+    }
+  }
 });
