@@ -14,5 +14,15 @@ export function createAuthPlugin(authenticationService: AuthenticationServiceCon
         },
       };
     },
+    appDeploymentAuth: {
+      async resolve({ request, params }) {
+        return {
+          deploymentAccess: await authenticationService.authenticateAppDeployment({
+            headers: request.headers,
+            appId: params && 'appId' in params ? params.appId : undefined,
+          }),
+        };
+      },
+    },
   });
 }
