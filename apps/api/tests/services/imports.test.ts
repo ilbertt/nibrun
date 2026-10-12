@@ -13,7 +13,10 @@ import { type ImportId, ImportIdSchema, type OwnerId } from '#lib/api/identifier
 import { ImportSchema } from '#lib/api/import.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
-import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
+import type {
+  ArtifactStorageRepositoryContract,
+  SignArtifactUploadInput,
+} from '#repositories/artifact-storage.repository.ts';
 import type {
   AbandonedImportRow,
   CompleteImportInput,
@@ -210,7 +213,7 @@ class FakeImportsRepository implements ImportsRepositoryContract {
 
 class FakeStorage implements ArtifactStorageRepositoryContract {
   readonly objects = new Map<ObjectKey, Uint8Array>();
-  readonly signed: { objectKey: ObjectKey; sizeBytes: number }[] = [];
+  readonly signed: SignArtifactUploadInput[] = [];
   readonly removed: ObjectKey[] = [];
   readonly refused = new Set<ObjectKey>();
 
@@ -219,7 +222,7 @@ class FakeStorage implements ArtifactStorageRepositoryContract {
     this.refused.add(objectKey);
   }
 
-  signUpload(input: { objectKey: ObjectKey; sizeBytes: number }): Promise<string> {
+  signUpload(input: SignArtifactUploadInput): Promise<string> {
     this.signed.push(input);
     return Promise.resolve(`${SIGNED_URL}/${input.objectKey}`);
   }
@@ -333,6 +336,7 @@ describe('an upload is addressed by the row it makes', () => {
 
     expect(storage.signed).toEqual([
       {
+        expiresAt: null,
         objectKey: importKey({ appId: APP_ID, importId: begun.importId }),
         sizeBytes: ARCHIVE.byteLength,
       },

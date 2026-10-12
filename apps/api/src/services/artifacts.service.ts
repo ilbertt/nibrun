@@ -359,6 +359,7 @@ export class ArtifactsService extends Service {
     );
 
     const url = await this.storageRepo.signUpload({
+      expiresAt: null,
       objectKey: stagingKey({ appId, artifactId: pending.id }),
       sizeBytes,
     });

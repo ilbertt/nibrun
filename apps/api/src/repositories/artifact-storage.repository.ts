@@ -1,6 +1,9 @@
 import { PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { ObjectKey } from '@repo/protocol';
+import { UnauthorizedError } from '#lib/errors.ts';
+
+const MS_PER_SECOND = 1_000;
 
 const ARTIFACT_CONTENT_TYPE = 'application/octet-stream';
 
@@ -18,8 +21,14 @@ const UPLOAD_RETRIES = 3;
  */
 const UPLOAD_URL_TTL_SECONDS = 900;
 
+export type SignArtifactUploadInput = {
+  objectKey: ObjectKey;
+  sizeBytes: number;
+  expiresAt: Date | null;
+};
+
 export abstract class ArtifactStorageRepositoryContract {
-  abstract signUpload(input: { objectKey: ObjectKey; sizeBytes: number }): Promise<string>;
+  abstract signUpload(input: SignArtifactUploadInput): Promise<string>;
   abstract write(input: { objectKey: ObjectKey; body: ReadableStream<Uint8Array> }): Promise<void>;
   abstract read(input: { objectKey: ObjectKey }): ReadableStream<Uint8Array>;
   abstract copy(input: { from: ObjectKey; to: ObjectKey }): Promise<void>;
@@ -60,13 +69,18 @@ export class ArtifactStorageRepository implements ArtifactStorageRepositoryContr
    * Exactly the size that was declared rather than at most it: this end was told what it is being
    * offered, and a body of any other length is not the upload it agreed to.
    */
-  async signUpload({
-    objectKey,
-    sizeBytes,
-  }: {
-    objectKey: ObjectKey;
-    sizeBytes: number;
-  }): Promise<string> {
+  async signUpload({ objectKey, sizeBytes, expiresAt }: SignArtifactUploadInput): Promise<string> {
+    const signingDate = new Date();
+    const expiresIn =
+      expiresAt === null
+        ? UPLOAD_URL_TTL_SECONDS
+        : Math.min(
+            UPLOAD_URL_TTL_SECONDS,
+            Math.floor((expiresAt.getTime() - signingDate.getTime()) / MS_PER_SECOND),
+          );
+    if (expiresIn <= 0) {
+      throw new UnauthorizedError('The deployment grant has expired.');
+    }
     return await getSignedUrl(
       this.signer,
       new PutObjectCommand({
@@ -74,7 +88,7 @@ export class ArtifactStorageRepository implements ArtifactStorageRepositoryContr
         Key: objectKey,
         ContentLength: sizeBytes,
       }),
-      { expiresIn: UPLOAD_URL_TTL_SECONDS, signableHeaders: new Set(['content-length']) },
+      { expiresIn, signingDate, signableHeaders: new Set(['content-length']) },
     );
   }
 
