@@ -3,7 +3,7 @@ import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/plugin.ts';
+import { Identity } from '#lib/auth/identity.ts';
 import { AuthPlugin, CronsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 const MAX_WAIT_MS = 30_000;

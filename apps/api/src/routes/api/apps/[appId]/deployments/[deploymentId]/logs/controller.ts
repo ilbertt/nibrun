@@ -4,7 +4,7 @@ import { type PublicValue, publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, sse } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/plugin.ts';
+import { Identity } from '#lib/auth/identity.ts';
 import { StreamLogsQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';
 import { AuthPlugin, LogsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 

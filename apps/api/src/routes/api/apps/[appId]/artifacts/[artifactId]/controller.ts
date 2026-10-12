@@ -4,7 +4,7 @@ import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap, t } from 'elysia';
 import { ArtifactSchema } from '#lib/api/artifact.ts';
 import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/plugin.ts';
+import { Identity } from '#lib/auth/identity.ts';
 import { UpdateArtifactBodySchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { ArtifactsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 

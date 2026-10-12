@@ -8,7 +8,7 @@ import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/plugin.ts';
+import { Identity } from '#lib/auth/identity.ts';
 import { ReadDirectoryQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/model.ts';
 import { AuthPlugin, FilesystemServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
