@@ -1,3 +1,6 @@
+import { mock } from 'bun:test';
+import { type MemoryDB, memoryAdapter } from 'better-auth/adapters/memory';
+import { getSchema } from 'better-auth/db';
 import { TEST_SECRETS_KEY_BASE64 } from '#tests/support/secrets.ts';
 
 const BETTER_AUTH_SECRET_LENGTH = 32;
@@ -20,6 +23,20 @@ Object.assign(process.env, {
   S3_REGION: 'test',
   APP_HOST_DOMAIN: 'apps.test',
   TENANT_SECRETS_KEY: TEST_SECRETS_KEY_BASE64,
+});
+
+const { createAuth } = await import('#lib/auth/better-auth.ts');
+const authDatabase: MemoryDB = {};
+mock.module('#lib/auth/better-auth.ts', function controllerAuthFactory() {
+  return {
+    createAuth(input: Parameters<typeof createAuth>[0]) {
+      const auth = createAuth({ ...input, database: memoryAdapter(authDatabase) });
+      for (const table of Object.keys(getSchema(auth.options))) {
+        authDatabase[table] ??= [];
+      }
+      return auth;
+    },
+  };
 });
 
 const { createApp } = await import('#app.ts');

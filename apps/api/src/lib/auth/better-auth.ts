@@ -1,14 +1,12 @@
+import { oauthProvider } from '@better-auth/oauth-provider';
 import { Value } from '@sinclair/typebox/value';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
-import { anonymous, bearer, deviceAuthorization } from 'better-auth/plugins';
+import { anonymous, bearer, deviceAuthorization, jwt } from 'better-auth/plugins';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { OAUTH_ISSUER } from '#lib/auth/oauth-issuer.ts';
+import { AUTH_BASE_PATH, AUTH_JWKS_PATH } from '#lib/auth/paths.ts';
 import { env } from '#lib/env.ts';
-import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import type { AppsService } from '#services/apps.service.ts';
-
-/** Bare path; the api controller applies the `/api` prefix it sits under. */
-export const AUTH_ROUTE_PATH = '/auth';
-const AUTH_BASE_PATH = `${RoutePrefix.Api}${AUTH_ROUTE_PATH}`;
 
 const DEVICE_VERIFICATION_PATH = '/device';
 
@@ -40,6 +38,7 @@ export function createAuth({
     baseURL: env.BASE_URL.origin,
     basePath: AUTH_BASE_PATH,
     secret: env.BETTER_AUTH_SECRET,
+    disabledPaths: ['/token'],
     socialProviders: {
       github: {
         clientId: env.GITHUB_CLIENT_ID,
@@ -47,6 +46,24 @@ export function createAuth({
       },
     },
     plugins: [
+      jwt({
+        jwt: { issuer: OAUTH_ISSUER },
+        jwks: { jwksPath: AUTH_JWKS_PATH },
+        disableSettingJwtHeader: true,
+      }),
+      oauthProvider({
+        loginPage: '/sign-in',
+        consentPage: '/consent',
+        scopes: [],
+        grantTypes: [],
+        resources: [],
+        clientPrivileges() {
+          return false;
+        },
+        resourcePrivileges() {
+          return false;
+        },
+      }),
       deviceAuthorization({ verificationUri: DEVICE_VERIFICATION_PATH }),
       bearer(),
       anonymous({
