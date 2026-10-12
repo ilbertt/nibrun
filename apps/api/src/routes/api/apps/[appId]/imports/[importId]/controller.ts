@@ -3,7 +3,7 @@ import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap, t } from 'elysia';
 import { ImportIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/plugin.ts';
+import { Identity } from '#lib/auth/identity.ts';
 import {
   ImportResponseSchema,
   UpdateImportBodySchema,

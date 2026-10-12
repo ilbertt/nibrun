@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { Elysia, StatusMap } from 'elysia';
 import type { Auth } from '#lib/auth/better-auth.ts';
-import { createAuthPlugin, Identity } from '#lib/auth/plugin.ts';
+import { Identity } from '#lib/auth/identity.ts';
+import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { elysiaErrorHandler } from '#lib/errors.ts';
+import { AuthenticationService } from '#services/authentication.service.ts';
 
 type Session = Awaited<ReturnType<Auth['api']['getSession']>>;
 
@@ -12,9 +14,10 @@ function authAnswering(session: Session): Auth {
 }
 
 function appBehind(auth: Auth) {
+  const authenticationService = new AuthenticationService(auth.api);
   return new Elysia()
     .onError(elysiaErrorHandler)
-    .use(createAuthPlugin(auth))
+    .use(createAuthPlugin(authenticationService))
     .get('/either', () => 'ok', { auth: Identity.Optional })
     .get('/identified', () => 'ok', { auth: Identity.Required });
 }

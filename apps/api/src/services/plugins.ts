@@ -35,6 +35,7 @@ import { AgentService } from '#services/agent.service.ts';
 import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
+import { AuthenticationService } from '#services/authentication.service.ts';
 import { CronsService } from '#services/crons.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
 import { DomainDnsService } from '#services/domain-dns.service.ts';
@@ -182,7 +183,9 @@ const logsService = new LogsService({
 
 export const auth = createAuth({ appsService });
 
-export const AuthPlugin = createAuthPlugin(auth);
+const authenticationService = new AuthenticationService(auth.api);
+
+export const AuthPlugin = createAuthPlugin(authenticationService);
 
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);

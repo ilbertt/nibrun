@@ -1,7 +1,7 @@
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema, SqliteConnectionIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/plugin.ts';
+import { Identity } from '#lib/auth/identity.ts';
 import { pathBelow, RoutePrefix } from '#lib/routes/prefixes.ts';
 import { SqliteClientCorsPlugin } from '#lib/sqlite/cors.ts';
 import { assertSqliteCookieOrigin } from '#lib/sqlite/http.ts';
