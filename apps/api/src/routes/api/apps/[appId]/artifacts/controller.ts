@@ -57,7 +57,7 @@ export const AppsAppIdArtifactsController = new Elysia()
       return status(StatusMap.Created, created);
     },
     {
-      appDeploymentAuth: true,
+      auth: { deploymentGrant: true },
       body: publicSchema(CreateArtifactBodySchema),
       response: { [StatusMap.Created]: publicSchema(CreateArtifactResponseSchema) },
     },

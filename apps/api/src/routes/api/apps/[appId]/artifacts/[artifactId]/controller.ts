@@ -53,7 +53,7 @@ export const AppsAppIdArtifactsArtifactIdController = new Elysia()
       return status(StatusMap.OK, artifact);
     },
     {
-      appDeploymentAuth: true,
+      auth: { deploymentGrant: true },
       body: publicSchema(UpdateArtifactBodySchema),
       response: {
         [StatusMap.OK]: publicSchema(ArtifactSchema),
