@@ -27,7 +27,10 @@ import {
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
-import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
+import type {
+  ArtifactStorageRepositoryContract,
+  SignArtifactUploadInput,
+} from '#repositories/artifact-storage.repository.ts';
 import type {
   AbandonedArtifactRow,
   ArtifactRow,
@@ -295,10 +298,10 @@ const SIGNED_URL = 'https://store.test/nibrun';
 /** A bucket as a map, so what a signed upload wrote and what the api copied are both visible. */
 class FakeStorage implements ArtifactStorageRepositoryContract {
   readonly objects = new Map<ObjectKey, Uint8Array>();
-  readonly signed: { objectKey: ObjectKey; sizeBytes: number }[] = [];
+  readonly signed: SignArtifactUploadInput[] = [];
   readonly copied: { from: ObjectKey; to: ObjectKey }[] = [];
 
-  signUpload(input: { objectKey: ObjectKey; sizeBytes: number }): Promise<string> {
+  signUpload(input: SignArtifactUploadInput): Promise<string> {
     this.signed.push(input);
     return Promise.resolve(`${SIGNED_URL}/${input.objectKey}`);
   }

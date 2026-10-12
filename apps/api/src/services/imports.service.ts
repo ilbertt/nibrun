@@ -127,6 +127,7 @@ export class ImportsService extends Service {
 
     const url = await this.storageRepo.signUpload({
       objectKey: importKey({ appId, importId: pending.id }),
+      expiresAt: null,
       sizeBytes,
     });
 
