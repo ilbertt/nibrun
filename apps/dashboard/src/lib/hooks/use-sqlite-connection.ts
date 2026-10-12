@@ -3,8 +3,14 @@ import {
   type SqliteConnectionSummary,
   sqliteConnectionQueryOptions,
 } from '#queries/sqlite-connection.ts';
+import { sqliteFileConnectionQueryOptions } from '#queries/sqlite-file-connection.ts';
 import { Route } from '#routes/sqlite.tsx';
 
 export function useSqliteConnection(): UseQueryResult<SqliteConnectionSummary, Error> {
-  return useQuery(sqliteConnectionQueryOptions(Route.useSearch().url));
+  const { url, appId, path } = Route.useSearch();
+  return useQuery(
+    url === ''
+      ? sqliteFileConnectionQueryOptions({ appId, path })
+      : sqliteConnectionQueryOptions(url),
+  );
 }
