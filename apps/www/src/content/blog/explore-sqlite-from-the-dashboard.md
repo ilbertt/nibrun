@@ -11,7 +11,10 @@ exporting the data and opening a local copy.
 You can now explore it from the dashboard. Open the database file in a new tab, and the
 queries run against the database your app is using.
 
-![A SQLite database file opens in the nibrun dashboard to browse tables and run read-only SQL.](/blog/explore-sqlite-from-the-dashboard.webp)
+The `nib` CLI can query the same live database. An AI agent with access to your signed-in
+CLI can explore it too, without downloading the file or changing its data.
+
+![A SQLite database file opens in the nibrun explorer, with dashboard, CLI and AI agent access highlighted.](/blog/explore-sqlite-from-the-dashboard.webp)
 
 > **Already running an app?** If it was running before the SQLite explorer launched, you
 > may get a 502 when opening a database. Click **Suspend**, wait until the app shows
@@ -76,10 +79,11 @@ password or token to create before opening the explorer.
 The database stays in your app's persistent directory. Your binary still opens the same file,
 and you can still export it with the rest of your app's data.
 
-## Explore with your AI agent
+## Explore through the CLI or your AI agent
 
-An AI agent with access to your signed-in `nib` CLI can query the live database too.
-Connections are read-only, so it can explore without changing data or schema. Give it the
+Use `nib apps sqlite` to discover the CLI commands for connections and SQL queries.
+An AI agent with access to your signed-in CLI can use those same commands. Connections are
+read-only, so it can explore without changing data or schema. Give it the
 [nibrun skill](https://github.com/ilbertt/nibrun/blob/main/skills/deploy-to-nibrun/SKILL.md#inspecting-sqlite-databases)
 for the CLI workflow.
 
