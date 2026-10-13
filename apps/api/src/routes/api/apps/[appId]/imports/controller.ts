@@ -15,18 +15,26 @@ export const AppsAppIdImportsController = new Elysia()
   .use(AuthPlugin)
   .use(ImportsServicePlugin)
   .guard({ auth: Identity.Required })
-  // Created rather than OK: the import exists from here on, and what is left to do with it is send
-  // the bytes to the url this answers with.
   .post(
     '/apps/:appId/imports',
     async ({ importsService, params, body: bodyInput, user, status }) => {
       const body = Value.Parse(CreateImportBodySchema, bodyInput);
-      const created = await importsService.create({
-        appId: Value.Parse(AppIdSchema, params.appId),
-        ownerId: Value.Parse(OwnerIdSchema, user.id),
-        filename: body.filename,
-        sizeBytes: body.sizeBytes,
-      });
+      const appId = Value.Parse(AppIdSchema, params.appId);
+      const ownerId = Value.Parse(OwnerIdSchema, user.id);
+      const created =
+        'url' in body
+          ? await importsService.createFromUrl({
+              appId,
+              ownerId,
+              url: body.url,
+              sha256: body.sha256,
+            })
+          : await importsService.create({
+              appId,
+              ownerId,
+              filename: body.filename,
+              sizeBytes: body.sizeBytes,
+            });
       return status(StatusMap.Created, created);
     },
     {

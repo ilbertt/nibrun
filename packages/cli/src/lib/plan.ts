@@ -136,7 +136,10 @@ function summary({ options, binarySource, args }: Plan): string {
     ['binary', binarySource],
     ['app', options.app?.name ?? options.name],
     ['port', options.port],
-    ['data', options.dataFolder?.path],
+    [
+      'data',
+      options.dataFolder?.kind === 'url' ? options.dataFolder.url : options.dataFolder?.path,
+    ],
     // Only when it was asked for: a row saying no on every run is one nobody reads.
     ['extra public port', options.extraPublicPort ? 'yes' : undefined],
     ['args', args.length === 0 ? undefined : args.join(' ')],

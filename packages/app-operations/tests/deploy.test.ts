@@ -41,6 +41,7 @@ function apiHolding({
   created = { artifactId: ARTIFACT_ID, url: PUT_URL },
   hostnames = [PENDING_CUSTOM, PLATFORM],
   artifacts = [],
+  createdImport = { importId: IMPORT_ID, url: IMPORT_PUT_URL },
 }: {
   apps: Array<{ id: string; name: string; state?: string }>;
   sent: Sent[];
@@ -48,6 +49,7 @@ function apiHolding({
   // Somewhere to send bytes, or the artifact those bytes already made: one endpoint answers both,
   // and which one a caller is owed is decided by what it asked for.
   created?: { artifactId: string; url: string } | { id: string; digest: string };
+  createdImport?: { importId: string; url: string } | { id: string; digest: string };
   hostnames?: HostnameRow[];
   artifacts?: Pick<Artifact, 'id' | 'digest' | 'sizeBytes' | 'originalFileName'>[];
 }): PublicApiClient {
@@ -99,7 +101,7 @@ function apiHolding({
         post: (body: unknown) => {
           sent.push({ what: 'import', body });
           return Promise.resolve({
-            data: { importId: IMPORT_ID, url: IMPORT_PUT_URL },
+            data: createdImport,
             error: null,
           });
         },
@@ -756,4 +758,39 @@ describe('a binary the api fetches is never sent from this end', () => {
       }),
     ).rejects.toThrow('The api answered an upload with an artifact nobody sent it.');
   });
+});
+
+test('remote initial data is fetched by the API and attached to the deployment without an upload', async () => {
+  const sent: Sent[] = [];
+  const archive = { url: 'https://releases.test/data.tar.gz', sha256: DIGEST };
+  await deploy({
+    api: apiHolding({
+      apps: [],
+      sent,
+      created: { id: ARTIFACT_ID, digest: DIGEST },
+      createdImport: { id: IMPORT_ID, digest: DIGEST },
+    }),
+    binary: { url: 'https://releases.test/my-server' },
+    initialData: archive,
+    args: [],
+  });
+  expect(sent.map((entry) => entry.what)).toEqual(['create', 'artifact', 'import', 'deployment']);
+  expect(sent[2]).toEqual({ what: 'import', body: archive });
+  expect(sent[3]).toEqual({
+    what: 'deployment',
+    body: { artifactId: ARTIFACT_ID, initialDataFrom: IMPORT_ID },
+  });
+});
+
+test('a remote archive response cannot silently become a pending upload', async () => {
+  const sent: Sent[] = [];
+  await expect(
+    deploy({
+      api: apiHolding({ apps: [], sent, created: { id: ARTIFACT_ID, digest: DIGEST } }),
+      binary: { url: 'https://releases.test/my-server' },
+      initialData: { url: 'https://releases.test/data.tar.gz' },
+      args: [],
+    }),
+  ).rejects.toThrow('fetched archive');
+  expect(sent.some((entry) => entry.what === 'deployment')).toBe(false);
 });

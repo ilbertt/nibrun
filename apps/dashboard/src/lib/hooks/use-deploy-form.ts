@@ -1,12 +1,12 @@
 import { trackEvent } from '@repo/analytics';
 import { DEFAULT_HTTP_PORT } from '@repo/api-constants';
 import {
+  type DeployableArchive,
   type DeployableBinary,
   type FetchableBinary,
   InvalidEnvironmentError,
   parseEnvironmentPatch,
   refusedArchiveBody,
-  type UploadableArchive,
 } from '@repo/app-operations';
 import { type DeploySuggestion, namedByUrl, refusedChecksum, refusedUrl } from '@repo/deploy-link';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
@@ -36,7 +36,7 @@ export type DeployFormValues = {
   extraPublicPort: boolean | undefined;
   args: string | undefined;
   environment: EnvironmentVariable[] | undefined;
-  initialData: File | undefined;
+  initialData: FileSource | undefined;
 };
 
 export type DeployFormApi = ReactFormExtendedApi<
@@ -115,11 +115,14 @@ function validateFileSource(source: FileSource): string | undefined {
 export async function validateInitialData({
   value,
 }: {
-  value: File | undefined;
+  value: FileSource | undefined;
 }): Promise<string | undefined> {
-  return value === undefined
-    ? undefined
-    : await refusedArchiveBody({ name: value.name, body: value });
+  const fetched = fetchedFile(value);
+  if (fetched !== undefined) {
+    return refusedUrl(fetched.url) ?? refusedChecksum(fetched.sha256);
+  }
+  const file = pickedFile(value);
+  return file === undefined ? undefined : await refusedArchiveBody({ name: file.name, body: file });
 }
 
 export function validatePort({ value }: { value: string | undefined }): string | undefined {
@@ -315,13 +318,18 @@ function initialDataFrom({
   file,
   replacing,
 }: {
-  file: File | undefined;
+  file: FileSource | undefined;
   replacing: AppSummary | undefined;
-}): UploadableArchive | undefined {
+}): DeployableArchive | undefined {
   if (file === undefined || replacing !== undefined) {
     return undefined;
   }
-  return { name: file.name, body: file };
+  const fetched = fetchedFile(file);
+  if (fetched !== undefined) {
+    return refusedUrl(fetched.url) === undefined ? fetchable(fetched) : undefined;
+  }
+  const local = pickedFile(file);
+  return local === undefined ? undefined : { name: local.name, body: local };
 }
 
 /**

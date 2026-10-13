@@ -7,7 +7,7 @@ import type {
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import { appFor } from '#apps.ts';
-import { type UploadableArchive, uploadImport } from '#imports.ts';
+import { type DeployableArchive, importArchive } from '#imports.ts';
 import {
   type ConfigEdit,
   configPatch,
@@ -92,7 +92,7 @@ export type DeployInput = ConfigEdit & {
   name?: string | undefined;
   // What the app's `data/` is created holding. Nameable on any deployment and accepted on one
   // only while the app's filesystem does not exist yet, which the api is the end that knows.
-  initialData?: UploadableArchive | undefined;
+  initialData?: DeployableArchive | undefined;
   onStep?: ((step: DeployStep) => void) | undefined;
   whileUploading?: UploadWait | undefined;
   upload?: UploadTransport | undefined;
@@ -138,7 +138,7 @@ export async function deploy({
   const initialDataFrom =
     initialData === undefined
       ? undefined
-      : await uploadImport({ api, appId: app.id, archive: initialData, whileUploading, upload });
+      : await importArchive({ api, appId: app.id, archive: initialData, whileUploading, upload });
 
   const deployment = unwrap(
     await api.api.apps({ appId: app.id }).deployments.post({

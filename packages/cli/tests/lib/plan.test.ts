@@ -164,3 +164,16 @@ test('a port is a whole number above zero, so nothing, zero and a negative are r
 test('a port typed as one is passed', () => {
   expect(validatePort('8080')).toBeUndefined();
 });
+
+test('a remote archive selects a new app and appears in the deployment summary', async () => {
+  const dataFolder: InitialData = { kind: 'url', url: 'https://releases.test/data.zip' };
+  const resolved = await completeOptions({
+    api: apiListing({ apps: [{ name: 'demo-abc123', state: 'active' }] }),
+    options: { dataFolder, name: 'new-app', port: 8080 },
+    binarySource: '/tmp/my-server',
+    args: [],
+  });
+  expect(resolved.app).toBeUndefined();
+  expect(prompts.transcript()).toEqual(['confirm:Create new-app and deploy?']);
+  expect(prompts.notes.at(-1)).toContain(`data: ${dataFolder.url}`);
+});
