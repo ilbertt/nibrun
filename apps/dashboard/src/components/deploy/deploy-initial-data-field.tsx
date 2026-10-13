@@ -1,11 +1,8 @@
 import { MAX_IMPORT_SIZE_BYTES } from '@repo/app-operations';
 import { Field, FieldDescription, FieldError } from '@repo/ui/components/field';
-import { FileArchiveIcon } from 'lucide-react';
-import { FileDropZone } from '#components/deploy/file-drop-zone.tsx';
+import { InitialDataSourcePicker } from '#components/deploy/initial-data-source-picker.tsx';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { type DeployFormApi, validateInitialData } from '#lib/hooks/use-deploy-form.ts';
-
-const INITIAL_DATA_INPUT_ID = 'deploy-initial-data';
 
 /**
  * The archive the app's volume is created holding, refused here before it is sent: the api reads
@@ -19,19 +16,15 @@ export function DeployInitialDataField({ api }: { api: DeployFormApi }) {
         const [issue] = field.state.meta.errors;
         return (
           <Field data-invalid={issue !== undefined || undefined}>
-            <FileDropZone
-              inputId={INITIAL_DATA_INPUT_ID}
-              file={field.state.value}
-              icon={FileArchiveIcon}
-              invitation="Drop a .tar.gz or .zip here, or browse for it."
-              clearLabel="Clear the archive"
+            <InitialDataSourcePicker
+              value={field.state.value}
               invalid={issue !== undefined}
-              onPick={field.handleChange}
+              onChange={field.handleChange}
             />
             <FieldDescription>
               Unpacked into <code className="font-mono">data/</code> before the app starts. One{' '}
               <code className="font-mono">.tar.gz</code> or <code className="font-mono">.zip</code>,
-              up to {formatBytes(MAX_IMPORT_SIZE_BYTES)}.
+              up to {formatBytes(MAX_IMPORT_SIZE_BYTES)}. URLs are fetched by nibrun over HTTPS.
             </FieldDescription>
             {issue !== undefined && <FieldError>{issue}</FieldError>}
           </Field>
