@@ -9,12 +9,13 @@ persistent `data/` directory. Your app can use it directly, but looking inside i
 exporting the data and opening a local copy.
 
 You can now explore it from the dashboard. Open the database file in a new tab, and the
-queries run against the database your app is using.
+queries run against the database your app is using through a read-only
+[SQL over HTTP](https://docs.turso.tech/sdk/http/quickstart) connection.
 
 The `nib` CLI can query the same live database. An AI agent with access to your signed-in
 CLI can explore it too, without downloading the file or changing its data.
 
-![A SQLite database file opens in the nibrun explorer, with dashboard, CLI and AI agent access highlighted.](/blog/explore-sqlite-from-the-dashboard.webp)
+![An app.db file inside a microVM uses a SQL over HTTP connection to the SQLite explorer, with dashboard, CLI and AI agent access highlighted.](/blog/explore-sqlite-from-the-dashboard.webp)
 
 > **Already running an app?** If it was running before the SQLite explorer launched, you
 > may get a 502 when opening a database. Click **Suspend**, wait until the app shows
@@ -64,9 +65,10 @@ The explorer header shows the app name and the database's path relative to `/app
 The explorer embeds [LibreDB Studio](https://github.com/libredb/libredb-studio) for table browsing,
 row details and the SQL editor. We adapt its styles to the dashboard and add foreign-key navigation.
 
-Queries use [libSQL's Hrana HTTP v2 protocol](https://github.com/tursodatabase/libsql/blob/main/docs/HTTP_V2_SPEC.md)
-through `@libsql/client` in the browser. nibrun's API relays them to a read-only SQLite connection
-inside your app's microVM.
+SQL over HTTP sends SQL queries and returns their results over HTTP. The dashboard uses
+`@libsql/client` with [libSQL's Hrana HTTP v2 protocol](https://github.com/tursodatabase/libsql/blob/main/docs/HTTP_V2_SPEC.md).
+nibrun's API relays the queries to a read-only SQLite connection inside your app's microVM.
+The database file stays in the guest; browsing it doesn't download a local copy.
 
 ## Your app's file, opened read-only
 
