@@ -1,6 +1,7 @@
 import { mock } from 'bun:test';
 import { type MemoryDB, memoryAdapter } from 'better-auth/adapters/memory';
 import { getSchema } from 'better-auth/db';
+import { TEST_API_ORIGIN } from '#tests/support/api-origin.ts';
 import { TEST_SECRETS_KEY_BASE64 } from '#tests/support/secrets.ts';
 
 const BETTER_AUTH_SECRET_LENGTH = 32;
@@ -9,6 +10,7 @@ const BETTER_AUTH_SECRET_LENGTH = 32;
 // to exist before the app module is imported — hence the dynamic import below. Postgres and the
 // object store are pointed at closed ports: no route reached from here gets that far.
 Object.assign(process.env, {
+  BASE_URL: TEST_API_ORIGIN,
   DATABASE_URL: 'postgres://nobody@127.0.0.1:1/none',
   BETTER_AUTH_SECRET: 'x'.repeat(BETTER_AUTH_SECRET_LENGTH),
   GITHUB_CLIENT_ID: 'test',

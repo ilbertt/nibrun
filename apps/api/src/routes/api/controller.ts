@@ -3,6 +3,7 @@ import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { AppsAppIdArtifactsArtifactIdController } from '#routes/api/apps/[appId]/artifacts/[artifactId]/controller.ts';
 import { AppsAppIdArtifactsController } from '#routes/api/apps/[appId]/artifacts/controller.ts';
 import { AppsAppIdController } from '#routes/api/apps/[appId]/controller.ts';
+import { AppsAppIdDeploymentTokensController } from '#routes/api/apps/[appId]/deployment-tokens/controller.ts';
 import { AppsAppIdDeploymentsDeploymentIdController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/controller.ts';
 import { AppsAppIdDeploymentsDeploymentIdCronsController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/crons/controller.ts';
 import { AppsAppIdDeploymentsDeploymentIdFilesystemController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/controller.ts';
@@ -10,7 +11,6 @@ import { AppsAppIdDeploymentsDeploymentIdLogsController } from '#routes/api/apps
 import { AppsAppIdDeploymentsController } from '#routes/api/apps/[appId]/deployments/controller.ts';
 import { AppsAppIdExportsExportIdController } from '#routes/api/apps/[appId]/exports/[exportId]/controller.ts';
 import { AppsAppIdExportsController } from '#routes/api/apps/[appId]/exports/controller.ts';
-import { AppsAppIdGitHubDeploymentGrantsController } from '#routes/api/apps/[appId]/github-deployment-grants/controller.ts';
 import { AppsAppIdHostnamesController } from '#routes/api/apps/[appId]/hostnames/controller.ts';
 import { AppsAppIdHostnamesDnsController } from '#routes/api/apps/[appId]/hostnames/dns/controller.ts';
 import { AppsAppIdImportsImportIdController } from '#routes/api/apps/[appId]/imports/[importId]/controller.ts';
@@ -31,7 +31,7 @@ export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(HealthController)
   .use(AppsController)
   .use(AppsAppIdController)
-  .use(AppsAppIdGitHubDeploymentGrantsController)
+  .use(AppsAppIdDeploymentTokensController)
   .use(AppsAppIdArtifactsController)
   .use(AppsAppIdArtifactsArtifactIdController)
   .use(AppsAppIdDeploymentsController)

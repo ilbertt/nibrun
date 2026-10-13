@@ -1,8 +1,8 @@
 import { beforeAll, expect, test } from 'bun:test';
+import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { DeploymentGrantSchema } from '#lib/api/deployment-grant.ts';
+import { DeploymentGrantIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
-import { deploymentGrantTokenHash } from '#lib/deployment-grant-token.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import { GitHubDeploymentGrantsService } from '#services/github-deployment-grants.service.ts';
 import {
@@ -34,14 +34,15 @@ function build() {
   return { service, grantsRepo, provider };
 }
 
-test('verified GitHub identity receives an app and run-attempt scoped grant with only its hash persisted', async () => {
+test('verified GitHub identity receives an app and run-attempt scoped grant without credentials persisted', async () => {
   const { service, grantsRepo } = build();
   const identity = { ...githubClaims(), repository: 'ACME/Backend', run_attempt: '2' };
   const identityToken = await signToken({ key, claims: identity });
   const before = Date.now();
   const grant = await service.exchange({ appId: GRANT_APP_ID, identityToken });
-  expect(Value.Check(DeploymentGrantSchema, grant)).toBe(true);
-  const expiresAt = new Date(grant.expiresAt).getTime();
+  expect(grant.app_id).toBe(GRANT_APP_ID);
+  expect(grant.owner_id).toBe(GRANT_OWNER_ID);
+  const expiresAt = grant.expires_at.getTime();
   expect(expiresAt).toBeGreaterThanOrEqual(before + DEPLOYMENT_GRANT_LIFETIME_MS);
   expect(expiresAt).toBeLessThanOrEqual(Date.now() + DEPLOYMENT_GRANT_LIFETIME_MS);
   expect(grantsRepo.lookups).toEqual([{ appId: GRANT_APP_ID, repository: 'acme/backend' }]);
@@ -49,11 +50,13 @@ test('verified GitHub identity receives an app and run-attempt scoped grant with
     appId: GRANT_APP_ID,
     ownerId: GRANT_OWNER_ID,
     identity,
-    tokenHash: deploymentGrantTokenHash(grant.token),
   });
-  expect(JSON.stringify(grantsRepo.writes)).not.toContain(grant.token);
   expect(JSON.stringify(grantsRepo.writes)).not.toContain(identityToken);
-  const authorized = await service.authenticate({ appId: GRANT_APP_ID, token: grant.token });
+  const authorized = await service.authenticate({
+    appId: GRANT_APP_ID,
+    ownerId: GRANT_OWNER_ID,
+    grantId: grant.id,
+  });
   expect(authorized).toMatchObject(githubGrantProvenance(identity));
   expect(authorized.owner_id).toBe(GRANT_OWNER_ID);
 });
@@ -100,7 +103,7 @@ test('a missing rule and a mismatched protected environment both refuse exchange
   expect(grantsRepo.writes).toHaveLength(0);
 });
 
-test('a changed rule detected during insertion never returns the generated token', async () => {
+test('a rule changed during insertion cannot create an authorization grant', async () => {
   const { service, grantsRepo } = build();
   grantsRepo.writable = false;
   await expect(
@@ -109,26 +112,23 @@ test('a changed rule detected during insertion never returns the generated token
   expect(grantsRepo.writes).toHaveLength(1);
 });
 
-test('ordinary session tokens, GitHub JWTs, malformed separators, and owner substitutions cannot authenticate', async () => {
+test('a verified token reference cannot authenticate another owner or app', async () => {
   const { service, grantsRepo } = build();
-  const identityToken = await signToken({ key });
-  const grant = await service.exchange({ appId: GRANT_APP_ID, identityToken });
-  for (const token of [
-    '',
-    'ordinary-session-token',
-    identityToken,
-    grant.token.replace('.', '!'),
-  ]) {
-    await expect(service.authenticate({ appId: GRANT_APP_ID, token })).rejects.toBeInstanceOf(
-      UnauthorizedError,
-    );
-  }
-  expect(grantsRepo.authentications).toHaveLength(0);
-  await expect(
-    service.authenticate({
+  const grant = await service.exchange({
+    appId: GRANT_APP_ID,
+    identityToken: await signToken({ key }),
+  });
+  const substitutions = [
+    { appId: Value.Parse(AppIdSchema, 'other-app'), ownerId: GRANT_OWNER_ID, grantId: grant.id },
+    { appId: GRANT_APP_ID, ownerId: Value.Parse(OwnerIdSchema, 'other-owner'), grantId: grant.id },
+    {
       appId: GRANT_APP_ID,
-      token: grant.token.replace(GRANT_OWNER_ID, 'other-owner'),
-    }),
-  ).rejects.toBeInstanceOf(UnauthorizedError);
-  expect(grantsRepo.authentications).toHaveLength(1);
+      ownerId: GRANT_OWNER_ID,
+      grantId: Value.Parse(DeploymentGrantIdSchema, 'other-grant'),
+    },
+  ];
+  for (const input of substitutions) {
+    await expect(service.authenticate(input)).rejects.toBeInstanceOf(UnauthorizedError);
+  }
+  expect(grantsRepo.authentications).toHaveLength(substitutions.length);
 });

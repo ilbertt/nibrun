@@ -915,6 +915,8 @@ export interface ISelectGitHubWorkflowTrustResult {
 /** Result of query `InsertGitHubDeploymentGrant`. */
 export interface IInsertGitHubDeploymentGrantResult {
     id: IGithubDeploymentGrantsColumns["id"];
+    app_id: IGithubDeploymentGrantsColumns["app_id"];
+    owner_id: IGithubDeploymentGrantsColumns["owner_id"];
     expires_at: IGithubDeploymentGrantsColumns["expires_at"];
 }
 
@@ -2020,7 +2022,6 @@ export interface IGithubDeploymentGrantsColumns {
     owner_id: import("#lib/api/identifiers.ts").OwnerId;
     workflow_id: import("#lib/api/identifiers.ts").TrustedWorkflowId;
     workflow_revision: string;
-    token_hash: string;
     github_token_jti: string;
     github_repository: string;
     github_repository_id: string;
@@ -2178,7 +2179,6 @@ export interface IValidGithubDeploymentGrantsColumns {
     owner_id: import("#lib/api/identifiers.ts").OwnerId | null;
     workflow_id: import("#lib/api/identifiers.ts").TrustedWorkflowId | null;
     workflow_revision: string | null;
-    token_hash: string | null;
     github_token_jti: string | null;
     github_repository: string | null;
     github_repository_id: string | null;
@@ -3057,7 +3057,6 @@ export const schema = {
             owner_id: { _columnName: "owner_id", _foreignKeys: {} },
             workflow_id: { _columnName: "workflow_id", _foreignKeys: { github_deployment_grants_workflow_id_fkey: { _constraintName: "github_deployment_grants_workflow_id_fkey", _references: { _relationName: "github_trusted_deployment_workflows", _columnName: "id" } } } },
             workflow_revision: { _columnName: "workflow_revision", _foreignKeys: {} },
-            token_hash: { _columnName: "token_hash", _foreignKeys: {} },
             github_token_jti: { _columnName: "github_token_jti", _foreignKeys: {} },
             github_repository: { _columnName: "github_repository", _foreignKeys: {} },
             github_repository_id: { _columnName: "github_repository_id", _foreignKeys: {} },
@@ -3077,14 +3076,12 @@ export const schema = {
         },
         _indexes: {
             github_deployment_grants_pkey: { _indexName: "github_deployment_grants_pkey" },
-            github_deployment_grants_token_hash_key: { _indexName: "github_deployment_grants_token_hash_key" },
             github_deployment_grants_token_once_idx: { _indexName: "github_deployment_grants_token_once_idx" }
         },
         _constraints: {
             github_deployment_grants_app_id_fkey: { _constraintName: "github_deployment_grants_app_id_fkey" },
             github_deployment_grants_github_token_jti_check: { _constraintName: "github_deployment_grants_github_token_jti_check" },
             github_deployment_grants_pkey: { _constraintName: "github_deployment_grants_pkey" },
-            github_deployment_grants_token_hash_key: { _constraintName: "github_deployment_grants_token_hash_key" },
             github_deployment_grants_workflow_id_fkey: { _constraintName: "github_deployment_grants_workflow_id_fkey" }
         }
     },
@@ -3213,7 +3210,6 @@ export const schema = {
             owner_id: { _columnName: "owner_id", _foreignKeys: {} },
             workflow_id: { _columnName: "workflow_id", _foreignKeys: {} },
             workflow_revision: { _columnName: "workflow_revision", _foreignKeys: {} },
-            token_hash: { _columnName: "token_hash", _foreignKeys: {} },
             github_token_jti: { _columnName: "github_token_jti", _foreignKeys: {} },
             github_repository: { _columnName: "github_repository", _foreignKeys: {} },
             github_repository_id: { _columnName: "github_repository_id", _foreignKeys: {} },

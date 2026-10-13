@@ -1,18 +1,13 @@
 import type { AppId } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
-import type { DeploymentGrant } from '#lib/api/deployment-grant.ts';
+import type { DeploymentGrantId, OwnerId } from '#lib/api/identifiers.ts';
 import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
-import {
-  createDeploymentGrantToken,
-  deploymentGrantTokenHash,
-  deploymentGrantTokenOwner,
-} from '#lib/deployment-grant-token.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { GitHubActionsOidcClaims } from '#lib/github-actions-oidc.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
-import { toTimestamp } from '#lib/timestamp.ts';
 import { matchesTrustedWorkflow } from '#lib/trusted-workflow.ts';
 import type {
+  CreatedGitHubDeploymentGrantRow,
   GitHubDeploymentGrantRow,
   GitHubDeploymentGrantsRepositoryContract,
   GitHubWorkflowTrustRow,
@@ -26,7 +21,21 @@ const TOKEN_ONCE_CONSTRAINT =
 const INVALID_GRANT = 'Invalid or expired GitHub deployment grant.';
 const UNTRUSTED_IDENTITY = 'GitHub identity is not authorized to deploy this app.';
 
-export class GitHubDeploymentGrantsService extends Service {
+export type ExchangeGitHubDeploymentGrantInput = { appId: AppId; identityToken: string };
+export type AuthenticateGitHubDeploymentGrantInput = {
+  appId: AppId;
+  ownerId: OwnerId;
+  grantId: DeploymentGrantId;
+};
+export interface GitHubDeploymentGrantsServiceContract {
+  exchange(input: ExchangeGitHubDeploymentGrantInput): Promise<CreatedGitHubDeploymentGrantRow>;
+  authenticate(input: AuthenticateGitHubDeploymentGrantInput): Promise<GitHubDeploymentGrantRow>;
+}
+
+export class GitHubDeploymentGrantsService
+  extends Service
+  implements GitHubDeploymentGrantsServiceContract
+{
   private readonly identityService: GitHubActionsIdentityServiceContract;
   private readonly grantsRepo: GitHubDeploymentGrantsRepositoryContract;
 
@@ -45,28 +54,16 @@ export class GitHubDeploymentGrantsService extends Service {
   async exchange({
     appId,
     identityToken,
-  }: {
-    appId: AppId;
-    identityToken: string;
-  }): Promise<DeploymentGrant> {
+  }: ExchangeGitHubDeploymentGrantInput): Promise<CreatedGitHubDeploymentGrantRow> {
     const identity = await this.identityService.verify({ token: identityToken });
     const trust = await this.authorizedTrust({ appId, identity });
     return this.issueGrant({ appId, identity, trust });
   }
 
-  async authenticate({
-    appId,
-    token,
-  }: {
-    appId: AppId;
-    token: string;
-  }): Promise<GitHubDeploymentGrantRow> {
-    const ownerId = this.tokenOwner(token);
-    const grant = await this.grantsRepo.findValid({
-      appId,
-      ownerId,
-      tokenHash: deploymentGrantTokenHash(token),
-    });
+  async authenticate(
+    input: AuthenticateGitHubDeploymentGrantInput,
+  ): Promise<GitHubDeploymentGrantRow> {
+    const grant = await this.grantsRepo.findValid(input);
     if (!grant) {
       throw new UnauthorizedError(INVALID_GRANT);
     }
@@ -98,8 +95,7 @@ export class GitHubDeploymentGrantsService extends Service {
     appId: AppId;
     identity: GitHubActionsOidcClaims;
     trust: GitHubWorkflowTrustRow;
-  }): Promise<DeploymentGrant> {
-    const token = createDeploymentGrantToken({ ownerId: trust.owner_id });
+  }): Promise<CreatedGitHubDeploymentGrantRow> {
     const expiresAt = new Date(Date.now() + DEPLOYMENT_GRANT_LIFETIME_MS);
     const grant = await this.grantsRepo
       .create({
@@ -107,7 +103,6 @@ export class GitHubDeploymentGrantsService extends Service {
         ownerId: trust.owner_id,
         trust,
         identity,
-        tokenHash: deploymentGrantTokenHash(token),
         expiresAt,
       })
       .catch(function rejectReplay(error: unknown) {
@@ -121,14 +116,6 @@ export class GitHubDeploymentGrantsService extends Service {
     if (!grant) {
       throw new UnauthorizedError(UNTRUSTED_IDENTITY);
     }
-    return { id: grant.id, token, expiresAt: toTimestamp(grant.expires_at) };
-  }
-
-  private tokenOwner(token: string) {
-    try {
-      return deploymentGrantTokenOwner(token);
-    } catch {
-      throw new UnauthorizedError(INVALID_GRANT);
-    }
+    return grant;
   }
 }

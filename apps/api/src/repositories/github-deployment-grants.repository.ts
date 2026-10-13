@@ -1,6 +1,6 @@
 import type { AppId } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
-import type { OwnerId } from '#lib/api/identifiers.ts';
+import type { DeploymentGrantId, OwnerId } from '#lib/api/identifiers.ts';
 import type { GitHubActionsOidcClaims } from '#lib/github-actions-oidc.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -12,11 +12,14 @@ export type CreateGitHubDeploymentGrantInput = {
   ownerId: OwnerId;
   trust: GitHubWorkflowTrustRow;
   identity: GitHubActionsOidcClaims;
-  tokenHash: string;
   expiresAt: Date;
 };
 export type FindGitHubWorkflowTrustInput = { appId: AppId; repository: string };
-export type FindGitHubDeploymentGrantInput = { appId: AppId; ownerId: OwnerId; tokenHash: string };
+export type FindGitHubDeploymentGrantInput = {
+  appId: AppId;
+  ownerId: OwnerId;
+  grantId: DeploymentGrantId;
+};
 
 export abstract class GitHubDeploymentGrantsRepositoryContract {
   abstract findTrust(input: FindGitHubWorkflowTrustInput): Promise<GitHubWorkflowTrustRow | null>;
@@ -51,17 +54,16 @@ export class GitHubDeploymentGrantsRepository
     ownerId,
     trust,
     identity,
-    tokenHash,
     expiresAt,
   }: CreateGitHubDeploymentGrantInput): Promise<CreatedGitHubDeploymentGrantRow | null> {
     const [row] = await this.sql.InsertGitHubDeploymentGrant`
       INSERT INTO nibrun.github_deployment_grants
-        (app_id, owner_id, workflow_id, workflow_revision, token_hash, expires_at,
+        (app_id, owner_id, workflow_id, workflow_revision, expires_at,
          github_token_jti, github_repository, github_repository_id, github_repository_owner_id,
          github_workflow_ref, github_ref, github_event_name, github_commit_sha,
          github_run_id, github_run_attempt, github_environment,
          github_job_workflow_ref, github_job_workflow_sha)
-      SELECT a.id, a.owner_id, w.id, w.current_revision, ${tokenHash}, ${expiresAt},
+      SELECT a.id, a.owner_id, w.id, w.current_revision, ${expiresAt},
         ${identity.jti}, ${identity.repository}, ${identity.repository_id}, ${identity.repository_owner_id},
         ${identity.workflow_ref}, ${identity.ref}, ${identity.event_name}, ${identity.sha},
         ${identity.run_id}, ${identity.run_attempt}, ${identity.environment ?? null},
@@ -73,7 +75,7 @@ export class GitHubDeploymentGrantsRepository
         AND w.deleted_at IS NULL
         AND to_timestamp(${identity.exp}) > statement_timestamp()
         AND ${expiresAt}::timestamptz > statement_timestamp()
-      RETURNING id, expires_at
+      RETURNING id, app_id, owner_id, expires_at
     `;
     return row ?? null;
   }
@@ -81,7 +83,7 @@ export class GitHubDeploymentGrantsRepository
   async findValid({
     appId,
     ownerId,
-    tokenHash,
+    grantId,
   }: FindGitHubDeploymentGrantInput): Promise<GitHubDeploymentGrantRow | null> {
     const [row] = await this.sql.SelectValidGitHubDeploymentGrant`
       SELECT g.id, g.app_id, g.owner_id, g.workflow_id, g.expires_at,
@@ -90,7 +92,7 @@ export class GitHubDeploymentGrantsRepository
         g.github_run_id, g.github_run_attempt, g.github_environment,
         g.github_job_workflow_ref, g.github_job_workflow_sha
       FROM nibrun.valid_github_deployment_grants g
-      WHERE g.app_id = ${appId} AND g.owner_id = ${ownerId} AND g.token_hash = ${tokenHash}
+      WHERE g.app_id = ${appId} AND g.owner_id = ${ownerId} AND g.id = ${grantId}
     `;
     return row ?? null;
   }

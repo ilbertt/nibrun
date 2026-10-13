@@ -1,8 +1,8 @@
+import { GITHUB_ACTIONS_OIDC_AUDIENCE } from '@repo/api-constants';
 import { Value } from '@sinclair/typebox/value';
 import { type FlattenedJWSInput, type JWSHeaderParameters, type JWTPayload, jwtVerify } from 'jose';
 import { UnauthorizedError } from '#lib/errors.ts';
 import {
-  GITHUB_ACTIONS_OIDC_AUDIENCE,
   GITHUB_ACTIONS_OIDC_ISSUER,
   type GitHubActionsOidcClaims,
   GitHubActionsOidcClaimsSchema,

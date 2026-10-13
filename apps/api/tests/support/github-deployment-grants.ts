@@ -1,6 +1,7 @@
 import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { DeploymentGrantIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
 import type { GitHubActionsOidcClaims } from '#lib/github-actions-oidc.ts';
 import type {
   CreatedGitHubDeploymentGrantRow,
@@ -11,6 +12,7 @@ import type {
   GitHubDeploymentGrantsRepositoryContract,
   GitHubWorkflowTrustRow,
 } from '#repositories/github-deployment-grants.repository.ts';
+import { githubClaims } from '#tests/support/github-actions-oidc.ts';
 import { trustedWorkflowResource } from '#tests/support/trusted-workflows.ts';
 
 export const GRANT_APP_ID = Value.Parse(AppIdSchema, 'app-1');
@@ -54,9 +56,8 @@ export class StubGitHubDeploymentGrantsRepository
 
   findValid(input: FindGitHubDeploymentGrantInput): Promise<GitHubDeploymentGrantRow | null> {
     this.authentications.push(input);
-    const write = this.writes.at(-1);
     const valid =
-      write?.tokenHash === input.tokenHash &&
+      this.grant?.id === input.grantId &&
       this.grant?.app_id === input.appId &&
       this.grant?.owner_id === input.ownerId &&
       this.grant.expires_at.getTime() > Date.now();
@@ -79,5 +80,16 @@ export function githubGrantProvenance(identity: GitHubActionsOidcClaims) {
     github_environment: identity.environment ?? null,
     github_job_workflow_ref: identity.job_workflow_ref ?? null,
     github_job_workflow_sha: identity.job_workflow_sha ?? null,
+  };
+}
+
+export function githubDeploymentGrant(): GitHubDeploymentGrantRow {
+  return {
+    id: GRANT_ID,
+    app_id: GRANT_APP_ID,
+    owner_id: GRANT_OWNER_ID,
+    workflow_id: trustedWorkflowResource().id,
+    expires_at: new Date(Date.now() + DEPLOYMENT_GRANT_LIFETIME_MS),
+    ...githubGrantProvenance(githubClaims()),
   };
 }

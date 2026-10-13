@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
+import { GITHUB_ACTIONS_OIDC_AUDIENCE } from '@repo/api-constants';
 import type { JWTPayload } from 'jose';
 import { UnauthorizedError } from '#lib/errors.ts';
-import { GITHUB_ACTIONS_OIDC_AUDIENCE } from '#lib/github-actions-oidc.ts';
 import {
   GitHubOidcProviderFixture,
   githubClaims,
