@@ -11,11 +11,22 @@ import { Value } from '@sinclair/typebox/value';
 import type { ImportId, OwnerId } from '#lib/api/identifiers.ts';
 import type { Import } from '#lib/api/import.ts';
 import { isAppDataArchive, OPENING_BYTES } from '#lib/archive/app-data.ts';
+import { ArtifactTooLargeError, boundedTo } from '#lib/artifact-digest.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
+import { type RemoteFetchSlots, sourceRefusal } from '#lib/remote-fetch.ts';
+import { filenameFromUrl, withoutCredentials } from '#lib/remote-url.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
-import type { ImportRow, ImportsRepositoryContract } from '#repositories/imports.repository.ts';
+import type {
+  ImportRow,
+  ImportsRepositoryContract,
+  PendingImportRow,
+} from '#repositories/imports.repository.ts';
+import {
+  InterruptedSourceError,
+  type RemoteSourceRepositoryContract,
+} from '#repositories/remote-source.repository.ts';
 import { Service } from '#services/service.ts';
 
 const NO_SUCH_APP = 'App not found.';
@@ -73,20 +84,28 @@ export class ImportsService extends Service {
   private readonly importsRepo: ImportsRepositoryContract;
   private readonly storageRepo: ArtifactStorageRepositoryContract;
   private readonly appsRepo: AppsRepositoryContract;
+  private readonly sourceRepo: RemoteSourceRepositoryContract;
+  private readonly fetchSlots: RemoteFetchSlots;
 
   constructor({
     importsRepo,
     storageRepo,
     appsRepo,
+    sourceRepo,
+    fetchSlots,
   }: {
     importsRepo: ImportsRepositoryContract;
     storageRepo: ArtifactStorageRepositoryContract;
     appsRepo: AppsRepositoryContract;
+    sourceRepo: RemoteSourceRepositoryContract;
+    fetchSlots: RemoteFetchSlots;
   }) {
     super();
     this.importsRepo = importsRepo;
     this.storageRepo = storageRepo;
     this.appsRepo = appsRepo;
+    this.sourceRepo = sourceRepo;
+    this.fetchSlots = fetchSlots;
   }
 
   /**
@@ -132,6 +151,112 @@ export class ImportsService extends Service {
     });
 
     return { importId: pending.id, url };
+  }
+
+  async createFromUrl({
+    appId,
+    ownerId,
+    url,
+    sha256,
+  }: {
+    appId: AppId;
+    ownerId: OwnerId;
+    url: string;
+    sha256?: Sha256Digest | undefined;
+  }): Promise<Import> {
+    if (!(await this.appsRepo.isOwnedBy({ appId, ownerId }))) {
+      throw new NotFoundError(NO_SUCH_APP);
+    }
+    const filename = filenameFromUrl(url);
+    if (filename === undefined) {
+      throw new BadRequestError("The url has to end in the archive's own name: .../data.tar.gz");
+    }
+    this.fetchSlots.take(ownerId);
+    try {
+      return await this.fetchArchive({ appId, ownerId, url, filename, sha256 });
+    } finally {
+      this.fetchSlots.release(ownerId);
+    }
+  }
+
+  private async fetchArchive({
+    appId,
+    ownerId,
+    url,
+    filename,
+    sha256,
+  }: {
+    appId: AppId;
+    ownerId: OwnerId;
+    url: string;
+    filename: Filename;
+    sha256: Sha256Digest | undefined;
+  }): Promise<Import> {
+    const source = await this.sourceRepo.open({ url });
+    const said = withoutCredentials(url);
+    if (source.outcome !== 'open') {
+      throw new BadRequestError(sourceRefusal({ url: said, source }));
+    }
+    if (
+      source.declaredSizeBytes !== undefined &&
+      source.declaredSizeBytes > MAX_IMPORT_SIZE_BYTES
+    ) {
+      await source.body.cancel().catch(() => undefined);
+      throw new BadRequestError(TOO_LARGE);
+    }
+    let pending: PendingImportRow | null;
+    try {
+      pending = await this.importsRepo.insertPending({
+        appId,
+        ownerId,
+        originalFileName: filename,
+      });
+    } catch (failure) {
+      await source.body.cancel().catch(() => undefined);
+      throw failure;
+    }
+    if (!pending) {
+      await source.body.cancel().catch(() => undefined);
+      throw new NotFoundError(NO_SUCH_APP);
+    }
+    const objectKey = importKey({ appId, importId: pending.id });
+    const inspection = inspectingArchive();
+    const body = boundedTo({
+      source: source.body,
+      maxSizeBytes: MAX_IMPORT_SIZE_BYTES,
+    }).pipeThrough(inspection.through);
+    try {
+      await this.storageRepo.write({ objectKey, body });
+      const uploaded = inspection.result();
+      if (sha256 !== undefined && uploaded.digest !== sha256) {
+        throw new BadRequestError(
+          `The url served ${uploaded.digest}, not the ${sha256} that was asked for.`,
+        );
+      }
+      const stored = await this.importsRepo.complete({
+        appId,
+        ownerId,
+        importId: pending.id,
+        objectKey,
+        ...uploaded,
+      });
+      if (!stored) {
+        throw new NotFoundError(NO_SUCH_IMPORT);
+      }
+      return toImport(stored);
+    } catch (failure) {
+      await body.cancel().catch(() => undefined);
+      if (await this.discard({ objectKey })) {
+        await this.importsRepo.remove({ appId, ownerId, importId: pending.id });
+      }
+      if (failure instanceof ArtifactTooLargeError) {
+        throw new BadRequestError(TOO_LARGE);
+      }
+      if (failure instanceof InterruptedSourceError) {
+        throw new BadRequestError(`The url stopped sending before the archive was whole: ${said}`);
+      }
+      throw failure;
+    }
   }
 
   /**
@@ -324,11 +449,13 @@ export class ImportsService extends Service {
    * Failing the request over it would report an upload that did not happen, so this is logged and
    * left to the rule.
    */
-  private async discard({ objectKey }: { objectKey: ObjectKey }): Promise<void> {
+  private async discard({ objectKey }: { objectKey: ObjectKey }): Promise<boolean> {
     try {
       await this.storageRepo.remove({ objectKey });
+      return true;
     } catch (error) {
       this.logger.warn('an uploaded import could not be removed', { objectKey, error });
+      return false;
     }
   }
 }
@@ -349,5 +476,50 @@ function toImport(row: ImportRow): Import {
     sizeBytes: Number(row.size_bytes),
     originalFileName: row.original_file_name,
     createdAt: toTimestamp(row.created_at),
+  };
+}
+
+function inspectingArchive(): {
+  through: TransformStream<Uint8Array, Uint8Array>;
+  result: () => UploadedArchive;
+} {
+  const hasher = new Bun.CryptoHasher(DIGEST_ALGORITHM);
+  const opening = new Uint8Array(OPENING_BYTES);
+  let held = 0;
+  let sizeBytes = 0;
+  let uploaded: UploadedArchive | undefined;
+  const through = new TransformStream<Uint8Array, Uint8Array>({
+    // biome-ignore lint/complexity/useMaxParams: the stream API supplies the chunk and controller
+    async transform(chunk, controller) {
+      const wasComplete = held === OPENING_BYTES;
+      const taken = chunk.subarray(0, OPENING_BYTES - held);
+      opening.set(taken, held);
+      held += taken.byteLength;
+      sizeBytes += chunk.byteLength;
+      hasher.update(chunk);
+      if (!wasComplete && held === OPENING_BYTES && !(await isAppDataArchive(opening))) {
+        throw new BadRequestError(NOT_AN_ARCHIVE);
+      }
+      controller.enqueue(chunk);
+    },
+    async flush() {
+      if (!(await isAppDataArchive(opening.subarray(0, held)))) {
+        throw new BadRequestError(NOT_AN_ARCHIVE);
+      }
+      uploaded = {
+        digest: Value.Parse(Sha256DigestSchema, hasher.digest(HEX_ENCODING)),
+        sizeBytes,
+        opening: opening.subarray(0, held),
+      };
+    },
+  });
+  return {
+    through,
+    result() {
+      if (uploaded === undefined) {
+        throw new Error('The archive was not fully stored.');
+      }
+      return uploaded;
+    },
   };
 }

@@ -48,12 +48,16 @@ export async function uploadImport({
   if (refusal) {
     throw new ApiError(refusal);
   }
-  const { importId, url } = unwrap(
+  const created = unwrap(
     await api.api.apps({ appId }).imports.post({
       filename: archive.name,
       sizeBytes: archive.body.size,
     }),
   );
+  if ('digest' in created) {
+    throw new ApiError('The api answered an upload with an archive nobody sent it.');
+  }
+  const { importId, url } = created;
   const pending = api.api.apps({ appId }).imports({ importId });
 
   try {

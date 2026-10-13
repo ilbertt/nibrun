@@ -60,3 +60,22 @@ describe('a request that could not name an archive is not one', () => {
     expect((await report({ upload: 'maybe' })).status).toBe(StatusMap['Bad Request']);
   });
 });
+
+test('fetching a remote data archive requires a session', async () => {
+  expect((await create({ url: 'https://releases.test/data.tar.gz' })).status).toBe(
+    StatusMap.Unauthorized,
+  );
+});
+
+test.each(['http://releases.test/data.zip', 'file:///data.zip', 'https://releases.test/data zip'])(
+  'initial data URL %s is rejected',
+  async (url) => {
+    expect((await create({ url })).status).toBe(StatusMap['Bad Request']);
+  },
+);
+
+test('a malformed archive checksum is refused', async () => {
+  expect((await create({ url: 'https://releases.test/data.zip', sha256: 'wrong' })).status).toBe(
+    StatusMap['Bad Request'],
+  );
+});
