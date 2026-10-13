@@ -28,7 +28,11 @@ import {
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
-import { MAX_CONCURRENT_FETCHES, MAX_CONCURRENT_FETCHES_PER_OWNER } from '#lib/remote-fetch.ts';
+import {
+  MAX_CONCURRENT_FETCHES,
+  MAX_CONCURRENT_FETCHES_PER_OWNER,
+  RemoteFetchSlots,
+} from '#lib/remote-fetch.ts';
 import type {
   ArtifactStorageRepositoryContract,
   SignArtifactUploadInput,
@@ -573,6 +577,7 @@ function build({
       cachedRepo,
       releaseRepo,
       appsRepo: ownership,
+      fetchSlots: new RemoteFetchSlots(),
     }),
   };
 }

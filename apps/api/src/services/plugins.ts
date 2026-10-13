@@ -69,6 +69,8 @@ const cloudflareDnsClient = new CloudflareDnsClient();
 
 const victoriaLogsClient = new VictoriaLogsClient(env.VICTORIALOGS_ENDPOINT);
 
+const remoteFetchSlots = new RemoteFetchSlots();
+
 const agentRepository = new AgentRepository({ sql, secretsKey });
 const assetsRepository = new AssetsRepository(sql);
 const healthRepository = new HealthRepository({
@@ -156,7 +158,6 @@ const sqliteService = new SqliteService({
     return openRemoteSqliteSession({ ...input, relay: sqliteRelayService });
   },
 });
-const remoteFetchSlots = new RemoteFetchSlots();
 const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,

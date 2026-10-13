@@ -28,7 +28,7 @@ import {
 } from '#lib/artifact-digest.ts';
 import { describeMachine } from '#lib/elf.ts';
 import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
-import { RemoteFetchSlots, sourceRefusal } from '#lib/remote-fetch.ts';
+import { type RemoteFetchSlots, sourceRefusal } from '#lib/remote-fetch.ts';
 import { carriesCredentials, filenameFromUrl, withoutCredentials } from '#lib/remote-url.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
@@ -244,7 +244,7 @@ export class ArtifactsService extends Service {
     cachedRepo,
     releaseRepo,
     appsRepo,
-    fetchSlots = new RemoteFetchSlots(),
+    fetchSlots,
   }: {
     artifactsRepo: ArtifactsRepositoryContract;
     storageRepo: ArtifactStorageRepositoryContract;
@@ -252,7 +252,7 @@ export class ArtifactsService extends Service {
     cachedRepo: CachedBinariesRepositoryContract;
     releaseRepo: ReleaseDigestRepositoryContract;
     appsRepo: AppOwnershipRepositoryContract;
-    fetchSlots?: RemoteFetchSlots;
+    fetchSlots: RemoteFetchSlots;
   }) {
     super();
     this.artifactsRepo = artifactsRepo;
