@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia';
-import { AUTH_ROUTE_PATH } from '#lib/auth/better-auth.ts';
+import { AUTH_ROUTE_PATH } from '#lib/auth/paths.ts';
 import { auth } from '#services/plugins.ts';
 
 // better-auth owns every path under its base path and reads the request itself,
