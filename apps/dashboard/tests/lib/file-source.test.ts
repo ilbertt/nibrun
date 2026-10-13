@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 import {
-  binaryName,
-  fetchedBinary,
+  fetchedFile,
   fetchedUrl,
   pickedFile,
   sourceFromUrl,
-} from '#lib/binary-source.ts';
+  sourceName,
+} from '#lib/file-source.ts';
 
 const URL_SOURCE = 'https://github.com/me/app/releases/download/v1/my-server';
 const FILE = new File([], 'my-server');
@@ -19,9 +19,9 @@ test('a file and a url are both the binary, and each is only itself', () => {
 });
 
 test('what the binary is called is answered the same way for both', () => {
-  expect(binaryName(FILE)).toBe('my-server');
-  expect(binaryName({ url: URL_SOURCE })).toBe('my-server');
-  expect(binaryName(undefined)).toBeUndefined();
+  expect(sourceName(FILE)).toBe('my-server');
+  expect(sourceName({ url: URL_SOURCE })).toBe('my-server');
+  expect(sourceName(undefined)).toBeUndefined();
 });
 
 // A box being cleared has to leave the field empty rather than holding a url of no characters,
@@ -38,6 +38,6 @@ test('an empty box is not a binary', () => {
  * nothing on the form could show.
  */
 test('a url typed over the one a link brought carries none of its checksum', () => {
-  expect(fetchedBinary({ url: URL_SOURCE, sha256: CHECKSUM })?.sha256).toBe(CHECKSUM);
+  expect(fetchedFile({ url: URL_SOURCE, sha256: CHECKSUM })?.sha256).toBe(CHECKSUM);
   expect(sourceFromUrl(URL_SOURCE)).toEqual({ url: URL_SOURCE });
 });

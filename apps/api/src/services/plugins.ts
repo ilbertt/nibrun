@@ -7,6 +7,7 @@ import { CloudflareClient } from '#lib/cloudflare/client.ts';
 import { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
+import { RemoteFetchSlots } from '#lib/remote-fetch.ts';
 import { artifactsS3, exportsS3, importsS3, uploadSigner } from '#lib/s3/client.ts';
 import { openRemoteSqliteSession } from '#lib/sqlite/remote-session.ts';
 import { readSecretsKey } from '#lib/tenant-secrets.ts';
@@ -17,7 +18,6 @@ import { AppsRepository } from '#repositories/apps.repository.ts';
 import { ArtifactStorageRepository } from '#repositories/artifact-storage.repository.ts';
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
-import { BinarySourceRepository } from '#repositories/binary-source.repository.ts';
 import { CachedBinariesRepository } from '#repositories/cached-binaries.repository.ts';
 import { CustomHostnamesRepository } from '#repositories/custom-hostnames.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
@@ -30,6 +30,7 @@ import { HealthRepository } from '#repositories/health.repository.ts';
 import { ImportsRepository } from '#repositories/imports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
 import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
+import { RemoteSourceRepository } from '#repositories/remote-source.repository.ts';
 import { SqliteConnectionsRepository } from '#repositories/sqlite-connections.repository.ts';
 import { TrustedWorkflowsRepository } from '#repositories/trusted-workflows.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
@@ -68,6 +69,8 @@ const cloudflareDnsClient = new CloudflareDnsClient();
 
 const victoriaLogsClient = new VictoriaLogsClient(env.VICTORIALOGS_ENDPOINT);
 
+const remoteFetchSlots = new RemoteFetchSlots();
+
 const agentRepository = new AgentRepository({ sql, secretsKey });
 const assetsRepository = new AssetsRepository(sql);
 const healthRepository = new HealthRepository({
@@ -89,7 +92,7 @@ const importStorageRepository = new ArtifactStorageRepository({
   signer: uploadSigner,
   bucket: env.IMPORTS_BUCKET,
 });
-const binarySourceRepository = new BinarySourceRepository();
+const remoteSourceRepository = new RemoteSourceRepository();
 const cachedBinariesRepository = new CachedBinariesRepository(sql);
 const releaseDigestRepository = new ReleaseDigestRepository();
 const exportsRepository = new ExportsRepository(sql);
@@ -158,7 +161,8 @@ const sqliteService = new SqliteService({
 const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,
-  sourceRepo: binarySourceRepository,
+  sourceRepo: remoteSourceRepository,
+  fetchSlots: remoteFetchSlots,
   cachedRepo: cachedBinariesRepository,
   releaseRepo: releaseDigestRepository,
   appsRepo: appsRepository,

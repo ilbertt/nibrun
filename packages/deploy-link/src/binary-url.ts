@@ -7,10 +7,10 @@ const SECURE_SCHEME = 'https://';
  */
 export function refusedUrl(url: string): string | undefined {
   if (!url.startsWith(SECURE_SCHEME)) {
-    return 'A binary is fetched over https.';
+    return 'A file is fetched over https.';
   }
   return namedByUrl(url) === undefined
-    ? 'The url has to end in the binary’s own name, as a release download does.'
+    ? 'The url has to end in the file’s own name, as a release download does.'
     : undefined;
 }
 

@@ -2,10 +2,10 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { TCPSocketListener } from 'bun';
 import { isPublicAddress } from '#lib/public-address.ts';
 import {
-  type BinarySource,
-  BinarySourceRepository,
   InterruptedSourceError,
-} from '#repositories/binary-source.repository.ts';
+  type RemoteSource,
+  RemoteSourceRepository,
+} from '#repositories/remote-source.repository.ts';
 
 const BINARY = 'a binary, as far as a source is concerned';
 // A chunked body sizes each chunk in hex, which is the one part of writing one out by hand.
@@ -23,11 +23,11 @@ let byHand: TCPSocketListener;
  * address policy exists to refuse — so the transport tests say so outright, and the policy has a
  * describe of its own where it is left at its default.
  */
-const repo = new BinarySourceRepository({ mayDial: () => true });
-const guarded = new BinarySourceRepository();
+const repo = new RemoteSourceRepository({ mayDial: () => true });
+const guarded = new RemoteSourceRepository();
 // The default policy loosened by exactly this machine, so a test about which *hop* is judged is
 // not answered by the first one being on the wrong side of the rule.
-const fromHere = new BinarySourceRepository({
+const fromHere = new RemoteSourceRepository({
   mayDial: (address) => LOOPBACK.has(address) || isPublicAddress(address),
 });
 const LOOPBACK = new Set(['127.0.0.1', '::1']);
@@ -84,7 +84,7 @@ function answerByHand(socket: Bun.Socket, data: Buffer): void {
   }
 }
 
-async function read(source: BinarySource): Promise<string> {
+async function read(source: RemoteSource): Promise<string> {
   if (source.outcome !== 'open') {
     throw new Error(`the source was ${source.outcome}`);
   }

@@ -1,11 +1,11 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import { isBinaryUrl } from '#lib/binary-url.ts';
 import { hostnameOf, IP_V6, isPublicAddress } from '#lib/public-address.ts';
+import { isRemoteUrl } from '#lib/remote-url.ts';
 
 /**
  * The whole fetch rather than the connect alone: the signal stays with the body, so this is also
- * what bounds a source that answers at once and then trickles. Long enough for the largest binary
+ * what bounds a source that answers at once and then trickles. Long enough for the largest file
  * that may be stored coming over an ordinary link, and short enough that a source which stopped
  * saying anything is a request that failed rather than one still being held.
  */
@@ -21,7 +21,7 @@ const FIRST_REDIRECT_STATUS = 300;
 const FIRST_ERROR_STATUS = 400;
 
 /**
- * A url the api was asked to fetch a binary from, opened but not read. The body is handed over as
+ * A url the api was asked to fetch a file from, opened but not read. The body is handed over as
  * a stream because a binary is the one thing here too large to hold: whoever asked for it decides
  * where the bytes go, and they go there as they arrive.
  *
@@ -29,7 +29,7 @@ const FIRST_ERROR_STATUS = 400;
  * chunked response, or a host that does not say. It is worth having anyway: it is what lets an
  * object too large to store be refused before a byte of it is fetched.
  */
-export type BinarySource =
+export type RemoteSource =
   | { outcome: 'open'; body: ReadableStream<Uint8Array>; declaredSizeBytes: number | undefined }
   | { outcome: 'unreachable' }
   | { outcome: 'refused'; status: number }
@@ -48,16 +48,16 @@ export type AddressPolicy = (address: string) => boolean;
  */
 export class InterruptedSourceError extends Error {
   constructor(cause: unknown) {
-    super('The url stopped sending before the binary was whole.', { cause });
+    super('The url stopped sending before the file was whole.', { cause });
     this.name = 'InterruptedSourceError';
   }
 }
 
-export abstract class BinarySourceRepositoryContract {
-  abstract open(input: { url: string }): Promise<BinarySource>;
+export abstract class RemoteSourceRepositoryContract {
+  abstract open(input: { url: string }): Promise<RemoteSource>;
 }
 
-export class BinarySourceRepository implements BinarySourceRepositoryContract {
+export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
   private readonly mayDial: AddressPolicy;
 
   /**
@@ -74,7 +74,7 @@ export class BinarySourceRepository implements BinarySourceRepositoryContract {
    * rules mean anything: every store that hosts a release answers the address people share with a
    * redirect, and a rule applied to the first address alone is one a `302` walks straight around.
    */
-  async open({ url }: { url: string }): Promise<BinarySource> {
+  async open({ url }: { url: string }): Promise<RemoteSource> {
     const deadline = AbortSignal.timeout(FETCH_DEADLINE_MS);
     let target = url;
 
@@ -88,7 +88,7 @@ export class BinarySourceRepository implements BinarySourceRepositoryContract {
         return await answered(reached.response);
       }
       await discard(reached.response);
-      if (!isBinaryUrl(location)) {
+      if (!isRemoteUrl(location)) {
         return { outcome: 'insecure-redirect', to: location };
       }
       target = location;
@@ -195,7 +195,7 @@ function parse(url: string): URL | undefined {
   }
 }
 
-async function answered(response: Response): Promise<BinarySource> {
+async function answered(response: Response): Promise<RemoteSource> {
   if (!response.ok) {
     await discard(response);
     return { outcome: 'refused', status: response.status };

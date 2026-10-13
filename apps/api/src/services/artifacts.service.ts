@@ -26,14 +26,10 @@ import {
   inspectingPassThrough,
   RefusedArtifactError,
 } from '#lib/artifact-digest.ts';
-import { carriesCredentials, filenameFromUrl, withoutCredentials } from '#lib/binary-url.ts';
 import { describeMachine } from '#lib/elf.ts';
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-  TooManyRequestsError,
-} from '#lib/errors.ts';
+import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
+import { type RemoteFetchSlots, sourceRefusal } from '#lib/remote-fetch.ts';
+import { carriesCredentials, filenameFromUrl, withoutCredentials } from '#lib/remote-url.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
@@ -43,11 +39,6 @@ import type {
   PendingArtifactInsert,
   PendingArtifactRow,
 } from '#repositories/artifacts.repository.ts';
-import {
-  type BinarySource,
-  type BinarySourceRepositoryContract,
-  InterruptedSourceError,
-} from '#repositories/binary-source.repository.ts';
 import type {
   CachedBinariesRepositoryContract,
   CachedBinaryRow,
@@ -57,6 +48,10 @@ import type {
   PublishedDigest,
   ReleaseDigestRepositoryContract,
 } from '#repositories/release-digest.repository.ts';
+import {
+  InterruptedSourceError,
+  type RemoteSourceRepositoryContract,
+} from '#repositories/remote-source.repository.ts';
 import { Service } from '#services/service.ts';
 
 export type ArtifactUploadGrant = Pick<GitHubDeploymentGrantRow, 'expires_at'>;
@@ -69,31 +64,10 @@ const NO_SUCH_UPLOAD = 'No upload is awaiting that artifact.';
 const NOTHING_UPLOADED = 'Nothing was uploaded against that artifact.';
 const UNNAMED_BINARY =
   "The url has to end in the binary's own name, as a release download does: .../my-server";
-const NOTHING_FETCHED = 'The url answered with no body.';
-const TOO_MANY_REDIRECTS = 'The url redirected more times than nibrun will follow.';
 const NOT_AN_EXECUTABLE = 'The artifact is not a Linux executable.';
 // A stranger's app takes one binary. Not counted, because the number is one and the refusal is
 // what to do about it.
 const ONE_BINARY = 'Sign in to upload another binary to this app.';
-
-/**
- * A binary being fetched passes through this process, which is the cost signing an upload away was
- * meant to avoid paying — so how many may be in flight at once is a number rather than whatever a
- * caller starts. Refused rather than queued: a caller told to come back has a request that ended,
- * while one held in a queue is one more transfer this end is carrying while it waits.
- */
-export const MAX_CONCURRENT_FETCHES = 8;
-const TOO_MANY_FETCHES =
-  'nibrun is fetching as many binaries as it will at once. Try again in a moment.';
-
-/**
- * And how many of those one account may be holding, because the ceiling above is the platform's
- * and a single caller pointing eight deploys at a url that dribbles bytes is otherwise the whole
- * of it. What every other tenant sees then is their own deploy refused, with nothing in the answer
- * to say it was somebody else's doing.
- */
-export const MAX_CONCURRENT_FETCHES_PER_OWNER = 3;
-const TOO_MANY_OWN_FETCHES = `This account is already fetching ${MAX_CONCURRENT_FETCHES_PER_OWNER} binaries. Wait for one to finish, then try again.`;
 
 const BYTES_PER_MEBIBYTE = 1_048_576;
 const MAX_ARTIFACT_MEBIBYTES = 256;
@@ -109,37 +83,6 @@ const MAX_ARTIFACT_MEBIBYTES = 256;
  */
 export const MAX_ARTIFACT_SIZE_BYTES = MAX_ARTIFACT_MEBIBYTES * BYTES_PER_MEBIBYTE;
 const TOO_LARGE = `A binary may be at most ${MAX_ARTIFACT_MEBIBYTES} MB.`;
-
-/**
- * A url that answers nothing, said with the url in it. The api reaches it from where the api runs
- * rather than from where the link was followed, so a host only the caller's own network can see is
- * a url that works everywhere they tried it and nowhere this runs.
- */
-function unreachable(url: string): string {
-  return `The url could not be reached from nibrun: ${url}`;
-}
-
-function refusedBy({ url, status }: { url: string; status: number }): string {
-  return `The url answered ${status}, so there was nothing to deploy: ${url}`;
-}
-
-/**
- * The hop that was refused rather than the address that was typed: a redirect out of https is one
- * the caller never saw, and naming it is the difference between a link they can fix and a fetch
- * that failed for no reason they can see.
- */
-function insecureRedirect(to: string): string {
-  return `The url redirected to ${withoutCredentials(to)}, which is not an https address nibrun will follow.`;
-}
-
-/**
- * A url that resolves inside the network the api runs in. Refused rather than fetched: the api can
- * reach addresses the caller cannot, so following one on their behalf lends them a position they
- * were never given — and tells them, in which sentence comes back, what is listening there.
- */
-function privateAddress(host: string): string {
-  return `${host} resolves inside the network nibrun runs in, which is not somewhere it will fetch from.`;
-}
 
 function interruptedSource(url: string): string {
   return `The url stopped sending before the binary was whole: ${url}`;
@@ -288,12 +231,11 @@ function toArtifact(row: ArtifactRow): Artifact {
 export class ArtifactsService extends Service {
   private readonly artifactsRepo: ArtifactsRepositoryContract;
   private readonly storageRepo: ArtifactStorageRepositoryContract;
-  private readonly sourceRepo: BinarySourceRepositoryContract;
+  private readonly sourceRepo: RemoteSourceRepositoryContract;
   private readonly cachedRepo: CachedBinariesRepositoryContract;
   private readonly releaseRepo: ReleaseDigestRepositoryContract;
   private readonly appsRepo: AppOwnershipRepositoryContract;
-  private fetchesInFlight = 0;
-  private readonly fetchesInFlightByOwner = new Map<OwnerId, number>();
+  private readonly fetchSlots: RemoteFetchSlots;
 
   constructor({
     artifactsRepo,
@@ -302,13 +244,15 @@ export class ArtifactsService extends Service {
     cachedRepo,
     releaseRepo,
     appsRepo,
+    fetchSlots,
   }: {
     artifactsRepo: ArtifactsRepositoryContract;
     storageRepo: ArtifactStorageRepositoryContract;
-    sourceRepo: BinarySourceRepositoryContract;
+    sourceRepo: RemoteSourceRepositoryContract;
     cachedRepo: CachedBinariesRepositoryContract;
     releaseRepo: ReleaseDigestRepositoryContract;
     appsRepo: AppOwnershipRepositoryContract;
+    fetchSlots: RemoteFetchSlots;
   }) {
     super();
     this.artifactsRepo = artifactsRepo;
@@ -317,6 +261,7 @@ export class ArtifactsService extends Service {
     this.cachedRepo = cachedRepo;
     this.releaseRepo = releaseRepo;
     this.appsRepo = appsRepo;
+    this.fetchSlots = fetchSlots;
   }
 
   /**
@@ -471,7 +416,7 @@ export class ArtifactsService extends Service {
     // Counted only against a fetch that is going to happen. A release everyone is deploying would
     // otherwise spend the slots it no longer needs, and turn its own popularity into the one
     // answer nobody can act on.
-    this.takeFetchSlot(ownerId);
+    this.fetchSlots.take(ownerId);
     try {
       return await this.fetchInto({
         appId,
@@ -484,38 +429,8 @@ export class ArtifactsService extends Service {
         sourceDigest,
       });
     } finally {
-      this.releaseFetchSlot(ownerId);
+      this.fetchSlots.release(ownerId);
     }
-  }
-
-  /**
-   * The caller's own cap is read first, because it is the one refusal they can do something about:
-   * a platform that is busy is somebody else's afternoon, while being told to wait for one of
-   * your own downloads names the thing they are waiting on.
-   */
-  private takeFetchSlot(ownerId: OwnerId): void {
-    const own = this.fetchesInFlightByOwner.get(ownerId) ?? 0;
-    if (own >= MAX_CONCURRENT_FETCHES_PER_OWNER) {
-      throw new TooManyRequestsError(TOO_MANY_OWN_FETCHES);
-    }
-    if (this.fetchesInFlight >= MAX_CONCURRENT_FETCHES) {
-      throw new TooManyRequestsError(TOO_MANY_FETCHES);
-    }
-
-    this.fetchesInFlight += 1;
-    this.fetchesInFlightByOwner.set(ownerId, own + 1);
-  }
-
-  // Dropped at nothing rather than left at zero, so what this holds is the owners fetching now
-  // and not every owner who ever has.
-  private releaseFetchSlot(ownerId: OwnerId): void {
-    this.fetchesInFlight -= 1;
-    const own = (this.fetchesInFlightByOwner.get(ownerId) ?? 1) - 1;
-    if (own <= 0) {
-      this.fetchesInFlightByOwner.delete(ownerId);
-      return;
-    }
-    this.fetchesInFlightByOwner.set(ownerId, own);
   }
 
   /**
@@ -963,30 +878,6 @@ export class ArtifactsService extends Service {
     } catch (error) {
       this.logger.warn('a staged upload could not be removed', { objectKey, error });
     }
-  }
-}
-
-/** Why the url gave nothing to store, in the terms of whoever wrote the link. */
-function sourceRefusal({
-  url,
-  source,
-}: {
-  url: string;
-  source: Exclude<BinarySource, { outcome: 'open' }>;
-}): string {
-  switch (source.outcome) {
-    case 'unreachable':
-      return unreachable(url);
-    case 'refused':
-      return refusedBy({ url, status: source.status });
-    case 'empty':
-      return NOTHING_FETCHED;
-    case 'insecure-redirect':
-      return insecureRedirect(source.to);
-    case 'too-many-redirects':
-      return TOO_MANY_REDIRECTS;
-    case 'private-address':
-      return privateAddress(source.host);
   }
 }
 

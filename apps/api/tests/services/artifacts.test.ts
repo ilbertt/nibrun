@@ -28,6 +28,11 @@ import {
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
+import {
+  MAX_CONCURRENT_FETCHES,
+  MAX_CONCURRENT_FETCHES_PER_OWNER,
+  RemoteFetchSlots,
+} from '#lib/remote-fetch.ts';
 import type {
   ArtifactStorageRepositoryContract,
   SignArtifactUploadInput,
@@ -41,11 +46,6 @@ import type {
   PendingArtifactInsert,
   PendingArtifactRow,
 } from '#repositories/artifacts.repository.ts';
-import {
-  type BinarySource,
-  type BinarySourceRepositoryContract,
-  InterruptedSourceError,
-} from '#repositories/binary-source.repository.ts';
 import type {
   CachedBinariesRepositoryContract,
   CachedBinaryRow,
@@ -55,11 +55,14 @@ import type {
   ReleaseDigestRepositoryContract,
 } from '#repositories/release-digest.repository.ts';
 import {
+  InterruptedSourceError,
+  type RemoteSource,
+  type RemoteSourceRepositoryContract,
+} from '#repositories/remote-source.repository.ts';
+import {
   type AppOwnershipRepositoryContract,
   ArtifactsService,
   MAX_ARTIFACT_SIZE_BYTES,
-  MAX_CONCURRENT_FETCHES,
-  MAX_CONCURRENT_FETCHES_PER_OWNER,
 } from '#services/artifacts.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 import { archiveOf } from '#tests/support/archives.ts';
@@ -382,19 +385,19 @@ function ownersFillingTheCeiling(): OwnerId[] {
 }
 
 /** The url as whatever it answers with, so what a fetch runs into is set by the test asking. */
-class FakeBinarySource implements BinarySourceRepositoryContract {
+class FakeRemoteSource implements RemoteSourceRepositoryContract {
   readonly opened: string[] = [];
-  private answer: BinarySource = { outcome: 'unreachable' };
+  private answer: RemoteSource = { outcome: 'unreachable' };
   private gate: PromiseWithResolvers<void> | undefined;
   private letGo = false;
 
-  async open({ url }: { url: string }): Promise<BinarySource> {
+  async open({ url }: { url: string }): Promise<RemoteSource> {
     this.opened.push(url);
     await this.gate?.promise;
     return this.answer;
   }
 
-  answers(source: BinarySource): void {
+  answers(source: RemoteSource): void {
     this.answer = source;
   }
 
@@ -558,7 +561,7 @@ function build({
   ownership?: AppOwnershipRepositoryContract;
 } = {}) {
   const artifactsRepo = new FakeArtifactsRepository(OWNER_ID);
-  const sourceRepo = new FakeBinarySource();
+  const sourceRepo = new FakeRemoteSource();
   const cachedRepo = new FakeCachedBinaries();
   const releaseRepo = new FakeReleaseDigests();
   return {
@@ -574,6 +577,7 @@ function build({
       cachedRepo,
       releaseRepo,
       appsRepo: ownership,
+      fetchSlots: new RemoteFetchSlots(),
     }),
   };
 }

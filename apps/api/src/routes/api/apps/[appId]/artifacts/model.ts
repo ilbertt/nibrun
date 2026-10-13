@@ -2,7 +2,7 @@ import { ByteSizeSchema, FilenameSchema, Sha256DigestSchema } from '@repo/protoc
 import { t } from 'elysia';
 import { ArtifactSchema } from '#lib/api/artifact.ts';
 import { ArtifactIdSchema } from '#lib/api/identifiers.ts';
-import { BINARY_URL_PATTERN, MAX_BINARY_URL_LENGTH } from '#lib/binary-url.ts';
+import { MAX_REMOTE_URL_LENGTH, REMOTE_URL_PATTERN } from '#lib/remote-url.ts';
 
 // The bytes the caller holds. The name is theirs, not the store's: a content-addressed key carries
 // none, and this is what a host writes into an export archive. Refused here as a shape rather than
@@ -25,8 +25,8 @@ const UploadedBinarySchema = t.Object({
 const FetchedBinarySchema = t.Object({
   url: t.String({
     description: 'Public https url the api fetches the binary from.',
-    pattern: BINARY_URL_PATTERN,
-    maxLength: MAX_BINARY_URL_LENGTH,
+    pattern: REMOTE_URL_PATTERN,
+    maxLength: MAX_REMOTE_URL_LENGTH,
   }),
   sha256: t.Optional(Sha256DigestSchema),
 });
