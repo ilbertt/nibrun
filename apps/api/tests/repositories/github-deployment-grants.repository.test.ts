@@ -6,10 +6,6 @@ import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
-import {
-  createDeploymentGrantToken,
-  deploymentGrantTokenHash,
-} from '#lib/deployment-grant-token.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { GitHubActionsOidcClaims } from '#lib/github-actions-oidc.ts';
 import { GitHubDeploymentGrantsRepository } from '#repositories/github-deployment-grants.repository.ts';
@@ -88,7 +84,7 @@ async function grant({
   return service().exchange({ appId, identityToken });
 }
 
-test('independent API instances share hashed grants and their immutable GitHub run-attempt provenance', async () => {
+test('independent API instances share grant references and their immutable GitHub run-attempt provenance', async () => {
   const appId = await configuredApp();
   const claims = {
     ...identity(),
@@ -98,22 +94,21 @@ test('independent API instances share hashed grants and their immutable GitHub r
     job_workflow_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
   };
   const issued = await grant({ appId, claims });
-  const authorized = await service().authenticate({ appId, token: issued.token });
+  const authorized = await service().authenticate({ appId, grantId: issued.id, ownerId: OWNER_ID });
   expect(authorized).toMatchObject(githubGrantProvenance(claims));
   expect(authorized.owner_id).toBe(OWNER_ID);
   expect(authorized.app_id).toBe(appId);
   const rows = await sql.unsafe(
-    'SELECT token_hash FROM nibrun.github_deployment_grants WHERE app_id = $1 AND owner_id = $2',
+    'SELECT id, github_token_jti FROM nibrun.github_deployment_grants WHERE app_id = $1 AND owner_id = $2',
     [appId, OWNER_ID],
   );
-  expect(rows).toEqual([{ token_hash: deploymentGrantTokenHash(issued.token) }]);
-  expect(rows[0].token_hash).not.toBe(issued.token);
+  expect(rows).toEqual([{ id: issued.id, github_token_jti: claims.jti }]);
   const otherApp = await configuredApp();
   await expect(
-    service().authenticate({ appId: otherApp, token: issued.token }),
+    service().authenticate({ appId: otherApp, grantId: issued.id, ownerId: OWNER_ID }),
   ).rejects.toBeInstanceOf(UnauthorizedError);
   await expect(
-    service().authenticate({ appId, token: issued.token.replace(OWNER_ID, OTHER_OWNER_ID) }),
+    service().authenticate({ appId, grantId: issued.id, ownerId: OTHER_OWNER_ID }),
   ).rejects.toBeInstanceOf(UnauthorizedError);
 });
 
@@ -157,16 +152,16 @@ test('even an unchanged workflow update rotates authorization and revokes existi
   });
   const updated = await grantsRepository().findTrust({ appId, repository: 'acme/backend' });
   expect(updated?.current_revision).not.toBe(trust.current_revision);
-  await expect(service().authenticate({ appId, token: issued.token })).rejects.toBeInstanceOf(
-    UnauthorizedError,
-  );
+  await expect(
+    service().authenticate({ appId, grantId: issued.id, ownerId: OWNER_ID }),
+  ).rejects.toBeInstanceOf(UnauthorizedError);
 });
 
 test('revocation and recreation preserve replay protection without reviving an old grant', async () => {
   const appId = await configuredApp();
   const identityToken = await signToken({ key, claims: identity() });
   const issued = await service().exchange({ appId, identityToken });
-  const authorized = await service().authenticate({ appId, token: issued.token });
+  const authorized = await service().authenticate({ appId, grantId: issued.id, ownerId: OWNER_ID });
   await workflowsRepository().remove({
     appId,
     ownerId: OWNER_ID,
@@ -179,24 +174,24 @@ test('revocation and recreation preserve replay protection without reviving an o
   expect(retainedGrants).toEqual([
     { workflow_id: authorized.workflow_id, github_token_jti: authorized.github_token_jti },
   ]);
-  await expect(service().authenticate({ appId, token: issued.token })).rejects.toBeInstanceOf(
-    UnauthorizedError,
-  );
+  await expect(
+    service().authenticate({ appId, grantId: issued.id, ownerId: OWNER_ID }),
+  ).rejects.toBeInstanceOf(UnauthorizedError);
   expect(await grantsRepository().findTrust({ appId, repository: 'acme/backend' })).toBeNull();
   await expect(service().exchange({ appId, identityToken })).rejects.toBeInstanceOf(
     UnauthorizedError,
   );
   await workflowsRepository().create({ appId, ownerId: OWNER_ID, workflow: trustedWorkflow() });
-  await expect(service().authenticate({ appId, token: issued.token })).rejects.toBeInstanceOf(
-    UnauthorizedError,
-  );
+  await expect(
+    service().authenticate({ appId, grantId: issued.id, ownerId: OWNER_ID }),
+  ).rejects.toBeInstanceOf(UnauthorizedError);
   await expect(service().exchange({ appId, identityToken })).rejects.toBeInstanceOf(
     UnauthorizedError,
   );
   const replacement = await grant({ appId });
-  expect((await service().authenticate({ appId, token: replacement.token })).id).toBe(
-    replacement.id,
-  );
+  expect(
+    (await service().authenticate({ appId, grantId: replacement.id, ownerId: OWNER_ID })).id,
+  ).toBe(replacement.id);
 });
 
 test('expired grants cannot authenticate or free their consumed GitHub identity for replay', async () => {
@@ -207,9 +202,9 @@ test('expired grants cannot authenticate or free their consumed GitHub identity 
     "UPDATE nibrun.github_deployment_grants SET expires_at = now() - interval '1 second' WHERE id = $1 AND owner_id = $2",
     [issued.id, OWNER_ID],
   );
-  await expect(service().authenticate({ appId, token: issued.token })).rejects.toBeInstanceOf(
-    UnauthorizedError,
-  );
+  await expect(
+    service().authenticate({ appId, grantId: issued.id, ownerId: OWNER_ID }),
+  ).rejects.toBeInstanceOf(UnauthorizedError);
   await expect(service().exchange({ appId, identityToken })).rejects.toBeInstanceOf(
     UnauthorizedError,
   );
@@ -227,7 +222,6 @@ test('a rule changed after verification and an identity expired before insertion
     ownerId: OWNER_ID,
     trust,
     identity: identity(),
-    tokenHash: deploymentGrantTokenHash(createDeploymentGrantToken({ ownerId: OWNER_ID })),
     expiresAt: new Date(Date.now() + DEPLOYMENT_GRANT_LIFETIME_MS),
   };
   expect(await repository.create({ ...input, ownerId: OTHER_OWNER_ID })).toBeNull();
@@ -249,9 +243,9 @@ test('ownership transfer and app deletion invalidate existing deployment capabil
     appId,
     OWNER_ID,
   ]);
-  await expect(service().authenticate({ appId, token: issued.token })).rejects.toBeInstanceOf(
-    UnauthorizedError,
-  );
+  await expect(
+    service().authenticate({ appId, grantId: issued.id, ownerId: OWNER_ID }),
+  ).rejects.toBeInstanceOf(UnauthorizedError);
   const deletedApp = await configuredApp();
   const deletedGrant = await grant({ appId: deletedApp });
   await sql.unsafe("UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1 AND owner_id = $2", [
@@ -259,7 +253,7 @@ test('ownership transfer and app deletion invalidate existing deployment capabil
     OWNER_ID,
   ]);
   await expect(
-    service().authenticate({ appId: deletedApp, token: deletedGrant.token }),
+    service().authenticate({ appId: deletedApp, grantId: deletedGrant.id, ownerId: OWNER_ID }),
   ).rejects.toBeInstanceOf(UnauthorizedError);
   await expect(grant({ appId: deletedApp })).rejects.toBeInstanceOf(UnauthorizedError);
 });
@@ -279,5 +273,7 @@ test('the workflow foreign key rejects references to a nonexistent trust rule', 
       schema.github_deployment_grants._constraints.github_deployment_grants_workflow_id_fkey
         ._constraintName,
   });
-  expect((await service().authenticate({ appId, token: issued.token })).id).toBe(issued.id);
+  expect((await service().authenticate({ appId, grantId: issued.id, ownerId: OWNER_ID })).id).toBe(
+    issued.id,
+  );
 });

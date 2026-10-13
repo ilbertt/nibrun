@@ -45,6 +45,7 @@ import { ExportsService } from '#services/exports.service.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
 import { GitHubActionsOidcService } from '#services/github-actions-oidc.service.ts';
 import { GitHubDeploymentGrantsService } from '#services/github-deployment-grants.service.ts';
+import { GitHubDeploymentTokensService } from '#services/github-deployment-tokens.service.ts';
 import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
@@ -105,15 +106,6 @@ const githubActionsOidcRepository = new GitHubActionsOidcRepository();
 const githubDeploymentGrantsRepository = new GitHubDeploymentGrantsRepository(sql);
 const trustedWorkflowsRepository = new TrustedWorkflowsRepository(sql);
 
-const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);
-const githubDeploymentGrantsService = new GitHubDeploymentGrantsService({
-  identityService: githubActionsOidcService,
-  grantsRepo: githubDeploymentGrantsRepository,
-});
-const trustedWorkflowsService = new TrustedWorkflowsService({
-  workflowsRepo: trustedWorkflowsRepository,
-});
-
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
   appsRepo: appsRepository,
@@ -125,6 +117,24 @@ const appsService = new AppsService({
   importStorageRepo: importStorageRepository,
   appHostDomain: env.APP_HOST_DOMAIN,
   secretsKey,
+});
+
+export const auth = createAuth({
+  appsService,
+  database: authDatabase,
+});
+
+const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);
+const githubDeploymentGrantsService = new GitHubDeploymentGrantsService({
+  identityService: githubActionsOidcService,
+  grantsRepo: githubDeploymentGrantsRepository,
+});
+const githubDeploymentTokensService = new GitHubDeploymentTokensService({
+  auth: auth.api,
+  grantsService: githubDeploymentGrantsService,
+});
+const trustedWorkflowsService = new TrustedWorkflowsService({
+  workflowsRepo: trustedWorkflowsRepository,
 });
 const hostnamesService = new HostnamesService({
   hostnamesRepo: appHostnamesRepository,
@@ -188,7 +198,6 @@ const logsService = new LogsService({
   deploymentsRepo: deploymentsRepository,
 });
 
-export const auth = createAuth({ appsService, database: authDatabase });
 const authenticationService = new AuthenticationService(auth.api);
 export const AuthPlugin = createAuthPlugin(authenticationService);
 
@@ -282,3 +291,7 @@ export const TrustedWorkflowsServicePlugin = new Elysia({
 export const GitHubDeploymentGrantsServicePlugin = new Elysia({
   name: 'service.githubDeploymentGrants',
 }).decorate('githubDeploymentGrantsService', githubDeploymentGrantsService);
+
+export const GitHubDeploymentTokensServicePlugin = new Elysia({
+  name: 'service.githubDeploymentTokens',
+}).decorate('githubDeploymentTokensService', githubDeploymentTokensService);

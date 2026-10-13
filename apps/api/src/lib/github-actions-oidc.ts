@@ -2,7 +2,6 @@ import { type Static, Type } from '@sinclair/typebox';
 
 export const GITHUB_ACTIONS_OIDC_ISSUER = 'https://token.actions.githubusercontent.com';
 export const GITHUB_ACTIONS_OIDC_JWKS_URL = `${GITHUB_ACTIONS_OIDC_ISSUER}/.well-known/jwks`;
-export const GITHUB_ACTIONS_OIDC_AUDIENCE = 'https://nibrun.com';
 
 const nonemptyString = Type.String({ minLength: 1 });
 const identifier = Type.String({ pattern: '^[1-9][0-9]*$' });

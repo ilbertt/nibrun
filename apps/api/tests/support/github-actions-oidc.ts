@@ -1,7 +1,7 @@
 import { expect } from 'bun:test';
+import { GITHUB_ACTIONS_OIDC_AUDIENCE } from '@repo/api-constants';
 import { exportJWK, generateKeyPair, type JWK, SignJWT } from 'jose';
 import {
-  GITHUB_ACTIONS_OIDC_AUDIENCE,
   GITHUB_ACTIONS_OIDC_ISSUER,
   GITHUB_ACTIONS_OIDC_JWKS_URL,
   type GitHubActionsOidcClaims,

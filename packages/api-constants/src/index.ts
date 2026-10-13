@@ -5,4 +5,5 @@ export {
   DEFAULT_INSTANCE_RESOURCES,
   DEFAULT_VOLUME_SIZE_BYTES,
 } from '#app-config.ts';
+export { GITHUB_ACTIONS_OIDC_AUDIENCE } from '#github-actions.ts';
 export { DEFAULT_LOG_TIMERANGE, LOG_TIMERANGE_PATTERN } from '#log-query.ts';
