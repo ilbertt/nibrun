@@ -39,14 +39,16 @@ export type DeployLink = Written & {
   name?: string | undefined;
   binary?: string | undefined;
   sha256?: string | undefined;
+  'initial-data'?: string | undefined;
   minimal?: boolean | undefined;
 };
 
 export function deployLink(search: Record<string, unknown>): DeployLink {
   return {
     name: asText(search.name),
-    binary: asBinaryUrl(search.binary),
+    binary: asFileUrl(search.binary),
     sha256: asChecksum(search.sha256),
+    'initial-data': asFileUrl(search['initial-data']),
     minimal: asFlag(search.minimal),
     ...written(search),
   };
@@ -54,7 +56,7 @@ export function deployLink(search: Record<string, unknown>): DeployLink {
 
 // Refused rather than prefilled: a url this end can already say is wrong is one the owner would
 // otherwise send, wait for, and be told about by the api.
-function asBinaryUrl(value: unknown): string | undefined {
+function asFileUrl(value: unknown): string | undefined {
   const url = asText(value);
   return url !== undefined && refusedUrl(url) === undefined ? url : undefined;
 }
@@ -99,6 +101,7 @@ export type DeploySuggestion = { [K in keyof typeof CONFIGURED]?: Meant[K] } & {
   // What the url should serve, for the api to hold what it fetches to. Never shown: there is
   // nothing to decide about it, and the owner is not the one who wrote it down.
   sha256?: string | undefined;
+  initialData?: DeployLink['initial-data'];
 };
 
 /** The link as the deploy it describes. A parameter renamed above is a line here that stops compiling. */
@@ -107,6 +110,7 @@ export function deploySuggestion(link: DeployLink): DeploySuggestion {
     name: link.name,
     binary: link.binary,
     sha256: link.sha256,
+    initialData: link['initial-data'],
     port: link.port,
     extraPublicPort: link['extra-public-port'],
     args: link.arg,

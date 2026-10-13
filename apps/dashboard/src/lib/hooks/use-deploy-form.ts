@@ -19,7 +19,13 @@ import {
   storedNames,
   unfilledAsked,
 } from '#lib/environment-variables.ts';
-import { type FetchedFile, type FileSource, fetchedFile, pickedFile } from '#lib/file-source.ts';
+import {
+  type FetchedFile,
+  type FileSource,
+  fetchedFile,
+  pickedFile,
+  sourceFromUrl,
+} from '#lib/file-source.ts';
 import { discardHandedOffBinary } from '#lib/handoff-store.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
@@ -251,6 +257,7 @@ function suggestedValues({
       (suggested?.binary === undefined
         ? undefined
         : { url: suggested.binary, sha256: suggested.sha256 }),
+    initialData: sourceFromUrl(suggested?.initialData ?? ''),
     name: suggested?.name ?? namedByUrl(suggested?.binary ?? '') ?? UNTOUCHED.name,
     port: suggested?.port === undefined ? undefined : String(suggested.port),
     // The api makes a stranger's app without the port whatever the link asked, so the form asks
