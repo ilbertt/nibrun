@@ -1,14 +1,10 @@
-import { bunSqlAdapter } from '@ilbertt/better-auth-bun-sql';
 import { Value } from '@sinclair/typebox/value';
-import { betterAuth } from 'better-auth';
+import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization } from 'better-auth/plugins';
-import { sql } from '#db/client.ts';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { env } from '#lib/env.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import type { AppsService } from '#services/apps.service.ts';
-
-const AUTH_SCHEMA = 'auth';
 
 /** Bare path; the api controller applies the `/api` prefix it sits under. */
 export const AUTH_ROUTE_PATH = '/auth';
@@ -32,9 +28,15 @@ export type AppClaimServiceContract = Pick<AppsService, 'claim'>;
  * reached for from here. The one instance the api serves is made there; the schema the CLI
  * prints is read off another, in `scripts/auth-schema.ts`, with nothing behind it.
  */
-export function createAuth({ appsService }: { appsService: AppClaimServiceContract }) {
+export function createAuth({
+  appsService,
+  database,
+}: {
+  appsService: AppClaimServiceContract;
+  database: NonNullable<BetterAuthOptions['database']>;
+}) {
   return betterAuth({
-    database: bunSqlAdapter({ sql, pgSchema: AUTH_SCHEMA }),
+    database,
     baseURL: env.BASE_URL.origin,
     basePath: AUTH_BASE_PATH,
     secret: env.BETTER_AUTH_SECRET,

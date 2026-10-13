@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia';
 import { sql } from '#db/client.ts';
 import { createAuth } from '#lib/auth/better-auth.ts';
+import { authDatabase } from '#lib/auth/database.ts';
 import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { CloudflareClient } from '#lib/cloudflare/client.ts';
 import { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
@@ -181,7 +182,7 @@ const logsService = new LogsService({
   deploymentsRepo: deploymentsRepository,
 });
 
-export const auth = createAuth({ appsService });
+export const auth = createAuth({ appsService, database: authDatabase });
 const authenticationService = new AuthenticationService(auth.api);
 export const AuthPlugin = createAuthPlugin(authenticationService);
 
