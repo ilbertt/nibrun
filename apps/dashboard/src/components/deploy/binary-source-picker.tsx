@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@repo/ui/components/ta
 import { LinkIcon, UploadIcon } from 'lucide-react';
 import { useState } from 'react';
 import { BinaryDropZone } from '#components/deploy/binary-drop-zone.tsx';
-import { type BinarySource, fetchedUrl, pickedFile, sourceFromUrl } from '#lib/binary-source.ts';
+import { type FileSource, fetchedUrl, pickedFile, sourceFromUrl } from '#lib/file-source.ts';
 
 export const BINARY_URL_INPUT_ID = 'deploy-binary-url';
 
@@ -26,10 +26,10 @@ export function BinarySourcePicker({
   keeping,
   onChange,
 }: {
-  value: BinarySource | undefined;
+  value: FileSource | undefined;
   invalid: boolean;
   keeping: boolean;
-  onChange: (source: BinarySource | undefined) => void;
+  onChange: (source: FileSource | undefined) => void;
 }) {
   const [chosen, setChosen] = useState<Chosen>(fetchedUrl(value) === undefined ? 'file' : 'url');
 
@@ -95,7 +95,7 @@ function heldBy({
   value,
 }: {
   chosen: Chosen;
-  value: BinarySource | undefined;
-}): BinarySource | undefined {
+  value: FileSource | undefined;
+}): FileSource | undefined {
   return chosen === 'file' ? pickedFile(value) : sourceFromUrl(fetchedUrl(value) ?? '');
 }

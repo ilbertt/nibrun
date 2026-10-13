@@ -4,7 +4,7 @@ import { BinaryDropTarget } from '@repo/ui/custom/binary-drop-target';
 import { FileTerminalIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BINARY_INPUT_ID } from '#components/deploy/binary-drop-zone.tsx';
-import { fetchedUrl, pickedFile } from '#lib/binary-source.ts';
+import { fetchedUrl, pickedFile } from '#lib/file-source.ts';
 import { type DeployFormState, validateBinary } from '#lib/hooks/use-deploy-form.ts';
 
 /**
@@ -46,7 +46,7 @@ export function MinimalBinaryField({
                 onPick={field.handleChange}
               />
             ) : (
-              <FetchedBinary url={fetching} />
+              <FetchedFile url={fetching} />
             )}
             {rejected && <FieldError>{field.state.meta.errors[0]}</FieldError>}
           </Field>
@@ -57,7 +57,7 @@ export function MinimalBinaryField({
 }
 
 /** What the link named, in the place a drop target would have been asking for it. */
-function FetchedBinary({ url }: { url: string }) {
+function FetchedFile({ url }: { url: string }) {
   return (
     <div className="flex flex-col items-center gap-4 rounded-3xl border border-muted-foreground/25 bg-input/40 px-6 py-16 text-center sm:py-20">
       <FileTerminalIcon className="size-8 text-muted-foreground" />

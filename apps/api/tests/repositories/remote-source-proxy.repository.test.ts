@@ -8,7 +8,7 @@ test(
   async () => {
     const unreachableProxy = 'http://127.0.0.1:1';
     const child = Bun.spawn(
-      [process.execPath, 'run', 'test', 'tests/repositories/binary-source.repository.test.ts'],
+      [process.execPath, 'run', 'test', 'tests/repositories/remote-source.repository.test.ts'],
       {
         cwd: join(import.meta.dir, '../..'),
         env: {

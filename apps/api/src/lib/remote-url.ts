@@ -1,28 +1,28 @@
 import { type Filename, FilenameSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 
-// Where a binary may be fetched from rather than uploaded. `https` alone: the api is what follows
+// Where a file may be fetched from rather than uploaded. `https` alone: the api is what follows
 // this, and a plaintext hop is one where what the guest ends up running was chosen by whoever sat
 // between.
 //
 // The api's own, not the protocol's: a host is told a digest and a key, never where the bytes were
 // found, so this reaches nothing below the control plane.
-export const BINARY_URL_PATTERN = '^https://[^\\s]+$';
-export const MAX_BINARY_URL_LENGTH = 2048;
+export const REMOTE_URL_PATTERN = '^https://[^\\s]+$';
+export const MAX_REMOTE_URL_LENGTH = 2048;
 
-const BINARY_URL = new RegExp(BINARY_URL_PATTERN);
+const REMOTE_URL = new RegExp(REMOTE_URL_PATTERN);
 
 /**
  * The rule the request body is held to, as something every later hop is held to as well: what the
  * caller typed is only the first address fetched, and a redirect to a plaintext one is exactly the
  * hop the rule exists to refuse.
  */
-export function isBinaryUrl(url: string): boolean {
-  return url.length <= MAX_BINARY_URL_LENGTH && BINARY_URL.test(url);
+export function isRemoteUrl(url: string): boolean {
+  return url.length <= MAX_REMOTE_URL_LENGTH && REMOTE_URL.test(url);
 }
 
 /**
- * What to call a binary nobody named: the last segment of the url's path, which is where a release
+ * What to call a file nobody named: the last segment of the url's path, which is where a release
  * host puts the file's own name. Undefined where that is not a name an export could carry — a url
  * ending in a slash, or in something `FilenameSchema` refuses.
  */

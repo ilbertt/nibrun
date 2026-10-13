@@ -7,26 +7,26 @@ import { namedByUrl } from '@repo/deploy-link';
  * what is not a sha256 is refused by name rather than dropped — see `refusedChecksum`. A checksum
  * quietly ignored is a deploy nobody verified, which is the one thing carrying one was for.
  */
-export type FetchedBinary = { url: string; sha256?: string | undefined };
+export type FetchedFile = { url: string; sha256?: string | undefined };
 
 /**
- * Where the binary is coming from: a file on this machine, or a url the api fetches it at.
+ * Where the file is coming from: a file on this machine, or a url the api fetches it at.
  *
- * The two are one value because a deploy has one binary. Whichever box was last used is what the
+ * The two are one value because a field holds one file. Whichever box was last used is what the
  * form holds, and the other is empty because there is nothing else it could be.
  */
-export type BinarySource = File | FetchedBinary;
+export type FileSource = File | FetchedFile;
 
-export function pickedFile(source: BinarySource | undefined): File | undefined {
+export function pickedFile(source: FileSource | undefined): File | undefined {
   return source instanceof File ? source : undefined;
 }
 
-export function fetchedBinary(source: BinarySource | undefined): FetchedBinary | undefined {
+export function fetchedFile(source: FileSource | undefined): FetchedFile | undefined {
   return source === undefined || source instanceof File ? undefined : source;
 }
 
-export function fetchedUrl(source: BinarySource | undefined): string | undefined {
-  return fetchedBinary(source)?.url;
+export function fetchedUrl(source: FileSource | undefined): string | undefined {
+  return fetchedFile(source)?.url;
 }
 
 /**
@@ -36,12 +36,12 @@ export function fetchedUrl(source: BinarySource | undefined): string | undefined
  * it was written beside, and held against a different one it would refuse a deploy for a reason
  * nobody on this side of the form can see.
  */
-export function sourceFromUrl(url: string): BinarySource | undefined {
+export function sourceFromUrl(url: string): FileSource | undefined {
   return url.trim() === '' ? undefined : { url: url.trim() };
 }
 
-/** What the binary is called, however it is being delivered: the file, or the file the url ends in. */
-export function binaryName(source: BinarySource | undefined): string | undefined {
+/** What the file is called, however it is being delivered: the file, or the file the url ends in. */
+export function sourceName(source: FileSource | undefined): string | undefined {
   const file = pickedFile(source);
   if (file !== undefined) {
     return file.name;

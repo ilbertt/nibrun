@@ -3,10 +3,10 @@ import { FilenameSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import {
   filenameFromUrl,
-  isBinaryUrl,
-  MAX_BINARY_URL_LENGTH,
+  isRemoteUrl,
+  MAX_REMOTE_URL_LENGTH,
   withoutCredentials,
-} from '#lib/binary-url.ts';
+} from '#lib/remote-url.ts';
 
 const MY_SERVER = Value.Parse(FilenameSchema, 'my-server');
 
@@ -56,15 +56,15 @@ describe('a binary is named after the file at the end of the url', () => {
 
 describe('the rule the request body is held to is one a redirect can be held to', () => {
   test('an https address passes it', () => {
-    expect(isBinaryUrl('https://releases.test/my-server')).toBe(true);
+    expect(isRemoteUrl('https://releases.test/my-server')).toBe(true);
   });
 
   test('a plaintext one does not', () => {
-    expect(isBinaryUrl('http://releases.test/my-server')).toBe(false);
+    expect(isRemoteUrl('http://releases.test/my-server')).toBe(false);
   });
 
   test('nor does one longer than a url may be', () => {
-    expect(isBinaryUrl(`https://releases.test/${'a'.repeat(MAX_BINARY_URL_LENGTH)}`)).toBe(false);
+    expect(isRemoteUrl(`https://releases.test/${'a'.repeat(MAX_REMOTE_URL_LENGTH)}`)).toBe(false);
   });
 });
 

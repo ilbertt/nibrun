@@ -11,12 +11,6 @@ import {
 import { type DeploySuggestion, namedByUrl, refusedChecksum, refusedUrl } from '@repo/deploy-link';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
 import {
-  type BinarySource,
-  type FetchedBinary,
-  fetchedBinary,
-  pickedFile,
-} from '#lib/binary-source.ts';
-import {
   askedVariables,
   type EnvironmentVariable,
   environmentEdits,
@@ -25,6 +19,7 @@ import {
   storedNames,
   unfilledAsked,
 } from '#lib/environment-variables.ts';
+import { type FetchedFile, type FileSource, fetchedFile, pickedFile } from '#lib/file-source.ts';
 import { discardHandedOffBinary } from '#lib/handoff-store.ts';
 import { useApps } from '#lib/hooks/use-apps.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
@@ -35,7 +30,7 @@ import { SessionIdentity } from '#lib/session-identity.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export type DeployFormValues = {
-  binary: BinarySource | undefined;
+  binary: FileSource | undefined;
   name: string;
   port: string | undefined;
   extraPublicPort: boolean | undefined;
@@ -61,7 +56,7 @@ export type DeployFormApi = ReactFormExtendedApi<
 
 /** What a change to the binary field does besides changing it. */
 export type BinaryFieldListeners = {
-  onChange?: (change: { value: BinarySource | undefined }) => void;
+  onChange?: (change: { value: FileSource | undefined }) => void;
 };
 
 export type DeployFormState = {
@@ -87,24 +82,24 @@ const UNTOUCHED: DeployFormValues = {
   initialData: undefined,
 };
 
-export function validateBinary({ value }: { value: BinarySource | undefined }): string | undefined {
+export function validateBinary({ value }: { value: FileSource | undefined }): string | undefined {
   if (value === undefined) {
     return 'Pick the binary to deploy, or give the url it can be fetched at.';
   }
-  return validateBinarySource(value);
+  return validateFileSource(value);
 }
 
 /** What an app already running one asks of the field: a binary it could keep, or nothing at all. */
 export function validateKeptBinary({
   value,
 }: {
-  value: BinarySource | undefined;
+  value: FileSource | undefined;
 }): string | undefined {
-  return value === undefined ? undefined : validateBinarySource(value);
+  return value === undefined ? undefined : validateFileSource(value);
 }
 
-function validateBinarySource(source: BinarySource): string | undefined {
-  const fetched = fetchedBinary(source);
+function validateFileSource(source: FileSource): string | undefined {
+  const fetched = fetchedFile(source);
   if (fetched !== undefined) {
     return refusedUrl(fetched.url) ?? refusedChecksum(fetched.sha256);
   }
@@ -333,8 +328,8 @@ function initialDataFrom({
  * The source as what the deploy sends: a file goes to the store from here, and a url goes to the
  * api, which is the end that can read it.
  */
-function deployableFrom(source: BinarySource): DeployableBinary | undefined {
-  const fetched = fetchedBinary(source);
+function deployableFrom(source: FileSource): DeployableBinary | undefined {
+  const fetched = fetchedFile(source);
   if (fetched !== undefined) {
     return refusedUrl(fetched.url) === undefined ? fetchable(fetched) : undefined;
   }
@@ -346,7 +341,7 @@ function deployableFrom(source: BinarySource): DeployableBinary | undefined {
 }
 
 /** The url as the api takes it. Nothing at all where the checksum beside it is not one. */
-function fetchable({ url, sha256 }: FetchedBinary): FetchableBinary | undefined {
+function fetchable({ url, sha256 }: FetchedFile): FetchableBinary | undefined {
   if (sha256 === undefined) {
     return { url };
   }
