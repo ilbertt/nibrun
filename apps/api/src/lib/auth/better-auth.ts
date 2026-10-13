@@ -1,8 +1,13 @@
+import { apiKey } from '@better-auth/api-key';
 import { oauthProvider } from '@better-auth/oauth-provider';
 import { Value } from '@sinclair/typebox/value';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization, jwt } from 'better-auth/plugins';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import {
+  protectShortLivedDeploymentTokens,
+  shortLivedDeploymentTokenConfiguration,
+} from '#lib/auth/deployment-api-keys.ts';
 import { OAUTH_ISSUER } from '#lib/auth/oauth-issuer.ts';
 import { AUTH_BASE_PATH, AUTH_JWKS_PATH } from '#lib/auth/paths.ts';
 import { env } from '#lib/env.ts';
@@ -39,6 +44,7 @@ export function createAuth({
     basePath: AUTH_BASE_PATH,
     secret: env.BETTER_AUTH_SECRET,
     disabledPaths: ['/token'],
+    hooks: { before: protectShortLivedDeploymentTokens },
     socialProviders: {
       github: {
         clientId: env.GITHUB_CLIENT_ID,
@@ -46,6 +52,7 @@ export function createAuth({
       },
     },
     plugins: [
+      apiKey([shortLivedDeploymentTokenConfiguration]),
       jwt({
         jwt: { issuer: OAUTH_ISSUER },
         jwks: { jwksPath: AUTH_JWKS_PATH },
