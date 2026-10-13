@@ -91,7 +91,6 @@ const importStorageRepository = new ArtifactStorageRepository({
   bucket: env.IMPORTS_BUCKET,
 });
 const remoteSourceRepository = new RemoteSourceRepository();
-const remoteFetchSlots = new RemoteFetchSlots();
 const cachedBinariesRepository = new CachedBinariesRepository(sql);
 const releaseDigestRepository = new ReleaseDigestRepository();
 const exportsRepository = new ExportsRepository(sql);
@@ -157,6 +156,7 @@ const sqliteService = new SqliteService({
     return openRemoteSqliteSession({ ...input, relay: sqliteRelayService });
   },
 });
+const remoteFetchSlots = new RemoteFetchSlots();
 const artifactsService = new ArtifactsService({
   artifactsRepo: artifactsRepository,
   storageRepo: artifactStorageRepository,
