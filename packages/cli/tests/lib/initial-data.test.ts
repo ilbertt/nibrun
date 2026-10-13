@@ -30,7 +30,7 @@ async function entriesIn(archive: Blob): Promise<string[]> {
   return text.split('\n').filter((line) => line !== '');
 }
 
-function folder(path: string): InitialData {
+function folder(path: string): Extract<InitialData, { kind: 'folder' }> {
   return { kind: 'folder', path };
 }
 
@@ -197,4 +197,21 @@ test('the original archive name is submitted for API validation', async () => {
   made.push(path);
 
   expect((await opening(path)).archive.name).toBe('my data.tar.gz');
+});
+
+test('an HTTPS archive URL is handed to nibrun without opening a local path', async () => {
+  const url = 'https://releases.test/data.tar.gz?signature=example';
+  expect(await initialDataFrom({ path: url })).toEqual({ kind: 'url', url });
+});
+
+test('remote initial data still requires a new app', async () => {
+  await expect(
+    initialDataFrom({ path: 'https://releases.test/data.zip', app: 'quiet-otter' }),
+  ).rejects.toThrow('--app quiet-otter');
+});
+
+test('initial data URLs must use HTTPS', async () => {
+  await expect(initialDataFrom({ path: 'http://releases.test/data.zip' })).rejects.toThrow(
+    'fetched over https',
+  );
 });

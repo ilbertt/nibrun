@@ -45,8 +45,13 @@ export of another app:
 nib run ./my-server --name my-app --data-folder ./seed
 ```
 
-It takes a folder, or a `.tar.gz` or `.zip` holding one, and the root of the archive becomes the
-root of `data/`. Up to 1 GiB, and only as the app is created.
+It takes a local folder, a `.tar.gz` or `.zip` file, or an HTTPS URL to either archive format.
+Remote archives are fetched by nibrun. The root of the archive becomes the root of `data/`.
+Up to 1 GiB, and only as the app is created:
+
+```sh
+nib run ./my-server --name my-app --data-folder https://example.com/seed.tar.gz
+```
 
 For an app where the first visitor claims the admin account, try seeding that setup before
 deploying, if the app supports it. Use a compatible native build or run from source: a Linux
