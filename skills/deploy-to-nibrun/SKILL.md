@@ -94,12 +94,20 @@ fixtures a first run would otherwise have to write:
 nib run ./my-server --name my-app --data-folder ./seed
 ```
 
-It takes a folder, or a `.tar.gz` or `.zip` that already holds one — the zip Finder or Explorer
-made goes as it stands. Either way **the root of the archive becomes the root of `data/`**: a
-folder is packed from the inside, so `./seed/app.db` arrives as `/app/data/app.db`, and bundling
-the folder rather than its contents puts every file one directory deeper than the app looks. Up to
-1 GiB sent and 2 GiB unpacked, and only as the app is created: this and the app writing its own
-files are the whole of how anything gets onto the volume. A zip made anywhere but unix carries no
+`--data-folder` accepts a local folder, a `.tar.gz` or `.zip` file, or an HTTPS URL to either
+archive format. nibrun fetches remote archives directly, so there is no need to download them
+locally first. The URL must name the archive in its path and be reachable from nibrun; signed
+query strings work, so quote URLs that contain them:
+
+```sh
+nib run ./my-server --name my-app --data-folder 'https://example.com/seed.tar.gz'
+```
+
+For every source, **the root of the archive becomes the root of `data/`**: a folder is packed from
+the inside, so `./seed/app.db` arrives as `/app/data/app.db`, and bundling the folder rather than
+its contents puts every file one directory deeper than the app looks. Up to 1 GiB uploaded or
+fetched and 2 GiB unpacked, and only as the app is created: this and the app writing its own files
+are the whole of how anything gets onto the volume. A zip made anywhere but unix carries no
 permissions, so an executable bit does not survive one.
 
 ### Try seeding first-run setup before going public
