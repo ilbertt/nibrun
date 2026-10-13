@@ -114,6 +114,9 @@ function waitingOn(phase: DeployPhase): string | undefined {
   }
   // No meter under this one: the bytes are moving between the url and nibrun, and this end is
   // only waiting to be told how it went.
+  if (phase === 'fetching-data') {
+    return 'nibrun is fetching the initial data';
+  }
   if (phase === 'fetching') {
     return 'nibrun is fetching the binary';
   }

@@ -2,13 +2,13 @@ import { analyticsIdentityState, trackEvent } from '@repo/analytics';
 import type { TenantArguments, TenantEnvironmentPatch } from '@repo/api-client/models';
 import {
   awaitDeploymentSettled,
+  type DeployableArchive,
   type DeployableBinary,
   type Deployed,
   type DeployStep,
   deploy,
   describeUnservedDeployment,
   redeploy,
-  type UploadableArchive,
   type UploadProgress,
 } from '@repo/app-operations';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -30,7 +30,7 @@ export type DeployRequest = Configured & {
   binary: DeployableBinary;
   appId: string | undefined;
   name: string | undefined;
-  initialData: UploadableArchive | undefined;
+  initialData: DeployableArchive | undefined;
 };
 
 /** The same release without a binary to upload, which only an app already running one can ask for. */
@@ -42,7 +42,7 @@ export function carriesBinary(request: ReleaseRequest): request is DeployRequest
   return 'binary' in request;
 }
 
-/** Whether an archive follows the binary, which is a second upload and leaves no step of its own. */
+/** Whether an archive follows the binary. */
 export function carriesInitialData(request: ReleaseRequest): boolean {
   return carriesBinary(request) && request.initialData !== undefined;
 }

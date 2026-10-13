@@ -106,3 +106,29 @@ describe('a port besides HTTPS waits for an identity', () => {
     expect(markup).not.toMatch(GREYED_CHECKBOX);
   });
 });
+
+test('remote initial data is validated as an HTTPS URL rather than as an uploaded file', async () => {
+  const { validateInitialData } = await import('#lib/hooks/use-deploy-form.ts');
+  expect(
+    await validateInitialData({ value: { url: 'https://releases.test/data.zip' } }),
+  ).toBeUndefined();
+  expect(
+    await validateInitialData({ value: { url: 'http://releases.test/data.zip' } }),
+  ).toBeDefined();
+  expect(await validateInitialData({ value: new File(['invalid'], 'data.zip') })).toContain(
+    'not a .tar.gz or a .zip',
+  );
+});
+
+test('a remote archive is displayed in the initial data URL field', async () => {
+  const { InitialDataSourcePicker } = await import(
+    '#components/deploy/initial-data-source-picker.tsx'
+  );
+  const url = 'https://releases.test/data.tar.gz';
+  const markup = renderToStaticMarkup(
+    <InitialDataSourcePicker value={{ url }} invalid={false} onChange={() => undefined} />,
+  );
+  expect(markup).toContain('Initial data archive url');
+  expect(markup).toContain(url);
+  expect(markup).toContain('Upload an archive');
+});

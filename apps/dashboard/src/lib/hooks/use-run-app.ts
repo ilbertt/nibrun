@@ -3,7 +3,7 @@ import { useState } from 'react';
 import {
   type BinaryDelivery,
   binaryDelivery,
-  carriesInitialData,
+  carriesBinary,
   type ReleaseRequest,
   useDeploy,
 } from '#lib/hooks/use-deploy.ts';
@@ -13,6 +13,7 @@ export type DeployPhase =
   | 'uploading'
   | 'uploading-data'
   | 'fetching'
+  | 'fetching-data'
   | 'releasing'
   | 'settling'
   | 'done'
@@ -35,10 +36,10 @@ export function isUploading(phase: DeployPhase): boolean {
  */
 type Sending = {
   binary: BinaryDelivery;
-  initialData: boolean;
+  initialData: BinaryDelivery;
 };
 
-const SENDING_NOTHING: Sending = { binary: 'none', initialData: false };
+const SENDING_NOTHING: Sending = { binary: 'none', initialData: 'none' };
 
 export type DeployRun = {
   phase: DeployPhase;
@@ -73,7 +74,15 @@ export function useRunApp({
     start: (request) => {
       setSteps([]);
       setProgress(undefined);
-      setSending({ binary: binaryDelivery(request), initialData: carriesInitialData(request) });
+      setSending({
+        binary: binaryDelivery(request),
+        initialData:
+          carriesBinary(request) && request.initialData !== undefined
+            ? 'url' in request.initialData
+              ? 'fetch'
+              : 'upload'
+            : 'none',
+      });
       run.mutate(request);
     },
     reset: () => {
@@ -107,8 +116,8 @@ function phaseOf({
   }
   // The archive is sent after the binary, so the artifact is the only thing that says which of the
   // two the meter is on.
-  if (sending.initialData && steps.some((step) => step.kind === 'artifact')) {
-    return 'uploading-data';
+  if (sending.initialData !== 'none' && steps.some((step) => step.kind === 'artifact')) {
+    return sending.initialData === 'fetch' ? 'fetching-data' : 'uploading-data';
   }
   if (sending.binary === 'none') {
     return 'releasing';

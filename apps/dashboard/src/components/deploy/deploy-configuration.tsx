@@ -29,6 +29,7 @@ import {
   storedVariables,
   unfilledAsked,
 } from '#lib/environment-variables.ts';
+import { sourceName } from '#lib/file-source.ts';
 import { type DeployFormState, tenantArguments, validatePort } from '#lib/hooks/use-deploy-form.ts';
 
 const ARGUMENTS = 'Arguments';
@@ -182,7 +183,7 @@ export function DeployConfiguration({
             <AccordionTrigger>
               <span className="flex items-baseline gap-2">
                 {INITIAL_DATA}
-                <api.Subscribe selector={(state) => state.values.initialData?.name}>
+                <api.Subscribe selector={(state) => sourceName(state.values.initialData)}>
                   {(name) => <CollapsedName name={name} />}
                 </api.Subscribe>
               </span>
