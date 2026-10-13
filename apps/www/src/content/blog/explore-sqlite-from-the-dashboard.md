@@ -1,43 +1,33 @@
 ---
-title: Explore SQLite from the dashboard
-description: Open your app's SQLite files, browse their tables and run SQL without downloading the database.
+title: A SQLite explorer for your microVM
+description: Browse tables, follow foreign keys and query your live SQLite database. Built into nibrun, with dashboard, CLI and AI agent access.
 date: 2026-10-08
 ---
 
-SQLite puts your database in a file. When your app runs on nibrun, that file lives in its
-persistent `data/` directory. Your app can use it directly, but looking inside it used to mean
-exporting the data and opening a local copy.
+Your app's microVM now comes with a SQLite explorer. Browse tables, inspect rows, follow
+foreign keys and run SQL against the live database your app is using.
 
-You can now explore it from the dashboard. Open the database file in a new tab, and the
-queries run against the database your app is using through a read-only
-[SQL over HTTP](https://docs.turso.tech/sdk/http/quickstart) connection.
-
-The `nib` CLI can query the same live database. An AI agent with access to your signed-in
-CLI can explore it too, without downloading the file or changing its data.
+It's available out of the box on nibrun. Deploy your binary, keep its SQLite database in the
+persistent `data/` directory, and explore it through the dashboard or CLI. An AI agent with
+access to your signed-in CLI can use the same tools.
 
 ![An app.db file inside a microVM uses a SQL over HTTP connection to the SQLite explorer, with dashboard, CLI and AI agent access highlighted.](/blog/explore-sqlite-from-the-dashboard.webp)
 
-> **Already running an app?** If it was running before the SQLite explorer launched, you
-> may get a 502 when opening a database. Click **Suspend**, wait until the app shows
-> **Suspended**, then click **Resume**. This briefly takes the app offline and brings it
-> back with SQLite support. Your binary and persistent `data/` stay intact. Once the app
-> is running again, retry opening the database.
+## Built into your deployment
 
-## From a file to a database
+nibrun provides the database connection, the web explorer and authentication. You don't need
+to bundle an admin interface with your binary, install an explorer in the guest or add a SQL
+endpoint to your app. SQLite support is built into new deployments.
 
-Open your app's **Files** tab. Files with SQLite extensions such as `.db` or `.sqlite` have
-a database icon and are already links. Click the filename to open the explorer in a new tab,
-or open its three-dot menu and choose **Open SQLite database**.
+Your app still opens its database as a file in `data/`. The explorer queries that same file
+inside the microVM while your app continues using it. The database stays on your persistent
+volume, and you can inspect it without exporting or downloading a copy.
 
-The filename doesn't need a `.sqlite` or `.db` extension. For other regular files, choose
-**Query as SQLite** from the three-dot menu. nibrun checks that it can open the file as a
-SQLite database when the explorer first opens, then saves the connection. If it can't, the
-explorer shows the error, and the file list shows an error you can click to inspect.
+The connection is read-only. You can investigate your app's data without changing it:
+`INSERT`, `UPDATE`, `DELETE` and schema changes fail with SQLite's own error. Your app can
+continue writing to the database normally.
 
-Once connected, a file without a recognized SQLite extension also gets a database icon and
-becomes a link. The connection is saved, so you can come back through the same file later.
-
-## Browse tables or write SQL
+## Browse tables, follow relationships and write SQL
 
 The explorer shows your tables and their columns. Open a table to browse its rows, with
 pagination for larger tables. Open a row to inspect its values and copy individual fields
@@ -47,8 +37,8 @@ For supported single-column foreign keys, **View row** opens the referenced reco
 result tab, keeping the source table open. Follow an order's `user_id` to the user it belongs
 to without writing a join just to look them up.
 
-The SQL editor is there when a table view isn't enough. For a notebook app, you might check
-which tags are used most often:
+Use the SQL editor when you want to ask a question across the data. For a notebook app,
+you might check which tags are used most often:
 
 ```sql
 SELECT tag, COUNT(*) AS notes
@@ -57,36 +47,51 @@ GROUP BY tag
 ORDER BY notes DESC;
 ```
 
-The explorer header shows the app name and the database's path relative to `/app/data`.
-**Back to app** returns to the app overview.
+The explorer header shows the app name and the database's path relative to `/app/data`, so
+you can see which database you're querying. **Back to app** returns to the app overview.
 
-## Built on LibreDB Studio and libSQL
+## A SQL over HTTP connection to your live database
 
-The explorer embeds [LibreDB Studio](https://github.com/libredb/libredb-studio) for table browsing,
-row details and the SQL editor. We adapt its styles to the dashboard and add foreign-key navigation.
+The explorer uses [SQL over HTTP](https://docs.turso.tech/sdk/http/quickstart): SQL queries go
+over HTTP, and their results come back over the same connection. nibrun's API relays the
+queries to SQLite inside your app's microVM.
 
-SQL over HTTP sends SQL queries and returns their results over HTTP. The dashboard uses
-`@libsql/client` with [libSQL's Hrana HTTP v2 protocol](https://github.com/tursodatabase/libsql/blob/main/docs/HTTP_V2_SPEC.md).
-nibrun's API relays the queries to a read-only SQLite connection inside your app's microVM.
-The database file stays in the guest; browsing it doesn't download a local copy.
-
-## Your app's file, opened read-only
-
-Explorer connections are read-only. You can inspect data while your app keeps using the
-database, but `INSERT`, `UPDATE`, `DELETE` and schema changes fail with SQLite's own error.
+The dashboard uses `@libsql/client` with
+[libSQL's Hrana HTTP v2 protocol](https://github.com/tursodatabase/libsql/blob/main/docs/HTTP_V2_SPEC.md).
+Its browsing interface embeds [LibreDB Studio](https://github.com/libredb/libredb-studio),
+with styles adapted to nibrun and added foreign-key navigation.
 
 Your existing dashboard session authenticates the connection. There is no separate database
 password or token to create before opening the explorer.
 
-The database stays in your app's persistent directory. Your binary still opens the same file,
-and you can still export it with the rest of your app's data.
+## Open the database your app already uses
 
-## Explore through the CLI or your AI agent
+Open your app's **Files** tab. Files with SQLite extensions such as `.db` or `.sqlite` have
+a database icon and are already links. Click the filename to open the explorer in a new tab,
+or choose **Open SQLite database** from its three-dot menu.
 
-Use `nib apps sqlite` to discover the CLI commands for connections and SQL queries.
-An AI agent with access to your signed-in CLI can use those same commands. Connections are
-read-only, so it can explore without changing data or schema. Give it the
+For a database with another filename, choose **Query as SQLite** from the file menu. nibrun
+checks that it can open the file as a SQLite database when the explorer first opens, then
+saves the connection. That file also gets a database icon and becomes a link, so you can
+come back to it later. If the file can't be opened, the explorer shows the error, and the
+file list shows an error you can click to inspect.
+
+## The same access for your CLI and AI agent
+
+Use `nib apps sqlite` to discover the CLI commands for saved connections and SQL queries.
+The CLI queries the same live database through SQL over HTTP, with the same read-only
+access as the dashboard.
+
+An AI agent with access to your signed-in `nib` CLI can use those commands to inspect the
+schema and query your app's data without downloading the database or changing its contents.
+Give it the
 [nibrun skill](https://github.com/ilbertt/nibrun/blob/main/skills/deploy-to-nibrun/SKILL.md#inspecting-sqlite-databases)
 for the CLI workflow.
 
-[Open your apps](https://app.nibrun.com/apps), pick a database file, and take a look inside.
+> **Using a deployment from before the explorer launched?** If opening a database returns
+> a 502, click **Suspend**, wait until the app shows **Suspended**, then click **Resume**.
+> This briefly takes the app offline and brings it back with SQLite support. Your binary
+> and persistent `data/` stay intact. Once the app is running again, retry opening the database.
+
+[Open your apps](https://app.nibrun.com/apps) and explore the SQLite database already running
+inside your microVM.
