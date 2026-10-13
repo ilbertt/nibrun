@@ -66,6 +66,12 @@ test('a url nibrun could not fetch a binary from prefills nothing', () => {
   expect(followed('?binary=https://releases.test/downloads/').binary).toBeUndefined();
 });
 
+test('an initial-data URL that cannot name a fetchable archive prefills nothing', () => {
+  expect(followed('?initial-data=http://releases.test/data.zip').initialData).toBeUndefined();
+  expect(followed('?initial-data=https://releases.test/downloads/').initialData).toBeUndefined();
+  expect(followed('?initial-data=').initialData).toBeUndefined();
+});
+
 test('a link may ask for everything a deploy configures', () => {
   expect(followed(EVERYTHING)).toEqual(ASKED);
 });
@@ -115,6 +121,7 @@ test('a link that asks for nothing suggests nothing', () => {
     name: undefined,
     binary: undefined,
     sha256: undefined,
+    initialData: undefined,
     port: undefined,
     extraPublicPort: undefined,
     args: undefined,

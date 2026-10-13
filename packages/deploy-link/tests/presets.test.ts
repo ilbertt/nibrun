@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
-import { defaultStringifySearch } from '@tanstack/react-router';
-import { DEPLOY_PRESETS, DeployCategory, type DeploySlug } from '#presets.ts';
+import { defaultParseSearch, defaultStringifySearch } from '@tanstack/react-router';
+import { deployLink, deploySuggestion } from '#link.ts';
+import { DEPLOY_PRESETS, DeployCategory, type DeployPreset, type DeploySlug } from '#presets.ts';
 
 const SLUGS = Object.keys(DEPLOY_PRESETS) as DeploySlug[];
 
@@ -21,6 +22,20 @@ test('a deploy url carries the link and nothing written beside it', () => {
     expect(written).not.toContain('category');
     expect(written).toContain('binary');
   }
+});
+
+test('a preset can suggest initial data through a rewritten deployment link', () => {
+  const archiveUrl = 'https://releases.test/seed.tar.gz?signature=a%2Fb&expires=123';
+  const preset: DeployPreset = {
+    ...DEPLOY_PRESETS.pocketbase,
+    deployLink: { ...DEPLOY_PRESETS.pocketbase.deployLink, 'initial-data': archiveUrl },
+  };
+  const written = defaultStringifySearch(preset.deployLink);
+  const parsed = deployLink(defaultParseSearch(written));
+  const configured = defaultStringifySearch({ ...parsed, minimal: undefined });
+
+  expect(deploySuggestion(parsed).initialData).toBe(archiveUrl);
+  expect(deploySuggestion(deployLink(defaultParseSearch(configured))).initialData).toBe(archiveUrl);
 });
 
 // A member nothing is in is one a catalog would render as a filter that returns an empty page.
