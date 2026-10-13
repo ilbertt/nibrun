@@ -2,6 +2,18 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.10.13-1]
+
+### 🚀 Features
+
+- *(cli)* Accept remote initial-data archives (#876)
+- *(app-operations)* Deploy with remote initial-data archives (#875)
+- *(api)* Fetch remote archives for initial data (#870)
+
+### 🐛 Bug Fixes
+
+- *(filesystem)* Wake idle apps for file queries (#821)
+
 ## [2026.10.8-1]
 
 ### 🚀 Features
