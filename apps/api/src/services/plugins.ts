@@ -170,6 +170,8 @@ const artifactsService = new ArtifactsService({
 const importsService = new ImportsService({
   importsRepo: importsRepository,
   storageRepo: importStorageRepository,
+  sourceRepo: remoteSourceRepository,
+  fetchSlots: remoteFetchSlots,
   appsRepo: appsRepository,
 });
 const agentService = new AgentService({

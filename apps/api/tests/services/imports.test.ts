@@ -12,6 +12,7 @@ import { Value } from '@sinclair/typebox/value';
 import { type ImportId, ImportIdSchema, type OwnerId } from '#lib/api/identifiers.ts';
 import { ImportSchema } from '#lib/api/import.ts';
 import { BadRequestError, NotFoundError } from '#lib/errors.ts';
+import { MAX_CONCURRENT_FETCHES_PER_OWNER, RemoteFetchSlots } from '#lib/remote-fetch.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type {
   ArtifactStorageRepositoryContract,
@@ -25,6 +26,11 @@ import type {
   PendingImportRow,
   SpentImportRow,
 } from '#repositories/imports.repository.ts';
+import {
+  InterruptedSourceError,
+  type RemoteSource,
+  type RemoteSourceRepositoryContract,
+} from '#repositories/remote-source.repository.ts';
 import { ImportsService, importKey, MAX_IMPORT_SIZE_BYTES } from '#services/imports.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 import { archiveOf } from '#tests/support/archives.ts';
@@ -282,15 +288,33 @@ class FakeAppsRepository {
   }
 }
 
+class FakeSource implements RemoteSourceRepositoryContract {
+  readonly opened: string[] = [];
+  answer: () => Promise<RemoteSource> = async () => ({
+    outcome: 'open',
+    body: new Blob([new Uint8Array(ARCHIVE)]).stream(),
+    declaredSizeBytes: undefined,
+  });
+
+  open({ url }: { url: string }): Promise<RemoteSource> {
+    this.opened.push(url);
+    return this.answer();
+  }
+}
+
 function build() {
   const importsRepo = new FakeImportsRepository(OWNER_ID);
   const storage = new FakeStorage();
+  const source = new FakeSource();
   return {
     importsRepo,
     storage,
+    source,
     service: new ImportsService({
       importsRepo,
       storageRepo: storage,
+      sourceRepo: source,
+      fetchSlots: new RemoteFetchSlots(),
       appsRepo: new FakeAppsRepository() as unknown as AppsRepositoryContract,
     }),
   };
@@ -691,4 +715,201 @@ describe('an archive that can no longer create a filesystem stops being stored',
 
     expect(importsRepo.rows.get(begun.importId)?.object_key).not.toBeNull();
   });
+});
+
+const REMOTE_ARCHIVE_URL = 'https://releases.test/data.tar.gz';
+
+describe('initial data fetched from a remote archive', () => {
+  test('stores the original bytes and computes the digest without reading the store again', async () => {
+    const { service, storage, source } = build();
+    const stored = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: REMOTE_ARCHIVE_URL,
+    });
+    expect(source.opened).toEqual([REMOTE_ARCHIVE_URL]);
+    expect(stored.digest).toBe(digestOf(ARCHIVE) as Sha256Digest);
+    expect(stored.sizeBytes).toBe(ARCHIVE.byteLength);
+    expect(stored.originalFileName).toBe(Value.Parse(FilenameSchema, 'data.tar.gz'));
+    expect(storage.objects.get(importKey({ appId: APP_ID, importId: stored.id }))).toEqual(ARCHIVE);
+    expect(storage.signed).toEqual([]);
+  });
+
+  test('accepts a remote zip without unpacking it', async () => {
+    const { service, storage, source } = build();
+    const bytes = archiveOf([{ name: 'app.db', content: bytesOf('rows') }]);
+    source.answer = async () => ({
+      outcome: 'open',
+      body: new Blob([new Uint8Array(bytes)]).stream(),
+      declaredSizeBytes: bytes.byteLength,
+    });
+    const stored = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: 'https://releases.test/data.zip',
+    });
+    expect(storage.objects.get(importKey({ appId: APP_ID, importId: stored.id }))).toEqual(bytes);
+  });
+
+  test('refuses an unowned app before opening a remote URL', async () => {
+    const { service, source } = build();
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OTHER_OWNER_ID, url: REMOTE_ARCHIVE_URL }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(source.opened).toEqual([]);
+  });
+
+  test('refuses unnamed archives before fetching', async () => {
+    const { service, source } = build();
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: 'https://releases.test/' }),
+    ).rejects.toThrow('own name');
+    expect(source.opened).toEqual([]);
+  });
+
+  test('rejects an oversized declared length and cancels the download', async () => {
+    const { service, source, importsRepo } = build();
+    let cancelled = false;
+    source.answer = async () => ({
+      outcome: 'open',
+      declaredSizeBytes: MAX_IMPORT_SIZE_BYTES + 1,
+      body: new ReadableStream({
+        cancel() {
+          cancelled = true;
+        },
+      }),
+    });
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: REMOTE_ARCHIVE_URL }),
+    ).rejects.toThrow('at most');
+    expect(cancelled).toBe(true);
+    expect(importsRepo.rows.size).toBe(0);
+  });
+
+  test('removes the pending row and object when the source is not an archive', async () => {
+    const { service, source, storage, importsRepo } = build();
+    source.answer = async () => ({
+      outcome: 'open',
+      declaredSizeBytes: undefined,
+      body: new Blob(['not an archive']).stream(),
+    });
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: REMOTE_ARCHIVE_URL }),
+    ).rejects.toThrow('not a .tar.gz or a .zip');
+    expect(importsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
+    expect(storage.removed.length).toBe(1);
+  });
+
+  test('verifies a supplied checksum and removes mismatched data', async () => {
+    const { service, storage, importsRepo } = build();
+    const input = { appId: APP_ID, ownerId: OWNER_ID, url: REMOTE_ARCHIVE_URL };
+    await expect(
+      service.createFromUrl({
+        ...input,
+        sha256: '0'.repeat(digestOf(ARCHIVE).length) as Sha256Digest,
+      }),
+    ).rejects.toThrow('not the');
+    expect(importsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
+    expect(
+      (await service.createFromUrl({ ...input, sha256: digestOf(ARCHIVE) as Sha256Digest })).digest,
+    ).toBe(digestOf(ARCHIVE) as Sha256Digest);
+  });
+
+  test('reports interruptions and removes unfinished imports', async () => {
+    const { service, source, storage, importsRepo } = build();
+    source.answer = async () => ({
+      outcome: 'open',
+      declaredSizeBytes: undefined,
+      body: new ReadableStream({
+        start(controller) {
+          controller.error(new InterruptedSourceError(new Error('connection lost')));
+        },
+      }),
+    });
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: REMOTE_ARCHIVE_URL }),
+    ).rejects.toThrow('before the archive was whole');
+    expect(importsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
+  });
+
+  test.each([
+    { outcome: 'unreachable' },
+    { outcome: 'refused', status: 404 },
+    { outcome: 'empty' },
+    { outcome: 'insecure-redirect', to: 'http://releases.test/data.tar.gz' },
+    { outcome: 'too-many-redirects' },
+    { outcome: 'private-address', host: '127.0.0.1' },
+  ] as const)('remote source failure %o creates no import', async (answer) => {
+    const { service, source, importsRepo } = build();
+    source.answer = async () => answer;
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: REMOTE_ARCHIVE_URL }),
+    ).rejects.toBeInstanceOf(BadRequestError);
+    expect(importsRepo.rows.size).toBe(0);
+  });
+
+  test('limits concurrent fetches and releases slots after failures', async () => {
+    const { service, source } = build();
+    const { promise, resolve } = Promise.withResolvers<RemoteSource>();
+    source.answer = () => promise;
+    const input = { appId: APP_ID, ownerId: OWNER_ID, url: REMOTE_ARCHIVE_URL };
+    const held = Array.from({ length: MAX_CONCURRENT_FETCHES_PER_OWNER }, () =>
+      service.createFromUrl(input),
+    );
+    await expect(service.createFromUrl(input)).rejects.toThrow('already fetching');
+    resolve({ outcome: 'unreachable' });
+    await Promise.allSettled(held);
+    source.answer = async () => ({
+      outcome: 'open',
+      body: new Blob([new Uint8Array(ARCHIVE)]).stream(),
+      declaredSizeBytes: undefined,
+    });
+    expect((await service.createFromUrl(input)).digest).toBe(digestOf(ARCHIVE) as Sha256Digest);
+  });
+});
+
+test.each([undefined, 1])(
+  'the streaming import limit holds when Content-Length is %s',
+  async (declaredSizeBytes) => {
+    const { service, source, importsRepo, storage } = build();
+    const oversizedChunk = new Uint8Array(1);
+    Object.defineProperty(oversizedChunk, 'byteLength', { value: MAX_IMPORT_SIZE_BYTES + 1 });
+    let cancelled = false;
+    source.answer = async () => ({
+      outcome: 'open',
+      declaredSizeBytes,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(oversizedChunk);
+        },
+        cancel() {
+          cancelled = true;
+        },
+      }),
+    });
+    await expect(
+      service.createFromUrl({ appId: APP_ID, ownerId: OWNER_ID, url: REMOTE_ARCHIVE_URL }),
+    ).rejects.toThrow('at most');
+    expect(cancelled).toBe(true);
+    expect(importsRepo.rows.size).toBe(0);
+    expect(storage.objects.size).toBe(0);
+  },
+);
+
+test('failed storage cleanup keeps the pending row available for sweeping', async () => {
+  const { service, storage, importsRepo } = build();
+  storage.remove = () => Promise.reject(new Error('store unavailable'));
+  await expect(
+    service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      url: REMOTE_ARCHIVE_URL,
+      sha256: '0'.repeat(digestOf(ARCHIVE).length) as Sha256Digest,
+    }),
+  ).rejects.toThrow('not the');
+  expect(importsRepo.rows.size).toBe(1);
+  expect([...importsRepo.rows.values()][0]?.digest).toBeNull();
 });
