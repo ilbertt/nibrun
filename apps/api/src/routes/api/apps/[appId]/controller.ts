@@ -3,7 +3,7 @@ import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import { AppPatchSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
 import { AppsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -21,7 +21,7 @@ export const AppsAppIdController = new Elysia()
       return status(StatusMap.OK, app);
     },
     {
-      auth: Identity.Optional,
+      auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] },
       response: { [StatusMap.OK]: publicSchema(AppResponseSchema) },
     },
   )
@@ -37,7 +37,7 @@ export const AppsAppIdController = new Elysia()
       return status(StatusMap.OK, app);
     },
     {
-      auth: Identity.Required,
+      auth: { policies: [AuthCaller.RegisteredAccount] },
       body: publicSchema(AppPatchSchema),
       response: { [StatusMap.OK]: publicSchema(AppResponseSchema) },
     },
@@ -54,7 +54,7 @@ export const AppsAppIdController = new Elysia()
       return status(StatusMap.Accepted, app);
     },
     {
-      auth: Identity.Optional,
+      auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] },
       response: { [StatusMap.Accepted]: publicSchema(AppResponseSchema) },
     },
   );

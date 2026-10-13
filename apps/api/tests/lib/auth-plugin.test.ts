@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Elysia, StatusMap } from 'elysia';
 import type { Auth } from '#lib/auth/better-auth.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { elysiaErrorHandler } from '#lib/errors.ts';
 import { AuthenticationService } from '#services/authentication.service.ts';
@@ -18,8 +18,11 @@ function appBehind(auth: Auth) {
   return new Elysia()
     .onError(elysiaErrorHandler)
     .use(createAuthPlugin(authenticationService))
-    .get('/either', () => 'ok', { auth: Identity.Optional })
-    .get('/identified', () => 'ok', { auth: Identity.Required });
+    .get('/either', () => 'ok', {
+      auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] },
+    })
+    .get('/identified', () => 'ok', { auth: { policies: [AuthCaller.RegisteredAccount] } })
+    .get('/anonymous', () => 'ok', { auth: { policies: [AuthCaller.AnonymousAccount] } });
 }
 
 function sessionOf(user: Record<string, unknown>): Session {
@@ -42,6 +45,7 @@ describe('a route says what it asks of the session it is given', () => {
 
     expect(await statusOf({ auth, path: '/either' })).toBe(StatusMap.Unauthorized);
     expect(await statusOf({ auth, path: '/identified' })).toBe(StatusMap.Unauthorized);
+    expect(await statusOf({ auth, path: '/anonymous' })).toBe(StatusMap.Unauthorized);
   });
 
   test('a stranger is let through a route that asks for a session, and no further', async () => {
@@ -49,12 +53,14 @@ describe('a route says what it asks of the session it is given', () => {
 
     expect(await statusOf({ auth, path: '/either' })).toBe(StatusMap.OK);
     expect(await statusOf({ auth, path: '/identified' })).toBe(StatusMap.Forbidden);
+    expect(await statusOf({ auth, path: '/anonymous' })).toBe(StatusMap.OK);
   });
 
   test('a person with an identity is let through both', async () => {
     for (const auth of [authAnswering(SOMEBODY), authAnswering(FROM_BEFORE)]) {
       expect(await statusOf({ auth, path: '/either' })).toBe(StatusMap.OK);
       expect(await statusOf({ auth, path: '/identified' })).toBe(StatusMap.OK);
+      expect(await statusOf({ auth, path: '/anonymous' })).toBe(StatusMap.Forbidden);
     }
   });
 });

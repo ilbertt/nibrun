@@ -1,14 +1,12 @@
 import type { Auth } from '#lib/auth/better-auth.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
+import type { AuthenticationPolicy } from '#lib/auth/policy.ts';
 import { ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
 import { Service } from '#services/service.ts';
 
 type AccountSession = NonNullable<Awaited<ReturnType<Auth['api']['getSession']>>>;
 
-export type AuthenticateAccountInput = {
-  headers: Headers;
-  identity: Identity;
-};
+export type AuthenticateAccountInput = AuthenticationPolicy & { headers: Headers };
 
 export type AuthenticatedAccount = {
   user: Omit<AccountSession['user'], 'isAnonymous'> & { isAnonymous: boolean };
@@ -29,15 +27,16 @@ export class AuthenticationService extends Service implements AuthenticationServ
 
   async authenticateAccount({
     headers,
-    identity,
+    policies,
   }: AuthenticateAccountInput): Promise<AuthenticatedAccount> {
     const session = await this.auth.getSession({ headers });
     if (!session) {
-      throw new UnauthorizedError();
+      throw new UnauthorizedError('An account session is required.');
     }
     const user = { ...session.user, isAnonymous: session.user.isAnonymous === true };
-    if (identity === Identity.Required && user.isAnonymous) {
-      throw new ForbiddenError('Sign in to do this.');
+    const caller = user.isAnonymous ? AuthCaller.AnonymousAccount : AuthCaller.RegisteredAccount;
+    if (!policies.includes(caller)) {
+      throw new ForbiddenError('This account is not allowed on this route.');
     }
     return { user, session: session.session };
   }

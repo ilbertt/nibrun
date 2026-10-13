@@ -3,7 +3,7 @@ import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap, t } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import {
   AddHostnameRequestSchema,
   RemoveHostnameQuerySchema,
@@ -15,7 +15,7 @@ export const AppsAppIdHostnamesController = new Elysia()
   .use(loggerPlugin('appsAppIdHostnamesController'))
   .use(AuthPlugin)
   .use(HostnamesServicePlugin)
-  .guard({ auth: Identity.Required })
+  .guard({ auth: { policies: [AuthCaller.RegisteredAccount] } })
   /**
    * Created rather than accepted: the row exists and the edge knows the hostname. What is still
    * outstanding is the owner's own DNS, which is theirs to do — the response carries the record

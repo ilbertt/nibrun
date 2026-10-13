@@ -2,7 +2,7 @@ import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema, SqliteConnectionIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import { assertSqliteOrigin } from '#lib/sqlite/http.ts';
 import {
   DeletedSqliteConnectionSchema,
@@ -25,7 +25,7 @@ export const AppsAppIdSqliteConnectionsConnectionIdController = new Elysia()
       return status(StatusMap.OK, { deleted: true as const });
     },
     {
-      auth: Identity.Optional,
+      auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] },
       params: DeleteSqliteConnectionParamsSchema,
       response: { [StatusMap.OK]: DeletedSqliteConnectionSchema },
     },

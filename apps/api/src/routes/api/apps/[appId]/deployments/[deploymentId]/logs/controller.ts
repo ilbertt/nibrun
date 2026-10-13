@@ -4,7 +4,7 @@ import { type PublicValue, publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, sse } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import { StreamLogsQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';
 import { AuthPlugin, LogsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -20,7 +20,7 @@ export const AppsAppIdDeploymentsDeploymentIdLogsController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsDeploymentIdLogsController'))
   .use(AuthPlugin)
   .use(LogsServicePlugin)
-  .guard({ auth: Identity.Optional })
+  .guard({ auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] } })
   .get(
     '/apps/:appId/deployments/:deploymentId/logs',
     // Not a generator itself: the ownership check has to answer before anything is streamed, and

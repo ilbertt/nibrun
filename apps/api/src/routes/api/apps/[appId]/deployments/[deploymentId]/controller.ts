@@ -3,7 +3,7 @@ import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import { DeploymentResponseSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
 import { AuthPlugin, DeploymentsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -11,7 +11,7 @@ export const AppsAppIdDeploymentsDeploymentIdController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsDeploymentIdController'))
   .use(AuthPlugin)
   .use(DeploymentsServicePlugin)
-  .guard({ auth: Identity.Optional })
+  .guard({ auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] } })
   .get(
     '/apps/:appId/deployments/:deploymentId',
     async ({ deploymentsService, params, user, status }) => {
