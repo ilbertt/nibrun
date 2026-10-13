@@ -16,6 +16,35 @@ export type UploadableArchive = {
   body: Blob;
 };
 
+type CreateImportBody = Parameters<
+  ReturnType<PublicApiClient['api']['apps']>['imports']['post']
+>[0];
+export type FetchableArchive = Extract<CreateImportBody, { url: string }>;
+export type DeployableArchive = UploadableArchive | FetchableArchive;
+
+export async function importArchive({
+  api,
+  appId,
+  archive,
+  whileUploading,
+  upload,
+}: {
+  api: PublicApiClient;
+  appId: string;
+  archive: DeployableArchive;
+  whileUploading: UploadWait;
+  upload: UploadTransport;
+}): Promise<ImportId> {
+  if (!('url' in archive)) {
+    return await uploadImport({ api, appId, archive, whileUploading, upload });
+  }
+  const stored = unwrap(await api.api.apps({ appId }).imports.post(archive));
+  if (!('digest' in stored)) {
+    throw new ApiError('The api answered a fetched archive with somewhere to upload one.');
+  }
+  return stored.id;
+}
+
 /**
  * Upload an archive against the app it is for, and hand back the import that names it.
  *
