@@ -48,7 +48,9 @@ async function startRelease({
 }: Omit<DeployInput, 'detach'>): Promise<Deployed> {
   const environment = environmentEdit({ env, unset });
   const opened =
-    dataFolder === undefined ? undefined : await openInitialData({ data: dataFolder, ui });
+    dataFolder === undefined || dataFolder.kind === 'url'
+      ? undefined
+      : await openInitialData({ data: dataFolder, ui });
 
   try {
     return await startDeployment({
@@ -60,7 +62,7 @@ async function startRelease({
       port,
       extraPublicPort,
       ...(environment !== undefined && { environment }),
-      ...(opened !== undefined && { initialData: opened.archive }),
+      initialData: dataFolder?.kind === 'url' ? { url: dataFolder.url } : opened?.archive,
       onStep: (step) => announce({ step, ui }),
       whileUploading: ({ message, task }) => {
         const startedAt = Date.now();

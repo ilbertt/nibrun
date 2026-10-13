@@ -10,14 +10,12 @@ const STAGING_PREFIX = 'nib-data-';
 const TAR_SUCCEEDED = 0;
 
 /**
- * Where an app's starting data is coming from, as a path this machine actually has.
- *
- * A folder is packed here; an archive somebody already has is sent as it stands. Which of the two
- * a path is gets decided once, so that nothing downstream has to ask the filesystem again.
+ * Folders are packed locally; existing archives are uploaded unchanged; URLs are fetched by the API.
  */
 export type InitialData =
   | { readonly kind: 'folder'; readonly path: string }
-  | { readonly kind: 'archive'; readonly path: string };
+  | { readonly kind: 'archive'; readonly path: string }
+  | { readonly kind: 'url'; readonly url: string };
 
 /**
  * What `--data-folder` was given, or nothing where it was not.
@@ -42,6 +40,12 @@ export async function initialDataFrom({
       `--data-folder gives a new app the data it starts with, and --app ${app} names one that already has its own.`,
     );
   }
+  if (path.startsWith('https://')) {
+    return { kind: 'url', url: path };
+  }
+  if (path.startsWith('http://')) {
+    throw new UsageError(`An archive is fetched over https, and this is not: ${path}`);
+  }
   return await readable(path);
 }
 
@@ -60,7 +64,7 @@ async function readable(path: string): Promise<InitialData> {
   return { kind: 'folder', path: found };
 }
 
-/** An archive on this machine, and the way to stop it being one once it has been sent. */
+/** Temporary archives are discarded after deployment; local files and URLs need no cleanup. */
 export type OpenedData = {
   archive: UploadableArchive;
   discard: () => Promise<void>;
@@ -78,7 +82,7 @@ export async function openInitialData({
   ui,
   limitBytes,
 }: {
-  data: InitialData;
+  data: Exclude<InitialData, { kind: 'url' }>;
   ui: Ui;
   limitBytes?: number;
 }): Promise<OpenedData> {
