@@ -8,29 +8,34 @@ SQLite puts your database in a file. When your app runs on nibrun, that file liv
 persistent `data/` directory. Your app can use it directly, but looking inside it used to mean
 exporting the data and opening a local copy.
 
-You can now explore it from the dashboard. Pick the file, mark it as a SQLite database, and
-open it in a new tab. The queries run against the database your app is using.
+You can now explore it from the dashboard. Open the database file in a new tab, and the
+queries run against the database your app is using through a read-only
+[SQL over HTTP](https://docs.turso.tech/sdk/http/quickstart) connection.
+
+The `nib` CLI can query the same live database. An AI agent with access to your signed-in
+CLI can explore it too, without downloading the file or changing its data.
+
+![An app.db file inside a microVM uses a SQL over HTTP connection to the SQLite explorer, with dashboard, CLI and AI agent access highlighted.](/blog/explore-sqlite-from-the-dashboard.webp)
 
 > **Already running an app?** If it was running before the SQLite explorer launched, you
-> may get a 502 when marking a database. Click **Suspend**, wait until the app shows
+> may get a 502 when opening a database. Click **Suspend**, wait until the app shows
 > **Suspended**, then click **Resume**. This briefly takes the app offline and brings it
 > back with SQLite support. Your binary and persistent `data/` stay intact. Once the app
-> is running again, retry **Mark as SQLite database**.
+> is running again, retry opening the database.
 
 ## From a file to a database
 
-Open your app's **Files** tab. Find the database, open its three-dot menu, and choose
-**Mark as SQLite database**.
+Open your app's **Files** tab. Files with SQLite extensions such as `.db` or `.sqlite` have
+a database icon and are already links. Click the filename to open the explorer in a new tab,
+or open its three-dot menu and choose **Open SQLite database**.
 
-![The file explorer in dark mode, with the app.db menu open and the Mark as SQLite database option visible.](/blog/mark-as-sqlite-database.jpg "Open a file's menu to connect it to the SQLite explorer.")
+The filename doesn't need a `.sqlite` or `.db` extension. For other regular files, choose
+**Query as SQLite** from the three-dot menu. nibrun checks that it can open the file as a
+SQLite database when the explorer first opens, then saves the connection. If it can't, the
+explorer shows the error, and the file list shows an error you can click to inspect.
 
-The filename doesn't need a `.sqlite` or `.db` extension. The option is available for any
-regular file, and nibrun checks that it can open it as a SQLite database before saving the
-connection. If it can't, the file shows an error you can click to inspect.
-
-Once connected, the file gets a database icon and becomes a link. Click it to open the
-explorer in a separate browser tab. The connection is saved, so you can come back through the
-same file later.
+Once connected, a file without a recognized SQLite extension also gets a database icon and
+becomes a link. The connection is saved, so you can come back through the same file later.
 
 ## Browse tables or write SQL
 
@@ -60,9 +65,10 @@ The explorer header shows the app name and the database's path relative to `/app
 The explorer embeds [LibreDB Studio](https://github.com/libredb/libredb-studio) for table browsing,
 row details and the SQL editor. We adapt its styles to the dashboard and add foreign-key navigation.
 
-Queries use [libSQL's Hrana HTTP v2 protocol](https://github.com/tursodatabase/libsql/blob/main/docs/HTTP_V2_SPEC.md)
-through `@libsql/client` in the browser. nibrun's API relays them to a read-only SQLite connection
-inside your app's microVM.
+SQL over HTTP sends SQL queries and returns their results over HTTP. The dashboard uses
+`@libsql/client` with [libSQL's Hrana HTTP v2 protocol](https://github.com/tursodatabase/libsql/blob/main/docs/HTTP_V2_SPEC.md).
+nibrun's API relays the queries to a read-only SQLite connection inside your app's microVM.
+The database file stays in the guest; browsing it doesn't download a local copy.
 
 ## Your app's file, opened read-only
 
@@ -75,10 +81,11 @@ password or token to create before opening the explorer.
 The database stays in your app's persistent directory. Your binary still opens the same file,
 and you can still export it with the rest of your app's data.
 
-## Explore with your AI agent
+## Explore through the CLI or your AI agent
 
-An AI agent with access to your signed-in `nib` CLI can query the live database too.
-Connections are read-only, so it can explore without changing data or schema. Give it the
+Use `nib apps sqlite` to discover the CLI commands for connections and SQL queries.
+An AI agent with access to your signed-in CLI can use those same commands. Connections are
+read-only, so it can explore without changing data or schema. Give it the
 [nibrun skill](https://github.com/ilbertt/nibrun/blob/main/skills/deploy-to-nibrun/SKILL.md#inspecting-sqlite-databases)
 for the CLI workflow.
 
