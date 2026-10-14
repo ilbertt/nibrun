@@ -3,7 +3,7 @@ import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import {
   DomainDnsQuerySchema,
   DomainDnsResponseSchema,
@@ -29,7 +29,7 @@ export const AppsAppIdHostnamesDnsController = new Elysia()
       return result;
     },
     {
-      auth: Identity.Required,
+      auth: { policies: [AuthCaller.RegisteredAccount] },
       query: publicSchema(DomainDnsQuerySchema),
       response: { [StatusMap.OK]: publicSchema(DomainDnsResponseSchema) },
     },

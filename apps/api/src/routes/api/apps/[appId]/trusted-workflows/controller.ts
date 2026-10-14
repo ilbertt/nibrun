@@ -3,7 +3,7 @@ import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import {
   CreateTrustedWorkflowRequestSchema,
   TrustedWorkflowResponseSchema,
@@ -13,7 +13,7 @@ import { AuthPlugin, TrustedWorkflowsServicePlugin } from '#services/plugins.ts'
 export const AppsAppIdTrustedWorkflowsController = new Elysia()
   .use(AuthPlugin)
   .use(TrustedWorkflowsServicePlugin)
-  .guard({ auth: Identity.Required })
+  .guard({ auth: { policies: [AuthCaller.RegisteredAccount] } })
   .get(
     '/apps/:appId/trusted-workflows',
     function findTrustedWorkflow({ trustedWorkflowsService, params, user }) {

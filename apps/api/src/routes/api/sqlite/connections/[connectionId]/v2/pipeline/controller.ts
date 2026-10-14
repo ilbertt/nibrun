@@ -2,7 +2,7 @@ import { HranaError, hranaError } from '@repo/sqlite';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema, SqliteConnectionIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import { pathBelow, RoutePrefix } from '#lib/routes/prefixes.ts';
 import { assertSqliteCookieOrigin, sqliteRequestSignal } from '#lib/sqlite/http.ts';
 import { SQLITE_CONNECTIONS_BASE_PATH } from '#lib/sqlite/routes.ts';
@@ -41,7 +41,7 @@ export const SqliteConnectionsConnectionIdV2PipelineController = new Elysia()
       }
     },
     {
-      auth: Identity.Optional,
+      auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] },
       params: SqliteConnectionParamsSchema,
       body: SqlitePipelineBodySchema,
       response: {

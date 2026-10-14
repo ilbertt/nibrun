@@ -2,7 +2,7 @@ import { AppIdSchema, GuestPathSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import { assertSqliteOrigin, sqliteRequestSignal } from '#lib/sqlite/http.ts';
 import {
   CreateSqliteConnectionSchema,
@@ -24,7 +24,10 @@ export const AppsAppIdSqliteConnectionsController = new Elysia()
         }),
       });
     },
-    { auth: Identity.Optional, response: { [StatusMap.OK]: ListSqliteConnectionsResponseSchema } },
+    {
+      auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] },
+      response: { [StatusMap.OK]: ListSqliteConnectionsResponseSchema },
+    },
   )
   .post(
     '/apps/:appId/sqlite/connections',
@@ -41,7 +44,7 @@ export const AppsAppIdSqliteConnectionsController = new Elysia()
       );
     },
     {
-      auth: Identity.Optional,
+      auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] },
       body: CreateSqliteConnectionSchema,
       response: { [StatusMap.Created]: SqliteConnectionResponseSchema },
     },

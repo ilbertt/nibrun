@@ -3,7 +3,7 @@ import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import {
   ExportResponseSchema,
   ListExportsResponseSchema,
@@ -14,7 +14,7 @@ export const AppsAppIdExportsController = new Elysia()
   .use(loggerPlugin('appsAppIdExportsController'))
   .use(AuthPlugin)
   .use(ExportsServicePlugin)
-  .guard({ auth: Identity.Required })
+  .guard({ auth: { policies: [AuthCaller.RegisteredAccount] } })
   .get(
     '/apps/:appId/exports',
     async ({ exportsService, params, user, status }) => {

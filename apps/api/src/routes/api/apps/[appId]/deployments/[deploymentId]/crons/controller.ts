@@ -3,7 +3,7 @@ import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import { AuthPlugin, CronsServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
 const MAX_WAIT_MS = 30_000;
@@ -12,7 +12,7 @@ export const AppsAppIdDeploymentsDeploymentIdCronsController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsDeploymentIdCronsController'))
   .use(AuthPlugin)
   .use(CronsServicePlugin)
-  .guard({ auth: Identity.Optional })
+  .guard({ auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] } })
   .get(
     '/apps/:appId/deployments/:deploymentId/crons',
     async ({ cronsService, params, user, request, status }) => {

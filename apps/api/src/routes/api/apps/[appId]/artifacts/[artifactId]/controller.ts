@@ -4,7 +4,7 @@ import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap, t } from 'elysia';
 import { ArtifactSchema } from '#lib/api/artifact.ts';
 import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { Identity } from '#lib/auth/identity.ts';
+import { AuthCaller } from '#lib/auth/caller.ts';
 import { UpdateArtifactBodySchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { ArtifactsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -12,7 +12,7 @@ export const AppsAppIdArtifactsArtifactIdController = new Elysia()
   .use(loggerPlugin('appsAppIdArtifactsArtifactIdController'))
   .use(AuthPlugin)
   .use(ArtifactsServicePlugin)
-  .guard({ auth: Identity.Optional })
+  .guard({ auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] } })
   .get(
     '/apps/:appId/artifacts/:artifactId',
     async ({ artifactsService, params, user, status }) => {
