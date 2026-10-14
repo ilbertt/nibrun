@@ -2,6 +2,27 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.10.14-1]
+
+### 🚀 Features
+
+- *(cli)* Manage trusted GitHub workflows (#914)
+- *(cli)* Deploy with trusted GitHub OIDC (#908)
+- *(api)* Exchange trusted GitHub proofs for deployment credentials (#859)
+
+### 🐛 Bug Fixes
+
+- *(cli)* Normalize installer version formats (#915)
+
+### 🚜 Refactor
+
+- *(app-operations)* Share GitHub workflow operations (#916)
+- *(cli)* Remove obsolete deploy action package (#909)
+
+### 📦 Build & Dependencies
+
+- *(cli)* Bump parsh core to 0.0.11 (#910)
+
 ## [2026.10.13-1]
 
 ### 🚀 Features
