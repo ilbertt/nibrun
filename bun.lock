@@ -197,7 +197,6 @@
         "@repo/api-client": "workspace:*",
         "@repo/api-constants": "workspace:*",
         "@repo/app-operations": "workspace:*",
-        "@repo/deploy-action": "workspace:*",
         "@repo/global-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
         "better-auth": "catalog:",
@@ -206,18 +205,6 @@
       "devDependencies": {
         "@parshjs/codegen": "^0.0.5",
         "@repo/internal-scripts": "workspace:*",
-        "@repo/typescript-config": "workspace:*",
-        "typescript": "catalog:",
-      },
-    },
-    "packages/deploy-action": {
-      "name": "@repo/deploy-action",
-      "dependencies": {
-        "@actions/core": "^3.0.1",
-        "@repo/api-client": "workspace:*",
-        "@repo/api-constants": "workspace:*",
-      },
-      "devDependencies": {
         "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",
       },
@@ -1202,8 +1189,6 @@
     "@repo/cli": ["@repo/cli@workspace:packages/cli"],
 
     "@repo/dashboard": ["@repo/dashboard@workspace:apps/dashboard"],
-
-    "@repo/deploy-action": ["@repo/deploy-action@workspace:packages/deploy-action"],
 
     "@repo/deploy-link": ["@repo/deploy-link@workspace:packages/deploy-link"],
 

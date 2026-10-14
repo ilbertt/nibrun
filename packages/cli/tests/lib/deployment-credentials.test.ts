@@ -1,6 +1,6 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test';
 import { GITHUB_ACTIONS_OIDC_AUDIENCE } from '@repo/api-constants';
-import { DeploymentCredentials } from '#credentials.ts';
+import { DeploymentCredentials } from '#lib/deployment-credentials.ts';
 import { mockFetch } from '#tests/support/fetch.ts';
 
 const ORIGIN = 'https://nibrun.test';

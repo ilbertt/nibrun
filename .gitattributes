@@ -1,4 +1,2 @@
 * text=auto eol=lf
 *.png binary
-
-packages/deploy-action/dist/index.mjs linguist-generated=true -whitespace

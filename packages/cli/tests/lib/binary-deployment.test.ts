@@ -1,5 +1,5 @@
 import { afterEach, expect, mock, test } from 'bun:test';
-import { deployBinary } from '#deploy.ts';
+import { deployBinary } from '#lib/binary-deployment.ts';
 import { mockFetch } from '#tests/support/fetch.ts';
 
 const ORIGIN = 'https://nibrun.test';
