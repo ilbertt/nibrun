@@ -2,7 +2,7 @@ import type { TypedSQL } from '@ilbertt/bun-sqlgen';
 import type { AppId, DeploymentId, HostPort, InstanceState, Ipv4Address } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { DeploymentState } from '#lib/api/deployment.ts';
-import type { ArtifactId, ImportId, OwnerId } from '#lib/api/identifiers.ts';
+import type { ArtifactId, DeploymentGrantId, ImportId, OwnerId } from '#lib/api/identifiers.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type DeploymentRow = Queries['SelectDeploymentById'];
@@ -31,9 +31,15 @@ export type CreateDeploymentInput = OwnedApp & {
 export type CreatedDeployment =
   | { outcome: 'created'; row: DeploymentRow }
   | { outcome: 'no-artifact' }
+  | { outcome: 'no-grant' }
   | { outcome: 'no-import' }
   | { outcome: 'data-exists' }
   | { outcome: 'held' };
+
+export type CreateGitHubDeploymentInput = OwnedApp & {
+  artifactId: ArtifactId;
+  deploymentGrantId: DeploymentGrantId;
+};
 
 /**
  * Going back to a release is a new row naming the one it replays, rather than that one revived:
@@ -74,6 +80,9 @@ export type ReportedDeployment = {
 
 export abstract class DeploymentsRepositoryContract {
   abstract insert(input: CreateDeploymentInput): Promise<CreatedDeployment>;
+  abstract insertWithDeploymentGrant(
+    input: CreateGitHubDeploymentInput,
+  ): Promise<CreatedDeployment>;
   abstract insertRollback(input: RollbackDeploymentInput): Promise<DeploymentRow | null>;
   abstract listByApp(input: DeploymentsByAppInput): Promise<DeploymentRow[]>;
   abstract findById(input: DeploymentByIdInput): Promise<DeploymentRow | null>;
@@ -99,13 +108,24 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
    * the app was running is superseded first. `deployments_live_idx` admits one live row per app,
    * so it has to leave in this same transaction or the insert meets it.
    */
-  insert({
+  insert(input: CreateDeploymentInput): Promise<CreatedDeployment> {
+    return this.insertDeployment({ ...input, deploymentGrantId: null });
+  }
+
+  insertWithDeploymentGrant(input: CreateGitHubDeploymentInput): Promise<CreatedDeployment> {
+    return this.insertDeployment({ ...input, initialDataFrom: null, onlyOne: false });
+  }
+
+  private insertDeployment({
     appId,
     ownerId,
     artifactId,
     initialDataFrom,
     onlyOne,
-  }: CreateDeploymentInput): Promise<CreatedDeployment> {
+    deploymentGrantId,
+  }: CreateDeploymentInput & {
+    deploymentGrantId: DeploymentGrantId | null;
+  }): Promise<CreatedDeployment> {
     return this.sql.begin(async (tx): Promise<CreatedDeployment> => {
       // Asked before anything is superseded: returning from this callback commits, so an
       // artifact this owner does not have must leave the running deployment alone rather than
@@ -122,6 +142,9 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if (!deployable) {
         return { outcome: 'no-artifact' };
       }
+      if (!(await validDeploymentGrant({ tx, appId, ownerId, deploymentGrantId }))) {
+        return { outcome: 'no-grant' };
+      }
       const refusal =
         initialDataFrom === null
           ? undefined
@@ -137,8 +160,9 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one
       // the row is written through rather than one checked beside it.
       const [inserted] = await tx.InsertDeployment`
-        INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, initial_data_import_id)
-        SELECT a.id, ar.id, c.id, ${initialDataFrom}
+        INSERT INTO nibrun.deployments
+          (app_id, artifact_id, config_id, initial_data_import_id, github_deployment_grant_id)
+        SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}
         FROM nibrun.live_apps a
         JOIN nibrun.artifacts ar ON ar.app_id = a.id
         JOIN LATERAL (
@@ -202,6 +226,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
+             g.github_repository, g.github_workflow_ref, g.github_ref,
+             g.github_commit_sha, g.github_run_id, g.github_run_attempt,
                c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -211,6 +237,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       FROM nibrun.deployments d
       JOIN nibrun.live_apps a ON a.id = d.app_id
       JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
+      LEFT JOIN nibrun.github_deployment_grants g ON g.id = d.github_deployment_grant_id
       WHERE d.app_id = ${appId} AND a.owner_id = ${ownerId}
       ORDER BY d.id DESC
     `;
@@ -227,6 +254,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
+             g.github_repository, g.github_workflow_ref, g.github_ref,
+             g.github_commit_sha, g.github_run_id, g.github_run_attempt,
                c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -236,6 +265,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       FROM nibrun.deployments d
       JOIN nibrun.live_apps a ON a.id = d.app_id
       JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
+      LEFT JOIN nibrun.github_deployment_grants g ON g.id = d.github_deployment_grant_id
       WHERE d.app_id = ${appId} AND d.id = ${deploymentId} AND a.owner_id = ${ownerId}
     `;
     return row ?? null;
@@ -352,6 +382,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
              d.rollback_of_deployment_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
+             g.github_repository, g.github_workflow_ref, g.github_ref,
+             g.github_commit_sha, g.github_run_id, g.github_run_attempt,
              c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -360,6 +392,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
       FROM nibrun.deployments d
       JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
+      LEFT JOIN nibrun.github_deployment_grants g ON g.id = d.github_deployment_grant_id
       WHERE d.id = ${deploymentId}
     `;
     return row ?? null;
@@ -425,4 +458,22 @@ async function seedRefusal({
       AND im.digest IS NOT NULL
   `;
   return usable ? undefined : { outcome: 'no-import' };
+}
+
+async function validDeploymentGrant({
+  tx,
+  appId,
+  ownerId,
+  deploymentGrantId,
+}: OwnedApp & { tx: Transaction; deploymentGrantId: DeploymentGrantId | null }): Promise<boolean> {
+  if (deploymentGrantId === null) {
+    return true;
+  }
+  const [grant] = await tx.SelectDeploymentGrantToUse`
+    SELECT g.id
+    FROM nibrun.valid_github_deployment_grants g
+    WHERE g.id = ${deploymentGrantId} AND g.app_id = ${appId} AND g.owner_id = ${ownerId}
+    FOR SHARE
+  `;
+  return grant !== undefined;
 }

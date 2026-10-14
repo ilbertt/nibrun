@@ -8,6 +8,7 @@ import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 import { deploymentToken } from '#tests/support/deployment-tokens.ts';
 import {
   GRANT_APP_ID,
+  GRANT_ID,
   GRANT_OWNER_ID,
   githubDeploymentGrant,
 } from '#tests/support/github-deployment-grants.ts';
@@ -48,6 +49,7 @@ test('a verified app grant can deploy a binary through the existing service', as
     appId: GRANT_APP_ID,
     ownerId: GRANT_OWNER_ID,
     source: BODY,
+    deploymentGrantId: GRANT_ID,
   });
 });
 
@@ -82,5 +84,23 @@ test('a grant for another app cannot create a deployment', async () => {
     body: BODY,
   });
   expect(response.status).toBe(StatusMap.Unauthorized);
+  expect(create).not.toHaveBeenCalled();
+});
+
+test('clients cannot supply GitHub provenance or choose a deployment grant', async () => {
+  spyOn(grants, 'authenticate').mockResolvedValue(githubDeploymentGrant());
+  const create = spyOn(deployments, 'createWithDeploymentGrant');
+  for (const claims of [
+    { deploymentGrantId: 'forged-grant' },
+    { github: { repository: 'forged/repository' } },
+  ]) {
+    const response = await sendJson({
+      method: 'POST',
+      url: URL,
+      headers: HEADERS,
+      body: { ...BODY, ...claims },
+    });
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  }
   expect(create).not.toHaveBeenCalled();
 });

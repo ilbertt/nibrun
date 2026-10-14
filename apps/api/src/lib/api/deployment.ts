@@ -28,10 +28,20 @@ export const DEPLOYMENT_STATES = [
 export const DeploymentStateSchema = stringEnum(DEPLOYMENT_STATES);
 export type DeploymentState = typeof DeploymentStateSchema.static;
 
+export const GitHubDeploymentSchema = Type.Object({
+  repository: Type.String(),
+  workflowRef: Type.String(),
+  ref: Type.String(),
+  commitSha: Type.String(),
+  runId: Type.String(),
+  runAttempt: Type.String(),
+});
+
 export const DeploymentSchema = Type.Object({
   id: DeploymentIdSchema,
   appId: AppIdSchema,
   artifactId: ArtifactIdSchema,
+  github: Type.Optional(GitHubDeploymentSchema),
   config: AppConfigSchema,
   state: DeploymentStateSchema,
   // What the microVM is doing, which the release's own state stopped answering when an app could

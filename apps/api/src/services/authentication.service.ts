@@ -33,7 +33,7 @@ export type AuthenticateRequestInput = AuthenticationPolicy & {
 export type AuthenticatedAppDeployment = {
   ownerId: OwnerId;
   isAnonymous: boolean;
-  deploymentGrant: Pick<GitHubDeploymentGrantRow, 'expires_at'> | null;
+  deploymentGrant: Pick<GitHubDeploymentGrantRow, 'id' | 'expires_at'> | null;
 };
 export type AuthenticatedRequest =
   | AuthenticatedAccount
@@ -145,6 +145,7 @@ export class AuthenticationService extends Service implements AuthenticationServ
       ownerId: grant.owner_id,
       isAnonymous: false,
       deploymentGrant: {
+        id: grant.id,
         expires_at: new Date(Math.min(grant.expires_at.getTime(), token.expiresAt.getTime())),
       },
     };

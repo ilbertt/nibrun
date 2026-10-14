@@ -1,13 +1,18 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
-import { type AppId, AppIdSchema } from '@repo/protocol';
+import { type AppId, HostnameSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
-import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { AppNameSchema } from '#lib/api/app.ts';
+import { DnsLabelSchema } from '#lib/api/dns-label.ts';
+import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { configWithDefaults } from '#lib/app-config.ts';
 import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { GitHubActionsOidcClaims } from '#lib/github-actions-oidc.ts';
+import { AppsRepository } from '#repositories/apps.repository.ts';
+import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { GitHubDeploymentGrantsRepository } from '#repositories/github-deployment-grants.repository.ts';
 import { TrustedWorkflowsRepository } from '#repositories/trusted-workflows.repository.ts';
 import { GitHubDeploymentGrantsService } from '#services/github-deployment-grants.service.ts';
@@ -27,6 +32,7 @@ const OWNER_ID = Value.Parse(OwnerIdSchema, 'grant-owner');
 const OTHER_OWNER_ID = Value.Parse(OwnerIdSchema, 'grant-stranger');
 let sql: SQL;
 let key: SigningKey;
+const APP_QUOTA = 100;
 
 beforeAll(async function initializeDatabase() {
   sql = await startTestDatabase();
@@ -37,6 +43,10 @@ beforeAll(async function initializeDatabase() {
        VALUES ($1, $1, $2, true, now(), now())`,
       [ownerId, `${ownerId}@example.test`],
     );
+    await sql.unsafe('UPDATE nibrun.profiles SET quota_apps_max_count = $1 WHERE owner_id = $2', [
+      APP_QUOTA,
+      ownerId,
+    ]);
   }
 }, DATABASE_START_TIMEOUT_MS);
 
@@ -64,11 +74,19 @@ function identity(): GitHubActionsOidcClaims {
 }
 
 async function configuredApp(): Promise<AppId> {
-  const rows = await sql.unsafe(
-    `INSERT INTO nibrun.apps (owner_id, name, slug) VALUES ($1, 'Grant app', $2) RETURNING id`,
-    [OWNER_ID, `grant-${Bun.randomUUIDv7()}`],
-  );
-  const appId = Value.Parse(AppIdSchema, rows[0].id);
+  const slug = Value.Parse(DnsLabelSchema, `grant-${Bun.randomUUIDv7()}`);
+  const created = await new AppsRepository(withTypes<Queries>(sql)).create({
+    ownerId: OWNER_ID,
+    anonymousAppsAtMost: null,
+    name: Value.Parse(AppNameSchema, 'Grant app'),
+    slug,
+    hostname: Value.Parse(HostnameSchema, `${slug}.apps.test`),
+    config: { ...configWithDefaults(), environment: {} },
+  });
+  if (created.outcome !== 'created') {
+    throw new Error('The grant fixture app must be created.');
+  }
+  const appId = created.app.id;
   await workflowsRepository().create({ appId, ownerId: OWNER_ID, workflow: trustedWorkflow() });
   return appId;
 }
@@ -286,4 +304,102 @@ test('the workflow foreign key rejects references to a nonexistent trust rule', 
   expect((await service().authenticate({ appId, grantId: issued.id, ownerId: OWNER_ID })).id).toBe(
     issued.id,
   );
+});
+
+async function deploymentInput(appId: AppId) {
+  const [artifact] = await sql.unsafe(
+    `INSERT INTO nibrun.artifacts (app_id, digest, size_bytes, object_key, original_file_name)
+     VALUES ($1, $2, 1, 'binary', 'server') RETURNING id`,
+    [appId, new Bun.CryptoHasher('sha256').update('binary').digest('hex')],
+  );
+  return {
+    appId,
+    ownerId: OWNER_ID,
+    artifactId: Value.Parse(ArtifactIdSchema, artifact.id),
+    initialDataFrom: null,
+    onlyOne: false,
+  };
+}
+
+test('deployment provenance survives grant expiry and workflow revocation', async () => {
+  const appId = await configuredApp();
+  const issued = await grant({ appId });
+  const repository = new DeploymentsRepository(withTypes<Queries>(sql));
+  const deployed = await repository.insertWithDeploymentGrant({
+    ...(await deploymentInput(appId)),
+    deploymentGrantId: issued.id,
+  });
+  if (deployed.outcome !== 'created') {
+    throw new Error('The GitHub deployment must be created.');
+  }
+  const authorized = await service().authenticate({ appId, ownerId: OWNER_ID, grantId: issued.id });
+  await workflowsRepository().remove({
+    appId,
+    ownerId: OWNER_ID,
+    workflowId: authorized.workflow_id,
+  });
+  await sql.unsafe(
+    "UPDATE nibrun.github_deployment_grants SET expires_at = now() - interval '1 second' WHERE id = $1 AND owner_id = $2",
+    [issued.id, OWNER_ID],
+  );
+  expect(
+    await repository.findById({ appId, ownerId: OWNER_ID, deploymentId: deployed.row.id }),
+  ).toMatchObject({
+    github_repository: authorized.github_repository,
+    github_workflow_ref: authorized.github_workflow_ref,
+    github_ref: authorized.github_ref,
+    github_commit_sha: authorized.github_commit_sha,
+    github_run_id: authorized.github_run_id,
+    github_run_attempt: authorized.github_run_attempt,
+  });
+  expect((await repository.listByApp({ appId, ownerId: OWNER_ID }))[0]?.github_run_id).toBe(
+    authorized.github_run_id,
+  );
+});
+
+test('manual redeploys and rollbacks do not inherit a GitHub artifact origin', async () => {
+  const appId = await configuredApp();
+  const issued = await grant({ appId });
+  const input = await deploymentInput(appId);
+  const repository = new DeploymentsRepository(withTypes<Queries>(sql));
+  const github = await repository.insertWithDeploymentGrant({
+    ...input,
+    deploymentGrantId: issued.id,
+  });
+  if (github.outcome !== 'created') {
+    throw new Error('The GitHub deployment must be created.');
+  }
+  const manual = await repository.insert(input);
+  expect(manual.outcome === 'created' ? manual.row.github_repository : undefined).toBeNull();
+  const rollback = await repository.insertRollback({
+    appId,
+    ownerId: OWNER_ID,
+    rollbackOf: github.row.id,
+  });
+  expect(rollback?.github_repository).toBeNull();
+  expect(rollback?.artifact_id).toBe(github.row.artifact_id);
+});
+
+test('another app grant cannot attach provenance or supersede the existing deployment', async () => {
+  const appId = await configuredApp();
+  const foreignGrant = await grant({ appId: await configuredApp() });
+  const input = await deploymentInput(appId);
+  const repository = new DeploymentsRepository(withTypes<Queries>(sql));
+  const current = await repository.insert(input);
+  if (current.outcome !== 'created') {
+    throw new Error('The current deployment must be created.');
+  }
+  expect(
+    await repository.insertWithDeploymentGrant({ ...input, deploymentGrantId: foreignGrant.id }),
+  ).toEqual({ outcome: 'no-grant' });
+  expect(
+    await repository.insertWithDeploymentGrant({
+      ...input,
+      ownerId: OTHER_OWNER_ID,
+      deploymentGrantId: foreignGrant.id,
+    }),
+  ).toEqual({ outcome: 'no-artifact' });
+  expect(
+    await repository.findById({ appId, ownerId: OWNER_ID, deploymentId: current.row.id }),
+  ).toMatchObject({ state: 'pending', github_repository: null });
 });

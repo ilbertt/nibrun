@@ -8,10 +8,10 @@ import type {
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
 import type { Deployment, DeploymentState } from '#lib/api/deployment.ts';
-import type { ArtifactId, ImportId } from '#lib/api/identifiers.ts';
+import type { ArtifactId, DeploymentGrantId, ImportId } from '#lib/api/identifiers.ts';
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { DeploymentLifecycle } from '#lib/deployments/lifecycle.ts';
-import { ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
+import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {
@@ -119,12 +119,19 @@ export class DeploymentsService extends Service {
   }
 
   async createWithDeploymentGrant(
-    input: OwnedApp & { source: DeploymentSource },
+    input: OwnedApp & { source: DeploymentSource; deploymentGrantId: DeploymentGrantId },
   ): Promise<PublicDeployment> {
     if ('rollbackOf' in input.source || input.source.initialDataFrom !== undefined) {
       throw new ForbiddenError('Deployment credentials can only deploy a compiled binary.');
     }
-    return await this.createOrRollback({ ...input, isAnonymous: false });
+    return await this.created(
+      this.deploymentsRepo.insertWithDeploymentGrant({
+        appId: input.appId,
+        ownerId: input.ownerId,
+        artifactId: input.source.artifactId,
+        deploymentGrantId: input.deploymentGrantId,
+      }),
+    );
   }
 
   async list(input: DeploymentsByAppInput): Promise<PublicDeployment[]> {
@@ -234,6 +241,9 @@ export class DeploymentsService extends Service {
     if (outcome.outcome === 'created') {
       return toPublicDeployment(outcome.row);
     }
+    if (outcome.outcome === 'no-grant') {
+      throw new UnauthorizedError('Invalid deployment grant.');
+    }
     if (outcome.outcome === 'no-artifact') {
       throw new NotFoundError(NOTHING_TO_DEPLOY);
     }
@@ -297,6 +307,7 @@ function toReportedDeployment({
 }
 
 function toPublicDeployment(row: DeploymentRow): PublicDeployment {
+  const github = githubDeployment(row);
   return {
     id: row.id,
     appId: row.app_id,
@@ -313,5 +324,20 @@ function toPublicDeployment(row: DeploymentRow): PublicDeployment {
     ...(row.last_healthy_at && { lastHealthyAt: toTimestamp(row.last_healthy_at) }),
     ...(row.message && { message: row.message }),
     ...(row.rollback_of_deployment_id && { rollbackOf: row.rollback_of_deployment_id }),
+    ...(github && { github }),
   };
+}
+
+function githubDeployment(row: DeploymentRow): Deployment['github'] {
+  const {
+    github_repository: repository,
+    github_workflow_ref: workflowRef,
+    github_ref: ref,
+    github_commit_sha: commitSha,
+    github_run_id: runId,
+    github_run_attempt: runAttempt,
+  } = row;
+  return repository && workflowRef && ref && commitSha && runId && runAttempt
+    ? { repository, workflowRef, ref, commitSha, runId, runAttempt }
+    : undefined;
 }
