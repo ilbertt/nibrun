@@ -209,6 +209,17 @@
         "typescript": "catalog:",
       },
     },
+    "packages/deploy-action": {
+      "name": "@repo/deploy-action",
+      "dependencies": {
+        "@repo/api-client": "workspace:*",
+        "@repo/api-constants": "workspace:*",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "packages/deploy-link": {
       "name": "@repo/deploy-link",
       "dependencies": {
@@ -1189,6 +1200,8 @@
     "@repo/cli": ["@repo/cli@workspace:packages/cli"],
 
     "@repo/dashboard": ["@repo/dashboard@workspace:apps/dashboard"],
+
+    "@repo/deploy-action": ["@repo/deploy-action@workspace:packages/deploy-action"],
 
     "@repo/deploy-link": ["@repo/deploy-link@workspace:packages/deploy-link"],
 
