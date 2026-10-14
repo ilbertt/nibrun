@@ -4,6 +4,8 @@ node_modules
 # output
 out
 dist
+!/packages/deploy-action/dist/
+!/packages/deploy-action/dist/index.mjs
 *.tgz
 .wrangler
 

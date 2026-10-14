@@ -20,3 +20,8 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      - name: Emit Action bundle
+        run: |
+          bun run --filter @repo/deploy-action emit
+          node --check packages/deploy-action/dist/index.mjs

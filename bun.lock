@@ -212,6 +212,7 @@
     "packages/deploy-action": {
       "name": "@repo/deploy-action",
       "dependencies": {
+        "@actions/core": "^3.0.1",
         "@repo/api-client": "workspace:*",
         "@repo/api-constants": "workspace:*",
       },

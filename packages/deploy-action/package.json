@@ -10,10 +10,12 @@
     "#tests/*": "./tests/*"
   },
   "scripts": {
+    "emit": "bun run scripts/emit.ts",
     "check:types": "bun run --bun tsc",
     "test": "bun test"
   },
   "dependencies": {
+    "@actions/core": "^3.0.1",
     "@repo/api-client": "workspace:*",
     "@repo/api-constants": "workspace:*"
   },
