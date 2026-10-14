@@ -10,7 +10,6 @@
     "#tests/*": "./tests/*"
   },
   "scripts": {
-    "emit": "bun run scripts/emit.ts",
     "check:types": "bun run --bun tsc",
     "test": "bun test"
   },

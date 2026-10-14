@@ -1,0 +1,44 @@
+name: update-action-bundle
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: update-action-bundle
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-action-bundle:
+    if: github.repository == 'ilbertt/nibrun'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - uses: ./.github/actions/prepare
+
+      - name: Emit Action bundle
+        run: bun run --filter @repo/internal-scripts emit-action-bundle
+
+      - name: Check for bundle changes
+        id: bundle
+        run: bun run --filter @repo/internal-scripts check-file-changes packages/deploy-action/dist/index.mjs
+
+      - name: Open the adoption pull request
+        if: steps.bundle.outputs.changed == 'true'
+        uses: ./.github/actions/open-pr
+        with:
+          branch: codex/action-bundle-${{ steps.bundle.outputs.source-commit }}
+          title: 'chore(deploy-action): update Action bundle'
+          paths: packages/deploy-action/dist/index.mjs
+          token: ${{ secrets.OPEN_PR_TOKEN || github.token }}
+          body: |
+            Regenerate the Action bundle from [nibrun source](${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.bundle.outputs.source-commit }}).
