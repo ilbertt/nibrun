@@ -8,6 +8,7 @@ const SHA256_DIGEST = /^sha256:([0-9a-f]{64})$/;
 export type PresetPin = Pick<DeployPreset, 'version'> & {
   binary: string;
   sha256: string | undefined;
+  'initial-data': string | undefined;
 };
 
 export type PresetUpdate = {
@@ -33,7 +34,7 @@ type UpdateOptions = {
 };
 
 export async function findUpdate(options: UpdateOptions): Promise<PresetUpdate | undefined> {
-  const { preset, request, slug } = options;
+  const { preset, slug } = options;
   if (!preset.deployLink.binary) {
     throw new Error(`No binary URL for ${slug}`);
   }
@@ -41,15 +42,21 @@ export async function findUpdate(options: UpdateOptions): Promise<PresetUpdate |
     version: preset.version,
     binary: preset.deployLink.binary,
     sha256: preset.deployLink.sha256,
+    'initial-data': preset.deployLink['initial-data'],
   };
   // Rolling releases intentionally carry no pin: their download already follows new builds.
-  if (previous.sha256 === undefined) {
+  if (previous.sha256 === undefined && previous['initial-data'] === undefined) {
     return undefined;
   }
-  const url = new URL(previous.binary);
+  const url = new URL(previous['initial-data'] ?? previous.binary);
   if (url.hostname !== 'github.com') {
     return findDrizzleUpdate({ ...options, previous });
   }
+  return await findGithubUpdate({ ...options, previous, url });
+}
+
+async function findGithubUpdate(options: UpdateOptions & { previous: PresetPin; url: URL }) {
+  const { previous, request, slug, url } = options;
   const match = GITHUB_RELEASE_PATH.exec(url.pathname);
   if (!match) {
     throw new Error(`Unsupported release URL: ${url}`);
@@ -58,7 +65,7 @@ export async function findUpdate(options: UpdateOptions): Promise<PresetUpdate |
   const tag = match[2]!;
   const encodedName = match[3]!;
   if (decodeURIComponent(tag) !== previous.version) {
-    throw new Error(`Version and binary tag disagree for ${slug}`);
+    throw new Error(`Version and release tag disagree for ${slug}`);
   }
   const endpoint = `https://api.github.com/repos/${repository}/releases`;
   const latest = (await (await request(`${endpoint}/latest`)).json()) as Release;
@@ -74,19 +81,33 @@ export async function findUpdate(options: UpdateOptions): Promise<PresetUpdate |
   if (!asset) {
     throw new Error(`${latest.tag_name} has no asset named ${name}`);
   }
+  return {
+    slug,
+    previous,
+    next: await nextGithubPin({ previous, latest, asset, request }),
+    releaseUrl: latest.html_url,
+  };
+}
+
+async function nextGithubPin(options: {
+  previous: PresetPin;
+  latest: Release;
+  asset: Release['assets'][number];
+  request: UpdateOptions['request'];
+}): Promise<PresetPin> {
+  const { previous, latest, asset, request } = options;
+  if (previous['initial-data'] !== undefined) {
+    return { ...previous, version: latest.tag_name, 'initial-data': asset.browser_download_url };
+  }
   const digest = asset.digest?.match(SHA256_DIGEST)?.[1];
   if (asset.digest && !digest) {
     throw new Error(`Unsupported asset digest: ${asset.digest}`);
   }
   return {
-    slug,
-    previous,
-    next: {
-      version: latest.tag_name,
-      binary: asset.browser_download_url,
-      sha256: digest ?? (await downloadChecksum({ request, url: asset.browser_download_url })),
-    },
-    releaseUrl: latest.html_url,
+    ...previous,
+    version: latest.tag_name,
+    binary: asset.browser_download_url,
+    sha256: digest ?? (await downloadChecksum({ request, url: asset.browser_download_url })),
   };
 }
 
@@ -127,6 +148,7 @@ async function findDrizzleUpdate(options: UpdateOptions & { previous: PresetPin 
     slug,
     previous,
     next: {
+      ...previous,
       version: `v${version}`,
       binary,
       sha256: await downloadChecksum({ request, url: binary }),

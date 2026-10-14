@@ -11,8 +11,10 @@ Run `bun run --filter @repo/deploy-link update:presets` from the repository root
 update the pins. The updater has no command-line options.
 The script runs `bun fix:codestyle` after writing updates and exits with an error
 if an upstream check or formatting fails.
-Derive GitHub release repositories and asset names from the pinned binary URLs,
-including forks. Drizzle Gateway uses its published Linux x64 download page.
+Derive GitHub release repositories and asset names from pinned initial-data URLs
+when present, otherwise from binary URLs, including forks. Initial-data updates
+preserve the separately pinned runtime binary and checksum. Drizzle Gateway uses
+its published Linux x64 download page.
 Keep rolling presets without checksums unpinned; they already follow upstream builds.
 
 The `update-deploy-presets` workflow runs daily at 06:23 UTC or on manual dispatch.

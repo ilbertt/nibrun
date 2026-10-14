@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import * as ts from 'typescript/unstable/ast';
 import { API } from 'typescript/unstable/async';
 import { createVirtualFileSystem } from 'typescript/unstable/fs';
-import type { PresetUpdate } from '#scripts/updates/releases.ts';
+import type { PresetPin, PresetUpdate } from '#scripts/updates/releases.ts';
 
 type Edit = { start: number; end: number; text: string };
 
@@ -34,26 +34,7 @@ export async function updatePresetSource(options: {
     if (!ts.isObjectLiteralExpression(link)) {
       throw new Error(`Expected a deploy link for ${update.slug}`);
     }
-    edits.push(
-      replacement({
-        object: preset,
-        name: 'version',
-        previous: update.previous.version,
-        next: update.next.version,
-      }),
-      replacement({
-        object: link,
-        name: 'binary',
-        previous: update.previous.binary,
-        next: update.next.binary,
-      }),
-      replacement({
-        object: link,
-        name: 'sha256',
-        previous: update.previous.sha256,
-        next: update.next.sha256,
-      }),
-    );
+    edits.push(...pinEdits({ preset, link, update }));
   }
   edits.sort(descendingPosition);
   let written = source;
@@ -61,6 +42,28 @@ export async function updatePresetSource(options: {
     written = written.slice(0, edit.start) + edit.text + written.slice(edit.end);
   }
   return written;
+}
+
+function pinEdits(options: {
+  preset: ts.ObjectLiteralExpression;
+  link: ts.ObjectLiteralExpression;
+  update: PresetUpdate;
+}): Edit[] {
+  const { preset, link, update } = options;
+  const edits: Edit[] = [];
+  for (const name of Object.keys(update.next) as (keyof PresetPin)[]) {
+    if (update.previous[name] !== update.next[name]) {
+      edits.push(
+        replacement({
+          object: name === 'version' ? preset : link,
+          name,
+          previous: update.previous[name],
+          next: update.next[name],
+        }),
+      );
+    }
+  }
+  return edits;
 }
 
 async function parseSource(source: string): Promise<ts.SourceFile> {
