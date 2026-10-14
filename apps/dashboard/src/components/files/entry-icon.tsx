@@ -22,7 +22,7 @@ export function EntryIcon({
   entry: FilesystemEntry;
   sqlite: FileSqliteConnection;
 }) {
-  if (sqlite.connection === undefined && sqlite.error !== null) {
+  if (sqlite.error !== null) {
     return <SqliteConnectionError name={entry.name} error={sqlite.error} />;
   }
   const Icon = sqlite.isDatabase ? DatabaseIcon : KIND_ICONS[entry.kind];

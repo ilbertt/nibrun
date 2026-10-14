@@ -1,4 +1,5 @@
 import { unwrap } from '@repo/api-client/unwrap';
+import { executeSqliteQuery } from '@repo/app-operations';
 import { queryOptions } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
 import { connectSqliteFile } from '#lib/connect-sqlite-file.ts';
@@ -19,6 +20,13 @@ export function sqliteFileConnectionQueryOptions(file: SqliteFile) {
               sqlite_file_path: file.path,
             }),
           ),
+        validate: async (connection) => {
+          await executeSqliteQuery({
+            api,
+            connectionId: connection.id,
+            sql: 'SELECT name FROM sqlite_schema LIMIT 0',
+          });
+        },
       });
       return { ...connection, url: sameOriginSqliteUrl(connection.url) };
     },
