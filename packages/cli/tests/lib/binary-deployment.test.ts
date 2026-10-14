@@ -90,10 +90,24 @@ test('an unsuccessful upload is cancelled and never creates a deployment', async
       Response.json({ artifactId: ARTIFACT_ID, url: STORAGE_URL }, { status: CREATED_STATUS }),
     );
   });
-  await expect(deployBinary(input())).rejects.toThrow('Binary upload failed');
+  await expect(deployBinary(input())).rejects.toThrow('Binary upload failed (HTTP 500)');
   expect(
     calls.some(function deploymentRequest(url) {
       return url.endsWith('/deployments');
     }),
   ).toBe(false);
+});
+
+test('a failed upload keeps its error when recording the cancellation also fails', async () => {
+  mockFetch(function fetchResponse(...args: Parameters<typeof fetch>) {
+    const [resource, init] = args;
+    if (String(resource) === STORAGE_URL) {
+      return Promise.resolve(new Response(null, { status: FAILURE_STATUS }));
+    }
+    if (init?.method === 'PATCH') {
+      return Promise.reject(new Error(`private-cancellation-error ${ACCESS_TOKEN}`));
+    }
+    return Promise.resolve(Response.json({ artifactId: ARTIFACT_ID, url: STORAGE_URL }));
+  });
+  await expect(deployBinary(input())).rejects.toThrow('Binary upload failed (HTTP 500)');
 });

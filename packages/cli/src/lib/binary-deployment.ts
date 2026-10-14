@@ -1,6 +1,6 @@
 import { createPublicApiClient } from '@repo/api-client/public';
-import { unwrap } from '@repo/api-client/unwrap';
 import type { DeploymentCredentialsContract } from '#lib/deployment-credentials.ts';
+import { DeploymentError, deploymentApiRequest } from '#lib/deployment-error.ts';
 
 export type DeployBinaryInput = {
   apiUrl: string;
@@ -20,14 +20,16 @@ async function client(input: DeployBinaryInput) {
 
 export async function deployBinary(input: DeployBinaryInput): Promise<string> {
   const api = await client(input);
-  const created = unwrap(
-    await api.api.apps({ appId: input.appId }).artifacts.post({
+  const created = await deploymentApiRequest({
+    response: api.api.apps({ appId: input.appId }).artifacts.post({
       filename: input.filename,
       sizeBytes: input.binary.size,
     }),
-  );
+    operation: 'request a binary upload',
+    rejectionHint: undefined,
+  });
   if (!('url' in created)) {
-    throw new Error('The API did not provide a binary upload URL.');
+    throw new DeploymentError('The API did not provide a binary upload URL.');
   }
   input.maskSecret(created.url);
   try {
@@ -38,31 +40,56 @@ export async function deployBinary(input: DeployBinaryInput): Promise<string> {
       redirect: 'error',
     });
     if (!response.ok) {
-      throw new Error(`Binary upload failed with HTTP ${response.status}.`);
+      throw new DeploymentError(
+        `Binary upload failed (HTTP ${response.status}). No deployment was created. Retry the workflow.`,
+      );
     }
-  } catch {
-    const cancellationApi = await client(input);
-    await cancellationApi.api
-      .apps({ appId: input.appId })
-      .artifacts({ artifactId: created.artifactId })
-      .patch({ upload: 'failed' });
-    throw new Error('Binary upload failed. No deployment was created.');
+  } catch (error) {
+    await cancelUpload({ input, artifactId: created.artifactId });
+    if (error instanceof DeploymentError) {
+      throw error;
+    }
+    throw new DeploymentError(
+      'Binary upload failed: storage could not be reached. No deployment was created. Check network connectivity, then retry.',
+    );
   }
   const completionApi = await client(input);
-  const completed = unwrap(
-    await completionApi.api
+  const completed = await deploymentApiRequest({
+    response: completionApi.api
       .apps({ appId: input.appId })
       .artifacts({ artifactId: created.artifactId })
       .patch({ upload: 'complete' }),
-  );
+    operation: 'confirm the binary upload',
+    rejectionHint: undefined,
+  });
   if (!completed) {
-    throw new Error('The API did not confirm the completed upload.');
+    throw new DeploymentError('The API did not confirm the completed upload.');
   }
   const deploymentApi = await client(input);
-  const deployment = unwrap(
-    await deploymentApi.api
+  const deployment = await deploymentApiRequest({
+    response: deploymentApi.api
       .apps({ appId: input.appId })
       .deployments.post({ artifactId: completed.id }),
-  );
+    operation: 'create the deployment',
+    rejectionHint: undefined,
+  });
   return deployment.id;
+}
+
+async function cancelUpload({
+  input,
+  artifactId,
+}: {
+  input: DeployBinaryInput;
+  artifactId: string;
+}): Promise<void> {
+  try {
+    const api = await client(input);
+    await api.api
+      .apps({ appId: input.appId })
+      .artifacts({ artifactId })
+      .patch({ upload: 'failed' });
+  } catch {
+    return;
+  }
 }

@@ -1,6 +1,6 @@
 import { createPublicApiClient } from '@repo/api-client/public';
-import { unwrap } from '@repo/api-client/unwrap';
 import { GITHUB_ACTIONS_OIDC_AUDIENCE } from '@repo/api-constants';
+import { DeploymentError, deploymentApiRequest } from '#lib/deployment-error.ts';
 
 const EXPIRY_MARGIN_MS = 30_000;
 export type DeploymentCredentialsInput = {
@@ -36,26 +36,38 @@ export class DeploymentCredentials implements DeploymentCredentialsContract {
     if (this.token && this.token.expiresAt > Date.now() + EXPIRY_MARGIN_MS) {
       return this.token.value;
     }
-    try {
-      const identity = await this.input.getIdentityToken(GITHUB_ACTIONS_OIDC_AUDIENCE);
-      this.input.maskSecret(identity);
-      const api = createPublicApiClient({
-        baseUrl: this.input.apiUrl,
-        headers: { authorization: `Bearer ${identity}` },
-      });
-      const credential = unwrap(
-        await api.api.apps({ appId: this.input.appId })['deployment-tokens'].post(),
+    const identity = await this.identityToken();
+    this.input.maskSecret(identity);
+    const api = createPublicApiClient({
+      baseUrl: this.input.apiUrl,
+      headers: { authorization: `Bearer ${identity}` },
+    });
+    const credential = await deploymentApiRequest({
+      response: api.api.apps({ appId: this.input.appId })['deployment-tokens'].post(),
+      operation: 'obtain deployment access',
+      rejectionHint:
+        'Check the app ID and its trusted GitHub repository, workflow filename, and environment.',
+    });
+    this.input.maskSecret(credential.token);
+    const expiresAt = Date.parse(credential.expiresAt);
+    if (!credential.token || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      throw new DeploymentError(
+        'Could not obtain deployment access: nibrun returned an invalid or expired token.',
       );
-      this.input.maskSecret(credential.token);
-      const expiresAt = Date.parse(credential.expiresAt);
-      if (!credential.token || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-        throw new Error('Invalid deployment credential.');
+    }
+    this.token = { value: credential.token, expiresAt };
+    return this.token.value;
+  }
+
+  private async identityToken(): Promise<string> {
+    try {
+      return await this.input.getIdentityToken(GITHUB_ACTIONS_OIDC_AUDIENCE);
+    } catch (error) {
+      if (error instanceof DeploymentError) {
+        throw error;
       }
-      this.token = { value: credential.token, expiresAt };
-      return this.token.value;
-    } catch {
-      throw new Error(
-        "Could not obtain deployment access. Check the app's trusted GitHub workflow and id-token: write permission.",
+      throw new DeploymentError(
+        'Could not request GitHub identity. Check id-token: write permission.',
       );
     }
   }
