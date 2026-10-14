@@ -192,7 +192,7 @@ Deploy an existing app without an API key or `nib login` in CI. Use a CLI releas
 OIDC support. After signing in locally, configure which workflow may deploy:
 
 ```sh
-nib apps github-workflows set --app my-app --repository OWNER/REPO --workflow deploy.yml --branch main
+nib apps github-workflows set --app my-app --repository OWNER/REPO --workflow deploy.yml
 ```
 
 Save this as `.github/workflows/deploy.yml`. Replace `./build.sh` with the repository’s build
@@ -217,8 +217,8 @@ jobs:
       - run: nib run ./my-server --github-trusted-oidc --app-id APP_ID
 ```
 
-The CLI exchanges GitHub identity for a temporary token scoped to this app. Deployments reuse
-its saved startup arguments and configuration. The command returns once the deployment is
+Branch and tag runs of this workflow can deploy. The CLI exchanges GitHub identity for a
+temporary token scoped to this app. Deployments reuse its saved startup arguments and configuration. The command returns once the deployment is
 created, without waiting for it to serve. If the trust rule requires a GitHub environment,
 set `jobs.deploy.environment` to match.
 

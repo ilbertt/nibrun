@@ -73,7 +73,6 @@ test('creation and replacement normalize repository casing and preserve the reso
   const replacement = trustedWorkflow({
     repository: 'ACME/Release',
     workflow: 'release.yaml',
-    branch: 'production',
     environment: 'production',
   });
   const expected = { id: created.id, ...replacement, repository: 'acme/release' };
@@ -102,7 +101,7 @@ test('updates and removal never create or address a different workflow', async (
     workflowId: Value.Parse(TrustedWorkflowIdSchema, 'other-workflow'),
   };
   await expect(
-    service.update({ ...wrongWorkflow, workflow: trustedWorkflow({ branch: 'other' }) }),
+    service.update({ ...wrongWorkflow, workflow: trustedWorkflow({ workflow: 'other.yml' }) }),
   ).rejects.toBeInstanceOf(NotFoundError);
   await expect(service.remove(wrongWorkflow)).rejects.toBeInstanceOf(NotFoundError);
   expect(await service.find(OWNED_APP)).toEqual(trustedWorkflowResource());

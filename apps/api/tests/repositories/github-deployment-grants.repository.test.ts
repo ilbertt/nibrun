@@ -84,33 +84,43 @@ async function grant({
   return service().exchange({ appId, identityToken });
 }
 
-test('independent API instances share grant references and their immutable GitHub run-attempt provenance', async () => {
-  const appId = await configuredApp();
-  const claims = {
-    ...identity(),
-    run_attempt: '2',
-    environment: 'production',
-    job_workflow_ref: 'acme/workflows/.github/workflows/deploy.yml@refs/heads/main',
-    job_workflow_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-  };
-  const issued = await grant({ appId, claims });
-  const authorized = await service().authenticate({ appId, grantId: issued.id, ownerId: OWNER_ID });
-  expect(authorized).toMatchObject(githubGrantProvenance(claims));
-  expect(authorized.owner_id).toBe(OWNER_ID);
-  expect(authorized.app_id).toBe(appId);
-  const rows = await sql.unsafe(
-    'SELECT id, github_token_jti FROM nibrun.github_deployment_grants WHERE app_id = $1 AND owner_id = $2',
-    [appId, OWNER_ID],
-  );
-  expect(rows).toEqual([{ id: issued.id, github_token_jti: claims.jti }]);
-  const otherApp = await configuredApp();
-  await expect(
-    service().authenticate({ appId: otherApp, grantId: issued.id, ownerId: OWNER_ID }),
-  ).rejects.toBeInstanceOf(UnauthorizedError);
-  await expect(
-    service().authenticate({ appId, grantId: issued.id, ownerId: OTHER_OWNER_ID }),
-  ).rejects.toBeInstanceOf(UnauthorizedError);
-});
+test.each(['refs/heads/main', 'refs/tags/v2026.10.4'])(
+  'independent API instances share grant references and immutable GitHub provenance from %s',
+  async (ref) => {
+    const appId = await configuredApp();
+    const claims = {
+      ...identity(),
+      ref,
+      sub: `repo:acme/backend:ref:${ref}`,
+      workflow_ref: `acme/backend/.github/workflows/deploy.yml@${ref}`,
+      run_attempt: '2',
+      environment: 'production',
+      job_workflow_ref: 'acme/workflows/.github/workflows/deploy.yml@refs/heads/main',
+      job_workflow_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    };
+    const issued = await grant({ appId, claims });
+    const authorized = await service().authenticate({
+      appId,
+      grantId: issued.id,
+      ownerId: OWNER_ID,
+    });
+    expect(authorized).toMatchObject(githubGrantProvenance(claims));
+    expect(authorized.owner_id).toBe(OWNER_ID);
+    expect(authorized.app_id).toBe(appId);
+    const rows = await sql.unsafe(
+      'SELECT id, github_token_jti FROM nibrun.github_deployment_grants WHERE app_id = $1 AND owner_id = $2',
+      [appId, OWNER_ID],
+    );
+    expect(rows).toEqual([{ id: issued.id, github_token_jti: claims.jti }]);
+    const otherApp = await configuredApp();
+    await expect(
+      service().authenticate({ appId: otherApp, grantId: issued.id, ownerId: OWNER_ID }),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    await expect(
+      service().authenticate({ appId, grantId: issued.id, ownerId: OTHER_OWNER_ID }),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+  },
+);
 
 test('concurrent exchanges consume the same GitHub token once per app', async () => {
   const appId = await configuredApp();
@@ -230,7 +240,7 @@ test('a rule changed after verification and an identity expired before insertion
     appId,
     ownerId: OWNER_ID,
     workflowId: trust.id,
-    workflow: trustedWorkflow({ branch: 'production' }),
+    workflow: trustedWorkflow({ workflow: 'release.yml' }),
   });
   expect(await repository.create(input)).toBeNull();
 });

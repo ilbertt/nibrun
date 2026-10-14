@@ -907,7 +907,6 @@ export interface ISelectGitHubWorkflowTrustResult {
     current_revision: IGithubTrustedDeploymentWorkflowsColumns["current_revision"];
     repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
     workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
-    branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
     environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
     owner_id: IAppsColumns["owner_id"];
 }
@@ -1057,7 +1056,6 @@ export interface ISelectTrustedWorkflowResult {
     id: IGithubTrustedDeploymentWorkflowsColumns["id"];
     repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
     workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
-    branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
     environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
 }
 
@@ -1066,7 +1064,6 @@ export interface IInsertTrustedWorkflowResult {
     id: IGithubTrustedDeploymentWorkflowsColumns["id"];
     repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
     workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
-    branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
     environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
 }
 
@@ -1075,7 +1072,6 @@ export interface IUpdateTrustedWorkflowResult {
     id: IGithubTrustedDeploymentWorkflowsColumns["id"];
     repository: IGithubTrustedDeploymentWorkflowsColumns["repository"];
     workflow: IGithubTrustedDeploymentWorkflowsColumns["workflow"];
-    branch: IGithubTrustedDeploymentWorkflowsColumns["branch"];
     environment: IGithubTrustedDeploymentWorkflowsColumns["environment"];
 }
 
@@ -1712,7 +1708,6 @@ export interface IGithubTrustedDeploymentWorkflowsColumns {
     app_id: import("@repo/protocol").AppId;
     repository: string;
     workflow: string;
-    branch: string;
     environment: string | null;
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
@@ -2357,7 +2352,6 @@ export const schema = {
             app_id: { _columnName: "app_id", _foreignKeys: { github_trusted_deployment_workflows_app_id_fkey: { _constraintName: "github_trusted_deployment_workflows_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
             repository: { _columnName: "repository", _foreignKeys: {} },
             workflow: { _columnName: "workflow", _foreignKeys: {} },
-            branch: { _columnName: "branch", _foreignKeys: {} },
             environment: { _columnName: "environment", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },

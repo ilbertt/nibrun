@@ -16,10 +16,9 @@ const WORKFLOW = {
   id: 'workflow-1',
   repository: 'owner/repo',
   workflow: 'deploy.yml',
-  branch: 'main',
   environment: 'production',
 };
-const SET_FLAGS = ['--repository', 'owner/repo', '--workflow', 'deploy.yml', '--branch', 'main'];
+const SET_FLAGS = ['--repository', 'owner/repo', '--workflow', 'deploy.yml'];
 const SUCCESS_STATUS = 200;
 const UNAUTHORIZED_STATUS = 401;
 const FORBIDDEN_STATUS = 403;
@@ -166,7 +165,6 @@ test('show renders all saved fields for a person', async function humanOutput() 
   for (const expected of [
     WORKFLOW.repository,
     WORKFLOW.workflow,
-    WORKFLOW.branch,
     WORKFLOW.environment,
     WORKFLOW.id,
   ]) {
@@ -190,7 +188,6 @@ test('set creates a workflow after 404 and sends the complete trusted configurat
       body: {
         repository: 'owner/repo',
         workflow: 'deploy.yml',
-        branch: 'main',
         environment: 'production',
       },
     },
@@ -219,7 +216,6 @@ test.each([
         body: {
           repository: 'owner/repo',
           workflow: 'deploy.yml',
-          branch: 'main',
           environment: null,
         },
       },
@@ -240,7 +236,7 @@ test.each([UNAUTHORIZED_STATUS, FORBIDDEN_STATUS, SERVER_ERROR_STATUS])(
   },
 );
 
-test.each(['repository', 'workflow', 'branch'])(
+test.each(['repository', 'workflow'])(
   'set requires %s for full replacement',
   async function required(flag) {
     const omittedValue = SET_FLAGS[SET_FLAGS.indexOf(`--${flag}`) + 1];

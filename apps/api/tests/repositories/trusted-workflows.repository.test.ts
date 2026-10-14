@@ -55,10 +55,10 @@ test('creation is exclusive and replacement preserves the workflow identity', as
   expect(created).toEqual({ id: expect.any(String), ...workflow });
   expect(await repository().find(owner)).toEqual(created);
   await expect(
-    service().create({ ...owner, workflow: trustedWorkflow({ branch: 'unwanted' }) }),
+    service().create({ ...owner, workflow: trustedWorkflow({ workflow: 'unwanted.yml' }) }),
   ).rejects.toBeInstanceOf(ConflictError);
   expect(await repository().find(owner)).toEqual(created);
-  const replacement = trustedWorkflow({ branch: 'production', environment: 'production' });
+  const replacement = trustedWorkflow({ environment: 'production' });
   expect(
     await service().update({ ...owner, workflowId: created.id, workflow: replacement }),
   ).toEqual({ id: created.id, ...replacement });
@@ -115,7 +115,7 @@ test('stale workflow IDs cannot update or delete a replacement configuration', a
   );
   const replacement = await service().create({
     ...owner,
-    workflow: trustedWorkflow({ branch: 'production' }),
+    workflow: trustedWorkflow({ workflow: 'release.yml' }),
   });
   expect(replacement.id).not.toBe(first.id);
   await expect(service().update({ ...stale, workflow: trustedWorkflow() })).rejects.toBeInstanceOf(
@@ -139,7 +139,10 @@ test('a deleted app cannot read, update, create, or remove a trusted workflow', 
   expect(await repository().find(owner)).toBeNull();
   expect(await repository().create({ ...owner, workflow: trustedWorkflow() })).toBeNull();
   expect(
-    await repository().update({ ...ownedWorkflow, workflow: trustedWorkflow({ branch: 'other' }) }),
+    await repository().update({
+      ...ownedWorkflow,
+      workflow: trustedWorkflow({ workflow: 'other.yml' }),
+    }),
   ).toBeNull();
   expect(await repository().remove(ownedWorkflow)).toBe(false);
 });

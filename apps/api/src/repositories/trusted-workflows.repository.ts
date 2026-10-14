@@ -25,7 +25,7 @@ export class TrustedWorkflowsRepository
 {
   async find({ appId, ownerId }: TrustedWorkflowsByAppInput): Promise<TrustedWorkflowRow | null> {
     const [row] = await this.sql.SelectTrustedWorkflow`
-      SELECT w.id, w.repository, w.workflow, w.branch, w.environment
+      SELECT w.id, w.repository, w.workflow, w.environment
       FROM nibrun.github_trusted_deployment_workflows w
       JOIN nibrun.live_apps a ON a.id = w.app_id
       WHERE w.app_id = ${appId} AND a.owner_id = ${ownerId} AND w.deleted_at IS NULL
@@ -39,11 +39,11 @@ export class TrustedWorkflowsRepository
     workflow,
   }: CreateTrustedWorkflowInput): Promise<TrustedWorkflowRow | null> {
     const [row] = await this.sql.InsertTrustedWorkflow`
-      INSERT INTO nibrun.github_trusted_deployment_workflows (app_id, repository, workflow, branch, environment)
-      SELECT a.id, ${workflow.repository}, ${workflow.workflow}, ${workflow.branch}, ${workflow.environment}
+      INSERT INTO nibrun.github_trusted_deployment_workflows (app_id, repository, workflow, environment)
+      SELECT a.id, ${workflow.repository}, ${workflow.workflow}, ${workflow.environment}
       FROM nibrun.live_apps a
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      RETURNING id, repository, workflow, branch, environment
+      RETURNING id, repository, workflow, environment
     `;
     return row ?? null;
   }
@@ -56,12 +56,11 @@ export class TrustedWorkflowsRepository
   }: UpdateTrustedWorkflowInput): Promise<TrustedWorkflowRow | null> {
     const [row] = await this.sql.UpdateTrustedWorkflow`
       UPDATE nibrun.github_trusted_deployment_workflows w
-      SET repository = ${workflow.repository}, workflow = ${workflow.workflow},
-          branch = ${workflow.branch}, environment = ${workflow.environment}
+      SET repository = ${workflow.repository}, workflow = ${workflow.workflow}, environment = ${workflow.environment}
       FROM nibrun.live_apps a
       WHERE w.id = ${workflowId} AND w.app_id = ${appId}
         AND a.id = w.app_id AND a.owner_id = ${ownerId} AND w.deleted_at IS NULL
-      RETURNING w.id, w.repository, w.workflow, w.branch, w.environment
+      RETURNING w.id, w.repository, w.workflow, w.environment
     `;
     return row ?? null;
   }

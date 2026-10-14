@@ -41,7 +41,7 @@ export class GitHubDeploymentGrantsRepository
   }: FindGitHubWorkflowTrustInput): Promise<GitHubWorkflowTrustRow | null> {
     // CI has no account owner yet. Only a verified repository can resolve this authentication context.
     const [row] = await this.sql.SelectGitHubWorkflowTrust`
-      SELECT w.id, w.current_revision, w.repository, w.workflow, w.branch, w.environment, a.owner_id
+      SELECT w.id, w.current_revision, w.repository, w.workflow, w.environment, a.owner_id
       FROM nibrun.github_trusted_deployment_workflows w
       JOIN nibrun.live_apps a ON a.id = w.app_id
       WHERE w.app_id = ${appId} AND w.repository = ${repository} AND w.deleted_at IS NULL

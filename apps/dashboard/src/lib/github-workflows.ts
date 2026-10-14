@@ -22,7 +22,6 @@ export function saveGitHubWorkflow({
   const workflow: GitHubWorkflowInput = {
     repository: fields.repository.trim(),
     workflow: fields.workflow.trim(),
-    branch: fields.branch.trim(),
     environment: fields.environment.trim() || null,
   };
   return setGitHubWorkflow({ api, appId, workflowId, workflow });

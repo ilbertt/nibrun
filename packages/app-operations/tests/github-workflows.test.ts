@@ -18,7 +18,6 @@ const api = createPublicApiClient({ baseUrl: 'https://api.example.com' });
 const workflowInput: GitHubWorkflowInput = {
   repository: 'owner/repository',
   workflow: 'deploy.yml',
-  branch: 'main',
   environment: null,
 };
 const workflow: GitHubWorkflow = { id: 'workflow-id', ...workflowInput };

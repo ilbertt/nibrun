@@ -17,9 +17,7 @@ export function githubWorkflowExample({
   const binaryCommand = runCommand({ binaryName, args: [] });
   const command = `nib run ${shellWord(binaryCommand)} --github-trusted-oidc --app-id ${shellWord(appId)}`;
   return `name: Deploy to nibrun
-on:
-  push:
-    branches: [${JSON.stringify(workflow.branch)}]
+on: push
 permissions:
   contents: read
   id-token: write

@@ -61,6 +61,28 @@ test('verified GitHub identity receives an app and run-attempt scoped grant with
   expect(authorized.owner_id).toBe(GRANT_OWNER_ID);
 });
 
+test.each(['refs/heads/feature', 'refs/tags/v2026.10.4'])(
+  'a trusted workflow on %s receives a grant with its verified ref retained',
+  async (ref) => {
+    const { service, grantsRepo } = build();
+    const identity = {
+      ...githubClaims(),
+      ref,
+      sub: `repo:acme/backend:ref:${ref}`,
+      workflow_ref: `acme/backend/.github/workflows/deploy.yml@${ref}`,
+    };
+    await service.exchange({
+      appId: GRANT_APP_ID,
+      identityToken: await signToken({ key, claims: identity }),
+    });
+    expect(grantsRepo.writes).toHaveLength(1);
+    expect(grantsRepo.writes[0]?.identity).toMatchObject({
+      ref,
+      workflow_ref: identity.workflow_ref,
+    });
+  },
+);
+
 test('invalid signatures cannot reach the trust lookup', async () => {
   const { service, grantsRepo } = build();
   const outsider = await signingKey({ kid: key.kid });
