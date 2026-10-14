@@ -113,9 +113,11 @@ describe('a url is opened, and what it answers with is what it is', () => {
   });
 
   test('a host nothing is listening on is unreachable rather than an error to read back', async () => {
-    expect(await repo.open({ url: 'https://not.a.host.nibrun.test/my-server' })).toEqual({
-      outcome: 'unreachable',
-    });
+    const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: answer });
+    const url = new URL('/my-server', server.url).toString();
+    await server.stop(true);
+
+    expect(await repo.open({ url })).toEqual({ outcome: 'unreachable' });
   });
 });
 
