@@ -48,6 +48,7 @@ main() {
   fi
 
   version=${NIB_VERSION:-$(latest_version)}
+  version=$(release_tag "$version")
   install_dir=${NIB_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}
   binary="$install_dir/nib"
   installed=$(installed_version "$binary")
@@ -55,7 +56,7 @@ main() {
   # before they are compared — the whole point of this check is that they can be equal.
   wanted=${version#"$TAG_PREFIX"}
 
-  if [ "$installed" = "$wanted" ]; then
+  if [ -n "$installed" ] && [ "$installed" = "$wanted" ]; then
     ok "nib ${BOLD}${wanted}${RESET} is already installed at ${DIM}${binary}${RESET}"
     report_path "$install_dir"
     return 0
@@ -112,6 +113,14 @@ resolve_target() {
   case "$os-$arch" in
     darwin-arm64 | linux-x64 | linux-arm64) echo "$os-$arch" ;;
     *) die "There is no nib build for $os-$arch" ;;
+  esac
+}
+
+release_tag() {
+  case "$1" in
+    "$TAG_PREFIX"*) echo "$1" ;;
+    v*) echo "$TAG_PREFIX${1#v}" ;;
+    *) echo "$TAG_PREFIX$1" ;;
   esac
 }
 

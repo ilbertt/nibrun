@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { chmod, mkdtemp, readdir, rm } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { RELEASE_PLATFORMS } from '../scripts/release-platforms.ts';
@@ -28,6 +28,26 @@ const RELEASE_ASSET = 'nib-linux-x64';
 // Executable and answers `--version`, which is all the script asks of what it downloads.
 const RELEASED_BINARY = `#!/bin/sh\necho ${RELEASE_VERSION}\n`;
 const RELEASED_BINARY_SHA256 = new Bun.CryptoHasher('sha256').update(RELEASED_BINARY).digest('hex');
+const RELEASE_DOWNLOAD_URL = `https://github.com/ilbertt/nibrun/releases/download/${RELEASE}`;
+const VERSION_INPUTS = [RELEASE, `v${RELEASE_VERSION}`, RELEASE_VERSION];
+
+type InstallProps = {
+  checksums: string | null;
+  shell: string;
+  installName: string;
+  machine: { os: string; arch: string };
+  version: string | undefined;
+  existingBinary: string | undefined;
+};
+
+const INSTALL_DEFAULTS: InstallProps = {
+  checksums: null,
+  shell: '/bin/zsh',
+  installName: 'bin',
+  machine: RELEASE_MACHINE,
+  version: RELEASE,
+  existingBinary: undefined,
+};
 
 const WRONG_SHA256 = '0'.repeat(RELEASED_BINARY_SHA256.length);
 
@@ -73,6 +93,7 @@ describe('a machine with no asset is told so rather than sent to a 404', () => {
 describe('a binary is checked against the checksum its release publishes', () => {
   test('one that matches is installed and run', async () => {
     const installed = await runInstall({
+      ...INSTALL_DEFAULTS,
       checksums: `${RELEASED_BINARY_SHA256}  ${RELEASE_ASSET}`,
     });
 
@@ -83,7 +104,10 @@ describe('a binary is checked against the checksum its release publishes', () =>
   });
 
   test('one that does not is refused, and nothing is left behind', async () => {
-    const installed = await runInstall({ checksums: `${WRONG_SHA256}  ${RELEASE_ASSET}` });
+    const installed = await runInstall({
+      ...INSTALL_DEFAULTS,
+      checksums: `${WRONG_SHA256}  ${RELEASE_ASSET}`,
+    });
 
     expect(installed.exitCode).not.toBe(0);
     expect(installed.entries).toEqual([]);
@@ -95,7 +119,7 @@ describe('a binary is checked against the checksum its release publishes', () =>
   // Every release cut before checksums.txt existed is still one NIB_VERSION can name, so a release
   // carrying no checksum has to install rather than fail closed.
   test('a release publishing none is installed anyway, and says so', async () => {
-    const installed = await runInstall({ checksums: null });
+    const installed = await runInstall(INSTALL_DEFAULTS);
 
     expect(installed.exitCode).toBe(0);
     expect(installed.binary).toBe(RELEASED_BINARY);
@@ -103,10 +127,72 @@ describe('a binary is checked against the checksum its release publishes', () =>
   });
 });
 
+describe('a selected version names its CLI release', () => {
+  test.each(VERSION_INPUTS)(
+    '%s downloads the binary and checksum from the same release',
+    async (version) => {
+      const installed = await runInstall({
+        ...INSTALL_DEFAULTS,
+        version,
+        checksums: `${RELEASED_BINARY_SHA256}  ${RELEASE_ASSET}`,
+      });
+
+      expect(installed.exitCode).toBe(0);
+      expect(installed.binary).toBe(RELEASED_BINARY);
+      expect(installed.requests).toEqual([
+        `${RELEASE_DOWNLOAD_URL}/${RELEASE_ASSET}`,
+        `${RELEASE_DOWNLOAD_URL}/checksums.txt`,
+      ]);
+    },
+  );
+
+  test.each(VERSION_INPUTS)(
+    '%s reuses the installed version without downloads',
+    async (version) => {
+      const installed = await runInstall({
+        ...INSTALL_DEFAULTS,
+        version,
+        existingBinary: RELEASED_BINARY,
+      });
+
+      expect(installed.exitCode).toBe(0);
+      expect(installed.binary).toBe(RELEASED_BINARY);
+      expect(installed.requests).toEqual([]);
+      expect(installed.stderr).toContain(`nib ${RELEASE_VERSION} is already installed`);
+    },
+  );
+
+  test.each(['2026.1.1-missing', 'v', 'cli-v'])(
+    '%s has no release and fails at download',
+    async (version) => {
+      const installed = await runInstall({ ...INSTALL_DEFAULTS, version });
+
+      expect(installed.exitCode).not.toBe(0);
+      expect(installed.binary).toBeNull();
+      expect(installed.entries).toEqual([]);
+      expect(installed.stderr).toContain('Could not download');
+    },
+  );
+
+  test('an unavailable latest release fails without reporting an installation', async () => {
+    const installed = await runInstall({ ...INSTALL_DEFAULTS, version: undefined });
+
+    expect(installed.exitCode).not.toBe(0);
+    expect(installed.binary).toBeNull();
+    expect(installed.entries).toEqual([]);
+    expect(installed.requests).toEqual([
+      'https://github.com/ilbertt/nibrun/releases.atom',
+      'https://api.github.com/repos/ilbertt/nibrun/releases?per_page=100',
+    ]);
+    expect(installed.stderr).toContain('No cli-v* release found');
+    expect(installed.stderr).not.toContain('already installed');
+  });
+});
+
 describe('an install outside PATH explains how to use it', () => {
   test('the suggested export works with spaces, quotes, dollars and backslashes in the path', async () => {
     const installed = await runInstall({
-      checksums: null,
+      ...INSTALL_DEFAULTS,
       installName: "bin with 'quotes' $dollars\\slashes",
     });
     const exported = installed.stderr
@@ -126,7 +212,7 @@ describe('an install outside PATH explains how to use it', () => {
   });
 
   test('fish gets a command that applies now and persists', async () => {
-    const installed = await runInstall({ checksums: null, shell: '/usr/local/bin/fish' });
+    const installed = await runInstall({ ...INSTALL_DEFAULTS, shell: '/usr/local/bin/fish' });
 
     expect(installed.stderr).toContain(`fish_add_path '${installed.installDir}'`);
     expect(installed.stderr).not.toContain('export PATH=');
@@ -137,7 +223,7 @@ describe('an install outside PATH explains how to use it', () => {
     { os: 'Darwin', arch: 'arm64', profile: '.bash_profile' },
   ])('bash on $os names $profile', async ({ os, arch, profile }) => {
     const installed = await runInstall({
-      checksums: null,
+      ...INSTALL_DEFAULTS,
       shell: '/bin/bash',
       machine: { os, arch },
     });
@@ -176,28 +262,32 @@ async function resolveTarget({ os, arch }: { os: string; arch: string }) {
  */
 async function runInstall({
   checksums,
-  shell = '/bin/zsh',
-  installName = 'bin',
-  machine = RELEASE_MACHINE,
-}: {
-  checksums: string | null;
-  shell?: string;
-  installName?: string;
-  machine?: { os: string; arch: string };
-}) {
+  shell,
+  installName,
+  machine,
+  version,
+  existingBinary,
+}: InstallProps) {
   const dir = await stubDir();
   const installDir = join(dir, installName);
   const configDir = join(dir, 'config');
+  const requestsPath = join(dir, 'requests.txt');
 
   await writeStub({ dir, name: 'uname', body: unameStub(machine) });
   await writeStub({ dir, name: 'curl', body: curlStub({ checksums }) });
+  await Bun.write(requestsPath, '');
+  await mkdir(installDir, { recursive: true });
+  if (existingBinary !== undefined) {
+    await writeStub({ dir: installDir, name: 'nib', body: existingBinary });
+  }
 
   const proc = Bun.spawn(['sh', INSTALL_SH], {
     env: {
       ...process.env,
       PATH: `${dir}:${process.env.PATH}`,
-      NIB_VERSION: RELEASE,
+      NIB_VERSION: version,
       NIB_INSTALL_DIR: installDir,
+      TEST_CURL_REQUESTS: requestsPath,
       SHELL: shell,
       ZDOTDIR: configDir,
     },
@@ -219,6 +309,7 @@ async function runInstall({
     exitCode,
     installDir,
     configDir,
+    requests: (await Bun.file(requestsPath).text()).trim().split('\n').filter(Boolean),
     binary: (await installed.exists()) ? await installed.text() : null,
     entries: await readdir(installDir),
   };
@@ -242,13 +333,15 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+printf '%s\\n' "$url" >> "$TEST_CURL_REQUESTS"
 case "$url" in
-  */checksums.txt) ${answer} ;;
-  *)
+  ${RELEASE_DOWNLOAD_URL}/checksums.txt) ${answer} ;;
+  ${RELEASE_DOWNLOAD_URL}/nib-*)
     cat > "$out" <<'RELEASED'
 ${RELEASED_BINARY.trimEnd()}
 RELEASED
     ;;
+  *) exit 22 ;;
 esac
 `;
 }
