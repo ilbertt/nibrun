@@ -23,7 +23,7 @@
     "@better-auth/oauth-provider": "1.7.2",
     "@elysia/cors": "^1.4.2",
     "@ilbertt/better-auth-bun-sql": "^0.4.0",
-    "@ilbertt/bun-sqlgen": "^0.6.2",
+    "@ilbertt/bun-sqlgen": "^0.7.0",
     "@repo/api-constants": "workspace:*",
     "@repo/protocol": "workspace:*",
     "@repo/sqlite": "workspace:*",
