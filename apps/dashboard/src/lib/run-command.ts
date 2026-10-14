@@ -3,7 +3,7 @@
 // copied out as the one argument it is rather than as whatever a shell would make of it.
 const BARE_WORD = /^[\w@%+=:,./-]+$/;
 
-function shellWord(word: string): string {
+export function shellWord(word: string): string {
   return BARE_WORD.test(word) ? word : `'${word.replaceAll("'", "'\\''")}'`;
 }
 
