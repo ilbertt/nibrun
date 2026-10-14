@@ -35,22 +35,26 @@ export function GitHubWorkflowSettings() {
       ) : workflow.isError ? (
         <FailureEmpty title="Could not read the trusted workflow" reason={workflow.error.message} />
       ) : (
-        <>
-          <GitHubWorkflowForm key={workflow.data?.id ?? 'new'} workflow={workflow.data} />
-          {workflow.data !== null && (
-            <>
-              <Accordion className="min-w-0">
-                <AccordionItem>
-                  <AccordionTrigger>View workflow example</AccordionTrigger>
-                  <AccordionContent>
-                    <GitHubWorkflowExample workflow={workflow.data} />
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+        <GitHubWorkflowForm
+          key={workflow.data?.id ?? 'new'}
+          workflow={workflow.data}
+          secondaryAction={
+            workflow.data !== null && (
               <RemoveGitHubWorkflowDialog workflow={workflow.data} finalFocus={settings} />
-            </>
+            )
+          }
+        >
+          {workflow.data !== null && (
+            <Accordion className="min-w-0">
+              <AccordionItem>
+                <AccordionTrigger>View workflow example</AccordionTrigger>
+                <AccordionContent>
+                  <GitHubWorkflowExample workflow={workflow.data} />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           )}
-        </>
+        </GitHubWorkflowForm>
       )}
     </section>
   );

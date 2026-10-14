@@ -3,9 +3,18 @@ import { Button } from '@repo/ui/components/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Spinner } from '@repo/ui/components/spinner';
+import type { ReactNode } from 'react';
 import { useGitHubWorkflowForm } from '#lib/hooks/use-github-workflow-form.ts';
 
-export function GitHubWorkflowForm({ workflow }: { workflow: GitHubWorkflow | null }) {
+export function GitHubWorkflowForm({
+  workflow,
+  children,
+  secondaryAction,
+}: {
+  workflow: GitHubWorkflow | null;
+  children: ReactNode;
+  secondaryAction: ReactNode;
+}) {
   const form = useGitHubWorkflowForm(workflow);
 
   return (
@@ -70,15 +79,12 @@ export function GitHubWorkflowForm({ workflow }: { workflow: GitHubWorkflow | nu
         </Field>
       </fieldset>
       {form.error !== undefined && <FieldError>{form.error}</FieldError>}
+      {children}
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={form.pending}>
           {form.pending ? <Spinner /> : workflow === null ? 'Trust workflow' : 'Save workflow'}
         </Button>
-        {workflow !== null && (
-          <p className="text-muted-foreground text-sm">
-            Saving this workflow revokes its existing deployment tokens.
-          </p>
-        )}
+        {secondaryAction}
       </div>
     </form>
   );
