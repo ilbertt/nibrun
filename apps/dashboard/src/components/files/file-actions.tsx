@@ -6,10 +6,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@repo/ui/components/dropdown-menu';
-import { Link } from '@tanstack/react-router';
-import { DatabaseIcon, EllipsisIcon } from 'lucide-react';
+import { DatabaseIcon, EllipsisIcon, LoaderCircleIcon } from 'lucide-react';
 import type { FileSqliteConnection } from '#lib/hooks/use-file-sqlite-connection.ts';
-import { Route as SqliteRoute } from '#routes/sqlite.tsx';
 
 export function FileActions({
   entry,
@@ -21,21 +19,35 @@ export function FileActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${entry.name}`} />}
+        disabled={sqlite.isOpening}
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Actions for ${entry.name}`}
+            aria-busy={sqlite.isOpening}
+          />
+        }
       >
-        <EllipsisIcon />
+        {sqlite.isOpening ? <LoaderCircleIcon className="animate-spin" /> : <EllipsisIcon />}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto">
         <DropdownMenuItem
           render={
-            <Link
-              to={SqliteRoute.to}
-              search={sqlite.search}
-              target="_blank"
-              rel="noopener"
-              preload={false}
-            />
+            sqlite.href === undefined
+              ? undefined
+              : (props) => (
+                  <a
+                    {...props}
+                    href={sqlite.href}
+                    target="_blank"
+                    rel="noopener"
+                    aria-label={`Open ${entry.name} in SQLite explorer (new tab)`}
+                  />
+                )
           }
+          onClick={sqlite.href === undefined ? sqlite.open : undefined}
+          disabled={sqlite.isOpening}
         >
           <DatabaseIcon />
           {sqlite.isDatabase ? 'Open SQLite database' : 'Query as SQLite'}

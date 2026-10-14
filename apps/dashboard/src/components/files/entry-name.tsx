@@ -6,7 +6,6 @@ import { useAppId } from '#lib/hooks/use-app-id.ts';
 import { useDirectoryPath } from '#lib/hooks/use-directory-path.ts';
 import type { FileSqliteConnection } from '#lib/hooks/use-file-sqlite-connection.ts';
 import { Route as FilesRoute } from '#routes/(dashboard)/apps/$appId/files.tsx';
-import { Route as SqliteRoute } from '#routes/sqlite.tsx';
 
 export function EntryName({
   entry,
@@ -30,18 +29,30 @@ export function EntryName({
     return (
       <span className="flex items-center gap-2">
         <EntryIcon entry={entry} sqlite={sqlite} />
-        <Link
-          to={SqliteRoute.to}
-          search={sqlite.search}
-          target="_blank"
-          rel="noopener"
-          preload={false}
-          className="truncate hover:underline"
-          title={entry.name}
-          aria-label={`Open ${entry.name} in SQLite explorer (new tab)`}
-        >
-          {entry.name}
-        </Link>
+        {sqlite.href === undefined ? (
+          <button
+            type="button"
+            onClick={sqlite.open}
+            disabled={sqlite.isOpening}
+            aria-busy={sqlite.isOpening}
+            className="cursor-pointer truncate text-left hover:underline disabled:cursor-wait"
+            title={entry.name}
+            aria-label={`Open ${entry.name} in SQLite explorer`}
+          >
+            {entry.name}
+          </button>
+        ) : (
+          <a
+            href={sqlite.href}
+            target="_blank"
+            rel="noopener"
+            className="truncate hover:underline"
+            title={entry.name}
+            aria-label={`Open ${entry.name} in SQLite explorer (new tab)`}
+          >
+            {entry.name}
+          </a>
+        )}
       </span>
     );
   }
