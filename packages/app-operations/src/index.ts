@@ -48,6 +48,13 @@ export { InvalidEnvironmentError, InvalidPathError } from '#errors.ts';
 export { awaitExportBundle, type ExportBundle, requestExport } from '#exports.ts';
 export { GUEST_PATH_ROOT, guestPath, readDirectory } from '#filesystem.ts';
 export {
+  type GitHubWorkflow,
+  type GitHubWorkflowInput,
+  readGitHubWorkflow,
+  removeGitHubWorkflow,
+  setGitHubWorkflow,
+} from '#github-workflows.ts';
+export {
   type DeployableArchive,
   type FetchableArchive,
   importArchive,
