@@ -4,6 +4,9 @@ import type { DeployPreset } from '#presets.ts';
 const REQUEST_TIMEOUT_MS = 120_000;
 const GITHUB_RELEASE_PATH = /^\/([^/]+\/[^/]+)\/releases\/download\/([^/]+)\/([^/]+)$/;
 const SHA256_DIGEST = /^sha256:([0-9a-f]{64})$/;
+const DRIZZLE_GATEWAY_URL = 'https://gateway.drizzle.team';
+
+type UpdateArtifact = { url: URL; field: 'binary' | 'initial-data' };
 
 export type PresetPin = Pick<DeployPreset, 'version'> & {
   binary: string;
@@ -44,19 +47,48 @@ export async function findUpdate(options: UpdateOptions): Promise<PresetUpdate |
     sha256: preset.deployLink.sha256,
     'initial-data': preset.deployLink['initial-data'],
   };
-  // Rolling releases intentionally carry no pin: their download already follows new builds.
-  if (previous.sha256 === undefined && previous['initial-data'] === undefined) {
+  const artifact = updateArtifact({ preset, previous });
+  if (!artifact) {
     return undefined;
   }
-  const url = new URL(previous['initial-data'] ?? previous.binary);
-  if (url.hostname !== 'github.com') {
+  if (artifact.url.hostname !== 'github.com') {
     return findDrizzleUpdate({ ...options, previous });
   }
-  return await findGithubUpdate({ ...options, previous, url });
+  return await findGithubUpdate({ ...options, previous, artifact });
 }
 
-async function findGithubUpdate(options: UpdateOptions & { previous: PresetPin; url: URL }) {
-  const { previous, request, slug, url } = options;
+function updateArtifact(options: {
+  preset: DeployPreset;
+  previous: PresetPin;
+}): UpdateArtifact | undefined {
+  const { preset, previous } = options;
+  const binary: UpdateArtifact = { url: new URL(previous.binary), field: 'binary' };
+  if (previous['initial-data'] !== undefined) {
+    const url = new URL(previous['initial-data']);
+    if (githubReleaseTag(url) === previous.version) {
+      return { url, field: 'initial-data' };
+    }
+    if (
+      githubReleaseTag(binary.url) !== previous.version &&
+      preset.projectUrl !== DRIZZLE_GATEWAY_URL
+    ) {
+      return undefined;
+    }
+  }
+  return previous.sha256 === undefined ? undefined : binary;
+}
+
+function githubReleaseTag(url: URL): string | undefined {
+  const tag =
+    url.hostname === 'github.com' ? GITHUB_RELEASE_PATH.exec(url.pathname)?.[2] : undefined;
+  return tag === undefined ? undefined : decodeURIComponent(tag);
+}
+
+async function findGithubUpdate(
+  options: UpdateOptions & { previous: PresetPin; artifact: UpdateArtifact },
+) {
+  const { previous, request, slug, artifact } = options;
+  const { url } = artifact;
   const match = GITHUB_RELEASE_PATH.exec(url.pathname);
   if (!match) {
     throw new Error(`Unsupported release URL: ${url}`);
@@ -84,7 +116,7 @@ async function findGithubUpdate(options: UpdateOptions & { previous: PresetPin; 
   return {
     slug,
     previous,
-    next: await nextGithubPin({ previous, latest, asset, request }),
+    next: await nextGithubPin({ previous, latest, asset, request, field: artifact.field }),
     releaseUrl: latest.html_url,
   };
 }
@@ -94,9 +126,10 @@ async function nextGithubPin(options: {
   latest: Release;
   asset: Release['assets'][number];
   request: UpdateOptions['request'];
+  field: UpdateArtifact['field'];
 }): Promise<PresetPin> {
-  const { previous, latest, asset, request } = options;
-  if (previous['initial-data'] !== undefined) {
+  const { previous, latest, asset, request, field } = options;
+  if (field === 'initial-data') {
     return { ...previous, version: latest.tag_name, 'initial-data': asset.browser_download_url };
   }
   const digest = asset.digest?.match(SHA256_DIGEST)?.[1];
@@ -128,7 +161,7 @@ export function updatedAssetName(options: {
 
 async function findDrizzleUpdate(options: UpdateOptions & { previous: PresetPin }) {
   const { preset, previous, request, slug } = options;
-  if (preset.projectUrl !== 'https://gateway.drizzle.team') {
+  if (preset.projectUrl !== DRIZZLE_GATEWAY_URL) {
     throw new Error(`Unsupported release source: ${preset.projectUrl}`);
   }
   const releaseUrl = `${preset.projectUrl}/docs/binary`;

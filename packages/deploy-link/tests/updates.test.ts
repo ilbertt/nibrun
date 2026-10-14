@@ -4,6 +4,16 @@ import { findUpdate, type PresetUpdate, type Release } from '#scripts/updates/re
 import { updatePresetSource } from '#scripts/updates/source.ts';
 
 const SHA256_HEX_LENGTH = 64;
+const COMMIT_SHA = 'aef66c462abe817e33aad91d97aa782a1e2ad2c7';
+const COMMIT_ARCHIVES = [
+  `https://github.com/example/studio/archive/${COMMIT_SHA}.tar.gz`,
+  `https://github.com/example/studio/archive/${COMMIT_SHA}.zip`,
+  `https://codeload.github.com/example/studio/tar.gz/${COMMIT_SHA}`,
+  `https://codeload.github.com/example/studio/zip/${COMMIT_SHA}`,
+  `https://codeload.github.com/example/studio/legacy.tar.gz/${COMMIT_SHA}`,
+  `https://api.github.com/repos/example/studio/tarball/${COMMIT_SHA}`,
+  `https://api.github.com/repos/example/studio/zipball/${COMMIT_SHA}`,
+];
 const ARCHIVE_PRESET = {
   ...DEPLOY_PRESETS.pocketbase,
   projectUrl: 'https://github.com/example/studio',
@@ -45,6 +55,10 @@ function releaseRequest(options: { preset: DeployPreset; version: string; assetN
     throw new Error(`Unexpected release request: ${url}`);
   }
   return { request, requests, binary, checksum, endpoint };
+}
+
+function unexpectedReleaseRequest(url: string): Promise<Response> {
+  throw new Error(`Unexpected release request for a fixed commit: ${url}`);
 }
 
 async function writtenUpdate(options: { preset: DeployPreset; update: PresetUpdate }) {
@@ -124,4 +138,98 @@ test('a missing application archive refuses an update', async () => {
   await expect(findUpdate({ slug: 'studio', preset, request: release.request })).rejects.toThrow(
     'has no asset named studio-99.0.0-linux-x64.tar.gz',
   );
+});
+
+test.each(COMMIT_ARCHIVES)('a source application commit stays fixed: %s', async (archive) => {
+  const preset = {
+    ...ARCHIVE_PRESET,
+    version: COMMIT_SHA,
+    deployLink: { ...ARCHIVE_PRESET.deployLink, 'initial-data': archive },
+  };
+  expect(
+    await findUpdate({ slug: 'studio', preset, request: unexpectedReleaseRequest }),
+  ).toBeUndefined();
+});
+
+test.each(COMMIT_ARCHIVES)(
+  'a binary release updates without rewriting source seed data: %s',
+  async (archive) => {
+    const binaryPreset = DEPLOY_PRESETS.pocketbase;
+    const preset = {
+      ...binaryPreset,
+      deployLink: { ...binaryPreset.deployLink, 'initial-data': archive },
+    };
+    const release = releaseRequest({
+      preset: binaryPreset,
+      version: 'v99.0.0',
+      assetName: 'pocketbase_99.0.0_linux_amd64.zip',
+    });
+    const update = await findUpdate({ slug: 'pocketbase', preset, request: release.request });
+
+    expect(update!.next).toEqual({
+      version: 'v99.0.0',
+      binary: release.binary,
+      sha256: release.checksum,
+      'initial-data': archive,
+    });
+    await writtenUpdate({ preset, update: update! });
+  },
+);
+
+test('an unpinned runtime with commit initial data stays unpinned', async () => {
+  const preset: DeployPreset = {
+    ...ARCHIVE_PRESET,
+    version: COMMIT_SHA,
+    deployLink: {
+      binary: 'https://github.com/example/runtime/releases/latest/download/runtime.zip',
+      'initial-data': COMMIT_ARCHIVES[0],
+    },
+  };
+  expect(
+    await findUpdate({ slug: 'studio', preset, request: unexpectedReleaseRequest }),
+  ).toBeUndefined();
+});
+
+test('a seed release from another project is preserved during a binary update', async () => {
+  const binaryPreset = DEPLOY_PRESETS.pocketbase;
+  const initialData = ARCHIVE_PRESET.deployLink['initial-data'];
+  const preset = {
+    ...binaryPreset,
+    deployLink: { ...binaryPreset.deployLink, 'initial-data': initialData },
+  };
+  const release = releaseRequest({
+    preset: binaryPreset,
+    version: 'v99.0.0',
+    assetName: 'pocketbase_99.0.0_linux_amd64.zip',
+  });
+  const update = await findUpdate({ slug: 'pocketbase', preset, request: release.request });
+
+  expect(update!.next.binary).toBe(release.binary);
+  expect(update!.next['initial-data']).toBe(initialData);
+  await writtenUpdate({ preset, update: update! });
+});
+
+test('Drizzle updates from its download page without rewriting commit seed data', async () => {
+  const preset = {
+    ...DEPLOY_PRESETS['drizzle-gateway'],
+    deployLink: {
+      ...DEPLOY_PRESETS['drizzle-gateway'].deployLink,
+      'initial-data': COMMIT_ARCHIVES[0],
+    },
+  };
+  const binary = 'https://downloads.example/drizzle-gateway-99.0.0-linux-x64';
+  function request(url: string): Promise<Response> {
+    if (url === `${preset.projectUrl}/docs/binary`) {
+      return Promise.resolve(new Response(binary));
+    }
+    if (url === binary) {
+      return Promise.resolve(new Response('runtime-binary'));
+    }
+    throw new Error(`Unexpected Drizzle release request: ${url}`);
+  }
+  const update = await findUpdate({ slug: 'drizzle-gateway', preset, request });
+
+  expect(update!.next.binary).toBe(binary);
+  expect(update!.next['initial-data']).toBe(preset.deployLink['initial-data']);
+  await writtenUpdate({ preset, update: update! });
 });
