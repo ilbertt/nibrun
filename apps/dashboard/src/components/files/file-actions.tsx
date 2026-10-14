@@ -32,7 +32,23 @@ export function FileActions({
         {sqlite.isOpening ? <LoaderCircleIcon className="animate-spin" /> : <EllipsisIcon />}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto">
-        <DropdownMenuItem onClick={sqlite.open} disabled={sqlite.isOpening}>
+        <DropdownMenuItem
+          render={
+            sqlite.href === undefined
+              ? undefined
+              : (props) => (
+                  <a
+                    {...props}
+                    href={sqlite.href}
+                    target="_blank"
+                    rel="noopener"
+                    aria-label={`Open ${entry.name} in SQLite explorer (new tab)`}
+                  />
+                )
+          }
+          onClick={sqlite.href === undefined ? sqlite.open : undefined}
+          disabled={sqlite.isOpening}
+        >
           <DatabaseIcon />
           {sqlite.isDatabase ? 'Open SQLite database' : 'Query as SQLite'}
         </DropdownMenuItem>

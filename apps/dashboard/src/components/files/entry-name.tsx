@@ -29,17 +29,30 @@ export function EntryName({
     return (
       <span className="flex items-center gap-2">
         <EntryIcon entry={entry} sqlite={sqlite} />
-        <button
-          type="button"
-          onClick={sqlite.open}
-          disabled={sqlite.isOpening}
-          aria-busy={sqlite.isOpening}
-          className="cursor-pointer truncate text-left hover:underline disabled:cursor-wait"
-          title={entry.name}
-          aria-label={`Open ${entry.name} in SQLite explorer`}
-        >
-          {entry.name}
-        </button>
+        {sqlite.href === undefined ? (
+          <button
+            type="button"
+            onClick={sqlite.open}
+            disabled={sqlite.isOpening}
+            aria-busy={sqlite.isOpening}
+            className="cursor-pointer truncate text-left hover:underline disabled:cursor-wait"
+            title={entry.name}
+            aria-label={`Open ${entry.name} in SQLite explorer`}
+          >
+            {entry.name}
+          </button>
+        ) : (
+          <a
+            href={sqlite.href}
+            target="_blank"
+            rel="noopener"
+            className="truncate hover:underline"
+            title={entry.name}
+            aria-label={`Open ${entry.name} in SQLite explorer (new tab)`}
+          >
+            {entry.name}
+          </a>
+        )}
       </span>
     );
   }
