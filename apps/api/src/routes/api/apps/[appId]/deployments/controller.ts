@@ -45,7 +45,10 @@ export const AppsAppIdDeploymentsController = new Elysia()
         source: body,
       };
       const deployment = deploymentAccess.deploymentGrant
-        ? await deploymentsService.createWithDeploymentGrant(input)
+        ? await deploymentsService.createWithDeploymentGrant({
+            ...input,
+            deploymentGrantId: deploymentAccess.deploymentGrant.id,
+          })
         : await deploymentsService.createOrRollback({
             ...input,
             isAnonymous: deploymentAccess.isAnonymous,

@@ -85,6 +85,7 @@ test('a GitHub deployment grant creates an upload without an account session', a
     ownerId: GRANT_OWNER_ID,
     isAnonymous: false,
     deploymentGrant: {
+      id: grant.id,
       expires_at: new Date(Math.min(grant.expires_at.getTime(), TOKEN_EXPIRY.getTime())),
     },
   });

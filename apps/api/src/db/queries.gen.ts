@@ -683,6 +683,12 @@ export interface ISelectDeploymentsByAppResult {
     restart_count: IDeploymentsColumns["restart_count"];
     public_ipv4: IDeploymentsColumns["public_ipv4"];
     extra_public_port: IDeploymentsColumns["extra_public_port"];
+    github_repository: IGithubDeploymentGrantsColumns["github_repository"] | null;
+    github_workflow_ref: IGithubDeploymentGrantsColumns["github_workflow_ref"] | null;
+    github_ref: IGithubDeploymentGrantsColumns["github_ref"] | null;
+    github_commit_sha: IGithubDeploymentGrantsColumns["github_commit_sha"] | null;
+    github_run_id: IGithubDeploymentGrantsColumns["github_run_id"] | null;
+    github_run_attempt: IGithubDeploymentGrantsColumns["github_run_attempt"] | null;
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -722,6 +728,12 @@ export interface ISelectDeploymentByIdResult {
     restart_count: IDeploymentsColumns["restart_count"];
     public_ipv4: IDeploymentsColumns["public_ipv4"];
     extra_public_port: IDeploymentsColumns["extra_public_port"];
+    github_repository: IGithubDeploymentGrantsColumns["github_repository"] | null;
+    github_workflow_ref: IGithubDeploymentGrantsColumns["github_workflow_ref"] | null;
+    github_ref: IGithubDeploymentGrantsColumns["github_ref"] | null;
+    github_commit_sha: IGithubDeploymentGrantsColumns["github_commit_sha"] | null;
+    github_run_id: IGithubDeploymentGrantsColumns["github_run_id"] | null;
+    github_run_attempt: IGithubDeploymentGrantsColumns["github_run_attempt"] | null;
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -788,6 +800,12 @@ export interface ISelectInsertedDeploymentResult {
     restart_count: IDeploymentsColumns["restart_count"];
     public_ipv4: IDeploymentsColumns["public_ipv4"];
     extra_public_port: IDeploymentsColumns["extra_public_port"];
+    github_repository: IGithubDeploymentGrantsColumns["github_repository"] | null;
+    github_workflow_ref: IGithubDeploymentGrantsColumns["github_workflow_ref"] | null;
+    github_ref: IGithubDeploymentGrantsColumns["github_ref"] | null;
+    github_commit_sha: IGithubDeploymentGrantsColumns["github_commit_sha"] | null;
+    github_run_id: IGithubDeploymentGrantsColumns["github_run_id"] | null;
+    github_run_attempt: IGithubDeploymentGrantsColumns["github_run_attempt"] | null;
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -826,6 +844,11 @@ export interface ISelectAppAwaitingDataResult {
 /** Result of query `SelectUsableImport`. */
 export interface ISelectUsableImportResult {
     id: IImportsColumns["id"];
+}
+
+/** Result of query `SelectDeploymentGrantToUse`. */
+export interface ISelectDeploymentGrantToUseResult {
+    id: IGithubDeploymentGrantsColumns["id"];
 }
 
 /** Result of query `InsertExport`. */
@@ -1153,6 +1176,7 @@ export interface Queries {
     SelectDeploymentHeldByApp: ISelectDeploymentHeldByAppResult;
     SelectAppAwaitingData: ISelectAppAwaitingDataResult;
     SelectUsableImport: ISelectUsableImportResult;
+    SelectDeploymentGrantToUse: ISelectDeploymentGrantToUseResult;
     InsertExport: IInsertExportResult;
     SelectExportsByApp: ISelectExportsByAppResult;
     SelectExportById: ISelectExportByIdResult;
@@ -1459,6 +1483,8 @@ export interface IDeploymentsColumns {
     instance_state: import("@repo/protocol").InstanceState | null;
     /** The uploaded archive this release's filesystem is created from, where one was named. */
     initial_data_import_id: import("#lib/api/identifiers.ts").ImportId | null;
+    /** The verified GitHub grant that created this deployment. */
+    github_deployment_grant_id: import("#lib/api/identifiers.ts").DeploymentGrantId | null;
 }
 
 /** Schema of `deployments`. */
@@ -2133,13 +2159,15 @@ export const schema = {
             public_ipv4: { _columnName: "public_ipv4", _foreignKeys: {} },
             extra_public_port: { _columnName: "extra_public_port", _foreignKeys: {} },
             instance_state: { _columnName: "instance_state", _foreignKeys: {} },
-            initial_data_import_id: { _columnName: "initial_data_import_id", _foreignKeys: { deployments_initial_data_import_id_fkey: { _constraintName: "deployments_initial_data_import_id_fkey", _references: { _relationName: "imports", _columnName: "id" } } } }
+            initial_data_import_id: { _columnName: "initial_data_import_id", _foreignKeys: { deployments_initial_data_import_id_fkey: { _constraintName: "deployments_initial_data_import_id_fkey", _references: { _relationName: "imports", _columnName: "id" } } } },
+            github_deployment_grant_id: { _columnName: "github_deployment_grant_id", _foreignKeys: { deployments_github_deployment_grant_id_fkey: { _constraintName: "deployments_github_deployment_grant_id_fkey", _references: { _relationName: "github_deployment_grants", _columnName: "id" } } } }
         },
         _indexes: {
             deployments_activated_artifact_idx: { _indexName: "deployments_activated_artifact_idx" },
             deployments_app_id_idx: { _indexName: "deployments_app_id_idx" },
             deployments_artifact_id_idx: { _indexName: "deployments_artifact_id_idx" },
             deployments_config_id_idx: { _indexName: "deployments_config_id_idx" },
+            deployments_github_deployment_grant_id_idx: { _indexName: "deployments_github_deployment_grant_id_idx" },
             deployments_initial_data_idx: { _indexName: "deployments_initial_data_idx" },
             deployments_live_idx: { _indexName: "deployments_live_idx" },
             deployments_pkey: { _indexName: "deployments_pkey" },
@@ -2150,6 +2178,7 @@ export const schema = {
             deployments_artifact_id_fkey: { _constraintName: "deployments_artifact_id_fkey" },
             deployments_config_id_fkey: { _constraintName: "deployments_config_id_fkey" },
             deployments_extra_public_port_check: { _constraintName: "deployments_extra_public_port_check" },
+            deployments_github_deployment_grant_id_fkey: { _constraintName: "deployments_github_deployment_grant_id_fkey" },
             deployments_initial_data_import_id_fkey: { _constraintName: "deployments_initial_data_import_id_fkey" },
             deployments_instance_state_check: { _constraintName: "deployments_instance_state_check" },
             deployments_pkey: { _constraintName: "deployments_pkey" },

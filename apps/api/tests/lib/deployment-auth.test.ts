@@ -216,7 +216,7 @@ test('Better Auth authenticates a deployment token over a real cookie session an
   expect(await response.json()).toEqual({
     ownerId: registeredAccount.ownerId,
     isAnonymous: false,
-    deploymentGrant: { expires_at: credential.expiresAt.toISOString() },
+    deploymentGrant: { id: GRANT_ID, expires_at: credential.expiresAt.toISOString() },
   });
   expect(authenticate).toHaveBeenCalledWith({
     appId: GRANT_APP_ID,

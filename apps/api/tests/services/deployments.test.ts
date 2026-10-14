@@ -18,10 +18,11 @@ import type { DeploymentState } from '#lib/api/deployment.ts';
 import type { PublicAppConfig } from '#lib/app-config.ts';
 import { DEFAULT_HEALTH_CHECK, DEFAULT_RESTART_POLICY } from '#lib/app-config-defaults.ts';
 import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
-import { ConflictError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
+import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '#lib/errors.ts';
 import type {
   CreateDeploymentInput,
   CreatedDeployment,
+  CreateGitHubDeploymentInput,
   DeploymentByIdInput,
   DeploymentRow,
   DeploymentsByAppInput,
@@ -40,6 +41,7 @@ import {
   IMPORT_ID,
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
+import { GRANT_ID } from '#tests/support/github-deployment-grants.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
 
 const HTTP_PORT_NUMBER = 8090;
@@ -103,6 +105,12 @@ function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
     restart_count: 0,
     public_ipv4: null,
     extra_public_port: null,
+    github_repository: null,
+    github_workflow_ref: null,
+    github_ref: null,
+    github_commit_sha: null,
+    github_run_id: null,
+    github_run_attempt: null,
     ...configColumns(PINNED_CONFIG),
     ...overrides,
   };
@@ -157,6 +165,10 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
     }
     const row = this.#behaviour.row;
     return Promise.resolve(row ? { outcome: 'created', row } : { outcome: 'no-artifact' });
+  }
+
+  insertWithDeploymentGrant(input: CreateGitHubDeploymentInput): Promise<CreatedDeployment> {
+    return this.insert({ ...input, initialDataFrom: null, onlyOne: false });
   }
 
   listByApp(input: DeploymentsByAppInput): Promise<DeploymentRow[]> {
@@ -795,6 +807,7 @@ describe('deployment grants only deploy compiled binaries', () => {
   test('a binary deployment preserves owner and app scoping', async () => {
     const { service, deploymentsRepo } = serviceWith({ row: deploymentRow() });
     await service.createWithDeploymentGrant({
+      deploymentGrantId: GRANT_ID,
       appId: APP_ID,
       ownerId: OWNER_ID,
       source: { artifactId: ARTIFACT_ID },
@@ -806,6 +819,7 @@ describe('deployment grants only deploy compiled binaries', () => {
         artifactId: ARTIFACT_ID,
         initialDataFrom: null,
         onlyOne: false,
+        deploymentGrantId: GRANT_ID,
       },
     ]);
   });
@@ -817,9 +831,55 @@ describe('deployment grants only deploy compiled binaries', () => {
       { artifactId: ARTIFACT_ID, initialDataFrom: IMPORT_ID },
     ]) {
       await expect(
-        service.createWithDeploymentGrant({ appId: APP_ID, ownerId: OWNER_ID, source }),
+        service.createWithDeploymentGrant({
+          appId: APP_ID,
+          ownerId: OWNER_ID,
+          source,
+          deploymentGrantId: GRANT_ID,
+        }),
       ).rejects.toBeInstanceOf(ForbiddenError);
     }
     expect(deploymentsRepo.calls).toEqual([]);
+  });
+});
+
+describe('GitHub deployment provenance belongs to the deployment', () => {
+  test('the public deployment exposes verified run claims', async () => {
+    const github = {
+      repository: 'acme/backend',
+      workflowRef: 'acme/backend/.github/workflows/release.yml@refs/tags/v1',
+      ref: 'refs/tags/v1',
+      commitSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      runId: '123',
+      runAttempt: '2',
+    };
+    const row = deploymentRow({
+      github_repository: github.repository,
+      github_workflow_ref: github.workflowRef,
+      github_ref: github.ref,
+      github_commit_sha: github.commitSha,
+      github_run_id: github.runId,
+      github_run_attempt: github.runAttempt,
+    });
+    const { service } = serviceWith({ row, rows: [row] });
+    expect((await service.get(OWNED_DEPLOYMENT)).github).toEqual(github);
+    expect((await service.list({ appId: APP_ID, ownerId: OWNER_ID }))[0]?.github).toEqual(github);
+  });
+
+  test('ordinary deployments omit GitHub provenance', async () => {
+    const { service } = serviceWith({ row: deploymentRow() });
+    expect(await service.get(OWNED_DEPLOYMENT)).not.toHaveProperty('github');
+  });
+
+  test('a revoked grant discovered during insertion remains unauthorized', async () => {
+    const { service } = serviceWith({ refusal: { outcome: 'no-grant' } });
+    await expect(
+      service.createWithDeploymentGrant({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        deploymentGrantId: GRANT_ID,
+        source: { artifactId: ARTIFACT_ID },
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 });
