@@ -15,10 +15,9 @@ export const AppsAppIdDeploymentsController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsController'))
   .use(AuthPlugin)
   .use(DeploymentsServicePlugin)
-  .guard({ auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] } })
   .get(
     '/apps/:appId/deployments',
-    async ({ deploymentsService, params, user, status }) => {
+    async function listDeployments({ deploymentsService, params, user, status }) {
       const deployments = await deploymentsService.list({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
@@ -26,22 +25,41 @@ export const AppsAppIdDeploymentsController = new Elysia()
       return status(StatusMap.OK, { deployments });
     },
     {
+      auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] },
       response: { [StatusMap.OK]: publicSchema(ListDeploymentsResponseSchema) },
     },
   )
   .post(
     '/apps/:appId/deployments',
-    async ({ deploymentsService, params, body: bodyInput, user, status }) => {
+    async function createDeployment({
+      deploymentsService,
+      params,
+      body: bodyInput,
+      deploymentAccess,
+      status,
+    }) {
       const body = Value.Parse(CreateDeploymentBodySchema, bodyInput);
-      const deployment = await deploymentsService.createOrRollback({
+      const input = {
         appId: Value.Parse(AppIdSchema, params.appId),
-        ownerId: Value.Parse(OwnerIdSchema, user.id),
-        isAnonymous: user.isAnonymous,
+        ownerId: deploymentAccess.ownerId,
         source: body,
-      });
+      };
+      const deployment = deploymentAccess.deploymentGrant
+        ? await deploymentsService.createWithDeploymentGrant(input)
+        : await deploymentsService.createOrRollback({
+            ...input,
+            isAnonymous: deploymentAccess.isAnonymous,
+          });
       return status(StatusMap.Created, deployment);
     },
     {
+      auth: {
+        policies: [
+          AuthCaller.AnonymousAccount,
+          AuthCaller.RegisteredAccount,
+          AuthCaller.GitHubOidcDeployment,
+        ],
+      },
       body: publicSchema(CreateDeploymentBodySchema),
       response: { [StatusMap.Created]: publicSchema(DeploymentResponseSchema) },
     },
