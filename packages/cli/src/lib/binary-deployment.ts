@@ -1,6 +1,6 @@
 import { createPublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
-import type { DeploymentCredentialsContract } from '#credentials.ts';
+import type { DeploymentCredentialsContract } from '#lib/deployment-credentials.ts';
 
 export type DeployBinaryInput = {
   apiUrl: string;

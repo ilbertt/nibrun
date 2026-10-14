@@ -1,10 +1,11 @@
 import type { InferOptions } from '@parshjs/core';
-import { DeploymentCredentials, deployBinary } from '@repo/deploy-action';
 import { z } from 'zod';
 import type { command } from '#commands/run/[command].ts';
 import { DEPLOYMENT_APP_ID_FLAG, GITHUB_TRUSTED_OIDC_FLAG, SHARED_OPTIONS } from '#config.ts';
+import { deployBinary } from '#lib/binary-deployment.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { binaryFrom } from '#lib/deploy.ts';
+import { DeploymentCredentials } from '#lib/deployment-credentials.ts';
 import { UsageError } from '#lib/errors.ts';
 import {
   maskGitHubSecret,
