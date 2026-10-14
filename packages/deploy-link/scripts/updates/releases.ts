@@ -4,14 +4,13 @@ import type { DeployPreset } from '#presets.ts';
 const REQUEST_TIMEOUT_MS = 120_000;
 const GITHUB_RELEASE_PATH = /^\/([^/]+\/[^/]+)\/releases\/download\/([^/]+)\/([^/]+)$/;
 const SHA256_DIGEST = /^sha256:([0-9a-f]{64})$/;
-const DRIZZLE_GATEWAY_URL = 'https://gateway.drizzle.team';
 
 type UpdateArtifact = { url: URL; field: 'binary' | 'initial-data' };
 
 export type PresetPin = Pick<DeployPreset, 'version'> & {
   binary: string;
   sha256: string | undefined;
-  'initial-data': string | undefined;
+  'initial-data'?: string | undefined;
 };
 
 export type PresetUpdate = {
@@ -47,7 +46,7 @@ export async function findUpdate(options: UpdateOptions): Promise<PresetUpdate |
     sha256: preset.deployLink.sha256,
     'initial-data': preset.deployLink['initial-data'],
   };
-  const artifact = updateArtifact({ preset, previous });
+  const artifact = updateArtifact(previous);
   if (!artifact) {
     return undefined;
   }
@@ -57,21 +56,14 @@ export async function findUpdate(options: UpdateOptions): Promise<PresetUpdate |
   return await findGithubUpdate({ ...options, previous, artifact });
 }
 
-function updateArtifact(options: {
-  preset: DeployPreset;
-  previous: PresetPin;
-}): UpdateArtifact | undefined {
-  const { preset, previous } = options;
+function updateArtifact(previous: PresetPin): UpdateArtifact | undefined {
   const binary: UpdateArtifact = { url: new URL(previous.binary), field: 'binary' };
   if (previous['initial-data'] !== undefined) {
     const url = new URL(previous['initial-data']);
     if (githubReleaseTag(url) === previous.version) {
       return { url, field: 'initial-data' };
     }
-    if (
-      githubReleaseTag(binary.url) !== previous.version &&
-      preset.projectUrl !== DRIZZLE_GATEWAY_URL
-    ) {
+    if (githubReleaseTag(binary.url) !== previous.version) {
       return undefined;
     }
   }
@@ -161,7 +153,7 @@ export function updatedAssetName(options: {
 
 async function findDrizzleUpdate(options: UpdateOptions & { previous: PresetPin }) {
   const { preset, previous, request, slug } = options;
-  if (preset.projectUrl !== DRIZZLE_GATEWAY_URL) {
+  if (preset.projectUrl !== 'https://gateway.drizzle.team') {
     throw new Error(`Unsupported release source: ${preset.projectUrl}`);
   }
   const releaseUrl = `${preset.projectUrl}/docs/binary`;
@@ -181,7 +173,6 @@ async function findDrizzleUpdate(options: UpdateOptions & { previous: PresetPin 
     slug,
     previous,
     next: {
-      ...previous,
       version: `v${version}`,
       binary,
       sha256: await downloadChecksum({ request, url: binary }),

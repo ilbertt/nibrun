@@ -16,8 +16,7 @@ tag matches the preset version, preferring initial data when both match. Other
 initial-data URLs, including commit-pinned source archives, stay fixed. If neither
 artifact owns the preset version, leave the runtime and initial data alone.
 Initial-data release updates preserve the separately pinned runtime binary and
-checksum. Drizzle Gateway uses its published Linux x64 download page and preserves
-any initial-data URL.
+checksum. Drizzle Gateway uses its published Linux x64 download page.
 Keep rolling presets without checksums unpinned; they already follow upstream builds.
 
 The `update-deploy-presets` workflow runs daily at 06:23 UTC or on manual dispatch.

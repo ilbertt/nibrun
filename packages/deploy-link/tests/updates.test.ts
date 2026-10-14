@@ -208,28 +208,3 @@ test('a seed release from another project is preserved during a binary update', 
   expect(update!.next['initial-data']).toBe(initialData);
   await writtenUpdate({ preset, update: update! });
 });
-
-test('Drizzle updates from its download page without rewriting commit seed data', async () => {
-  const preset = {
-    ...DEPLOY_PRESETS['drizzle-gateway'],
-    deployLink: {
-      ...DEPLOY_PRESETS['drizzle-gateway'].deployLink,
-      'initial-data': COMMIT_ARCHIVES[0],
-    },
-  };
-  const binary = 'https://downloads.example/drizzle-gateway-99.0.0-linux-x64';
-  function request(url: string): Promise<Response> {
-    if (url === `${preset.projectUrl}/docs/binary`) {
-      return Promise.resolve(new Response(binary));
-    }
-    if (url === binary) {
-      return Promise.resolve(new Response('runtime-binary'));
-    }
-    throw new Error(`Unexpected Drizzle release request: ${url}`);
-  }
-  const update = await findUpdate({ slug: 'drizzle-gateway', preset, request });
-
-  expect(update!.next.binary).toBe(binary);
-  expect(update!.next['initial-data']).toBe(preset.deployLink['initial-data']);
-  await writtenUpdate({ preset, update: update! });
-});
