@@ -71,8 +71,8 @@ the layout under `src/commands/` is the command tree.
   for readiness. Both flags are hidden from public help.
 - `nib apps github-workflows show/set/remove` manages the app’s one trusted GitHub
   Actions workflow through normal owner login and the parent `--app` selector.
-  `set` replaces the complete configuration: repository, workflow filename and
-  branch are required; omitted or blank environment removes that restriction.
+  `set` replaces the complete configuration: repository and workflow filename
+  are required; omitted or blank environment removes that restriction.
   `remove` requires a typed confirmation in a terminal or `--yes` in scripts.
 - GitHub OIDC uses its documented HTTP request so workflow commands can go to
   stderr and `--json` stays parseable, including when stdout is captured.

@@ -6,7 +6,6 @@ export function trustedWorkflow(overrides: Partial<TrustedWorkflow> = {}): Trust
   return {
     repository: 'acme/backend',
     workflow: 'deploy.yml',
-    branch: 'main',
     environment: null,
     ...overrides,
   };

@@ -17,7 +17,6 @@ const GitHubWorkflowSchema = z.object({
   id: z.string(),
   repository: z.string(),
   workflow: z.string(),
-  branch: z.string(),
   environment: z.string().nullable(),
 }) satisfies z.ZodType<GitHubWorkflow>;
 
@@ -31,7 +30,6 @@ export const GITHUB_WORKFLOW_OUTPUT = defineOutput({
     }
     out.info(`repository: ${value.workflow.repository}`);
     out.info(`workflow: ${value.workflow.workflow}`);
-    out.info(`branch: ${value.workflow.branch}`);
     out.info(`environment: ${value.workflow.environment ?? 'unrestricted'}`);
     out.dim(`workflow ID: ${value.workflow.id}`);
   },

@@ -21,7 +21,6 @@ export function useGitHubWorkflowForm(workflow: GitHubWorkflow | null): GitHubWo
   const fields = edited ?? {
     repository: workflow?.repository ?? '',
     workflow: workflow?.workflow ?? 'deploy.yml',
-    branch: workflow?.branch ?? 'main',
     environment: workflow?.environment ?? '',
   };
   const save = useMutation({

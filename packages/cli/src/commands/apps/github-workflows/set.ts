@@ -18,10 +18,6 @@ export const command = defineCommand('apps github-workflows set', {
       schema: z.string().min(1),
       description: 'Workflow filename under .github/workflows, such as deploy.yml.',
     },
-    branch: {
-      schema: z.string().min(1),
-      description: 'Branch allowed to deploy, such as main.',
-    },
     environment: {
       schema: z.string().trim().optional(),
       description: 'Required GitHub environment. Omit or leave empty to remove this restriction.',
@@ -46,7 +42,6 @@ export const command = defineCommand('apps github-workflows set', {
       workflow: {
         repository: options.repository,
         workflow: options.workflow,
-        branch: options.branch,
         environment: options.environment || null,
       },
     });

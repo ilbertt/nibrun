@@ -39,7 +39,7 @@ non-interactive shell creates a second app rather than replacing the first.
 ### GitHub Actions
 
 GitHub Actions can deploy an existing app without an API key or `nib login` in CI. Configure a
-trusted repository, workflow and branch, give the workflow `id-token: write`, then deploy with
+trusted repository and workflow, give the workflow `id-token: write`, then deploy with
 `nib run ./my-server --github-trusted-oidc --app-id APP_ID`. Requires a CLI release with GitHub
 OIDC support; deployments use the app’s saved arguments and configuration. See the
 [GitHub Actions example](https://github.com/ilbertt/nibrun/blob/main/skills/deploy-to-nibrun/SKILL.md#github-actions).

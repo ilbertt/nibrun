@@ -6,7 +6,7 @@ import { GITHUB_WORKFLOW_OUTPUT } from '#lib/github-workflows.ts';
 import { createOutput } from '#lib/output.ts';
 
 export const command = defineCommand('apps github-workflows show', {
-  description: 'Show the repository, workflow, branch and environment allowed to deploy this app.',
+  description: 'Show the repository, workflow and environment allowed to deploy this app.',
   options: {},
   beforeHandler: function signedIn({ context }) {
     return requireSignedIn(context);

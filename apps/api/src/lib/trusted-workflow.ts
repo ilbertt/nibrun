@@ -15,11 +15,9 @@ export function matchesTrustedWorkflow({
     return false;
   }
   const repository = workflow.repository.toLowerCase();
-  const ref = `refs/heads/${workflow.branch}`;
-  const workflowPath = `/.github/workflows/${workflow.workflow}@${ref}`;
+  const workflowPath = `/.github/workflows/${workflow.workflow}@${claims.ref}`;
   return (
     claims.repository.toLowerCase() === repository &&
-    claims.ref === ref &&
     claims.workflow_ref.slice(0, repository.length).toLowerCase() === repository &&
     claims.workflow_ref.slice(repository.length) === workflowPath &&
     (workflow.environment === null || claims.environment === workflow.environment)

@@ -53,19 +53,6 @@ export function GitHubWorkflowForm({
           <FieldDescription>The filename inside .github/workflows/.</FieldDescription>
         </Field>
         <Field>
-          <FieldLabel htmlFor="github-branch">Branch</FieldLabel>
-          <Input
-            id="github-branch"
-            value={form.fields.branch}
-            placeholder="main"
-            required
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => form.change({ field: 'branch', value: event.target.value })}
-          />
-          <FieldDescription>Only runs from this branch can deploy.</FieldDescription>
-        </Field>
-        <Field>
           <FieldLabel htmlFor="github-environment">GitHub environment</FieldLabel>
           <Input
             id="github-environment"

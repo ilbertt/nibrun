@@ -62,8 +62,8 @@ test('trusted workflows require an account session', async () => {
   }
 });
 
-test('workflow paths and invalid branch refs are refused on both creation and update', async () => {
-  for (const override of [{ workflow: '../deploy.yml' }, { branch: 'main..next' }]) {
+test('workflow paths and invalid repository names are refused on both creation and update', async () => {
+  for (const override of [{ workflow: '../deploy.yml' }, { repository: 'acme/backend/other' }]) {
     for (const route of [
       { method: 'POST', url: URL },
       { method: 'PUT', url: RESOURCE_URL },
@@ -86,7 +86,7 @@ test('creation returns 201 and the workflow ID used for updates and deletion', a
   expect(await response.json()).toEqual(created);
   const ownedApp = { appId: Value.Parse(AppIdSchema, 'app-1'), ownerId: OWNER_ID };
   expect(create).toHaveBeenCalledWith({ ...ownedApp, workflow });
-  const replacement = trustedWorkflow({ branch: 'production' });
+  const replacement = trustedWorkflow({ workflow: 'release.yml' });
   const update = spyOn(service, 'update').mockResolvedValue({ ...created, ...replacement });
   const updated = await sendJson({ method: 'PUT', url: RESOURCE_URL, body: replacement });
   expect(updated.status).toBe(StatusMap.OK);

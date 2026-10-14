@@ -10,7 +10,6 @@ const workflow: GitHubWorkflow = {
   id: 'workflow-id',
   repository: 'owner/repository',
   workflow: 'deploy.yml',
-  branch: 'main',
   environment: null,
 };
 const fetchSpy = spyOn(globalThis, 'fetch');
@@ -32,7 +31,6 @@ test('saving normalizes form fields and sends a blank environment as unrestricte
       fields: {
         repository: ' owner/repository ',
         workflow: ' deploy.yml ',
-        branch: ' main ',
         environment: '  ',
       },
     }),
@@ -42,7 +40,6 @@ test('saving normalizes form fields and sends a blank environment as unrestricte
   expect(JSON.parse(String(request?.body))).toEqual({
     repository: workflow.repository,
     workflow: workflow.workflow,
-    branch: workflow.branch,
     environment: null,
   });
 });
@@ -61,14 +58,14 @@ test('saving retains the known workflow id and trims the environment restriction
   expect(JSON.parse(String(request?.body)).environment).toBe('production');
 });
 
-test('the example grants OIDC permission and deploys this app using the saved branch', () => {
+test('the example grants OIDC permission and deploys this app on branch and tag pushes', () => {
   const example = githubWorkflowExample({
     appId,
-    workflow: { ...workflow, branch: 'release/v1' },
+    workflow,
     binaryName: 'uploaded-binary',
   });
   expect(Bun.YAML.parse(example)).toMatchObject({
-    on: { push: { branches: ['release/v1'] } },
+    on: 'push',
     permissions: { contents: 'read', 'id-token': 'write' },
     jobs: {
       deploy: {

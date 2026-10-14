@@ -63,45 +63,58 @@ function installVerifiedExchange() {
   return { grantsRepo, exchange };
 }
 
-test('API-verified GitHub proof becomes a Better Auth app-scoped token without an account session', async () => {
-  const { grantsRepo, exchange } = installVerifiedExchange();
-  const accountSession = spyOn(auth.api, 'getSession');
-  const response = await exchangeRequest(await signToken({ key }));
-  expect(response.status).toBe(StatusMap.Created);
-  expect(response.headers.get('cache-control')).toBe('no-store');
-  const credential = (await response.json()) as DeploymentTokenResource;
-  const expiresAt = new Date(credential.expiresAt);
-  expect(expiresAt.getTime()).toBeLessThanOrEqual(grantsRepo.grant!.expires_at.getTime());
-  expect(expiresAt.getTime()).toBeLessThanOrEqual(
-    Date.now() + DEPLOYMENT_TOKEN_LIFETIME_SECONDS * MS_PER_SECOND,
-  );
-  const verification = await auth.api.verifyApiKey({
-    body: {
-      configId: shortLivedDeploymentTokenConfiguration.configId,
-      key: credential.token,
-      permissions: { [GRANT_APP_ID]: [DEPLOYMENT_TOKEN_PERMISSION] },
-    },
-  });
-  expect(verification.valid).toBe(true);
-  expect(verification.key).toMatchObject({
-    referenceId: GRANT_OWNER_ID,
-    metadata: { grantId: GRANT_ID },
-    expiresAt,
-  });
-  expect(
-    (
-      await auth.api.verifyApiKey({
-        body: {
-          configId: shortLivedDeploymentTokenConfiguration.configId,
-          key: credential.token,
-          permissions: { 'another-app': [DEPLOYMENT_TOKEN_PERMISSION] },
+test.each(['refs/heads/main', 'refs/tags/v2026.10.4'])(
+  'API-verified GitHub proof from %s becomes a Better Auth app-scoped token without an account session',
+  async (ref) => {
+    const { grantsRepo, exchange } = installVerifiedExchange();
+    const accountSession = spyOn(auth.api, 'getSession');
+    const response = await exchangeRequest(
+      await signToken({
+        key,
+        claims: {
+          ...githubClaims(),
+          ref,
+          sub: `repo:acme/backend:ref:${ref}`,
+          workflow_ref: `acme/backend/.github/workflows/deploy.yml@${ref}`,
         },
-      })
-    ).valid,
-  ).toBe(false);
-  expect(exchange).toHaveBeenCalledTimes(1);
-  expect(accountSession).not.toHaveBeenCalled();
-});
+      }),
+    );
+    expect(response.status).toBe(StatusMap.Created);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const credential = (await response.json()) as DeploymentTokenResource;
+    const expiresAt = new Date(credential.expiresAt);
+    expect(expiresAt.getTime()).toBeLessThanOrEqual(grantsRepo.grant!.expires_at.getTime());
+    expect(expiresAt.getTime()).toBeLessThanOrEqual(
+      Date.now() + DEPLOYMENT_TOKEN_LIFETIME_SECONDS * MS_PER_SECOND,
+    );
+    const verification = await auth.api.verifyApiKey({
+      body: {
+        configId: shortLivedDeploymentTokenConfiguration.configId,
+        key: credential.token,
+        permissions: { [GRANT_APP_ID]: [DEPLOYMENT_TOKEN_PERMISSION] },
+      },
+    });
+    expect(verification.valid).toBe(true);
+    expect(verification.key).toMatchObject({
+      referenceId: GRANT_OWNER_ID,
+      metadata: { grantId: GRANT_ID },
+      expiresAt,
+    });
+    expect(
+      (
+        await auth.api.verifyApiKey({
+          body: {
+            configId: shortLivedDeploymentTokenConfiguration.configId,
+            key: credential.token,
+            permissions: { 'another-app': [DEPLOYMENT_TOKEN_PERMISSION] },
+          },
+        })
+      ).valid,
+    ).toBe(false);
+    expect(exchange).toHaveBeenCalledTimes(1);
+    expect(accountSession).not.toHaveBeenCalled();
+  },
+);
 
 test('invalid authentication cannot reach GitHub trust or issue credentials', async () => {
   const { exchange } = installVerifiedExchange();
@@ -126,7 +139,13 @@ test('bad signatures and untrusted workflows cannot issue credentials', async ()
   const outsider = await signingKey({ kid: key.kid });
   for (const identityToken of [
     await signToken({ key: outsider }),
-    await signToken({ key, claims: { ...githubClaims(), ref: 'refs/heads/untrusted' } }),
+    await signToken({
+      key,
+      claims: {
+        ...githubClaims(),
+        workflow_ref: 'acme/backend/.github/workflows/other.yml@refs/heads/main',
+      },
+    }),
   ]) {
     const response = await exchangeRequest(identityToken);
     expect(response.status).toBe(StatusMap.Unauthorized);
