@@ -191,7 +191,7 @@
       "version": "2026.10.13-1",
       "dependencies": {
         "@clack/prompts": "^1.7.0",
-        "@parshjs/core": "^0.0.10",
+        "@parshjs/core": "^0.0.11",
         "@parshjs/env": "^0.0.3",
         "@parshjs/files": "^0.0.4",
         "@repo/api-client": "workspace:*",
@@ -1010,7 +1010,7 @@
 
     "@parshjs/codegen": ["@parshjs/codegen@0.0.5", "", { "dependencies": { "typescript": "^5.9.3" }, "bin": { "parsh-codegen": "dist/cli/main.js" } }, "sha512-fJFVIa5A6OWiABD8kZqSm2A75SV+ZgDuakQ/XASmYpJyd/FN6E/2erkev2LdqiFD6WySnbux8O/Dh+ms4oNzlw=="],
 
-    "@parshjs/core": ["@parshjs/core@0.0.10", "", {}, "sha512-tMjf7tx7snUMLWQch0SXJXFxHfiJZusbG3UXivqSQN9lTf+JTj6iaWIRkpw+1FKPoV7t9WPvCi9LsmeZ98/QnQ=="],
+    "@parshjs/core": ["@parshjs/core@0.0.11", "", {}, "sha512-2W8gzfUhvIGh1ft8lt87tcPridRlh3oXpp7JBlDeibdNw0E8Clsp9s7k0DkxF3TWXtjtsjZi0/ruAoiw7Lm8Yg=="],
 
     "@parshjs/env": ["@parshjs/env@0.0.3", "", {}, "sha512-n0D9K7YLyLPxwJbyz3oKP3q0/t0V1vDZpnyNZ7kJZ8nGuB8oX2tMNYYgdhJDOXgHQl6IKZHeIi+RTa6OWSQPGg=="],
 
