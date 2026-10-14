@@ -10,6 +10,9 @@ export const PROGRAM_VERSION = packageJson.version;
 
 export const DEFAULT_API_URL = DASHBOARD_SITE.url;
 
+export const GITHUB_TRUSTED_OIDC_FLAG = 'github-trusted-oidc';
+export const DEPLOYMENT_APP_ID_FLAG = 'app-id';
+
 /**
  * A flag more than one command takes, held as both the name parsh spells it by and the declaration
  * that name points at, so neither half can drift between the commands taking it. A site adds only

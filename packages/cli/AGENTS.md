@@ -64,6 +64,13 @@ the layout under `src/commands/` is the command tree.
   command like any other — can run at all. What stops an unauthenticated
   request is `requireSignedIn` in a `beforeHandler`. A new command that talks to
   the api needs that line, or its failure is a bare 401.
+- `nib run <binary> --github-trusted-oidc --app-id <id>` deploys an existing app
+  from GitHub Actions with `id-token: write`. It obtains temporary credentials in
+  memory and uses only the binary upload and deployment-creation endpoints. It
+  returns the app and deployment IDs, without changing app configuration or waiting
+  for readiness. Both flags are hidden from public help.
+- GitHub OIDC uses its documented HTTP request so workflow commands can go to
+  stderr and `--json` stays parseable, including when stdout is captured.
 - The factory is where a missing variable or unreadable credential is noticed,
   and parsh resolves it outside its own error handling — hence the `try` around
   `cli.main()`. Remove it and those print a stack trace instead of one line.

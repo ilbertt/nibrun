@@ -1,10 +1,15 @@
 import { defineCommand } from '@parshjs/core';
 import { z } from 'zod';
-import { SHARED_OPTIONS } from '#config.ts';
+import { DEPLOYMENT_APP_ID_FLAG, GITHUB_TRUSTED_OIDC_FLAG, SHARED_OPTIONS } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { binaryFrom, deploy } from '#lib/deploy.ts';
+import { UsageError } from '#lib/errors.ts';
+import {
+  deployWithGitHubOidc,
+  GITHUB_OIDC_DEPLOYMENT_OUTPUT,
+} from '#lib/github-oidc-deployment.ts';
 import { initialDataFrom } from '#lib/initial-data.ts';
 import { createOutput } from '#lib/output.ts';
 import { completeOptions } from '#lib/plan.ts';
@@ -21,6 +26,14 @@ export const command = defineCommand('run [command]', {
     command: { schema: z.string().min(1) },
   },
   options: {
+    [GITHUB_TRUSTED_OIDC_FLAG]: {
+      schema: z.boolean().optional(),
+      hidden: true,
+    },
+    [DEPLOYMENT_APP_ID_FLAG]: {
+      schema: z.string().min(1).optional(),
+      hidden: true,
+    },
     [SHARED_OPTIONS.app.name]: {
       ...SHARED_OPTIONS.app.option,
       description:
@@ -46,11 +59,36 @@ export const command = defineCommand('run [command]', {
     [SHARED_OPTIONS.unset.name]: SHARED_OPTIONS.unset.option,
     [SHARED_OPTIONS.detach.name]: SHARED_OPTIONS.detach.option,
   },
-  beforeHandler: ({ context }) => requireSignedIn(context),
+  beforeHandler: ({ context, options }) => {
+    if (options[GITHUB_TRUSTED_OIDC_FLAG] === true) {
+      return;
+    }
+    if (options[DEPLOYMENT_APP_ID_FLAG] !== undefined) {
+      throw new UsageError(`--${DEPLOYMENT_APP_ID_FLAG} requires --${GITHUB_TRUSTED_OIDC_FLAG}.`);
+    }
+    return requireSignedIn(context);
+  },
   handler: async ({ params, options, context, print, rootOptions }) => {
+    if (options[GITHUB_TRUSTED_OIDC_FLAG] === true) {
+      const { emit } = createOutput({
+        output: GITHUB_OIDC_DEPLOYMENT_OUTPUT,
+        print,
+        json: rootOptions.json,
+      });
+      emit(
+        await deployWithGitHubOidc({
+          commandLine: params.command,
+          options,
+          apiUrl: context.apiUrl,
+        }),
+      );
+      return;
+    }
     // parsh names an option as it is typed, so a flag with hyphens in it does not arrive under the
     // name the deploy takes and has to be renamed rather than spread through.
     const {
+      [GITHUB_TRUSTED_OIDC_FLAG]: _githubTrustedOidc,
+      [DEPLOYMENT_APP_ID_FLAG]: _appId,
       detach,
       sha256,
       [SHARED_OPTIONS.extraPublicPort.name]: extraPublicPort,
