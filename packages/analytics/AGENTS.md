@@ -22,10 +22,9 @@ Internal tracking shared by the marketing site and dashboard.
   in pageviews, custom events, identification and performance payloads. Umami
   extracts UTM parameters from the query string. UTM query and hash navigation
   are pageviews; deduplicate by origin, pathname, filtered search and hash.
-- Sanitize every outgoing payload outside the preserved UTM query values. Exclude
-  credentials, referrer queries and hashes, app names, custom hostnames, file paths,
-  prompt contents, configuration values and raw errors. Opaque app and attempt IDs
-  may correlate events; settings events carry changed field names only.
+- Exclude credentials, referrer queries and hashes, app names, custom hostnames,
+  file paths, prompt contents, configuration values and raw errors. Opaque app and
+  attempt IDs may correlate events; settings events carry changed field names only.
 - Define event contracts in `src/events.ts`; derive callers' types from them.
   Keep acquisition context separate from the preset actually deployed.
 - Record outcomes after confirmation. Deployment success requires observed
