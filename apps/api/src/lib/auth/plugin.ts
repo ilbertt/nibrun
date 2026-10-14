@@ -6,9 +6,10 @@ export function createAuthPlugin(authenticationService: AuthenticationServiceCon
   return new Elysia({ name: 'auth' }).macro({
     auth: function authenticationPolicy(policy: AuthenticationPolicy) {
       return {
-        async resolve({ request }) {
-          return await authenticationService.authenticateAccount({
-            headers: request.headers,
+        async resolve({ request, params }) {
+          return await authenticationService.authenticateRequest({
+            request,
+            appId: params && 'appId' in params ? params.appId : undefined,
             policies: policy.policies,
           });
         },

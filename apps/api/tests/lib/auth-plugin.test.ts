@@ -14,7 +14,14 @@ function authAnswering(session: Session): Auth {
 }
 
 function appBehind(auth: Auth) {
-  const authenticationService = new AuthenticationService(auth.api);
+  const authenticationService = new AuthenticationService({
+    auth: auth.api,
+    grantsService: {
+      authenticate() {
+        throw new Error('Account routes must not authenticate grants.');
+      },
+    },
+  });
   return new Elysia()
     .onError(elysiaErrorHandler)
     .use(createAuthPlugin(authenticationService))

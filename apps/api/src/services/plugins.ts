@@ -198,7 +198,10 @@ const logsService = new LogsService({
   deploymentsRepo: deploymentsRepository,
 });
 
-const authenticationService = new AuthenticationService(auth.api);
+const authenticationService = new AuthenticationService({
+  auth: auth.api,
+  grantsService: githubDeploymentGrantsService,
+});
 export const AuthPlugin = createAuthPlugin(authenticationService);
 
 export function loggerPlugin(name: string) {
