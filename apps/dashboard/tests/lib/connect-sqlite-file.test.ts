@@ -1,10 +1,5 @@
 import { describe, expect, mock, test } from 'bun:test';
 import { connectSqliteFile } from '#lib/connect-sqlite-file.ts';
-import {
-  type SqliteFile,
-  type SqliteFileConnectionEvent,
-  sqliteFileConnectionChannel,
-} from '#lib/sqlite-file-connection-events.ts';
 import type { SqliteConnectionSummary } from '#queries/sqlite-connection.ts';
 
 const file = { appId: 'app-1', path: '/data/app.db' };
@@ -16,25 +11,12 @@ const connection: SqliteConnectionSummary = {
   url: 'https://nibrun.com/api/sqlite/connections/connection-1/',
 };
 
-function recordEvents(file: SqliteFile) {
-  const channel = sqliteFileConnectionChannel(file);
-  const events: SqliteFileConnectionEvent[] = [];
-  const finished = Promise.withResolvers<void>();
-  channel.onmessage = (event: MessageEvent<SqliteFileConnectionEvent>) => {
-    events.push(event.data);
-    channel.close();
-    finished.resolve();
-  };
-  return { events, finished: finished.promise };
-}
-
 function validateConnection(): Promise<void> {
   return Promise.resolve();
 }
 
 describe('connecting a file for the SQLite explorer', () => {
-  test('creates a missing connection and sends it to the file list', async () => {
-    const recorder = recordEvents(file);
+  test('creates a missing connection before opening the explorer', async () => {
     const create = mock(() => Promise.resolve(connection));
 
     expect(
@@ -45,14 +27,11 @@ describe('connecting a file for the SQLite explorer', () => {
         validate: validateConnection,
       }),
     ).toEqual(connection);
-    await recorder.finished;
 
     expect(create).toHaveBeenCalledTimes(1);
-    expect(recorder.events).toEqual([{ status: 'success', connection }]);
   });
 
   test('reuses an existing connection when a file link is reopened', async () => {
-    const recorder = recordEvents(file);
     const create = mock(() => Promise.resolve(connection));
 
     expect(
@@ -63,14 +42,11 @@ describe('connecting a file for the SQLite explorer', () => {
         validate: validateConnection,
       }),
     ).toEqual(connection);
-    await recorder.finished;
 
     expect(create).not.toHaveBeenCalled();
-    expect(recorder.events.at(-1)).toEqual({ status: 'success', connection });
   });
 
-  test('sends the original creation error back to the file list and rejects', async () => {
-    const recorder = recordEvents(file);
+  test('rejects with the original creation error', async () => {
     const failure = new Error('file is not a database');
 
     await expect(
@@ -81,13 +57,9 @@ describe('connecting a file for the SQLite explorer', () => {
         validate: validateConnection,
       }),
     ).rejects.toBe(failure);
-    await recorder.finished;
-
-    expect(recorder.events).toEqual([{ status: 'error', message: failure.message }]);
   });
 
-  test('waits for database validation before returning a link or announcing success', async () => {
-    const recorder = recordEvents(file);
+  test('waits for database validation before returning a link', async () => {
     const checked = Promise.withResolvers<void>();
     const checking = Promise.withResolvers<SqliteConnectionSummary>();
     const returned = mock();
@@ -103,34 +75,25 @@ describe('connecting a file for the SQLite explorer', () => {
 
     expect(await checking.promise).toEqual(connection);
     expect(returned).not.toHaveBeenCalled();
-    expect(recorder.events).toEqual([]);
 
     checked.resolve();
     await connecting;
-    await recorder.finished;
     expect(returned).toHaveBeenCalledWith(connection);
-    expect(recorder.events).toEqual([{ status: 'success', connection }]);
   });
 
-  test.each([false, true])(
-    'rejects an unusable database without announcing success (saved: %s)',
-    async (saved) => {
-      const recorder = recordEvents(file);
-      const failure = new Error('file is not a database');
-      const validate = mock(() => Promise.reject(failure));
+  test.each([false, true])('rejects an unusable database (saved: %s)', async (saved) => {
+    const failure = new Error('file is not a database');
+    const validate = mock(() => Promise.reject(failure));
 
-      await expect(
-        connectSqliteFile({
-          file,
-          list: () => Promise.resolve(saved ? [connection] : []),
-          create: () => Promise.resolve(connection),
-          validate,
-        }),
-      ).rejects.toBe(failure);
-      await recorder.finished;
+    await expect(
+      connectSqliteFile({
+        file,
+        list: () => Promise.resolve(saved ? [connection] : []),
+        create: () => Promise.resolve(connection),
+        validate,
+      }),
+    ).rejects.toBe(failure);
 
-      expect(validate).toHaveBeenCalledWith(connection);
-      expect(recorder.events).toEqual([{ status: 'error', message: failure.message }]);
-    },
-  );
+    expect(validate).toHaveBeenCalledWith(connection);
+  });
 });
