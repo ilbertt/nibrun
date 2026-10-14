@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { analyticsPath, analyticsReferrer, analyticsSite } from '#page.ts';
+import { analyticsPath, analyticsReferrer, analyticsSearch, analyticsSite } from '#page.ts';
 
 describe('analytics URLs', () => {
   test('only the two production sites are tracked', () => {
@@ -13,6 +13,18 @@ describe('analytics URLs', () => {
   test('site prefixes distinguish the two homepages', () => {
     expect(analyticsPath({ site: 'www', pathname: '/' })).toBe('/www/');
     expect(analyticsPath({ site: 'dashboard', pathname: '/' })).toBe('/dashboard/');
+  });
+
+  test('only utm-prefixed query parameters survive with repeated and empty values', () => {
+    expect(
+      analyticsSearch(
+        '?code=SECRET&utm_source=email&utm_campaign=launch&utm_term=compiled%20binary&utm_custom=one&utm_custom=two&utm_extra=&env=SECRET&xutm_source=SECRET',
+      ),
+    ).toBe(
+      '?utm_source=email&utm_campaign=launch&utm_term=compiled+binary&utm_custom=one&utm_custom=two&utm_extra=',
+    );
+    expect(analyticsSearch('?code=SECRET&env=SECRET')).toBe('');
+    expect(analyticsSearch('')).toBe('');
   });
 
   test('app identifiers and file paths stay out of referrers', () => {

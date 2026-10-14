@@ -2,7 +2,7 @@
 
 import { UMAMI_WEBSITE_ID } from '#config.ts';
 import { analyticsIdentity } from '#identity.ts';
-import { analyticsPath, analyticsReferrer, analyticsSite } from '#page.ts';
+import { analyticsPath, analyticsReferrer, analyticsSearch, analyticsSite } from '#page.ts';
 
 type Payload = Record<string, unknown>;
 type Tracker = {
@@ -62,7 +62,6 @@ export function loadTracker(): Promise<boolean> {
     script.dataset.websiteId = UMAMI_WEBSITE_ID;
     script.dataset.beforeSend = 'nibrunBeforeSend';
     script.dataset.performance = 'true';
-    script.dataset.excludeSearch = 'true';
     script.dataset.doNotTrack = 'true';
     distinctId = analyticsIdentity();
     (window as AnalyticsWindow).nibrunBeforeSend = beforeSend;
@@ -95,6 +94,7 @@ function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined 
     return undefined;
   }
   const url = new URL(String(payload.url), window.location.href);
+  url.search = analyticsSearch(url.search);
   const site = analyticsSite(url.hostname);
   if (!site) {
     return undefined;
@@ -103,6 +103,7 @@ function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined 
     if (
       previousPage?.origin === url.origin &&
       previousPage.pathname === url.pathname &&
+      previousPage.search === url.search &&
       previousPage.hash === url.hash
     ) {
       return undefined;
@@ -113,7 +114,7 @@ function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined 
     ...payload,
     ...(type === 'identify' && { data: { account_id: accountId ?? '' } }),
     id: distinctId,
-    url: `${url.origin}${analyticsPath({ site, pathname: url.pathname })}${url.hash}`,
+    url: `${url.origin}${analyticsPath({ site, pathname: url.pathname })}${url.search}${url.hash}`,
     referrer: sanitizedReferrer(payload.referrer),
     title: `nibrun ${site}`,
   };
