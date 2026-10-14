@@ -2,6 +2,13 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.10.14-2]
+
+### 🐛 Bug Fixes
+
+- *(cli)* Explain GitHub deployment failures by stage (#924)
+- *(deploy)* Trust GitHub workflows across branches and tags (#921)
+
 ## [2026.10.14-1]
 
 ### 🚀 Features
