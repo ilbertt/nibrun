@@ -22,6 +22,7 @@ const CREATED_STATUS = 201;
 const FORBIDDEN_STATUS = 403;
 const REDIRECT_STATUS = 302;
 const UNAUTHORIZED_STATUS = 401;
+const SERVER_ERROR_STATUS = 500;
 const ENV_NAMES = [
   'GITHUB_ACTIONS',
   'ACTIONS_ID_TOKEN_REQUEST_URL',
@@ -40,6 +41,7 @@ let identityRequests: { url: string; headers: Headers }[];
 let requests: { url: string; method: string; headers: Headers; body: RequestInit['body'] }[];
 let oidc: ReturnType<typeof Bun.serve>;
 let failTokens: boolean;
+let failure: { url: string; status: number; network: boolean } | undefined;
 let renewAfterUpload: boolean;
 let issuedTokenCount: number;
 let now: number;
@@ -61,6 +63,7 @@ beforeEach(async function prepareWorkflow() {
   identityRequests = [];
   requests = [];
   failTokens = false;
+  failure = undefined;
   renewAfterUpload = false;
   issuedTokenCount = 0;
   now = Date.now();
@@ -140,6 +143,17 @@ async function apiResponse(...args: Parameters<typeof fetch>): Promise<Response>
     headers: new Headers(init?.headers),
     body: init?.body ?? undefined,
   });
+  if (url === failure?.url) {
+    if (failure.network) {
+      throw new Error(
+        `private-transport-error ${STORAGE_URL} github-identity-1 deployment-token-1`,
+      );
+    }
+    return Response.json(
+      { error: `private-api-error ${STORAGE_URL} github-identity-1 deployment-token-1` },
+      { status: failure.status },
+    );
+  }
   if (url.endsWith('/deployment-tokens')) {
     if (failTokens) {
       return Response.json(
@@ -294,7 +308,11 @@ test.each([
     identityStatus = status;
     const { cli } = workflowCli();
     expect(await cli.run(trustedArguments(['--json']))).toBe(1);
-    expect(errors[0]).toContain('GitHub trusted deployment failed');
+    expect(errors[0]).toContain(
+      status === FORBIDDEN_STATUS
+        ? 'GitHub refused the identity token request (HTTP 403)'
+        : 'GitHub returned an invalid identity token response',
+    );
     expect(errors.join('')).not.toContain(response);
     expect(requests).toHaveLength(0);
     expect(output).toEqual([]);
@@ -340,10 +358,88 @@ test('an exchange failure never prints the GitHub proof or API error as an error
   failTokens = true;
   const { cli } = workflowCli();
   expect(await cli.run(trustedArguments())).toBe(1);
-  expect(errors[0]).toContain('GitHub trusted deployment failed');
+  expect(errors[0]).toContain('Could not obtain deployment access');
+  expect(errors[0]).toContain('HTTP 401');
+  expect(errors[0]).toContain('Check the app ID and its trusted GitHub repository');
   expect(errors.join('')).not.toContain('github-identity-1');
   expect(errors.join('')).not.toContain('private-token-exchange-error');
   expect(requests).toHaveLength(1);
+});
+
+test('a GitHub connection failure identifies GitHub without exposing the request credential', async () => {
+  spyOn(globalThis, 'fetch').mockImplementation(
+    Object.assign(
+      function unreachableGitHub() {
+        return Promise.reject(
+          new Error(`private-github-error ${OIDC_REQUEST_SECRET} ${STORAGE_URL}`),
+        );
+      },
+      { preconnect: fetch.preconnect },
+    ),
+  );
+  const { cli } = workflowCli();
+  expect(await cli.run(trustedArguments(['--json']))).toBe(1);
+  expect(errors).toEqual([
+    'Could not request GitHub identity: GitHub could not be reached. Check network connectivity, then retry.',
+  ]);
+  expect(requests).toHaveLength(0);
+  expect(output).toEqual([]);
+});
+
+test.each([
+  {
+    url: `${API_URL}/api/apps/${APP_ID}/artifacts`,
+    status: FORBIDDEN_STATUS,
+    message: 'Could not request a binary upload',
+  },
+  { url: STORAGE_URL, status: SERVER_ERROR_STATUS, message: 'Binary upload failed' },
+  {
+    url: `${API_URL}/api/apps/${APP_ID}/artifacts/artifact-1`,
+    status: SERVER_ERROR_STATUS,
+    message: 'Could not confirm the binary upload',
+  },
+  {
+    url: `${API_URL}/api/apps/${APP_ID}/deployments`,
+    status: FORBIDDEN_STATUS,
+    message: 'Could not create the deployment',
+  },
+])(
+  'server refusal identifies the failed stage $message and status',
+  async ({ url, status, message }) => {
+    failure = { url, status, network: false };
+    const { cli } = workflowCli();
+    expect(await cli.run(trustedArguments(['--json']))).toBe(1);
+    expect(errors[0]).toContain(message);
+    expect(errors[0]).toContain(`HTTP ${status}`);
+    expect(errors.join('')).not.toContain('private-api-error');
+    expect(errors.join('')).not.toContain('github-identity-1');
+    expect(errors.join('')).not.toContain('deployment-token-1');
+    expect(errors.join('')).not.toContain(STORAGE_URL);
+    expect(output).toEqual([]);
+  },
+);
+
+test.each([
+  {
+    url: `${API_URL}/api/apps/${APP_ID}/deployment-tokens`,
+    message: 'Could not obtain deployment access: the nibrun API could not be reached',
+  },
+  {
+    url: `${API_URL}/api/apps/${APP_ID}/deployments`,
+    message: 'Could not create the deployment: the nibrun API could not be reached',
+  },
+  { url: STORAGE_URL, message: 'Binary upload failed: storage could not be reached' },
+])('network failure identifies the failed service safely: $message', async ({ url, message }) => {
+  failure = { url, status: SERVER_ERROR_STATUS, network: true };
+  const { cli } = workflowCli();
+  expect(await cli.run(trustedArguments(['--json']))).toBe(1);
+  expect(errors[0]).toContain(message);
+  expect(errors[0]).toContain('Check network connectivity');
+  expect(errors.join('')).not.toContain('private-transport-error');
+  expect(errors.join('')).not.toContain('github-identity-1');
+  expect(errors.join('')).not.toContain('deployment-token-1');
+  expect(errors.join('')).not.toContain(STORAGE_URL);
+  expect(output).toEqual([]);
 });
 
 test('normal deployment still requires owner sign-in', async () => {

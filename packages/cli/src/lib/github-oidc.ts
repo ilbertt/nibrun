@@ -1,6 +1,7 @@
 import { createEnvContext } from '@parshjs/env';
 import { z } from 'zod';
 import { GITHUB_TRUSTED_OIDC_FLAG } from '#config.ts';
+import { DeploymentError } from '#lib/deployment-error.ts';
 import { UsageError } from '#lib/errors.ts';
 
 const GitHubIdentityTokenSchema = z.object({ value: z.string().min(1) });
@@ -36,24 +37,34 @@ export async function requestGitHubIdentityToken({
   audience,
 }: GitHubIdentityTokenInput): Promise<string> {
   maskGitHubSecret(requestToken);
+  let response: Response;
   try {
     const url = new URL(requestUrl);
     url.searchParams.set('audience', audience);
-    const response = await fetch(url, {
+    response = await fetch(url, {
       headers: { authorization: `Bearer ${requestToken}` },
       redirect: 'error',
     });
-    if (!response.ok) {
-      throw new Error('GitHub did not issue an identity token.');
-    }
-    const result = GitHubIdentityTokenSchema.safeParse(await response.json());
-    if (!result.success) {
-      throw new Error('GitHub did not return an identity token.');
-    }
-    return result.data.value;
   } catch {
-    throw new Error('Could not request GitHub identity. Check id-token: write permission.');
+    throw new DeploymentError(
+      'Could not request GitHub identity: GitHub could not be reached. Check network connectivity, then retry.',
+    );
   }
+  if (!response.ok) {
+    throw new DeploymentError(
+      `GitHub refused the identity token request (HTTP ${response.status}). Check id-token: write permission on the deployment job.`,
+    );
+  }
+  const payload: unknown = await response.json().catch(function invalidResponse() {
+    return null;
+  });
+  const result = GitHubIdentityTokenSchema.safeParse(payload);
+  if (result.success) {
+    return result.data.value;
+  }
+  throw new DeploymentError(
+    'GitHub returned an invalid identity token response. Retry the workflow.',
+  );
 }
 
 export function maskGitHubSecret(secret: string): void {

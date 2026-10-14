@@ -6,6 +6,7 @@ import { deployBinary } from '#lib/binary-deployment.ts';
 import { parseCommandLine } from '#lib/command-line.ts';
 import { binaryFrom } from '#lib/deploy.ts';
 import { DeploymentCredentials } from '#lib/deployment-credentials.ts';
+import { DeploymentError } from '#lib/deployment-error.ts';
 import { UsageError } from '#lib/errors.ts';
 import {
   maskGitHubSecret,
@@ -74,9 +75,12 @@ export async function deployWithGitHubOidc({
       maskSecret: maskGitHubSecret,
     });
     return { appId, deploymentId };
-  } catch {
-    throw new Error(
-      'GitHub trusted deployment failed. Check the trusted workflow, app ID, id-token: write permission, and API availability.',
+  } catch (error) {
+    if (error instanceof DeploymentError) {
+      throw error;
+    }
+    throw new DeploymentError(
+      'GitHub trusted deployment failed unexpectedly. Retry the workflow; if it persists, contact nibrun support.',
     );
   }
 }

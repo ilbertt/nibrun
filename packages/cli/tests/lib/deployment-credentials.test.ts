@@ -131,7 +131,25 @@ test('exchange errors never expose response contents or GitHub secrets', async (
     throw new Error('Expected exchange failure.');
   } catch (error) {
     expect(String(error)).toContain('Could not obtain deployment access');
+    expect(String(error)).toContain('HTTP 401');
+    expect(String(error)).toContain(
+      'trusted GitHub repository, workflow filename, and environment',
+    );
     expect(String(error)).not.toContain('sensitive-secret');
     expect(String(error)).not.toContain('github-secret');
   }
+});
+
+test('unexpected identity errors never expose transport details or credentials', async () => {
+  const credentials = new DeploymentCredentials({
+    apiUrl: ORIGIN,
+    appId: APP_ID,
+    getIdentityToken: function identityToken() {
+      return Promise.reject(new Error('private-error https://github.test/?token=github-secret'));
+    },
+    maskSecret: function mask(_secret) {},
+  });
+  await expect(credentials.accessToken()).rejects.toThrow(
+    'Could not request GitHub identity. Check id-token: write permission.',
+  );
 });
