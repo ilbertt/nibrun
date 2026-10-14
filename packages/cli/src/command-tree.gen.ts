@@ -10,6 +10,10 @@ import type { command as appsDomainsRemoveHostnameCmd } from './commands/apps/do
 import type { command as appsExportDestinationCmd } from './commands/apps/export/[destination].ts';
 import type { command as appsFilesLsCmd } from './commands/apps/files/ls.ts';
 import type { command as appsFilesLsPathCmd } from './commands/apps/files/ls/[path].ts';
+import type { command as appsGithubworkflowsCmd } from './commands/apps/github-workflows.ts';
+import type { command as appsGithubworkflowsRemoveCmd } from './commands/apps/github-workflows/remove.ts';
+import type { command as appsGithubworkflowsSetCmd } from './commands/apps/github-workflows/set.ts';
+import type { command as appsGithubworkflowsShowCmd } from './commands/apps/github-workflows/show.ts';
 import type { command as appsListCmd } from './commands/apps/list.ts';
 import type { command as appsLogsCmd } from './commands/apps/logs.ts';
 import type { command as appsResumeCmd } from './commands/apps/resume.ts';
@@ -83,6 +87,33 @@ declare module '@parshjs/core' {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
         'apps files ls': { options: InferForwardedOptions<typeof appsFilesLsCmd.options>; params: InferParams<typeof appsFilesLsCmd.params> };
+      };
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'apps github-workflows': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'apps github-workflows remove': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+        'apps github-workflows': { options: InferForwardedOptions<typeof appsGithubworkflowsCmd.options>; params: InferParams<typeof appsGithubworkflowsCmd.params> };
+      };
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'apps github-workflows set': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+        'apps github-workflows': { options: InferForwardedOptions<typeof appsGithubworkflowsCmd.options>; params: InferParams<typeof appsGithubworkflowsCmd.params> };
+      };
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'apps github-workflows show': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+        'apps github-workflows': { options: InferForwardedOptions<typeof appsGithubworkflowsCmd.options>; params: InferParams<typeof appsGithubworkflowsCmd.params> };
       };
       rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
@@ -267,6 +298,31 @@ export const commandTree: RuntimeNode = {
                 literalChildren: {},
                 paramChild: null,
               },
+            },
+          },
+          paramChild: null,
+        },
+        'github-workflows': {
+          segment: { kind: 'literal', value: 'github-workflows' },
+          command: { path: 'apps github-workflows', load: () => import('./commands/apps/github-workflows.ts').then((m) => m.command) },
+          literalChildren: {
+            'remove': {
+              segment: { kind: 'literal', value: 'remove' },
+              command: { path: 'apps github-workflows remove', load: () => import('./commands/apps/github-workflows/remove.ts').then((m) => m.command) },
+              literalChildren: {},
+              paramChild: null,
+            },
+            'set': {
+              segment: { kind: 'literal', value: 'set' },
+              command: { path: 'apps github-workflows set', load: () => import('./commands/apps/github-workflows/set.ts').then((m) => m.command) },
+              literalChildren: {},
+              paramChild: null,
+            },
+            'show': {
+              segment: { kind: 'literal', value: 'show' },
+              command: { path: 'apps github-workflows show', load: () => import('./commands/apps/github-workflows/show.ts').then((m) => m.command) },
+              literalChildren: {},
+              paramChild: null,
             },
           },
           paramChild: null,
