@@ -25,7 +25,8 @@
     "better-auth": "catalog:",
     "zod": "^4.5.4",
     "@repo/api-constants": "workspace:*",
-    "@repo/protocol": "workspace:*"
+    "@repo/protocol": "workspace:*",
+    "@repo/deploy-action": "workspace:*"
   },
   "devDependencies": {
     "@parshjs/codegen": "^0.0.5",

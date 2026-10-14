@@ -197,6 +197,7 @@
         "@repo/api-client": "workspace:*",
         "@repo/api-constants": "workspace:*",
         "@repo/app-operations": "workspace:*",
+        "@repo/deploy-action": "workspace:*",
         "@repo/global-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
         "better-auth": "catalog:",
