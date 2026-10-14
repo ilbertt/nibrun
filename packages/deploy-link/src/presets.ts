@@ -9,6 +9,7 @@ import fusionPage from '../content/fusion.md?raw';
 import giteaPage from '../content/gitea.md?raw';
 import goatcounterPage from '../content/goatcounter.md?raw';
 import gotifyPage from '../content/gotify.md?raw';
+import libredbStudioPage from '../content/libredb-studio.md?raw';
 import memosPage from '../content/memos.md?raw';
 import microbinPage from '../content/microbin.md?raw';
 import nibrunVitalsPage from '../content/nibrun-vitals.md?raw';
@@ -219,6 +220,41 @@ export const DEPLOY_PRESETS = {
       sha256: '793aaf0acb8db9d90b83cc9db78df82009051862acb995419b39d9497ddb51a5',
       port: 4983,
       env: [`STORE_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`],
+      minimal: true,
+    },
+  },
+  'libredb-studio': {
+    isRecommended: false,
+    projectUrl: 'https://github.com/libredb/libredb-studio',
+    version: '0.18.3',
+    markdownContent: libredbStudioPage,
+    category: DeployCategory.DeveloperTools,
+    title: 'LibreDB Studio',
+    subtitle: 'A SQL workspace for browsing and querying your databases from one browser tab.',
+    deployLink: {
+      name: 'libredb-studio',
+      binary:
+        'https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-x64-baseline.zip',
+      sha256: '1fc2edac843102909e3a1be1d8d9802cc6071cf074e67e88231f4ffe0f8b397b',
+      'initial-data':
+        'https://github.com/libredb/libredb-studio/releases/download/0.18.3/libredb-studio-standalone-0.18.3-linux-x64.tar.gz',
+      port: 3000,
+      arg: ['--smol', '/app/data/server.js'],
+      env: [
+        'NODE_ENV=production',
+        'NEXT_TELEMETRY_DISABLED=1',
+        'HOSTNAME=0.0.0.0',
+        `HOME=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        'AUTH_BOOTSTRAP=off',
+        'ADMIN_EMAIL=admin@libredb.org',
+        'ADMIN_PASSWORD',
+        'JWT_SECRET',
+        'STORAGE_PROVIDER=sqlite',
+        `STORAGE_SQLITE_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/data/libredb-storage.db`,
+        `WORKFLOW_LOCAL_DATA_DIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/data/workflow`,
+        'AUTH_COOKIE_SECURE=true',
+        `ALLOWED_ORIGINS=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
+      ],
       minimal: true,
     },
   },
