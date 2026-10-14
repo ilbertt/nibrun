@@ -3,7 +3,6 @@ import { AppConfigCard } from '#components/apps/app-config-card.tsx';
 import { AppOverviewCard } from '#components/apps/app-overview-card.tsx';
 import { AppResourcesCard } from '#components/apps/app-resources-card.tsx';
 import { DeploymentHistory } from '#components/apps/deployment-history.tsx';
-import { GitHubWorkflowCard } from '#components/apps/github-workflow-card.tsx';
 import { FailureEmpty } from '#components/failure-empty.tsx';
 import { useApp } from '#lib/hooks/use-app.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
@@ -26,7 +25,6 @@ export function AppDetail() {
         <AppConfigCard app={app.data} />
         <AppResourcesCard app={app.data} />
       </div>
-      <GitHubWorkflowCard key={appId} />
       <DeploymentHistory />
     </div>
   );

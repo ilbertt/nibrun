@@ -13,17 +13,32 @@ import {
 import { Button } from '@repo/ui/components/button';
 import { FieldError } from '@repo/ui/components/field';
 import { Spinner } from '@repo/ui/components/spinner';
+import { type RefObject, useRef } from 'react';
 import { useRemoveGitHubWorkflow } from '#lib/hooks/use-remove-github-workflow.ts';
 
-export function RemoveGitHubWorkflowDialog({ workflow }: { workflow: GitHubWorkflow }) {
+export function RemoveGitHubWorkflowDialog({
+  workflow,
+  finalFocus,
+}: {
+  workflow: GitHubWorkflow;
+  finalFocus: RefObject<HTMLElement | null>;
+}) {
   const removal = useRemoveGitHubWorkflow();
+  const trigger = useRef<HTMLButtonElement>(null);
+
+  function returnFocus(): HTMLElement | null {
+    return trigger.current?.isConnected ? trigger.current : finalFocus.current;
+  }
 
   return (
     <AlertDialog onOpenChange={() => removal.reset()}>
-      <AlertDialogTrigger render={<Button variant="outline" className="self-start" />}>
+      <AlertDialogTrigger
+        ref={trigger}
+        render={<Button variant="outline" className="self-start" />}
+      >
         Remove trusted workflow
       </AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent finalFocus={returnFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle>Remove trusted workflow?</AlertDialogTitle>
           <AlertDialogDescription>
