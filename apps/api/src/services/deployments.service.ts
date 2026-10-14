@@ -118,6 +118,15 @@ export class DeploymentsService extends Service {
     );
   }
 
+  async createWithDeploymentGrant(
+    input: OwnedApp & { source: DeploymentSource },
+  ): Promise<PublicDeployment> {
+    if ('rollbackOf' in input.source || input.source.initialDataFrom !== undefined) {
+      throw new ForbiddenError('Deployment credentials can only deploy a compiled binary.');
+    }
+    return await this.createOrRollback({ ...input, isAnonymous: false });
+  }
+
   async list(input: DeploymentsByAppInput): Promise<PublicDeployment[]> {
     const rows = await this.deploymentsRepo.listByApp(input);
     return rows.map(toPublicDeployment);

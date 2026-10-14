@@ -790,3 +790,36 @@ describe('a deployment can say what the app starts with, once', () => {
     expect(deploymentsRepo.calls[0]).not.toHaveProperty('initialDataFrom');
   });
 });
+
+describe('deployment grants only deploy compiled binaries', () => {
+  test('a binary deployment preserves owner and app scoping', async () => {
+    const { service, deploymentsRepo } = serviceWith({ row: deploymentRow() });
+    await service.createWithDeploymentGrant({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      source: { artifactId: ARTIFACT_ID },
+    });
+    expect(deploymentsRepo.calls).toEqual([
+      {
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        artifactId: ARTIFACT_ID,
+        initialDataFrom: null,
+        onlyOne: false,
+      },
+    ]);
+  });
+
+  test('rollback and initial data imports are rejected before writing', async () => {
+    const { service, deploymentsRepo } = serviceWith();
+    for (const source of [
+      { rollbackOf: DEPLOYMENT_ID },
+      { artifactId: ARTIFACT_ID, initialDataFrom: IMPORT_ID },
+    ]) {
+      await expect(
+        service.createWithDeploymentGrant({ appId: APP_ID, ownerId: OWNER_ID, source }),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    }
+    expect(deploymentsRepo.calls).toEqual([]);
+  });
+});
