@@ -18,12 +18,13 @@ Internal tracking shared by the marketing site and dashboard.
   Add a navigation fallback only for a verified gap in the pinned tracker.
 - Gate tracking through `trackingAllowed()`, including custom events. Preserve
   production-host, HTTPS, top-level-window and Do Not Track restrictions.
-- Preserve URL hashes in pageviews, custom events and performance payloads.
-  Hash navigation is a pageview; deduplicate by origin, pathname and hash.
-- Sanitize every outgoing payload. Exclude credentials, query values, referrer hashes,
-  app names, custom hostnames, file paths, prompt contents, configuration values
-  and raw errors. Opaque app and attempt IDs may correlate events; settings
-  events carry changed field names only.
+- Preserve only query parameters whose names start with `utm`, plus URL hashes,
+  in pageviews, custom events, identification and performance payloads. Umami
+  extracts UTM parameters from the query string. UTM query and hash navigation
+  are pageviews; deduplicate by origin, pathname, filtered search and hash.
+- Exclude credentials, referrer queries and hashes, app names, custom hostnames,
+  file paths, prompt contents, configuration values and raw errors. Opaque app and
+  attempt IDs may correlate events; settings events carry changed field names only.
 - Define event contracts in `src/events.ts`; derive callers' types from them.
   Keep acquisition context separate from the preset actually deployed.
 - Record outcomes after confirmation. Deployment success requires observed
