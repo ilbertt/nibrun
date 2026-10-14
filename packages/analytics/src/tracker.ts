@@ -2,7 +2,7 @@
 
 import { UMAMI_WEBSITE_ID } from '#config.ts';
 import { analyticsIdentity } from '#identity.ts';
-import { analyticsPath, analyticsReferrer, analyticsSite } from '#page.ts';
+import { analyticsPath, analyticsReferrer, analyticsSearch, analyticsSite } from '#page.ts';
 
 type Payload = Record<string, unknown>;
 type Tracker = {
@@ -94,6 +94,7 @@ function beforeSend(...[type, payload]: [string, Payload]): Payload | undefined 
     return undefined;
   }
   const url = new URL(String(payload.url), window.location.href);
+  url.search = analyticsSearch(url.search);
   const site = analyticsSite(url.hostname);
   if (!site) {
     return undefined;

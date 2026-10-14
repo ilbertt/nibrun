@@ -20,6 +20,14 @@ export function analyticsPath({
   return `/${site}${path}`;
 }
 
+export function analyticsSearch(search: string): string {
+  const parameters = new URLSearchParams(
+    [...new URLSearchParams(search)].filter(([name]) => name.startsWith('utm')),
+  );
+  const query = parameters.toString();
+  return query ? `?${query}` : '';
+}
+
 export function analyticsReferrer(referrer: string): string {
   if (!referrer) {
     return '';

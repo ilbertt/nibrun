@@ -129,7 +129,7 @@ test('tracking excludes Do Not Track, frames and previews before creating an ide
   browser.location.hostname = 'nibrun.com';
 });
 
-test('native pageviews share identity, preserve queries and redact titles and app IDs', async () => {
+test('native pageviews share identity, preserve UTM queries and redact other queries, titles and app IDs', async () => {
   expect(await loadTracker()).toBe(true);
   const id = analyticsIdentity();
   expect(cookieWrite).toContain('Domain=nibrun.com');
@@ -142,28 +142,29 @@ test('native pageviews share identity, preserve queries and redact titles and ap
   expect(scripts[0]?.dataset.excludeHash).toBeUndefined();
   expect(scripts[0]?.src).toBe('https://analytics.example/script.js');
   const campaignUrl =
-    'https://nibrun.com/?utm_source=newsletter&utm_medium=email&utm_campaign=launch&utm_term=compiled%20binary&utm_content=header&filter=a&filter=b&empty=';
-  nativeTrack(nativePayload(campaignUrl));
-  nativeTrack(nativePayload(campaignUrl));
+    'https://nibrun.com/?utm_source=newsletter&utm_medium=email&utm_campaign=launch&utm_term=compiled+binary&utm_content=header&utm_custom=a&utm_custom=b&utm_extra=';
+  nativeTrack(nativePayload(`${campaignUrl}&access_token=SECRET`));
+  nativeTrack(nativePayload(`${campaignUrl}&access_token=OTHER_SECRET`));
   browser.location = {
     protocol: 'https:',
     hostname: 'app.nibrun.com',
     origin: 'https://app.nibrun.com',
-    href: 'https://app.nibrun.com/deploy?preset=pocketbase',
+    href: 'https://app.nibrun.com/deploy?env=SECRET&utm_campaign=launch',
   };
   expect(analyticsIdentity()).toBe(id);
   expect(await loadTracker()).toBe(true);
   nativeTrack(nativePayload(browser.location.href));
-  nativeTrack(nativePayload('/apps/private-id/logs?level=error'));
+  nativeTrack(nativePayload('/apps/private-id/logs?path=SECRET&utm_source=email'));
   nativeTrack(nativePayload('/apps/another-private-id/logs'));
   expect(scripts).toHaveLength(2);
   expect(events).toHaveLength(EXPECTED_PAGEVIEWS);
   expect(events[0]?.referrer).toBe('https://github.com');
   expect(events[0]?.id).toBe(id);
   expect(events[1]?.url).toBe(campaignUrl.replace('nibrun.com/', 'nibrun.com/www/'));
-  expect(events[2]?.url).toBe('https://app.nibrun.com/dashboard/deploy?preset=pocketbase');
-  expect(events[3]?.url).toBe('https://app.nibrun.com/dashboard/apps/:appId/logs?level=error');
+  expect(events[2]?.url).toBe('https://app.nibrun.com/dashboard/deploy?utm_campaign=launch');
+  expect(events[3]?.url).toBe('https://app.nibrun.com/dashboard/apps/:appId/logs?utm_source=email');
   expect(JSON.stringify(events)).not.toContain('access_token');
+  expect(JSON.stringify(events)).not.toContain('SECRET');
   expect(JSON.stringify(events)).not.toContain('Private app');
   expect(JSON.stringify(events)).not.toContain('private-id');
 });
@@ -177,20 +178,22 @@ test('the recorder loads once alongside the tracker for the same website', async
 });
 
 test('back and forward pageviews use the current URL and redact their referrer', () => {
-  browser.location.href = 'https://app.nibrun.com/apps/private-id/files?path=logs%2Fapp.log';
+  browser.location.href =
+    'https://app.nibrun.com/apps/private-id/files?path=SECRET&utm_content=header';
   listeners.get('popstate')?.(new Event('popstate'));
   expect(events.at(-1)?.url).toBe(
-    'https://app.nibrun.com/dashboard/apps/:appId/files?path=logs%2Fapp.log',
+    'https://app.nibrun.com/dashboard/apps/:appId/files?utm_content=header',
   );
   expect(events.at(-1)?.referrer).toBe('https://app.nibrun.com/dashboard/apps/:appId/logs');
   const count = events.length;
   listeners.get('popstate')?.(new Event('popstate'));
   expect(events).toHaveLength(count);
-  browser.location.href = 'https://app.nibrun.com/apps/private-id/files?path=logs%2Fserver.log';
+  browser.location.href =
+    'https://app.nibrun.com/apps/private-id/files?path=SECRET&utm_content=footer';
   listeners.get('popstate')?.(new Event('popstate'));
   expect(events).toHaveLength(count + 1);
   expect(events.at(-1)?.url).toBe(
-    'https://app.nibrun.com/dashboard/apps/:appId/files?path=logs%2Fserver.log',
+    'https://app.nibrun.com/dashboard/apps/:appId/files?utm_content=footer',
   );
 });
 
@@ -201,7 +204,7 @@ test('direct hash visits and native hash navigation are distinct pageviews witho
     protocol: 'https:',
     hostname: 'nibrun.com',
     origin: 'https://nibrun.com',
-    href: 'https://nibrun.com/?utm_source=newsletter#pricing',
+    href: 'https://nibrun.com/?query=SECRET&utm_source=newsletter#pricing',
   };
   nativeTrack(nativePayload(browser.location.href));
   browser.location.href = 'https://nibrun.com/#features';
@@ -223,7 +226,7 @@ test('direct hash visits and native hash navigation are distinct pageviews witho
 
 test('performance payloads retain metrics and sanitized identity without suppressing pageviews', () => {
   const payload = {
-    ...nativePayload('/apps/private-id/logs?level=error#details'),
+    ...nativePayload('/apps/private-id/logs?path=SECRET&utm_source=email#details'),
     referrer: '/apps/another-private-id/files?path=SECRET',
     lcp: 1200,
     ttfb: 150,
@@ -236,7 +239,7 @@ test('performance payloads retain metrics and sanitized identity without suppres
   expect(sanitized).toEqual({
     ...payload,
     id: events[0]?.id,
-    url: 'https://app.nibrun.com/dashboard/apps/:appId/logs?level=error#details',
+    url: 'https://app.nibrun.com/dashboard/apps/:appId/logs?utm_source=email#details',
     referrer: 'https://app.nibrun.com/dashboard/apps/:appId/files',
     title: 'nibrun dashboard',
   });
@@ -279,13 +282,13 @@ test('performance payloads obey the tracking restrictions', () => {
 
 test('all event payloads are filtered at send time and same-origin referrers are sanitized', () => {
   nativeTrack({
-    ...nativePayload('/deploy?preset=pocketbase#configuration'),
+    ...nativePayload('/deploy?env=SECRET&utm_campaign=launch#configuration'),
     name: 'fixture_event',
     referrer: '/apps/private-id/files?path=SECRET',
   });
   expect(events.at(-1)?.referrer).toBe('https://app.nibrun.com/dashboard/apps/:appId/files');
   expect(events.at(-1)?.url).toBe(
-    'https://app.nibrun.com/dashboard/deploy?preset=pocketbase#configuration',
+    'https://app.nibrun.com/dashboard/deploy?utm_campaign=launch#configuration',
   );
   expect(JSON.stringify(events.at(-1))).not.toContain('SECRET');
   const count = events.length;
@@ -363,11 +366,12 @@ test('account identification preserves the anonymous journey and excludes person
   expect(identifications.at(-1)?.data).toEqual({ account_id: accountId });
   expect(events.at(-1)?.data).toMatchObject({ account_id: accountId });
   const sanitized = browser.nibrunBeforeSend?.('identify', {
-    ...nativePayload('/apps/private-id?tab=logs'),
+    ...nativePayload('/apps/private-id?env=SECRET&utm_source=email'),
     data: { email: 'private@example.com', name: 'Private name' },
   });
   expect(sanitized?.data).toEqual({ account_id: accountId });
-  expect(sanitized?.url).toBe('https://app.nibrun.com/dashboard/apps/:appId?tab=logs');
+  expect(sanitized?.url).toBe('https://app.nibrun.com/dashboard/apps/:appId?utm_source=email');
+  expect(JSON.stringify(sanitized)).not.toContain('SECRET');
   expect(JSON.stringify(sanitized)).not.toContain('private@example.com');
   expect(JSON.stringify(sanitized)).not.toContain('Private name');
 });
