@@ -1,13 +1,21 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui/components/tooltip';
 import { useClipboardCopy } from '@repo/ui/hooks/use-clipboard-copy';
 import { BinaryOrigin } from '#components/apps/binary-origin.tsx';
+import { GitHubDeploymentOrigin } from '#components/apps/github-deployment-origin.tsx';
 import type { ArtifactSummary } from '#queries/artifacts.ts';
+import type { DeploymentSummary } from '#queries/deployments.ts';
 
 // Docker's abbreviation of a SHA-256: enough to tell two binaries apart at a glance, short enough
 // to sit beside the name. The whole digest is a hover away, and a click is what hands it over.
 const SHORT_DIGEST_LENGTH = 12;
 
-export function BinaryLabel({ artifact }: { artifact: ArtifactSummary }) {
+export function BinaryLabel({
+  artifact,
+  github,
+}: {
+  artifact: ArtifactSummary;
+  github: DeploymentSummary['github'];
+}) {
   const { copied, copy } = useClipboardCopy({ value: artifact.digest, onCopied: undefined });
 
   return (
@@ -26,6 +34,7 @@ export function BinaryLabel({ artifact }: { artifact: ArtifactSummary }) {
         )
       </span>
       <BinaryOrigin originalFileUrl={artifact.originalFileUrl} />
+      {github !== undefined && <GitHubDeploymentOrigin github={github} />}
     </>
   );
 }

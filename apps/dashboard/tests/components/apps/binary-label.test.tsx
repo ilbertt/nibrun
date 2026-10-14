@@ -2,8 +2,17 @@ import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BinaryLabel } from '#components/apps/binary-label.tsx';
 import type { ArtifactSummary } from '#queries/artifacts.ts';
+import type { DeploymentSummary } from '#queries/deployments.ts';
 
 const SOURCE_URL = 'https://releases.example.com/v1/my-server.tar.gz';
+const GITHUB: NonNullable<DeploymentSummary['github']> = {
+  repository: 'ilbertt/nibrun',
+  workflowRef: 'ilbertt/nibrun/.github/workflows/deploy.yml@refs/heads/main',
+  ref: 'refs/heads/main',
+  commitSha: 'b765447e50cceaf3268f44278940c4394d494cf9',
+  runId: '123456789',
+  runAttempt: '2',
+};
 
 function artifact(originalFileUrl: ArtifactSummary['originalFileUrl']): ArtifactSummary {
   return {
@@ -19,7 +28,9 @@ function artifact(originalFileUrl: ArtifactSummary['originalFileUrl']): Artifact
 }
 
 test('downloaded binaries link to their original source beside the name and SHA', () => {
-  const markup = renderToStaticMarkup(<BinaryLabel artifact={artifact(SOURCE_URL)} />);
+  const markup = renderToStaticMarkup(
+    <BinaryLabel artifact={artifact(SOURCE_URL)} github={undefined} />,
+  );
 
   expect(markup).toContain('my-server');
   expect(markup).toContain('sha256:d9403d88cdf0');
@@ -28,13 +39,43 @@ test('downloaded binaries link to their original source beside the name and SHA'
   expect(markup).toContain('target="_blank"');
   expect(markup).toContain('rel="noopener noreferrer"');
   expect(markup.indexOf('sha256:')).toBeLessThan(markup.indexOf('href='));
+  expect(markup).not.toContain('Deployed by GitHub Actions');
 });
 
 test('uploaded binaries show their origin without a download link', () => {
-  const markup = renderToStaticMarkup(<BinaryLabel artifact={artifact(undefined)} />);
+  const markup = renderToStaticMarkup(
+    <BinaryLabel artifact={artifact(undefined)} github={undefined} />,
+  );
 
   expect(markup).toContain('my-server');
   expect(markup).toContain('sha256:d9403d88cdf0');
   expect(markup).toContain('aria-label="Uploaded binary"');
   expect(markup).not.toContain('href=');
 });
+
+test.each([undefined, SOURCE_URL])(
+  'GitHub deployments retain the binary source and link to the verified workflow run attempt',
+  (originalFileUrl) => {
+    const binary = artifact(originalFileUrl);
+    const markup = renderToStaticMarkup(<BinaryLabel artifact={binary} github={GITHUB} />);
+    const ownerDeployment = renderToStaticMarkup(
+      <BinaryLabel artifact={binary} github={undefined} />,
+    );
+
+    expect(markup).toContain('my-server');
+    expect(markup).toContain('sha256:d9403d88cdf0');
+    expect(markup).toContain('aria-label="Deployed by GitHub Actions"');
+    expect(markup).toContain(
+      'href="https://github.com/ilbertt/nibrun/actions/runs/123456789/attempts/2"',
+    );
+    expect(markup).toContain('target="_blank"');
+    expect(markup).toContain('rel="noopener noreferrer"');
+    expect(markup).toContain(
+      originalFileUrl === undefined
+        ? 'aria-label="Uploaded binary"'
+        : `aria-label="Binary source: ${SOURCE_URL}"`,
+    );
+    expect(ownerDeployment).not.toContain('Deployed by GitHub Actions');
+    expect(ownerDeployment).not.toContain('github.com');
+  },
+);

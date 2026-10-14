@@ -21,7 +21,11 @@ export function DeploymentRow({
         <DeploymentDetails deployment={deployment} />
       </TableCell>
       <TableCell className="font-mono">
-        {artifact === undefined ? ABSENT : <BinaryLabel artifact={artifact} />}
+        {artifact === undefined ? (
+          ABSENT
+        ) : (
+          <BinaryLabel artifact={artifact} github={deployment.github} />
+        )}
       </TableCell>
       <TableCell className="text-muted-foreground tabular-nums">
         {deployment.activatedAt === undefined ? ABSENT : dayAndMinute(deployment.activatedAt)}
