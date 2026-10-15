@@ -2,8 +2,12 @@ import { afterAll, beforeEach, expect, test } from 'bun:test';
 import { isRedirect } from '@tanstack/react-router';
 
 const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
-const location = { origin: 'https://nibrun.test', search: '' };
-Object.defineProperty(globalThis, 'window', { configurable: true, value: { location } });
+const location =
+  typeof window === 'undefined' ? { origin: 'https://nibrun.test', search: '' } : window.location;
+const previousSearch = Object.getOwnPropertyDescriptor(location, 'search');
+if (!previousWindow) {
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location } });
+}
 
 const { authClient } = await import('#lib/auth.ts');
 const { Route } = await import('#routes/(auth)/login.tsx');
@@ -31,9 +35,12 @@ beforeEach(() => {
 });
 
 afterAll(() => {
-  if (previousWindow) {
-    Object.defineProperty(globalThis, 'window', previousWindow);
+  if (previousSearch) {
+    Object.defineProperty(location, 'search', previousSearch);
   } else {
+    Reflect.deleteProperty(location, 'search');
+  }
+  if (!previousWindow) {
     Reflect.deleteProperty(globalThis, 'window');
   }
 });
