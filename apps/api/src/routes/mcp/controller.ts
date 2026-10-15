@@ -1,6 +1,7 @@
 import { createMcpProtectedRequestHandler } from '@better-auth/mcp';
 import {
   createMcpHandler,
+  hostHeaderValidationResponse,
   McpServer,
   originValidationResponse,
 } from '@modelcontextprotocol/server';
@@ -63,6 +64,7 @@ function createMcpController() {
       return server;
     },
     {
+      legacy: 'stateless',
       onerror(error) {
         logger.error('MCP request failed', error);
       },
@@ -72,11 +74,15 @@ function createMcpController() {
   return controller.all(
     RoutePrefix.Mcp,
     async function mcpRequest({ request }) {
-      const originError = originValidationResponse(request, [env.BASE_URL.origin]);
-      if (originError) {
-        return originError;
+      const allowedHostnames = [env.BASE_URL.hostname];
+      const rejected =
+        hostHeaderValidationResponse(request, allowedHostnames) ??
+        originValidationResponse(request, allowedHostnames);
+      if (rejected) {
+        return rejected;
       }
       const { internalAdapter } = await auth.$context;
+      // requireMcpAuth does not expose jwtVerifyOptions for the token type and required claims.
       const protectedRequest = createMcpProtectedRequestHandler(
         {
           issuer: OAUTH_ISSUER,

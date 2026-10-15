@@ -89,6 +89,8 @@ MCP and `/.well-known/` controllers mount at the root and stay hidden from OpenA
 MCP describes its own tools. Tool schemas derive from the existing TypeBox models through
 `mcpSchema`, which removes Elysia's OpenAPI-only annotations. The official MCP SDK owns
 transport; Better Auth's MCP and CIMD plugins own OAuth, with DCR enabled explicitly.
+Use the SDK's Host and Origin guards with hostname allowlists, not full origins. Keep the
+Better Auth protected-request helper's JWT type and required-claim constraints explicit.
 Keep Better Auth packages at the same version. CIMD's single-file transport closely follows
 the upstream Node transport linked on its first line, using `Bun.dns.lookup` for resolution.
 Preserve upstream's HTTPS connection pinning, TLS identity, isolated connections, redirect

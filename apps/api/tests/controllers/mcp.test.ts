@@ -25,7 +25,10 @@ const FUTURE_OFFSET_SECONDS = 60;
 const HTTP_METHOD_NOT_ALLOWED = StatusMap['Method Not Allowed'];
 const PROTOCOL_VERSIONS = ['2025-11-25', '2026-07-28'] as const;
 const CLIENT_INFO = { name: 'nibrun-test', version: '1.0.0' };
-const HEADERS = { accept: 'application/json, text/event-stream' };
+const HEADERS = {
+  accept: 'application/json, text/event-stream',
+  host: MCP_RESOURCE.host,
+};
 const nativeFetch = globalThis.fetch;
 
 let ownerId: string;
@@ -377,6 +380,46 @@ test('rejects an unexpected browser origin', async () => {
     method: 'POST',
     url: MCP_URL,
     headers: { ...HEADERS, origin: 'https://untrusted.example' },
+    body: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+  });
+  expect(response.status).toBe(StatusMap.Forbidden);
+});
+
+test('accepts the configured browser origin', async () => {
+  const response = await sendJson({
+    method: 'POST',
+    url: MCP_URL,
+    headers: {
+      ...HEADERS,
+      origin: MCP_RESOURCE.origin,
+      'mcp-protocol-version': PROTOCOL_VERSIONS[0],
+      authorization: `Bearer ${await accessToken()}`,
+    },
+    body: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+  });
+  expect((await rpcBody(response)).result.tools).toHaveLength(1);
+});
+
+test.each(['untrusted.example', `${MCP_RESOURCE.hostname}.untrusted.example`])(
+  'rejects an unexpected Host header: %s',
+  async (host) => {
+    const list = spyOn(appsService, 'list');
+    const response = await sendJson({
+      method: 'POST',
+      url: MCP_URL,
+      headers: { ...HEADERS, host },
+      body: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+    });
+    expect(response.status).toBe(StatusMap.Forbidden);
+    expect(list).not.toHaveBeenCalled();
+  },
+);
+
+test('rejects a missing Host header', async () => {
+  const response = await sendJson({
+    method: 'POST',
+    url: MCP_URL,
+    headers: { accept: HEADERS.accept },
     body: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
   });
   expect(response.status).toBe(StatusMap.Forbidden);
