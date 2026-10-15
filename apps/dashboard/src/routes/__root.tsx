@@ -5,25 +5,19 @@ import { AnalyticsSession } from '#components/analytics-session.tsx';
 import { AppDevtools } from '#components/app-devtools.tsx';
 import { sameOriginPath } from '#lib/same-origin-path.ts';
 import { sessionQueryOptions } from '#queries/session.ts';
+import { Route as ConsentRoute } from '#routes/(auth)/consent.tsx';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 import { Route as DeployRoute } from '#routes/deploy.tsx';
 
 import '../styles.css';
 
-// Enumerated rather than opted into, so the guard below stays the thing that decides who is
-// public: signing in cannot itself require a session, and the landing page frames /deploy to
-// post a binary here before anyone has signed in.
-//
-// A function, not a module-level set: these routes import this module back, so at evaluation
-// time their `to` is still undefined and every path — including /login — would read as private.
+// Consent owns its account guard to preserve the signed OAuth query when redirecting to login.
+// These routes import this module back, so their `to` is undefined during module evaluation.
 function isPublic(pathname: string): boolean {
-  return pathname === LoginRoute.to || pathname === DeployRoute.to;
+  return pathname === LoginRoute.to || pathname === DeployRoute.to || pathname === ConsentRoute.to;
 }
 
-// Guarding at the root, rather than under a pathless layout, is what makes it
-// impossible to add a route that forgets to ask for a session: every route is
-// already behind this, and the paths above are the only ones that cannot be.
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ context, location }) => {
     const session = await context.queryClient.ensureQueryData(sessionQueryOptions);
