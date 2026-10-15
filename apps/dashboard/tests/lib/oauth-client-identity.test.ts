@@ -14,13 +14,32 @@ test('CIMD identity shows the metadata origin without its path or query', () => 
   expect(identity.logoUrl).toBe('https://client.example/logo.png');
 });
 
-test('registered clients with opaque identifiers use the website domain', () => {
+test('registered clients with opaque identifiers use the website domain and favicon', () => {
   const identity = oauthClientIdentity({
     client_id: 'registered-client',
     client_uri: 'https://client.example/about',
     redirect_uris: [],
   });
   expect(identity.domain).toBe('client.example');
+  expect(identity.logoUrl).toBe('https://client.example/favicon.ico');
+});
+
+test('the favicon comes from the client website rather than the CIMD document', () => {
+  const identity = oauthClientIdentity({
+    client_id: 'https://identity.example/oauth/client.json',
+    client_uri: 'https://client.example/about?campaign=oauth#connect',
+    redirect_uris: [],
+  });
+  expect(identity.logoUrl).toBe('https://client.example/favicon.ico');
+});
+
+test('an unsafe client website does not produce a favicon request', () => {
+  const identity = oauthClientIdentity({
+    client_id: 'https://identity.example/oauth/client.json',
+    client_uri: 'https://user:password@client.example/',
+    redirect_uris: [],
+  });
+  expect(identity.logoUrl).toBeUndefined();
 });
 
 test('missing metadata falls back without displaying the opaque client identifier', () => {

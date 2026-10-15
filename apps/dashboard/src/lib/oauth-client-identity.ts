@@ -21,9 +21,12 @@ function clientUrl(value: string | undefined): URL | undefined {
 }
 
 export function oauthClientIdentity(client: OAuthConsentRequest['client']): OAuthClientIdentity {
+  const website = clientUrl(client.client_uri);
   return {
     name: client.client_name?.trim() || 'An app',
-    logoUrl: clientUrl(client.logo_uri)?.href,
-    domain: (clientUrl(client.client_id) ?? clientUrl(client.client_uri))?.hostname,
+    logoUrl:
+      clientUrl(client.logo_uri)?.href ??
+      (website ? new URL('/favicon.ico', website).href : undefined),
+    domain: (clientUrl(client.client_id) ?? website)?.hostname,
   };
 }
