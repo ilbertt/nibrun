@@ -8,11 +8,11 @@ import type { McpAuthorizationRepositoryContract } from '#repositories/mcp-autho
 import { Service } from '#services/service.ts';
 
 export class McpAuthorizationService extends Service {
-  private readonly repository: McpAuthorizationRepositoryContract;
+  private readonly mcpAuthorizationRepo: McpAuthorizationRepositoryContract;
 
-  constructor(repository: McpAuthorizationRepositoryContract) {
+  constructor(mcpAuthorizationRepo: McpAuthorizationRepositoryContract) {
     super();
-    this.repository = repository;
+    this.mcpAuthorizationRepo = mcpAuthorizationRepo;
   }
 
   async authorize({
@@ -25,7 +25,7 @@ export class McpAuthorizationService extends Service {
     if (!Value.Check(McpAccessTokenClaimsSchema, claims)) {
       throw new ForbiddenError('The access token has no valid nibrun account identity.');
     }
-    if (!(await this.repository.isRegisteredAccount(claims.sub))) {
+    if (!(await this.mcpAuthorizationRepo.isRegisteredAccount(claims.sub))) {
       throw new ForbiddenError('A registered nibrun account is required.');
     }
     return {
