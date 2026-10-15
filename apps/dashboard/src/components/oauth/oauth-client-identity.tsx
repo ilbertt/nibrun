@@ -3,7 +3,7 @@ import { Plug } from 'lucide-react';
 import { useOAuthClientIdentity } from '#lib/hooks/use-oauth-client-identity.ts';
 
 export function OAuthClientIdentity() {
-  const client = useOAuthClientIdentity();
+  const { client, logoUrl, onLogoLoadingStatusChange } = useOAuthClientIdentity();
   if (!client) {
     return null;
   }
@@ -12,7 +12,9 @@ export function OAuthClientIdentity() {
     <div className="flex items-center gap-3">
       <Avatar size="lg" className="rounded-lg">
         <AvatarImage
-          src={client.logoUrl}
+          key={logoUrl}
+          src={logoUrl}
+          onLoadingStatusChange={onLogoLoadingStatusChange}
           alt=""
           referrerPolicy="no-referrer"
           className="rounded-lg object-contain"
