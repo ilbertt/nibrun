@@ -33,6 +33,8 @@ The agent may not import `@repo/api` or its subpaths; neither app imports the ot
 ## Layering (keep strict)
 
 Every feature is a repository, a service, and a controller. Do not collapse them.
+CIMD's runtime transport callback is a standalone function in `src/lib/mcp/cimd-transport.ts`,
+passed directly to Better Auth without repository or service wrappers.
 
 Repository implementations end in `Repository`; their full and narrowed dependency
 contracts end in `RepositoryContract` (`DeploymentLookupRepositoryContract`). Service
@@ -82,6 +84,12 @@ controller mounts flat on one of them and writes its whole path below that
 prefix on each handler — `.get('/apps/:appId/artifacts', …)` — which is what
 lets Elysia name and type `params`. That path also names the controller:
 `AppsAppIdArtifactsController`, unique where the folder name alone would not be.
+
+MCP code belongs in `src/lib/mcp/`: one tool registration per file in `tools/`,
+shared helpers in `tools/shared/`. Derive tool schemas from existing API models.
+
+Keep MCP and discovery routes out of OpenAPI. Leave protocol and OAuth behavior
+to the official SDK and Better Auth. Keep the CIMD transport close to its linked upstream source.
 
 ## Tests
 

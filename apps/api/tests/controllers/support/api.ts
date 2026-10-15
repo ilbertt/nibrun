@@ -2,6 +2,7 @@ import { mock } from 'bun:test';
 import { type MemoryDB, memoryAdapter } from 'better-auth/adapters/memory';
 import { getSchema } from 'better-auth/db';
 import { TEST_API_ORIGIN } from '#tests/support/api-origin.ts';
+import { fetchTestClientMetadataResource } from '#tests/support/cimd.ts';
 import { TEST_SECRETS_KEY_BASE64 } from '#tests/support/secrets.ts';
 
 const BETTER_AUTH_SECRET_LENGTH = 32;
@@ -27,12 +28,26 @@ Object.assign(process.env, {
   TENANT_SECRETS_KEY: TEST_SECRETS_KEY_BASE64,
 });
 
+const cimdModule = await import('@better-auth/cimd');
+const createCimd = cimdModule.cimd;
+mock.module('@better-auth/cimd', function controllerCimdPlugin() {
+  return {
+    ...cimdModule,
+    cimd(input: Parameters<typeof createCimd>[0]) {
+      return createCimd({ ...input, fetchClientMetadataResource: fetchTestClientMetadataResource });
+    },
+  };
+});
+
 const { createAuth } = await import('#lib/auth/better-auth.ts');
 const authDatabase: MemoryDB = {};
 mock.module('#lib/auth/better-auth.ts', function controllerAuthFactory() {
   return {
     createAuth(input: Parameters<typeof createAuth>[0]) {
-      const auth = createAuth({ ...input, database: memoryAdapter(authDatabase) });
+      const auth = createAuth({
+        ...input,
+        database: memoryAdapter(authDatabase),
+      });
       for (const table of Object.keys(getSchema(auth.options))) {
         authDatabase[table] ??= [];
       }

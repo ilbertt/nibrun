@@ -1,5 +1,6 @@
 import { apiKey } from '@better-auth/api-key';
-import { oauthProvider } from '@better-auth/oauth-provider';
+import { cimd } from '@better-auth/cimd';
+import { mcp } from '@better-auth/mcp';
 import { Value } from '@sinclair/typebox/value';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization, jwt } from 'better-auth/plugins';
@@ -11,6 +12,8 @@ import {
 import { OAUTH_ISSUER } from '#lib/auth/oauth-issuer.ts';
 import { AUTH_BASE_PATH, AUTH_JWKS_PATH } from '#lib/auth/paths.ts';
 import { env } from '#lib/env.ts';
+import { MCP_RESOURCE, MCP_SCOPE } from '#lib/mcp/auth.ts';
+import { fetchClientMetadataResource } from '#lib/mcp/cimd-transport.ts';
 import type { AppsService } from '#services/apps.service.ts';
 
 const DEVICE_VERIFICATION_PATH = '/device';
@@ -58,18 +61,24 @@ export function createAuth({
         jwks: { jwksPath: AUTH_JWKS_PATH },
         disableSettingJwtHeader: true,
       }),
-      oauthProvider({
-        loginPage: '/sign-in',
+      mcp({
+        loginPage: '/login',
         consentPage: '/consent',
-        scopes: [],
-        grantTypes: [],
-        resources: [],
+        resource: MCP_RESOURCE.href,
+        scopes: [MCP_SCOPE, 'offline_access'],
+        grantTypes: ['authorization_code', 'refresh_token'],
+        allowDynamicClientRegistration: true,
+        allowUnauthenticatedClientRegistration: true,
         clientPrivileges() {
           return false;
         },
         resourcePrivileges() {
           return false;
         },
+      }),
+      cimd({
+        metadataProfile: 'mcp-2026-07-28',
+        fetchClientMetadataResource,
       }),
       deviceAuthorization({ verificationUri: DEVICE_VERIFICATION_PATH }),
       bearer(),

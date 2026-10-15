@@ -2,12 +2,18 @@ import { Elysia } from 'elysia';
 import { NotFoundError } from '#lib/errors.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { WellKnownOAuthAuthorizationServerController } from '#routes/.well-known/oauth-authorization-server/controller.ts';
+import { WellKnownOAuthProtectedResourceController } from '#routes/.well-known/oauth-protected-resource/controller.ts';
+import { WellKnownOAuthProtectedResourceMcpController } from '#routes/.well-known/oauth-protected-resource/mcp/controller.ts';
+import { McpController } from '#routes/mcp/controller.ts';
 import { AssetsServicePlugin } from '#services/plugins.ts';
 
 function createRootController() {
   const controller = new Elysia()
     .use(AssetsServicePlugin)
-    .use(WellKnownOAuthAuthorizationServerController);
+    .use(WellKnownOAuthAuthorizationServerController)
+    .use(WellKnownOAuthProtectedResourceController)
+    .use(WellKnownOAuthProtectedResourceMcpController)
+    .use(McpController);
   const { assetsService } = controller.decorator;
 
   for (const [path, response] of assetsService.routes()) {
@@ -34,7 +40,12 @@ function createRootController() {
 // Every prefix the server answers. A path missing from here falls through to the
 // dashboard's index, so an agent calling a route that does not exist would be
 // handed HTML and a 200 instead of the 404 that would tell it what is wrong.
-const SERVED_PREFIXES = [RoutePrefix.Api, RoutePrefix.Internal];
+const SERVED_PREFIXES = [
+  RoutePrefix.Api,
+  RoutePrefix.Internal,
+  RoutePrefix.Mcp,
+  RoutePrefix.WellKnown,
+];
 
 function isClientRoutePath(pathname: string): boolean {
   return !SERVED_PREFIXES.some((prefix) => pathname.startsWith(prefix));

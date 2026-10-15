@@ -1,10 +1,10 @@
 import { Elysia } from 'elysia';
 import { auth } from '#services/plugins.ts';
 
-export const WellKnownOAuthAuthorizationServerController = new Elysia().get(
+export const WellKnownOAuthAuthorizationServerController = new Elysia().all(
   '/.well-known/oauth-authorization-server',
   function authorizationServerMetadata({ request }) {
     return auth.handler(request);
   },
-  { parse: 'none' },
+  { parse: 'none', detail: { hide: true } },
 );

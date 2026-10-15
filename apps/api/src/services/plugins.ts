@@ -50,6 +50,7 @@ import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
 import { LogsService } from '#services/logs.service.ts';
+import { McpAuthorizationService } from '#services/mcp-authorization.service.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
 import { TrustedWorkflowsService } from '#services/trusted-workflows.service.ts';
@@ -197,12 +198,17 @@ const logsService = new LogsService({
   logsRepo: logsRepository,
   deploymentsRepo: deploymentsRepository,
 });
+const mcpAuthorizationService = new McpAuthorizationService();
 
 const authenticationService = new AuthenticationService({
   auth: auth.api,
   grantsService: githubDeploymentGrantsService,
 });
 export const AuthPlugin = createAuthPlugin(authenticationService);
+
+export const McpAuthorizationServicePlugin = new Elysia({
+  name: 'service.mcpAuthorization',
+}).decorate('mcpAuthorizationService', mcpAuthorizationService);
 
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);

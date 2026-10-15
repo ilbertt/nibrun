@@ -1,11 +1,11 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test';
 import { Value } from '@sinclair/typebox/value';
-import { betterAuth } from 'better-auth';
 import { StatusMap } from 'elysia';
 import { ArtifactSchema } from '#lib/api/artifact.ts';
 import { ArtifactIdSchema, DeploymentGrantIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { shortLivedDeploymentTokenConfiguration } from '#lib/auth/deployment-api-keys.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
+import { registeredAccount } from '#tests/controllers/support/accounts.ts';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { deploymentToken } from '#tests/support/deployment-tokens.ts';
 import {
@@ -33,35 +33,6 @@ const HEADERS = { authorization: `Bearer ${TOKEN}` };
 const BODY = { filename: 'server', sizeBytes: 1024 };
 const UPLOAD = { artifactId: ARTIFACT_ID, url: 'https://storage.test/upload' };
 const ACCOUNT = await registeredAccount();
-
-async function registeredAccount() {
-  const issuer = betterAuth({ ...auth.options, emailAndPassword: { enabled: true } });
-  const signup = await issuer.api.signUpEmail({
-    body: {
-      name: 'Artifact owner',
-      email: 'artifact-owner@example.test',
-      password: 'correct-horse-battery-staple',
-    },
-    returnHeaders: true,
-  });
-  const token = signup.response.token;
-  const signedToken = signup.headers.get('set-auth-token');
-  if (!token || !signedToken) {
-    throw new Error('The registered account fixture must have a Bearer session token.');
-  }
-  const cookie = signup.headers
-    .getSetCookie()
-    .map(function cookieValue(value) {
-      return value.split(';')[0];
-    })
-    .join('; ');
-  return {
-    ownerId: Value.Parse(OwnerIdSchema, signup.response.user.id),
-    token,
-    signedToken,
-    cookie,
-  };
-}
 
 afterEach(function restoreMocks() {
   mock.restore();
