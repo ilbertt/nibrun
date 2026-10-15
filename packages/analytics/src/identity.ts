@@ -1,9 +1,11 @@
 import { BASE_DOMAIN } from '@repo/global-constants';
 
-const COOKIE_NAME = 'nibrun_analytics';
-const COOKIE_LIFETIME_DAYS = 90;
-const COOKIE_LIFETIME_SECONDS = 60 * 60 * 24 * COOKIE_LIFETIME_DAYS;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+import {
+  ANALYTICS_COOKIE_LIFETIME_SECONDS,
+  ANALYTICS_UUID,
+  ANALYTICS_IDENTITY_COOKIE as COOKIE_NAME,
+  MCP_ATTEMPT_COOKIE,
+} from '#config.ts';
 
 export function analyticsIdentity(): string | undefined {
   try {
@@ -11,13 +13,25 @@ export function analyticsIdentity(): string | undefined {
       .split('; ')
       .find((cookie) => cookie.startsWith(`${COOKIE_NAME}=`));
     const id = existing?.slice(`${COOKIE_NAME}=`.length);
-    if (id && UUID.test(id)) {
+    if (id && ANALYTICS_UUID.test(id)) {
       return id;
     }
     const created = crypto.randomUUID();
     // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store is unavailable in older browsers that can still deploy.
-    document.cookie = `${COOKIE_NAME}=${created}; Domain=${BASE_DOMAIN}; Path=/; Max-Age=${COOKIE_LIFETIME_SECONDS}; Secure; SameSite=Lax`;
+    document.cookie = `${COOKIE_NAME}=${created}; Domain=${BASE_DOMAIN}; Path=/; Max-Age=${ANALYTICS_COOKIE_LIFETIME_SECONDS}; Secure; SameSite=Lax`;
     return document.cookie.includes(`${COOKIE_NAME}=${created}`) ? created : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function mcpAnalyticsAttempt(): string | undefined {
+  try {
+    const id = document.cookie
+      .split('; ')
+      .find((cookie) => cookie.startsWith(`${MCP_ATTEMPT_COOKIE}=`))
+      ?.slice(MCP_ATTEMPT_COOKIE.length + 1);
+    return id && ANALYTICS_UUID.test(id) ? id : undefined;
   } catch {
     return undefined;
   }

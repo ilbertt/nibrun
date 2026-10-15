@@ -32,14 +32,16 @@ export function useAnalyticsSession(): void {
     if (!pending) {
       return;
     }
-    trackEvent({
-      name: 'sign_in_completed',
-      data: {
-        identity_state: identity,
-        previous_identity_state: pending.previous_identity_state,
-        reason: pending.reason,
-      },
-    });
+    if (pending.reason !== 'mcp') {
+      trackEvent({
+        name: 'sign_in_completed',
+        data: {
+          identity_state: identity,
+          previous_identity_state: pending.previous_identity_state,
+          reason: pending.reason,
+        },
+      });
+    }
     if (pending.anonymous_app_ids.length === 0) {
       return;
     }

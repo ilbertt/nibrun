@@ -29,6 +29,7 @@ import { GitHubDeploymentGrantsRepository } from '#repositories/github-deploymen
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { ImportsRepository } from '#repositories/imports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
+import { McpAnalyticsRepository } from '#repositories/mcp-analytics.repository.ts';
 import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
 import { RemoteSourceRepository } from '#repositories/remote-source.repository.ts';
 import { SqliteConnectionsRepository } from '#repositories/sqlite-connections.repository.ts';
@@ -50,6 +51,7 @@ import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
 import { LogsService } from '#services/logs.service.ts';
+import { McpAnalyticsService } from '#services/mcp-analytics.service.ts';
 import { McpAuthorizationService } from '#services/mcp-authorization.service.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
@@ -120,7 +122,20 @@ const appsService = new AppsService({
   secretsKey,
 });
 
+const mcpAnalyticsRepository = new McpAnalyticsRepository({
+  async adapter() {
+    return (await auth.$context).internalAdapter;
+  },
+  baseUrl: env.BASE_URL,
+  hostname: env.UMAMI_HOSTNAME,
+});
+const mcpAnalyticsService = new McpAnalyticsService({
+  repository: mcpAnalyticsRepository,
+  baseUrl: env.BASE_URL,
+});
+
 export const auth = createAuth({
+  analytics: mcpAnalyticsService,
   appsService,
   database: authDatabase,
 });
@@ -304,3 +319,8 @@ export const GitHubDeploymentGrantsServicePlugin = new Elysia({
 export const GitHubDeploymentTokensServicePlugin = new Elysia({
   name: 'service.githubDeploymentTokens',
 }).decorate('githubDeploymentTokensService', githubDeploymentTokensService);
+
+export const McpAnalyticsServicePlugin = new Elysia({ name: 'service.mcpAnalytics' }).decorate(
+  'mcpAnalyticsService',
+  mcpAnalyticsService,
+);

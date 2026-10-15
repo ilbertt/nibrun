@@ -3,6 +3,7 @@ import { cimd } from '@better-auth/cimd';
 import { mcp } from '@better-auth/mcp';
 import { Value } from '@sinclair/typebox/value';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
+import { createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
 import { anonymous, bearer, deviceAuthorization, jwt } from 'better-auth/plugins';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import {
@@ -15,6 +16,7 @@ import { env } from '#lib/env.ts';
 import { MCP_RESOURCE, MCP_SCOPE } from '#lib/mcp/auth.ts';
 import { fetchClientMetadataResource } from '#lib/mcp/cimd-transport.ts';
 import type { AppsService } from '#services/apps.service.ts';
+import type { McpAnalyticsService } from '#services/mcp-analytics.service.ts';
 
 const DEVICE_VERIFICATION_PATH = '/device';
 
@@ -37,9 +39,11 @@ export type AppClaimServiceContract = Pick<AppsService, 'claim'>;
 export function createAuth({
   appsService,
   database,
+  analytics,
 }: {
   appsService: AppClaimServiceContract;
   database: NonNullable<BetterAuthOptions['database']>;
+  analytics: Pick<McpAnalyticsService, 'sessionObserved' | 'accountCreated'> | undefined;
 }) {
   return betterAuth({
     database,
@@ -47,7 +51,34 @@ export function createAuth({
     basePath: AUTH_BASE_PATH,
     secret: env.BETTER_AUTH_SECRET,
     disabledPaths: ['/token'],
-    hooks: { before: protectShortLivedDeploymentTokens },
+    hooks: {
+      before: createAuthMiddleware(async function observePreviousAnalyticsSession(context) {
+        await protectShortLivedDeploymentTokens(context);
+        if (context.path === '/sign-in/social' || context.path === '/oauth2/authorize') {
+          analytics?.sessionObserved({
+            session: await getSessionFromCtx(context),
+            signedIn: false,
+          });
+        }
+      }),
+      after: createAuthMiddleware(function observeAnalyticsSession(context) {
+        analytics?.sessionObserved({
+          session: context.context.newSession ?? context.context.session,
+          signedIn: Boolean(context.context.newSession),
+        });
+        return Promise.resolve();
+      }),
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          after(user) {
+            analytics?.accountCreated(user);
+            return Promise.resolve();
+          },
+        },
+      },
+    },
     socialProviders: {
       github: {
         clientId: env.GITHUB_CLIENT_ID,

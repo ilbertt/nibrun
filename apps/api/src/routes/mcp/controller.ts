@@ -10,11 +10,19 @@ import { env } from '#lib/env.ts';
 import { MCP_RESOURCE, MCP_SCOPE, McpAccessTokenClaimsSchema } from '#lib/mcp/auth.ts';
 import { createMcpServerHandler } from '#lib/mcp/server.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
-import { AppsServicePlugin, auth, McpAuthorizationServicePlugin } from '#services/plugins.ts';
+import {
+  AppsServicePlugin,
+  auth,
+  McpAnalyticsServicePlugin,
+  McpAuthorizationServicePlugin,
+} from '#services/plugins.ts';
 
 function createMcpController() {
-  const controller = new Elysia().use(AppsServicePlugin).use(McpAuthorizationServicePlugin);
-  const { appsService, mcpAuthorizationService } = controller.decorator;
+  const controller = new Elysia()
+    .use(AppsServicePlugin)
+    .use(McpAuthorizationServicePlugin)
+    .use(McpAnalyticsServicePlugin);
+  const { appsService, mcpAuthorizationService, mcpAnalyticsService } = controller.decorator;
   const handler = createMcpServerHandler({ appsService });
 
   return controller.all(
@@ -41,12 +49,14 @@ function createMcpController() {
           },
           dpop: { replayStore: createDpopReplayStore(internalAdapter) },
         },
-        function authorizedMcpRequest(...[verifiedRequest, claims]) {
+        async function authorizedMcpRequest(...[verifiedRequest, claims]) {
           const authInfo = mcpAuthorizationService.authorize({
             request: verifiedRequest,
             claims,
           });
-          return handler.fetch(verifiedRequest, { authInfo });
+          const response = await handler.fetch(verifiedRequest, { authInfo });
+          await mcpAnalyticsService.connected({ request: verifiedRequest, claims, response });
+          return response;
         },
       );
       return protectedRequest(request);

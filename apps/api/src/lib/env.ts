@@ -1,6 +1,7 @@
 interface CustomProcessEnv {
   // Entries here must match the .env.example file
   readonly PORT?: string;
+  readonly UMAMI_HOSTNAME?: string;
   readonly BASE_URL?: string;
   readonly DATABASE_URL: string;
   readonly BETTER_AUTH_SECRET: string;
@@ -49,6 +50,7 @@ function optional({
 
 type Env = {
   PORT: number;
+  UMAMI_HOSTNAME: string;
   BASE_URL: URL;
   DATABASE_URL: string;
   BETTER_AUTH_SECRET: string;
@@ -71,6 +73,7 @@ type Env = {
 
 function loadEnv(): Env {
   return {
+    UMAMI_HOSTNAME: optional({ name: 'UMAMI_HOSTNAME', defaultValue: '' }),
     PORT: Number(optional({ name: 'PORT', defaultValue: DEFAULT_PORT })),
     BASE_URL: new URL(optional({ name: 'BASE_URL', defaultValue: DEFAULT_BASE_URL })),
     DATABASE_URL: required('DATABASE_URL'),

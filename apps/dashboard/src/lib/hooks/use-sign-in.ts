@@ -1,4 +1,4 @@
-import { trackEvent, trackingAllowed } from '@repo/analytics';
+import { mcpAnalyticsAttempt, trackEvent, trackingAllowed } from '@repo/analytics';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authClient } from '#lib/auth.ts';
 import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
@@ -26,10 +26,19 @@ export function useSignIn({
   const landing = sameOriginPath(callbackURL) ?? IndexRoute.to;
   const identity = useSessionIdentity();
   const queryClient = useQueryClient();
+  const mcpAttempt = new URLSearchParams(window.location.search).has('sig')
+    ? mcpAnalyticsAttempt()
+    : undefined;
   return useMutation({
     mutationFn: async () => {
       if (trackingAllowed()) {
-        rememberSignIn({ reason, identity, anonymousAppIds: cachedAnonymousApps(queryClient) });
+        rememberSignIn({
+          reason: mcpAttempt ? 'mcp' : reason,
+          identity,
+          anonymousAppIds: cachedAnonymousApps(queryClient),
+        });
+      }
+      if (!mcpAttempt) {
         trackEvent({ name: 'sign_in_started', data: { identity_state: identity, reason } });
       }
       const result = await authClient.signIn.social({ provider: 'github', callbackURL: landing });
@@ -40,6 +49,24 @@ export function useSignIn({
     },
     onError: (error) => {
       forgetSignIn();
+      if (mcpAttempt) {
+        if (error instanceof TypeError) {
+          trackEvent({
+            name: 'sign_in_failed',
+            data: {
+              source: 'mcp',
+              attempt_id: mcpAttempt,
+              provider: 'github',
+              phase: 'start',
+              identity_state: identity,
+              reason: 'mcp',
+              error_code: 'network_error',
+              http_status: undefined,
+            },
+          });
+        }
+        return;
+      }
       trackEvent({
         name: 'sign_in_failed',
         data: { identity_state: identity, reason, ...signInFailureData(error) },
