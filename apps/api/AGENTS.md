@@ -89,9 +89,10 @@ MCP implementation lives in `src/lib/mcp/`: shared auth models, the SDK server f
 runtime transport, schema adaptation, and one registration module per tool under `tools/`.
 Controllers mount MCP and `/.well-known/` at the root and stay hidden from OpenAPI:
 MCP describes its own tools. Tool schemas derive from the existing TypeBox models through
-`fromTypeBox`, which removes Elysia's OpenAPI-only annotations. Discovery forwards directly to
-Better Auth. `ClientCorsPlugin` runs once at the app boundary and allows browser access only
-to SQLite client endpoints and public discovery paths. The official MCP SDK owns
+`fromTypeBox`, which removes Elysia's OpenAPI-only annotations. Wrap structured-result tool
+callbacks with `handleResult` for text/structured responses and sanitized failures.
+Discovery forwards directly to Better Auth. `ClientCorsPlugin` runs once at the app boundary
+and allows browser access only to SQLite client endpoints and public discovery paths. The official MCP SDK owns
 transport; Better Auth's MCP and CIMD plugins own OAuth, with DCR enabled explicitly.
 MCP uses one server-wide `mcp` scope, defined by `MCP_SCOPE`, for access to every tool.
 The MCP resource binds the token's audience; `offline_access` only requests refresh tokens.

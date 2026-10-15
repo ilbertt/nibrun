@@ -313,6 +313,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const { result } = await rpcBody(response);
     expect(result.isError).not.toBe(true);
     expect(result.structuredContent).toEqual({ apps: [app] });
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
     expect(list).toHaveBeenCalledWith({ ownerId });
   });
 
