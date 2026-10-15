@@ -11,7 +11,7 @@ test('CIMD identity shows the metadata origin without its path or query', () => 
   });
   expect(identity.domain).toBe('client.example');
   expect(identity.name).toBe('Example Client');
-  expect(identity.logoUrl).toBe('https://client.example/logo.png');
+  expect(identity.logoUrls[0]).toBe('https://client.example/logo.png');
 });
 
 test('registered clients with opaque identifiers use the website domain', () => {
@@ -23,13 +23,17 @@ test('registered clients with opaque identifiers use the website domain', () => 
   expect(identity.domain).toBe('client.example');
 });
 
-test('missing logos do not guess an icon path on the client website', () => {
+test('the favicon comes from the client website rather than the CIMD document', () => {
   const identity = oauthClientIdentity({
     client_id: 'https://identity.example/oauth/client.json',
     client_uri: 'https://client.example/about?campaign=oauth#connect',
     redirect_uris: [],
   });
-  expect(identity.logoUrl).toBeUndefined();
+  expect(identity.logoUrls).toEqual([
+    'https://client.example/favicon.ico',
+    'https://client.example/favicon.svg',
+    'https://client.example/favicon.png',
+  ]);
 });
 
 test('an unsafe client website does not produce a favicon request', () => {
@@ -38,13 +42,13 @@ test('an unsafe client website does not produce a favicon request', () => {
     client_uri: 'https://user:password@client.example/',
     redirect_uris: [],
   });
-  expect(identity.logoUrl).toBeUndefined();
+  expect(identity.logoUrls).toEqual([]);
 });
 
 test('missing metadata falls back without displaying the opaque client identifier', () => {
   expect(
     oauthClientIdentity({ client_id: 'registered-client', client_name: '  ', redirect_uris: [] }),
-  ).toEqual({ name: 'An app', domain: undefined, logoUrl: undefined });
+  ).toEqual({ name: 'An app', domain: undefined, logoUrls: [] });
 });
 
 test.each([
@@ -55,6 +59,6 @@ test.each([
 ])('unsupported logo URLs fall back to the app icon: %s', (logoUri) => {
   expect(
     oauthClientIdentity({ client_id: 'registered-client', logo_uri: logoUri, redirect_uris: [] })
-      .logoUrl,
-  ).toBeUndefined();
+      .logoUrls,
+  ).toEqual([]);
 });
