@@ -12,7 +12,7 @@ import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 
 const { auth, AppsServicePlugin } = await import('#services/plugins.ts');
-const { OAUTH_ISSUER } = await import('#lib/auth/oauth-issuer.ts');
+const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, McpScope } = await import('#lib/mcp.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
 const context = await auth.$context;
@@ -26,6 +26,7 @@ const HTTP_METHOD_NOT_ALLOWED = StatusMap['Method Not Allowed'];
 const PROTOCOL_VERSIONS = ['2025-11-25', '2026-07-28'] as const;
 const CLIENT_INFO = { name: 'nibrun-test', version: '1.0.0' };
 const HEADERS = { accept: 'application/json, text/event-stream' };
+const nativeFetch = globalThis.fetch;
 
 let ownerId: string;
 let otherOwnerId: string;
@@ -45,6 +46,17 @@ beforeAll(async function createAccounts() {
 
 beforeEach(function publishSigningKey() {
   spyOn(auth.api, 'getJwks').mockResolvedValue({ keys: [jwk] });
+  spyOn(globalThis, 'fetch').mockImplementation(
+    Object.assign(
+      function serveJwks(...[input, init]: Parameters<typeof fetch>) {
+        const url = input instanceof Request ? input.url : input.toString();
+        return url === OAUTH_JWKS_URL
+          ? Promise.resolve(Response.json({ keys: [jwk] }))
+          : nativeFetch(input, init);
+      },
+      { preconnect: nativeFetch.preconnect },
+    ),
+  );
 });
 
 afterEach(function restoreMocks() {
@@ -135,12 +147,12 @@ test('protected-resource discovery is public and names the existing OAuth issuer
     url: `${ORIGIN}${new URL(MCP_RESOURCE_METADATA_URL).pathname}`,
   });
   expect(response.status).toBe(StatusMap.OK);
-  expect(await response.json()).toEqual({
+  expect(response.headers.get('access-control-allow-origin')).toBe('*');
+  expect(await response.json()).toMatchObject({
     resource: MCP_RESOURCE.href,
     authorization_servers: [OAUTH_ISSUER],
     scopes_supported: [McpScope.AppsRead],
     bearer_methods_supported: ['header'],
-    resource_name: 'nibrun',
   });
 });
 
@@ -177,12 +189,7 @@ test.each([
   ['issuer', { iss: 'https://untrusted.example' }],
   ['audience', { aud: 'https://other-resource.example' }],
   ['expiry', { exp: 1 }],
-  ['subject', { sub: '' }],
-  ['numeric subject', { sub: 123 }],
-  ['client', { client_id: '' }],
-  ['numeric client', { client_id: 123 }],
   ['scope type', { scope: [McpScope.AppsRead] }],
-  ['unknown account', { sub: 'deleted-account' }],
   ['sender-constrained token', { cnf: { jkt: 'requires-proof' } }],
 ] as const)(
   'rejects an invalid %s before querying apps',
@@ -195,13 +202,30 @@ test.each([
   },
 );
 
+test.each([
+  ['subject', { sub: '' }],
+  ['numeric subject', { sub: 123 }],
+  ['client', { client_id: '' }],
+  ['numeric client', { client_id: 123 }],
+  ['unknown account', { sub: 'deleted-account' }],
+] as const)(
+  'rejects an invalid %s account identity',
+  async function rejectsAccount(...[_name, overrides]) {
+    const response = await rpc({
+      method: 'tools/list',
+      token: await accessToken({ claims: { ...accessTokenClaims(), ...overrides } }),
+    });
+    expect(response.status).toBe(StatusMap.Forbidden);
+  },
+);
+
 test('rejects a token issued in the future', async () => {
   const claims = {
     ...accessTokenClaims(),
     iat: Math.floor(Date.now() / MS_PER_SECOND) + FUTURE_OFFSET_SECONDS,
   };
   const response = await rpc({ method: 'tools/list', token: await accessToken({ claims }) });
-  expect(response.status).toBe(StatusMap.Unauthorized);
+  expect(response.status).toBe(StatusMap.Forbidden);
 });
 
 test('rejects tokens without an expiry', async () => {
@@ -229,7 +253,7 @@ test('rejects anonymous accounts even with an otherwise valid access token', asy
   const anonymous = await auth.api.signInAnonymous();
   const claims = { ...accessTokenClaims(), sub: anonymous.user.id };
   const response = await rpc({ method: 'tools/list', token: await accessToken({ claims }) });
-  expect(response.status).toBe(StatusMap.Unauthorized);
+  expect(response.status).toBe(StatusMap.Forbidden);
 });
 
 describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {

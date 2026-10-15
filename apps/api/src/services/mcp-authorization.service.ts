@@ -1,19 +1,15 @@
-import {
-  type AuthInfo,
-  OAuthError,
-  OAuthErrorCode,
-  type OAuthTokenVerifier,
-} from '@modelcontextprotocol/server';
-import { AssertError, Value } from '@sinclair/typebox/value';
-import { createLocalJWKSet, errors, jwtVerify } from 'jose';
-import { OAUTH_ISSUER } from '#lib/auth/oauth-issuer.ts';
+import type { AuthInfo } from '@modelcontextprotocol/server';
+import { Value } from '@sinclair/typebox/value';
+import { parseAccessTokenAuthorization } from 'better-auth/oauth2';
+import type { JWTPayload } from 'jose';
+import { ForbiddenError } from '#lib/errors.ts';
 import { MCP_RESOURCE, McpAccessTokenClaimsSchema } from '#lib/mcp.ts';
 import type { McpAuthorizationRepositoryContract } from '#repositories/mcp-authorization.repository.ts';
 import { Service } from '#services/service.ts';
 
 const MS_PER_SECOND = 1000;
 
-export class McpAuthorizationService extends Service implements OAuthTokenVerifier {
+export class McpAuthorizationService extends Service {
   private readonly repository: McpAuthorizationRepositoryContract;
 
   constructor(repository: McpAuthorizationRepositoryContract) {
@@ -21,42 +17,29 @@ export class McpAuthorizationService extends Service implements OAuthTokenVerifi
     this.repository = repository;
   }
 
-  async verifyAccessToken(token: string): Promise<AuthInfo> {
-    try {
-      const { payload } = await jwtVerify(
-        token,
-        createLocalJWKSet(await this.repository.signingKeys()),
-        {
-          issuer: OAUTH_ISSUER,
-          audience: MCP_RESOURCE.href,
-          typ: 'at+jwt',
-          requiredClaims: McpAccessTokenClaimsSchema.required,
-        },
-      );
-      if (payload.cnf !== undefined) {
-        throw new OAuthError(OAuthErrorCode.InvalidToken, 'Invalid MCP access token.');
-      }
-      Value.Assert(McpAccessTokenClaimsSchema, payload);
-      const claims = payload;
-      if (claims.iat > Date.now() / MS_PER_SECOND) {
-        throw new OAuthError(OAuthErrorCode.InvalidToken, 'Invalid MCP access token.');
-      }
-      if (!(await this.repository.isRegisteredAccount(claims.sub))) {
-        throw new OAuthError(OAuthErrorCode.InvalidToken, 'A registered account is required.');
-      }
-      return {
-        token,
-        clientId: claims.client_id,
-        scopes: claims.scope.split(' ').filter(Boolean),
-        expiresAt: claims.exp,
-        resource: MCP_RESOURCE,
-        extra: { ownerId: claims.sub },
-      };
-    } catch (error) {
-      if (error instanceof errors.JOSEError || error instanceof AssertError) {
-        throw new OAuthError(OAuthErrorCode.InvalidToken, 'Invalid MCP access token.');
-      }
-      throw error;
+  async authorize({
+    request,
+    claims,
+  }: {
+    request: Request;
+    claims: JWTPayload;
+  }): Promise<AuthInfo> {
+    if (
+      !Value.Check(McpAccessTokenClaimsSchema, claims) ||
+      claims.iat > Date.now() / MS_PER_SECOND
+    ) {
+      throw new ForbiddenError('The access token has no valid nibrun account identity.');
     }
+    if (!(await this.repository.isRegisteredAccount(claims.sub))) {
+      throw new ForbiddenError('A registered nibrun account is required.');
+    }
+    return {
+      token: parseAccessTokenAuthorization(request.headers.get('authorization'))!.token,
+      clientId: claims.client_id,
+      scopes: claims.scope.split(' '),
+      expiresAt: claims.exp,
+      resource: MCP_RESOURCE,
+      extra: { ownerId: claims.sub },
+    };
   }
 }

@@ -1,5 +1,6 @@
 import { type AppClaimServiceContract, createAuth } from '#lib/auth/better-auth.ts';
 import { authDatabase } from '#lib/auth/database.ts';
+import { CimdMetadataRepository } from '#repositories/cimd-metadata.repository.ts';
 
 const appsServiceMock: AppClaimServiceContract = { claim: () => Promise.resolve() };
 
@@ -8,4 +9,8 @@ const appsServiceMock: AppClaimServiceContract = { claim: () => Promise.resolve(
  * what tables it expects. The schema is decided by the plugins `createAuth` lists, so this cannot
  * say anything the served instance does not.
  */
-export const auth = createAuth({ appsService: appsServiceMock, database: authDatabase });
+export const auth = createAuth({
+  appsService: appsServiceMock,
+  database: authDatabase,
+  clientMetadataRepository: new CimdMetadataRepository(),
+});

@@ -19,6 +19,7 @@ import { ArtifactStorageRepository } from '#repositories/artifact-storage.reposi
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { CachedBinariesRepository } from '#repositories/cached-binaries.repository.ts';
+import { CimdMetadataRepository } from '#repositories/cimd-metadata.repository.ts';
 import { CustomHostnamesRepository } from '#repositories/custom-hostnames.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { DnsRepository } from '#repositories/dns.repository.ts';
@@ -124,6 +125,7 @@ const appsService = new AppsService({
 export const auth = createAuth({
   appsService,
   database: authDatabase,
+  clientMetadataRepository: new CimdMetadataRepository(),
 });
 
 const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);

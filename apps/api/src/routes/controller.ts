@@ -2,6 +2,7 @@ import { Elysia } from 'elysia';
 import { NotFoundError } from '#lib/errors.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { WellKnownOAuthAuthorizationServerController } from '#routes/.well-known/oauth-authorization-server/controller.ts';
+import { WellKnownOAuthProtectedResourceController } from '#routes/.well-known/oauth-protected-resource/controller.ts';
 import { WellKnownOAuthProtectedResourceMcpController } from '#routes/.well-known/oauth-protected-resource/mcp/controller.ts';
 import { McpController } from '#routes/mcp/controller.ts';
 import { AssetsServicePlugin } from '#services/plugins.ts';
@@ -10,6 +11,7 @@ function createRootController() {
   const controller = new Elysia()
     .use(AssetsServicePlugin)
     .use(WellKnownOAuthAuthorizationServerController)
+    .use(WellKnownOAuthProtectedResourceController)
     .use(WellKnownOAuthProtectedResourceMcpController)
     .use(McpController);
   const { assetsService } = controller.decorator;

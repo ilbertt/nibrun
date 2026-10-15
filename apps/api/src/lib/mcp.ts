@@ -21,11 +21,3 @@ export const McpAccessTokenClaimsSchema = Type.Object({
   exp: Type.Integer(),
   iat: Type.Integer(),
 });
-
-export const MCP_RESOURCE_METADATA = {
-  resource: MCP_RESOURCE.href,
-  authorization_servers: [OAUTH_ISSUER],
-  scopes_supported: MCP_SCOPES,
-  bearer_methods_supported: ['header'],
-  resource_name: 'nibrun',
-};

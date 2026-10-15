@@ -83,12 +83,14 @@ prefix on each handler — `.get('/apps/:appId/artifacts', …)` — which is wh
 lets Elysia name and type `params`. That path also names the controller:
 `AppsAppIdArtifactsController`, unique where the folder name alone would not be.
 
-MCP and `/.well-known/` controllers mount at the root. MCP uses the official
-`@modelcontextprotocol/server` SDK and its stateless HTTP handler, including legacy
-Streamable HTTP compatibility. Tool schemas derive from the existing TypeBox models through
-`mcpSchema`, which removes Elysia's OpenAPI-only annotations. MCP authenticates OAuth access
-tokens independently of dashboard sessions and deployment keys; account ownership comes from
-the verified token, never tool arguments.
+MCP and `/.well-known/` controllers mount at the root and stay hidden from OpenAPI:
+MCP describes its own tools. Tool schemas derive from the existing TypeBox models through
+`mcpSchema`, which removes Elysia's OpenAPI-only annotations. The official MCP SDK owns
+transport; Better Auth's MCP and CIMD plugins own OAuth, with DCR enabled explicitly.
+Keep Better Auth packages at the same version. CIMD metadata fetches use the Bun transport
+in `CimdMetadataRepository`: resolve once, reject special-use addresses, pin the connection,
+preserve TLS identity, and refuse redirects. Account ownership comes from verified token
+claims, never tool arguments or dashboard sessions.
 
 ## Tests
 
