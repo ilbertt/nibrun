@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "imports": {
-    "#*": "./src/*"
+    "#*": "./src/*",
+    "#tests/*": "./tests/*"
   },
   "scripts": {
     "dev": "bun run --bun vite dev --port 3001",

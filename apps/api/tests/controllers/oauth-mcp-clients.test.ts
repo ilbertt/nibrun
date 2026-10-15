@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, setSystemTime, test } from 'bun:test';
 import { StatusMap } from 'elysia';
 import { createLocalJWKSet, exportJWK, generateKeyPair, jwtVerify, SignJWT } from 'jose';
 import { registeredAccount } from '#tests/controllers/support/accounts.ts';
@@ -14,6 +14,7 @@ const SCOPES = [MCP_SCOPE, 'offline_access'].join(' ');
 const VERIFIER_LENGTH = 64;
 const VERIFIER = 'v'.repeat(VERIFIER_LENGTH);
 const CLIENT_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+const MS_PER_SECOND = 1_000;
 
 type TestClient = { clientId: string; privateKey: CryptoKey | undefined };
 type ClientMode = 'DCR' | 'CIMD public' | 'CIMD signed';
@@ -74,6 +75,88 @@ test.each(['DCR', 'CIMD public', 'CIMD signed'] as const)(
     expect(refreshed.refresh_token).not.toBe(tokens.refresh_token);
   },
 );
+
+test.each(['DCR', 'CIMD public', 'CIMD signed'] as const)(
+  '%s consent pages resolve public client details from a signed request',
+  async (mode) => {
+    const client = await createClient(mode);
+    const { consentPage } = await consentRequest(client);
+    const response = await publicClientRequest(consentPage);
+    expect(response.status, await response.clone().text()).toBe(StatusMap.OK);
+    expect(await response.json()).toEqual({
+      client_id: client.clientId,
+      client_name: 'nibrun test client',
+      redirect_uris: [],
+    });
+    expect(consentPage.searchParams.get('scope')).toBe(SCOPES);
+  },
+);
+
+test('client details and consent reject a tampered authorization query', async () => {
+  const client = await createClient('DCR');
+  const { consentPage, cookie } = await consentRequest(client);
+  consentPage.searchParams.set('scope', 'offline_access');
+  const metadata = await publicClientRequest(consentPage);
+  expect(metadata.status).toBe(StatusMap['Bad Request']);
+  expect(await metadata.json()).toMatchObject({ error: 'invalid_signature' });
+  const consent = await sendJson({
+    method: 'POST',
+    url: `${AUTH_URL}/oauth2/consent`,
+    headers: { cookie, origin: OAUTH_ISSUER },
+    body: { accept: true, oauth_query: consentPage.searchParams.toString() },
+  });
+  expect(consent.status).toBe(StatusMap['Bad Request']);
+  expect(await consent.json()).toMatchObject({ error: 'invalid_signature' });
+});
+
+test('client details reject an expired signed request', async () => {
+  const { consentPage } = await consentRequest(await createClient('DCR'));
+  const expiresAt = Number(consentPage.searchParams.get('exp'));
+  try {
+    setSystemTime((expiresAt + 1) * MS_PER_SECOND);
+    const response = await publicClientRequest(consentPage);
+    expect(response.status).toBe(StatusMap['Bad Request']);
+    expect(await response.json()).toMatchObject({ error: 'invalid_signature' });
+  } finally {
+    setSystemTime();
+  }
+});
+
+test('denying consent returns the client error redirect without granting access', async () => {
+  const client = await createClient('DCR');
+  const { consentPage, cookie } = await consentRequest(client);
+  const response = await sendJson({
+    method: 'POST',
+    url: `${AUTH_URL}/oauth2/consent`,
+    headers: { cookie, origin: OAUTH_ISSUER },
+    body: { accept: false, oauth_query: consentPage.searchParams.toString() },
+  });
+  expect(response.status, await response.clone().text()).toBe(StatusMap.OK);
+  const result = (await response.json()) as { redirect: boolean; url: string };
+  const destination = new URL(result.url);
+  expect(result.redirect).toBe(true);
+  expect(`${destination.origin}${destination.pathname}`).toBe(CALLBACK);
+  expect(destination.searchParams.get('error')).toBe('access_denied');
+  expect(destination.searchParams.get('state')).toBe('test-state');
+  expect(destination.searchParams.has('code')).toBe(false);
+  const retry = await send({
+    url: `${AUTH_URL}/oauth2/authorize?${authorizationQuery(client.clientId)}`,
+    headers: { cookie },
+  });
+  expect(new URL(retry.headers.get('location')!, OAUTH_ISSUER).pathname).toBe('/consent');
+});
+
+test('consent requires a browser session even with a valid signed request', async () => {
+  const { consentPage } = await consentRequest(await createClient('DCR'));
+  const response = await sendJson({
+    method: 'POST',
+    url: `${AUTH_URL}/oauth2/consent`,
+    headers: { origin: OAUTH_ISSUER },
+    body: { accept: true, oauth_query: consentPage.searchParams.toString() },
+  });
+  expect(response.status).toBe(StatusMap.Unauthorized);
+  expect(await response.json()).not.toHaveProperty('url');
+});
 
 test('authorization requires PKCE for public clients', async () => {
   const client = await createClient('DCR');
@@ -243,7 +326,7 @@ function authorizationQuery(clientId: string): URLSearchParams {
   });
 }
 
-async function authorizationCode(client: TestClient): Promise<string> {
+async function consentRequest(client: TestClient) {
   const { cookie } = await registeredAccount();
   const response = await send({
     url: `${AUTH_URL}/oauth2/authorize?${authorizationQuery(client.clientId)}`,
@@ -253,6 +336,23 @@ async function authorizationCode(client: TestClient): Promise<string> {
   expect(location, await response.clone().text()).toBeString();
   const consentPage = new URL(location!, OAUTH_ISSUER);
   expect(consentPage.pathname).toBe('/consent');
+  return { consentPage, cookie };
+}
+
+function publicClientRequest(consentPage: URL): Promise<Response> {
+  return sendJson({
+    method: 'POST',
+    url: `${AUTH_URL}/oauth2/public-client-prelogin`,
+    headers: { origin: OAUTH_ISSUER },
+    body: {
+      client_id: consentPage.searchParams.get('client_id'),
+      oauth_query: consentPage.searchParams.toString(),
+    },
+  });
+}
+
+async function authorizationCode(client: TestClient): Promise<string> {
+  const { consentPage, cookie } = await consentRequest(client);
   const consent = await sendJson({
     method: 'POST',
     url: `${AUTH_URL}/oauth2/consent`,

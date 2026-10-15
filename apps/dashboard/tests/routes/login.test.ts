@@ -1,13 +1,8 @@
-import { afterAll, beforeEach, expect, test } from 'bun:test';
+import { expect, test } from 'bun:test';
 import { isRedirect } from '@tanstack/react-router';
+import { setupBrowserLocation } from '#tests/support/browser.ts';
 
-const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
-const location =
-  typeof window === 'undefined' ? { origin: 'https://nibrun.test', search: '' } : window.location;
-const previousSearch = Object.getOwnPropertyDescriptor(location, 'search');
-if (!previousWindow) {
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location } });
-}
+const location = setupBrowserLocation();
 
 const { authClient } = await import('#lib/auth.ts');
 const { Route } = await import('#routes/(auth)/login.tsx');
@@ -29,21 +24,6 @@ const SIGNED_QUERY = new URLSearchParams([
   ['ba_param', 'ba_param'],
   ['sig', 'server-issued-signature'],
 ]);
-
-beforeEach(() => {
-  location.search = '';
-});
-
-afterAll(() => {
-  if (previousSearch) {
-    Object.defineProperty(location, 'search', previousSearch);
-  } else {
-    Reflect.deleteProperty(location, 'search');
-  }
-  if (!previousWindow) {
-    Reflect.deleteProperty(globalThis, 'window');
-  }
-});
 
 async function socialSignInBody(): Promise<Record<string, unknown>> {
   let body: Record<string, unknown> = {};
