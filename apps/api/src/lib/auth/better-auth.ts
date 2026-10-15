@@ -12,7 +12,7 @@ import {
 import { OAUTH_ISSUER } from '#lib/auth/oauth-issuer.ts';
 import { AUTH_BASE_PATH, AUTH_JWKS_PATH } from '#lib/auth/paths.ts';
 import { env } from '#lib/env.ts';
-import { MCP_RESOURCE, MCP_SCOPES } from '#lib/mcp/auth.ts';
+import { MCP_RESOURCE, MCP_SCOPE } from '#lib/mcp/auth.ts';
 import { fetchClientMetadataResource } from '#lib/mcp/cimd-transport.ts';
 import type { AppsService } from '#services/apps.service.ts';
 
@@ -65,7 +65,7 @@ export function createAuth({
         loginPage: '/sign-in',
         consentPage: '/consent',
         resource: MCP_RESOURCE.href,
-        scopes: [...MCP_SCOPES, 'offline_access'],
+        scopes: [MCP_SCOPE, 'offline_access'],
         grantTypes: ['authorization_code', 'refresh_token'],
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,

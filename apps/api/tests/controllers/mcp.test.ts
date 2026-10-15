@@ -13,7 +13,7 @@ import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 
 const { auth, AppsServicePlugin } = await import('#services/plugins.ts');
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
-const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, McpScope } = await import('#lib/mcp/auth.ts');
+const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
 const context = await auth.$context;
 const key = await generateKeyPair('EdDSA');
@@ -73,7 +73,7 @@ function accessTokenClaims(): JWTPayload {
     aud: MCP_RESOURCE.href,
     sub: ownerId,
     client_id: 'test-mcp-client',
-    scope: McpScope.AppsRead,
+    scope: MCP_SCOPE,
     iat: now,
     exp: now + TOKEN_LIFETIME_SECONDS,
   };
@@ -154,7 +154,7 @@ test('protected-resource discovery is public and names the existing OAuth issuer
   expect(await response.json()).toMatchObject({
     resource: MCP_RESOURCE.href,
     authorization_servers: [OAUTH_ISSUER],
-    scopes_supported: [McpScope.AppsRead],
+    scopes_supported: [MCP_SCOPE],
     bearer_methods_supported: ['header'],
   });
 });
@@ -179,20 +179,23 @@ test('an account session cannot substitute for an OAuth access token', async () 
   expect(response.status).toBe(StatusMap.Unauthorized);
 });
 
-test('a valid token without the read scope receives an insufficient-scope challenge', async () => {
-  const token = await accessToken({ claims: { ...accessTokenClaims(), scope: 'other:read' } });
-  const response = await rpc({ method: 'tools/list', token });
-  expect(response.status).toBe(StatusMap.Forbidden);
-  expect(response.headers.get('www-authenticate')).toContain('insufficient_scope');
-  expect(response.headers.get('www-authenticate')).toContain(McpScope.AppsRead);
-  expect(response.headers.get('www-authenticate')).toContain(MCP_RESOURCE_METADATA_URL);
-});
+test.each(['other:read', 'offline_access'])(
+  'a resource-bound token with only %s cannot substitute for MCP permission',
+  async (scope) => {
+    const token = await accessToken({ claims: { ...accessTokenClaims(), scope } });
+    const response = await rpc({ method: 'tools/list', token });
+    expect(response.status).toBe(StatusMap.Forbidden);
+    expect(response.headers.get('www-authenticate')).toContain('insufficient_scope');
+    expect(response.headers.get('www-authenticate')).toContain(MCP_SCOPE);
+    expect(response.headers.get('www-authenticate')).toContain(MCP_RESOURCE_METADATA_URL);
+  },
+);
 
 test.each([
   ['issuer', { iss: 'https://untrusted.example' }],
   ['audience', { aud: 'https://other-resource.example' }],
   ['expiry', { exp: 1 }],
-  ['scope type', { scope: [McpScope.AppsRead] }],
+  ['scope type', { scope: [MCP_SCOPE] }],
   ['sender-constrained token', { cnf: { jkt: 'requires-proof' } }],
 ] as const)(
   'rejects an invalid %s before querying apps',
@@ -271,7 +274,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(result.tools[0]).toMatchObject({
       name: 'list_apps',
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-      _meta: { securitySchemes: [{ type: 'oauth2', scopes: [McpScope.AppsRead] }] },
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }] },
     });
     expect(result.tools[0].outputSchema.properties.apps.items.required).toEqual(
       ListAppsResponseSchema.properties.apps.items.required,

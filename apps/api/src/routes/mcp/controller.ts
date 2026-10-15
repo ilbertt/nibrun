@@ -7,7 +7,7 @@ import { createDpopReplayStore } from 'better-auth/oauth2';
 import { Elysia } from 'elysia';
 import { OAUTH_ISSUER, OAUTH_JWKS_URL } from '#lib/auth/oauth-issuer.ts';
 import { env } from '#lib/env.ts';
-import { MCP_RESOURCE, MCP_SCOPES, McpAccessTokenClaimsSchema } from '#lib/mcp/auth.ts';
+import { MCP_RESOURCE, MCP_SCOPE, McpAccessTokenClaimsSchema } from '#lib/mcp/auth.ts';
 import { createMcpServerHandler } from '#lib/mcp/server.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { AppsServicePlugin, auth, McpAuthorizationServicePlugin } from '#services/plugins.ts';
@@ -34,7 +34,7 @@ function createMcpController() {
           issuer: OAUTH_ISSUER,
           audience: MCP_RESOURCE.href,
           jwksUrl: OAUTH_JWKS_URL,
-          requiredScopes: MCP_SCOPES,
+          requiredScopes: [MCP_SCOPE],
           jwtVerifyOptions: {
             typ: 'at+jwt',
             requiredClaims: McpAccessTokenClaimsSchema.required,

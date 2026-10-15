@@ -10,11 +10,11 @@ import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { cimdDocuments } from '#tests/support/cimd.ts';
 
 const { auth } = await import('#services/plugins.ts');
-const { MCP_RESOURCE, MCP_SCOPES } = await import('#lib/mcp/auth.ts');
+const { MCP_RESOURCE, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const { OAUTH_ISSUER } = await import('#lib/auth/oauth-issuer.ts');
 const AUTH_URL = `${ORIGIN}/api/auth`;
 const CALLBACK = 'https://mcp-client.example/callback';
-const SCOPES = [...MCP_SCOPES, 'offline_access'].join(' ');
+const SCOPES = [MCP_SCOPE, 'offline_access'].join(' ');
 const VERIFIER_LENGTH = 64;
 const VERIFIER = 'v'.repeat(VERIFIER_LENGTH);
 const CLIENT_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
@@ -109,7 +109,7 @@ test.each(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protecte
     expect(await response.json()).toMatchObject({
       resource: MCP_RESOURCE.href,
       authorization_servers: [OAUTH_ISSUER],
-      scopes_supported: MCP_SCOPES,
+      scopes_supported: [MCP_SCOPE],
     });
   },
 );
@@ -284,5 +284,5 @@ async function verifyIssuedToken({ token, client }: { token: string; client: Tes
     typ: 'at+jwt',
   });
   expect(payload.client_id).toBe(client.clientId);
-  expect(payload.scope).toContain(MCP_SCOPES[0]);
+  expect(payload.scope).toContain(MCP_SCOPE);
 }

@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { Type } from '@sinclair/typebox';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import { createLogger } from '#lib/logger.ts';
-import { MCP_SCOPES } from '#lib/mcp/auth.ts';
+import { MCP_SCOPE } from '#lib/mcp/auth.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import { ListAppsResponseSchema } from '#routes/api/apps/model.ts';
 import type { AppsService } from '#services/apps.service.ts';
@@ -33,7 +33,7 @@ export function registerListAppsTool({
         openWorldHint: false,
         idempotentHint: true,
       },
-      _meta: { securitySchemes: [{ type: 'oauth2', scopes: MCP_SCOPES }] },
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }] },
     },
     async function listApps() {
       try {

@@ -8,11 +8,7 @@ export const MCP_RESOURCE = new URL(RoutePrefix.Mcp, OAUTH_ISSUER);
 export const MCP_RESOURCE_METADATA_URL = getOAuthProtectedResourceMetadataUrl(MCP_RESOURCE);
 export const MCP_RESOURCE_METADATA_PATH = new URL(MCP_RESOURCE_METADATA_URL).pathname;
 
-export enum McpScope {
-  AppsRead = 'apps:read',
-}
-
-export const MCP_SCOPES = Object.values(McpScope);
+export const MCP_SCOPE = 'mcp';
 
 export const McpAccessTokenClaimsSchema = Type.Object({
   sub: OwnerIdSchema,

@@ -93,6 +93,8 @@ MCP describes its own tools. Tool schemas derive from the existing TypeBox model
 Better Auth. `ClientCorsPlugin` runs once at the app boundary and allows browser access only
 to SQLite client endpoints and public discovery paths. The official MCP SDK owns
 transport; Better Auth's MCP and CIMD plugins own OAuth, with DCR enabled explicitly.
+MCP uses one server-wide `mcp` scope, defined by `MCP_SCOPE`, for access to every tool.
+The MCP resource binds the token's audience; `offline_access` only requests refresh tokens.
 Use the SDK's Host and Origin guards with hostname allowlists, not full origins. Keep the
 Better Auth protected-request helper's JWT type and required-claim constraints explicit.
 Keep Better Auth packages at the same version. CIMD's single-file transport closely follows
