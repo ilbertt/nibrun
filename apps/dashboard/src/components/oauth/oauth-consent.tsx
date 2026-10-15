@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from '@repo/ui/components/card';
 import { Field, FieldError } from '@repo/ui/components/field';
+import { OAuthClientIdentity } from '#components/oauth/oauth-client-identity.tsx';
 import { OAuthConsentButtons } from '#components/oauth/oauth-consent-buttons.tsx';
 import { OAuthPermissions } from '#components/oauth/oauth-permissions.tsx';
 import { useOAuthConsent } from '#lib/hooks/use-oauth-consent.ts';
@@ -26,18 +27,15 @@ export function OAuthConsent() {
             ? 'Checking the connection request…'
             : consent.isError
               ? consent.error.message
-              : `${consent.data.client.client_name ?? 'An app'} wants to access your account.`}
+              : 'Review the app and permissions before connecting.'}
         </CardDescription>
       </CardHeader>
       {consent.isSuccess && (
         <CardContent className="flex flex-col gap-6">
+          <OAuthClientIdentity />
           <div className="flex flex-col gap-1">
             <p className="text-muted-foreground text-sm">Connecting as</p>
             <p className="truncate font-semibold">{session?.user.email}</p>
-          </div>
-          <div className="flex flex-col gap-1">
-            <p className="text-muted-foreground text-sm">App identifier</p>
-            <p className="wrap-anywhere text-sm">{consent.data.client.client_id}</p>
           </div>
           <OAuthPermissions scopes={consent.data.scopes} />
           <p className="text-muted-foreground text-sm">
