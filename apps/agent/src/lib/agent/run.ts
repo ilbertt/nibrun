@@ -4,6 +4,7 @@ import { cronLoop } from '#lib/agent/crons.ts';
 import { filesystemLoop } from '#lib/agent/filesystem.ts';
 import { heartbeatLoop } from '#lib/agent/heartbeat.ts';
 import { logLoop } from '#lib/agent/logs.ts';
+import { memoryLoop } from '#lib/agent/memory.ts';
 import { pollLoop, reconcileSafely } from '#lib/agent/poll.ts';
 import { reportLoop } from '#lib/agent/report.ts';
 import { sqliteQueryLoop } from '#lib/agent/sqlite-query.ts';
@@ -44,6 +45,7 @@ export const run = Effect.gen(function* () {
 
   yield* reconciler.load;
   yield* restoreGuestReceivers;
+  yield* Effect.forkScoped(memoryLoop);
 
   const cached = yield* cache.restore;
   if (Option.isSome(cached)) {

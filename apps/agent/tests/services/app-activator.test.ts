@@ -11,9 +11,10 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { Duration, Effect, Either, Fiber, Layer, Logger, Option } from 'effect';
 import { waitingPort } from '#lib/proxy/listener.ts';
+import { HostHasNoRoom } from '#lib/report/memory.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppActivator } from '#services/app-activator.service.ts';
-import { AppWaker, HostHasNoRoom, WakeFailed } from '#services/app-waker.service.ts';
+import { AppWaker, WakeFailed } from '#services/app-waker.service.ts';
 import { APP_ID, instanceRecord } from '#tests/support/fixtures.ts';
 import { provided } from '#tests/support/run.ts';
 import { HTTP_OK, HTTP_UNAVAILABLE, serving } from '#tests/support/server.ts';

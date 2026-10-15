@@ -6,6 +6,7 @@ import { isSessionExpiring, openSession } from '#lib/control/session.ts';
 import { readHostCapacity } from '#lib/report/capacity.ts';
 import { readHostVersions } from '#lib/report/versions.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
+import { HostMemory } from '#services/host-memory.service.ts';
 
 export class AgentSessionHolder extends Effect.Service<AgentSessionHolder>()('AgentSessionHolder', {
   effect: Effect.gen(function* () {
@@ -25,7 +26,6 @@ export class AgentSessionHolder extends Effect.Service<AgentSessionHolder>()('Ag
         }
         const capacity = yield* readHostCapacity({
           cacheDir: config.stateDir,
-          zerofsConfigFile: config.zerofsConfigFile,
         });
         const session = yield* openSession({ versions, capacity });
         yield* Effect.logInfo('session opened').pipe(
@@ -53,5 +53,5 @@ export class AgentSessionHolder extends Effect.Service<AgentSessionHolder>()('Ag
         error.isSessionExpired ? SynchronizedRef.set(cached, Option.none()) : Effect.void,
     };
   }),
-  dependencies: [AgentConfig.Default],
+  dependencies: [AgentConfig.Default, HostMemory.Default],
 }) {}
