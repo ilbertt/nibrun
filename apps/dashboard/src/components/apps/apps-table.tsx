@@ -1,4 +1,4 @@
-import { servingHostname } from '@repo/app-operations';
+import { servingHostname } from '@repo/app-ui';
 import {
   Table,
   TableBody,

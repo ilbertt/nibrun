@@ -1,7 +1,8 @@
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import { appUrl } from '@repo/app-ui';
 import { appFor, pinnedArtifact } from '#apps.ts';
-import { type AppEdit, type Deployed, type DeployStep, servingHostname } from '#release.ts';
+import type { AppEdit, Deployed, DeployStep } from '#release.ts';
 import { updateApp } from '#update.ts';
 
 const NOTHING_TO_RELEASE = 'This app has never been deployed.';
@@ -47,6 +48,6 @@ export async function redeploy({ api, appId, onStep, ...edit }: RedeployInput): 
     appId: patched.id,
     name: patched.name,
     deploymentId: deployment.id,
-    url: `https://${servingHostname(patched.hostnames)}`,
+    url: appUrl(patched.hostnames),
   };
 }

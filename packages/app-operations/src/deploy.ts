@@ -6,15 +6,10 @@ import type {
 } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import { appUrl } from '@repo/app-ui';
 import { appFor } from '#apps.ts';
 import { type DeployableArchive, importArchive } from '#imports.ts';
-import {
-  type ConfigEdit,
-  configPatch,
-  type Deployed,
-  type DeployStep,
-  servingHostname,
-} from '#release.ts';
+import { type ConfigEdit, configPatch, type Deployed, type DeployStep } from '#release.ts';
 import { updateApp } from '#update.ts';
 import {
   mebibytes,
@@ -152,7 +147,7 @@ export async function deploy({
     appId: app.id,
     name: app.name,
     deploymentId: deployment.id,
-    url: `https://${servingHostname(app.hostnames)}`,
+    url: appUrl(app.hostnames),
   };
 }
 
