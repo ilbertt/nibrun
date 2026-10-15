@@ -62,7 +62,7 @@ export function createAuth({
         disableSettingJwtHeader: true,
       }),
       mcp({
-        loginPage: '/sign-in',
+        loginPage: '/login',
         consentPage: '/consent',
         resource: MCP_RESOURCE.href,
         scopes: [MCP_SCOPE, 'offline_access'],
