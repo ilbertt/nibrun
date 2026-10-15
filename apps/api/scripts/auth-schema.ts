@@ -8,7 +8,4 @@ const appsServiceMock: AppClaimServiceContract = { claim: () => Promise.resolve(
  * what tables it expects. The schema is decided by the plugins `createAuth` lists, so this cannot
  * say anything the served instance does not.
  */
-export const auth = createAuth({
-  appsService: appsServiceMock,
-  database: authDatabase,
-});
+export const auth = createAuth({ appsService: appsServiceMock, database: authDatabase });
