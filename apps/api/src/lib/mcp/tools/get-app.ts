@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/server';
+import { appUrl } from '@repo/app-ui';
 import { type AppId, AppIdSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import type { OwnerId } from '#lib/api/identifiers.ts';
@@ -20,9 +21,10 @@ const outputSchema = fromTypeBox(
       description:
         'The newest deployment, including pending, stopped or failed releases; null before the first deployment.',
     }),
-    url: Type.Union([Type.String({ format: 'uri' }), Type.Null()], {
+    url: Type.String({
+      format: 'uri',
       description:
-        'The app’s platform HTTPS URL. Availability depends on the app and deployment state.',
+        'The app’s public HTTPS URL, preferring an active custom domain. Availability depends on the app and deployment state.',
     }),
   }),
 );
@@ -57,11 +59,10 @@ export function registerGetAppTool({
     handleToolResult(async function getApp({ appId }: { appId: AppId }) {
       const app = await appsService.get({ appId, ownerId });
       const deployments = await deploymentsService.list({ appId, ownerId });
-      const hostname = app.hostnames.find((entry) => entry.kind === 'platform')?.hostname;
       return {
         app,
         currentDeployment: deployments[0] ?? null,
-        url: hostname === undefined ? null : `https://${hostname}`,
+        url: appUrl(app.hostnames),
       };
     }),
   );

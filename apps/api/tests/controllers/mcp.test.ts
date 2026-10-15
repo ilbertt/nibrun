@@ -476,6 +476,35 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(result.structuredContent.currentDeployment).toBeNull();
   });
 
+  test.each([true, false])(
+    'returns the active custom domain URL when the platform hostname is present: %s',
+    async (withPlatformHostname) => {
+      const original = ownedApp();
+      const app = Value.Parse(AppResponseSchema, {
+        ...original,
+        hostnames: [
+          {
+            ...original.hostnames[0],
+            hostname: 'app.example.com',
+            kind: 'custom',
+          },
+          ...(withPlatformHostname ? original.hostnames : []),
+        ],
+      });
+      spyOn(appsService, 'get').mockResolvedValue(app);
+      spyOn(deploymentsService, 'list').mockResolvedValue([]);
+      const response = await rpc({
+        method: 'tools/call',
+        params: { name: 'get_app', arguments: { appId: app.id } },
+        token: await accessToken(),
+        protocolVersion,
+      });
+      const { result } = await rpcBody(response);
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent.url).toBe('https://app.example.com');
+    },
+  );
+
   test.each(['missing-app', 'other-owner-app'])(
     'does not read deployments or disclose details for an inaccessible app: %s',
     async (appId) => {
