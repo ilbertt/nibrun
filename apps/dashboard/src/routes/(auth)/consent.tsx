@@ -3,9 +3,9 @@ import { OAuthConsent } from '#components/oauth/oauth-consent.tsx';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
 
 export const Route = createFileRoute('/(auth)/consent')({
-  beforeLoad: ({ context, location }) => {
+  beforeLoad: ({ context }) => {
     if (!context.session || context.session.user.isAnonymous === true) {
-      throw redirect({ href: `${LoginRoute.to}${location.searchStr}` });
+      throw redirect({ href: `${LoginRoute.to}${window.location.search}`, reloadDocument: true });
     }
   },
   component: RouteComponent,
