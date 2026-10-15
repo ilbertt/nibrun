@@ -5,7 +5,7 @@ type OAuthConsentClient = NonNullable<
   Awaited<ReturnType<typeof authClient.oauth2.publicClientPrelogin>>['data']
 >;
 
-export type OAuthConsentRequest = { client: OAuthConsentClient; scopes: string[] };
+export type OAuthConsentRequest = { client: OAuthConsentClient };
 
 export function oauthConsentQueryOptions(oauthQuery: string) {
   return queryOptions({
@@ -23,7 +23,7 @@ export function oauthConsentQueryOptions(oauthQuery: string) {
       if (error || !data) {
         throw new Error('This connection request is invalid or has expired. Start it again.');
       }
-      return { client: data, scopes: query.get('scope')?.split(' ').filter(Boolean) ?? [] };
+      return { client: data };
     },
     retry: false,
     staleTime: 0,

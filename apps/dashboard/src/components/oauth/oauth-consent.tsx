@@ -8,7 +8,6 @@ import {
 import { Field, FieldError } from '@repo/ui/components/field';
 import { OAuthClientIdentity } from '#components/oauth/oauth-client-identity.tsx';
 import { OAuthConsentButtons } from '#components/oauth/oauth-consent-buttons.tsx';
-import { OAuthPermissions } from '#components/oauth/oauth-permissions.tsx';
 import { useMcpConsentAnalytics } from '#lib/hooks/use-mcp-consent-analytics.ts';
 import { useOAuthConsent } from '#lib/hooks/use-oauth-consent.ts';
 import { useOAuthConsentDecision } from '#lib/hooks/use-oauth-consent-decision.ts';
@@ -24,13 +23,11 @@ export function OAuthConsent() {
     <Card>
       <CardHeader className="text-center">
         <CardTitle className="text-xl">Connect to nibrun</CardTitle>
-        <CardDescription>
-          {consent.isPending
-            ? 'Checking the connection request…'
-            : consent.isError
-              ? consent.error.message
-              : 'Review the app and permissions before connecting.'}
-        </CardDescription>
+        {!consent.isSuccess && (
+          <CardDescription>
+            {consent.isError ? consent.error.message : 'Checking the connection request…'}
+          </CardDescription>
+        )}
       </CardHeader>
       {consent.isSuccess && (
         <CardContent className="flex flex-col gap-6">
@@ -39,10 +36,6 @@ export function OAuthConsent() {
             <p className="text-muted-foreground text-sm">Connecting as</p>
             <p className="truncate font-semibold">{session?.user.email}</p>
           </div>
-          <OAuthPermissions scopes={consent.data.scopes} />
-          <p className="text-muted-foreground text-sm">
-            Continue only if you started this connection and trust this app.
-          </p>
           <Field data-invalid={decision.isError || undefined}>
             <OAuthConsentButtons
               redirecting={decision.isPending || decision.isSuccess}
