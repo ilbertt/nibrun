@@ -41,8 +41,8 @@ function createMcpController() {
           },
           dpop: { replayStore: createDpopReplayStore(internalAdapter) },
         },
-        async function authorizedMcpRequest(...[verifiedRequest, claims]) {
-          const authInfo = await mcpAuthorizationService.authorize({
+        function authorizedMcpRequest(...[verifiedRequest, claims]) {
+          const authInfo = mcpAuthorizationService.authorize({
             request: verifiedRequest,
             claims,
           });

@@ -214,7 +214,6 @@ test.each([
   ['numeric subject', { sub: 123 }],
   ['client', { client_id: '' }],
   ['numeric client', { client_id: 123 }],
-  ['unknown account', { sub: 'deleted-account' }],
 ] as const)(
   'rejects an invalid %s account identity',
   async function rejectsAccount(...[_name, overrides]) {
@@ -247,14 +246,24 @@ test('rejects a forged signature even when the key ID matches', async () => {
   expect(response.status).toBe(StatusMap.Unauthorized);
 });
 
-test('rejects anonymous accounts even with an otherwise valid access token', async () => {
-  const anonymous = await auth.api.signInAnonymous();
-  const claims = { ...accessTokenClaims(), sub: anonymous.user.id };
-  const response = await rpc({ method: 'tools/list', token: await accessToken({ claims }) });
-  expect(response.status).toBe(StatusMap.Forbidden);
-});
-
 describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
+  test('uses the verified token identity without a separate account lookup', async () => {
+    const accountLookup = spyOn(context.internalAdapter, 'findUserById').mockRejectedValue(
+      new Error('MCP authorization must not query account state'),
+    );
+    const list = spyOn(appsService, 'list').mockResolvedValue([]);
+    const sub = crypto.randomUUID();
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: 'list_apps', arguments: {} },
+      token: await accessToken({ claims: { ...accessTokenClaims(), sub } }),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.structuredContent).toEqual({ apps: [] });
+    expect(list).toHaveBeenCalledWith({ ownerId: sub });
+    expect(accountLookup).not.toHaveBeenCalled();
+  });
+
   test('advertises the read tool using the existing API response schema', async () => {
     const response = await rpc({
       method: 'tools/list',

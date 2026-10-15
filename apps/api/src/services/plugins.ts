@@ -29,7 +29,6 @@ import { GitHubDeploymentGrantsRepository } from '#repositories/github-deploymen
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { ImportsRepository } from '#repositories/imports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
-import { McpAuthorizationRepository } from '#repositories/mcp-authorization.repository.ts';
 import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
 import { RemoteSourceRepository } from '#repositories/remote-source.repository.ts';
 import { SqliteConnectionsRepository } from '#repositories/sqlite-connections.repository.ts';
@@ -126,8 +125,6 @@ export const auth = createAuth({
   database: authDatabase,
 });
 
-const mcpAuthorizationRepository = new McpAuthorizationRepository(auth);
-
 const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);
 const githubDeploymentGrantsService = new GitHubDeploymentGrantsService({
   identityService: githubActionsOidcService,
@@ -201,7 +198,7 @@ const logsService = new LogsService({
   logsRepo: logsRepository,
   deploymentsRepo: deploymentsRepository,
 });
-const mcpAuthorizationService = new McpAuthorizationService(mcpAuthorizationRepository);
+const mcpAuthorizationService = new McpAuthorizationService();
 
 const authenticationService = new AuthenticationService({
   auth: auth.api,

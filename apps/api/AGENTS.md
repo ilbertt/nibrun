@@ -103,6 +103,7 @@ the upstream Node transport linked on its first line, using `Bun.dns.lookup` for
 Preserve upstream's HTTPS connection pinning, TLS identity, isolated connections, redirect
 handling, and response streaming; avoid unrelated rewrites when syncing upstream.
 Account ownership comes from verified token claims, never tool arguments or dashboard sessions.
+MCP maps verified claims to SDK auth context without a separate account lookup.
 
 ## Tests
 
