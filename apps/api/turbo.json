@@ -4,7 +4,11 @@
   "tasks": {
     "build": {
       "dependsOn": ["@repo/dashboard#build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/skills/deploy-to-nibrun/**"],
       "outputs": ["dist/**", "public/**"]
+    },
+    "test": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/skills/deploy-to-nibrun/**"]
     }
   }
 }
