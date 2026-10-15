@@ -19,6 +19,7 @@ COPY tsconfig.json turbo.json ./
 COPY packages packages
 COPY apps apps
 COPY brand brand
+COPY skills skills
 ENV NODE_ENV=production
 ARG UMAMI_HOSTNAME
 ENV VITE_UMAMI_HOSTNAME=${UMAMI_HOSTNAME}
