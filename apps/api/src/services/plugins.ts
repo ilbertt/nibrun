@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia';
 import { sql } from '#db/client.ts';
 import { createAuth } from '#lib/auth/better-auth.ts';
+import { fetchClientMetadataResource } from '#lib/auth/cimd-transport.ts';
 import { authDatabase } from '#lib/auth/database.ts';
 import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { CloudflareClient } from '#lib/cloudflare/client.ts';
@@ -19,7 +20,6 @@ import { ArtifactStorageRepository } from '#repositories/artifact-storage.reposi
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { CachedBinariesRepository } from '#repositories/cached-binaries.repository.ts';
-import { CimdMetadataRepository } from '#repositories/cimd-metadata.repository.ts';
 import { CustomHostnamesRepository } from '#repositories/custom-hostnames.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { DnsRepository } from '#repositories/dns.repository.ts';
@@ -40,7 +40,6 @@ import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
 import { AuthenticationService } from '#services/authentication.service.ts';
-import { CimdMetadataService } from '#services/cimd-metadata.service.ts';
 import { CronsService } from '#services/crons.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
 import { DomainDnsService } from '#services/domain-dns.service.ts';
@@ -99,7 +98,6 @@ const importStorageRepository = new ArtifactStorageRepository({
 });
 const remoteSourceRepository = new RemoteSourceRepository();
 const cachedBinariesRepository = new CachedBinariesRepository(sql);
-const cimdMetadataRepository = new CimdMetadataRepository();
 const releaseDigestRepository = new ReleaseDigestRepository();
 const exportsRepository = new ExportsRepository(sql);
 const importsRepository = new ImportsRepository(sql);
@@ -124,12 +122,10 @@ const appsService = new AppsService({
   secretsKey,
 });
 
-const cimdMetadataService = new CimdMetadataService(cimdMetadataRepository);
-
 export const auth = createAuth({
   appsService,
   database: authDatabase,
-  cimdMetadataService,
+  fetchClientMetadataResource,
 });
 
 const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);

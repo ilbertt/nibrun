@@ -33,6 +33,8 @@ The agent may not import `@repo/api` or its subpaths; neither app imports the ot
 ## Layering (keep strict)
 
 Every feature is a repository, a service, and a controller. Do not collapse them.
+CIMD's runtime transport callback is a standalone function in `src/lib/auth/cimd-transport.ts`,
+passed directly to Better Auth without repository or service wrappers.
 
 Repository implementations end in `Repository`; their full and narrowed dependency
 contracts end in `RepositoryContract` (`DeploymentLookupRepositoryContract`). Service
@@ -87,10 +89,9 @@ MCP and `/.well-known/` controllers mount at the root and stay hidden from OpenA
 MCP describes its own tools. Tool schemas derive from the existing TypeBox models through
 `mcpSchema`, which removes Elysia's OpenAPI-only annotations. The official MCP SDK owns
 transport; Better Auth's MCP and CIMD plugins own OAuth, with DCR enabled explicitly.
-Keep Better Auth packages at the same version. `CimdMetadataRepository` delegates to
-`@better-auth/cimd/node`, verified on the pinned Bun runtime. Version 1.7.3 or later is required
-for its DNS lookup callback to support address arrays. The transport resolves once, rejects
-special-use addresses, pins the connection, preserves TLS identity, and refuses redirects.
+Keep Better Auth packages at the same version. CIMD's single-file transport uses `Bun.dns.lookup`
+and Bun's `fetch`: resolve once, reject every special-use address, dial a validated IP while
+preserving Host and TLS identity, disable proxies and connection reuse, and refuse redirects.
 Account ownership comes from verified token claims, never tool arguments or dashboard sessions.
 
 ## Tests

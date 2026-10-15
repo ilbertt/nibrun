@@ -1,6 +1,7 @@
 import { apiKey } from '@better-auth/api-key';
 import { cimd } from '@better-auth/cimd';
 import { mcp } from '@better-auth/mcp';
+import type { ClientMetadataResourceFetch } from '@better-auth/oauth-provider';
 import { Value } from '@sinclair/typebox/value';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization, jwt } from 'better-auth/plugins';
@@ -14,7 +15,6 @@ import { AUTH_BASE_PATH, AUTH_JWKS_PATH } from '#lib/auth/paths.ts';
 import { env } from '#lib/env.ts';
 import { MCP_RESOURCE, MCP_SCOPES } from '#lib/mcp.ts';
 import type { AppsService } from '#services/apps.service.ts';
-import type { CimdMetadataServiceContract } from '#services/cimd-metadata.service.ts';
 
 const DEVICE_VERIFICATION_PATH = '/device';
 
@@ -37,11 +37,11 @@ export type AppClaimServiceContract = Pick<AppsService, 'claim'>;
 export function createAuth({
   appsService,
   database,
-  cimdMetadataService,
+  fetchClientMetadataResource,
 }: {
   appsService: AppClaimServiceContract;
   database: NonNullable<BetterAuthOptions['database']>;
-  cimdMetadataService: CimdMetadataServiceContract;
+  fetchClientMetadataResource: ClientMetadataResourceFetch;
 }) {
   return betterAuth({
     database,
@@ -80,9 +80,7 @@ export function createAuth({
       }),
       cimd({
         metadataProfile: 'mcp-2026-07-28',
-        fetchClientMetadataResource(...[input, init]) {
-          return cimdMetadataService.fetch({ input, init });
-        },
+        fetchClientMetadataResource,
       }),
       deviceAuthorization({ verificationUri: DEVICE_VERIFICATION_PATH }),
       bearer(),
