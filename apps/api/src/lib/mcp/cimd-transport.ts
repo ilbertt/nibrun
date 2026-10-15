@@ -3,8 +3,8 @@
 import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
 import { Readable } from 'node:stream';
+import type { CimdOptions } from '@better-auth/cimd';
 import { isPublicRoutableHost } from '@better-auth/core/utils/host';
-import type { ClientMetadataResourceFetch } from '@better-auth/oauth-provider';
 import { dns } from 'bun';
 import { StatusMap } from 'elysia';
 
@@ -38,7 +38,7 @@ function responseHeaders(headers: Record<string, string | string[] | undefined>)
  * the caller and are never followed.
  */
 export async function fetchClientMetadataResource(
-  ...[input, init]: Parameters<ClientMetadataResourceFetch>
+  ...[input, init]: Parameters<CimdOptions['fetchClientMetadataResource']>
 ): Promise<Response> {
   const webRequest = new Request(input, init);
   const url = new URL(webRequest.url);

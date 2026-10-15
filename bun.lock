@@ -41,7 +41,6 @@
         "@better-auth/cimd": "1.7.2",
         "@better-auth/core": "catalog:",
         "@better-auth/mcp": "1.7.2",
-        "@better-auth/oauth-provider": "1.7.2",
         "@elysia/cors": "^1.4.2",
         "@ilbertt/better-auth-bun-sql": "^0.4.0",
         "@ilbertt/bun-sqlgen": "^0.7.0",

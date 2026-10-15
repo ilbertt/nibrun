@@ -1,8 +1,4 @@
 import { expect, test } from 'bun:test';
-import type {
-  OAuthClientRegistrationResponse,
-  OAuthTokenResponse,
-} from '@better-auth/oauth-provider';
 import { StatusMap } from 'elysia';
 import { createLocalJWKSet, exportJWK, generateKeyPair, jwtVerify, SignJWT } from 'jose';
 import { registeredAccount } from '#tests/controllers/support/accounts.ts';
@@ -11,7 +7,7 @@ import { cimdDocuments } from '#tests/support/cimd.ts';
 
 const { auth } = await import('#services/plugins.ts');
 const { MCP_RESOURCE, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
-const { OAUTH_ISSUER } = await import('#lib/auth/oauth-issuer.ts');
+const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const AUTH_URL = `${ORIGIN}/api/auth`;
 const CALLBACK = 'https://mcp-client.example/callback';
 const SCOPES = [MCP_SCOPE, 'offline_access'].join(' ');
@@ -21,6 +17,33 @@ const CLIENT_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-b
 
 type TestClient = { clientId: string; privateKey: CryptoKey | undefined };
 type ClientMode = 'DCR' | 'CIMD public' | 'CIMD signed';
+type TokenResponse = Awaited<ReturnType<typeof auth.api.oauth2Token>>;
+type ClientRegistrationResponse = Awaited<ReturnType<typeof auth.api.registerOAuthClient>>;
+
+test('authorization server discovery advertises MCP account linking', async () => {
+  const response = await send({ url: `${ORIGIN}/.well-known/oauth-authorization-server` });
+  expect(response.status).toBe(StatusMap.OK);
+  expect(response.headers.get('access-control-allow-origin')).toBe('*');
+  expect(await response.json()).toMatchObject({
+    issuer: OAUTH_ISSUER,
+    token_endpoint: `${OAUTH_ISSUER}/api/auth/oauth2/token`,
+    jwks_uri: OAUTH_JWKS_URL,
+    scopes_supported: [MCP_SCOPE, 'offline_access'],
+    grant_types_supported: ['authorization_code', 'refresh_token'],
+    registration_endpoint: `${OAUTH_ISSUER}/api/auth/oauth2/register`,
+    client_id_metadata_document_supported: true,
+    code_challenge_methods_supported: ['S256'],
+  });
+});
+
+test('MCP account linking does not enable machine credentials', async () => {
+  const response = await tokenRequest({
+    grant_type: 'client_credentials',
+    client_id: 'unknown',
+  });
+  expect(response.status).toBe(StatusMap['Bad Request']);
+  expect(await response.json()).toMatchObject({ error: 'unsupported_grant_type' });
+});
 
 test.each(['DCR', 'CIMD public', 'CIMD signed'] as const)(
   '%s clients can authorize with PKCE, exchange a code, and refresh',
@@ -36,7 +59,7 @@ test.each(['DCR', 'CIMD public', 'CIMD signed'] as const)(
       ...(await clientAuthentication(client)),
     });
     expect(tokensResponse.status, await tokensResponse.clone().text()).toBe(StatusMap.OK);
-    const tokens = (await tokensResponse.json()) as OAuthTokenResponse;
+    const tokens = (await tokensResponse.json()) as TokenResponse;
     await verifyIssuedToken({ token: tokens.access_token, client });
     expect(tokens.refresh_token).toBeString();
     const refresh = await tokenRequest({
@@ -46,7 +69,7 @@ test.each(['DCR', 'CIMD public', 'CIMD signed'] as const)(
       ...(await clientAuthentication(client)),
     });
     expect(refresh.status, await refresh.clone().text()).toBe(StatusMap.OK);
-    const refreshed = (await refresh.json()) as OAuthTokenResponse;
+    const refreshed = (await refresh.json()) as TokenResponse;
     await verifyIssuedToken({ token: refreshed.access_token, client });
     expect(refreshed.refresh_token).not.toBe(tokens.refresh_token);
   },
@@ -179,7 +202,7 @@ async function createClient(mode: ClientMode): Promise<TestClient> {
       },
     });
     expect(response.status, await response.clone().text()).toBe(StatusMap.Created);
-    const client = (await response.json()) as OAuthClientRegistrationResponse;
+    const client = (await response.json()) as ClientRegistrationResponse;
     return { clientId: client.client_id, privateKey: undefined };
   }
   const clientId = `https://mcp-client.example/${crypto.randomUUID()}/client.json`;
