@@ -5,10 +5,10 @@ const logger = createLogger('mcp:tools');
 
 type StructuredContent = NonNullable<CallToolResult['structuredContent']>;
 
-export function handleResult<Args extends unknown[]>(
+export function handleToolResult<Args extends unknown[]>(
   callback: (...args: Args) => StructuredContent | Promise<StructuredContent>,
 ) {
-  return async function handleToolResult(...args: Args): Promise<CallToolResult> {
+  return async (...args: Args): Promise<CallToolResult> => {
     try {
       const result = await callback(...args);
       return {
