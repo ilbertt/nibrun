@@ -13,6 +13,7 @@ import { Route as authRouteRouteImport } from './routes/(auth)/route'
 import { Route as dashboardRouteRouteImport } from './routes/(dashboard)/route'
 import { Route as DeployRouteImport } from './routes/deploy'
 import { Route as SqliteRouteImport } from './routes/sqlite'
+import { Route as authConsentRouteImport } from './routes/(auth)/consent'
 import { Route as authDeviceRouteImport } from './routes/(auth)/device'
 import { Route as authLoginRouteImport } from './routes/(auth)/login'
 import { Route as dashboardIndexRouteImport } from './routes/(dashboard)/index'
@@ -41,6 +42,11 @@ const SqliteRoute = SqliteRouteImport.update({
   id: '/sqlite',
   path: '/sqlite',
   getParentRoute: () => rootRouteImport,
+} as any)
+const authConsentRoute = authConsentRouteImport.update({
+  id: '/consent',
+  path: '/consent',
+  getParentRoute: () => authRouteRoute,
 } as any)
 const authDeviceRoute = authDeviceRouteImport.update({
   id: '/device',
@@ -97,6 +103,7 @@ const dashboardAppsAppIdLogsRoute = dashboardAppsAppIdLogsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/deploy': typeof DeployRoute
   '/sqlite': typeof SqliteRoute
+  '/consent': typeof authConsentRoute
   '/device': typeof authDeviceRoute
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/deploy': typeof DeployRoute
   '/sqlite': typeof SqliteRoute
+  '/consent': typeof authConsentRoute
   '/device': typeof authDeviceRoute
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/(dashboard)': typeof dashboardRouteRouteWithChildren
   '/deploy': typeof DeployRoute
   '/sqlite': typeof SqliteRoute
+  '/(auth)/consent': typeof authConsentRoute
   '/(auth)/device': typeof authDeviceRoute
   '/(auth)/login': typeof authLoginRoute
   '/(dashboard)/': typeof dashboardIndexRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/deploy'
     | '/sqlite'
+    | '/consent'
     | '/device'
     | '/login'
     | '/'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
   to:
     | '/deploy'
     | '/sqlite'
+    | '/consent'
     | '/device'
     | '/login'
     | '/'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/(dashboard)'
     | '/deploy'
     | '/sqlite'
+    | '/(auth)/consent'
     | '/(auth)/device'
     | '/(auth)/login'
     | '/(dashboard)/'
@@ -220,6 +232,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/sqlite'
       preLoaderRoute: typeof SqliteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/consent': {
+      id: '/(auth)/consent'
+      path: '/consent'
+      fullPath: '/consent'
+      preLoaderRoute: typeof authConsentRouteImport
+      parentRoute: typeof authRouteRoute
     }
     '/(auth)/device': {
       id: '/(auth)/device'
@@ -295,11 +314,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface authRouteRouteChildren {
+  authConsentRoute: typeof authConsentRoute
   authDeviceRoute: typeof authDeviceRoute
   authLoginRoute: typeof authLoginRoute
 }
 
 const authRouteRouteChildren: authRouteRouteChildren = {
+  authConsentRoute: authConsentRoute,
   authDeviceRoute: authDeviceRoute,
   authLoginRoute: authLoginRoute,
 }

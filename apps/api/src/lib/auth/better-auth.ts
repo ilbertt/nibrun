@@ -69,6 +69,7 @@ export function createAuth({
         grantTypes: ['authorization_code', 'refresh_token'],
         allowDynamicClientRegistration: true,
         allowUnauthenticatedClientRegistration: true,
+        allowPublicClientPrelogin: true,
         clientPrivileges() {
           return false;
         },
