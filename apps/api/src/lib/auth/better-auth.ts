@@ -15,6 +15,7 @@ import { AUTH_BASE_PATH, AUTH_JWKS_PATH } from '#lib/auth/paths.ts';
 import { env } from '#lib/env.ts';
 import { MCP_RESOURCE, MCP_SCOPE } from '#lib/mcp/auth.ts';
 import { fetchClientMetadataResource } from '#lib/mcp/cimd-transport.ts';
+import { createMcpConnectionAnalyticsHook } from '#lib/mcp/connection-analytics.ts';
 import { isMcpAuthorizationQuery } from '#lib/mcp/signup.ts';
 import type { AnalyticsServiceContract } from '#services/analytics.service.ts';
 import type { AppsService } from '#services/apps.service.ts';
@@ -52,7 +53,10 @@ export function createAuth({
     basePath: AUTH_BASE_PATH,
     secret: env.BETTER_AUTH_SECRET,
     disabledPaths: ['/token'],
-    hooks: { before: protectShortLivedDeploymentTokens },
+    hooks: {
+      before: protectShortLivedDeploymentTokens,
+      after: createMcpConnectionAnalyticsHook(analyticsService),
+    },
     databaseHooks: {
       user: {
         create: {

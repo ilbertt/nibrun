@@ -92,7 +92,11 @@ Keep MCP and discovery routes out of OpenAPI. Leave protocol and OAuth behavior
 to the official SDK and Better Auth. Keep the CIMD transport close to its linked upstream source.
 
 MCP signup analytics run only for newly created GitHub accounts with a verified
-MCP authorization query in Better Auth's OAuth server context. Tool analytics
+MCP authorization query in Better Auth's OAuth server context. `mcp_connected`
+records successful authorization-code exchanges for MCP credentials, including
+existing accounts and reconnections, but never refreshes or failed exchanges.
+Server events carry `site: api` and `source: mcp` so Umami can distinguish them
+from browser events in the shared collection. Tool analytics
 record completed calls through `handleToolResult`, including failures. Never
 send arguments, results, OAuth credentials or raw errors. `UMAMI_ENDPOINT` is the
 full collection URL; leaving it empty disables server analytics. Production

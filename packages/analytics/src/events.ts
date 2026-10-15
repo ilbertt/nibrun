@@ -72,6 +72,7 @@ export type AnalyticsEvent = {
 
 export type ServerAnalyticsEventData = {
   mcp_signup_completed: Record<string, never>;
+  mcp_connected: Record<string, never>;
   mcp_tool_completed: {
     tool_name: string;
     outcome: 'success' | 'error';

@@ -30,6 +30,7 @@ Internal tracking shared by the marketing site, dashboard and API.
 - Server events use the schema-free `./events` and `./config` subpaths, without
   loading the browser tracker. MCP events use the opaque account ID as their
   Distinct ID and `account_id` data; browser identity remains unchanged.
+  Distinguish them in the shared Umami collection with `site: api` and `source: mcp`.
 - Keep server delivery optional outside production, bounded and best effort.
   Respect request Do Not Track headers. Never send tool arguments or results.
 - Record outcomes after confirmation. Deployment success requires observed

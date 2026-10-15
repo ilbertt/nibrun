@@ -1,11 +1,11 @@
-import { expect, test } from 'bun:test';
+import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { StatusMap } from 'elysia';
 import { createLocalJWKSet, exportJWK, generateKeyPair, jwtVerify, SignJWT } from 'jose';
 import { registeredAccount } from '#tests/controllers/support/accounts.ts';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { cimdDocuments } from '#tests/support/cimd.ts';
 
-const { auth } = await import('#services/plugins.ts');
+const { auth, AnalyticsServicePlugin } = await import('#services/plugins.ts');
 const { MCP_RESOURCE, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const AUTH_URL = `${ORIGIN}/api/auth`;
@@ -14,6 +14,15 @@ const SCOPES = [MCP_SCOPE, 'offline_access'].join(' ');
 const VERIFIER_LENGTH = 64;
 const VERIFIER = 'v'.repeat(VERIFIER_LENGTH);
 const CLIENT_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+const analytics = AnalyticsServicePlugin.decorator.analyticsService;
+
+beforeEach(function observeAnalytics() {
+  spyOn(analytics, 'track');
+});
+
+afterEach(function restoreMocks() {
+  mock.restore();
+});
 
 type TestClient = { clientId: string; privateKey: CryptoKey | undefined };
 type ClientMode = 'DCR' | 'CIMD public' | 'CIMD signed';
@@ -50,6 +59,7 @@ test.each(['DCR', 'CIMD public', 'CIMD signed'] as const)(
   async (mode) => {
     const client = await createClient(mode);
     const code = await authorizationCode(client);
+    expect(analytics.track).not.toHaveBeenCalled();
     const tokensResponse = await tokenRequest({
       grant_type: 'authorization_code',
       code,
@@ -60,7 +70,12 @@ test.each(['DCR', 'CIMD public', 'CIMD signed'] as const)(
     });
     expect(tokensResponse.status, await tokensResponse.clone().text()).toBe(StatusMap.OK);
     const tokens = (await tokensResponse.json()) as TokenResponse;
-    await verifyIssuedToken({ token: tokens.access_token, client });
+    const payload = await verifyIssuedToken({ token: tokens.access_token, client });
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith({
+      ownerId: payload.sub,
+      event: { name: 'mcp_connected', data: {} },
+    });
     expect(tokens.refresh_token).toBeString();
     const refresh = await tokenRequest({
       grant_type: 'refresh_token',
@@ -72,6 +87,7 @@ test.each(['DCR', 'CIMD public', 'CIMD signed'] as const)(
     const refreshed = (await refresh.json()) as TokenResponse;
     await verifyIssuedToken({ token: refreshed.access_token, client });
     expect(refreshed.refresh_token).not.toBe(tokens.refresh_token);
+    expect(analytics.track).toHaveBeenCalledTimes(1);
   },
 );
 
@@ -98,6 +114,7 @@ test('the code exchange rejects a different PKCE verifier', async () => {
   });
   expect(response.ok).toBe(false);
   expect(await response.json()).not.toHaveProperty('access_token');
+  expect(analytics.track).not.toHaveBeenCalled();
 });
 
 test('signed CIMD clients cannot downgrade their code exchange to public-client authentication', async () => {
@@ -113,6 +130,44 @@ test('signed CIMD clients cannot downgrade their code exchange to public-client 
   });
   expect(response.status).toBe(StatusMap['Bad Request']);
   expect(await response.json()).toMatchObject({ error: 'invalid_client' });
+  expect(analytics.track).not.toHaveBeenCalled();
+});
+
+test('replaying an exchanged authorization code does not record another connection', async () => {
+  const client = await createClient('DCR');
+  const code = await authorizationCode(client);
+  const body = {
+    grant_type: 'authorization_code',
+    client_id: client.clientId,
+    code,
+    redirect_uri: CALLBACK,
+    code_verifier: VERIFIER,
+    resource: MCP_RESOURCE.href,
+  };
+  expect((await tokenRequest(body)).status).toBe(StatusMap.OK);
+  expect(analytics.track).toHaveBeenCalledTimes(1);
+  expect((await tokenRequest(body)).ok).toBe(false);
+  expect(analytics.track).toHaveBeenCalledTimes(1);
+});
+
+test('respects Do Not Track when exchanging MCP credentials', async () => {
+  const client = await createClient('DCR');
+  const code = await authorizationCode(client);
+  const response = await send({
+    method: 'POST',
+    url: `${AUTH_URL}/oauth2/token`,
+    headers: { 'content-type': 'application/x-www-form-urlencoded', dnt: '1' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: client.clientId,
+      code,
+      redirect_uri: CALLBACK,
+      code_verifier: VERIFIER,
+      resource: MCP_RESOURCE.href,
+    }).toString(),
+  });
+  expect(response.status).toBe(StatusMap.OK);
+  expect(analytics.track).not.toHaveBeenCalled();
 });
 
 test('CIMD clients cannot redirect to a URL absent from their metadata', async () => {
@@ -308,4 +363,5 @@ async function verifyIssuedToken({ token, client }: { token: string; client: Tes
   });
   expect(payload.client_id).toBe(client.clientId);
   expect(payload.scope).toContain(MCP_SCOPE);
+  return payload;
 }
