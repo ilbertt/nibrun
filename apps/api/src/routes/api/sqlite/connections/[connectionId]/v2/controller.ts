@@ -6,7 +6,6 @@ import { pathBelow, RoutePrefix } from '#lib/routes/prefixes.ts';
 import { assertSqliteCookieOrigin } from '#lib/sqlite/http.ts';
 import { SQLITE_CONNECTIONS_BASE_PATH } from '#lib/sqlite/routes.ts';
 import { SqliteVersionResponseSchema } from '#routes/api/sqlite/connections/[connectionId]/v2/model.ts';
-import { SqliteConnectionsConnectionIdV2PipelineController } from '#routes/api/sqlite/connections/[connectionId]/v2/pipeline/controller.ts';
 import { SqliteConnectionParamsSchema } from '#routes/api/sqlite/connections/model.ts';
 import { AuthPlugin, SqliteServicePlugin } from '#services/plugins.ts';
 
@@ -31,5 +30,4 @@ export const SqliteConnectionsConnectionIdV2Controller = new Elysia()
       params: SqliteConnectionParamsSchema,
       response: { [StatusMap.OK]: SqliteVersionResponseSchema },
     },
-  )
-  .use(SqliteConnectionsConnectionIdV2PipelineController);
+  );
