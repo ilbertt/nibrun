@@ -40,6 +40,7 @@ import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
 import { AuthenticationService } from '#services/authentication.service.ts';
+import { CimdMetadataService } from '#services/cimd-metadata.service.ts';
 import { CronsService } from '#services/crons.service.ts';
 import { DeploymentsService } from '#services/deployments.service.ts';
 import { DomainDnsService } from '#services/domain-dns.service.ts';
@@ -98,6 +99,7 @@ const importStorageRepository = new ArtifactStorageRepository({
 });
 const remoteSourceRepository = new RemoteSourceRepository();
 const cachedBinariesRepository = new CachedBinariesRepository(sql);
+const cimdMetadataRepository = new CimdMetadataRepository();
 const releaseDigestRepository = new ReleaseDigestRepository();
 const exportsRepository = new ExportsRepository(sql);
 const importsRepository = new ImportsRepository(sql);
@@ -122,10 +124,12 @@ const appsService = new AppsService({
   secretsKey,
 });
 
+const cimdMetadataService = new CimdMetadataService(cimdMetadataRepository);
+
 export const auth = createAuth({
   appsService,
   database: authDatabase,
-  clientMetadataRepository: new CimdMetadataRepository(),
+  cimdMetadataService,
 });
 
 const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);

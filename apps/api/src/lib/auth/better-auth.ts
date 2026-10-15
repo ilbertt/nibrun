@@ -13,8 +13,8 @@ import { OAUTH_ISSUER } from '#lib/auth/oauth-issuer.ts';
 import { AUTH_BASE_PATH, AUTH_JWKS_PATH } from '#lib/auth/paths.ts';
 import { env } from '#lib/env.ts';
 import { MCP_RESOURCE, MCP_SCOPES } from '#lib/mcp.ts';
-import type { CimdMetadataRepositoryContract } from '#repositories/cimd-metadata.repository.ts';
 import type { AppsService } from '#services/apps.service.ts';
+import type { CimdMetadataServiceContract } from '#services/cimd-metadata.service.ts';
 
 const DEVICE_VERIFICATION_PATH = '/device';
 
@@ -37,11 +37,11 @@ export type AppClaimServiceContract = Pick<AppsService, 'claim'>;
 export function createAuth({
   appsService,
   database,
-  clientMetadataRepository,
+  cimdMetadataService,
 }: {
   appsService: AppClaimServiceContract;
   database: NonNullable<BetterAuthOptions['database']>;
-  clientMetadataRepository: CimdMetadataRepositoryContract;
+  cimdMetadataService: CimdMetadataServiceContract;
 }) {
   return betterAuth({
     database,
@@ -81,7 +81,7 @@ export function createAuth({
       cimd({
         metadataProfile: 'mcp-2026-07-28',
         fetchClientMetadataResource(...[input, init]) {
-          return clientMetadataRepository.fetch({ input, init });
+          return cimdMetadataService.fetch({ input, init });
         },
       }),
       deviceAuthorization({ verificationUri: DEVICE_VERIFICATION_PATH }),

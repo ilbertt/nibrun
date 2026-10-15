@@ -1,8 +1,13 @@
 import { type AppClaimServiceContract, createAuth } from '#lib/auth/better-auth.ts';
 import { authDatabase } from '#lib/auth/database.ts';
-import { CimdMetadataRepository } from '#repositories/cimd-metadata.repository.ts';
+import type { CimdMetadataServiceContract } from '#services/cimd-metadata.service.ts';
 
 const appsServiceMock: AppClaimServiceContract = { claim: () => Promise.resolve() };
+const cimdMetadataServiceMock: CimdMetadataServiceContract = {
+  fetch() {
+    throw new Error('Schema generation must not fetch client metadata.');
+  },
+};
 
 /**
  * What `auth generate --config scripts/auth-schema.ts` reads: an instance made only to be asked
@@ -12,5 +17,5 @@ const appsServiceMock: AppClaimServiceContract = { claim: () => Promise.resolve(
 export const auth = createAuth({
   appsService: appsServiceMock,
   database: authDatabase,
-  clientMetadataRepository: new CimdMetadataRepository(),
+  cimdMetadataService: cimdMetadataServiceMock,
 });

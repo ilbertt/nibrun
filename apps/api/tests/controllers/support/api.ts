@@ -1,6 +1,7 @@
 import { mock } from 'bun:test';
 import { type MemoryDB, memoryAdapter } from 'better-auth/adapters/memory';
 import { getSchema } from 'better-auth/db';
+import { CimdMetadataService } from '#services/cimd-metadata.service.ts';
 import { TEST_API_ORIGIN } from '#tests/support/api-origin.ts';
 import { cimdMetadataRepository } from '#tests/support/cimd.ts';
 import { TEST_SECRETS_KEY_BASE64 } from '#tests/support/secrets.ts';
@@ -36,7 +37,7 @@ mock.module('#lib/auth/better-auth.ts', function controllerAuthFactory() {
       const auth = createAuth({
         ...input,
         database: memoryAdapter(authDatabase),
-        clientMetadataRepository: cimdMetadataRepository,
+        cimdMetadataService: new CimdMetadataService(cimdMetadataRepository),
       });
       for (const table of Object.keys(getSchema(auth.options))) {
         authDatabase[table] ??= [];
