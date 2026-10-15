@@ -5,24 +5,33 @@ import { Value } from '@sinclair/typebox/value';
 import { getSkills } from '#lib/assets.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 
-const deployToNibrun = await getSkills().get('deploy-to-nibrun/SKILL.md')!.text();
-
-const frontmatter = Value.Parse(
-  Type.Object({ name: Type.String(), description: Type.String() }, { additionalProperties: true }),
-  Bun.YAML.parse(deployToNibrun.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)![1]!),
+const skills = new Map(
+  await Promise.all([...getSkills()].filter(([path]) => path.endsWith('/SKILL.md')).map(readSkill)),
 );
-const uri = `skill://nibrun/${frontmatter.name}/SKILL.md`;
-const skill = {
-  uri,
-  frontmatter,
-  resources: [
-    {
-      uri,
-      digest: `sha256:${createHash('sha256').update(deployToNibrun).digest('hex')}`,
-      size: Buffer.byteLength(deployToNibrun),
-    },
-  ],
-};
+
+async function readSkill([, file]: [string, Blob]) {
+  const text = await file.text();
+  const frontmatter = Value.Parse(
+    Type.Object(
+      { name: Type.String(), description: Type.String() },
+      { additionalProperties: true },
+    ),
+    Bun.YAML.parse(text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)![1]!),
+  );
+  const uri = `skill://nibrun/${frontmatter.name}/SKILL.md`;
+  const descriptor = {
+    uri,
+    frontmatter,
+    resources: [
+      {
+        uri,
+        digest: `sha256:${createHash('sha256').update(text).digest('hex')}`,
+        size: Buffer.byteLength(text),
+      },
+    ],
+  };
+  return [uri, { descriptor, text }] as const;
+}
 
 const listParams = fromTypeBox(Type.Object({ cursor: Type.Optional(Type.String()) }));
 const getParams = fromTypeBox(Type.Object({ uri: Type.String() }));
@@ -34,18 +43,27 @@ export function registerSkills({ server }: { server: McpServer }) {
     if (cursor !== undefined) {
       throw new ProtocolError(INVALID_PARAMS, 'Unknown skills cursor');
     }
-    return { resultType: 'complete', skills: [skill], ttlMs: 0, cacheScope: 'public' };
+    return {
+      resultType: 'complete',
+      skills: [...skills.values()].map(({ descriptor }) => descriptor),
+      ttlMs: 0,
+      cacheScope: 'public',
+    };
   });
   server.server.setRequestHandler('skills/get', { params: getParams }, (params) => {
-    if (params.uri !== uri) {
+    const skill = skills.get(params.uri);
+    if (skill === undefined) {
       throw new ProtocolError(INVALID_PARAMS, 'Unknown skill');
     }
-    return { resultType: 'complete', skill };
+    return { resultType: 'complete', skill: skill.descriptor };
   });
-  server.registerResource(
-    frontmatter.name,
-    uri,
-    { description: frontmatter.description, mimeType: 'text/markdown' },
-    () => ({ contents: [{ uri, mimeType: 'text/markdown', text: deployToNibrun }] }),
-  );
+  for (const { descriptor, text } of skills.values()) {
+    const { uri, frontmatter } = descriptor;
+    server.registerResource(
+      frontmatter.name,
+      uri,
+      { description: frontmatter.description, mimeType: 'text/markdown' },
+      () => ({ contents: [{ uri, mimeType: 'text/markdown', text }] }),
+    );
+  }
 }

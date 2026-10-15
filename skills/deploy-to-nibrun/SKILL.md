@@ -8,14 +8,17 @@ description: Deploy a compiled binary to nibrun and run it as an HTTPS service. 
 nibrun takes one compiled binary and gives it a microVM of its own, a persistent filesystem, and
 an HTTPS URL. No Dockerfile, no YAML, no cluster.
 
-Sign in, build for Linux x86_64, `nib run`, then ask the URL for something. What that path does not
-need is below it: [copying an app](#copying-an-app), [the guest contract](#the-guest-contract),
+Build for Linux x86_64, deploy through nibrun's MCP server or CLI, then ask the URL for something.
+What that path does not need is below it: [copying an app](#copying-an-app), [the guest contract](#the-guest-contract),
 [naming a runtime value](#naming-a-runtime-value), [a second public port](#a-second-public-port),
 [cron jobs](#cron-jobs), and [what nibrun does not do](#tradeoffs).
 
 For CI deployments, start at [GitHub Actions](#github-actions).
 
 ## 1. Sign in
+
+If using a connected nibrun MCP server, use its authenticated account and skip CLI sign-in.
+Otherwise, check the CLI:
 
 ```sh
 nib apps list
@@ -79,7 +82,13 @@ is what keeps an address across that.
 
 ## 3. Deploy
 
-First deploy — creates the app:
+With nibrun's MCP server, call `deploy_app` with the existing `appId` and either the compiled file
+as `binary` through ChatGPT's native file binding, or a `url` reachable over HTTPS from nibrun.
+An optional `sha256` verifies the download. nibrun fetches the binary and queues a deployment.
+The tool deploys to an existing app; create the app first if needed. Check deployment status and
+the public URL before reporting success.
+
+With the CLI, the first deploy creates the app:
 
 ```sh
 nib run ./my-server --name my-app --port 8080
