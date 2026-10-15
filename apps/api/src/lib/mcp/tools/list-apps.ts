@@ -5,22 +5,28 @@ import { fromTypeBox } from '#lib/mcp/schema.ts';
 import { handleToolResult } from '#lib/mcp/tools/shared/handle-tool-result.ts';
 import { MCP_TOOL_META } from '#lib/mcp/tools/shared/tool-meta.ts';
 import { ListAppsResponseSchema } from '#routes/api/apps/model.ts';
+import type { AnalyticsServiceContract } from '#services/analytics.service.ts';
 import type { AppsService } from '#services/apps.service.ts';
 
 const inputSchema = fromTypeBox(Type.Object({}, { additionalProperties: false }));
 const outputSchema = fromTypeBox(ListAppsResponseSchema);
+const TOOL_NAME = 'list_apps';
 
 export function registerListAppsTool({
   server,
   appsService,
   ownerId,
+  analyticsService,
+  trackingAllowed,
 }: {
   server: McpServer;
   appsService: AppsService;
   ownerId: OwnerId;
+  analyticsService: AnalyticsServiceContract;
+  trackingAllowed: boolean;
 }) {
   server.registerTool(
-    'list_apps',
+    TOOL_NAME,
     {
       title: 'List nibrun apps',
       description: 'List the apps owned by your connected nibrun account.',
@@ -34,8 +40,14 @@ export function registerListAppsTool({
       },
       _meta: MCP_TOOL_META,
     },
-    handleToolResult(async function listApps() {
-      return { apps: await appsService.list({ ownerId }) };
+    handleToolResult({
+      analyticsService,
+      ownerId,
+      toolName: TOOL_NAME,
+      trackingAllowed,
+      async callback() {
+        return { apps: await appsService.list({ ownerId }) };
+      },
     }),
   );
 }

@@ -91,6 +91,15 @@ shared helpers in `tools/shared/`. Derive tool schemas from existing API models.
 Keep MCP and discovery routes out of OpenAPI. Leave protocol and OAuth behavior
 to the official SDK and Better Auth. Keep the CIMD transport close to its linked upstream source.
 
+MCP signup analytics run only for newly created GitHub accounts with a verified
+MCP authorization query in Better Auth's OAuth server context. Tool analytics
+record completed calls through `handleToolResult`, including failures. Never
+send arguments, results, OAuth credentials or raw errors. `UMAMI_ENDPOINT` is the
+full collection URL; leaving it empty disables server analytics. Production
+Compose points it at the internal Umami service. Event contracts and website ID
+belong to `@repo/analytics`; delivery goes through the analytics service and
+Umami repository without blocking authentication or tool responses.
+
 ## Tests
 
 `tests/` mirrors the layering rather than the source tree —

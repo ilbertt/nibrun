@@ -10,12 +10,20 @@ import { env } from '#lib/env.ts';
 import { MCP_RESOURCE, MCP_SCOPE, McpAccessTokenClaimsSchema } from '#lib/mcp/auth.ts';
 import { createMcpServerHandler } from '#lib/mcp/server.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
-import { AppsServicePlugin, auth, McpAuthorizationServicePlugin } from '#services/plugins.ts';
+import {
+  AnalyticsServicePlugin,
+  AppsServicePlugin,
+  auth,
+  McpAuthorizationServicePlugin,
+} from '#services/plugins.ts';
 
 function createMcpController() {
-  const controller = new Elysia().use(AppsServicePlugin).use(McpAuthorizationServicePlugin);
-  const { appsService, mcpAuthorizationService } = controller.decorator;
-  const handler = createMcpServerHandler({ appsService });
+  const controller = new Elysia()
+    .use(AppsServicePlugin)
+    .use(McpAuthorizationServicePlugin)
+    .use(AnalyticsServicePlugin);
+  const { appsService, mcpAuthorizationService, analyticsService } = controller.decorator;
+  const handler = createMcpServerHandler({ appsService, analyticsService });
 
   return controller.all(
     RoutePrefix.Mcp,

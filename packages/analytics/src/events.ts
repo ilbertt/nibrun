@@ -69,3 +69,16 @@ export type AnalyticsEventData = {
 export type AnalyticsEvent = {
   [Name in keyof AnalyticsEventData]: { name: Name; data: AnalyticsEventData[Name] };
 }[keyof AnalyticsEventData];
+
+export type ServerAnalyticsEventData = {
+  mcp_signup_completed: Record<string, never>;
+  mcp_tool_completed: {
+    tool_name: string;
+    outcome: 'success' | 'error';
+    duration_ms: number;
+  };
+};
+
+export type ServerAnalyticsEvent = {
+  [Name in keyof ServerAnalyticsEventData]: { name: Name; data: ServerAnalyticsEventData[Name] };
+}[keyof ServerAnalyticsEventData];

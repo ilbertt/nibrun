@@ -1,6 +1,6 @@
 # @repo/analytics
 
-Internal tracking shared by the marketing site and dashboard.
+Internal tracking shared by the marketing site, dashboard and API.
 
 - Seed one Umami website named `nibrun` for marketing and dashboard tracking.
 - Keep both sites on the same Umami website. Derive its ID from `src/config.ts`
@@ -27,6 +27,11 @@ Internal tracking shared by the marketing site and dashboard.
   attempt IDs may correlate events; settings events carry changed field names only.
 - Define event contracts in `src/events.ts`; derive callers' types from them.
   Keep acquisition context separate from the preset actually deployed.
+- Server events use the schema-free `./events` and `./config` subpaths, without
+  loading the browser tracker. MCP events use the opaque account ID as their
+  Distinct ID and `account_id` data; browser identity remains unchanged.
+- Keep server delivery optional outside production, bounded and best effort.
+  Respect request Do Not Track headers. Never send tool arguments or results.
 - Record outcomes after confirmation. Deployment success requires observed
   `running`; sign-in requires an account session; app claims require the same
   anonymous app to become permanent in that account. Browser events cannot

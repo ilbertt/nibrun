@@ -33,7 +33,9 @@ import { ReleaseDigestRepository } from '#repositories/release-digest.repository
 import { RemoteSourceRepository } from '#repositories/remote-source.repository.ts';
 import { SqliteConnectionsRepository } from '#repositories/sqlite-connections.repository.ts';
 import { TrustedWorkflowsRepository } from '#repositories/trusted-workflows.repository.ts';
+import { UmamiRepository } from '#repositories/umami.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
+import { AnalyticsService } from '#services/analytics.service.ts';
 import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
 import { AssetsService } from '#services/assets.service.ts';
@@ -106,6 +108,9 @@ const logsRepository = new LogsRepository(victoriaLogsClient);
 const githubActionsOidcRepository = new GitHubActionsOidcRepository();
 const githubDeploymentGrantsRepository = new GitHubDeploymentGrantsRepository(sql);
 const trustedWorkflowsRepository = new TrustedWorkflowsRepository(sql);
+const analyticsService = new AnalyticsService(
+  new UmamiRepository({ endpoint: env.UMAMI_ENDPOINT, hostname: env.BASE_URL.hostname }),
+);
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
@@ -122,6 +127,7 @@ const appsService = new AppsService({
 
 export const auth = createAuth({
   appsService,
+  analyticsService,
   database: authDatabase,
 });
 
@@ -209,6 +215,11 @@ export const AuthPlugin = createAuthPlugin(authenticationService);
 export const McpAuthorizationServicePlugin = new Elysia({
   name: 'service.mcpAuthorization',
 }).decorate('mcpAuthorizationService', mcpAuthorizationService);
+
+export const AnalyticsServicePlugin = new Elysia({ name: 'service.analytics' }).decorate(
+  'analyticsService',
+  analyticsService,
+);
 
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);

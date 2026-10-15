@@ -9,6 +9,7 @@ interface CustomProcessEnv {
   readonly GITHUB_CLIENT_SECRET: string;
   readonly S3_ENDPOINT: string;
   readonly VICTORIALOGS_ENDPOINT: string;
+  readonly UMAMI_ENDPOINT?: string;
   readonly ARTIFACTS_BUCKET: string;
   readonly EXPORTS_BUCKET: string;
   readonly IMPORTS_BUCKET: string;
@@ -57,6 +58,7 @@ type Env = {
   GITHUB_CLIENT_SECRET: string;
   S3_ENDPOINT: URL;
   VICTORIALOGS_ENDPOINT: URL;
+  UMAMI_ENDPOINT: URL | undefined;
   ARTIFACTS_BUCKET: string;
   EXPORTS_BUCKET: string;
   IMPORTS_BUCKET: string;
@@ -80,6 +82,7 @@ function loadEnv(): Env {
     GITHUB_CLIENT_SECRET: required('GITHUB_CLIENT_SECRET'),
     S3_ENDPOINT: new URL(required('S3_ENDPOINT')),
     VICTORIALOGS_ENDPOINT: new URL(required('VICTORIALOGS_ENDPOINT')),
+    UMAMI_ENDPOINT: process.env.UMAMI_ENDPOINT ? new URL(process.env.UMAMI_ENDPOINT) : undefined,
     ARTIFACTS_BUCKET: required('ARTIFACTS_BUCKET'),
     EXPORTS_BUCKET: required('EXPORTS_BUCKET'),
     IMPORTS_BUCKET: required('IMPORTS_BUCKET'),

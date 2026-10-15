@@ -19,6 +19,7 @@ services:
     image: ${API_IMAGE_URI}
     environment:
       - S3_ENDPOINT=${API_S3_ENDPOINT}
+      - UMAMI_ENDPOINT=http://umami:3000/api/send
     # Replaced, not merged: the local stack waits for minio-prepare, which does
     # not run here.
     depends_on: !override

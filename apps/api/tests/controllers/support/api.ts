@@ -18,6 +18,7 @@ Object.assign(process.env, {
   GITHUB_CLIENT_SECRET: 'test',
   S3_ENDPOINT: 'http://127.0.0.1:1',
   VICTORIALOGS_ENDPOINT: 'http://127.0.0.1:1',
+  UMAMI_ENDPOINT: '',
   ARTIFACTS_BUCKET: 'test',
   EXPORTS_BUCKET: 'test-exports',
   IMPORTS_BUCKET: 'test-imports',

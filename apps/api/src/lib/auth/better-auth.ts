@@ -3,6 +3,7 @@ import { cimd } from '@better-auth/cimd';
 import { mcp } from '@better-auth/mcp';
 import { Value } from '@sinclair/typebox/value';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
+import { getOAuthState } from 'better-auth/api';
 import { anonymous, bearer, deviceAuthorization, jwt } from 'better-auth/plugins';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import {
@@ -14,6 +15,8 @@ import { AUTH_BASE_PATH, AUTH_JWKS_PATH } from '#lib/auth/paths.ts';
 import { env } from '#lib/env.ts';
 import { MCP_RESOURCE, MCP_SCOPE } from '#lib/mcp/auth.ts';
 import { fetchClientMetadataResource } from '#lib/mcp/cimd-transport.ts';
+import { isMcpAuthorizationQuery } from '#lib/mcp/signup.ts';
+import type { AnalyticsServiceContract } from '#services/analytics.service.ts';
 import type { AppsService } from '#services/apps.service.ts';
 
 const DEVICE_VERIFICATION_PATH = '/device';
@@ -36,9 +39,11 @@ export type AppClaimServiceContract = Pick<AppsService, 'claim'>;
  */
 export function createAuth({
   appsService,
+  analyticsService,
   database,
 }: {
   appsService: AppClaimServiceContract;
+  analyticsService: AnalyticsServiceContract;
   database: NonNullable<BetterAuthOptions['database']>;
 }) {
   return betterAuth({
@@ -48,6 +53,28 @@ export function createAuth({
     secret: env.BETTER_AUTH_SECRET,
     disabledPaths: ['/token'],
     hooks: { before: protectShortLivedDeploymentTokens },
+    databaseHooks: {
+      user: {
+        create: {
+          async after(...[user, context]) {
+            if (
+              user.isAnonymous ||
+              !context?.path?.startsWith('/callback/') ||
+              context.headers?.get('dnt') === '1'
+            ) {
+              return;
+            }
+            const state = await getOAuthState();
+            if (isMcpAuthorizationQuery(state?.serverContext?.query)) {
+              void analyticsService.track({
+                ownerId: Value.Parse(OwnerIdSchema, user.id),
+                event: { name: 'mcp_signup_completed', data: {} },
+              });
+            }
+          },
+        },
+      },
+    },
     socialProviders: {
       github: {
         clientId: env.GITHUB_CLIENT_ID,

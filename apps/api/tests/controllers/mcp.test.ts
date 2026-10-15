@@ -7,14 +7,16 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
+import { UmamiRepository } from '#repositories/umami.repository.ts';
 import { AppResponseSchema, ListAppsResponseSchema } from '#routes/api/apps/model.ts';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 
-const { auth, AppsServicePlugin } = await import('#services/plugins.ts');
+const { auth, AppsServicePlugin, AnalyticsServicePlugin } = await import('#services/plugins.ts');
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
+const analytics = AnalyticsServicePlugin.decorator.analyticsService;
 const context = await auth.$context;
 const key = await generateKeyPair('EdDSA');
 const jwk = { ...(await exportJWK(key.publicKey)), kid: 'mcp-test', alg: 'EdDSA' };
@@ -48,6 +50,7 @@ beforeAll(async function createAccounts() {
 });
 
 beforeEach(function publishSigningKey() {
+  spyOn(analytics, 'track');
   spyOn(auth.api, 'getJwks').mockResolvedValue({ keys: [jwk] });
   spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
@@ -96,11 +99,13 @@ function rpc({
   params = {},
   token,
   protocolVersion = PROTOCOL_VERSIONS[0],
+  headers = {},
 }: {
   method: string;
   params?: Record<string, unknown>;
   token?: string;
   protocolVersion?: (typeof PROTOCOL_VERSIONS)[number];
+  headers?: Record<string, string>;
 }) {
   const modern = protocolVersion === '2026-07-28';
   return sendJson({
@@ -108,6 +113,7 @@ function rpc({
     url: MCP_URL,
     headers: {
       ...HEADERS,
+      ...headers,
       'mcp-protocol-version': protocolVersion,
       ...(modern ? { 'mcp-method': method } : {}),
       ...(modern && typeof params.name === 'string' ? { 'mcp-name': params.name } : {}),
@@ -165,6 +171,7 @@ test('unauthenticated clients receive a discovery challenge without querying app
   expect(response.status).toBe(StatusMap.Unauthorized);
   expect(response.headers.get('www-authenticate')).toContain(MCP_RESOURCE_METADATA_URL);
   expect(list).not.toHaveBeenCalled();
+  expect(analytics.track).not.toHaveBeenCalled();
 });
 
 test('an account session cannot substitute for an OAuth access token', async () => {
@@ -284,6 +291,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       result.tools[0].outputSchema.properties.apps.items.properties.computeUsage.anyOf,
     ).toContainEqual({ type: 'null' });
     expect(JSON.stringify(result.tools[0].outputSchema)).not.toContain('"nullable"');
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   test('passes only the verified account identity to the existing app service', async () => {
@@ -324,6 +332,14 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(result.structuredContent).toEqual({ apps: [app] });
     expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
     expect(list).toHaveBeenCalledWith({ ownerId });
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith({
+      ownerId,
+      event: {
+        name: 'mcp_tool_completed',
+        data: { tool_name: 'list_apps', outcome: 'success', duration_ms: expect.any(Number) },
+      },
+    });
   });
 
   test('cannot retain another account identity between requests', async () => {
@@ -337,6 +353,10 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       });
       expect((await rpcBody(response)).result.isError).not.toBe(true);
       expect(list).toHaveBeenLastCalledWith({ ownerId: sub });
+      expect(analytics.track).toHaveBeenLastCalledWith({
+        ownerId: sub,
+        event: expect.objectContaining({ name: 'mcp_tool_completed' }),
+      });
     }
   });
 
@@ -351,6 +371,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const body = await rpcBody(response);
     expect(body.error ?? body.result?.isError).toBeTruthy();
     expect(list).not.toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 
   test('does not expose internal service errors to the client', async () => {
@@ -364,6 +385,46 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const body = await rpcBody(response);
     expect(body.result.isError).toBe(true);
     expect(JSON.stringify(body)).not.toContain('database-password-must-stay-private');
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith({
+      ownerId,
+      event: {
+        name: 'mcp_tool_completed',
+        data: { tool_name: 'list_apps', outcome: 'error', duration_ms: expect.any(Number) },
+      },
+    });
+  });
+
+  test('respects Do Not Track without blocking tool execution', async () => {
+    const list = spyOn(appsService, 'list').mockResolvedValue([]);
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: 'list_apps', arguments: {} },
+      token: await accessToken(),
+      protocolVersion,
+      headers: { dnt: '1' },
+    });
+    expect((await rpcBody(response)).result.structuredContent).toEqual({ apps: [] });
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  test('returns tool results while analytics delivery is pending', async () => {
+    const pending = Promise.withResolvers<void>();
+    spyOn(UmamiRepository.prototype, 'send').mockReturnValue(pending.promise);
+    spyOn(appsService, 'list').mockResolvedValue([]);
+    try {
+      const response = await rpc({
+        method: 'tools/call',
+        params: { name: 'list_apps', arguments: {} },
+        token: await accessToken(),
+        protocolVersion,
+      });
+      expect((await rpcBody(response)).result.structuredContent).toEqual({ apps: [] });
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+    } finally {
+      pending.resolve();
+    }
   });
 });
 
