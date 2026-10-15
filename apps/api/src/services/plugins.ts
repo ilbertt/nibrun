@@ -126,6 +126,8 @@ export const auth = createAuth({
   database: authDatabase,
 });
 
+const mcpAuthorizationRepository = new McpAuthorizationRepository(auth);
+
 const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);
 const githubDeploymentGrantsService = new GitHubDeploymentGrantsService({
   identityService: githubActionsOidcService,
@@ -199,6 +201,7 @@ const logsService = new LogsService({
   logsRepo: logsRepository,
   deploymentsRepo: deploymentsRepository,
 });
+const mcpAuthorizationService = new McpAuthorizationService(mcpAuthorizationRepository);
 
 const authenticationService = new AuthenticationService({
   auth: auth.api,
@@ -208,10 +211,7 @@ export const AuthPlugin = createAuthPlugin(authenticationService);
 
 export const McpAuthorizationServicePlugin = new Elysia({
   name: 'service.mcpAuthorization',
-}).decorate(
-  'mcpAuthorizationService',
-  new McpAuthorizationService(new McpAuthorizationRepository(auth)),
-);
+}).decorate('mcpAuthorizationService', mcpAuthorizationService);
 
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);
