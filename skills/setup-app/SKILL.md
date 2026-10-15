@@ -11,7 +11,7 @@ and, if unavailable, download and install the latest stable version from the
 
 When choosing the default stack, clone the appropriate template:
 
-- App: [ilbertt/bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter).
+- Webapp (with or without backend): [ilbertt/bun-full-stack-starter](https://github.com/ilbertt/bun-full-stack-starter).
 - Telegram bot: [ilbertt/telegram-bot-starter](https://github.com/ilbertt/telegram-bot-starter),
   which also requires Bun.
 
