@@ -85,27 +85,11 @@ prefix on each handler — `.get('/apps/:appId/artifacts', …)` — which is wh
 lets Elysia name and type `params`. That path also names the controller:
 `AppsAppIdArtifactsController`, unique where the folder name alone would not be.
 
-MCP implementation lives in `src/lib/mcp/`: shared auth models, the SDK server factory,
-runtime transport, schema adaptation, and one registration module per tool under `tools/`.
-Shared tool metadata and result handling live under `tools/shared/`.
-Controllers mount MCP and `/.well-known/` at the root and stay hidden from OpenAPI:
-MCP describes its own tools. Tool schemas derive from the existing TypeBox models through
-`fromTypeBox`, which removes Elysia's OpenAPI-only annotations. Wrap structured-result tool
-callbacks with `handleToolResult` for text/structured responses and sanitized failures.
-Reuse `MCP_TOOL_META` for tool OAuth metadata; keep behavioral annotations per tool.
-Discovery forwards directly to Better Auth. `clientCorsPlugin` runs once at the app boundary
-and allows browser access only to SQLite client endpoints and public discovery paths. The official MCP SDK owns
-transport; Better Auth's MCP and CIMD plugins own OAuth, with DCR enabled explicitly.
-MCP uses one server-wide `mcp` scope, defined by `MCP_SCOPE`, for access to every tool.
-The MCP resource binds the token's audience; `offline_access` only requests refresh tokens.
-Use the SDK's Host and Origin guards with hostname allowlists, not full origins. Keep the
-Better Auth protected-request helper's JWT type and required-claim constraints explicit.
-Keep Better Auth packages at the same version. CIMD's single-file transport closely follows
-the upstream Node transport linked on its first line, using `Bun.dns.lookup` for resolution.
-Preserve upstream's HTTPS connection pinning, TLS identity, isolated connections, redirect
-handling, and response streaming; avoid unrelated rewrites when syncing upstream.
-Account ownership comes from verified token claims, never tool arguments or dashboard sessions.
-MCP maps verified claims to SDK auth context without a separate account lookup.
+MCP code belongs in `src/lib/mcp/`: one tool registration per file in `tools/`,
+shared helpers in `tools/shared/`. Derive tool schemas from existing API models.
+
+Keep MCP and discovery routes out of OpenAPI. Leave protocol and OAuth behavior
+to the official SDK and Better Auth. Keep the CIMD transport close to its linked upstream source.
 
 ## Tests
 
