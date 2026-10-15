@@ -7,8 +7,6 @@ import { MCP_RESOURCE, McpAccessTokenClaimsSchema } from '#lib/mcp/auth.ts';
 import type { McpAuthorizationRepositoryContract } from '#repositories/mcp-authorization.repository.ts';
 import { Service } from '#services/service.ts';
 
-const MS_PER_SECOND = 1000;
-
 export class McpAuthorizationService extends Service {
   private readonly repository: McpAuthorizationRepositoryContract;
 
@@ -24,10 +22,7 @@ export class McpAuthorizationService extends Service {
     request: Request;
     claims: JWTPayload;
   }): Promise<AuthInfo> {
-    if (
-      !Value.Check(McpAccessTokenClaimsSchema, claims) ||
-      claims.iat > Date.now() / MS_PER_SECOND
-    ) {
+    if (!Value.Check(McpAccessTokenClaimsSchema, claims)) {
       throw new ForbiddenError('The access token has no valid nibrun account identity.');
     }
     if (!(await this.repository.isRegisteredAccount(claims.sub))) {

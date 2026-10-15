@@ -195,6 +195,7 @@ test.each([
   ['issuer', { iss: 'https://untrusted.example' }],
   ['audience', { aud: 'https://other-resource.example' }],
   ['expiry', { exp: 1 }],
+  ['not-before time', { nbf: Math.floor(Date.now() / MS_PER_SECOND) + FUTURE_OFFSET_SECONDS }],
   ['scope type', { scope: [MCP_SCOPE] }],
   ['sender-constrained token', { cnf: { jkt: 'requires-proof' } }],
 ] as const)(
@@ -224,15 +225,6 @@ test.each([
     expect(response.status).toBe(StatusMap.Forbidden);
   },
 );
-
-test('rejects a token issued in the future', async () => {
-  const claims = {
-    ...accessTokenClaims(),
-    iat: Math.floor(Date.now() / MS_PER_SECOND) + FUTURE_OFFSET_SECONDS,
-  };
-  const response = await rpc({ method: 'tools/list', token: await accessToken({ claims }) });
-  expect(response.status).toBe(StatusMap.Forbidden);
-});
 
 test('rejects tokens without an expiry', async () => {
   const { exp: _expiry, ...claims } = accessTokenClaims();
