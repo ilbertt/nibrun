@@ -1,5 +1,4 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@repo/ui/components/avatar';
-import { Plug } from 'lucide-react';
 import { useOAuthClientIdentity } from '#lib/hooks/use-oauth-client-identity.ts';
 
 export function OAuthClientIdentity() {
@@ -10,17 +9,17 @@ export function OAuthClientIdentity() {
 
   return (
     <div className="flex items-center gap-3">
-      <Avatar size="lg" className="rounded-lg">
+      <Avatar size="lg" className="overflow-hidden">
         <AvatarImage
           key={logoUrl}
           src={logoUrl}
           onLoadingStatusChange={onLogoLoadingStatusChange}
           alt=""
           referrerPolicy="no-referrer"
-          className="rounded-lg object-contain"
+          className="object-contain"
         />
-        <AvatarFallback className="rounded-lg">
-          <Plug className="size-5" aria-hidden="true" />
+        <AvatarFallback className="font-semibold text-base" aria-hidden="true">
+          {Array.from(client.name)[0]?.toUpperCase()}
         </AvatarFallback>
       </Avatar>
       <div className="flex min-w-0 flex-col gap-1">
