@@ -24,9 +24,7 @@ export function oauthClientIdentity(client: OAuthConsentRequest['client']): OAut
   const website = clientUrl(client.client_uri);
   return {
     name: client.client_name?.trim() || 'An app',
-    logoUrl:
-      clientUrl(client.logo_uri)?.href ??
-      (website ? new URL('/favicon.ico', website).href : undefined),
+    logoUrl: clientUrl(client.logo_uri)?.href,
     domain: (clientUrl(client.client_id) ?? website)?.hostname,
   };
 }

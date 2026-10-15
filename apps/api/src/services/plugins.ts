@@ -7,6 +7,7 @@ import { CloudflareClient } from '#lib/cloudflare/client.ts';
 import { CloudflareDnsClient } from '#lib/cloudflare-dns/client.ts';
 import { env } from '#lib/env.ts';
 import { createLogger } from '#lib/logger.ts';
+import { fetchClientMetadataResource } from '#lib/mcp/cimd-transport.ts';
 import { RemoteFetchSlots } from '#lib/remote-fetch.ts';
 import { artifactsS3, exportsS3, importsS3, uploadSigner } from '#lib/s3/client.ts';
 import { openRemoteSqliteSession } from '#lib/sqlite/remote-session.ts';
@@ -19,6 +20,7 @@ import { ArtifactStorageRepository } from '#repositories/artifact-storage.reposi
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { CachedBinariesRepository } from '#repositories/cached-binaries.repository.ts';
+import { ClientWebsiteRepository } from '#repositories/client-website.repository.ts';
 import { CustomHostnamesRepository } from '#repositories/custom-hostnames.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { DnsRepository } from '#repositories/dns.repository.ts';
@@ -51,6 +53,7 @@ import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
 import { LogsService } from '#services/logs.service.ts';
 import { McpAuthorizationService } from '#services/mcp-authorization.service.ts';
+import { OAuthClientIconService } from '#services/oauth-client-icon.service.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
 import { TrustedWorkflowsService } from '#services/trusted-workflows.service.ts';
@@ -75,6 +78,9 @@ const remoteFetchSlots = new RemoteFetchSlots();
 
 const agentRepository = new AgentRepository({ sql, secretsKey });
 const assetsRepository = new AssetsRepository(sql);
+const clientWebsiteRepository = new ClientWebsiteRepository({
+  fetchResource: fetchClientMetadataResource,
+});
 const healthRepository = new HealthRepository({
   sql,
   logStore: victoriaLogsClient.health,
@@ -154,6 +160,9 @@ const exportsService = new ExportsService({
 });
 
 const assetsService = new AssetsService(assetsRepository);
+const oauthClientIconService = new OAuthClientIconService({
+  clientWebsiteRepo: clientWebsiteRepository,
+});
 const healthService = new HealthService({
   healthRepo: healthRepository,
   agentRepo: agentRepository,
@@ -219,6 +228,10 @@ export const AssetsServicePlugin = new Elysia({ name: 'service.assets' }).decora
   'assetsService',
   assetsService,
 );
+
+export const OAuthClientIconServicePlugin = new Elysia({
+  name: 'service.oauthClientIcon',
+}).decorate('oauthClientIconService', oauthClientIconService);
 
 export const HealthServicePlugin = new Elysia({ name: 'service.health' }).decorate(
   'healthService',
