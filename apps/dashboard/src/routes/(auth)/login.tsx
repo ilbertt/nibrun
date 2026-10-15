@@ -11,8 +11,12 @@ export const Route = createFileRoute('/(auth)/login')({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
     redirect: sameOriginPath(search.redirect),
   }),
-  beforeLoad: ({ context, search }) => {
-    if (context.session) {
+  beforeLoad: ({ context, search, location }) => {
+    if (
+      context.session &&
+      !context.session.user.isAnonymous &&
+      !new URLSearchParams(location.searchStr).has('sig')
+    ) {
       throw redirect({ href: search.redirect ?? IndexRoute.to });
     }
   },
