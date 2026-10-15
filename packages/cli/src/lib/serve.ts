@@ -1,5 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
+import { hostnameUrl } from '@repo/app-ui';
 import { RUNTIME_ENVIRONMENT_VALUES } from '@repo/protocol/runtime-values';
 import type { Server } from 'bun';
 import { z } from 'zod';
@@ -42,7 +43,7 @@ export function guestAddress(environment: GuestEnvironment): Address {
   if (hostname === null) {
     throw offNibrun(RUNTIME_ENVIRONMENT_VALUES.HOSTNAME);
   }
-  return { hostname: EVERY_INTERFACE, port: httpPort, url: `https://${hostname}` };
+  return { hostname: EVERY_INTERFACE, port: httpPort, url: hostnameUrl(hostname) };
 }
 
 function offNibrun(variable: string): UsageError {

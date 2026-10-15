@@ -1,0 +1,19 @@
+{
+  "name": "@repo/app-ui",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "check:types": "bun run --bun tsc",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

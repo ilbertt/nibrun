@@ -20,6 +20,7 @@
     "@parshjs/env": "^0.0.3",
     "@parshjs/files": "^0.0.4",
     "@repo/api-client": "workspace:*",
+    "@repo/app-ui": "workspace:*",
     "@repo/app-operations": "workspace:*",
     "@repo/global-constants": "workspace:*",
     "better-auth": "catalog:",

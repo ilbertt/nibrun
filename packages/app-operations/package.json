@@ -14,7 +14,8 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
-    "@repo/api-client": "workspace:*"
+    "@repo/api-client": "workspace:*",
+    "@repo/app-ui": "workspace:*"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

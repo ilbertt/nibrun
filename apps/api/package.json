@@ -28,6 +28,7 @@
     "@ilbertt/bun-sqlgen": "^0.7.0",
     "@modelcontextprotocol/server": "^2.3.1",
     "@repo/api-constants": "workspace:*",
+    "@repo/app-ui": "workspace:*",
     "@repo/protocol": "workspace:*",
     "@repo/sqlite": "workspace:*",
     "@repo/typebox-extensions": "workspace:*",

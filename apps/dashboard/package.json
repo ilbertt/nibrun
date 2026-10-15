@@ -18,6 +18,7 @@
     "@repo/analytics": "workspace:*",
     "@repo/api-client": "workspace:*",
     "@repo/api-constants": "workspace:*",
+    "@repo/app-ui": "workspace:*",
     "@repo/app-operations": "workspace:*",
     "@repo/binary-handoff": "workspace:*",
     "@repo/deploy-link": "workspace:*",

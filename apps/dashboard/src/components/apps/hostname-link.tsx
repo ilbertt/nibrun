@@ -1,4 +1,5 @@
 import { trackEvent } from '@repo/analytics';
+import { hostnameUrl } from '@repo/app-ui';
 import { ExternalLinkIcon } from 'lucide-react';
 import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
 
@@ -6,7 +7,7 @@ export function HostnameLink({ hostname, appId }: { hostname: string; appId: str
   const identity = useSessionIdentity();
   return (
     <a
-      href={`https://${hostname}`}
+      href={hostnameUrl(hostname)}
       target="_blank"
       rel="noreferrer"
       onClick={() =>

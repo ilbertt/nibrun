@@ -25,6 +25,7 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
   DNS record names, type metadata, and required-record construction live in
   `apps/api/src/lib/dns-records.ts`. Consumers render the DNS records returned by the API;
   client fixtures describe those responses instead of reconstructing records from templates.
+  App presentation helpers, including hostname selection and HTTPS URLs, live in `@repo/app-ui`.
 - Single source of truth is the golden rule: put each definition in the package that owns its
   meaning and derive every consumer from it. `@repo/protocol` owns API–agent messages, their wire
   schemas, and runtime-reference names, metadata and interpolation. Public consumers may import
