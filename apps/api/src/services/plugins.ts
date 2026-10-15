@@ -29,6 +29,7 @@ import { GitHubDeploymentGrantsRepository } from '#repositories/github-deploymen
 import { HealthRepository } from '#repositories/health.repository.ts';
 import { ImportsRepository } from '#repositories/imports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
+import { McpAuthorizationRepository } from '#repositories/mcp-authorization.repository.ts';
 import { ReleaseDigestRepository } from '#repositories/release-digest.repository.ts';
 import { RemoteSourceRepository } from '#repositories/remote-source.repository.ts';
 import { SqliteConnectionsRepository } from '#repositories/sqlite-connections.repository.ts';
@@ -50,6 +51,7 @@ import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
 import { LogsService } from '#services/logs.service.ts';
+import { McpAuthorizationService } from '#services/mcp-authorization.service.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
 import { TrustedWorkflowsService } from '#services/trusted-workflows.service.ts';
@@ -203,6 +205,13 @@ const authenticationService = new AuthenticationService({
   grantsService: githubDeploymentGrantsService,
 });
 export const AuthPlugin = createAuthPlugin(authenticationService);
+
+export const McpAuthorizationServicePlugin = new Elysia({
+  name: 'service.mcpAuthorization',
+}).decorate(
+  'mcpAuthorizationService',
+  new McpAuthorizationService(new McpAuthorizationRepository(auth)),
+);
 
 export function loggerPlugin(name: string) {
   const logger = createLogger(name);

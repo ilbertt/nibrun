@@ -83,6 +83,13 @@ prefix on each handler — `.get('/apps/:appId/artifacts', …)` — which is wh
 lets Elysia name and type `params`. That path also names the controller:
 `AppsAppIdArtifactsController`, unique where the folder name alone would not be.
 
+MCP and `/.well-known/` controllers mount at the root. MCP uses the official
+`@modelcontextprotocol/server` SDK and its stateless HTTP handler, including legacy
+Streamable HTTP compatibility. Tool schemas derive from the existing TypeBox models through
+`mcpSchema`, which removes Elysia's OpenAPI-only annotations. MCP authenticates OAuth access
+tokens independently of dashboard sessions and deployment keys; account ownership comes from
+the verified token, never tool arguments.
+
 ## Tests
 
 `tests/` mirrors the layering rather than the source tree —
