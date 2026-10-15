@@ -1,14 +1,19 @@
-import type { CallToolResult } from '@modelcontextprotocol/server';
+import type { CallToolResult, InputRequiredResult } from '@modelcontextprotocol/server';
 import { createLogger } from '#lib/logger.ts';
 
 const logger = createLogger('mcp:tools');
 
-type StructuredContent = NonNullable<CallToolResult['structuredContent']>;
+type StructuredContent = Exclude<CallToolResult['structuredContent'], undefined>;
 
-export function handleToolResult<Args extends unknown[]>(
-  callback: (...args: Args) => StructuredContent | Promise<StructuredContent>,
+export type ToolResult<Output> =
+  | (CallToolResult & { structuredContent: Output })
+  | (CallToolResult & { isError: true })
+  | InputRequiredResult;
+
+export function handleToolResult<Args extends unknown[], Output extends StructuredContent>(
+  callback: (...args: Args) => Output | Promise<Output>,
 ) {
-  return async (...args: Args): Promise<CallToolResult> => {
+  return async (...args: Args): Promise<ToolResult<Output>> => {
     try {
       const result = await callback(...args);
       return {
