@@ -5,6 +5,7 @@ import { join, relative, resolve } from 'node:path';
 // the same names.
 export const DB_MIGRATIONS_DIR_NAME = 'migrations';
 export const PUBLIC_DASHBOARD_DIR_NAME = 'public';
+export const SKILLS_DIR_NAME = 'skills';
 
 // `--asset <folder>` mounts each tree under its own basename at `import.meta.dir`, reachable
 // through `node:fs` like any other directory — so a compiled binary and a checkout differ only in
@@ -15,6 +16,9 @@ const DB_MIGRATIONS_DIR = Bun.isStandaloneExecutable
 const PUBLIC_DASHBOARD_DIR = Bun.isStandaloneExecutable
   ? join(import.meta.dir, PUBLIC_DASHBOARD_DIR_NAME)
   : resolve(import.meta.dir, '..', '..', PUBLIC_DASHBOARD_DIR_NAME);
+const SKILLS_DIR = Bun.isStandaloneExecutable
+  ? join(import.meta.dir, SKILLS_DIR_NAME)
+  : resolve(import.meta.dir, '..', '..', '..', '..', SKILLS_DIR_NAME);
 
 /** Keyed by the path of the file relative to the folder it came from. */
 export type AssetFiles = Map<string, Blob>;
@@ -25,6 +29,10 @@ export function getMigrations(): AssetFiles {
 
 export function getPublicAssets(): AssetFiles {
   return readFolder(PUBLIC_DASHBOARD_DIR);
+}
+
+export function getSkills(): AssetFiles {
+  return readFolder(SKILLS_DIR);
 }
 
 function readFolder(folder: string): AssetFiles {

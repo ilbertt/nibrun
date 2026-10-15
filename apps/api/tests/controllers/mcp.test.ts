@@ -1,7 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
+import { createHash } from 'node:crypto';
+import { readdir } from 'node:fs/promises';
 import {
   CLIENT_CAPABILITIES_META_KEY,
   CLIENT_INFO_META_KEY,
+  INVALID_PARAMS,
   PROTOCOL_VERSION_META_KEY,
 } from '@modelcontextprotocol/server';
 import { Value } from '@sinclair/typebox/value';
@@ -30,6 +33,8 @@ const HEADERS = {
   host: MCP_RESOURCE.host,
 };
 const nativeFetch = globalThis.fetch;
+const SKILL_URI = 'skill://nibrun/deploy-to-nibrun/SKILL.md';
+const SKILL_DIRECTORY = new URL('../../../../skills/deploy-to-nibrun/', import.meta.url);
 
 let ownerId: string;
 let otherOwnerId: string;
@@ -103,6 +108,7 @@ function rpc({
   protocolVersion?: (typeof PROTOCOL_VERSIONS)[number];
 }) {
   const modern = protocolVersion === '2026-07-28';
+  const name = method === 'resources/read' ? params.uri : params.name;
   return sendJson({
     method: 'POST',
     url: MCP_URL,
@@ -110,7 +116,7 @@ function rpc({
       ...HEADERS,
       'mcp-protocol-version': protocolVersion,
       ...(modern ? { 'mcp-method': method } : {}),
-      ...(modern && typeof params.name === 'string' ? { 'mcp-name': params.name } : {}),
+      ...(modern && typeof name === 'string' ? { 'mcp-name': name } : {}),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
     body: {
@@ -159,13 +165,16 @@ test('protected-resource discovery is public and names the existing OAuth issuer
   });
 });
 
-test('unauthenticated clients receive a discovery challenge without querying apps', async () => {
-  const list = spyOn(appsService, 'list');
-  const response = await rpc({ method: 'tools/list' });
-  expect(response.status).toBe(StatusMap.Unauthorized);
-  expect(response.headers.get('www-authenticate')).toContain(MCP_RESOURCE_METADATA_URL);
-  expect(list).not.toHaveBeenCalled();
-});
+test.each(['tools/list', 'skills/list', 'skills/get', 'resources/read'])(
+  'unauthenticated %s receives a discovery challenge without querying apps',
+  async (method) => {
+    const list = spyOn(appsService, 'list');
+    const response = await rpc({ method });
+    expect(response.status).toBe(StatusMap.Unauthorized);
+    expect(response.headers.get('www-authenticate')).toContain(MCP_RESOURCE_METADATA_URL);
+    expect(list).not.toHaveBeenCalled();
+  },
+);
 
 test('an account session cannot substitute for an OAuth access token', async () => {
   const result = await auth.api.signInAnonymous({ asResponse: true });
@@ -247,6 +256,69 @@ test('rejects a forged signature even when the key ID matches', async () => {
 });
 
 describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
+  test('imports the canonical deployment skill with matching frontmatter, bytes and digest', async () => {
+    const token = await accessToken();
+    const listing = await rpc({ method: 'skills/list', token, protocolVersion });
+    const { result } = await rpcBody(listing);
+    expect(result.skills).toHaveLength(1);
+    expect(result.nextCursor).toBeUndefined();
+    const skill = result.skills[0];
+    expect(skill.uri).toBe(SKILL_URI);
+
+    const resources = await rpc({ method: 'resources/list', token, protocolVersion });
+    expect((await rpcBody(resources)).result.resources).toEqual([
+      expect.objectContaining({
+        uri: SKILL_URI,
+        name: skill.frontmatter.name,
+        description: skill.frontmatter.description,
+        mimeType: 'text/markdown',
+      }),
+    ]);
+
+    const metadata = await rpc({
+      method: 'skills/get',
+      params: { uri: SKILL_URI },
+      token,
+      protocolVersion,
+    });
+    expect((await rpcBody(metadata)).result.skill).toEqual(skill);
+
+    const source = await Bun.file(new URL('SKILL.md', SKILL_DIRECTORY)).text();
+    expect(skill.frontmatter).toEqual(Bun.YAML.parse(source.match(/^---\n([\s\S]*?)\n---\n/)![1]!));
+    expect(await readdir(SKILL_DIRECTORY, { recursive: true })).toEqual(['SKILL.md']);
+    expect(skill.resources).toEqual([
+      {
+        uri: SKILL_URI,
+        digest: `sha256:${createHash('sha256').update(source).digest('hex')}`,
+        size: Buffer.byteLength(source),
+      },
+    ]);
+
+    const resource = await rpc({
+      method: 'resources/read',
+      params: { uri: SKILL_URI },
+      token,
+      protocolVersion,
+    });
+    expect((await rpcBody(resource)).result.contents).toEqual([
+      { uri: SKILL_URI, mimeType: 'text/markdown', text: source },
+    ]);
+  });
+
+  test.each([
+    ['skills/get', {}],
+    ['skills/get', { uri: 'skill://nibrun/missing/SKILL.md' }],
+    ['skills/list', { cursor: 'unknown' }],
+    ['resources/read', { uri: 'skill://nibrun/deploy-to-nibrun/../../AGENTS.md' }],
+    ['resources/read', { uri: 'file:///etc/passwd' }],
+  ] as const)(
+    'rejects invalid skill requests: %s %j',
+    async function rejectsSkillRequest(...[method, params]) {
+      const response = await rpc({ method, params, token: await accessToken(), protocolVersion });
+      expect((await rpcBody(response)).error.code).toBe(INVALID_PARAMS);
+    },
+  );
+
   test('uses the verified token identity without a separate account lookup', async () => {
     const accountLookup = spyOn(context.internalAdapter, 'findUserById').mockRejectedValue(
       new Error('MCP authorization must not query account state'),
@@ -376,7 +448,22 @@ test('supports the existing initialization handshake', async () => {
   expect((await rpcBody(response)).result).toMatchObject({
     protocolVersion: PROTOCOL_VERSIONS[0],
     serverInfo: { name: 'nibrun' },
-    capabilities: { tools: {} },
+    capabilities: {
+      tools: {},
+      resources: {},
+      extensions: { 'io.modelcontextprotocol/skills': {} },
+    },
+  });
+});
+
+test('advertises the skills extension through current protocol discovery', async () => {
+  const response = await rpc({
+    method: 'server/discover',
+    token: await accessToken(),
+    protocolVersion: '2026-07-28',
+  });
+  expect((await rpcBody(response)).result.capabilities.extensions).toEqual({
+    'io.modelcontextprotocol/skills': {},
   });
 });
 

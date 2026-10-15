@@ -1,6 +1,6 @@
 import { cp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { DB_MIGRATIONS_DIR_NAME, PUBLIC_DASHBOARD_DIR_NAME } from '#lib/assets.ts';
+import { DB_MIGRATIONS_DIR_NAME, PUBLIC_DASHBOARD_DIR_NAME, SKILLS_DIR_NAME } from '#lib/assets.ts';
 
 const API_DIR = join(import.meta.dir, '..');
 const API_DIST_DIR = join(API_DIR, 'dist');
@@ -9,6 +9,7 @@ const API_ENTRYPOINT = 'src/index.ts';
 const DB_MIGRATIONS_DIR = join(API_DIR, 'src/db', DB_MIGRATIONS_DIR_NAME);
 const DASHBOARD_DIST_DIR = join(API_DIR, '..', 'dashboard', 'dist');
 const PUBLIC_DASHBOARD_DIR = join(API_DIR, PUBLIC_DASHBOARD_DIR_NAME);
+const SKILLS_DIR = join(API_DIR, '..', '..', SKILLS_DIR_NAME);
 
 console.log('🧹 Cleaning dist dir...');
 await rm(API_DIST_DIR, { recursive: true, force: true });
@@ -24,7 +25,7 @@ const buildResult = await Bun.build({
   entrypoints: [API_ENTRYPOINT],
   compile: {
     outfile: API_BINARY_FILE,
-    assets: [PUBLIC_DASHBOARD_DIR, DB_MIGRATIONS_DIR],
+    assets: [PUBLIC_DASHBOARD_DIR, DB_MIGRATIONS_DIR, SKILLS_DIR],
   },
   minify: { whitespace: true, syntax: true },
   target: 'bun',
