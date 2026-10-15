@@ -13,4 +13,5 @@ apps/api/public
 **/*.md
 # Source rather than docs: the presets import these pages, and the dashboard builds from them.
 !packages/deploy-link/content/*.md
+!skills/**/*.md
 docker-compose*.yml
