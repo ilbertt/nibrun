@@ -45,16 +45,27 @@ export function useFileSqliteConnection(entry: FilesystemEntry): FileSqliteConne
         connection,
         ...(current ?? []).filter((saved) => saved.id !== connection.id),
       ]);
-      window.open(explorerHref(connection.url), '_blank', 'noopener');
     },
   });
   useFailureToast(opening.error?.message);
+
+  function open(): void {
+    // Open during the click to preserve user activation; noopener would discard the tab handle.
+    const tab = window.open('about:blank', '_blank');
+    if (tab !== null) {
+      tab.opener = null;
+    }
+    void opening
+      .mutateAsync()
+      .then((connection) => tab?.location.replace(explorerHref(connection.url)))
+      .catch(() => tab?.close());
+  }
 
   return {
     isDatabase: entry.kind === 'file' && (saved !== undefined || isSqliteFilename(entry.name)),
     href: saved === undefined ? undefined : explorerHref(saved.url),
     error: opening.error,
     isOpening: connections.isPending || opening.isPending,
-    open: () => opening.mutate(),
+    open,
   };
 }
