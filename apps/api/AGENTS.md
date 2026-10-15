@@ -87,10 +87,12 @@ lets Elysia name and type `params`. That path also names the controller:
 
 MCP implementation lives in `src/lib/mcp/`: shared auth models, the SDK server factory,
 runtime transport, schema adaptation, and one registration module per tool under `tools/`.
+Shared tool metadata and result handling live under `tools/shared/`.
 Controllers mount MCP and `/.well-known/` at the root and stay hidden from OpenAPI:
 MCP describes its own tools. Tool schemas derive from the existing TypeBox models through
 `fromTypeBox`, which removes Elysia's OpenAPI-only annotations. Wrap structured-result tool
-callbacks with `handleResult` for text/structured responses and sanitized failures.
+callbacks with `handleToolResult` for text/structured responses and sanitized failures.
+Reuse `MCP_TOOL_META` for tool OAuth metadata; keep behavioral annotations per tool.
 Discovery forwards directly to Better Auth. `clientCorsPlugin` runs once at the app boundary
 and allows browser access only to SQLite client endpoints and public discovery paths. The official MCP SDK owns
 transport; Better Auth's MCP and CIMD plugins own OAuth, with DCR enabled explicitly.

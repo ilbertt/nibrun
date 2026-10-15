@@ -1,9 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { Type } from '@sinclair/typebox';
 import type { OwnerId } from '#lib/api/identifiers.ts';
-import { MCP_SCOPE } from '#lib/mcp/auth.ts';
-import { handleResult } from '#lib/mcp/handle-result.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
+import { handleToolResult } from '#lib/mcp/tools/shared/handle-tool-result.ts';
+import { MCP_TOOL_META } from '#lib/mcp/tools/shared/tool-meta.ts';
 import { ListAppsResponseSchema } from '#routes/api/apps/model.ts';
 import type { AppsService } from '#services/apps.service.ts';
 
@@ -32,9 +32,9 @@ export function registerListAppsTool({
         openWorldHint: false,
         idempotentHint: true,
       },
-      _meta: { securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }] },
+      _meta: MCP_TOOL_META,
     },
-    handleResult(async function listApps() {
+    handleToolResult(async function listApps() {
       return { apps: await appsService.list({ ownerId }) };
     }),
   );
