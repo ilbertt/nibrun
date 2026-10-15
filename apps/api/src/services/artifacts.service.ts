@@ -378,6 +378,7 @@ export class ArtifactsService extends Service {
     deploymentGrant,
     isAnonymous,
     url,
+    filename: providedFilename,
     sha256,
   }: {
     appId: AppId;
@@ -385,6 +386,7 @@ export class ArtifactsService extends Service {
     deploymentGrant: ArtifactUploadGrant | null;
     isAnonymous: boolean;
     url: string;
+    filename: Filename | undefined;
     sha256?: Sha256Digest | undefined;
   }): Promise<Artifact> {
     if (deploymentGrant !== null) {
@@ -394,9 +396,8 @@ export class ArtifactsService extends Service {
       throw new NotFoundError(NO_SUCH_APP);
     }
 
-    // The name a host writes into an export comes from the url, because nobody else is here to
-    // give one. A url that ends in no name at all is refused before it is fetched.
-    const filename = filenameFromUrl(url);
+    // Temporary file download URLs may not carry a filename in their path.
+    const filename = providedFilename ?? filenameFromUrl(url);
     if (filename === undefined) {
       throw new BadRequestError(UNNAMED_BINARY);
     }

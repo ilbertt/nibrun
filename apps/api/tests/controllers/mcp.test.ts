@@ -49,6 +49,8 @@ const SKILL_URI = 'skill://nibrun/deploy-to-nibrun/SKILL.md';
 const SKILL_DIRECTORY = new URL('../../../../skills/deploy-to-nibrun/', import.meta.url);
 
 const BINARY_URL = 'https://files.example.test/app';
+const NATIVE_DOWNLOAD_URL = 'https://files.example.test/?signature=temporary-download-token';
+const NATIVE_BINARY = { download_url: NATIVE_DOWNLOAD_URL, file_id: 'file-mcp-binary' };
 const BINARY_SHA256 = 'a94d242b9587cc191df91f21b3ac236714b02ce453730e17b0ddf17cb138eb1e';
 const ARTIFACT = Value.Parse(ArtifactSchema, {
   id: 'mcp-artifact',
@@ -468,19 +470,35 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
         openWorldHint: true,
         idempotentHint: false,
       },
-      inputSchema: { required: ['appId', 'url'], additionalProperties: false },
-      _meta: { securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }] },
+      inputSchema: {
+        required: ['appId'],
+        additionalProperties: false,
+        oneOf: [{ required: ['url'] }, { required: ['binary'] }],
+      },
+      _meta: {
+        securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }],
+        'openai/fileParams': ['binary'],
+      },
     });
     const fetched = CreateArtifactBodySchema.anyOf
       .map((schema) => schema.properties)
       .find((properties) => 'url' in properties)!;
     expect(tool.inputSchema.properties.url).toEqual(JSON.parse(JSON.stringify(fetched.url)));
     expect(tool.inputSchema.properties.sha256).toEqual(JSON.parse(JSON.stringify(fetched.sha256)));
+    expect(tool.inputSchema.properties.binary.required).toEqual(['download_url', 'file_id']);
+    expect(Object.keys(tool.inputSchema.properties.binary.properties)).toEqual([
+      'download_url',
+      'file_id',
+      'mime_type',
+      'file_name',
+    ]);
+    expect(tool.inputSchema.properties.binary.properties.download_url).toEqual(
+      tool.inputSchema.properties.url,
+    );
     expect(tool.outputSchema.properties.deployment.required).toEqual(
       DeploymentResponseSchema.required,
     );
     expect(tool.outputSchema.properties.app.required).toEqual(AppResponseSchema.required);
-    expect(JSON.stringify(tool)).not.toContain('openai/');
     expect(JSON.stringify(tool.outputSchema)).not.toContain('"nullable"');
   });
 
@@ -516,6 +534,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       deploymentGrant: null,
       isAnonymous: false,
       url: BINARY_URL,
+      filename: undefined,
       sha256: BINARY_SHA256,
     });
     expect(deploy).toHaveBeenCalledTimes(1);
@@ -544,6 +563,57 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect((await rpcBody(response)).result.isError).not.toBe(true);
     expect(fetch.mock.calls[0]?.[0].sha256).toBeUndefined();
   });
+
+  test.each([
+    {
+      metadata: { file_name: 'native-server', mime_type: 'application/octet-stream' },
+      filename: 'native-server',
+    },
+    { metadata: {}, filename: 'app' },
+    { metadata: { file_name: '../../unsafe-name' }, filename: 'app' },
+  ])(
+    'normalizes a native file descriptor without treating its ID as account identity: %j',
+    async ({ metadata, filename }) => {
+      const app = deploymentApp();
+      const get = spyOn(appsService, 'get').mockResolvedValue(app);
+      const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
+      const deploy = spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+      const token = await accessToken();
+      const response = await rpc({
+        method: 'tools/call',
+        params: {
+          name: 'deploy_app',
+          arguments: {
+            appId: app.id,
+            binary: { ...NATIVE_BINARY, ...metadata, file_id: otherOwnerId },
+            sha256: BINARY_SHA256,
+          },
+        },
+        token,
+        protocolVersion,
+      });
+      const { result } = await rpcBody(response);
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent.deployment).toEqual(DEPLOYMENT);
+      expect(get).toHaveBeenCalledWith({ appId: app.id, ownerId });
+      expect(fetch).toHaveBeenCalledWith({
+        appId: app.id,
+        ownerId,
+        isAnonymous: false,
+        deploymentGrant: null,
+        url: NATIVE_DOWNLOAD_URL,
+        filename,
+        sha256: BINARY_SHA256,
+      });
+      expect(deploy).toHaveBeenCalledWith({
+        appId: app.id,
+        ownerId,
+        isAnonymous: false,
+        source: { artifactId: ARTIFACT.id },
+      });
+      expect(JSON.stringify([fetch.mock.calls, deploy.mock.calls, result])).not.toContain(token);
+    },
+  );
 
   test('does not fetch a binary for a missing app or an app owned by another account', async () => {
     const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
@@ -584,6 +654,18 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     { appId: ARTIFACT.appId },
     { url: BINARY_URL },
     { appId: ARTIFACT.appId, url: BINARY_URL, name: 'unexpected-new-app' },
+    { appId: ARTIFACT.appId, url: BINARY_URL, binary: NATIVE_BINARY },
+    { appId: ARTIFACT.appId, binary: { file_id: NATIVE_BINARY.file_id } },
+    { appId: ARTIFACT.appId, binary: { download_url: NATIVE_DOWNLOAD_URL } },
+    { appId: ARTIFACT.appId, binary: { ...NATIVE_BINARY, file_id: '' } },
+    {
+      appId: ARTIFACT.appId,
+      binary: { ...NATIVE_BINARY, download_url: 'http://files.example.test/' },
+    },
+    { appId: ARTIFACT.appId, binary: { ...NATIVE_BINARY, mime_type: 123 } },
+    { appId: ARTIFACT.appId, binary: { ...NATIVE_BINARY, ownerId: 'caller-selected-owner' } },
+    { appId: ARTIFACT.appId, binary: NATIVE_BINARY, ownerId: 'caller-selected-owner' },
+    { appId: ARTIFACT.appId, binary: NATIVE_BINARY, sha256: 'wrong-checksum' },
   ])('refuses invalid deployment arguments before calling services: %j', async (args) => {
     const get = spyOn(appsService, 'get');
     const fetch = spyOn(artifactsService, 'createFromUrl');

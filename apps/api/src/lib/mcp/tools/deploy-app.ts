@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/server';
-import { AppIdSchema } from '@repo/protocol';
+import { AppIdSchema, FilenameSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
+import { Value } from '@sinclair/typebox/value';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import { handleToolResult } from '#lib/mcp/tools/shared/handle-tool-result.ts';
@@ -12,12 +13,31 @@ import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 
-const DeployAppInputSchema = Type.Composite(
-  [
-    Type.Object({ appId: AppIdSchema }),
-    Type.Extract(CreateArtifactBodySchema, Type.Object({ url: Type.String() })),
-  ],
+const FetchedBinarySchema = Type.Extract(
+  CreateArtifactBodySchema,
+  Type.Object({ url: Type.String() }),
+);
+const ChatGptFileInputSchema = Type.Object(
+  {
+    download_url: FetchedBinarySchema.properties.url,
+    file_id: Type.String({ minLength: 1 }),
+    mime_type: Type.Optional(Type.String()),
+    file_name: Type.Optional(Type.String()),
+  },
   { additionalProperties: false },
+);
+const DEFAULT_BINARY_FILENAME = Value.Parse(FilenameSchema, 'app');
+const DeployAppInputSchema = Type.Object(
+  {
+    appId: AppIdSchema,
+    url: Type.Optional(FetchedBinarySchema.properties.url),
+    binary: Type.Optional(ChatGptFileInputSchema),
+    sha256: FetchedBinarySchema.properties.sha256,
+  },
+  {
+    additionalProperties: false,
+    oneOf: [{ required: ['url'] }, { required: ['binary'] }],
+  },
 );
 const inputSchema = fromTypeBox(DeployAppInputSchema);
 const outputSchema = fromTypeBox(
@@ -49,7 +69,7 @@ export function registerDeployAppTool({
     {
       title: 'Deploy nibrun app',
       description:
-        'Fetch a Linux x86_64 executable from a public HTTPS URL, validate it and queue a deployment for an existing app owned by your connected nibrun account. An optional SHA-256 verifies the downloaded file. This replaces the app’s current release; calling again creates another deployment. A pending result does not mean the app is healthy.',
+        'Deploy a Linux x86_64 executable to an existing app owned by your connected nibrun account. Supply exactly one source: a binary file when supported by the client, or a public HTTPS url. An optional SHA-256 verifies the downloaded file. This replaces the current release; calling again creates another deployment. A pending result does not mean the app is healthy.',
       inputSchema,
       outputSchema,
       annotations: {
@@ -58,20 +78,32 @@ export function registerDeployAppTool({
         openWorldHint: true,
         idempotentHint: false,
       },
-      _meta: MCP_TOOL_META,
+      _meta: { ...MCP_TOOL_META, 'openai/fileParams': ['binary'] },
     },
     handleToolResult(async function deployApp({
       appId,
       url,
+      binary,
       sha256,
     }: typeof DeployAppInputSchema.static) {
       const app = await appsService.get({ appId, ownerId });
+      const sourceUrl = Value.Parse(
+        FetchedBinarySchema.properties.url,
+        binary?.download_url ?? url,
+      );
+      const filename =
+        binary === undefined
+          ? undefined
+          : Value.Check(FilenameSchema, binary.file_name)
+            ? binary.file_name
+            : DEFAULT_BINARY_FILENAME;
       const artifact = await artifactsService.createFromUrl({
         appId,
         ownerId,
         deploymentGrant: null,
         isAnonymous: false,
-        url,
+        url: sourceUrl,
+        filename,
         sha256,
       });
       const deployment = await deploymentsService.createOrRollback({
