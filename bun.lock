@@ -39,7 +39,7 @@
         "@aws-sdk/s3-request-presigner": "^3.1127.0",
         "@better-auth/api-key": "1.7.2",
         "@better-auth/cimd": "1.7.2",
-        "@better-auth/core": "1.7.2",
+        "@better-auth/core": "catalog:",
         "@better-auth/mcp": "1.7.2",
         "@better-auth/oauth-provider": "1.7.2",
         "@elysia/cors": "^1.4.2",
@@ -65,7 +65,7 @@
     "apps/dashboard": {
       "name": "@repo/dashboard",
       "dependencies": {
-        "@better-auth/core": "1.7.2",
+        "@better-auth/core": "catalog:",
         "@repo/analytics": "workspace:*",
         "@repo/api-client": "workspace:*",
         "@repo/api-constants": "workspace:*",
@@ -342,6 +342,7 @@
     "@libredb/studio@0.18.0": "packages/sqlite-explorer/patches/@libredb%2Fstudio@0.18.0.patch",
   },
   "catalog": {
+    "@better-auth/core": "1.7.2",
     "@libsql/client": "^0.18.0",
     "@sinclair/typebox": "^0.34.52",
     "@tailwindcss/vite": "^4.3.3",

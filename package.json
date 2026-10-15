@@ -18,6 +18,7 @@
       "packages/*"
     ],
     "catalog": {
+      "@better-auth/core": "1.7.2",
       "@libsql/client": "^0.18.0",
       "@sinclair/typebox": "^0.34.52",
       "@tailwindcss/vite": "^4.3.3",
