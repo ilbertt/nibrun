@@ -21,7 +21,9 @@ import { AppResponseSchema, ListAppsResponseSchema } from '#routes/api/apps/mode
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 
-const { auth, AppsServicePlugin, ArtifactsServicePlugin, DeploymentsServicePlugin } = await import('#services/plugins.ts');
+const { auth, AppsServicePlugin, ArtifactsServicePlugin, DeploymentsServicePlugin } = await import(
+  '#services/plugins.ts'
+);
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const { fromTypeBox } = await import('#lib/mcp/schema.ts');
@@ -424,7 +426,11 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       protocolVersion,
     });
     const { result } = await rpcBody(response);
-    expect(result.tools).toHaveLength(3);
+    expect(result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      'list_apps',
+      'get_app',
+      'deploy_app',
+    ]);
     expect(result.tools[0]).toMatchObject({
       name: 'list_apps',
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
@@ -499,6 +505,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       DeploymentResponseSchema.required,
     );
     expect(tool.outputSchema.properties.app.required).toEqual(AppResponseSchema.required);
+    expect(tool.outputSchema.properties.url).toMatchObject({ type: 'string', format: 'uri' });
     expect(JSON.stringify(tool.outputSchema)).not.toContain('"nullable"');
   });
 
@@ -564,6 +571,37 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(fetch.mock.calls[0]?.[0].sha256).toBeUndefined();
   });
 
+  test.each([true, false])(
+    'deploys with the active custom domain URL when the platform hostname is present: %s',
+    async (withPlatformHostname) => {
+      const original = ownedApp();
+      const app = Value.Parse(AppResponseSchema, {
+        ...original,
+        hostnames: [
+          {
+            ...original.hostnames[0],
+            hostname: 'app.example.com',
+            kind: 'custom',
+          },
+          ...(withPlatformHostname ? original.hostnames : []),
+        ],
+      });
+      spyOn(appsService, 'get').mockResolvedValue(app);
+      spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
+      spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+      const response = await rpc({
+        method: 'tools/call',
+        params: { name: 'deploy_app', arguments: { appId: app.id, url: BINARY_URL } },
+        token: await accessToken(),
+        protocolVersion,
+      });
+      const { result } = await rpcBody(response);
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent.url).toBe('https://app.example.com');
+      expect(result.structuredContent.deployment).toEqual(DEPLOYMENT);
+    },
+  );
+
   test.each([
     {
       metadata: { file_name: 'native-server', mime_type: 'application/octet-stream' },
@@ -574,7 +612,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
   ])(
     'normalizes a native file descriptor without treating its ID as account identity: %j',
     async ({ metadata, filename }) => {
-      const app = deploymentApp();
+      const app = ownedApp();
       const get = spyOn(appsService, 'get').mockResolvedValue(app);
       const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
       const deploy = spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
@@ -910,7 +948,9 @@ test('accepts the configured browser origin', async () => {
     },
     body: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
   });
-  expect((await rpcBody(response)).result.tools).toHaveLength(3);
+  expect((await rpcBody(response)).result.tools).toContainEqual(
+    expect.objectContaining({ name: 'list_apps' }),
+  );
 });
 
 test.each(['untrusted.example', `${MCP_RESOURCE.hostname}.untrusted.example`])(

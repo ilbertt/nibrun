@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/server';
+import { appUrl } from '@repo/app-ui';
 import { AppIdSchema, FilenameSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
@@ -44,9 +45,10 @@ const outputSchema = fromTypeBox(
   Type.Object({
     app: AppResponseSchema,
     deployment: DeploymentResponseSchema,
-    url: Type.Union([Type.String({ format: 'uri' }), Type.Null()], {
+    url: Type.String({
+      format: 'uri',
       description:
-        'The app’s platform HTTPS URL. A pending deployment has not been confirmed healthy.',
+        'The app’s public HTTPS URL, preferring an active custom domain. A pending deployment has not been confirmed healthy.',
     }),
   }),
 );
@@ -112,8 +114,7 @@ export function registerDeployAppTool({
         isAnonymous: false,
         source: { artifactId: artifact.id },
       });
-      const hostname = app.hostnames.find((entry) => entry.kind === 'platform')?.hostname;
-      return { app, deployment, url: hostname === undefined ? null : `https://${hostname}` };
+      return { app, deployment, url: appUrl(app.hostnames) };
     }),
   );
 }
