@@ -1,11 +1,11 @@
-import type { McpServer } from '@modelcontextprotocol/server';
+import type { McpServer, StandardSchemaWithJSON } from '@modelcontextprotocol/server';
 import { appUrl } from '@repo/app-ui';
-import { type AppId, AppIdSchema } from '@repo/protocol';
+import { AppIdSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import { handleToolResult } from '#lib/mcp/tools/shared/handle-tool-result.ts';
-import { MCP_TOOL_META } from '#lib/mcp/tools/shared/tool-meta.ts';
+import { registerTool } from '#lib/mcp/tools/shared/register-tool.ts';
 import { DeploymentResponseSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
 import { AppResponseSchema } from '#routes/api/apps/model.ts';
 import type { AppsService } from '#services/apps.service.ts';
@@ -29,6 +29,9 @@ const outputSchema = fromTypeBox(
   }),
 );
 
+type GetAppInput = StandardSchemaWithJSON.InferOutput<typeof inputSchema>;
+type GetAppOutput = StandardSchemaWithJSON.InferOutput<typeof outputSchema>;
+
 export function registerGetAppTool({
   server,
   appsService,
@@ -40,9 +43,10 @@ export function registerGetAppTool({
   deploymentsService: DeploymentsService;
   ownerId: OwnerId;
 }) {
-  server.registerTool(
-    'get_app',
-    {
+  registerTool({
+    server,
+    name: 'get_app',
+    config: {
       title: 'Get nibrun app',
       description:
         'Get an app owned by your connected nibrun account, its configuration, newest deployment and public URL. Environment values are redacted.',
@@ -54,9 +58,10 @@ export function registerGetAppTool({
         openWorldHint: false,
         idempotentHint: true,
       },
-      _meta: MCP_TOOL_META,
     },
-    handleToolResult(async function getApp({ appId }: { appId: AppId }) {
+    callback: handleToolResult(async function getApp({
+      appId,
+    }: GetAppInput): Promise<GetAppOutput> {
       const app = await appsService.get({ appId, ownerId });
       const deployments = await deploymentsService.list({ appId, ownerId });
       return {
@@ -65,5 +70,5 @@ export function registerGetAppTool({
         url: appUrl(app.hostnames),
       };
     }),
-  );
+  });
 }

@@ -5,8 +5,10 @@ import {
   CLIENT_CAPABILITIES_META_KEY,
   CLIENT_INFO_META_KEY,
   INVALID_PARAMS,
+  McpServer,
   PROTOCOL_VERSION_META_KEY,
 } from '@modelcontextprotocol/server';
+import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
@@ -20,6 +22,9 @@ import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 const { auth, AppsServicePlugin, DeploymentsServicePlugin } = await import('#services/plugins.ts');
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
+const { fromTypeBox } = await import('#lib/mcp/schema.ts');
+const { registerTool } = await import('#lib/mcp/tools/shared/register-tool.ts');
+const { MCP_TOOL_META } = await import('#lib/mcp/tools/shared/tool-meta.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
 const deploymentsService = DeploymentsServicePlugin.decorator.deploymentsService;
 const context = await auth.$context;
@@ -195,6 +200,24 @@ test('protected-resource discovery is public and names the existing OAuth issuer
     scopes_supported: [MCP_SCOPE],
     bearer_methods_supported: ['header'],
   });
+});
+
+test('shared tool registration keeps extension metadata and server-owned authorization metadata', () => {
+  const server = new McpServer({ name: 'metadata-test', version: '1.0.0' });
+  const schema = fromTypeBox(Type.Object({}));
+  const registered = registerTool({
+    server,
+    name: 'metadata',
+    config: {
+      inputSchema: schema,
+      outputSchema: schema,
+      _meta: { 'test/metadata': true, securitySchemes: [{ type: 'noauth' }] },
+    },
+    callback: function metadata() {
+      return { content: [], structuredContent: {} };
+    },
+  });
+  expect(registered._meta).toEqual({ 'test/metadata': true, ...MCP_TOOL_META });
 });
 
 test.each(['tools/list', 'skills/list', 'skills/get', 'resources/read'])(
