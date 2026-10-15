@@ -2,6 +2,7 @@ import { trackEvent, trackingAllowed } from '@repo/analytics';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authClient } from '#lib/auth.ts';
 import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
+import { isMcpLogin } from '#lib/mcp-login-analytics.ts';
 import { sameOriginPath } from '#lib/same-origin-path.ts';
 import {
   cachedAnonymousApps,
@@ -25,14 +26,26 @@ export function useSignIn({
 }): UseMutationResult<SignInResult, unknown, void> {
   const landing = sameOriginPath(callbackURL) ?? IndexRoute.to;
   const identity = useSessionIdentity();
+  const signInReason = isMcpLogin(window.location.search) ? 'mcp' : reason;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
       if (trackingAllowed()) {
-        rememberSignIn({ reason, identity, anonymousAppIds: cachedAnonymousApps(queryClient) });
-        trackEvent({ name: 'sign_in_started', data: { identity_state: identity, reason } });
+        rememberSignIn({
+          reason: signInReason,
+          identity,
+          anonymousAppIds: cachedAnonymousApps(queryClient),
+        });
+        trackEvent({
+          name: 'sign_in_started',
+          data: { identity_state: identity, reason: signInReason, provider: 'github' },
+        });
       }
-      const result = await authClient.signIn.social({ provider: 'github', callbackURL: landing });
+      const result = await authClient.signIn.social({
+        provider: 'github',
+        callbackURL: landing,
+        ...(signInReason === 'mcp' ? { errorCallbackURL: `/login${window.location.search}` } : {}),
+      });
       if (result.error) {
         throw result.error;
       }
@@ -42,7 +55,13 @@ export function useSignIn({
       forgetSignIn();
       trackEvent({
         name: 'sign_in_failed',
-        data: { identity_state: identity, reason, ...signInFailureData(error) },
+        data: {
+          identity_state: identity,
+          reason: signInReason,
+          provider: 'github',
+          phase: 'start',
+          ...signInFailureData(error),
+        },
       });
     },
   });

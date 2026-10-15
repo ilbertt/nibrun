@@ -9,6 +9,7 @@ import { Field, FieldError } from '@repo/ui/components/field';
 import { OAuthClientIdentity } from '#components/oauth/oauth-client-identity.tsx';
 import { OAuthConsentButtons } from '#components/oauth/oauth-consent-buttons.tsx';
 import { OAuthPermissions } from '#components/oauth/oauth-permissions.tsx';
+import { useMcpConsentAnalytics } from '#lib/hooks/use-mcp-consent-analytics.ts';
 import { useOAuthConsent } from '#lib/hooks/use-oauth-consent.ts';
 import { useOAuthConsentDecision } from '#lib/hooks/use-oauth-consent-decision.ts';
 import { useSession } from '#lib/hooks/use-session.ts';
@@ -17,6 +18,7 @@ export function OAuthConsent() {
   const consent = useOAuthConsent();
   const decision = useOAuthConsentDecision();
   const session = useSession();
+  useMcpConsentAnalytics({ ready: consent.isSuccess, error: consent.error });
 
   return (
     <Card>

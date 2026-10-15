@@ -6,9 +6,21 @@ export type DeploymentContext = {
   preset_slug: string | undefined;
 };
 
-export const SIGN_IN_REASONS = ['login', 'keep-app'] as const;
+export const SIGN_IN_REASONS = ['login', 'keep-app', 'mcp'] as const;
+
+type McpAnalyticsContext = { identity_state: string };
 
 export type AnalyticsEventData = {
+  mcp_login_viewed: McpAnalyticsContext;
+  mcp_consent_viewed: McpAnalyticsContext;
+  mcp_authorization_denied: McpAnalyticsContext;
+  mcp_authorization_completed: McpAnalyticsContext;
+  mcp_authorization_failed: McpAnalyticsContext & {
+    phase: 'request' | 'consent';
+    error_code: string | undefined;
+    http_status: number | undefined;
+  };
+
   pricing_link_clicked: { cta_placement: 'header' };
   pricing_viewed: Record<string, never>;
   pricing_calculated: { app_count: number };
@@ -42,13 +54,20 @@ export type AnalyticsEventData = {
   };
   app_open_clicked: { identity_state: string; app_id: string; placement: 'deployment' | 'app' };
   session_seen: { identity_state: string };
-  sign_in_started: { identity_state: string; reason: (typeof SIGN_IN_REASONS)[number] };
+  sign_in_started: {
+    provider?: 'github';
+    identity_state: string;
+    reason: (typeof SIGN_IN_REASONS)[number];
+  };
   sign_in_completed: {
+    provider?: 'github';
     identity_state: string;
     previous_identity_state: string | undefined;
     reason: (typeof SIGN_IN_REASONS)[number];
   };
   sign_in_failed: {
+    provider?: 'github';
+    phase?: 'start' | 'callback';
     identity_state: string;
     reason: (typeof SIGN_IN_REASONS)[number];
     error_code: string | undefined;

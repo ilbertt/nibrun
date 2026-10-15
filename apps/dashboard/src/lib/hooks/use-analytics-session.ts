@@ -8,6 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useSession } from '#lib/hooks/use-session.ts';
 import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
+import { isMcpLogin } from '#lib/mcp-login-analytics.ts';
 import { SessionIdentity } from '#lib/session-identity.ts';
 import { takeSignIn, verifiedClaims } from '#lib/sign-in-analytics.ts';
 import { appsQueryOptions } from '#queries/apps.ts';
@@ -28,6 +29,12 @@ export function useAnalyticsSession(): void {
     if (identity !== SessionIdentity.WithAccount) {
       return;
     }
+    if (
+      isMcpLogin(window.location.search) &&
+      new URLSearchParams(window.location.search).has('error')
+    ) {
+      return;
+    }
     const pending = takeSignIn();
     if (!pending) {
       return;
@@ -38,6 +45,7 @@ export function useAnalyticsSession(): void {
         identity_state: identity,
         previous_identity_state: pending.previous_identity_state,
         reason: pending.reason,
+        provider: 'github',
       },
     });
     if (pending.anonymous_app_ids.length === 0) {

@@ -32,3 +32,8 @@ Internal tracking shared by the marketing site and dashboard.
   anonymous app to become permanent in that account. Browser events cannot
   guarantee outcomes after the page closes.
 - Keep initialization in a `.ts` hook. Add `.tsx` files only when they contain JSX.
+
+- MCP funnel events are emitted by the browser on the login and consent pages.
+  An authorization success requires a successful consent response with an issued
+  code. Do not infer signup from a visitor login or infer a working MCP
+  connection from approved consent.
