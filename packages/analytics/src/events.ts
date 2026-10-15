@@ -8,27 +8,18 @@ export type DeploymentContext = {
 
 export const SIGN_IN_REASONS = ['login', 'keep-app', 'mcp'] as const;
 
-export type McpAnalyticsContext = {
-  source: 'mcp';
-  attempt_id: string;
-};
-
-export type SignInAnalyticsContext = Partial<McpAnalyticsContext> & {
-  provider?: 'github';
-};
+type McpAnalyticsContext = { identity_state: string };
 
 export type AnalyticsEventData = {
-  mcp_auth_started: McpAnalyticsContext;
+  mcp_login_viewed: McpAnalyticsContext;
   mcp_consent_viewed: McpAnalyticsContext;
   mcp_authorization_denied: McpAnalyticsContext;
-  mcp_authorization_completed: McpAnalyticsContext & { duration_ms: number };
+  mcp_authorization_completed: McpAnalyticsContext;
   mcp_authorization_failed: McpAnalyticsContext & {
-    phase: 'authorization' | 'consent' | 'token';
-    error_code: string;
-    http_status: number;
+    phase: 'request' | 'consent';
+    error_code: string | undefined;
+    http_status: number | undefined;
   };
-  mcp_connected: McpAnalyticsContext & { duration_ms: number };
-  sign_up_completed: McpAnalyticsContext & { provider: 'github' };
 
   pricing_link_clicked: { cta_placement: 'header' };
   pricing_viewed: Record<string, never>;
@@ -63,17 +54,19 @@ export type AnalyticsEventData = {
   };
   app_open_clicked: { identity_state: string; app_id: string; placement: 'deployment' | 'app' };
   session_seen: { identity_state: string };
-  sign_in_started: SignInAnalyticsContext & {
+  sign_in_started: {
+    provider?: 'github';
     identity_state: string;
     reason: (typeof SIGN_IN_REASONS)[number];
   };
-  sign_in_completed: SignInAnalyticsContext & {
-    account_type?: 'new' | 'existing';
+  sign_in_completed: {
+    provider?: 'github';
     identity_state: string;
     previous_identity_state: string | undefined;
     reason: (typeof SIGN_IN_REASONS)[number];
   };
-  sign_in_failed: SignInAnalyticsContext & {
+  sign_in_failed: {
+    provider?: 'github';
     phase?: 'start' | 'callback';
     identity_state: string;
     reason: (typeof SIGN_IN_REASONS)[number];

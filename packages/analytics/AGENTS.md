@@ -1,6 +1,6 @@
 # @repo/analytics
 
-Internal tracking shared by the marketing site, dashboard, and API-confirmed MCP outcomes.
+Internal tracking shared by the marketing site and dashboard.
 
 - Seed one Umami website named `nibrun` for marketing and dashboard tracking.
 - Keep both sites on the same Umami website. Derive its ID from `src/config.ts`
@@ -33,13 +33,7 @@ Internal tracking shared by the marketing site, dashboard, and API-confirmed MCP
   guarantee outcomes after the page closes.
 - Keep initialization in a `.ts` hook. Add `.tsx` files only when they contain JSX.
 
-- Backend consumers import event types from `@repo/analytics/events` and the
-  browser-independent collector payload helpers from `@repo/analytics/server`.
-  Use the same website and browser Distinct ID, and attach known user IDs as
-  `account_id`. Respect the production dashboard origin, HTTPS, Do Not Track,
-  and embedded-window restrictions before persisting a tracking attempt.
-- MCP signup requires a real account creation hook followed by a confirmed
-  account session. Authorization requires an issued code; connection requires
-  a successful authenticated MCP response. Keep attempt correlation and event
-  deduplication in expiring backend records, including across token refresh.
-  Analytics failures must not change authentication or MCP responses.
+- MCP funnel events are emitted by the browser on the login and consent pages.
+  An authorization success requires a successful consent response with an issued
+  code. Do not infer signup from a visitor login or infer a working MCP
+  connection from approved consent.

@@ -18,7 +18,7 @@ export function OAuthConsent() {
   const consent = useOAuthConsent();
   const decision = useOAuthConsentDecision();
   const session = useSession();
-  useMcpConsentAnalytics(consent.isSuccess);
+  useMcpConsentAnalytics({ ready: consent.isSuccess, error: consent.error });
 
   return (
     <Card>

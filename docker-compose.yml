@@ -138,7 +138,6 @@ services:
     environment:
       - PORT=3000
       - BASE_URL=${API_BASE_URL}
-      - UMAMI_HOSTNAME=${UMAMI_HOSTNAME}
       - DATABASE_URL=postgresql://${API_DB_USER}:${API_DB_PASSWORD}@postgres-db:5432/${API_DB_NAME}
       - BETTER_AUTH_SECRET=${API_BETTER_AUTH_SECRET}
       - TENANT_SECRETS_KEY=${API_TENANT_SECRETS_KEY}

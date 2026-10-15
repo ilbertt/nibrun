@@ -78,3 +78,18 @@ test('a claim requires the same anonymous app to become permanent under the acco
   ).toEqual([]);
   expect(verifiedClaims({ pending, apps: [{ id: APP_ID, expiresAt: null }] })).toEqual([APP_ID]);
 });
+
+test('MCP attribution survives the OAuth redirect without implying a new account', () => {
+  const stored = JSON.stringify({
+    reason: 'mcp',
+    previous_identity_state: SessionIdentity.Anonymous,
+    expires_at: Date.now() + SIGN_IN_WINDOW_MS,
+    anonymous_app_ids: [APP_ID],
+  });
+  const pending = consumeSignIn({ getItem: () => stored, removeItem() {} });
+  expect(pending).toMatchObject({
+    reason: 'mcp',
+    previous_identity_state: SessionIdentity.Anonymous,
+    anonymous_app_ids: [APP_ID],
+  });
+});

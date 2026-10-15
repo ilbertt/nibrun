@@ -4,9 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./config": "./src/config.ts",
-    "./events": "./src/events.ts",
-    "./server": "./src/server.ts"
+    "./config": "./src/config.ts"
   },
   "imports": {
     "#*": "./src/*"
