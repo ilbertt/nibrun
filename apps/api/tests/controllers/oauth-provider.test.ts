@@ -3,7 +3,7 @@ import { StatusMap } from 'elysia';
 import { ORIGIN, send } from '#tests/controllers/support/api.ts';
 
 const { auth } = await import('#services/plugins.ts');
-const { MCP_SCOPES } = await import('#lib/mcp.ts');
+const { MCP_SCOPES } = await import('#lib/mcp/auth.ts');
 
 test('RFC 8414 discovery advertises the API origin and separate authentication endpoints', async () => {
   const response = await send({ url: `${ORIGIN}/.well-known/oauth-authorization-server` });

@@ -5,7 +5,6 @@ import { Value } from '@sinclair/typebox/value';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization, jwt } from 'better-auth/plugins';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { fetchClientMetadataResource } from '#lib/auth/cimd-transport.ts';
 import {
   protectShortLivedDeploymentTokens,
   shortLivedDeploymentTokenConfiguration,
@@ -13,7 +12,8 @@ import {
 import { OAUTH_ISSUER } from '#lib/auth/oauth-issuer.ts';
 import { AUTH_BASE_PATH, AUTH_JWKS_PATH } from '#lib/auth/paths.ts';
 import { env } from '#lib/env.ts';
-import { MCP_RESOURCE, MCP_SCOPES } from '#lib/mcp.ts';
+import { MCP_RESOURCE, MCP_SCOPES } from '#lib/mcp/auth.ts';
+import { fetchClientMetadataResource } from '#lib/mcp/cimd-transport.ts';
 import type { AppsService } from '#services/apps.service.ts';
 
 const DEVICE_VERIFICATION_PATH = '/device';

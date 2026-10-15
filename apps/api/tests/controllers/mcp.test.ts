@@ -13,7 +13,7 @@ import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 
 const { auth, AppsServicePlugin } = await import('#services/plugins.ts');
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
-const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, McpScope } = await import('#lib/mcp.ts');
+const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, McpScope } = await import('#lib/mcp/auth.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
 const context = await auth.$context;
 const key = await generateKeyPair('EdDSA');

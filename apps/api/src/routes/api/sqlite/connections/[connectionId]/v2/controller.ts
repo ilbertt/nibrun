@@ -3,7 +3,6 @@ import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema, SqliteConnectionIdSchema } from '#lib/api/identifiers.ts';
 import { AuthCaller } from '#lib/auth/caller.ts';
 import { pathBelow, RoutePrefix } from '#lib/routes/prefixes.ts';
-import { SqliteClientCorsPlugin } from '#lib/sqlite/cors.ts';
 import { assertSqliteCookieOrigin } from '#lib/sqlite/http.ts';
 import { SQLITE_CONNECTIONS_BASE_PATH } from '#lib/sqlite/routes.ts';
 import { SqliteVersionResponseSchema } from '#routes/api/sqlite/connections/[connectionId]/v2/model.ts';
@@ -12,7 +11,6 @@ import { SqliteConnectionParamsSchema } from '#routes/api/sqlite/connections/mod
 import { AuthPlugin, SqliteServicePlugin } from '#services/plugins.ts';
 
 export const SqliteConnectionsConnectionIdV2Controller = new Elysia()
-  .use(SqliteClientCorsPlugin)
   .use(AuthPlugin)
   .use(SqliteServicePlugin)
   .get(
@@ -34,6 +32,4 @@ export const SqliteConnectionsConnectionIdV2Controller = new Elysia()
       response: { [StatusMap.OK]: SqliteVersionResponseSchema },
     },
   )
-  // Mount the pipeline here instead of in ApiController to share SqliteClientCorsPlugin
-  // across both v2 endpoints.
   .use(SqliteConnectionsConnectionIdV2PipelineController);

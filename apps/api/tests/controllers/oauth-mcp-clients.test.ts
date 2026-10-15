@@ -10,7 +10,7 @@ import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { cimdDocuments } from '#tests/support/cimd.ts';
 
 const { auth } = await import('#services/plugins.ts');
-const { MCP_RESOURCE, MCP_SCOPES } = await import('#lib/mcp.ts');
+const { MCP_RESOURCE, MCP_SCOPES } = await import('#lib/mcp/auth.ts');
 const { OAUTH_ISSUER } = await import('#lib/auth/oauth-issuer.ts');
 const AUTH_URL = `${ORIGIN}/api/auth`;
 const CALLBACK = 'https://mcp-client.example/callback';
@@ -113,6 +113,56 @@ test.each(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protecte
     });
   },
 );
+
+test.each([
+  '/.well-known/oauth-authorization-server',
+  '/.well-known/oauth-protected-resource',
+  '/.well-known/oauth-protected-resource/mcp',
+])('discovery preflight at %s is public without allowing credentials', async (path) => {
+  const response = await send({
+    method: 'OPTIONS',
+    url: `${ORIGIN}${path}`,
+    headers: {
+      origin: 'https://mcp-client.example',
+      'access-control-request-method': 'GET',
+      'access-control-request-headers': 'content-type',
+    },
+  });
+  expect(response.status).toBe(StatusMap['No Content']);
+  expect(response.headers.get('access-control-allow-origin')).toBe('https://mcp-client.example');
+  expect(response.headers.get('access-control-allow-methods')).toContain('GET');
+  expect(response.headers.get('access-control-allow-headers')?.toLowerCase()).toContain(
+    'content-type',
+  );
+  expect(response.headers.get('access-control-allow-credentials')).toBeNull();
+});
+
+test.each(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'])(
+  'discovery HEAD at %s preserves metadata headers without a body',
+  async (path) => {
+    const response = await send({ method: 'HEAD', url: `${ORIGIN}${path}` });
+    expect(response.status).toBe(StatusMap.OK);
+    expect(response.headers.get('access-control-allow-origin')).toBe('*');
+    expect(response.headers.get('cache-control')).toContain('public');
+    expect(await response.text()).toBe('');
+  },
+);
+
+test('public discovery CORS does not apply to the MCP endpoint or other API routes', async () => {
+  const mcpResponse = await send({
+    method: 'POST',
+    url: `${ORIGIN}/mcp`,
+    headers: { origin: 'https://mcp-client.example', host: MCP_RESOURCE.host },
+  });
+  expect(mcpResponse.status).toBe(StatusMap.Forbidden);
+  expect(mcpResponse.headers.get('access-control-allow-origin')).toBeNull();
+  const apiResponse = await send({
+    url: `${ORIGIN}/api/missing`,
+    headers: { origin: 'https://mcp-client.example' },
+  });
+  expect(apiResponse.status).toBe(StatusMap['Not Found']);
+  expect(apiResponse.headers.get('access-control-allow-origin')).toBeNull();
+});
 
 async function createClient(mode: ClientMode): Promise<TestClient> {
   if (mode === 'DCR') {

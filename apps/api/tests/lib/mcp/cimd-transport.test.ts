@@ -5,7 +5,7 @@ import * as https from 'node:https';
 import { Socket } from 'node:net';
 import { type DNSLookup, dns } from 'bun';
 import { StatusMap } from 'elysia';
-import { fetchClientMetadataResource } from '#lib/auth/cimd-transport.ts';
+import { fetchClientMetadataResource } from '#lib/mcp/cimd-transport.ts';
 import { IP_V4, IP_V6 } from '#lib/public-address.ts';
 
 const METADATA_URL = 'https://client.example:8443/oauth/client.json?version=1';

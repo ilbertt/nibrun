@@ -33,7 +33,7 @@ The agent may not import `@repo/api` or its subpaths; neither app imports the ot
 ## Layering (keep strict)
 
 Every feature is a repository, a service, and a controller. Do not collapse them.
-CIMD's runtime transport callback is a standalone function in `src/lib/auth/cimd-transport.ts`,
+CIMD's runtime transport callback is a standalone function in `src/lib/mcp/cimd-transport.ts`,
 passed directly to Better Auth without repository or service wrappers.
 
 Repository implementations end in `Repository`; their full and narrowed dependency
@@ -85,9 +85,13 @@ prefix on each handler — `.get('/apps/:appId/artifacts', …)` — which is wh
 lets Elysia name and type `params`. That path also names the controller:
 `AppsAppIdArtifactsController`, unique where the folder name alone would not be.
 
-MCP and `/.well-known/` controllers mount at the root and stay hidden from OpenAPI:
+MCP implementation lives in `src/lib/mcp/`: shared auth models, the SDK server factory,
+runtime transport, schema adaptation, and one registration module per tool under `tools/`.
+Controllers mount MCP and `/.well-known/` at the root and stay hidden from OpenAPI:
 MCP describes its own tools. Tool schemas derive from the existing TypeBox models through
-`mcpSchema`, which removes Elysia's OpenAPI-only annotations. The official MCP SDK owns
+`fromTypeBox`, which removes Elysia's OpenAPI-only annotations. Discovery forwards directly to
+Better Auth. `ClientCorsPlugin` runs once at the app boundary and allows browser access only
+to SQLite client endpoints and public discovery paths. The official MCP SDK owns
 transport; Better Auth's MCP and CIMD plugins own OAuth, with DCR enabled explicitly.
 Use the SDK's Host and Origin guards with hostname allowlists, not full origins. Keep the
 Better Auth protected-request helper's JWT type and required-claim constraints explicit.

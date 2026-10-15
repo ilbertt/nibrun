@@ -3,7 +3,7 @@ import { Value } from '@sinclair/typebox/value';
 import { parseAccessTokenAuthorization } from 'better-auth/oauth2';
 import type { JWTPayload } from 'jose';
 import { ForbiddenError } from '#lib/errors.ts';
-import { MCP_RESOURCE, McpAccessTokenClaimsSchema } from '#lib/mcp.ts';
+import { MCP_RESOURCE, McpAccessTokenClaimsSchema } from '#lib/mcp/auth.ts';
 import type { McpAuthorizationRepositoryContract } from '#repositories/mcp-authorization.repository.ts';
 import { Service } from '#services/service.ts';
 
