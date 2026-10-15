@@ -11,7 +11,4 @@ const appsServiceMock: AppClaimServiceContract = { claim: () => Promise.resolve(
 export const auth = createAuth({
   appsService: appsServiceMock,
   database: authDatabase,
-  fetchClientMetadataResource() {
-    throw new Error('Schema generation must not fetch client metadata.');
-  },
 });

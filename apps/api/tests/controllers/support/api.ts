@@ -28,6 +28,17 @@ Object.assign(process.env, {
   TENANT_SECRETS_KEY: TEST_SECRETS_KEY_BASE64,
 });
 
+const cimdModule = await import('@better-auth/cimd');
+const createCimd = cimdModule.cimd;
+mock.module('@better-auth/cimd', function controllerCimdPlugin() {
+  return {
+    ...cimdModule,
+    cimd(input: Parameters<typeof createCimd>[0]) {
+      return createCimd({ ...input, fetchClientMetadataResource: fetchTestClientMetadataResource });
+    },
+  };
+});
+
 const { createAuth } = await import('#lib/auth/better-auth.ts');
 const authDatabase: MemoryDB = {};
 mock.module('#lib/auth/better-auth.ts', function controllerAuthFactory() {
@@ -36,7 +47,6 @@ mock.module('#lib/auth/better-auth.ts', function controllerAuthFactory() {
       const auth = createAuth({
         ...input,
         database: memoryAdapter(authDatabase),
-        fetchClientMetadataResource: fetchTestClientMetadataResource,
       });
       for (const table of Object.keys(getSchema(auth.options))) {
         authDatabase[table] ??= [];

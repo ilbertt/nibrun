@@ -1,11 +1,11 @@
 import { apiKey } from '@better-auth/api-key';
 import { cimd } from '@better-auth/cimd';
 import { mcp } from '@better-auth/mcp';
-import type { ClientMetadataResourceFetch } from '@better-auth/oauth-provider';
 import { Value } from '@sinclair/typebox/value';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization, jwt } from 'better-auth/plugins';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { fetchClientMetadataResource } from '#lib/auth/cimd-transport.ts';
 import {
   protectShortLivedDeploymentTokens,
   shortLivedDeploymentTokenConfiguration,
@@ -37,11 +37,9 @@ export type AppClaimServiceContract = Pick<AppsService, 'claim'>;
 export function createAuth({
   appsService,
   database,
-  fetchClientMetadataResource,
 }: {
   appsService: AppClaimServiceContract;
   database: NonNullable<BetterAuthOptions['database']>;
-  fetchClientMetadataResource: ClientMetadataResourceFetch;
 }) {
   return betterAuth({
     database,

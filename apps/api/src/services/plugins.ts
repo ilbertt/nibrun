@@ -1,7 +1,6 @@
 import { Elysia } from 'elysia';
 import { sql } from '#db/client.ts';
 import { createAuth } from '#lib/auth/better-auth.ts';
-import { fetchClientMetadataResource } from '#lib/auth/cimd-transport.ts';
 import { authDatabase } from '#lib/auth/database.ts';
 import { createAuthPlugin } from '#lib/auth/plugin.ts';
 import { CloudflareClient } from '#lib/cloudflare/client.ts';
@@ -125,7 +124,6 @@ const appsService = new AppsService({
 export const auth = createAuth({
   appsService,
   database: authDatabase,
-  fetchClientMetadataResource,
 });
 
 const githubActionsOidcService = new GitHubActionsOidcService(githubActionsOidcRepository);
