@@ -10,14 +10,18 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
+import { NotFoundError } from '#lib/errors.ts';
+import { REDACTED } from '#lib/redact-secrets.ts';
+import { DeploymentResponseSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
 import { AppResponseSchema, ListAppsResponseSchema } from '#routes/api/apps/model.ts';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 
-const { auth, AppsServicePlugin } = await import('#services/plugins.ts');
+const { auth, AppsServicePlugin, DeploymentsServicePlugin } = await import('#services/plugins.ts');
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
+const deploymentsService = DeploymentsServicePlugin.decorator.deploymentsService;
 const context = await auth.$context;
 const key = await generateKeyPair('EdDSA');
 const jwk = { ...(await exportJWK(key.publicKey)), kid: 'mcp-test', alg: 'EdDSA' };
@@ -149,6 +153,34 @@ async function rpcBody(response: Response) {
         .slice('data:'.length)
     : text;
   return JSON.parse(data);
+}
+
+function ownedApp() {
+  return Value.Parse(AppResponseSchema, {
+    id: 'mcp-app',
+    ownerId,
+    name: 'MCP example',
+    slug: 'mcp-example',
+    config: { ...DEFAULT_CONFIG, environment: { API_KEY: REDACTED } },
+    hostnames: [
+      {
+        hostname: 'mcp-example.apps.test',
+        kind: 'platform',
+        state: 'active',
+        dcvTarget: null,
+        edgeErrors: [],
+        createdAt: new Date().toISOString(),
+      },
+    ],
+    state: 'active',
+    activation: 'on-request',
+    idleTimeoutMs: 300_000,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    volumeUsage: null,
+    computeUsage: null,
+    expiresAt: null,
+  });
 }
 
 test('protected-resource discovery is public and names the existing OAuth issuer', async () => {
@@ -336,14 +368,14 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(accountLookup).not.toHaveBeenCalled();
   });
 
-  test('advertises the read tool using the existing API response schema', async () => {
+  test('advertises read tools using the existing API response schemas', async () => {
     const response = await rpc({
       method: 'tools/list',
       token: await accessToken(),
       protocolVersion,
     });
     const { result } = await rpcBody(response);
-    expect(result.tools).toHaveLength(1);
+    expect(result.tools).toHaveLength(2);
     expect(result.tools[0]).toMatchObject({
       name: 'list_apps',
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
@@ -356,34 +388,26 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       result.tools[0].outputSchema.properties.apps.items.properties.computeUsage.anyOf,
     ).toContainEqual({ type: 'null' });
     expect(JSON.stringify(result.tools[0].outputSchema)).not.toContain('"nullable"');
+    expect(result.tools[1]).toMatchObject({
+      name: 'get_app',
+      inputSchema: { required: ['appId'], additionalProperties: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+        idempotentHint: true,
+      },
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }] },
+    });
+    const output = result.tools[1].outputSchema.properties;
+    expect(output.app.required).toEqual(AppResponseSchema.required);
+    expect(output.currentDeployment.anyOf[0].required).toEqual(DeploymentResponseSchema.required);
+    expect(output.currentDeployment.anyOf).toContainEqual({ type: 'null' });
+    expect(JSON.stringify(result.tools[1].outputSchema)).not.toContain('"nullable"');
   });
 
   test('passes only the verified account identity to the existing app service', async () => {
-    const app = Value.Parse(AppResponseSchema, {
-      id: 'mcp-app',
-      ownerId,
-      name: 'MCP example',
-      slug: 'mcp-example',
-      config: DEFAULT_CONFIG,
-      hostnames: [
-        {
-          hostname: 'mcp-example.apps.test',
-          kind: 'platform',
-          state: 'active',
-          dcvTarget: null,
-          edgeErrors: [],
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      state: 'active',
-      activation: 'on-request',
-      idleTimeoutMs: 300_000,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      volumeUsage: null,
-      computeUsage: null,
-      expiresAt: null,
-    });
+    const app = ownedApp();
     const list = spyOn(appsService, 'list').mockResolvedValue([app]);
     const response = await rpc({
       method: 'tools/call',
@@ -397,6 +421,97 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
     expect(list).toHaveBeenCalledWith({ ownerId });
   });
+
+  test('gets the owned app, newest deployment and platform URL with redacted configuration', async () => {
+    const app = ownedApp();
+    const newest = Value.Parse(DeploymentResponseSchema, {
+      id: 'deployment-new',
+      appId: app.id,
+      artifactId: 'artifact-1',
+      config: app.config,
+      state: 'failed',
+      message: 'The app did not start.',
+      createdAt: new Date().toISOString(),
+      restartCount: 0,
+    });
+    const get = spyOn(appsService, 'get').mockResolvedValue(app);
+    const list = spyOn(deploymentsService, 'list').mockResolvedValue([
+      newest,
+      Value.Parse(DeploymentResponseSchema, {
+        ...newest,
+        id: 'deployment-old',
+        state: 'superseded',
+      }),
+    ]);
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: 'get_app', arguments: { appId: app.id } },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toEqual({
+      app,
+      currentDeployment: newest,
+      url: 'https://mcp-example.apps.test',
+    });
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+    expect(get).toHaveBeenCalledWith({ appId: app.id, ownerId });
+    expect(list).toHaveBeenCalledWith({ appId: app.id, ownerId });
+  });
+
+  test('returns no current deployment before the first release', async () => {
+    const app = ownedApp();
+    spyOn(appsService, 'get').mockResolvedValue(app);
+    spyOn(deploymentsService, 'list').mockResolvedValue([]);
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: 'get_app', arguments: { appId: app.id } },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent.currentDeployment).toBeNull();
+  });
+
+  test.each(['missing-app', 'other-owner-app'])(
+    'does not read deployments or disclose details for an inaccessible app: %s',
+    async (appId) => {
+      const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
+      const list = spyOn(deploymentsService, 'list');
+      const response = await rpc({
+        method: 'tools/call',
+        params: { name: 'get_app', arguments: { appId } },
+        token: await accessToken(),
+        protocolVersion,
+      });
+      const { result } = await rpcBody(response);
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toBeUndefined();
+      expect(get).toHaveBeenCalledWith({ appId, ownerId });
+      expect(list).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each([{}, { appId: '-invalid' }, { appId: 'mcp-app', ownerId: 'other-owner' }])(
+    'refuses invalid get_app arguments: %j',
+    async (args) => {
+      const get = spyOn(appsService, 'get');
+      const list = spyOn(deploymentsService, 'list');
+      const response = await rpc({
+        method: 'tools/call',
+        params: { name: 'get_app', arguments: args },
+        token: await accessToken(),
+        protocolVersion,
+      });
+      const body = await rpcBody(response);
+      expect(body.error ?? body.result?.isError).toBeTruthy();
+      expect(get).not.toHaveBeenCalled();
+      expect(list).not.toHaveBeenCalled();
+    },
+  );
 
   test('cannot retain another account identity between requests', async () => {
     const list = spyOn(appsService, 'list').mockResolvedValue([]);
@@ -489,7 +604,7 @@ test('accepts the configured browser origin', async () => {
     },
     body: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
   });
-  expect((await rpcBody(response)).result.tools).toHaveLength(1);
+  expect((await rpcBody(response)).result.tools).toHaveLength(2);
 });
 
 test.each(['untrusted.example', `${MCP_RESOURCE.hostname}.untrusted.example`])(
