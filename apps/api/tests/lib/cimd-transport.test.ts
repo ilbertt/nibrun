@@ -1,4 +1,8 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test';
+import { EventEmitter } from 'node:events';
+import { type ClientRequest, type IncomingHttpHeaders, IncomingMessage } from 'node:http';
+import * as https from 'node:https';
+import { Socket } from 'node:net';
 import { type DNSLookup, dns } from 'bun';
 import { StatusMap } from 'elysia';
 import { fetchClientMetadataResource } from '#lib/auth/cimd-transport.ts';
@@ -11,34 +15,64 @@ afterEach(function restoreTransportMocks() {
   mock.restore();
 });
 
-test('resolves once and pins the address while preserving Host, TLS identity, headers, and aborts', async () => {
+function mockMetadataResponse({
+  status = StatusMap.OK,
+  headers = {},
+  body = 'metadata',
+  error,
+}: {
+  status?: number;
+  headers?: IncomingHttpHeaders;
+  body?: string;
+  error?: Error;
+} = {}) {
+  return spyOn(https, 'request').mockImplementation(function requestMetadata(
+    ...[, , onResponse]: Parameters<typeof https.request>
+  ) {
+    const response = new IncomingMessage(new Socket());
+    response.statusCode = status;
+    response.headers = headers;
+    response.push(body);
+    response.push(null);
+    const request = Object.assign(new EventEmitter(), {
+      end() {
+        if (error) {
+          request.emit('error', error);
+        } else {
+          onResponse?.(response);
+        }
+      },
+    });
+    return request as ClientRequest;
+  } as typeof https.request);
+}
+
+test('resolves once and pins both lookup callback forms while preserving Host, TLS identity, headers, and signal', async () => {
   const resolve = spyOn(dns, 'lookup').mockResolvedValue([PUBLIC_ADDRESS]);
-  const send = spyOn(globalThis, 'fetch').mockResolvedValue(
-    new Response(null, { status: StatusMap['Not Modified'] }),
-  );
+  const send = mockMetadataResponse({ status: StatusMap['Not Modified'] });
   const abort = new AbortController();
   const response = await fetchClientMetadataResource(METADATA_URL, {
     signal: abort.signal,
     headers: { 'if-none-match': 'cached-version', host: 'untrusted' },
   });
   expect(response.status).toBe(StatusMap['Not Modified']);
+  expect(response.body).toBeNull();
   expect(resolve).toHaveBeenCalledTimes(1);
   expect(resolve).toHaveBeenCalledWith('client.example', { family: 0 });
   expect(send).toHaveBeenCalledTimes(1);
-  const [url, init] = send.mock.calls[0]!;
-  expect(String(url)).toBe('https://1.1.1.1:8443/oauth/client.json?version=1');
-  const headers = new Headers(init?.headers);
-  expect(headers.get('host')).toBe('client.example:8443');
-  expect(headers.get('if-none-match')).toBe('cached-version');
-  expect(init).toMatchObject({
-    method: 'GET',
-    redirect: 'manual',
-    proxy: false,
-    keepalive: false,
-    tls: { serverName: 'client.example' },
+  const [url, options] = send.mock.calls[0]!;
+  expect(String(url)).toBe(METADATA_URL);
+  expect(options.headers).toMatchObject({
+    host: 'client.example:8443',
+    'if-none-match': 'cached-version',
   });
-  abort.abort();
-  expect(init?.signal?.aborted).toBe(true);
+  expect(options).toMatchObject({ method: 'GET', agent: false, servername: 'client.example' });
+  expect(options.signal).toBe(abort.signal);
+  const callback = mock();
+  options.lookup?.('client.example', { all: true }, callback);
+  expect(callback).toHaveBeenLastCalledWith(null, [PUBLIC_ADDRESS]);
+  options.lookup?.('client.example', {}, callback);
+  expect(callback).toHaveBeenLastCalledWith(null, PUBLIC_ADDRESS.address, PUBLIC_ADDRESS.family);
 });
 
 test.each([
@@ -54,65 +88,71 @@ test.each([
     PUBLIC_ADDRESS,
     { address, family: address.includes(':') ? IP_V6 : IP_V4, ttl: 0 },
   ]);
-  const send = spyOn(globalThis, 'fetch');
+  const send = mockMetadataResponse();
   await expect(fetchClientMetadataResource(METADATA_URL)).rejects.toThrow('public-routable');
   expect(send).not.toHaveBeenCalled();
 });
 
 test('rejects an empty DNS answer before connecting', async () => {
   spyOn(dns, 'lookup').mockResolvedValue([]);
-  const send = spyOn(globalThis, 'fetch');
-  await expect(fetchClientMetadataResource(METADATA_URL)).rejects.toThrow('public-routable');
+  const send = mockMetadataResponse();
+  await expect(fetchClientMetadataResource(METADATA_URL)).rejects.toThrow('no DNS addresses');
   expect(send).not.toHaveBeenCalled();
 });
 
 test.each([
-  { url: 'http://client.invalid/client.json', method: 'GET' },
-  { url: 'https://client.invalid/client.json', method: 'POST' },
-  { url: 'https://client.invalid/client.json', method: 'PUT' },
-])('rejects unsupported requests before DNS: %j', async ({ url, method }) => {
+  { url: 'http://client.invalid/client.json', method: 'GET', message: 'HTTPS' },
+  { url: 'https://client.invalid/client.json', method: 'POST', message: 'GET and HEAD' },
+  { url: 'https://client.invalid/client.json', method: 'PUT', message: 'GET and HEAD' },
+])('rejects unsupported requests before DNS: %j', async ({ url, method, message }) => {
   const resolve = spyOn(dns, 'lookup');
-  const send = spyOn(globalThis, 'fetch');
-  await expect(fetchClientMetadataResource(url, { method })).rejects.toThrow('HTTPS');
+  const send = mockMetadataResponse();
+  await expect(fetchClientMetadataResource(url, { method })).rejects.toThrow(message);
   expect(resolve).not.toHaveBeenCalled();
   expect(send).not.toHaveBeenCalled();
 });
 
-test('pins an IPv6 address and returns HEAD redirects without following them', async () => {
-  const address = '2606:4700:4700::1111';
-  spyOn(dns, 'lookup').mockResolvedValue([{ address, family: IP_V6, ttl: 0 }]);
-  const redirect = new Response(null, {
+test('pins IPv6 and returns HEAD redirects without following them', async () => {
+  const address: DNSLookup = { address: '2606:4700:4700::1111', family: IP_V6, ttl: 0 };
+  spyOn(dns, 'lookup').mockResolvedValue([address]);
+  const send = mockMetadataResponse({
     status: StatusMap.Found,
     headers: { location: 'https://127.0.0.1/private' },
   });
-  const send = spyOn(globalThis, 'fetch').mockResolvedValue(redirect);
   const response = await fetchClientMetadataResource(new Request(METADATA_URL, { method: 'HEAD' }));
-  expect(response).toBe(redirect);
+  expect(response.status).toBe(StatusMap.Found);
+  expect(response.headers.get('location')).toBe('https://127.0.0.1/private');
+  expect(response.body).toBeNull();
   expect(send).toHaveBeenCalledTimes(1);
-  const [url, init] = send.mock.calls[0]!;
-  expect(String(url)).toBe(`https://[${address}]:8443/oauth/client.json?version=1`);
-  expect(init).toMatchObject({ method: 'HEAD', redirect: 'manual' });
+  const [, options] = send.mock.calls[0]!;
+  expect(options.method).toBe('HEAD');
+  const callback = mock();
+  options.lookup?.('client.example', { all: true }, callback);
+  expect(callback).toHaveBeenCalledWith(null, [address]);
 });
 
-test('an aborted request never resolves or connects', async () => {
-  const resolve = spyOn(dns, 'lookup');
-  const send = spyOn(globalThis, 'fetch');
-  await expect(
-    fetchClientMetadataResource(METADATA_URL, { signal: AbortSignal.abort() }),
-  ).rejects.toThrow();
-  expect(resolve).not.toHaveBeenCalled();
-  expect(send).not.toHaveBeenCalled();
+test('bridges the upstream response stream and repeated headers', async () => {
+  spyOn(dns, 'lookup').mockResolvedValue([PUBLIC_ADDRESS]);
+  mockMetadataResponse({ headers: { 'x-metadata': ['first', 'second'] } });
+  const response = await fetchClientMetadataResource(METADATA_URL);
+  expect(response.headers.get('x-metadata')).toBe('first, second');
+  expect(await response.text()).toBe('metadata');
 });
 
-test('a request aborted during DNS never connects', async () => {
-  const abort = new AbortController();
-  spyOn(dns, 'lookup').mockImplementation(function resolveAndAbort() {
-    abort.abort();
-    return Promise.resolve([PUBLIC_ADDRESS]);
-  });
-  const send = spyOn(globalThis, 'fetch');
-  await expect(
-    fetchClientMetadataResource(METADATA_URL, { signal: abort.signal }),
-  ).rejects.toThrow();
-  expect(send).not.toHaveBeenCalled();
+test.each([StatusMap['No Content'], StatusMap['Reset Content'], StatusMap['Not Modified']])(
+  'omits a body for status %i',
+  async (status) => {
+    spyOn(dns, 'lookup').mockResolvedValue([PUBLIC_ADDRESS]);
+    mockMetadataResponse({ status });
+    const response = await fetchClientMetadataResource(METADATA_URL);
+    expect(response.status).toBe(status);
+    expect(response.body).toBeNull();
+  },
+);
+
+test('propagates request errors', async () => {
+  spyOn(dns, 'lookup').mockResolvedValue([PUBLIC_ADDRESS]);
+  const error = new Error('connection failed');
+  mockMetadataResponse({ error });
+  await expect(fetchClientMetadataResource(METADATA_URL)).rejects.toBe(error);
 });
