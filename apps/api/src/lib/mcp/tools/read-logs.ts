@@ -62,8 +62,7 @@ export function registerReadLogsTool({
       ]: Parameters<ToolCallback<typeof inputSchema>>
     ): Promise<ReadLogsOutput> {
       await appsService.get({ appId, ownerId });
-      const deployments = await deploymentsService.list({ appId, ownerId });
-      const deployment = deployments[0];
+      const deployment = await deploymentsService.getLatestDeployment({ appId, ownerId });
       if (!deployment) {
         return { logs: [] };
       }

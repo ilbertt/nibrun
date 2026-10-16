@@ -144,6 +144,11 @@ export class DeploymentsService extends Service {
     return rows.map(toPublicDeployment);
   }
 
+  async getLatestDeployment(input: DeploymentsByAppInput): Promise<PublicDeployment | null> {
+    const deployments = await this.list(input);
+    return deployments[0] ?? null;
+  }
+
   async get(input: DeploymentByIdInput): Promise<PublicDeployment> {
     const row = await this.deploymentsRepo.findById(input);
     if (!row) {
