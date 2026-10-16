@@ -13,11 +13,15 @@ import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
 import { ArtifactSchema } from '#lib/api/artifact.ts';
-import { BadRequestError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { CreateArtifactBodySchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { DeploymentResponseSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
-import { AppResponseSchema, ListAppsResponseSchema } from '#routes/api/apps/model.ts';
+import {
+  AppResponseSchema,
+  CreateAppRequestSchema,
+  ListAppsResponseSchema,
+} from '#routes/api/apps/model.ts';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 
@@ -461,7 +465,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(JSON.stringify(result.tools[1].outputSchema)).not.toContain('"nullable"');
   });
 
-  test('advertises URL deployment using the existing artifact and deployment schemas', async () => {
+  test('advertises creation and redeployment using the existing API schemas', async () => {
     const response = await rpc({
       method: 'tools/list',
       token: await accessToken(),
@@ -477,15 +481,25 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
         idempotentHint: false,
       },
       inputSchema: {
-        required: ['appId'],
         additionalProperties: false,
         oneOf: [{ required: ['url'] }, { required: ['binary'] }],
+        allOf: [
+          { oneOf: [{ required: ['appId'] }, { required: ['name'] }] },
+          { not: { required: ['appId', 'config'] } },
+        ],
       },
       _meta: {
         securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }],
         'openai/fileParams': ['binary'],
       },
     });
+    expect(tool.inputSchema.required ?? []).toEqual([]);
+    expect(tool.inputSchema.properties.name).toEqual(
+      JSON.parse(JSON.stringify(CreateAppRequestSchema.properties.name)),
+    );
+    expect(tool.inputSchema.properties.config).toEqual(
+      JSON.parse(JSON.stringify(CreateAppRequestSchema.properties.config)),
+    );
     const fetched = CreateArtifactBodySchema.anyOf
       .map((schema) => schema.properties)
       .find((properties) => 'url' in properties)!;
@@ -507,6 +521,91 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(tool.outputSchema.properties.app.required).toEqual(AppResponseSchema.required);
     expect(tool.outputSchema.properties.url).toMatchObject({ type: 'string', format: 'uri' });
     expect(JSON.stringify(tool.outputSchema)).not.toContain('"nullable"');
+  });
+
+  test.each([
+    { source: { url: BINARY_URL }, config: undefined },
+    {
+      source: { binary: NATIVE_BINARY },
+      config: { httpPort: 8080, environment: { API_KEY: 'initial-secret' } },
+    },
+  ])('creates an app and redeploys it using the returned ID: %j', async ({ source, config }) => {
+    const app = ownedApp();
+    const create = spyOn(appsService, 'create').mockResolvedValue(app);
+    const get = spyOn(appsService, 'get').mockResolvedValue(app);
+    const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
+    const deploy = spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+    const token = await accessToken();
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: 'deploy_app',
+        arguments: { name: app.name, config, ...source },
+      },
+      token,
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toEqual({
+      app,
+      deployment: DEPLOYMENT,
+      url: 'https://mcp-example.apps.test',
+    });
+    expect(create).toHaveBeenCalledWith({ ownerId, isAnonymous: false, name: app.name, config });
+    expect(get).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.objectContaining({ appId: app.id, ownerId, isAnonymous: false }),
+    );
+    expect(deploy).toHaveBeenCalledWith({
+      appId: app.id,
+      ownerId,
+      isAnonymous: false,
+      source: { artifactId: ARTIFACT.id },
+    });
+    expect(create.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[0]!);
+    expect(fetch.mock.invocationCallOrder[0]).toBeLessThan(deploy.mock.invocationCallOrder[0]!);
+    expect(JSON.stringify(result)).not.toContain('initial-secret');
+    const redeployResponse = await rpc({
+      method: 'tools/call',
+      params: {
+        name: 'deploy_app',
+        arguments: { appId: result.structuredContent.app.id, ...source },
+      },
+      token,
+      protocolVersion,
+    });
+    const redeployed = (await rpcBody(redeployResponse)).result;
+    expect(redeployed.isError).not.toBe(true);
+    expect(redeployed.structuredContent.app.id).toBe(app.id);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledWith({ appId: app.id, ownerId });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(deploy).toHaveBeenCalledTimes(2);
+  });
+
+  test('does not fetch or deploy a binary when app creation is refused', async () => {
+    const create = spyOn(appsService, 'create').mockRejectedValue(
+      new ForbiddenError('App quota exceeded.'),
+    );
+    const fetch = spyOn(artifactsService, 'createFromUrl');
+    const deploy = spyOn(deploymentsService, 'createOrRollback');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: 'deploy_app', arguments: { name: 'New app', url: BINARY_URL } },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.isError).toBe(true);
+    expect(create).toHaveBeenCalledWith({
+      ownerId,
+      isAnonymous: false,
+      name: 'New app',
+      config: undefined,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(deploy).not.toHaveBeenCalled();
   });
 
   test('fetches and queues a deployment under the verified account without forwarding its token', async () => {
@@ -655,6 +754,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
   test('does not fetch a binary for a missing app or an app owned by another account', async () => {
     const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
+    const create = spyOn(appsService, 'create');
     const fetch = spyOn(artifactsService, 'createFromUrl');
     const deploy = spyOn(deploymentsService, 'createOrRollback');
     const response = await rpc({
@@ -665,6 +765,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     });
     expect((await rpcBody(response)).result.isError).toBe(true);
     expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
+    expect(create).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
     expect(deploy).not.toHaveBeenCalled();
   });
@@ -692,6 +793,13 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     { appId: ARTIFACT.appId },
     { url: BINARY_URL },
     { appId: ARTIFACT.appId, url: BINARY_URL, name: 'unexpected-new-app' },
+    { appId: ARTIFACT.appId, url: BINARY_URL, config: {} },
+    { name: '', url: BINARY_URL },
+    { name: 'New app', config: { httpPort: 0 }, url: BINARY_URL },
+    { name: 'New app', config: { unknown: true }, url: BINARY_URL },
+    { name: 'New app', ownerId: 'caller-selected-owner', url: BINARY_URL },
+    { name: 'New app', url: BINARY_URL, binary: NATIVE_BINARY },
+    { name: 'New app', binary: { file_id: NATIVE_BINARY.file_id } },
     { appId: ARTIFACT.appId, url: BINARY_URL, binary: NATIVE_BINARY },
     { appId: ARTIFACT.appId, binary: { file_id: NATIVE_BINARY.file_id } },
     { appId: ARTIFACT.appId, binary: { download_url: NATIVE_DOWNLOAD_URL } },
@@ -705,6 +813,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     { appId: ARTIFACT.appId, binary: NATIVE_BINARY, ownerId: 'caller-selected-owner' },
     { appId: ARTIFACT.appId, binary: NATIVE_BINARY, sha256: 'wrong-checksum' },
   ])('refuses invalid deployment arguments before calling services: %j', async (args) => {
+    const create = spyOn(appsService, 'create');
     const get = spyOn(appsService, 'get');
     const fetch = spyOn(artifactsService, 'createFromUrl');
     const deploy = spyOn(deploymentsService, 'createOrRollback');
@@ -716,6 +825,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     });
     const body = await rpcBody(response);
     expect(body.error ?? body.result?.isError).toBeTruthy();
+    expect(create).not.toHaveBeenCalled();
     expect(get).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
     expect(deploy).not.toHaveBeenCalled();
