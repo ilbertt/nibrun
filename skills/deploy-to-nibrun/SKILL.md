@@ -8,14 +8,17 @@ description: Deploy a compiled binary to nibrun and run it as an HTTPS service. 
 nibrun takes one compiled binary and gives it a microVM of its own, a persistent filesystem, and
 an HTTPS URL. No Dockerfile, no YAML, no cluster.
 
-Sign in, build for Linux x86_64, `nib run`, then ask the URL for something. What that path does not
-need is below it: [copying an app](#copying-an-app), [the guest contract](#the-guest-contract),
+Build for Linux x86_64, deploy through nibrun's MCP server or CLI, then ask the URL for something.
+What that path does not need is below it: [copying an app](#copying-an-app), [the guest contract](#the-guest-contract),
 [naming a runtime value](#naming-a-runtime-value), [a second public port](#a-second-public-port),
 [cron jobs](#cron-jobs), and [what nibrun does not do](#tradeoffs).
 
 For CI deployments, start at [GitHub Actions](#github-actions).
 
 ## 1. Sign in
+
+If using a connected nibrun MCP server, use its authenticated account and skip CLI sign-in.
+Otherwise, check the CLI:
 
 ```sh
 nib apps list
@@ -79,7 +82,40 @@ is what keeps an address across that.
 
 ## 3. Deploy
 
-First deploy — creates the app:
+### With MCP
+
+Choose the app: supply a `name` and optional initial `config` to create one, or an `appId` to
+redeploy an existing app. Initial configuration includes the environment, arguments and HTTP port
+needed on first boot. Existing apps reuse their saved configuration. Reuse the returned `app.id`
+as `appId` for subsequent deployments; a name creates a new app.
+
+Choose one binary source:
+
+- **Native file binding:** attach the compiled executable to `deploy_app`'s `binary` input using
+  the client's file binding.
+- **HTTPS download:** pass `url` to `deploy_app` when the binary is already reachable over HTTPS
+  from nibrun. Signed download URLs work. For `binary` or `url`, an optional `sha256` verifies the
+  downloaded bytes.
+- **Direct upload:** if native file binding is unavailable, use `prepare_deploy` as described
+  below. This requires an agent that can read the compiled file and upload bytes over HTTP.
+
+For a direct upload:
+
+1. Call `prepare_deploy` with the app target, the binary's `filename` and its actual `sizeBytes`.
+   It returns `app` and `upload`, creating the app if needed. It does not deploy anything.
+2. PUT the raw binary as the whole request body to `upload.url`, with `Content-Length` equal to
+   `sizeBytes`. The signed URL authorizes this request; send no nibrun authorization token. Wait
+   for a successful 2xx response.
+3. Call `deploy_app` with `appId: app.id` and `artifactId: upload.artifactId`. nibrun finalizes and
+   validates the uploaded binary, then queues the deployment.
+
+Each `deploy_app` call creates a deployment and replaces the current release. The result contains
+`app`, `deployment` and the public `url`; a pending deployment is only queued. Use `get_app` to
+check the returned deployment and request the public URL before reporting success.
+
+### With the CLI
+
+The first deploy creates the app:
 
 ```sh
 nib run ./my-server --name my-app --port 8080
