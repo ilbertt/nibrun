@@ -1,0 +1,11 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/infra/app-host/deploy/prune_agent_versions.sh"
+      ]
+    }
+  }
+}
