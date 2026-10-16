@@ -567,6 +567,9 @@ if [ "$(systemctl is-active systemd-journal-upload.service || true)" != "active"
   systemctl status systemd-journal-upload.service --no-pager --lines 20 || true
 fi
 
+log "Pruning obsolete agent versions"
+bash prune_agent_versions.sh "$NIBRUN_DIR"
+
 log "Active versions"
 for component in zerofs firecracker caddy agent guest-image; do
   if [ -L "$CURRENT_DIR/$component" ]; then

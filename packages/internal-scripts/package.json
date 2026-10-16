@@ -24,7 +24,8 @@
     "terraform-check": "bun run src/terraform-check.ts",
     "terraform-plan": "bun run src/terraform-plan.ts",
     "verify-public-images": "bun run src/verify-public-images.ts",
-    "check:types": "bun run --bun tsc"
+    "check:types": "bun run --bun tsc",
+    "test": "bun test tests"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
