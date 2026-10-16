@@ -433,7 +433,7 @@ export const DEPLOY_PRESETS = {
   openlist: {
     isRecommended: false,
     projectUrl: 'https://github.com/OpenListTeam/OpenList',
-    version: 'v4.2.6',
+    version: 'v4.2.7',
     markdownContent: openlistPage,
     category: DeployCategory.FilesAndSharing,
     title: 'OpenList',
@@ -441,8 +441,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'openlist',
       binary:
-        'https://github.com/OpenListTeam/OpenList/releases/download/v4.2.6/openlist-linux-amd64.tar.gz',
-      sha256: '2f2a5008efe45895292018479cb05556c83e828c3eed68a8b8cd3d35e82f03cb',
+        'https://github.com/OpenListTeam/OpenList/releases/download/v4.2.7/openlist-linux-amd64.tar.gz',
+      sha256: 'e9ab57a1572401836c9edfa92697d9c69f330c0172dd97b2698a9839a367ba7c',
       port: 5244,
       arg: ['server', '--data', '/app/data', '--log-std'],
       env: [
@@ -621,7 +621,7 @@ export const DEPLOY_PRESETS = {
   flipt: {
     isRecommended: false,
     projectUrl: 'https://github.com/flipt-io/flipt',
-    version: 'v2.13.1',
+    version: 'v2.14.0',
     markdownContent: fliptPage,
     title: 'Flipt',
     subtitle: 'Feature flags with a UI, evaluated over HTTP or gRPC.',
@@ -629,8 +629,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'flipt',
       binary:
-        'https://github.com/flipt-io/flipt/releases/download/v2.13.1/flipt_linux_x86_64.tar.gz',
-      sha256: '5cefdf507eb4d2b5bb8fe3e167e2f7bf5ac83fbaed2b065693067beb2f96327a',
+        'https://github.com/flipt-io/flipt/releases/download/v2.14.0/flipt_linux_x86_64.tar.gz',
+      sha256: 'e62e91b44181b2d36a22192fb94c679e74309dbb6e617231021967c11dc0fb2f',
       port: 8080,
       arg: ['server'],
       env: [
