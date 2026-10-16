@@ -10,11 +10,13 @@ import {
 } from '@modelcontextprotocol/server';
 import { DEFAULT_LOG_TIMERANGE } from '@repo/api-constants';
 import { DirectoryListingSchema, TenantLogRecordSchema } from '@repo/protocol';
+import { HranaStmtResultSchema, HranaStmtSchema } from '@repo/sqlite';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
 import { ArtifactSchema } from '#lib/api/artifact.ts';
+import { SqliteConnectionSchema } from '#lib/api/sqlite-connection.ts';
 import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { DIRECTORY_READ_TIMEOUT_MS } from '#lib/filesystem/timeouts.ts';
 import { DeploymentTargetSchema } from '#lib/mcp/tools/shared/deployment-target.ts';
@@ -38,6 +40,7 @@ const {
   DeploymentsServicePlugin,
   LogsServicePlugin,
   FilesystemServicePlugin,
+  SqliteServicePlugin,
 } = await import('#services/plugins.ts');
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
@@ -50,6 +53,7 @@ const artifactsService = ArtifactsServicePlugin.decorator.artifactsService;
 const deploymentsService = DeploymentsServicePlugin.decorator.deploymentsService;
 const logsService = LogsServicePlugin.decorator.logsService;
 const filesystemService = FilesystemServicePlugin.decorator.filesystemService;
+const sqliteService = SqliteServicePlugin.decorator.sqliteService;
 const context = await auth.$context;
 const key = await generateKeyPair('EdDSA');
 const jwk = { ...(await exportJWK(key.publicKey)), kid: 'mcp-test', alg: 'EdDSA' };
@@ -456,6 +460,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       MCP_TOOL_NAMES.deployApp,
       MCP_TOOL_NAMES.prepareDeploy,
       MCP_TOOL_NAMES.listFiles,
+      MCP_TOOL_NAMES.queryDatabase,
     ]);
     expect(result.tools[0]).toMatchObject({
       name: MCP_TOOL_NAMES.listApps,
@@ -907,6 +912,128 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(result.structuredContent).toBeUndefined();
     expect(latest).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
     expect(read).not.toHaveBeenCalled();
+  });
+
+  test('advertises database queries with file paths and shared SQLite schemas', async () => {
+    const response = await rpc({
+      method: 'tools/list',
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    const tool = result.tools.find(
+      (entry: { name: string }) => entry.name === MCP_TOOL_NAMES.queryDatabase,
+    );
+    expect(tool).toMatchObject({
+      inputSchema: {
+        required: ['appId', 'sqlite_file_path', 'sql'],
+        additionalProperties: false,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: false,
+        idempotentHint: true,
+      },
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }] },
+    });
+    expect(Object.keys(tool.inputSchema.properties)).toEqual([
+      'appId',
+      'sqlite_file_path',
+      'sql',
+      'args',
+      'named_args',
+    ]);
+    expect(tool.inputSchema.properties.sqlite_file_path).toEqual(
+      JSON.parse(JSON.stringify(SqliteConnectionSchema.properties.sqlite_file_path)),
+    );
+    expect(tool.inputSchema.properties.args).toEqual(
+      fromTypeBox(HranaStmtSchema.properties.args)['~standard'].jsonSchema.input({
+        target: 'draft-07',
+      }),
+    );
+    expect(tool.outputSchema.properties.result).toEqual(
+      fromTypeBox(HranaStmtResultSchema)['~standard'].jsonSchema.output({ target: 'draft-07' }),
+    );
+  });
+
+  test('queries a file using the verified owner and returns typed database results', async () => {
+    const result = {
+      cols: [{ name: 'value', decltype: null }],
+      rows: [[{ type: 'integer' as const, value: '9007199254740993' }]],
+      affected_row_count: 0,
+      last_insert_rowid: null,
+    };
+    const query = spyOn(sqliteService, 'query').mockResolvedValue(result);
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: MCP_TOOL_NAMES.queryDatabase,
+        arguments: {
+          appId: ARTIFACT.appId,
+          sqlite_file_path: '/app.db',
+          sql: 'SELECT ? AS value',
+          args: [{ type: 'integer', value: '9007199254740993' }],
+        },
+      },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.structuredContent).toEqual({ result });
+    expect(query).toHaveBeenCalledWith({
+      appId: ARTIFACT.appId,
+      ownerId,
+      sqlite_file_path: '/app.db',
+      stmt: { sql: 'SELECT ? AS value', args: [{ type: 'integer', value: '9007199254740993' }] },
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  test.each([
+    { appId: ARTIFACT.appId, sql: 'SELECT 1' },
+    { appId: ARTIFACT.appId, sqlite_file_path: '/app.db' },
+    { appId: ARTIFACT.appId, sqlite_file_path: '/app.db', sql: null },
+    { appId: ARTIFACT.appId, sqlite_file_path: '/../app.db', sql: 'SELECT 1' },
+    {
+      appId: ARTIFACT.appId,
+      sqlite_file_path: '/app.db',
+      sql: 'SELECT 1',
+      deploymentId: DEPLOYMENT.id,
+    },
+    {
+      appId: ARTIFACT.appId,
+      sqlite_file_path: '/app.db',
+      sql: 'SELECT 1',
+      url: 'https://api.test/',
+    },
+  ])('rejects invalid database query arguments: %j', async (args) => {
+    const query = spyOn(sqliteService, 'query');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: MCP_TOOL_NAMES.queryDatabase, arguments: args },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const body = await rpcBody(response);
+    expect(body.error ?? body.result?.isError).toBeTruthy();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  test('database query failures use the shared tool error response', async () => {
+    spyOn(sqliteService, 'query').mockRejectedValue(new NotFoundError('Private database details'));
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: MCP_TOOL_NAMES.queryDatabase,
+        arguments: { appId: ARTIFACT.appId, sqlite_file_path: '/app.db', sql: 'SELECT 1' },
+      },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result).toMatchObject({
+      isError: true,
+      content: [{ type: 'text', text: 'Unable to complete request.' }],
+    });
   });
 
   test('advertises creation and redeployment using the existing API schemas', async () => {

@@ -18,6 +18,7 @@ import {
   FilesystemServicePlugin,
   LogsServicePlugin,
   McpAuthorizationServicePlugin,
+  SqliteServicePlugin,
 } from '#services/plugins.ts';
 
 function createMcpController() {
@@ -27,6 +28,7 @@ function createMcpController() {
     .use(DeploymentsServicePlugin)
     .use(LogsServicePlugin)
     .use(FilesystemServicePlugin)
+    .use(SqliteServicePlugin)
     .use(McpAuthorizationServicePlugin);
   const {
     appsService,
@@ -34,6 +36,7 @@ function createMcpController() {
     deploymentsService,
     logsService,
     filesystemService,
+    sqliteService,
     mcpAuthorizationService,
   } = controller.decorator;
   const handler = createMcpServerHandler({
@@ -42,6 +45,7 @@ function createMcpController() {
     deploymentsService,
     logsService,
     filesystemService,
+    sqliteService,
   });
 
   return controller.all(

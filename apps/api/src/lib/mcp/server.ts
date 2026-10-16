@@ -8,12 +8,14 @@ import { registerGetAppTool } from '#lib/mcp/tools/get-app.ts';
 import { registerListAppsTool } from '#lib/mcp/tools/list-apps.ts';
 import { registerListFilesTool } from '#lib/mcp/tools/list-files.ts';
 import { registerPrepareDeployTool } from '#lib/mcp/tools/prepare-deploy.ts';
+import { registerQueryDatabaseTool } from '#lib/mcp/tools/query-database.ts';
 import { registerReadLogsTool } from '#lib/mcp/tools/read-logs.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { FilesystemService } from '#services/filesystem.service.ts';
 import type { LogsService } from '#services/logs.service.ts';
+import type { SqliteService } from '#services/sqlite.service.ts';
 
 const logger = createLogger('mcp');
 
@@ -23,12 +25,14 @@ export function createMcpServerHandler({
   deploymentsService,
   logsService,
   filesystemService,
+  sqliteService,
 }: {
   appsService: AppsService;
   artifactsService: ArtifactsService;
   deploymentsService: DeploymentsService;
   logsService: LogsService;
   filesystemService: FilesystemService;
+  sqliteService: SqliteService;
 }) {
   return createMcpHandler(
     function createServer(context) {
@@ -55,6 +59,7 @@ export function createMcpServerHandler({
         filesystemService,
         ownerId,
       });
+      registerQueryDatabaseTool({ server, sqliteService, ownerId });
       return server;
     },
     {
