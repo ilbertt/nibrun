@@ -54,7 +54,7 @@ export function registerPrepareDeployTool({
     name: MCP_TOOL_NAMES.prepareDeploy,
     config: {
       title: 'Prepare nibrun deployment',
-      description: `Prepare a direct binary upload when native client file binding is unavailable. Requires access to the compiled file and an HTTP upload capability. Supply a name and optional initial config to create an app, or appId for an existing app, plus filename and sizeBytes. PUT the raw binary as the whole request body to upload.url with Content-Length equal to sizeBytes; the signed URL authorizes the upload, so do not attach your nibrun token. After a successful 2xx response, call ${MCP_TOOL_NAMES.deployApp} with appId set to app.id and artifactId set to upload.artifactId. This tool only prepares the upload; it does not deploy. Reuse app.id for subsequent calls.`,
+      description: `Prepare a direct HTTP binary upload for a new or existing app. Requires file access and HTTP upload capability; does not deploy. Read the deploy-to-nibrun skill for upload steps, then call ${MCP_TOOL_NAMES.deployApp}.`,
       inputSchema,
       outputSchema,
       annotations: {

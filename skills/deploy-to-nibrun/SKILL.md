@@ -82,16 +82,40 @@ is what keeps an address across that.
 
 ## 3. Deploy
 
-With nibrun's MCP server, call `deploy_app` with a `name` and optional initial `config` to create
-and deploy a new app. For subsequent deployments, pass the returned `app.id` as `appId` to reuse
-that app and its configuration.
+### With MCP
 
-In ChatGPT, bind the compiled executable to the `binary` file input. Alternatively, provide a
-`url` reachable over HTTPS from nibrun. An optional `sha256` verifies the download. nibrun fetches
-the binary and queues a deployment. Check deployment status and the public URL before reporting
-success.
+Choose the app: supply a `name` and optional initial `config` to create one, or an `appId` to
+redeploy an existing app. Initial configuration includes the environment, arguments and HTTP port
+needed on first boot. Existing apps reuse their saved configuration. Reuse the returned `app.id`
+as `appId` for subsequent deployments; a name creates a new app.
 
-With the CLI, the first deploy creates the app:
+Choose one binary source:
+
+- **Native file binding:** attach the compiled executable to `deploy_app`'s `binary` input using
+  the client's file binding.
+- **HTTPS download:** pass `url` to `deploy_app` when the binary is already reachable over HTTPS
+  from nibrun. Signed download URLs work. For `binary` or `url`, an optional `sha256` verifies the
+  downloaded bytes.
+- **Direct upload:** if native file binding is unavailable, use `prepare_deploy` as described
+  below. This requires an agent that can read the compiled file and upload bytes over HTTP.
+
+For a direct upload:
+
+1. Call `prepare_deploy` with the app target, the binary's `filename` and its actual `sizeBytes`.
+   It returns `app` and `upload`, creating the app if needed. It does not deploy anything.
+2. PUT the raw binary as the whole request body to `upload.url`, with `Content-Length` equal to
+   `sizeBytes`. The signed URL authorizes this request; send no nibrun authorization token. Wait
+   for a successful 2xx response.
+3. Call `deploy_app` with `appId: app.id` and `artifactId: upload.artifactId`. nibrun finalizes and
+   validates the uploaded binary, then queues the deployment.
+
+Each `deploy_app` call creates a deployment and replaces the current release. The result contains
+`app`, `deployment` and the public `url`; a pending deployment is only queued. Use `get_app` to
+check the returned deployment and request the public URL before reporting success.
+
+### With the CLI
+
+The first deploy creates the app:
 
 ```sh
 nib run ./my-server --name my-app --port 8080
