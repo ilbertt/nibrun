@@ -1,8 +1,9 @@
-import type { McpServer, StandardSchemaWithJSON } from '@modelcontextprotocol/server';
+import type { McpServer, StandardSchemaWithJSON, ToolCallback } from '@modelcontextprotocol/server';
 import { appUrl } from '@repo/app-ui';
 import { FilenameSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
+import { McpDeploymentSchema } from '#lib/api/deployment.ts';
 import { ArtifactIdSchema, type OAuthClientId, type OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import { DEPLOY_TO_NIBRUN_SKILL_URI } from '#lib/mcp/skills.ts';
@@ -37,6 +38,7 @@ const DEFAULT_BINARY_FILENAME = Value.Parse(FilenameSchema, 'app');
 const DeployAppInputSchema = Type.Object(
   {
     ...DeploymentTargetSchema.properties,
+    chatId: McpDeploymentSchema.properties.chatId,
     artifactId: Type.Optional(ArtifactIdSchema),
     url: Type.Optional(FetchedBinarySchema.properties.url),
     binary: Type.Optional(ChatGptFileInputSchema),
@@ -65,7 +67,6 @@ const outputSchema = fromTypeBox(
   }),
 );
 
-type DeployAppInput = StandardSchemaWithJSON.InferOutput<typeof inputSchema>;
 type DeployAppOutput = StandardSchemaWithJSON.InferOutput<typeof outputSchema>;
 
 export function registerDeployAppTool({
@@ -88,7 +89,7 @@ export function registerDeployAppTool({
     name: MCP_TOOL_NAMES.deployApp,
     config: {
       title: 'Deploy nibrun app',
-      description: `Create or redeploy an app from a Linux x86_64 binary. Redeploying replaces its current release. For local files without native file binding, call ${MCP_TOOL_NAMES.prepareDeploy} first. Read ${DEPLOY_TO_NIBRUN_SKILL_URI} via resources/read for the workflow.`,
+      description: `Create or redeploy an app from a Linux x86_64 binary. Redeploying replaces its current release. Include chatId if your current chat ID is available; omit it rather than guessing. For local files without native file binding, call ${MCP_TOOL_NAMES.prepareDeploy} first. Read ${DEPLOY_TO_NIBRUN_SKILL_URI} via resources/read for the workflow.`,
       inputSchema,
       outputSchema,
       annotations: {
@@ -100,9 +101,10 @@ export function registerDeployAppTool({
       _meta: { 'openai/fileParams': ['binary'] },
     },
     callback: handleToolResult(async function deployApp(
-      input: DeployAppInput,
+      ...[input, { mcpReq }]: Parameters<ToolCallback<typeof inputSchema>>
     ): Promise<DeployAppOutput> {
       const { artifactId, url, binary, sha256 } = input;
+      const sessionId = mcpReq._meta?.['openai/session'];
       const app = await appForDeployment({ appsService, ownerId, target: input });
       const artifact =
         artifactId === undefined
@@ -125,6 +127,9 @@ export function registerDeployAppTool({
         appId: app.id,
         ownerId,
         clientId,
+        chatId:
+          input.chatId ??
+          (Value.Check(McpDeploymentSchema.properties.chatId, sessionId) ? sessionId : undefined),
         artifactId: artifact.id,
       });
       return { app, deployment, url: appUrl(app.hostnames) };

@@ -404,6 +404,50 @@ test('another app grant cannot attach provenance or supersede the existing deplo
   ).toMatchObject({ state: 'pending', github_repository: null });
 });
 
+test.each([
+  { clientId: null, chatId: null, constraint: null },
+  { clientId: 'registered-client', chatId: null, constraint: null },
+  { clientId: 'registered-client', chatId: 'originating-chat', constraint: null },
+  {
+    clientId: null,
+    chatId: 'originating-chat',
+    constraint:
+      schema.deployments._constraints.deployments_mcp_chat_requires_client._constraintName,
+  },
+  {
+    clientId: 'registered-client',
+    chatId: '',
+    constraint: schema.deployments._constraints.deployments_mcp_chat_nonempty._constraintName,
+  },
+])('MCP chat constraints enforce their named rules: %j', async (input) => {
+  const appId = await configuredApp();
+  const repository = new DeploymentsRepository(withTypes<Queries>(sql));
+  const deployed = await repository.insert(await deploymentInput(appId));
+  if (deployed.outcome !== 'created') {
+    throw new Error('The deployment must be created.');
+  }
+  const deploymentId = deployed.row.id;
+  async function setProvenance() {
+    await sql.unsafe(
+      `UPDATE nibrun.deployments SET mcp_client_id = $1, mcp_chat_id = $2
+       WHERE id = $3 AND app_id IN (SELECT id FROM nibrun.apps WHERE owner_id = $4)`,
+      [input.clientId, input.chatId, deploymentId, OWNER_ID],
+    );
+  }
+  if (input.constraint !== null) {
+    await expect(setProvenance()).rejects.toMatchObject({
+      errno: '23514',
+      constraint: input.constraint,
+    });
+    return;
+  }
+  await setProvenance();
+  expect(await repository.findById({ appId, ownerId: OWNER_ID, deploymentId })).toMatchObject({
+    mcp_client_id: input.clientId,
+    mcp_chat_id: input.chatId,
+  });
+});
+
 test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metadata'])(
   'MCP provenance persists per deployment and is not inherited on reuse: %s',
   async (identity) => {
@@ -411,31 +455,48 @@ test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metada
     const input = await deploymentInput(appId);
     const repository = new DeploymentsRepository(withTypes<Queries>(sql));
     const clientId = Value.Parse(OAuthClientIdSchema, identity);
-    const deployed = await repository.insertWithMcpClient({ ...input, clientId });
+    const deployed = await repository.insertWithMcpClient({
+      ...input,
+      clientId,
+      chatId: 'originating-chat',
+    });
     if (deployed.outcome !== 'created') {
       throw new Error('The MCP deployment must be created.');
     }
     const owned = { appId, ownerId: OWNER_ID, deploymentId: deployed.row.id };
     expect(deployed.row.mcp_client_id).toBe(clientId);
+    expect(deployed.row.mcp_chat_id).toBe('originating-chat');
     expect(deployed.row.github_repository).toBeNull();
     expect((await repository.findById(owned))?.mcp_client_id).toBe(clientId);
+    expect((await repository.findById(owned))?.mcp_chat_id).toBe('originating-chat');
     expect((await repository.listByApp({ appId, ownerId: OWNER_ID }))[0]?.mcp_client_id).toBe(
       clientId,
     );
+    expect((await repository.listByApp({ appId, ownerId: OWNER_ID }))[0]?.mcp_chat_id).toBe(
+      'originating-chat',
+    );
     expect(await repository.findById({ ...owned, ownerId: OTHER_OWNER_ID })).toBeNull();
     expect(
-      await repository.insertWithMcpClient({ ...input, clientId, ownerId: OTHER_OWNER_ID }),
+      await repository.insertWithMcpClient({
+        ...input,
+        clientId,
+        chatId: 'originating-chat',
+        ownerId: OTHER_OWNER_ID,
+      }),
     ).toEqual({ outcome: 'no-artifact' });
     expect((await repository.findById(owned))?.state).toBe('pending');
     const manual = await repository.insert(input);
     expect(manual.outcome === 'created' ? manual.row.mcp_client_id : undefined).toBeNull();
+    expect(manual.outcome === 'created' ? manual.row.mcp_chat_id : undefined).toBeNull();
     const rollback = await repository.insertRollback({
       appId,
       ownerId: OWNER_ID,
       rollbackOf: deployed.row.id,
     });
     expect(rollback?.mcp_client_id).toBeNull();
+    expect(rollback?.mcp_chat_id).toBeNull();
     expect(rollback?.artifact_id).toBe(deployed.row.artifact_id);
     expect((await repository.findById(owned))?.mcp_client_id).toBe(clientId);
+    expect((await repository.findById(owned))?.mcp_chat_id).toBe('originating-chat');
   },
 );

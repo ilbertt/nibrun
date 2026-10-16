@@ -89,6 +89,10 @@ redeploy an existing app. Initial configuration includes the environment, argume
 needed on first boot. Existing apps reuse their saved configuration. Reuse the returned `app.id`
 as `appId` for subsequent deployments; a name creates a new app.
 
+Include `chatId` in `deploy_app` when your current chat ID is available; omit it rather than
+guessing. Without it, nibrun records the client's `_meta["openai/session"]` when available.
+This metadata is an anonymized conversation ID and cannot be assumed to resolve to a chat URL.
+
 Choose one binary source:
 
 - **Native file binding:** attach the compiled executable to `deploy_app`'s `binary` input using
