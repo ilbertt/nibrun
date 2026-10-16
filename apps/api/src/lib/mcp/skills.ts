@@ -5,13 +5,11 @@ import { Value } from '@sinclair/typebox/value';
 import { getSkills } from '#lib/assets.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 
+export const DEPLOY_TO_NIBRUN_SKILL_URI = 'skill://nibrun/deploy-to-nibrun/SKILL.md';
+
 const skills = new Map(
   await Promise.all([...getSkills()].filter(([path]) => path.endsWith('/SKILL.md')).map(readSkill)),
 );
-
-export const DEPLOY_TO_NIBRUN_SKILL_URI = [...skills.values()].find(
-  ({ descriptor }) => descriptor.frontmatter.name === 'deploy-to-nibrun',
-)!.descriptor.uri;
 
 async function readSkill([, file]: [string, Blob]) {
   const text = await file.text();
