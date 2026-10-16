@@ -29,6 +29,13 @@ hand back every privilege it removed.
   it has a config of its own rather than the live server's: two processes sharing either is two
   processes fighting over it.
 
+## Agent version retention
+
+After the service health gate, deploys prune only complete, SHA-named agent installations with
+the expected binary and marker. Keep the active target, the two newest other installed versions
+for rollback, and every version whose executable is still running. Other components and tenant
+data are outside this cleanup.
+
 ## Unsettled
 
 **`nibrun-vm@.service` carries `BindsTo=nibrun-zerofs.service`**, which stops every tenant VM on

@@ -1,29 +1,44 @@
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { Value } from '@sinclair/typebox/value';
-import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { OAuthClientIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { createLogger } from '#lib/logger.ts';
 import { registerSkills } from '#lib/mcp/skills.ts';
+import { registerDeployAppTool } from '#lib/mcp/tools/deploy-app.ts';
 import { registerGetAppTool } from '#lib/mcp/tools/get-app.ts';
 import { registerListAppsTool } from '#lib/mcp/tools/list-apps.ts';
+import { registerPrepareDeployTool } from '#lib/mcp/tools/prepare-deploy.ts';
 import type { AppsService } from '#services/apps.service.ts';
+import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 
 const logger = createLogger('mcp');
 
 export function createMcpServerHandler({
   appsService,
+  artifactsService,
   deploymentsService,
 }: {
   appsService: AppsService;
+  artifactsService: ArtifactsService;
   deploymentsService: DeploymentsService;
 }) {
   return createMcpHandler(
     function createServer(context) {
       const server = new McpServer({ name: 'nibrun', version: '0.1.0' });
       const ownerId = Value.Parse(OwnerIdSchema, context.authInfo?.extra?.ownerId);
+      const clientId = Value.Parse(OAuthClientIdSchema, context.authInfo?.clientId);
       registerSkills({ server });
       registerListAppsTool({ server, appsService, ownerId });
       registerGetAppTool({ server, appsService, deploymentsService, ownerId });
+      registerDeployAppTool({
+        server,
+        appsService,
+        artifactsService,
+        deploymentsService,
+        ownerId,
+        clientId,
+      });
+      registerPrepareDeployTool({ server, appsService, artifactsService, ownerId });
       return server;
     },
     {

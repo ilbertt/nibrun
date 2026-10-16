@@ -24,7 +24,7 @@ export function DeploymentRow({
         {artifact === undefined ? (
           ABSENT
         ) : (
-          <BinaryLabel artifact={artifact} github={deployment.github} />
+          <BinaryLabel artifact={artifact} github={deployment.github} mcp={deployment.mcp} />
         )}
       </TableCell>
       <TableCell className="text-muted-foreground tabular-nums">
