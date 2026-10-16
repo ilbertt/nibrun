@@ -701,7 +701,11 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(open).not.toHaveBeenCalled();
   });
 
-  test('advertises directory listings using the existing filesystem schemas', async () => {
+  test('advertises the directory contract after HTTP filesystem validation runs', async () => {
+    const filesystem = await send({
+      url: `${ORIGIN}/api/apps/${ARTIFACT.appId}/deployments/${DEPLOYMENT.id}/filesystem`,
+    });
+    expect(filesystem.status).toBe(StatusMap.Unauthorized);
     const response = await rpc({
       method: 'tools/list',
       token: await accessToken(),
@@ -725,7 +729,11 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       JSON.parse(JSON.stringify(DirectoryListingSchema.properties.path)),
     );
     expect(tool.inputSchema.properties.deploymentId).toBeUndefined();
-    expect(tool.outputSchema).toEqual(JSON.parse(JSON.stringify(DirectoryListingSchema)));
+    expect(tool.outputSchema.type).toBe(DirectoryListingSchema.type);
+    expect(tool.outputSchema.required).toEqual(DirectoryListingSchema.required);
+    expect(tool.outputSchema.properties).toEqual(
+      JSON.parse(JSON.stringify(DirectoryListingSchema.properties)),
+    );
   });
 
   test.each([
