@@ -15,6 +15,7 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { schema } from '#db/queries.gen.ts';
 import type { DeploymentState } from '#lib/api/deployment.ts';
+import { OAuthClientIdSchema } from '#lib/api/identifiers.ts';
 import type { PublicAppConfig } from '#lib/app-config.ts';
 import { DEFAULT_HEALTH_CHECK, DEFAULT_RESTART_POLICY } from '#lib/app-config-defaults.ts';
 import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
@@ -23,6 +24,7 @@ import type {
   CreateDeploymentInput,
   CreatedDeployment,
   CreateGitHubDeploymentInput,
+  CreateMcpDeploymentInput,
   DeploymentByIdInput,
   DeploymentRow,
   DeploymentsByAppInput,
@@ -111,6 +113,7 @@ function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
     github_commit_sha: null,
     github_run_id: null,
     github_run_attempt: null,
+    mcp_client_id: null,
     ...configColumns(PINNED_CONFIG),
     ...overrides,
   };
@@ -165,6 +168,10 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
     }
     const row = this.#behaviour.row;
     return Promise.resolve(row ? { outcome: 'created', row } : { outcome: 'no-artifact' });
+  }
+
+  insertWithMcpClient(input: CreateMcpDeploymentInput): Promise<CreatedDeployment> {
+    return this.insert({ ...input, initialDataFrom: null, onlyOne: false });
   }
 
   insertWithDeploymentGrant(input: CreateGitHubDeploymentInput): Promise<CreatedDeployment> {
@@ -881,5 +888,40 @@ describe('GitHub deployment provenance belongs to the deployment', () => {
         source: { artifactId: ARTIFACT_ID },
       }),
     ).rejects.toBeInstanceOf(UnauthorizedError);
+  });
+});
+
+describe('MCP deployment provenance belongs to the deployment', () => {
+  test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metadata'])(
+    'the verified OAuth client reaches creation and public reads: %s',
+    async (identity) => {
+      const clientId = Value.Parse(OAuthClientIdSchema, identity);
+      const row = deploymentRow({ mcp_client_id: clientId });
+      const { service, deploymentsRepo } = serviceWith({ row, rows: [row] });
+      const deployment = await service.createWithMcpClient({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        artifactId: ARTIFACT_ID,
+        clientId,
+      });
+      expect(deployment.mcp).toEqual({ clientId });
+      expect((await service.get(OWNED_DEPLOYMENT)).mcp).toEqual({ clientId });
+      expect((await service.list({ appId: APP_ID, ownerId: OWNER_ID }))[0]?.mcp).toEqual({
+        clientId,
+      });
+      expect(deploymentsRepo.calls[0]).toEqual({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        artifactId: ARTIFACT_ID,
+        clientId,
+        initialDataFrom: null,
+        onlyOne: false,
+      });
+    },
+  );
+
+  test('ordinary deployments omit MCP provenance', async () => {
+    const { service } = serviceWith({ row: deploymentRow() });
+    expect(await service.get(OWNED_DEPLOYMENT)).not.toHaveProperty('mcp');
   });
 });

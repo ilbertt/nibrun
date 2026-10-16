@@ -6,7 +6,7 @@ import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
 import { AppNameSchema } from '#lib/api/app.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
-import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { ArtifactIdSchema, OAuthClientIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { configWithDefaults } from '#lib/app-config.ts';
 import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
@@ -403,3 +403,39 @@ test('another app grant cannot attach provenance or supersede the existing deplo
     await repository.findById({ appId, ownerId: OWNER_ID, deploymentId: current.row.id }),
   ).toMatchObject({ state: 'pending', github_repository: null });
 });
+
+test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metadata'])(
+  'MCP provenance persists per deployment and is not inherited on reuse: %s',
+  async (identity) => {
+    const appId = await configuredApp();
+    const input = await deploymentInput(appId);
+    const repository = new DeploymentsRepository(withTypes<Queries>(sql));
+    const clientId = Value.Parse(OAuthClientIdSchema, identity);
+    const deployed = await repository.insertWithMcpClient({ ...input, clientId });
+    if (deployed.outcome !== 'created') {
+      throw new Error('The MCP deployment must be created.');
+    }
+    const owned = { appId, ownerId: OWNER_ID, deploymentId: deployed.row.id };
+    expect(deployed.row.mcp_client_id).toBe(clientId);
+    expect(deployed.row.github_repository).toBeNull();
+    expect((await repository.findById(owned))?.mcp_client_id).toBe(clientId);
+    expect((await repository.listByApp({ appId, ownerId: OWNER_ID }))[0]?.mcp_client_id).toBe(
+      clientId,
+    );
+    expect(await repository.findById({ ...owned, ownerId: OTHER_OWNER_ID })).toBeNull();
+    expect(
+      await repository.insertWithMcpClient({ ...input, clientId, ownerId: OTHER_OWNER_ID }),
+    ).toEqual({ outcome: 'no-artifact' });
+    expect((await repository.findById(owned))?.state).toBe('pending');
+    const manual = await repository.insert(input);
+    expect(manual.outcome === 'created' ? manual.row.mcp_client_id : undefined).toBeNull();
+    const rollback = await repository.insertRollback({
+      appId,
+      ownerId: OWNER_ID,
+      rollbackOf: deployed.row.id,
+    });
+    expect(rollback?.mcp_client_id).toBeNull();
+    expect(rollback?.artifact_id).toBe(deployed.row.artifact_id);
+    expect((await repository.findById(owned))?.mcp_client_id).toBe(clientId);
+  },
+);

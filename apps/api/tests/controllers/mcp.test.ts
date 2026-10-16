@@ -58,6 +58,7 @@ const SKILL_DIRECTORY = new URL('../../../../skills/deploy-to-nibrun/', import.m
 
 const BINARY_URL = 'https://files.example.test/app';
 const NATIVE_DOWNLOAD_URL = 'https://files.example.test/?signature=temporary-download-token';
+const MCP_CLIENT_ID = 'test-mcp-client';
 const NATIVE_BINARY = { download_url: NATIVE_DOWNLOAD_URL, file_id: 'file-mcp-binary' };
 const UPLOAD_URL = 'https://uploads.example.test/binary?signature=upload-token';
 const BINARY_SHA256 = 'a94d242b9587cc191df91f21b3ac236714b02ce453730e17b0ddf17cb138eb1e';
@@ -121,7 +122,7 @@ function accessTokenClaims(): JWTPayload {
     iss: OAUTH_ISSUER,
     aud: MCP_RESOURCE.href,
     sub: ownerId,
-    client_id: 'test-mcp-client',
+    client_id: MCP_CLIENT_ID,
     scope: MCP_SCOPE,
     iat: now,
     exp: now + TOKEN_LIFETIME_SECONDS,
@@ -583,7 +584,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       });
       const complete = spyOn(artifactsService, 'completeUpload').mockResolvedValue(ARTIFACT);
       const fetch = spyOn(artifactsService, 'createFromUrl');
-      const deploy = spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+      const deploy = spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(DEPLOYMENT);
       const token = await accessToken();
       const response = await rpc({
         method: 'tools/call',
@@ -656,8 +657,8 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       expect(deploy).toHaveBeenCalledWith({
         appId: app.id,
         ownerId,
-        isAnonymous: false,
-        source: { artifactId: ARTIFACT.id },
+        clientId: MCP_CLIENT_ID,
+        artifactId: ARTIFACT.id,
       });
       expect(complete.mock.invocationCallOrder[0]).toBeLessThan(
         deploy.mock.invocationCallOrder[0]!,
@@ -712,7 +713,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     spyOn(appsService, 'get').mockResolvedValue(app);
     const complete = spyOn(artifactsService, 'completeUpload').mockRejectedValue(error);
     const fetch = spyOn(artifactsService, 'createFromUrl');
-    const deploy = spyOn(deploymentsService, 'createOrRollback');
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient');
     const response = await rpc({
       method: 'tools/call',
       params: {
@@ -769,7 +770,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const create = spyOn(appsService, 'create').mockResolvedValue(app);
     const get = spyOn(appsService, 'get').mockResolvedValue(app);
     const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
-    const deploy = spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(DEPLOYMENT);
     const token = await accessToken();
     const response = await rpc({
       method: 'tools/call',
@@ -795,8 +796,8 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(deploy).toHaveBeenCalledWith({
       appId: app.id,
       ownerId,
-      isAnonymous: false,
-      source: { artifactId: ARTIFACT.id },
+      clientId: MCP_CLIENT_ID,
+      artifactId: ARTIFACT.id,
     });
     expect(create.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[0]!);
     expect(fetch.mock.invocationCallOrder[0]).toBeLessThan(deploy.mock.invocationCallOrder[0]!);
@@ -825,7 +826,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       new ForbiddenError('App quota exceeded.'),
     );
     const fetch = spyOn(artifactsService, 'createFromUrl');
-    const deploy = spyOn(deploymentsService, 'createOrRollback');
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient');
     const response = await rpc({
       method: 'tools/call',
       params: { name: MCP_TOOL_NAMES.deployApp, arguments: { name: 'New app', url: BINARY_URL } },
@@ -843,11 +844,46 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(deploy).not.toHaveBeenCalled();
   });
 
+  test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metadata'])(
+    'deployment provenance uses the client identity verified in the access token: %s',
+    async (clientId) => {
+      const app = ownedApp();
+      spyOn(appsService, 'get').mockResolvedValue(app);
+      spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
+      const deployment = Value.Parse(DeploymentResponseSchema, {
+        ...DEPLOYMENT,
+        mcp: { clientId },
+      });
+      const deploy = spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(deployment);
+      const token = await accessToken({ claims: { ...accessTokenClaims(), client_id: clientId } });
+      const response = await rpc({
+        method: 'tools/call',
+        params: {
+          name: MCP_TOOL_NAMES.deployApp,
+          arguments: { appId: app.id, url: BINARY_URL },
+          _meta: { clientId: 'forged-client', mcp: { clientId: 'forged-client' } },
+        },
+        token,
+        protocolVersion,
+      });
+      const { result } = await rpcBody(response);
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent.deployment.mcp).toEqual({ clientId });
+      expect(deploy).toHaveBeenCalledWith({
+        appId: app.id,
+        ownerId,
+        artifactId: ARTIFACT.id,
+        clientId,
+      });
+      expect(JSON.stringify(result)).not.toContain(token);
+    },
+  );
+
   test('fetches and queues a deployment under the verified account without forwarding its token', async () => {
     const app = ownedApp();
     const get = spyOn(appsService, 'get').mockResolvedValue(app);
     const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
-    const deploy = spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(DEPLOYMENT);
     const token = await accessToken();
     const response = await rpc({
       method: 'tools/call',
@@ -882,8 +918,8 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(deploy).toHaveBeenCalledWith({
       appId: app.id,
       ownerId,
-      isAnonymous: false,
-      source: { artifactId: ARTIFACT.id },
+      clientId: MCP_CLIENT_ID,
+      artifactId: ARTIFACT.id,
     });
     expect(get.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[0]!);
     expect(fetch.mock.invocationCallOrder[0]).toBeLessThan(deploy.mock.invocationCallOrder[0]!);
@@ -894,7 +930,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const app = ownedApp();
     spyOn(appsService, 'get').mockResolvedValue(app);
     const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
-    spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+    spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(DEPLOYMENT);
     const response = await rpc({
       method: 'tools/call',
       params: { name: MCP_TOOL_NAMES.deployApp, arguments: { appId: app.id, url: BINARY_URL } },
@@ -922,7 +958,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       });
       spyOn(appsService, 'get').mockResolvedValue(app);
       spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
-      spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+      spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(DEPLOYMENT);
       const response = await rpc({
         method: 'tools/call',
         params: { name: MCP_TOOL_NAMES.deployApp, arguments: { appId: app.id, url: BINARY_URL } },
@@ -949,7 +985,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       const app = ownedApp();
       const get = spyOn(appsService, 'get').mockResolvedValue(app);
       const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
-      const deploy = spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+      const deploy = spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(DEPLOYMENT);
       const token = await accessToken();
       const response = await rpc({
         method: 'tools/call',
@@ -980,8 +1016,8 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       expect(deploy).toHaveBeenCalledWith({
         appId: app.id,
         ownerId,
-        isAnonymous: false,
-        source: { artifactId: ARTIFACT.id },
+        clientId: MCP_CLIENT_ID,
+        artifactId: ARTIFACT.id,
       });
       expect(JSON.stringify([fetch.mock.calls, deploy.mock.calls, result])).not.toContain(token);
     },
@@ -991,7 +1027,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
     const create = spyOn(appsService, 'create');
     const fetch = spyOn(artifactsService, 'createFromUrl');
-    const deploy = spyOn(deploymentsService, 'createOrRollback');
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient');
     const response = await rpc({
       method: 'tools/call',
       params: {
@@ -1013,7 +1049,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     spyOn(artifactsService, 'createFromUrl').mockRejectedValue(
       new BadRequestError('The artifact is not a Linux executable.'),
     );
-    const deploy = spyOn(deploymentsService, 'createOrRollback');
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient');
     const response = await rpc({
       method: 'tools/call',
       params: {
@@ -1031,6 +1067,8 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     { appId: ARTIFACT.appId, url: 'http://files.example.test/app' },
     { appId: ARTIFACT.appId, url: BINARY_URL, sha256: 'wrong-checksum' },
     { appId: ARTIFACT.appId, url: BINARY_URL, ownerId: 'caller-selected-owner' },
+    { appId: ARTIFACT.appId, url: BINARY_URL, clientId: 'forged-client' },
+    { appId: ARTIFACT.appId, url: BINARY_URL, mcp: { clientId: 'forged-client' } },
     { appId: ARTIFACT.appId },
     { url: BINARY_URL },
     { appId: ARTIFACT.appId, url: BINARY_URL, name: 'unexpected-new-app' },
@@ -1062,7 +1100,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const get = spyOn(appsService, 'get');
     const complete = spyOn(artifactsService, 'completeUpload');
     const fetch = spyOn(artifactsService, 'createFromUrl');
-    const deploy = spyOn(deploymentsService, 'createOrRollback');
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient');
     const response = await rpc({
       method: 'tools/call',
       params: { name: MCP_TOOL_NAMES.deployApp, arguments: args },

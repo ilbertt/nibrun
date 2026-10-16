@@ -10,7 +10,7 @@ import {
 } from '@repo/protocol';
 import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
-import { ArtifactIdSchema } from '#lib/api/identifiers.ts';
+import { ArtifactIdSchema, OAuthClientIdSchema } from '#lib/api/identifiers.ts';
 
 // `stopped` is the one an owner puts a release into and takes it back out of: a suspended app's
 // microVM is down and the release is still the app's current one, which is a different thing from
@@ -37,11 +37,14 @@ export const GitHubDeploymentSchema = Type.Object({
   runAttempt: Type.String(),
 });
 
+export const McpDeploymentSchema = Type.Object({ clientId: OAuthClientIdSchema });
+
 export const DeploymentSchema = Type.Object({
   id: DeploymentIdSchema,
   appId: AppIdSchema,
   artifactId: ArtifactIdSchema,
   github: Type.Optional(GitHubDeploymentSchema),
+  mcp: Type.Optional(McpDeploymentSchema),
   config: AppConfigSchema,
   state: DeploymentStateSchema,
   // What the microVM is doing, which the release's own state stopped answering when an app could

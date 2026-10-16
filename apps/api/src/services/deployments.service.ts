@@ -16,6 +16,7 @@ import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {
   CreatedDeployment,
+  CreateMcpDeploymentInput,
   DeploymentByIdInput,
   DeploymentRow,
   DeploymentsByAppInput,
@@ -116,6 +117,10 @@ export class DeploymentsService extends Service {
         onlyOne: isAnonymous,
       }),
     );
+  }
+
+  async createWithMcpClient(input: CreateMcpDeploymentInput): Promise<PublicDeployment> {
+    return await this.created(this.deploymentsRepo.insertWithMcpClient(input));
   }
 
   async createWithDeploymentGrant(
@@ -325,6 +330,7 @@ function toPublicDeployment(row: DeploymentRow): PublicDeployment {
     ...(row.message && { message: row.message }),
     ...(row.rollback_of_deployment_id && { rollbackOf: row.rollback_of_deployment_id }),
     ...(github && { github }),
+    ...(row.mcp_client_id !== null && { mcp: { clientId: row.mcp_client_id } }),
   };
 }
 

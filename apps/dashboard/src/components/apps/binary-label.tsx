@@ -2,6 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui/components/too
 import { useClipboardCopy } from '@repo/ui/hooks/use-clipboard-copy';
 import { BinaryOrigin } from '#components/apps/binary-origin.tsx';
 import { GitHubDeploymentOrigin } from '#components/apps/github-deployment-origin.tsx';
+import { McpDeploymentOrigin } from '#components/apps/mcp-deployment-origin.tsx';
 import type { ArtifactSummary } from '#queries/artifacts.ts';
 import type { DeploymentSummary } from '#queries/deployments.ts';
 
@@ -12,9 +13,11 @@ const SHORT_DIGEST_LENGTH = 12;
 export function BinaryLabel({
   artifact,
   github,
+  mcp,
 }: {
   artifact: ArtifactSummary;
   github: DeploymentSummary['github'];
+  mcp: DeploymentSummary['mcp'];
 }) {
   const { copied, copy } = useClipboardCopy({ value: artifact.digest, onCopied: undefined });
 
@@ -34,6 +37,7 @@ export function BinaryLabel({
         )
       </span>
       <BinaryOrigin originalFileUrl={artifact.originalFileUrl} />
+      {mcp !== undefined && <McpDeploymentOrigin mcp={mcp} />}
       {github !== undefined && <GitHubDeploymentOrigin github={github} />}
     </>
   );

@@ -1,6 +1,6 @@
 import { getOAuthProtectedResourceMetadataUrl } from '@modelcontextprotocol/server';
 import { Type } from '@sinclair/typebox';
-import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { OAuthClientIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { OAUTH_ISSUER } from '#lib/auth/oauth-issuer.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 
@@ -12,7 +12,7 @@ export const MCP_SCOPE = 'mcp';
 
 export const McpAccessTokenClaimsSchema = Type.Object({
   sub: OwnerIdSchema,
-  client_id: Type.String({ minLength: 1 }),
+  client_id: OAuthClientIdSchema,
   scope: Type.String(),
   exp: Type.Integer(),
   iat: Type.Integer(),
