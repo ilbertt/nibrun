@@ -6,11 +6,13 @@ import { registerSkills } from '#lib/mcp/skills.ts';
 import { registerDeployAppTool } from '#lib/mcp/tools/deploy-app.ts';
 import { registerGetAppTool } from '#lib/mcp/tools/get-app.ts';
 import { registerListAppsTool } from '#lib/mcp/tools/list-apps.ts';
+import { registerListFilesTool } from '#lib/mcp/tools/list-files.ts';
 import { registerPrepareDeployTool } from '#lib/mcp/tools/prepare-deploy.ts';
 import { registerReadLogsTool } from '#lib/mcp/tools/read-logs.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
+import type { FilesystemService } from '#services/filesystem.service.ts';
 import type { LogsService } from '#services/logs.service.ts';
 
 const logger = createLogger('mcp');
@@ -20,11 +22,13 @@ export function createMcpServerHandler({
   artifactsService,
   deploymentsService,
   logsService,
+  filesystemService,
 }: {
   appsService: AppsService;
   artifactsService: ArtifactsService;
   deploymentsService: DeploymentsService;
   logsService: LogsService;
+  filesystemService: FilesystemService;
 }) {
   return createMcpHandler(
     function createServer(context) {
@@ -44,6 +48,7 @@ export function createMcpServerHandler({
         clientId,
       });
       registerPrepareDeployTool({ server, appsService, artifactsService, ownerId });
+      registerListFilesTool({ server, filesystemService, ownerId });
       return server;
     },
     {
