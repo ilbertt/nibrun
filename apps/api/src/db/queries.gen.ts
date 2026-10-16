@@ -2195,6 +2195,7 @@ export const schema = {
             deployments_github_deployment_grant_id_fkey: { _constraintName: "deployments_github_deployment_grant_id_fkey" },
             deployments_initial_data_import_id_fkey: { _constraintName: "deployments_initial_data_import_id_fkey" },
             deployments_instance_state_check: { _constraintName: "deployments_instance_state_check" },
+            deployments_mcp_chat_nonempty: { _constraintName: "deployments_mcp_chat_nonempty" },
             deployments_mcp_chat_requires_client: { _constraintName: "deployments_mcp_chat_requires_client" },
             deployments_pkey: { _constraintName: "deployments_pkey" },
             deployments_rollback_of_deployment_id_fkey: { _constraintName: "deployments_rollback_of_deployment_id_fkey" },
