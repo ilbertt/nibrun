@@ -3,7 +3,7 @@ import { appUrl } from '@repo/app-ui';
 import { FilenameSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
-import { ArtifactIdSchema, type OwnerId } from '#lib/api/identifiers.ts';
+import { ArtifactIdSchema, type OAuthClientId, type OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import {
   appForDeployment,
@@ -73,12 +73,14 @@ export function registerDeployAppTool({
   artifactsService,
   deploymentsService,
   ownerId,
+  clientId,
 }: {
   server: McpServer;
   appsService: AppsService;
   artifactsService: ArtifactsService;
   deploymentsService: DeploymentsService;
   ownerId: OwnerId;
+  clientId: OAuthClientId;
 }) {
   registerTool({
     server,
@@ -118,11 +120,11 @@ export function registerDeployAppTool({
               sha256,
             })
           : await artifactsService.completeUpload({ appId: app.id, ownerId, artifactId });
-      const deployment = await deploymentsService.createOrRollback({
+      const deployment = await deploymentsService.createWithMcpClient({
         appId: app.id,
         ownerId,
-        isAnonymous: false,
-        source: { artifactId: artifact.id },
+        clientId,
+        artifactId: artifact.id,
       });
       return { app, deployment, url: appUrl(app.hostnames) };
     }),

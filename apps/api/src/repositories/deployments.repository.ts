@@ -2,7 +2,13 @@ import type { TypedSQL } from '@ilbertt/bun-sqlgen';
 import type { AppId, DeploymentId, HostPort, InstanceState, Ipv4Address } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { DeploymentState } from '#lib/api/deployment.ts';
-import type { ArtifactId, DeploymentGrantId, ImportId, OwnerId } from '#lib/api/identifiers.ts';
+import type {
+  ArtifactId,
+  DeploymentGrantId,
+  ImportId,
+  OAuthClientId,
+  OwnerId,
+} from '#lib/api/identifiers.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type DeploymentRow = Queries['SelectDeploymentById'];
@@ -35,6 +41,11 @@ export type CreatedDeployment =
   | { outcome: 'no-import' }
   | { outcome: 'data-exists' }
   | { outcome: 'held' };
+
+export type CreateMcpDeploymentInput = OwnedApp & {
+  artifactId: ArtifactId;
+  clientId: OAuthClientId;
+};
 
 export type CreateGitHubDeploymentInput = OwnedApp & {
   artifactId: ArtifactId;
@@ -80,6 +91,7 @@ export type ReportedDeployment = {
 
 export abstract class DeploymentsRepositoryContract {
   abstract insert(input: CreateDeploymentInput): Promise<CreatedDeployment>;
+  abstract insertWithMcpClient(input: CreateMcpDeploymentInput): Promise<CreatedDeployment>;
   abstract insertWithDeploymentGrant(
     input: CreateGitHubDeploymentInput,
   ): Promise<CreatedDeployment>;
@@ -109,11 +121,29 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
    * so it has to leave in this same transaction or the insert meets it.
    */
   insert(input: CreateDeploymentInput): Promise<CreatedDeployment> {
-    return this.insertDeployment({ ...input, deploymentGrantId: null });
+    return this.insertDeployment({ ...input, deploymentGrantId: null, mcpClientId: null });
+  }
+
+  insertWithMcpClient({
+    clientId,
+    ...input
+  }: CreateMcpDeploymentInput): Promise<CreatedDeployment> {
+    return this.insertDeployment({
+      ...input,
+      initialDataFrom: null,
+      onlyOne: false,
+      deploymentGrantId: null,
+      mcpClientId: clientId,
+    });
   }
 
   insertWithDeploymentGrant(input: CreateGitHubDeploymentInput): Promise<CreatedDeployment> {
-    return this.insertDeployment({ ...input, initialDataFrom: null, onlyOne: false });
+    return this.insertDeployment({
+      ...input,
+      initialDataFrom: null,
+      onlyOne: false,
+      mcpClientId: null,
+    });
   }
 
   private insertDeployment({
@@ -123,8 +153,10 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     initialDataFrom,
     onlyOne,
     deploymentGrantId,
+    mcpClientId,
   }: CreateDeploymentInput & {
     deploymentGrantId: DeploymentGrantId | null;
+    mcpClientId: OAuthClientId | null;
   }): Promise<CreatedDeployment> {
     return this.sql.begin(async (tx): Promise<CreatedDeployment> => {
       // Asked before anything is superseded: returning from this callback commits, so an
@@ -161,8 +193,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       // the row is written through rather than one checked beside it.
       const [inserted] = await tx.InsertDeployment`
         INSERT INTO nibrun.deployments
-          (app_id, artifact_id, config_id, initial_data_import_id, github_deployment_grant_id)
-        SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}
+          (app_id, artifact_id, config_id, initial_data_import_id, github_deployment_grant_id, mcp_client_id)
+        SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}, ${mcpClientId}
         FROM nibrun.live_apps a
         JOIN nibrun.artifacts ar ON ar.app_id = a.id
         JOIN LATERAL (
@@ -223,7 +255,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     return this.sql.SelectDeploymentsByApp`
       /* @notNull environment_names */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.instance_state, d.activated_at,
-             d.rollback_of_deployment_id, d.created_at, d.message,
+             d.rollback_of_deployment_id, d.mcp_client_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
              g.github_repository, g.github_workflow_ref, g.github_ref,
@@ -251,7 +283,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     const [row] = await this.sql.SelectDeploymentById`
       /* @notNull environment_names */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.instance_state, d.activated_at,
-             d.rollback_of_deployment_id, d.created_at, d.message,
+             d.rollback_of_deployment_id, d.mcp_client_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
              g.github_repository, g.github_workflow_ref, g.github_ref,
@@ -379,7 +411,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     const [row] = await tx.SelectInsertedDeployment`
       /* @notNull environment_names */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.instance_state, d.activated_at,
-             d.rollback_of_deployment_id, d.created_at, d.message,
+             d.rollback_of_deployment_id, d.mcp_client_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
              g.github_repository, g.github_workflow_ref, g.github_ref,

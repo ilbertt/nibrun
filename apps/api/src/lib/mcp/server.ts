@@ -1,6 +1,6 @@
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import { Value } from '@sinclair/typebox/value';
-import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { OAuthClientIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { createLogger } from '#lib/logger.ts';
 import { registerSkills } from '#lib/mcp/skills.ts';
 import { registerDeployAppTool } from '#lib/mcp/tools/deploy-app.ts';
@@ -26,10 +26,18 @@ export function createMcpServerHandler({
     function createServer(context) {
       const server = new McpServer({ name: 'nibrun', version: '0.1.0' });
       const ownerId = Value.Parse(OwnerIdSchema, context.authInfo?.extra?.ownerId);
+      const clientId = Value.Parse(OAuthClientIdSchema, context.authInfo?.clientId);
       registerSkills({ server });
       registerListAppsTool({ server, appsService, ownerId });
       registerGetAppTool({ server, appsService, deploymentsService, ownerId });
-      registerDeployAppTool({ server, appsService, artifactsService, deploymentsService, ownerId });
+      registerDeployAppTool({
+        server,
+        appsService,
+        artifactsService,
+        deploymentsService,
+        ownerId,
+        clientId,
+      });
       registerPrepareDeployTool({ server, appsService, artifactsService, ownerId });
       return server;
     },
