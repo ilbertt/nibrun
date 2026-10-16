@@ -2,7 +2,7 @@ import { ForbiddenError } from '#lib/errors.ts';
 
 const SQLITE_REQUEST_TIMEOUT_MS = 30_000;
 
-export function sqliteRequestSignal(request: Request): AbortSignal {
+export function sqliteRequestSignal(request: Pick<Request, 'signal'>): AbortSignal {
   return AbortSignal.any([request.signal, AbortSignal.timeout(SQLITE_REQUEST_TIMEOUT_MS)]);
 }
 

@@ -4,4 +4,5 @@ export const MCP_TOOL_NAMES = {
   readLogs: 'read_logs',
   prepareDeploy: 'prepare_deploy',
   deployApp: 'deploy_app',
+  queryDatabase: 'query_database',
 } as const;
