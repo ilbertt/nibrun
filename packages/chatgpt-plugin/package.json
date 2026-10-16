@@ -9,8 +9,7 @@
   },
   "scripts": {
     "build": "bun run scripts/build.ts",
-    "check:types": "bun run --bun tsc",
-    "test": "bun test"
+    "check:types": "bun run --bun tsc"
   },
   "dependencies": {
     "@repo/global-constants": "workspace:*",
