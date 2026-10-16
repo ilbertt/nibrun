@@ -6,6 +6,7 @@ import { registerSkills } from '#lib/mcp/skills.ts';
 import { registerDeployAppTool } from '#lib/mcp/tools/deploy-app.ts';
 import { registerGetAppTool } from '#lib/mcp/tools/get-app.ts';
 import { registerListAppsTool } from '#lib/mcp/tools/list-apps.ts';
+import { registerPrepareDeployTool } from '#lib/mcp/tools/prepare-deploy.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
@@ -29,6 +30,7 @@ export function createMcpServerHandler({
       registerListAppsTool({ server, appsService, ownerId });
       registerGetAppTool({ server, appsService, deploymentsService, ownerId });
       registerDeployAppTool({ server, appsService, artifactsService, deploymentsService, ownerId });
+      registerPrepareDeployTool({ server, appsService, artifactsService, ownerId });
       return server;
     },
     {
