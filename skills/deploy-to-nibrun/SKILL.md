@@ -82,11 +82,14 @@ is what keeps an address across that.
 
 ## 3. Deploy
 
-With nibrun's MCP server, call `deploy_app` with the existing `appId` and either the compiled file
-as `binary` through ChatGPT's native file binding, or a `url` reachable over HTTPS from nibrun.
-An optional `sha256` verifies the download. nibrun fetches the binary and queues a deployment.
-The tool deploys to an existing app; create the app first if needed. Check deployment status and
-the public URL before reporting success.
+With nibrun's MCP server, call `deploy_app` with a `name` and optional initial `config` to create
+and deploy a new app. For subsequent deployments, pass the returned `app.id` as `appId` to reuse
+that app and its configuration.
+
+In ChatGPT, bind the compiled executable to the `binary` file input. Alternatively, provide a
+`url` reachable over HTTPS from nibrun. An optional `sha256` verifies the download. nibrun fetches
+the binary and queues a deployment. Check deployment status and the public URL before reporting
+success.
 
 With the CLI, the first deploy creates the app:
 
