@@ -11,25 +11,10 @@ const ZIP_COMPRESSION_LEVEL = 9;
 
 type ArchiveFiles = Record<string, Uint8Array>;
 
-export async function createPluginArchive({ appId }: { appId: string | undefined }) {
-  if (
-    appId !== undefined &&
-    !/^(asdk_app_|connector_|templated_apps_)[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(appId)
-  ) {
-    throw new Error('Use an existing OpenAI app ID, not a plugin ID or URL.');
-  }
-
-  const files: ArchiveFiles = { 'plugin.json': jsonBytes(createManifest({ appId })) };
-  for (const directory of ['skills', 'assets']) {
-    await addDirectory({
-      files,
-      directory: join(PACKAGE_DIRECTORY, directory),
-      archivePath: directory,
-    });
-  }
-
-  if (appId === undefined) {
-    files['mcp.json'] = jsonBytes({
+export async function createPluginArchive() {
+  const files: ArchiveFiles = {
+    'plugin.json': jsonBytes(createManifest()),
+    'mcp.json': jsonBytes({
       $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
       mcpServers: {
         [PRODUCT_NAME]: {
@@ -37,9 +22,14 @@ export async function createPluginArchive({ appId }: { appId: string | undefined
           url: new URL('/mcp', DASHBOARD_SITE.url).href,
         },
       },
+    }),
+  };
+  for (const directory of ['skills', 'assets']) {
+    await addDirectory({
+      files,
+      directory: join(PACKAGE_DIRECTORY, directory),
+      archivePath: directory,
     });
-  } else {
-    files['.app.json'] = jsonBytes({ apps: { [PRODUCT_NAME]: { id: appId, required: true } } });
   }
 
   return zipSync(files, { level: ZIP_COMPRESSION_LEVEL, mtime: ZIP_MTIME });

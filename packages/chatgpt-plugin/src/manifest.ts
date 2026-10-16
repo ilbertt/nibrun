@@ -1,7 +1,7 @@
 import { GITHUB_REPO_URL, PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 import packageJson from '../package.json' with { type: 'json' };
 
-export function createManifest({ appId }: { appId: string | undefined }) {
+export function createManifest() {
   return {
     $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
     name: PRODUCT_NAME,
@@ -27,7 +27,6 @@ export function createManifest({ appId }: { appId: string | undefined }) {
           logo: './assets/logo.png',
           composerIcon: './assets/composer-icon.png',
         },
-        apps: appId === undefined ? undefined : './.app.json',
         requires_local_executor: false,
       },
     },
