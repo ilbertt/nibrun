@@ -46,6 +46,7 @@ export const AppsAppIdArtifactsController = new Elysia()
               appId,
               ...deploymentAccess,
               url: body.url,
+              filename: undefined,
               sha256: body.sha256,
             })
           : await artifactsService.create({

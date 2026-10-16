@@ -12,6 +12,7 @@ import { createMcpServerHandler } from '#lib/mcp/server.ts';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import {
   AppsServicePlugin,
+  ArtifactsServicePlugin,
   auth,
   DeploymentsServicePlugin,
   McpAuthorizationServicePlugin,
@@ -20,10 +21,12 @@ import {
 function createMcpController() {
   const controller = new Elysia()
     .use(AppsServicePlugin)
+    .use(ArtifactsServicePlugin)
     .use(DeploymentsServicePlugin)
     .use(McpAuthorizationServicePlugin);
-  const { appsService, deploymentsService, mcpAuthorizationService } = controller.decorator;
-  const handler = createMcpServerHandler({ appsService, deploymentsService });
+  const { appsService, artifactsService, deploymentsService, mcpAuthorizationService } =
+    controller.decorator;
+  const handler = createMcpServerHandler({ appsService, artifactsService, deploymentsService });
 
   return controller.all(
     RoutePrefix.Mcp,

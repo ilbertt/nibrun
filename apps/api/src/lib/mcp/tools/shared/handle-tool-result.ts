@@ -24,7 +24,7 @@ export function handleToolResult<Args extends unknown[], Output extends Structur
       logger.error(`${callback.name} failed`, error);
       return {
         isError: true,
-        content: [{ type: 'text', text: 'Unable to complete request. Try again later.' }],
+        content: [{ type: 'text', text: 'Unable to complete request.' }],
       };
     }
   };

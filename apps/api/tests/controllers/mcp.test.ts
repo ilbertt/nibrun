@@ -12,20 +12,29 @@ import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
-import { NotFoundError } from '#lib/errors.ts';
+import { ArtifactSchema } from '#lib/api/artifact.ts';
+import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
+import { CreateArtifactBodySchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { DeploymentResponseSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
-import { AppResponseSchema, ListAppsResponseSchema } from '#routes/api/apps/model.ts';
+import {
+  AppResponseSchema,
+  CreateAppRequestSchema,
+  ListAppsResponseSchema,
+} from '#routes/api/apps/model.ts';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 
-const { auth, AppsServicePlugin, DeploymentsServicePlugin } = await import('#services/plugins.ts');
+const { auth, AppsServicePlugin, ArtifactsServicePlugin, DeploymentsServicePlugin } = await import(
+  '#services/plugins.ts'
+);
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const { fromTypeBox } = await import('#lib/mcp/schema.ts');
 const { registerTool } = await import('#lib/mcp/tools/shared/register-tool.ts');
 const { MCP_TOOL_META } = await import('#lib/mcp/tools/shared/tool-meta.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
+const artifactsService = ArtifactsServicePlugin.decorator.artifactsService;
 const deploymentsService = DeploymentsServicePlugin.decorator.deploymentsService;
 const context = await auth.$context;
 const key = await generateKeyPair('EdDSA');
@@ -44,6 +53,29 @@ const HEADERS = {
 const nativeFetch = globalThis.fetch;
 const SKILL_URI = 'skill://nibrun/deploy-to-nibrun/SKILL.md';
 const SKILL_DIRECTORY = new URL('../../../../skills/deploy-to-nibrun/', import.meta.url);
+
+const BINARY_URL = 'https://files.example.test/app';
+const NATIVE_DOWNLOAD_URL = 'https://files.example.test/?signature=temporary-download-token';
+const NATIVE_BINARY = { download_url: NATIVE_DOWNLOAD_URL, file_id: 'file-mcp-binary' };
+const BINARY_SHA256 = 'a94d242b9587cc191df91f21b3ac236714b02ce453730e17b0ddf17cb138eb1e';
+const ARTIFACT = Value.Parse(ArtifactSchema, {
+  id: 'mcp-artifact',
+  appId: 'mcp-app',
+  digest: BINARY_SHA256,
+  sizeBytes: 4096,
+  objectKey: `sha256/${BINARY_SHA256}`,
+  originalFileName: 'app',
+  createdAt: new Date().toISOString(),
+});
+const DEPLOYMENT = Value.Parse(DeploymentResponseSchema, {
+  id: 'mcp-deployment',
+  appId: ARTIFACT.appId,
+  artifactId: ARTIFACT.id,
+  config: DEFAULT_CONFIG,
+  state: 'pending',
+  createdAt: new Date().toISOString(),
+  restartCount: 0,
+});
 
 let ownerId: string;
 let otherOwnerId: string;
@@ -398,7 +430,11 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       protocolVersion,
     });
     const { result } = await rpcBody(response);
-    expect(result.tools).toHaveLength(2);
+    expect(result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      'list_apps',
+      'get_app',
+      'deploy_app',
+    ]);
     expect(result.tools[0]).toMatchObject({
       name: 'list_apps',
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
@@ -427,6 +463,372 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(output.currentDeployment.anyOf[0].required).toEqual(DeploymentResponseSchema.required);
     expect(output.currentDeployment.anyOf).toContainEqual({ type: 'null' });
     expect(JSON.stringify(result.tools[1].outputSchema)).not.toContain('"nullable"');
+  });
+
+  test('advertises creation and redeployment using the existing API schemas', async () => {
+    const response = await rpc({
+      method: 'tools/list',
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    const tool = result.tools.find((entry: { name: string }) => entry.name === 'deploy_app');
+    expect(tool).toMatchObject({
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        openWorldHint: true,
+        idempotentHint: false,
+      },
+      inputSchema: {
+        additionalProperties: false,
+        oneOf: [{ required: ['url'] }, { required: ['binary'] }],
+        allOf: [
+          { oneOf: [{ required: ['appId'] }, { required: ['name'] }] },
+          { not: { required: ['appId', 'config'] } },
+        ],
+      },
+      _meta: {
+        securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }],
+        'openai/fileParams': ['binary'],
+      },
+    });
+    expect(tool.inputSchema.required ?? []).toEqual([]);
+    expect(tool.inputSchema.properties.name).toEqual(
+      JSON.parse(JSON.stringify(CreateAppRequestSchema.properties.name)),
+    );
+    expect(tool.inputSchema.properties.config).toEqual(
+      JSON.parse(JSON.stringify(CreateAppRequestSchema.properties.config)),
+    );
+    const fetched = CreateArtifactBodySchema.anyOf
+      .map((schema) => schema.properties)
+      .find((properties) => 'url' in properties)!;
+    expect(tool.inputSchema.properties.url).toEqual(JSON.parse(JSON.stringify(fetched.url)));
+    expect(tool.inputSchema.properties.sha256).toEqual(JSON.parse(JSON.stringify(fetched.sha256)));
+    expect(tool.inputSchema.properties.binary.required).toEqual(['download_url', 'file_id']);
+    expect(Object.keys(tool.inputSchema.properties.binary.properties)).toEqual([
+      'download_url',
+      'file_id',
+      'mime_type',
+      'file_name',
+    ]);
+    expect(tool.inputSchema.properties.binary.properties.download_url).toEqual(
+      tool.inputSchema.properties.url,
+    );
+    expect(tool.outputSchema.properties.deployment.required).toEqual(
+      DeploymentResponseSchema.required,
+    );
+    expect(tool.outputSchema.properties.app.required).toEqual(AppResponseSchema.required);
+    expect(tool.outputSchema.properties.url).toMatchObject({ type: 'string', format: 'uri' });
+    expect(JSON.stringify(tool.outputSchema)).not.toContain('"nullable"');
+  });
+
+  test.each([
+    { source: { url: BINARY_URL }, config: undefined },
+    {
+      source: { binary: NATIVE_BINARY },
+      config: { httpPort: 8080, environment: { API_KEY: 'initial-secret' } },
+    },
+  ])('creates an app and redeploys it using the returned ID: %j', async ({ source, config }) => {
+    const app = ownedApp();
+    const create = spyOn(appsService, 'create').mockResolvedValue(app);
+    const get = spyOn(appsService, 'get').mockResolvedValue(app);
+    const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
+    const deploy = spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+    const token = await accessToken();
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: 'deploy_app',
+        arguments: { name: app.name, config, ...source },
+      },
+      token,
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toEqual({
+      app,
+      deployment: DEPLOYMENT,
+      url: 'https://mcp-example.apps.test',
+    });
+    expect(create).toHaveBeenCalledWith({ ownerId, isAnonymous: false, name: app.name, config });
+    expect(get).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.objectContaining({ appId: app.id, ownerId, isAnonymous: false }),
+    );
+    expect(deploy).toHaveBeenCalledWith({
+      appId: app.id,
+      ownerId,
+      isAnonymous: false,
+      source: { artifactId: ARTIFACT.id },
+    });
+    expect(create.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[0]!);
+    expect(fetch.mock.invocationCallOrder[0]).toBeLessThan(deploy.mock.invocationCallOrder[0]!);
+    expect(JSON.stringify(result)).not.toContain('initial-secret');
+    const redeployResponse = await rpc({
+      method: 'tools/call',
+      params: {
+        name: 'deploy_app',
+        arguments: { appId: result.structuredContent.app.id, ...source },
+      },
+      token,
+      protocolVersion,
+    });
+    const redeployed = (await rpcBody(redeployResponse)).result;
+    expect(redeployed.isError).not.toBe(true);
+    expect(redeployed.structuredContent.app.id).toBe(app.id);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledWith({ appId: app.id, ownerId });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(deploy).toHaveBeenCalledTimes(2);
+  });
+
+  test('does not fetch or deploy a binary when app creation is refused', async () => {
+    const create = spyOn(appsService, 'create').mockRejectedValue(
+      new ForbiddenError('App quota exceeded.'),
+    );
+    const fetch = spyOn(artifactsService, 'createFromUrl');
+    const deploy = spyOn(deploymentsService, 'createOrRollback');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: 'deploy_app', arguments: { name: 'New app', url: BINARY_URL } },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.isError).toBe(true);
+    expect(create).toHaveBeenCalledWith({
+      ownerId,
+      isAnonymous: false,
+      name: 'New app',
+      config: undefined,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(deploy).not.toHaveBeenCalled();
+  });
+
+  test('fetches and queues a deployment under the verified account without forwarding its token', async () => {
+    const app = ownedApp();
+    const get = spyOn(appsService, 'get').mockResolvedValue(app);
+    const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
+    const deploy = spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+    const token = await accessToken();
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: 'deploy_app',
+        arguments: { appId: app.id, url: BINARY_URL, sha256: BINARY_SHA256 },
+      },
+      token,
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toEqual({
+      app,
+      deployment: DEPLOYMENT,
+      url: 'https://mcp-example.apps.test',
+    });
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledWith({ appId: app.id, ownerId });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith({
+      appId: app.id,
+      ownerId,
+      deploymentGrant: null,
+      isAnonymous: false,
+      url: BINARY_URL,
+      filename: undefined,
+      sha256: BINARY_SHA256,
+    });
+    expect(deploy).toHaveBeenCalledTimes(1);
+    expect(deploy).toHaveBeenCalledWith({
+      appId: app.id,
+      ownerId,
+      isAnonymous: false,
+      source: { artifactId: ARTIFACT.id },
+    });
+    expect(get.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[0]!);
+    expect(fetch.mock.invocationCallOrder[0]).toBeLessThan(deploy.mock.invocationCallOrder[0]!);
+    expect(JSON.stringify([fetch.mock.calls, deploy.mock.calls, result])).not.toContain(token);
+  });
+
+  test('accepts a URL without a caller checksum', async () => {
+    const app = ownedApp();
+    spyOn(appsService, 'get').mockResolvedValue(app);
+    const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
+    spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: 'deploy_app', arguments: { appId: app.id, url: BINARY_URL } },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.isError).not.toBe(true);
+    expect(fetch.mock.calls[0]?.[0].sha256).toBeUndefined();
+  });
+
+  test.each([true, false])(
+    'deploys with the active custom domain URL when the platform hostname is present: %s',
+    async (withPlatformHostname) => {
+      const original = ownedApp();
+      const app = Value.Parse(AppResponseSchema, {
+        ...original,
+        hostnames: [
+          {
+            ...original.hostnames[0],
+            hostname: 'app.example.com',
+            kind: 'custom',
+          },
+          ...(withPlatformHostname ? original.hostnames : []),
+        ],
+      });
+      spyOn(appsService, 'get').mockResolvedValue(app);
+      spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
+      spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+      const response = await rpc({
+        method: 'tools/call',
+        params: { name: 'deploy_app', arguments: { appId: app.id, url: BINARY_URL } },
+        token: await accessToken(),
+        protocolVersion,
+      });
+      const { result } = await rpcBody(response);
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent.url).toBe('https://app.example.com');
+      expect(result.structuredContent.deployment).toEqual(DEPLOYMENT);
+    },
+  );
+
+  test.each([
+    {
+      metadata: { file_name: 'native-server', mime_type: 'application/octet-stream' },
+      filename: 'native-server',
+    },
+    { metadata: {}, filename: 'app' },
+    { metadata: { file_name: '../../unsafe-name' }, filename: 'app' },
+  ])(
+    'normalizes a native file descriptor without treating its ID as account identity: %j',
+    async ({ metadata, filename }) => {
+      const app = ownedApp();
+      const get = spyOn(appsService, 'get').mockResolvedValue(app);
+      const fetch = spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
+      const deploy = spyOn(deploymentsService, 'createOrRollback').mockResolvedValue(DEPLOYMENT);
+      const token = await accessToken();
+      const response = await rpc({
+        method: 'tools/call',
+        params: {
+          name: 'deploy_app',
+          arguments: {
+            appId: app.id,
+            binary: { ...NATIVE_BINARY, ...metadata, file_id: otherOwnerId },
+            sha256: BINARY_SHA256,
+          },
+        },
+        token,
+        protocolVersion,
+      });
+      const { result } = await rpcBody(response);
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent.deployment).toEqual(DEPLOYMENT);
+      expect(get).toHaveBeenCalledWith({ appId: app.id, ownerId });
+      expect(fetch).toHaveBeenCalledWith({
+        appId: app.id,
+        ownerId,
+        isAnonymous: false,
+        deploymentGrant: null,
+        url: NATIVE_DOWNLOAD_URL,
+        filename,
+        sha256: BINARY_SHA256,
+      });
+      expect(deploy).toHaveBeenCalledWith({
+        appId: app.id,
+        ownerId,
+        isAnonymous: false,
+        source: { artifactId: ARTIFACT.id },
+      });
+      expect(JSON.stringify([fetch.mock.calls, deploy.mock.calls, result])).not.toContain(token);
+    },
+  );
+
+  test('does not fetch a binary for a missing app or an app owned by another account', async () => {
+    const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
+    const create = spyOn(appsService, 'create');
+    const fetch = spyOn(artifactsService, 'createFromUrl');
+    const deploy = spyOn(deploymentsService, 'createOrRollback');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: 'deploy_app', arguments: { appId: ARTIFACT.appId, url: BINARY_URL } },
+      token: await accessToken({ claims: { ...accessTokenClaims(), sub: otherOwnerId } }),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.isError).toBe(true);
+    expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
+    expect(create).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(deploy).not.toHaveBeenCalled();
+  });
+
+  test('does not replace a release when the artifact service refuses the binary', async () => {
+    spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+    spyOn(artifactsService, 'createFromUrl').mockRejectedValue(
+      new BadRequestError('The artifact is not a Linux executable.'),
+    );
+    const deploy = spyOn(deploymentsService, 'createOrRollback');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: 'deploy_app', arguments: { appId: ARTIFACT.appId, url: BINARY_URL } },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.isError).toBe(true);
+    expect(deploy).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { appId: ARTIFACT.appId, url: 'http://files.example.test/app' },
+    { appId: ARTIFACT.appId, url: BINARY_URL, sha256: 'wrong-checksum' },
+    { appId: ARTIFACT.appId, url: BINARY_URL, ownerId: 'caller-selected-owner' },
+    { appId: ARTIFACT.appId },
+    { url: BINARY_URL },
+    { appId: ARTIFACT.appId, url: BINARY_URL, name: 'unexpected-new-app' },
+    { appId: ARTIFACT.appId, url: BINARY_URL, config: {} },
+    { name: '', url: BINARY_URL },
+    { name: 'New app', config: { httpPort: 0 }, url: BINARY_URL },
+    { name: 'New app', config: { unknown: true }, url: BINARY_URL },
+    { name: 'New app', ownerId: 'caller-selected-owner', url: BINARY_URL },
+    { name: 'New app', url: BINARY_URL, binary: NATIVE_BINARY },
+    { name: 'New app', binary: { file_id: NATIVE_BINARY.file_id } },
+    { appId: ARTIFACT.appId, url: BINARY_URL, binary: NATIVE_BINARY },
+    { appId: ARTIFACT.appId, binary: { file_id: NATIVE_BINARY.file_id } },
+    { appId: ARTIFACT.appId, binary: { download_url: NATIVE_DOWNLOAD_URL } },
+    { appId: ARTIFACT.appId, binary: { ...NATIVE_BINARY, file_id: '' } },
+    {
+      appId: ARTIFACT.appId,
+      binary: { ...NATIVE_BINARY, download_url: 'http://files.example.test/' },
+    },
+    { appId: ARTIFACT.appId, binary: { ...NATIVE_BINARY, mime_type: 123 } },
+    { appId: ARTIFACT.appId, binary: { ...NATIVE_BINARY, ownerId: 'caller-selected-owner' } },
+    { appId: ARTIFACT.appId, binary: NATIVE_BINARY, ownerId: 'caller-selected-owner' },
+    { appId: ARTIFACT.appId, binary: NATIVE_BINARY, sha256: 'wrong-checksum' },
+  ])('refuses invalid deployment arguments before calling services: %j', async (args) => {
+    const create = spyOn(appsService, 'create');
+    const get = spyOn(appsService, 'get');
+    const fetch = spyOn(artifactsService, 'createFromUrl');
+    const deploy = spyOn(deploymentsService, 'createOrRollback');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: 'deploy_app', arguments: args },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const body = await rpcBody(response);
+    expect(body.error ?? body.result?.isError).toBeTruthy();
+    expect(create).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(deploy).not.toHaveBeenCalled();
   });
 
   test('passes only the verified account identity to the existing app service', async () => {
@@ -656,7 +1058,9 @@ test('accepts the configured browser origin', async () => {
     },
     body: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
   });
-  expect((await rpcBody(response)).result.tools).toHaveLength(2);
+  expect((await rpcBody(response)).result.tools).toContainEqual(
+    expect.objectContaining({ name: 'list_apps' }),
+  );
 });
 
 test.each(['untrusted.example', `${MCP_RESOURCE.hostname}.untrusted.example`])(
