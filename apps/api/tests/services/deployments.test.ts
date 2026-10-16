@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
 import {
   type DeploymentId,
+  DeploymentIdSchema,
   HostPortSchema,
   type HostReportedState,
   HttpPortSchema,
@@ -50,7 +51,7 @@ const HTTP_PORT_NUMBER = 8090;
 const HOST_PORT_NUMBER = 30_001;
 
 const HTTP_PORT = Value.Parse(HttpPortSchema, HTTP_PORT_NUMBER);
-const OWNER_SCOPED_METHODS = 4;
+const OWNER_SCOPED_METHODS = 5;
 const CREATED_AT = new Date('2026-08-04T10:00:00.000Z');
 const ACTIVATED_AT = new Date('2026-08-04T11:30:00.000Z');
 const STARTED_AT = new Date('2026-08-04T11:29:00.000Z');
@@ -360,6 +361,40 @@ describe('a deployment publishes the config version it pins', () => {
   });
 });
 
+describe('the latest deployment follows release order rather than running state', () => {
+  test.each(['pending', 'failed', 'stopped'] as const)(
+    'returns the newest %s release ahead of an older running release',
+    async (state) => {
+      const { deploymentsRepo, service } = serviceWith({
+        rows: [
+          deploymentRow({ state }),
+          deploymentRow({
+            id: Value.Parse(DeploymentIdSchema, 'older-deployment'),
+            state: 'running',
+            created_at: new Date('2026-08-03T10:00:00.000Z'),
+          }),
+        ],
+      });
+
+      expect(await service.getLatestDeployment({ appId: APP_ID, ownerId: OWNER_ID })).toMatchObject(
+        {
+          id: DEPLOYMENT_ID,
+          state,
+          createdAt: CREATED_AT.toISOString(),
+          config: PINNED_CONFIG,
+        },
+      );
+      expect(deploymentsRepo.calls).toEqual([{ appId: APP_ID, ownerId: OWNER_ID }]);
+    },
+  );
+
+  test('returns null before the first deployment or for an inaccessible app', async () => {
+    const { service } = serviceWith({ rows: [] });
+
+    expect(await service.getLatestDeployment({ appId: APP_ID, ownerId: OWNER_ID })).toBeNull();
+  });
+});
+
 describe('an app the caller does not own is indistinguishable from one that does not exist', () => {
   test('creating against an unowned app or a foreign artifact is a 404, never a 403', async () => {
     const { service } = serviceWith({ row: null });
@@ -404,6 +439,7 @@ describe('an app the caller does not own is indistinguishable from one that does
       source: { artifactId: ARTIFACT_ID },
     });
     await service.list({ appId: APP_ID, ownerId: OWNER_ID });
+    await service.getLatestDeployment({ appId: APP_ID, ownerId: OWNER_ID });
     await service.get(OWNED_DEPLOYMENT);
     await service.createOrRollback(ROLLBACK_REQUEST);
 

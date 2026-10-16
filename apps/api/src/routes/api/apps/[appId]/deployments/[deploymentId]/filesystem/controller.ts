@@ -9,18 +9,9 @@ import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { AuthCaller } from '#lib/auth/caller.ts';
+import { DIRECTORY_READ_TIMEOUT_MS } from '#lib/filesystem/timeouts.ts';
 import { ReadDirectoryQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/model.ts';
 import { AuthPlugin, FilesystemServicePlugin, loggerPlugin } from '#services/plugins.ts';
-
-/**
- * Held open until a host answers, because a read is only performed when the host that holds the
- * volume next polls. The ceiling has to clear one of those polls plus the read itself, or this end
- * would abandon requests hosts are about to answer — and it stays well short of a log tail's,
- * since nothing arrives in the meantime to say the wait is still worth anything.
- */
-const MAX_WAIT_SECONDS = 30;
-const MS_PER_SECOND = 1000;
-const MAX_WAIT_MS = MAX_WAIT_SECONDS * MS_PER_SECOND;
 
 export const AppsAppIdDeploymentsDeploymentIdFilesystemController = new Elysia()
   .use(loggerPlugin('appsAppIdDeploymentsDeploymentIdFilesystemController'))
@@ -36,7 +27,7 @@ export const AppsAppIdDeploymentsDeploymentIdFilesystemController = new Elysia()
         deploymentId: Value.Parse(DeploymentIdSchema, params.deploymentId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         path: query.path ?? GUEST_PATH_ROOT,
-        signal: AbortSignal.any([request.signal, AbortSignal.timeout(MAX_WAIT_MS)]),
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(DIRECTORY_READ_TIMEOUT_MS)]),
       });
       return status(StatusMap.OK, listing);
     },

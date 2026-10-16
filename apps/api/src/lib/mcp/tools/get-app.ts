@@ -64,10 +64,10 @@ export function registerGetAppTool({
       appId,
     }: GetAppInput): Promise<GetAppOutput> {
       const app = await appsService.get({ appId, ownerId });
-      const deployments = await deploymentsService.list({ appId, ownerId });
+      const currentDeployment = await deploymentsService.getLatestDeployment({ appId, ownerId });
       return {
         app,
-        currentDeployment: deployments[0] ?? null,
+        currentDeployment,
         url: appUrl(app.hostnames),
       };
     }),

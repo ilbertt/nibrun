@@ -1,5 +1,5 @@
 import type { AppId, DeploymentId, GuestPath } from '@repo/protocol';
-import type { HranaPipelineSessionContract } from '@repo/sqlite';
+import type { HranaPipelineSessionContract, HranaStmt, HranaStmtResult } from '@repo/sqlite';
 import { HranaError, HranaPipelineRelay, HranaStreams } from '@repo/sqlite';
 import type { OwnerId, SqliteConnectionId } from '#lib/api/identifiers.ts';
 import type { SqliteConnection } from '#lib/api/sqlite-connection.ts';
@@ -98,6 +98,42 @@ export class SqliteService extends Service {
   async list(input: SqliteConnectionsByAppInput): Promise<SqliteConnection[]> {
     const rows = await this.connectionsRepo.listByApp(input);
     return rows.map((row) => this.toConnection(row));
+  }
+
+  async query({
+    appId,
+    ownerId,
+    sqlite_file_path,
+    stmt,
+    signal,
+  }: SqliteConnectionsByAppInput & {
+    sqlite_file_path: GuestPath;
+    stmt: Pick<HranaStmt, 'sql' | 'args' | 'named_args'>;
+    signal: AbortSignal;
+  }): Promise<HranaStmtResult> {
+    const connections = await this.list({ appId, ownerId });
+    const connection =
+      connections.find((saved) => saved.sqlite_file_path === sqlite_file_path) ??
+      (await this.create({ appId, ownerId, sqlite_file_path, signal }));
+    const response = await this.pipeline({
+      id: connection.id,
+      ownerId,
+      signal,
+      body: {
+        baton: null,
+        requests: [{ type: 'execute', stmt: { ...stmt, want_rows: true } }, { type: 'close' }],
+      },
+    });
+    for (const result of response.results) {
+      if (result.type === 'error') {
+        throw new HranaError({ ...result.error, code: result.error.code ?? 'SQLITE_ERROR' });
+      }
+    }
+    const execution = response.results[0];
+    if (execution?.type !== 'ok' || execution.response.type !== 'execute') {
+      throw new BadGatewayError('The database returned an unexpected query response.');
+    }
+    return execution.response.result;
   }
 
   async removeConnection(input: DeleteSqliteConnectionInput): Promise<void> {

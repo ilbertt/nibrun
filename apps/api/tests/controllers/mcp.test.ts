@@ -9,13 +9,16 @@ import {
   PROTOCOL_VERSION_META_KEY,
 } from '@modelcontextprotocol/server';
 import { DEFAULT_LOG_TIMERANGE } from '@repo/api-constants';
-import { TenantLogRecordSchema } from '@repo/protocol';
+import { DirectoryListingSchema, TenantLogRecordSchema } from '@repo/protocol';
+import { HranaStmtResultSchema, HranaStmtSchema } from '@repo/sqlite';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
 import { ArtifactSchema } from '#lib/api/artifact.ts';
+import { SqliteConnectionSchema } from '#lib/api/sqlite-connection.ts';
 import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
+import { DIRECTORY_READ_TIMEOUT_MS } from '#lib/filesystem/timeouts.ts';
 import { DeploymentTargetSchema } from '#lib/mcp/tools/shared/deployment-target.ts';
 import { MCP_TOOL_NAMES } from '#lib/mcp/tools/shared/tool-names.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
@@ -36,6 +39,8 @@ const {
   ArtifactsServicePlugin,
   DeploymentsServicePlugin,
   LogsServicePlugin,
+  FilesystemServicePlugin,
+  SqliteServicePlugin,
 } = await import('#services/plugins.ts');
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
@@ -47,6 +52,8 @@ const appsService = AppsServicePlugin.decorator.appsService;
 const artifactsService = ArtifactsServicePlugin.decorator.artifactsService;
 const deploymentsService = DeploymentsServicePlugin.decorator.deploymentsService;
 const logsService = LogsServicePlugin.decorator.logsService;
+const filesystemService = FilesystemServicePlugin.decorator.filesystemService;
+const sqliteService = SqliteServicePlugin.decorator.sqliteService;
 const context = await auth.$context;
 const key = await generateKeyPair('EdDSA');
 const jwk = { ...(await exportJWK(key.publicKey)), kid: 'mcp-test', alg: 'EdDSA' };
@@ -453,6 +460,8 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       MCP_TOOL_NAMES.readLogs,
       MCP_TOOL_NAMES.deployApp,
       MCP_TOOL_NAMES.prepareDeploy,
+      MCP_TOOL_NAMES.listFiles,
+      MCP_TOOL_NAMES.queryDatabase,
     ]);
     expect(result.tools[0]).toMatchObject({
       name: MCP_TOOL_NAMES.listApps,
@@ -518,14 +527,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     'reads available deployment logs without following, with timerange %s',
     async (timerange) => {
       const get = spyOn(appsService, 'get').mockResolvedValue(ownedApp());
-      const list = spyOn(deploymentsService, 'list').mockResolvedValue([
-        DEPLOYMENT,
-        Value.Parse(DeploymentResponseSchema, {
-          ...DEPLOYMENT,
-          id: 'older-deployment',
-          state: 'running',
-        }),
-      ]);
+      const latest = spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
       const logs = [
         Value.Parse(TenantLogRecordSchema, {
           _time: new Date().toISOString(),
@@ -561,7 +563,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       expect(result.structuredContent).toEqual({ logs });
       expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
       expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
-      expect(list).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
+      expect(latest).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
       expect(open).toHaveBeenCalledWith({
         appId: ARTIFACT.appId,
         deploymentId: DEPLOYMENT.id,
@@ -575,7 +577,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
   test('finishes with an empty log result when no records are available', async () => {
     spyOn(appsService, 'get').mockResolvedValue(ownedApp());
-    spyOn(deploymentsService, 'list').mockResolvedValue([DEPLOYMENT]);
+    spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
     spyOn(logsService, 'openStream').mockResolvedValue(
       (async function* emptyLogs() {
         yield* [];
@@ -595,7 +597,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
   test('returns empty logs before the first deployment without opening a log stream', async () => {
     spyOn(appsService, 'get').mockResolvedValue(ownedApp());
-    spyOn(deploymentsService, 'list').mockResolvedValue([]);
+    spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(null);
     const open = spyOn(logsService, 'openStream');
     const response = await rpc({
       method: 'tools/call',
@@ -611,7 +613,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
   test('does not read deployments or logs for an inaccessible app', async () => {
     const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
-    const list = spyOn(deploymentsService, 'list');
+    const latest = spyOn(deploymentsService, 'getLatestDeployment');
     const open = spyOn(logsService, 'openStream');
     const response = await rpc({
       method: 'tools/call',
@@ -622,13 +624,13 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const { result } = await rpcBody(response);
     expect(result.isError).toBe(true);
     expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
-    expect(list).not.toHaveBeenCalled();
+    expect(latest).not.toHaveBeenCalled();
     expect(open).not.toHaveBeenCalled();
   });
 
   test('scopes log access to the verified account and hides inaccessible deployment details', async () => {
     const get = spyOn(appsService, 'get').mockResolvedValue(ownedApp());
-    const list = spyOn(deploymentsService, 'list').mockResolvedValue([DEPLOYMENT]);
+    const latest = spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
     const open = spyOn(logsService, 'openStream').mockRejectedValue(
       new NotFoundError('Deployment not found.'),
     );
@@ -646,7 +648,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(result.structuredContent).toBeUndefined();
     expect(result.content).toEqual([{ type: 'text', text: 'Unable to complete request.' }]);
     expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
-    expect(list).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
+    expect(latest).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
     expect(open).toHaveBeenCalledWith(
       expect.objectContaining({
         appId: ARTIFACT.appId,
@@ -658,7 +660,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
   test('handles errors encountered while reading log records', async () => {
     spyOn(appsService, 'get').mockResolvedValue(ownedApp());
-    spyOn(deploymentsService, 'list').mockResolvedValue([DEPLOYMENT]);
+    spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
     spyOn(logsService, 'openStream').mockResolvedValue(
       (async function* failedLogs() {
         yield* [];
@@ -690,7 +692,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     { appId: ARTIFACT.appId, ownerId: 'other-owner' },
   ])('refuses invalid read_logs arguments: %j', async (args) => {
     const get = spyOn(appsService, 'get');
-    const list = spyOn(deploymentsService, 'list');
+    const latest = spyOn(deploymentsService, 'getLatestDeployment');
     const open = spyOn(logsService, 'openStream');
     const response = await rpc({
       method: 'tools/call',
@@ -701,8 +703,338 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const body = await rpcBody(response);
     expect(body.error ?? body.result?.isError).toBeTruthy();
     expect(get).not.toHaveBeenCalled();
-    expect(list).not.toHaveBeenCalled();
+    expect(latest).not.toHaveBeenCalled();
     expect(open).not.toHaveBeenCalled();
+  });
+
+  test('advertises the directory contract after HTTP filesystem validation runs', async () => {
+    const filesystem = await send({
+      url: `${ORIGIN}/api/apps/${ARTIFACT.appId}/deployments/${DEPLOYMENT.id}/filesystem`,
+    });
+    expect(filesystem.status).toBe(StatusMap.Unauthorized);
+    const response = await rpc({
+      method: 'tools/list',
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    const tool = result.tools.find(
+      (entry: { name: string }) => entry.name === MCP_TOOL_NAMES.listFiles,
+    );
+    expect(tool).toMatchObject({
+      inputSchema: { required: ['appId'], additionalProperties: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+        idempotentHint: true,
+      },
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }] },
+    });
+    expect(tool.inputSchema.properties.path).toEqual(
+      JSON.parse(JSON.stringify(DirectoryListingSchema.properties.path)),
+    );
+    expect(tool.inputSchema.properties.deploymentId).toBeUndefined();
+    expect(tool.outputSchema.type).toBe(DirectoryListingSchema.type);
+    expect(tool.outputSchema.required).toEqual(DirectoryListingSchema.required);
+    expect(tool.outputSchema.properties).toEqual(
+      JSON.parse(JSON.stringify(DirectoryListingSchema.properties)),
+    );
+  });
+
+  test.each([
+    { path: undefined, expectedPath: '/', truncated: false, sub: 'owner' },
+    { path: '/uploads', expectedPath: '/uploads', truncated: true, sub: 'other' },
+  ])(
+    'lists one volume directory with the verified owner: %j',
+    async ({ path, expectedPath, truncated, sub }) => {
+      const listing = Value.Parse(DirectoryListingSchema, {
+        path: expectedPath,
+        entries: [
+          {
+            name: 'database.sqlite',
+            kind: 'file',
+            sizeBytes: 4096,
+            modifiedAt: new Date().toISOString(),
+          },
+          {
+            name: 'uploads',
+            kind: 'directory',
+            sizeBytes: 1024,
+            modifiedAt: new Date().toISOString(),
+          },
+        ],
+        truncated,
+      });
+      const get = spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+      const latest = spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
+      const read = spyOn(filesystemService, 'readDirectory').mockImplementation(
+        function readDirectory({ signal }) {
+          expect(signal.aborted).toBe(false);
+          return Promise.resolve(listing);
+        },
+      );
+      const identity = sub === 'owner' ? ownerId : otherOwnerId;
+      const response = await rpc({
+        method: 'tools/call',
+        params: {
+          name: MCP_TOOL_NAMES.listFiles,
+          arguments: {
+            appId: ARTIFACT.appId,
+            ...(path ? { path } : {}),
+          },
+        },
+        token: await accessToken({ claims: { ...accessTokenClaims(), sub: identity } }),
+        protocolVersion,
+      });
+      const { result } = await rpcBody(response);
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toEqual(listing);
+      expect(JSON.parse(result.content[0].text)).toEqual(listing);
+      expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: identity });
+      expect(latest).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: identity });
+      expect(get.mock.invocationCallOrder[0]).toBeLessThan(latest.mock.invocationCallOrder[0]!);
+      expect(latest.mock.invocationCallOrder[0]).toBeLessThan(read.mock.invocationCallOrder[0]!);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(read).toHaveBeenCalledWith({
+        appId: ARTIFACT.appId,
+        deploymentId: DEPLOYMENT.id,
+        ownerId: identity,
+        path: expectedPath,
+        signal: expect.any(AbortSignal),
+      });
+    },
+  );
+
+  test.each([
+    {},
+    { deploymentId: DEPLOYMENT.id },
+    { appId: '-invalid' },
+    { appId: ARTIFACT.appId, deploymentId: DEPLOYMENT.id },
+    ...['relative', '/../etc', '/data/../../etc', '/uploads/', '/a\\b', '/a\n'].map((path) => ({
+      appId: ARTIFACT.appId,
+      path,
+    })),
+    { appId: ARTIFACT.appId, ownerId: 'forged-owner' },
+  ])('refuses invalid list_files arguments before reading a volume: %j', async (args) => {
+    const get = spyOn(appsService, 'get');
+    const latest = spyOn(deploymentsService, 'getLatestDeployment');
+    const read = spyOn(filesystemService, 'readDirectory');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: MCP_TOOL_NAMES.listFiles, arguments: args },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const body = await rpcBody(response);
+    expect(body.error ?? body.result?.isError).toBeTruthy();
+    expect(get).not.toHaveBeenCalled();
+    expect(latest).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  test.each([new NotFoundError('Deployment not found.'), new Error('private-host-device-path')])(
+    'handles inaccessible deployments and host failures without disclosing details: %s',
+    async (error) => {
+      spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+      spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
+      const read = spyOn(filesystemService, 'readDirectory').mockRejectedValue(error);
+      const response = await rpc({
+        method: 'tools/call',
+        params: {
+          name: MCP_TOOL_NAMES.listFiles,
+          arguments: { appId: ARTIFACT.appId },
+        },
+        token: await accessToken(),
+        protocolVersion,
+      });
+      const { result } = await rpcBody(response);
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toBeUndefined();
+      expect(JSON.stringify(result)).not.toContain(error.message);
+      expect(read).toHaveBeenCalledWith(expect.objectContaining({ ownerId }));
+    },
+  );
+
+  test('bounds directory reads with the shared filesystem timeout', async () => {
+    spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+    spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
+    const deadline = new AbortController();
+    const timeout = spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);
+    const read = spyOn(filesystemService, 'readDirectory').mockImplementation(function expireRead({
+      signal,
+    }) {
+      deadline.abort(new Error('directory deadline expired'));
+      expect(signal.aborted).toBe(true);
+      return Promise.reject(signal.reason);
+    });
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: MCP_TOOL_NAMES.listFiles,
+        arguments: { appId: ARTIFACT.appId },
+      },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.isError).toBe(true);
+    expect(timeout).toHaveBeenCalledWith(DIRECTORY_READ_TIMEOUT_MS);
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not read deployments or files for an inaccessible app', async () => {
+    const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
+    const latest = spyOn(deploymentsService, 'getLatestDeployment');
+    const read = spyOn(filesystemService, 'readDirectory');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: MCP_TOOL_NAMES.listFiles, arguments: { appId: ARTIFACT.appId } },
+      token: await accessToken({ claims: { ...accessTokenClaims(), sub: otherOwnerId } }),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.isError).toBe(true);
+    expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
+    expect(latest).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  test('does not read a volume before the first deployment', async () => {
+    spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+    const latest = spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(null);
+    const read = spyOn(filesystemService, 'readDirectory');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: MCP_TOOL_NAMES.listFiles, arguments: { appId: ARTIFACT.appId } },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    expect(latest).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  test('advertises database queries with file paths and shared SQLite schemas', async () => {
+    const response = await rpc({
+      method: 'tools/list',
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    const tool = result.tools.find(
+      (entry: { name: string }) => entry.name === MCP_TOOL_NAMES.queryDatabase,
+    );
+    expect(tool).toMatchObject({
+      inputSchema: {
+        required: ['appId', 'sqlite_file_path', 'sql'],
+        additionalProperties: false,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: false,
+        idempotentHint: true,
+      },
+      _meta: { securitySchemes: [{ type: 'oauth2', scopes: [MCP_SCOPE] }] },
+    });
+    expect(Object.keys(tool.inputSchema.properties)).toEqual([
+      'appId',
+      'sqlite_file_path',
+      'sql',
+      'args',
+      'named_args',
+    ]);
+    expect(tool.inputSchema.properties.sqlite_file_path).toEqual(
+      JSON.parse(JSON.stringify(SqliteConnectionSchema.properties.sqlite_file_path)),
+    );
+    expect(tool.inputSchema.properties.args).toEqual(
+      fromTypeBox(HranaStmtSchema.properties.args)['~standard'].jsonSchema.input({
+        target: 'draft-07',
+      }),
+    );
+    expect(tool.outputSchema.properties.result).toEqual(
+      fromTypeBox(HranaStmtResultSchema)['~standard'].jsonSchema.output({ target: 'draft-07' }),
+    );
+  });
+
+  test('queries a file using the verified owner and returns typed database results', async () => {
+    const result = {
+      cols: [{ name: 'value', decltype: null }],
+      rows: [[{ type: 'integer' as const, value: '9007199254740993' }]],
+      affected_row_count: 0,
+      last_insert_rowid: null,
+    };
+    const query = spyOn(sqliteService, 'query').mockResolvedValue(result);
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: MCP_TOOL_NAMES.queryDatabase,
+        arguments: {
+          appId: ARTIFACT.appId,
+          sqlite_file_path: '/app.db',
+          sql: 'SELECT ? AS value',
+          args: [{ type: 'integer', value: '9007199254740993' }],
+        },
+      },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.structuredContent).toEqual({ result });
+    expect(query).toHaveBeenCalledWith({
+      appId: ARTIFACT.appId,
+      ownerId,
+      sqlite_file_path: '/app.db',
+      stmt: { sql: 'SELECT ? AS value', args: [{ type: 'integer', value: '9007199254740993' }] },
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  test.each([
+    { appId: ARTIFACT.appId, sql: 'SELECT 1' },
+    { appId: ARTIFACT.appId, sqlite_file_path: '/app.db' },
+    { appId: ARTIFACT.appId, sqlite_file_path: '/app.db', sql: null },
+    { appId: ARTIFACT.appId, sqlite_file_path: '/../app.db', sql: 'SELECT 1' },
+    {
+      appId: ARTIFACT.appId,
+      sqlite_file_path: '/app.db',
+      sql: 'SELECT 1',
+      deploymentId: DEPLOYMENT.id,
+    },
+    {
+      appId: ARTIFACT.appId,
+      sqlite_file_path: '/app.db',
+      sql: 'SELECT 1',
+      url: 'https://api.test/',
+    },
+  ])('rejects invalid database query arguments: %j', async (args) => {
+    const query = spyOn(sqliteService, 'query');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: MCP_TOOL_NAMES.queryDatabase, arguments: args },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const body = await rpcBody(response);
+    expect(body.error ?? body.result?.isError).toBeTruthy();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  test('database query failures use the shared tool error response', async () => {
+    spyOn(sqliteService, 'query').mockRejectedValue(new NotFoundError('Private database details'));
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: MCP_TOOL_NAMES.queryDatabase,
+        arguments: { appId: ARTIFACT.appId, sqlite_file_path: '/app.db', sql: 'SELECT 1' },
+      },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result).toMatchObject({
+      isError: true,
+      content: [{ type: 'text', text: 'Unable to complete request.' }],
+    });
   });
 
   test('advertises creation and redeployment using the existing API schemas', async () => {
@@ -1445,14 +1777,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       restartCount: 0,
     });
     const get = spyOn(appsService, 'get').mockResolvedValue(app);
-    const list = spyOn(deploymentsService, 'list').mockResolvedValue([
-      newest,
-      Value.Parse(DeploymentResponseSchema, {
-        ...newest,
-        id: 'deployment-old',
-        state: 'superseded',
-      }),
-    ]);
+    const latest = spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(newest);
     const response = await rpc({
       method: 'tools/call',
       params: { name: MCP_TOOL_NAMES.getApp, arguments: { appId: app.id } },
@@ -1468,13 +1793,13 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     });
     expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
     expect(get).toHaveBeenCalledWith({ appId: app.id, ownerId });
-    expect(list).toHaveBeenCalledWith({ appId: app.id, ownerId });
+    expect(latest).toHaveBeenCalledWith({ appId: app.id, ownerId });
   });
 
   test('returns no current deployment before the first release', async () => {
     const app = ownedApp();
     spyOn(appsService, 'get').mockResolvedValue(app);
-    spyOn(deploymentsService, 'list').mockResolvedValue([]);
+    spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(null);
     const response = await rpc({
       method: 'tools/call',
       params: { name: MCP_TOOL_NAMES.getApp, arguments: { appId: app.id } },
@@ -1502,7 +1827,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
         ],
       });
       spyOn(appsService, 'get').mockResolvedValue(app);
-      spyOn(deploymentsService, 'list').mockResolvedValue([]);
+      spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(null);
       const response = await rpc({
         method: 'tools/call',
         params: { name: MCP_TOOL_NAMES.getApp, arguments: { appId: app.id } },
@@ -1519,7 +1844,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     'does not read deployments or disclose details for an inaccessible app: %s',
     async (appId) => {
       const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
-      const list = spyOn(deploymentsService, 'list');
+      const latest = spyOn(deploymentsService, 'getLatestDeployment');
       const response = await rpc({
         method: 'tools/call',
         params: { name: MCP_TOOL_NAMES.getApp, arguments: { appId } },
@@ -1530,7 +1855,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       expect(result.isError).toBe(true);
       expect(result.structuredContent).toBeUndefined();
       expect(get).toHaveBeenCalledWith({ appId, ownerId });
-      expect(list).not.toHaveBeenCalled();
+      expect(latest).not.toHaveBeenCalled();
     },
   );
 
@@ -1538,7 +1863,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     'refuses invalid get_app arguments: %j',
     async (args) => {
       const get = spyOn(appsService, 'get');
-      const list = spyOn(deploymentsService, 'list');
+      const latest = spyOn(deploymentsService, 'getLatestDeployment');
       const response = await rpc({
         method: 'tools/call',
         params: { name: MCP_TOOL_NAMES.getApp, arguments: args },
@@ -1548,7 +1873,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       const body = await rpcBody(response);
       expect(body.error ?? body.result?.isError).toBeTruthy();
       expect(get).not.toHaveBeenCalled();
-      expect(list).not.toHaveBeenCalled();
+      expect(latest).not.toHaveBeenCalled();
     },
   );
 
