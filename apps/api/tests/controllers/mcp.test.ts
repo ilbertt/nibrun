@@ -8,6 +8,8 @@ import {
   McpServer,
   PROTOCOL_VERSION_META_KEY,
 } from '@modelcontextprotocol/server';
+import { DEFAULT_LOG_TIMERANGE } from '@repo/api-constants';
+import { TenantLogRecordSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
@@ -18,6 +20,7 @@ import { DeploymentTargetSchema } from '#lib/mcp/tools/shared/deployment-target.
 import { MCP_TOOL_NAMES } from '#lib/mcp/tools/shared/tool-names.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { CreateArtifactBodySchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
+import { StreamLogsQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';
 import { DeploymentResponseSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
 import {
   AppResponseSchema,
@@ -27,9 +30,13 @@ import {
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
 
-const { auth, AppsServicePlugin, ArtifactsServicePlugin, DeploymentsServicePlugin } = await import(
-  '#services/plugins.ts'
-);
+const {
+  auth,
+  AppsServicePlugin,
+  ArtifactsServicePlugin,
+  DeploymentsServicePlugin,
+  LogsServicePlugin,
+} = await import('#services/plugins.ts');
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const { fromTypeBox } = await import('#lib/mcp/schema.ts');
@@ -38,6 +45,7 @@ const { MCP_TOOL_META } = await import('#lib/mcp/tools/shared/tool-meta.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
 const artifactsService = ArtifactsServicePlugin.decorator.artifactsService;
 const deploymentsService = DeploymentsServicePlugin.decorator.deploymentsService;
+const logsService = LogsServicePlugin.decorator.logsService;
 const context = await auth.$context;
 const key = await generateKeyPair('EdDSA');
 const jwk = { ...(await exportJWK(key.publicKey)), kid: 'mcp-test', alg: 'EdDSA' };
@@ -437,6 +445,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       MCP_TOOL_NAMES.listApps,
       MCP_TOOL_NAMES.getApp,
+      MCP_TOOL_NAMES.readLogs,
       MCP_TOOL_NAMES.deployApp,
       MCP_TOOL_NAMES.prepareDeploy,
     ]);
@@ -468,6 +477,227 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(output.currentDeployment.anyOf[0].required).toEqual(DeploymentResponseSchema.required);
     expect(output.currentDeployment.anyOf).toContainEqual({ type: 'null' });
     expect(JSON.stringify(result.tools[1].outputSchema)).not.toContain('"nullable"');
+  });
+
+  test('advertises a finite log read using the existing log schemas', async () => {
+    const response = await rpc({
+      method: 'tools/list',
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    const tool = result.tools.find(
+      (entry: { name: string }) => entry.name === MCP_TOOL_NAMES.readLogs,
+    );
+    expect(tool).toMatchObject({
+      inputSchema: { required: ['appId'], additionalProperties: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+        idempotentHint: true,
+      },
+      _meta: MCP_TOOL_META,
+    });
+    expect(tool.inputSchema.properties.timerange).toEqual(
+      JSON.parse(JSON.stringify(StreamLogsQuerySchema.properties.timerange)),
+    );
+    expect(tool.inputSchema.properties.follow).toBeUndefined();
+    expect(tool.inputSchema.properties.deploymentId).toBeUndefined();
+    expect(tool.outputSchema.properties.logs.items).toEqual(
+      JSON.parse(JSON.stringify(TenantLogRecordSchema)),
+    );
+  });
+
+  test.each([undefined, '30s', '2h'])(
+    'reads available deployment logs without following, with timerange %s',
+    async (timerange) => {
+      const get = spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+      const list = spyOn(deploymentsService, 'list').mockResolvedValue([
+        DEPLOYMENT,
+        Value.Parse(DeploymentResponseSchema, {
+          ...DEPLOYMENT,
+          id: 'older-deployment',
+          state: 'running',
+        }),
+      ]);
+      const logs = [
+        Value.Parse(TenantLogRecordSchema, {
+          _time: new Date().toISOString(),
+          _msg: 'App started',
+          hostId: 'mcp-host',
+          SOURCE: 'tenant',
+          appId: ARTIFACT.appId,
+          deploymentId: DEPLOYMENT.id,
+          stream: 'stdout',
+          sourceId: 'mcp-source',
+          sequence: 0,
+        }),
+      ];
+      const open = spyOn(logsService, 'openStream').mockResolvedValue(
+        (async function* records() {
+          yield* logs;
+        })(),
+      );
+      const response = await rpc({
+        method: 'tools/call',
+        params: {
+          name: MCP_TOOL_NAMES.readLogs,
+          arguments: {
+            appId: ARTIFACT.appId,
+            ...(timerange === undefined ? {} : { timerange }),
+          },
+        },
+        token: await accessToken(),
+        protocolVersion,
+      });
+      const { result } = await rpcBody(response);
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toEqual({ logs });
+      expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+      expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
+      expect(list).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
+      expect(open).toHaveBeenCalledWith({
+        appId: ARTIFACT.appId,
+        deploymentId: DEPLOYMENT.id,
+        ownerId,
+        timerange: timerange ?? DEFAULT_LOG_TIMERANGE,
+        follow: false,
+        signal: expect.any(AbortSignal),
+      });
+    },
+  );
+
+  test('finishes with an empty log result when no records are available', async () => {
+    spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+    spyOn(deploymentsService, 'list').mockResolvedValue([DEPLOYMENT]);
+    spyOn(logsService, 'openStream').mockResolvedValue(
+      (async function* emptyLogs() {
+        yield* [];
+      })(),
+    );
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: MCP_TOOL_NAMES.readLogs,
+        arguments: { appId: ARTIFACT.appId },
+      },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.structuredContent).toEqual({ logs: [] });
+  });
+
+  test('returns empty logs before the first deployment without opening a log stream', async () => {
+    spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+    spyOn(deploymentsService, 'list').mockResolvedValue([]);
+    const open = spyOn(logsService, 'openStream');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: MCP_TOOL_NAMES.readLogs, arguments: { appId: ARTIFACT.appId } },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toEqual({ logs: [] });
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  test('does not read deployments or logs for an inaccessible app', async () => {
+    const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
+    const list = spyOn(deploymentsService, 'list');
+    const open = spyOn(logsService, 'openStream');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: MCP_TOOL_NAMES.readLogs, arguments: { appId: ARTIFACT.appId } },
+      token: await accessToken({ claims: { ...accessTokenClaims(), sub: otherOwnerId } }),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    expect(result.isError).toBe(true);
+    expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
+    expect(list).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  test('scopes log access to the verified account and hides inaccessible deployment details', async () => {
+    const get = spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+    const list = spyOn(deploymentsService, 'list').mockResolvedValue([DEPLOYMENT]);
+    const open = spyOn(logsService, 'openStream').mockRejectedValue(
+      new NotFoundError('Deployment not found.'),
+    );
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: MCP_TOOL_NAMES.readLogs,
+        arguments: { appId: ARTIFACT.appId },
+      },
+      token: await accessToken({ claims: { ...accessTokenClaims(), sub: otherOwnerId } }),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    expect(result.content).toEqual([{ type: 'text', text: 'Unable to complete request.' }]);
+    expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
+    expect(list).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
+    expect(open).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appId: ARTIFACT.appId,
+        deploymentId: DEPLOYMENT.id,
+        ownerId: otherOwnerId,
+      }),
+    );
+  });
+
+  test('handles errors encountered while reading log records', async () => {
+    spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+    spyOn(deploymentsService, 'list').mockResolvedValue([DEPLOYMENT]);
+    spyOn(logsService, 'openStream').mockResolvedValue(
+      (async function* failedLogs() {
+        yield* [];
+        throw new Error('log-store-password-must-stay-private');
+      })(),
+    );
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: MCP_TOOL_NAMES.readLogs,
+        arguments: { appId: ARTIFACT.appId },
+      },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const body = await rpcBody(response);
+    expect(body.result.isError).toBe(true);
+    expect(JSON.stringify(body)).not.toContain('log-store-password-must-stay-private');
+  });
+
+  test.each([
+    {},
+    { deploymentId: DEPLOYMENT.id },
+    { appId: '-invalid' },
+    { appId: ARTIFACT.appId, deploymentId: DEPLOYMENT.id },
+    { appId: ARTIFACT.appId, timerange: 'forever' },
+    { appId: ARTIFACT.appId, timerange: '0s' },
+    { appId: ARTIFACT.appId, follow: true },
+    { appId: ARTIFACT.appId, ownerId: 'other-owner' },
+  ])('refuses invalid read_logs arguments: %j', async (args) => {
+    const get = spyOn(appsService, 'get');
+    const list = spyOn(deploymentsService, 'list');
+    const open = spyOn(logsService, 'openStream');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: MCP_TOOL_NAMES.readLogs, arguments: args },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const body = await rpcBody(response);
+    expect(body.error ?? body.result?.isError).toBeTruthy();
+    expect(get).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
   });
 
   test('advertises creation and redeployment using the existing API schemas', async () => {
