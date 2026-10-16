@@ -264,12 +264,16 @@ set `jobs.deploy.environment` to match.
 
 ## 4. Verify
 
-Serving is only a TCP connect, and a broken process can hold the port while answering nothing. So
-ask the URL for something:
+Run the compiled server locally and check its main flows with HTTP/API requests. After deployment,
+request the public URL too: a serving status only confirms a TCP connection, not a working app.
+Use a browser for testing only when the user asks for browser or visual testing.
 
 ```sh
 curl -fsS https://my-app.nibrun.app/
 ```
+
+Report which checks passed and which remain unverified. With MCP, use `read_logs` for recent
+output and `list_files` to inspect the app's persistent files when diagnosing failures.
 
 `nib apps logs --app my-app` prints recent output and exits. Add `--follow` for live output, or
 `--timerange 2h` to read further back. It says why an app never came up, and what one that did is
@@ -277,7 +281,9 @@ complaining about. `nib --help` lists the rest — status, domains, filesystem, 
 
 ## Inspecting SQLite databases
 
-Read SQLite databases in an app's `data/` through the CLI or dashboard without downloading them.
+Read SQLite databases in an app's `data/` through MCP, the CLI or dashboard without downloading them.
+With MCP, use `query_database`.
+
 When a task calls for inspecting an app's database, use `nib apps sqlite` to discover its
 subcommands:
 
