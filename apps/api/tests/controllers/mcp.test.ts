@@ -33,6 +33,7 @@ const { auth, AppsServicePlugin, ArtifactsServicePlugin, DeploymentsServicePlugi
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const { fromTypeBox } = await import('#lib/mcp/schema.ts');
+const { DEPLOY_TO_NIBRUN_SKILL_URI } = await import('#lib/mcp/skills.ts');
 const { registerTool } = await import('#lib/mcp/tools/shared/register-tool.ts');
 const { MCP_TOOL_META } = await import('#lib/mcp/tools/shared/tool-meta.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
@@ -53,8 +54,8 @@ const HEADERS = {
   host: MCP_RESOURCE.host,
 };
 const nativeFetch = globalThis.fetch;
-const SKILL_URI = 'skill://nibrun/deploy-to-nibrun/SKILL.md';
-const SKILL_DIRECTORY = new URL('../../../../skills/deploy-to-nibrun/', import.meta.url);
+const SKILL_NAMES = ['deploy-to-nibrun', 'setup-app'];
+const SKILLS_DIRECTORY = new URL('../../../../skills/', import.meta.url);
 
 const BINARY_URL = 'https://files.example.test/app';
 const NATIVE_DOWNLOAD_URL = 'https://files.example.test/?signature=temporary-download-token';
@@ -347,39 +348,42 @@ test('rejects a forged signature even when the key ID matches', async () => {
 });
 
 describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
-  test('imports the canonical deployment skill with matching frontmatter, bytes and digest', async () => {
+  test.each(SKILL_NAMES)('imports %s with matching frontmatter, bytes and digest', async (name) => {
+    const uri =
+      name === 'deploy-to-nibrun' ? DEPLOY_TO_NIBRUN_SKILL_URI : `skill://nibrun/${name}/SKILL.md`;
+    const directory = new URL(`${name}/`, SKILLS_DIRECTORY);
     const token = await accessToken();
     const listing = await rpc({ method: 'skills/list', token, protocolVersion });
     const { result } = await rpcBody(listing);
-    expect(result.skills).toHaveLength(1);
+    expect(result.skills).toHaveLength(SKILL_NAMES.length);
     expect(result.nextCursor).toBeUndefined();
-    const skill = result.skills[0];
-    expect(skill.uri).toBe(SKILL_URI);
+    const skill = result.skills.find((entry: { uri: string }) => entry.uri === uri);
+    expect(skill).toBeDefined();
 
     const resources = await rpc({ method: 'resources/list', token, protocolVersion });
-    expect((await rpcBody(resources)).result.resources).toEqual([
+    expect((await rpcBody(resources)).result.resources).toContainEqual(
       expect.objectContaining({
-        uri: SKILL_URI,
+        uri,
         name: skill.frontmatter.name,
         description: skill.frontmatter.description,
         mimeType: 'text/markdown',
       }),
-    ]);
+    );
 
     const metadata = await rpc({
       method: 'skills/get',
-      params: { uri: SKILL_URI },
+      params: { uri },
       token,
       protocolVersion,
     });
     expect((await rpcBody(metadata)).result.skill).toEqual(skill);
 
-    const source = await Bun.file(new URL('SKILL.md', SKILL_DIRECTORY)).text();
+    const source = await Bun.file(new URL('SKILL.md', directory)).text();
     expect(skill.frontmatter).toEqual(Bun.YAML.parse(source.match(/^---\n([\s\S]*?)\n---\n/)![1]!));
-    expect(await readdir(SKILL_DIRECTORY, { recursive: true })).toEqual(['SKILL.md']);
+    expect(await readdir(directory, { recursive: true })).toEqual(['SKILL.md']);
     expect(skill.resources).toEqual([
       {
-        uri: SKILL_URI,
+        uri,
         digest: `sha256:${createHash('sha256').update(source).digest('hex')}`,
         size: Buffer.byteLength(source),
       },
@@ -387,12 +391,12 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
     const resource = await rpc({
       method: 'resources/read',
-      params: { uri: SKILL_URI },
+      params: { uri },
       token,
       protocolVersion,
     });
     expect((await rpcBody(resource)).result.contents).toEqual([
-      { uri: SKILL_URI, mimeType: 'text/markdown', text: source },
+      { uri, mimeType: 'text/markdown', text: source },
     ]);
   });
 
@@ -502,6 +506,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       },
     });
     expect(tool.description).toContain(MCP_TOOL_NAMES.prepareDeploy);
+    expect(tool.description).toContain(DEPLOY_TO_NIBRUN_SKILL_URI);
     expect(tool.inputSchema.required ?? []).toEqual([]);
     expect(tool.inputSchema.properties.name).toEqual(
       JSON.parse(JSON.stringify(CreateAppRequestSchema.properties.name)),
@@ -543,6 +548,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       (entry: { name: string }) => entry.name === MCP_TOOL_NAMES.prepareDeploy,
     );
     expect(tool.description).toContain(MCP_TOOL_NAMES.deployApp);
+    expect(tool.description).toContain(DEPLOY_TO_NIBRUN_SKILL_URI);
     expect(tool).toMatchObject({
       inputSchema: {
         required: ['filename', 'sizeBytes'],
