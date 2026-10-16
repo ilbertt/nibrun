@@ -7,11 +7,13 @@ import { registerDeployAppTool } from '#lib/mcp/tools/deploy-app.ts';
 import { registerGetAppTool } from '#lib/mcp/tools/get-app.ts';
 import { registerListAppsTool } from '#lib/mcp/tools/list-apps.ts';
 import { registerPrepareDeployTool } from '#lib/mcp/tools/prepare-deploy.ts';
+import { registerQueryDatabaseTool } from '#lib/mcp/tools/query-database.ts';
 import { registerReadLogsTool } from '#lib/mcp/tools/read-logs.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { LogsService } from '#services/logs.service.ts';
+import type { SqliteService } from '#services/sqlite.service.ts';
 
 const logger = createLogger('mcp');
 
@@ -20,11 +22,13 @@ export function createMcpServerHandler({
   artifactsService,
   deploymentsService,
   logsService,
+  sqliteService,
 }: {
   appsService: AppsService;
   artifactsService: ArtifactsService;
   deploymentsService: DeploymentsService;
   logsService: LogsService;
+  sqliteService: SqliteService;
 }) {
   return createMcpHandler(
     function createServer(context) {
@@ -44,6 +48,7 @@ export function createMcpServerHandler({
         clientId,
       });
       registerPrepareDeployTool({ server, appsService, artifactsService, ownerId });
+      registerQueryDatabaseTool({ server, sqliteService, ownerId });
       return server;
     },
     {
