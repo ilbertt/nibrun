@@ -6,6 +6,7 @@ import { Value } from '@sinclair/typebox/value';
 import { McpDeploymentSchema } from '#lib/api/deployment.ts';
 import { ArtifactIdSchema, type OAuthClientId, type OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
+import { DEPLOY_TO_NIBRUN_SKILL_URI } from '#lib/mcp/skills.ts';
 import {
   appForDeployment,
   DeploymentTargetSchema,
@@ -88,7 +89,7 @@ export function registerDeployAppTool({
     name: MCP_TOOL_NAMES.deployApp,
     config: {
       title: 'Deploy nibrun app',
-      description: `Deploy a Linux x86_64 executable to your connected nibrun account. Supply a name and optional initial config to create an app, or appId to redeploy. Supply exactly one source: a binary file through native client file binding, a public HTTPS url, or an uploaded artifactId with appId. If native file binding is unavailable and the binary has no HTTPS download URL, first call ${MCP_TOOL_NAMES.prepareDeploy}, upload the bytes as it describes, then call this tool with its app.id and upload.artifactId. An optional sha256 verifies downloaded binaries. Include chatId if your current chat ID is available; omit it rather than guessing. Otherwise the client’s openai/session metadata is recorded when available. Reuse app.id for subsequent deployments. Each call creates a deployment and replaces the current release. A pending result is not confirmed healthy.`,
+      description: `Create or redeploy an app from a Linux x86_64 binary. Redeploying replaces its current release. Include chatId if your current chat ID is available; omit it rather than guessing. For local files without native file binding, call ${MCP_TOOL_NAMES.prepareDeploy} first. Read ${DEPLOY_TO_NIBRUN_SKILL_URI} via resources/read for the workflow.`,
       inputSchema,
       outputSchema,
       annotations: {

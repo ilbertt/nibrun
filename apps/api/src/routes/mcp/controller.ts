@@ -15,6 +15,7 @@ import {
   ArtifactsServicePlugin,
   auth,
   DeploymentsServicePlugin,
+  LogsServicePlugin,
   McpAuthorizationServicePlugin,
 } from '#services/plugins.ts';
 
@@ -23,10 +24,21 @@ function createMcpController() {
     .use(AppsServicePlugin)
     .use(ArtifactsServicePlugin)
     .use(DeploymentsServicePlugin)
+    .use(LogsServicePlugin)
     .use(McpAuthorizationServicePlugin);
-  const { appsService, artifactsService, deploymentsService, mcpAuthorizationService } =
-    controller.decorator;
-  const handler = createMcpServerHandler({ appsService, artifactsService, deploymentsService });
+  const {
+    appsService,
+    artifactsService,
+    deploymentsService,
+    logsService,
+    mcpAuthorizationService,
+  } = controller.decorator;
+  const handler = createMcpServerHandler({
+    appsService,
+    artifactsService,
+    deploymentsService,
+    logsService,
+  });
 
   return controller.all(
     RoutePrefix.Mcp,
