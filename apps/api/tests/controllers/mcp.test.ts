@@ -148,7 +148,7 @@ function rpc({
   protocolVersion = PROTOCOL_VERSIONS[0],
 }: {
   method: string;
-  params?: Record<string, unknown>;
+  params?: Record<string, unknown> & { _meta?: Record<string, unknown> };
   token?: string;
   protocolVersion?: (typeof PROTOCOL_VERSIONS)[number];
 }) {
@@ -176,6 +176,7 @@ function rpc({
                 [PROTOCOL_VERSION_META_KEY]: protocolVersion,
                 [CLIENT_INFO_META_KEY]: CLIENT_INFO,
                 [CLIENT_CAPABILITIES_META_KEY]: {},
+                ...params._meta,
               },
             }
           : {}),
@@ -502,6 +503,10 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       },
     });
     expect(tool.description).toContain(MCP_TOOL_NAMES.prepareDeploy);
+    expect(tool.description).toContain('Include chatId');
+    expect(tool.inputSchema.properties.chatId).toEqual(
+      JSON.parse(JSON.stringify(DeploymentResponseSchema.properties.mcp.properties.chatId)),
+    );
     expect(tool.inputSchema.required ?? []).toEqual([]);
     expect(tool.inputSchema.properties.name).toEqual(
       JSON.parse(JSON.stringify(CreateAppRequestSchema.properties.name)),
@@ -658,6 +663,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
         appId: app.id,
         ownerId,
         clientId: MCP_CLIENT_ID,
+        chatId: undefined,
         artifactId: ARTIFACT.id,
       });
       expect(complete.mock.invocationCallOrder[0]).toBeLessThan(
@@ -797,6 +803,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       appId: app.id,
       ownerId,
       clientId: MCP_CLIENT_ID,
+      chatId: undefined,
       artifactId: ARTIFACT.id,
     });
     expect(create.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[0]!);
@@ -874,10 +881,65 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
         ownerId,
         artifactId: ARTIFACT.id,
         clientId,
+        chatId: undefined,
       });
       expect(JSON.stringify(result)).not.toContain(token);
     },
   );
+
+  test.each([
+    { chatId: undefined, session: 'anonymous-session', expected: 'anonymous-session' },
+    { chatId: 'known-chat', session: undefined, expected: 'known-chat' },
+    { chatId: 'known-chat', session: 'anonymous-session', expected: 'known-chat' },
+    { chatId: undefined, session: undefined, expected: undefined },
+    { chatId: undefined, session: '', expected: undefined },
+    { chatId: undefined, session: true, expected: undefined },
+    { chatId: undefined, session: { id: 'invalid-session' }, expected: undefined },
+    { chatId: undefined, session: null, expected: undefined },
+  ])('records optional chat provenance from input or client metadata: %j', async (input) => {
+    const app = ownedApp();
+    spyOn(appsService, 'get').mockResolvedValue(app);
+    spyOn(artifactsService, 'createFromUrl').mockResolvedValue(ARTIFACT);
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(DEPLOYMENT);
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: MCP_TOOL_NAMES.deployApp,
+        arguments: { appId: app.id, url: BINARY_URL, chatId: input.chatId },
+        _meta: { 'openai/session': input.session },
+      },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.isError).not.toBe(true);
+    expect(deploy).toHaveBeenCalledWith({
+      appId: app.id,
+      ownerId,
+      artifactId: ARTIFACT.id,
+      clientId: MCP_CLIENT_ID,
+      chatId: input.expected,
+    });
+  });
+
+  test.each(['', true, null])('rejects invalid explicit chat IDs: %j', async (chatId) => {
+    const get = spyOn(appsService, 'get');
+    const fetch = spyOn(artifactsService, 'createFromUrl');
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient');
+    const response = await rpc({
+      method: 'tools/call',
+      params: {
+        name: MCP_TOOL_NAMES.deployApp,
+        arguments: { appId: ARTIFACT.appId, url: BINARY_URL, chatId },
+      },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const body = await rpcBody(response);
+    expect(body.error ?? body.result?.isError).toBeTruthy();
+    expect(get).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(deploy).not.toHaveBeenCalled();
+  });
 
   test('fetches and queues a deployment under the verified account without forwarding its token', async () => {
     const app = ownedApp();
@@ -919,6 +981,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       appId: app.id,
       ownerId,
       clientId: MCP_CLIENT_ID,
+      chatId: undefined,
       artifactId: ARTIFACT.id,
     });
     expect(get.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[0]!);
@@ -1017,6 +1080,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
         appId: app.id,
         ownerId,
         clientId: MCP_CLIENT_ID,
+        chatId: undefined,
         artifactId: ARTIFACT.id,
       });
       expect(JSON.stringify([fetch.mock.calls, deploy.mock.calls, result])).not.toContain(token);

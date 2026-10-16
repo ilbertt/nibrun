@@ -114,6 +114,7 @@ function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
     github_run_id: null,
     github_run_attempt: null,
     mcp_client_id: null,
+    mcp_chat_id: null,
     ...configColumns(PINNED_CONFIG),
     ...overrides,
   };
@@ -903,6 +904,7 @@ describe('MCP deployment provenance belongs to the deployment', () => {
         ownerId: OWNER_ID,
         artifactId: ARTIFACT_ID,
         clientId,
+        chatId: undefined,
       });
       expect(deployment.mcp).toEqual({ clientId });
       expect((await service.get(OWNED_DEPLOYMENT)).mcp).toEqual({ clientId });
@@ -914,11 +916,31 @@ describe('MCP deployment provenance belongs to the deployment', () => {
         ownerId: OWNER_ID,
         artifactId: ARTIFACT_ID,
         clientId,
+        chatId: undefined,
         initialDataFrom: null,
         onlyOne: false,
       });
     },
   );
+
+  test('chat provenance reaches creation and public reads', async () => {
+    const mcp = {
+      clientId: Value.Parse(OAuthClientIdSchema, 'registered-client'),
+      chatId: 'originating-chat',
+    };
+    const row = deploymentRow({ mcp_client_id: mcp.clientId, mcp_chat_id: mcp.chatId });
+    const { service, deploymentsRepo } = serviceWith({ row, rows: [row] });
+    const deployment = await service.createWithMcpClient({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      artifactId: ARTIFACT_ID,
+      ...mcp,
+    });
+    expect(deployment.mcp).toEqual(mcp);
+    expect((await service.get(OWNED_DEPLOYMENT)).mcp).toEqual(mcp);
+    expect((await service.list({ appId: APP_ID, ownerId: OWNER_ID }))[0]?.mcp).toEqual(mcp);
+    expect(deploymentsRepo.calls[0]).toMatchObject(mcp);
+  });
 
   test('ordinary deployments omit MCP provenance', async () => {
     const { service } = serviceWith({ row: deploymentRow() });

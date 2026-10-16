@@ -3,7 +3,7 @@ import { McpMark } from '@repo/ui/custom/mcp-mark';
 import type { DeploymentSummary } from '#queries/deployments.ts';
 
 export function McpDeploymentOrigin({ mcp }: { mcp: NonNullable<DeploymentSummary['mcp']> }) {
-  const label = `Deployed via MCP: ${mcp.clientId}`;
+  const label = `Deployed via MCP: ${mcp.clientId}${mcp.chatId === undefined ? '' : ` · Chat ID: ${mcp.chatId}`}`;
   return (
     <Tooltip>
       <TooltipTrigger

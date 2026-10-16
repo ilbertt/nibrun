@@ -676,6 +676,7 @@ export interface ISelectDeploymentsByAppResult {
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: IDeploymentsColumns["mcp_client_id"];
+    mcp_chat_id: IDeploymentsColumns["mcp_chat_id"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     /** Why the deployment is in the state it is in, as the host put it. Never the tenant's own output, which has a streaming path of its own. */
@@ -723,6 +724,7 @@ export interface ISelectDeploymentByIdResult {
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: IDeploymentsColumns["mcp_client_id"];
+    mcp_chat_id: IDeploymentsColumns["mcp_chat_id"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     /** Why the deployment is in the state it is in, as the host put it. Never the tenant's own output, which has a streaming path of its own. */
@@ -797,6 +799,7 @@ export interface ISelectInsertedDeploymentResult {
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: IDeploymentsColumns["mcp_client_id"];
+    mcp_chat_id: IDeploymentsColumns["mcp_chat_id"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     /** Why the deployment is in the state it is in, as the host put it. Never the tenant's own output, which has a streaming path of its own. */
@@ -1493,6 +1496,7 @@ export interface IDeploymentsColumns {
     github_deployment_grant_id: import("#lib/api/identifiers.ts").DeploymentGrantId | null;
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: import("#lib/api/identifiers.ts").OAuthClientId | null;
+    mcp_chat_id: string | null;
 }
 
 /** Schema of `deployments`. */
@@ -2169,7 +2173,8 @@ export const schema = {
             instance_state: { _columnName: "instance_state", _foreignKeys: {} },
             initial_data_import_id: { _columnName: "initial_data_import_id", _foreignKeys: { deployments_initial_data_import_id_fkey: { _constraintName: "deployments_initial_data_import_id_fkey", _references: { _relationName: "imports", _columnName: "id" } } } },
             github_deployment_grant_id: { _columnName: "github_deployment_grant_id", _foreignKeys: { deployments_github_deployment_grant_id_fkey: { _constraintName: "deployments_github_deployment_grant_id_fkey", _references: { _relationName: "github_deployment_grants", _columnName: "id" } } } },
-            mcp_client_id: { _columnName: "mcp_client_id", _foreignKeys: {} }
+            mcp_client_id: { _columnName: "mcp_client_id", _foreignKeys: {} },
+            mcp_chat_id: { _columnName: "mcp_chat_id", _foreignKeys: {} }
         },
         _indexes: {
             deployments_activated_artifact_idx: { _indexName: "deployments_activated_artifact_idx" },
@@ -2190,6 +2195,7 @@ export const schema = {
             deployments_github_deployment_grant_id_fkey: { _constraintName: "deployments_github_deployment_grant_id_fkey" },
             deployments_initial_data_import_id_fkey: { _constraintName: "deployments_initial_data_import_id_fkey" },
             deployments_instance_state_check: { _constraintName: "deployments_instance_state_check" },
+            deployments_mcp_chat_requires_client: { _constraintName: "deployments_mcp_chat_requires_client" },
             deployments_pkey: { _constraintName: "deployments_pkey" },
             deployments_rollback_of_deployment_id_fkey: { _constraintName: "deployments_rollback_of_deployment_id_fkey" },
             deployments_state_check: { _constraintName: "deployments_state_check" }

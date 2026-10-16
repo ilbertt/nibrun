@@ -1,8 +1,9 @@
-import type { McpServer, StandardSchemaWithJSON } from '@modelcontextprotocol/server';
+import type { McpServer, StandardSchemaWithJSON, ToolCallback } from '@modelcontextprotocol/server';
 import { appUrl } from '@repo/app-ui';
 import { FilenameSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
+import { McpDeploymentSchema } from '#lib/api/deployment.ts';
 import { ArtifactIdSchema, type OAuthClientId, type OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import {
@@ -36,6 +37,7 @@ const DEFAULT_BINARY_FILENAME = Value.Parse(FilenameSchema, 'app');
 const DeployAppInputSchema = Type.Object(
   {
     ...DeploymentTargetSchema.properties,
+    chatId: McpDeploymentSchema.properties.chatId,
     artifactId: Type.Optional(ArtifactIdSchema),
     url: Type.Optional(FetchedBinarySchema.properties.url),
     binary: Type.Optional(ChatGptFileInputSchema),
@@ -64,7 +66,6 @@ const outputSchema = fromTypeBox(
   }),
 );
 
-type DeployAppInput = StandardSchemaWithJSON.InferOutput<typeof inputSchema>;
 type DeployAppOutput = StandardSchemaWithJSON.InferOutput<typeof outputSchema>;
 
 export function registerDeployAppTool({
@@ -87,7 +88,7 @@ export function registerDeployAppTool({
     name: MCP_TOOL_NAMES.deployApp,
     config: {
       title: 'Deploy nibrun app',
-      description: `Deploy a Linux x86_64 executable to your connected nibrun account. Supply a name and optional initial config to create an app, or appId to redeploy. Supply exactly one source: a binary file through native client file binding, a public HTTPS url, or an uploaded artifactId with appId. If native file binding is unavailable and the binary has no HTTPS download URL, first call ${MCP_TOOL_NAMES.prepareDeploy}, upload the bytes as it describes, then call this tool with its app.id and upload.artifactId. An optional sha256 verifies downloaded binaries. Reuse app.id for subsequent deployments. Each call creates a deployment and replaces the current release. A pending result is not confirmed healthy.`,
+      description: `Deploy a Linux x86_64 executable to your connected nibrun account. Supply a name and optional initial config to create an app, or appId to redeploy. Supply exactly one source: a binary file through native client file binding, a public HTTPS url, or an uploaded artifactId with appId. If native file binding is unavailable and the binary has no HTTPS download URL, first call ${MCP_TOOL_NAMES.prepareDeploy}, upload the bytes as it describes, then call this tool with its app.id and upload.artifactId. An optional sha256 verifies downloaded binaries. Include chatId if your current chat ID is available; omit it rather than guessing. Otherwise the client’s openai/session metadata is recorded when available. Reuse app.id for subsequent deployments. Each call creates a deployment and replaces the current release. A pending result is not confirmed healthy.`,
       inputSchema,
       outputSchema,
       annotations: {
@@ -99,9 +100,10 @@ export function registerDeployAppTool({
       _meta: { 'openai/fileParams': ['binary'] },
     },
     callback: handleToolResult(async function deployApp(
-      input: DeployAppInput,
+      ...[input, { mcpReq }]: Parameters<ToolCallback<typeof inputSchema>>
     ): Promise<DeployAppOutput> {
       const { artifactId, url, binary, sha256 } = input;
+      const sessionId = mcpReq._meta?.['openai/session'];
       const app = await appForDeployment({ appsService, ownerId, target: input });
       const artifact =
         artifactId === undefined
@@ -124,6 +126,9 @@ export function registerDeployAppTool({
         appId: app.id,
         ownerId,
         clientId,
+        chatId:
+          input.chatId ??
+          (Value.Check(McpDeploymentSchema.properties.chatId, sessionId) ? sessionId : undefined),
         artifactId: artifact.id,
       });
       return { app, deployment, url: appUrl(app.hostnames) };

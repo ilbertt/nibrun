@@ -330,7 +330,12 @@ function toPublicDeployment(row: DeploymentRow): PublicDeployment {
     ...(row.message && { message: row.message }),
     ...(row.rollback_of_deployment_id && { rollbackOf: row.rollback_of_deployment_id }),
     ...(github && { github }),
-    ...(row.mcp_client_id !== null && { mcp: { clientId: row.mcp_client_id } }),
+    ...(row.mcp_client_id !== null && {
+      mcp: {
+        clientId: row.mcp_client_id,
+        ...(row.mcp_chat_id !== null && { chatId: row.mcp_chat_id }),
+      },
+    }),
   };
 }
 

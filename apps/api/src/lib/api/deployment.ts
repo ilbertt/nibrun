@@ -37,7 +37,16 @@ export const GitHubDeploymentSchema = Type.Object({
   runAttempt: Type.String(),
 });
 
-export const McpDeploymentSchema = Type.Object({ clientId: OAuthClientIdSchema });
+export const McpDeploymentSchema = Type.Object({
+  clientId: OAuthClientIdSchema,
+  chatId: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        'The originating chat ID, when known, or an anonymized client session ID. An anonymized ID cannot be assumed to resolve to a chat URL.',
+    }),
+  ),
+});
 
 export const DeploymentSchema = Type.Object({
   id: DeploymentIdSchema,

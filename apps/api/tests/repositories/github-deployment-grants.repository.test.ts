@@ -411,31 +411,48 @@ test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metada
     const input = await deploymentInput(appId);
     const repository = new DeploymentsRepository(withTypes<Queries>(sql));
     const clientId = Value.Parse(OAuthClientIdSchema, identity);
-    const deployed = await repository.insertWithMcpClient({ ...input, clientId });
+    const deployed = await repository.insertWithMcpClient({
+      ...input,
+      clientId,
+      chatId: 'originating-chat',
+    });
     if (deployed.outcome !== 'created') {
       throw new Error('The MCP deployment must be created.');
     }
     const owned = { appId, ownerId: OWNER_ID, deploymentId: deployed.row.id };
     expect(deployed.row.mcp_client_id).toBe(clientId);
+    expect(deployed.row.mcp_chat_id).toBe('originating-chat');
     expect(deployed.row.github_repository).toBeNull();
     expect((await repository.findById(owned))?.mcp_client_id).toBe(clientId);
+    expect((await repository.findById(owned))?.mcp_chat_id).toBe('originating-chat');
     expect((await repository.listByApp({ appId, ownerId: OWNER_ID }))[0]?.mcp_client_id).toBe(
       clientId,
     );
+    expect((await repository.listByApp({ appId, ownerId: OWNER_ID }))[0]?.mcp_chat_id).toBe(
+      'originating-chat',
+    );
     expect(await repository.findById({ ...owned, ownerId: OTHER_OWNER_ID })).toBeNull();
     expect(
-      await repository.insertWithMcpClient({ ...input, clientId, ownerId: OTHER_OWNER_ID }),
+      await repository.insertWithMcpClient({
+        ...input,
+        clientId,
+        chatId: 'originating-chat',
+        ownerId: OTHER_OWNER_ID,
+      }),
     ).toEqual({ outcome: 'no-artifact' });
     expect((await repository.findById(owned))?.state).toBe('pending');
     const manual = await repository.insert(input);
     expect(manual.outcome === 'created' ? manual.row.mcp_client_id : undefined).toBeNull();
+    expect(manual.outcome === 'created' ? manual.row.mcp_chat_id : undefined).toBeNull();
     const rollback = await repository.insertRollback({
       appId,
       ownerId: OWNER_ID,
       rollbackOf: deployed.row.id,
     });
     expect(rollback?.mcp_client_id).toBeNull();
+    expect(rollback?.mcp_chat_id).toBeNull();
     expect(rollback?.artifact_id).toBe(deployed.row.artifact_id);
     expect((await repository.findById(owned))?.mcp_client_id).toBe(clientId);
+    expect((await repository.findById(owned))?.mcp_chat_id).toBe('originating-chat');
   },
 );
