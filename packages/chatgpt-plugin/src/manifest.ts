@@ -27,7 +27,8 @@ export function createManifest({ appId }: { appId: string | undefined }) {
           logo: './assets/logo.png',
           composerIcon: './assets/composer-icon.png',
         },
-        ...(appId === undefined ? {} : { apps: './.app.json', requires_local_executor: false }),
+        apps: appId === undefined ? undefined : './.app.json',
+        requires_local_executor: false,
       },
     },
   };
