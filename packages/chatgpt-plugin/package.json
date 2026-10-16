@@ -1,0 +1,23 @@
+{
+  "name": "@repo/chatgpt-plugin",
+  "version": "0.1.2",
+  "description": "Build apps and deploy compiled binaries to your nibrun account.",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "check:types": "bun run --bun tsc",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@repo/global-constants": "workspace:*",
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
