@@ -33,6 +33,7 @@ const { auth, AppsServicePlugin, ArtifactsServicePlugin, DeploymentsServicePlugi
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const { MCP_RESOURCE, MCP_RESOURCE_METADATA_URL, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const { fromTypeBox } = await import('#lib/mcp/schema.ts');
+const { DEPLOY_TO_NIBRUN_SKILL_URI } = await import('#lib/mcp/skills.ts');
 const { registerTool } = await import('#lib/mcp/tools/shared/register-tool.ts');
 const { MCP_TOOL_META } = await import('#lib/mcp/tools/shared/tool-meta.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
@@ -348,7 +349,8 @@ test('rejects a forged signature even when the key ID matches', async () => {
 
 describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
   test.each(SKILL_NAMES)('imports %s with matching frontmatter, bytes and digest', async (name) => {
-    const uri = `skill://nibrun/${name}/SKILL.md`;
+    const uri =
+      name === 'deploy-to-nibrun' ? DEPLOY_TO_NIBRUN_SKILL_URI : `skill://nibrun/${name}/SKILL.md`;
     const directory = new URL(`${name}/`, SKILLS_DIRECTORY);
     const token = await accessToken();
     const listing = await rpc({ method: 'skills/list', token, protocolVersion });
@@ -504,6 +506,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       },
     });
     expect(tool.description).toContain(MCP_TOOL_NAMES.prepareDeploy);
+    expect(tool.description).toContain(DEPLOY_TO_NIBRUN_SKILL_URI);
     expect(tool.inputSchema.required ?? []).toEqual([]);
     expect(tool.inputSchema.properties.name).toEqual(
       JSON.parse(JSON.stringify(CreateAppRequestSchema.properties.name)),
@@ -545,6 +548,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       (entry: { name: string }) => entry.name === MCP_TOOL_NAMES.prepareDeploy,
     );
     expect(tool.description).toContain(MCP_TOOL_NAMES.deployApp);
+    expect(tool.description).toContain(DEPLOY_TO_NIBRUN_SKILL_URI);
     expect(tool).toMatchObject({
       inputSchema: {
         required: ['filename', 'sizeBytes'],

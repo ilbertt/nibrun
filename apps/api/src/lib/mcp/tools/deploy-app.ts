@@ -5,6 +5,7 @@ import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { ArtifactIdSchema, type OAuthClientId, type OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
+import { DEPLOY_TO_NIBRUN_SKILL_URI } from '#lib/mcp/skills.ts';
 import {
   appForDeployment,
   DeploymentTargetSchema,
@@ -87,7 +88,7 @@ export function registerDeployAppTool({
     name: MCP_TOOL_NAMES.deployApp,
     config: {
       title: 'Deploy nibrun app',
-      description: `Create or redeploy an app from a Linux x86_64 binary. Redeploying replaces its current release. For local files without native file binding, call ${MCP_TOOL_NAMES.prepareDeploy} first. Read the deploy-to-nibrun skill for the workflow.`,
+      description: `Create or redeploy an app from a Linux x86_64 binary. Redeploying replaces its current release. For local files without native file binding, call ${MCP_TOOL_NAMES.prepareDeploy} first. Read ${DEPLOY_TO_NIBRUN_SKILL_URI} via resources/read for the workflow.`,
       inputSchema,
       outputSchema,
       annotations: {

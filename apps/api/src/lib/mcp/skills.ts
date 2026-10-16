@@ -9,6 +9,10 @@ const skills = new Map(
   await Promise.all([...getSkills()].filter(([path]) => path.endsWith('/SKILL.md')).map(readSkill)),
 );
 
+export const DEPLOY_TO_NIBRUN_SKILL_URI = [...skills.values()].find(
+  ({ descriptor }) => descriptor.frontmatter.name === 'deploy-to-nibrun',
+)!.descriptor.uri;
+
 async function readSkill([, file]: [string, Blob]) {
   const text = await file.text();
   const frontmatter = Value.Parse(

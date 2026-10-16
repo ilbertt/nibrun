@@ -2,6 +2,7 @@ import type { McpServer, StandardSchemaWithJSON } from '@modelcontextprotocol/se
 import { Type } from '@sinclair/typebox';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
+import { DEPLOY_TO_NIBRUN_SKILL_URI } from '#lib/mcp/skills.ts';
 import {
   appForDeployment,
   DeploymentTargetSchema,
@@ -54,7 +55,7 @@ export function registerPrepareDeployTool({
     name: MCP_TOOL_NAMES.prepareDeploy,
     config: {
       title: 'Prepare nibrun deployment',
-      description: `Prepare a direct HTTP binary upload for a new or existing app. Requires file access and HTTP upload capability; does not deploy. Read the deploy-to-nibrun skill for upload steps, then call ${MCP_TOOL_NAMES.deployApp}.`,
+      description: `Prepare a direct HTTP binary upload for a new or existing app. Requires file access and HTTP upload capability; does not deploy. Read ${DEPLOY_TO_NIBRUN_SKILL_URI} via resources/read for upload steps, then call ${MCP_TOOL_NAMES.deployApp}.`,
       inputSchema,
       outputSchema,
       annotations: {
