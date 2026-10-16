@@ -48,7 +48,13 @@ export function createMcpServerHandler({
         clientId,
       });
       registerPrepareDeployTool({ server, appsService, artifactsService, ownerId });
-      registerListFilesTool({ server, filesystemService, ownerId });
+      registerListFilesTool({
+        server,
+        appsService,
+        deploymentsService,
+        filesystemService,
+        ownerId,
+      });
       return server;
     },
     {

@@ -521,14 +521,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     'reads available deployment logs without following, with timerange %s',
     async (timerange) => {
       const get = spyOn(appsService, 'get').mockResolvedValue(ownedApp());
-      const list = spyOn(deploymentsService, 'list').mockResolvedValue([
-        DEPLOYMENT,
-        Value.Parse(DeploymentResponseSchema, {
-          ...DEPLOYMENT,
-          id: 'older-deployment',
-          state: 'running',
-        }),
-      ]);
+      const latest = spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
       const logs = [
         Value.Parse(TenantLogRecordSchema, {
           _time: new Date().toISOString(),
@@ -564,7 +557,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       expect(result.structuredContent).toEqual({ logs });
       expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
       expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
-      expect(list).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
+      expect(latest).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
       expect(open).toHaveBeenCalledWith({
         appId: ARTIFACT.appId,
         deploymentId: DEPLOYMENT.id,
@@ -578,7 +571,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
   test('finishes with an empty log result when no records are available', async () => {
     spyOn(appsService, 'get').mockResolvedValue(ownedApp());
-    spyOn(deploymentsService, 'list').mockResolvedValue([DEPLOYMENT]);
+    spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
     spyOn(logsService, 'openStream').mockResolvedValue(
       (async function* emptyLogs() {
         yield* [];
@@ -598,7 +591,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
   test('returns empty logs before the first deployment without opening a log stream', async () => {
     spyOn(appsService, 'get').mockResolvedValue(ownedApp());
-    spyOn(deploymentsService, 'list').mockResolvedValue([]);
+    spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(null);
     const open = spyOn(logsService, 'openStream');
     const response = await rpc({
       method: 'tools/call',
@@ -614,7 +607,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
   test('does not read deployments or logs for an inaccessible app', async () => {
     const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
-    const list = spyOn(deploymentsService, 'list');
+    const latest = spyOn(deploymentsService, 'getLatestDeployment');
     const open = spyOn(logsService, 'openStream');
     const response = await rpc({
       method: 'tools/call',
@@ -625,13 +618,13 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const { result } = await rpcBody(response);
     expect(result.isError).toBe(true);
     expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
-    expect(list).not.toHaveBeenCalled();
+    expect(latest).not.toHaveBeenCalled();
     expect(open).not.toHaveBeenCalled();
   });
 
   test('scopes log access to the verified account and hides inaccessible deployment details', async () => {
     const get = spyOn(appsService, 'get').mockResolvedValue(ownedApp());
-    const list = spyOn(deploymentsService, 'list').mockResolvedValue([DEPLOYMENT]);
+    const latest = spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
     const open = spyOn(logsService, 'openStream').mockRejectedValue(
       new NotFoundError('Deployment not found.'),
     );
@@ -649,7 +642,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(result.structuredContent).toBeUndefined();
     expect(result.content).toEqual([{ type: 'text', text: 'Unable to complete request.' }]);
     expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
-    expect(list).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
+    expect(latest).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
     expect(open).toHaveBeenCalledWith(
       expect.objectContaining({
         appId: ARTIFACT.appId,
@@ -661,7 +654,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
   test('handles errors encountered while reading log records', async () => {
     spyOn(appsService, 'get').mockResolvedValue(ownedApp());
-    spyOn(deploymentsService, 'list').mockResolvedValue([DEPLOYMENT]);
+    spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
     spyOn(logsService, 'openStream').mockResolvedValue(
       (async function* failedLogs() {
         yield* [];
@@ -693,7 +686,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     { appId: ARTIFACT.appId, ownerId: 'other-owner' },
   ])('refuses invalid read_logs arguments: %j', async (args) => {
     const get = spyOn(appsService, 'get');
-    const list = spyOn(deploymentsService, 'list');
+    const latest = spyOn(deploymentsService, 'getLatestDeployment');
     const open = spyOn(logsService, 'openStream');
     const response = await rpc({
       method: 'tools/call',
@@ -704,7 +697,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     const body = await rpcBody(response);
     expect(body.error ?? body.result?.isError).toBeTruthy();
     expect(get).not.toHaveBeenCalled();
-    expect(list).not.toHaveBeenCalled();
+    expect(latest).not.toHaveBeenCalled();
     expect(open).not.toHaveBeenCalled();
   });
 
@@ -719,7 +712,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       (entry: { name: string }) => entry.name === MCP_TOOL_NAMES.listFiles,
     );
     expect(tool).toMatchObject({
-      inputSchema: { required: ['appId', 'deploymentId'], additionalProperties: false },
+      inputSchema: { required: ['appId'], additionalProperties: false },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -731,6 +724,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(tool.inputSchema.properties.path).toEqual(
       JSON.parse(JSON.stringify(DirectoryListingSchema.properties.path)),
     );
+    expect(tool.inputSchema.properties.deploymentId).toBeUndefined();
     expect(tool.outputSchema).toEqual(JSON.parse(JSON.stringify(DirectoryListingSchema)));
   });
 
@@ -758,6 +752,8 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
         ],
         truncated,
       });
+      const get = spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+      const latest = spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
       const read = spyOn(filesystemService, 'readDirectory').mockImplementation(
         function readDirectory({ signal }) {
           expect(signal.aborted).toBe(false);
@@ -771,7 +767,6 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
           name: MCP_TOOL_NAMES.listFiles,
           arguments: {
             appId: ARTIFACT.appId,
-            deploymentId: DEPLOYMENT.id,
             ...(path ? { path } : {}),
           },
         },
@@ -782,6 +777,10 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       expect(result.isError).not.toBe(true);
       expect(result.structuredContent).toEqual(listing);
       expect(JSON.parse(result.content[0].text)).toEqual(listing);
+      expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: identity });
+      expect(latest).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: identity });
+      expect(get.mock.invocationCallOrder[0]).toBeLessThan(latest.mock.invocationCallOrder[0]!);
+      expect(latest.mock.invocationCallOrder[0]).toBeLessThan(read.mock.invocationCallOrder[0]!);
       expect(read).toHaveBeenCalledTimes(1);
       expect(read).toHaveBeenCalledWith({
         appId: ARTIFACT.appId,
@@ -795,17 +794,17 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
 
   test.each([
     {},
-    { appId: ARTIFACT.appId },
     { deploymentId: DEPLOYMENT.id },
-    { appId: '-invalid', deploymentId: DEPLOYMENT.id },
-    { appId: ARTIFACT.appId, deploymentId: '-invalid' },
+    { appId: '-invalid' },
+    { appId: ARTIFACT.appId, deploymentId: DEPLOYMENT.id },
     ...['relative', '/../etc', '/data/../../etc', '/uploads/', '/a\\b', '/a\n'].map((path) => ({
       appId: ARTIFACT.appId,
-      deploymentId: DEPLOYMENT.id,
       path,
     })),
-    { appId: ARTIFACT.appId, deploymentId: DEPLOYMENT.id, ownerId: 'forged-owner' },
+    { appId: ARTIFACT.appId, ownerId: 'forged-owner' },
   ])('refuses invalid list_files arguments before reading a volume: %j', async (args) => {
+    const get = spyOn(appsService, 'get');
+    const latest = spyOn(deploymentsService, 'getLatestDeployment');
     const read = spyOn(filesystemService, 'readDirectory');
     const response = await rpc({
       method: 'tools/call',
@@ -815,18 +814,22 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     });
     const body = await rpcBody(response);
     expect(body.error ?? body.result?.isError).toBeTruthy();
+    expect(get).not.toHaveBeenCalled();
+    expect(latest).not.toHaveBeenCalled();
     expect(read).not.toHaveBeenCalled();
   });
 
   test.each([new NotFoundError('Deployment not found.'), new Error('private-host-device-path')])(
     'handles inaccessible deployments and host failures without disclosing details: %s',
     async (error) => {
+      spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+      spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
       const read = spyOn(filesystemService, 'readDirectory').mockRejectedValue(error);
       const response = await rpc({
         method: 'tools/call',
         params: {
           name: MCP_TOOL_NAMES.listFiles,
-          arguments: { appId: ARTIFACT.appId, deploymentId: DEPLOYMENT.id },
+          arguments: { appId: ARTIFACT.appId },
         },
         token: await accessToken(),
         protocolVersion,
@@ -840,6 +843,8 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
   );
 
   test('bounds directory reads with the shared filesystem timeout', async () => {
+    spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+    spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(DEPLOYMENT);
     const deadline = new AbortController();
     const timeout = spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);
     const read = spyOn(filesystemService, 'readDirectory').mockImplementation(function expireRead({
@@ -853,7 +858,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       method: 'tools/call',
       params: {
         name: MCP_TOOL_NAMES.listFiles,
-        arguments: { appId: ARTIFACT.appId, deploymentId: DEPLOYMENT.id },
+        arguments: { appId: ARTIFACT.appId },
       },
       token: await accessToken(),
       protocolVersion,
@@ -861,6 +866,39 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect((await rpcBody(response)).result.isError).toBe(true);
     expect(timeout).toHaveBeenCalledWith(DIRECTORY_READ_TIMEOUT_MS);
     expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not read deployments or files for an inaccessible app', async () => {
+    const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
+    const latest = spyOn(deploymentsService, 'getLatestDeployment');
+    const read = spyOn(filesystemService, 'readDirectory');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: MCP_TOOL_NAMES.listFiles, arguments: { appId: ARTIFACT.appId } },
+      token: await accessToken({ claims: { ...accessTokenClaims(), sub: otherOwnerId } }),
+      protocolVersion,
+    });
+    expect((await rpcBody(response)).result.isError).toBe(true);
+    expect(get).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId: otherOwnerId });
+    expect(latest).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  test('does not read a volume before the first deployment', async () => {
+    spyOn(appsService, 'get').mockResolvedValue(ownedApp());
+    const latest = spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(null);
+    const read = spyOn(filesystemService, 'readDirectory');
+    const response = await rpc({
+      method: 'tools/call',
+      params: { name: MCP_TOOL_NAMES.listFiles, arguments: { appId: ARTIFACT.appId } },
+      token: await accessToken(),
+      protocolVersion,
+    });
+    const { result } = await rpcBody(response);
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    expect(latest).toHaveBeenCalledWith({ appId: ARTIFACT.appId, ownerId });
+    expect(read).not.toHaveBeenCalled();
   });
 
   test('advertises creation and redeployment using the existing API schemas', async () => {
@@ -1540,14 +1578,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       restartCount: 0,
     });
     const get = spyOn(appsService, 'get').mockResolvedValue(app);
-    const list = spyOn(deploymentsService, 'list').mockResolvedValue([
-      newest,
-      Value.Parse(DeploymentResponseSchema, {
-        ...newest,
-        id: 'deployment-old',
-        state: 'superseded',
-      }),
-    ]);
+    const latest = spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(newest);
     const response = await rpc({
       method: 'tools/call',
       params: { name: MCP_TOOL_NAMES.getApp, arguments: { appId: app.id } },
@@ -1563,13 +1594,13 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     });
     expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
     expect(get).toHaveBeenCalledWith({ appId: app.id, ownerId });
-    expect(list).toHaveBeenCalledWith({ appId: app.id, ownerId });
+    expect(latest).toHaveBeenCalledWith({ appId: app.id, ownerId });
   });
 
   test('returns no current deployment before the first release', async () => {
     const app = ownedApp();
     spyOn(appsService, 'get').mockResolvedValue(app);
-    spyOn(deploymentsService, 'list').mockResolvedValue([]);
+    spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(null);
     const response = await rpc({
       method: 'tools/call',
       params: { name: MCP_TOOL_NAMES.getApp, arguments: { appId: app.id } },
@@ -1597,7 +1628,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
         ],
       });
       spyOn(appsService, 'get').mockResolvedValue(app);
-      spyOn(deploymentsService, 'list').mockResolvedValue([]);
+      spyOn(deploymentsService, 'getLatestDeployment').mockResolvedValue(null);
       const response = await rpc({
         method: 'tools/call',
         params: { name: MCP_TOOL_NAMES.getApp, arguments: { appId: app.id } },
@@ -1614,7 +1645,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     'does not read deployments or disclose details for an inaccessible app: %s',
     async (appId) => {
       const get = spyOn(appsService, 'get').mockRejectedValue(new NotFoundError('App not found.'));
-      const list = spyOn(deploymentsService, 'list');
+      const latest = spyOn(deploymentsService, 'getLatestDeployment');
       const response = await rpc({
         method: 'tools/call',
         params: { name: MCP_TOOL_NAMES.getApp, arguments: { appId } },
@@ -1625,7 +1656,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       expect(result.isError).toBe(true);
       expect(result.structuredContent).toBeUndefined();
       expect(get).toHaveBeenCalledWith({ appId, ownerId });
-      expect(list).not.toHaveBeenCalled();
+      expect(latest).not.toHaveBeenCalled();
     },
   );
 
@@ -1633,7 +1664,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     'refuses invalid get_app arguments: %j',
     async (args) => {
       const get = spyOn(appsService, 'get');
-      const list = spyOn(deploymentsService, 'list');
+      const latest = spyOn(deploymentsService, 'getLatestDeployment');
       const response = await rpc({
         method: 'tools/call',
         params: { name: MCP_TOOL_NAMES.getApp, arguments: args },
@@ -1643,7 +1674,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       const body = await rpcBody(response);
       expect(body.error ?? body.result?.isError).toBeTruthy();
       expect(get).not.toHaveBeenCalled();
-      expect(list).not.toHaveBeenCalled();
+      expect(latest).not.toHaveBeenCalled();
     },
   );
 
