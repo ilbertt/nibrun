@@ -282,9 +282,7 @@ complaining about. `nib --help` lists the rest — status, domains, filesystem, 
 ## Inspecting SQLite databases
 
 Read SQLite databases in an app's `data/` through MCP, the CLI or dashboard without downloading them.
-With MCP, use `list_files` to locate the database, then call `query_database` with `appId`,
-`sqlite_file_path` and a read-only `sql` statement. The tool selects the running deployment and
-reuses or creates the saved connection.
+With MCP, use `query_database`.
 
 When a task calls for inspecting an app's database, use `nib apps sqlite` to discover its
 subcommands:
