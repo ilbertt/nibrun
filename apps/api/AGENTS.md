@@ -87,6 +87,7 @@ lets Elysia name and type `params`. That path also names the controller:
 
 MCP code belongs in `src/lib/mcp/`: one tool registration per file in `tools/`,
 shared helpers in `tools/shared/`. Derive tool schemas from existing API models.
+Register tools through `tools/shared/register-tool.ts`.
 Follow MCP specifications and MCP-owned extensions without client-specific protocol behavior.
 
 Keep MCP and discovery routes out of OpenAPI. Leave protocol and OAuth behavior

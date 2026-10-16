@@ -46,6 +46,7 @@
         "@ilbertt/bun-sqlgen": "^0.7.0",
         "@modelcontextprotocol/server": "^2.3.1",
         "@repo/api-constants": "workspace:*",
+        "@repo/app-ui": "workspace:*",
         "@repo/protocol": "workspace:*",
         "@repo/sqlite": "workspace:*",
         "@repo/typebox-extensions": "workspace:*",
@@ -70,6 +71,7 @@
         "@repo/api-client": "workspace:*",
         "@repo/api-constants": "workspace:*",
         "@repo/app-operations": "workspace:*",
+        "@repo/app-ui": "workspace:*",
         "@repo/binary-handoff": "workspace:*",
         "@repo/deploy-link": "workspace:*",
         "@repo/global-constants": "workspace:*",
@@ -177,7 +179,15 @@
       "name": "@repo/app-operations",
       "dependencies": {
         "@repo/api-client": "workspace:*",
+        "@repo/app-ui": "workspace:*",
       },
+      "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/app-ui": {
+      "name": "@repo/app-ui",
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",
@@ -201,6 +211,7 @@
         "@repo/api-client": "workspace:*",
         "@repo/api-constants": "workspace:*",
         "@repo/app-operations": "workspace:*",
+        "@repo/app-ui": "workspace:*",
         "@repo/global-constants": "workspace:*",
         "@repo/protocol": "workspace:*",
         "better-auth": "catalog:",
@@ -1196,6 +1207,8 @@
     "@repo/api-constants": ["@repo/api-constants@workspace:packages/api-constants"],
 
     "@repo/app-operations": ["@repo/app-operations@workspace:packages/app-operations"],
+
+    "@repo/app-ui": ["@repo/app-ui@workspace:packages/app-ui"],
 
     "@repo/binary-handoff": ["@repo/binary-handoff@workspace:packages/binary-handoff"],
 

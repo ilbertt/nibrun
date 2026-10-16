@@ -64,12 +64,11 @@ export {
 export { type FollowInput, followLogs } from '#logs.ts';
 export { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
 export { type RedeployInput, redeploy } from '#redeploy.ts';
-export {
-  type AppEdit,
-  type ConfigEdit,
-  type Deployed,
-  type DeployStep,
-  servingHostname,
+export type {
+  AppEdit,
+  ConfigEdit,
+  Deployed,
+  DeployStep,
 } from '#release.ts';
 export { executeSqliteQuery } from '#sqlite.ts';
 export {
