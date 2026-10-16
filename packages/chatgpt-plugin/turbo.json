@@ -3,11 +3,11 @@
   "extends": ["//"],
   "tasks": {
     "build": {
+      "dependsOn": ["^build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/skills/**",
-        "$TURBO_ROOT$/brand/**",
-        "$TURBO_ROOT$/packages/global-constants/src/**"
+        "$TURBO_ROOT$/brand/**"
       ]
     }
   }
