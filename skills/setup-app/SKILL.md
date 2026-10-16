@@ -15,5 +15,11 @@ When choosing the default stack, clone the appropriate template:
 - Telegram bot: [ilbertt/telegram-bot-starter](https://github.com/ilbertt/telegram-bot-starter),
   which also requires Bun.
 
-Read the template's `AGENTS.md` and create the app the user requested. Then read
-[deploy-to-nibrun](../deploy-to-nibrun/SKILL.md) to compile and deploy it.
+Read the template's `AGENTS.md` and build on the cloned template. If the app needs authentication, use
+the template's authentication setup. If the template cannot be retrieved, explain the limitation
+before choosing a different starting point.
+
+Verify with build checks and HTTP/API requests. Use a browser for testing only when the user
+asks for browser or visual testing.
+
+Then read [deploy-to-nibrun](../deploy-to-nibrun/SKILL.md) to compile and deploy it.
