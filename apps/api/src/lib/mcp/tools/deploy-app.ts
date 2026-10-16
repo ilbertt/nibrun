@@ -1,15 +1,20 @@
 import type { McpServer, StandardSchemaWithJSON } from '@modelcontextprotocol/server';
 import { appUrl } from '@repo/app-ui';
-import { AppIdSchema, FilenameSchema } from '@repo/protocol';
+import { FilenameSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
-import type { OwnerId } from '#lib/api/identifiers.ts';
+import { ArtifactIdSchema, type OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
+import {
+  appForDeployment,
+  DeploymentTargetSchema,
+} from '#lib/mcp/tools/shared/deployment-target.ts';
 import { handleToolResult } from '#lib/mcp/tools/shared/handle-tool-result.ts';
 import { registerTool } from '#lib/mcp/tools/shared/register-tool.ts';
+import { MCP_TOOL_NAMES } from '#lib/mcp/tools/shared/tool-names.ts';
 import { CreateArtifactBodySchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { DeploymentResponseSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
-import { AppResponseSchema, CreateAppRequestSchema } from '#routes/api/apps/model.ts';
+import { AppResponseSchema } from '#routes/api/apps/model.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
@@ -30,19 +35,19 @@ const ChatGptFileInputSchema = Type.Object(
 const DEFAULT_BINARY_FILENAME = Value.Parse(FilenameSchema, 'app');
 const DeployAppInputSchema = Type.Object(
   {
-    appId: Type.Optional(AppIdSchema),
-    name: Type.Optional(CreateAppRequestSchema.properties.name),
-    config: CreateAppRequestSchema.properties.config,
+    ...DeploymentTargetSchema.properties,
+    artifactId: Type.Optional(ArtifactIdSchema),
     url: Type.Optional(FetchedBinarySchema.properties.url),
     binary: Type.Optional(ChatGptFileInputSchema),
     sha256: FetchedBinarySchema.properties.sha256,
   },
   {
     additionalProperties: false,
-    oneOf: [{ required: ['url'] }, { required: ['binary'] }],
+    oneOf: [{ required: ['url'] }, { required: ['binary'] }, { required: ['artifactId'] }],
     allOf: [
-      { oneOf: [{ required: ['appId'] }, { required: ['name'] }] },
-      { not: { required: ['appId', 'config'] } },
+      ...DeploymentTargetSchema.allOf,
+      { not: { required: ['name', 'artifactId'] } },
+      { not: { required: ['sha256', 'artifactId'] } },
     ],
   },
 );
@@ -77,11 +82,10 @@ export function registerDeployAppTool({
 }) {
   registerTool({
     server,
-    name: 'deploy_app',
+    name: MCP_TOOL_NAMES.deployApp,
     config: {
       title: 'Deploy nibrun app',
-      description:
-        'Deploy a Linux x86_64 executable to your connected nibrun account. Supply a name and optional initial config to create an app, or appId to redeploy an existing app. Reuse the returned app.id for subsequent deployments. Supply exactly one source: a binary file when supported by the client, or a public HTTPS url. An optional SHA-256 verifies the downloaded file. This replaces the current release; calling again creates another deployment. A pending result does not mean the app is healthy.',
+      description: `Deploy a Linux x86_64 executable to your connected nibrun account. Supply a name and optional initial config to create an app, or appId to redeploy. Supply exactly one source: a binary file through native client file binding, a public HTTPS url, or an uploaded artifactId with appId. If native file binding is unavailable and the binary has no HTTPS download URL, first call ${MCP_TOOL_NAMES.prepareDeploy}, upload the bytes as it describes, then call this tool with its app.id and upload.artifactId. An optional sha256 verifies downloaded binaries. Reuse app.id for subsequent deployments. Each call creates a deployment and replaces the current release. A pending result is not confirmed healthy.`,
       inputSchema,
       outputSchema,
       annotations: {
@@ -92,42 +96,28 @@ export function registerDeployAppTool({
       },
       _meta: { 'openai/fileParams': ['binary'] },
     },
-    callback: handleToolResult(async function deployApp({
-      appId,
-      name,
-      config,
-      url,
-      binary,
-      sha256,
-    }: DeployAppInput): Promise<DeployAppOutput> {
-      const app =
-        appId === undefined
-          ? await appsService.create({
+    callback: handleToolResult(async function deployApp(
+      input: DeployAppInput,
+    ): Promise<DeployAppOutput> {
+      const { artifactId, url, binary, sha256 } = input;
+      const app = await appForDeployment({ appsService, ownerId, target: input });
+      const artifact =
+        artifactId === undefined
+          ? await artifactsService.createFromUrl({
+              appId: app.id,
               ownerId,
+              deploymentGrant: null,
               isAnonymous: false,
-              name: Value.Parse(CreateAppRequestSchema.properties.name, name),
-              config,
+              url: Value.Parse(FetchedBinarySchema.properties.url, binary?.download_url ?? url),
+              filename:
+                binary === undefined
+                  ? undefined
+                  : Value.Check(FilenameSchema, binary.file_name)
+                    ? binary.file_name
+                    : DEFAULT_BINARY_FILENAME,
+              sha256,
             })
-          : await appsService.get({ appId, ownerId });
-      const sourceUrl = Value.Parse(
-        FetchedBinarySchema.properties.url,
-        binary?.download_url ?? url,
-      );
-      const filename =
-        binary === undefined
-          ? undefined
-          : Value.Check(FilenameSchema, binary.file_name)
-            ? binary.file_name
-            : DEFAULT_BINARY_FILENAME;
-      const artifact = await artifactsService.createFromUrl({
-        appId: app.id,
-        ownerId,
-        deploymentGrant: null,
-        isAnonymous: false,
-        url: sourceUrl,
-        filename,
-        sha256,
-      });
+          : await artifactsService.completeUpload({ appId: app.id, ownerId, artifactId });
       const deployment = await deploymentsService.createOrRollback({
         appId: app.id,
         ownerId,

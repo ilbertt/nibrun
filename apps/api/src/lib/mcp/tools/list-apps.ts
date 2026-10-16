@@ -4,6 +4,7 @@ import type { OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import { handleToolResult } from '#lib/mcp/tools/shared/handle-tool-result.ts';
 import { registerTool } from '#lib/mcp/tools/shared/register-tool.ts';
+import { MCP_TOOL_NAMES } from '#lib/mcp/tools/shared/tool-names.ts';
 import { ListAppsResponseSchema } from '#routes/api/apps/model.ts';
 import type { AppsService } from '#services/apps.service.ts';
 
@@ -23,7 +24,7 @@ export function registerListAppsTool({
 }) {
   registerTool({
     server,
-    name: 'list_apps',
+    name: MCP_TOOL_NAMES.listApps,
     config: {
       title: 'List nibrun apps',
       description: 'List the apps owned by your connected nibrun account.',
