@@ -141,15 +141,15 @@ export const DEPLOY_PRESETS = {
   sharkord: {
     isRecommended: false,
     projectUrl: 'https://github.com/sharkord/sharkord',
-    version: 'v0.0.27',
+    version: 'v0.0.28',
     markdownContent: sharkordPage,
     category: DeployCategory.Communication,
     title: 'Sharkord',
     subtitle: 'A self-hosted chat server with voice, video and screen sharing.',
     deployLink: {
       name: 'sharkord',
-      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.27/sharkord-linux-x64',
-      sha256: '49dbfd371dc72191e8fc6388652752fd772c3365e081f740ed55e9b57cbab47c',
+      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.28/sharkord-linux-x64',
+      sha256: '1a5680513ce43a31cccccfef1696794ea25a250baf61c3aa8acfe440f5dbe9b6',
       port: 4991,
       'extra-public-port': true,
       env: [
