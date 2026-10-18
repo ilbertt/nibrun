@@ -1,0 +1,22 @@
+{
+  "name": "@repo/chatgpt-plugin",
+  "version": "0.1.2",
+  "description": "Create apps with your AI assistant and keep control of your app and data.",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "build": "bun run scripts/build.ts",
+    "check:types": "bun run --bun tsc"
+  },
+  "dependencies": {
+    "@repo/global-constants": "workspace:*",
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
