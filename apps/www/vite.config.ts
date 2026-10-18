@@ -1,5 +1,5 @@
 import { cloudflare } from '@cloudflare/vite-plugin';
-import { WWW_DEPLOY_PATH } from '@repo/global-constants';
+import { LLMS_TXT_PATH, WWW_DEPLOY_PATH, WWW_SITE } from '@repo/global-constants';
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import viteReact from '@vitejs/plugin-react';
@@ -16,7 +16,21 @@ const config = defineConfig({
     tanstackStart({
       prerender: {
         enabled: true,
-        filter: (page) => !answeredByWorker(page.path),
+        filter: (page) => {
+          const exclude =
+            answeredByWorker(page.path) ||
+            page.path === LLMS_TXT_PATH ||
+            /[?#]/.test(page.path) ||
+            (page.path !== '/' && page.path.endsWith('/'));
+
+          // TanStack keeps filtered pages for sitemap generation, so exclude them explicitly.
+          page.sitemap = { ...page.sitemap, exclude };
+          return !exclude;
+        },
+      },
+      sitemap: {
+        enabled: true,
+        host: WWW_SITE.url,
       },
     }),
     viteReact(),
