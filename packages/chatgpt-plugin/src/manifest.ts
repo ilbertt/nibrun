@@ -13,15 +13,15 @@ export function createManifest() {
       'com.openai': {
         interface: {
           displayName: PRODUCT_NAME,
-          shortDescription: 'Build and deploy web apps',
+          shortDescription: 'Build an app. Keep it yours.',
           longDescription:
-            'Create and deploy apps to your connected nibrun account. When you have not chosen a stack, start webapps from the Bun full-stack starter or Telegram bots from the Bun Telegram starter. Compile a self-contained Linux x86_64 executable, deploy it through nibrun, and check its deployment status and HTTPS URL. You can also list your apps and inspect their configuration and newest deployment.',
-          category: 'Other',
+            'Describe your idea and turn it into a working app with your AI assistant. Get it online without servers or separate databases to manage. Keep improving it through conversation, switch assistants whenever you choose, and export your app and data when you want to take them elsewhere. Your app stays yours.',
+          category: 'Developer Tools',
           capabilities: [],
           defaultPrompt: [
-            'Create a webapp for my tennis club that collects emails for a future newsletter.',
-            'Show my nibrun apps.',
-            'Deploy the app I just built to nibrun.',
+            'Create a signup page for my tennis club that collects emails for a future newsletter.',
+            'Build a booking app for my tutoring sessions where students can choose an available time.',
+            'Build a Telegram bot that saves links I send and lets me search them later.',
           ],
           websiteURL: WWW_SITE.url,
           logo: './assets/logo.png',
