@@ -4,6 +4,7 @@ import { Button } from '@repo/ui/components/button';
 import { Spinner } from '@repo/ui/components/spinner';
 import { CheckIcon, TriangleAlertIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
+import { AppLimitReached } from '#components/deploy/app-limit-reached.tsx';
 import { UploadMeter } from '#components/deploy/upload-meter.tsx';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import { type DeployPhase, isUploading } from '#lib/hooks/use-run-app.ts';
@@ -72,7 +73,9 @@ export function DeployProgress({ done, goToApp }: { done: ReactNode; goToApp: ()
         </div>
       )}
 
-      {run.reason !== undefined && (
+      {run.appsAllowed !== undefined && <AppLimitReached appsAllowed={run.appsAllowed} />}
+
+      {run.reason !== undefined && run.appsAllowed === undefined && (
         <p className="flex items-start gap-2 rounded-2xl bg-destructive/10 px-3 py-2 text-destructive text-sm">
           <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
           <span className="wrap-anywhere">{run.reason}</span>
