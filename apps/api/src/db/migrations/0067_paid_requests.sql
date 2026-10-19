@@ -2,14 +2,16 @@ CREATE TABLE nibrun.paid_requests (
   id uuid PRIMARY KEY DEFAULT uuidv7(),
   owner_id text NOT NULL REFERENCES auth."user" (id) ON DELETE CASCADE,
   request_type text NOT NULL,
-  amount integer,
+  requested_apps_amount integer,
   created_at timestamptz GENERATED ALWAYS AS (uuid_extract_timestamp(id)) VIRTUAL,
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT paid_requests_owner_type_key UNIQUE (owner_id, request_type),
   CONSTRAINT paid_requests_type_check CHECK (request_type IN ('apps')),
-  CONSTRAINT paid_requests_amount_check CHECK (amount > 0),
-  CONSTRAINT paid_requests_apps_amount_check CHECK (
-    request_type <> 'apps' OR (amount IS NOT NULL AND amount <= 100)
+  CONSTRAINT paid_requests_requested_apps_amount_check CHECK (
+    CASE WHEN request_type = 'apps'
+      THEN requested_apps_amount IS NOT NULL AND requested_apps_amount BETWEEN 1 AND 100
+      ELSE requested_apps_amount IS NULL
+    END
   )
 );
 

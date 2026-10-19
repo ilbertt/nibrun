@@ -26,5 +26,8 @@ export class PaidRequestsService extends Service {
 }
 
 function paidRequest(row: PaidRequestRow): PaidRequest {
-  return Value.Parse(PaidRequestSchema, { requestType: row.request_type, amount: row.amount });
+  return Value.Parse(PaidRequestSchema, {
+    requestType: row.request_type,
+    amount: row.requested_apps_amount,
+  });
 }

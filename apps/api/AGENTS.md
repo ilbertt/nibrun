@@ -110,6 +110,10 @@ graph is constructed, so an earlier import would pin the wrong environment.
 Raw SQL via `Bun.sql` (`src/db/client.ts`), no ORM. Always schema-qualify
 (`nibrun.*`).
 
+Paid-request values live in feature-specific columns, such as `requested_apps_amount`.
+Each column's `CHECK` requires a valid, non-null value for its matching `request_type`
+and `NULL` for every other type. Apply the same rule when adding paid-request types.
+
 Migrations are ordered `src/db/migrations/NNNN_*.sql`, applied on startup by
 `src/db/migrate.ts`. Add one by dropping in the next-numbered file. The runner's
 ledger lives in the `api_migrations` schema — never put app tables there.
