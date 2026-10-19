@@ -44,7 +44,7 @@ export function PaidAppsRequestForm() {
       {form.savedAmount !== undefined && (
         <p role="status" className="text-sm">
           Thanks! We recorded your request for {form.savedAmount} app
-          {form.savedAmount === 1 ? '' : 's'} in total. You can update it here anytime.
+          {form.savedAmount === 1 ? '' : 's'} in total.
         </p>
       )}
     </form>
