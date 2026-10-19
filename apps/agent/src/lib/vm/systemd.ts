@@ -2,13 +2,9 @@ import { join } from 'node:path';
 import { type AppId, AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
+import { parsePropertyBlocks } from '#lib/systemd-properties.ts';
 import { consoleFailure, GUEST_LOG_PREFIX } from '#lib/vm/failure.ts';
-import {
-  parsePropertyBlocks,
-  SHOWN_PROPERTIES,
-  type UnitStatus,
-  unitStatusFrom,
-} from '#lib/vm/unit-status.ts';
+import { SHOWN_PROPERTIES, type UnitStatus, unitStatusFrom } from '#lib/vm/unit-status.ts';
 import { run, stdoutOf } from '#services/command-runner.service.ts';
 
 const SYSTEMCTL = 'systemctl';
