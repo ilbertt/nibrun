@@ -6,7 +6,7 @@ import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
 
 const { auth, AppsServicePlugin, PaidRequestsServicePlugin } = await import('#services/plugins.ts');
 const URL = `${ORIGIN}/api/paid-requests`;
-const REQUEST = { requestType: 'apps' as const, amount: 10 };
+const REQUEST = { requestType: 'apps' as const, requestedAppsAmount: 10 };
 const APPS_ALLOWED = 3;
 
 afterEach(function restoreMocks() {
@@ -15,8 +15,13 @@ afterEach(function restoreMocks() {
 
 test('paid requests require a registered account', async () => {
   expect(
-    (await sendJson({ method: 'PUT', url: `${URL}/apps`, body: { amount: REQUEST.amount } }))
-      .status,
+    (
+      await sendJson({
+        method: 'PUT',
+        url: `${URL}/apps`,
+        body: { requestedAppsAmount: REQUEST.requestedAppsAmount },
+      })
+    ).status,
   ).toBe(StatusMap.Unauthorized);
   const anonymous = await auth.api.signInAnonymous({ returnHeaders: true });
   const headers = { authorization: `Bearer ${anonymous.response.token}` };
@@ -25,7 +30,7 @@ test('paid requests require a registered account', async () => {
       await sendJson({
         method: 'PUT',
         url: `${URL}/apps`,
-        body: { amount: REQUEST.amount },
+        body: { requestedAppsAmount: REQUEST.requestedAppsAmount },
         headers,
       })
     ).status,
@@ -40,7 +45,7 @@ test('saving a request uses the authenticated owner', async () => {
   const saved = await sendJson({
     method: 'PUT',
     url: `${URL}/apps`,
-    body: { amount: REQUEST.amount },
+    body: { requestedAppsAmount: REQUEST.requestedAppsAmount },
     headers,
   });
   expect(saved.status).toBe(StatusMap.OK);
@@ -56,21 +61,28 @@ test('the API refuses unsupported types, invalid totals and owner spoofing', asy
     'save',
   ).mockResolvedValue(REQUEST);
   for (const body of [
-    { amount: 0 },
-    { amount: 101 },
-    { amount: 1.5 },
-    { amount: '10' },
-    { amount: null },
+    { requestedAppsAmount: 0 },
+    { requestedAppsAmount: 101 },
+    { requestedAppsAmount: 1.5 },
+    { requestedAppsAmount: '10' },
+    { requestedAppsAmount: null },
     {},
-    { amount: 10, ownerId: 'someone-else' },
+    { amount: 10 },
+    { requestedAppsAmount: 10, ownerId: 'someone-else' },
   ]) {
     expect((await sendJson({ method: 'PUT', url: `${URL}/apps`, body, headers })).status).toBe(
       StatusMap['Bad Request'],
     );
   }
   expect(
-    (await sendJson({ method: 'PUT', url: `${URL}/custom-domain`, body: { amount: 10 }, headers }))
-      .status,
+    (
+      await sendJson({
+        method: 'PUT',
+        url: `${URL}/custom-domain`,
+        body: { requestedAppsAmount: 10 },
+        headers,
+      })
+    ).status,
   ).toBe(StatusMap['Bad Request']);
   expect(save).not.toHaveBeenCalled();
 });

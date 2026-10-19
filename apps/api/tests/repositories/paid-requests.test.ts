@@ -42,7 +42,7 @@ async function savedRequests(ownerId: OwnerId): Promise<PaidRequestRow[]> {
 }
 
 test('repeated and concurrent submissions keep one latest request per owner and type', async () => {
-  const request = { requestType: 'apps' as const, amount: 10 };
+  const request = { requestType: 'apps' as const, requestedAppsAmount: 10 };
   await Promise.all([
     repository().save({ ownerId: OWNER_ID, request }),
     repository().save({ ownerId: OWNER_ID, request }),
@@ -52,10 +52,10 @@ test('repeated and concurrent submissions keep one latest request per owner and 
     [OWNER_ID],
   );
   expect(before.created_at).toBeInstanceOf(Date);
-  const updated = { ...request, amount: 100 };
+  const updated = { ...request, requestedAppsAmount: 100 };
   expect(await repository().save({ ownerId: OWNER_ID, request: updated })).toEqual({
     request_type: 'apps',
-    requested_apps_amount: updated.amount,
+    requested_apps_amount: updated.requestedAppsAmount,
   });
   const [after] = await sql.unsafe(
     'SELECT id, created_at, updated_at FROM nibrun.paid_requests WHERE owner_id = $1',
@@ -65,14 +65,17 @@ test('repeated and concurrent submissions keep one latest request per owner and 
   expect(after.created_at).toEqual(before.created_at);
   expect(after.updated_at.getTime()).toBeGreaterThanOrEqual(before.updated_at.getTime());
   expect(await savedRequests(OWNER_ID)).toEqual([
-    { request_type: 'apps', requested_apps_amount: updated.amount },
+    { request_type: 'apps', requested_apps_amount: updated.requestedAppsAmount },
   ]);
 });
 
 test('another owner’s submission cannot overwrite the first owner’s request', async () => {
   const first = await savedRequests(OWNER_ID);
   expect(await savedRequests(OTHER_OWNER_ID)).toEqual([]);
-  await repository().save({ ownerId: OTHER_OWNER_ID, request: { requestType: 'apps', amount: 1 } });
+  await repository().save({
+    ownerId: OTHER_OWNER_ID,
+    request: { requestType: 'apps', requestedAppsAmount: 1 },
+  });
   expect(await savedRequests(OWNER_ID)).toEqual(first);
   expect(await savedRequests(OTHER_OWNER_ID)).toEqual([
     { request_type: 'apps', requested_apps_amount: 1 },
