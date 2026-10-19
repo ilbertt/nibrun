@@ -64,6 +64,9 @@ the layout under `src/commands/` is the command tree.
   command like any other — can run at all. What stops an unauthenticated
   request is `requireSignedIn` in a `beforeHandler`. A new command that talks to
   the api needs that line, or its failure is a bare 401.
+- `nib paid-request apps` records the owner's requested total app count (1–100),
+  replacing their previous request. It prompts in a terminal; scripts and `--json`
+  require `--amount`. App-limit refusals point to this command.
 - `nib run <binary> --github-trusted-oidc --app-id <id>` deploys an existing app
   from GitHub Actions with `id-token: write`. It obtains temporary credentials in
   memory and uses only the binary upload and deployment-creation endpoints. It
