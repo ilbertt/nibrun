@@ -20,6 +20,14 @@ export async function createPluginArchive() {
         [PRODUCT_NAME]: {
           type: 'streamable-http',
           url: new URL('/mcp', DASHBOARD_SITE.url).href,
+          extensions: {
+            'com.openai': {
+              auth: {
+                type: 'oauth',
+                client: { mode: 'cimd' },
+              },
+            },
+          },
         },
       },
     }),
