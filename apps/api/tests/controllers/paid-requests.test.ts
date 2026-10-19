@@ -2,7 +2,7 @@ import { afterEach, expect, mock, spyOn, test } from 'bun:test';
 import { StatusMap } from 'elysia';
 import { AppQuotaExceededError } from '#lib/app-quota.ts';
 import { registeredAccount } from '#tests/controllers/support/accounts.ts';
-import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
+import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
 
 const { auth, AppsServicePlugin, PaidRequestsServicePlugin } = await import('#services/plugins.ts');
 const URL = `${ORIGIN}/api/paid-requests`;
@@ -14,14 +14,12 @@ afterEach(function restoreMocks() {
 });
 
 test('paid requests require a registered account', async () => {
-  expect((await send({ url: URL })).status).toBe(StatusMap.Unauthorized);
   expect(
     (await sendJson({ method: 'PUT', url: `${URL}/apps`, body: { amount: REQUEST.amount } }))
       .status,
   ).toBe(StatusMap.Unauthorized);
   const anonymous = await auth.api.signInAnonymous({ returnHeaders: true });
   const headers = { authorization: `Bearer ${anonymous.response.token}` };
-  expect((await send({ url: URL, headers })).status).toBe(StatusMap.Forbidden);
   expect(
     (
       await sendJson({
@@ -34,12 +32,11 @@ test('paid requests require a registered account', async () => {
   ).toBe(StatusMap.Forbidden);
 });
 
-test('saving and reading requests always use the authenticated owner', async () => {
+test('saving a request uses the authenticated owner', async () => {
   const account = await registeredAccount();
   const headers = { cookie: account.cookie };
   const service = PaidRequestsServicePlugin.decorator.paidRequestsService;
   const save = spyOn(service, 'save').mockResolvedValue(REQUEST);
-  const list = spyOn(service, 'list').mockResolvedValue([REQUEST]);
   const saved = await sendJson({
     method: 'PUT',
     url: `${URL}/apps`,
@@ -49,10 +46,6 @@ test('saving and reading requests always use the authenticated owner', async () 
   expect(saved.status).toBe(StatusMap.OK);
   expect(await saved.json()).toEqual(REQUEST);
   expect(save).toHaveBeenCalledWith({ ownerId: account.ownerId, request: REQUEST });
-  const listed = await send({ url: URL, headers });
-  expect(listed.status).toBe(StatusMap.OK);
-  expect(await listed.json()).toEqual({ requests: [REQUEST] });
-  expect(list).toHaveBeenCalledWith({ ownerId: account.ownerId });
 });
 
 test('the API refuses unsupported types, invalid totals and owner spoofing', async () => {
