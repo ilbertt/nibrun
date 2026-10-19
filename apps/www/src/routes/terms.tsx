@@ -1,4 +1,4 @@
-import { HELLO_EMAIL, WWW_PRIVACY_PATH, WWW_TERMS_PATH } from '@repo/global-constants';
+import { SUPPORT_EMAIL, WWW_PRIVACY_PATH, WWW_TERMS_PATH } from '@repo/global-constants';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ContentPage } from '#components/content-page.tsx';
 import { pageHead } from '#lib/page-head.ts';
@@ -97,8 +97,8 @@ function TermsPage() {
       <p>
         The <Link to={WWW_PRIVACY_PATH}>privacy policy</Link> explains how nibrun processes
         information and how to make a privacy request. These terms may be updated on this page with
-        a revised date. Contact <a href={`mailto:${HELLO_EMAIL}`}>{HELLO_EMAIL}</a> with questions
-        about the service or these terms.
+        a revised date. Contact <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> with
+        questions about the service or these terms.
       </p>
     </ContentPage>
   );

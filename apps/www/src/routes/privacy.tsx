@@ -1,4 +1,4 @@
-import { HELLO_EMAIL, WWW_PRIVACY_PATH } from '@repo/global-constants';
+import { SUPPORT_EMAIL, WWW_PRIVACY_PATH } from '@repo/global-constants';
 import { createFileRoute } from '@tanstack/react-router';
 import { ContentPage } from '#components/content-page.tsx';
 import { pageHead } from '#lib/page-head.ts';
@@ -22,7 +22,7 @@ function PrivacyPage() {
       </p>
       <p>
         This policy covers the nibrun website, dashboard, CLI, and MCP integration. For privacy
-        questions or requests, contact <a href={`mailto:${HELLO_EMAIL}`}>{HELLO_EMAIL}</a>.
+        questions or requests, contact <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 
       <h2>Information we process</h2>
@@ -138,8 +138,8 @@ function PrivacyPage() {
         fulfilling a request.
       </p>
       <p>
-        Send requests to <a href={`mailto:${HELLO_EMAIL}`}>{HELLO_EMAIL}</a>. Requests about data
-        collected by an app hosted on nibrun should normally go to that app’s operator.
+        Send requests to <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Requests about
+        data collected by an app hosted on nibrun should normally go to that app’s operator.
       </p>
     </ContentPage>
   );

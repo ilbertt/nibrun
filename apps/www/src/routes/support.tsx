@@ -1,4 +1,4 @@
-import { GITHUB_REPO_URL, HELLO_EMAIL, WWW_SUPPORT_PATH } from '@repo/global-constants';
+import { GITHUB_REPO_URL, SUPPORT_EMAIL, WWW_SUPPORT_PATH } from '@repo/global-constants';
 import { createFileRoute } from '@tanstack/react-router';
 import { ContentPage } from '#components/content-page.tsx';
 import { pageHead } from '#lib/page-head.ts';
@@ -18,7 +18,7 @@ function SupportPage() {
     <ContentPage title={TITLE} description={DESCRIPTION}>
       <h2>Get in touch</h2>
       <p>
-        Email <a href={`mailto:${HELLO_EMAIL}`}>{HELLO_EMAIL}</a> for help with nibrun, account
+        Email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> for help with nibrun, account
         access, deployments, or privacy requests.
       </p>
       <p>
