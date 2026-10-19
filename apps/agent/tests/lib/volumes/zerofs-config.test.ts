@@ -69,6 +69,12 @@ describe('per-app ZeroFS configuration', () => {
     expect(config).toHaveProperty('aws.session_token', 'session-token');
   });
 
+  test('an omitted region uses a fixed signing region instead of the host environment', () => {
+    const config = Bun.TOML.parse(rendered({ storage: storage({ region: undefined }) }));
+    expect(config).toHaveProperty('aws.region', 'us-east-1');
+    expect(config).not.toHaveProperty('aws.session_token');
+  });
+
   test('escapes TOML syntax and prevents ZeroFS from expanding tenant dollar signs', () => {
     const config = Bun.TOML.parse(
       rendered({

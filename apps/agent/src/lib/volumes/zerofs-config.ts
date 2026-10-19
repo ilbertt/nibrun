@@ -16,6 +16,7 @@ type ZerofsConfig = {
 };
 
 const FLUSH_INTERVAL_SECONDS = 5;
+const DEFAULT_S3_SIGNING_REGION = 'us-east-1';
 
 // ZeroFS expands environment references after parsing TOML, including inside secrets.
 function tomlString(value: string): string {
@@ -47,7 +48,7 @@ export function renderZerofsConfig({ storage, cache, sockets, readOnly }: Zerofs
     '',
     '[aws]',
     `endpoint = ${tomlString(storage.endpoint)}`,
-    `region = ${tomlString(storage.region)}`,
+    `region = ${tomlString(storage.region ?? DEFAULT_S3_SIGNING_REGION)}`,
     `access_key_id = ${tomlString(storage.accessKeyId)}`,
     `secret_access_key = ${tomlString(storage.secretAccessKey)}`,
     ...(storage.sessionToken === undefined

@@ -26,6 +26,11 @@ describe('external volume storage', () => {
     );
   });
 
+  test('allows providers without a region while rejecting an empty override', () => {
+    expect(Value.Check(S3VolumeStorageSchema, storage({ region: undefined }))).toBe(true);
+    expect(Value.Check(S3VolumeStorageSchema, storage({ region: '' }))).toBe(false);
+  });
+
   test('requires explicit credentials and an encryption password', () => {
     for (const name of ['accessKeyId', 'secretAccessKey', 'encryptionPassword']) {
       expect(Value.Check(S3VolumeStorageSchema, storage({ [name]: undefined }))).toBe(false);

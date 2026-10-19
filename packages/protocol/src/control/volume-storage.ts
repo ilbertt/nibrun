@@ -7,7 +7,7 @@ export const S3VolumeStorageSchema = Type.Object({
   endpoint: Type.String({ pattern: '^https://[^\\s]+$' }),
   bucket: Type.String({ pattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$' }),
   prefix: ObjectKeySchema,
-  region: Type.String({ minLength: 1 }),
+  region: Type.Optional(Type.String({ minLength: 1 })),
   accessKeyId: secretString({ minLength: 1 }),
   secretAccessKey: secretString({ minLength: 1 }),
   sessionToken: Type.Optional(secretString({ minLength: 1 })),
