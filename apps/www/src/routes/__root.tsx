@@ -4,6 +4,7 @@ import { Toaster } from '@repo/ui/components/sonner';
 import appCss from '@repo/ui/globals.css?url';
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
+import { SiteFooter } from '#components/site-footer.tsx';
 import { themeScript } from '#lib/theme-script.ts';
 
 export const Route = createRootRoute({
@@ -40,6 +41,7 @@ function RootDocument({ children }: { children: ReactNode }) {
       </head>
       <body>
         {children}
+        <SiteFooter />
         <Toaster />
         <Scripts />
       </body>

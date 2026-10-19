@@ -39,3 +39,8 @@ export const DASHBOARD_SITE = site({
 });
 
 export const HELLO_EMAIL = `hello@${BASE_DOMAIN}`;
+export const SUPPORT_EMAIL = `support@${BASE_DOMAIN}`;
+
+export const WWW_SUPPORT_PATH = '/support';
+export const WWW_PRIVACY_PATH = '/privacy';
+export const WWW_TERMS_PATH = '/terms';
