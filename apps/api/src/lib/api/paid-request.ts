@@ -5,7 +5,7 @@ export const PaidRequestSchema = Type.Union([
   Type.Object(
     {
       requestType: Type.Literal('apps'),
-      amount: Type.Integer({
+      requestedAppsAmount: Type.Integer({
         minimum: MIN_PAID_APPS_REQUEST,
         maximum: MAX_PAID_APPS_REQUEST,
         description: 'The total number of apps this account would like to have.',
