@@ -10,6 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as SupportRouteImport } from './routes/support'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AppsIndexRouteImport } from './routes/apps/index'
 import { Route as AppsSlugRouteImport } from './routes/apps/$slug'
 import { Route as BlogIndexRouteImport } from './routes/blog/index'
@@ -18,6 +21,21 @@ import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppsIndexRoute = AppsIndexRouteImport.update({
@@ -43,6 +61,9 @@ const BlogSlugRoute = BlogSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/privacy': typeof PrivacyRoute
+  '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
   '/apps/$slug': typeof AppsSlugRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/apps/': typeof AppsIndexRoute
@@ -50,6 +71,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/privacy': typeof PrivacyRoute
+  '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
   '/apps/$slug': typeof AppsSlugRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/apps': typeof AppsIndexRoute
@@ -58,6 +82,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/privacy': typeof PrivacyRoute
+  '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
   '/apps/$slug': typeof AppsSlugRoute
   '/blog/$slug': typeof BlogSlugRoute
   '/apps/': typeof AppsIndexRoute
@@ -65,14 +92,42 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/apps/$slug' | '/blog/$slug' | '/apps/' | '/blog/'
+  fullPaths:
+    | '/'
+    | '/privacy'
+    | '/support'
+    | '/terms'
+    | '/apps/$slug'
+    | '/blog/$slug'
+    | '/apps/'
+    | '/blog/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/apps/$slug' | '/blog/$slug' | '/apps' | '/blog'
-  id: '__root__' | '/' | '/apps/$slug' | '/blog/$slug' | '/apps/' | '/blog/'
+  to:
+    | '/'
+    | '/privacy'
+    | '/support'
+    | '/terms'
+    | '/apps/$slug'
+    | '/blog/$slug'
+    | '/apps'
+    | '/blog'
+  id:
+    | '__root__'
+    | '/'
+    | '/privacy'
+    | '/support'
+    | '/terms'
+    | '/apps/$slug'
+    | '/blog/$slug'
+    | '/apps/'
+    | '/blog/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PrivacyRoute: typeof PrivacyRoute
+  SupportRoute: typeof SupportRoute
+  TermsRoute: typeof TermsRoute
   AppsSlugRoute: typeof AppsSlugRoute
   BlogSlugRoute: typeof BlogSlugRoute
   AppsIndexRoute: typeof AppsIndexRoute
@@ -86,6 +141,27 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/apps/': {
@@ -121,6 +197,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PrivacyRoute: PrivacyRoute,
+  SupportRoute: SupportRoute,
+  TermsRoute: TermsRoute,
   AppsSlugRoute: AppsSlugRoute,
   BlogSlugRoute: BlogSlugRoute,
   AppsIndexRoute: AppsIndexRoute,

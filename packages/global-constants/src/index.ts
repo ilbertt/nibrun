@@ -22,5 +22,8 @@ export {
   HELLO_EMAIL,
   PRODUCT_NAME,
   type Site,
+  WWW_PRIVACY_PATH,
   WWW_SITE,
+  WWW_SUPPORT_PATH,
+  WWW_TERMS_PATH,
 } from '#sites.ts';

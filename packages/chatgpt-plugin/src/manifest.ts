@@ -1,4 +1,11 @@
-import { GITHUB_REPO_URL, PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
+import {
+  GITHUB_REPO_URL,
+  PRODUCT_NAME,
+  WWW_PRIVACY_PATH,
+  WWW_SITE,
+  WWW_SUPPORT_PATH,
+  WWW_TERMS_PATH,
+} from '@repo/global-constants';
 import packageJson from '../package.json' with { type: 'json' };
 
 export function createManifest() {
@@ -24,6 +31,9 @@ export function createManifest() {
             'Build a Telegram bot that saves links I send and lets me search them later.',
           ],
           websiteURL: WWW_SITE.url,
+          supportURL: new URL(WWW_SUPPORT_PATH, WWW_SITE.url).href,
+          privacyPolicyURL: new URL(WWW_PRIVACY_PATH, WWW_SITE.url).href,
+          termsOfServiceURL: new URL(WWW_TERMS_PATH, WWW_SITE.url).href,
           logo: './assets/logo.png',
           composerIcon: './assets/composer-icon.png',
         },
