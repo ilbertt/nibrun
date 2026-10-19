@@ -3,24 +3,14 @@ import type { OwnerId } from '#lib/api/identifiers.ts';
 import type { PaidRequest } from '#lib/api/paid-request.ts';
 import { Repository } from '#repositories/repository.ts';
 
-export type PaidRequestRow = Queries['SelectPaidRequests'];
-export type PaidRequestsByOwnerInput = { ownerId: OwnerId };
-export type SavePaidRequestInput = PaidRequestsByOwnerInput & { request: PaidRequest };
+export type PaidRequestRow = Queries['UpsertPaidRequest'];
+export type SavePaidRequestInput = { ownerId: OwnerId; request: PaidRequest };
 
 export abstract class PaidRequestsRepositoryContract {
-  abstract list(input: PaidRequestsByOwnerInput): Promise<PaidRequestRow[]>;
   abstract save(input: SavePaidRequestInput): Promise<PaidRequestRow>;
 }
 
 export class PaidRequestsRepository extends Repository implements PaidRequestsRepositoryContract {
-  list({ ownerId }: PaidRequestsByOwnerInput): Promise<PaidRequestRow[]> {
-    return this.sql.SelectPaidRequests`
-      SELECT request_type, requested_apps_amount FROM nibrun.paid_requests
-      WHERE owner_id = ${ownerId}
-      ORDER BY request_type
-    `;
-  }
-
   async save({ ownerId, request }: SavePaidRequestInput): Promise<PaidRequestRow> {
     const [row] = await this.sql.UpsertPaidRequest`
       INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount)
