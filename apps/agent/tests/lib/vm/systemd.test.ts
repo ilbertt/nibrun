@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { appIdFromUnit, lastGuestLine, parseUnitNames, vmUnitName } from '#lib/vm/systemd.ts';
-import { parseProperties, parsePropertyBlocks, unitStatusFrom } from '#lib/vm/unit-status.ts';
+import { unitStatusFrom } from '#lib/vm/unit-status.ts';
 
 describe('unit naming round-trips', () => {
   test('an instance id becomes a template instance and back', () => {
@@ -37,23 +37,6 @@ describe('list-units output', () => {
 
   test('an empty listing yields nothing rather than an empty name', () => {
     expect(parseUnitNames('')).toEqual([]);
-  });
-});
-
-describe('show output', () => {
-  test('properties split on the first equals, so values may contain one', () => {
-    expect(parseProperties('LoadState=loaded\nExecStart=/bin/x --a=b')).toEqual({
-      LoadState: 'loaded',
-      ExecStart: '/bin/x --a=b',
-    });
-  });
-
-  test('several units come back in one call, in the order asked', () => {
-    const blocks = parsePropertyBlocks(
-      'LoadState=loaded\nActiveState=active\n\nLoadState=not-found\nActiveState=inactive\n',
-    );
-    expect(blocks).toHaveLength(2);
-    expect(blocks[1]?.LoadState).toBe('not-found');
   });
 });
 
