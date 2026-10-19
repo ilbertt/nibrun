@@ -45,11 +45,6 @@ export function PaidAppsRequestForm() {
           Choose {MIN_PAID_APPS_REQUEST}–{MAX_PAID_APPS_REQUEST} apps. This records your interest;
           your current limit stays the same.
         </FieldDescription>
-        {form.loadFailed && (
-          <FieldDescription>
-            Could not load your previous request. You can still send one.
-          </FieldDescription>
-        )}
         {form.error !== undefined && <FieldError role="alert">{form.error}</FieldError>}
       </Field>
       {form.savedAmount !== undefined && (
