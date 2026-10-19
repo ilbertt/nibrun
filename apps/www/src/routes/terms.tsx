@@ -71,21 +71,30 @@ function TermsPage() {
         credentials.
       </p>
       <p>
-        You are responsible for the behaviour and security of your apps, the information they
-        collect, and compliance with applicable law and third-party rights. Hosting isolation does
-        not supply authentication or access controls for your app’s own users.
+        You are responsible for the code, content, configuration, behaviour, and security of the
+        apps you deploy. This includes having the necessary rights to your content, securing your
+        users’ access, and meeting the legal requirements for information your apps collect and use.
+        Hosting isolation does not supply authentication or access controls for your app’s own
+        users.
+      </p>
+      <p>
+        Deploying an app does not mean that nibrun has reviewed or approved its code, content,
+        security, or legal compliance.
       </p>
 
-      <h2>Availability and backups</h2>
+      <h2>Availability, warranties, and backups</h2>
       <p>
-        Unless a separate written agreement says otherwise, nibrun is provided as available, without
-        a guaranteed service level. Maintenance, failures, and changes can interrupt service.
-        Persistent storage is not a substitute for an independent backup. Export and keep copies of
-        anything you cannot afford to lose.
+        To the extent permitted by applicable law, nibrun is provided “as is” and “as available”,
+        without express or implied warranties. Unless a separate written agreement says otherwise,
+        there is no guaranteed service level. Maintenance, failures, and changes can interrupt
+        service. Persistent storage is not a substitute for an independent backup. Export and keep
+        copies of anything you cannot afford to lose.
       </p>
       <p>
         Nothing in these terms excludes responsibilities or limits rights that cannot lawfully be
-        excluded or limited, including applicable consumer rights.
+        excluded or limited, including applicable consumer and data-protection rights. Your
+        responsibility for your apps does not remove obligations that applicable law places on
+        nibrun itself.
       </p>
 
       <h2>Suspension and ending use</h2>
