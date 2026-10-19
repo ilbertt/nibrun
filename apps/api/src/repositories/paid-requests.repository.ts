@@ -15,7 +15,7 @@ export abstract class PaidRequestsRepositoryContract {
 export class PaidRequestsRepository extends Repository implements PaidRequestsRepositoryContract {
   list({ ownerId }: PaidRequestsByOwnerInput): Promise<PaidRequestRow[]> {
     return this.sql.SelectPaidRequests`
-      SELECT request_type, amount FROM nibrun.paid_requests
+      SELECT request_type, requested_apps_amount FROM nibrun.paid_requests
       WHERE owner_id = ${ownerId}
       ORDER BY request_type
     `;
@@ -23,11 +23,12 @@ export class PaidRequestsRepository extends Repository implements PaidRequestsRe
 
   async save({ ownerId, request }: SavePaidRequestInput): Promise<PaidRequestRow> {
     const [row] = await this.sql.UpsertPaidRequest`
-      INSERT INTO nibrun.paid_requests (owner_id, request_type, amount)
+      INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount)
       VALUES (${ownerId}, ${request.requestType}, ${request.amount})
-      ON CONFLICT (owner_id, request_type) DO UPDATE SET amount = EXCLUDED.amount
+      ON CONFLICT (owner_id, request_type)
+      DO UPDATE SET requested_apps_amount = EXCLUDED.requested_apps_amount
       WHERE nibrun.paid_requests.owner_id = ${ownerId}
-      RETURNING request_type, amount
+      RETURNING request_type, requested_apps_amount
     `;
     if (!row) {
       throw new Error('Saving a paid request returned no row.');
