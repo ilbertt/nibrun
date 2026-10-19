@@ -2,6 +2,12 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.10.19-1]
+
+### 🚜 Refactor
+
+- Extract shared app presentation helpers (#942)
+
 ## [2026.10.14-2]
 
 ### 🐛 Bug Fixes
