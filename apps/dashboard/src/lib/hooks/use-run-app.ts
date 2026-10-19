@@ -1,4 +1,5 @@
 import type { Deployed, DeployStep, UploadProgress } from '@repo/app-operations';
+import { appQuotaExceeded } from '@repo/app-operations';
 import { useState } from 'react';
 import {
   type BinaryDelivery,
@@ -47,6 +48,7 @@ export type DeployRun = {
   progress: UploadProgress | undefined;
   deployed: Deployed | undefined;
   reason: string | undefined;
+  appsAllowed: number | undefined;
   start: (request: ReleaseRequest) => void;
   reset: () => void;
 };
@@ -71,6 +73,7 @@ export function useRunApp({
     progress,
     deployed: run.data,
     reason: run.error?.message,
+    appsAllowed: appQuotaExceeded(run.error)?.appsAllowed,
     start: (request) => {
       setSteps([]);
       setProgress(undefined);
