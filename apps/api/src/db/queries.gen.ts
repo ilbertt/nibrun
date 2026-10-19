@@ -1054,13 +1054,13 @@ export interface IForgetImportObjectResult {
 /** Result of query `SelectPaidRequests`. */
 export interface ISelectPaidRequestsResult {
     request_type: IPaidRequestsColumns["request_type"];
-    amount: IPaidRequestsColumns["amount"];
+    requested_apps_amount: IPaidRequestsColumns["requested_apps_amount"];
 }
 
 /** Result of query `UpsertPaidRequest`. */
 export interface IUpsertPaidRequestResult {
     request_type: IPaidRequestsColumns["request_type"];
-    amount: IPaidRequestsColumns["amount"];
+    requested_apps_amount: IPaidRequestsColumns["requested_apps_amount"];
 }
 
 /** Result of query `InsertSqliteConnection`. */
@@ -1830,7 +1830,7 @@ export interface IPaidRequestsColumns {
     id: string;
     owner_id: import("#lib/api/identifiers.ts").OwnerId;
     request_type: import("#lib/api/paid-request.ts").PaidRequest["requestType"];
-    amount: number | null;
+    requested_apps_amount: number | null;
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
@@ -2493,7 +2493,7 @@ export const schema = {
             id: { _columnName: "id", _foreignKeys: {} },
             owner_id: { _columnName: "owner_id", _foreignKeys: { paid_requests_owner_id_fkey: { _constraintName: "paid_requests_owner_id_fkey", _references: { _relationName: "user", _columnName: "id" } } } },
             request_type: { _columnName: "request_type", _foreignKeys: {} },
-            amount: { _columnName: "amount", _foreignKeys: {} },
+            requested_apps_amount: { _columnName: "requested_apps_amount", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} }
         },
@@ -2502,11 +2502,10 @@ export const schema = {
             paid_requests_pkey: { _indexName: "paid_requests_pkey" }
         },
         _constraints: {
-            paid_requests_amount_check: { _constraintName: "paid_requests_amount_check" },
-            paid_requests_apps_amount_check: { _constraintName: "paid_requests_apps_amount_check" },
             paid_requests_owner_id_fkey: { _constraintName: "paid_requests_owner_id_fkey" },
             paid_requests_owner_type_key: { _constraintName: "paid_requests_owner_type_key" },
             paid_requests_pkey: { _constraintName: "paid_requests_pkey" },
+            paid_requests_requested_apps_amount_check: { _constraintName: "paid_requests_requested_apps_amount_check" },
             paid_requests_type_check: { _constraintName: "paid_requests_type_check" }
         }
     },
