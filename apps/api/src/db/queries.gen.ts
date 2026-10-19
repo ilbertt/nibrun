@@ -1051,6 +1051,18 @@ export interface ISelectSpentImportsResult {
 export interface IForgetImportObjectResult {
 }
 
+/** Result of query `SelectPaidRequests`. */
+export interface ISelectPaidRequestsResult {
+    request_type: IPaidRequestsColumns["request_type"];
+    amount: IPaidRequestsColumns["amount"];
+}
+
+/** Result of query `UpsertPaidRequest`. */
+export interface IUpsertPaidRequestResult {
+    request_type: IPaidRequestsColumns["request_type"];
+    amount: IPaidRequestsColumns["amount"];
+}
+
 /** Result of query `InsertSqliteConnection`. */
 export interface IInsertSqliteConnectionResult {
     id: ISqliteConnectionsColumns["id"];
@@ -1205,6 +1217,8 @@ export interface Queries {
     DeleteAbandonedImport: IDeleteAbandonedImportResult;
     SelectSpentImports: ISelectSpentImportsResult;
     ForgetImportObject: IForgetImportObjectResult;
+    SelectPaidRequests: ISelectPaidRequestsResult;
+    UpsertPaidRequest: IUpsertPaidRequestResult;
     InsertSqliteConnection: IInsertSqliteConnectionResult;
     SelectSqliteConnectionsByApp: ISelectSqliteConnectionsByAppResult;
     SelectSqliteConnectionById: ISelectSqliteConnectionByIdResult;
@@ -1809,6 +1823,25 @@ export interface ILiveAppsTable {
     relationType: (typeof schema)["live_apps"]["_relationType"];
     indexes: keyof (typeof schema)["live_apps"]["_indexes"];
     constraints: keyof (typeof schema)["live_apps"]["_constraints"];
+}
+
+/** Columns of `paid_requests`. */
+export interface IPaidRequestsColumns {
+    id: string;
+    owner_id: import("#lib/api/identifiers.ts").OwnerId;
+    request_type: import("#lib/api/paid-request.ts").PaidRequest["requestType"];
+    amount: number | null;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+}
+
+/** Schema of `paid_requests`. */
+export interface IPaidRequestsTable {
+    columns: IPaidRequestsColumns;
+    relationType: (typeof schema)["paid_requests"]["_relationType"];
+    indexes: keyof (typeof schema)["paid_requests"]["_indexes"];
+    constraints: keyof (typeof schema)["paid_requests"]["_constraints"];
 }
 
 /** Columns of `profiles`. */
@@ -2453,6 +2486,30 @@ export const schema = {
         _indexes: {},
         _constraints: {}
     },
+    paid_requests: {
+        _relationName: "paid_requests",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            owner_id: { _columnName: "owner_id", _foreignKeys: { paid_requests_owner_id_fkey: { _constraintName: "paid_requests_owner_id_fkey", _references: { _relationName: "user", _columnName: "id" } } } },
+            request_type: { _columnName: "request_type", _foreignKeys: {} },
+            amount: { _columnName: "amount", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+        },
+        _indexes: {
+            paid_requests_owner_type_key: { _indexName: "paid_requests_owner_type_key" },
+            paid_requests_pkey: { _indexName: "paid_requests_pkey" }
+        },
+        _constraints: {
+            paid_requests_amount_check: { _constraintName: "paid_requests_amount_check" },
+            paid_requests_apps_amount_check: { _constraintName: "paid_requests_apps_amount_check" },
+            paid_requests_owner_id_fkey: { _constraintName: "paid_requests_owner_id_fkey" },
+            paid_requests_owner_type_key: { _constraintName: "paid_requests_owner_type_key" },
+            paid_requests_pkey: { _constraintName: "paid_requests_pkey" },
+            paid_requests_type_check: { _constraintName: "paid_requests_type_check" }
+        }
+    },
     profiles: {
         _relationName: "profiles",
         _relationType: "table",
@@ -2560,6 +2617,7 @@ export interface Tables {
     github_trusted_deployment_workflows: IGithubTrustedDeploymentWorkflowsTable;
     imports: IImportsTable;
     live_apps: ILiveAppsTable;
+    paid_requests: IPaidRequestsTable;
     profiles: IProfilesTable;
     purgeable_apps: IPurgeableAppsTable;
     sqlite_connections: ISqliteConnectionsTable;

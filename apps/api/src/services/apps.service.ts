@@ -24,13 +24,12 @@ import {
   toAppConfig,
 } from '#lib/app-config.ts';
 import { type PublicAppHostname, platformHostname, toAppHostname } from '#lib/app-hostname.ts';
-import { overAppQuota } from '#lib/app-quota.ts';
+import { AppQuotaExceededError } from '#lib/app-quota.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
 import type { AccountLink } from '#lib/auth/better-auth.ts';
 import {
   BadRequestError,
   ConflictError,
-  ForbiddenError,
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
@@ -249,7 +248,7 @@ export class AppsService extends Service {
     if (allowed === null) {
       return new Error('The owner refused an app has no quota.');
     }
-    return new ForbiddenError(overAppQuota(allowed));
+    return new AppQuotaExceededError(allowed);
   }
 
   /**

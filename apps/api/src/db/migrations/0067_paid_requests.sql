@@ -1,0 +1,21 @@
+CREATE TABLE nibrun.paid_requests (
+  id uuid PRIMARY KEY DEFAULT uuidv7(),
+  owner_id text NOT NULL REFERENCES auth."user" (id) ON DELETE CASCADE,
+  request_type text NOT NULL,
+  amount integer,
+  created_at timestamptz GENERATED ALWAYS AS (uuid_extract_timestamp(id)) VIRTUAL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT paid_requests_owner_type_key UNIQUE (owner_id, request_type),
+  CONSTRAINT paid_requests_type_check CHECK (request_type IN ('apps')),
+  CONSTRAINT paid_requests_amount_check CHECK (amount > 0),
+  CONSTRAINT paid_requests_apps_amount_check CHECK (
+    request_type <> 'apps' OR (amount IS NOT NULL AND amount <= 100)
+  )
+);
+
+COMMENT ON COLUMN nibrun.paid_requests.owner_id IS $c$@type import('#lib/api/identifiers.ts').OwnerId$c$;
+COMMENT ON COLUMN nibrun.paid_requests.request_type IS $c$@type import('#lib/api/paid-request.ts').PaidRequest['requestType']$c$;
+COMMENT ON COLUMN nibrun.paid_requests.created_at IS 'Derived from the uuidv7 id; the moment the row was created. @notNull';
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON nibrun.paid_requests
+  FOR EACH ROW EXECUTE FUNCTION nibrun.set_updated_at();

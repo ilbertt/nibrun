@@ -6,6 +6,7 @@ export {
   activationSummary,
   idleTimeoutLabel,
 } from '#activation.ts';
+export { appQuotaExceeded } from '#app-quota.ts';
 export {
   type AddressedDeployment,
   addressedDeployment,

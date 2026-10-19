@@ -5,6 +5,14 @@ type AppRoutes = ReturnType<PublicApiClient['api']['apps']>;
 type DeploymentRoutes = ReturnType<AppRoutes['deployments']>;
 
 export type App = Treaty.Data<AppRoutes['get']>;
+export type PaidRequest = Treaty.Data<
+  PublicApiClient['api']['paid-requests']['get']
+>['requests'][number];
+export type PaidRequestType = PaidRequest['requestType'];
+export type AppQuotaExceeded = Extract<
+  NonNullable<Treaty.Error<PublicApiClient['api']['apps']['post']>>['value'],
+  { appsAllowed: number }
+>;
 export type AppState = App['state'];
 export type AppActivation = App['activation'];
 export type AppHostname = App['hostnames'][number];

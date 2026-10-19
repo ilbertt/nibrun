@@ -1,0 +1,3 @@
+export const MIN_PAID_APPS_REQUEST = 1;
+export const MAX_PAID_APPS_REQUEST = 100;
+export const APP_QUOTA_EXCEEDED_CODE = 'APP_QUOTA_EXCEEDED';
