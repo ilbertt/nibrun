@@ -90,7 +90,7 @@ function responseFor([resource, init]: Parameters<typeof fetch>): Response {
   if (responseStatus !== SUCCESS_STATUS) {
     return Response.json({ error: 'Please retry this request.' }, { status: responseStatus });
   }
-  return Response.json({ requestType: 'apps', amount: body.amount });
+  return Response.json({ requestType: 'apps', requestedAppsAmount: body.requestedAppsAmount });
 }
 
 test('paid-request sends an authenticated total and emits one JSON result', async function requestApps() {
@@ -98,13 +98,15 @@ test('paid-request sends an authenticated total and emits one JSON result', asyn
     await paidRequestCli().run(['paid-request', 'apps', '--amount', String(ASKED_TOTAL), '--json']),
   ).toBe(0);
   expect(errors).toEqual([]);
-  expect(output).toEqual([`${JSON.stringify({ requestType: 'apps', amount: ASKED_TOTAL })}\n`]);
+  expect(output).toEqual([
+    `${JSON.stringify({ requestType: 'apps', requestedAppsAmount: ASKED_TOTAL })}\n`,
+  ]);
   expect(requests).toEqual([
     {
       url: `${API_URL}/api/paid-requests/apps`,
       method: 'PUT',
       authorization: `Bearer ${TOKEN}`,
-      body: { amount: ASKED_TOTAL },
+      body: { requestedAppsAmount: ASKED_TOTAL },
     },
   ]);
 });
@@ -115,7 +117,10 @@ test.each([MIN_PAID_APPS_REQUEST, MAX_PAID_APPS_REQUEST])(
     expect(
       await paidRequestCli().run(['paid-request', 'apps', '--amount', String(amount), '--json']),
     ).toBe(0);
-    expect(JSON.parse(output.join(''))).toEqual({ requestType: 'apps', amount });
+    expect(JSON.parse(output.join(''))).toEqual({
+      requestType: 'apps',
+      requestedAppsAmount: amount,
+    });
   },
 );
 

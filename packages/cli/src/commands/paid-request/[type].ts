@@ -29,13 +29,17 @@ export const command = defineCommand('paid-request [type]', {
       print,
       json: rootOptions.json,
     });
-    const amount = await requestedPaidAmount({
+    const requestedAppsAmount = await requestedPaidAmount({
       amount: options.amount,
       requestType: params.type,
       interactive,
     });
     emit(
-      unwrap(await context.api.api['paid-requests']({ requestType: params.type }).put({ amount })),
+      unwrap(
+        await context.api.api['paid-requests']({ requestType: params.type }).put({
+          requestedAppsAmount,
+        }),
+      ),
     );
   },
 });

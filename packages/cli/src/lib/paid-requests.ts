@@ -27,11 +27,15 @@ export const PAID_REQUEST_AMOUNT_SCHEMA = z
 export const PAID_REQUEST_HINT = `Run \`${PROGRAM_NAME} paid-request apps\` to tell us, or pass \`--amount <total>\` in scripts.`;
 
 export const PAID_REQUEST_OUTPUT = defineOutput({
-  schema: z.object({ requestType: PAID_REQUEST_TYPE_SCHEMA, amount: PAID_REQUEST_AMOUNT_SCHEMA }),
+  schema: z.object({
+    requestType: PAID_REQUEST_TYPE_SCHEMA,
+    requestedAppsAmount: PAID_REQUEST_AMOUNT_SCHEMA,
+  }),
   render: function renderRequest({ value, out }) {
-    const unit = REQUEST_LABELS[value.requestType].unit;
+    const { requestType, requestedAppsAmount } = value;
+    const unit = REQUEST_LABELS[requestType].unit;
     out.success(
-      `Thanks! We recorded your request for ${value.amount} ${unit}${value.amount === 1 ? '' : 's'} in total. Paid apps are coming.`,
+      `Thanks! We recorded your request for ${requestedAppsAmount} ${unit}${requestedAppsAmount === 1 ? '' : 's'} in total. Paid apps are coming.`,
     );
   },
 });
