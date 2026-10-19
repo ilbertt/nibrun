@@ -14,7 +14,7 @@ export class PaidRequestsRepository extends Repository implements PaidRequestsRe
   async save({ ownerId, request }: SavePaidRequestInput): Promise<PaidRequestRow> {
     const [row] = await this.sql.UpsertPaidRequest`
       INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount)
-      VALUES (${ownerId}, ${request.requestType}, ${request.amount})
+      VALUES (${ownerId}, ${request.requestType}, ${request.requestedAppsAmount})
       ON CONFLICT (owner_id, request_type)
       DO UPDATE SET requested_apps_amount = EXCLUDED.requested_apps_amount
       WHERE nibrun.paid_requests.owner_id = ${ownerId}
