@@ -108,9 +108,7 @@ const logsRepository = new LogsRepository(victoriaLogsClient);
 const githubActionsOidcRepository = new GitHubActionsOidcRepository();
 const githubDeploymentGrantsRepository = new GitHubDeploymentGrantsRepository(sql);
 const trustedWorkflowsRepository = new TrustedWorkflowsRepository(sql);
-const paidRequestsService = new PaidRequestsService({
-  requestsRepo: new PaidRequestsRepository(sql),
-});
+const paidRequestsRepository = new PaidRequestsRepository(sql);
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
@@ -141,6 +139,9 @@ const githubDeploymentTokensService = new GitHubDeploymentTokensService({
 });
 const trustedWorkflowsService = new TrustedWorkflowsService({
   workflowsRepo: trustedWorkflowsRepository,
+});
+const paidRequestsService = new PaidRequestsService({
+  requestsRepo: paidRequestsRepository,
 });
 const hostnamesService = new HostnamesService({
   hostnamesRepo: appHostnamesRepository,
