@@ -91,6 +91,7 @@ export {
   PROTOCOL_VERSION,
   PROTOCOL_VERSION_HEADER,
 } from '#control/transport.ts';
+export { type S3VolumeStorage, S3VolumeStorageSchema } from '#control/volume-storage.ts';
 export {
   EXTRA_PUBLIC_PORT_VALUES,
   interpolableRuntimeValue,
