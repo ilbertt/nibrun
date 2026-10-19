@@ -34,6 +34,18 @@ function socketSections(sockets: ZerofsConfig['sockets']): string[] {
   );
 }
 
+function authenticationSettings(auth: S3VolumeStorage['auth']): string[] {
+  if (auth.kind === 'anonymous') {
+    return ['skip_signature = "true"'];
+  }
+  return [
+    'skip_signature = "false"',
+    `access_key_id = ${tomlString(auth.accessKeyId)}`,
+    `secret_access_key = ${tomlString(auth.secretAccessKey)}`,
+    ...(auth.kind === 'session' ? [`session_token = ${tomlString(auth.sessionToken)}`] : []),
+  ];
+}
+
 export function renderZerofsConfig({ storage, cache, sockets, readOnly }: ZerofsConfig): string {
   return [
     '[cache]',
@@ -49,11 +61,7 @@ export function renderZerofsConfig({ storage, cache, sockets, readOnly }: Zerofs
     '[aws]',
     `endpoint = ${tomlString(storage.endpoint)}`,
     `region = ${tomlString(storage.region ?? DEFAULT_S3_SIGNING_REGION)}`,
-    `access_key_id = ${tomlString(storage.accessKeyId)}`,
-    `secret_access_key = ${tomlString(storage.secretAccessKey)}`,
-    ...(storage.sessionToken === undefined
-      ? []
-      : [`session_token = ${tomlString(storage.sessionToken)}`]),
+    ...authenticationSettings(storage.auth),
     'virtual_hosted_style_request = "false"',
     '',
     ...(readOnly

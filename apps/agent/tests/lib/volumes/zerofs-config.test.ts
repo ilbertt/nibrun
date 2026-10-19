@@ -10,8 +10,11 @@ function storage(overrides: Record<string, unknown> = {}): S3VolumeStorage {
     bucket: 'customer-data',
     prefix: 'apps/app-1',
     region: 'eu-central-1',
-    accessKeyId: 'customer-access-key',
-    secretAccessKey: 'customer-secret-key',
+    auth: {
+      kind: 'access-key',
+      accessKeyId: 'customer-access-key',
+      secretAccessKey: 'customer-secret-key',
+    },
     encryptionPassword: 'customer-filesystem-password',
     ...overrides,
   });
@@ -47,6 +50,7 @@ describe('per-app ZeroFS configuration', () => {
       aws: {
         endpoint: 'https://objects.example.com',
         region: 'eu-central-1',
+        skip_signature: 'false',
         access_key_id: 'customer-access-key',
         secret_access_key: 'customer-secret-key',
         virtual_hosted_style_request: 'false',
@@ -64,9 +68,31 @@ describe('per-app ZeroFS configuration', () => {
 
   test('preserves temporary credentials', () => {
     const config = Bun.TOML.parse(
-      rendered({ storage: storage({ sessionToken: 'session-token' }) }),
+      rendered({
+        storage: storage({
+          auth: {
+            kind: 'session',
+            accessKeyId: 'temporary-access-key',
+            secretAccessKey: 'temporary-secret-key',
+            sessionToken: 'session-token',
+          },
+        }),
+      }),
     );
+    expect(config).toHaveProperty('aws.skip_signature', 'false');
+    expect(config).toHaveProperty('aws.access_key_id', 'temporary-access-key');
+    expect(config).toHaveProperty('aws.secret_access_key', 'temporary-secret-key');
     expect(config).toHaveProperty('aws.session_token', 'session-token');
+  });
+
+  test('anonymous access disables signing without emitting credentials', () => {
+    const config = Bun.TOML.parse(rendered({ storage: storage({ auth: { kind: 'anonymous' } }) }));
+    expect(config).toHaveProperty('aws', {
+      endpoint: 'https://objects.example.com',
+      region: 'eu-central-1',
+      skip_signature: 'true',
+      virtual_hosted_style_request: 'false',
+    });
   });
 
   test('an omitted region uses a fixed signing region instead of the host environment', () => {
@@ -79,7 +105,11 @@ describe('per-app ZeroFS configuration', () => {
     const config = Bun.TOML.parse(
       rendered({
         storage: storage({
-          secretAccessKey: `quotes"\\\n\${AWS_SECRET_ACCESS_KEY}`,
+          auth: {
+            kind: 'access-key',
+            accessKeyId: 'customer-access-key',
+            secretAccessKey: `quotes"\\\n\${AWS_SECRET_ACCESS_KEY}`,
+          },
           encryptionPassword: `$literal-\${HOME}`,
           prefix: 'apps/data #1?version=2',
         }),
