@@ -28,6 +28,7 @@ import type { command as appsStatusCmd } from './commands/apps/status.ts';
 import type { command as appsSuspendCmd } from './commands/apps/suspend.ts';
 import type { command as appsUpdateCmd } from './commands/apps/update.ts';
 import type { command as loginCmd } from './commands/login.ts';
+import type { command as paidrequestCmd } from './commands/paid-request.ts';
 import type { command as rootCmd } from './commands/_root.ts';
 import type { command as runCommandCmd } from './commands/run/[command].ts';
 import type { command as serveDirectoryCmd } from './commands/serve/[directory].ts';
@@ -206,6 +207,10 @@ declare module '@parshjs/core' {
       rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'login': {
+      parents: {};
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'paid-request': {
       parents: {};
       rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
@@ -422,6 +427,12 @@ export const commandTree: RuntimeNode = {
     'login': {
       segment: { kind: 'literal', value: 'login' },
       command: { path: 'login', load: () => import('./commands/login.ts').then((m) => m.command) },
+      literalChildren: {},
+      paramChild: null,
+    },
+    'paid-request': {
+      segment: { kind: 'literal', value: 'paid-request' },
+      command: { path: 'paid-request', load: () => import('./commands/paid-request.ts').then((m) => m.command) },
       literalChildren: {},
       paramChild: null,
     },

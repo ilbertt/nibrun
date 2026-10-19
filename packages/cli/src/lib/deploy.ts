@@ -1,7 +1,9 @@
 import { basename } from 'node:path';
 import type { Sha256Digest, TenantArguments } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
+import { ApiError } from '@repo/api-client/unwrap';
 import {
+  appQuotaExceeded,
   type DeployableBinary,
   type Deployed,
   deploy as startDeployment,
@@ -10,6 +12,7 @@ import {
 import { environmentEdit } from '#lib/environment.ts';
 import { UsageError } from '#lib/errors.ts';
 import { openInitialData } from '#lib/initial-data.ts';
+import { PAID_REQUEST_HINT } from '#lib/paid-requests.ts';
 import type { RunOptions } from '#lib/plan.ts';
 import { announce, awaitServing, type Release } from '#lib/release.ts';
 import type { Ui } from '#lib/ui.ts';
@@ -24,7 +27,15 @@ export type DeployInput = RunOptions & {
 };
 
 export async function deploy({ api, ui, detach, ...release }: DeployInput): Promise<Release> {
-  const deployed = await startRelease({ api, ui, ...release });
+  const deployed = await startRelease({ api, ui, ...release }).catch(function explainAppLimit(
+    error: unknown,
+  ) {
+    const quota = appQuotaExceeded(error);
+    if (quota !== undefined) {
+      throw new ApiError(`${quota.error} ${PAID_REQUEST_HINT}`);
+    }
+    throw error;
+  });
   return await awaitServing({ api, ui, deployed, detach });
 }
 
