@@ -1,6 +1,6 @@
 import { MAX_PAID_APPS_REQUEST, MIN_PAID_APPS_REQUEST } from '@repo/api-constants';
 import { Button } from '@repo/ui/components/button';
-import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
+import { Field, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Spinner } from '@repo/ui/components/spinner';
 import { useId } from 'react';
@@ -9,7 +9,6 @@ import { usePaidAppsRequest } from '#lib/hooks/use-paid-apps-request.ts';
 export function PaidAppsRequestForm() {
   const form = usePaidAppsRequest();
   const inputId = useId();
-  const descriptionId = useId();
 
   return (
     <form
@@ -33,7 +32,6 @@ export function PaidAppsRequestForm() {
             value={form.value}
             onChange={(event) => form.change(event.target.value)}
             disabled={form.pending}
-            aria-describedby={descriptionId}
             className="w-24"
           />
           <Button type="submit" disabled={!form.submittable}>
@@ -41,10 +39,6 @@ export function PaidAppsRequestForm() {
             Send request
           </Button>
         </div>
-        <FieldDescription id={descriptionId}>
-          Choose {MIN_PAID_APPS_REQUEST}–{MAX_PAID_APPS_REQUEST} apps. This records your interest;
-          your current limit stays the same.
-        </FieldDescription>
         {form.error !== undefined && <FieldError role="alert">{form.error}</FieldError>}
       </Field>
       {form.savedAmount !== undefined && (
