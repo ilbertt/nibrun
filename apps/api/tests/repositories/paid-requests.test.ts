@@ -4,8 +4,11 @@ import { MAX_PAID_APPS_REQUEST } from '@repo/api-constants';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
-import { OwnerIdSchema } from '#lib/api/identifiers.ts';
-import { PaidRequestsRepository } from '#repositories/paid-requests.repository.ts';
+import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import {
+  type PaidRequestRow,
+  PaidRequestsRepository,
+} from '#repositories/paid-requests.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
@@ -31,6 +34,13 @@ function repository() {
   return new PaidRequestsRepository(withTypes<Queries>(sql));
 }
 
+async function savedRequests(ownerId: OwnerId): Promise<PaidRequestRow[]> {
+  return (await sql.unsafe(
+    'SELECT request_type, requested_apps_amount FROM nibrun.paid_requests WHERE owner_id = $1',
+    [ownerId],
+  )) as PaidRequestRow[];
+}
+
 test('repeated and concurrent submissions keep one latest request per owner and type', async () => {
   const request = { requestType: 'apps' as const, amount: 10 };
   await Promise.all([
@@ -54,17 +64,17 @@ test('repeated and concurrent submissions keep one latest request per owner and 
   expect(after.id).toBe(before.id);
   expect(after.created_at).toEqual(before.created_at);
   expect(after.updated_at.getTime()).toBeGreaterThanOrEqual(before.updated_at.getTime());
-  expect(await repository().list({ ownerId: OWNER_ID })).toEqual([
+  expect(await savedRequests(OWNER_ID)).toEqual([
     { request_type: 'apps', requested_apps_amount: updated.amount },
   ]);
 });
 
-test('another owner cannot read or overwrite the first owner’s request', async () => {
-  const first = await repository().list({ ownerId: OWNER_ID });
-  expect(await repository().list({ ownerId: OTHER_OWNER_ID })).toEqual([]);
+test('another owner’s submission cannot overwrite the first owner’s request', async () => {
+  const first = await savedRequests(OWNER_ID);
+  expect(await savedRequests(OTHER_OWNER_ID)).toEqual([]);
   await repository().save({ ownerId: OTHER_OWNER_ID, request: { requestType: 'apps', amount: 1 } });
-  expect(await repository().list({ ownerId: OWNER_ID })).toEqual(first);
-  expect(await repository().list({ ownerId: OTHER_OWNER_ID })).toEqual([
+  expect(await savedRequests(OWNER_ID)).toEqual(first);
+  expect(await savedRequests(OTHER_OWNER_ID)).toEqual([
     { request_type: 'apps', requested_apps_amount: 1 },
   ]);
 });
@@ -131,5 +141,5 @@ test('future request types require a null requested app count', async function f
 
 test('deleting an account also removes its paid requests', async () => {
   await sql.unsafe('DELETE FROM auth."user" WHERE id = $1', [OTHER_OWNER_ID]);
-  expect(await repository().list({ ownerId: OTHER_OWNER_ID })).toEqual([]);
+  expect(await savedRequests(OTHER_OWNER_ID)).toEqual([]);
 });

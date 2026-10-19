@@ -1051,12 +1051,6 @@ export interface ISelectSpentImportsResult {
 export interface IForgetImportObjectResult {
 }
 
-/** Result of query `SelectPaidRequests`. */
-export interface ISelectPaidRequestsResult {
-    request_type: IPaidRequestsColumns["request_type"];
-    requested_apps_amount: IPaidRequestsColumns["requested_apps_amount"];
-}
-
 /** Result of query `UpsertPaidRequest`. */
 export interface IUpsertPaidRequestResult {
     request_type: IPaidRequestsColumns["request_type"];
@@ -1217,7 +1211,6 @@ export interface Queries {
     DeleteAbandonedImport: IDeleteAbandonedImportResult;
     SelectSpentImports: ISelectSpentImportsResult;
     ForgetImportObject: IForgetImportObjectResult;
-    SelectPaidRequests: ISelectPaidRequestsResult;
     UpsertPaidRequest: IUpsertPaidRequestResult;
     InsertSqliteConnection: IInsertSqliteConnectionResult;
     SelectSqliteConnectionsByApp: ISelectSqliteConnectionsByAppResult;
