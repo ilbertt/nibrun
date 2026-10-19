@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { FetchHttpClient } from '@effect/platform';
-import { DeploymentIdSchema } from '@repo/protocol';
+import { AppIdSchema, DeploymentIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Deferred, Duration, Effect, Fiber, Layer, TestClock, TestContext } from 'effect';
+import { Deferred, Duration, Effect, Fiber, Layer, Ref, TestClock, TestContext } from 'effect';
 import { CommandFailed } from '#lib/exec.ts';
 import {
   refreshStates,
@@ -28,6 +28,7 @@ import {
   instanceRecord,
   OBSERVED_AT,
 } from '#tests/support/fixtures.ts';
+import { HOST_MEMORY_SAMPLE, hostMemory } from '#tests/support/memory.ts';
 import { platform, provided } from '#tests/support/run.ts';
 
 /** What `systemctl show` says about a microVM that is up, which is all a pass reads off it. */
@@ -46,6 +47,7 @@ const NEVER_DUE = Number.MAX_SAFE_INTEGER;
 const run = provided(
   Layer.mergeAll(
     AgentState.Default,
+    hostMemory(),
     GuestActivity.Default,
     ReportSignal.Default,
     FetchHttpClient.layer,
@@ -262,6 +264,7 @@ function onHost({
   return provided(
     Layer.mergeAll(
       AgentState.Default,
+      hostMemory(),
       GuestActivity.Default,
       ReportSignal.Default,
       FetchHttpClient.layer,
@@ -689,4 +692,139 @@ describe('an app that has gone quiet is put down where it can be picked up', () 
       }),
     );
   });
+});
+
+describe('host memory admission', () => {
+  test('defers a cold boot without marking the deployment failed', () => {
+    const vms = recordingVms();
+    return withMicroVmDown(vms)(
+      Effect.gen(function* () {
+        yield* startInstance(desiredInstance()).pipe(
+          Effect.provide(hostMemory(Effect.succeed(undefined))),
+        );
+        const record = yield* recordOf;
+        expect(record?.state).toBe('pending');
+        expect(record?.message).toContain('short of the memory');
+        expect(record?.recovery).toBeUndefined();
+        expect((yield* AgentState.snapshot).deferredWork).toBe(true);
+        expect(vms.calls).toEqual([]);
+        yield* startInstance(desiredInstance());
+        expect(vms.calls).toEqual(['boot']);
+      }),
+    );
+  });
+  test('refuses an idle restore before touching the VMM', () => {
+    const vms = recordingVms();
+    return withMicroVmDown(vms)(
+      Effect.gen(function* () {
+        yield* AgentState.putRecord(instanceRecord({ state: 'idle', onRequest: true }));
+        const result = yield* Effect.either(
+          resumeInstance(desiredInstance({ desiredState: 'on-request' })).pipe(
+            Effect.provide(hostMemory(Effect.succeed(undefined))),
+          ),
+        );
+        expect(result._tag).toBe('Left');
+        expect((yield* recordOf)?.state).toBe('idle');
+        expect(vms.calls).toEqual([]);
+      }),
+    );
+  });
+  test('concurrent different apps cannot spend the same remaining capacity', () => {
+    const vms = recordingVms();
+    return withMicroVmDown(vms)(
+      Effect.gen(function* () {
+        const desired = desiredInstance();
+        const other = desiredInstance({ appId: Value.Parse(AppIdSchema, 'memory-neighbour') });
+        yield* Effect.all([startInstance(desired), startInstance(other)], {
+          concurrency: 'unbounded',
+        });
+        expect(vms.calls).toEqual(['boot']);
+        const records = yield* AgentState.records;
+        expect(records.filter((record) => record.state === 'starting')).toHaveLength(1);
+        expect(records.filter((record) => record.state === 'pending')).toHaveLength(1);
+      }).pipe(
+        Effect.provide(
+          hostMemory(
+            Effect.succeed({
+              ...HOST_MEMORY_SAMPLE,
+              guestCapacityMib: 256,
+              guestAvailableMib: 256,
+            }),
+          ),
+        ),
+      ),
+    );
+  });
+});
+
+test('memory deferral preserves a due recovery attempt', () => {
+  const vms = recordingVms({
+    onBoot: new CommandFailed({
+      command: ['boot'],
+      result: { code: 1, stdout: '', stderr: 'boot failed' },
+    }),
+  });
+  return withMicroVmDown(vms)(
+    Effect.gen(function* () {
+      yield* startInstance(desiredInstance());
+      const recovery = (yield* recordOf)?.recovery;
+      yield* TestClock.adjust(Duration.millis(VM_RECOVERY_POLICY.maxBackoffMs));
+      yield* startInstance(desiredInstance()).pipe(
+        Effect.provide(hostMemory(Effect.succeed(undefined))),
+      );
+      expect((yield* recordOf)?.recovery).toEqual(recovery);
+      expect((yield* recordOf)?.state).toBe('starting');
+      expect(vms.calls).toEqual(['boot']);
+    }).pipe(Effect.provide(TestContext.TestContext)),
+  );
+});
+
+test('memory pressure during restore fallback does not consume a VM recovery attempt', () => {
+  const vms = recordingVms({
+    onWake: new SnapshotUnusable({ reason: 'no usable snapshot' }),
+  });
+  return withMicroVmDown(vms)(
+    Effect.gen(function* () {
+      yield* AgentState.putRecord(instanceRecord({ state: 'idle', onRequest: true }));
+      const readings = yield* Ref.make(0);
+      const read = Ref.modify(readings, (count) => [
+        count === 0 ? HOST_MEMORY_SAMPLE : undefined,
+        count + 1,
+      ]);
+      const result = yield* Effect.either(
+        resumeInstance(desiredInstance({ desiredState: 'on-request' })).pipe(
+          Effect.provide(hostMemory(read)),
+        ),
+      );
+      expect(result._tag).toBe('Left');
+      expect((yield* recordOf)?.state).toBe('idle');
+      expect((yield* recordOf)?.recovery).toBeUndefined();
+      expect(vms.calls).toEqual(['wake']);
+    }),
+  );
+});
+
+test('queued crashed VMs do not reserve memory against each other before recovery', () => {
+  const vms = recordingVms();
+  return withMicroVmDown(vms)(
+    Effect.gen(function* () {
+      const otherId = Value.Parse(AppIdSchema, 'queued-neighbour');
+      const recovery = {
+        attempts: 0,
+        nextAttemptAtMs: 0,
+        failure: { kind: 'unexpected-exit' as const, retryable: true, message: 'VM exited' },
+      };
+      yield* AgentState.putRecord(instanceRecord({ state: 'starting', recovery }));
+      yield* AgentState.putRecord(instanceRecord({ appId: otherId, state: 'starting', recovery }));
+      yield* startInstance(desiredInstance());
+      expect(vms.calls).toEqual(['boot']);
+      expect((yield* recordOf)?.recovery?.attempts).toBe(1);
+    }).pipe(
+      Effect.provide(
+        hostMemory(
+          Effect.succeed({ ...HOST_MEMORY_SAMPLE, guestCapacityMib: 256, guestAvailableMib: 256 }),
+        ),
+      ),
+    ),
+  );
 });

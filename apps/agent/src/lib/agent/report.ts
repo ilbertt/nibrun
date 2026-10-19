@@ -6,8 +6,8 @@ import { nowTimestamp } from '#lib/clock.ts';
 import { buildReportedState } from '#lib/report/build-report.ts';
 import {
   allocatableCapacity,
-  committedResources,
   readAvailableCacheBytes,
+  readCommittedResources,
   readHostCapacity,
 } from '#lib/report/capacity.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
@@ -16,6 +16,7 @@ import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
+import { HostMemory } from '#services/host-memory.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
@@ -57,8 +58,9 @@ const report = Effect.gen(function* () {
   const records = [...current.records.values()];
   const capacity = yield* readHostCapacity({
     cacheDir: config.stateDir,
-    zerofsConfigFile: config.zerofsConfigFile,
   });
+  const memory = yield* HostMemory;
+  const sample = yield* memory.read;
   const reachedAt = yield* publicAddresses(records);
 
   yield* control.sendReportedState({
@@ -70,7 +72,8 @@ const report = Effect.gen(function* () {
       capacity,
       allocatable: allocatableCapacity({
         capacity,
-        committed: committedResources(records),
+        availableMemoryMib: sample?.guestAvailableMib ?? 0,
+        committed: yield* readCommittedResources(records),
         availableCacheBytes: yield* readAvailableCacheBytes(config.stateDir),
       }),
       versions: sessions.versions,

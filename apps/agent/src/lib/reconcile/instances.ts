@@ -20,11 +20,13 @@ import {
 } from '#lib/health/state.ts';
 import type { AppSlot } from '#lib/network/slot.ts';
 import type { ReconcilePlan } from '#lib/reconcile/plan.ts';
+import { memoryShortfallMib, readCommittedResources } from '#lib/report/capacity.ts';
 import {
   graceInputs,
   type InstanceRecord,
   newInstanceRecord,
 } from '#lib/report/instance-record.ts';
+import { HostHasNoRoom } from '#lib/report/memory.ts';
 import type { VmFailure } from '#lib/vm/failure.ts';
 import {
   afterVmFailure,
@@ -38,6 +40,7 @@ import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { GuestActivity } from '#services/guest-activity.service.ts';
+import { HostMemory } from '#services/host-memory.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
@@ -399,6 +402,51 @@ function probeAtOnce(appId: AppId) {
   });
 }
 
+const admitInstance = Effect.fn('admitInstance')(function* (desired: DesiredInstance) {
+  const memory = yield* HostMemory;
+  const sample = yield* memory.read;
+  const others = (yield* AgentState.records).filter((record) => record.appId !== desired.appId);
+  const shortfallMib = memoryShortfallMib({
+    hostMemoryMib: sample?.guestCapacityMib ?? 0,
+    availableMemoryMib: sample?.guestAvailableMib ?? 0,
+    committed: yield* readCommittedResources(others),
+    wanted: desired.config.resources,
+  });
+  if (shortfallMib > 0) {
+    return yield* new HostHasNoRoom({ appId: desired.appId, shortfallMib });
+  }
+});
+
+const deferForMemory = Effect.fn('deferForMemory')(function* ({
+  desired,
+  refusal,
+}: {
+  desired: DesiredInstance;
+  refusal: HostHasNoRoom;
+}) {
+  const existing = (yield* AgentState.snapshot).records.get(desired.appId);
+  const allocator = yield* SlotAllocator;
+  const record =
+    existing ??
+    newInstanceRecord({
+      ...recordFields({ desired, slot: yield* allocator.allocate(desired.appId) }),
+      state: 'pending',
+      health: initialTracker(),
+    });
+  yield* AgentState.putRecord({ ...record, message: refusal.message });
+  yield* AgentState.modify((current) => ({ ...current, deferredWork: true }));
+  if (record.message !== refusal.message) {
+    yield* Effect.logWarning('microVM start deferred for host memory').pipe(
+      Effect.annotateLogs({
+        appId: desired.appId,
+        deploymentId: desired.deploymentId,
+        shortfallMib: refusal.shortfallMib,
+      }),
+    );
+  }
+  yield* ReportSignal.raise;
+});
+
 const attemptStartInstance = Effect.fn('attemptStartInstance')(function* (
   desired: DesiredInstance,
 ) {
@@ -410,6 +458,7 @@ const attemptStartInstance = Effect.fn('attemptStartInstance')(function* (
   if (!isStartable({ existing, nowMs })) {
     return;
   }
+  yield* admitInstance(desired);
 
   const slot = yield* allocator.allocate(desired.appId);
   const attempted: InstanceRecord = {
@@ -478,7 +527,10 @@ function withStartClaim<A, E, R>({
 }) {
   return Effect.acquireUseRelease(
     AgentState.claimStart(appId),
-    (claimed) => (claimed ? effect : Effect.succeed(skipped)),
+    (claimed) =>
+      claimed
+        ? Effect.flatMap(HostMemory, (memory) => memory.serialize(effect))
+        : Effect.succeed(skipped),
     (claimed) => (claimed ? AgentState.releaseStart(appId) : Effect.void),
   );
 }
@@ -486,7 +538,9 @@ function withStartClaim<A, E, R>({
 export function startInstance(desired: DesiredInstance) {
   return withStartClaim({
     appId: desired.appId,
-    effect: attemptStartInstance(desired),
+    effect: attemptStartInstance(desired).pipe(
+      Effect.catchTag('HostHasNoRoom', (refusal) => deferForMemory({ desired, refusal })),
+    ),
     skipped: undefined,
   });
 }
@@ -555,6 +609,7 @@ const attemptResumeInstance = Effect.fn('attemptResumeInstance')(function* (
   if (record && record.state !== 'idle' && record.state !== 'stopped') {
     return 'recovering' as const;
   }
+  yield* admitInstance(desired);
 
   // For the reason `startInstance` marks one before its boot: the clock this starts is the one
   // that decides when the app may sleep again.
@@ -576,6 +631,9 @@ const attemptResumeInstance = Effect.fn('attemptResumeInstance')(function* (
     ),
     Effect.tapError((error) =>
       Effect.gen(function* () {
+        if (error._tag === 'HostHasNoRoom') {
+          return;
+        }
         const latest = (yield* AgentState.snapshot).records.get(desired.appId);
         if (
           latest &&
@@ -601,7 +659,9 @@ const attemptResumeInstance = Effect.fn('attemptResumeInstance')(function* (
 export function resumeInstance(desired: DesiredInstance) {
   return withStartClaim({
     appId: desired.appId,
-    effect: attemptResumeInstance(desired),
+    effect: attemptResumeInstance(desired).pipe(
+      Effect.tapErrorTag('HostHasNoRoom', (refusal) => deferForMemory({ desired, refusal })),
+    ),
     skipped: 'recovering' as const,
   });
 }
