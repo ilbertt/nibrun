@@ -19,7 +19,9 @@ export function usePaidAppsRequest(): PaidAppsRequestForm {
   const amount = paidAppsAmount(value);
   const save = useMutation({
     mutationFn: async function savePaidApps(total: number) {
-      return unwrap(await api.api['paid-requests']({ requestType: 'apps' }).put({ amount: total }));
+      return unwrap(
+        await api.api['paid-requests']({ requestType: 'apps' }).put({ requestedAppsAmount: total }),
+      );
     },
   });
 
@@ -37,6 +39,6 @@ export function usePaidAppsRequest(): PaidAppsRequestForm {
     pending: save.isPending,
     submittable: amount !== undefined && !save.isPending,
     error: save.error?.message,
-    savedAmount: save.data?.amount,
+    savedAmount: save.data?.requestedAppsAmount,
   };
 }
