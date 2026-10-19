@@ -15,7 +15,6 @@ function accessKeyAuth(overrides: Record<string, unknown> = {}) {
 
 function storage(overrides: Record<string, unknown> = {}) {
   return {
-    kind: 's3',
     endpoint: 'https://objects.example.com',
     bucket: 'customer-bucket',
     prefix: 'nibrun/app-1',

@@ -5,7 +5,6 @@ import { renderZerofsConfig } from '#lib/volumes/zerofs-config.ts';
 
 function storage(overrides: Record<string, unknown> = {}): S3VolumeStorage {
   return Value.Parse(S3VolumeStorageSchema, {
-    kind: 's3',
     endpoint: 'https://objects.example.com',
     bucket: 'customer-data',
     prefix: 'apps/app-1',

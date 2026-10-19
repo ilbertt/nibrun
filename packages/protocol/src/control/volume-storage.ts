@@ -30,7 +30,6 @@ export const S3VolumeAuthSchema = Type.Union(
 export type S3VolumeAuth = typeof S3VolumeAuthSchema.static;
 
 export const S3VolumeStorageSchema = Type.Object({
-  kind: Type.Literal('s3'),
   endpoint: Type.String({ pattern: '^https://[^\\s]+$' }),
   bucket: Type.String({ pattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$' }),
   prefix: ObjectKeySchema,
