@@ -1,0 +1,42 @@
+[Unit]
+Description=ZeroFS for app %i
+Documentation=https://www.zerofs.net
+Wants=network-online.target
+Requires=nibrun-data.service
+After=network-online.target nibrun-data.service
+
+[Service]
+Type=exec
+User=zerofs
+Group=zerofs
+UMask=0077
+LoadCredential=zerofs.toml:/var/lib/nibrun/zerofs/%i/config.toml
+ExecStart=/opt/nibrun/bin/zerofs/zerofs run --config %d/zerofs.toml
+ExecStartPost=/bin/sh -c 'for _ in $(seq 600); do [ -S "$${RUNTIME_DIRECTORY}/nbd.sock" ] && [ -S "$${RUNTIME_DIRECTORY}/9p.sock" ] && [ -S "$${RUNTIME_DIRECTORY}/rpc.sock" ] && exit 0; sleep 0.1; done; exit 1'
+TimeoutStartSec=90
+
+# Explicit customer credentials must not inherit the host's AWS identity or session.
+UnsetEnvironment=AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_TOKEN AWS_REGION AWS_DEFAULT_REGION
+UnsetEnvironment=AWS_ROLE_ARN AWS_WEB_IDENTITY_TOKEN_FILE AWS_CONTAINER_CREDENTIALS_RELATIVE_URI AWS_CONTAINER_CREDENTIALS_FULL_URI AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
+
+Restart=always
+RestartSec=5s
+# Allow buffered writes to reach object storage before systemd can send SIGKILL.
+TimeoutStopSec=120
+
+RuntimeDirectory=zerofs-apps/%i
+RuntimeDirectoryMode=0750
+LimitNOFILE=1048576
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/data/zerofs-apps/%i
+LogExtraFields=SOURCE=zerofs

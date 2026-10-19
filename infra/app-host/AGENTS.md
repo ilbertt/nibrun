@@ -36,6 +36,19 @@ the expected binary and marker. Keep the active target, the two newest other ins
 for rollback, and every version whose executable is still running. Other components and tenant
 data are outside this cleanup.
 
+## Per-app storage templates
+
+`nibrun-app-zerofs@.service` and `nibrun-app-zerofs-mount@.service` are installed but
+never enabled by the host deploy. No production caller starts them yet. Keep the shared
+ZeroFS service, its configuration and existing VM dependencies unchanged until explicit
+per-app activation is implemented.
+
+Before starting an instance, its caller must establish exclusive ownership of the storage
+prefix, stage `/var/lib/nibrun/zerofs/<app-id>/config.toml` as a root-owned `0600` file, and
+create `/data/zerofs-apps/<app-id>` writable by `zerofs`. The configuration names that cache
+directory and the NBD, 9P and RPC sockets under `/run/zerofs-apps/<app-id>`. Each instance
+loads its configuration through systemd credentials; never load the shared `zerofs.env`.
+
 ## Unsettled
 
 **`nibrun-vm@.service` carries `BindsTo=nibrun-zerofs.service`**, which stops every tenant VM on
