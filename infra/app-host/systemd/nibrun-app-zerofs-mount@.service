@@ -1,0 +1,18 @@
+[Unit]
+Description=Host filesystem access for app %i
+BindsTo=nibrun-app-zerofs@%i.service
+After=nibrun-app-zerofs@%i.service
+PartOf=nibrun-app-zerofs@%i.service
+
+[Service]
+Type=exec
+UMask=0077
+# The mount must remain in the host mount namespace so the agent can create device files.
+ExecStartPre=/usr/bin/mkdir -p /mnt/zerofs-apps/%i
+ExecStart=/opt/nibrun/bin/zerofs/zerofs mount --writeback false unix:%t/zerofs-apps/%i/9p.sock /mnt/zerofs-apps/%i
+ExecStartPost=/bin/sh -c 'for _ in $(seq 100); do mountpoint -q /mnt/zerofs-apps/%i && exit 0; sleep 0.1; done; exit 1'
+ExecStopPost=-/usr/bin/fusermount3 -u /mnt/zerofs-apps/%i
+TimeoutStartSec=30
+Restart=always
+RestartSec=2s
+LogExtraFields=SOURCE=zerofs
