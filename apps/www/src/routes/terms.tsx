@@ -19,6 +19,9 @@ function TermsPage() {
         Last updated: <time dateTime="2026-10-19">19 October 2026</time>.
       </p>
       <p>
+        In these terms, “nibrun”, “we”, “us”, and “our” refer to the operator of the nibrun service.
+      </p>
+      <p>
         These terms apply to your use of the nibrun website, dashboard, CLI, MCP server, and hosting
         service. By using nibrun, you agree to these terms. If you use nibrun on behalf of an
         organisation, you must have authority to accept them for that organisation.

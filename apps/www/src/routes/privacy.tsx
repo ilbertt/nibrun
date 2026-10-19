@@ -21,6 +21,9 @@ function PrivacyPage() {
         Last updated: <time dateTime="2026-10-19">19 October 2026</time>.
       </p>
       <p>
+        In this policy, “nibrun”, “we”, “us”, and “our” refer to the operator of the nibrun service.
+      </p>
+      <p>
         This policy covers the nibrun website, dashboard, CLI, and MCP integration. For privacy
         questions or requests, contact <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
