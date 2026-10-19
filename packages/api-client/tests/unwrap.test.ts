@@ -1,6 +1,8 @@
 import { expect, test } from 'bun:test';
 import { ApiError, describeFailure, unwrap } from '#unwrap.ts';
 
+const FORBIDDEN_STATUS = 403;
+
 test('a reply that carries no failure is the data it carries', () => {
   expect(unwrap({ data: { apps: [] }, error: null })).toEqual({ apps: [] });
 });
@@ -12,6 +14,18 @@ test('a failure Eden handed back rather than threw is raised here', () => {
   });
 
   expect(() => unwrap({ data: null, error: failure })).toThrow(ApiError);
+});
+
+test('the structured API refusal survives unwrapping for callers to act on', () => {
+  const body = { error: 'App limit reached', code: 'APP_QUOTA_EXCEEDED', appsAllowed: 3 };
+  try {
+    unwrap({ data: null, error: { status: 403, value: body } });
+    throw new Error('Expected the API refusal to be raised.');
+  } catch (error) {
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(FORBIDDEN_STATUS);
+    expect((error as ApiError).body).toEqual(body);
+  }
 });
 
 test('a refusal is reported as the api answering, not as this program deciding', () => {

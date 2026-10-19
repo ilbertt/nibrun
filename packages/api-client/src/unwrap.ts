@@ -1,7 +1,12 @@
 export class ApiError extends Error {
-  constructor(message: string) {
-    super(message);
+  readonly status: number | undefined;
+  readonly body: unknown;
+
+  constructor(input: string | { message: string; status: number | undefined; body: unknown }) {
+    super(typeof input === 'string' ? input : input.message);
     this.name = 'ApiError';
+    this.status = typeof input === 'string' ? undefined : input.status;
+    this.body = typeof input === 'string' ? undefined : input.body;
   }
 }
 
@@ -14,7 +19,21 @@ type Reply = { data: unknown; error: unknown };
  */
 export function unwrap<R extends Reply>(reply: R): NonNullable<R['data']> {
   if (reply.error !== null) {
-    throw new ApiError(describeFailure(reply.error));
+    const failure = reply.error;
+    throw new ApiError({
+      message: describeFailure(failure),
+      status:
+        typeof failure === 'object' &&
+        failure !== null &&
+        'status' in failure &&
+        typeof failure.status === 'number'
+          ? failure.status
+          : undefined,
+      body:
+        typeof failure === 'object' && failure !== null && 'value' in failure
+          ? failure.value
+          : undefined,
+    });
   }
   return reply.data as NonNullable<R['data']>;
 }

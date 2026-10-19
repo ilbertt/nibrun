@@ -8,6 +8,10 @@ const errorLogger = createLogger();
 export class AppError extends Error {
   readonly statusCode: number;
 
+  get response(): { error: string } {
+    return { error: this.message };
+  }
+
   // biome-ignore lint/complexity/useMaxParams: extends native Error class
   constructor(statusCode: number, message: string) {
     super(message);
@@ -105,7 +109,7 @@ export function elysiaErrorHandler({
     if (error.statusCode >= StatusMap['Internal Server Error']) {
       errorLogger.error(code, error);
     }
-    return status(error.statusCode, { error: error.message });
+    return status(error.statusCode, error.response);
   }
   if (code === 'VALIDATION') {
     return status(StatusMap['Bad Request'], {

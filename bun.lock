@@ -179,6 +179,7 @@
       "name": "@repo/app-operations",
       "dependencies": {
         "@repo/api-client": "workspace:*",
+        "@repo/api-constants": "workspace:*",
         "@repo/app-ui": "workspace:*",
       },
       "devDependencies": {
