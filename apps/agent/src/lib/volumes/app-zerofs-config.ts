@@ -40,6 +40,10 @@ export function appZerofsPaths({ appId, stateDir }: { appId: AppId; stateDir: st
   };
 }
 
+export function appZerofsUnitConfigFile(appId: AppId): string {
+  return appZerofsPaths({ appId, stateDir: '/var/lib/nibrun' }).configFile;
+}
+
 function publishConfig({ configFile, contents }: { configFile: string; contents: string }) {
   return Effect.scoped(
     Effect.gen(function* () {
