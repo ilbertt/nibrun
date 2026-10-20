@@ -55,6 +55,17 @@ describe('staging per-app ZeroFS credentials', () => {
           `/run/zerofs-apps/${APP_ID}/9p.sock`,
           `/run/zerofs-apps/${APP_ID}/rpc.sock`,
         ]);
+        const mountTemplate = yield* fs.readFileString(
+          fileURLToPath(
+            new URL(
+              '../../../../../infra/app-host/systemd/nibrun-app-zerofs-mount@.service',
+              import.meta.url,
+            ),
+          ),
+        );
+        expect(mountTemplate.replaceAll('%i', APP_ID).replaceAll('%t', '/run')).toContain(
+          `unix:${paths.sockets.ninep} ${paths.mountPath}`,
+        );
       }),
     );
   });

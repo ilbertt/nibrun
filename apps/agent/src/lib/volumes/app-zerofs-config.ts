@@ -32,6 +32,7 @@ export function appZerofsPaths({ appId, stateDir }: { appId: AppId; stateDir: st
   return {
     configFile: join(stateDir, 'zerofs', appId, 'config.toml'),
     cacheDirectory: `/data/zerofs-apps/${appId}`,
+    mountPath: `/mnt/zerofs-apps/${appId}`,
     sockets: {
       nbd: `${runtimeDirectory}/nbd.sock`,
       ninep: `${runtimeDirectory}/9p.sock`,
