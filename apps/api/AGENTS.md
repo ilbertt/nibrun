@@ -8,6 +8,10 @@ agent socket (see `@repo/protocol`).
 
 Bun + Elysia service.
 
+Provision demo accounts with `bun create:password-account`, setting `PASSWORD_ACCOUNT_EMAIL`
+and `PASSWORD_ACCOUNT_NAME` and supplying the password on stdin. Sign in at `/login/password`;
+public password signup is disabled.
+
 `src/lib/api/` contains public resource schemas and their derived types. API-only defaults,
 DNS record construction, redaction and log deduplication live in `src/lib/`.
 Shared static defaults come from `@repo/api-constants`; runtime-reference names, descriptions

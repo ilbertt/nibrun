@@ -18,7 +18,7 @@ function PrivacyPage() {
   return (
     <ContentPage title={TITLE} description={DESCRIPTION}>
       <p>
-        Last updated: <time dateTime="2026-10-19">19 October 2026</time>.
+        Last updated: <time dateTime="2026-10-20">20 October 2026</time>.
       </p>
       <p>
         In this policy, “nibrun”, “we”, “us”, and “our” refer to the operator of the nibrun service.
@@ -34,8 +34,8 @@ function PrivacyPage() {
           <strong>Account and sign-in information.</strong> When you sign in with GitHub, we receive
           account identifiers, your name, email address, and profile image. We store authentication
           records, sessions, tokens, and connection information, which can include IP addresses and
-          browser details. Anonymous sessions let us associate a temporary app with its creator
-          before sign-in.
+          browser details. For pre-provisioned demo accounts, we also store a password hash.
+          Anonymous sessions let us associate a temporary app with its creator before sign-in.
         </li>
         <li>
           <strong>Your apps.</strong> We process uploaded executables, app settings, environment

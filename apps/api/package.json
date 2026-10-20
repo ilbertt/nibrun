@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "bun run scripts/build.ts",
+    "create:password-account": "bun run scripts/create-password-account.ts",
     "check:types": "bun codegen:sql:check && bun run --bun tsc",
     "codegen:sql": "bun bun-sqlgen generate 'src/repositories/*.repository.ts' --migrations src/db/migrations --out src/db/queries.gen.ts",
     "codegen:sql:check": "bun codegen:sql --check",

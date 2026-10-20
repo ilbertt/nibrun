@@ -7,6 +7,7 @@ import { sameOriginPath } from '#lib/same-origin-path.ts';
 import { sessionQueryOptions } from '#queries/session.ts';
 import { Route as ConsentRoute } from '#routes/(auth)/consent.tsx';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
+import { Route as PasswordLoginRoute } from '#routes/(auth)/login_.password.tsx';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 import { Route as DeployRoute } from '#routes/deploy.tsx';
 
@@ -15,7 +16,12 @@ import '../styles.css';
 // Consent owns its account guard to preserve the signed OAuth query when redirecting to login.
 // These routes import this module back, so their `to` is undefined during module evaluation.
 function isPublic(pathname: string): boolean {
-  return pathname === LoginRoute.to || pathname === DeployRoute.to || pathname === ConsentRoute.to;
+  return (
+    pathname === LoginRoute.to ||
+    pathname === PasswordLoginRoute.to ||
+    pathname === DeployRoute.to ||
+    pathname === ConsentRoute.to
+  );
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({

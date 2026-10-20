@@ -17,6 +17,7 @@ import { Route as authConsentRouteImport } from './routes/(auth)/consent'
 import { Route as authDeviceRouteImport } from './routes/(auth)/device'
 import { Route as authLoginRouteImport } from './routes/(auth)/login'
 import { Route as dashboardIndexRouteImport } from './routes/(dashboard)/index'
+import { Route as authLoginPasswordRouteImport } from './routes/(auth)/login_.password'
 import { Route as dashboardAppsIndexRouteImport } from './routes/(dashboard)/apps/index'
 import { Route as dashboardAppsAppIdRouteRouteImport } from './routes/(dashboard)/apps/$appId/route'
 import { Route as dashboardAppsAppIdIndexRouteImport } from './routes/(dashboard)/apps/$appId/index'
@@ -63,6 +64,11 @@ const dashboardIndexRoute = dashboardIndexRouteImport.update({
   path: '/',
   getParentRoute: () => dashboardRouteRoute,
 } as any)
+const authLoginPasswordRoute = authLoginPasswordRouteImport.update({
+  id: '/login_/password',
+  path: '/login/password',
+  getParentRoute: () => authRouteRoute,
+} as any)
 const dashboardAppsIndexRoute = dashboardAppsIndexRouteImport.update({
   id: '/apps/',
   path: '/apps/',
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
   '/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
+  '/login/password': typeof authLoginPasswordRoute
   '/apps/': typeof dashboardAppsIndexRoute
   '/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/device': typeof authDeviceRoute
   '/login': typeof authLoginRoute
   '/': typeof dashboardIndexRoute
+  '/login/password': typeof authLoginPasswordRoute
   '/apps': typeof dashboardAppsIndexRoute
   '/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/(auth)/login': typeof authLoginRoute
   '/(dashboard)/': typeof dashboardIndexRoute
   '/(dashboard)/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
+  '/(auth)/login_/password': typeof authLoginPasswordRoute
   '/(dashboard)/apps/': typeof dashboardAppsIndexRoute
   '/(dashboard)/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/(dashboard)/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/'
     | '/apps/$appId'
+    | '/login/password'
     | '/apps/'
     | '/apps/$appId/crons'
     | '/apps/$appId/domains'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/device'
     | '/login'
     | '/'
+    | '/login/password'
     | '/apps'
     | '/apps/$appId/crons'
     | '/apps/$appId/domains'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/(auth)/login'
     | '/(dashboard)/'
     | '/(dashboard)/apps/$appId'
+    | '/(auth)/login_/password'
     | '/(dashboard)/apps/'
     | '/(dashboard)/apps/$appId/crons'
     | '/(dashboard)/apps/$appId/domains'
@@ -261,6 +273,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof dashboardIndexRouteImport
       parentRoute: typeof dashboardRouteRoute
     }
+    '/(auth)/login_/password': {
+      id: '/(auth)/login_/password'
+      path: '/login/password'
+      fullPath: '/login/password'
+      preLoaderRoute: typeof authLoginPasswordRouteImport
+      parentRoute: typeof authRouteRoute
+    }
     '/(dashboard)/apps/': {
       id: '/(dashboard)/apps/'
       path: '/apps'
@@ -317,12 +336,14 @@ interface authRouteRouteChildren {
   authConsentRoute: typeof authConsentRoute
   authDeviceRoute: typeof authDeviceRoute
   authLoginRoute: typeof authLoginRoute
+  authLoginPasswordRoute: typeof authLoginPasswordRoute
 }
 
 const authRouteRouteChildren: authRouteRouteChildren = {
   authConsentRoute: authConsentRoute,
   authDeviceRoute: authDeviceRoute,
   authLoginRoute: authLoginRoute,
+  authLoginPasswordRoute: authLoginPasswordRoute,
 }
 
 const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
