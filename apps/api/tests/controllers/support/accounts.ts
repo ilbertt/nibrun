@@ -26,3 +26,16 @@ export async function registeredAccount() {
     cookie,
   };
 }
+
+export async function passwordAccount() {
+  const account = await registeredAccount();
+  const email = `${crypto.randomUUID()}@example.test`;
+  const password = 'review-account-test-password';
+  const context = await auth.$context;
+  await context.internalAdapter.updateUser(account.ownerId, { email, name: 'Demo' });
+  await auth.api.setPassword({
+    body: { newPassword: password },
+    headers: new Headers({ cookie: account.cookie }),
+  });
+  return { ...account, email, password };
+}

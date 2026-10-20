@@ -1,12 +1,11 @@
 import { expect, setSystemTime, test } from 'bun:test';
 import { StatusMap } from 'elysia';
 import { createLocalJWKSet, exportJWK, generateKeyPair, jwtVerify, SignJWT } from 'jose';
-import { registeredAccount } from '#tests/controllers/support/accounts.ts';
+import { passwordAccount, registeredAccount } from '#tests/controllers/support/accounts.ts';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { cimdDocuments } from '#tests/support/cimd.ts';
 
 const { auth } = await import('#services/plugins.ts');
-const { createPasswordAccount } = await import('#lib/auth/create-password-account.ts');
 const { MCP_RESOURCE, MCP_SCOPE } = await import('#lib/mcp/auth.ts');
 const { OAUTH_ISSUER, OAUTH_JWKS_URL } = await import('#lib/auth/oauth-issuer.ts');
 const AUTH_URL = `${ORIGIN}/api/auth`;
@@ -47,12 +46,29 @@ test('MCP account linking does not enable machine credentials', async () => {
   expect(await response.json()).toMatchObject({ error: 'unsupported_grant_type' });
 });
 
+test('a reviewer can sign in before connecting MCP and proceed directly to consent', async () => {
+  const { email, password } = await passwordAccount();
+  const login = await sendJson({
+    method: 'POST',
+    url: `${AUTH_URL}/sign-in/email`,
+    body: { email, password, callbackURL: '/' },
+  });
+  expect(login.status, await login.clone().text()).toBe(StatusMap.OK);
+  const cookie = login.headers
+    .getSetCookie()
+    .map((value) => value.split(';')[0])
+    .join('; ');
+  const client = await createClient('DCR');
+  const authorization = await send({
+    url: `${AUTH_URL}/oauth2/authorize?${authorizationQuery(client.clientId)}`,
+    headers: { cookie },
+  });
+  expect(new URL(authorization.headers.get('location')!, OAUTH_ISSUER).pathname).toBe('/consent');
+});
+
 test('a password account completes MCP login, consent, and PKCE token exchange', async () => {
-  const credentials = {
-    email: `${crypto.randomUUID()}@example.test`,
-    password: 'review-account-test-password',
-  };
-  const ownerId = await createPasswordAccount({ auth, ...credentials, name: 'Demo' });
+  const { ownerId, email, password } = await passwordAccount();
+  const credentials = { email, password };
   const client = await createClient('DCR');
   const authorization = await send({
     url: `${AUTH_URL}/oauth2/authorize?${authorizationQuery(client.clientId)}`,

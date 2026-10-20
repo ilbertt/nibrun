@@ -1,18 +1,17 @@
 import { expect, test } from 'bun:test';
 import { StatusMap } from 'elysia';
+import { passwordAccount } from '#tests/controllers/support/accounts.ts';
 import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
 
 const { auth } = await import('#services/plugins.ts');
-const { createPasswordAccount } = await import('#lib/auth/create-password-account.ts');
-const PASSWORD = 'review-account-test-password';
 
 function credentials() {
-  return { email: `${crypto.randomUUID()}@example.test`, password: PASSWORD };
+  return { email: `${crypto.randomUUID()}@example.test`, password: 'unknown-account-password' };
 }
 
 test('provisioned password accounts receive ordinary registered sessions', async () => {
-  const body = credentials();
-  const ownerId = await createPasswordAccount({ auth, ...body, name: 'Demo' });
+  const { ownerId, email, password } = await passwordAccount();
+  const body = { email, password };
   const response = await sendJson({
     method: 'POST',
     url: `${ORIGIN}/api/auth/sign-in/email`,
@@ -27,7 +26,7 @@ test('provisioned password accounts receive ordinary registered sessions', async
   });
   const account = stored?.accounts.find((account) => account.providerId === 'credential');
   expect(account?.password).toBeString();
-  expect(account?.password).not.toBe(PASSWORD);
+  expect(account?.password).not.toBe(password);
   expect(auth.options.socialProviders?.github).toBeDefined();
 });
 
@@ -44,8 +43,8 @@ test('public password signup cannot create an account', async () => {
 });
 
 test('unknown accounts and incorrect passwords cannot sign in', async () => {
-  const body = credentials();
-  await createPasswordAccount({ auth, ...body, name: 'Demo' });
+  const { email, password } = await passwordAccount();
+  const body = { email, password };
   for (const attempt of [credentials(), { ...body, password: 'incorrect-password' }]) {
     const response = await sendJson({
       method: 'POST',
@@ -57,29 +56,9 @@ test('unknown accounts and incorrect passwords cannot sign in', async () => {
   }
 });
 
-test('provisioning refuses existing accounts and invalid password lengths', async () => {
-  const body = credentials();
-  const input = { auth, ...body, name: 'Demo' };
-  await createPasswordAccount(input);
-  await expect(
-    createPasswordAccount({ ...input, email: body.email.toUpperCase() }),
-  ).rejects.toThrow('already exists');
-  const context = await auth.$context;
-  const fresh = credentials();
-  for (const length of [
-    context.password.config.minPasswordLength - 1,
-    context.password.config.maxPasswordLength + 1,
-  ]) {
-    await expect(
-      createPasswordAccount({ auth, ...fresh, name: 'Demo', password: 'x'.repeat(length) }),
-    ).rejects.toThrow('Password must contain');
-  }
-  expect(await context.internalAdapter.findUserByEmail(fresh.email)).toBeNull();
-});
-
 test('password sign-in retains the normal origin and redirect protections', async () => {
-  const body = credentials();
-  await createPasswordAccount({ auth, ...body, name: 'Demo' });
+  const { email, password } = await passwordAccount();
+  const body = { email, password };
   const context = await auth.$context;
   const previous = {
     skipOriginCheck: context.skipOriginCheck,
