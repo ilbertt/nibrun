@@ -1,7 +1,7 @@
 import { expect, setSystemTime, test } from 'bun:test';
 import { StatusMap } from 'elysia';
 import { createLocalJWKSet, exportJWK, generateKeyPair, jwtVerify, SignJWT } from 'jose';
-import { registeredAccount } from '#tests/controllers/support/accounts.ts';
+import { passwordAccount, registeredAccount } from '#tests/controllers/support/accounts.ts';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { cimdDocuments } from '#tests/support/cimd.ts';
 
@@ -44,6 +44,80 @@ test('MCP account linking does not enable machine credentials', async () => {
   });
   expect(response.status).toBe(StatusMap['Bad Request']);
   expect(await response.json()).toMatchObject({ error: 'unsupported_grant_type' });
+});
+
+test('a reviewer can sign in before connecting MCP and proceed directly to consent', async () => {
+  const { email, password } = await passwordAccount();
+  const login = await sendJson({
+    method: 'POST',
+    url: `${AUTH_URL}/sign-in/email`,
+    body: { email, password, callbackURL: '/' },
+  });
+  expect(login.status, await login.clone().text()).toBe(StatusMap.OK);
+  const cookie = login.headers
+    .getSetCookie()
+    .map((value) => value.split(';')[0])
+    .join('; ');
+  const client = await createClient('DCR');
+  const authorization = await send({
+    url: `${AUTH_URL}/oauth2/authorize?${authorizationQuery(client.clientId)}`,
+    headers: { cookie },
+  });
+  expect(new URL(authorization.headers.get('location')!, OAUTH_ISSUER).pathname).toBe('/consent');
+});
+
+test('a password account completes MCP login, consent, and PKCE token exchange', async () => {
+  const { ownerId, email, password } = await passwordAccount();
+  const credentials = { email, password };
+  const client = await createClient('DCR');
+  const authorization = await send({
+    url: `${AUTH_URL}/oauth2/authorize?${authorizationQuery(client.clientId)}`,
+  });
+  const loginPage = new URL(authorization.headers.get('location')!, OAUTH_ISSUER);
+  expect(loginPage.pathname).toBe('/login');
+  const login = await sendJson({
+    method: 'POST',
+    url: `${AUTH_URL}/sign-in/email`,
+    headers: { origin: OAUTH_ISSUER },
+    body: { ...credentials, callbackURL: '/', oauth_query: loginPage.searchParams.toString() },
+  });
+  expect(login.status, await login.clone().text()).toBe(StatusMap.OK);
+  const result = (await login.json()) as { url: string };
+  const consentPage = new URL(result.url, OAUTH_ISSUER);
+  expect(consentPage.pathname).toBe('/consent');
+  const cookie = login.headers
+    .getSetCookie()
+    .map((value) => value.split(';')[0])
+    .join('; ');
+  const consent = await sendJson({
+    method: 'POST',
+    url: `${AUTH_URL}/oauth2/consent`,
+    headers: { cookie, origin: OAUTH_ISSUER },
+    body: { accept: true, oauth_query: consentPage.searchParams.toString() },
+  });
+  expect(consent.status, await consent.clone().text()).toBe(StatusMap.OK);
+  const callback = new URL(((await consent.json()) as { url: string }).url);
+  const tokensResponse = await tokenRequest({
+    grant_type: 'authorization_code',
+    code: callback.searchParams.get('code')!,
+    redirect_uri: CALLBACK,
+    code_verifier: VERIFIER,
+    resource: MCP_RESOURCE.href,
+    ...(await clientAuthentication(client)),
+  });
+  expect(tokensResponse.status, await tokensResponse.clone().text()).toBe(StatusMap.OK);
+  const tokens = (await tokensResponse.json()) as TokenResponse;
+  const { payload } = await jwtVerify(
+    tokens.access_token,
+    createLocalJWKSet(await auth.api.getJwks()),
+    {
+      issuer: OAUTH_ISSUER,
+      audience: MCP_RESOURCE.href,
+      typ: 'at+jwt',
+    },
+  );
+  expect(payload.sub).toBe(ownerId);
+  expect(payload.scope).toContain(MCP_SCOPE);
 });
 
 test.each(['DCR', 'CIMD public', 'CIMD signed'] as const)(

@@ -1,25 +1,10 @@
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { LoginForm } from '#components/login/login-form.tsx';
-import { sameOriginPath } from '#lib/same-origin-path.ts';
-import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
-
-type LoginSearch = {
-  redirect?: string;
-};
+import { beforeLogin, validateLoginSearch } from '#lib/login-route.ts';
 
 export const Route = createFileRoute('/(auth)/login')({
-  validateSearch: (search: Record<string, unknown>): LoginSearch => ({
-    redirect: sameOriginPath(search.redirect),
-  }),
-  beforeLoad: ({ context, search, location }) => {
-    if (
-      context.session &&
-      !context.session.user.isAnonymous &&
-      !new URLSearchParams(location.searchStr).has('sig')
-    ) {
-      throw redirect({ href: search.redirect ?? IndexRoute.to });
-    }
-  },
+  validateSearch: validateLoginSearch,
+  beforeLoad: beforeLogin,
   component: RouteComponent,
 });
 

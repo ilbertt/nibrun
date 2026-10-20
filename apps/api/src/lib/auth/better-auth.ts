@@ -48,6 +48,7 @@ export function createAuth({
     secret: env.BETTER_AUTH_SECRET,
     disabledPaths: ['/token'],
     hooks: { before: protectShortLivedDeploymentTokens },
+    emailAndPassword: { enabled: true, disableSignUp: true },
     socialProviders: {
       github: {
         clientId: env.GITHUB_CLIENT_ID,

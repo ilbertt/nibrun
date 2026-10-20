@@ -5,9 +5,9 @@ import { setupBrowserLocation } from '#tests/support/browser.ts';
 const location = setupBrowserLocation();
 
 const { authClient } = await import('#lib/auth.ts');
-const { Route } = await import('#routes/(auth)/login.tsx');
+const { beforeLogin } = await import('#lib/login-route.ts');
 
-type BeforeLoadContext = Parameters<NonNullable<typeof Route.options.beforeLoad>>[0];
+type BeforeLoadContext = Parameters<typeof beforeLogin>[0];
 
 const SIGNED_QUERY = new URLSearchParams([
   ['client_id', 'https://client.test/metadata.json'],
@@ -46,8 +46,8 @@ function visitLogin({
 }: {
   anonymous: boolean | null;
   search: string;
-}): ReturnType<NonNullable<typeof Route.options.beforeLoad>> {
-  return Route.options.beforeLoad?.({
+}): ReturnType<typeof beforeLogin> {
+  return beforeLogin({
     context: { session: anonymous === null ? null : { user: { isAnonymous: anonymous } } },
     search: { redirect: '/apps' },
     location: { searchStr: search },
@@ -65,6 +65,23 @@ test('GitHub sign-in carries the signed authorization query with repeated resour
 test('ordinary sign-in does not send an unsigned page query as OAuth context', async () => {
   location.search = '?redirect=%2Fapps&client_id=untrusted&scope=mcp';
   expect((await socialSignInBody()).oauth_query).toBeUndefined();
+});
+
+test('password sign-in preserves the same signed OAuth query as GitHub sign-in', async () => {
+  location.search = `?${SIGNED_QUERY}`;
+  let body: Record<string, unknown> = {};
+  const result = await authClient.signIn.email(
+    { email: 'review@example.test', password: 'test-password', callbackURL: '/apps' },
+    {
+      async customFetchImpl(...args: Parameters<typeof fetch>) {
+        body = await new Request(...args).json();
+        return Response.json({ redirect: false, url: '/consent' });
+      },
+    },
+  );
+  expect(result.error).toBeNull();
+  expect(body.oauth_query).toBe(SIGNED_QUERY.toString());
+  expect(body.callbackURL).toBe('/apps');
 });
 
 test('a registered session can complete a signed request that requires fresh sign-in', () => {
