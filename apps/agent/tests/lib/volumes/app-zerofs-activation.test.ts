@@ -6,7 +6,7 @@ import { activateAppZerofs } from '#lib/volumes/app-zerofs-activation.ts';
 import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
 import { appZerofsUnits } from '#lib/volumes/app-zerofs-systemd.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
-import { agentConfig } from '#tests/support/config.ts';
+import { AGENT_CONFIG, agentConfig } from '#tests/support/config.ts';
 import { APP_ID } from '#tests/support/fixtures.ts';
 import { provided, runScoped } from '#tests/support/run.ts';
 import { s3Storage } from '#tests/support/s3-storage.ts';
@@ -56,8 +56,14 @@ describe('explicit per-app ZeroFS activation', () => {
       }
       return succeeding({ stdout: input.command[1] === 'show' ? READY : '' });
     });
-    const paths = await provided(host({ commands, files }))(activateAppZerofs(request()));
-    expect(paths).toEqual(appZerofsPaths({ appId: APP_ID, stateDir: '/var/lib/nibrun' }));
+    const filesystem = await provided(host({ commands, files }))(activateAppZerofs(request()));
+    const paths = appZerofsPaths({ appId: APP_ID, stateDir: '/var/lib/nibrun' });
+    expect(filesystem).toEqual({
+      storagePrefix: request().storage.prefix,
+      mountPath: paths.mountPath,
+      nbdSocketPath: paths.sockets.nbd,
+      admin: { binary: AGENT_CONFIG.zerofsBinary, configFile: paths.configFile },
+    });
     expect(commands.commands.map(({ command }) => command.slice(0, 2))).toEqual([
       ['mountpoint', '--quiet'],
       ['install', '--directory'],

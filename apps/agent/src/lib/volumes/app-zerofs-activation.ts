@@ -1,5 +1,6 @@
 import { Data, Effect } from 'effect';
 import { appZerofsPaths, appZerofsUnitConfigFile } from '#lib/volumes/app-zerofs-config.ts';
+import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
 import { observeAppZerofs } from '#lib/volumes/app-zerofs-observation.ts';
 import { prepareAppZerofs } from '#lib/volumes/app-zerofs-preparation.ts';
 import { startAppZerofs } from '#lib/volumes/app-zerofs-systemd.ts';
@@ -25,13 +26,16 @@ export function activateAppZerofs(config: Parameters<typeof prepareAppZerofs>[0]
     if (configured.configFile !== appZerofsUnitConfigFile(config.appId)) {
       return yield* new AppZerofsConfigPathMismatch();
     }
-    const paths = yield* prepareAppZerofs(config);
+    yield* prepareAppZerofs(config);
     // A partial start can leave an existing writer alive; failed activation must not roll it back.
     yield* startAppZerofs(config.appId);
     const observed = yield* observeAppZerofs(config.appId);
     if (!observed.ready) {
       return yield* new AppZerofsNotReady();
     }
-    return paths;
+    return yield* appZerofsFilesystem({
+      appId: config.appId,
+      storagePrefix: config.storage.prefix,
+    });
   });
 }
