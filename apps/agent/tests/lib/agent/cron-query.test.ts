@@ -39,6 +39,8 @@ const VERSIONS = Value.Parse(HostVersionsSchema, {
   firecracker: 'd',
 });
 const POLLS_ACROSS_TWO_FLOORS = 3;
+// Fractional jitter can make TestClock's nanosecond conversion throw.
+const RETRY_JITTER_MIDPOINT = 0.5;
 
 function unreached() {
   return Effect.dieMessage('cron queries use only the cron query and result routes');
@@ -174,6 +176,6 @@ describe('agent cron query loop', () => {
         yield* TestClock.adjust('2 seconds');
         expect(expired).toEqual([error]);
         expect(api.polls).toHaveLength(2);
-      }),
+      }).pipe(Effect.withRandomFixed([RETRY_JITTER_MIDPOINT])),
     ));
 });
