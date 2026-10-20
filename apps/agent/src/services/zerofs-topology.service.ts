@@ -1,7 +1,10 @@
-import { ObjectKeySchema } from '@repo/protocol';
+import { isDeepStrictEqual } from 'node:util';
+import { type AppId, ObjectKeySchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Effect } from 'effect';
-import type { ZerofsFilesystem } from '#lib/volumes/topology.ts';
+import { Effect, Ref } from 'effect';
+import { AppZerofsFlushError } from '#lib/volumes/app-zerofs-durability.ts';
+import { AppZerofsFilesystemConflict } from '#lib/volumes/app-zerofs-filesystem.ts';
+import type { ZerofsFilesystem, ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
@@ -34,6 +37,52 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
         admin: { binary: config.zerofsBinary, configFile: config.zerofsConfigFile },
       },
     ];
+    const appFilesystems = yield* Ref.make<ReadonlyMap<AppId, ZerofsLiveFilesystem>>(new Map());
+
+    /** Register only ready filesystems under exclusive writer ownership for the instance's lifetime. */
+    const registerAppFilesystem = Effect.fn('ZerofsTopology.registerAppFilesystem')(function* ({
+      appId,
+      filesystem,
+    }: {
+      appId: AppId;
+      filesystem: ZerofsLiveFilesystem;
+    }) {
+      const registered = { ...filesystem, admin: { ...filesystem.admin } };
+      const accepted = yield* Ref.modify(appFilesystems, (current) => {
+        const existing = current.get(appId);
+        if (existing !== undefined) {
+          return [isDeepStrictEqual(existing, registered), current] as const;
+        }
+        const occupied = [...filesystems, ...current.values()].some(
+          (other) =>
+            other.mountPath === registered.mountPath ||
+            other.nbdSocketPath === registered.nbdSocketPath ||
+            other.admin.configFile === registered.admin.configFile,
+        );
+        return occupied
+          ? ([false, current] as const)
+          : ([true, new Map(current).set(appId, registered)] as const);
+      });
+      if (!accepted) {
+        return yield* new AppZerofsFilesystemConflict();
+      }
+    });
+
+    const flushApps = Effect.flatMap(Ref.get(appFilesystems), (registered) =>
+      Effect.forEach(
+        registered,
+        ([appId, filesystem]) =>
+          flush(filesystem.admin).pipe(
+            Effect.mapError(() => new AppZerofsFlushError()),
+            Effect.catchAll((error) =>
+              Effect.logWarning('app zerofs flush failed', error).pipe(
+                Effect.annotateLogs({ appId }),
+              ),
+            ),
+          ),
+        { discard: true },
+      ),
+    );
     /**
      * Every filesystem on the host brought to a durability point. Under `ignore_fsync` the guest's
      * own flushes are a no-op, so this is the whole of what stands between a microVM going down —
@@ -53,9 +102,9 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
           ),
         ),
       { discard: true },
-    ).pipe(Effect.withSpan('ZerofsTopology.flushAll'));
+    ).pipe(Effect.andThen(flushApps), Effect.withSpan('ZerofsTopology.flushAll'));
 
-    return { place: () => filesystems[0], all: filesystems, flushAll };
+    return { place: () => filesystems[0], all: filesystems, registerAppFilesystem, flushAll };
   }),
   dependencies: [AgentConfig.Default],
 }) {}
