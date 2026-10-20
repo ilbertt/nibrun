@@ -1,8 +1,14 @@
 import type { AppId } from '@repo/protocol';
-import { Effect } from 'effect';
+import { Data, Effect } from 'effect';
 import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
+
+export class AppZerofsFilesystemConflict extends Data.TaggedError('AppZerofsFilesystemConflict') {
+  override get message() {
+    return 'The app ZeroFS filesystem conflicts with an existing registration.';
+  }
+}
 
 export function appZerofsFilesystem({
   appId,
