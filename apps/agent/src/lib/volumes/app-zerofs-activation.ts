@@ -5,6 +5,7 @@ import { observeAppZerofs } from '#lib/volumes/app-zerofs-observation.ts';
 import { prepareAppZerofs } from '#lib/volumes/app-zerofs-preparation.ts';
 import { startAppZerofs } from '#lib/volumes/app-zerofs-systemd.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
+import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
 export class AppZerofsConfigPathMismatch extends Data.TaggedError('AppZerofsConfigPathMismatch') {
   override get message() {
@@ -22,6 +23,7 @@ export class AppZerofsNotReady extends Data.TaggedError('AppZerofsNotReady') {
 export function activateAppZerofs(config: Parameters<typeof prepareAppZerofs>[0]) {
   return Effect.gen(function* () {
     const agent = yield* AgentConfig;
+    const topology = yield* ZerofsTopology;
     const configured = appZerofsPaths({ appId: config.appId, stateDir: agent.stateDir });
     if (configured.configFile !== appZerofsUnitConfigFile(config.appId)) {
       return yield* new AppZerofsConfigPathMismatch();
@@ -33,9 +35,11 @@ export function activateAppZerofs(config: Parameters<typeof prepareAppZerofs>[0]
     if (!observed.ready) {
       return yield* new AppZerofsNotReady();
     }
-    return yield* appZerofsFilesystem({
+    const filesystem = yield* appZerofsFilesystem({
       appId: config.appId,
       storagePrefix: config.storage.prefix,
     });
+    yield* topology.registerAppFilesystem({ appId: config.appId, filesystem });
+    return filesystem;
   });
 }

@@ -4,7 +4,9 @@ import { SystemError } from '@effect/platform/Error';
 import { Deferred, Effect, Either, Fiber, Layer } from 'effect';
 import { activateAppZerofs } from '#lib/volumes/app-zerofs-activation.ts';
 import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
+import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
 import { appZerofsUnits } from '#lib/volumes/app-zerofs-systemd.ts';
+import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { AGENT_CONFIG, agentConfig } from '#tests/support/config.ts';
 import { APP_ID } from '#tests/support/fixtures.ts';
@@ -14,6 +16,7 @@ import { systemdUnitProperties as unit } from '#tests/support/systemd.ts';
 
 const UNITS = appZerofsUnits(APP_ID);
 const READY = `${unit({ id: UNITS.server })}\n\n${unit({ id: UNITS.mount })}`;
+const ACTIVATING = `${unit({ id: UNITS.server })}\n\n${unit({ id: UNITS.mount, activeState: 'activating', subState: 'start-post' })}`;
 
 function request() {
   return { appId: APP_ID, storage: s3Storage(), cache: { diskSizeGb: 4, memorySizeGb: 0.25 } };
@@ -44,11 +47,23 @@ function host({
   files: ReturnType<typeof stagedConfig>;
   stateDir?: string;
 }) {
-  return Layer.mergeAll(agentConfig({ stateDir }), commands.layer, files.layer);
+  const config = agentConfig({ stateDir });
+  return Layer.mergeAll(
+    config,
+    commands.layer,
+    files.layer,
+    ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provide(config)),
+  );
+}
+
+function flushCommands(commands: ReturnType<typeof recordingCommands>) {
+  return commands.commands
+    .filter(({ command }) => command[1] === 'flush')
+    .map(({ command }) => command);
 }
 
 describe('explicit per-app ZeroFS activation', () => {
-  test('stages config and cache before starting, then returns only after readiness', async () => {
+  test('stages config and cache before starting, then registers the ready filesystem for flushes', async () => {
     const files = stagedConfig();
     const commands = recordingCommands((input) => {
       if (input.command[0] === 'install') {
@@ -56,7 +71,14 @@ describe('explicit per-app ZeroFS activation', () => {
       }
       return succeeding({ stdout: input.command[1] === 'show' ? READY : '' });
     });
-    const filesystem = await provided(host({ commands, files }))(activateAppZerofs(request()));
+    const filesystem = await provided(host({ commands, files }))(
+      Effect.gen(function* () {
+        const activated = yield* activateAppZerofs(request());
+        const topology = yield* ZerofsTopology;
+        yield* topology.flushAll;
+        return activated;
+      }),
+    );
     const paths = appZerofsPaths({ appId: APP_ID, stateDir: '/var/lib/nibrun' });
     expect(filesystem).toEqual({
       storagePrefix: request().storage.prefix,
@@ -69,10 +91,90 @@ describe('explicit per-app ZeroFS activation', () => {
       ['install', '--directory'],
       ['systemctl', 'start'],
       ['systemctl', 'show'],
+      [AGENT_CONFIG.zerofsBinary, 'flush'],
+      [AGENT_CONFIG.zerofsBinary, 'flush'],
+    ]);
+    expect(flushCommands(commands)).toEqual([
+      [AGENT_CONFIG.zerofsBinary, 'flush', '-c', AGENT_CONFIG.zerofsConfigFile],
+      [filesystem.admin.binary, 'flush', '-c', filesystem.admin.configFile],
     ]);
     expect(Bun.TOML.parse(files.written[0] ?? '')).toHaveProperty(
       'storage.url',
       's3://customer-data/apps/app-1',
+    );
+  });
+
+  test('repeated activation enrolls the app in each later flush only once', async () => {
+    const files = stagedConfig();
+    const commands = recordingCommands((input) =>
+      succeeding({ stdout: input.command[1] === 'show' ? READY : '' }),
+    );
+    await provided(host({ commands, files }))(
+      Effect.gen(function* () {
+        const filesystem = yield* activateAppZerofs(request());
+        yield* activateAppZerofs(request());
+        const topology = yield* ZerofsTopology;
+        expect(topology.place().admin.configFile).toBe(AGENT_CONFIG.zerofsConfigFile);
+        yield* topology.flushAll;
+        expect(flushCommands(commands)).toEqual([
+          [AGENT_CONFIG.zerofsBinary, 'flush', '-c', AGENT_CONFIG.zerofsConfigFile],
+          [filesystem.admin.binary, 'flush', '-c', filesystem.admin.configFile],
+        ]);
+      }),
+    );
+  });
+
+  test.each([
+    { phase: 'start', tag: 'AppZerofsUnitError' },
+    { phase: 'show', tag: 'AppZerofsObservationError' },
+    { phase: 'activating', tag: 'AppZerofsNotReady' },
+  ])('an unsuccessful activation never enrolls a new filesystem: %j', async ({ phase, tag }) => {
+    const files = stagedConfig();
+    const commands = recordingCommands((input) =>
+      succeeding({
+        code: input.command[1] === phase ? 1 : 0,
+        stdout: phase === 'activating' ? ACTIVATING : READY,
+      }),
+    );
+    await provided(host({ commands, files }))(
+      Effect.gen(function* () {
+        const result = yield* Effect.either(activateAppZerofs(request()));
+        expect(Either.isLeft(result) && result.left._tag).toBe(tag);
+        const topology = yield* ZerofsTopology;
+        yield* topology.flushAll;
+        expect(flushCommands(commands)).toEqual([
+          [AGENT_CONFIG.zerofsBinary, 'flush', '-c', AGENT_CONFIG.zerofsConfigFile],
+        ]);
+      }),
+    );
+  });
+
+  test('a registration conflict preserves the original entry and leaves the writer running', async () => {
+    const files = stagedConfig();
+    const commands = recordingCommands((input) =>
+      succeeding({ stdout: input.command[1] === 'show' ? READY : '' }),
+    );
+    await provided(host({ commands, files }))(
+      Effect.gen(function* () {
+        const topology = yield* ZerofsTopology;
+        const original = {
+          appId: APP_ID,
+          filesystem: yield* appZerofsFilesystem({
+            appId: APP_ID,
+            storagePrefix: s3Storage({ prefix: 'another/prefix' }).prefix,
+          }),
+        };
+        yield* topology.registerAppFilesystem(original);
+        const result = yield* Effect.either(activateAppZerofs(request()));
+        expect(Either.isLeft(result) && result.left._tag).toBe('AppZerofsFilesystemConflict');
+        yield* topology.registerAppFilesystem(original);
+        expect(commands.commands.map(({ command }) => command.slice(0, 2))).toEqual([
+          ['mountpoint', '--quiet'],
+          ['install', '--directory'],
+          ['systemctl', 'start'],
+          ['systemctl', 'show'],
+        ]);
+      }),
     );
   });
 
@@ -146,8 +248,7 @@ describe('explicit per-app ZeroFS activation', () => {
 
   test('a mount still activating is rejected without stopping or removing storage', async () => {
     const files = stagedConfig();
-    const output = `${unit({ id: UNITS.server })}\n\n${unit({ id: UNITS.mount, activeState: 'activating', subState: 'start-post' })}`;
-    const commands = recordingCommands(() => succeeding({ stdout: output }));
+    const commands = recordingCommands(() => succeeding({ stdout: ACTIVATING }));
     const result = await provided(host({ commands, files }))(
       Effect.either(activateAppZerofs(request())),
     );
@@ -188,18 +289,23 @@ describe('explicit per-app ZeroFS activation', () => {
             ? Deferred.succeed(entered, undefined).pipe(Effect.andThen(Effect.never))
             : succeeding(),
         );
-        const activation = yield* Effect.forkScoped(
-          activateAppZerofs(request()).pipe(Effect.provide(host({ commands, files }))),
-        );
-        yield* Deferred.await(entered);
-        yield* Fiber.interrupt(activation);
-        expect(files.written).toHaveLength(1);
-        expect(commands.commands.map(({ command }) => command[1])).toEqual([
-          '--quiet',
-          '--directory',
-          'start',
-          'show',
-        ]);
+        yield* Effect.gen(function* () {
+          const activation = yield* Effect.forkScoped(activateAppZerofs(request()));
+          yield* Deferred.await(entered);
+          yield* Fiber.interrupt(activation);
+          expect(files.written).toHaveLength(1);
+          expect(commands.commands.map(({ command }) => command[1])).toEqual([
+            '--quiet',
+            '--directory',
+            'start',
+            'show',
+          ]);
+          const topology = yield* ZerofsTopology;
+          yield* topology.flushAll;
+          expect(flushCommands(commands)).toEqual([
+            [AGENT_CONFIG.zerofsBinary, 'flush', '-c', AGENT_CONFIG.zerofsConfigFile],
+          ]);
+        }).pipe(Effect.provide(host({ commands, files })));
       }),
     );
   });
