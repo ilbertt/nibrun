@@ -6,7 +6,11 @@ import { SystemError } from '@effect/platform/Error';
 import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Deferred, Effect, Either, Fiber, Layer } from 'effect';
-import { appZerofsPaths, stageAppZerofsConfig } from '#lib/volumes/app-zerofs-config.ts';
+import {
+  appZerofsPaths,
+  appZerofsUnitConfigFile,
+  stageAppZerofsConfig,
+} from '#lib/volumes/app-zerofs-config.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { APP_ID } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
@@ -39,6 +43,7 @@ describe('staging per-app ZeroFS credentials', () => {
           ),
         );
         const paths = appZerofsPaths({ appId: APP_ID, stateDir: '/var/lib/nibrun' });
+        expect(paths.configFile).toBe(appZerofsUnitConfigFile(APP_ID));
         const instance = template.replaceAll('%i', APP_ID);
         expect(instance).toContain(`LoadCredential=zerofs.toml:${paths.configFile}`);
         expect(instance).toContain(`ReadWritePaths=${paths.cacheDirectory}`);
@@ -50,6 +55,17 @@ describe('staging per-app ZeroFS credentials', () => {
           `/run/zerofs-apps/${APP_ID}/9p.sock`,
           `/run/zerofs-apps/${APP_ID}/rpc.sock`,
         ]);
+        const mountTemplate = yield* fs.readFileString(
+          fileURLToPath(
+            new URL(
+              '../../../../../infra/app-host/systemd/nibrun-app-zerofs-mount@.service',
+              import.meta.url,
+            ),
+          ),
+        );
+        expect(mountTemplate.replaceAll('%i', APP_ID).replaceAll('%t', '/run')).toContain(
+          `unix:${paths.sockets.ninep} ${paths.mountPath}`,
+        );
       }),
     );
   });

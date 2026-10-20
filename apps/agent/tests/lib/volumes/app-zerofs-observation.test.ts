@@ -5,23 +5,10 @@ import { observeAppZerofs } from '#lib/volumes/app-zerofs-observation.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { APP_ID } from '#tests/support/fixtures.ts';
 import { provided } from '#tests/support/run.ts';
+import { systemdUnitProperties as unit } from '#tests/support/systemd.ts';
 
 const SERVER = 'nibrun-app-zerofs@app-1.service';
 const MOUNT = 'nibrun-app-zerofs-mount@app-1.service';
-
-function unit({
-  id,
-  loadState = 'loaded',
-  activeState = 'active',
-  subState = 'running',
-}: {
-  id: string;
-  loadState?: string;
-  activeState?: string;
-  subState?: string;
-}) {
-  return `Id=${id}\nLoadState=${loadState}\nActiveState=${activeState}\nSubState=${subState}`;
-}
 
 function observation(output: string) {
   const commands = recordingCommands(() => succeeding({ stdout: output }));
