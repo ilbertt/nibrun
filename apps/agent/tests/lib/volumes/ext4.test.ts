@@ -1,30 +1,17 @@
 import { describe, expect, test } from 'bun:test';
-import { Buffer } from 'node:buffer';
+import type { Buffer } from 'node:buffer';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Option } from 'effect';
 import { FILESYSTEM_LABEL, format } from '#lib/volumes/ext4.ts';
 import { recordingCommands } from '#tests/support/commands.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
+import {
+  formattedVolumeDevice as alreadyFormatted,
+  blankVolumeDevice as blank,
+} from '#tests/support/volume-device.ts';
 
 const run = provided(platform);
-
-const SUPERBLOCK_MAGIC_OFFSET = 1080;
-const SUPERBLOCK_BYTES = 2048;
-/** `0xef53`, as ext4 writes it: little-endian, so the low byte comes first. */
-const EXT_MAGIC_LOW = 0x53;
-const EXT_MAGIC_HIGH = 0xef;
-
-/** A device as ZeroFS first exports one: the length is there, and nothing has been written to it. */
-function blank(): Buffer {
-  return Buffer.alloc(SUPERBLOCK_BYTES);
-}
-
-function alreadyFormatted(): Buffer {
-  const device = blank();
-  device.set([EXT_MAGIC_LOW, EXT_MAGIC_HIGH], SUPERBLOCK_MAGIC_OFFSET);
-  return device;
-}
 
 function formatting({ device, seedDir }: { device: Buffer; seedDir: Option.Option<string> }) {
   return Effect.gen(function* () {
