@@ -261,7 +261,7 @@ export const DEPLOY_PRESETS = {
   'open-connector': {
     isRecommended: false,
     projectUrl: 'https://github.com/oomol-lab/open-connector',
-    version: 'v1.9.0',
+    version: 'v1.9.1',
     markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
@@ -269,8 +269,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'open-connector',
       binary:
-        'https://github.com/oomol-lab/open-connector/releases/download/v1.9.0/open-connector-linux-x64',
-      sha256: 'bac5e32003ec61dd0994fcdbcac6d9d60b0d6bc3b0e377dd5d711362a0d4f022',
+        'https://github.com/oomol-lab/open-connector/releases/download/v1.9.1/open-connector-linux-x64',
+      sha256: 'c0bff99fbf374a81c49a8eafb7d6e9617da3484ea1e9e8465fcc331c1a41fc0d',
       port: 3000,
       env: [
         'HOST=0.0.0.0',
