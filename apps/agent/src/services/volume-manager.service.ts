@@ -10,15 +10,9 @@ import { Value } from '@sinclair/typebox/value';
 import { Array as Arr, Effect, Option } from 'effect';
 import type { AppSlot } from '#lib/network/slot.ts';
 import type { ObservedVolume } from '#lib/reconcile/plan.ts';
-import {
-  devicePathFor,
-  ensureDeviceFile,
-  NBD_DIRECTORY,
-  removeDeviceFile,
-} from '#lib/volumes/device-file.ts';
-import { format } from '#lib/volumes/ext4.ts';
-import { detach, isUsable, reattach } from '#lib/volumes/nbd.ts';
-import { formatFromSeed } from '#lib/volumes/seed.ts';
+import { NBD_DIRECTORY, removeDeviceFile } from '#lib/volumes/device-file.ts';
+import { detach, isUsable } from '#lib/volumes/nbd.ts';
+import { provisionVolume } from '#lib/volumes/provision.ts';
 import type { ZerofsFilesystem } from '#lib/volumes/topology.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -129,51 +123,11 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
         ).pipe(Effect.map((byFilesystem) => byFilesystem.flat())),
     );
 
-    const provision = Effect.fn('VolumeManager.provision')(function* (desired: DesiredVolume) {
-      yield* Effect.annotateCurrentSpan({ volumeId: desired.volumeId, appId: desired.appId });
-      const filesystem = topology.place();
-      const slot = yield* allocator.allocate(desired.appId);
-      const sizeBytes = yield* ensureDeviceFile({
-        path: devicePathFor({ mount: filesystem.mountPath, volumeId: desired.volumeId, path }),
-        sizeBytes: desired.sizeBytes,
-      });
-
-      if (!(yield* isUsable(slot.nbdDevicePath))) {
-        yield* reattach({
-          socketPath: filesystem.nbdSocketPath,
-          devicePath: slot.nbdDevicePath,
-          volumeId: desired.volumeId,
-        });
-      }
-
-      // The archive is only ever read on the way to creating the filesystem, so which of these
-      // runs is decided by desired state and the guard inside both is what makes it once.
-      const formatted = yield* desired.seed
-        ? formatFromSeed({
-            devicePath: slot.nbdDevicePath,
-            volumeId: desired.volumeId,
-            seed: desired.seed,
-          })
-        : format({ devicePath: slot.nbdDevicePath, seedDir: Option.none() });
-      if (formatted) {
-        yield* Effect.logInfo('volume formatted').pipe(
-          Effect.annotateLogs({
-            volumeId: desired.volumeId,
-            device: slot.nbdDevicePath,
-            seeded: desired.seed !== undefined,
-          }),
-        );
-      }
-
-      return {
-        volumeId: desired.volumeId,
-        appId: desired.appId,
-        state: 'ready',
-        sizeBytes,
-        devicePath: slot.nbdDevicePath,
-        storagePrefix: filesystem.storagePrefix,
-      } satisfies ReportedVolume;
-    });
+    const provision = Effect.fn('VolumeManager.provision')((desired: DesiredVolume) =>
+      provisionVolume({ desired, filesystem: topology.place() }).pipe(
+        Effect.provideService(SlotAllocator, allocator),
+      ),
+    );
 
     /**
      * The only path that destroys tenant data, and it runs only for an explicit `absent`. The
