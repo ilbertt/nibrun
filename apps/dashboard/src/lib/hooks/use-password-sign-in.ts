@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { authClient } from '#lib/auth.ts';
-import { Route as PasswordLoginRoute } from '#routes/(auth)/login_.password.tsx';
+import { Route as PasswordLoginRoute } from '#routes/(auth)/login_/password.tsx';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 type PasswordFields = { email: string; password: string };

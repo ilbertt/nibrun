@@ -7,7 +7,7 @@ import { sameOriginPath } from '#lib/same-origin-path.ts';
 import { sessionQueryOptions } from '#queries/session.ts';
 import { Route as ConsentRoute } from '#routes/(auth)/consent.tsx';
 import { Route as LoginRoute } from '#routes/(auth)/login.tsx';
-import { Route as PasswordLoginRoute } from '#routes/(auth)/login_.password.tsx';
+import { Route as PasswordLoginRoute } from '#routes/(auth)/login_/password.tsx';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 import { Route as DeployRoute } from '#routes/deploy.tsx';
 
