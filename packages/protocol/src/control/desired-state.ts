@@ -1,5 +1,6 @@
 import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
+import { S3VolumeStorageSchema } from '#control/volume-storage.ts';
 import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } from '#lib/wire.ts';
 import {
   AppConfigSchema,
@@ -84,6 +85,8 @@ export const DesiredVolumeSchema = Type.Object({
   sizeBytes: ByteSizeSchema,
   desiredState: DesiredPresenceSchema,
   seed: Type.Optional(DesiredArtifactSchema),
+  // Omitted by existing control planes, which leaves the host on shared storage.
+  storage: Type.Optional(S3VolumeStorageSchema),
 });
 
 export type DesiredVolume = typeof DesiredVolumeSchema.static;

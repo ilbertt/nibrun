@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Value } from '@sinclair/typebox/value';
+import { HostDesiredStateSchema } from '#control/desired-state.ts';
 import { S3VolumeAuthSchema, S3VolumeStorageSchema } from '#control/volume-storage.ts';
 import { SECRET_ANNOTATION } from '#lib/secret.ts';
 import { ProtocolValidationError, parseMessage } from '#lib/validate.ts';
@@ -24,6 +25,81 @@ function storage(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+function desiredVolume(overrides: Record<string, unknown> = {}) {
+  return {
+    volumeId: 'vol-1',
+    appId: 'app-1',
+    sizeBytes: 4096,
+    desiredState: 'present',
+    ...overrides,
+  };
+}
+
+function desiredState(volume: ReturnType<typeof desiredVolume>) {
+  return {
+    hostId: 'host-1',
+    volumes: [volume],
+    instances: [],
+    checkpoints: [],
+    exports: [],
+  };
+}
+
+describe('optional desired volume storage', () => {
+  test('existing desired state without storage is accepted without adding defaults', () => {
+    const input = desiredState(desiredVolume());
+    const parsed = parseMessage({ schema: HostDesiredStateSchema, value: input });
+    expect(JSON.stringify(parsed)).toBe(JSON.stringify(input));
+    expect(parsed.volumes[0]).not.toHaveProperty('storage');
+  });
+
+  test.each([
+    accessKeyAuth(),
+    accessKeyAuth({ kind: 'session', sessionToken: 'private-session-token' }),
+    { kind: 'anonymous' },
+  ])('configured storage survives the desired-state wire format: %j', (auth) => {
+    const configured = storage({ auth, region: undefined });
+    const input = desiredState(desiredVolume({ storage: configured }));
+    const parsed = parseMessage({
+      schema: HostDesiredStateSchema,
+      value: JSON.parse(JSON.stringify(input)),
+    });
+    expect(parsed.volumes[0]?.storage).toEqual(JSON.parse(JSON.stringify(configured)));
+    expect(parsed.volumes[0]?.storage).not.toHaveProperty('region');
+  });
+
+  test.each([
+    null,
+    {},
+    storage({ auth: { kind: 'session', sessionToken: 'private-token' } }),
+    storage({ auth: accessKeyAuth({ secretAccessKey: undefined }) }),
+  ])('a supplied storage field must be a complete configuration: %j', (configured) => {
+    const input = desiredState(desiredVolume({ storage: configured }));
+    expect(() => parseMessage({ schema: HostDesiredStateSchema, value: input })).toThrow(
+      ProtocolValidationError,
+    );
+  });
+
+  test('a nested storage validation failure never includes credentials or the encryption password', () => {
+    const configured = storage({
+      endpoint: 'http://objects.example.com',
+      auth: accessKeyAuth({ kind: 'session', sessionToken: 'private-session-token' }),
+    });
+    const input = desiredState(desiredVolume({ storage: configured }));
+    try {
+      parseMessage({ schema: HostDesiredStateSchema, value: input });
+      throw new Error('expected invalid desired storage to be rejected');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ProtocolValidationError);
+      const rendered = `${String(error)} ${JSON.stringify(error)}`;
+      expect(rendered).not.toInclude(configured.auth.accessKeyId);
+      expect(rendered).not.toInclude(configured.auth.secretAccessKey);
+      expect(rendered).not.toInclude('private-session-token');
+      expect(rendered).not.toInclude(configured.encryptionPassword);
+    }
+  });
+});
 
 describe('external volume storage', () => {
   test('supports explicit key-pair, session and anonymous authentication', () => {
