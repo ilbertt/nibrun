@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { type AppId, AppIdSchema, ObjectKeySchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Effect, Either, Layer, Logger } from 'effect';
+import { Effect, Either, Layer, Logger, Option } from 'effect';
 import type { CommandLine } from '#lib/exec.ts';
 import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
@@ -280,5 +280,68 @@ describe('registered app filesystems participate in durability flushes', () => {
     expect(logs.join()).toContain('AppZerofsFlushError');
     expect(logs.join()).not.toContain('customer-access-key');
     expect(logs.join()).not.toContain('customer-secret-key');
+  });
+});
+
+describe('looking up a registered app filesystem', () => {
+  test('a lookup reads current registration without falling back or changing shared placement', async () => {
+    const host = topology();
+    const lookup = host.lookupAppFilesystem(APP_ID);
+    await provided(Layer.empty)(
+      Effect.gen(function* () {
+        const shared = host.place();
+        expect(Option.isNone(yield* lookup)).toBe(true);
+        const first = yield* registration(APP_ID);
+        yield* host.registerAppFilesystem(first);
+        expect(Option.getOrThrow(yield* lookup)).toEqual(first.filesystem);
+        expect(Option.isNone(yield* host.lookupAppFilesystem(SECOND_APP_ID))).toBe(true);
+        expect(host.place()).toBe(shared);
+        expect(host.all).toEqual([shared]);
+      }),
+    );
+  });
+
+  test('equal relative prefixes still resolve to distinct app endpoints', async () => {
+    const host = topology();
+    await provided(Layer.empty)(
+      Effect.gen(function* () {
+        const first = yield* registration(APP_ID);
+        const second = yield* registration(SECOND_APP_ID);
+        yield* host.registerAppFilesystem(first);
+        yield* host.registerAppFilesystem(second);
+        expect(first.filesystem.storagePrefix).toBe(second.filesystem.storagePrefix);
+        expect(Option.getOrThrow(yield* host.lookupAppFilesystem(APP_ID))).toEqual(
+          first.filesystem,
+        );
+        expect(Option.getOrThrow(yield* host.lookupAppFilesystem(SECOND_APP_ID))).toEqual(
+          second.filesystem,
+        );
+      }),
+    );
+  });
+
+  test('mutating lookup results cannot redirect subsequent lookup or durability flushes', async () => {
+    const commands = recordingCommands();
+    const host = topology();
+    await provided(commands.layer)(
+      Effect.gen(function* () {
+        const first = yield* registration(APP_ID);
+        yield* host.registerAppFilesystem(first);
+        const selected = Option.getOrThrow(yield* host.lookupAppFilesystem(APP_ID));
+        Object.assign(selected, {
+          mountPath: '/unexpected/mount',
+          nbdSocketPath: '/unexpected/socket',
+        });
+        Object.assign(selected.admin, { configFile: '/unexpected/config.toml' });
+        expect(Option.getOrThrow(yield* host.lookupAppFilesystem(APP_ID))).toEqual(
+          first.filesystem,
+        );
+        yield* host.flushAll;
+        expect(commands.commands.map(({ command }) => command)).toEqual([
+          flushCommand(host.place()),
+          flushCommand(first.filesystem),
+        ]);
+      }),
+    );
   });
 });

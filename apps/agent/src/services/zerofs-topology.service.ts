@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { type AppId, ObjectKeySchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Effect, Ref } from 'effect';
+import { Effect, Option, Ref } from 'effect';
 import { AppZerofsFlushError } from '#lib/volumes/app-zerofs-durability.ts';
 import { AppZerofsFilesystemConflict } from '#lib/volumes/app-zerofs-filesystem.ts';
 import type { ZerofsFilesystem, ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
@@ -38,6 +38,15 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
       },
     ];
     const appFilesystems = yield* Ref.make<ReadonlyMap<AppId, ZerofsLiveFilesystem>>(new Map());
+
+    const lookupAppFilesystem = Effect.fn('ZerofsTopology.lookupAppFilesystem')((appId: AppId) =>
+      Effect.map(Ref.get(appFilesystems), (registered) =>
+        Option.map(Option.fromNullable(registered.get(appId)), (filesystem) => ({
+          ...filesystem,
+          admin: { ...filesystem.admin },
+        })),
+      ),
+    );
 
     /** Register only ready filesystems under exclusive writer ownership for the instance's lifetime. */
     const registerAppFilesystem = Effect.fn('ZerofsTopology.registerAppFilesystem')(function* ({
@@ -104,7 +113,13 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
       { discard: true },
     ).pipe(Effect.andThen(flushApps), Effect.withSpan('ZerofsTopology.flushAll'));
 
-    return { place: () => filesystems[0], all: filesystems, registerAppFilesystem, flushAll };
+    return {
+      place: () => filesystems[0],
+      all: filesystems,
+      lookupAppFilesystem,
+      registerAppFilesystem,
+      flushAll,
+    };
   }),
   dependencies: [AgentConfig.Default],
 }) {}
