@@ -3,7 +3,10 @@
   "extends": ["//"],
   "tasks": {
     "build": {
-      "dependsOn": ["@repo/global-constants#build"],
+      "dependsOn": [
+        "@repo/api-constants#build",
+        "@repo/global-constants#build"
+      ],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/skills/**",

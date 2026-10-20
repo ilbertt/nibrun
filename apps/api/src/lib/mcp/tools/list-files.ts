@@ -1,4 +1,5 @@
 import type { McpServer, StandardSchemaWithJSON, ToolCallback } from '@modelcontextprotocol/server';
+import { MCP_TOOL_NAMES } from '@repo/api-constants';
 import { AppIdSchema, DirectoryListingSchema, GUEST_PATH_ROOT } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import type { OwnerId } from '#lib/api/identifiers.ts';
@@ -7,7 +8,6 @@ import { DIRECTORY_READ_TIMEOUT_MS } from '#lib/filesystem/timeouts.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import { handleToolResult } from '#lib/mcp/tools/shared/handle-tool-result.ts';
 import { registerTool } from '#lib/mcp/tools/shared/register-tool.ts';
-import { MCP_TOOL_NAMES } from '#lib/mcp/tools/shared/tool-names.ts';
 import { ReadDirectoryQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/filesystem/model.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
