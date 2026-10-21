@@ -1,7 +1,8 @@
-import type { ExportId, ReportedExport } from '@repo/protocol';
+import type { ExportId, HostDesiredState, ReportedExport } from '@repo/protocol';
 import { Effect, Option } from 'effect';
 import { reportedMessage } from '#lib/failure.ts';
 import type { ExportPlan, ReconcilePlan } from '#lib/reconcile/plan.ts';
+import { AppVolumeOperationUnavailable, usesAppVolumeStorage } from '#lib/volumes/placement.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -61,20 +62,41 @@ const write = ({ action }: { action: Extract<ExportPlan, { action: 'write' }> })
  * exactly the pass that finds one. Before the writes, so an export never starts against a device
  * or a server a dead predecessor left attached.
  */
-export const applyExports = ({ plan }: { plan: ReconcilePlan }) =>
+export const applyExports = ({
+  plan,
+  desired,
+}: {
+  plan: ReconcilePlan;
+  desired: HostDesiredState;
+}) =>
   Effect.gen(function* () {
     const exports = yield* ExportManager;
     yield* exports.reap;
     yield* Effect.forEach(
       plan.exports,
-      (action) => {
-        if (action.action === 'none') {
-          return Effect.void;
-        }
-        return action.action === 'forget'
-          ? forget(action.exportId)
-          : Effect.flatMap(write({ action }), setReport);
-      },
+      (action) =>
+        Effect.gen(function* () {
+          if (action.action === 'none') {
+            return;
+          }
+          if (
+            action.action === 'write' &&
+            (yield* usesAppVolumeStorage({
+              appId: action.desired.appId,
+              storage: desired.volumes.find((volume) => volume.volumeId === action.desired.volumeId)
+                ?.storage,
+            }))
+          ) {
+            return yield* setReport({
+              exportId: action.desired.exportId,
+              state: 'failed',
+              message: new AppVolumeOperationUnavailable().message,
+            });
+          }
+          return yield* action.action === 'forget'
+            ? forget(action.exportId)
+            : Effect.flatMap(write({ action }), setReport);
+        }),
       { discard: true },
     );
   });

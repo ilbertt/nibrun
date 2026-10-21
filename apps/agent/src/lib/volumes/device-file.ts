@@ -96,9 +96,17 @@ export const removeDeviceFile = Effect.fn('removeDeviceFile')(function* ({
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const [root, parent] = yield* Effect.all([fs.stat(mount), fs.stat(path.dirname(mount))]);
-  if (root.dev === parent.dev) {
-    return yield* new NotMounted({ mount });
-  }
+  yield* assertMounted(mount);
   yield* fs.remove(devicePathFor({ mount, volumeId, path }), { force: true });
 });
+
+export function assertMounted(mount: string) {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const [root, parent] = yield* Effect.all([fs.stat(mount), fs.stat(path.dirname(mount))]);
+    if (root.dev === parent.dev) {
+      return yield* new NotMounted({ mount });
+    }
+  });
+}

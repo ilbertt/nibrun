@@ -8,6 +8,7 @@ import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import { NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
 import { observeVolumes } from '#lib/volumes/observe.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
+import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -64,7 +65,11 @@ function host({
           ? Effect.succeed(usable ? '8\n' : '0\n')
           : fs.readFileString(...args),
     });
-    const support = Layer.merge(filesystemLayer, commands.layer);
+    const support = Layer.mergeAll(
+      filesystemLayer,
+      commands.layer,
+      AppVolumeFiles.Default.pipe(Layer.provide(filesystemLayer)),
+    );
     return {
       fs,
       directory,
@@ -233,7 +238,9 @@ describe('observation on a selected live filesystem', () => {
             ),
           ),
         );
-        const observed = yield* manager.observe(owners).pipe(Effect.provide(stage.support));
+        const observed = yield* manager
+          .observe({ appIdByVolume: owners, desiredVolumes: [] })
+          .pipe(Effect.provide(stage.support));
         expect(observed).toHaveLength(1);
         expect(observed[0]?.sizeBytes).toBe(1);
         expect(observed[0]?.storagePrefix).toBe(HOST_STORAGE_PREFIX);

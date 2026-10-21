@@ -11,15 +11,24 @@ import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { ArtifactTransferError } from '#services/artifact-store.service.ts';
 import { CronRegistrationReceiver } from '#services/cron-registration-receiver.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { servingFirecracker } from '#tests/support/firecracker.ts';
-import { APP_ID, DEPLOYMENT_ID, desiredInstance, instanceRecord } from '#tests/support/fixtures.ts';
+import {
+  APP_ID,
+  DEPLOYMENT_ID,
+  desiredInstance,
+  desiredState,
+  desiredVolume,
+  instanceRecord,
+} from '#tests/support/fixtures.ts';
 import { installedGuestImage } from '#tests/support/guest-image.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
+import { s3Storage } from '#tests/support/s3-storage.ts';
 
 const run = provided(platform);
 
@@ -107,12 +116,13 @@ function hostAsleepAndRefusing() {
         versionsFile: imageHost.versionsFile,
         guestImageDir: imageHost.guestImageDir,
         runtimeDir,
+        desiredStateFile: `${snapshotDir}/desired-state.json`,
       }),
       systemctl.layer,
       hostBooted(HOST_BOOT_ID),
     ).pipe(Layer.provideMerge(platform));
     const services = VmManager.DefaultWithoutDependencies.pipe(
-      Layer.provide(
+      Layer.provideMerge(
         Layer.mergeAll(
           AgentState.Default,
           noArtifactImages,
@@ -122,6 +132,7 @@ function hostAsleepAndRefusing() {
             CronRegistrationReceiver.make({ attach: () => Effect.void, detach: () => Effect.void }),
           ),
           ZerofsTopology.DefaultWithoutDependencies,
+          DesiredStateCache.DefaultWithoutDependencies,
         ),
       ),
       Layer.provideMerge(host),
@@ -133,7 +144,18 @@ function hostAsleepAndRefusing() {
       stamp: fs.exists(paths.stampPath),
       snapshot: fs.exists(paths.directory),
     });
+    function blockedByStorage(operation: 'boot' | 'wake') {
+      return Effect.gen(function* () {
+        const cache = yield* DesiredStateCache;
+        yield* cache.accept(desiredState({ volumes: [desiredVolume({ storage: s3Storage() })] }));
+        const vms = yield* VmManager;
+        return yield* operation === 'boot'
+          ? vms.boot({ desired: desiredInstance(), slot: SLOT, dataDevicePath: SLOT.nbdDevicePath })
+          : vms.wake({ appId: APP_ID, deploymentId: DEPLOYMENT_ID, slot: SLOT });
+      }).pipe(Effect.either, Effect.provide(services));
+    }
     return {
+      blockedByStorage,
       wake,
       kept,
       commands: systemctl.commands,
@@ -225,6 +247,23 @@ describe('a wake whose unit systemd would not start', () => {
   });
 });
 
+describe('configured storage gates every VM start', () => {
+  test.each(['boot', 'wake'] as const)(
+    'an unavailable backend blocks %s without touching the VM or snapshot',
+    async (operation) => {
+      await run(
+        Effect.gen(function* () {
+          const stage = yield* hostAsleepAndRefusing();
+          const result = yield* stage.blockedByStorage(operation);
+          expect(Either.isLeft(result) && result.left._tag).toBe('AppZerofsFilesystemUnavailable');
+          expect(stage.commands).toEqual([]);
+          expect(yield* stage.kept).toEqual({ stamp: true, snapshot: true });
+        }),
+      );
+    },
+  );
+});
+
 test('a cold boot pins paths and refuses capture after a subsequent image adoption', () =>
   run(
     Effect.gen(function* () {
@@ -274,6 +313,7 @@ test('a cold boot pins paths and refuses capture after a subsequent image adopti
               }),
             ),
             ZerofsTopology.DefaultWithoutDependencies,
+            DesiredStateCache.DefaultWithoutDependencies,
           ),
         ),
         Layer.provideMerge(host),

@@ -3,6 +3,7 @@ import { Effect } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import { reportedMessage } from '#lib/failure.ts';
 import type { CheckpointPlan, ReconcilePlan } from '#lib/reconcile/plan.ts';
+import { AppVolumeOperationUnavailable, usesAppVolumeStorage } from '#lib/volumes/placement.ts';
 import { createCheckpoint, deleteCheckpoint, listCheckpoints } from '#lib/volumes/zerofs.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -60,6 +61,21 @@ export const applyCheckpoints = ({
       desired.checkpoints.length === 0
         ? []
         : plan.checkpoints.filter((action): action is Applicable => action.action !== 'none');
-    const checkpointReports = yield* Effect.forEach(applicable, applyOne);
+    const checkpointReports = yield* Effect.forEach(applicable, (action) =>
+      Effect.gen(function* () {
+        const volume = desired.volumes.find(
+          (volume) => volume.volumeId === action.desired.volumeId,
+        );
+        if (volume !== undefined && (yield* usesAppVolumeStorage(volume))) {
+          return {
+            checkpointId: action.desired.checkpointId,
+            volumeId: action.desired.volumeId,
+            state: 'failed',
+            message: new AppVolumeOperationUnavailable().message,
+          } satisfies ReportedCheckpoint;
+        }
+        return yield* applyOne(action);
+      }),
+    );
     yield* AgentState.modify((current) => ({ ...current, checkpointReports }));
   });

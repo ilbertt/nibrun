@@ -1,6 +1,6 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { AppId, DeploymentId, DesiredInstance } from '@repo/protocol';
-import { Duration, Effect, Either } from 'effect';
+import { Duration, Effect, Either, Option } from 'effect';
 import { cronRegistrationSocketPath } from '#lib/cron/registration-protocol.ts';
 import type { CronDeployment } from '#lib/cron/registry.ts';
 import { writeJsonFile } from '#lib/json-store.ts';
@@ -27,11 +27,13 @@ import {
 } from '#lib/vm/snapshot.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { GUEST_VSOCK_FILENAME, vmWorkingDir } from '#lib/vm/vsock.ts';
+import { requireConfiguredVolume, VolumeStorageConflict } from '#lib/volumes/placement.ts';
 import { readCacheDiskBytes } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { CronRegistrationReceiver } from '#services/cron-registration-receiver.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -57,6 +59,24 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     const crons = yield* CronRegistrationReceiver;
     const zerofs = yield* ZerofsTopology;
     const agentState = yield* AgentState;
+    const desiredCache = yield* DesiredStateCache;
+
+    function requireDataVolume({ appId, devicePath }: { appId: AppId; devicePath: string }) {
+      return Effect.gen(function* () {
+        const volume = Option.getOrUndefined(yield* desiredCache.latest)?.volumes.find(
+          (wanted) => wanted.appId === appId && wanted.storage !== undefined,
+        );
+        if (volume !== undefined) {
+          yield* requireConfiguredVolume({ desired: volume, devicePath }).pipe(
+            Effect.provideService(ZerofsTopology, zerofs),
+            Effect.provideService(FileSystem.FileSystem, fs),
+            Effect.provideService(Path.Path, path),
+          );
+        } else if (Option.isSome(yield* zerofs.lookupAppFilesystem(appId))) {
+          return yield* new VolumeStorageConflict();
+        }
+      });
+    }
 
     const workingDir = (appId: AppId) => vmWorkingDir({ vmDir: config.vmDir, appId });
     const attachReceivers = Effect.fn('VmManager.attachReceivers')(
@@ -221,6 +241,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       yield* Effect.annotateCurrentSpan({
         appId: desired.appId,
       });
+      yield* requireDataVolume({ appId: desired.appId, devicePath: dataDevicePath });
       // Ahead of everything, because everything below replaces what a snapshot of this app was
       // taken against — and a start that still found a stamp would restore the old guest onto
       // the new deployment's disk rather than boot the new one.
@@ -397,6 +418,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       slot,
     }: SuspendRequest) {
       yield* Effect.annotateCurrentSpan({ appId });
+      yield* requireDataVolume({ appId, devicePath: slot.nbdDevicePath });
       const paths = snapshotFor(appId);
       const socketPath = apiSocket(appId);
       const expected = yield* stampForImage({
@@ -480,5 +502,6 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     TenantLogReceiver.Default,
     CronRegistrationReceiver.Default,
     ZerofsTopology.Default,
+    DesiredStateCache.Default,
   ],
 }) {}
