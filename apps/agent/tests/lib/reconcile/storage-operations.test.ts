@@ -38,7 +38,7 @@ function registerPrivateFilesystem() {
     const filesystem = yield* appZerofsFilesystem({
       appId: APP_ID,
       storagePrefix: storage.prefix,
-    }).pipe(Effect.provide(agentConfig()));
+    }).pipe(Effect.provide(agentConfig({ stateDir: '/var/lib/nibrun' })));
     yield* topology.registerAppFilesystem({ appId: APP_ID, filesystem, storage });
   });
 }
