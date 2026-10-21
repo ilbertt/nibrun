@@ -27,6 +27,12 @@ assignments and filesystem contents do not establish attachment ownership. Ioctl
 an already-created NBD device and the host's unified cgroup hierarchy. Shared volumes and
 checkpoint readers retain their netlink path.
 
+Reserve per-app ZeroFS cache limits from every staged configuration, including while its guest
+is idle or the filesystem registry is recovering after an agent restart. Memory reports and wake
+admission use the same reservation; snapshot disk budgets reserve the per-app caches too. An
+unreadable app reservation refuses new memory admission or snapshots. Staged reservations remain
+until explicit lifecycle cleanup removes their configuration.
+
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
 test needs to substitute is a service. State that used to be
 mutable class fields lives in a `Ref`. The loops in `lib/agent/` are fibers, and their retry

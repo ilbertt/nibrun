@@ -132,7 +132,10 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
     ) {
       const others = (yield* AgentState.records).filter((record) => record.appId !== wanted.appId);
       const shortfallMib = memoryShortfallMib({
-        hostMemoryMib: yield* readGuestMemoryMib(config.zerofsConfigFile),
+        hostMemoryMib: yield* readGuestMemoryMib({
+          zerofsConfigFile: config.zerofsConfigFile,
+          stateDir: config.stateDir,
+        }),
         committed: committedResources(others),
         wanted: wanted.config.resources,
       });

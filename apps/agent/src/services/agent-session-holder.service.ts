@@ -24,7 +24,7 @@ export class AgentSessionHolder extends Effect.Service<AgentSessionHolder>()('Ag
           return [existing.value, existing] as const;
         }
         const capacity = yield* readHostCapacity({
-          cacheDir: config.stateDir,
+          stateDir: config.stateDir,
           zerofsConfigFile: config.zerofsConfigFile,
         });
         const session = yield* openSession({ versions, capacity });
