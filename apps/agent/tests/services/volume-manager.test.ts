@@ -9,7 +9,7 @@ import type { CommandLine } from '#lib/exec.ts';
 import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import { AppVolumeFileUnavailable } from '#lib/volumes/app-volume-file.ts';
 import { ensureDeviceFile, NBD_DIRECTORY, removeDeviceFile } from '#lib/volumes/device-file.ts';
-import { backendIdentifier } from '#lib/volumes/nbd.ts';
+import { attachmentScope } from '#lib/volumes/nbd.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
@@ -20,6 +20,7 @@ import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { agentConfig, HOST_STORAGE_PREFIX } from '#tests/support/config.ts';
 import { APP_ID, desiredVolume, VOLUME_ID, VOLUME_SIZE_BYTES } from '#tests/support/fixtures.ts';
+import { privateNbdProcess } from '#tests/support/nbd.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 import { s3Storage } from '#tests/support/s3-storage.ts';
 import { formattedVolumeDevice } from '#tests/support/volume-device.ts';
@@ -34,12 +35,12 @@ function host({
   registered = true,
   connection = 'none',
   mounted = true,
-  supportsIdentity = true,
+  supportsClient = true,
 }: {
   registered?: boolean;
   connection?: 'none' | 'shared' | 'private';
   mounted?: boolean;
-  supportsIdentity?: boolean;
+  supportsClient?: boolean;
 } = {}) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -66,22 +67,27 @@ function host({
       volumeId: VOLUME_ID,
     };
     let connected = connection !== 'none';
-    let identity = connection === 'private' ? backendIdentifier(target) : undefined;
+    let process = connection === 'private' ? privateNbdProcess(target) : undefined;
     function nbdExitCode(command: CommandLine) {
-      if (command[0] !== 'nbd-client' && command[0] !== APP_NBD_CLIENT) {
+      if (!['nbd-client', APP_NBD_CLIENT, 'flock', 'systemctl'].includes(command[0])) {
         return 0;
       }
-      if (command.includes('-d')) {
+      if (command.includes('-d') || (command[0] === 'systemctl' && command[1] === 'stop')) {
         connected = false;
-        identity = undefined;
+        process = undefined;
         return 0;
       }
-      if (!supportsIdentity && command.includes('-identifier')) {
+      if (!supportsClient && command.includes('-nonetlink')) {
         return 1;
       }
       connected = true;
-      const identifierAt = command.indexOf('-identifier');
-      identity = identifierAt < 0 ? undefined : command[identifierAt + 1];
+      process =
+        command[0] === 'flock'
+          ? {
+              cmdline: `${command.slice(command.indexOf('--') + 1).join('\0')}\0`,
+              cgroup: `0::/system.slice/${attachmentScope(target)}\n`,
+            }
+          : undefined;
       return 0;
     }
     const commands = recordingCommands(({ command }) =>
@@ -92,7 +98,8 @@ function host({
       const attributes: Record<string, string | undefined> = {
         [`${sysfs}size`]: connected ? '8\n' : '0\n',
         [`${sysfs}pid`]: connected ? '123\n' : undefined,
-        [`${sysfs}backend`]: identity,
+        '/proc/123/cmdline': process?.cmdline,
+        '/proc/123/cgroup': process?.cgroup,
       };
       const value = attributes[path];
       return value === undefined
@@ -103,6 +110,8 @@ function host({
     }
     const filesystemLayer = Layer.succeed(FileSystem.FileSystem, {
       ...fs,
+      makeDirectory: (...args) =>
+        args[0] === '/run/nibrun-nbd' ? Effect.void : fs.makeDirectory(...args),
       stat: (path) =>
         fs
           .stat(path)
@@ -114,7 +123,9 @@ function host({
             ),
           ),
       readFileString: (...args) =>
-        args[0].startsWith(sysfs) ? readAttribute(args[0]) : fs.readFileString(...args),
+        args[0].startsWith(sysfs) || args[0].startsWith('/proc/123/')
+          ? readAttribute(args[0])
+          : fs.readFileString(...args),
     });
     let releases = 0;
     const allocations: string[] = [];
@@ -261,8 +272,10 @@ describe('opt-in volume routing', () => {
         const report = yield* stage.manager.provision(wanted).pipe(Effect.provide(stage.support));
         expect(report.storagePrefix).toBe(stage.filesystem.storagePrefix);
         expect(stage.commands.commands[0]?.command).toContain(stage.filesystem.nbdSocketPath);
-        expect(stage.commands.commands[0]?.command).toContain('-identifier');
-        expect(stage.commands.commands[0]?.command[0]).toBe(APP_NBD_CLIENT);
+        expect(stage.commands.commands[0]?.command).toContain('-nonetlink');
+        expect(stage.commands.commands[0]?.command).not.toContain('-identifier');
+        expect(stage.commands.commands[0]?.command[0]).toBe('flock');
+        expect(stage.commands.commands[0]?.command).toContain(APP_NBD_CLIENT);
         expect(yield* stage.fs.exists(join(stage.sharedMount, NBD_DIRECTORY, VOLUME_ID))).toBe(
           false,
         );
@@ -277,8 +290,16 @@ describe('opt-in volume routing', () => {
           .pipe(Effect.provide(stage.support));
         expect(deleted.state).toBe('deleted');
         expect(
-          stage.commands.commands.find(({ command }) => command.includes('-d'))?.command,
-        ).toEqual([APP_NBD_CLIENT, '-d', stage.slot.nbdDevicePath]);
+          stage.commands.commands.find(({ command }) => command[0] === 'systemctl')?.command,
+        ).toEqual([
+          'systemctl',
+          'stop',
+          attachmentScope({
+            socketPath: stage.filesystem.nbdSocketPath,
+            devicePath: stage.slot.nbdDevicePath,
+            volumeId: VOLUME_ID,
+          }),
+        ]);
         expect(stage.released()).toBe(1);
         expect(
           yield* stage.fs.exists(join(stage.filesystem.mountPath, NBD_DIRECTORY, VOLUME_ID)),
@@ -377,7 +398,7 @@ describe('opt-in volume routing', () => {
     );
   });
 
-  test.each([{ mounted: false }, { supportsIdentity: false }])(
+  test.each([{ mounted: false }, { supportsClient: false }])(
     'an unusable host setup fails without falling back: %j',
     async (options) => {
       await run(
@@ -396,7 +417,9 @@ describe('opt-in volume routing', () => {
             stage.commands.commands.every(
               ({ command }) =>
                 !command.includes('-unix') ||
-                (command[0] === APP_NBD_CLIENT && command.includes(stage.filesystem.nbdSocketPath)),
+                (command[0] === 'flock' &&
+                  command.includes(APP_NBD_CLIENT) &&
+                  command.includes(stage.filesystem.nbdSocketPath)),
             ),
           ).toBe(true);
         }),

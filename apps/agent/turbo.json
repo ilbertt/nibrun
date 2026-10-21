@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "env": ["NIBRUN_TEST_NBD"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/internal-scripts/src/prepare-agent-tests.ts"
+      ]
+    }
+  }
+}
