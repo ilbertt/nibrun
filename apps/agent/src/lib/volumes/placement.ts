@@ -1,6 +1,6 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredVolume } from '@repo/protocol';
-import { Data, Effect, Option } from 'effect';
+import { Data, Effect } from 'effect';
 import { AppZerofsFilesystemUnavailable } from '#lib/volumes/app-zerofs-filesystem.ts';
 import { assertMounted, devicePathFor } from '#lib/volumes/device-file.ts';
 import { isUsableFor } from '#lib/volumes/nbd.ts';
@@ -32,10 +32,7 @@ export function usesAppVolumeStorage(desired: Pick<DesiredVolume, 'appId' | 'sto
       return true;
     }
     const topology = yield* ZerofsTopology;
-    return (
-      Option.isSome(yield* topology.lookupAppFilesystem(desired.appId)) ||
-      (yield* topology.isAppRetired(desired.appId))
-    );
+    return yield* topology.usesAppStorage(desired.appId);
   });
 }
 
@@ -43,10 +40,7 @@ export function selectVolumeFilesystem(desired: DesiredVolume) {
   return Effect.gen(function* () {
     const topology = yield* ZerofsTopology;
     if (desired.storage === undefined) {
-      if (
-        Option.isSome(yield* topology.lookupAppFilesystem(desired.appId)) ||
-        (yield* topology.isAppRetired(desired.appId))
-      ) {
+      if (yield* topology.usesAppStorage(desired.appId)) {
         return yield* new VolumeStorageConflict();
       }
       return topology.place();

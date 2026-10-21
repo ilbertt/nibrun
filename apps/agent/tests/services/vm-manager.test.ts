@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { dirname } from 'node:path';
 import { FileSystem } from '@effect/platform';
 import type { HostVersions } from '@repo/protocol';
 import { Effect, Either, Layer } from 'effect';
@@ -7,6 +8,7 @@ import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import type { FirecrackerConfig } from '#lib/vm/firecracker-config.ts';
 import { type SnapshotStamp, snapshotPaths } from '#lib/vm/snapshot.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
+import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { ArtifactTransferError } from '#services/artifact-store.service.ts';
@@ -99,6 +101,7 @@ function hostAsleepAndRefusing() {
     const snapshotDir = yield* temporaryDirectory;
     const imageHost = yield* installedGuestImage(versions.guestImage);
     const runtimeDir = yield* temporaryDirectory;
+    const stateDir = yield* temporaryDirectory;
     const paths = snapshotPaths({ snapshotDir, appId: APP_ID });
     yield* fs.makeDirectory(paths.directory, { recursive: true });
     yield* fs.writeFileString(paths.statePath, 'the vmm as it was');
@@ -111,6 +114,7 @@ function hostAsleepAndRefusing() {
     const systemctl = systemctlRefusingStart();
     const host = Layer.mergeAll(
       agentConfig({
+        stateDir,
         vmSnapshotDir: snapshotDir,
         vmDir: yield* temporaryDirectory,
         versionsFile: imageHost.versionsFile,
@@ -144,10 +148,22 @@ function hostAsleepAndRefusing() {
       stamp: fs.exists(paths.stampPath),
       snapshot: fs.exists(paths.directory),
     });
-    function blockedByStorage(operation: 'boot' | 'wake') {
+    function blockedByStorage({
+      operation,
+      staged,
+    }: {
+      operation: 'boot' | 'wake';
+      staged: boolean;
+    }) {
       return Effect.gen(function* () {
+        if (staged) {
+          const configFile = appZerofsPaths({ appId: APP_ID, stateDir }).configFile;
+          yield* fs.makeDirectory(dirname(configFile), { recursive: true });
+        }
         const cache = yield* DesiredStateCache;
-        yield* cache.accept(desiredState({ volumes: [desiredVolume({ storage: s3Storage() })] }));
+        yield* cache.accept(
+          desiredState({ volumes: [desiredVolume({ storage: staged ? undefined : s3Storage() })] }),
+        );
         const vms = yield* VmManager;
         return yield* operation === 'boot'
           ? vms.boot({ desired: desiredInstance(), slot: SLOT, dataDevicePath: SLOT.nbdDevicePath })
@@ -248,14 +264,21 @@ describe('a wake whose unit systemd would not start', () => {
 });
 
 describe('configured storage gates every VM start', () => {
-  test.each(['boot', 'wake'] as const)(
-    'an unavailable backend blocks %s without touching the VM or snapshot',
-    async (operation) => {
+  test.each([
+    { operation: 'boot', staged: false },
+    { operation: 'wake', staged: false },
+    { operation: 'boot', staged: true },
+    { operation: 'wake', staged: true },
+  ] as const)(
+    'an unavailable or omitted storage backend blocks the VM start: %j',
+    async (options) => {
       await run(
         Effect.gen(function* () {
           const stage = yield* hostAsleepAndRefusing();
-          const result = yield* stage.blockedByStorage(operation);
-          expect(Either.isLeft(result) && result.left._tag).toBe('AppZerofsFilesystemUnavailable');
+          const result = yield* stage.blockedByStorage(options);
+          expect(Either.isLeft(result) && result.left._tag).toBe(
+            options.staged ? 'VolumeStorageConflict' : 'AppZerofsFilesystemUnavailable',
+          );
           expect(stage.commands).toEqual([]);
           expect(yield* stage.kept).toEqual({ stamp: true, snapshot: true });
         }),

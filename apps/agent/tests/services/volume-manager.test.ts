@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
 import { SystemError } from '@effect/platform/Error';
 import { AppIdSchema, type DesiredVolume, ObjectKeySchema, VolumeIdSchema } from '@repo/protocol';
@@ -8,6 +8,7 @@ import { Effect, Either, Layer, Option } from 'effect';
 import type { CommandLine } from '#lib/exec.ts';
 import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import { AppVolumeFileUnavailable } from '#lib/volumes/app-volume-file.ts';
+import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
 import { ensureDeviceFile, NBD_DIRECTORY, removeDeviceFile } from '#lib/volumes/device-file.ts';
 import { attachmentScope, NbdAttachmentUnavailable } from '#lib/volumes/nbd.ts';
 import { AppVolumeUnavailable, selectVolumeFilesystem } from '#lib/volumes/placement.ts';
@@ -53,6 +54,7 @@ function host({
     const fs = yield* FileSystem.FileSystem;
     const paths = yield* Path.Path;
     const directory = yield* temporaryDirectory;
+    const stateDir = join(directory, 'state');
     const slot = {
       ...describeSlot({ slot: FIRST_SLOT, appId: APP_ID }),
       nbdDevicePath: join(directory, 'nbd0'),
@@ -165,6 +167,7 @@ function host({
       }),
     );
     const config = agentConfig({
+      stateDir,
       appVolumeNbdClient: APP_NBD_CLIENT,
       zerofsMount: sharedMount,
       zerofsNbdSocket: join(directory, 'shared.sock'),
@@ -297,12 +300,62 @@ function host({
       activations,
       storage,
       image,
+      configDirectory: dirname(appZerofsPaths({ appId: APP_ID, stateDir }).configFile),
       released: () => releases,
     };
   });
 }
 
 describe('opt-in volume routing', () => {
+  test.each(['provision', 'teardown'] as const)(
+    'staged storage without a recovered registration blocks shared %s',
+    async (operation) => {
+      await run(
+        Effect.gen(function* () {
+          const stage = yield* host({ registered: false, connection: 'shared' });
+          yield* stage.fs.makeDirectory(stage.configDirectory, { recursive: true });
+          yield* stage.image({ mount: stage.sharedMount });
+          const result = yield* operation === 'provision'
+            ? stage.manager
+                .provision(desiredVolume())
+                .pipe(
+                  Effect.match({ onFailure: (error) => error._tag, onSuccess: () => undefined }),
+                  Effect.provide(stage.support),
+                )
+            : stage.manager
+                .teardown(desiredVolume({ desiredState: 'absent' }))
+                .pipe(
+                  Effect.match({ onFailure: (error) => error._tag, onSuccess: () => undefined }),
+                  Effect.provide(stage.support),
+                );
+          expect(result).toBe('VolumeStorageConflict');
+          expect(stage.commands.commands).toEqual([]);
+          expect(yield* stage.fs.exists(join(stage.sharedMount, NBD_DIRECTORY, VOLUME_ID))).toBe(
+            true,
+          );
+        }),
+      );
+    },
+  );
+
+  test('staged storage cannot be discovered as shared after a restart', async () => {
+    await run(
+      Effect.gen(function* () {
+        const stage = yield* host({ registered: false, connection: 'shared' });
+        yield* stage.fs.makeDirectory(stage.configDirectory, { recursive: true });
+        yield* stage.image({ mount: stage.sharedMount });
+        yield* stage.image({ mount: stage.sharedMount, volumeId: OTHER_VOLUME });
+        const observed = yield* stage.manager
+          .observe({
+            appIdByVolume: new Map([...owners, [OTHER_VOLUME, OTHER_APP]]),
+            desiredVolumes: [desiredVolume()],
+          })
+          .pipe(Effect.provide(stage.support));
+        expect(observed.map(({ volumeId }) => volumeId)).toEqual([OTHER_VOLUME]);
+      }),
+    );
+  });
+
   test('a configured volume activates its filesystem before placement and provisioning', async () => {
     await run(
       Effect.gen(function* () {

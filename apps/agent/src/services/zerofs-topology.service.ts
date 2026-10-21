@@ -7,6 +7,7 @@ import { AppZerofsFlushError } from '#lib/volumes/app-zerofs-durability.ts';
 import {
   AppZerofsFilesystemConflict,
   AppZerofsFilesystemUnavailable,
+  hasStagedAppZerofsConfig,
 } from '#lib/volumes/app-zerofs-filesystem.ts';
 import { readAppZerofsRetirement } from '#lib/volumes/app-zerofs-retirement.ts';
 import type { AppZerofsRegistration, ZerofsFilesystem } from '#lib/volumes/topology.ts';
@@ -160,11 +161,14 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
       resolveAppFilesystem,
       registerAppFilesystem,
       unregisterAppFilesystem,
-      isAppRetired: (appId: AppId) =>
-        readAppZerofsRetirement(appId).pipe(
-          Effect.map(Option.isSome),
-          Effect.provideService(AgentConfig, config),
-        ),
+      usesAppStorage: (appId: AppId) =>
+        Effect.gen(function* () {
+          return (
+            Option.isSome(yield* lookupAppFilesystem(appId)) ||
+            Option.isSome(yield* readAppZerofsRetirement(appId)) ||
+            (yield* hasStagedAppZerofsConfig(appId))
+          );
+        }).pipe(Effect.provideService(AgentConfig, config)),
       flushAll,
     };
   }),
