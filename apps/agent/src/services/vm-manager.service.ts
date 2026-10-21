@@ -27,6 +27,7 @@ import {
 } from '#lib/vm/snapshot.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { GUEST_VSOCK_FILENAME, vmWorkingDir } from '#lib/vm/vsock.ts';
+import { readAppZerofsCacheDiskBytes } from '#lib/volumes/app-zerofs-cache.ts';
 import { requireConfiguredVolume, VolumeStorageConflict } from '#lib/volumes/placement.ts';
 import { readCacheDiskBytes } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
@@ -277,7 +278,9 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       const space = yield* readFilesystemSpace(config.vmSnapshotDir);
       return {
         ...space,
-        zerofsCacheBytes: yield* readCacheDiskBytes(config.zerofsConfigFile),
+        zerofsCacheBytes:
+          (yield* readCacheDiskBytes(config.zerofsConfigFile)) +
+          (yield* readAppZerofsCacheDiskBytes(config.stateDir)),
         snapshotBytes: yield* readSnapshotBytes(config.vmSnapshotDir),
       } satisfies SnapshotDisk;
     });

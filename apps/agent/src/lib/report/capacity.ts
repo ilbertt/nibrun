@@ -4,6 +4,7 @@ import type { FileSystem } from '@effect/platform';
 import type { HostCapacity, InstanceResources, InstanceState } from '@repo/protocol';
 import { Effect, Either } from 'effect';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
+import { readAppZerofsCacheMemoryBytes } from '#lib/volumes/app-zerofs-cache.ts';
 import { readCacheMemoryBytes } from '#lib/volumes/zerofs.ts';
 
 const BYTES_PER_MIB = 1_048_576;
@@ -66,9 +67,13 @@ export function guestMemoryMib({
   return Math.max(hostMemoryMib - zerofsCacheMib - HOST_BASELINE_MIB, NONE);
 }
 
-export const readGuestMemoryMib = Effect.fn('capacity.readGuestMemoryMib')(function* (
-  zerofsConfigFile: string,
-) {
+export const readGuestMemoryMib = Effect.fn('capacity.readGuestMemoryMib')(function* ({
+  zerofsConfigFile,
+  stateDir,
+}: {
+  zerofsConfigFile: string;
+  stateDir: string;
+}) {
   const configured = yield* Effect.either(readCacheMemoryBytes(zerofsConfigFile));
   if (Either.isLeft(configured)) {
     yield* Effect.logWarning('zerofs memory cache could not be read').pipe(
@@ -78,11 +83,17 @@ export const readGuestMemoryMib = Effect.fn('capacity.readGuestMemoryMib')(funct
       }),
     );
   }
+  const apps = yield* Effect.either(readAppZerofsCacheMemoryBytes(stateDir));
+  if (Either.isLeft(apps)) {
+    yield* Effect.logWarning(apps.left.message);
+    return NONE;
+  }
   return guestMemoryMib({
     hostMemoryMib: readHostMemoryMib(),
-    zerofsCacheMib: Either.isLeft(configured)
-      ? ASSUMED_ZEROFS_CACHE_MIB
-      : Math.ceil(configured.right / BYTES_PER_MIB),
+    zerofsCacheMib:
+      (Either.isLeft(configured)
+        ? ASSUMED_ZEROFS_CACHE_MIB
+        : Math.ceil(configured.right / BYTES_PER_MIB)) + Math.ceil(apps.right / BYTES_PER_MIB),
   });
 });
 
@@ -112,15 +123,15 @@ export const readAvailableCacheBytes = (cacheDir: string) =>
  * what it can carry.
  */
 export const readHostCapacity = ({
-  cacheDir,
+  stateDir,
   zerofsConfigFile,
 }: {
-  cacheDir: string;
+  stateDir: string;
   zerofsConfigFile: string;
 }): Effect.Effect<HostCapacity, never, FileSystem.FileSystem> =>
   Effect.all({
-    space: spaceOrUnmeasured(cacheDir),
-    memoryMib: readGuestMemoryMib(zerofsConfigFile),
+    space: spaceOrUnmeasured(stateDir),
+    memoryMib: readGuestMemoryMib({ zerofsConfigFile, stateDir }),
   }).pipe(
     Effect.map(({ space, memoryMib }) => ({
       vcpuCount: availableParallelism(),

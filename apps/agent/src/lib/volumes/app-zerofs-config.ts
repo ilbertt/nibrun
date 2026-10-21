@@ -13,6 +13,7 @@ type AppZerofsConfig = {
 
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
+export const APP_ZEROFS_CONFIG_FILENAME = 'config.toml';
 
 export class AppZerofsConfigConflict extends Data.TaggedError('AppZerofsConfigConflict') {
   override get message() {
@@ -26,11 +27,15 @@ export class AppZerofsConfigUnavailable extends Data.TaggedError('AppZerofsConfi
   }
 }
 
+export function appZerofsConfigDirectory(stateDir: string) {
+  return join(stateDir, 'zerofs');
+}
+
 // These paths also appear in nibrun-app-zerofs@.service, which outlives the agent.
 export function appZerofsPaths({ appId, stateDir }: { appId: AppId; stateDir: string }) {
   const runtimeDirectory = `/run/zerofs-apps/${appId}`;
   return {
-    configFile: join(stateDir, 'zerofs', appId, 'config.toml'),
+    configFile: join(appZerofsConfigDirectory(stateDir), appId, APP_ZEROFS_CONFIG_FILENAME),
     cacheDirectory: `/data/zerofs-apps/${appId}`,
     mountPath: `/mnt/zerofs-apps/${appId}`,
     sockets: {
@@ -56,7 +61,7 @@ function publishConfig({ configFile, contents }: { configFile: string; contents:
         directory,
         prefix: '.config-',
       });
-      const temporaryFile = join(temporaryDirectory, 'config.toml');
+      const temporaryFile = join(temporaryDirectory, APP_ZEROFS_CONFIG_FILENAME);
       yield* fs.writeFileString(temporaryFile, contents, { mode: PRIVATE_FILE_MODE, flag: 'wx' });
 
       // A hard link publishes complete bytes without replacing a concurrent writer's config.
