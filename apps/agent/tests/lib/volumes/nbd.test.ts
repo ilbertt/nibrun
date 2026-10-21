@@ -4,9 +4,17 @@ import { FileSystem } from '@effect/platform';
 import { SystemError } from '@effect/platform/Error';
 import { VolumeIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Effect, Layer } from 'effect';
+import { Effect, Either, Layer } from 'effect';
 import { CommandTimedOut } from '#lib/exec.ts';
-import { isUsable, reattach } from '#lib/volumes/nbd.ts';
+import {
+  backendIdentifier,
+  detachVerified,
+  inspectAttachment,
+  isUsable,
+  isUsableFor,
+  reattach,
+  reattachVerified,
+} from '#lib/volumes/nbd.ts';
 import type { CommandRunner } from '#services/command-runner.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 
@@ -53,7 +61,7 @@ function sysfs(attributes: Readonly<Record<string, string>>) {
 type Host = CommandRunner | FileSystem.FileSystem;
 
 function running(layer: Layer.Layer<Host>) {
-  return function once<A>(effect: Effect.Effect<A, never, Host>) {
+  return function once<A, E>(effect: Effect.Effect<A, E, Host>) {
     return Effect.runPromise(Effect.provide(effect, layer));
   };
 }
@@ -216,5 +224,136 @@ describe('repairing a device the kernel still holds', () => {
     expect(commands.find(({ command }) => command.includes('-persist'))?.command).toContain(
       '-timeout',
     );
+  });
+});
+
+describe('identifying the live NBD export', () => {
+  test('an unassigned device has no verified attachment', async () => {
+    const { commands, run } = host({ attributes: {} });
+    expect(await run(inspectAttachment(target))).toBe(false);
+    expect(commands).toEqual([]);
+  });
+
+  test('a healthy legacy device is never accepted or probed as a private export', async () => {
+    const { commands, run } = host();
+    expect(await run(isUsableFor(target))).toBe(false);
+    const result = await run(Effect.either(reattachVerified(target)));
+    expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentMismatch');
+    expect(commands).toEqual([]);
+  });
+
+  test.each([
+    { ...target, socketPath: '/run/another/nbd.sock' },
+    { ...target, volumeId: Value.Parse(VolumeIdSchema, 'another-volume') },
+  ])('a connection to another socket or export is never detached: %j', async (other) => {
+    const { commands, run } = host({
+      attributes: {
+        ...attached,
+        [`${SYSFS}/backend`]: `${backendIdentifier(other)}\n`,
+      },
+    });
+    const result = await run(Effect.either(detachVerified(target)));
+    expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentMismatch');
+    expect(commands).toEqual([]);
+  });
+
+  test('only a matching live export receives the liveness probe', async () => {
+    const { commands, run } = host({
+      attributes: {
+        ...attached,
+        [`${SYSFS}/backend`]: `${backendIdentifier(target)}\n`,
+      },
+    });
+    expect(await run(isUsableFor(target))).toBe(true);
+    expect(commands.map(({ command }) => command[0])).toEqual(['dd']);
+  });
+
+  test('a new attachment supplies its identity and verifies what the kernel recorded', async () => {
+    const attributes: Record<string, string> = {};
+    const { commands, run } = host({
+      attributes,
+      answer: () =>
+        Effect.sync(() => {
+          Object.assign(attributes, attached, { [`${SYSFS}/backend`]: backendIdentifier(target) });
+          return { code: 0, stdout: '', stderr: '' };
+        }),
+    });
+    await run(reattachVerified(target));
+    expect(commands.map(({ command }) => command[0])).toEqual(['nbd-client']);
+    expect(commands[0]?.command).toContain('-identifier');
+    expect(commands[0]?.command).toContain(backendIdentifier(target));
+    expect(commands[0]?.command).toContain('-persist');
+  });
+
+  test('repairing a verified connection checks the detach before reconnecting', async () => {
+    const attributes: Record<string, string> = {
+      ...attached,
+      [`${SYSFS}/backend`]: backendIdentifier(target),
+    };
+    const { commands, run } = host({
+      attributes,
+      answer: ({ command }) =>
+        Effect.sync(() => {
+          if (isDetach(command)) {
+            delete attributes[`${SYSFS}/pid`];
+            delete attributes[`${SYSFS}/backend`];
+          } else {
+            Object.assign(attributes, attached, {
+              [`${SYSFS}/backend`]: backendIdentifier(target),
+            });
+          }
+          return { code: 0, stdout: '', stderr: '' };
+        }),
+    });
+    await run(reattachVerified(target));
+    expect(commands[0]?.command).toEqual(['nbd-client', '-d', DEVICE]);
+    expect(commands[1]?.command).toContain('-identifier');
+  });
+
+  test('a failed verified detach never reconnects and hides subprocess output', async () => {
+    const { commands, run } = host({
+      attributes: { ...attached, [`${SYSFS}/backend`]: backendIdentifier(target) },
+      answer: () => succeeding({ code: 1, stderr: 'private-server-output' }),
+    });
+    const result = await run(Effect.either(reattachVerified(target)));
+    expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentUnavailable');
+    expect(JSON.stringify(result)).not.toContain('private-server-output');
+    expect(commands.map(({ command }) => command)).toEqual([['nbd-client', '-d', DEVICE]]);
+  });
+
+  test('success from a client that recorded no identity is not an attachment success', async () => {
+    const { commands, run } = host({ attributes: {} });
+    const result = await run(Effect.either(reattachVerified(target)));
+    expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentUnavailable');
+    expect(commands.map(({ command }) => command[0])).toEqual(['nbd-client']);
+  });
+
+  test('an older client that rejects the identifier fails without a fallback connection', async () => {
+    const { commands, run } = host({ attributes: {}, answer: () => succeeding({ code: 1 }) });
+    const result = await run(Effect.either(reattachVerified(target)));
+    expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentUnavailable');
+    expect(commands.map(({ command }) => command[0])).toEqual(['nbd-client']);
+  });
+
+  test('unreadable kernel metadata is an error rather than evidence that the device is free', async () => {
+    const commands = recordingCommands();
+    const run = running(
+      Layer.merge(
+        commands.layer,
+        FileSystem.layerNoop({
+          readFileString: () =>
+            Effect.fail(
+              new SystemError({
+                module: 'FileSystem',
+                method: 'readFileString',
+                reason: 'PermissionDenied',
+              }),
+            ),
+        }),
+      ),
+    );
+    const result = await run(Effect.either(reattachVerified(target)));
+    expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentUnavailable');
+    expect(commands.commands).toEqual([]);
   });
 });
