@@ -8,6 +8,7 @@ import { duringReplacements } from '#lib/reconcile/replacements.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppActivator } from '#services/app-activator.service.ts';
 import { CaddyProxy } from '#services/caddy-proxy.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { HostFirewall } from '#services/host-firewall.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
@@ -73,7 +74,9 @@ function host({ refuseFirewall, refuseProxy }: { refuseFirewall: boolean; refuse
   const run = provided(
     Layer.mergeAll(
       AgentState.Default,
-      SlotAllocator.DefaultWithoutDependencies,
+      SlotAllocator.DefaultWithoutDependencies.pipe(
+        Layer.provide(DesiredStateCache.DefaultWithoutDependencies),
+      ),
       HostFirewall.Default,
       activators,
       proxy,

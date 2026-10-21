@@ -17,6 +17,7 @@ import {
   HOST_PORT_BASE,
   SLOT_COUNT,
 } from '#lib/network/slot.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { platform, provided } from '#tests/support/run.ts';
@@ -36,6 +37,7 @@ const everySlot = [...Array(SLOT_COUNT).keys()];
 
 const run = provided(
   SlotAllocator.DefaultWithoutDependencies.pipe(
+    Layer.provide(DesiredStateCache.DefaultWithoutDependencies),
     Layer.provide(Layer.merge(agentConfig(), platform)),
   ),
 );
@@ -185,6 +187,7 @@ describe('a cursor read off disk cannot hand out a slot somebody holds', () => {
       await Bun.write(file, JSON.stringify(cursor));
       const slot = await provided(
         SlotAllocator.DefaultWithoutDependencies.pipe(
+          Layer.provide(DesiredStateCache.DefaultWithoutDependencies),
           Layer.provide(Layer.merge(agentConfig({ slotCursorFile: file }), platform)),
         ),
       )(

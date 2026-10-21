@@ -5,6 +5,7 @@ import { Effect, Layer, Option } from 'effect';
 import { forwardedInstances } from '#lib/reconcile/network.ts';
 import type { InstanceRecord } from '#lib/report/instance-record.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { APP_ID, HTTP_PORT_FIXTURE, instanceRecord } from '#tests/support/fixtures.ts';
@@ -18,7 +19,10 @@ const DOWN_STATES = INSTANCE_STATES.filter((state) => state !== 'running');
 const run = provided(
   Layer.mergeAll(
     AgentState.Default,
-    SlotAllocator.DefaultWithoutDependencies.pipe(Layer.provide(agentConfig())),
+    SlotAllocator.DefaultWithoutDependencies.pipe(
+      Layer.provide(DesiredStateCache.DefaultWithoutDependencies),
+      Layer.provide(agentConfig()),
+    ),
   ).pipe(Layer.provideMerge(platform)),
 );
 

@@ -22,7 +22,9 @@ export function provisionVolume({
     yield* Effect.annotateCurrentSpan({ volumeId: desired.volumeId, appId: desired.appId });
     const path = yield* Path.Path;
     const allocator = yield* SlotAllocator;
-    const slot = yield* allocator.allocate(desired.appId);
+    const slot = yield* desired.storage === undefined
+      ? allocator.allocate(desired.appId)
+      : allocator.allocateWithNbdDevice(desired.appId);
     const target = {
       socketPath: filesystem.nbdSocketPath,
       devicePath: slot.nbdDevicePath,

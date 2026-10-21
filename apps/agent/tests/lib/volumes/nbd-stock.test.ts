@@ -4,6 +4,7 @@ import { Command, FileSystem } from '@effect/platform';
 import { VolumeIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Effect, Either, Layer, Schedule } from 'effect';
+import { SLOT_COUNT } from '#lib/network/slot.ts';
 import {
   attachmentLock,
   attachmentScope,
@@ -15,7 +16,10 @@ import {
   reattachVerified,
 } from '#lib/volumes/nbd.ts';
 import { CommandRunner, run as runCommand, stdoutOf } from '#services/command-runner.service.ts';
-import { VOLUME_ID } from '#tests/support/fixtures.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
+import { SlotAllocator } from '#services/slot-allocator.service.ts';
+import { agentConfig } from '#tests/support/config.ts';
+import { APP_ID, VOLUME_ID } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const commands = Layer.effect(
@@ -40,9 +44,23 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_NBD !== '1')
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const directory = yield* temporaryDirectory;
+        const slotCursorFile = join(directory, 'cursor.json');
+        yield* fs.writeFileString(slotCursorFile, `${SLOT_COUNT - 1}`);
+        const allocator = yield* SlotAllocator.pipe(
+          Effect.provide(
+            SlotAllocator.DefaultWithoutDependencies.pipe(
+              Layer.provide(DesiredStateCache.DefaultWithoutDependencies),
+              Layer.provide(
+                agentConfig({ slotsFile: join(directory, 'slots.json'), slotCursorFile }),
+              ),
+            ),
+          ),
+        );
+        const slot = yield* allocator.allocateWithNbdDevice(APP_ID);
+        expect(slot.nbdDevicePath).toBe('/dev/nbd0');
         const target = {
           socketPath: join(directory, 'nbd.sock'),
-          devicePath: '/dev/nbd0',
+          devicePath: slot.nbdDevicePath,
           volumeId: VOLUME_ID,
           client: NBD_CLIENT,
         };
