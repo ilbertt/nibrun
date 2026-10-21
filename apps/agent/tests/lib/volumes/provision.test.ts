@@ -9,6 +9,7 @@ import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import { NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
 import { provisionVolume } from '#lib/volumes/provision.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
+import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { ArtifactStore, ArtifactTransferError } from '#services/artifact-store.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
@@ -101,7 +102,13 @@ function host({
       nbdSocketPath: join(directory, 'customer.sock'),
       admin: { binary: '/test/zerofs', configFile: join(directory, 'customer.toml') },
     };
-    const support = Layer.mergeAll(filesystemLayer, commands.layer, agentConfig(), store);
+    const support = Layer.mergeAll(
+      filesystemLayer,
+      commands.layer,
+      agentConfig(),
+      store,
+      AppVolumeFiles.Default.pipe(Layer.provide(filesystemLayer)),
+    );
     return {
       fs,
       directory,

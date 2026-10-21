@@ -1,7 +1,8 @@
-import type { ExportId, ReportedExport } from '@repo/protocol';
+import type { ExportId, HostDesiredState, ReportedExport } from '@repo/protocol';
 import { Effect, Option } from 'effect';
 import { reportedMessage } from '#lib/failure.ts';
 import type { ExportPlan, ReconcilePlan } from '#lib/reconcile/plan.ts';
+import { AppVolumeOperationUnavailable } from '#lib/volumes/placement.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -61,7 +62,13 @@ const write = ({ action }: { action: Extract<ExportPlan, { action: 'write' }> })
  * exactly the pass that finds one. Before the writes, so an export never starts against a device
  * or a server a dead predecessor left attached.
  */
-export const applyExports = ({ plan }: { plan: ReconcilePlan }) =>
+export const applyExports = ({
+  plan,
+  desired,
+}: {
+  plan: ReconcilePlan;
+  desired: HostDesiredState;
+}) =>
   Effect.gen(function* () {
     const exports = yield* ExportManager;
     yield* exports.reap;
@@ -70,6 +77,18 @@ export const applyExports = ({ plan }: { plan: ReconcilePlan }) =>
       (action) => {
         if (action.action === 'none') {
           return Effect.void;
+        }
+        if (
+          action.action === 'write' &&
+          desired.volumes.some(
+            (volume) => volume.volumeId === action.desired.volumeId && volume.storage !== undefined,
+          )
+        ) {
+          return setReport({
+            exportId: action.desired.exportId,
+            state: 'failed',
+            message: new AppVolumeOperationUnavailable().message,
+          });
         }
         return action.action === 'forget'
           ? forget(action.exportId)

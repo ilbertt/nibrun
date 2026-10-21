@@ -10,6 +10,7 @@ import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import { NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
 import { teardownVolume } from '#lib/volumes/teardown.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
+import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -114,7 +115,11 @@ function host({
           return yield* fs.remove(...args);
         }),
     });
-    const support = Layer.merge(filesystemLayer, commands.layer);
+    const support = Layer.mergeAll(
+      filesystemLayer,
+      commands.layer,
+      AppVolumeFiles.Default.pipe(Layer.provide(filesystemLayer)),
+    );
     return {
       fs,
       filesystem,
