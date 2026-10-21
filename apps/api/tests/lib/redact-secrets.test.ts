@@ -94,6 +94,35 @@ function desiredExport() {
 // keeps the bundle writable then.
 
 describe('secrets', () => {
+  test.each(['session', 'unknown'])(
+    'redaction reaches volume storage secrets for auth kind %s',
+    (kind) => {
+      const state = desiredState();
+      const volume = state.volumes[0];
+      const storage = {
+        endpoint: 'https://objects.example.com',
+        bucket: 'customer-bucket',
+        prefix: 'nibrun/app-1',
+        auth: {
+          kind,
+          accessKeyId: TENANT_SECRET,
+          secretAccessKey: TENANT_SECRET,
+          sessionToken: TENANT_SECRET,
+        },
+        encryptionPassword: TENANT_SECRET,
+      };
+      const input = { ...state, instances: [], volumes: [{ ...volume, storage }] };
+      const redacted = redactSecrets({ schema: HostDesiredStateSchema, value: input });
+      expect(JSON.stringify(redacted)).not.toInclude(TENANT_SECRET);
+      expect(redacted).toEqual({
+        ...input,
+        volumes: [
+          { ...volume, storage: { ...storage, auth: REDACTED, encryptionPassword: REDACTED } },
+        ],
+      });
+    },
+  );
+
   test('redaction reaches tenant environment values anywhere in a message', () => {
     const redacted = redactSecrets({ schema: HostDesiredStateSchema, value: desiredState() });
     expect(JSON.stringify(redacted)).not.toInclude(TENANT_SECRET);
