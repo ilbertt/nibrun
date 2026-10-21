@@ -15,7 +15,12 @@ import {
 import { applyActivators, applyNetwork, applyRoutes } from '#lib/reconcile/network.ts';
 import { hasDeferredWork, type ObservedState, planReconcile } from '#lib/reconcile/plan.ts';
 import { duringReplacements } from '#lib/reconcile/replacements.ts';
-import { applyTeardowns, applyVolumes, volumeOwners } from '#lib/reconcile/volumes.ts';
+import {
+  applyTeardowns,
+  applyVolumes,
+  hasPendingAppRetirements,
+  volumeOwners,
+} from '#lib/reconcile/volumes.ts';
 import { readInstanceRecords } from '#lib/report/instance-record.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT } from '#lib/vm/unit-status.ts';
@@ -291,6 +296,29 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       // before teardowns, so a volume marked absent this generation is still there to read.
       yield* applyExports({ plan, desired }).pipe(Effect.withSpan('reconcile.exports'));
       yield* applyTeardowns(plan).pipe(Effect.withSpan('reconcile.teardowns'));
+      yield* AgentState.modify((current) => ({
+        ...current,
+        deferredWork:
+          current.deferredWork ||
+          hasPendingAppRetirements({
+            desiredVolumes: desired.volumes,
+            deletedVolumes: current.deletedVolumes,
+          }),
+      }));
+      yield* volumes
+        .reclaim(
+          new Set([
+            ...desired.instances.map((instance) => instance.appId),
+            ...desired.volumes.map((volume) => volume.appId),
+          ]),
+        )
+        .pipe(
+          Effect.catchAll((error) =>
+            AgentState.modify((current) => ({ ...current, deferredWork: true })).pipe(
+              Effect.andThen(Effect.logWarning('app filesystem reclamation deferred', error)),
+            ),
+          ),
+        );
       // Again, because the instances started above are the ones whose forwards this renders.
       yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
       yield* applyRoutes.pipe(Effect.withSpan('reconcile.routes'));

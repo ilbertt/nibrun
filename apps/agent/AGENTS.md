@@ -38,6 +38,8 @@ Explicit deletion flushes the image removal before stopping the app's services a
 its filesystem. Retirement records reach disk before deletion is reported; they let retries avoid
 reopening an already-retired bucket and prevent fallback to shared storage after a restart.
 Cache and configuration files remain until acknowledged deletion allows local reclamation.
+Reclamation verifies the stopped services and matching config before removing local files, then
+releases their cache reservations. Durable retirement tombstones remain to reject stale starts.
 Agent shutdown, guest sleep and an omitted desired volume never retire a writer.
 
 Reserve per-app ZeroFS cache limits from every staged configuration, including while its guest

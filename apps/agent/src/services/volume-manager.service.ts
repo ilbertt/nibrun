@@ -96,7 +96,7 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
           ),
     );
 
-    return { observe, provision, teardown };
+    return { observe, provision, teardown, reclaim: appZerofs.reclaim };
   }),
   dependencies: [
     ZerofsTopology.Default,

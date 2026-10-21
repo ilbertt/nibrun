@@ -245,6 +245,7 @@ describe('observation on a selected live filesystem', () => {
                   Layer.succeed(
                     AppZerofs,
                     AppZerofs.make({
+                      reclaim: () => Effect.die('observation must not reclaim ZeroFS files'),
                       retire: () => Effect.die('observation must not retire ZeroFS'),
                       ensure: () => Effect.die('observation must not activate ZeroFS'),
                     }),

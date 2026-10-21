@@ -246,6 +246,7 @@ describe('provisioning on a selected live filesystem', () => {
                   Layer.succeed(
                     AppZerofs,
                     AppZerofs.make({
+                      reclaim: () => Effect.die('provisioning must not reclaim ZeroFS files'),
                       retire: () => Effect.die('provisioning must not retire ZeroFS'),
                       ensure: () => Effect.die('shared volumes must not activate ZeroFS'),
                     }),
