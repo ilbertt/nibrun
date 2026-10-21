@@ -35,19 +35,23 @@ jobs:
   tests:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    env:
-      NIBRUN_TEST_NBD: '1'
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/prepare
 
-      - name: Prepare agent integration tests
-        run: bun run --filter @repo/internal-scripts prepare-agent-tests
-
       - name: Run Tests
         run: bun run test
+
+      - name: Test NBD attachment
+        env:
+          NIBRUN_TEST_NBD: '1'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nbd-client nbdkit
+          sudo modprobe nbd nbds_max=1
+          bun run --filter @repo/agent test tests/lib/volumes/nbd-stock.test.ts
 
   checks-passed:
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)

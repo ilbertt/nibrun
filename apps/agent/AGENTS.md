@@ -141,8 +141,9 @@ Owned by `infra/app-host/`, not fixable here.
 ## What is not tested
 
 Linux CI exercises the packaged NBD client's attach, repair, ownership rejection and detach
-against an in-memory server and a real kernel device. This runs in the normal Turbo test suite
-with `NIBRUN_TEST_NBD=1`; only the fixture's privileged commands use sudo.
+against an in-memory server and a real kernel device. The existing checks job installs its
+packages and runs this test directly with `NIBRUN_TEST_NBD=1`; only the fixture's privileged
+commands use sudo.
 
 The gaps below still need a hypervisor, ZeroFS or real cloud storage; source inspection and
 mocked tests do not establish those guarantees.
