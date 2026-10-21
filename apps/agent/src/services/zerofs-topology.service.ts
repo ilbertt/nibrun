@@ -1,10 +1,14 @@
 import { isDeepStrictEqual } from 'node:util';
-import { type AppId, ObjectKeySchema } from '@repo/protocol';
+import { type AppId, ObjectKeySchema, type S3VolumeStorage } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Effect, Option, Ref } from 'effect';
+import { AppZerofsConfigConflict } from '#lib/volumes/app-zerofs-config.ts';
 import { AppZerofsFlushError } from '#lib/volumes/app-zerofs-durability.ts';
-import { AppZerofsFilesystemConflict } from '#lib/volumes/app-zerofs-filesystem.ts';
-import type { ZerofsFilesystem, ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
+import {
+  AppZerofsFilesystemConflict,
+  AppZerofsFilesystemUnavailable,
+} from '#lib/volumes/app-zerofs-filesystem.ts';
+import type { AppZerofsRegistration, ZerofsFilesystem } from '#lib/volumes/topology.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
@@ -37,36 +41,60 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
         admin: { binary: config.zerofsBinary, configFile: config.zerofsConfigFile },
       },
     ];
-    const appFilesystems = yield* Ref.make<ReadonlyMap<AppId, ZerofsLiveFilesystem>>(new Map());
+    const appFilesystems = yield* Ref.make<ReadonlyMap<AppId, AppZerofsRegistration>>(new Map());
 
     const lookupAppFilesystem = Effect.fn('ZerofsTopology.lookupAppFilesystem')((appId: AppId) =>
       Effect.map(Ref.get(appFilesystems), (registered) =>
-        Option.map(Option.fromNullable(registered.get(appId)), (filesystem) => ({
+        Option.map(Option.fromNullable(registered.get(appId)), ({ filesystem }) => ({
           ...filesystem,
           admin: { ...filesystem.admin },
         })),
       ),
     );
 
+    const resolveAppFilesystem = Effect.fn('ZerofsTopology.resolveAppFilesystem')(function* ({
+      appId,
+      storage,
+    }: {
+      appId: AppId;
+      storage: S3VolumeStorage;
+    }) {
+      const registered = (yield* Ref.get(appFilesystems)).get(appId);
+      if (registered === undefined) {
+        return yield* new AppZerofsFilesystemUnavailable();
+      }
+      if (!isDeepStrictEqual(registered.storage, storage)) {
+        return yield* new AppZerofsConfigConflict();
+      }
+      return { ...registered.filesystem, admin: { ...registered.filesystem.admin } };
+    });
+
     /** Register only ready filesystems under exclusive writer ownership for the instance's lifetime. */
     const registerAppFilesystem = Effect.fn('ZerofsTopology.registerAppFilesystem')(function* ({
       appId,
       filesystem,
-    }: {
-      appId: AppId;
-      filesystem: ZerofsLiveFilesystem;
-    }) {
-      const registered = { ...filesystem, admin: { ...filesystem.admin } };
+      storage,
+    }: AppZerofsRegistration & { appId: AppId }) {
+      if (storage.prefix !== filesystem.storagePrefix) {
+        return yield* new AppZerofsConfigConflict();
+      }
+      const registered: AppZerofsRegistration = {
+        filesystem: { ...filesystem, admin: { ...filesystem.admin } },
+        storage: { ...storage, auth: { ...storage.auth } },
+      };
       const accepted = yield* Ref.modify(appFilesystems, (current) => {
         const existing = current.get(appId);
         if (existing !== undefined) {
           return [isDeepStrictEqual(existing, registered), current] as const;
         }
-        const occupied = [...filesystems, ...current.values()].some(
+        const occupied = [
+          ...filesystems,
+          ...Array.from(current.values(), (entry) => entry.filesystem),
+        ].some(
           (other) =>
-            other.mountPath === registered.mountPath ||
-            other.nbdSocketPath === registered.nbdSocketPath ||
-            other.admin.configFile === registered.admin.configFile,
+            other.mountPath === filesystem.mountPath ||
+            other.nbdSocketPath === filesystem.nbdSocketPath ||
+            other.admin.configFile === filesystem.admin.configFile,
         );
         return occupied
           ? ([false, current] as const)
@@ -80,7 +108,7 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
     const flushApps = Effect.flatMap(Ref.get(appFilesystems), (registered) =>
       Effect.forEach(
         registered,
-        ([appId, filesystem]) =>
+        ([appId, { filesystem }]) =>
           flush(filesystem.admin).pipe(
             Effect.mapError(() => new AppZerofsFlushError()),
             Effect.catchAll((error) =>
@@ -117,6 +145,7 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
       place: () => filesystems[0],
       all: filesystems,
       lookupAppFilesystem,
+      resolveAppFilesystem,
       registerAppFilesystem,
       flushAll,
     };

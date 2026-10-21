@@ -1,4 +1,4 @@
-import type { ObjectKey } from '@repo/protocol';
+import type { ObjectKey, S3VolumeStorage } from '@repo/protocol';
 import type { ZerofsAdmin } from '#lib/volumes/zerofs.ts';
 
 /**
@@ -13,6 +13,11 @@ export type ZerofsLiveFilesystem = {
   readonly mountPath: string;
   readonly nbdSocketPath: string;
   readonly admin: ZerofsAdmin;
+};
+
+export type AppZerofsRegistration = {
+  readonly filesystem: ZerofsLiveFilesystem;
+  readonly storage: S3VolumeStorage;
 };
 
 /**
