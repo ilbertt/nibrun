@@ -1,4 +1,5 @@
 import type { McpServer, StandardSchemaWithJSON, ToolCallback } from '@modelcontextprotocol/server';
+import { MCP_TOOL_NAMES } from '@repo/api-constants';
 import { HranaStmtResultSchema, HranaStmtSchema } from '@repo/sqlite';
 import { Type } from '@sinclair/typebox';
 import type { OwnerId } from '#lib/api/identifiers.ts';
@@ -6,7 +7,6 @@ import { SqliteConnectionSchema } from '#lib/api/sqlite-connection.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import { handleToolResult } from '#lib/mcp/tools/shared/handle-tool-result.ts';
 import { registerTool } from '#lib/mcp/tools/shared/register-tool.ts';
-import { MCP_TOOL_NAMES } from '#lib/mcp/tools/shared/tool-names.ts';
 import { sqliteRequestSignal } from '#lib/sqlite/http.ts';
 import type { SqliteService } from '#services/sqlite.service.ts';
 
