@@ -250,6 +250,7 @@ describe('teardown on a selected live filesystem', () => {
                   Layer.succeed(
                     AppZerofs,
                     AppZerofs.make({
+                      reclaim: () => Effect.die('shared volumes must not reclaim ZeroFS files'),
                       retire: () => Effect.die('shared volumes must not retire ZeroFS'),
                       ensure: () => Effect.die('teardown must not activate ZeroFS'),
                     }),

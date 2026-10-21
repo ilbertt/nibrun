@@ -226,6 +226,7 @@ function host({
       Layer.succeed(
         AppZerofs,
         AppZerofs.make({
+          reclaim: () => Effect.void,
           retire: (desired) =>
             Effect.gen(function* () {
               const selected = yield* selectVolumeFilesystem(desired);

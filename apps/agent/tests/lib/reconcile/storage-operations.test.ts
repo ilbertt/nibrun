@@ -7,7 +7,9 @@ import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import { applyCheckpoints } from '#lib/reconcile/checkpoints.ts';
 import { applyExports } from '#lib/reconcile/exports.ts';
 import { planReconcile } from '#lib/reconcile/plan.ts';
+import { hasPendingAppRetirements } from '#lib/reconcile/volumes.ts';
 import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
+import { deletedVolumeReport } from '#lib/volumes/teardown.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
@@ -44,6 +46,31 @@ function registerPrivateFilesystem() {
 }
 
 describe('operations that still require shared storage', () => {
+  test('only incomplete configured deletions require another retirement pass', () => {
+    const wanted = desiredVolume({ desiredState: 'absent', storage: s3Storage() });
+    expect(hasPendingAppRetirements({ desiredVolumes: [wanted], deletedVolumes: new Map() })).toBe(
+      true,
+    );
+    expect(
+      hasPendingAppRetirements({
+        desiredVolumes: [wanted],
+        deletedVolumes: new Map([[wanted.volumeId, deletedVolumeReport(wanted)]]),
+      }),
+    ).toBe(false);
+    expect(
+      hasPendingAppRetirements({
+        desiredVolumes: [desiredVolume({ desiredState: 'absent' })],
+        deletedVolumes: new Map(),
+      }),
+    ).toBe(false);
+    expect(
+      hasPendingAppRetirements({
+        desiredVolumes: [desiredVolume({ storage: s3Storage() })],
+        deletedVolumes: new Map(),
+      }),
+    ).toBe(false);
+  });
+
   test.each(
     DESIRED_PRESENCE.flatMap((desiredPresence) => [
       { desiredPresence, configured: true },

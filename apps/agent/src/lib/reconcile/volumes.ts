@@ -14,6 +14,21 @@ import { toReportedVolume } from '#lib/volumes/manager.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
 
+export function hasPendingAppRetirements({
+  desiredVolumes,
+  deletedVolumes,
+}: {
+  desiredVolumes: readonly DesiredVolume[];
+  deletedVolumes: ReadonlyMap<VolumeId, ReportedVolume>;
+}) {
+  return desiredVolumes.some(
+    (volume) =>
+      volume.storage !== undefined &&
+      volume.desiredState === 'absent' &&
+      !deletedVolumes.has(volume.volumeId),
+  );
+}
+
 /**
  * Which app owns which volume, so that a device file on disk can be observed as one app's
  * filesystem rather than as an orphan to leave alone.

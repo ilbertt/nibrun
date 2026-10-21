@@ -12,6 +12,7 @@ const RetirementSchema = Type.Object({
   appId: AppIdSchema,
   volumeId: VolumeIdSchema,
   configDigest: Type.String({ pattern: '^[a-f0-9]{64}$' }),
+  cleaned: Type.Optional(Type.Boolean()),
 });
 
 export type AppZerofsRetirement = typeof RetirementSchema.static;

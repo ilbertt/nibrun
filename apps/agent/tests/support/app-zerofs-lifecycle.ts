@@ -1,3 +1,4 @@
+import { dirname } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
 import { SystemError } from '@effect/platform/Error';
 import { Effect, Layer, Option } from 'effect';
@@ -24,6 +25,14 @@ function missing(method: string) {
   return new SystemError({ module: 'FileSystem', method, reason: 'NotFound' });
 }
 
+function forgetTree({ persisted, root }: { persisted: Map<string, string>; root: string }) {
+  for (const file of persisted.keys()) {
+    if (file === root || file.startsWith(`${root}/`)) {
+      persisted.delete(file);
+    }
+  }
+}
+
 export function appZerofsLifecycleHost() {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -42,10 +51,21 @@ export function appZerofsLifecycleHost() {
       storage,
       cache: APP_ZEROFS_CACHE,
     });
-    const persisted = new Map([[paths.configFile, contents]]);
+    const persisted = new Map([
+      [paths.configFile, contents],
+      [path.join(paths.cacheDirectory, 'segment'), 'cache bytes'],
+    ]);
     const events: string[] = [];
     const faults = new Set<
-      'flush-data' | 'flush-deletion' | 'stop' | 'receipt' | 'still-running' | 'sync'
+      | 'flush-data'
+      | 'flush-deletion'
+      | 'stop'
+      | 'receipt'
+      | 'still-running'
+      | 'sync'
+      | 'cache-remove'
+      | 'config-remove'
+      | 'data-mount'
     >();
     const state = { attached: true, allocated: true, image: true, running: true, mounted: true };
     const slot = describeSlot({ slot: FIRST_SLOT, appId: APP_ID });
@@ -55,8 +75,30 @@ export function appZerofsLifecycleHost() {
       volumeId: VOLUME_ID,
     };
     const process = privateNbdProcess(target);
+    function removeLocal(name: string) {
+      const phase = name === paths.cacheDirectory ? 'cache-remove' : 'config-remove';
+      if (name !== paths.cacheDirectory && name !== dirname(paths.configFile)) {
+        return Effect.die('cleanup must remove only app cache/config directories');
+      }
+      events.push(phase);
+      if (faults.has(phase)) {
+        return Effect.fail(
+          new SystemError({ module: 'FileSystem', method: 'remove', reason: 'PermissionDenied' }),
+        );
+      }
+      forgetTree({ persisted, root: name });
+      return Effect.void;
+    }
     const files = FileSystem.layerNoop({
       exists: (name) => Effect.succeed(persisted.has(name)),
+      readDirectory: (directory) =>
+        Effect.succeed([
+          ...new Set(
+            [...persisted.keys()]
+              .filter((name) => name.startsWith(`${directory}/`))
+              .map((name) => name.slice(directory.length + 1).split('/')[0] ?? ''),
+          ),
+        ]),
       stat: (name) =>
         Effect.succeed({
           ...info,
@@ -90,7 +132,17 @@ export function appZerofsLifecycleHost() {
             }
           }),
         }),
-      makeTempDirectoryScoped: () => Effect.succeed('/staging'),
+      makeTempDirectoryScoped: () =>
+        Effect.acquireRelease(Effect.succeed('/staging'), () =>
+          Effect.sync(() => {
+            for (const name of persisted.keys()) {
+              if (name.startsWith('/staging/')) {
+                persisted.delete(name);
+              }
+            }
+          }),
+        ),
+      remove: removeLocal,
       writeFileString: (...args) =>
         Effect.sync(() => {
           persisted.set(args[0], args[1]);
@@ -149,6 +201,9 @@ export function appZerofsLifecycleHost() {
       return succeeding({ code: faults.has(phase) ? 1 : 0, stderr: 'customer-secret-key' });
     }
     function answer({ command }: CommandRequest) {
+      if (command[0] === 'mountpoint' && faults.has('data-mount')) {
+        return succeeding({ code: 1 });
+      }
       switch (command[1]) {
         case 'flush':
           return flush();
