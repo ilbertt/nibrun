@@ -73,7 +73,9 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
             Effect.provideService(FileSystem.FileSystem, fs),
             Effect.provideService(Path.Path, path),
           );
-        } else if (Option.isSome(yield* zerofs.lookupAppFilesystem(appId))) {
+        } else if (
+          yield* zerofs.usesAppStorage(appId).pipe(Effect.provideService(FileSystem.FileSystem, fs))
+        ) {
           return yield* new VolumeStorageConflict();
         }
       });

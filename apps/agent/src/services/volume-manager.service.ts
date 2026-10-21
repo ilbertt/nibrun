@@ -35,7 +35,7 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
           const configured = desiredVolumes.filter((volume) => volume.storage !== undefined);
           const guardedApps = new Set(configured.map((volume) => volume.appId));
           for (const appId of new Set(appIdByVolume.values())) {
-            if ((yield* topology.lookupAppFilesystem(appId))._tag === 'Some') {
+            if (yield* topology.usesAppStorage(appId)) {
               guardedApps.add(appId);
             }
           }

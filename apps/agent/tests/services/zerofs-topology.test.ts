@@ -1,15 +1,20 @@
 import { describe, expect, test } from 'bun:test';
+import { dirname } from 'node:path';
+import { FileSystem } from '@effect/platform';
+import { SystemError } from '@effect/platform/Error';
 import { type AppId, AppIdSchema, ObjectKeySchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Effect, Either, Layer, Logger, Option } from 'effect';
 import type { CommandLine } from '#lib/exec.ts';
+import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
 import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
+import { usesAppVolumeStorage } from '#lib/volumes/placement.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { AGENT_CONFIG, agentConfig } from '#tests/support/config.ts';
 import { APP_ID } from '#tests/support/fixtures.ts';
-import { provided } from '#tests/support/run.ts';
+import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 import { s3Storage } from '#tests/support/s3-storage.ts';
 
 const SECOND_APP_ID = Value.Parse(AppIdSchema, 'app-2');
@@ -61,6 +66,70 @@ describe('the host decides where a volume goes', () => {
     expect(topology().all.map((filesystem) => filesystem.storagePrefix)).toEqual([
       AGENT_CONFIG.zerofsStoragePrefix,
     ]);
+  });
+});
+
+describe('private storage identity survives an agent restart', () => {
+  test('an incomplete staging directory guards only its app without reading credentials', async () => {
+    await provided(platform)(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const stateDir = yield* temporaryDirectory;
+        const host = yield* ZerofsTopology.pipe(
+          Effect.provide(
+            ZerofsTopology.DefaultWithoutDependencies.pipe(
+              Layer.provide(agentConfig({ stateDir })),
+            ),
+          ),
+        );
+        expect(yield* host.usesAppStorage(APP_ID)).toBe(false);
+        const configFile = appZerofsPaths({ appId: APP_ID, stateDir }).configFile;
+        yield* fs.makeDirectory(dirname(configFile), { recursive: true });
+        expect(yield* host.usesAppStorage(APP_ID)).toBe(true);
+        expect(Option.isNone(yield* host.lookupAppFilesystem(APP_ID))).toBe(true);
+        expect(yield* host.usesAppStorage(SECOND_APP_ID)).toBe(false);
+        yield* fs.writeFileString(configFile, 'unreadable or incomplete credentials');
+        expect(
+          yield* usesAppVolumeStorage({ appId: APP_ID, storage: undefined }).pipe(
+            Effect.provideService(ZerofsTopology, host),
+          ),
+        ).toBe(true);
+        expect(host.all).toEqual([host.place()]);
+      }),
+    );
+  });
+
+  test('a staging inspection error refuses fallback and exposes no filesystem details', async () => {
+    await provided(platform)(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const stateDir = yield* temporaryDirectory;
+        const host = yield* ZerofsTopology.pipe(
+          Effect.provide(
+            ZerofsTopology.DefaultWithoutDependencies.pipe(
+              Layer.provide(agentConfig({ stateDir })),
+            ),
+          ),
+        );
+        const result = yield* host.usesAppStorage(APP_ID).pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            stat: () =>
+              Effect.fail(
+                new SystemError({
+                  module: 'FileSystem',
+                  method: 'stat',
+                  reason: 'PermissionDenied',
+                  pathOrDescriptor: 'customer-private-path',
+                }),
+              ),
+          }),
+          Effect.either,
+        );
+        expect(Either.isLeft(result) && result.left._tag).toBe('AppZerofsFilesystemUnavailable');
+        expect(JSON.stringify(result)).not.toContain('customer-private-path');
+      }),
+    );
   });
 });
 

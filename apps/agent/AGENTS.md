@@ -33,6 +33,8 @@ Provisioning a present volume with explicit storage configuration starts its per
 services and registers the ready filesystem. Shared-image conflicts, configuration changes and
 foreign NBD attachments are rejected before startup. The control plane must grant exclusive
 fleet ownership of each configured bucket/prefix. Unconfigured volumes never enter activation.
+Staged configuration directories also mark private storage after an agent restart; losing the
+desired storage field must not redirect volume operations or VM starts to the shared backend.
 
 Explicit deletion flushes the image removal before stopping the app's services and unregistering
 its filesystem. Retirement records reach disk before deletion is reported; they let retries avoid
