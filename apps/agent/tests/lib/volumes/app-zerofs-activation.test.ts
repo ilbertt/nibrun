@@ -3,13 +3,15 @@ import { FileSystem, Path } from '@effect/platform';
 import { SystemError } from '@effect/platform/Error';
 import { Deferred, Effect, Either, Fiber, Layer, Option } from 'effect';
 import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
-import { APP_ZEROFS_CACHE } from '#lib/volumes/activate-app-volume.ts';
 import { activateAppZerofs } from '#lib/volumes/app-zerofs-activation.ts';
+import { APP_ZEROFS_CACHE } from '#lib/volumes/app-zerofs-cache.ts';
 import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
 import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
 import { appZerofsUnits } from '#lib/volumes/app-zerofs-systemd.ts';
 import { NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
 import { NbdAttachmentUnavailable } from '#lib/volumes/nbd.ts';
+import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
+import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
 import { AppZerofs } from '#services/app-zerofs.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -134,7 +136,26 @@ function configuredHost({
     );
     const layer = AppZerofs.DefaultWithoutDependencies.pipe(
       Layer.provideMerge(
-        Layer.mergeAll(host({ commands, files }), allocator, Layer.succeed(Path.Path, path)),
+        Layer.mergeAll(
+          host({ commands, files }),
+          allocator,
+          Layer.succeed(Path.Path, path),
+          Layer.succeed(
+            AppVolumeFiles,
+            AppVolumeFiles.make({
+              ensure: () => Effect.die('activation must not create images'),
+              size: () => Effect.die('activation must not inspect images'),
+              remove: () => Effect.die('activation must not remove images'),
+            }),
+          ),
+          Layer.succeed(
+            AppVolumeNbd,
+            AppVolumeNbd.make({
+              reattach: () => Effect.die('activation must not attach a device'),
+              detach: () => Effect.die('activation must not detach a device'),
+            }),
+          ),
+        ),
       ),
     );
     return { files, commands, allocations, layer };

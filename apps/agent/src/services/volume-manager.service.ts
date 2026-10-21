@@ -80,18 +80,20 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
     );
 
     const teardown = Effect.fn('VolumeManager.teardown')((desired: DesiredVolume) =>
-      Effect.flatMap(selectVolumeFilesystem(desired), (filesystem) =>
-        teardownVolume({ desired, filesystem }).pipe(
-          Effect.mapError((error) =>
-            desired.storage === undefined ? error : new AppVolumeUnavailable(),
+      desired.storage !== undefined
+        ? appZerofs.retire(desired)
+        : Effect.flatMap(selectVolumeFilesystem(desired), (filesystem) =>
+            teardownVolume({ desired, filesystem }).pipe(
+              Effect.mapError((error) =>
+                desired.storage === undefined ? error : new AppVolumeUnavailable(),
+              ),
+            ),
+          ).pipe(
+            Effect.provideService(ZerofsTopology, topology),
+            Effect.provideService(SlotAllocator, allocator),
+            Effect.provideService(AppVolumeFiles, files),
+            Effect.provideService(AppVolumeNbd, nbd),
           ),
-        ),
-      ).pipe(
-        Effect.provideService(ZerofsTopology, topology),
-        Effect.provideService(SlotAllocator, allocator),
-        Effect.provideService(AppVolumeFiles, files),
-        Effect.provideService(AppVolumeNbd, nbd),
-      ),
     );
 
     return { observe, provision, teardown };

@@ -11,6 +11,17 @@ import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
 const EMPTY_SIZE = 0;
 
+export function deletedVolumeReport(
+  desired: Pick<DesiredVolume, 'volumeId' | 'appId'>,
+): ReportedVolume {
+  return {
+    volumeId: desired.volumeId,
+    appId: desired.appId,
+    state: 'deleted',
+    sizeBytes: EMPTY_SIZE,
+  };
+}
+
 /** Only for explicit deletion, with guest writes stopped and the assigned device on this filesystem. */
 export function teardownVolume({
   desired,
@@ -47,13 +58,11 @@ export function teardownVolume({
       : Effect.flatMap(AppVolumeFiles, (files) =>
           files.remove({ mountPath: filesystem.mountPath, volumeId: desired.volumeId }),
         );
-    yield* allocator.release(desired.appId);
+    // A configured writer retains its slot until service retirement is complete.
+    if (desired.storage === undefined) {
+      yield* allocator.release(desired.appId);
+    }
     // The control plane finishes deleting the app on the strength of this report.
-    return {
-      volumeId: desired.volumeId,
-      appId: desired.appId,
-      state: 'deleted',
-      sizeBytes: EMPTY_SIZE,
-    } satisfies ReportedVolume;
+    return deletedVolumeReport(desired);
   });
 }

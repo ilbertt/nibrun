@@ -50,6 +50,21 @@ export function appZerofsUnitConfigFile(appId: AppId): string {
   return appZerofsPaths({ appId, stateDir: '/var/lib/nibrun' }).configFile;
 }
 
+export function appZerofsConfigContents({
+  appId,
+  stateDir,
+  storage,
+  cache,
+}: AppZerofsConfig & { stateDir: string }) {
+  const paths = appZerofsPaths({ appId, stateDir });
+  return renderZerofsConfig({
+    storage,
+    cache: { ...cache, directory: paths.cacheDirectory },
+    sockets: paths.sockets,
+    readOnly: false,
+  });
+}
+
 function publishConfig({ configFile, contents }: { configFile: string; contents: string }) {
   return Effect.scoped(
     Effect.gen(function* () {
@@ -89,12 +104,7 @@ export function stageAppZerofsConfig({ appId, storage, cache }: AppZerofsConfig)
   return Effect.gen(function* () {
     const config = yield* AgentConfig;
     const paths = appZerofsPaths({ appId, stateDir: config.stateDir });
-    const contents = renderZerofsConfig({
-      storage,
-      cache: { ...cache, directory: paths.cacheDirectory },
-      sockets: paths.sockets,
-      readOnly: false,
-    });
+    const contents = appZerofsConfigContents({ appId, stateDir: config.stateDir, storage, cache });
     yield* publishConfig({ configFile: paths.configFile, contents });
     return paths;
   });

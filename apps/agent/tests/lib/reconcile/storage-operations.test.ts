@@ -64,7 +64,7 @@ describe('operations that still require shared storage', () => {
             : [],
       });
       const topology = ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provide(agentConfig()));
-      await provided(Layer.mergeAll(AgentState.Default, topology, commands.layer))(
+      await provided(Layer.mergeAll(AgentState.Default, topology, commands.layer, platform))(
         Effect.gen(function* () {
           if (!configured) {
             yield* registerPrivateFilesystem();

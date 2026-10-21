@@ -7,6 +7,8 @@ import {
 } from '#lib/volumes/app-zerofs-config.ts';
 import { readCacheDiskBytes, readCacheMemoryBytes } from '#lib/volumes/zerofs.ts';
 
+export const APP_ZEROFS_CACHE = { diskSizeGb: 4, memorySizeGb: 0.25 } as const;
+
 export class AppZerofsCacheUnknown extends Data.TaggedError('AppZerofsCacheUnknown') {
   override get message() {
     return 'The app ZeroFS cache reservations could not be read.';

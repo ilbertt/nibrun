@@ -1,13 +1,13 @@
 import type { DesiredVolume } from '@repo/protocol';
 import { Effect, Option } from 'effect';
 import { activateAppZerofs } from '#lib/volumes/app-zerofs-activation.ts';
+import { APP_ZEROFS_CACHE } from '#lib/volumes/app-zerofs-cache.ts';
 import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
+import { readAppZerofsRetirement } from '#lib/volumes/app-zerofs-retirement.ts';
 import { inspectAttachment } from '#lib/volumes/nbd.ts';
 import { AppVolumeUnavailable, assertNoSharedVolume } from '#lib/volumes/placement.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
-
-export const APP_ZEROFS_CACHE = { diskSizeGb: 4, memorySizeGb: 0.25 } as const;
 
 /** Requires the control plane's exclusive fleet assignment of this bucket/prefix. */
 export function activateAppVolume(desired: DesiredVolume) {
@@ -16,6 +16,9 @@ export function activateAppVolume(desired: DesiredVolume) {
       return;
     }
     if (desired.desiredState !== 'present') {
+      return yield* new AppVolumeUnavailable();
+    }
+    if (Option.isSome(yield* readAppZerofsRetirement(desired.appId))) {
       return yield* new AppVolumeUnavailable();
     }
     const topology = yield* ZerofsTopology;

@@ -8,6 +8,7 @@ export const HOST_STORAGE_PREFIX = Value.Parse(ObjectKeySchema, 'filesystems/hos
 
 /** The slot files name a directory nothing creates: what a test persists never reaches a host. */
 export const AGENT_CONFIG = {
+  stateDir: '/nonexistent/nibrun-test',
   slotsFile: '/nonexistent/nibrun-test/slots.json',
   slotCursorFile: '/nonexistent/nibrun-test/slot-cursor.json',
   cronRegistryFile: '/nonexistent/nibrun-test/crons.json',

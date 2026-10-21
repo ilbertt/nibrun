@@ -34,6 +34,12 @@ services and registers the ready filesystem. Shared-image conflicts, configurati
 foreign NBD attachments are rejected before startup. The control plane must grant exclusive
 fleet ownership of each configured bucket/prefix. Unconfigured volumes never enter activation.
 
+Explicit deletion flushes the image removal before stopping the app's services and unregistering
+its filesystem. Retirement records reach disk before deletion is reported; they let retries avoid
+reopening an already-retired bucket and prevent fallback to shared storage after a restart.
+Cache and configuration files remain until acknowledged deletion allows local reclamation.
+Agent shutdown, guest sleep and an omitted desired volume never retire a writer.
+
 Reserve per-app ZeroFS cache limits from every staged configuration, including while its guest
 is idle or the filesystem registry is recovering after an agent restart. Memory reports and wake
 admission use the same reservation; snapshot disk budgets reserve the per-app caches too. An

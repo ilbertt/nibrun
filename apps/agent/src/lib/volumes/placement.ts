@@ -32,7 +32,10 @@ export function usesAppVolumeStorage(desired: Pick<DesiredVolume, 'appId' | 'sto
       return true;
     }
     const topology = yield* ZerofsTopology;
-    return Option.isSome(yield* topology.lookupAppFilesystem(desired.appId));
+    return (
+      Option.isSome(yield* topology.lookupAppFilesystem(desired.appId)) ||
+      (yield* topology.isAppRetired(desired.appId))
+    );
   });
 }
 
@@ -40,7 +43,10 @@ export function selectVolumeFilesystem(desired: DesiredVolume) {
   return Effect.gen(function* () {
     const topology = yield* ZerofsTopology;
     if (desired.storage === undefined) {
-      if (Option.isSome(yield* topology.lookupAppFilesystem(desired.appId))) {
+      if (
+        Option.isSome(yield* topology.lookupAppFilesystem(desired.appId)) ||
+        (yield* topology.isAppRetired(desired.appId))
+      ) {
         return yield* new VolumeStorageConflict();
       }
       return topology.place();
