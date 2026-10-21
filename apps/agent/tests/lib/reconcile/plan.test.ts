@@ -17,6 +17,7 @@ import {
   VOLUME_ID,
   VOLUME_SIZE_BYTES,
 } from '#tests/support/fixtures.ts';
+import { s3Storage } from '#tests/support/s3-storage.ts';
 
 const GROWN_VOLUME_SIZE_BYTES = VOLUME_SIZE_BYTES * 2;
 
@@ -296,18 +297,44 @@ describe('volumes are not authoritative', () => {
     expect(hasDeferredWork(plan)).toBe(false);
   });
 
+  test.each([
+    { state: 'missing', volumes: [] },
+    { state: 'detached', volumes: [observedVolume({ attached: false })] },
+    { state: 'undersized', volumes: [observedVolume({ sizeBytes: VOLUME_SIZE_BYTES / 2 })] },
+  ])('a stopped app keeps retrying its configured volume: %j', ({ volumes }) => {
+    const storage = s3Storage();
+    const desired = desiredState({
+      instances: [desiredInstance({ desiredState: 'stopped' })],
+      volumes: [desiredVolume({ storage })],
+    });
+    const pending = planReconcile({ desired, observed: observedState({ volumes }) });
+    expect(pending.instances).toEqual([{ action: 'none', appId: APP_ID }]);
+    expect(pending.volumes[0]?.action).toBe('provision');
+    expect(hasDeferredWork(pending)).toBe(true);
+
+    const recovered = planReconcile({
+      desired,
+      observed: observedState({ volumes: [observedVolume({ storagePrefix: storage.prefix })] }),
+    });
+    expect(recovered.instances).toEqual([{ action: 'none', appId: APP_ID }]);
+    expect(recovered.volumes).toEqual([{ action: 'none', volumeId: VOLUME_ID }]);
+    expect(hasDeferredWork(recovered)).toBe(false);
+  });
+
   test('an unattached volume is provisioned and a grown one re-provisioned', () => {
     const missing = planReconcile({
       desired: desiredState({ volumes: [desiredVolume()] }),
       observed: observedState(),
     });
     expect(missing.volumes[0]?.action).toBe('provision');
+    expect(hasDeferredWork(missing)).toBe(false);
 
     const small = planReconcile({
       desired: desiredState({ volumes: [desiredVolume({ sizeBytes: GROWN_VOLUME_SIZE_BYTES })] }),
       observed: observedState({ volumes: [observedVolume()] }),
     });
     expect(small.volumes[0]?.action).toBe('provision');
+    expect(hasDeferredWork(small)).toBe(false);
 
     const converged = planReconcile({
       desired: desiredState({ volumes: [desiredVolume()] }),

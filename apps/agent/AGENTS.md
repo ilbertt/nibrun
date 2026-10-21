@@ -33,6 +33,8 @@ Provisioning a present volume with explicit storage configuration starts its per
 services and registers the ready filesystem. Shared-image conflicts, configuration changes and
 foreign NBD attachments are rejected before startup. The control plane must grant exclusive
 fleet ownership of each configured bucket/prefix. Unconfigured volumes never enter activation.
+Pending configured-volume provisioning keeps reconciliation scheduled even without a guest to
+start, so a transient storage failure does not require a new desired-state generation to recover.
 Staged configuration directories also mark private storage after an agent restart; losing the
 desired storage field must not redirect volume operations or VM starts to the shared backend.
 

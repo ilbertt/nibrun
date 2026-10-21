@@ -115,12 +115,16 @@ export type ReconcilePlan = {
 };
 
 /**
- * Delayed starts and blocked teardowns need another pass even when desired state is unchanged.
+ * Delayed starts, configured volume provisioning and blocked teardowns need another pass even
+ * when desired state is unchanged.
  */
 export function hasDeferredWork(plan: ReconcilePlan): boolean {
   return (
-    plan.volumes.some((action) => action.action === 'blocked') ||
-    plan.instances.some((action) => action.action === 'start' || action.action === 'replace')
+    plan.volumes.some(
+      (action) =>
+        action.action === 'blocked' ||
+        (action.action === 'provision' && action.desired.storage !== undefined),
+    ) || plan.instances.some((action) => action.action === 'start' || action.action === 'replace')
   );
 }
 
