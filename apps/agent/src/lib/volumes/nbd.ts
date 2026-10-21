@@ -1,7 +1,7 @@
 import { basename } from 'node:path';
 import { FileSystem } from '@effect/platform';
 import type { VolumeId } from '@repo/protocol';
-import { Duration, Effect } from 'effect';
+import { Data, Duration, Effect, Option } from 'effect';
 import { run, stdoutOf } from '#services/command-runner.service.ts';
 
 const NBD_CLIENT = 'nbd-client';
@@ -223,3 +223,76 @@ export const reattach = Effect.fn('nbd.reattach')(function* (target: {
   }
   return yield* attach(target);
 });
+
+export class NbdAttachmentMismatch extends Data.TaggedError('NbdAttachmentMismatch') {
+  override get message() {
+    return 'The block device is attached to a different or unidentified filesystem.';
+  }
+}
+
+export class NbdAttachmentUnavailable extends Data.TaggedError('NbdAttachmentUnavailable') {
+  override get message() {
+    return 'The requested block device attachment is unavailable.';
+  }
+}
+
+export function backendIdentifier(target: Parameters<typeof attach>[0]): string {
+  return `nibrun:${JSON.stringify([target.socketPath, target.volumeId])}`;
+}
+
+function attachmentAttribute(input: Parameters<typeof readAttribute>[0]) {
+  return readAttribute(input).pipe(
+    Effect.map((value) => Option.some(value.trim())),
+    Effect.catchTag('SystemError', (error) =>
+      error.reason === 'NotFound' ? Effect.succeedNone : Effect.fail(error),
+    ),
+    Effect.mapError(() => new NbdAttachmentUnavailable()),
+  );
+}
+
+export function inspectAttachment(target: Parameters<typeof attach>[0]) {
+  return Effect.gen(function* () {
+    const [backend, pid] = yield* Effect.all([
+      attachmentAttribute({ devicePath: target.devicePath, attribute: 'backend' }),
+      attachmentAttribute({ devicePath: target.devicePath, attribute: 'pid' }),
+    ]);
+    if (Option.isSome(backend) && backend.value === backendIdentifier(target)) {
+      return Option.isSome(pid);
+    }
+    // A healthy legacy device may still be exporting shared storage; liveness cannot prove ownership.
+    if (Option.isSome(backend) || Option.isSome(pid)) {
+      return yield* new NbdAttachmentMismatch();
+    }
+    return false;
+  });
+}
+
+export function isUsableFor(target: Parameters<typeof attach>[0]) {
+  return inspectAttachment(target).pipe(
+    Effect.flatMap((matched) => (matched ? isUsable(target.devicePath) : Effect.succeed(false))),
+    Effect.orElseSucceed(() => false),
+  );
+}
+
+export function detachVerified(target: Parameters<typeof attach>[0]) {
+  return Effect.gen(function* () {
+    if (yield* inspectAttachment(target)) {
+      yield* stdoutOf({ command: [NBD_CLIENT, '-d', target.devicePath] }).pipe(
+        Effect.mapError(() => new NbdAttachmentUnavailable()),
+      );
+    }
+  });
+}
+
+export function reattachVerified(target: Parameters<typeof attach>[0]) {
+  return Effect.gen(function* () {
+    yield* detachVerified(target);
+    yield* connect({
+      ...target,
+      extraArgs: ['-persist', '-identifier', backendIdentifier(target)],
+    }).pipe(Effect.mapError(() => new NbdAttachmentUnavailable()));
+    if (!(yield* inspectAttachment(target))) {
+      return yield* new NbdAttachmentUnavailable();
+    }
+  });
+}
