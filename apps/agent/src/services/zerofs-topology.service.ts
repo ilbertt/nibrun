@@ -8,6 +8,7 @@ import {
   AppZerofsFilesystemConflict,
   AppZerofsFilesystemUnavailable,
 } from '#lib/volumes/app-zerofs-filesystem.ts';
+import { readAppZerofsRetirement } from '#lib/volumes/app-zerofs-retirement.ts';
 import type { AppZerofsRegistration, ZerofsFilesystem } from '#lib/volumes/topology.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
@@ -95,6 +96,27 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
       }
     });
 
+    const unregisterAppFilesystem = Effect.fn('ZerofsTopology.unregisterAppFilesystem')(function* ({
+      appId,
+      ...registration
+    }: AppZerofsRegistration & { appId: AppId }) {
+      const removed = yield* Ref.modify(appFilesystems, (current) => {
+        const existing = current.get(appId);
+        if (existing === undefined) {
+          return [true, current] as const;
+        }
+        if (!isDeepStrictEqual(existing, registration)) {
+          return [false, current] as const;
+        }
+        const next = new Map(current);
+        next.delete(appId);
+        return [true, next] as const;
+      });
+      if (!removed) {
+        return yield* new AppZerofsFilesystemConflict();
+      }
+    });
+
     const flushApps = Effect.flatMap(Ref.get(appFilesystems), (registered) =>
       Effect.forEach(
         registered,
@@ -137,6 +159,12 @@ export class ZerofsTopology extends Effect.Service<ZerofsTopology>()('ZerofsTopo
       lookupAppFilesystem,
       resolveAppFilesystem,
       registerAppFilesystem,
+      unregisterAppFilesystem,
+      isAppRetired: (appId: AppId) =>
+        readAppZerofsRetirement(appId).pipe(
+          Effect.map(Option.isSome),
+          Effect.provideService(AgentConfig, config),
+        ),
       flushAll,
     };
   }),

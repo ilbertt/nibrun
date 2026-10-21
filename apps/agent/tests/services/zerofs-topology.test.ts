@@ -65,6 +65,46 @@ describe('the host decides where a volume goes', () => {
 });
 
 describe('registered app filesystems participate in durability flushes', () => {
+  test('retiring one app removes only its flush target and preserves shared placement', async () => {
+    const commands = recordingCommands();
+    const host = topology();
+    await provided(commands.layer)(
+      Effect.gen(function* () {
+        const first = yield* registration(APP_ID);
+        const second = yield* registration(SECOND_APP_ID);
+        yield* host.registerAppFilesystem(first);
+        yield* host.registerAppFilesystem(second);
+        yield* host.unregisterAppFilesystem(first);
+        yield* host.unregisterAppFilesystem(first);
+        expect(Option.isNone(yield* host.lookupAppFilesystem(APP_ID))).toBe(true);
+        expect(Option.isSome(yield* host.lookupAppFilesystem(SECOND_APP_ID))).toBe(true);
+        yield* host.flushAll;
+        expect(commands.commands.map(({ command }) => command)).toEqual([
+          flushCommand(host.place()),
+          flushCommand(second.filesystem),
+        ]);
+      }),
+    );
+  });
+
+  test('a different registration cannot unregister the current writer', async () => {
+    const host = topology();
+    await provided(Layer.empty)(
+      Effect.gen(function* () {
+        const original = yield* registration(APP_ID);
+        yield* host.registerAppFilesystem(original);
+        const removed = yield* Effect.either(
+          host.unregisterAppFilesystem({
+            ...original,
+            storage: s3Storage({ bucket: 'another-bucket', prefix: original.storage.prefix }),
+          }),
+        );
+        expect(Either.isLeft(removed) && removed.left._tag).toBe('AppZerofsFilesystemConflict');
+        expect(Option.isSome(yield* host.lookupAppFilesystem(APP_ID))).toBe(true);
+      }),
+    );
+  });
+
   test('an empty registry keeps the existing shared flush behavior', async () => {
     const commands = recordingCommands();
     const host = topology();

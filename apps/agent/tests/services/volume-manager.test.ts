@@ -10,6 +10,8 @@ import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import { AppVolumeFileUnavailable } from '#lib/volumes/app-volume-file.ts';
 import { ensureDeviceFile, NBD_DIRECTORY, removeDeviceFile } from '#lib/volumes/device-file.ts';
 import { attachmentScope, NbdAttachmentUnavailable } from '#lib/volumes/nbd.ts';
+import { AppVolumeUnavailable, selectVolumeFilesystem } from '#lib/volumes/placement.ts';
+import { teardownVolume } from '#lib/volumes/teardown.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
@@ -208,10 +210,31 @@ function host({
           ),
       }),
     );
+    const retirementContext = yield* Layer.build(
+      Layer.mergeAll(
+        files,
+        AppVolumeNbd.DefaultWithoutDependencies.pipe(Layer.provide(config)),
+        filesystemLayer,
+        Layer.succeed(Path.Path, paths),
+        commands.layer,
+        config,
+        allocator,
+        Layer.succeed(ZerofsTopology, topology),
+      ),
+    );
     const support = Layer.mergeAll(
       Layer.succeed(
         AppZerofs,
         AppZerofs.make({
+          retire: (desired) =>
+            Effect.gen(function* () {
+              const selected = yield* selectVolumeFilesystem(desired);
+              const report = yield* teardownVolume({ desired, filesystem: selected }).pipe(
+                Effect.mapError(() => new AppVolumeUnavailable()),
+              );
+              yield* (yield* SlotAllocator).release(desired.appId);
+              return report;
+            }).pipe(Effect.provide(retirementContext)),
           ensure: (desired) =>
             Effect.gen(function* () {
               activations.push(desired);

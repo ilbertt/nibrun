@@ -18,6 +18,25 @@ export class AppZerofsObservationError extends Data.TaggedError('AppZerofsObserv
   }
 }
 
+export class AppZerofsNotStopped extends Data.TaggedError('AppZerofsNotStopped') {
+  override get message() {
+    return 'The app ZeroFS services have not stopped.';
+  }
+}
+
+export function assertAppZerofsStopped(appId: AppId) {
+  return Effect.gen(function* () {
+    const state = yield* observeAppZerofs(appId);
+    if (
+      [state.server, state.mount].some(
+        (unit) => unit.activeState !== 'inactive' || unit.subState !== 'dead',
+      )
+    ) {
+      return yield* new AppZerofsNotStopped();
+    }
+  });
+}
+
 function unitState(properties: Record<string, string> | undefined): AppZerofsUnitState | undefined {
   if (!(properties?.LoadState && properties.ActiveState && properties.SubState)) {
     return undefined;
