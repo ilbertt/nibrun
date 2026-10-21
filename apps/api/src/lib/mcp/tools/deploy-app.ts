@@ -1,4 +1,5 @@
 import type { McpServer, StandardSchemaWithJSON, ToolCallback } from '@modelcontextprotocol/server';
+import { MCP_TOOL_NAMES } from '@repo/api-constants';
 import { appUrl } from '@repo/app-ui';
 import { FilenameSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
@@ -13,7 +14,6 @@ import {
 } from '#lib/mcp/tools/shared/deployment-target.ts';
 import { handleToolResult } from '#lib/mcp/tools/shared/handle-tool-result.ts';
 import { registerTool } from '#lib/mcp/tools/shared/register-tool.ts';
-import { MCP_TOOL_NAMES } from '#lib/mcp/tools/shared/tool-names.ts';
 import { CreateArtifactBodySchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { DeploymentResponseSchema } from '#routes/api/apps/[appId]/deployments/model.ts';
 import { AppResponseSchema } from '#routes/api/apps/model.ts';

@@ -6,6 +6,7 @@ import {
   WWW_SUPPORT_PATH,
   WWW_TERMS_PATH,
 } from '@repo/global-constants';
+import { reviewCases } from '#review-cases.ts';
 import packageJson from '../package.json' with { type: 'json' };
 
 export function createManifest() {
@@ -38,6 +39,7 @@ export function createManifest() {
           composerIcon: './assets/composer-icon.png',
         },
         requires_local_executor: false,
+        review: { test_cases: reviewCases },
       },
     },
   };

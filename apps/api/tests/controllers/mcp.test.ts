@@ -8,7 +8,7 @@ import {
   McpServer,
   PROTOCOL_VERSION_META_KEY,
 } from '@modelcontextprotocol/server';
-import { DEFAULT_LOG_TIMERANGE } from '@repo/api-constants';
+import { DEFAULT_LOG_TIMERANGE, MCP_TOOL_NAMES } from '@repo/api-constants';
 import { DirectoryListingSchema, TenantLogRecordSchema } from '@repo/protocol';
 import { HranaStmtResultSchema, HranaStmtSchema } from '@repo/sqlite';
 import { Type } from '@sinclair/typebox';
@@ -20,7 +20,6 @@ import { SqliteConnectionSchema } from '#lib/api/sqlite-connection.ts';
 import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { DIRECTORY_READ_TIMEOUT_MS } from '#lib/filesystem/timeouts.ts';
 import { DeploymentTargetSchema } from '#lib/mcp/tools/shared/deployment-target.ts';
-import { MCP_TOOL_NAMES } from '#lib/mcp/tools/shared/tool-names.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { CreateArtifactBodySchema } from '#routes/api/apps/[appId]/artifacts/model.ts';
 import { StreamLogsQuerySchema } from '#routes/api/apps/[appId]/deployments/[deploymentId]/logs/model.ts';

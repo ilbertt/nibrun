@@ -1,6 +1,6 @@
 # @repo/api-constants
 
-Shared static API defaults and query syntax constants used by the API and its clients. Each value is declared once here;
+Shared static API defaults, MCP tool names, and query syntax constants used by the API and its clients. Each value is declared once here;
 consumers import it instead of copying a literal or fetching a configuration endpoint.
 
 Keep this package free of schemas, request/response types, validation functions, transports and application
