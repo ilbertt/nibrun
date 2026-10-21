@@ -1,10 +1,10 @@
 import type { McpServer, StandardSchemaWithJSON } from '@modelcontextprotocol/server';
+import { MCP_TOOL_NAMES } from '@repo/api-constants';
 import { Type } from '@sinclair/typebox';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import { handleToolResult } from '#lib/mcp/tools/shared/handle-tool-result.ts';
 import { registerTool } from '#lib/mcp/tools/shared/register-tool.ts';
-import { MCP_TOOL_NAMES } from '#lib/mcp/tools/shared/tool-names.ts';
 import { ListAppsResponseSchema } from '#routes/api/apps/model.ts';
 import type { AppsService } from '#services/apps.service.ts';
 
