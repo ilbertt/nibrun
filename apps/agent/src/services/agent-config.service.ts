@@ -2,6 +2,7 @@ import { Path } from '@effect/platform';
 import { type Ipv4Address, Ipv4AddressSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Config, Effect } from 'effect';
+import { NBD_CLIENT } from '#lib/volumes/nbd.ts';
 
 const DEFAULT_STATE_DIR = '/var/lib/nibrun';
 const DEFAULT_RUNTIME_DIR = '/run/nibrun';
@@ -131,6 +132,10 @@ export class AgentConfig extends Effect.Service<AgentConfig>()('AgentConfig', {
       zerofsNbdSocket: yield* optional({
         name: 'AGENT_ZEROFS_NBD_SOCKET',
         fallback: DEFAULT_ZEROFS_NBD_SOCKET,
+      }),
+      appVolumeNbdClient: yield* optional({
+        name: 'AGENT_APP_VOLUME_NBD_CLIENT',
+        fallback: NBD_CLIENT,
       }),
       // One directory per checkpoint server below this, created and removed by the unit that
       // serves it — which is why this names the parent rather than a socket.

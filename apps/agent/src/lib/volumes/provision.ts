@@ -3,10 +3,11 @@ import type { DesiredVolume, ReportedVolume } from '@repo/protocol';
 import { Effect, Option } from 'effect';
 import { devicePathFor, ensureDeviceFile } from '#lib/volumes/device-file.ts';
 import { format } from '#lib/volumes/ext4.ts';
-import { inspectAttachment, isUsable, reattach, reattachVerified } from '#lib/volumes/nbd.ts';
+import { inspectAttachment, isUsable, reattach } from '#lib/volumes/nbd.ts';
 import { formatFromSeed } from '#lib/volumes/seed.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
+import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
 /** A usable assigned device must already belong to the selected filesystem. */
@@ -42,7 +43,9 @@ export function provisionVolume({
         );
 
     if (appDeviceMissing || !(yield* isUsable(slot.nbdDevicePath))) {
-      yield* desired.storage === undefined ? reattach(target) : reattachVerified(target);
+      yield* desired.storage === undefined
+        ? reattach(target)
+        : Effect.flatMap(AppVolumeNbd, (nbd) => nbd.reattach(target));
     }
 
     // The archive is only ever read at format time; the guard there makes a seed apply once.

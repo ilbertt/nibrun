@@ -2,10 +2,11 @@ import type { DesiredVolume, ReportedVolume } from '@repo/protocol';
 import { Effect, Option } from 'effect';
 import { AppZerofsFlushError } from '#lib/volumes/app-zerofs-durability.ts';
 import { removeDeviceFile } from '#lib/volumes/device-file.ts';
-import { detach, detachVerified, inspectAttachment } from '#lib/volumes/nbd.ts';
+import { detach, inspectAttachment } from '#lib/volumes/nbd.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { flush } from '#lib/volumes/zerofs.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
+import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 
 const EMPTY_SIZE = 0;
@@ -39,7 +40,7 @@ export function teardownVolume({
     if (Option.isSome(slot)) {
       yield* desired.storage === undefined
         ? detach(slot.value.nbdDevicePath)
-        : detachVerified(Option.getOrThrow(target));
+        : Effect.flatMap(AppVolumeNbd, (nbd) => nbd.detach(Option.getOrThrow(target)));
     }
     yield* desired.storage === undefined
       ? removeDeviceFile({ mount: filesystem.mountPath, volumeId: desired.volumeId })

@@ -9,6 +9,7 @@ import { NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
 import { observeVolumes } from '#lib/volumes/observe.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
+import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -69,6 +70,7 @@ function host({
       filesystemLayer,
       commands.layer,
       AppVolumeFiles.Default.pipe(Layer.provide(filesystemLayer)),
+      AppVolumeNbd.DefaultWithoutDependencies.pipe(Layer.provide(agentConfig())),
     );
     return {
       fs,

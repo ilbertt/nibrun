@@ -7,6 +7,7 @@ import { AppVolumeUnavailable, selectVolumeFilesystem } from '#lib/volumes/place
 import { provisionVolume } from '#lib/volumes/provision.ts';
 import { teardownVolume } from '#lib/volumes/teardown.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
+import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -17,6 +18,7 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
     const topology = yield* ZerofsTopology;
     const allocator = yield* SlotAllocator;
     const files = yield* AppVolumeFiles;
+    const nbd = yield* AppVolumeNbd;
 
     /** The truth a restarted agent converges against: what ZeroFS is exporting, not what it remembers. */
     const observe = Effect.fn('VolumeManager.observe')(
@@ -67,6 +69,7 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
         Effect.provideService(ZerofsTopology, topology),
         Effect.provideService(SlotAllocator, allocator),
         Effect.provideService(AppVolumeFiles, files),
+        Effect.provideService(AppVolumeNbd, nbd),
       ),
     );
 
@@ -81,10 +84,16 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
         Effect.provideService(ZerofsTopology, topology),
         Effect.provideService(SlotAllocator, allocator),
         Effect.provideService(AppVolumeFiles, files),
+        Effect.provideService(AppVolumeNbd, nbd),
       ),
     );
 
     return { observe, provision, teardown };
   }),
-  dependencies: [ZerofsTopology.Default, SlotAllocator.Default, AppVolumeFiles.Default],
+  dependencies: [
+    ZerofsTopology.Default,
+    SlotAllocator.Default,
+    AppVolumeFiles.Default,
+    AppVolumeNbd.Default,
+  ],
 }) {}
