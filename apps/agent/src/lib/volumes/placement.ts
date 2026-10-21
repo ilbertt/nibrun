@@ -49,11 +49,19 @@ export function selectVolumeFilesystem(desired: DesiredVolume) {
       appId: desired.appId,
       storage: desired.storage,
     });
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
     yield* assertMounted(filesystem.mountPath).pipe(
       Effect.mapError(() => new AppZerofsFilesystemUnavailable()),
     );
+    yield* assertNoSharedVolume(desired);
+    return filesystem;
+  });
+}
+
+export function assertNoSharedVolume(desired: Pick<DesiredVolume, 'volumeId'>) {
+  return Effect.gen(function* () {
+    const topology = yield* ZerofsTopology;
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
     for (const shared of topology.all) {
       yield* assertMounted(shared.mountPath).pipe(
         Effect.mapError(() => new AppZerofsFilesystemUnavailable()),
@@ -65,7 +73,6 @@ export function selectVolumeFilesystem(desired: DesiredVolume) {
         return yield* new VolumeStorageConflict();
       }
     }
-    return filesystem;
   });
 }
 

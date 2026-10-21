@@ -8,6 +8,7 @@ import { provisionVolume } from '#lib/volumes/provision.ts';
 import { teardownVolume } from '#lib/volumes/teardown.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
+import { AppZerofs } from '#services/app-zerofs.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -19,6 +20,7 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
     const allocator = yield* SlotAllocator;
     const files = yield* AppVolumeFiles;
     const nbd = yield* AppVolumeNbd;
+    const appZerofs = yield* AppZerofs;
 
     /** The truth a restarted agent converges against: what ZeroFS is exporting, not what it remembers. */
     const observe = Effect.fn('VolumeManager.observe')(
@@ -59,13 +61,17 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
     );
 
     const provision = Effect.fn('VolumeManager.provision')((desired: DesiredVolume) =>
-      Effect.flatMap(selectVolumeFilesystem(desired), (filesystem) =>
-        provisionVolume({ desired, filesystem }).pipe(
+      Effect.gen(function* () {
+        if (desired.storage !== undefined) {
+          yield* appZerofs.ensure(desired);
+        }
+        const filesystem = yield* selectVolumeFilesystem(desired);
+        return yield* provisionVolume({ desired, filesystem }).pipe(
           Effect.mapError((error) =>
             desired.storage === undefined ? error : new AppVolumeUnavailable(),
           ),
-        ),
-      ).pipe(
+        );
+      }).pipe(
         Effect.provideService(ZerofsTopology, topology),
         Effect.provideService(SlotAllocator, allocator),
         Effect.provideService(AppVolumeFiles, files),
@@ -95,5 +101,6 @@ export class VolumeManager extends Effect.Service<VolumeManager>()('VolumeManage
     SlotAllocator.Default,
     AppVolumeFiles.Default,
     AppVolumeNbd.Default,
+    AppZerofs.Default,
   ],
 }) {}

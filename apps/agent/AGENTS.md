@@ -29,6 +29,11 @@ only slots backed by an existing kernel device and block node; a missing device 
 existing assignment. Shared volumes and checkpoint readers retain their netlink path and slot
 allocation behavior. No module reload is needed to discover usable devices on a running host.
 
+Provisioning a present volume with explicit storage configuration starts its per-app ZeroFS
+services and registers the ready filesystem. Shared-image conflicts, configuration changes and
+foreign NBD attachments are rejected before startup. The control plane must grant exclusive
+fleet ownership of each configured bucket/prefix. Unconfigured volumes never enter activation.
+
 Reserve per-app ZeroFS cache limits from every staged configuration, including while its guest
 is idle or the filesystem registry is recovering after an agent restart. Memory reports and wake
 admission use the same reservation; snapshot disk budgets reserve the per-app caches too. An

@@ -86,6 +86,7 @@ export const DesiredVolumeSchema = Type.Object({
   desiredState: DesiredPresenceSchema,
   seed: Type.Optional(DesiredArtifactSchema),
   // Omitted by existing control planes, which leaves the host on shared storage.
+  // Its producer must grant this host exclusive writer ownership of the configured bucket/prefix.
   storage: Type.Optional(S3VolumeStorageSchema),
 });
 

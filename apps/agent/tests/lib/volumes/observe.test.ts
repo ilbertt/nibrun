@@ -10,6 +10,7 @@ import { observeVolumes } from '#lib/volumes/observe.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
+import { AppZerofs } from '#services/app-zerofs.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
@@ -237,7 +238,18 @@ describe('observation on a selected live filesystem', () => {
         const manager = yield* VolumeManager.pipe(
           Effect.provide(
             VolumeManager.DefaultWithoutDependencies.pipe(
-              Layer.provide(Layer.mergeAll(stage.layer, topology)),
+              Layer.provide(
+                Layer.mergeAll(
+                  stage.layer,
+                  topology,
+                  Layer.succeed(
+                    AppZerofs,
+                    AppZerofs.make({
+                      ensure: () => Effect.die('observation must not activate ZeroFS'),
+                    }),
+                  ),
+                ),
+              ),
             ),
           ),
         );
