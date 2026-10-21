@@ -7,6 +7,7 @@ import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import { applyCheckpoints } from '#lib/reconcile/checkpoints.ts';
 import { applyExports } from '#lib/reconcile/exports.ts';
 import { planReconcile } from '#lib/reconcile/plan.ts';
+import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
@@ -30,13 +31,30 @@ import {
 import { platform, provided } from '#tests/support/run.ts';
 import { s3Storage } from '#tests/support/s3-storage.ts';
 
+function registerPrivateFilesystem() {
+  return Effect.gen(function* () {
+    const topology = yield* ZerofsTopology;
+    const storage = s3Storage();
+    const filesystem = yield* appZerofsFilesystem({
+      appId: APP_ID,
+      storagePrefix: storage.prefix,
+    }).pipe(Effect.provide(agentConfig()));
+    yield* topology.registerAppFilesystem({ appId: APP_ID, filesystem, storage });
+  });
+}
+
 describe('operations that still require shared storage', () => {
-  test.each(DESIRED_PRESENCE)(
-    'configured volume checkpoints fail without using the shared backend: %s',
-    async (desiredPresence) => {
+  test.each(
+    DESIRED_PRESENCE.flatMap((desiredPresence) => [
+      { desiredPresence, configured: true },
+      { desiredPresence, configured: false },
+    ]),
+  )(
+    'private volume checkpoints fail without using the shared backend: %j',
+    async ({ desiredPresence, configured }) => {
       const commands = recordingCommands();
       const desired = desiredState({
-        volumes: [desiredVolume({ storage: s3Storage() })],
+        volumes: [desiredVolume(configured ? { storage: s3Storage() } : {})],
         checkpoints: [desiredCheckpoint({ desiredState: desiredPresence })],
       });
       const observed = observedState({
@@ -48,6 +66,9 @@ describe('operations that still require shared storage', () => {
       const topology = ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provide(agentConfig()));
       await provided(Layer.mergeAll(AgentState.Default, topology, commands.layer))(
         Effect.gen(function* () {
+          if (!configured) {
+            yield* registerPrivateFilesystem();
+          }
           yield* applyCheckpoints({ plan: planReconcile({ desired, observed }), desired });
           expect((yield* AgentState.snapshot).checkpointReports[0]?.state).toBe('failed');
           expect(commands.commands).toEqual([]);
@@ -56,9 +77,14 @@ describe('operations that still require shared storage', () => {
     },
   );
 
-  test.each([true, false])(
-    'exports use the shared writer only for unconfigured volumes: configured=%s',
-    async (configured) => {
+  test.each([
+    { configured: true, registered: false },
+    { configured: false, registered: false },
+    { configured: false, registered: true },
+  ])(
+    'exports use the shared writer only for shared volumes: %j',
+    async ({ configured, registered }) => {
+      const privateStorage = configured || registered;
       let writes = 0;
       let reaps = 0;
       const writer = Layer.succeed(
@@ -105,6 +131,7 @@ describe('operations that still require shared storage', () => {
           allocator,
           commands.layer,
           agentConfig(),
+          ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provide(agentConfig())),
           Layer.succeed(
             ArtifactStore,
             ArtifactStore.make({ open: () => Effect.die('unexpected artifact download') }),
@@ -112,14 +139,17 @@ describe('operations that still require shared storage', () => {
         ),
       )(
         Effect.gen(function* () {
+          if (registered) {
+            yield* registerPrivateFilesystem();
+          }
           yield* applyExports({
             plan: planReconcile({ desired, observed: observedState() }),
             desired,
           });
           expect((yield* AgentState.snapshot).exportReports.get(EXPORT_ID)?.state).toBe(
-            configured ? 'failed' : 'ready',
+            privateStorage ? 'failed' : 'ready',
           );
-          expect(writes).toBe(configured ? 0 : 1);
+          expect(writes).toBe(privateStorage ? 0 : 1);
           expect(reaps).toBe(1);
         }),
       );

@@ -26,6 +26,16 @@ export class AppVolumeOperationUnavailable extends Data.TaggedError(
   }
 }
 
+export function usesAppVolumeStorage(desired: Pick<DesiredVolume, 'appId' | 'storage'>) {
+  return Effect.gen(function* () {
+    if (desired.storage !== undefined) {
+      return true;
+    }
+    const topology = yield* ZerofsTopology;
+    return Option.isSome(yield* topology.lookupAppFilesystem(desired.appId));
+  });
+}
+
 export function selectVolumeFilesystem(desired: DesiredVolume) {
   return Effect.gen(function* () {
     const topology = yield* ZerofsTopology;
