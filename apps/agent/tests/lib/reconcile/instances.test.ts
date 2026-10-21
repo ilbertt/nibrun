@@ -14,6 +14,7 @@ import { VM_RECOVERY_POLICY } from '#lib/vm/recovery.ts';
 import { SleepRefused, SnapshotUnusable } from '#lib/vm/snapshot.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { GuestActivity } from '#services/guest-activity.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -265,7 +266,9 @@ function onHost({
       GuestActivity.Default,
       ReportSignal.Default,
       FetchHttpClient.layer,
-      SlotAllocator.DefaultWithoutDependencies,
+      SlotAllocator.DefaultWithoutDependencies.pipe(
+        Layer.provide(DesiredStateCache.DefaultWithoutDependencies),
+      ),
       ZerofsTopology.DefaultWithoutDependencies,
       vms.layer,
     ).pipe(Layer.provideMerge(host), Layer.provideMerge(platform)),

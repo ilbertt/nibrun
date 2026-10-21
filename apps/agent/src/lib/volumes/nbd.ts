@@ -243,6 +243,30 @@ export class NbdAttachmentUnavailable extends Data.TaggedError('NbdAttachmentUna
   }
 }
 
+export function existingNbdDevices() {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const devices = new Set<string>();
+    for (const name of yield* fs.readDirectory(SYSFS_BLOCK_DIRECTORY)) {
+      if (!/^nbd(?:0|[1-9]\d*)$/.test(name)) {
+        continue;
+      }
+      const devicePath = `/dev/${name}`;
+      const info = yield* fs
+        .stat(devicePath)
+        .pipe(
+          Effect.catchTag('SystemError', (error) =>
+            error.reason === 'NotFound' ? Effect.succeed(undefined) : Effect.fail(error),
+          ),
+        );
+      if (info?.type === 'BlockDevice') {
+        devices.add(devicePath);
+      }
+    }
+    return devices;
+  }).pipe(Effect.mapError(() => new NbdAttachmentUnavailable()));
+}
+
 export function attachmentScope(target: Parameters<typeof attach>[0]): string {
   const identity = JSON.stringify([target.socketPath, target.volumeId, target.devicePath]);
   return `nibrun-app-nbd-${createHash('sha256').update(identity).digest('hex')}.scope`;

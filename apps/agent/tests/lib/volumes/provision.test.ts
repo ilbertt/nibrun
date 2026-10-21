@@ -51,6 +51,7 @@ function host({
     const allocator = Layer.succeed(
       SlotAllocator,
       SlotAllocator.make({
+        allocateWithNbdDevice: () => Effect.die('shared volumes must not inspect NBD availability'),
         allocate: (appId) =>
           Effect.sync(() => {
             allocations.push(appId);

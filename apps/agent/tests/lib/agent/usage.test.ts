@@ -10,6 +10,7 @@ import { Value } from '@sinclair/typebox/value';
 import { Effect, Layer } from 'effect';
 import { measureUsage } from '#lib/agent/usage.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import {
   FilesystemReader,
   type GuestReading,
@@ -71,7 +72,10 @@ function reading(both: Partial<GuestReading> = {}): GuestReading {
  * never what a measurement reaches.
  */
 const host = Layer.mergeAll(agentConfig(), platform);
-const slots = Layer.provide(SlotAllocator.DefaultWithoutDependencies, host);
+const slots = SlotAllocator.DefaultWithoutDependencies.pipe(
+  Layer.provide(DesiredStateCache.DefaultWithoutDependencies),
+  Layer.provide(host),
+);
 
 /** Answers with whatever the test put in front of it, and refuses the apps it was given none for. */
 function measuring(readings: ReadonlyMap<AppId, GuestReading>) {

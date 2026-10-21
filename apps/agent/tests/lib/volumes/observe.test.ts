@@ -47,6 +47,7 @@ function host({
     const allocator = Layer.succeed(
       SlotAllocator,
       SlotAllocator.make({
+        allocateWithNbdDevice: () => Effect.die('observation must not allocate a slot'),
         allocate: () => Effect.die('observation must not allocate a slot'),
         lookup: (appId) =>
           Effect.sync(() => {

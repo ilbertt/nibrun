@@ -66,6 +66,7 @@ function host({
     const allocator = Layer.succeed(
       SlotAllocator,
       SlotAllocator.make({
+        allocateWithNbdDevice: () => Effect.die('teardown must not allocate a slot'),
         allocate: () => Effect.die('teardown must not allocate a slot'),
         lookup: () =>
           Effect.sync(() => {

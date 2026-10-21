@@ -24,8 +24,10 @@ systemd scope, so the kernel's owner PID remains a live process across agent res
 An inherited per-device lock excludes overlapping setup, including before a PID is published.
 Verification requires that PID's exact socket/export arguments and scope to match; saved slot
 assignments and filesystem contents do not establish attachment ownership. Ioctl mode requires
-an already-created NBD device and the host's unified cgroup hierarchy. Shared volumes and
-checkpoint readers retain their netlink path.
+an already-created NBD device and the host's unified cgroup hierarchy. Configured volumes allocate
+only slots backed by an existing kernel device and block node; a missing device never moves an
+existing assignment. Shared volumes and checkpoint readers retain their netlink path and slot
+allocation behavior. No module reload is needed to discover usable devices on a running host.
 
 Reserve per-app ZeroFS cache limits from every staged configuration, including while its guest
 is idle or the filesystem registry is recovering after an agent restart. Memory reports and wake

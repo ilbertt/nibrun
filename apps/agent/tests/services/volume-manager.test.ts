@@ -9,7 +9,7 @@ import type { CommandLine } from '#lib/exec.ts';
 import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
 import { AppVolumeFileUnavailable } from '#lib/volumes/app-volume-file.ts';
 import { ensureDeviceFile, NBD_DIRECTORY, removeDeviceFile } from '#lib/volumes/device-file.ts';
-import { attachmentScope } from '#lib/volumes/nbd.ts';
+import { attachmentScope, NbdAttachmentUnavailable } from '#lib/volumes/nbd.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
@@ -36,11 +36,13 @@ function host({
   connection = 'none',
   mounted = true,
   supportsClient = true,
+  deviceAvailable = true,
 }: {
   registered?: boolean;
   connection?: 'none' | 'shared' | 'private';
   mounted?: boolean;
   supportsClient?: boolean;
+  deviceAvailable?: boolean;
 } = {}) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -129,9 +131,20 @@ function host({
     });
     let releases = 0;
     const allocations: string[] = [];
+    const privateAllocations: string[] = [];
     const allocator = Layer.succeed(
       SlotAllocator,
       SlotAllocator.make({
+        allocateWithNbdDevice: (appId) =>
+          Effect.sync(() => {
+            privateAllocations.push(appId);
+            return slot;
+          }).pipe(
+            Effect.filterOrFail(
+              () => deviceAvailable,
+              () => new NbdAttachmentUnavailable(),
+            ),
+          ),
         allocate: (appId) =>
           Effect.sync(() => {
             allocations.push(appId);
@@ -230,6 +243,7 @@ function host({
       support,
       commands,
       allocations,
+      privateAllocations,
       storage,
       image,
       released: () => releases,
@@ -238,6 +252,24 @@ function host({
 }
 
 describe('opt-in volume routing', () => {
+  test('an unavailable NBD device stops configured provisioning before touching either filesystem', async () => {
+    await run(
+      Effect.gen(function* () {
+        const stage = yield* host({ deviceAvailable: false });
+        const provisioned = yield* stage.manager
+          .provision(desiredVolume({ storage: stage.storage }))
+          .pipe(Effect.either, Effect.provide(stage.support));
+        expect(Either.isLeft(provisioned) && provisioned.left._tag).toBe('AppVolumeUnavailable');
+        expect(stage.privateAllocations).toEqual([APP_ID]);
+        expect(stage.allocations).toEqual([]);
+        expect(stage.commands.commands).toEqual([]);
+        for (const mount of [stage.sharedMount, stage.filesystem.mountPath]) {
+          expect(yield* stage.fs.exists(join(mount, NBD_DIRECTORY, VOLUME_ID))).toBe(false);
+        }
+      }),
+    );
+  });
+
   test('an unconfigured volume still uses shared storage and the original NBD command', async () => {
     await run(
       Effect.gen(function* () {
@@ -246,6 +278,8 @@ describe('opt-in volume routing', () => {
           .provision(desiredVolume())
           .pipe(Effect.provide(stage.support));
         expect(report.storagePrefix).toBe(HOST_STORAGE_PREFIX);
+        expect(stage.allocations).toEqual([APP_ID]);
+        expect(stage.privateAllocations).toEqual([]);
         expect(yield* stage.fs.exists(join(stage.sharedMount, NBD_DIRECTORY, VOLUME_ID))).toBe(
           true,
         );
@@ -271,6 +305,8 @@ describe('opt-in volume routing', () => {
         const wanted = desiredVolume({ storage: stage.storage });
         const report = yield* stage.manager.provision(wanted).pipe(Effect.provide(stage.support));
         expect(report.storagePrefix).toBe(stage.filesystem.storagePrefix);
+        expect(stage.allocations).toEqual([]);
+        expect(stage.privateAllocations).toEqual([APP_ID]);
         expect(stage.commands.commands[0]?.command).toContain(stage.filesystem.nbdSocketPath);
         expect(stage.commands.commands[0]?.command).toContain('-nonetlink');
         expect(stage.commands.commands[0]?.command).not.toContain('-identifier');

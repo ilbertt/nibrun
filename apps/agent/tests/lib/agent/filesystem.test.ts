@@ -19,6 +19,7 @@ import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppWaker, WakeFailed } from '#services/app-waker.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { FilesystemReader, NoDeviceForApp } from '#services/filesystem-reader.service.ts';
 import { GuestActivity } from '#services/guest-activity.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
@@ -294,7 +295,10 @@ const host = Layer.mergeAll(
 
 // The real allocator over a slots file nothing wrote: a host holding no volume serves no app,
 // which is what an idle poll carries.
-const slots = Layer.provide(SlotAllocator.DefaultWithoutDependencies, host);
+const slots = SlotAllocator.DefaultWithoutDependencies.pipe(
+  Layer.provide(DesiredStateCache.DefaultWithoutDependencies),
+  Layer.provide(host),
+);
 
 const reader = Layer.succeed(
   FilesystemReader,

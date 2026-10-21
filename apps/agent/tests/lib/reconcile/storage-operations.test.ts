@@ -110,6 +110,7 @@ describe('operations that still require shared storage', () => {
       const allocator = Layer.succeed(
         SlotAllocator,
         SlotAllocator.make({
+          allocateWithNbdDevice: () => Effect.die('unexpected allocation'),
           allocate: () => Effect.die('unexpected allocation'),
           lookup: () => Effect.succeed(Option.some(slot)),
           release: () => Effect.void,
