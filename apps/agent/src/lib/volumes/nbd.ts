@@ -1,7 +1,9 @@
-import { basename } from 'node:path';
+import { createHash } from 'node:crypto';
+import { basename, dirname } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { FileSystem } from '@effect/platform';
 import type { VolumeId } from '@repo/protocol';
-import { Data, Duration, Effect, Option } from 'effect';
+import { Data, Duration, Effect, Option, Schedule } from 'effect';
 import { run, stdoutOf } from '#services/command-runner.service.ts';
 
 export const NBD_CLIENT = 'nbd-client';
@@ -140,34 +142,36 @@ const readsFirstBlock = (devicePath: string) =>
 
 function connect({
   client,
+  ...target
+}: Parameters<typeof connectionArguments>[0] & { client: string }) {
+  return stdoutOf({ command: [client, ...connectionArguments(target)] });
+}
+
+function connectionArguments({
   socketPath,
   devicePath,
   volumeId,
   extraArgs,
 }: {
-  client: string;
   socketPath: string;
   devicePath: string;
   volumeId: VolumeId;
   extraArgs: readonly string[];
 }) {
-  return stdoutOf({
-    command: [
-      client,
-      '-unix',
-      socketPath,
-      devicePath,
-      '-N',
-      volumeId,
-      ...extraArgs,
-      '-timeout',
-      String(NBD_TIMEOUT_SECONDS),
-      '-connections',
-      String(NBD_CONNECTIONS),
-      '-block-size',
-      String(NBD_BLOCK_SIZE_BYTES),
-    ],
-  });
+  return [
+    '-unix',
+    socketPath,
+    devicePath,
+    '-N',
+    volumeId,
+    ...extraArgs,
+    '-timeout',
+    String(NBD_TIMEOUT_SECONDS),
+    '-connections',
+    String(NBD_CONNECTIONS),
+    '-block-size',
+    String(NBD_BLOCK_SIZE_BYTES),
+  ];
 }
 
 /**
@@ -239,8 +243,44 @@ export class NbdAttachmentUnavailable extends Data.TaggedError('NbdAttachmentUna
   }
 }
 
-export function backendIdentifier(target: Parameters<typeof attach>[0]): string {
-  return `nibrun:${JSON.stringify([target.socketPath, target.volumeId])}`;
+export function attachmentScope(target: Parameters<typeof attach>[0]): string {
+  const identity = JSON.stringify([target.socketPath, target.volumeId, target.devicePath]);
+  return `nibrun-app-nbd-${createHash('sha256').update(identity).digest('hex')}.scope`;
+}
+
+export function attachmentLock(target: Parameters<typeof attach>[0]): string {
+  return `/run/nibrun-nbd/${basename(target.devicePath)}.lock`;
+}
+
+function scopeExists(target: Parameters<typeof attach>[0]) {
+  return Effect.flatMap(FileSystem.FileSystem, (fs) =>
+    fs.exists(`/sys/fs/cgroup/system.slice/${attachmentScope(target)}`),
+  );
+}
+
+function privateArguments(target: Parameters<typeof attach>[0]) {
+  return connectionArguments({ ...target, extraArgs: ['-persist', '-nonetlink'] });
+}
+
+function matchesProcess({
+  target,
+  cmdline,
+  cgroup,
+}: {
+  target: Parameters<typeof attach>[0];
+  cmdline: string;
+  cgroup: string;
+}) {
+  const actual = cmdline.split('\0').slice(1, -1);
+  const expected = privateArguments(target);
+  const scopePath = `/system.slice/${attachmentScope(target)}`;
+  return (
+    cmdline.endsWith('\0') &&
+    isDeepStrictEqual(actual, expected) &&
+    cgroup.split('\n').some((line) => {
+      return line === `0::${scopePath}`;
+    })
+  );
 }
 
 function attachmentAttribute(input: Parameters<typeof readAttribute>[0]) {
@@ -255,18 +295,39 @@ function attachmentAttribute(input: Parameters<typeof readAttribute>[0]) {
 
 export function inspectAttachment(target: Parameters<typeof attach>[0]) {
   return Effect.gen(function* () {
-    const [backend, pid] = yield* Effect.all([
-      attachmentAttribute({ devicePath: target.devicePath, attribute: 'backend' }),
+    const [pid, backend] = yield* Effect.all([
       attachmentAttribute({ devicePath: target.devicePath, attribute: 'pid' }),
+      attachmentAttribute({ devicePath: target.devicePath, attribute: 'backend' }),
     ]);
-    if (Option.isSome(backend) && backend.value === backendIdentifier(target)) {
-      return Option.isSome(pid);
-    }
-    // A healthy legacy device may still be exporting shared storage; liveness cannot prove ownership.
-    if (Option.isSome(backend) || Option.isSome(pid)) {
+    // Netlink setup PIDs can outlive the process and be reused; only ioctl owners stay blocked.
+    if (Option.isSome(backend)) {
       return yield* new NbdAttachmentMismatch();
     }
-    return false;
+    if (Option.isNone(pid)) {
+      return false;
+    }
+    if (!/^[1-9]\d*$/.test(pid.value)) {
+      return yield* new NbdAttachmentUnavailable();
+    }
+    const fs = yield* FileSystem.FileSystem;
+    const [cmdline, cgroup] = yield* Effect.all([
+      fs.readFileString(`/proc/${pid.value}/cmdline`),
+      fs.readFileString(`/proc/${pid.value}/cgroup`),
+    ]).pipe(
+      Effect.mapError((error) =>
+        error._tag === 'SystemError' && error.reason === 'NotFound'
+          ? new NbdAttachmentMismatch()
+          : new NbdAttachmentUnavailable(),
+      ),
+    );
+    if (!matchesProcess({ target, cmdline, cgroup })) {
+      return yield* new NbdAttachmentMismatch();
+    }
+    const current = yield* attachmentAttribute({ devicePath: target.devicePath, attribute: 'pid' });
+    if (Option.isNone(current) || current.value !== pid.value) {
+      return yield* new NbdAttachmentMismatch();
+    }
+    return true;
   });
 }
 
@@ -277,25 +338,74 @@ export function isUsableFor(target: Parameters<typeof attach>[0]) {
   );
 }
 
-export function detachVerified(target: Parameters<typeof attach>[0] & { client: string }) {
+export function detachVerified(target: Parameters<typeof attach>[0]) {
   return Effect.gen(function* () {
-    if (yield* inspectAttachment(target)) {
-      yield* stdoutOf({ command: [target.client, '-d', target.devicePath] }).pipe(
-        Effect.mapError(() => new NbdAttachmentUnavailable()),
+    const attached = yield* inspectAttachment(target);
+    if (attached || (yield* scopeExists(target))) {
+      // Stop also waits for the old daemon's cleanup before another client can reuse the device.
+      yield* stdoutOf({ command: ['systemctl', 'stop', attachmentScope(target)] }).pipe(
+        Effect.catchAll(() =>
+          Effect.gen(function* () {
+            if ((yield* scopeExists(target)) || (yield* inspectAttachment(target))) {
+              return yield* new NbdAttachmentUnavailable();
+            }
+          }),
+        ),
       );
     }
-  });
+    yield* attachmentAttribute({ devicePath: target.devicePath, attribute: 'pid' }).pipe(
+      Effect.filterOrFail(Option.isNone, () => new NbdAttachmentUnavailable()),
+      Effect.retry(Schedule.spaced('50 millis').pipe(Schedule.upTo('2 seconds'))),
+    );
+  }).pipe(
+    Effect.mapError((error) =>
+      error._tag === 'NbdAttachmentMismatch' ? error : new NbdAttachmentUnavailable(),
+    ),
+  );
 }
 
-export function reattachVerified(target: Parameters<typeof detachVerified>[0]) {
+export function reattachVerified(
+  target: Parameters<typeof detachVerified>[0] & { client: string },
+) {
   return Effect.gen(function* () {
     yield* detachVerified(target);
-    yield* connect({
-      ...target,
-      extraArgs: ['-persist', '-identifier', backendIdentifier(target)],
+    const fs = yield* FileSystem.FileSystem;
+    yield* fs
+      .makeDirectory(dirname(attachmentLock(target)), { recursive: true, mode: 0o700 })
+      .pipe(Effect.mapError(() => new NbdAttachmentUnavailable()));
+    // A separate scope keeps the ioctl owner alive when the agent's service restarts.
+    // The inherited lock excludes another setup even before the kernel publishes the owner PID.
+    yield* stdoutOf({
+      command: [
+        'flock',
+        '--exclusive',
+        '--nonblock',
+        '--no-fork',
+        attachmentLock(target),
+        'systemd-run',
+        '--scope',
+        '--quiet',
+        '--collect',
+        '--slice=system.slice',
+        `--unit=${attachmentScope(target)}`,
+        '--',
+        target.client,
+        ...privateArguments(target),
+      ],
     }).pipe(Effect.mapError(() => new NbdAttachmentUnavailable()));
-    if (!(yield* inspectAttachment(target))) {
-      return yield* new NbdAttachmentUnavailable();
-    }
+    // The client daemonizes before entering NBD_DO_IT and publishing its kernel PID.
+    yield* inspectAttachment(target).pipe(
+      Effect.flatMap((attached) =>
+        attached ? isUsable(target.devicePath) : Effect.succeed(false),
+      ),
+      Effect.filterOrFail(
+        (attached) => attached,
+        () => new NbdAttachmentUnavailable(),
+      ),
+      Effect.retry({
+        while: (error) => error._tag === 'NbdAttachmentUnavailable',
+        schedule: Schedule.spaced('50 millis').pipe(Schedule.upTo('2 seconds')),
+      }),
+    );
   });
 }

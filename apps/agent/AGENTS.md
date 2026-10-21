@@ -19,9 +19,13 @@ message definitions come from `@repo/protocol`; agent mechanics and fallback pol
 Tests use agent fixtures, not API defaults. Biome enforces this boundary.
 
 Configured app volumes may use a separate NBD client through `AGENT_APP_VOLUME_NBD_CLIENT`.
-It defaults to `nbd-client` and must support `-identifier`; verified attach and detach use that
-client. Shared volumes and checkpoint readers keep using `nbd-client`, so installing a newer
-client for customer storage does not require replacing the one serving existing apps.
+It defaults to the packaged `nbd-client`. Private attachments use its ioctl mode in a separate
+systemd scope, so the kernel's owner PID remains a live process across agent restarts.
+An inherited per-device lock excludes overlapping setup, including before a PID is published.
+Verification requires that PID's exact socket/export arguments and scope to match; saved slot
+assignments and filesystem contents do not establish attachment ownership. Ioctl mode requires
+an already-created NBD device and the host's unified cgroup hierarchy. Shared volumes and
+checkpoint readers retain their netlink path.
 
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
 test needs to substitute is a service. State that used to be
@@ -136,8 +140,13 @@ Owned by `infra/app-host/`, not fixable here.
 
 ## What is not tested
 
-Everything that needs a hypervisor, a Linux kernel or AWS — this was written on macOS with no AWS
-credentials, and the gap is wider than the test count suggests.
+Linux CI exercises the packaged NBD client's attach, repair, ownership rejection and detach
+against an in-memory server and a real kernel device. The existing checks job installs its
+packages and runs this test directly with `NIBRUN_TEST_NBD=1`; only the fixture's privileged
+commands use sudo.
+
+The gaps below still need a hypervisor, ZeroFS or real cloud storage; source inspection and
+mocked tests do not establish those guarantees.
 
 - **The nftables ruleset is rendered and asserted as text, never loaded.** Proving the isolation
   rules needs a booted guest trying to reach `169.254.169.254`, its neighbour and the control

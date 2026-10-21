@@ -44,6 +44,15 @@ jobs:
       - name: Run Tests
         run: bun run test
 
+      - name: Test NBD attachment
+        env:
+          NIBRUN_TEST_NBD: '1'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nbd-client nbdkit
+          sudo modprobe nbd nbds_max=1
+          bun run --filter @repo/agent test tests/lib/volumes/nbd-stock.test.ts
+
   checks-passed:
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     name: checks:required

@@ -10,9 +10,8 @@ export class AppVolumeNbd extends Effect.Service<AppVolumeNbd>()('AppVolumeNbd',
         (target: Omit<Parameters<typeof reattachVerified>[0], 'client'>) =>
           reattachVerified({ ...target, client: config.appVolumeNbdClient }),
       ),
-      detach: Effect.fn('AppVolumeNbd.detach')(
-        (target: Omit<Parameters<typeof detachVerified>[0], 'client'>) =>
-          detachVerified({ ...target, client: config.appVolumeNbdClient }),
+      detach: Effect.fn('AppVolumeNbd.detach')((target: Parameters<typeof detachVerified>[0]) =>
+        detachVerified(target),
       ),
     };
   }),

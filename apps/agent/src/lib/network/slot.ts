@@ -16,9 +16,9 @@ export const FIRST_SLOT = 0;
 /**
  * How many `/dev/nbdN` this host will use, which is this agent's own ceiling on the apps it
  * holds and not the kernel's. `nbds_max` in `app_host_user_data.sh.tftpl` only says how many
- * minors exist when the module loads; a netlink connect names any index, and the kernel makes
- * the device on the spot — `nbd-client` has been netlink since `-connections` was asked of it,
- * and the same on a kernel with `nbds_max=4` attached `/dev/nbd100` and read it back.
+ * minors exist when the module loads. Shared netlink attachments create extra devices on demand;
+ * the same on a kernel with `nbds_max=4` attached `/dev/nbd100` and read it back. Private ioctl
+ * attachments require a device that already exists.
  *
  * What does bound this is the instance store: every sleeping app keeps its memory there, and
  * `snapshotBudget` is what is left of `/data` beside ZeroFS's cache. At 128 the two meet for a
