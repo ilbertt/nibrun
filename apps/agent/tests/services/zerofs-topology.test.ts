@@ -10,6 +10,7 @@ import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { AGENT_CONFIG, agentConfig } from '#tests/support/config.ts';
 import { APP_ID } from '#tests/support/fixtures.ts';
 import { provided } from '#tests/support/run.ts';
+import { s3Storage } from '#tests/support/s3-storage.ts';
 
 const SECOND_APP_ID = Value.Parse(AppIdSchema, 'app-2');
 
@@ -27,7 +28,11 @@ function registration(appId: AppId) {
     appId,
     storagePrefix: Value.Parse(ObjectKeySchema, 'customer/filesystem'),
   }).pipe(
-    Effect.map((filesystem) => ({ appId, filesystem })),
+    Effect.map((filesystem) => ({
+      appId,
+      filesystem,
+      storage: s3Storage({ prefix: filesystem.storagePrefix, bucket: `customer-${appId}` }),
+    })),
     Effect.provide(agentConfig({ stateDir: '/var/lib/nibrun' })),
   );
 }
@@ -99,6 +104,7 @@ describe('registered app filesystems participate in durability flushes', () => {
         const first = yield* registration(APP_ID);
         const reordered = {
           appId: first.appId,
+          storage: first.storage,
           filesystem: {
             admin: {
               configFile: first.filesystem.admin.configFile,
@@ -135,6 +141,7 @@ describe('registered app filesystems participate in durability flushes', () => {
           host.registerAppFilesystem({
             appId: APP_ID,
             filesystem: replacement.filesystem,
+            storage: replacement.storage,
           }),
         );
         expect(Either.isLeft(result) && result.left._tag).toBe('AppZerofsFilesystemConflict');
@@ -174,6 +181,7 @@ describe('registered app filesystems participate in durability flushes', () => {
           host.registerAppFilesystem({
             appId: second.appId,
             filesystem,
+            storage: second.storage,
           }),
         );
         expect(Either.isLeft(result) && result.left._tag).toBe('AppZerofsFilesystemConflict');
@@ -193,7 +201,11 @@ describe('registered app filesystems participate in durability flushes', () => {
       Effect.gen(function* () {
         const first = yield* registration(APP_ID);
         const mutable = { ...first.filesystem, admin: { ...first.filesystem.admin } };
-        yield* host.registerAppFilesystem({ appId: first.appId, filesystem: mutable });
+        yield* host.registerAppFilesystem({
+          appId: first.appId,
+          filesystem: mutable,
+          storage: first.storage,
+        });
         mutable.admin.configFile = '/unexpected/config.toml';
         mutable.mountPath = '/unexpected/mount';
         yield* host.flushAll;
@@ -341,6 +353,89 @@ describe('looking up a registered app filesystem', () => {
           flushCommand(host.place()),
           flushCommand(first.filesystem),
         ]);
+      }),
+    );
+  });
+});
+
+describe('resolving a configured app filesystem', () => {
+  test('an unregistered app cannot resolve another app backend', async () => {
+    const host = topology();
+    await provided(Layer.empty)(
+      Effect.gen(function* () {
+        const first = yield* registration(APP_ID);
+        const storage = s3Storage({ prefix: first.filesystem.storagePrefix });
+        const lookup = host.resolveAppFilesystem({ appId: APP_ID, storage });
+        expect(Either.isLeft(yield* Effect.either(lookup))).toBe(true);
+        yield* host.registerAppFilesystem(yield* registration(SECOND_APP_ID));
+        const unavailable = yield* Effect.either(lookup);
+        expect(Either.isLeft(unavailable) && unavailable.left._tag).toBe(
+          'AppZerofsFilesystemUnavailable',
+        );
+      }),
+    );
+  });
+
+  test('a matching full configuration resolves to the private filesystem', async () => {
+    const host = topology();
+    await provided(Layer.empty)(
+      Effect.gen(function* () {
+        const first = yield* registration(APP_ID);
+        const storage = s3Storage({ prefix: first.filesystem.storagePrefix });
+        yield* host.registerAppFilesystem({ ...first, storage });
+        expect(yield* host.resolveAppFilesystem({ appId: APP_ID, storage })).toEqual(
+          first.filesystem,
+        );
+        expect(host.place().admin.configFile).toBe(AGENT_CONFIG.zerofsConfigFile);
+      }),
+    );
+  });
+
+  test.each([
+    { endpoint: 'https://another.example.com' },
+    { bucket: 'another-bucket' },
+    { prefix: 'another/prefix' },
+    { region: 'another-region' },
+    { auth: { kind: 'anonymous' } },
+    { encryptionPassword: 'another-secret-password' },
+  ])(
+    'a changed backend configuration never resolves to the registered filesystem: %j',
+    async (overrides) => {
+      const host = topology();
+      await provided(Layer.empty)(
+        Effect.gen(function* () {
+          const first = yield* registration(APP_ID);
+          const storage = s3Storage({ prefix: first.filesystem.storagePrefix });
+          yield* host.registerAppFilesystem({ ...first, storage });
+          const result = yield* Effect.either(
+            host.resolveAppFilesystem({
+              appId: APP_ID,
+              storage: s3Storage({ ...storage, ...overrides }),
+            }),
+          );
+          expect(Either.isLeft(result) && result.left._tag).toBe('AppZerofsConfigConflict');
+          expect(JSON.stringify(result)).not.toContain(storage.encryptionPassword);
+          expect(JSON.stringify(result)).not.toContain('another-secret-password');
+        }),
+      );
+    },
+  );
+
+  test('caller mutations cannot change the storage identity or resolved endpoints', async () => {
+    const host = topology();
+    await provided(Layer.empty)(
+      Effect.gen(function* () {
+        const first = yield* registration(APP_ID);
+        const storage = s3Storage({ prefix: first.filesystem.storagePrefix });
+        const expected = s3Storage({ prefix: first.filesystem.storagePrefix });
+        yield* host.registerAppFilesystem({ ...first, storage });
+        storage.bucket = 'mutated-bucket';
+        Object.assign(storage.auth, { secretAccessKey: 'mutated-key' });
+        const resolved = yield* host.resolveAppFilesystem({ appId: APP_ID, storage: expected });
+        resolved.admin.configFile = '/unexpected/config.toml';
+        expect(yield* host.resolveAppFilesystem({ appId: APP_ID, storage: expected })).toEqual(
+          first.filesystem,
+        );
       }),
     );
   });

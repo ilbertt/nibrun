@@ -39,7 +39,11 @@ export function activateAppZerofs(config: Parameters<typeof prepareAppZerofs>[0]
       appId: config.appId,
       storagePrefix: config.storage.prefix,
     });
-    yield* topology.registerAppFilesystem({ appId: config.appId, filesystem });
+    yield* topology.registerAppFilesystem({
+      appId: config.appId,
+      filesystem,
+      storage: config.storage,
+    });
     return filesystem;
   });
 }

@@ -159,6 +159,7 @@ describe('explicit per-app ZeroFS activation', () => {
         const topology = yield* ZerofsTopology;
         const original = {
           appId: APP_ID,
+          storage: s3Storage({ prefix: 'another/prefix' }),
           filesystem: yield* appZerofsFilesystem({
             appId: APP_ID,
             storagePrefix: s3Storage({ prefix: 'another/prefix' }).prefix,
