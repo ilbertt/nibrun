@@ -12,6 +12,7 @@ import {
   inspectAttachment,
   isUsable,
   isUsableFor,
+  NBD_CLIENT,
   reattach,
   reattachVerified,
 } from '#lib/volumes/nbd.ts';
@@ -36,6 +37,7 @@ const attached: Readonly<Record<string, string>> = {
 };
 
 const target = { socketPath: SOCKET, devicePath: DEVICE, volumeId: VOLUME_ID };
+const verifiedTarget = { ...target, client: NBD_CLIENT };
 
 const isProbe = (command: readonly string[]) => command[0] === 'dd';
 const isDetach = (command: readonly string[]) => command.includes('-d');
@@ -237,7 +239,7 @@ describe('identifying the live NBD export', () => {
   test('a healthy legacy device is never accepted or probed as a private export', async () => {
     const { commands, run } = host();
     expect(await run(isUsableFor(target))).toBe(false);
-    const result = await run(Effect.either(reattachVerified(target)));
+    const result = await run(Effect.either(reattachVerified(verifiedTarget)));
     expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentMismatch');
     expect(commands).toEqual([]);
   });
@@ -252,7 +254,7 @@ describe('identifying the live NBD export', () => {
         [`${SYSFS}/backend`]: `${backendIdentifier(other)}\n`,
       },
     });
-    const result = await run(Effect.either(detachVerified(target)));
+    const result = await run(Effect.either(detachVerified(verifiedTarget)));
     expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentMismatch');
     expect(commands).toEqual([]);
   });
@@ -278,7 +280,7 @@ describe('identifying the live NBD export', () => {
           return { code: 0, stdout: '', stderr: '' };
         }),
     });
-    await run(reattachVerified(target));
+    await run(reattachVerified(verifiedTarget));
     expect(commands.map(({ command }) => command[0])).toEqual(['nbd-client']);
     expect(commands[0]?.command).toContain('-identifier');
     expect(commands[0]?.command).toContain(backendIdentifier(target));
@@ -305,7 +307,7 @@ describe('identifying the live NBD export', () => {
           return { code: 0, stdout: '', stderr: '' };
         }),
     });
-    await run(reattachVerified(target));
+    await run(reattachVerified(verifiedTarget));
     expect(commands[0]?.command).toEqual(['nbd-client', '-d', DEVICE]);
     expect(commands[1]?.command).toContain('-identifier');
   });
@@ -315,7 +317,7 @@ describe('identifying the live NBD export', () => {
       attributes: { ...attached, [`${SYSFS}/backend`]: backendIdentifier(target) },
       answer: () => succeeding({ code: 1, stderr: 'private-server-output' }),
     });
-    const result = await run(Effect.either(reattachVerified(target)));
+    const result = await run(Effect.either(reattachVerified(verifiedTarget)));
     expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentUnavailable');
     expect(JSON.stringify(result)).not.toContain('private-server-output');
     expect(commands.map(({ command }) => command)).toEqual([['nbd-client', '-d', DEVICE]]);
@@ -323,14 +325,14 @@ describe('identifying the live NBD export', () => {
 
   test('success from a client that recorded no identity is not an attachment success', async () => {
     const { commands, run } = host({ attributes: {} });
-    const result = await run(Effect.either(reattachVerified(target)));
+    const result = await run(Effect.either(reattachVerified(verifiedTarget)));
     expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentUnavailable');
     expect(commands.map(({ command }) => command[0])).toEqual(['nbd-client']);
   });
 
   test('an older client that rejects the identifier fails without a fallback connection', async () => {
     const { commands, run } = host({ attributes: {}, answer: () => succeeding({ code: 1 }) });
-    const result = await run(Effect.either(reattachVerified(target)));
+    const result = await run(Effect.either(reattachVerified(verifiedTarget)));
     expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentUnavailable');
     expect(commands.map(({ command }) => command[0])).toEqual(['nbd-client']);
   });
@@ -352,7 +354,7 @@ describe('identifying the live NBD export', () => {
         }),
       ),
     );
-    const result = await run(Effect.either(reattachVerified(target)));
+    const result = await run(Effect.either(reattachVerified(verifiedTarget)));
     expect(Either.isLeft(result) && result.left._tag).toBe('NbdAttachmentUnavailable');
     expect(commands.commands).toEqual([]);
   });

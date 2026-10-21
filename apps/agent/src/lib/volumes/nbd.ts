@@ -4,7 +4,7 @@ import type { VolumeId } from '@repo/protocol';
 import { Data, Duration, Effect, Option } from 'effect';
 import { run, stdoutOf } from '#services/command-runner.service.ts';
 
-const NBD_CLIENT = 'nbd-client';
+export const NBD_CLIENT = 'nbd-client';
 
 const NBD_CONNECTIONS = 4;
 const NBD_BLOCK_SIZE_BYTES = 4096;
@@ -138,20 +138,22 @@ const readsFirstBlock = (devicePath: string) =>
     Effect.catchAll(() => Effect.succeed(false)),
   );
 
-const connect = ({
+function connect({
+  client,
   socketPath,
   devicePath,
   volumeId,
   extraArgs,
 }: {
+  client: string;
   socketPath: string;
   devicePath: string;
   volumeId: VolumeId;
   extraArgs: readonly string[];
-}) =>
-  stdoutOf({
+}) {
+  return stdoutOf({
     command: [
-      NBD_CLIENT,
+      client,
       '-unix',
       socketPath,
       devicePath,
@@ -166,6 +168,7 @@ const connect = ({
       String(NBD_BLOCK_SIZE_BYTES),
     ],
   });
+}
 
 /**
  * `-persist` reconnects on its own, and it is kept for the drops it does cover — a socket that
@@ -176,7 +179,7 @@ const connect = ({
  */
 export const attach = Effect.fn('nbd.attach')(
   (target: { socketPath: string; devicePath: string; volumeId: VolumeId }) =>
-    connect({ ...target, extraArgs: ['-persist'] }),
+    connect({ ...target, client: NBD_CLIENT, extraArgs: ['-persist'] }),
 );
 
 /**
@@ -193,7 +196,7 @@ export const attach = Effect.fn('nbd.attach')(
  */
 export const attachCheckpoint = Effect.fn('nbd.attachCheckpoint')(
   (target: { socketPath: string; devicePath: string; volumeId: VolumeId }) =>
-    connect({ ...target, extraArgs: [] }),
+    connect({ ...target, client: NBD_CLIENT, extraArgs: [] }),
 );
 
 /**
@@ -274,17 +277,17 @@ export function isUsableFor(target: Parameters<typeof attach>[0]) {
   );
 }
 
-export function detachVerified(target: Parameters<typeof attach>[0]) {
+export function detachVerified(target: Parameters<typeof attach>[0] & { client: string }) {
   return Effect.gen(function* () {
     if (yield* inspectAttachment(target)) {
-      yield* stdoutOf({ command: [NBD_CLIENT, '-d', target.devicePath] }).pipe(
+      yield* stdoutOf({ command: [target.client, '-d', target.devicePath] }).pipe(
         Effect.mapError(() => new NbdAttachmentUnavailable()),
       );
     }
   });
 }
 
-export function reattachVerified(target: Parameters<typeof attach>[0]) {
+export function reattachVerified(target: Parameters<typeof detachVerified>[0]) {
   return Effect.gen(function* () {
     yield* detachVerified(target);
     yield* connect({

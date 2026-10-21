@@ -18,6 +18,11 @@ the durable registry and cached desired state without waking a guest, including 
 message definitions come from `@repo/protocol`; agent mechanics and fallback policy stay here.
 Tests use agent fixtures, not API defaults. Biome enforces this boundary.
 
+Configured app volumes may use a separate NBD client through `AGENT_APP_VOLUME_NBD_CLIENT`.
+It defaults to `nbd-client` and must support `-identifier`; verified attach and detach use that
+client. Shared volumes and checkpoint readers keep using `nbd-client`, so installing a newer
+client for customer storage does not require replacing the one serving existing apps.
+
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
 test needs to substitute is a service. State that used to be
 mutable class fields lives in a `Ref`. The loops in `lib/agent/` are fibers, and their retry

@@ -12,6 +12,7 @@ import { ensureDeviceFile, NBD_DIRECTORY, removeDeviceFile } from '#lib/volumes/
 import { backendIdentifier } from '#lib/volumes/nbd.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
+import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
@@ -27,6 +28,7 @@ const run = provided(platform);
 const owners = new Map([[VOLUME_ID, APP_ID]]);
 const OTHER_APP = Value.Parse(AppIdSchema, 'app-2');
 const OTHER_VOLUME = Value.Parse(VolumeIdSchema, 'vol-2');
+const APP_NBD_CLIENT = '/opt/nibrun/bin/app-nbd-client/nbd-client';
 
 function host({
   registered = true,
@@ -66,7 +68,7 @@ function host({
     let connected = connection !== 'none';
     let identity = connection === 'private' ? backendIdentifier(target) : undefined;
     function nbdExitCode(command: CommandLine) {
-      if (command[0] !== 'nbd-client') {
+      if (command[0] !== 'nbd-client' && command[0] !== APP_NBD_CLIENT) {
         return 0;
       }
       if (command.includes('-d')) {
@@ -134,6 +136,7 @@ function host({
       }),
     );
     const config = agentConfig({
+      appVolumeNbdClient: APP_NBD_CLIENT,
       zerofsMount: sharedMount,
       zerofsNbdSocket: join(directory, 'shared.sock'),
       zerofsConfigFile: join(directory, 'shared.toml'),
@@ -179,6 +182,7 @@ function host({
     );
     const support = Layer.mergeAll(
       files,
+      AppVolumeNbd.DefaultWithoutDependencies.pipe(Layer.provide(config)),
       filesystemLayer,
       commands.layer,
       config,
@@ -238,6 +242,13 @@ describe('opt-in volume routing', () => {
           yield* stage.fs.exists(join(stage.filesystem.mountPath, NBD_DIRECTORY, VOLUME_ID)),
         ).toBe(false);
         expect(stage.commands.commands[0]?.command).not.toContain('-identifier');
+        expect(stage.commands.commands[0]?.command[0]).toBe('nbd-client');
+        yield* stage.manager
+          .teardown(desiredVolume({ desiredState: 'absent' }))
+          .pipe(Effect.provide(stage.support));
+        expect(
+          stage.commands.commands.find(({ command }) => command.includes('-d'))?.command,
+        ).toEqual(['nbd-client', '-d', stage.slot.nbdDevicePath]);
       }),
     );
   });
@@ -251,6 +262,7 @@ describe('opt-in volume routing', () => {
         expect(report.storagePrefix).toBe(stage.filesystem.storagePrefix);
         expect(stage.commands.commands[0]?.command).toContain(stage.filesystem.nbdSocketPath);
         expect(stage.commands.commands[0]?.command).toContain('-identifier');
+        expect(stage.commands.commands[0]?.command[0]).toBe(APP_NBD_CLIENT);
         expect(yield* stage.fs.exists(join(stage.sharedMount, NBD_DIRECTORY, VOLUME_ID))).toBe(
           false,
         );
@@ -264,6 +276,9 @@ describe('opt-in volume routing', () => {
           .teardown({ ...wanted, desiredState: 'absent' })
           .pipe(Effect.provide(stage.support));
         expect(deleted.state).toBe('deleted');
+        expect(
+          stage.commands.commands.find(({ command }) => command.includes('-d'))?.command,
+        ).toEqual([APP_NBD_CLIENT, '-d', stage.slot.nbdDevicePath]);
         expect(stage.released()).toBe(1);
         expect(
           yield* stage.fs.exists(join(stage.filesystem.mountPath, NBD_DIRECTORY, VOLUME_ID)),
@@ -380,7 +395,8 @@ describe('opt-in volume routing', () => {
           expect(
             stage.commands.commands.every(
               ({ command }) =>
-                !command.includes('-unix') || command.includes(stage.filesystem.nbdSocketPath),
+                !command.includes('-unix') ||
+                (command[0] === APP_NBD_CLIENT && command.includes(stage.filesystem.nbdSocketPath)),
             ),
           ).toBe(true);
         }),

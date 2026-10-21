@@ -1,6 +1,7 @@
 import { ObjectKeySchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Layer } from 'effect';
+import { NBD_CLIENT } from '#lib/volumes/nbd.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 
 export const HOST_STORAGE_PREFIX = Value.Parse(ObjectKeySchema, 'filesystems/host-1');
@@ -13,6 +14,7 @@ export const AGENT_CONFIG = {
   zerofsStoragePrefix: HOST_STORAGE_PREFIX,
   zerofsMount: '/mnt/zerofs',
   zerofsNbdSocket: '/run/zerofs/nbd.sock',
+  appVolumeNbdClient: NBD_CLIENT,
   zerofsCheckpointRuntimeDir: '/run/zerofs-checkpoint',
   zerofsBinary: '/opt/nibrun/bin/zerofs/zerofs',
   zerofsConfigFile: '/etc/zerofs/config.toml',
