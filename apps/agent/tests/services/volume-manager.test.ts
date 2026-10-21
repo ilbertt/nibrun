@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { basename, join } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
 import { SystemError } from '@effect/platform/Error';
-import { AppIdSchema, ObjectKeySchema, VolumeIdSchema } from '@repo/protocol';
+import { AppIdSchema, type DesiredVolume, ObjectKeySchema, VolumeIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Effect, Either, Layer, Option } from 'effect';
 import type { CommandLine } from '#lib/exec.ts';
@@ -13,6 +13,7 @@ import { attachmentScope, NbdAttachmentUnavailable } from '#lib/volumes/nbd.ts';
 import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
+import { AppZerofs } from '#services/app-zerofs.service.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
@@ -37,12 +38,14 @@ function host({
   mounted = true,
   supportsClient = true,
   deviceAvailable = true,
+  canActivate = false,
 }: {
   registered?: boolean;
   connection?: 'none' | 'shared' | 'private';
   mounted?: boolean;
   supportsClient?: boolean;
   deviceAvailable?: boolean;
+  canActivate?: boolean;
 } = {}) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -169,6 +172,7 @@ function host({
       Effect.provide(ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provide(config))),
     );
     const storage = s3Storage({ prefix: filesystem.storagePrefix });
+    const activations: DesiredVolume[] = [];
     if (registered) {
       yield* topology.registerAppFilesystem({ appId: APP_ID, filesystem, storage });
     }
@@ -205,6 +209,28 @@ function host({
       }),
     );
     const support = Layer.mergeAll(
+      Layer.succeed(
+        AppZerofs,
+        AppZerofs.make({
+          ensure: (desired) =>
+            Effect.gen(function* () {
+              activations.push(desired);
+              if (canActivate) {
+                yield* topology.registerAppFilesystem({
+                  appId: desired.appId,
+                  filesystem,
+                  storage,
+                });
+              }
+              if (desired.storage !== undefined) {
+                yield* topology.resolveAppFilesystem({
+                  appId: desired.appId,
+                  storage: desired.storage,
+                });
+              }
+            }),
+        }),
+      ),
       files,
       AppVolumeNbd.DefaultWithoutDependencies.pipe(Layer.provide(config)),
       filesystemLayer,
@@ -244,6 +270,7 @@ function host({
       commands,
       allocations,
       privateAllocations,
+      activations,
       storage,
       image,
       released: () => releases,
@@ -252,6 +279,24 @@ function host({
 }
 
 describe('opt-in volume routing', () => {
+  test('a configured volume activates its filesystem before placement and provisioning', async () => {
+    await run(
+      Effect.gen(function* () {
+        const stage = yield* host({ registered: false, canActivate: true });
+        const wanted = desiredVolume({ storage: stage.storage });
+        const report = yield* stage.manager.provision(wanted).pipe(Effect.provide(stage.support));
+        expect(stage.activations).toEqual([wanted]);
+        expect(report.storagePrefix).toBe(stage.filesystem.storagePrefix);
+        expect(
+          yield* stage.fs.exists(join(stage.filesystem.mountPath, NBD_DIRECTORY, VOLUME_ID)),
+        ).toBe(true);
+        expect(yield* stage.fs.exists(join(stage.sharedMount, NBD_DIRECTORY, VOLUME_ID))).toBe(
+          false,
+        );
+      }),
+    );
+  });
+
   test('an unavailable NBD device stops configured provisioning before touching either filesystem', async () => {
     await run(
       Effect.gen(function* () {
@@ -280,6 +325,7 @@ describe('opt-in volume routing', () => {
         expect(report.storagePrefix).toBe(HOST_STORAGE_PREFIX);
         expect(stage.allocations).toEqual([APP_ID]);
         expect(stage.privateAllocations).toEqual([]);
+        expect(stage.activations).toEqual([]);
         expect(yield* stage.fs.exists(join(stage.sharedMount, NBD_DIRECTORY, VOLUME_ID))).toBe(
           true,
         );

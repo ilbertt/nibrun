@@ -39,9 +39,9 @@ data are outside this cleanup.
 ## Per-app storage templates
 
 `nibrun-app-zerofs@.service` and `nibrun-app-zerofs-mount@.service` are installed but
-never enabled by the host deploy. No production caller starts them yet. Keep the shared
-ZeroFS service, its configuration and existing VM dependencies unchanged until explicit
-per-app activation is implemented.
+never enabled by the host deploy. The agent starts them only when provisioning a present volume
+with explicit storage configuration. Existing API producers omit that configuration. Keep the
+shared ZeroFS service, its configuration and existing VM dependencies unchanged for those apps.
 
 Before starting an instance, its caller must establish exclusive ownership of the storage
 prefix, stage `/var/lib/nibrun/zerofs/<app-id>/config.toml` as a root-owned `0600` file, and

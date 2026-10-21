@@ -1,16 +1,22 @@
 import { describe, expect, test } from 'bun:test';
-import { FileSystem } from '@effect/platform';
+import { FileSystem, Path } from '@effect/platform';
 import { SystemError } from '@effect/platform/Error';
-import { Deferred, Effect, Either, Fiber, Layer } from 'effect';
+import { Deferred, Effect, Either, Fiber, Layer, Option } from 'effect';
+import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
+import { APP_ZEROFS_CACHE } from '#lib/volumes/activate-app-volume.ts';
 import { activateAppZerofs } from '#lib/volumes/app-zerofs-activation.ts';
 import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
 import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
 import { appZerofsUnits } from '#lib/volumes/app-zerofs-systemd.ts';
+import { NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
+import { NbdAttachmentUnavailable } from '#lib/volumes/nbd.ts';
+import { AppZerofs } from '#services/app-zerofs.service.ts';
+import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { AGENT_CONFIG, agentConfig } from '#tests/support/config.ts';
-import { APP_ID } from '#tests/support/fixtures.ts';
-import { provided, runScoped } from '#tests/support/run.ts';
+import { APP_ID, desiredVolume, VOLUME_ID } from '#tests/support/fixtures.ts';
+import { platform, provided, runScoped, temporaryDirectory } from '#tests/support/run.ts';
 import { s3Storage } from '#tests/support/s3-storage.ts';
 import { systemdUnitProperties as unit } from '#tests/support/systemd.ts';
 
@@ -61,6 +67,214 @@ function flushCommands(commands: ReturnType<typeof recordingCommands>) {
     .filter(({ command }) => command[1] === 'flush')
     .map(({ command }) => command);
 }
+
+function configuredHost({
+  sharedImage = false,
+  deviceAvailable = true,
+  foreignAttachment = false,
+  failure,
+}: {
+  sharedImage?: boolean;
+  deviceAvailable?: boolean;
+  foreignAttachment?: boolean;
+  failure?: 'start' | 'unready';
+} = {}) {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const info = yield* fs.stat(yield* temporaryDirectory);
+    const files = stagedConfig({
+      stat: (value) =>
+        Effect.succeed({
+          ...info,
+          dev: value === AGENT_CONFIG.zerofsMount ? info.dev + 1 : info.dev,
+        }),
+      exists: (value) =>
+        Effect.succeed(
+          sharedImage && value === path.join(AGENT_CONFIG.zerofsMount, NBD_DIRECTORY, VOLUME_ID),
+        ),
+      readFileString: (value) =>
+        foreignAttachment && value.endsWith('/backend')
+          ? Effect.succeed('')
+          : Effect.fail(
+              new SystemError({
+                module: 'FileSystem',
+                method: 'readFileString',
+                reason: 'NotFound',
+              }),
+            ),
+    });
+    const commands = recordingCommands(({ command }) =>
+      succeeding({
+        code: failure === 'start' && command[1] === 'start' ? 1 : 0,
+        stdout: command[1] === 'show' ? (failure === 'unready' ? ACTIVATING : READY) : '',
+      }),
+    );
+    const allocations: string[] = [];
+    const slot = describeSlot({ slot: FIRST_SLOT, appId: APP_ID });
+    const allocator = Layer.succeed(
+      SlotAllocator,
+      SlotAllocator.make({
+        allocate: () => Effect.die('configured activation requires an existing NBD device'),
+        allocateWithNbdDevice: (appId) =>
+          Effect.sync(() => {
+            allocations.push(appId);
+            return slot;
+          }).pipe(
+            Effect.filterOrFail(
+              () => deviceAvailable,
+              () => new NbdAttachmentUnavailable(),
+            ),
+          ),
+        lookup: () => Effect.succeed(Option.some(slot)),
+        slots: Effect.succeed([slot]),
+        release: () => Effect.die('activation must not release a slot'),
+        persist: Effect.void,
+      }),
+    );
+    const layer = AppZerofs.DefaultWithoutDependencies.pipe(
+      Layer.provideMerge(
+        Layer.mergeAll(host({ commands, files }), allocator, Layer.succeed(Path.Path, path)),
+      ),
+    );
+    return { files, commands, allocations, layer };
+  });
+}
+
+describe('activation from configured desired volumes', () => {
+  const run = provided(platform);
+
+  test('starts and registers the app before provisioning and enrolls it in durability flushes once', async () => {
+    await run(
+      Effect.gen(function* () {
+        const stage = yield* configuredHost();
+        yield* Effect.gen(function* () {
+          const app = yield* AppZerofs;
+          const topology = yield* ZerofsTopology;
+          const desired = desiredVolume({ storage: s3Storage() });
+          expect(Option.isNone(yield* topology.lookupAppFilesystem(APP_ID))).toBe(true);
+          yield* app.ensure(desired);
+          yield* app.ensure(desired);
+          const beforeConflict = stage.commands.commands.length;
+          const conflict = yield* Effect.either(
+            app.ensure(
+              desiredVolume({
+                storage: s3Storage({ bucket: 'another-bucket' }),
+              }),
+            ),
+          );
+          expect(Either.isLeft(conflict) && conflict.left._tag).toBe('AppZerofsConfigConflict');
+          expect(stage.commands.commands).toHaveLength(beforeConflict);
+          expect(stage.files.written).toHaveLength(2);
+          const filesystem = yield* topology.resolveAppFilesystem({
+            appId: APP_ID,
+            storage: s3Storage(),
+          });
+          yield* topology.flushAll;
+          expect(flushCommands(stage.commands)).toEqual([
+            [AGENT_CONFIG.zerofsBinary, 'flush', '-c', AGENT_CONFIG.zerofsConfigFile],
+            [filesystem.admin.binary, 'flush', '-c', filesystem.admin.configFile],
+          ]);
+          for (const contents of stage.files.written) {
+            expect(Bun.TOML.parse(contents)).toHaveProperty(
+              'cache.memory_size_gb',
+              APP_ZEROFS_CACHE.memorySizeGb,
+            );
+            expect(Bun.TOML.parse(contents)).toHaveProperty(
+              'cache.disk_size_gb',
+              APP_ZEROFS_CACHE.diskSizeGb,
+            );
+          }
+          expect(
+            stage.commands.commands
+              .filter(({ command }) => command[1] === 'start')
+              .map(({ command }) => command),
+          ).toEqual([
+            ['systemctl', 'start', UNITS.mount],
+            ['systemctl', 'start', UNITS.mount],
+          ]);
+        }).pipe(Effect.provide(stage.layer));
+      }),
+    );
+  });
+
+  test('an unconfigured volume never stages, allocates or starts anything', async () => {
+    await run(
+      Effect.gen(function* () {
+        const stage = yield* configuredHost();
+        yield* Effect.flatMap(AppZerofs, (app) => app.ensure(desiredVolume())).pipe(
+          Effect.provide(stage.layer),
+        );
+        expect(stage.files.written).toEqual([]);
+        expect(stage.commands.commands).toEqual([]);
+        expect(stage.allocations).toEqual([]);
+      }),
+    );
+  });
+
+  test.each([
+    { options: { sharedImage: true }, tag: 'VolumeStorageConflict' },
+    { options: { deviceAvailable: false }, tag: 'NbdAttachmentUnavailable' },
+    { options: { foreignAttachment: true }, tag: 'NbdAttachmentMismatch' },
+  ])('unsafe placement fails before staging or startup: %j', async ({ options, tag }) => {
+    await run(
+      Effect.gen(function* () {
+        const stage = yield* configuredHost(options);
+        const result = yield* Effect.flatMap(AppZerofs, (app) =>
+          app.ensure(desiredVolume({ storage: s3Storage() })),
+        ).pipe(Effect.either, Effect.provide(stage.layer));
+        expect(Either.isLeft(result) && result.left._tag).toBe(tag);
+        expect(stage.files.written).toEqual([]);
+        expect(stage.commands.commands).toEqual([]);
+      }),
+    );
+  });
+
+  test('a request to delete a volume never activates its storage', async () => {
+    await run(
+      Effect.gen(function* () {
+        const stage = yield* configuredHost();
+        const result = yield* Effect.flatMap(AppZerofs, (app) =>
+          app.ensure(desiredVolume({ storage: s3Storage(), desiredState: 'absent' })),
+        ).pipe(Effect.either, Effect.provide(stage.layer));
+        expect(Either.isLeft(result) && result.left._tag).toBe('AppVolumeUnavailable');
+        expect(stage.files.written).toEqual([]);
+        expect(stage.commands.commands).toEqual([]);
+        expect(stage.allocations).toEqual([]);
+      }),
+    );
+  });
+
+  test.each([
+    { failure: 'start' as const, tag: 'AppZerofsUnitError' },
+    { failure: 'unready' as const, tag: 'AppZerofsNotReady' },
+  ])(
+    'an unsuccessful activation leaves no ready registration and never stops a writer: %j',
+    async ({ failure, tag }) => {
+      await run(
+        Effect.gen(function* () {
+          const stage = yield* configuredHost({ failure });
+          yield* Effect.gen(function* () {
+            const app = yield* AppZerofs;
+            const result = yield* Effect.either(
+              app.ensure(desiredVolume({ storage: s3Storage() })),
+            );
+            expect(Either.isLeft(result) && result.left._tag).toBe(tag);
+            expect(Option.isNone(yield* (yield* ZerofsTopology).lookupAppFilesystem(APP_ID))).toBe(
+              true,
+            );
+            expect(stage.files.written).toHaveLength(1);
+            expect(
+              stage.commands.commands.some(
+                ({ command }) => command[1] === 'stop' || command[1] === 'restart',
+              ),
+            ).toBe(false);
+          }).pipe(Effect.provide(stage.layer));
+        }),
+      );
+    },
+  );
+});
 
 describe('explicit per-app ZeroFS activation', () => {
   test('stages config and cache before starting, then registers the ready filesystem for flushes', async () => {
