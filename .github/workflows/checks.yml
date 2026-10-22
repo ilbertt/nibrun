@@ -59,6 +59,7 @@ jobs:
       - name: Test configured ZeroFS integration
         run: |
           sudo modprobe fuse
+          sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS_SYSTEMD=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/app-zerofs-systemd-linux.test.ts
           sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/zerofs-persistence.test.ts tests/lib/reconcile/checkpoints-linux.test.ts
 
   checks-passed:

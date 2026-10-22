@@ -18,7 +18,7 @@ type MountedZerofsPaths = Pick<ReturnType<typeof appZerofsPaths>, 'configFile' |
   sockets: Parameters<typeof renderZerofsConfig>[0]['sockets'] & { ninep: string };
 };
 
-function zerofsBinary() {
+export function zerofsBinary() {
   return Effect.gen(function* () {
     const override = process.env.NIBRUN_TEST_ZEROFS_BINARY;
     if (override) {

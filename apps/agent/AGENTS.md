@@ -178,6 +178,12 @@ packages and runs this test directly with `NIBRUN_TEST_NBD=1`; only the fixture'
 commands use sudo.
 Linux CI also checks VM dependency isolation with real systemd and disposable sleep processes;
 the fixture runs as root and refuses to replace any existing host units.
+With `NIBRUN_TEST_ZEROFS_SYSTEMD=1`, Linux CI installs the unchanged per-app unit templates,
+the pinned binary and a disposable `zerofs` account. A bind-mounted test directory stands in for
+the data disk, with a fixture unit satisfying its dependency and a drop-in trusting the test CA.
+Production activation and flush/stop helpers verify credential loading, unprivileged execution,
+idempotent activation, unmount/runtime-directory cleanup and cache-free restart recovery. The
+fixture refuses existing host paths, units or accounts and removes its own resources on exit.
 With `NIBRUN_TEST_ZEROFS=1`, Linux CI also runs the pinned ZeroFS release against a disposable
 RustFS bucket over TLS and a real FUSE mount. It stages the production app configuration, creates
 the image through the volume file helpers, and writes through a real NBD attachment using the
