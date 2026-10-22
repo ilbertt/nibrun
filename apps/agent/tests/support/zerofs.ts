@@ -83,10 +83,10 @@ function writer<A, E, R>({
           Command.stderr('inherit'),
         ),
       );
-      yield* fs.exists(paths.sockets.rpc).pipe(
+      yield* Effect.all(Object.values(paths.sockets).map((socket) => fs.exists(socket))).pipe(
         Effect.filterOrFail(
-          (ready) => ready,
-          () => new Error('ZeroFS did not open its RPC socket.'),
+          (listeners) => listeners.every(Boolean),
+          () => new Error('ZeroFS did not open its listener sockets.'),
         ),
         Effect.retry(poll),
       );

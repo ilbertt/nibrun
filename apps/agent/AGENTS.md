@@ -178,8 +178,10 @@ Linux CI also checks VM dependency isolation with real systemd and disposable sl
 the fixture runs as root and refuses to replace any existing host units.
 With `NIBRUN_TEST_ZEROFS=1`, Linux CI also runs the pinned ZeroFS release against a disposable
 RustFS bucket over TLS and a real FUSE mount. It stages the production app configuration, creates
-and writes an image through the volume file helpers, flushes, removes the local cache, and checks
-that a fresh writer restores the image from the bucket. Downloads use the checksum in
+the image through the volume file helpers, and writes through a real NBD attachment using the
+production client service. After flushing and detaching, it removes the local cache and checks
+the restored bytes through a fresh NBD attachment with direct I/O. The test requires a free
+`/dev/nbd0`. Downloads use the checksum in
 `infra/app-host/versions.json`; `NIBRUN_TEST_ZEROFS_BINARY` permits a preinstalled test binary.
 
 The gaps below still need a hypervisor, ZeroFS or real cloud storage; source inspection and
@@ -190,9 +192,9 @@ mocked tests do not establish those guarantees.
   plane.
 - **The Firecracker config is asserted as a structure, never booted.** Firecracker validates it
   with `deny_unknown_fields`, so a typo is a hard error at boot and nowhere earlier.
-- **The configured image's full guest I/O path is not exercised.** The FUSE-to-bucket test and
-  the NBD ownership test run separately; a guest still needs to write through the real ZeroFS
-  NBD export and read its filesystem after recovery.
+- **The configured image's full guest I/O path is not exercised.** Raw NBD writes now reach
+  the real S3 backend and survive recovery, but a guest still needs to mount the image and read
+  its filesystem after recovery.
 - **`mkfs.ext4 -d` has never written a seeded filesystem onto a real device.** The unpack is
   exercised against a temp directory — every refusal, both ceilings, and who the tree ends up
   belonging to — but who it belongs to is only provable as "whoever the caller said", because only
