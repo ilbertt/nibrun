@@ -8,6 +8,7 @@ import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
 import type { AppSlot } from '#lib/network/slot.ts';
 import { ensureTap, refreshNeighbour } from '#lib/network/tap.ts';
 import { readFilesystemSpace } from '#lib/report/capacity.ts';
+import { isolateAppVmStorage } from '#lib/vm/app-storage-unit.ts';
 import * as Firecracker from '#lib/vm/firecracker-api.ts';
 import { renderFirecrackerConfig } from '#lib/vm/firecracker-config.ts';
 import { adoptedGuestImage, type GuestImage } from '#lib/vm/guest-image.ts';
@@ -70,6 +71,10 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
         if (volume !== undefined) {
           yield* requireConfiguredVolume({ desired: volume, devicePath }).pipe(
             Effect.provideService(ZerofsTopology, zerofs),
+            Effect.provideService(FileSystem.FileSystem, fs),
+            Effect.provideService(Path.Path, path),
+          );
+          yield* isolateAppVmStorage(appId).pipe(
             Effect.provideService(FileSystem.FileSystem, fs),
             Effect.provideService(Path.Path, path),
           );

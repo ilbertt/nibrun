@@ -1,14 +1,18 @@
 import { describe, expect, test } from 'bun:test';
 import { dirname } from 'node:path';
 import { FileSystem } from '@effect/platform';
+import { SystemError } from '@effect/platform/Error';
 import type { HostVersions } from '@repo/protocol';
 import { Effect, Either, Layer } from 'effect';
 import { writeJsonFile } from '#lib/json-store.ts';
 import { describeSlot, FIRST_SLOT } from '#lib/network/slot.ts';
+import { VM_TEMPLATE_UNIT_FILE } from '#lib/vm/app-storage-unit.ts';
 import type { FirecrackerConfig } from '#lib/vm/firecracker-config.ts';
 import { type SnapshotStamp, snapshotPaths } from '#lib/vm/snapshot.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
+import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
+import type { ZerofsLiveFilesystem } from '#lib/volumes/topology.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { ArtifactTransferError } from '#services/artifact-store.service.ts';
@@ -27,8 +31,10 @@ import {
   desiredState,
   desiredVolume,
   instanceRecord,
+  VOLUME_ID,
 } from '#tests/support/fixtures.ts';
 import { installedGuestImage } from '#tests/support/guest-image.ts';
+import { privateNbdProcess } from '#tests/support/nbd.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 import { s3Storage } from '#tests/support/s3-storage.ts';
 
@@ -55,16 +61,66 @@ const stamp: SnapshotStamp = {
   slot: SLOT.slot,
 };
 
-function hostBooted(bootId: string) {
+function hostBooted({
+  bootId,
+  filesystem,
+  storage,
+}: {
+  bootId: string;
+  filesystem: ZerofsLiveFilesystem;
+  storage: { ready: boolean };
+}) {
   return Layer.effect(
     FileSystem.FileSystem,
-    Effect.map(FileSystem.FileSystem, (fs) => ({
-      ...fs,
-      readFileString: (...read: Parameters<FileSystem.FileSystem['readFileString']>) => {
-        const [path] = read;
-        return path === HOST_BOOT_ID_PATH ? Effect.succeed(bootId) : fs.readFileString(...read);
-      },
-    })),
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const info = yield* fs.stat('/');
+      const mounts = new Set([filesystem.mountPath, '/mnt/zerofs']);
+      const parents = new Set([...mounts].map(dirname));
+      const process = privateNbdProcess({
+        socketPath: filesystem.nbdSocketPath,
+        devicePath: SLOT.nbdDevicePath,
+        volumeId: VOLUME_ID,
+      });
+      const attributes: Record<string, string> = {
+        '/sys/block/nbd0/pid': '123\n',
+        '/sys/block/nbd0/size': '8\n',
+        '/proc/123/cmdline': process.cmdline,
+        '/proc/123/cgroup': process.cgroup,
+      };
+      function isStorageFile(path: string) {
+        return (
+          path.startsWith('/sys/block/nbd0/') ||
+          path === VM_TEMPLATE_UNIT_FILE ||
+          Object.hasOwn(attributes, path)
+        );
+      }
+      return {
+        ...fs,
+        stat: (path: string) =>
+          storage.ready && mounts.has(path)
+            ? Effect.succeed({ ...info, dev: info.dev + 1 })
+            : storage.ready && parents.has(path)
+              ? Effect.succeed(info)
+              : fs.stat(path),
+        readFileString: (...read: Parameters<FileSystem.FileSystem['readFileString']>) => {
+          const [path] = read;
+          if (storage.ready && isStorageFile(path)) {
+            const value = attributes[path];
+            return value === undefined
+              ? Effect.fail(
+                  new SystemError({
+                    module: 'FileSystem',
+                    method: 'readFileString',
+                    reason: 'NotFound',
+                  }),
+                )
+              : Effect.succeed(value);
+          }
+          return path === HOST_BOOT_ID_PATH ? Effect.succeed(bootId) : fs.readFileString(...read);
+        },
+      };
+    }),
   );
 }
 
@@ -102,6 +158,11 @@ function hostAsleepAndRefusing() {
     const imageHost = yield* installedGuestImage(versions.guestImage);
     const runtimeDir = yield* temporaryDirectory;
     const stateDir = yield* temporaryDirectory;
+    const storage = { ready: false };
+    const filesystem = yield* appZerofsFilesystem({
+      appId: APP_ID,
+      storagePrefix: s3Storage().prefix,
+    }).pipe(Effect.provide(agentConfig({ stateDir })));
     const paths = snapshotPaths({ snapshotDir, appId: APP_ID });
     yield* fs.makeDirectory(paths.directory, { recursive: true });
     yield* fs.writeFileString(paths.statePath, 'the vmm as it was');
@@ -123,7 +184,7 @@ function hostAsleepAndRefusing() {
         desiredStateFile: `${snapshotDir}/desired-state.json`,
       }),
       systemctl.layer,
-      hostBooted(HOST_BOOT_ID),
+      hostBooted({ bootId: HOST_BOOT_ID, filesystem, storage }),
     ).pipe(Layer.provideMerge(platform));
     const services = VmManager.DefaultWithoutDependencies.pipe(
       Layer.provideMerge(
@@ -170,7 +231,25 @@ function hostAsleepAndRefusing() {
           : vms.wake({ appId: APP_ID, deploymentId: DEPLOYMENT_ID, slot: SLOT });
       }).pipe(Effect.either, Effect.provide(services));
     }
+    function blockedByVmUnit(operation: 'boot' | 'wake') {
+      return Effect.gen(function* () {
+        storage.ready = true;
+        yield* (yield* DesiredStateCache).accept(
+          desiredState({ volumes: [desiredVolume({ storage: s3Storage() })] }),
+        );
+        yield* (yield* ZerofsTopology).registerAppFilesystem({
+          appId: APP_ID,
+          filesystem,
+          storage: s3Storage(),
+        });
+        const vms = yield* VmManager;
+        return yield* operation === 'boot'
+          ? vms.boot({ desired: desiredInstance(), slot: SLOT, dataDevicePath: SLOT.nbdDevicePath })
+          : vms.wake({ appId: APP_ID, deploymentId: DEPLOYMENT_ID, slot: SLOT });
+      }).pipe(Effect.either, Effect.provide(services));
+    }
     return {
+      blockedByVmUnit,
       blockedByStorage,
       wake,
       kept,
@@ -264,6 +343,20 @@ describe('a wake whose unit systemd would not start', () => {
 });
 
 describe('configured storage gates every VM start', () => {
+  test.each(['boot', 'wake'] as const)(
+    'an unavailable isolated VM unit blocks %s before altering its snapshot',
+    async (operation) => {
+      await run(
+        Effect.gen(function* () {
+          const stage = yield* hostAsleepAndRefusing();
+          const result = yield* stage.blockedByVmUnit(operation);
+          expect(Either.isLeft(result) && result.left._tag).toBe('VmStorageUnitUnavailable');
+          expect(stage.commands.map(({ command }) => command[0])).toEqual(['dd']);
+          expect(yield* stage.kept).toEqual({ stamp: true, snapshot: true });
+        }),
+      );
+    },
+  );
   test.each([
     { operation: 'boot', staged: false },
     { operation: 'wake', staged: false },

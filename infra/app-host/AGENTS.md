@@ -48,10 +48,14 @@ prefix, stage `/var/lib/nibrun/zerofs/<app-id>/config.toml` as a root-owned `060
 create `/data/zerofs-apps/<app-id>` writable by `zerofs`. The configuration names that cache
 directory and the NBD, 9P and RPC sockets under `/run/zerofs-apps/<app-id>`. Each instance
 loads its configuration through systemd credentials; never load the shared `zerofs.env`.
+Before a configured VM boots or wakes, the agent derives a full runtime instance unit from the
+installed VM template and replaces its shared dependency with that app's ZeroFS server. The
+instance keeps its existing name and service body. The installed template remains the source
+for shared VMs and future configured starts; deploys do not restart existing configured VMs.
 
 ## Unsettled
 
-**`nibrun-vm@.service` carries `BindsTo=nibrun-zerofs.service`**, which stops every tenant VM on
+**Shared VMs use `BindsTo=nibrun-zerofs.service`**, which interrupts every shared-storage VM on
 the host whenever ZeroFS restarts. Measured behaviour is milder than that implies: `nbd-client
 -persist` reconnects on its own, and with a long timeout a ZeroFS restart is a *stall* in the guest
 rather than an I/O error — the guest's ext4 only remounts read-only if the restart outlasts the
