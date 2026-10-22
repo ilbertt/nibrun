@@ -49,14 +49,14 @@ jobs:
           NIBRUN_TEST_NBD: '1'
         run: |
           sudo apt-get update
-          sudo apt-get install -y nbd-client nbdkit fuse3 openssl curl
+          sudo apt-get install -y nbd-client nbdkit fuse3 openssl curl e2fsprogs util-linux
           sudo modprobe nbd nbds_max=1
           bun run --filter @repo/agent test tests/lib/volumes/nbd-stock.test.ts
 
       - name: Test VM storage dependencies
         run: sudo env "PATH=$PATH" NIBRUN_TEST_VM_SYSTEMD=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/vm/app-storage-unit-linux.test.ts
 
-      - name: Test configured ZeroFS NBD persistence
+      - name: Test configured ZeroFS filesystem persistence
         run: |
           sudo modprobe fuse
           sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/zerofs-persistence.test.ts

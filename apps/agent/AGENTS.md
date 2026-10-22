@@ -183,6 +183,11 @@ production client service. After flushing and detaching, it removes the local ca
 the restored bytes through a fresh NBD attachment with direct I/O. The test requires a free
 `/dev/nbd0`. Downloads use the checksum in
 `infra/app-host/versions.json`; `NIBRUN_TEST_ZEROFS_BINARY` permits a preinstalled test binary.
+The same fixture formats a seeded ext4 image through the production formatter, mounts it and
+appends to a seeded file as an unprivileged owner. After unmounting, flushing and recovering
+without the cache, it checks filesystem consistency, label, file contents, ownership and mode,
+and verifies that the formatter does not format it again. These mounts contain only fixture data
+on the disposable CI host; production never mounts a tenant ext4 filesystem on the host.
 
 The gaps below still need a hypervisor, ZeroFS or real cloud storage; source inspection and
 mocked tests do not establish those guarantees.
@@ -195,12 +200,6 @@ mocked tests do not establish those guarantees.
 - **The configured image's full guest I/O path is not exercised.** Raw NBD writes now reach
   the real S3 backend and survive recovery, but a guest still needs to mount the image and read
   its filesystem after recovery.
-- **`mkfs.ext4 -d` has never written a seeded filesystem onto a real device.** The unpack is
-  exercised against a temp directory — every refusal, both ceilings, and who the tree ends up
-  belonging to — but who it belongs to is only provable as "whoever the caller said", because only
-  root may give a file away and none of this was run as root. That the tenant can then write to
-  their own `data/`, and that mke2fs is content with a tree behind an NBD device, are a host's
-  questions.
 - **AWS, other S3 providers and IMDS** remain untested against live services. The configured
   storage test uses RustFS. `ExportUploader` is the
   seam the export tests stand in front of, so what happens to a bundle's bytes after `writeBundle`
