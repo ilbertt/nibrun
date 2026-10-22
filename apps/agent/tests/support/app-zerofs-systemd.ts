@@ -165,6 +165,14 @@ export function appZerofsSystemdHost(certificate: string) {
       { flag: 'wx', mode: PUBLIC_FILE_MODE },
     );
     yield* stdoutOf({ command: ['systemctl', 'daemon-reload'] });
-    return { appId, paths, units, config: agentConfig({ stateDir: STATE_DIRECTORY }) };
+    const journal = stdoutOf({
+      command: [
+        'journalctl',
+        '--no-pager',
+        '--lines=100',
+        ...Object.values(units).flatMap((unit) => ['--unit', unit]),
+      ],
+    }).pipe(Effect.flatMap(Effect.logError), Effect.ignore);
+    return { appId, paths, units, journal, config: agentConfig({ stateDir: STATE_DIRECTORY }) };
   });
 }

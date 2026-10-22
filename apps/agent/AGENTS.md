@@ -184,6 +184,11 @@ the data disk, with a fixture unit satisfying its dependency and a drop-in trust
 Production activation and flush/stop helpers verify credential loading, unprivileged execution,
 idempotent activation, unmount/runtime-directory cleanup and cache-free restart recovery. The
 fixture refuses existing host paths, units or accounts and removes its own resources on exit.
+The same test file also closes one agent topology scope and builds a fresh registry while the
+real writer and mount keep running. Staged configuration rejects an omitted storage field,
+and reactivation registers the existing filesystem without changing either PID or its data.
+An unrelated unconfigured app still selects the shared filesystem.
+This checks registry reconstruction, not a restart of the full agent binary or its layer graph.
 With `NIBRUN_TEST_ZEROFS=1`, Linux CI also runs the pinned ZeroFS release against a disposable
 RustFS bucket over TLS and a real FUSE mount. It stages the production app configuration, creates
 the image through the volume file helpers, and writes through a real NBD attachment using the
