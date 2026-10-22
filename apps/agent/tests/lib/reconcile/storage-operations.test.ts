@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { FetchHttpClient } from '@effect/platform';
+import { dirname } from 'node:path';
+import { FetchHttpClient, FileSystem } from '@effect/platform';
 import { DESIRED_PRESENCE } from '@repo/protocol';
 import { Effect, Layer, Option } from 'effect';
 import { exportCheckpointId } from '#lib/exports/checkpoint.ts';
@@ -15,7 +16,7 @@ import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { ExportManager } from '#services/export-manager.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
-import { recordingCommands } from '#tests/support/commands.ts';
+import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import {
   APP_ID,
@@ -42,10 +43,148 @@ function registerPrivateFilesystem() {
       storagePrefix: storage.prefix,
     }).pipe(Effect.provide(agentConfig({ stateDir: '/var/lib/nibrun' })));
     yield* topology.registerAppFilesystem({ appId: APP_ID, filesystem, storage });
+    return filesystem;
   });
 }
 
-describe('operations that still require shared storage', () => {
+function checkpointHost({
+  configured,
+  listed,
+  failAt,
+}: {
+  configured: boolean;
+  listed: boolean;
+  failAt: 'list' | 'create' | 'delete' | undefined;
+}) {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const info = yield* fs.stat('/');
+    const topology = yield* ZerofsTopology.pipe(
+      Effect.provide(ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provide(agentConfig()))),
+    );
+    const filesystem = configured
+      ? yield* registerPrivateFilesystem().pipe(Effect.provideService(ZerofsTopology, topology))
+      : topology.place();
+    const mounts = new Set([topology.place().mountPath, filesystem.mountPath]);
+    const parents = new Set([...mounts].map(dirname));
+    const commands = recordingCommands(({ command }) =>
+      succeeding({
+        code: command[2] === failAt ? 1 : 0,
+        stdout: listed ? `${CHECKPOINT_ID}\n` : '',
+        stderr: 'customer-secret-key',
+      }),
+    );
+    const layer = Layer.mergeAll(
+      AgentState.Default,
+      Layer.succeed(ZerofsTopology, topology),
+      commands.layer,
+      Layer.succeed(FileSystem.FileSystem, {
+        ...fs,
+        exists: () => Effect.succeed(false),
+        stat: (path) =>
+          mounts.has(path)
+            ? Effect.succeed({ ...info, dev: info.dev + 1 })
+            : parents.has(path)
+              ? Effect.succeed(info)
+              : fs.stat(path),
+      }),
+    );
+    return { commands, layer, filesystem };
+  });
+}
+
+describe('storage-specific operations', () => {
+  test.each(
+    DESIRED_PRESENCE.flatMap((desiredPresence) =>
+      [false, true].flatMap((configured) =>
+        [false, true].map((listed) => ({ desiredPresence, configured, listed })),
+      ),
+    ),
+  )(
+    'checkpoints use only their selected writer and tolerate retries: %j',
+    async ({ desiredPresence, configured, listed }) => {
+      const sharedRemoval = desiredPresence === 'absent' && !configured;
+      await provided(platform)(
+        Effect.gen(function* () {
+          const host = yield* checkpointHost({ configured, listed, failAt: undefined });
+          const desired = desiredState({
+            volumes: [desiredVolume(configured ? { storage: s3Storage() } : {})],
+            checkpoints: [desiredCheckpoint({ desiredState: desiredPresence })],
+          });
+          const observed = observedState({
+            checkpoints: sharedRemoval
+              ? [{ checkpointId: CHECKPOINT_ID, volumeId: VOLUME_ID }]
+              : [],
+          });
+          yield* Effect.gen(function* () {
+            yield* applyCheckpoints({ plan: planReconcile({ desired, observed }), desired });
+            expect((yield* AgentState.snapshot).checkpointReports[0]?.state).toBe(
+              desiredPresence === 'present' ? 'ready' : 'pending',
+            );
+          }).pipe(Effect.provide(host.layer));
+          const { binary, configFile } = host.filesystem.admin;
+          const operation = desiredPresence === 'present' ? 'create' : 'delete';
+          const changes = desiredPresence === 'present' ? !listed : listed;
+          expect(host.commands.commands.map(({ command }) => command)).toEqual([
+            [binary, 'checkpoint', 'list', '-c', configFile],
+            ...(changes
+              ? [[binary, 'checkpoint', operation, '-c', configFile, CHECKPOINT_ID] as const]
+              : []),
+          ]);
+        }),
+      );
+    },
+  );
+
+  test('a changed bucket is rejected before issuing checkpoint commands', async () => {
+    await provided(platform)(
+      Effect.gen(function* () {
+        const host = yield* checkpointHost({ configured: true, listed: false, failAt: undefined });
+        const desired = desiredState({
+          volumes: [desiredVolume({ storage: s3Storage({ bucket: 'another-bucket' }) })],
+          checkpoints: [desiredCheckpoint()],
+        });
+        yield* Effect.gen(function* () {
+          yield* applyCheckpoints({
+            plan: planReconcile({ desired, observed: observedState() }),
+            desired,
+          });
+          expect((yield* AgentState.snapshot).checkpointReports[0]?.state).toBe('failed');
+        }).pipe(Effect.provide(host.layer));
+        expect(host.commands.commands).toEqual([]);
+      }),
+    );
+  });
+
+  test.each(['list', 'create', 'delete'] as const)(
+    'a private checkpoint %s failure is sanitized without falling back',
+    async (failAt) => {
+      await provided(platform)(
+        Effect.gen(function* () {
+          const deleting = failAt === 'delete';
+          const host = yield* checkpointHost({ configured: true, listed: deleting, failAt });
+          const desired = desiredState({
+            volumes: [desiredVolume({ storage: s3Storage() })],
+            checkpoints: [desiredCheckpoint({ desiredState: deleting ? 'absent' : 'present' })],
+          });
+          const observed = observedState();
+          yield* Effect.gen(function* () {
+            yield* applyCheckpoints({ plan: planReconcile({ desired, observed }), desired });
+            const report = (yield* AgentState.snapshot).checkpointReports[0];
+            expect(report?.state).toBe('failed');
+            expect(JSON.stringify(report)).not.toContain('customer-secret-key');
+          }).pipe(Effect.provide(host.layer));
+          expect(host.commands.commands.length).toBeGreaterThan(0);
+          expect(
+            host.commands.commands.every(({ command }) =>
+              command.includes(host.filesystem.admin.configFile),
+            ),
+          ).toBe(true);
+        }),
+      );
+    },
+  );
+
   test('only incomplete configured deletions require another retirement pass', () => {
     const wanted = desiredVolume({ desiredState: 'absent', storage: s3Storage() });
     expect(hasPendingAppRetirements({ desiredVolumes: [wanted], deletedVolumes: new Map() })).toBe(
@@ -77,7 +216,7 @@ describe('operations that still require shared storage', () => {
       { desiredPresence, configured: false },
     ]),
   )(
-    'private volume checkpoints fail without using the shared backend: %j',
+    'unavailable or unconfigured private volumes cannot checkpoint shared storage: %j',
     async ({ desiredPresence, configured }) => {
       const commands = recordingCommands();
       const desired = desiredState({

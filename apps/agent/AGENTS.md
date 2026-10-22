@@ -37,6 +37,8 @@ Pending configured-volume provisioning keeps reconciliation scheduled even witho
 start, so a transient storage failure does not require a new desired-state generation to recover.
 Staged configuration directories also mark private storage after an agent restart; losing the
 desired storage field must not redirect volume operations or VM starts to the shared backend.
+Native checkpoints for configured volumes target only the matching registered app filesystem.
+Their failures are sanitized; exports still require shared storage.
 
 Explicit deletion flushes the image removal before stopping the app's services and unregistering
 its filesystem. Retirement records reach disk before deletion is reported; they let retries avoid
