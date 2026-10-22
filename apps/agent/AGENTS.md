@@ -188,6 +188,9 @@ appends to a seeded file as an unprivileged owner. After unmounting, flushing an
 without the cache, it checks filesystem consistency, label, file contents, ownership and mode,
 and verifies that the formatter does not format it again. These mounts contain only fixture data
 on the disposable CI host; production never mounts a tenant ext4 filesystem on the host.
+Configured checkpoint reconciliation also runs against real per-app and shared ZeroFS writers
+on separate prefixes. It retries creation and deletion, verifies both survive cache-free writer
+restarts, and checks that a same-named shared checkpoint remains intact.
 
 The gaps below still need a hypervisor, ZeroFS or real cloud storage; source inspection and
 mocked tests do not establish those guarantees.
@@ -204,8 +207,9 @@ mocked tests do not establish those guarantees.
   storage test uses RustFS. `ExportUploader` is the
   seam the export tests stand in front of, so what happens to a bundle's bytes after `writeBundle`
   is a recorded call and nothing more.
-- **No checkpoint has been cut.** The export is asserted as a sequence of invocations against a
-  recording runner: the cut happens while the guest is frozen, the read after it has thawed, and
+- **Checkpoint contents and the guest freeze barrier remain untested.** The export is asserted
+  as a sequence of invocations against a recording runner: the cut happens while the guest is
+  frozen, the read after it has thawed, and
   the checkpoint, its server and its device go on every way out. That ZeroFS answers `checkpoint
   create` by sealing the open segment and flushing metadata *before* it records — which is why the
   export no longer flushes first, and under `ignore_fsync` is the whole durability guarantee — is

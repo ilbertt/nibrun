@@ -5,7 +5,7 @@ import { Value } from '@sinclair/typebox/value';
 import { Effect, Schedule } from 'effect';
 import { APP_ZEROFS_CACHE } from '#lib/volumes/app-zerofs-cache.ts';
 import { appZerofsPaths, stageAppZerofsConfig } from '#lib/volumes/app-zerofs-config.ts';
-import type { ZerofsAdmin } from '#lib/volumes/zerofs.ts';
+import { appZerofsFilesystem } from '#lib/volumes/app-zerofs-filesystem.ts';
 import { stdoutOf } from '#services/command-runner.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { temporaryDirectory } from '#tests/support/run.ts';
@@ -121,7 +121,7 @@ export function configuredZerofs({
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const binary = yield* zerofsBinary();
-    const appId: AppId = Value.Parse(AppIdSchema, `integration-${process.pid}`);
+    const appId: AppId = Value.Parse(AppIdSchema, `integration-${crypto.randomUUID()}`);
     const stateDir = yield* temporaryDirectory;
     const paths = appZerofsPaths({ appId, stateDir });
     const owned = [paths.mountPath, paths.cacheDirectory, dirname(paths.sockets.nbd)];
@@ -140,12 +140,18 @@ export function configuredZerofs({
     for (const path of owned) {
       yield* fs.makeDirectory(path, { recursive: true });
     }
+    const config = agentConfig({ stateDir, zerofsBinary: binary });
     yield* stageAppZerofsConfig({ appId, storage, cache: APP_ZEROFS_CACHE }).pipe(
-      Effect.provide(agentConfig({ stateDir })),
+      Effect.provide(config),
+    );
+    const filesystem = yield* appZerofsFilesystem({ appId, storagePrefix: storage.prefix }).pipe(
+      Effect.provide(config),
     );
     return {
+      appId,
       paths,
-      admin: { binary, configFile: paths.configFile } satisfies ZerofsAdmin,
+      filesystem,
+      admin: filesystem.admin,
       run: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         writer({ binary, paths, certificate, effect }),
       clearCache: fs

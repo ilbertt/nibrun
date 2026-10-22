@@ -56,10 +56,10 @@ jobs:
       - name: Test VM storage dependencies
         run: sudo env "PATH=$PATH" NIBRUN_TEST_VM_SYSTEMD=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/vm/app-storage-unit-linux.test.ts
 
-      - name: Test configured ZeroFS filesystem persistence
+      - name: Test configured ZeroFS integration
         run: |
           sudo modprobe fuse
-          sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/zerofs-persistence.test.ts
+          sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/zerofs-persistence.test.ts tests/lib/reconcile/checkpoints-linux.test.ts
 
   checks-passed:
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
