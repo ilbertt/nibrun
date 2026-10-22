@@ -39,6 +39,9 @@ Staged configuration directories also mark private storage after an agent restar
 desired storage field must not redirect volume operations or VM starts to the shared backend.
 Native checkpoints for configured volumes target only the matching registered app filesystem.
 Their failures are sanitized; exports still require shared storage.
+Configured VM boots and wakes derive a runtime instance unit from the installed VM template,
+binding only to their own ZeroFS server. Keep the VM unit name and service body unchanged, and
+verify systemd's loaded fragment and dependencies before starting. Shared VMs use the template.
 
 Explicit deletion flushes the image removal before stopping the app's services and unregistering
 its filesystem. Retirement records reach disk before deletion is reported; they let retries avoid
@@ -171,6 +174,8 @@ Linux CI exercises the packaged NBD client's attach, repair, ownership rejection
 against an in-memory server and a real kernel device. The existing checks job installs its
 packages and runs this test directly with `NIBRUN_TEST_NBD=1`; only the fixture's privileged
 commands use sudo.
+Linux CI also checks VM dependency isolation with real systemd and disposable sleep processes;
+the fixture runs as root and refuses to replace any existing host units.
 
 The gaps below still need a hypervisor, ZeroFS or real cloud storage; source inspection and
 mocked tests do not establish those guarantees.
