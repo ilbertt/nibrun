@@ -349,6 +349,24 @@ describe('checkpoints', () => {
     checkpoints: [{ checkpointId: CHECKPOINT_ID, volumeId: VOLUME_ID }],
   });
 
+  test('configured checkpoint deletion is verified by its writer without prior observation', () => {
+    const checkpoint = desiredCheckpoint({ desiredState: 'absent' });
+    const configured = planReconcile({
+      desired: desiredState({
+        volumes: [desiredVolume({ storage: s3Storage() })],
+        checkpoints: [checkpoint],
+      }),
+      observed: observedState(),
+    });
+    expect(configured.checkpoints).toEqual([{ action: 'delete', desired: checkpoint }]);
+
+    const shared = planReconcile({
+      desired: desiredState({ volumes: [desiredVolume()], checkpoints: [checkpoint] }),
+      observed: observedState(),
+    });
+    expect(shared.checkpoints).toEqual([{ action: 'none', checkpointId: CHECKPOINT_ID }]);
+  });
+
   test('present creates only what is missing, absent deletes only what exists', () => {
     const create = planReconcile({
       desired: desiredState({ checkpoints: [desiredCheckpoint()] }),

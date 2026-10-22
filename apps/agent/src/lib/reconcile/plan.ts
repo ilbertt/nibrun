@@ -304,6 +304,11 @@ function planCheckpoints({
   observed: ObservedState;
 }): CheckpointPlan[] {
   const observedIds = new Set(observed.checkpoints.map((checkpoint) => checkpoint.checkpointId));
+  const configuredVolumes = new Set(
+    desired.volumes
+      .filter((volume) => volume.storage !== undefined)
+      .map((volume) => volume.volumeId),
+  );
   return desired.checkpoints.map((wanted): CheckpointPlan => {
     const exists = observedIds.has(wanted.checkpointId);
     if (wanted.desiredState === 'present') {
@@ -311,7 +316,7 @@ function planCheckpoints({
         ? { action: 'none', checkpointId: wanted.checkpointId }
         : { action: 'create', desired: wanted };
     }
-    return exists
+    return exists || configuredVolumes.has(wanted.volumeId)
       ? { action: 'delete', desired: wanted }
       : { action: 'none', checkpointId: wanted.checkpointId };
   });
