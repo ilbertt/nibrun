@@ -10,6 +10,8 @@ import { stdoutOf } from '#services/command-runner.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { temporaryDirectory } from '#tests/support/run.ts';
 
+const EXECUTABLE_MODE = 0o755;
+
 function zerofsBinary() {
   return Effect.gen(function* () {
     const override = process.env.NIBRUN_TEST_ZEROFS_BINARY;
@@ -50,7 +52,9 @@ function zerofsBinary() {
         zerofs.member,
       ],
     });
-    return join(directory, zerofs.member);
+    const binary = join(directory, zerofs.member);
+    yield* (yield* FileSystem.FileSystem).chmod(binary, EXECUTABLE_MODE);
+    return binary;
   });
 }
 
