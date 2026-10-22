@@ -176,6 +176,11 @@ packages and runs this test directly with `NIBRUN_TEST_NBD=1`; only the fixture'
 commands use sudo.
 Linux CI also checks VM dependency isolation with real systemd and disposable sleep processes;
 the fixture runs as root and refuses to replace any existing host units.
+With `NIBRUN_TEST_ZEROFS=1`, Linux CI also runs the pinned ZeroFS release against a disposable
+RustFS bucket over TLS and a real FUSE mount. It stages the production app configuration, creates
+and writes an image through the volume file helpers, flushes, removes the local cache, and checks
+that a fresh writer restores the image from the bucket. Downloads use the checksum in
+`infra/app-host/versions.json`; `NIBRUN_TEST_ZEROFS_BINARY` permits a preinstalled test binary.
 
 The gaps below still need a hypervisor, ZeroFS or real cloud storage; source inspection and
 mocked tests do not establish those guarantees.
@@ -185,17 +190,17 @@ mocked tests do not establish those guarantees.
   plane.
 - **The Firecracker config is asserted as a structure, never booted.** Firecracker validates it
   with `deny_unknown_fields`, so a typo is a hard error at boot and nowhere earlier.
-- **Almost every subprocess argument list is unasserted** — only the parsers for their *output*
-  are tested, and the export path, where the order the commands come in is the guarantee. In
-  particular nothing has confirmed that a `truncate` onto a `zerofs` mount produces a device file
-  ZeroFS then exports, which is the one step the whole volume path rests on.
+- **The configured image's full guest I/O path is not exercised.** The FUSE-to-bucket test and
+  the NBD ownership test run separately; a guest still needs to write through the real ZeroFS
+  NBD export and read its filesystem after recovery.
 - **`mkfs.ext4 -d` has never written a seeded filesystem onto a real device.** The unpack is
   exercised against a temp directory — every refusal, both ceilings, and who the tree ends up
   belonging to — but who it belongs to is only provable as "whoever the caller said", because only
   root may give a file away and none of this was run as root. That the tenant can then write to
   their own `data/`, and that mke2fs is content with a tree behind an NBD device, are a host's
   questions.
-- **S3 and IMDS** are tested against stubs; nothing has spoken to AWS. `ExportUploader` is the
+- **AWS, other S3 providers and IMDS** remain untested against live services. The configured
+  storage test uses RustFS. `ExportUploader` is the
   seam the export tests stand in front of, so what happens to a bundle's bytes after `writeBundle`
   is a recorded call and nothing more.
 - **No checkpoint has been cut.** The export is asserted as a sequence of invocations against a
