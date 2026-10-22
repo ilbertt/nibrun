@@ -151,6 +151,7 @@ export function s3Backend() {
       storage,
       certificate,
       list: stdoutOf({ command: [...signed, `${endpoint}/${storage.bucket}?list-type=2`] }),
+      stop: stdoutOf({ command: ['docker', 'stop', name] }),
     };
   });
 }
