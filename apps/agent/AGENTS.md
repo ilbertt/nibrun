@@ -39,6 +39,8 @@ Staged configuration directories also mark private storage after an agent restar
 desired storage field must not redirect volume operations or VM starts to the shared backend.
 Native checkpoints for configured volumes target only the matching registered app filesystem.
 Their failures are sanitized; exports still require shared storage.
+Configured checkpoint listings parse the pinned ZeroFS CLI's table and explicit empty response;
+an unrecognized response refuses mutations. Shared checkpoint listing behavior stays unchanged.
 Configured VM boots and wakes derive a runtime instance unit from the installed VM template,
 binding only to their own ZeroFS server. Keep the VM unit name and service body unchanged, and
 verify systemd's loaded fragment and dependencies before starting. Shared VMs use the template.

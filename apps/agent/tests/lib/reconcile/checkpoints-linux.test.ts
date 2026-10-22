@@ -3,7 +3,7 @@ import type { DesiredCheckpoint, DesiredVolume } from '@repo/protocol';
 import { Effect, Layer, Option } from 'effect';
 import { applyCheckpoints } from '#lib/reconcile/checkpoints.ts';
 import { planReconcile } from '#lib/reconcile/plan.ts';
-import { createCheckpoint, listCheckpoints } from '#lib/volumes/zerofs.ts';
+import { createCheckpoint, listAppCheckpoints } from '#lib/volumes/zerofs.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
@@ -94,29 +94,29 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '
                   filesystem: app.filesystem,
                 });
                 yield* files.ensure({ ...input, sizeBytes: VOLUME_SIZE_BYTES });
-                expect(yield* listCheckpoints(app.admin)).toEqual([]);
+                expect(yield* listAppCheckpoints(app.admin)).toEqual([]);
                 yield* create;
                 yield* create;
-                expect(yield* listCheckpoints(app.admin)).toEqual([CHECKPOINT_ID]);
-                expect(yield* listCheckpoints(shared.admin)).toEqual([CHECKPOINT_ID]);
+                expect(yield* listAppCheckpoints(app.admin)).toEqual([CHECKPOINT_ID]);
+                expect(yield* listAppCheckpoints(shared.admin)).toEqual([CHECKPOINT_ID]);
               }),
             );
             yield* app.clearCache;
             yield* app.run(
               Effect.gen(function* () {
-                expect(yield* listCheckpoints(app.admin)).toEqual([CHECKPOINT_ID]);
+                expect(yield* listAppCheckpoints(app.admin)).toEqual([CHECKPOINT_ID]);
                 yield* remove;
                 yield* remove;
-                expect(yield* listCheckpoints(app.admin)).toEqual([]);
-                expect(yield* listCheckpoints(shared.admin)).toEqual([CHECKPOINT_ID]);
+                expect(yield* listAppCheckpoints(app.admin)).toEqual([]);
+                expect(yield* listAppCheckpoints(shared.admin)).toEqual([CHECKPOINT_ID]);
               }),
             );
             yield* app.clearCache;
             yield* app.run(
               Effect.gen(function* () {
-                expect(yield* listCheckpoints(app.admin)).toEqual([]);
+                expect(yield* listAppCheckpoints(app.admin)).toEqual([]);
                 expect(Option.getOrThrow(yield* files.size(input))).toBe(VOLUME_SIZE_BYTES);
-                expect(yield* listCheckpoints(shared.admin)).toEqual([CHECKPOINT_ID]);
+                expect(yield* listAppCheckpoints(shared.admin)).toEqual([CHECKPOINT_ID]);
               }),
             );
           }).pipe(Effect.provide(Layer.merge(AgentState.Default, topology))),

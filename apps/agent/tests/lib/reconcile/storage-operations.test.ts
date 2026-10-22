@@ -33,6 +33,7 @@ import {
 } from '#tests/support/fixtures.ts';
 import { platform, provided } from '#tests/support/run.ts';
 import { s3Storage } from '#tests/support/s3-storage.ts';
+import { CHECKPOINT_TABLE, EMPTY_CHECKPOINT_LIST } from '#tests/support/zerofs-checkpoints.ts';
 
 function registerPrivateFilesystem() {
   return Effect.gen(function* () {
@@ -70,7 +71,13 @@ function checkpointHost({
     const commands = recordingCommands(({ command }) =>
       succeeding({
         code: command[2] === failAt ? 1 : 0,
-        stdout: listed ? `${CHECKPOINT_ID}\n` : '',
+        stdout: configured
+          ? listed
+            ? CHECKPOINT_TABLE
+            : EMPTY_CHECKPOINT_LIST
+          : listed
+            ? `${CHECKPOINT_ID}\n`
+            : '',
         stderr: 'customer-secret-key',
       }),
     );
@@ -155,6 +162,45 @@ describe('storage-specific operations', () => {
       }),
     );
   });
+
+  test.each(DESIRED_PRESENCE)(
+    'an unreadable configured checkpoint listing refuses %s mutations without falling back',
+    async (desiredPresence) => {
+      await provided(platform)(
+        Effect.gen(function* () {
+          const host = yield* checkpointHost({
+            configured: true,
+            listed: false,
+            failAt: undefined,
+          });
+          const commands = recordingCommands(() => succeeding({ stdout: 'customer-secret-key' }));
+          const desired = desiredState({
+            volumes: [desiredVolume({ storage: s3Storage() })],
+            checkpoints: [desiredCheckpoint({ desiredState: desiredPresence })],
+          });
+          yield* Effect.gen(function* () {
+            yield* applyCheckpoints({
+              plan: planReconcile({ desired, observed: observedState() }),
+              desired,
+            }).pipe(Effect.provide(commands.layer));
+            const report = (yield* AgentState.snapshot).checkpointReports[0];
+            expect(report?.state).toBe('failed');
+            expect(JSON.stringify(report)).not.toContain('customer-secret-key');
+          }).pipe(Effect.provide(host.layer));
+          expect(commands.commands.map(({ command }) => command)).toEqual([
+            [
+              host.filesystem.admin.binary,
+              'checkpoint',
+              'list',
+              '-c',
+              host.filesystem.admin.configFile,
+            ],
+          ]);
+          expect(host.commands.commands).toEqual([]);
+        }),
+      );
+    },
+  );
 
   test.each(['list', 'create', 'delete'] as const)(
     'a private checkpoint %s failure is sanitized without falling back',
