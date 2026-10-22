@@ -9,7 +9,12 @@ import {
   selectVolumeFilesystem,
   usesAppVolumeStorage,
 } from '#lib/volumes/placement.ts';
-import { createCheckpoint, deleteCheckpoint, listCheckpoints } from '#lib/volumes/zerofs.ts';
+import {
+  createCheckpoint,
+  deleteCheckpoint,
+  listAppCheckpoints,
+  listCheckpoints,
+} from '#lib/volumes/zerofs.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -33,7 +38,9 @@ const applyOne = Effect.fn('applyCheckpoint')(function* ({
       volume?.storage === undefined
         ? topology.place().admin
         : (yield* selectVolumeFilesystem(volume)).admin;
-    const existing = new Set(yield* listCheckpoints(target));
+    const existing = new Set(
+      yield* volume?.storage === undefined ? listCheckpoints(target) : listAppCheckpoints(target),
+    );
     if (action.action === 'create') {
       if (!existing.has(checkpointId)) {
         yield* createCheckpoint({ target, checkpointId });

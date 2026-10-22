@@ -10,10 +10,14 @@ import {
   createCheckpoint,
   deleteCheckpoint,
   flush,
+  listAppCheckpoints,
   listCheckpoints,
   parseCheckpointNames,
 } from '#lib/volumes/zerofs.ts';
-import { recordingCommands } from '#tests/support/commands.ts';
+import { recordingCommands, succeeding } from '#tests/support/commands.ts';
+import { CHECKPOINT_ID } from '#tests/support/fixtures.ts';
+import { provided } from '#tests/support/run.ts';
+import { CHECKPOINT_TABLE, EMPTY_CHECKPOINT_LIST } from '#tests/support/zerofs-checkpoints.ts';
 
 const BINARY = '/opt/nibrun/bin/zerofs/zerofs';
 /** What `infra/app-host/zerofs/config.toml` and `checkpoint.toml` hold this host's disk at. */
@@ -51,6 +55,28 @@ describe('ZeroFS is invoked where the deploy put it', () => {
 
 test('only the checkpoint name is read off each line', () => {
   expect(parseCheckpointNames('cp-1  2026-08-04\n\n cp-2 \n')).toEqual(['cp-1', 'cp-2']);
+});
+
+describe('configured checkpoints use the pinned ZeroFS CLI format', () => {
+  test.each([
+    { output: EMPTY_CHECKPOINT_LIST, names: [] },
+    { output: CHECKPOINT_TABLE, names: [CHECKPOINT_ID] },
+  ])('reads the checkpoint listing: %j', async ({ output, names }) => {
+    const { layer } = recordingCommands(() => succeeding({ stdout: output }));
+    expect(await provided(layer)(listAppCheckpoints(target))).toEqual([...names]);
+  });
+
+  test.each([
+    '',
+    `${CHECKPOINT_ID}\n`,
+    CHECKPOINT_TABLE.replace('Created At', 'Unknown'),
+    CHECKPOINT_TABLE.replace(`${CHECKPOINT_ID} ┆`, '┆'),
+    CHECKPOINT_TABLE.replace(`${CHECKPOINT_ID} ┆`, `${CHECKPOINT_ID} │`),
+  ])('rejects an unrecognized listing: %j', async (output) => {
+    const { layer } = recordingCommands(() => succeeding({ stdout: output }));
+    const error = await provided(layer)(listAppCheckpoints(target).pipe(Effect.flip));
+    expect(error._tag).toBe('ZerofsCheckpointListUnreadable');
+  });
 });
 
 /**

@@ -42,8 +42,50 @@ export const deleteCheckpoint = Effect.fn('zerofs.deleteCheckpoint')(
     }),
 );
 
+function checkpointListing(target: ZerofsAdmin) {
+  return admin({ target, args: ['checkpoint', 'list'] });
+}
+
 export const listCheckpoints = Effect.fn('zerofs.listCheckpoints')((target: ZerofsAdmin) =>
-  Effect.map(admin({ target, args: ['checkpoint', 'list'] }), parseCheckpointNames),
+  Effect.map(checkpointListing(target), parseCheckpointNames),
+);
+
+export class ZerofsCheckpointListUnreadable extends Data.TaggedError(
+  'ZerofsCheckpointListUnreadable',
+) {
+  override get message() {
+    return 'The ZeroFS checkpoint listing could not be read.';
+  }
+}
+
+function parseCheckpointTable(output: string) {
+  if (output.trim() === 'No checkpoints found.') {
+    return Effect.succeed<string[]>([]);
+  }
+  const [header, ...rows] = output
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('│'))
+    .map((line) =>
+      line.endsWith('│')
+        ? line
+            .slice(1, -1)
+            .split('┆')
+            .map((cell) => cell.trim())
+        : [],
+    );
+  if (
+    header === undefined ||
+    header.join('|') !== 'Name|ID|Created At' ||
+    rows.some((row) => row.length !== header.length || !row[0])
+  ) {
+    return Effect.fail(new ZerofsCheckpointListUnreadable());
+  }
+  return Effect.succeed(rows.map(([name]) => name ?? ''));
+}
+
+export const listAppCheckpoints = Effect.fn('zerofs.listAppCheckpoints')((target: ZerofsAdmin) =>
+  Effect.flatMap(checkpointListing(target), parseCheckpointTable),
 );
 
 export class ZerofsCacheUnknown extends Data.TaggedError('ZerofsCacheUnknown')<{
