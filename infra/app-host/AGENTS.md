@@ -55,7 +55,7 @@ for shared VMs and future configured starts; deploys do not restart existing con
 
 ## Unsettled
 
-**Shared VMs use `BindsTo=nibrun-zerofs.service`**, which stops every shared-storage VM on
+**Shared VMs use `BindsTo=nibrun-zerofs.service`**, which interrupts every shared-storage VM on
 the host whenever ZeroFS restarts. Measured behaviour is milder than that implies: `nbd-client
 -persist` reconnects on its own, and with a long timeout a ZeroFS restart is a *stall* in the guest
 rather than an I/O error — the guest's ext4 only remounts read-only if the restart outlasts the

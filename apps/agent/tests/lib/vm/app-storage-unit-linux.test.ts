@@ -121,18 +121,26 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_VM_SYSTEMD !
         });
         const firstPid = yield* pidOf(first);
         const secondPid = yield* pidOf(second);
+        const legacyPid = yield* pidOf(legacy);
         expect(firstPid).not.toBe('0');
         expect(secondPid).not.toBe('0');
-        expect(yield* pidOf(legacy)).not.toBe('0');
+        expect(legacyPid).not.toBe('0');
         yield* isolateAppVmStorage(first);
         expect(yield* pidOf(first)).toBe(firstPid);
 
         yield* stdoutOf({ command: ['systemctl', 'restart', sharedUnit] });
+        expect(yield* pidOf(legacy)).not.toBe(legacyPid);
+        expect(yield* pidOf(first)).toBe(firstPid);
+        expect(yield* pidOf(second)).toBe(secondPid);
+        yield* stdoutOf({ command: ['systemctl', 'stop', sharedUnit] });
         expect(yield* pidOf(legacy)).toBe('0');
         expect(yield* pidOf(first)).toBe(firstPid);
         expect(yield* pidOf(second)).toBe(secondPid);
 
         yield* stdoutOf({ command: ['systemctl', 'restart', appZerofsUnits(first).server] });
+        expect(yield* pidOf(first)).not.toBe(firstPid);
+        expect(yield* pidOf(second)).toBe(secondPid);
+        yield* stdoutOf({ command: ['systemctl', 'stop', appZerofsUnits(first).server] });
         expect(yield* pidOf(first)).toBe('0');
         expect(yield* pidOf(second)).toBe(secondPid);
       }),
