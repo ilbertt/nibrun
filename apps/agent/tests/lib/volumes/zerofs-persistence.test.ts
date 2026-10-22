@@ -1,21 +1,23 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { FileSystem } from '@effect/platform';
+import { FileSystem, Path } from '@effect/platform';
 import { Effect, Layer, Option } from 'effect';
+import { devicePathFor } from '#lib/volumes/device-file.ts';
 import { FILESYSTEM_LABEL, format } from '#lib/volumes/ext4.ts';
 import { isAttached } from '#lib/volumes/nbd.ts';
-import { flush } from '#lib/volumes/zerofs.ts';
+import { createCheckpoint, flush } from '#lib/volumes/zerofs.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
 import { CommandRunner, stdoutOf } from '#services/command-runner.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
-import { VOLUME_ID, VOLUME_SIZE_BYTES } from '#tests/support/fixtures.ts';
+import { CHECKPOINT_ID, VOLUME_ID, VOLUME_SIZE_BYTES } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 import { s3Backend } from '#tests/support/s3-backend.ts';
 import { configuredZerofs } from '#tests/support/zerofs.ts';
 
 const TEST_TIMEOUT_MS = 300_000;
 const PAYLOAD = 'customer data survives a ZeroFS restart without its local cache';
+const UPDATED_PAYLOAD = 'live writes continue after a checkpoint reader opens';
 const NBD_DEVICE = '/dev/nbd0';
 const EXT4_SIZE_BYTES = 67_108_864;
 const FILE_OWNER = { uid: 12345, gid: 12346 };
@@ -115,12 +117,34 @@ function appendAsOwner(path: string) {
   });
 }
 
+function volumeBlock(contents: string) {
+  const block = new Uint8Array(VOLUME_SIZE_BYTES);
+  block.set(new TextEncoder().encode(contents));
+  return block;
+}
+
+function writeNbdBlock({ source, devicePath }: { source: string; devicePath: string }) {
+  return stdoutOf({
+    command: [
+      'dd',
+      `if=${source}`,
+      `of=${devicePath}`,
+      `bs=${VOLUME_SIZE_BYTES}`,
+      'count=1',
+      'oflag=direct',
+      'conv=fsync',
+      'status=none',
+    ],
+  });
+}
+
 test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '1')(
-  'configured ZeroFS restores NBD writes from S3 after a restart with no local cache',
+  'configured ZeroFS restores live NBD writes and immutable checkpoint contents from S3 without caches',
   async () => {
     await run(
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
         const files = yield* AppVolumeFiles;
         const backend = yield* s3Backend();
         const host = yield* configuredZerofs(backend);
@@ -128,8 +152,8 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '
         const directory = yield* temporaryDirectory;
         const original = join(directory, 'original');
         const recovered = join(directory, 'recovered');
-        const payload = new Uint8Array(VOLUME_SIZE_BYTES);
-        payload.set(new TextEncoder().encode(PAYLOAD));
+        const payload = volumeBlock(PAYLOAD);
+        const updatedPayload = volumeBlock(UPDATED_PAYLOAD);
         yield* fs.writeFile(original, payload);
         const target = {
           socketPath: host.paths.sockets.nbd,
@@ -145,25 +169,37 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '
             yield* attachedVolume({
               target,
               effect: Effect.gen(function* () {
-                yield* stdoutOf({
-                  command: [
-                    'dd',
-                    `if=${original}`,
-                    `of=${target.devicePath}`,
-                    `bs=${VOLUME_SIZE_BYTES}`,
-                    'count=1',
-                    'oflag=direct',
-                    'conv=fsync',
-                    'status=none',
-                  ],
+                yield* writeNbdBlock({ source: original, devicePath: target.devicePath });
+                yield* createCheckpoint({ target: host.admin, checkpointId: CHECKPOINT_ID });
+                yield* host.readCheckpoint({
+                  checkpointId: CHECKPOINT_ID,
+                  use: (mountPath) =>
+                    Effect.gen(function* () {
+                      const image = devicePathFor({ mount: mountPath, volumeId: VOLUME_ID, path });
+                      expect(Buffer.from(yield* fs.readFile(image))).toEqual(Buffer.from(payload));
+                      expect(yield* Effect.isFailure(fs.writeFile(image, updatedPayload))).toBe(
+                        true,
+                      );
+                      yield* fs.writeFile(original, updatedPayload);
+                      yield* writeNbdBlock({ source: original, devicePath: target.devicePath });
+                      yield* flush(host.admin);
+                      expect(Buffer.from(yield* fs.readFile(image))).toEqual(Buffer.from(payload));
+                    }),
                 });
-                yield* flush(host.admin);
                 expect(yield* backend.list).toContain('<Key>');
               }),
             });
           }),
         );
         yield* host.clearCache;
+        yield* host.readCheckpoint({
+          checkpointId: CHECKPOINT_ID,
+          use: (mountPath) =>
+            Effect.gen(function* () {
+              const image = devicePathFor({ mount: mountPath, volumeId: VOLUME_ID, path });
+              expect(Buffer.from(yield* fs.readFile(image))).toEqual(Buffer.from(payload));
+            }),
+        });
         yield* host.run(
           Effect.gen(function* () {
             expect(Option.getOrThrow(yield* files.size(input))).toBe(VOLUME_SIZE_BYTES);
@@ -181,7 +217,9 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '
                     'status=none',
                   ],
                 });
-                expect(Buffer.from(yield* fs.readFile(recovered))).toEqual(Buffer.from(payload));
+                expect(Buffer.from(yield* fs.readFile(recovered))).toEqual(
+                  Buffer.from(updatedPayload),
+                );
               }),
             });
           }),

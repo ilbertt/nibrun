@@ -193,6 +193,10 @@ on the disposable CI host; production never mounts a tenant ext4 filesystem on t
 Configured checkpoint reconciliation also runs against real per-app and shared ZeroFS writers
 on separate prefixes. It retries creation and deletion, verifies both survive cache-free writer
 restarts, and checks that a same-named shared checkpoint remains intact.
+The NBD persistence test opens a real read-only `--checkpoint` server with its own listeners
+and cache, checks its bytes and write rejection, and keeps writing through the live NBD device
+while that reader is open. After stopping both and clearing the writer cache, it reopens the
+checkpoint with a fresh cache to verify the original bytes, then recovers the newer live bytes.
 
 The gaps below still need a hypervisor, ZeroFS or real cloud storage; source inspection and
 mocked tests do not establish those guarantees.
@@ -209,14 +213,11 @@ mocked tests do not establish those guarantees.
   storage test uses RustFS. `ExportUploader` is the
   seam the export tests stand in front of, so what happens to a bundle's bytes after `writeBundle`
   is a recorded call and nothing more.
-- **Checkpoint contents and the guest freeze barrier remain untested.** The export is asserted
-  as a sequence of invocations against a recording runner: the cut happens while the guest is
-  frozen, the read after it has thawed, and
-  the checkpoint, its server and its device go on every way out. That ZeroFS answers `checkpoint
-  create` by sealing the open segment and flushing metadata *before* it records — which is why the
-  export no longer flushes first, and under `ignore_fsync` is the whole durability guarantee — is
-  read from ZeroFS v2.3.1's source rather than observed here. A version bump has to re-read it.
-- **The read-only checkpoint server has never been started.** Whether
+- **The guest freeze barrier remains untested.** The native test cuts a checkpoint after a
+  completed NBD write without an extra admin flush and reads its captured bytes. It does not
+  prove that an ext4 guest stays frozen until the checkpoint is recorded. Export tests assert
+  freeze, cut, thaw and cleanup through recorded calls, without a real guest filesystem journal.
+- **The installed checkpoint systemd unit has not been exercised.** Whether
   `nibrun-zerofs-checkpoint@.service` and `checkpoint.toml` between them produce a listening NBD
   socket — the `%i` expansion, the `ExecStartPost` wait, ZeroFS's own `${VAR}` substitution — is a
   question only a host can answer.
