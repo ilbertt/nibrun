@@ -234,8 +234,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'libredb-studio',
       binary:
-        'https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-x64-baseline.zip',
-      sha256: '1fc2edac843102909e3a1be1d8d9802cc6071cf074e67e88231f4ffe0f8b397b',
+        'https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip',
+      sha256: 'e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76',
       'initial-data':
         'https://github.com/libredb/libredb-studio/releases/download/1.0.0/libredb-studio-standalone-1.0.0-linux-x64.tar.gz',
       port: 3000,
