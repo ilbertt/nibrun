@@ -6,6 +6,7 @@ import { Effect } from 'effect';
 import { parseProperties } from '#lib/systemd-properties.ts';
 import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
 import { appZerofsUnits } from '#lib/volumes/app-zerofs-systemd.ts';
+import { AgentConfig } from '#services/agent-config.service.ts';
 import { run, stdoutOf } from '#services/command-runner.service.ts';
 import { AGENT_CONFIG, agentConfig } from '#tests/support/config.ts';
 import { temporaryDirectory } from '#tests/support/run.ts';
@@ -18,6 +19,35 @@ const DATA_UNIT = 'nibrun-data.service';
 const PUBLIC_FILE_MODE = 0o644;
 const PUBLIC_DIRECTORY_MODE = 0o755;
 const DATA_UNIT_CONTENTS = '[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/true\n';
+
+export function emptySharedMount() {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const { zerofsMount } = yield* AgentConfig;
+    if (yield* fs.exists(zerofsMount)) {
+      return yield* Effect.fail(new Error('The shared-mount fixture refuses an existing path.'));
+    }
+    yield* fs.makeDirectory(zerofsMount);
+    yield* Effect.addFinalizer(() =>
+      fs.remove(zerofsMount, { recursive: true }).pipe(Effect.orDie),
+    );
+    yield* Effect.acquireRelease(
+      stdoutOf({
+        command: [
+          'mount',
+          '-t',
+          'tmpfs',
+          '-o',
+          'size=1M,nodev,nosuid,noexec',
+          'tmpfs',
+          zerofsMount,
+        ],
+      }),
+      () => stdoutOf({ command: ['umount', '--', zerofsMount] }).pipe(Effect.orDie),
+    );
+    return zerofsMount;
+  });
+}
 
 function requireDisposableHost({
   directories,
@@ -173,6 +203,17 @@ export function appZerofsSystemdHost(certificate: string) {
         ...Object.values(units).flatMap((unit) => ['--unit', unit]),
       ],
     }).pipe(Effect.flatMap(Effect.logError), Effect.ignore);
-    return { appId, paths, units, journal, config: agentConfig({ stateDir: STATE_DIRECTORY }) };
+    return {
+      appId,
+      paths,
+      units,
+      journal,
+      config: agentConfig({
+        stateDir: STATE_DIRECTORY,
+        slotsFile: join(STATE_DIRECTORY, 'slots.json'),
+        slotCursorFile: join(STATE_DIRECTORY, 'slot-cursor.json'),
+        desiredStateFile: join(STATE_DIRECTORY, 'desired-state.json'),
+      }),
+    };
   });
 }

@@ -189,6 +189,12 @@ real writer and mount keep running. Staged configuration rejects an omitted stor
 and reactivation registers the existing filesystem without changing either PID or its data.
 An unrelated unconfigured app still selects the shared filesystem.
 This checks registry reconstruction, not a restart of the full agent binary or its layer graph.
+Real retirement coverage also joins the production lifecycle, slot allocator and NBD client:
+it detaches an attached image, stops the app units, and verifies deletion through a separate
+cache-free writer after the retired writer has stopped. A small fixture tmpfs satisfies shared
+mount safety checks. Reclamation waits for acknowledgement, releases cache reservations and
+retains the retirement record; fresh service scopes retry deletion and reject stale starts with
+S3 stopped and local config/cache gone. The shared-mount marker remains untouched.
 With `NIBRUN_TEST_ZEROFS=1`, Linux CI also runs the pinned ZeroFS release against a disposable
 RustFS bucket over TLS and a real FUSE mount. It stages the production app configuration, creates
 the image through the volume file helpers, and writes through a real NBD attachment using the
