@@ -5,7 +5,8 @@ import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
 import { parseProperties } from '#lib/systemd-properties.ts';
 import { appZerofsPaths } from '#lib/volumes/app-zerofs-config.ts';
-import { appZerofsUnits } from '#lib/volumes/app-zerofs-systemd.ts';
+import { assertAppZerofsStopped } from '#lib/volumes/app-zerofs-observation.ts';
+import { appZerofsUnits, stopAppZerofs } from '#lib/volumes/app-zerofs-systemd.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { run, stdoutOf } from '#services/command-runner.service.ts';
 import { AGENT_CONFIG, agentConfig } from '#tests/support/config.ts';
@@ -19,6 +20,89 @@ const DATA_UNIT = 'nibrun-data.service';
 const PUBLIC_FILE_MODE = 0o644;
 const PUBLIC_DIRECTORY_MODE = 0o755;
 const DATA_UNIT_CONTENTS = '[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=/bin/true\n';
+const TRUSTED_CERTIFICATE = join(INSTALL_DIRECTORY, 'test-ca.crt');
+
+function systemdInstance() {
+  const appId = Value.Parse(AppIdSchema, `systemd-${crypto.randomUUID()}`);
+  const paths = appZerofsPaths({ appId, stateDir: STATE_DIRECTORY });
+  const units = appZerofsUnits(appId);
+  const journal = stdoutOf({
+    command: [
+      'journalctl',
+      '--no-pager',
+      '--lines=100',
+      ...Object.values(units).flatMap((unit) => ['--unit', unit]),
+    ],
+  }).pipe(Effect.flatMap(Effect.logError), Effect.ignore);
+  return { appId, paths, units, journal };
+}
+
+function installAppTrust(appId: AppId) {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const directory = join(UNIT_DIRECTORY, `${appZerofsUnits(appId).server}.d`);
+    yield* fs.makeDirectory(directory);
+    yield* fs.writeFileString(
+      join(directory, 'test.conf'),
+      `[Service]\nEnvironment=SSL_CERT_FILE=${TRUSTED_CERTIFICATE} NO_PROXY=* no_proxy=*\n`,
+      { flag: 'wx', mode: PUBLIC_FILE_MODE },
+    );
+  });
+}
+
+export function additionalAppZerofsInstance() {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const instance = systemdInstance();
+    const { appId, paths, units } = instance;
+    const dropInDirectory = join(UNIT_DIRECTORY, `${units.server}.d`);
+    for (const path of [
+      paths.cacheDirectory,
+      paths.mountPath,
+      dirname(paths.configFile),
+      dirname(paths.sockets.nbd),
+      dropInDirectory,
+    ]) {
+      if (yield* fs.exists(path)) {
+        return yield* Effect.fail(
+          new Error('The systemd instance fixture refuses existing app files.'),
+        );
+      }
+    }
+    for (const unit of Object.values(units)) {
+      const output = yield* stdoutOf({
+        command: ['systemctl', 'show', unit, '--property=ActiveState,MainPID,FragmentPath'],
+      });
+      const state = parseProperties(output);
+      if (
+        state.ActiveState !== 'inactive' ||
+        state.MainPID !== '0' ||
+        state.FragmentPath !== join(UNIT_DIRECTORY, unit.replace(appId, ''))
+      ) {
+        return yield* Effect.fail(
+          new Error('The systemd instance fixture requires unused installed templates.'),
+        );
+      }
+    }
+    yield* Effect.addFinalizer(() =>
+      Effect.gen(function* () {
+        yield* stopAppZerofs(appId);
+        yield* run({ command: ['systemctl', 'reset-failed', ...Object.values(units)] });
+        yield* assertAppZerofsStopped(appId);
+        if (
+          (yield* run({ command: ['mountpoint', '--quiet', '--', paths.mountPath] })).code === 0
+        ) {
+          yield* stdoutOf({ command: ['fusermount3', '-u', paths.mountPath] });
+        }
+        yield* fs.remove(dropInDirectory, { force: true, recursive: true });
+        yield* stdoutOf({ command: ['systemctl', 'daemon-reload'] });
+      }).pipe(Effect.orDie),
+    );
+    yield* installAppTrust(appId);
+    yield* stdoutOf({ command: ['systemctl', 'daemon-reload'] });
+    return instance;
+  });
+}
 
 export function emptySharedMount() {
   return Effect.gen(function* () {
@@ -130,9 +214,7 @@ export function appZerofsSystemdHost(certificate: string) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const binary = yield* zerofsBinary();
-    const appId = Value.Parse(AppIdSchema, `systemd-${crypto.randomUUID()}`);
-    const paths = appZerofsPaths({ appId, stateDir: STATE_DIRECTORY });
-    const units = appZerofsUnits(appId);
+    const { appId, paths, units, journal } = systemdInstance();
     const templateNames = Object.values(units).map((unit) => unit.replace(appId, ''));
     const dropInDirectory = join(UNIT_DIRECTORY, `${units.server}.d`);
     const unitFiles = [
@@ -173,8 +255,9 @@ export function appZerofsSystemdHost(certificate: string) {
     yield* stdoutOf({
       command: ['install', '--mode=0755', '--', binary, AGENT_CONFIG.zerofsBinary],
     });
-    const trustedCertificate = join(INSTALL_DIRECTORY, 'test-ca.crt');
-    yield* stdoutOf({ command: ['install', '--mode=0644', '--', certificate, trustedCertificate] });
+    yield* stdoutOf({
+      command: ['install', '--mode=0644', '--', certificate, TRUSTED_CERTIFICATE],
+    });
     for (const name of templateNames) {
       const contents = yield* Effect.promise(() =>
         Bun.file(new URL(`../../../../infra/app-host/systemd/${name}`, import.meta.url)).text(),
@@ -188,21 +271,8 @@ export function appZerofsSystemdHost(certificate: string) {
       flag: 'wx',
       mode: PUBLIC_FILE_MODE,
     });
-    yield* fs.makeDirectory(dropInDirectory);
-    yield* fs.writeFileString(
-      join(dropInDirectory, 'test.conf'),
-      `[Service]\nEnvironment=SSL_CERT_FILE=${trustedCertificate} NO_PROXY=* no_proxy=*\n`,
-      { flag: 'wx', mode: PUBLIC_FILE_MODE },
-    );
+    yield* installAppTrust(appId);
     yield* stdoutOf({ command: ['systemctl', 'daemon-reload'] });
-    const journal = stdoutOf({
-      command: [
-        'journalctl',
-        '--no-pager',
-        '--lines=100',
-        ...Object.values(units).flatMap((unit) => ['--unit', unit]),
-      ],
-    }).pipe(Effect.flatMap(Effect.logError), Effect.ignore);
     return {
       appId,
       paths,

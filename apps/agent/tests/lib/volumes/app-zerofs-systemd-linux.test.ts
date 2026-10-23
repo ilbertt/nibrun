@@ -4,16 +4,20 @@ import { FileSystem } from '@effect/platform';
 import { Effect, Layer, Option } from 'effect';
 import { activateAppZerofs } from '#lib/volumes/app-zerofs-activation.ts';
 import { APP_ZEROFS_CACHE } from '#lib/volumes/app-zerofs-cache.ts';
-import { flushAndStopAppZerofs } from '#lib/volumes/app-zerofs-durability.ts';
+import { flushAndStopAppZerofs, flushAppZerofs } from '#lib/volumes/app-zerofs-durability.ts';
 import { assertAppZerofsStopped, observeAppZerofs } from '#lib/volumes/app-zerofs-observation.ts';
 import { assertMounted } from '#lib/volumes/device-file.ts';
 import { selectVolumeFilesystem } from '#lib/volumes/placement.ts';
 import { CommandRunner, stdoutOf } from '#services/command-runner.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
-import { appZerofsSystemdHost } from '#tests/support/app-zerofs-systemd.ts';
+import {
+  additionalAppZerofsInstance,
+  appZerofsSystemdHost,
+} from '#tests/support/app-zerofs-systemd.ts';
 import { desiredVolume } from '#tests/support/fixtures.ts';
 import { platform, provided } from '#tests/support/run.ts';
 import { s3Backend } from '#tests/support/s3-backend.ts';
+import { s3Storage } from '#tests/support/s3-storage.ts';
 
 const TEST_TIMEOUT_MS = 300_000;
 const PAYLOAD = 'data written through the actual per-app systemd mount';
@@ -73,6 +77,79 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS_SYSTE
           yield* assertAppZerofsStopped(host.appId);
         }).pipe(
           Effect.onError(() => host.journal),
+          Effect.provide(
+            ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provideMerge(host.config)),
+          ),
+        );
+      }).pipe(Effect.timeout('4 minutes')),
+    );
+  },
+  TEST_TIMEOUT_MS,
+);
+
+test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS_SYSTEMD !== '1')(
+  'stopping and recovering one real app writer leaves another app mount and data usable',
+  async () => {
+    await run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const backend = yield* s3Backend();
+        const host = yield* appZerofsSystemdHost(backend.certificate);
+        const peer = yield* additionalAppZerofsInstance();
+        yield* Effect.gen(function* () {
+          const firstStorage = backend.storage;
+          const peerStorage = s3Storage({ ...backend.storage, prefix: 'apps/systemd-peer' });
+          const firstActivation = {
+            appId: host.appId,
+            storage: firstStorage,
+            cache: APP_ZEROFS_CACHE,
+          };
+          const first = yield* activateAppZerofs(firstActivation);
+          const second = yield* activateAppZerofs({
+            appId: peer.appId,
+            storage: peerStorage,
+            cache: APP_ZEROFS_CACHE,
+          });
+          const firstMarker = join(first.mountPath, 'isolation-marker');
+          const secondMarker = join(second.mountPath, 'isolation-marker');
+          const firstPayload = 'only the first app owns this data';
+          const secondPayload = 'only the second app owns this data';
+          yield* fs.writeFileString(firstMarker, firstPayload);
+          yield* fs.writeFileString(secondMarker, secondPayload);
+          expect(yield* fs.readFileString(firstMarker)).toBe(firstPayload);
+          expect(yield* fs.readFileString(secondMarker)).toBe(secondPayload);
+          const firstPid = yield* unitPid(host.units.server);
+          const peerPids = yield* Effect.forEach(Object.values(peer.units), unitPid);
+          expect(firstPid).not.toBe('0');
+          expect(peerPids).not.toContain('0');
+          yield* flushAppZerofs(peer.appId);
+          yield* flushAndStopAppZerofs(host.appId);
+          yield* assertAppZerofsStopped(host.appId);
+          expect((yield* observeAppZerofs(peer.appId)).ready).toBe(true);
+          expect(yield* Effect.forEach(Object.values(peer.units), unitPid)).toEqual(peerPids);
+          expect(yield* fs.readFileString(secondMarker)).toBe(secondPayload);
+          const continuedPayload = `${secondPayload}\nwritten while the first app is stopped`;
+          yield* fs.writeFileString(secondMarker, continuedPayload);
+          yield* flushAppZerofs(peer.appId);
+          expect(yield* fs.readFileString(secondMarker)).toBe(continuedPayload);
+          yield* fs.remove(host.paths.cacheDirectory, { recursive: true });
+          yield* activateAppZerofs(firstActivation);
+          expect(yield* unitPid(host.units.server)).not.toBe(firstPid);
+          expect((yield* observeAppZerofs(host.appId)).ready).toBe(true);
+          expect(yield* fs.readFileString(firstMarker)).toBe(firstPayload);
+          expect(yield* Effect.forEach(Object.values(peer.units), unitPid)).toEqual(peerPids);
+          expect((yield* observeAppZerofs(peer.appId)).ready).toBe(true);
+          expect(yield* fs.readFileString(secondMarker)).toBe(continuedPayload);
+          const afterRecoveryPayload = `${continuedPayload}\nwritten after the first app recovers`;
+          yield* fs.writeFileString(secondMarker, afterRecoveryPayload);
+          yield* flushAppZerofs(peer.appId);
+          expect(yield* fs.readFileString(secondMarker)).toBe(afterRecoveryPayload);
+          yield* flushAndStopAppZerofs(host.appId);
+          yield* flushAndStopAppZerofs(peer.appId);
+          yield* assertAppZerofsStopped(host.appId);
+          yield* assertAppZerofsStopped(peer.appId);
+        }).pipe(
+          Effect.onError(() => Effect.all([host.journal, peer.journal])),
           Effect.provide(
             ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provideMerge(host.config)),
           ),
