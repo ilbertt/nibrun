@@ -663,8 +663,13 @@ async function appendConfigVersion({
            c.health_check_grace_period_ms, c.health_check_healthy_threshold,
            c.health_check_unhealthy_threshold,
            c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-           c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+           c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+           s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
+           s.volume_storage_region, s.volume_storage_auth_kind, s.volume_storage_access_key_id,
+           s.volume_storage_secret_access_key, s.volume_storage_session_token,
+           s.volume_storage_encryption_password
     FROM nibrun.app_configs_with_environment c
+    JOIN nibrun.app_configs s ON s.id = c.id
     WHERE c.app_id = ${appId}
     ORDER BY c.id DESC
     LIMIT 1
@@ -682,7 +687,11 @@ async function appendConfigVersion({
       health_check_grace_period_ms, health_check_healthy_threshold,
       health_check_unhealthy_threshold,
       restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-      restart_backoff_factor, restart_reset_after_ms
+      restart_backoff_factor, restart_reset_after_ms,
+      volume_storage_endpoint, volume_storage_bucket, volume_storage_prefix,
+      volume_storage_region, volume_storage_auth_kind, volume_storage_access_key_id,
+      volume_storage_secret_access_key, volume_storage_session_token,
+      volume_storage_encryption_password
     )
     VALUES (
       ${appId}, ${config.httpPort}, ${config.hasExtraPublicPort},
@@ -693,7 +702,11 @@ async function appendConfigVersion({
       ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
       ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
       ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
-      ${config.restartPolicy.resetAfterMs}
+      ${config.restartPolicy.resetAfterMs},
+      ${current.volume_storage_endpoint}, ${current.volume_storage_bucket}, ${current.volume_storage_prefix},
+      ${current.volume_storage_region}, ${current.volume_storage_auth_kind}, ${current.volume_storage_access_key_id},
+      ${current.volume_storage_secret_access_key}, ${current.volume_storage_session_token},
+      ${current.volume_storage_encryption_password}
     )
     RETURNING id
   `;

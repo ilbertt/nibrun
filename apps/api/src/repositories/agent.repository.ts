@@ -120,9 +120,24 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
           FROM nibrun.desired_deployments
         `,
         this.sql.SelectDesiredVolumes`
-          SELECT app_id, state,
-                 seed_digest, seed_size_bytes, seed_object_key, seed_original_file_name
-          FROM nibrun.desired_volumes
+          SELECT v.app_id, v.state,
+                 v.seed_digest, v.seed_size_bytes, v.seed_object_key, v.seed_original_file_name,
+                 s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
+                 s.volume_storage_region, s.volume_storage_auth_kind, s.volume_storage_access_key_id,
+                 s.volume_storage_secret_access_key, s.volume_storage_session_token,
+                 s.volume_storage_encryption_password
+          FROM nibrun.desired_volumes v
+          LEFT JOIN LATERAL (
+            SELECT c.volume_storage_endpoint, c.volume_storage_bucket, c.volume_storage_prefix,
+                   c.volume_storage_region, c.volume_storage_auth_kind, c.volume_storage_access_key_id,
+                   c.volume_storage_secret_access_key, c.volume_storage_session_token,
+                   c.volume_storage_encryption_password
+            FROM nibrun.deployments d
+            JOIN nibrun.app_configs c ON c.id = d.config_id
+            WHERE d.app_id = v.app_id
+            ORDER BY d.id DESC
+            LIMIT 1
+          ) s ON true
         `,
         this.sql.SelectDesiredHostnames`
           SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
@@ -149,7 +164,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
 
     return {
       hostId,
-      volumes: volumes.map(toDesiredVolume),
+      volumes: volumes.map((row) => toDesiredVolume({ row, secretsKey: this.#secretsKey })),
       instances: deployments.map((row) =>
         toDesiredInstance({ row, hostnames, environments, secretsKey: this.#secretsKey }),
       ),
