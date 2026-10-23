@@ -62,7 +62,7 @@ export const DEPLOY_PRESETS = {
   pocketbase: {
     isRecommended: true,
     projectUrl: 'https://github.com/pocketbase/pocketbase',
-    version: 'v0.40.5',
+    version: 'v0.40.6',
     markdownContent: pocketbasePage,
     category: DeployCategory.Backends,
     title: 'PocketBase',
@@ -70,8 +70,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'pocketbase',
       binary:
-        'https://github.com/pocketbase/pocketbase/releases/download/v0.40.5/pocketbase_0.40.5_linux_amd64.zip',
-      sha256: '1dbea1b01eb3dfe64953513859d01e759c96650c4e3264fa4eecd54b769382e4',
+        'https://github.com/pocketbase/pocketbase/releases/download/v0.40.6/pocketbase_0.40.6_linux_amd64.zip',
+      sha256: '0e1f609158ed945f809f8a02ae012aa0427129c66ebb63c1aee76f2c0309373f',
       port: 8090,
       arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data', '--publicDir=./data/pb_public'],
       minimal: true,
@@ -261,7 +261,7 @@ export const DEPLOY_PRESETS = {
   'open-connector': {
     isRecommended: false,
     projectUrl: 'https://github.com/oomol-lab/open-connector',
-    version: 'v1.9.1',
+    version: 'v1.9.2',
     markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
@@ -269,8 +269,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'open-connector',
       binary:
-        'https://github.com/oomol-lab/open-connector/releases/download/v1.9.1/open-connector-linux-x64',
-      sha256: 'c0bff99fbf374a81c49a8eafb7d6e9617da3484ea1e9e8465fcc331c1a41fc0d',
+        'https://github.com/oomol-lab/open-connector/releases/download/v1.9.2/open-connector-linux-x64',
+      sha256: '0cca679b3bd1f763a9d5098a0add9f0e84e7e53da95a338a7d7c5d44c66b6182',
       port: 3000,
       env: [
         'HOST=0.0.0.0',
@@ -621,7 +621,7 @@ export const DEPLOY_PRESETS = {
   flipt: {
     isRecommended: false,
     projectUrl: 'https://github.com/flipt-io/flipt',
-    version: 'v2.14.0',
+    version: 'v2.14.1',
     markdownContent: fliptPage,
     title: 'Flipt',
     subtitle: 'Feature flags with a UI, evaluated over HTTP or gRPC.',
@@ -629,8 +629,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'flipt',
       binary:
-        'https://github.com/flipt-io/flipt/releases/download/v2.14.0/flipt_linux_x86_64.tar.gz',
-      sha256: 'e62e91b44181b2d36a22192fb94c679e74309dbb6e617231021967c11dc0fb2f',
+        'https://github.com/flipt-io/flipt/releases/download/v2.14.1/flipt_linux_x86_64.tar.gz',
+      sha256: '777437f40420332460b36639ae2b50a8874d3d3dd165edaff381e4d8a61b1626',
       port: 8080,
       arg: ['server'],
       env: [
