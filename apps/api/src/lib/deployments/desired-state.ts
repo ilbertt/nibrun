@@ -18,6 +18,7 @@ import {
   sealedEnvironmentBy,
   type TenantSecretsKey,
 } from '#lib/tenant-secrets.ts';
+import { openVolumeStorage } from '#lib/volume-storage.ts';
 
 export type DesiredDeploymentRow = Queries['SelectDesiredDeployments'];
 
@@ -42,13 +43,22 @@ export function volumeIdOf(appId: AppId): VolumeId {
  * filesystem exists. A host that already has one ignores it, so this is about what crosses the
  * wire rather than about what would happen if it did.
  */
-export function toDesiredVolume(row: DesiredVolumeRow): DesiredVolume {
+export function toDesiredVolume({
+  row,
+  secretsKey,
+}: {
+  row: DesiredVolumeRow;
+  secretsKey: TenantSecretsKey;
+}): DesiredVolume {
   return {
     volumeId: volumeIdOf(row.app_id),
     appId: row.app_id,
     sizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
     desiredState: row.state === 'deleting' ? 'absent' : 'present',
     ...seedOf(row),
+    ...(row.storage_configuration === null
+      ? {}
+      : { storage: openVolumeStorage({ key: secretsKey, sealed: row.storage_configuration }) }),
   };
 }
 

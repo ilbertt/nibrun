@@ -157,3 +157,24 @@ constraint in the `nibrun` schema, selected by `dbSchemas` in `sqlgen.config.ts`
 Code that has to name one — matching a unique violation against the index it came
 from — reads it from there, so a rename in a migration breaks the build instead
 of the behaviour.
+
+### Manual per-app storage configuration
+
+Before a new app's first deployment, insert its storage into `nibrun.app_volume_storage`.
+Use a dedicated bucket/prefix exclusively owned by that app on the current single host.
+The entire `S3VolumeStorage` object is sealed with the API's existing `TENANT_SECRETS_KEY`;
+no row means shared storage. Rows cannot be changed or removed: filesystem migration and
+credential rotation require a host transition that is not implemented yet.
+
+From `apps/api`, with `TENANT_SECRETS_KEY` available and the configuration JSON on stdin:
+
+```sh
+bun -e 'import { readSecretsKey } from "./src/lib/tenant-secrets.ts"; import { sealVolumeStorage } from "./src/lib/volume-storage.ts"; console.log(sealVolumeStorage({ key: readSecretsKey(process.env.TENANT_SECRETS_KEY ?? ""), storage: await Bun.stdin.json() }));' < /path/to/storage.json
+```
+
+Insert the resulting ciphertext rather than the original JSON:
+
+```sql
+INSERT INTO nibrun.app_volume_storage (app_id, configuration)
+VALUES ('<new-app-uuid>', '<sealed-value>');
+```

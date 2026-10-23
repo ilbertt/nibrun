@@ -50,6 +50,8 @@ export interface ISelectDesiredVolumesResult {
     seed_object_key: IDesiredVolumesColumns["seed_object_key"];
     /** The name the archive was uploaded under; the key it lands under carries none. */
     seed_original_file_name: IDesiredVolumesColumns["seed_original_file_name"];
+    /** S3VolumeStorage sealed with TENANT_SECRETS_KEY; credentials and encryption password never reach the database in plaintext. */
+    storage_configuration: IAppVolumeStorageColumns["configuration"] | null;
 }
 
 /** Result of query `SelectDesiredHostnames`. */
@@ -1398,6 +1400,22 @@ export interface IAppUsageTable {
     constraints: keyof (typeof schema)["app_usage"]["_constraints"];
 }
 
+/** Columns of `app_volume_storage`. */
+export interface IAppVolumeStorageColumns {
+    id: string;
+    app_id: import("@repo/protocol").AppId;
+    /** S3VolumeStorage sealed with TENANT_SECRETS_KEY; credentials and encryption password never reach the database in plaintext. */
+    configuration: import("#lib/tenant-secrets.ts").SealedSecret;
+}
+
+/** Schema of `app_volume_storage`. */
+export interface IAppVolumeStorageTable {
+    columns: IAppVolumeStorageColumns;
+    relationType: (typeof schema)["app_volume_storage"]["_relationType"];
+    indexes: keyof (typeof schema)["app_volume_storage"]["_indexes"];
+    constraints: keyof (typeof schema)["app_volume_storage"]["_constraints"];
+}
+
 /** Columns of `apps`. */
 export interface IAppsColumns {
     id: import("@repo/protocol").AppId;
@@ -2106,6 +2124,24 @@ export const schema = {
             volume_usage_app_id_fkey: { _constraintName: "volume_usage_app_id_fkey" }
         }
     },
+    app_volume_storage: {
+        _relationName: "app_volume_storage",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { app_volume_storage_app_id_fkey: { _constraintName: "app_volume_storage_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            configuration: { _columnName: "configuration", _foreignKeys: {} }
+        },
+        _indexes: {
+            app_volume_storage_app_id_key: { _indexName: "app_volume_storage_app_id_key" },
+            app_volume_storage_pkey: { _indexName: "app_volume_storage_pkey" }
+        },
+        _constraints: {
+            app_volume_storage_app_id_fkey: { _constraintName: "app_volume_storage_app_id_fkey" },
+            app_volume_storage_app_id_key: { _constraintName: "app_volume_storage_app_id_key" },
+            app_volume_storage_pkey: { _constraintName: "app_volume_storage_pkey" }
+        }
+    },
     apps: {
         _relationName: "apps",
         _relationType: "table",
@@ -2592,6 +2628,7 @@ export interface Tables {
     app_hostnames: IAppHostnamesTable;
     app_quotas: IAppQuotasTable;
     app_usage: IAppUsageTable;
+    app_volume_storage: IAppVolumeStorageTable;
     apps: IAppsTable;
     artifacts: IArtifactsTable;
     cached_binaries: ICachedBinariesTable;
