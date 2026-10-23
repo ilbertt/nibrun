@@ -189,6 +189,10 @@ real writer and mount keep running. Staged configuration rejects an omitted stor
 and reactivation registers the existing filesystem without changing either PID or its data.
 An unrelated unconfigured app still selects the shared filesystem.
 This checks registry reconstruction, not a restart of the full agent binary or its layer graph.
+Two real per-app systemd instances also write the same filename under distinct S3 prefixes.
+Stopping one writer and recovering it without its cache leaves the other's writer/mount PIDs
+unchanged and its filesystem writable; both apps retain their own contents. This does not boot
+guests or exercise their VM dependency units.
 Real retirement coverage also joins the production lifecycle, slot allocator and NBD client:
 it detaches an attached image, stops the app units, and verifies deletion through a separate
 cache-free writer after the retired writer has stopped. A small fixture tmpfs satisfies shared
