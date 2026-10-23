@@ -4,6 +4,7 @@ import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { WellKnownOAuthAuthorizationServerController } from '#routes/.well-known/oauth-authorization-server/controller.ts';
 import { WellKnownOAuthProtectedResourceController } from '#routes/.well-known/oauth-protected-resource/controller.ts';
 import { WellKnownOAuthProtectedResourceMcpController } from '#routes/.well-known/oauth-protected-resource/mcp/controller.ts';
+import { WellKnownOpenAIAppsChallengeController } from '#routes/.well-known/openai-apps-challenge/controller.ts';
 import { McpController } from '#routes/mcp/controller.ts';
 import { AssetsServicePlugin } from '#services/plugins.ts';
 
@@ -13,6 +14,7 @@ function createRootController() {
     .use(WellKnownOAuthAuthorizationServerController)
     .use(WellKnownOAuthProtectedResourceController)
     .use(WellKnownOAuthProtectedResourceMcpController)
+    .use(WellKnownOpenAIAppsChallengeController)
     .use(McpController);
   const { assetsService } = controller.decorator;
 
