@@ -50,8 +50,18 @@ export interface ISelectDesiredVolumesResult {
     seed_object_key: IDesiredVolumesColumns["seed_object_key"];
     /** The name the archive was uploaded under; the key it lands under carries none. */
     seed_original_file_name: IDesiredVolumesColumns["seed_original_file_name"];
-    /** S3VolumeStorage sealed with TENANT_SECRETS_KEY; credentials and encryption password never reach the database in plaintext. */
-    storage_configuration: IAppVolumeStorageColumns["configuration"] | null;
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
+    volume_storage_access_key_id: IAppConfigsColumns["volume_storage_access_key_id"];
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_secret_access_key: IAppConfigsColumns["volume_storage_secret_access_key"];
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_session_token: IAppConfigsColumns["volume_storage_session_token"];
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_encryption_password: IAppConfigsColumns["volume_storage_encryption_password"];
 }
 
 /** Result of query `SelectDesiredHostnames`. */
@@ -464,6 +474,18 @@ export interface ISelectCurrentAppConfigResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
+    volume_storage_access_key_id: IAppConfigsColumns["volume_storage_access_key_id"];
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_secret_access_key: IAppConfigsColumns["volume_storage_secret_access_key"];
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_session_token: IAppConfigsColumns["volume_storage_session_token"];
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_encryption_password: IAppConfigsColumns["volume_storage_encryption_password"];
 }
 
 /** Result of query `InsertPatchedAppConfig`. */
@@ -1265,6 +1287,18 @@ export interface IAppConfigsColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     has_extra_public_port: boolean;
+    volume_storage_endpoint: string | null;
+    volume_storage_bucket: string | null;
+    volume_storage_prefix: string | null;
+    volume_storage_region: string | null;
+    volume_storage_auth_kind: import("@repo/protocol").S3VolumeAuth["kind"] | null;
+    volume_storage_access_key_id: string | null;
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_secret_access_key: import("#lib/tenant-secrets.ts").SealedSecret | null;
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_session_token: import("#lib/tenant-secrets.ts").SealedSecret | null;
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_encryption_password: import("#lib/tenant-secrets.ts").SealedSecret | null;
 }
 
 /** Schema of `app_configs`. */
@@ -1398,22 +1432,6 @@ export interface IAppUsageTable {
     relationType: (typeof schema)["app_usage"]["_relationType"];
     indexes: keyof (typeof schema)["app_usage"]["_indexes"];
     constraints: keyof (typeof schema)["app_usage"]["_constraints"];
-}
-
-/** Columns of `app_volume_storage`. */
-export interface IAppVolumeStorageColumns {
-    id: string;
-    app_id: import("@repo/protocol").AppId;
-    /** S3VolumeStorage sealed with TENANT_SECRETS_KEY; credentials and encryption password never reach the database in plaintext. */
-    configuration: import("#lib/tenant-secrets.ts").SealedSecret;
-}
-
-/** Schema of `app_volume_storage`. */
-export interface IAppVolumeStorageTable {
-    columns: IAppVolumeStorageColumns;
-    relationType: (typeof schema)["app_volume_storage"]["_relationType"];
-    indexes: keyof (typeof schema)["app_volume_storage"]["_indexes"];
-    constraints: keyof (typeof schema)["app_volume_storage"]["_constraints"];
 }
 
 /** Columns of `apps`. */
@@ -1985,7 +2003,16 @@ export const schema = {
             restart_backoff_factor: { _columnName: "restart_backoff_factor", _foreignKeys: {} },
             restart_reset_after_ms: { _columnName: "restart_reset_after_ms", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} }
+            has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} },
+            volume_storage_endpoint: { _columnName: "volume_storage_endpoint", _foreignKeys: {} },
+            volume_storage_bucket: { _columnName: "volume_storage_bucket", _foreignKeys: {} },
+            volume_storage_prefix: { _columnName: "volume_storage_prefix", _foreignKeys: {} },
+            volume_storage_region: { _columnName: "volume_storage_region", _foreignKeys: {} },
+            volume_storage_auth_kind: { _columnName: "volume_storage_auth_kind", _foreignKeys: {} },
+            volume_storage_access_key_id: { _columnName: "volume_storage_access_key_id", _foreignKeys: {} },
+            volume_storage_secret_access_key: { _columnName: "volume_storage_secret_access_key", _foreignKeys: {} },
+            volume_storage_session_token: { _columnName: "volume_storage_session_token", _foreignKeys: {} },
+            volume_storage_encryption_password: { _columnName: "volume_storage_encryption_password", _foreignKeys: {} }
         },
         _indexes: {
             app_configs_app_id_id_idx: { _indexName: "app_configs_app_id_id_idx" },
@@ -2008,7 +2035,9 @@ export const schema = {
             app_configs_restart_max_backoff_ms_check: { _constraintName: "app_configs_restart_max_backoff_ms_check" },
             app_configs_restart_max_restarts_check: { _constraintName: "app_configs_restart_max_restarts_check" },
             app_configs_restart_reset_after_ms_check: { _constraintName: "app_configs_restart_reset_after_ms_check" },
-            app_configs_vcpu_count_check: { _constraintName: "app_configs_vcpu_count_check" }
+            app_configs_vcpu_count_check: { _constraintName: "app_configs_vcpu_count_check" },
+            app_configs_volume_storage_auth_check: { _constraintName: "app_configs_volume_storage_auth_check" },
+            app_configs_volume_storage_target_check: { _constraintName: "app_configs_volume_storage_target_check" }
         }
     },
     app_configs_with_environment: {
@@ -2122,24 +2151,6 @@ export const schema = {
             app_usage_volume_whole: { _constraintName: "app_usage_volume_whole" },
             app_usage_volume_within_itself: { _constraintName: "app_usage_volume_within_itself" },
             volume_usage_app_id_fkey: { _constraintName: "volume_usage_app_id_fkey" }
-        }
-    },
-    app_volume_storage: {
-        _relationName: "app_volume_storage",
-        _relationType: "table",
-        _columns: {
-            id: { _columnName: "id", _foreignKeys: {} },
-            app_id: { _columnName: "app_id", _foreignKeys: { app_volume_storage_app_id_fkey: { _constraintName: "app_volume_storage_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
-            configuration: { _columnName: "configuration", _foreignKeys: {} }
-        },
-        _indexes: {
-            app_volume_storage_app_id_key: { _indexName: "app_volume_storage_app_id_key" },
-            app_volume_storage_pkey: { _indexName: "app_volume_storage_pkey" }
-        },
-        _constraints: {
-            app_volume_storage_app_id_fkey: { _constraintName: "app_volume_storage_app_id_fkey" },
-            app_volume_storage_app_id_key: { _constraintName: "app_volume_storage_app_id_key" },
-            app_volume_storage_pkey: { _constraintName: "app_volume_storage_pkey" }
         }
     },
     apps: {
@@ -2628,7 +2639,6 @@ export interface Tables {
     app_hostnames: IAppHostnamesTable;
     app_quotas: IAppQuotasTable;
     app_usage: IAppUsageTable;
-    app_volume_storage: IAppVolumeStorageTable;
     apps: IAppsTable;
     artifacts: IArtifactsTable;
     cached_binaries: ICachedBinariesTable;

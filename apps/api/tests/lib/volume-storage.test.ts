@@ -1,55 +1,53 @@
 import { expect, test } from 'bun:test';
-import { type S3VolumeStorage, S3VolumeStorageSchema } from '@repo/protocol';
+import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { readSecretsKey, sealSecret } from '#lib/tenant-secrets.ts';
-import { openVolumeStorage, sealVolumeStorage } from '#lib/volume-storage.ts';
+import type { Queries } from '#db/queries.gen.ts';
+import { readSecretsKey, sealedFromStore, sealSecret } from '#lib/tenant-secrets.ts';
+import { toVolumeStorage } from '#lib/volume-storage.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const SECRETS_KEY_BYTES = 32;
+const ROW: Queries['SelectDesiredVolumes'] = {
+  app_id: Value.Parse(AppIdSchema, 'storage-app'),
+  state: 'active',
+  seed_digest: null,
+  seed_size_bytes: null,
+  seed_object_key: null,
+  seed_original_file_name: null,
+  volume_storage_endpoint: 'https://objects.example.test',
+  volume_storage_bucket: 'customer-bucket',
+  volume_storage_prefix: 'app/',
+  volume_storage_region: null,
+  volume_storage_auth_kind: 'access-key',
+  volume_storage_access_key_id: 'access',
+  volume_storage_secret_access_key: sealSecret({
+    key: TEST_SECRETS_KEY,
+    plaintext: 'must-not-be-logged',
+  }),
+  volume_storage_session_token: null,
+  volume_storage_encryption_password: sealSecret({
+    key: TEST_SECRETS_KEY,
+    plaintext: 'filesystem-password',
+  }),
+};
+const ERROR = 'Stored volume storage configuration is invalid or could not be opened.';
 
-const STORAGE = Value.Parse(S3VolumeStorageSchema, {
-  endpoint: 'https://objects.example.test',
-  bucket: 'customer-bucket',
-  prefix: 'app/',
-  region: 'custom',
-  auth: {
-    kind: 'session',
-    accessKeyId: 'access',
-    secretAccessKey: 'secret',
-    sessionToken: 'token',
-  },
-  encryptionPassword: 'filesystem-password',
+test('invalid stored fields never expose the decrypted credentials through validation errors', () => {
+  expect(() =>
+    toVolumeStorage({
+      row: { ...ROW, volume_storage_endpoint: 'invalid' },
+      secretsKey: TEST_SECRETS_KEY,
+    }),
+  ).toThrow(ERROR);
 });
 
-test('storage uses the existing randomized secret envelope and retains an explicit region', () => {
-  const sealed = sealVolumeStorage({ key: TEST_SECRETS_KEY, storage: STORAGE });
-  expect(sealed).not.toBe(sealVolumeStorage({ key: TEST_SECRETS_KEY, storage: STORAGE }));
-  expect(openVolumeStorage({ key: TEST_SECRETS_KEY, sealed })).toEqual(STORAGE);
-});
-
-test('invalid stored values fail closed without exposing rejected credentials', () => {
-  for (const plaintext of [
-    'not-json-secret',
-    JSON.stringify({ ...STORAGE, auth: { kind: 'session', sessionToken: 'must-not-be-logged' } }),
-  ]) {
-    const sealed = sealSecret({ key: TEST_SECRETS_KEY, plaintext });
-    expect(() => openVolumeStorage({ key: TEST_SECRETS_KEY, sealed })).toThrow(
-      /^Stored volume storage configuration (could not be opened|is invalid)\.$/,
-    );
-  }
-  const key = readSecretsKey(Buffer.alloc(SECRETS_KEY_BYTES).toString('base64'));
-  const sealed = sealVolumeStorage({ key: TEST_SECRETS_KEY, storage: STORAGE });
-  expect(() => openVolumeStorage({ key, sealed })).toThrow(
-    'Stored volume storage configuration could not be opened.',
-  );
-});
-
-test('incomplete auth cannot be sealed for storage', () => {
-  const storage = {
-    ...STORAGE,
-    auth: { kind: 'session', sessionToken: 'must-not-be-logged' },
-  } as S3VolumeStorage;
-  expect(() => sealVolumeStorage({ key: TEST_SECRETS_KEY, storage })).toThrow(
-    'Invalid volume storage configuration.',
-  );
+test('unreadable secret columns fail closed without falling back to shared storage', () => {
+  const secretsKey = readSecretsKey(Buffer.alloc(SECRETS_KEY_BYTES).toString('base64'));
+  expect(() => toVolumeStorage({ row: ROW, secretsKey })).toThrow(ERROR);
+  expect(() =>
+    toVolumeStorage({
+      row: { ...ROW, volume_storage_secret_access_key: sealedFromStore('unsealed-secret') },
+      secretsKey: TEST_SECRETS_KEY,
+    }),
+  ).toThrow(ERROR);
 });

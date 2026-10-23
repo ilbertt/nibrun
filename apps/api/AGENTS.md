@@ -160,21 +160,39 @@ of the behaviour.
 
 ### Manual per-app storage configuration
 
-Before a new app's first deployment, insert its storage into `nibrun.app_volume_storage`.
-Use a dedicated bucket/prefix exclusively owned by that app on the current single host.
-The entire `S3VolumeStorage` object is sealed with the API's existing `TENANT_SECRETS_KEY`;
-no row means shared storage. Rows cannot be changed or removed: filesystem migration and
-credential rotation require a host transition that is not implemented yet.
+Before a new app's first deployment, append an `app_configs` version carrying its
+`volume_storage_*` columns. Null columns keep shared storage. Use a dedicated bucket/prefix
+exclusively owned by that app on the current single host. The agent reads the latest deployment's
+pinned config, including during deletion; ordinary config edits carry the storage columns forward.
+Changing the backend or rotating credentials still requires a host transition that is not implemented.
 
-From `apps/api`, with `TENANT_SECRETS_KEY` available and the configuration JSON on stdin:
+Endpoint, bucket, prefix, optional region, auth kind and access key ID are ordinary columns.
+Seal the secret access key, session token (when used) and ZeroFS encryption password individually
+with the existing `TENANT_SECRETS_KEY`. From `apps/api`, seal each secret read from stdin:
 
 ```sh
-bun -e 'import { readSecretsKey } from "./src/lib/tenant-secrets.ts"; import { sealVolumeStorage } from "./src/lib/volume-storage.ts"; console.log(sealVolumeStorage({ key: readSecretsKey(process.env.TENANT_SECRETS_KEY ?? ""), storage: await Bun.stdin.json() }));' < /path/to/storage.json
+bun -e 'import { readSecretsKey, sealSecret } from "./src/lib/tenant-secrets.ts"; console.log(sealSecret({ key: readSecretsKey(process.env.TENANT_SECRETS_KEY ?? ""), plaintext: await Bun.stdin.text() }));' < /path/to/secret
 ```
 
-Insert the resulting ciphertext rather than the original JSON:
+Copy the current config into a new version with the storage fields. For access-key auth:
 
 ```sql
-INSERT INTO nibrun.app_volume_storage (app_id, configuration)
-VALUES ('<new-app-uuid>', '<sealed-value>');
+INSERT INTO nibrun.app_configs (
+  app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
+  health_check_path, health_check_interval_ms, health_check_timeout_ms,
+  health_check_grace_period_ms, health_check_healthy_threshold, health_check_unhealthy_threshold,
+  restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
+  restart_backoff_factor, restart_reset_after_ms,
+  volume_storage_endpoint, volume_storage_bucket, volume_storage_prefix,
+  volume_storage_region, volume_storage_auth_kind, volume_storage_access_key_id,
+  volume_storage_secret_access_key, volume_storage_session_token, volume_storage_encryption_password
+)
+SELECT app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
+       health_check_path, health_check_interval_ms, health_check_timeout_ms,
+       health_check_grace_period_ms, health_check_healthy_threshold, health_check_unhealthy_threshold,
+       restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
+       restart_backoff_factor, restart_reset_after_ms,
+       'https://objects.example.com', 'customer-bucket', 'app-prefix/',
+       NULL, 'access-key', '<access-key-id>', '<sealed-access-secret>', NULL, '<sealed-encryption-password>'
+FROM nibrun.app_configs WHERE id = '<current-config-uuid>';
 ```

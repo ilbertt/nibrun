@@ -18,7 +18,7 @@ import {
   sealedEnvironmentBy,
   type TenantSecretsKey,
 } from '#lib/tenant-secrets.ts';
-import { openVolumeStorage } from '#lib/volume-storage.ts';
+import { toVolumeStorage } from '#lib/volume-storage.ts';
 
 export type DesiredDeploymentRow = Queries['SelectDesiredDeployments'];
 
@@ -50,15 +50,14 @@ export function toDesiredVolume({
   row: DesiredVolumeRow;
   secretsKey: TenantSecretsKey;
 }): DesiredVolume {
+  const storage = toVolumeStorage({ row, secretsKey });
   return {
     volumeId: volumeIdOf(row.app_id),
     appId: row.app_id,
     sizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
     desiredState: row.state === 'deleting' ? 'absent' : 'present',
     ...seedOf(row),
-    ...(row.storage_configuration === null
-      ? {}
-      : { storage: openVolumeStorage({ key: secretsKey, sealed: row.storage_configuration }) }),
+    ...(storage === undefined ? {} : { storage }),
   };
 }
 
