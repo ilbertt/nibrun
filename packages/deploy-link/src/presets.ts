@@ -62,7 +62,7 @@ export const DEPLOY_PRESETS = {
   pocketbase: {
     isRecommended: true,
     projectUrl: 'https://github.com/pocketbase/pocketbase',
-    version: 'v0.40.5',
+    version: 'v0.40.6',
     markdownContent: pocketbasePage,
     category: DeployCategory.Backends,
     title: 'PocketBase',
@@ -70,8 +70,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'pocketbase',
       binary:
-        'https://github.com/pocketbase/pocketbase/releases/download/v0.40.5/pocketbase_0.40.5_linux_amd64.zip',
-      sha256: '1dbea1b01eb3dfe64953513859d01e759c96650c4e3264fa4eecd54b769382e4',
+        'https://github.com/pocketbase/pocketbase/releases/download/v0.40.6/pocketbase_0.40.6_linux_amd64.zip',
+      sha256: '0e1f609158ed945f809f8a02ae012aa0427129c66ebb63c1aee76f2c0309373f',
       port: 8090,
       arg: ['serve', '--http=0.0.0.0:8090', '--dir=./data/pb_data', '--publicDir=./data/pb_public'],
       minimal: true,
@@ -226,7 +226,7 @@ export const DEPLOY_PRESETS = {
   'libredb-studio': {
     isRecommended: false,
     projectUrl: 'https://github.com/libredb/libredb-studio',
-    version: '1.0.0',
+    version: '1.1.0',
     markdownContent: libredbStudioPage,
     category: DeployCategory.DeveloperTools,
     title: 'LibreDB Studio',
@@ -237,7 +237,7 @@ export const DEPLOY_PRESETS = {
         'https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip',
       sha256: 'e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76',
       'initial-data':
-        'https://github.com/libredb/libredb-studio/releases/download/1.0.0/libredb-studio-standalone-1.0.0-linux-x64.tar.gz',
+        'https://github.com/libredb/libredb-studio/releases/download/1.1.0/libredb-studio-standalone-1.1.0-linux-x64.tar.gz',
       port: 3000,
       arg: ['--smol', '/app/data/server.js'],
       env: [
@@ -261,7 +261,7 @@ export const DEPLOY_PRESETS = {
   'open-connector': {
     isRecommended: false,
     projectUrl: 'https://github.com/oomol-lab/open-connector',
-    version: 'v1.9.1',
+    version: 'v1.9.3',
     markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
@@ -269,8 +269,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'open-connector',
       binary:
-        'https://github.com/oomol-lab/open-connector/releases/download/v1.9.1/open-connector-linux-x64',
-      sha256: 'c0bff99fbf374a81c49a8eafb7d6e9617da3484ea1e9e8465fcc331c1a41fc0d',
+        'https://github.com/oomol-lab/open-connector/releases/download/v1.9.3/open-connector-linux-x64',
+      sha256: 'dcccb681d9daa24052f82109709d371fb0148c23c1e542fbb285976c1e0d6872',
       port: 3000,
       env: [
         'HOST=0.0.0.0',
@@ -433,7 +433,7 @@ export const DEPLOY_PRESETS = {
   openlist: {
     isRecommended: false,
     projectUrl: 'https://github.com/OpenListTeam/OpenList',
-    version: 'v4.2.7',
+    version: 'v4.2.9',
     markdownContent: openlistPage,
     category: DeployCategory.FilesAndSharing,
     title: 'OpenList',
@@ -441,8 +441,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'openlist',
       binary:
-        'https://github.com/OpenListTeam/OpenList/releases/download/v4.2.7/openlist-linux-amd64.tar.gz',
-      sha256: 'e9ab57a1572401836c9edfa92697d9c69f330c0172dd97b2698a9839a367ba7c',
+        'https://github.com/OpenListTeam/OpenList/releases/download/v4.2.9/openlist-linux-amd64.tar.gz',
+      sha256: '1f41b64c61f66bc632490a0e17ee8769454fe093f03a68d22ffb4aa8a9b23187',
       port: 5244,
       arg: ['server', '--data', '/app/data', '--log-std'],
       env: [
@@ -621,7 +621,7 @@ export const DEPLOY_PRESETS = {
   flipt: {
     isRecommended: false,
     projectUrl: 'https://github.com/flipt-io/flipt',
-    version: 'v2.14.0',
+    version: 'v2.14.1',
     markdownContent: fliptPage,
     title: 'Flipt',
     subtitle: 'Feature flags with a UI, evaluated over HTTP or gRPC.',
@@ -629,8 +629,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'flipt',
       binary:
-        'https://github.com/flipt-io/flipt/releases/download/v2.14.0/flipt_linux_x86_64.tar.gz',
-      sha256: 'e62e91b44181b2d36a22192fb94c679e74309dbb6e617231021967c11dc0fb2f',
+        'https://github.com/flipt-io/flipt/releases/download/v2.14.1/flipt_linux_x86_64.tar.gz',
+      sha256: '777437f40420332460b36639ae2b50a8874d3d3dd165edaff381e4d8a61b1626',
       port: 8080,
       arg: ['server'],
       env: [
