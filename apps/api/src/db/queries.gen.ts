@@ -1143,6 +1143,45 @@ export interface ISoftDeleteTrustedWorkflowResult {
     id: IGithubTrustedDeploymentWorkflowsColumns["id"];
 }
 
+/** Result of query `InsertVolumeStorageMigration`. */
+export interface IInsertVolumeStorageMigrationResult {
+    id: IVolumeStorageMigrationsColumns["id"];
+}
+
+/** Result of query `SelectPendingVolumeStorageMigration`. */
+export interface ISelectPendingVolumeStorageMigrationResult {
+    id: IVolumeStorageMigrationsColumns["id"];
+    app_id: IVolumeStorageMigrationsColumns["app_id"];
+    source_config_id: IVolumeStorageMigrationsColumns["source_config_id"];
+    state: IVolumeStorageMigrationsColumns["state"];
+    message: IVolumeStorageMigrationsColumns["message"];
+    volume_storage_endpoint: IVolumeStorageMigrationsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IVolumeStorageMigrationsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IVolumeStorageMigrationsColumns["volume_storage_prefix"];
+    volume_storage_region: IVolumeStorageMigrationsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IVolumeStorageMigrationsColumns["volume_storage_auth_kind"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: IVolumeStorageMigrationsColumns["updated_at"];
+}
+
+/** Result of query `SelectVolumeStorageMigrationById`. */
+export interface ISelectVolumeStorageMigrationByIdResult {
+    id: IVolumeStorageMigrationsColumns["id"];
+    app_id: IVolumeStorageMigrationsColumns["app_id"];
+    source_config_id: IVolumeStorageMigrationsColumns["source_config_id"];
+    state: IVolumeStorageMigrationsColumns["state"];
+    message: IVolumeStorageMigrationsColumns["message"];
+    volume_storage_endpoint: IVolumeStorageMigrationsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IVolumeStorageMigrationsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IVolumeStorageMigrationsColumns["volume_storage_prefix"];
+    volume_storage_region: IVolumeStorageMigrationsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IVolumeStorageMigrationsColumns["volume_storage_auth_kind"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: IVolumeStorageMigrationsColumns["updated_at"];
+}
+
 export interface Queries {
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
@@ -1245,6 +1284,9 @@ export interface Queries {
     InsertTrustedWorkflow: IInsertTrustedWorkflowResult;
     UpdateTrustedWorkflow: IUpdateTrustedWorkflowResult;
     SoftDeleteTrustedWorkflow: ISoftDeleteTrustedWorkflowResult;
+    InsertVolumeStorageMigration: IInsertVolumeStorageMigrationResult;
+    SelectPendingVolumeStorageMigration: ISelectPendingVolumeStorageMigrationResult;
+    SelectVolumeStorageMigrationById: ISelectVolumeStorageMigrationByIdResult;
 }
 
 /** Columns of `app_config_environment`. */
@@ -1960,6 +2002,38 @@ export interface IValidGithubDeploymentGrantsTable {
     constraints: keyof (typeof schema)["valid_github_deployment_grants"]["_constraints"];
 }
 
+/** Columns of `volume_storage_migrations`. */
+export interface IVolumeStorageMigrationsColumns {
+    id: import("#lib/api/identifiers.ts").VolumeStorageMigrationId;
+    app_id: import("@repo/protocol").AppId;
+    source_config_id: string;
+    state: import("#lib/api/volume-storage-migration.ts").VolumeStorageMigrationState;
+    volume_storage_endpoint: string;
+    volume_storage_bucket: string;
+    volume_storage_prefix: import("@repo/protocol").ObjectKey;
+    volume_storage_region: string | null;
+    volume_storage_auth_kind: import("@repo/protocol").S3VolumeAuth["kind"];
+    volume_storage_access_key_id: string | null;
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_secret_access_key: import("#lib/tenant-secrets.ts").SealedSecret | null;
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_session_token: import("#lib/tenant-secrets.ts").SealedSecret | null;
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_encryption_password: import("#lib/tenant-secrets.ts").SealedSecret;
+    message: string | null;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    updated_at: Date;
+}
+
+/** Schema of `volume_storage_migrations`. */
+export interface IVolumeStorageMigrationsTable {
+    columns: IVolumeStorageMigrationsColumns;
+    relationType: (typeof schema)["volume_storage_migrations"]["_relationType"];
+    indexes: keyof (typeof schema)["volume_storage_migrations"]["_indexes"];
+    constraints: keyof (typeof schema)["volume_storage_migrations"]["_constraints"];
+}
+
 export const schema = {
     app_config_environment: {
         _relationName: "app_config_environment",
@@ -2634,6 +2708,46 @@ export const schema = {
         },
         _indexes: {},
         _constraints: {}
+    },
+    volume_storage_migrations: {
+        _relationName: "volume_storage_migrations",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { volume_storage_migrations_app_id_fkey: { _constraintName: "volume_storage_migrations_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            source_config_id: { _columnName: "source_config_id", _foreignKeys: { volume_storage_migrations_source_config_id_fkey: { _constraintName: "volume_storage_migrations_source_config_id_fkey", _references: { _relationName: "app_configs", _columnName: "id" } } } },
+            state: { _columnName: "state", _foreignKeys: {} },
+            volume_storage_endpoint: { _columnName: "volume_storage_endpoint", _foreignKeys: {} },
+            volume_storage_bucket: { _columnName: "volume_storage_bucket", _foreignKeys: {} },
+            volume_storage_prefix: { _columnName: "volume_storage_prefix", _foreignKeys: {} },
+            volume_storage_region: { _columnName: "volume_storage_region", _foreignKeys: {} },
+            volume_storage_auth_kind: { _columnName: "volume_storage_auth_kind", _foreignKeys: {} },
+            volume_storage_access_key_id: { _columnName: "volume_storage_access_key_id", _foreignKeys: {} },
+            volume_storage_secret_access_key: { _columnName: "volume_storage_secret_access_key", _foreignKeys: {} },
+            volume_storage_session_token: { _columnName: "volume_storage_session_token", _foreignKeys: {} },
+            volume_storage_encryption_password: { _columnName: "volume_storage_encryption_password", _foreignKeys: {} },
+            message: { _columnName: "message", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+        },
+        _indexes: {
+            volume_storage_migrations_app_id_idx: { _indexName: "volume_storage_migrations_app_id_idx" },
+            volume_storage_migrations_pending_app_idx: { _indexName: "volume_storage_migrations_pending_app_idx" },
+            volume_storage_migrations_pkey: { _indexName: "volume_storage_migrations_pkey" },
+            volume_storage_migrations_source_config_id_idx: { _indexName: "volume_storage_migrations_source_config_id_idx" }
+        },
+        _constraints: {
+            volume_storage_migrations_app_id_fkey: { _constraintName: "volume_storage_migrations_app_id_fkey" },
+            volume_storage_migrations_auth_check: { _constraintName: "volume_storage_migrations_auth_check" },
+            volume_storage_migrations_pkey: { _constraintName: "volume_storage_migrations_pkey" },
+            volume_storage_migrations_source_config_id_fkey: { _constraintName: "volume_storage_migrations_source_config_id_fkey" },
+            volume_storage_migrations_state_check: { _constraintName: "volume_storage_migrations_state_check" },
+            volume_storage_migrations_volume_storage_bucket_check: { _constraintName: "volume_storage_migrations_volume_storage_bucket_check" },
+            volume_storage_migrations_volume_storage_encryption_passw_check: { _constraintName: "volume_storage_migrations_volume_storage_encryption_passw_check" },
+            volume_storage_migrations_volume_storage_endpoint_check: { _constraintName: "volume_storage_migrations_volume_storage_endpoint_check" },
+            volume_storage_migrations_volume_storage_prefix_check: { _constraintName: "volume_storage_migrations_volume_storage_prefix_check" },
+            volume_storage_migrations_volume_storage_region_check: { _constraintName: "volume_storage_migrations_volume_storage_region_check" }
+        }
     }
 } as const;
 
@@ -2667,6 +2781,7 @@ export interface Tables {
     purgeable_apps: IPurgeableAppsTable;
     sqlite_connections: ISqliteConnectionsTable;
     valid_github_deployment_grants: IValidGithubDeploymentGrantsTable;
+    volume_storage_migrations: IVolumeStorageMigrationsTable;
 }
 
 declare module "@ilbertt/bun-sqlgen" {
