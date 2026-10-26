@@ -1,0 +1,156 @@
+import type { TypedSQL } from '@ilbertt/bun-sqlgen';
+import { type AppId, ObjectKeySchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
+import type { Queries } from '#db/queries.gen.ts';
+import type { OwnerId } from '#lib/api/identifiers.ts';
+import type { VolumeStorageMigrationState } from '#lib/api/volume-storage-migration.ts';
+import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
+import { appendConfigVersion, lockApp } from '#repositories/apps.repository.ts';
+import { Repository } from '#repositories/repository.ts';
+
+export type VolumeStorageMigrationRow = Queries['SelectVolumeStorageMigration'];
+export type VolumeStorageMigrationDestination = Omit<
+  StoredVolumeStorage,
+  'volume_storage_prefix'
+> & {
+  [Key in
+    | 'volume_storage_endpoint'
+    | 'volume_storage_bucket'
+    | 'volume_storage_auth_kind'
+    | 'volume_storage_encryption_password']: NonNullable<StoredVolumeStorage[Key]>;
+};
+type OwnedApp = { appId: AppId; ownerId: OwnerId };
+type TransactionInput = OwnedApp & { tx: TypedSQL<Queries> };
+export type RequestVolumeStorageMigrationInput = OwnedApp & {
+  destination: VolumeStorageMigrationDestination;
+};
+export type AbortVolumeStorageMigrationInput = OwnedApp & {
+  configId: string;
+  state: Extract<VolumeStorageMigrationState, 'failed' | 'cancelled'>;
+  message: string | null;
+};
+
+export abstract class VolumeStorageMigrationsRepositoryContract {
+  abstract request(
+    input: RequestVolumeStorageMigrationInput,
+  ): Promise<VolumeStorageMigrationRow | null>;
+  abstract findByApp(input: OwnedApp): Promise<VolumeStorageMigrationRow | null>;
+  abstract abort(input: AbortVolumeStorageMigrationInput): Promise<boolean>;
+}
+
+export class VolumeStorageMigrationsRepository
+  extends Repository
+  implements VolumeStorageMigrationsRepositoryContract
+{
+  request({
+    appId,
+    ownerId,
+    destination,
+  }: RequestVolumeStorageMigrationInput): Promise<VolumeStorageMigrationRow | null> {
+    return this.sql.begin(async (tx) => {
+      const app = await lockApp({ tx, appId, ownerId });
+      if (!app || (app.state !== 'active' && app.state !== 'suspended')) {
+        return null;
+      }
+      if (app.volume_storage_migration_state === 'pending') {
+        return this.read({ tx, appId, ownerId });
+      }
+      const source = await this.source({ tx, appId, ownerId });
+      if (!source || source.volume_storage_endpoint !== null) {
+        return null;
+      }
+      await appendConfigVersion({
+        tx,
+        appId,
+        patch: {},
+        storage: {
+          ...destination,
+          volume_storage_prefix: Value.Parse(
+            ObjectKeySchema,
+            `apps/${appId}/${crypto.randomUUID()}/`,
+          ),
+        },
+      });
+      await tx.MarkVolumeStorageMigrationPending`
+        UPDATE nibrun.apps
+        SET volume_storage_migration_state = 'pending', volume_storage_migration_message = NULL
+        WHERE id = ${appId} AND owner_id = ${ownerId}
+      `;
+      return this.read({ tx, appId, ownerId });
+    });
+  }
+
+  findByApp(input: OwnedApp): Promise<VolumeStorageMigrationRow | null> {
+    return this.read({ ...input, tx: this.sql });
+  }
+
+  // The caller must stop the destination writer and finish its cleanup before releasing the guard.
+  abort({
+    appId,
+    ownerId,
+    configId,
+    state,
+    message,
+  }: AbortVolumeStorageMigrationInput): Promise<boolean> {
+    return this.sql.begin(async (tx) => {
+      const app = await lockApp({ tx, appId, ownerId });
+      if (app?.volume_storage_migration_state !== 'pending') {
+        return false;
+      }
+      const migration = await this.read({ tx, appId, ownerId });
+      if (migration?.config_id !== configId) {
+        return false;
+      }
+      const source = await this.source({ tx, appId, ownerId });
+      if (!source || source.volume_storage_endpoint !== null) {
+        return false;
+      }
+      await appendConfigVersion({ tx, appId, patch: {}, storage: source });
+      await tx.AbortVolumeStorageMigration`
+        UPDATE nibrun.apps
+        SET volume_storage_migration_state = ${state}, volume_storage_migration_message = ${message}
+        WHERE id = ${appId} AND owner_id = ${ownerId}
+      `;
+      return true;
+    });
+  }
+
+  private async source({ tx, appId, ownerId }: TransactionInput) {
+    const [row] = await tx.SelectVolumeStorageMigrationSource`
+      SELECT c.id AS config_id,
+             c.volume_storage_endpoint, c.volume_storage_bucket, c.volume_storage_prefix,
+             c.volume_storage_region, c.volume_storage_auth_kind, c.volume_storage_access_key_id,
+             c.volume_storage_secret_access_key, c.volume_storage_session_token,
+             c.volume_storage_encryption_password
+      FROM nibrun.apps a
+      JOIN LATERAL (
+        SELECT config_id FROM nibrun.deployments d
+        WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
+      ) d ON true
+      JOIN nibrun.app_configs c ON c.id = d.config_id AND c.app_id = a.id
+      WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND a.state IN ('active', 'suspended')
+    `;
+    return row;
+  }
+
+  private async read({
+    tx,
+    appId,
+    ownerId,
+  }: TransactionInput): Promise<VolumeStorageMigrationRow | null> {
+    const [row] = await tx.SelectVolumeStorageMigration`
+      /* @notNull state */
+      SELECT a.id AS app_id, a.volume_storage_migration_state AS state,
+             a.volume_storage_migration_message AS message, a.updated_at,
+             c.id AS config_id, c.created_at, c.volume_storage_endpoint, c.volume_storage_bucket,
+             c.volume_storage_prefix, c.volume_storage_region, c.volume_storage_auth_kind
+      FROM nibrun.apps a
+      JOIN LATERAL (
+        SELECT * FROM nibrun.app_configs c WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
+      ) c ON true
+      WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND a.state <> 'deleted'
+        AND a.volume_storage_migration_state IS NOT NULL
+    `;
+    return row ?? null;
+  }
+}

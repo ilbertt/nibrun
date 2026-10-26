@@ -375,11 +375,6 @@ export interface ISelectAppByIdResult {
     expires_at: Date | null;
 }
 
-/** Result of query `SelectAppForUpdate`. */
-export interface ISelectAppForUpdateResult {
-    id: IAppsColumns["id"];
-}
-
 /** Result of query `TouchApp`. */
 export interface ITouchAppResult {
 }
@@ -491,6 +486,14 @@ export interface ISelectCurrentAppConfigResult {
 /** Result of query `InsertPatchedAppConfig`. */
 export interface IInsertPatchedAppConfigResult {
     id: IAppConfigsColumns["id"];
+}
+
+/** Result of query `SelectAppForUpdate`. */
+export interface ISelectAppForUpdateResult {
+    id: IAppsColumns["id"];
+    state: IAppsColumns["state"];
+    /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
+    volume_storage_migration_state: IAppsColumns["volume_storage_migration_state"];
 }
 
 /** Result of query `SelectProfileForAppCreate`. */
@@ -1143,6 +1146,48 @@ export interface ISoftDeleteTrustedWorkflowResult {
     id: IGithubTrustedDeploymentWorkflowsColumns["id"];
 }
 
+/** Result of query `MarkVolumeStorageMigrationPending`. */
+export interface IMarkVolumeStorageMigrationPendingResult {
+}
+
+/** Result of query `AbortVolumeStorageMigration`. */
+export interface IAbortVolumeStorageMigrationResult {
+}
+
+/** Result of query `SelectVolumeStorageMigrationSource`. */
+export interface ISelectVolumeStorageMigrationSourceResult {
+    config_id: IAppConfigsColumns["id"];
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
+    volume_storage_access_key_id: IAppConfigsColumns["volume_storage_access_key_id"];
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_secret_access_key: IAppConfigsColumns["volume_storage_secret_access_key"];
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_session_token: IAppConfigsColumns["volume_storage_session_token"];
+    /** Sealed with TENANT_SECRETS_KEY. */
+    volume_storage_encryption_password: IAppConfigsColumns["volume_storage_encryption_password"];
+}
+
+/** Result of query `SelectVolumeStorageMigration`. */
+export interface ISelectVolumeStorageMigrationResult {
+    app_id: IAppsColumns["id"];
+    /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
+    state: NonNullable<IAppsColumns["volume_storage_migration_state"]>;
+    message: IAppsColumns["volume_storage_migration_message"];
+    updated_at: IAppsColumns["updated_at"];
+    config_id: IAppConfigsColumns["id"];
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
+}
+
 export interface Queries {
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
@@ -1167,7 +1212,6 @@ export interface Queries {
     SelectCreatedApp: ISelectCreatedAppResult;
     SelectAppsByOwner: ISelectAppsByOwnerResult;
     SelectAppById: ISelectAppByIdResult;
-    SelectAppForUpdate: ISelectAppForUpdateResult;
     TouchApp: ITouchAppResult;
     SelectFinishableDeletion: ISelectFinishableDeletionResult;
     SelectFinishableDeletions: ISelectFinishableDeletionsResult;
@@ -1185,6 +1229,7 @@ export interface Queries {
     DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
+    SelectAppForUpdate: ISelectAppForUpdateResult;
     SelectProfileForAppCreate: ISelectProfileForAppCreateResult;
     SelectAppsLeft: ISelectAppsLeftResult;
     SelectAnonymousAppsHeld: ISelectAnonymousAppsHeldResult;
@@ -1245,6 +1290,10 @@ export interface Queries {
     InsertTrustedWorkflow: IInsertTrustedWorkflowResult;
     UpdateTrustedWorkflow: IUpdateTrustedWorkflowResult;
     SoftDeleteTrustedWorkflow: ISoftDeleteTrustedWorkflowResult;
+    MarkVolumeStorageMigrationPending: IMarkVolumeStorageMigrationPendingResult;
+    AbortVolumeStorageMigration: IAbortVolumeStorageMigrationResult;
+    SelectVolumeStorageMigrationSource: ISelectVolumeStorageMigrationSourceResult;
+    SelectVolumeStorageMigration: ISelectVolumeStorageMigrationResult;
 }
 
 /** Columns of `app_config_environment`. */
@@ -1450,6 +1499,9 @@ export interface IAppsColumns {
     data_initialized_at: Date | null;
     /** What its owner calls the app, and names it by. */
     name: import("#lib/api/app.ts").AppName;
+    /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
+    volume_storage_migration_state: import("#lib/api/volume-storage-migration.ts").VolumeStorageMigrationState | null;
+    volume_storage_migration_message: string | null;
 }
 
 /** Schema of `apps`. */
@@ -2168,7 +2220,9 @@ export const schema = {
             activation: { _columnName: "activation", _foreignKeys: {} },
             idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} },
             data_initialized_at: { _columnName: "data_initialized_at", _foreignKeys: {} },
-            name: { _columnName: "name", _foreignKeys: {} }
+            name: { _columnName: "name", _foreignKeys: {} },
+            volume_storage_migration_state: { _columnName: "volume_storage_migration_state", _foreignKeys: {} },
+            volume_storage_migration_message: { _columnName: "volume_storage_migration_message", _foreignKeys: {} }
         },
         _indexes: {
             apps_deleted_idx: { _indexName: "apps_deleted_idx" },
@@ -2182,7 +2236,8 @@ export const schema = {
             apps_owner_id_fkey: { _constraintName: "apps_owner_id_fkey" },
             apps_pkey: { _constraintName: "apps_pkey" },
             apps_slug_key: { _constraintName: "apps_slug_key" },
-            apps_state_check: { _constraintName: "apps_state_check" }
+            apps_state_check: { _constraintName: "apps_state_check" },
+            apps_volume_storage_migration_state_check: { _constraintName: "apps_volume_storage_migration_state_check" }
         }
     },
     artifacts: {
