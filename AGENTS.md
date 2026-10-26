@@ -8,9 +8,6 @@ Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 ## Stack
 
 - **Runtime:** Bun
-- **React runtime:** TanStack Redact through each app's Vite plugin, using the default
-  feature set. Keep React imports and types; check third-party component compatibility
-  when upgrading Redact.
 - **Monorepo:** Bun workspaces + Turbo
 - **Linter/Formatter:** Biome (auto-formats on save)
 - **Commits:** Conventional Commits (commitlint)
