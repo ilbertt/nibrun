@@ -1,11 +1,13 @@
+import monoFont from '@fontsource/space-mono/files/space-mono-latin-400-normal.woff2?url';
+import sansFont from '@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2?url';
 import { useAnalytics } from '@repo/analytics';
 import { PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 import { Toaster } from '@repo/ui/components/sonner';
-import appCss from '@repo/ui/globals.css?url';
 import { createRootRoute, HeadContent, Scripts } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { SiteFooter } from '#components/site-footer.tsx';
 import { themeScript } from '#lib/theme-script.ts';
+import appCss from '#styles/site.css?url';
 
 export const Route = createRootRoute({
   head: () => ({
@@ -24,6 +26,8 @@ export const Route = createRootRoute({
       { name: 'twitter:image:alt', content: WWW_SITE.title },
     ],
     links: [
+      { rel: 'preload', href: sansFont, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' },
+      { rel: 'preload', href: monoFont, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' },
       { rel: 'stylesheet', href: appCss },
       { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
     ],

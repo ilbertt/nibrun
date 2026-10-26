@@ -18,7 +18,12 @@ export function markdownResponse(request: Request): Response | undefined {
 
   return body === undefined
     ? undefined
-    : new Response(body, { headers: { 'content-type': 'text/markdown; charset=utf-8' } });
+    : new Response(body, {
+        headers: {
+          'content-type': 'text/markdown; charset=utf-8',
+          link: `<${WWW_SITE.url}${pathname.slice(0, -'.md'.length)}>; rel="canonical"`,
+        },
+      });
 }
 
 function written(pathname: string): string | undefined {

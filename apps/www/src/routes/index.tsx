@@ -2,6 +2,7 @@ import { WWW_SITE } from '@repo/global-constants';
 import { createFileRoute } from '@tanstack/react-router';
 import { BinaryDrop } from '#components/binary-drop.tsx';
 import { DeployCta } from '#components/deploy-cta.tsx';
+import { Explore } from '#components/explore.tsx';
 import { Hero } from '#components/hero.tsx';
 import { OpenSource } from '#components/open-source.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
@@ -35,6 +36,7 @@ function RouteComponent() {
         <WhatYourAppGets />
         <Pricing />
         <OpenSource />
+        <Explore />
         <DeployCta />
       </main>
     </>

@@ -12,7 +12,17 @@ export function SiteFooter() {
       <Link to="/" className="font-medium transition-colors hover:text-foreground">
         {PRODUCT_NAME}
       </Link>
-      <nav aria-label="Support and legal" className="flex flex-wrap items-center gap-x-6 gap-y-3">
+      <nav aria-label="Site links" className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <Link
+          to="/apps"
+          search={{ category: undefined }}
+          className="transition-colors hover:text-foreground"
+        >
+          Apps
+        </Link>
+        <Link to="/blog" className="transition-colors hover:text-foreground">
+          Blog
+        </Link>
         <Link to={WWW_SUPPORT_PATH} className="transition-colors hover:text-foreground">
           Support
         </Link>
