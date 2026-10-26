@@ -43,6 +43,7 @@
     "@repo/typescript-config": "workspace:*",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/devtools-vite": "^0.8.5",
+    "@tanstack/redact": "catalog:",
     "@tanstack/router-cli": "^1.167.33",
     "@tanstack/router-plugin": "catalog:",
     "@types/react": "catalog:",

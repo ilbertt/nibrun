@@ -2,6 +2,7 @@ import { cloudflare } from '@cloudflare/vite-plugin';
 import { LLMS_TXT_PATH, WWW_DEPLOY_PATH } from '@repo/global-constants';
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
+import { redact } from '@tanstack/redact/vite';
 import viteReact from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
@@ -10,6 +11,7 @@ import { defineConfig } from 'vite';
 // build as in production, not because a page view needs compute.
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
+  ssr: { noExternal: true },
   plugins: [
     cloudflare({ viteEnvironment: { name: 'ssr' } }),
     tailwindcss(),
@@ -31,6 +33,7 @@ const config = defineConfig({
       },
     }),
     viteReact(),
+    redact(),
   ],
 });
 
