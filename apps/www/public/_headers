@@ -1,5 +1,2 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
-
-/llms.txt
-  X-Robots-Tag: noindex
