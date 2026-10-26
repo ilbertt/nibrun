@@ -225,9 +225,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   }
 
   /**
-   * Replays an earlier deployment as a new one, taking both the artifact and the config it
-   * pinned. `app_configs` never changes a row, so that is the release as it ran rather than
-   * that artifact rebuilt against today's configuration.
+   * Replays the earlier artifact and run configuration while preserving the current volume's
+   * storage. A config from before a migration must not redirect the volume back to shared storage.
    *
    * The deployment being replayed is matched through the app the caller owns, so one belonging
    * to another app is not a deployment this request can name.
@@ -243,6 +242,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
         FROM nibrun.deployments d
         JOIN nibrun.live_apps a ON a.id = d.app_id
         WHERE d.id = ${rollbackOf} AND d.app_id = ${appId} AND a.owner_id = ${ownerId}
+        FOR UPDATE OF a
       `;
       if (!replayable) {
         return null;
@@ -250,12 +250,69 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       await this.supersedeLive({ tx, appId, ownerId });
 
       const [inserted] = await tx.InsertReplayedDeployment`
+        WITH replay_source AS (
+          SELECT src.id, src.app_id, src.artifact_id, src.config_id,
+                 latest.config_id AS storage_config_id
+          FROM nibrun.deployments src
+          JOIN nibrun.live_apps a ON a.id = src.app_id
+          JOIN LATERAL (
+            SELECT d.config_id FROM nibrun.deployments d
+            WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
+          ) latest ON true
+          WHERE src.id = ${rollbackOf} AND src.app_id = ${appId} AND a.owner_id = ${ownerId}
+        ), rollback_config AS (
+          INSERT INTO nibrun.app_configs (
+            app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
+            health_check_path, health_check_interval_ms, health_check_timeout_ms,
+            health_check_grace_period_ms, health_check_healthy_threshold,
+            health_check_unhealthy_threshold,
+            restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
+            restart_backoff_factor, restart_reset_after_ms,
+            volume_storage_endpoint, volume_storage_bucket, volume_storage_prefix,
+            volume_storage_region, volume_storage_auth_kind, volume_storage_access_key_id,
+            volume_storage_secret_access_key, volume_storage_session_token,
+            volume_storage_encryption_password
+          )
+          SELECT previous.app_id, previous.http_port, previous.has_extra_public_port,
+                 previous.args, previous.vcpu_count, previous.memory_mib,
+                 previous.health_check_path, previous.health_check_interval_ms,
+                 previous.health_check_timeout_ms, previous.health_check_grace_period_ms,
+                 previous.health_check_healthy_threshold, previous.health_check_unhealthy_threshold,
+                 previous.restart_max_restarts, previous.restart_initial_backoff_ms,
+                 previous.restart_max_backoff_ms, previous.restart_backoff_factor,
+                 previous.restart_reset_after_ms,
+                 storage.volume_storage_endpoint, storage.volume_storage_bucket,
+                 storage.volume_storage_prefix, storage.volume_storage_region,
+                 storage.volume_storage_auth_kind, storage.volume_storage_access_key_id,
+                 storage.volume_storage_secret_access_key, storage.volume_storage_session_token,
+                 storage.volume_storage_encryption_password
+          FROM replay_source source
+          JOIN nibrun.app_configs previous ON previous.id = source.config_id
+          JOIN nibrun.app_configs storage ON storage.id = source.storage_config_id
+          WHERE ROW(previous.volume_storage_endpoint, previous.volume_storage_bucket,
+                    previous.volume_storage_prefix, previous.volume_storage_region,
+                    previous.volume_storage_auth_kind, previous.volume_storage_access_key_id,
+                    previous.volume_storage_secret_access_key, previous.volume_storage_session_token,
+                    previous.volume_storage_encryption_password)
+            IS DISTINCT FROM
+                ROW(storage.volume_storage_endpoint, storage.volume_storage_bucket,
+                    storage.volume_storage_prefix, storage.volume_storage_region,
+                    storage.volume_storage_auth_kind, storage.volume_storage_access_key_id,
+                    storage.volume_storage_secret_access_key, storage.volume_storage_session_token,
+                    storage.volume_storage_encryption_password)
+          RETURNING id
+        ), rollback_environment AS (
+          INSERT INTO nibrun.app_config_environment (config_id, name, value)
+          SELECT config.id, e.name, e.value
+          FROM rollback_config config
+          CROSS JOIN replay_source source
+          JOIN nibrun.app_config_environment e ON e.config_id = source.config_id
+        )
         INSERT INTO nibrun.deployments
           (app_id, artifact_id, config_id, rollback_of_deployment_id)
-        SELECT src.app_id, src.artifact_id, src.config_id, src.id
-        FROM nibrun.deployments src
-        JOIN nibrun.live_apps a ON a.id = src.app_id
-        WHERE src.id = ${rollbackOf} AND src.app_id = ${appId} AND a.owner_id = ${ownerId}
+        SELECT source.app_id, source.artifact_id, COALESCE(config.id, source.config_id), source.id
+        FROM replay_source source
+        LEFT JOIN rollback_config config ON true
         RETURNING id
       `;
       return inserted ? await this.selectDeployment({ tx, deploymentId: inserted.id }) : null;

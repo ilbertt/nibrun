@@ -3,7 +3,9 @@ import { withTypes } from '@ilbertt/bun-sqlgen';
 import { DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
 import {
   AppIdSchema,
+  DeploymentIdSchema,
   HostIdSchema,
+  HttpPortSchema,
   type S3VolumeAuth,
   type S3VolumeStorage,
   S3VolumeStorageSchema,
@@ -15,6 +17,7 @@ import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
+import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
@@ -23,6 +26,7 @@ const SHARED_APP = 'shared';
 const PRIVATE_APP = 'private';
 const HOST_ID = Value.Parse(HostIdSchema, 'storage-test-host');
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner');
+const PREVIOUS_HTTP_PORT = 8181;
 const ACCESS_KEY_AUTH = Value.Parse(S3VolumeStorageSchema.properties.auth, {
   kind: 'access-key',
   accessKeyId: 'access',
@@ -65,15 +69,15 @@ function storage(auth: S3VolumeAuth) {
   });
 }
 
-async function storedColumns() {
+async function storedColumns(slug = PRIVATE_APP) {
   const [row] = await sql.unsafe(
     `SELECT volume_storage_endpoint, volume_storage_bucket, volume_storage_prefix,
             volume_storage_region, volume_storage_auth_kind, volume_storage_access_key_id,
             volume_storage_secret_access_key, volume_storage_session_token,
             volume_storage_encryption_password
      FROM nibrun.app_configs c JOIN nibrun.apps a ON a.id = c.app_id
-     WHERE a.slug = $1 ORDER BY c.id DESC LIMIT 1`,
-    [PRIVATE_APP],
+     WHERE a.slug = $1 AND a.owner_id = $2 ORDER BY c.id DESC LIMIT 1`,
+    [slug, OWNER_ID],
   );
   return row;
 }
@@ -213,6 +217,127 @@ test('deletion retains the deployment’s storage even after every release is su
   expect((await desiredVolumes()).some((volume) => volume.appId === app.id)).toBe(false);
 });
 
+test.each([
+  ACCESS_KEY_AUTH,
+  Value.Parse(S3VolumeStorageSchema.properties.auth, {
+    kind: 'session',
+    accessKeyId: 'new-access',
+    secretAccessKey: 'new-secret',
+    sessionToken: 'new-token',
+  }),
+  { kind: 'anonymous' as const },
+])(
+  'rollback restores the old release while preserving current $kind volume storage',
+  async (auth) => {
+    const slug = `rollback-${auth.kind}`;
+    const appId = Value.Parse(AppIdSchema, await createApp(slug));
+    const apps = new AppsRepository(withTypes<Queries>(sql));
+    const deployments = new DeploymentsRepository(withTypes<Queries>(sql));
+    await insertConfig({ slug, storage: undefined });
+    const previousSecret = sealSecret({ key: TEST_SECRETS_KEY, plaintext: 'previous-environment' });
+    await apps.update({
+      appId,
+      ownerId: OWNER_ID,
+      patch: {
+        name: undefined,
+        httpPort: Value.Parse(HttpPortSchema, PREVIOUS_HTTP_PORT),
+        args: ['previous'],
+        environment: { set: { TOKEN: previousSecret }, removed: [] },
+      },
+    });
+    const previous = await deployApp(slug);
+    await sql.unsafe(
+      `INSERT INTO nibrun.artifacts (app_id, digest, size_bytes, object_key, original_file_name)
+     SELECT id, 'sha256:new', 1, 'artifacts/new', 'new-app'
+     FROM nibrun.apps WHERE id = $1 AND owner_id = $2`,
+      [appId, OWNER_ID],
+    );
+    const configured = { ...storage(auth), region: 'auto' };
+    await insertConfig({ slug, storage: configured });
+    const current = await deployApp(slug);
+    const currentColumns = await storedColumns(slug);
+    const volume = (await desiredVolumes()).find((one) => one.appId === appId);
+    await insertConfig({ slug, storage: { ...configured, bucket: 'not-deployed' } });
+    const request = {
+      appId,
+      ownerId: OWNER_ID,
+      rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),
+    };
+    expect(
+      await deployments.insertRollback({
+        ...request,
+        ownerId: Value.Parse(OwnerIdSchema, 'another-owner'),
+      }),
+    ).toBeNull();
+    expect(
+      (
+        await deployments.findById({
+          appId,
+          ownerId: OWNER_ID,
+          deploymentId: Value.Parse(DeploymentIdSchema, current.id),
+        })
+      )?.state,
+    ).toBe('running');
+    const rollback = await deployments.insertRollback(request);
+    expect(rollback).toMatchObject({
+      artifact_id: previous.artifact_id,
+      rollback_of_deployment_id: previous.id,
+      http_port: PREVIOUS_HTTP_PORT,
+      args: ['previous'],
+      environment_names: ['TOKEN'],
+    });
+    expect(rollback?.artifact_id).not.toBe(current.artifact_id);
+    expect(await storedColumns(slug)).toEqual(currentColumns);
+    expect((await desiredVolumes()).find((one) => one.appId === appId)).toEqual(volume);
+    const environment = await sql.unsafe(
+      `SELECT e.name, e.value FROM nibrun.app_config_environment e
+     JOIN nibrun.deployments d ON d.config_id = e.config_id
+     JOIN nibrun.apps a ON a.id = d.app_id
+     WHERE d.id = $1 AND a.id = $2 AND a.owner_id = $3`,
+      [rollback!.id, appId, OWNER_ID],
+    );
+    expect([...environment]).toEqual([{ name: 'TOKEN', value: previousSecret }]);
+  },
+);
+
+test.each([
+  { name: 'shared', configured: undefined },
+  { name: 'configured', configured: storage(ACCESS_KEY_AUTH) },
+])('matching $name storage reuses the original rollback config', async ({ name, configured }) => {
+  const slug = `rollback-same-${name}`;
+  const appId = Value.Parse(AppIdSchema, await createApp(slug));
+  await insertConfig({ slug, storage: configured });
+  const previous = await deployApp(slug);
+  await new AppsRepository(withTypes<Queries>(sql)).update({
+    appId,
+    ownerId: OWNER_ID,
+    patch: { name: undefined, args: ['newer'] },
+  });
+  await deployApp(slug);
+  const volume = (await desiredVolumes()).find((one) => one.appId === appId);
+  const [before] = await sql.unsafe(
+    'SELECT count(*) FROM nibrun.app_configs c JOIN nibrun.apps a ON a.id = c.app_id WHERE a.id = $1 AND a.owner_id = $2',
+    [appId, OWNER_ID],
+  );
+  const rollback = await new DeploymentsRepository(withTypes<Queries>(sql)).insertRollback({
+    appId,
+    ownerId: OWNER_ID,
+    rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),
+  });
+  const [selected] = await sql.unsafe(
+    'SELECT d.config_id FROM nibrun.deployments d JOIN nibrun.apps a ON a.id = d.app_id WHERE d.id = $1 AND a.id = $2 AND a.owner_id = $3',
+    [rollback!.id, appId, OWNER_ID],
+  );
+  const [after] = await sql.unsafe(
+    'SELECT count(*) FROM nibrun.app_configs c JOIN nibrun.apps a ON a.id = c.app_id WHERE a.id = $1 AND a.owner_id = $2',
+    [appId, OWNER_ID],
+  );
+  expect(selected.config_id).toBe(previous.config_id);
+  expect(after.count).toBe(before.count);
+  expect(rollback?.args).toEqual([]);
+  expect((await desiredVolumes()).find((one) => one.appId === appId)).toEqual(volume);
+});
+
 async function createApp(slug: string) {
   const [app] = await sql.unsafe(
     `INSERT INTO nibrun.apps (owner_id, name, slug) VALUES ('owner', $1, $1) RETURNING id`,
@@ -273,13 +398,17 @@ async function deployApp(slug: string) {
      FROM nibrun.apps a WHERE d.app_id = a.id AND a.slug = $1`,
     [slug],
   );
-  await sql.unsafe(
+  const [deployment] = await sql.unsafe(
     `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state)
      SELECT a.id, ar.id, c.id, 'running'
      FROM nibrun.apps a
-     JOIN nibrun.artifacts ar ON ar.app_id = a.id
+     JOIN LATERAL (
+       SELECT id FROM nibrun.artifacts ar WHERE ar.app_id = a.id ORDER BY ar.id DESC LIMIT 1
+     ) ar ON true
      JOIN LATERAL (SELECT id FROM nibrun.app_configs c WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1) c ON true
-     WHERE a.slug = $1`,
+     WHERE a.slug = $1
+     RETURNING id, config_id, artifact_id`,
     [slug],
   );
+  return deployment;
 }
