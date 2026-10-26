@@ -111,8 +111,10 @@ const githubActionsOidcRepository = new GitHubActionsOidcRepository();
 const githubDeploymentGrantsRepository = new GitHubDeploymentGrantsRepository(sql);
 const trustedWorkflowsRepository = new TrustedWorkflowsRepository(sql);
 const paidRequestsRepository = new PaidRequestsRepository(sql);
+const volumeStorageMigrationsRepository = new VolumeStorageMigrationsRepository(sql);
+
 const volumeStorageMigrationsService = new VolumeStorageMigrationsService(
-  new VolumeStorageMigrationsRepository(sql),
+  volumeStorageMigrationsRepository,
 );
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
