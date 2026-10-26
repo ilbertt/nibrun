@@ -1,0 +1,26 @@
+diff --git a/dist/core/attributes.js b/dist/core/attributes.js
+index 43b74f0840bc2e50b74fb0d871abbac639b248eb..12d276ab1c0516423c1c57e051b2f215d982b0aa 100644
+--- a/dist/core/attributes.js
++++ b/dist/core/attributes.js
+@@ -4,7 +4,7 @@ function attributeName(name, isSvg) {
+     return "class";
+   if (name === "htmlFor")
+     return "for";
+-  if (isSvg && /^(clip|fill|stroke)/.test(name) || /^(httpEquiv|acceptCharset|maskType)$/.test(name)) {
++  if (isSvg && /^(clip|fill|stroke|stop)/.test(name) || /^(httpEquiv|acceptCharset|maskType)$/.test(name)) {
+     return name.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
+   }
+   return name === "viewBox" || /^(aria|data)-/.test(name) ? name : name.toLowerCase();
+diff --git a/src/core/attributes.ts b/src/core/attributes.ts
+index 5fa4c665b4c8ab68f105e058e771e64e6473ba0f..71c8ca4bbb8d28e87248e259a4abc9f92fa901ef 100644
+--- a/src/core/attributes.ts
++++ b/src/core/attributes.ts
+@@ -3,7 +3,7 @@ export const STRING_BOOLEAN_ATTRS = /^(contenteditable|draggable|spellcheck)$/
+ export function attributeName(name: string, isSvg?: boolean): string {
+   if (name === 'className') return 'class'
+   if (name === 'htmlFor') return 'for'
+-  if ((isSvg && /^(clip|fill|stroke)/.test(name)) || /^(httpEquiv|acceptCharset|maskType)$/.test(name)) {
++  if ((isSvg && /^(clip|fill|stroke|stop)/.test(name)) || /^(httpEquiv|acceptCharset|maskType)$/.test(name)) {
+     return name.replace(/[A-Z]/g, m => '-' + m.toLowerCase())
+   }
+   return name === 'viewBox' || /^(aria|data)-/.test(name) ? name : name.toLowerCase()
