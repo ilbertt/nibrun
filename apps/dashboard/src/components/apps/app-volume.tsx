@@ -8,7 +8,7 @@ export function AppVolume() {
       <PaidBucketRequestDialog
         trigger={
           <Button variant="outline" size="xs">
-            Use your S3-compatible bucket
+            Use your S3 bucket
           </Button>
         }
       />
