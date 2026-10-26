@@ -9,6 +9,7 @@ import { appendConfigVersion, lockApp } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type VolumeStorageMigrationRow = Queries['SelectVolumeStorageMigration'];
+export type UnstartedVolumeStorageMigrationRow = Queries['SelectUnstartedVolumeStorageMigrations'];
 export type VolumeStorageMigrationDestination = Omit<
   StoredVolumeStorage,
   'volume_storage_prefix'
@@ -20,12 +21,12 @@ export type VolumeStorageMigrationDestination = Omit<
     | 'volume_storage_encryption_password']: NonNullable<StoredVolumeStorage[Key]>;
 };
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
+type MigrationAttempt = OwnedApp & { configId: string };
 type TransactionInput = OwnedApp & { tx: TypedSQL<Queries> };
 export type RequestVolumeStorageMigrationInput = OwnedApp & {
   destination: VolumeStorageMigrationDestination;
 };
-export type AbortVolumeStorageMigrationInput = OwnedApp & {
-  configId: string;
+export type AbortVolumeStorageMigrationInput = MigrationAttempt & {
   state: Extract<VolumeStorageMigrationState, 'failed' | 'cancelled'>;
   message: string | null;
 };
@@ -35,6 +36,14 @@ export abstract class VolumeStorageMigrationsRepositoryContract {
     input: RequestVolumeStorageMigrationInput,
   ): Promise<VolumeStorageMigrationRow | null>;
   abstract findByApp(input: OwnedApp): Promise<VolumeStorageMigrationRow | null>;
+  abstract start(input: MigrationAttempt): Promise<boolean>;
+  abstract listUnstarted(input: {
+    createdBefore: Date;
+    limit: number;
+  }): Promise<UnstartedVolumeStorageMigrationRow[]>;
+  abstract abortUnstarted(
+    input: AbortVolumeStorageMigrationInput & { createdBefore: Date },
+  ): Promise<boolean>;
   abstract abort(input: AbortVolumeStorageMigrationInput): Promise<boolean>;
 }
 
@@ -73,7 +82,8 @@ export class VolumeStorageMigrationsRepository
       });
       await tx.MarkVolumeStorageMigrationPending`
         UPDATE nibrun.apps
-        SET volume_storage_migration_state = 'pending', volume_storage_migration_message = NULL
+        SET volume_storage_migration_state = 'pending', volume_storage_migration_message = NULL,
+            volume_storage_migration_started_at = NULL
         WHERE id = ${appId} AND owner_id = ${ownerId}
       `;
       return this.read({ tx, appId, ownerId });
@@ -84,14 +94,62 @@ export class VolumeStorageMigrationsRepository
     return this.read({ ...input, tx: this.sql });
   }
 
+  // A worker must win this transition before issuing any host-side work, including after a restart.
+  start({ appId, ownerId, configId }: MigrationAttempt): Promise<boolean> {
+    return this.sql.begin(async (tx) => {
+      const app = await lockApp({ tx, appId, ownerId });
+      if (
+        app?.volume_storage_migration_state !== 'pending' ||
+        app.volume_storage_migration_started_at !== null
+      ) {
+        return false;
+      }
+      const migration = await this.read({ tx, appId, ownerId });
+      if (migration?.config_id !== configId) {
+        return false;
+      }
+      await tx.StartVolumeStorageMigration`
+        UPDATE nibrun.apps
+        SET volume_storage_migration_started_at = now()
+        WHERE id = ${appId} AND owner_id = ${ownerId}
+      `;
+      return true;
+    });
+  }
+
+  listUnstarted({ createdBefore, limit }: { createdBefore: Date; limit: number }) {
+    return this.sql.SelectUnstartedVolumeStorageMigrations`
+      /* @notNull config_id */
+      SELECT a.id AS app_id, a.owner_id, c.id AS config_id
+      FROM nibrun.apps a
+      JOIN LATERAL (
+        SELECT c.id, c.created_at FROM nibrun.app_configs c
+        WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
+      ) c ON true
+      WHERE a.volume_storage_migration_state = 'pending'
+        AND a.volume_storage_migration_started_at IS NULL
+        AND a.state IN ('active', 'suspended') AND c.created_at < ${createdBefore}
+      ORDER BY c.id LIMIT ${limit}
+    `;
+  }
+
+  abortUnstarted(input: AbortVolumeStorageMigrationInput & { createdBefore: Date }) {
+    return this.restore({ ...input, unstartedBefore: input.createdBefore });
+  }
+
   // The caller must stop the destination writer and finish its cleanup before releasing the guard.
-  abort({
+  abort(input: AbortVolumeStorageMigrationInput): Promise<boolean> {
+    return this.restore({ ...input, unstartedBefore: undefined });
+  }
+
+  private restore({
     appId,
     ownerId,
     configId,
     state,
     message,
-  }: AbortVolumeStorageMigrationInput): Promise<boolean> {
+    unstartedBefore,
+  }: AbortVolumeStorageMigrationInput & { unstartedBefore: Date | undefined }): Promise<boolean> {
     return this.sql.begin(async (tx) => {
       const app = await lockApp({ tx, appId, ownerId });
       if (app?.volume_storage_migration_state !== 'pending') {
@@ -99,6 +157,13 @@ export class VolumeStorageMigrationsRepository
       }
       const migration = await this.read({ tx, appId, ownerId });
       if (migration?.config_id !== configId) {
+        return false;
+      }
+      if (
+        unstartedBefore !== undefined &&
+        (app.volume_storage_migration_started_at !== null ||
+          migration.created_at >= unstartedBefore)
+      ) {
         return false;
       }
       const source = await this.source({ tx, appId, ownerId });

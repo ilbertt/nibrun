@@ -34,6 +34,7 @@ import { ReleaseDigestRepository } from '#repositories/release-digest.repository
 import { RemoteSourceRepository } from '#repositories/remote-source.repository.ts';
 import { SqliteConnectionsRepository } from '#repositories/sqlite-connections.repository.ts';
 import { TrustedWorkflowsRepository } from '#repositories/trusted-workflows.repository.ts';
+import { VolumeStorageMigrationsRepository } from '#repositories/volume-storage-migrations.repository.ts';
 import { AgentService } from '#services/agent.service.ts';
 import { AppsService } from '#services/apps.service.ts';
 import { ArtifactsService } from '#services/artifacts.service.ts';
@@ -56,6 +57,7 @@ import { PaidRequestsService } from '#services/paid-requests.service.ts';
 import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
 import { TrustedWorkflowsService } from '#services/trusted-workflows.service.ts';
+import { VolumeStorageMigrationsService } from '#services/volume-storage-migrations.service.ts';
 
 // Read once, where every other piece of the environment is read: a key of the wrong length is a
 // deployment that fails to start rather than one that fails on the first secret written.
@@ -109,6 +111,11 @@ const githubActionsOidcRepository = new GitHubActionsOidcRepository();
 const githubDeploymentGrantsRepository = new GitHubDeploymentGrantsRepository(sql);
 const trustedWorkflowsRepository = new TrustedWorkflowsRepository(sql);
 const paidRequestsRepository = new PaidRequestsRepository(sql);
+const volumeStorageMigrationsRepository = new VolumeStorageMigrationsRepository(sql);
+
+const volumeStorageMigrationsService = new VolumeStorageMigrationsService(
+  volumeStorageMigrationsRepository,
+);
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
@@ -199,6 +206,7 @@ const agentService = new AgentService({
   artifactsService,
   importsService,
   hostnamesService,
+  volumeStorageMigrationsService,
 });
 const logsService = new LogsService({
   logsRepo: logsRepository,

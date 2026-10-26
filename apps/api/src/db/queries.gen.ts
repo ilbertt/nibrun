@@ -494,6 +494,8 @@ export interface ISelectAppForUpdateResult {
     state: IAppsColumns["state"];
     /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
     volume_storage_migration_state: IAppsColumns["volume_storage_migration_state"];
+    /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
+    volume_storage_migration_started_at: IAppsColumns["volume_storage_migration_started_at"];
 }
 
 /** Result of query `SelectProfileForAppCreate`. */
@@ -1150,6 +1152,17 @@ export interface ISoftDeleteTrustedWorkflowResult {
 export interface IMarkVolumeStorageMigrationPendingResult {
 }
 
+/** Result of query `StartVolumeStorageMigration`. */
+export interface IStartVolumeStorageMigrationResult {
+}
+
+/** Result of query `SelectUnstartedVolumeStorageMigrations`. */
+export interface ISelectUnstartedVolumeStorageMigrationsResult {
+    app_id: IAppsColumns["id"];
+    owner_id: IAppsColumns["owner_id"];
+    config_id: string;
+}
+
 /** Result of query `AbortVolumeStorageMigration`. */
 export interface IAbortVolumeStorageMigrationResult {
 }
@@ -1291,6 +1304,8 @@ export interface Queries {
     UpdateTrustedWorkflow: IUpdateTrustedWorkflowResult;
     SoftDeleteTrustedWorkflow: ISoftDeleteTrustedWorkflowResult;
     MarkVolumeStorageMigrationPending: IMarkVolumeStorageMigrationPendingResult;
+    StartVolumeStorageMigration: IStartVolumeStorageMigrationResult;
+    SelectUnstartedVolumeStorageMigrations: ISelectUnstartedVolumeStorageMigrationsResult;
     AbortVolumeStorageMigration: IAbortVolumeStorageMigrationResult;
     SelectVolumeStorageMigrationSource: ISelectVolumeStorageMigrationSourceResult;
     SelectVolumeStorageMigration: ISelectVolumeStorageMigrationResult;
@@ -1502,6 +1517,8 @@ export interface IAppsColumns {
     /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
     volume_storage_migration_state: import("#lib/api/volume-storage-migration.ts").VolumeStorageMigrationState | null;
     volume_storage_migration_message: string | null;
+    /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
+    volume_storage_migration_started_at: Date | null;
 }
 
 /** Schema of `apps`. */
@@ -2222,13 +2239,15 @@ export const schema = {
             data_initialized_at: { _columnName: "data_initialized_at", _foreignKeys: {} },
             name: { _columnName: "name", _foreignKeys: {} },
             volume_storage_migration_state: { _columnName: "volume_storage_migration_state", _foreignKeys: {} },
-            volume_storage_migration_message: { _columnName: "volume_storage_migration_message", _foreignKeys: {} }
+            volume_storage_migration_message: { _columnName: "volume_storage_migration_message", _foreignKeys: {} },
+            volume_storage_migration_started_at: { _columnName: "volume_storage_migration_started_at", _foreignKeys: {} }
         },
         _indexes: {
             apps_deleted_idx: { _indexName: "apps_deleted_idx" },
             apps_owner_id_idx: { _indexName: "apps_owner_id_idx" },
             apps_pkey: { _indexName: "apps_pkey" },
-            apps_slug_key: { _indexName: "apps_slug_key" }
+            apps_slug_key: { _indexName: "apps_slug_key" },
+            apps_unstarted_volume_storage_migrations_idx: { _indexName: "apps_unstarted_volume_storage_migrations_idx" }
         },
         _constraints: {
             apps_activation_check: { _constraintName: "apps_activation_check" },

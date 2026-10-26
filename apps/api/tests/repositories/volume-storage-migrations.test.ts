@@ -389,6 +389,93 @@ test('incomplete auth and empty destination credentials are rejected by the data
   }
 });
 
+test('an abandoned unstarted request is restored after repository restart and can be retried', async () => {
+  const appId = await createApp({ name: 'unstarted-recovery', deployed: true, configured: false });
+  const input = { appId, ownerId: OWNER_ID, destination: destination(ACCESS_KEY_AUTH) };
+  const migration = await repository().request(input);
+  const createdBefore = new Date(migration!.created_at.getTime() + 1);
+  const recovery = {
+    appId,
+    ownerId: OWNER_ID,
+    configId: migration!.config_id,
+    createdBefore,
+    state: 'failed' as const,
+    message: 'Never started.',
+  };
+  expect(await repository().listUnstarted({ createdBefore, limit: 100 })).toContainEqual({
+    app_id: appId,
+    owner_id: OWNER_ID,
+    config_id: migration!.config_id,
+  });
+  expect(await repository().abortUnstarted({ ...recovery, ownerId: OTHER_OWNER_ID })).toBe(false);
+  expect(await repository().abortUnstarted(recovery)).toBe(true);
+  expect(await repository().abortUnstarted(recovery)).toBe(false);
+  expect(await repository().findByApp({ appId, ownerId: OWNER_ID })).toMatchObject({
+    state: 'failed',
+    volume_storage_endpoint: null,
+  });
+  expect(await repository().start(recovery)).toBe(false);
+  const retry = await repository().request(input);
+  expect(retry!.config_id).not.toBe(migration!.config_id);
+  expect(await repository().abortUnstarted(recovery)).toBe(false);
+  expect(await repository().start(recovery)).toBe(false);
+  expect(await repository().start({ ...recovery, configId: retry!.config_id })).toBe(true);
+});
+
+test('timeout recovery leaves fresh requests and started work blocked', async () => {
+  const appId = await createApp({ name: 'started-recovery', deployed: true, configured: false });
+  const migration = await repository().request({
+    appId,
+    ownerId: OWNER_ID,
+    destination: destination(ACCESS_KEY_AUTH),
+  });
+  const attempt = { appId, ownerId: OWNER_ID, configId: migration!.config_id };
+  const recovery = { ...attempt, state: 'failed' as const, message: 'timeout' };
+  expect(
+    await repository().abortUnstarted({ ...recovery, createdBefore: migration!.created_at }),
+  ).toBe(false);
+  const createdBefore = new Date(migration!.created_at.getTime() + 1);
+  expect(await repository().start({ ...attempt, ownerId: OTHER_OWNER_ID })).toBe(false);
+  expect(await repository().start(attempt)).toBe(true);
+  expect(await repository().start(attempt)).toBe(false);
+  expect(await repository().listUnstarted({ createdBefore, limit: 100 })).not.toContainEqual({
+    app_id: appId,
+    owner_id: OWNER_ID,
+    config_id: migration!.config_id,
+  });
+  expect(await repository().abortUnstarted({ ...recovery, createdBefore })).toBe(false);
+  await expect(
+    new AppsRepository(withTypes<Queries>(sql)).update({
+      appId,
+      ownerId: OWNER_ID,
+      patch: { name: undefined, args: ['unsafe'] },
+    }),
+  ).rejects.toBeInstanceOf(ConflictError);
+});
+
+test('starting and timeout recovery serialize so recovered attempts cannot begin host work', async () => {
+  const appId = await createApp({ name: 'start-recovery-race', deployed: true, configured: false });
+  const migration = await repository().request({
+    appId,
+    ownerId: OWNER_ID,
+    destination: destination(ACCESS_KEY_AUTH),
+  });
+  const attempt = { appId, ownerId: OWNER_ID, configId: migration!.config_id };
+  const [started, recovered] = await Promise.all([
+    repository().start(attempt),
+    repository().abortUnstarted({
+      ...attempt,
+      createdBefore: new Date(migration!.created_at.getTime() + 1),
+      state: 'failed',
+      message: 'timeout',
+    }),
+  ]);
+  expect([started, recovered].filter(Boolean)).toHaveLength(1);
+  expect((await repository().findByApp({ appId, ownerId: OWNER_ID }))?.state).toBe(
+    recovered ? 'failed' : 'pending',
+  );
+});
+
 async function createApp({
   name,
   deployed,
