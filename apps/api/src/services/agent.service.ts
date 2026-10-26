@@ -19,6 +19,7 @@ import type { ExportsService } from '#services/exports.service.ts';
 import type { HostnamesService } from '#services/hostnames.service.ts';
 import type { ImportsService } from '#services/imports.service.ts';
 import { Service } from '#services/service.ts';
+import type { VolumeStorageMigrationsService } from '#services/volume-storage-migrations.service.ts';
 
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_HOUR = 60 * 60;
@@ -42,6 +43,10 @@ export class AgentService extends Service {
   private readonly artifactsService: UploadSweepServiceContract;
   private readonly importsService: ImportSweepServiceContract;
   private readonly hostnamesService: HostnameReconcileServiceContract;
+  private readonly volumeStorageMigrationsService: Pick<
+    VolumeStorageMigrationsService,
+    'sweepAbandoned'
+  >;
 
   constructor({
     agentRepo,
@@ -51,6 +56,7 @@ export class AgentService extends Service {
     artifactsService,
     importsService,
     hostnamesService,
+    volumeStorageMigrationsService,
   }: {
     agentRepo: AgentRepositoryContract;
     deploymentsService: DeploymentsService;
@@ -59,6 +65,7 @@ export class AgentService extends Service {
     artifactsService: UploadSweepServiceContract;
     importsService: ImportSweepServiceContract;
     hostnamesService: HostnameReconcileServiceContract;
+    volumeStorageMigrationsService: Pick<VolumeStorageMigrationsService, 'sweepAbandoned'>;
   }) {
     super();
     this.agentRepo = agentRepo;
@@ -68,6 +75,7 @@ export class AgentService extends Service {
     this.artifactsService = artifactsService;
     this.importsService = importsService;
     this.hostnamesService = hostnamesService;
+    this.volumeStorageMigrationsService = volumeStorageMigrationsService;
   }
 
   /**
@@ -164,5 +172,6 @@ export class AgentService extends Service {
     // The same clock, for the same reason: whether a custom hostname has been pointed at us is
     // decided in somebody else's DNS, so there is no moment to act on but a passing one.
     await this.hostnamesService.reconcile();
+    await this.volumeStorageMigrationsService.sweepAbandoned();
   }
 }

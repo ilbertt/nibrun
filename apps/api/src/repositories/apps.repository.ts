@@ -742,7 +742,7 @@ export async function lockApp({
   ownerId: OwnerId;
 }) {
   const [app] = await tx.SelectAppForUpdate`
-    SELECT a.id, a.state, a.volume_storage_migration_state
+    SELECT a.id, a.state, a.volume_storage_migration_state, a.volume_storage_migration_started_at
     FROM nibrun.apps a
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND a.state <> 'deleted'
     FOR UPDATE
