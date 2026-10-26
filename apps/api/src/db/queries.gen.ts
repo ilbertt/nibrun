@@ -496,6 +496,8 @@ export interface ISelectAppForUpdateResult {
     volume_storage_migration_state: IAppsColumns["volume_storage_migration_state"];
     /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
     volume_storage_migration_started_at: IAppsColumns["volume_storage_migration_started_at"];
+    /** The host that owns this started attempt; recovery must not accept another host's cleanup. */
+    volume_storage_migration_host_id: IAppsColumns["volume_storage_migration_host_id"];
 }
 
 /** Result of query `SelectProfileForAppCreate`. */
@@ -1191,6 +1193,10 @@ export interface ISelectVolumeStorageMigrationResult {
     state: NonNullable<IAppsColumns["volume_storage_migration_state"]>;
     message: IAppsColumns["volume_storage_migration_message"];
     updated_at: IAppsColumns["updated_at"];
+    /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
+    volume_storage_migration_started_at: IAppsColumns["volume_storage_migration_started_at"];
+    /** The host that owns this started attempt; recovery must not accept another host's cleanup. */
+    volume_storage_migration_host_id: IAppsColumns["volume_storage_migration_host_id"];
     config_id: IAppConfigsColumns["id"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
@@ -1519,6 +1525,8 @@ export interface IAppsColumns {
     volume_storage_migration_message: string | null;
     /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
     volume_storage_migration_started_at: Date | null;
+    /** The host that owns this started attempt; recovery must not accept another host's cleanup. */
+    volume_storage_migration_host_id: import("@repo/protocol").HostId | null;
 }
 
 /** Schema of `apps`. */
@@ -2240,7 +2248,8 @@ export const schema = {
             name: { _columnName: "name", _foreignKeys: {} },
             volume_storage_migration_state: { _columnName: "volume_storage_migration_state", _foreignKeys: {} },
             volume_storage_migration_message: { _columnName: "volume_storage_migration_message", _foreignKeys: {} },
-            volume_storage_migration_started_at: { _columnName: "volume_storage_migration_started_at", _foreignKeys: {} }
+            volume_storage_migration_started_at: { _columnName: "volume_storage_migration_started_at", _foreignKeys: {} },
+            volume_storage_migration_host_id: { _columnName: "volume_storage_migration_host_id", _foreignKeys: {} }
         },
         _indexes: {
             apps_deleted_idx: { _indexName: "apps_deleted_idx" },
@@ -2256,6 +2265,7 @@ export const schema = {
             apps_pkey: { _constraintName: "apps_pkey" },
             apps_slug_key: { _constraintName: "apps_slug_key" },
             apps_state_check: { _constraintName: "apps_state_check" },
+            apps_volume_storage_migration_host_check: { _constraintName: "apps_volume_storage_migration_host_check" },
             apps_volume_storage_migration_state_check: { _constraintName: "apps_volume_storage_migration_state_check" }
         }
     },
