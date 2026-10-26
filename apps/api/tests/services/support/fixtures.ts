@@ -8,6 +8,7 @@ import {
   DEFAULT_HTTP_PORT,
   DEFAULT_RESTART_POLICY,
 } from '#lib/app-config-defaults.ts';
+import type { VolumeStorageMetadataColumns } from '#lib/volume-storage.ts';
 import type {
   DeploymentByIdInput,
   DeploymentLookupRepositoryContract,
@@ -57,8 +58,15 @@ export const DEFAULT_CONFIG: PublicAppConfig = {
 export const DEFAULT_STORED_CONFIG: StoredAppConfig = { ...DEFAULT_CONFIG, environment: {} };
 
 /** The inverse of `toAppConfig`: the `app_configs` columns a row carries for this config. */
-export function configColumns(config: StoredAppConfig | PublicAppConfig): AppConfigColumns {
+export function configColumns(
+  config: StoredAppConfig | PublicAppConfig,
+): AppConfigColumns & VolumeStorageMetadataColumns {
   return {
+    volume_storage_endpoint: null,
+    volume_storage_bucket: null,
+    volume_storage_prefix: null,
+    volume_storage_region: null,
+    volume_storage_auth_kind: null,
     environment_names: Object.keys(config.environment),
     http_port: config.httpPort,
     has_extra_public_port: config.hasExtraPublicPort,

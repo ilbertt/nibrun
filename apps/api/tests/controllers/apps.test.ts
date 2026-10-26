@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { StatusMap } from 'elysia';
 import { ORIGIN, type Route, routesUnder, sendJson } from '#tests/controllers/support/api.ts';
+import { volumeStorageInput, volumeStorageInputs } from '#tests/support/volume-storage.ts';
 
 const APPS_URL = `${ORIGIN}/api/apps`;
 const APP_URL = `${APPS_URL}/app-1`;
@@ -243,3 +244,53 @@ describe('a malformed request is a bad request', () => {
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
 });
+
+test.each(volumeStorageInputs())(
+  'creation accepts $auth.kind storage and reaches authentication',
+  async (volumeStorage) => {
+    const response = await sendJson({
+      method: 'POST',
+      url: APPS_URL,
+      body: { name: 'storage-app', config: { volumeStorage } },
+    });
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  },
+);
+
+test.each([
+  { prefix: 'someone-elses-prefix/' },
+  { endpoint: 'http://objects.example.test' },
+  { bucket: '' },
+  { region: '' },
+  { encryptionPassword: '' },
+  { auth: { kind: 'session', sessionToken: 'session-token-private' } },
+  { auth: { kind: 'anonymous', secretAccessKey: 'access-secret-private' } },
+])(
+  'creation rejects malformed or client-selected storage without exposing secrets: %j',
+  async (invalid) => {
+    const volumeStorage = { ...volumeStorageInput(), ...invalid };
+    const response = await sendJson({
+      method: 'POST',
+      url: APPS_URL,
+      body: { name: 'storage-app', config: { volumeStorage } },
+    });
+    expect(response.status).toBe(StatusMap['Bad Request']);
+    const text = await response.text();
+    for (const secret of [
+      'filesystem-password-private',
+      'access-secret-private',
+      'session-token-private',
+    ]) {
+      expect(text).not.toContain(secret);
+    }
+  },
+);
+
+test.each([null, volumeStorageInput()])(
+  'patching storage is refused: %j',
+  async (volumeStorage) => {
+    expect(
+      (await sendJson({ method: 'PATCH', url: APP_URL, body: { volumeStorage } })).status,
+    ).toBe(StatusMap['Bad Request']);
+  },
+);

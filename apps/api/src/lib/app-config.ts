@@ -2,6 +2,7 @@ import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api
 import type { AppConfig, SecretString, TenantEnvironment } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { TenantEnvironmentPatch } from '#lib/api/environment.ts';
+import type { CreateVolumeStorage } from '#lib/api/volume-storage.ts';
 import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
@@ -9,6 +10,7 @@ import {
 } from '#lib/app-config-defaults.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
+import type { SealedVolumeStorage } from '#lib/volume-storage.ts';
 
 // An owner reads which variables are set, never what they hold: the values are sealed in the
 // database and only opened where desired state is built, so there is nothing here to return.
@@ -27,6 +29,7 @@ type OwnedAppConfig = Pick<AppConfig, 'httpPort' | 'hasExtraPublicPort' | 'args'
 // What an app is created with: the whole environment, because there is not yet one to edit.
 export type NewAppConfig = Partial<OwnedAppConfig> & {
   environment?: TenantEnvironment | undefined;
+  volumeStorage?: CreateVolumeStorage;
 };
 
 // `environment` is an edit, where `args` is always the whole list: a deploy states its arguments
@@ -38,6 +41,7 @@ export type AppConfigPatch = Partial<OwnedAppConfig> & {
 
 export type StoredAppConfig = Omit<PublicAppConfig, 'environment'> & {
   environment: SealedEnvironment;
+  volumeStorage?: SealedVolumeStorage;
 };
 
 /**

@@ -210,11 +210,6 @@ export interface IInsertAppResult {
     id: IAppsColumns["id"];
 }
 
-/** Result of query `InsertAppConfig`. */
-export interface IInsertAppConfigResult {
-    id: IAppConfigsColumns["id"];
-}
-
 /** Result of query `InsertAppHostname`. */
 export interface IInsertAppHostnameResult {
     hostname: IAppHostnamesColumns["hostname"];
@@ -259,6 +254,11 @@ export interface ISelectCreatedAppResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
@@ -308,6 +308,11 @@ export interface ISelectAppsByOwnerResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
@@ -357,6 +362,11 @@ export interface ISelectAppByIdResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
@@ -453,6 +463,11 @@ export interface IDeleteArtifactsByAppResult {
 export interface IDeleteAppUsageByAppResult {
 }
 
+/** Result of query `InsertAppConfig`. */
+export interface IInsertAppConfigResult {
+    id: IAppConfigsColumns["id"];
+}
+
 /** Result of query `SelectCurrentAppConfig`. */
 export interface ISelectCurrentAppConfigResult {
     id: IAppConfigsColumns["id"];
@@ -539,6 +554,11 @@ export interface ISelectAppAsChangedResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
     volume_total_bytes: IAppUsageColumns["volume_total_bytes"];
     /** A Postgres bigint, so it arrives as a string; the wire type is a number. */
@@ -1161,7 +1181,6 @@ export interface Queries {
     SelectAppOwnership: ISelectAppOwnershipResult;
     SelectAppsAllowed: ISelectAppsAllowedResult;
     InsertApp: IInsertAppResult;
-    InsertAppConfig: IInsertAppConfigResult;
     InsertAppHostname: IInsertAppHostnameResult;
     SelectCreatedApp: ISelectCreatedAppResult;
     SelectAppsByOwner: ISelectAppsByOwnerResult;
@@ -1182,6 +1201,7 @@ export interface Queries {
     DeleteImportsByApp: IDeleteImportsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
+    InsertAppConfig: IInsertAppConfigResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
     SelectProfileForAppCreate: ISelectProfileForAppCreateResult;

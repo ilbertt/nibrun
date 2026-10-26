@@ -13,6 +13,7 @@ import type { DnsLabel } from '#lib/api/dns-label.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
+import { volumeStoragePrefix } from '#lib/volume-storage.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
@@ -177,37 +178,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('Inserting into nibrun.apps returned no row.');
       }
 
-      const [insertedConfig] = await tx.InsertAppConfig`
-        INSERT INTO nibrun.app_configs (
-          app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
-          health_check_path, health_check_interval_ms, health_check_timeout_ms,
-          health_check_grace_period_ms, health_check_healthy_threshold,
-          health_check_unhealthy_threshold,
-          restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-          restart_backoff_factor, restart_reset_after_ms
-        )
-        VALUES (
-          ${inserted.id}, ${config.httpPort}, ${config.hasExtraPublicPort},
-          ${tx.array(config.args, TEXT_ARRAY)},
-          ${config.resources.vcpuCount}, ${config.resources.memoryMib},
-          ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
-          ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
-          ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
-          ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
-          ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
-          ${config.restartPolicy.resetAfterMs}
-        )
-        RETURNING id
-      `;
-      if (!insertedConfig) {
-        throw new Error('Inserting into nibrun.app_configs returned no row.');
-      }
-
-      await insertEnvironment({
-        tx,
-        configId: insertedConfig.id,
-        environment: config.environment,
-      });
+      await insertInitialConfig({ tx, appId: inserted.id, ownerId, config });
 
       // Active on insert: the wildcard record and the wildcard certificate already cover this
       // name, so there is nothing for it to wait for. Only a brought domain has to be proved.
@@ -230,6 +201,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+               s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
+               s.volume_storage_region, s.volume_storage_auth_kind,
                u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
                u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
                d.expires_at
@@ -238,6 +211,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           SELECT * FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
+        JOIN nibrun.app_configs s ON s.id = c.id
         LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
         LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
         WHERE a.id = ${inserted.id} AND a.owner_id = ${ownerId}
@@ -261,6 +235,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
+             s.volume_storage_region, s.volume_storage_auth_kind,
              u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
              u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
              d.expires_at
@@ -269,6 +245,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
+      JOIN nibrun.app_configs s ON s.id = c.id
       LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
       LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
       WHERE a.owner_id = ${ownerId}
@@ -417,6 +394,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
+             s.volume_storage_region, s.volume_storage_auth_kind,
              u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
              u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
              d.expires_at
@@ -425,6 +404,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
+      JOIN nibrun.app_configs s ON s.id = c.id
       LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
       LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
@@ -642,6 +622,62 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   }
 }
 
+async function insertInitialConfig({
+  tx,
+  appId,
+  ownerId,
+  config,
+}: OwnedApp & {
+  tx: TypedSQL<Queries>;
+  config: StoredAppConfig;
+}): Promise<void> {
+  const [insertedConfig] = await tx.InsertAppConfig`
+    INSERT INTO nibrun.app_configs (
+      app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
+      health_check_path, health_check_interval_ms, health_check_timeout_ms,
+      health_check_grace_period_ms, health_check_healthy_threshold,
+      health_check_unhealthy_threshold,
+      restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
+      restart_backoff_factor, restart_reset_after_ms,
+      volume_storage_endpoint, volume_storage_bucket, volume_storage_prefix,
+      volume_storage_region, volume_storage_auth_kind, volume_storage_access_key_id,
+      volume_storage_secret_access_key, volume_storage_session_token,
+      volume_storage_encryption_password
+    )
+    SELECT
+      a.id, ${config.httpPort}, ${config.hasExtraPublicPort},
+      ${tx.array(config.args, TEXT_ARRAY)},
+      ${config.resources.vcpuCount}, ${config.resources.memoryMib},
+      ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
+      ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
+      ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
+      ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
+      ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
+      ${config.restartPolicy.resetAfterMs},
+      ${config.volumeStorage?.volume_storage_endpoint ?? null},
+      ${config.volumeStorage?.volume_storage_bucket ?? null},
+      ${config.volumeStorage === undefined ? null : volumeStoragePrefix(appId)},
+      ${config.volumeStorage?.volume_storage_region ?? null},
+      ${config.volumeStorage?.volume_storage_auth_kind ?? null},
+      ${config.volumeStorage?.volume_storage_access_key_id ?? null},
+      ${config.volumeStorage?.volume_storage_secret_access_key ?? null},
+      ${config.volumeStorage?.volume_storage_session_token ?? null},
+      ${config.volumeStorage?.volume_storage_encryption_password ?? null}
+    FROM nibrun.apps a
+    WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+    RETURNING id
+  `;
+  if (!insertedConfig) {
+    throw new Error('Inserting into nibrun.app_configs returned no row.');
+  }
+
+  await insertEnvironment({
+    tx,
+    configId: insertedConfig.id,
+    environment: config.environment,
+  });
+}
+
 /**
  * A patch appends a version rather than editing one, and the newest version is the live one, so
  * the write is a single INSERT — under the row lock `update` holds, which is what keeps two of
@@ -822,6 +858,8 @@ async function appAsChanged({
            c.health_check_unhealthy_threshold,
            c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
            c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+           s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
+           s.volume_storage_region, s.volume_storage_auth_kind,
            u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
            u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
            d.expires_at
@@ -830,6 +868,7 @@ async function appAsChanged({
       SELECT * FROM nibrun.app_configs_with_environment c
       WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
     ) c ON true
+    JOIN nibrun.app_configs s ON s.id = c.id
     LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
     LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId}

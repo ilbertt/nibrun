@@ -68,6 +68,7 @@ import {
 } from '#tests/services/support/fixtures.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
+import { volumeStorageInputs } from '#tests/support/volume-storage.ts';
 
 const MINTED_AT = new Date('2026-09-01T09:14:12.784Z');
 const SECRET = 'sk-not-in-any-response';
@@ -217,7 +218,19 @@ class StubAppsRepository implements AppsRepositoryContract {
     this.held++;
     return Promise.resolve({
       outcome: 'created',
-      app: { ...appRow(slug), ...configColumns(config) },
+      app: {
+        ...appRow(slug),
+        ...configColumns(config),
+        ...(config.volumeStorage === undefined
+          ? {}
+          : {
+              volume_storage_endpoint: config.volumeStorage.volume_storage_endpoint,
+              volume_storage_bucket: config.volumeStorage.volume_storage_bucket,
+              volume_storage_prefix: 'apps/app-1/',
+              volume_storage_region: config.volumeStorage.volume_storage_region,
+              volume_storage_auth_kind: config.volumeStorage.volume_storage_auth_kind,
+            }),
+      },
       hostnames: [
         {
           hostname,
@@ -1697,3 +1710,45 @@ describe('an owner at their limit is told so rather than retried', () => {
     await expect(createApp({ appsRepo })).rejects.toThrow('cannot create apps');
   });
 });
+
+test.each(volumeStorageInputs())(
+  'app creation seals $auth.kind storage secrets and returns only metadata',
+  async (storage) => {
+    const appsRepo = new StubAppsRepository({ failures: 0 });
+    const app = await createApp({ appsRepo, config: { volumeStorage: storage } });
+    const stored = appsRepo.offeredConfigs[0]?.volumeStorage;
+    if (!stored) {
+      throw new Error('The repository was not given the storage configuration');
+    }
+    expect(stored.volume_storage_endpoint).toBe(storage.endpoint);
+    expect(stored.volume_storage_encryption_password).not.toBe(storage.encryptionPassword);
+    expect(
+      openSecret({ key: TEST_SECRETS_KEY, sealed: stored.volume_storage_encryption_password! }),
+    ).toBe(storage.encryptionPassword);
+    if (storage.auth.kind === 'anonymous') {
+      expect(stored.volume_storage_secret_access_key).toBeNull();
+    } else {
+      expect(stored.volume_storage_secret_access_key).not.toBe(storage.auth.secretAccessKey);
+      expect(
+        openSecret({ key: TEST_SECRETS_KEY, sealed: stored.volume_storage_secret_access_key! }),
+      ).toBe(storage.auth.secretAccessKey);
+    }
+    if (storage.auth.kind === 'session') {
+      expect(
+        openSecret({ key: TEST_SECRETS_KEY, sealed: stored.volume_storage_session_token! }),
+      ).toBe(storage.auth.sessionToken);
+    } else {
+      expect(stored.volume_storage_session_token).toBeNull();
+    }
+    const { auth, encryptionPassword, ...target } = storage;
+    expect(app.config.volumeStorage).toEqual({
+      ...target,
+      prefix: objectKey('apps/app-1/'),
+      auth: { kind: auth.kind },
+    });
+    const response = JSON.stringify(app);
+    for (const secret of [encryptionPassword, 'access-secret-private', 'session-token-private']) {
+      expect(response).not.toContain(secret);
+    }
+  },
+);

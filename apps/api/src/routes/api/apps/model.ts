@@ -10,6 +10,7 @@ import {
 import { t } from 'elysia';
 import { AppHostnameStateSchema, AppNameSchema, AppSchema, MIN_HOSTNAMES } from '#lib/api/app.ts';
 import { TenantEnvironmentPatchSchema } from '#lib/api/environment.ts';
+import { CreateVolumeStorageSchema, VolumeStorageMetadataSchema } from '#lib/api/volume-storage.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 
 // Which variables are set, never what they hold: the values are sealed in the database and only
@@ -50,7 +51,10 @@ export const AppPatchSchema = t.Partial(
 // An app being created has nothing to leave alone and nothing to remove, so what it is given is
 // the whole environment rather than an edit to one.
 const NewAppConfigSchema = t.Partial(
-  t.Composite([OwnedAppConfigSchema, t.Object({ environment: TenantEnvironmentSchema })]),
+  t.Composite([
+    OwnedAppConfigSchema,
+    t.Object({ environment: TenantEnvironmentSchema, volumeStorage: CreateVolumeStorageSchema }),
+  ]),
   { additionalProperties: false },
 );
 
@@ -87,7 +91,10 @@ export const AppHostnameResponseSchema = t.Composite([
 export const AppResponseSchema = t.Composite([
   t.Omit(AppSchema, ['config', 'hostnames']),
   t.Object({
-    config: PublicAppConfigSchema,
+    config: t.Composite([
+      PublicAppConfigSchema,
+      t.Object({ volumeStorage: t.Optional(VolumeStorageMetadataSchema) }),
+    ]),
     hostnames: t.Array(AppHostnameResponseSchema, { minItems: MIN_HOSTNAMES }),
     volumeUsage: t.Nullable(FilesystemUsageSchema),
     computeUsage: t.Nullable(ComputeUsageSchema),
