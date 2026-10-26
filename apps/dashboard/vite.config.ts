@@ -1,6 +1,7 @@
 import { DASHBOARD_SITE, PRODUCT_NAME } from '@repo/global-constants';
 import tailwindcss from '@tailwindcss/vite';
 import { devtools } from '@tanstack/devtools-vite';
+import { redact } from '@tanstack/redact/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import viteReact from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
@@ -33,6 +34,7 @@ const config = defineConfig({
     tailwindcss(),
     tanstackRouter({ target: 'react', autoCodeSplitting: true }),
     viteReact(),
+    redact(),
   ],
 });
 
