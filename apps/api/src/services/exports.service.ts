@@ -58,8 +58,8 @@ export class ExportsService extends Service {
     const row = await this.exportsRepo.request({ appId, ownerId, expiresAt });
     if (!row) {
       // Two ways to write nothing, and they are not the same answer. Ownership is asked only
-      // once the insert has already declined, so the ordinary path costs one statement and a
-      // stranger still cannot tell a missing app from one that is not theirs.
+      // once the insert has already declined, so a stranger still cannot tell a missing app
+      // from one that is not theirs.
       if (await this.appsRepo.isOwnedBy({ appId, ownerId })) {
         throw new ConflictError(NOTHING_TO_EXPORT);
       }

@@ -1150,6 +1150,11 @@ export interface ISoftDeleteTrustedWorkflowResult {
     id: IGithubTrustedDeploymentWorkflowsColumns["id"];
 }
 
+/** Result of query `SelectExportBlockingVolumeStorageMigration`. */
+export interface ISelectExportBlockingVolumeStorageMigrationResult {
+    id: IExportsColumns["id"];
+}
+
 /** Result of query `MarkVolumeStorageMigrationPending`. */
 export interface IMarkVolumeStorageMigrationPendingResult {
 }
@@ -1309,6 +1314,7 @@ export interface Queries {
     InsertTrustedWorkflow: IInsertTrustedWorkflowResult;
     UpdateTrustedWorkflow: IUpdateTrustedWorkflowResult;
     SoftDeleteTrustedWorkflow: ISoftDeleteTrustedWorkflowResult;
+    SelectExportBlockingVolumeStorageMigration: ISelectExportBlockingVolumeStorageMigrationResult;
     MarkVolumeStorageMigrationPending: IMarkVolumeStorageMigrationPendingResult;
     StartVolumeStorageMigration: IStartVolumeStorageMigrationResult;
     SelectUnstartedVolumeStorageMigrations: ISelectUnstartedVolumeStorageMigrationsResult;

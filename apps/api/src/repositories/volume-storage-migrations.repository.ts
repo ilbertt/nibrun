@@ -4,6 +4,7 @@ import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import type { VolumeStorageMigrationState } from '#lib/api/volume-storage-migration.ts';
+import { ConflictError } from '#lib/errors.ts';
 import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
 import { appendConfigVersion, lockApp } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
@@ -70,6 +71,17 @@ export class VolumeStorageMigrationsRepository
       const source = await this.source({ tx, appId, ownerId });
       if (!source || source.volume_storage_endpoint !== null) {
         return null;
+      }
+      const [inFlightExport] = await tx.SelectExportBlockingVolumeStorageMigration`
+        SELECT e.id
+        FROM nibrun.exports e
+        JOIN nibrun.apps a ON a.id = e.app_id
+        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+          AND e.state IN ('pending', 'preparing')
+        LIMIT 1
+      `;
+      if (inFlightExport) {
+        throw new ConflictError('Cannot migrate app storage while an export is in progress.');
       }
       await appendConfigVersion({
         tx,

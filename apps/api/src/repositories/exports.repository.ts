@@ -1,6 +1,7 @@
 import type { AppId, CheckpointId, ExportId, ExportState } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
+import { lockAppForMutation } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type ExportRow = Queries['SelectExportById'];
@@ -57,18 +58,21 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
   async request({ appId, ownerId, expiresAt }: RequestExportInput): Promise<ExportRow | null> {
     // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one the
     // row is written through rather than one checked beside it.
-    const [inserted] = await this.sql.InsertExport`
-      INSERT INTO nibrun.exports (app_id, artifact_id, config_id, expires_at)
-      SELECT a.id, d.artifact_id, d.config_id, ${expiresAt}
-      FROM nibrun.live_apps a
-      JOIN LATERAL (
-        SELECT artifact_id, config_id FROM nibrun.deployments d
-        WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
-      ) d ON true
-      WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      ON CONFLICT (app_id) WHERE state IN ('pending', 'preparing') DO NOTHING
-      RETURNING id
-    `;
+    const [inserted] = await this.sql.begin(async (tx) => {
+      await lockAppForMutation({ tx, appId, ownerId });
+      return tx.InsertExport`
+        INSERT INTO nibrun.exports (app_id, artifact_id, config_id, expires_at)
+        SELECT a.id, d.artifact_id, d.config_id, ${expiresAt}
+        FROM nibrun.live_apps a
+        JOIN LATERAL (
+          SELECT artifact_id, config_id FROM nibrun.deployments d
+          WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
+        ) d ON true
+        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+        ON CONFLICT (app_id) WHERE state IN ('pending', 'preparing') DO NOTHING
+        RETURNING id
+      `;
+    });
     if (inserted) {
       return this.findById({ appId, exportId: inserted.id, ownerId });
     }
