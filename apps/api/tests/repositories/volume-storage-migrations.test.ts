@@ -16,6 +16,7 @@ import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { ExportsRepository } from '#repositories/exports.repository.ts';
 import {
   type VolumeStorageMigrationDestination,
   VolumeStorageMigrationsRepository,
@@ -24,6 +25,7 @@ import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts'
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
+const EXPORT_RETENTION_MS = 86_400_000;
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'migration-owner');
 const OTHER_OWNER_ID = Value.Parse(OwnerIdSchema, 'migration-other');
 const HOST_ID = Value.Parse(HostIdSchema, 'migration-host');
@@ -541,6 +543,100 @@ test('started recovery requires the owning host and attempt, including after a r
   expect(await repository().start({ ...attempt, configId: retry!.config_id, hostId })).toBe(true);
   expect(await repository().abortStarted({ ...recovery, hostId })).toBe(false);
   expect((await repository().findByApp({ appId, ownerId: OWNER_ID }))?.state).toBe('pending');
+});
+
+test.each(['pending', 'preparing', 'ready', 'failed'] as const)(
+  'migration admission coordinates with an existing %s export',
+  async (state) => {
+    const appId = await createApp({ name: `export-${state}`, deployed: true, configured: false });
+    const exports = new ExportsRepository(withTypes<Queries>(sql));
+    const bundle = await exports.request({
+      appId,
+      ownerId: OWNER_ID,
+      expiresAt: new Date(Date.now() + EXPORT_RETENTION_MS),
+    });
+    await exports.applyReport({
+      reported: [
+        {
+          exportId: bundle!.id,
+          state,
+          checkpointId: null,
+          sizeBytes: null,
+          readyAt: null,
+          message: null,
+        },
+      ],
+    });
+    const request = { appId, ownerId: OWNER_ID, destination: destination(ACCESS_KEY_AUTH) };
+    if (state === 'pending' || state === 'preparing') {
+      await expect(repository().request(request)).rejects.toBeInstanceOf(ConflictError);
+      expect(await repository().findByApp({ appId, ownerId: OWNER_ID })).toBeNull();
+      return;
+    }
+    expect(await repository().request(request)).toMatchObject({ state: 'pending' });
+  },
+);
+
+test('exports are blocked until a queued migration is cancelled without exposing it to another owner', async () => {
+  const appId = await createApp({
+    name: 'migration-export-guard',
+    deployed: true,
+    configured: false,
+  });
+  const migration = await repository().request({
+    appId,
+    ownerId: OWNER_ID,
+    destination: destination(ACCESS_KEY_AUTH),
+  });
+  const exports = new ExportsRepository(withTypes<Queries>(sql));
+  const request = {
+    appId,
+    ownerId: OWNER_ID,
+    expiresAt: new Date(Date.now() + EXPORT_RETENTION_MS),
+  };
+  await expect(exports.request(request)).rejects.toBeInstanceOf(ConflictError);
+  expect(await exports.request({ ...request, ownerId: OTHER_OWNER_ID })).toBeNull();
+  expect(await exports.listByApp({ appId, ownerId: OWNER_ID })).toEqual([]);
+  expect(
+    await repository().abort({
+      appId,
+      ownerId: OWNER_ID,
+      configId: migration!.config_id,
+      state: 'cancelled',
+      message: null,
+    }),
+  ).toBe(true);
+  const bundle = await exports.request(request);
+  expect(bundle).not.toBeNull();
+  expect(await exports.request(request)).toEqual(bundle);
+});
+
+test('concurrent export and migration requests admit exactly one operation', async () => {
+  const appId = await createApp({
+    name: 'migration-export-race',
+    deployed: true,
+    configured: false,
+  });
+  const exports = new ExportsRepository(withTypes<Queries>(sql));
+  const results = await Promise.allSettled([
+    exports.request({
+      appId,
+      ownerId: OWNER_ID,
+      expiresAt: new Date(Date.now() + EXPORT_RETENTION_MS),
+    }),
+    repository().request({ appId, ownerId: OWNER_ID, destination: destination(ACCESS_KEY_AUTH) }),
+  ]);
+  expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      expect(result.reason).toBeInstanceOf(ConflictError);
+    } else {
+      expect(result.value).not.toBeNull();
+    }
+  }
+  expect((await desiredVolumes()).find((volume) => volume.appId === appId)).not.toHaveProperty(
+    'storage',
+  );
 });
 
 test('legacy started attempts without a known host cannot be released by a guessed cleanup', async () => {
