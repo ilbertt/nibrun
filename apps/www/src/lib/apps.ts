@@ -1,6 +1,5 @@
 import { DEPLOY_PRESETS, type DeployPreset, type DeploySlug } from '@repo/deploy-link';
 import { WWW_DEPLOY_PATH } from '@repo/global-constants';
-import { renderMarkdown } from '#lib/markdown.ts';
 
 export type CatalogApp = DeployPreset & { slug: DeploySlug };
 
@@ -36,10 +35,6 @@ export function appMarkdownPath(app: CatalogApp): string {
 
 export function appDeployPath(app: CatalogApp): string {
   return `${WWW_DEPLOY_PATH}/${app.slug}`;
-}
-
-export function renderApp(app: CatalogApp): string {
-  return renderMarkdown(app.markdownContent);
 }
 
 export function projectLink(app: CatalogApp): {

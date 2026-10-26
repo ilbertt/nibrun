@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CodeCopyButton } from '#components/code-copy-button.tsx';
-import { type CatalogApp, renderApp } from '#lib/apps.ts';
+import type { CatalogApp } from '#lib/apps.ts';
+import { renderMarkdown } from '#lib/markdown.ts';
 
 type CodeBlock = { key: string; slot: Element; code: string };
 
@@ -14,7 +15,7 @@ export function AppBody({ app }: { app: CatalogApp }) {
   // Stable across renders, and not only to save the parse: React compares this prop by object
   // identity, so a fresh one re-runs `innerHTML =` and replaces the very slots the portals below
   // are pointed at — leaving the buttons mounted in nodes no longer on the page.
-  const content = useMemo(() => ({ __html: renderApp(app) }), [app]);
+  const content = useMemo(() => ({ __html: renderMarkdown(app.markdownContent) }), [app]);
   const body = useRef<HTMLDivElement>(null);
   const [blocks, setBlocks] = useState<CodeBlock[]>([]);
 

@@ -35,6 +35,28 @@ export function pageHead({
         ];
 
   return {
+    scripts:
+      publishedAt === undefined
+        ? []
+        : [
+            {
+              type: 'application/ld+json',
+              children: JSON.stringify({
+                '@context': 'https://schema.org',
+                '@type': 'BlogPosting',
+                headline: title,
+                description,
+                datePublished: publishedAt,
+                mainEntityOfPage: url,
+                image: image === undefined ? WWW_SITE.ogImage.url : `${WWW_SITE.url}${image}`,
+                publisher: {
+                  '@type': 'Organization',
+                  name: PRODUCT_NAME,
+                  url: WWW_SITE.url,
+                },
+              }).replace(/</g, '\\u003c'),
+            },
+          ],
     meta: [
       { title },
       { name: 'description', content: description },

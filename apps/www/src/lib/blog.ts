@@ -1,4 +1,4 @@
-import { frontmatterOf, renderMarkdown, slugOf } from '#lib/markdown.ts';
+import { frontmatterOf, slugOf } from '#lib/frontmatter.ts';
 
 export type BlogPost = {
   slug: string;
@@ -32,10 +32,6 @@ export const POSTS: readonly BlogPost[] = Object.entries(SOURCES)
 
 export function findPost(slug: string): BlogPost | undefined {
   return POSTS.find((post) => post.slug === slug);
-}
-
-export function renderPost(post: BlogPost): string {
-  return renderMarkdown(post.markdown);
 }
 
 export function postMarkdownPath(post: BlogPost): string {
