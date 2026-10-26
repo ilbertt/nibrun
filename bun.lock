@@ -367,6 +367,7 @@
     },
   },
   "patchedDependencies": {
+    "@tanstack/redact@0.2.0": "patches/@tanstack%2Fredact@0.2.0.patch",
     "@libredb/studio@0.18.0": "packages/sqlite-explorer/patches/@libredb%2Fstudio@0.18.0.patch",
   },
   "catalog": {
