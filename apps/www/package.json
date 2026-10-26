@@ -38,6 +38,7 @@
     "@repo/typescript-config": "workspace:*",
     "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "catalog:",
+    "@tanstack/redact": "catalog:",
     "@tanstack/router-plugin": "catalog:",
     "@types/node": "^26.4.1",
     "@types/react": "catalog:",
