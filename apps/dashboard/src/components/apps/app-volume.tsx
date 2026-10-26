@@ -1,5 +1,6 @@
 import { Button } from '@repo/ui/components/button';
 import { PaidBucketRequestDialog } from '#components/apps/paid-bucket-request-dialog.tsx';
+import { BucketIcon } from '#icons/bucket-icon.tsx';
 
 export function AppVolume() {
   return (
@@ -8,7 +9,8 @@ export function AppVolume() {
       <PaidBucketRequestDialog
         trigger={
           <Button variant="outline" size="xs">
-            Use your S3 bucket
+            <BucketIcon data-icon="inline-start" />
+            Use your bucket
           </Button>
         }
       />
