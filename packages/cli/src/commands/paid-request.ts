@@ -1,6 +1,7 @@
 import { defineCommand } from '@parshjs/core';
 import { unwrap } from '@repo/api-client/unwrap';
 import { MAX_PAID_APPS_REQUEST, MIN_PAID_APPS_REQUEST } from '@repo/api-constants';
+import { SHARED_OPTIONS } from '#config.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { createOutput } from '#lib/output.ts';
 import {
@@ -22,6 +23,11 @@ export const command = defineCommand('paid-request', {
       schema: REQUESTED_APPS_AMOUNT_SCHEMA.optional(),
       description: `Total apps you need (${MIN_PAID_APPS_REQUEST}–${MAX_PAID_APPS_REQUEST}). Only for --type apps; asked when omitted in a terminal.`,
     },
+    [SHARED_OPTIONS.app.name]: {
+      ...SHARED_OPTIONS.app.option,
+      description:
+        'App name or slug. Only for --type custom-bucket; asked for when omitted in a terminal.',
+    },
   },
   beforeHandler: function signedIn({ context }) {
     return requireSignedIn(context);
@@ -32,7 +38,11 @@ export const command = defineCommand('paid-request', {
       print,
       json: rootOptions.json,
     });
-    const { requestType, ...body } = await completePaidRequest({ options, interactive });
+    const { requestType, ...body } = await completePaidRequest({
+      options,
+      interactive,
+      api: context.api,
+    });
     const saved = unwrap(await context.api.api['paid-requests']({ requestType }).put(body));
     if (saved.requestType !== requestType) {
       throw new Error('The API returned a different paid request type.');
