@@ -1,6 +1,7 @@
 import { unwrap } from '@repo/api-client/unwrap';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '#lib/api.ts';
+import { useAppId } from '#lib/hooks/use-app-id.ts';
 
 type PaidBucketRequestForm = {
   submit: () => void;
@@ -10,9 +11,12 @@ type PaidBucketRequestForm = {
 };
 
 export function usePaidBucketRequest(): PaidBucketRequestForm {
+  const appId = useAppId();
   const save = useMutation({
     mutationFn: async function savePaidBucketRequest() {
-      return unwrap(await api.api['paid-requests']({ requestType: 'custom-bucket' }).put({}));
+      return unwrap(
+        await api.api['paid-requests']({ requestType: 'custom-bucket' }).put({ appId }),
+      );
     },
   });
 

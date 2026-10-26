@@ -1,19 +1,25 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
 import { MAX_PAID_APPS_REQUEST } from '@repo/api-constants';
+import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
-import { type Queries, schema } from '#db/queries.gen.ts';
+import { type IPaidRequestsColumns, type Queries, schema } from '#db/queries.gen.ts';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { getMigrations } from '#lib/assets.ts';
 import {
   type PaidRequestRow,
   PaidRequestsRepository,
 } from '#repositories/paid-requests.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
+import { CUSTOM_BUCKET_REQUEST } from '#tests/support/paid-requests.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'paid-owner');
 const OTHER_OWNER_ID = Value.Parse(OwnerIdSchema, 'paid-other');
+const SECOND_APP_ID = Value.Parse(AppIdSchema, '019a0a00-0000-7000-8000-000000000002');
+const OTHER_APP_ID = Value.Parse(AppIdSchema, '019a0a00-0000-7000-8000-000000000003');
+const MISSING_APP_ID = Value.Parse(AppIdSchema, '019a0a00-0000-7000-8000-000000000004');
 let sql: SQL;
 
 beforeAll(async function startDatabase() {
@@ -23,6 +29,17 @@ beforeAll(async function startDatabase() {
       `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1, $1, $2, true, now(), now())`,
       [ownerId, `${ownerId}@example.test`],
     );
+  }
+  for (const [appId, ownerId] of [
+    [CUSTOM_BUCKET_REQUEST.appId, OWNER_ID],
+    [SECOND_APP_ID, OWNER_ID],
+    [OTHER_APP_ID, OTHER_OWNER_ID],
+  ]) {
+    await sql.unsafe('INSERT INTO nibrun.apps (id, owner_id, slug, name) VALUES ($1, $2, $3, $3)', [
+      appId,
+      ownerId,
+      appId,
+    ]);
   }
 }, DATABASE_START_TIMEOUT_MS);
 
@@ -36,10 +53,55 @@ function repository() {
 
 async function savedRequests(ownerId: OwnerId): Promise<PaidRequestRow[]> {
   return (await sql.unsafe(
-    'SELECT request_type, requested_apps_amount FROM nibrun.paid_requests WHERE owner_id = $1',
+    'SELECT request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1',
     [ownerId],
   )) as PaidRequestRow[];
 }
+
+test('the upgrade preserves legacy requests while requiring app IDs on new bucket requests', async () => {
+  const migrations = getMigrations();
+  await sql.begin(async function upgradePaidRequests(transaction) {
+    await transaction.unsafe('DROP TABLE nibrun.paid_requests');
+    for (const name of ['0067_paid_requests.sql', '0069_custom_bucket_paid_requests.sql']) {
+      await transaction.unsafe(await migrations.get(name)!.text());
+    }
+    await transaction.unsafe(
+      `INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount)
+       VALUES ($1, 'apps', 10), ($1, 'custom-bucket', NULL)`,
+      [OWNER_ID],
+    );
+    const before = await transaction.unsafe<
+      Pick<IPaidRequestsColumns, 'id' | 'request_type' | 'requested_apps_amount'>[]
+    >(
+      'SELECT id, request_type, requested_apps_amount FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
+      [OWNER_ID],
+    );
+    await transaction.unsafe(await migrations.get('0070_bucket_requests_name_an_app.sql')!.text());
+    const after = await transaction.unsafe(
+      'SELECT id, request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
+      [OWNER_ID],
+    );
+    expect([...after]).toEqual(before.map((row) => ({ ...row, app_id: null })));
+    await expect(
+      transaction.savepoint(async function refuseUnscopedBucket(savepoint) {
+        await savepoint.unsafe(
+          `INSERT INTO nibrun.paid_requests (owner_id, request_type) VALUES ($1, 'custom-bucket')`,
+          [OTHER_OWNER_ID],
+        );
+      }),
+    ).rejects.toMatchObject({ errno: '23514' });
+    await expect(
+      transaction.savepoint(async function refuseAppScopedCount(savepoint) {
+        await savepoint.unsafe(
+          `INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount, app_id)
+         VALUES ($1, 'apps', 10, $2)`,
+          [OWNER_ID, CUSTOM_BUCKET_REQUEST.appId],
+        );
+      }),
+    ).rejects.toMatchObject({ errno: '23514' });
+    await transaction.unsafe('DELETE FROM nibrun.paid_requests WHERE owner_id = $1', [OWNER_ID]);
+  });
+});
 
 test('repeated and concurrent submissions keep one latest request per owner and type', async () => {
   const request = { requestType: 'apps' as const, requestedAppsAmount: 10 };
@@ -56,6 +118,7 @@ test('repeated and concurrent submissions keep one latest request per owner and 
   expect(await repository().save({ ownerId: OWNER_ID, request: updated })).toEqual({
     request_type: 'apps',
     requested_apps_amount: updated.requestedAppsAmount,
+    app_id: null,
   });
   const [after] = await sql.unsafe(
     'SELECT id, created_at, updated_at FROM nibrun.paid_requests WHERE owner_id = $1',
@@ -65,7 +128,7 @@ test('repeated and concurrent submissions keep one latest request per owner and 
   expect(after.created_at).toEqual(before.created_at);
   expect(after.updated_at.getTime()).toBeGreaterThanOrEqual(before.updated_at.getTime());
   expect(await savedRequests(OWNER_ID)).toEqual([
-    { request_type: 'apps', requested_apps_amount: updated.requestedAppsAmount },
+    { request_type: 'apps', requested_apps_amount: updated.requestedAppsAmount, app_id: null },
   ]);
 });
 
@@ -78,7 +141,7 @@ test('another owner’s submission cannot overwrite the first owner’s request'
   });
   expect(await savedRequests(OWNER_ID)).toEqual(first);
   expect(await savedRequests(OTHER_OWNER_ID)).toEqual([
-    { request_type: 'apps', requested_apps_amount: 1 },
+    { request_type: 'apps', requested_apps_amount: 1, app_id: null },
   ]);
 });
 
@@ -145,8 +208,12 @@ test('future request types require a null requested app count', async function f
 test('bucket requests are idempotent, owner scoped and coexist with app requests', async () => {
   const before = await savedRequests(OWNER_ID);
   const otherBefore = await savedRequests(OTHER_OWNER_ID);
-  const request = { requestType: 'custom-bucket' as const };
-  const expected: PaidRequestRow = { request_type: 'custom-bucket', requested_apps_amount: null };
+  const request = CUSTOM_BUCKET_REQUEST;
+  const expected: PaidRequestRow = {
+    request_type: request.requestType,
+    requested_apps_amount: null,
+    app_id: request.appId,
+  };
   const [first, repeated] = await Promise.all([
     repository().save({ ownerId: OWNER_ID, request }),
     repository().save({ ownerId: OWNER_ID, request }),
@@ -174,14 +241,64 @@ test('bucket requests are idempotent, owner scoped and coexist with app requests
       .execute(),
   ).rejects.toMatchObject({ errno: '23514' });
   expect(await savedRequests(OTHER_OWNER_ID)).toEqual(otherBefore);
-  await repository().save({ ownerId: OTHER_OWNER_ID, request });
+  const otherRequest = { ...request, appId: OTHER_APP_ID };
+  await repository().save({ ownerId: OTHER_OWNER_ID, request: otherRequest });
   expect(await savedRequests(OWNER_ID)).toEqual(expect.arrayContaining([...before, expected]));
   expect(await savedRequests(OTHER_OWNER_ID)).toEqual(
-    expect.arrayContaining([...otherBefore, expected]),
+    expect.arrayContaining([...otherBefore, { ...expected, app_id: OTHER_APP_ID }]),
   );
 });
 
+test('requests for two apps owned by the same account are retained independently', async () => {
+  const request = { ...CUSTOM_BUCKET_REQUEST, appId: SECOND_APP_ID };
+  expect(await repository().save({ ownerId: OWNER_ID, request })).toEqual({
+    request_type: request.requestType,
+    requested_apps_amount: null,
+    app_id: SECOND_APP_ID,
+  });
+  const buckets = (await savedRequests(OWNER_ID)).filter(
+    (row) => row.request_type === 'custom-bucket',
+  );
+  expect(buckets).toHaveLength(2);
+  expect(buckets.map((row) => row.app_id)).toEqual(
+    expect.arrayContaining([CUSTOM_BUCKET_REQUEST.appId, SECOND_APP_ID]),
+  );
+});
+
+test('missing and unowned apps cannot create or replace a request', async () => {
+  const before = await savedRequests(OWNER_ID);
+  for (const appId of [MISSING_APP_ID, OTHER_APP_ID]) {
+    expect(
+      await repository().save({
+        ownerId: OWNER_ID,
+        request: { ...CUSTOM_BUCKET_REQUEST, appId },
+      }),
+    ).toBeNull();
+  }
+  expect(await savedRequests(OWNER_ID)).toEqual(before);
+});
+
+test('deleted apps cannot be requested and hard deletion removes their requests', async () => {
+  await sql.unsafe('UPDATE nibrun.apps SET state = $2 WHERE id = $1 AND owner_id = $3', [
+    SECOND_APP_ID,
+    'deleted',
+    OWNER_ID,
+  ]);
+  expect(
+    await repository().save({
+      ownerId: OWNER_ID,
+      request: { ...CUSTOM_BUCKET_REQUEST, appId: SECOND_APP_ID },
+    }),
+  ).toBeNull();
+  await sql.unsafe('DELETE FROM nibrun.apps WHERE id = $1 AND owner_id = $2', [
+    SECOND_APP_ID,
+    OWNER_ID,
+  ]);
+  expect((await savedRequests(OWNER_ID)).some((row) => row.app_id === SECOND_APP_ID)).toBe(false);
+});
+
 test('deleting an account also removes its paid requests', async () => {
+  await sql.unsafe('DELETE FROM nibrun.apps WHERE owner_id = $1', [OTHER_OWNER_ID]);
   await sql.unsafe('DELETE FROM auth."user" WHERE id = $1', [OTHER_OWNER_ID]);
   expect(await savedRequests(OTHER_OWNER_ID)).toEqual([]);
 });

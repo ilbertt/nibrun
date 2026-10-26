@@ -1,8 +1,10 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test';
 import { StatusMap } from 'elysia';
 import { AppQuotaExceededError } from '#lib/app-quota.ts';
+import { NotFoundError } from '#lib/errors.ts';
 import { registeredAccount } from '#tests/controllers/support/accounts.ts';
 import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
+import { CUSTOM_BUCKET_REQUEST } from '#tests/support/paid-requests.ts';
 
 const { auth, AppsServicePlugin, PaidRequestsServicePlugin } = await import('#services/plugins.ts');
 const URL = `${ORIGIN}/api/paid-requests`;
@@ -16,7 +18,10 @@ afterEach(function restoreMocks() {
 test.each(['apps', 'custom-bucket'])(
   'paid %s requests require a registered account',
   async (requestType) => {
-    const body = requestType === 'apps' ? { requestedAppsAmount: REQUEST.requestedAppsAmount } : {};
+    const body =
+      requestType === 'apps'
+        ? { requestedAppsAmount: REQUEST.requestedAppsAmount }
+        : { appId: CUSTOM_BUCKET_REQUEST.appId };
     expect(
       (
         await sendJson({
@@ -41,9 +46,9 @@ test.each(['apps', 'custom-bucket'])(
   },
 );
 
-test('a custom bucket request records interest for the authenticated account', async () => {
+test('a custom bucket request includes its app and authenticated owner', async () => {
   const account = await registeredAccount();
-  const request = { requestType: 'custom-bucket' as const };
+  const request = CUSTOM_BUCKET_REQUEST;
   const save = spyOn(
     PaidRequestsServicePlugin.decorator.paidRequestsService,
     'save',
@@ -51,7 +56,7 @@ test('a custom bucket request records interest for the authenticated account', a
   const response = await sendJson({
     method: 'PUT',
     url: `${URL}/custom-bucket`,
-    body: {},
+    body: { appId: request.appId },
     headers: { cookie: account.cookie },
   });
   expect(response.status).toBe(StatusMap.OK);
@@ -63,9 +68,13 @@ test('a bucket request refuses app counts, credentials and owner spoofing', asyn
   const account = await registeredAccount();
   const save = spyOn(PaidRequestsServicePlugin.decorator.paidRequestsService, 'save');
   for (const body of [
-    { requestedAppsAmount: 10 },
-    { ownerId: 'someone-else' },
-    { bucket: 'customer-data', secretAccessKey: 'private' },
+    {},
+    { appId: null },
+    { appId: '' },
+    { appId: 123 },
+    { appId: CUSTOM_BUCKET_REQUEST.appId, requestedAppsAmount: 10 },
+    { appId: CUSTOM_BUCKET_REQUEST.appId, ownerId: 'someone-else' },
+    { appId: CUSTOM_BUCKET_REQUEST.appId, bucket: 'customer-data', secretAccessKey: 'private' },
   ]) {
     const response = await sendJson({
       method: 'PUT',
@@ -76,6 +85,20 @@ test('a bucket request refuses app counts, credentials and owner spoofing', asyn
     expect(response.status).toBe(StatusMap['Bad Request']);
   }
   expect(save).not.toHaveBeenCalled();
+});
+
+test('a bucket request cannot distinguish missing apps from apps owned by someone else', async () => {
+  const account = await registeredAccount();
+  spyOn(PaidRequestsServicePlugin.decorator.paidRequestsService, 'save').mockRejectedValue(
+    new NotFoundError(),
+  );
+  const response = await sendJson({
+    method: 'PUT',
+    url: `${URL}/custom-bucket`,
+    body: { appId: CUSTOM_BUCKET_REQUEST.appId },
+    headers: { cookie: account.cookie },
+  });
+  expect(response.status).toBe(StatusMap['Not Found']);
 });
 
 test('saving a request uses the authenticated owner', async () => {
@@ -110,6 +133,7 @@ test('the API refuses unsupported types, invalid totals and owner spoofing', asy
     {},
     { amount: 10 },
     { requestedAppsAmount: 10, ownerId: 'someone-else' },
+    { requestedAppsAmount: 10, appId: CUSTOM_BUCKET_REQUEST.appId },
   ]) {
     expect((await sendJson({ method: 'PUT', url: `${URL}/apps`, body, headers })).status).toBe(
       StatusMap['Bad Request'],
