@@ -11,9 +11,10 @@ import { answered } from '#lib/prompts.ts';
 
 const REQUEST_LABELS = {
   apps: { question: 'How many apps do you need in total?', unit: 'app' },
-} satisfies Record<PaidRequestType, { question: string; unit: string }>;
+} satisfies Partial<Record<PaidRequestType, { question: string; unit: string }>>;
 
-const REQUEST_TYPES = Object.keys(REQUEST_LABELS) as [PaidRequestType, ...PaidRequestType[]];
+type CliPaidRequestType = keyof typeof REQUEST_LABELS;
+const REQUEST_TYPES = Object.keys(REQUEST_LABELS) as [CliPaidRequestType, ...CliPaidRequestType[]];
 
 export const PAID_REQUEST_TYPE_SCHEMA = z.enum(REQUEST_TYPES, {
   error: `Supported paid request types: ${REQUEST_TYPES.join(', ')}.`,
@@ -56,7 +57,7 @@ export async function completePaidRequest({
 }: {
   options: InferOptions<typeof command.options>;
   interactive: boolean;
-}): Promise<PaidRequest> {
+}): Promise<Extract<PaidRequest, { requestType: CliPaidRequestType }>> {
   const supplied = Object.fromEntries(
     Object.entries(options).filter(function provided([, value]) {
       return value !== undefined;

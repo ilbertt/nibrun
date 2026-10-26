@@ -33,6 +33,10 @@ export const command = defineCommand('paid-request', {
       json: rootOptions.json,
     });
     const { requestType, ...body } = await completePaidRequest({ options, interactive });
-    emit(unwrap(await context.api.api['paid-requests']({ requestType }).put(body)));
+    const saved = unwrap(await context.api.api['paid-requests']({ requestType }).put(body));
+    if (saved.requestType !== requestType) {
+      throw new Error('The API returned a different paid request type.');
+    }
+    emit(saved);
   },
 });
