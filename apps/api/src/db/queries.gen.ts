@@ -1079,6 +1079,7 @@ export interface IForgetImportObjectResult {
 export interface IUpsertPaidRequestResult {
     request_type: IPaidRequestsColumns["request_type"];
     requested_apps_amount: IPaidRequestsColumns["requested_apps_amount"];
+    app_id: IPaidRequestsColumns["app_id"];
 }
 
 /** Result of query `InsertSqliteConnection`. */
@@ -1863,6 +1864,7 @@ export interface IPaidRequestsColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
+    app_id: import("@repo/protocol").AppId | null;
 }
 
 /** Schema of `paid_requests`. */
@@ -2535,15 +2537,19 @@ export const schema = {
             request_type: { _columnName: "request_type", _foreignKeys: {} },
             requested_apps_amount: { _columnName: "requested_apps_amount", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { paid_requests_app_id_fkey: { _constraintName: "paid_requests_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } }
         },
         _indexes: {
-            paid_requests_owner_type_key: { _indexName: "paid_requests_owner_type_key" },
+            paid_requests_app_id_idx: { _indexName: "paid_requests_app_id_idx" },
+            paid_requests_owner_type_app_key: { _indexName: "paid_requests_owner_type_app_key" },
             paid_requests_pkey: { _indexName: "paid_requests_pkey" }
         },
         _constraints: {
+            paid_requests_app_id_check: { _constraintName: "paid_requests_app_id_check" },
+            paid_requests_app_id_fkey: { _constraintName: "paid_requests_app_id_fkey" },
             paid_requests_owner_id_fkey: { _constraintName: "paid_requests_owner_id_fkey" },
-            paid_requests_owner_type_key: { _constraintName: "paid_requests_owner_type_key" },
+            paid_requests_owner_type_app_key: { _constraintName: "paid_requests_owner_type_app_key" },
             paid_requests_pkey: { _constraintName: "paid_requests_pkey" },
             paid_requests_requested_apps_amount_check: { _constraintName: "paid_requests_requested_apps_amount_check" },
             paid_requests_type_check: { _constraintName: "paid_requests_type_check" }

@@ -7,22 +7,23 @@ export type PaidRequestRow = Queries['UpsertPaidRequest'];
 export type SavePaidRequestInput = { ownerId: OwnerId; request: PaidRequest };
 
 export abstract class PaidRequestsRepositoryContract {
-  abstract save(input: SavePaidRequestInput): Promise<PaidRequestRow>;
+  abstract save(input: SavePaidRequestInput): Promise<PaidRequestRow | null>;
 }
 
 export class PaidRequestsRepository extends Repository implements PaidRequestsRepositoryContract {
-  async save({ ownerId, request }: SavePaidRequestInput): Promise<PaidRequestRow> {
+  async save({ ownerId, request }: SavePaidRequestInput): Promise<PaidRequestRow | null> {
+    const appId = request.requestType === 'custom-bucket' ? request.appId : null;
     const [row] = await this.sql.UpsertPaidRequest`
-      INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount)
-      VALUES (${ownerId}, ${request.requestType}, ${request.requestType === 'apps' ? request.requestedAppsAmount : null})
-      ON CONFLICT (owner_id, request_type)
+      INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount, app_id)
+      SELECT ${ownerId}, ${request.requestType}, ${request.requestType === 'apps' ? request.requestedAppsAmount : null}, ${appId}
+      WHERE ${appId}::uuid IS NULL OR EXISTS (
+        SELECT 1 FROM nibrun.live_apps a WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+      )
+      ON CONFLICT (owner_id, request_type, app_id)
       DO UPDATE SET requested_apps_amount = EXCLUDED.requested_apps_amount
       WHERE nibrun.paid_requests.owner_id = ${ownerId}
-      RETURNING request_type, requested_apps_amount
+      RETURNING request_type, requested_apps_amount, app_id
     `;
-    if (!row) {
-      throw new Error('Saving a paid request returned no row.');
-    }
-    return row;
+    return row ?? null;
   }
 }

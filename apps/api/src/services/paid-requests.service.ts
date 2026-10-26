@@ -1,5 +1,6 @@
 import { Value } from '@sinclair/typebox/value';
 import { type PaidRequest, PaidRequestSchema } from '#lib/api/paid-request.ts';
+import { NotFoundError } from '#lib/errors.ts';
 import type {
   PaidRequestsRepositoryContract,
   SavePaidRequestInput,
@@ -16,9 +17,14 @@ export class PaidRequestsService extends Service {
 
   async save(input: SavePaidRequestInput): Promise<PaidRequest> {
     const row = await this.requestsRepo.save(input);
+    if (row === null) {
+      throw new NotFoundError();
+    }
     return Value.Parse(PaidRequestSchema, {
       requestType: row.request_type,
-      ...(row.request_type === 'apps' ? { requestedAppsAmount: row.requested_apps_amount } : {}),
+      ...(row.request_type === 'apps'
+        ? { requestedAppsAmount: row.requested_apps_amount }
+        : { appId: row.app_id }),
     });
   }
 }

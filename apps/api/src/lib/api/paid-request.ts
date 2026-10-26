@@ -1,4 +1,5 @@
 import { MAX_PAID_APPS_REQUEST, MIN_PAID_APPS_REQUEST } from '@repo/api-constants';
+import { AppIdSchema } from '@repo/protocol';
 import { type Static, Type } from '@sinclair/typebox';
 
 export const PaidRequestSchema = Type.Union([
@@ -13,7 +14,10 @@ export const PaidRequestSchema = Type.Union([
     },
     { additionalProperties: false },
   ),
-  Type.Object({ requestType: Type.Literal('custom-bucket') }, { additionalProperties: false }),
+  Type.Object(
+    { requestType: Type.Literal('custom-bucket'), appId: AppIdSchema },
+    { additionalProperties: false },
+  ),
 ]);
 
 export type PaidRequest = Static<typeof PaidRequestSchema>;
