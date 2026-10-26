@@ -3,6 +3,7 @@ import { CopyableLine } from '@repo/ui/custom/copyable-line';
 import { AppActivation } from '#components/apps/app-activation.tsx';
 import { AppEnvironment } from '#components/apps/app-environment.tsx';
 import { AppRunCommand } from '#components/apps/app-run-command.tsx';
+import { AppVolume } from '#components/apps/app-volume.tsx';
 import { useNewestDeployment } from '#lib/hooks/use-newest-deployment.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
@@ -21,6 +22,7 @@ export function AppConfigCard({ app }: { app: AppSummary }) {
         <AppRunCommand app={app} />
         <AppActivation app={app} />
         <AppEnvironment app={app} />
+        <AppVolume />
       </CardContent>
     </Card>
   );

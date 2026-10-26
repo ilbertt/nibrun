@@ -39,6 +39,6 @@ export function usePaidAppsRequest(): PaidAppsRequestForm {
     pending: save.isPending,
     submittable: amount !== undefined && !save.isPending,
     error: save.error?.message,
-    savedAmount: save.data?.requestedAppsAmount,
+    savedAmount: save.data?.requestType === 'apps' ? save.data.requestedAppsAmount : undefined,
   };
 }

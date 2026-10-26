@@ -142,6 +142,45 @@ test('future request types require a null requested app count', async function f
   });
 });
 
+test('bucket requests are idempotent, owner scoped and coexist with app requests', async () => {
+  const before = await savedRequests(OWNER_ID);
+  const otherBefore = await savedRequests(OTHER_OWNER_ID);
+  const request = { requestType: 'custom-bucket' as const };
+  const expected: PaidRequestRow = { request_type: 'custom-bucket', requested_apps_amount: null };
+  const [first, repeated] = await Promise.all([
+    repository().save({ ownerId: OWNER_ID, request }),
+    repository().save({ ownerId: OWNER_ID, request }),
+  ]);
+  expect(first).toEqual(expected);
+  expect(repeated).toEqual(expected);
+  expect(await savedRequests(OWNER_ID)).toHaveLength(before.length + 1);
+  expect(await savedRequests(OWNER_ID)).toEqual(expect.arrayContaining([...before, expected]));
+  const [id] = await sql.unsafe(
+    'SELECT id FROM nibrun.paid_requests WHERE owner_id = $1 AND request_type = $2',
+    [OWNER_ID, request.requestType],
+  );
+  await repository().save({ ownerId: OWNER_ID, request });
+  const [saved] = await sql.unsafe(
+    'SELECT id FROM nibrun.paid_requests WHERE owner_id = $1 AND request_type = $2',
+    [OWNER_ID, request.requestType],
+  );
+  expect(saved.id).toBe(id.id);
+  await expect(
+    sql
+      .unsafe(
+        'UPDATE nibrun.paid_requests SET requested_apps_amount = 1 WHERE owner_id = $1 AND request_type = $2',
+        [OWNER_ID, request.requestType],
+      )
+      .execute(),
+  ).rejects.toMatchObject({ errno: '23514' });
+  expect(await savedRequests(OTHER_OWNER_ID)).toEqual(otherBefore);
+  await repository().save({ ownerId: OTHER_OWNER_ID, request });
+  expect(await savedRequests(OWNER_ID)).toEqual(expect.arrayContaining([...before, expected]));
+  expect(await savedRequests(OTHER_OWNER_ID)).toEqual(
+    expect.arrayContaining([...otherBefore, expected]),
+  );
+});
+
 test('deleting an account also removes its paid requests', async () => {
   await sql.unsafe('DELETE FROM auth."user" WHERE id = $1', [OTHER_OWNER_ID]);
   expect(await savedRequests(OTHER_OWNER_ID)).toEqual([]);

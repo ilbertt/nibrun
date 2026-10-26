@@ -18,7 +18,7 @@ export class PaidRequestsService extends Service {
     const row = await this.requestsRepo.save(input);
     return Value.Parse(PaidRequestSchema, {
       requestType: row.request_type,
-      requestedAppsAmount: row.requested_apps_amount,
+      ...(row.request_type === 'apps' ? { requestedAppsAmount: row.requested_apps_amount } : {}),
     });
   }
 }

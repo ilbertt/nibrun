@@ -13,28 +13,69 @@ afterEach(function restoreMocks() {
   mock.restore();
 });
 
-test('paid requests require a registered account', async () => {
-  expect(
-    (
-      await sendJson({
-        method: 'PUT',
-        url: `${URL}/apps`,
-        body: { requestedAppsAmount: REQUEST.requestedAppsAmount },
-      })
-    ).status,
-  ).toBe(StatusMap.Unauthorized);
-  const anonymous = await auth.api.signInAnonymous({ returnHeaders: true });
-  const headers = { authorization: `Bearer ${anonymous.response.token}` };
-  expect(
-    (
-      await sendJson({
-        method: 'PUT',
-        url: `${URL}/apps`,
-        body: { requestedAppsAmount: REQUEST.requestedAppsAmount },
-        headers,
-      })
-    ).status,
-  ).toBe(StatusMap.Forbidden);
+test.each(['apps', 'custom-bucket'])(
+  'paid %s requests require a registered account',
+  async (requestType) => {
+    const body = requestType === 'apps' ? { requestedAppsAmount: REQUEST.requestedAppsAmount } : {};
+    expect(
+      (
+        await sendJson({
+          method: 'PUT',
+          url: `${URL}/${requestType}`,
+          body,
+        })
+      ).status,
+    ).toBe(StatusMap.Unauthorized);
+    const anonymous = await auth.api.signInAnonymous({ returnHeaders: true });
+    const headers = { authorization: `Bearer ${anonymous.response.token}` };
+    expect(
+      (
+        await sendJson({
+          method: 'PUT',
+          url: `${URL}/${requestType}`,
+          body,
+          headers,
+        })
+      ).status,
+    ).toBe(StatusMap.Forbidden);
+  },
+);
+
+test('a custom bucket request records interest for the authenticated account', async () => {
+  const account = await registeredAccount();
+  const request = { requestType: 'custom-bucket' as const };
+  const save = spyOn(
+    PaidRequestsServicePlugin.decorator.paidRequestsService,
+    'save',
+  ).mockResolvedValue(request);
+  const response = await sendJson({
+    method: 'PUT',
+    url: `${URL}/custom-bucket`,
+    body: {},
+    headers: { cookie: account.cookie },
+  });
+  expect(response.status).toBe(StatusMap.OK);
+  expect(await response.json()).toEqual(request);
+  expect(save).toHaveBeenCalledWith({ ownerId: account.ownerId, request });
+});
+
+test('a bucket request refuses app counts, credentials and owner spoofing', async () => {
+  const account = await registeredAccount();
+  const save = spyOn(PaidRequestsServicePlugin.decorator.paidRequestsService, 'save');
+  for (const body of [
+    { requestedAppsAmount: 10 },
+    { ownerId: 'someone-else' },
+    { bucket: 'customer-data', secretAccessKey: 'private' },
+  ]) {
+    const response = await sendJson({
+      method: 'PUT',
+      url: `${URL}/custom-bucket`,
+      body,
+      headers: { cookie: account.cookie },
+    });
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  }
+  expect(save).not.toHaveBeenCalled();
 });
 
 test('saving a request uses the authenticated owner', async () => {

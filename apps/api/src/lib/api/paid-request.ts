@@ -13,6 +13,7 @@ export const PaidRequestSchema = Type.Union([
     },
     { additionalProperties: false },
   ),
+  Type.Object({ requestType: Type.Literal('custom-bucket') }, { additionalProperties: false }),
 ]);
 
 export type PaidRequest = Static<typeof PaidRequestSchema>;
