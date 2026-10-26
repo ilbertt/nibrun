@@ -55,10 +55,11 @@ export const AppPatchSchema = t.Partial(
 // An app being created has nothing to leave alone and nothing to remove, so what it is given is
 // the whole environment rather than an edit to one.
 const NewAppConfigSchema = t.Partial(
-  t.Composite([
-    OwnedAppConfigSchema,
-    t.Object({ environment: TenantEnvironmentSchema, volumeStorage: CreateVolumeStorageSchema }),
-  ]),
+  t.Object({
+    ...OwnedAppConfigSchema.properties,
+    environment: TenantEnvironmentSchema,
+    volumeStorage: CreateVolumeStorageSchema,
+  }),
   { additionalProperties: false },
 );
 
