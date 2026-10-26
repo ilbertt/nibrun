@@ -754,6 +754,11 @@ export interface ISelectDeploymentsByAppResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
 }
 
 /** Result of query `SelectDeploymentById`. */
@@ -802,6 +807,11 @@ export interface ISelectDeploymentByIdResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
 }
 
 /** Result of query `SelectLiveDeployments`. */
@@ -877,6 +887,11 @@ export interface ISelectInsertedDeploymentResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    volume_storage_prefix: IAppConfigsColumns["volume_storage_prefix"];
+    volume_storage_region: IAppConfigsColumns["volume_storage_region"];
+    volume_storage_auth_kind: IAppConfigsColumns["volume_storage_auth_kind"];
 }
 
 /** Result of query `SelectAppForOnlyDeployment`. */

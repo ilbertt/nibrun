@@ -8,7 +8,6 @@ import {
   DEFAULT_HTTP_PORT,
   DEFAULT_RESTART_POLICY,
 } from '#lib/app-config-defaults.ts';
-import type { VolumeStorageMetadataColumns } from '#lib/volume-storage.ts';
 import type {
   DeploymentByIdInput,
   DeploymentLookupRepositoryContract,
@@ -43,7 +42,7 @@ export function deploymentLookupRepository(
 
 // Spelled out from the protocol's own defaults rather than built with `configWithDefaults`,
 // which is the thing under test wherever this is the expected value.
-export const DEFAULT_CONFIG: PublicAppConfig = {
+export const DEFAULT_CONFIG = {
   volumeSizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
   environment: {},
   httpPort: DEFAULT_HTTP_PORT,
@@ -52,15 +51,13 @@ export const DEFAULT_CONFIG: PublicAppConfig = {
   resources: DEFAULT_INSTANCE_RESOURCES,
   healthCheck: DEFAULT_HEALTH_CHECK,
   restartPolicy: DEFAULT_RESTART_POLICY,
-};
+} satisfies PublicAppConfig;
 
 /** The same defaults, in the shape a repository is handed rather than the one an owner reads. */
 export const DEFAULT_STORED_CONFIG: StoredAppConfig = { ...DEFAULT_CONFIG, environment: {} };
 
 /** The inverse of `toAppConfig`: the `app_configs` columns a row carries for this config. */
-export function configColumns(
-  config: StoredAppConfig | PublicAppConfig,
-): AppConfigColumns & VolumeStorageMetadataColumns {
+export function configColumns(config: StoredAppConfig | PublicAppConfig): AppConfigColumns {
   return {
     volume_storage_endpoint: null,
     volume_storage_bucket: null,

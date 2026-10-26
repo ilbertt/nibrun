@@ -8,7 +8,7 @@ import { AppNameSchema } from '#lib/api/app.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import type { CreateVolumeStorage } from '#lib/api/volume-storage.ts';
-import { configWithDefaults } from '#lib/app-config.ts';
+import { configWithDefaults, toAppConfig } from '#lib/app-config.ts';
 import { sealVolumeStorage, toVolumeStorageMetadata } from '#lib/volume-storage.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -97,17 +97,37 @@ test.each(volumeStorageInputs())(
      FROM nibrun.apps WHERE id = $1 AND owner_id = $2 RETURNING id`,
       [app.id, OWNER_ID],
     );
-    expect(
-      (
-        await new DeploymentsRepository(withTypes<Queries>(sql)).insert({
-          appId: app.id,
-          ownerId: OWNER_ID,
-          artifactId: Value.Parse(ArtifactIdSchema, artifact.id),
-          initialDataFrom: null,
-          onlyOne: false,
-        })
-      ).outcome,
-    ).toBe('created');
+    const deployments = new DeploymentsRepository(withTypes<Queries>(sql));
+    const created = await deployments.insert({
+      appId: app.id,
+      ownerId: OWNER_ID,
+      artifactId: Value.Parse(ArtifactIdSchema, artifact.id),
+      initialDataFrom: null,
+      onlyOne: false,
+    });
+    if (created.outcome !== 'created') {
+      throw new Error('Test deployment creation was declined');
+    }
+    expect(toAppConfig(created.row).volumeStorage).toEqual(metadata);
+    await repository().update({
+      appId: app.id,
+      ownerId: OWNER_ID,
+      patch: { name: undefined, args: ['newer-config'] },
+    });
+    const deployment = await deployments.findById({
+      appId: app.id,
+      ownerId: OWNER_ID,
+      deploymentId: created.row.id,
+    });
+    expect(toAppConfig(deployment!)).toMatchObject({ args: ['changed'], volumeStorage: metadata });
+    const listed = await deployments.listByApp({ appId: app.id, ownerId: OWNER_ID });
+    expect(toAppConfig(listed[0]!).volumeStorage).toEqual(metadata);
+    const rollback = await deployments.insertRollback({
+      appId: app.id,
+      ownerId: OWNER_ID,
+      rollbackOf: created.row.id,
+    });
+    expect(toAppConfig(rollback!)).toMatchObject({ args: ['changed'], volumeStorage: metadata });
     const desired = await new AgentRepository({
       sql: withTypes<Queries>(sql),
       secretsKey: TEST_SECRETS_KEY,
@@ -126,6 +146,7 @@ test.each(volumeStorageInputs())(
 test('omitting storage preserves shared storage and the existing default config', async () => {
   const app = await createApp(undefined);
   expect(toVolumeStorageMetadata(app)).toBeUndefined();
+  expect(toAppConfig(app)).not.toHaveProperty('volumeStorage');
   const [stored] = await sql.unsafe(
     `SELECT c.volume_storage_endpoint, c.volume_storage_bucket, c.volume_storage_prefix,
             c.volume_storage_auth_kind, c.volume_storage_secret_access_key,

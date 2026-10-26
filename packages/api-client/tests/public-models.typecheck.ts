@@ -2,6 +2,7 @@ import type {
   App,
   AppPatch,
   CronListing,
+  Deployment,
   Filename,
   GuestPath,
   TenantEnvironmentPatch,
@@ -17,6 +18,7 @@ type AccessKeyAuth = Extract<CreateStorage['auth'], { kind: 'access-key' }>;
 type StorageMetadata = NonNullable<App['config']['volumeStorage']>;
 
 export type PublicModelAssertions = [
+  Assert<Equal<Deployment['config'], App['config']>>,
   Assert<Equal<AccessKeyAuth['secretAccessKey'], string>>,
   Assert<Equal<CreateStorage['encryptionPassword'], string>>,
   Assert<Equal<StorageMetadata['prefix'], string>>,

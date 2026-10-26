@@ -15,7 +15,6 @@ import {
 import { schema } from '#db/queries.gen.ts';
 import { type App, type AppName, OWNED_APP_STATES, type OwnedAppState } from '#lib/api/app.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
-import type { VolumeStorageMetadata } from '#lib/api/volume-storage.ts';
 import {
   type AppConfigPatch,
   configWithDefaults,
@@ -38,7 +37,7 @@ import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
-import { sealVolumeStorage, toVolumeStorageMetadata } from '#lib/volume-storage.ts';
+import { sealVolumeStorage } from '#lib/volume-storage.ts';
 import type {
   AppHostnameRow,
   AppHostnamesRepositoryContract,
@@ -55,7 +54,7 @@ import type { ExportsRepositoryContract } from '#repositories/exports.repository
 import { Service } from '#services/service.ts';
 
 export type PublicApp = Omit<App, 'config' | 'hostnames'> & {
-  config: PublicAppConfig & { volumeStorage?: VolumeStorageMetadata };
+  config: PublicAppConfig;
   hostnames: PublicAppHostname[];
   /** `null` until a host has measured the filesystem, which it cannot while nothing mounts it. */
   volumeUsage: FilesystemUsage | null;
@@ -785,14 +784,13 @@ function toComputeUsage(app: AppRow): ComputeUsage | null {
 }
 
 function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
-  const volumeStorage = toVolumeStorageMetadata(app);
   return {
     id: app.id,
     ownerId: app.owner_id,
     name: app.name,
     slug: app.slug,
     hostnames: hostnames.map(toAppHostname),
-    config: { ...toAppConfig(app), ...(volumeStorage === undefined ? {} : { volumeStorage }) },
+    config: toAppConfig(app),
     volumeUsage: toVolumeUsage(app),
     computeUsage: toComputeUsage(app),
     expiresAt: app.expires_at === null ? null : toTimestamp(app.expires_at),

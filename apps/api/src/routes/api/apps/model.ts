@@ -23,7 +23,11 @@ const RedactedEnvironmentSchema = t.Record(t.String(), t.Literal(REDACTED), {
 // and read in different shapes, so it is taken out and each half says its own.
 export const PublicAppConfigSchema = t.Composite([
   t.Omit(AppConfigSchema, ['environment']),
-  t.Object({ volumeSizeBytes: ByteSizeSchema, environment: RedactedEnvironmentSchema }),
+  t.Object({
+    volumeSizeBytes: ByteSizeSchema,
+    environment: RedactedEnvironmentSchema,
+    volumeStorage: t.Optional(VolumeStorageMetadataSchema),
+  }),
 ]);
 
 // How the binary is started, which is the whole of what an owner chooses. The machine it starts
@@ -91,10 +95,7 @@ export const AppHostnameResponseSchema = t.Composite([
 export const AppResponseSchema = t.Composite([
   t.Omit(AppSchema, ['config', 'hostnames']),
   t.Object({
-    config: t.Composite([
-      PublicAppConfigSchema,
-      t.Object({ volumeStorage: t.Optional(VolumeStorageMetadataSchema) }),
-    ]),
+    config: PublicAppConfigSchema,
     hostnames: t.Array(AppHostnameResponseSchema, { minItems: MIN_HOSTNAMES }),
     volumeUsage: t.Nullable(FilesystemUsageSchema),
     computeUsage: t.Nullable(ComputeUsageSchema),

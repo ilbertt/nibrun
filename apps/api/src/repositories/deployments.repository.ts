@@ -271,15 +271,18 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
              d.public_ipv4, d.extra_public_port,
              g.github_repository, g.github_workflow_ref, g.github_ref,
              g.github_commit_sha, g.github_run_id, g.github_run_attempt,
-               c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
-               c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
-               c.health_check_grace_period_ms, c.health_check_healthy_threshold,
-               c.health_check_unhealthy_threshold,
-               c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+             c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
+             c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
+             c.health_check_grace_period_ms, c.health_check_healthy_threshold,
+             c.health_check_unhealthy_threshold,
+             c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
+             s.volume_storage_region, s.volume_storage_auth_kind
       FROM nibrun.deployments d
       JOIN nibrun.live_apps a ON a.id = d.app_id
       JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
+      JOIN nibrun.app_configs s ON s.id = c.id
       LEFT JOIN nibrun.github_deployment_grants g ON g.id = d.github_deployment_grant_id
       WHERE d.app_id = ${appId} AND a.owner_id = ${ownerId}
       ORDER BY d.id DESC
@@ -299,15 +302,18 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
              d.public_ipv4, d.extra_public_port,
              g.github_repository, g.github_workflow_ref, g.github_ref,
              g.github_commit_sha, g.github_run_id, g.github_run_attempt,
-               c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
-               c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
-               c.health_check_grace_period_ms, c.health_check_healthy_threshold,
-               c.health_check_unhealthy_threshold,
-               c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+             c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
+             c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
+             c.health_check_grace_period_ms, c.health_check_healthy_threshold,
+             c.health_check_unhealthy_threshold,
+             c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
+             s.volume_storage_region, s.volume_storage_auth_kind
       FROM nibrun.deployments d
       JOIN nibrun.live_apps a ON a.id = d.app_id
       JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
+      JOIN nibrun.app_configs s ON s.id = c.id
       LEFT JOIN nibrun.github_deployment_grants g ON g.id = d.github_deployment_grant_id
       WHERE d.app_id = ${appId} AND d.id = ${deploymentId} AND a.owner_id = ${ownerId}
     `;
@@ -432,9 +438,12 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
+             s.volume_storage_region, s.volume_storage_auth_kind
       FROM nibrun.deployments d
       JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
+      JOIN nibrun.app_configs s ON s.id = c.id
       LEFT JOIN nibrun.github_deployment_grants g ON g.id = d.github_deployment_grant_id
       WHERE d.id = ${deploymentId}
     `;

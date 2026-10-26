@@ -2,7 +2,7 @@ import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api
 import type { AppConfig, SecretString, TenantEnvironment } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { TenantEnvironmentPatch } from '#lib/api/environment.ts';
-import type { CreateVolumeStorage } from '#lib/api/volume-storage.ts';
+import type { CreateVolumeStorage, VolumeStorageMetadata } from '#lib/api/volume-storage.ts';
 import {
   DEFAULT_HEALTH_CHECK,
   DEFAULT_HTTP_PORT,
@@ -10,7 +10,11 @@ import {
 } from '#lib/app-config-defaults.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
-import type { SealedVolumeStorage } from '#lib/volume-storage.ts';
+import {
+  type SealedVolumeStorage,
+  toVolumeStorageMetadata,
+  type VolumeStorageMetadataColumns,
+} from '#lib/volume-storage.ts';
 
 // An owner reads which variables are set, never what they hold: the values are sealed in the
 // database and only opened where desired state is built, so there is nothing here to return.
@@ -19,6 +23,7 @@ export type RedactedEnvironment = Record<string, typeof REDACTED>;
 export type PublicAppConfig = Omit<AppConfig, 'environment'> & {
   volumeSizeBytes: number;
   environment: RedactedEnvironment;
+  volumeStorage?: VolumeStorageMetadata;
 };
 
 // How the binary is started, which is the whole of what an owner chooses. The machine it starts
@@ -39,7 +44,7 @@ export type AppConfigPatch = Partial<OwnedAppConfig> & {
   environment?: TenantEnvironmentPatch | undefined;
 };
 
-export type StoredAppConfig = Omit<PublicAppConfig, 'environment'> & {
+export type StoredAppConfig = Omit<PublicAppConfig, 'environment' | 'volumeStorage'> & {
   environment: SealedEnvironment;
   volumeStorage?: SealedVolumeStorage;
 };
@@ -102,13 +107,14 @@ export type RunConfigColumns = Pick<
 >;
 
 export type AppConfigColumns = RunConfigColumns &
+  VolumeStorageMetadataColumns &
   Pick<Queries['SelectAppById'], 'environment_names'>;
 
 // Everything but the environment, which only the caller holding the key can supply in the one
 // form the database accepts.
 export function configWithDefaults(
   patch: AppConfigPatch = {},
-): Omit<PublicAppConfig, 'environment'> {
+): Omit<PublicAppConfig, 'environment' | 'volumeStorage'> {
   return {
     volumeSizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
     resources: DEFAULT_INSTANCE_RESOURCES,
@@ -123,10 +129,12 @@ export function configWithDefaults(
 // Field by field rather than a spread, so a config field added later fails to compile here
 // instead of reaching the guest as undefined.
 export function toAppConfig(row: AppConfigColumns): PublicAppConfig {
+  const volumeStorage = toVolumeStorageMetadata(row);
   return {
     ...toRunConfig(row),
     volumeSizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
     environment: redacted(row.environment_names),
+    ...(volumeStorage === undefined ? {} : { volumeStorage }),
   };
 }
 
