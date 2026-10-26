@@ -2,6 +2,20 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.10.26-1]
+
+### 🚀 Features
+
+- *(cli)* Request custom bucket storage (#1015)
+- *(dashboard)* Request custom bucket storage (#1013)
+- *(agent)* Activate ZeroFS for configured app volumes (#991)
+- *(plugin)* Add submission review cases (#979)
+- *(protocol)* Add optional volume storage configuration (#982)
+- *(www)* Add support, privacy, and terms pages (#957)
+- *(agent)* Render per-app ZeroFS storage configurations (#963)
+- *(cli)* Add paid-request command and app limit hint (#961)
+- *(api)* Collect paid app requests (#959)
+
 ## [2026.10.19-1]
 
 ### 🚜 Refactor

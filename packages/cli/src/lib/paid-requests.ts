@@ -1,20 +1,18 @@
 import { text } from '@clack/prompts';
 import type { InferOptions } from '@parshjs/core';
 import type { PaidRequest, PaidRequestType } from '@repo/api-client/models';
+import type { PublicApiClient } from '@repo/api-client/public';
 import { MAX_PAID_APPS_REQUEST, MIN_PAID_APPS_REQUEST } from '@repo/api-constants';
 import { z } from 'zod';
 import type { command } from '#commands/paid-request.ts';
-import { PROGRAM_NAME } from '#config.ts';
+import { PROGRAM_NAME, SHARED_OPTIONS } from '#config.ts';
+import { selectApp } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';
 import { defineOutput } from '#lib/output.ts';
 import { answered } from '#lib/prompts.ts';
 
-const REQUEST_LABELS = {
-  apps: { question: 'How many apps do you need in total?', unit: 'app' },
-} satisfies Partial<Record<PaidRequestType, { question: string; unit: string }>>;
-
-type CliPaidRequestType = keyof typeof REQUEST_LABELS;
-const REQUEST_TYPES = Object.keys(REQUEST_LABELS) as [CliPaidRequestType, ...CliPaidRequestType[]];
+const REQUEST_TYPES = ['apps', 'custom-bucket'] as const satisfies readonly PaidRequestType[];
+type CliPaidRequestType = (typeof REQUEST_TYPES)[number];
 
 export const PAID_REQUEST_TYPE_SCHEMA = z.enum(REQUEST_TYPES, {
   error: `Supported paid request types: ${REQUEST_TYPES.join(', ')}.`,
@@ -31,22 +29,37 @@ export const REQUESTED_APPS_AMOUNT_SCHEMA = z
 const PaidRequestOptionsSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum.apps),
-    [REQUESTED_APPS_AMOUNT_FLAG]: REQUESTED_APPS_AMOUNT_SCHEMA,
+    [REQUESTED_APPS_AMOUNT_FLAG]: REQUESTED_APPS_AMOUNT_SCHEMA.optional(),
+  }),
+  z.strictObject({
+    type: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum['custom-bucket']),
+    [SHARED_OPTIONS.app.name]: SHARED_OPTIONS.app.option.schema,
   }),
 ]);
 
 export const PAID_REQUEST_HINT = `Run \`${PROGRAM_NAME} paid-request --type ${PAID_REQUEST_TYPE_SCHEMA.enum.apps}\` to tell us, or pass \`--${REQUESTED_APPS_AMOUNT_FLAG} <total>\` in scripts.`;
 
 export const PAID_REQUEST_OUTPUT = defineOutput({
-  schema: z.object({
-    requestType: PAID_REQUEST_TYPE_SCHEMA,
-    requestedAppsAmount: REQUESTED_APPS_AMOUNT_SCHEMA,
-  }),
+  schema: z.discriminatedUnion('requestType', [
+    z.object({
+      requestType: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum.apps),
+      requestedAppsAmount: REQUESTED_APPS_AMOUNT_SCHEMA,
+    }),
+    z.object({
+      requestType: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum['custom-bucket']),
+      appId: z.string(),
+    }),
+  ]),
   render: function renderRequest({ value, out }) {
-    const { requestType, requestedAppsAmount } = value;
-    const unit = REQUEST_LABELS[requestType].unit;
+    if (value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum['custom-bucket']) {
+      out.success(
+        `Thanks! We recorded your request to use your own S3-compatible bucket for app ${value.appId}. This does not enable the feature or charge you.`,
+      );
+      return;
+    }
+    const { requestedAppsAmount } = value;
     out.success(
-      `Thanks! We recorded your request for ${requestedAppsAmount} ${unit}${requestedAppsAmount === 1 ? '' : 's'} in total. Paid apps are coming.`,
+      `Thanks! We recorded your request for ${requestedAppsAmount} app${requestedAppsAmount === 1 ? '' : 's'} in total. Paid apps are coming.`,
     );
   },
 });
@@ -54,21 +67,17 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
 export async function completePaidRequest({
   options,
   interactive,
+  api,
 }: {
   options: InferOptions<typeof command.options>;
   interactive: boolean;
+  api: PublicApiClient;
 }): Promise<Extract<PaidRequest, { requestType: CliPaidRequestType }>> {
   const supplied = Object.fromEntries(
     Object.entries(options).filter(function provided([, value]) {
       return value !== undefined;
     }),
   );
-  if (
-    options.type === PAID_REQUEST_TYPE_SCHEMA.enum.apps &&
-    options[REQUESTED_APPS_AMOUNT_FLAG] === undefined
-  ) {
-    supplied[REQUESTED_APPS_AMOUNT_FLAG] = await requestedAppsAmount(interactive);
-  }
   const parsed = PaidRequestOptionsSchema.safeParse(supplied);
   if (!parsed.success) {
     const reason = parsed.error.issues
@@ -78,10 +87,19 @@ export async function completePaidRequest({
       .join('; ');
     throw new UsageError(`Invalid options for --type ${options.type}: ${reason}`);
   }
-  return {
-    requestType: parsed.data.type,
-    requestedAppsAmount: parsed.data[REQUESTED_APPS_AMOUNT_FLAG],
-  };
+  if (parsed.data.type === PAID_REQUEST_TYPE_SCHEMA.enum.apps) {
+    return {
+      requestType: parsed.data.type,
+      requestedAppsAmount:
+        parsed.data[REQUESTED_APPS_AMOUNT_FLAG] ?? (await requestedAppsAmount(interactive)),
+    };
+  }
+  const app = await selectApp({
+    api,
+    name: parsed.data[SHARED_OPTIONS.app.name],
+    interactive,
+  });
+  return { requestType: parsed.data.type, appId: app.id };
 }
 
 async function requestedAppsAmount(interactive: boolean): Promise<number> {
@@ -91,7 +109,7 @@ async function requestedAppsAmount(interactive: boolean): Promise<number> {
     );
   }
   const value = answered(
-    await text({ message: REQUEST_LABELS.apps.question, validate: validateAmount }),
+    await text({ message: 'How many apps do you need in total?', validate: validateAmount }),
   );
   return REQUESTED_APPS_AMOUNT_SCHEMA.parse(Number(value));
 }
