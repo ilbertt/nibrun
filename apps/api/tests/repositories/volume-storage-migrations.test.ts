@@ -27,6 +27,7 @@ const DATABASE_START_TIMEOUT_MS = 180_000;
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'migration-owner');
 const OTHER_OWNER_ID = Value.Parse(OwnerIdSchema, 'migration-other');
 const HOST_ID = Value.Parse(HostIdSchema, 'migration-host');
+const OTHER_HOST_ID = Value.Parse(HostIdSchema, 'migration-other-host');
 const ACCESS_KEY_AUTH = Value.Parse(S3VolumeAuthSchema, {
   kind: 'access-key',
   accessKeyId: 'test-access',
@@ -320,13 +321,21 @@ test('a deployment racing with migration cannot select the pending destination',
   );
 });
 
-test('abort cannot return to shared storage after the destination was deployed', async () => {
+test('host recovery cannot return to shared storage after the destination was deployed', async () => {
   const appId = await createApp({ name: 'cutover', deployed: true, configured: false });
   const migration = await repository().request({
     appId,
     ownerId: OWNER_ID,
     destination: destination(ACCESS_KEY_AUTH),
   });
+  expect(
+    await repository().start({
+      appId,
+      ownerId: OWNER_ID,
+      configId: migration!.config_id,
+      hostId: HOST_ID,
+    }),
+  ).toBe(true);
   await sql.begin(async function simulateCutover(transaction) {
     await transaction.unsafe(
       `UPDATE nibrun.deployments d SET state = 'superseded'
@@ -343,10 +352,11 @@ test('abort cannot return to shared storage after the destination was deployed',
     );
   });
   expect(
-    await repository().abort({
+    await repository().abortStarted({
       appId,
       ownerId: OWNER_ID,
       configId: migration!.config_id,
+      hostId: HOST_ID,
       state: 'failed',
       message: 'failed after cutover',
     }),
@@ -414,12 +424,14 @@ test('an abandoned unstarted request is restored after repository restart and ca
     state: 'failed',
     volume_storage_endpoint: null,
   });
-  expect(await repository().start(recovery)).toBe(false);
+  expect(await repository().start({ ...recovery, hostId: HOST_ID })).toBe(false);
   const retry = await repository().request(input);
   expect(retry!.config_id).not.toBe(migration!.config_id);
   expect(await repository().abortUnstarted(recovery)).toBe(false);
-  expect(await repository().start(recovery)).toBe(false);
-  expect(await repository().start({ ...recovery, configId: retry!.config_id })).toBe(true);
+  expect(await repository().start({ ...recovery, hostId: HOST_ID })).toBe(false);
+  expect(
+    await repository().start({ ...recovery, configId: retry!.config_id, hostId: HOST_ID }),
+  ).toBe(true);
 });
 
 test('timeout recovery leaves fresh requests and started work blocked', async () => {
@@ -429,7 +441,7 @@ test('timeout recovery leaves fresh requests and started work blocked', async ()
     ownerId: OWNER_ID,
     destination: destination(ACCESS_KEY_AUTH),
   });
-  const attempt = { appId, ownerId: OWNER_ID, configId: migration!.config_id };
+  const attempt = { appId, ownerId: OWNER_ID, configId: migration!.config_id, hostId: HOST_ID };
   const recovery = { ...attempt, state: 'failed' as const, message: 'timeout' };
   expect(
     await repository().abortUnstarted({ ...recovery, createdBefore: migration!.created_at }),
@@ -460,7 +472,7 @@ test('starting and timeout recovery serialize so recovered attempts cannot begin
     ownerId: OWNER_ID,
     destination: destination(ACCESS_KEY_AUTH),
   });
-  const attempt = { appId, ownerId: OWNER_ID, configId: migration!.config_id };
+  const attempt = { appId, ownerId: OWNER_ID, configId: migration!.config_id, hostId: HOST_ID };
   const [started, recovered] = await Promise.all([
     repository().start(attempt),
     repository().abortUnstarted({
@@ -474,6 +486,89 @@ test('starting and timeout recovery serialize so recovered attempts cannot begin
   expect((await repository().findByApp({ appId, ownerId: OWNER_ID }))?.state).toBe(
     recovered ? 'failed' : 'pending',
   );
+});
+
+test('started recovery requires the owning host and attempt, including after a repository restart', async () => {
+  const appId = await createApp({ name: 'host-owned-recovery', deployed: true, configured: false });
+  const request = { appId, ownerId: OWNER_ID, destination: destination(ACCESS_KEY_AUTH) };
+  const migration = await repository().request(request);
+  const attempt = { appId, ownerId: OWNER_ID, configId: migration!.config_id };
+  expect(
+    await repository().abortStarted({
+      ...attempt,
+      hostId: HOST_ID,
+      state: 'failed',
+      message: null,
+    }),
+  ).toBe(false);
+  const [first, second] = await Promise.all([
+    repository().start({ ...attempt, hostId: HOST_ID }),
+    repository().start({ ...attempt, hostId: OTHER_HOST_ID }),
+  ]);
+  expect([first, second].filter(Boolean)).toHaveLength(1);
+  const hostId = first ? HOST_ID : OTHER_HOST_ID;
+  const otherHostId = first ? OTHER_HOST_ID : HOST_ID;
+  expect(await repository().findByApp({ appId, ownerId: OWNER_ID })).toMatchObject({
+    volume_storage_migration_host_id: hostId,
+    volume_storage_migration_started_at: expect.any(Date),
+  });
+  const recovery = { ...attempt, state: 'failed' as const, message: 'Host cleanup confirmed.' };
+  expect(await repository().abort(recovery)).toBe(false);
+  expect(await repository().abortStarted({ ...recovery, hostId: otherHostId })).toBe(false);
+  expect(await repository().abortStarted({ ...recovery, hostId, ownerId: OTHER_OWNER_ID })).toBe(
+    false,
+  );
+  await expect(
+    new AppsRepository(withTypes<Queries>(sql)).update({
+      appId,
+      ownerId: OWNER_ID,
+      patch: { name: undefined, args: ['still-blocked'] },
+    }),
+  ).rejects.toBeInstanceOf(ConflictError);
+  expect(await repository().abortStarted({ ...recovery, hostId })).toBe(true);
+  expect(await repository().abortStarted({ ...recovery, hostId })).toBe(false);
+  expect(await repository().findByApp({ appId, ownerId: OWNER_ID })).toMatchObject({
+    state: 'failed',
+    volume_storage_endpoint: null,
+    volume_storage_bucket: null,
+  });
+  const retry = await repository().request(request);
+  expect(await repository().findByApp({ appId, ownerId: OWNER_ID })).toMatchObject({
+    volume_storage_migration_host_id: null,
+    volume_storage_migration_started_at: null,
+  });
+  expect(await repository().abortStarted({ ...recovery, hostId })).toBe(false);
+  expect(await repository().start({ ...attempt, configId: retry!.config_id, hostId })).toBe(true);
+  expect(await repository().abortStarted({ ...recovery, hostId })).toBe(false);
+  expect((await repository().findByApp({ appId, ownerId: OWNER_ID }))?.state).toBe('pending');
+});
+
+test('legacy started attempts without a known host cannot be released by a guessed cleanup', async () => {
+  const appId = await createApp({
+    name: 'unknown-started-host',
+    deployed: true,
+    configured: false,
+  });
+  const migration = await repository().request({
+    appId,
+    ownerId: OWNER_ID,
+    destination: destination(ACCESS_KEY_AUTH),
+  });
+  await sql.unsafe(
+    `UPDATE nibrun.apps SET volume_storage_migration_started_at = now()
+     WHERE id = $1 AND owner_id = $2`,
+    [appId, OWNER_ID],
+  );
+  const recovery = {
+    appId,
+    ownerId: OWNER_ID,
+    configId: migration!.config_id,
+    state: 'failed' as const,
+    message: 'Unknown writer.',
+  };
+  expect(await repository().abort(recovery)).toBe(false);
+  expect(await repository().abortStarted({ ...recovery, hostId: HOST_ID })).toBe(false);
+  expect(await repository().abortStarted({ ...recovery, hostId: OTHER_HOST_ID })).toBe(false);
 });
 
 async function createApp({

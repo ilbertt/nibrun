@@ -1,5 +1,5 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
-import { type AppId, ObjectKeySchema } from '@repo/protocol';
+import { type AppId, type HostId, ObjectKeySchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
@@ -36,7 +36,7 @@ export abstract class VolumeStorageMigrationsRepositoryContract {
     input: RequestVolumeStorageMigrationInput,
   ): Promise<VolumeStorageMigrationRow | null>;
   abstract findByApp(input: OwnedApp): Promise<VolumeStorageMigrationRow | null>;
-  abstract start(input: MigrationAttempt): Promise<boolean>;
+  abstract start(input: MigrationAttempt & { hostId: HostId }): Promise<boolean>;
   abstract listUnstarted(input: {
     createdBefore: Date;
     limit: number;
@@ -45,6 +45,9 @@ export abstract class VolumeStorageMigrationsRepositoryContract {
     input: AbortVolumeStorageMigrationInput & { createdBefore: Date },
   ): Promise<boolean>;
   abstract abort(input: AbortVolumeStorageMigrationInput): Promise<boolean>;
+  abstract abortStarted(
+    input: AbortVolumeStorageMigrationInput & { hostId: HostId },
+  ): Promise<boolean>;
 }
 
 export class VolumeStorageMigrationsRepository
@@ -83,7 +86,7 @@ export class VolumeStorageMigrationsRepository
       await tx.MarkVolumeStorageMigrationPending`
         UPDATE nibrun.apps
         SET volume_storage_migration_state = 'pending', volume_storage_migration_message = NULL,
-            volume_storage_migration_started_at = NULL
+            volume_storage_migration_started_at = NULL, volume_storage_migration_host_id = NULL
         WHERE id = ${appId} AND owner_id = ${ownerId}
       `;
       return this.read({ tx, appId, ownerId });
@@ -95,7 +98,12 @@ export class VolumeStorageMigrationsRepository
   }
 
   // A worker must win this transition before issuing any host-side work, including after a restart.
-  start({ appId, ownerId, configId }: MigrationAttempt): Promise<boolean> {
+  start({
+    appId,
+    ownerId,
+    configId,
+    hostId,
+  }: MigrationAttempt & { hostId: HostId }): Promise<boolean> {
     return this.sql.begin(async (tx) => {
       const app = await lockApp({ tx, appId, ownerId });
       if (
@@ -110,7 +118,7 @@ export class VolumeStorageMigrationsRepository
       }
       await tx.StartVolumeStorageMigration`
         UPDATE nibrun.apps
-        SET volume_storage_migration_started_at = now()
+        SET volume_storage_migration_started_at = now(), volume_storage_migration_host_id = ${hostId}
         WHERE id = ${appId} AND owner_id = ${ownerId}
       `;
       return true;
@@ -134,11 +142,15 @@ export class VolumeStorageMigrationsRepository
   }
 
   abortUnstarted(input: AbortVolumeStorageMigrationInput & { createdBefore: Date }) {
-    return this.restore({ ...input, unstartedBefore: input.createdBefore });
+    return this.restore({ ...input, unstartedBefore: input.createdBefore, hostId: undefined });
   }
 
-  // The caller must stop the destination writer and finish its cleanup before releasing the guard.
   abort(input: AbortVolumeStorageMigrationInput): Promise<boolean> {
+    return this.restore({ ...input, unstartedBefore: undefined, hostId: undefined });
+  }
+
+  // Only after this host confirms the destination writer and copy work have stopped for this attempt.
+  abortStarted(input: AbortVolumeStorageMigrationInput & { hostId: HostId }): Promise<boolean> {
     return this.restore({ ...input, unstartedBefore: undefined });
   }
 
@@ -149,21 +161,28 @@ export class VolumeStorageMigrationsRepository
     state,
     message,
     unstartedBefore,
-  }: AbortVolumeStorageMigrationInput & { unstartedBefore: Date | undefined }): Promise<boolean> {
+    hostId,
+  }: AbortVolumeStorageMigrationInput & {
+    unstartedBefore: Date | undefined;
+    hostId: HostId | undefined;
+  }): Promise<boolean> {
     return this.sql.begin(async (tx) => {
       const app = await lockApp({ tx, appId, ownerId });
       if (app?.volume_storage_migration_state !== 'pending') {
+        return false;
+      }
+      const expectedHostId =
+        app.volume_storage_migration_started_at === null
+          ? undefined
+          : app.volume_storage_migration_host_id;
+      if (hostId !== expectedHostId) {
         return false;
       }
       const migration = await this.read({ tx, appId, ownerId });
       if (migration?.config_id !== configId) {
         return false;
       }
-      if (
-        unstartedBefore !== undefined &&
-        (app.volume_storage_migration_started_at !== null ||
-          migration.created_at >= unstartedBefore)
-      ) {
+      if (unstartedBefore !== undefined && migration.created_at >= unstartedBefore) {
         return false;
       }
       const source = await this.source({ tx, appId, ownerId });
@@ -207,6 +226,7 @@ export class VolumeStorageMigrationsRepository
       /* @notNull state */
       SELECT a.id AS app_id, a.volume_storage_migration_state AS state,
              a.volume_storage_migration_message AS message, a.updated_at,
+             a.volume_storage_migration_started_at, a.volume_storage_migration_host_id,
              c.id AS config_id, c.created_at, c.volume_storage_endpoint, c.volume_storage_bucket,
              c.volume_storage_prefix, c.volume_storage_region, c.volume_storage_auth_kind
       FROM nibrun.apps a
