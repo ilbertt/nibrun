@@ -12,7 +12,9 @@ import { APP_STATES, type AppHostnameState, type AppName, type AppState } from '
 import type { DnsLabel } from '#lib/api/dns-label.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
+import { ConflictError } from '#lib/errors.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
+import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
@@ -445,18 +447,13 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    */
   update({ appId, ownerId, patch: { name, ...config } }: OwnedApp & { patch: SealedAppPatch }) {
     return this.sql.begin(async (tx) => {
-      const [locked] = await tx.SelectAppForUpdate`
-        SELECT a.id
-        FROM nibrun.live_apps a
-        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-        FOR UPDATE
-      `;
+      const locked = await lockAppForMutation({ tx, appId, ownerId });
       if (!locked) {
         return null;
       }
 
       if (Object.keys(config).length > 0) {
-        await appendConfigVersion({ tx, appId, patch: config });
+        await appendConfigVersion({ tx, appId, patch: config, storage: undefined });
       }
 
       await tx.TouchApp`
@@ -626,6 +623,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
   updateState({ appId, ownerId, state, from }: StateChange) {
     return this.sql.begin(async (tx) => {
+      if (!(await lockAppForMutation({ tx, appId, ownerId }))) {
+        return null;
+      }
       // Untagged for the reason `insertEnvironment` is: `sql.array` is a clause the generator
       // blanks out before it parses the statement, and `state = ANY()` is not a predicate. There
       // is no row type to lose — the only column is the id, and all this reads from it is
@@ -647,15 +647,17 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
  * the write is a single INSERT — under the row lock `update` holds, which is what keeps two of
  * these from each reading the same starting config.
  */
-async function appendConfigVersion({
+export async function appendConfigVersion({
   tx,
   appId,
   patch,
+  storage,
 }: {
   tx: TypedSQL<Queries>;
   appId: AppId;
   patch: SealedConfigPatch;
-}): Promise<void> {
+  storage: StoredVolumeStorage | undefined;
+}): Promise<string> {
   const [current] = await tx.SelectCurrentAppConfig`
     /* @notNull environment_names */
     SELECT c.id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -679,6 +681,7 @@ async function appendConfigVersion({
   }
 
   const config = { ...toAppConfig(current), ...patch };
+  const volumeStorage = storage ?? current;
 
   const [inserted] = await tx.InsertPatchedAppConfig`
     INSERT INTO nibrun.app_configs (
@@ -703,10 +706,10 @@ async function appendConfigVersion({
       ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
       ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
       ${config.restartPolicy.resetAfterMs},
-      ${current.volume_storage_endpoint}, ${current.volume_storage_bucket}, ${current.volume_storage_prefix},
-      ${current.volume_storage_region}, ${current.volume_storage_auth_kind}, ${current.volume_storage_access_key_id},
-      ${current.volume_storage_secret_access_key}, ${current.volume_storage_session_token},
-      ${current.volume_storage_encryption_password}
+      ${volumeStorage.volume_storage_endpoint}, ${volumeStorage.volume_storage_bucket}, ${volumeStorage.volume_storage_prefix},
+      ${volumeStorage.volume_storage_region}, ${volumeStorage.volume_storage_auth_kind}, ${volumeStorage.volume_storage_access_key_id},
+      ${volumeStorage.volume_storage_secret_access_key}, ${volumeStorage.volume_storage_session_token},
+      ${volumeStorage.volume_storage_encryption_password}
     )
     RETURNING id
   `;
@@ -726,6 +729,33 @@ async function appendConfigVersion({
     names: current.environment_names.filter((name) => !edited.has(name)),
   });
   await insertEnvironment({ tx, configId: inserted.id, environment: environment.set });
+  return inserted.id;
+}
+
+export async function lockApp({
+  tx,
+  appId,
+  ownerId,
+}: {
+  tx: TypedSQL<Queries>;
+  appId: AppId;
+  ownerId: OwnerId;
+}) {
+  const [app] = await tx.SelectAppForUpdate`
+    SELECT a.id, a.state, a.volume_storage_migration_state
+    FROM nibrun.apps a
+    WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND a.state <> 'deleted'
+    FOR UPDATE
+  `;
+  return app;
+}
+
+export async function lockAppForMutation(input: Parameters<typeof lockApp>[0]): Promise<boolean> {
+  const app = await lockApp(input);
+  if (app?.volume_storage_migration_state === 'pending') {
+    throw new ConflictError('Cannot change this app while its storage migration is pending.');
+  }
+  return app !== undefined;
 }
 
 /**

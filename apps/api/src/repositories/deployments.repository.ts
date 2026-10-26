@@ -9,6 +9,7 @@ import type {
   OAuthClientId,
   OwnerId,
 } from '#lib/api/identifiers.ts';
+import { lockAppForMutation } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type DeploymentRow = Queries['SelectDeploymentById'];
@@ -198,6 +199,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if (onlyOne && (await alreadyDeployed({ tx, appId, ownerId }))) {
         return { outcome: 'held' };
       }
+      await lockAppForMutation({ tx, appId, ownerId });
       await this.supersedeLive({ tx, appId, ownerId });
 
       // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one
@@ -247,6 +249,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if (!replayable) {
         return null;
       }
+      await lockAppForMutation({ tx, appId, ownerId });
       await this.supersedeLive({ tx, appId, ownerId });
 
       const [inserted] = await tx.InsertReplayedDeployment`

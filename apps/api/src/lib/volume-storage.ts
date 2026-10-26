@@ -3,6 +3,19 @@ import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
 import { openSecret, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 
+export type StoredVolumeStorage = Pick<
+  Queries['SelectCurrentAppConfig'],
+  | 'volume_storage_endpoint'
+  | 'volume_storage_bucket'
+  | 'volume_storage_prefix'
+  | 'volume_storage_region'
+  | 'volume_storage_auth_kind'
+  | 'volume_storage_access_key_id'
+  | 'volume_storage_secret_access_key'
+  | 'volume_storage_session_token'
+  | 'volume_storage_encryption_password'
+>;
+
 export function toVolumeStorage({
   row,
   secretsKey,

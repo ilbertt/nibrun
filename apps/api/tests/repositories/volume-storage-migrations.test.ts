@@ -1,12 +1,21 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
-import { AppIdSchema, HostIdSchema, type S3VolumeAuth, S3VolumeAuthSchema } from '@repo/protocol';
+import {
+  AppIdSchema,
+  DeploymentIdSchema,
+  HostIdSchema,
+  type S3VolumeAuth,
+  S3VolumeAuthSchema,
+} from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
-import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { ConflictError } from '#lib/errors.ts';
 import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
+import { AppsRepository } from '#repositories/apps.repository.ts';
+import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import {
   type VolumeStorageMigrationDestination,
   VolumeStorageMigrationsRepository,
@@ -80,55 +89,68 @@ test.each([
     sessionToken: 'test-token',
   }),
   { kind: 'anonymous' as const },
-])('a pending $kind destination leaves the live config and volume unchanged', async (auth) => {
-  const appId = await createApp({ name: auth.kind, deployed: true, configured: false });
-  const before = await desiredVolumes();
-  const target = destination(auth);
-  const job = await repository().request({ appId, ownerId: OWNER_ID, destination: target });
-  if (job === null) {
-    throw new Error('The deployed shared app must accept a migration request.');
-  }
-  expect(job).toMatchObject({
-    app_id: appId,
-    state: 'pending',
-    volume_storage_bucket: target.volume_storage_bucket,
-  });
-  expect(job.created_at).toBeInstanceOf(Date);
-  expect(job.updated_at).toBeInstanceOf(Date);
-  expect(String(job.volume_storage_prefix)).toBe(`apps/${appId}/${job.id}/`);
-  expect(job).not.toHaveProperty('volume_storage_access_key_id');
-  expect(job).not.toHaveProperty('volume_storage_secret_access_key');
-  expect(job).not.toHaveProperty('volume_storage_session_token');
-  expect(job).not.toHaveProperty('volume_storage_encryption_password');
-  expect(await desiredVolumes()).toEqual(before);
-  const [current] = await sql.unsafe(
-    `SELECT c.id, c.volume_storage_endpoint FROM nibrun.app_configs c
+])(
+  'a pending $kind destination uses app_configs while the deployed volume stays unchanged',
+  async (auth) => {
+    const appId = await createApp({ name: auth.kind, deployed: true, configured: false });
+    const environment = { TOKEN: sealed('original-environment') };
+    await new AppsRepository(withTypes<Queries>(sql)).update({
+      appId,
+      ownerId: OWNER_ID,
+      patch: { name: undefined, args: ['serve'], environment: { set: environment, removed: [] } },
+    });
+    const before = await desiredVolumes();
+    const target = destination(auth);
+    const job = await repository().request({ appId, ownerId: OWNER_ID, destination: target });
+    if (job === null) {
+      throw new Error('The deployed shared app must accept a migration request.');
+    }
+    expect(job).toMatchObject({
+      app_id: appId,
+      state: 'pending',
+      volume_storage_bucket: target.volume_storage_bucket,
+    });
+    expect(job.created_at).toBeInstanceOf(Date);
+    expect(job.updated_at).toBeInstanceOf(Date);
+    expect(String(job.volume_storage_prefix).startsWith(`apps/${appId}/`)).toBe(true);
+    expect(job).not.toHaveProperty('volume_storage_access_key_id');
+    expect(job).not.toHaveProperty('volume_storage_secret_access_key');
+    expect(job).not.toHaveProperty('volume_storage_session_token');
+    expect(job).not.toHaveProperty('volume_storage_encryption_password');
+    expect(await desiredVolumes()).toEqual(before);
+    const [current] = await sql.unsafe(
+      `SELECT c.id, c.args, c.volume_storage_endpoint FROM nibrun.app_configs c
      JOIN nibrun.apps a ON a.id = c.app_id
      WHERE a.id = $1 AND a.owner_id = $2 ORDER BY c.id DESC LIMIT 1`,
-    [appId, OWNER_ID],
-  );
-  expect(current.id).toBe(job.source_config_id);
-  expect(current.volume_storage_endpoint).toBeNull();
-  const [stored] = await sql.unsafe(
-    `SELECT m.volume_storage_secret_access_key, m.volume_storage_session_token,
+      [appId, OWNER_ID],
+    );
+    expect(current.id).toBe(job.config_id);
+    expect(current.volume_storage_endpoint).toBe(target.volume_storage_endpoint);
+    expect(current.args).toEqual(['serve']);
+    const variables = await sql.unsafe(
+      'SELECT e.name, e.value FROM nibrun.app_config_environment e JOIN nibrun.app_configs c ON c.id = e.config_id JOIN nibrun.apps a ON a.id = c.app_id WHERE e.config_id = $1 AND a.owner_id = $2',
+      [job.config_id, OWNER_ID],
+    );
+    expect([...variables]).toEqual([{ name: 'TOKEN', value: environment.TOKEN }]);
+    const [stored] = await sql.unsafe(
+      `SELECT m.volume_storage_secret_access_key, m.volume_storage_session_token,
             m.volume_storage_encryption_password
-     FROM nibrun.volume_storage_migrations m JOIN nibrun.apps a ON a.id = m.app_id
+     FROM nibrun.app_configs m JOIN nibrun.apps a ON a.id = m.app_id
      WHERE m.id = $1 AND a.owner_id = $2`,
-    [job.id, OWNER_ID],
-  );
-  expect(stored.volume_storage_encryption_password).toBe(target.volume_storage_encryption_password);
-  expect(
-    openSecret({ key: TEST_SECRETS_KEY, sealed: stored.volume_storage_encryption_password }),
-  ).toBe('filesystem-password');
-  expect(stored.volume_storage_secret_access_key).toBe(target.volume_storage_secret_access_key);
-  expect(stored.volume_storage_session_token).toBe(target.volume_storage_session_token);
-  expect(await repository().findById({ appId, ownerId: OWNER_ID, migrationId: job.id })).toEqual(
-    job,
-  );
-  expect(
-    await repository().findById({ appId, ownerId: OTHER_OWNER_ID, migrationId: job.id }),
-  ).toBeNull();
-});
+      [job.config_id, OWNER_ID],
+    );
+    expect(stored.volume_storage_encryption_password).toBe(
+      target.volume_storage_encryption_password,
+    );
+    expect(
+      openSecret({ key: TEST_SECRETS_KEY, sealed: stored.volume_storage_encryption_password }),
+    ).toBe('filesystem-password');
+    expect(stored.volume_storage_secret_access_key).toBe(target.volume_storage_secret_access_key);
+    expect(stored.volume_storage_session_token).toBe(target.volume_storage_session_token);
+    expect(await repository().findByApp({ appId, ownerId: OWNER_ID })).toEqual(job);
+    expect(await repository().findByApp({ appId, ownerId: OTHER_OWNER_ID })).toBeNull();
+  },
+);
 
 test('concurrent requests retain one pending destination and retries get fresh prefixes', async () => {
   const appId = await createApp({ name: 'concurrent', deployed: true, configured: false });
@@ -144,15 +166,194 @@ test('concurrent requests retain one pending destination and retries get fresh p
     destination: { ...input.destination, volume_storage_bucket: 'another-bucket' },
   });
   expect(changed).toEqual(first);
-  await sql.unsafe(
-    `UPDATE nibrun.volume_storage_migrations m SET state = 'failed', message = 'retry'
-     FROM nibrun.apps a WHERE m.app_id = a.id AND m.id = $1 AND a.owner_id = $2`,
-    [first!.id, OWNER_ID],
-  );
+  expect(
+    await repository().abort({
+      appId,
+      ownerId: OWNER_ID,
+      configId: first!.config_id,
+      state: 'failed',
+      message: 'retry',
+    }),
+  ).toBe(true);
+  expect(await repository().findByApp({ appId, ownerId: OWNER_ID })).toMatchObject({
+    state: 'failed',
+    message: 'retry',
+    volume_storage_endpoint: null,
+  });
   const retry = await repository().request(input);
   expect(retry).not.toBeNull();
-  expect(retry!.id).not.toBe(first!.id);
+  expect(retry!.config_id).not.toBe(first!.config_id);
   expect(retry!.volume_storage_prefix).not.toBe(first!.volume_storage_prefix);
+  expect(
+    await repository().abort({
+      appId,
+      ownerId: OWNER_ID,
+      configId: first!.config_id,
+      state: 'cancelled',
+      message: null,
+    }),
+  ).toBe(false);
+});
+
+test('pending migration blocks config edits, deployments, rollbacks and deletion until cancelled', async () => {
+  const appId = await createApp({ name: 'guarded', deployed: true, configured: false });
+  const apps = new AppsRepository(withTypes<Queries>(sql));
+  const deployments = new DeploymentsRepository(withTypes<Queries>(sql));
+  const [previous] = await sql.unsafe(
+    'SELECT d.id, d.artifact_id FROM nibrun.deployments d JOIN nibrun.apps a ON a.id = d.app_id WHERE a.id = $1 AND a.owner_id = $2 ORDER BY d.id DESC LIMIT 1',
+    [appId, OWNER_ID],
+  );
+  const artifactId = Value.Parse(ArtifactIdSchema, previous.artifact_id);
+  const migration = await repository().request({
+    appId,
+    ownerId: OWNER_ID,
+    destination: destination(ACCESS_KEY_AUTH),
+  });
+  const attempts = [
+    function edit() {
+      return apps.update({
+        appId,
+        ownerId: OWNER_ID,
+        patch: { name: undefined, args: ['edited'] },
+      });
+    },
+    function deploy() {
+      return deployments.insert({
+        appId,
+        ownerId: OWNER_ID,
+        artifactId,
+        initialDataFrom: null,
+        onlyOne: false,
+      });
+    },
+    function rollback() {
+      return deployments.insertRollback({
+        appId,
+        ownerId: OWNER_ID,
+        rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),
+      });
+    },
+    function remove() {
+      return apps.updateState({
+        appId,
+        ownerId: OWNER_ID,
+        state: 'deleting',
+        from: ['active', 'suspended'],
+      });
+    },
+  ];
+  for (const attempt of attempts) {
+    await expect(attempt()).rejects.toBeInstanceOf(ConflictError);
+  }
+  expect(
+    await repository().abort({
+      appId,
+      ownerId: OTHER_OWNER_ID,
+      configId: migration!.config_id,
+      state: 'cancelled',
+      message: null,
+    }),
+  ).toBe(false);
+  expect(
+    await repository().abort({
+      appId,
+      ownerId: OWNER_ID,
+      configId: migration!.config_id,
+      state: 'cancelled',
+      message: null,
+    }),
+  ).toBe(true);
+  expect(await repository().findByApp({ appId, ownerId: OWNER_ID })).toMatchObject({
+    state: 'cancelled',
+    volume_storage_endpoint: null,
+    volume_storage_bucket: null,
+  });
+  expect(
+    (
+      await apps.update({
+        appId,
+        ownerId: OWNER_ID,
+        patch: { name: undefined, args: ['after-cancel'] },
+      })
+    )?.args,
+  ).toEqual(['after-cancel']);
+  expect(
+    (
+      await deployments.insert({
+        appId,
+        ownerId: OWNER_ID,
+        artifactId,
+        initialDataFrom: null,
+        onlyOne: false,
+      })
+    ).outcome,
+  ).toBe('created');
+  expect((await desiredVolumes()).find((volume) => volume.appId === appId)).not.toHaveProperty(
+    'storage',
+  );
+});
+
+test('a deployment racing with migration cannot select the pending destination', async () => {
+  const appId = await createApp({ name: 'deployment-race', deployed: true, configured: false });
+  const [previous] = await sql.unsafe(
+    'SELECT d.artifact_id FROM nibrun.deployments d JOIN nibrun.apps a ON a.id = d.app_id WHERE a.id = $1 AND a.owner_id = $2 ORDER BY d.id DESC LIMIT 1',
+    [appId, OWNER_ID],
+  );
+  const [migration, deployment] = await Promise.allSettled([
+    repository().request({ appId, ownerId: OWNER_ID, destination: destination(ACCESS_KEY_AUTH) }),
+    new DeploymentsRepository(withTypes<Queries>(sql)).insert({
+      appId,
+      ownerId: OWNER_ID,
+      artifactId: Value.Parse(ArtifactIdSchema, previous.artifact_id),
+      initialDataFrom: null,
+      onlyOne: false,
+    }),
+  ]);
+  expect(migration).toMatchObject({ status: 'fulfilled', value: { state: 'pending' } });
+  if (deployment.status === 'rejected') {
+    expect(deployment.reason).toBeInstanceOf(ConflictError);
+  } else {
+    expect(deployment.value.outcome).toBe('created');
+  }
+  expect((await desiredVolumes()).find((volume) => volume.appId === appId)).not.toHaveProperty(
+    'storage',
+  );
+});
+
+test('abort cannot return to shared storage after the destination was deployed', async () => {
+  const appId = await createApp({ name: 'cutover', deployed: true, configured: false });
+  const migration = await repository().request({
+    appId,
+    ownerId: OWNER_ID,
+    destination: destination(ACCESS_KEY_AUTH),
+  });
+  await sql.begin(async function simulateCutover(transaction) {
+    await transaction.unsafe(
+      `UPDATE nibrun.deployments d SET state = 'superseded'
+       FROM nibrun.apps a WHERE a.id = d.app_id AND a.id = $1 AND a.owner_id = $2`,
+      [appId, OWNER_ID],
+    );
+    await transaction.unsafe(
+      `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state)
+       SELECT a.id, d.artifact_id, $3, 'running'
+       FROM nibrun.apps a
+       JOIN LATERAL (SELECT artifact_id FROM nibrun.deployments d WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1) d ON true
+       WHERE a.id = $1 AND a.owner_id = $2`,
+      [appId, OWNER_ID, migration!.config_id],
+    );
+  });
+  expect(
+    await repository().abort({
+      appId,
+      ownerId: OWNER_ID,
+      configId: migration!.config_id,
+      state: 'failed',
+      message: 'failed after cutover',
+    }),
+  ).toBe(false);
+  expect((await desiredVolumes()).find((volume) => volume.appId === appId)?.storage?.bucket).toBe(
+    'customer-data',
+  );
 });
 
 test('unowned, undeployed and configured apps cannot queue a migration', async () => {

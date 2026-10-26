@@ -15,11 +15,6 @@ export const ImportIdSchema = identifierSchema<ImportId>(
   'One uploaded archive an app can be given as its starting data.',
 );
 
-export type VolumeStorageMigrationId = Identifier<'VolumeStorageMigrationId'>;
-export const VolumeStorageMigrationIdSchema = identifierSchema<VolumeStorageMigrationId>(
-  'One migration of an app volume to its own bucket.',
-);
-
 export type SqliteConnectionId = Identifier<'SqliteConnectionId'>;
 export const SqliteConnectionIdSchema = identifierSchema<SqliteConnectionId>(
   'One saved database connection.',
