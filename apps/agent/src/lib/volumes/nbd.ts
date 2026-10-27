@@ -23,6 +23,7 @@ const NBD_BLOCK_SIZE_BYTES = 4096;
 const NBD_TIMEOUT_SECONDS = 600;
 
 const SYSFS_BLOCK_DIRECTORY = '/sys/block';
+const NBD_DEVICE_NAME = /^nbd(?:0|[1-9]\d*)$/;
 /** The unit the kernel publishes capacity in, whatever logical block size the device negotiated. */
 const SYSFS_SECTOR_BYTES = 512;
 
@@ -248,7 +249,7 @@ export function existingNbdDevices() {
     const fs = yield* FileSystem.FileSystem;
     const devices = new Set<string>();
     for (const name of yield* fs.readDirectory(SYSFS_BLOCK_DIRECTORY)) {
-      if (!/^nbd(?:0|[1-9]\d*)$/.test(name)) {
+      if (!NBD_DEVICE_NAME.test(name)) {
         continue;
       }
       const devicePath = `/dev/${name}`;
@@ -314,6 +315,45 @@ function attachmentAttribute(input: Parameters<typeof readAttribute>[0]) {
       error.reason === 'NotFound' ? Effect.succeedNone : Effect.fail(error),
     ),
     Effect.mapError(() => new NbdAttachmentUnavailable()),
+  );
+}
+
+/** Requires exclusive device ownership and stopped guest writes; does not establish export identity. */
+export function detachAndWaitForDisconnect(devicePath: string) {
+  return Effect.gen(function* () {
+    const name = basename(devicePath);
+    if (devicePath !== `/dev/${name}` || !NBD_DEVICE_NAME.test(name)) {
+      return yield* new NbdAttachmentUnavailable();
+    }
+    const fs = yield* FileSystem.FileSystem;
+    const [device, kernel] = yield* Effect.all([
+      fs.stat(devicePath),
+      fs.stat(`${SYSFS_BLOCK_DIRECTORY}/${name}`),
+    ]);
+    if (device.type !== 'BlockDevice' || kernel.type !== 'Directory') {
+      return yield* new NbdAttachmentUnavailable();
+    }
+    const attribute = { devicePath, attribute: 'pid' };
+    const pid = yield* attachmentAttribute(attribute);
+    if (Option.isNone(pid)) {
+      return;
+    }
+    if (!/^[1-9]\d*$/.test(pid.value) || (yield* detach(devicePath)).code !== 0) {
+      return yield* new NbdAttachmentUnavailable();
+    }
+    yield* attachmentAttribute(attribute).pipe(
+      Effect.repeat({
+        schedule: Schedule.spaced('50 millis'),
+        until: Option.isNone,
+      }),
+      Effect.timeoutFail({
+        duration: '2 seconds',
+        onTimeout: () => new NbdAttachmentUnavailable(),
+      }),
+    );
+  }).pipe(
+    Effect.mapError(() => new NbdAttachmentUnavailable()),
+    Effect.asVoid,
   );
 }
 
