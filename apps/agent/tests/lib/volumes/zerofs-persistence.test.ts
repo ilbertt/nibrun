@@ -9,10 +9,12 @@ import { createCheckpoint, flush } from '#lib/volumes/zerofs.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
 import { CommandRunner, stdoutOf } from '#services/command-runner.service.ts';
+import { VolumeImageCopier } from '#services/volume-image-copier.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { CHECKPOINT_ID, VOLUME_ID, VOLUME_SIZE_BYTES } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 import { s3Backend } from '#tests/support/s3-backend.ts';
+import { s3Storage } from '#tests/support/s3-storage.ts';
 import { configuredZerofs } from '#tests/support/zerofs.ts';
 
 const TEST_TIMEOUT_MS = 300_000;
@@ -23,12 +25,91 @@ const EXT4_SIZE_BYTES = 67_108_864;
 const FILE_OWNER = { uid: 12345, gid: 12346 };
 const FILE_MODE = 0o640;
 const DIRECTORY_MODE = 0o755;
+const COPY_IMAGE_BYTES = 2_097_664;
+const LAST_IMAGE_BYTE = 127;
 const run = provided(
   Layer.mergeAll(
     CommandRunner.Default,
     AppVolumeFiles.Default,
+    VolumeImageCopier.Default,
     AppVolumeNbd.DefaultWithoutDependencies.pipe(Layer.provide(agentConfig())),
   ).pipe(Layer.provideMerge(platform)),
+);
+
+test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '1')(
+  'a copied image survives a destination cache-free restart while its source remains intact',
+  async () => {
+    await run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const files = yield* AppVolumeFiles;
+        const copier = yield* VolumeImageCopier;
+        const backend = yield* s3Backend();
+        const source = yield* configuredZerofs(backend);
+        const destination = yield* configuredZerofs({
+          ...backend,
+          storage: s3Storage({ ...backend.storage, prefix: 'migration/destination' }),
+        });
+        const payload = new Uint8Array(COPY_IMAGE_BYTES);
+        payload.set(new TextEncoder().encode(PAYLOAD));
+        payload[payload.length - 1] = LAST_IMAGE_BYTE;
+        const sourcePath = devicePathFor({
+          mount: source.filesystem.mountPath,
+          volumeId: VOLUME_ID,
+          path,
+        });
+        const destinationPath = devicePathFor({
+          mount: destination.filesystem.mountPath,
+          volumeId: VOLUME_ID,
+          path,
+        });
+        yield* source.run(
+          destination.run(
+            Effect.gen(function* () {
+              yield* files.ensure({
+                mountPath: source.filesystem.mountPath,
+                volumeId: VOLUME_ID,
+                sizeBytes: COPY_IMAGE_BYTES,
+              });
+              yield* fs.writeFile(sourcePath, payload);
+              yield* Effect.scoped(
+                Effect.flatMap(fs.open(sourcePath, { flag: 'r+' }), (file) => file.sync),
+              );
+              yield* flush(source.admin);
+              const input = {
+                source: source.filesystem,
+                destination: destination.filesystem,
+                volumeId: VOLUME_ID,
+                sizeBytes: COPY_IMAGE_BYTES,
+              };
+              const receipt = yield* copier.copy(input);
+              expect(receipt.sizeBytes).toBe(COPY_IMAGE_BYTES);
+              expect(String(receipt.digest)).toBe(
+                new Bun.CryptoHasher('sha256').update(payload).digest('hex'),
+              );
+              expect(yield* fs.readFile(destinationPath)).toEqual(payload);
+              expect(yield* Effect.isFailure(copier.copy(input))).toBe(true);
+              expect(yield* fs.readFile(sourcePath)).toEqual(payload);
+              expect(yield* fs.readFile(destinationPath)).toEqual(payload);
+            }),
+          ),
+        );
+        yield* destination.clearCache;
+        yield* destination.run(
+          Effect.gen(function* () {
+            expect(yield* fs.readFile(destinationPath)).toEqual(payload);
+          }),
+        );
+        yield* source.run(
+          Effect.gen(function* () {
+            expect(yield* fs.readFile(sourcePath)).toEqual(payload);
+          }),
+        );
+      }).pipe(Effect.timeout('4 minutes')),
+    );
+  },
+  TEST_TIMEOUT_MS,
 );
 
 function attachedVolume<A, E, R>({

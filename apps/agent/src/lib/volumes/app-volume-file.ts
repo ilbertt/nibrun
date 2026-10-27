@@ -109,6 +109,28 @@ function writableImage(path: string) {
   }).pipe(Effect.catchTag('AppVolumeFileMissing', () => openHandle({ path, flags: CREATE_FLAGS })));
 }
 
+export function openAppVolumeImage({
+  mountPath,
+  volumeId,
+  access,
+}: AppVolumeFile & { access: 'read' | 'create' }) {
+  return Effect.gen(function* () {
+    const directory = yield* imageDirectory({ mountPath, create: access === 'create' });
+    const path = yield* imagePath({ directory, volumeId });
+    if (access === 'create') {
+      return yield* openHandle({ path, flags: CREATE_FLAGS });
+    }
+    const pinned = yield* openHandle({ path, flags: PIN_FLAGS });
+    if (!(yield* native(() => pinned.stat())).isFile()) {
+      return yield* new AppVolumeFileUnavailable();
+    }
+    return yield* openHandle({
+      path: descriptorPath(pinned),
+      flags: constants.O_RDONLY | constants.O_NONBLOCK,
+    });
+  });
+}
+
 export function ensureAppVolumeFile(input: AppVolumeFile & { sizeBytes: number }) {
   return Effect.scoped(
     Effect.gen(function* () {
