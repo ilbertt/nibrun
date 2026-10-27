@@ -349,21 +349,7 @@ test('host recovery cannot return to shared storage after the destination was de
       hostId: HOST_ID,
     }),
   ).toBe(true);
-  await sql.begin(async function simulateCutover(transaction) {
-    await transaction.unsafe(
-      `UPDATE nibrun.deployments d SET state = 'superseded'
-       FROM nibrun.apps a WHERE a.id = d.app_id AND a.id = $1 AND a.owner_id = $2`,
-      [appId, OWNER_ID],
-    );
-    await transaction.unsafe(
-      `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state)
-       SELECT a.id, d.artifact_id, $3, 'running'
-       FROM nibrun.apps a
-       JOIN LATERAL (SELECT artifact_id FROM nibrun.deployments d WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1) d ON true
-       WHERE a.id = $1 AND a.owner_id = $2`,
-      [appId, OWNER_ID, migration!.config_id],
-    );
-  });
+  await simulateCutover({ appId, configId: migration!.config_id });
   expect(
     await repository().abortStarted({
       appId,
@@ -377,6 +363,83 @@ test('host recovery cannot return to shared storage after the destination was de
   expect((await desiredVolumes()).find((volume) => volume.appId === appId)?.storage?.bucket).toBe(
     'customer-data',
   );
+});
+
+test('only the owning host can complete a deployed destination, unlocking edits and safe rollback', async () => {
+  const appId = await createApp({ name: 'complete-cutover', deployed: true, configured: false });
+  const deployments = new DeploymentsRepository(withTypes<Queries>(sql));
+  const [source] = await deployments.listByApp({ appId, ownerId: OWNER_ID });
+  const migration = await repository().request({
+    appId,
+    ownerId: OWNER_ID,
+    destination: destination(ACCESS_KEY_AUTH),
+  });
+  const attempt = { appId, ownerId: OWNER_ID, configId: migration!.config_id, hostId: HOST_ID };
+  expect(await repository().complete(attempt)).toBe(false);
+  expect(await repository().start(attempt)).toBe(true);
+  expect(await repository().complete(attempt)).toBe(false);
+  expect((await desiredVolumes()).find((volume) => volume.appId === appId)).not.toHaveProperty(
+    'storage',
+  );
+  await simulateCutover(attempt);
+  expect(await repository().complete({ ...attempt, hostId: OTHER_HOST_ID })).toBe(false);
+  expect(await repository().complete({ ...attempt, ownerId: OTHER_OWNER_ID })).toBe(false);
+  expect(await repository().complete({ ...attempt, configId: crypto.randomUUID() })).toBe(false);
+  expect((await repository().findByApp(attempt))?.state).toBe('pending');
+  const apps = new AppsRepository(withTypes<Queries>(sql));
+  const edit = {
+    appId,
+    ownerId: OWNER_ID,
+    patch: { name: undefined, args: ['after-migration'] },
+  };
+  await expect(apps.update(edit)).rejects.toBeInstanceOf(ConflictError);
+  expect(await repository().complete(attempt)).toBe(true);
+  const completed = await repository().findByApp(attempt);
+  expect(completed).toMatchObject({
+    state: 'completed',
+    config_id: attempt.configId,
+    message: null,
+    volume_storage_migration_host_id: HOST_ID,
+    volume_storage_migration_started_at: expect.any(Date),
+  });
+  expect(await repository().complete(attempt)).toBe(true);
+  expect(await repository().findByApp(attempt)).toEqual(completed);
+  expect(
+    await repository().abortStarted({ ...attempt, state: 'failed', message: 'stale failure' }),
+  ).toBe(false);
+  expect(await apps.update(edit)).not.toBeNull();
+  expect(
+    await deployments.insertRollback({ appId, ownerId: OWNER_ID, rollbackOf: source!.id }),
+  ).not.toBeNull();
+  expect((await desiredVolumes()).find((volume) => volume.appId === appId)?.storage).toMatchObject({
+    bucket: 'customer-data',
+    prefix: migration!.volume_storage_prefix,
+  });
+});
+
+test('completion cannot release a cancelled attempt or a newer pending migration', async () => {
+  const appId = await createApp({
+    name: 'complete-stale-attempt',
+    deployed: true,
+    configured: false,
+  });
+  const request = { appId, ownerId: OWNER_ID, destination: destination(ACCESS_KEY_AUTH) };
+  const first = await repository().request(request);
+  const stale = { appId, ownerId: OWNER_ID, configId: first!.config_id, hostId: HOST_ID };
+  expect(await repository().start(stale)).toBe(true);
+  expect(await repository().abortStarted({ ...stale, state: 'cancelled', message: null })).toBe(
+    true,
+  );
+  expect(await repository().complete(stale)).toBe(false);
+  const next = await repository().request(request);
+  const current = { ...stale, configId: next!.config_id };
+  expect(await repository().complete(stale)).toBe(false);
+  expect(await repository().complete(current)).toBe(false);
+  expect(await repository().start(current)).toBe(true);
+  await simulateCutover(current);
+  expect(await repository().complete(stale)).toBe(false);
+  expect((await repository().findByApp(current))?.state).toBe('pending');
+  expect(await repository().complete(current)).toBe(true);
 });
 
 test('unowned, undeployed and configured apps cannot queue a migration', async () => {
@@ -677,6 +740,27 @@ test('legacy started attempts without a known host cannot be released by a guess
   expect(await repository().abortStarted({ ...recovery, hostId: HOST_ID })).toBe(false);
   expect(await repository().abortStarted({ ...recovery, hostId: OTHER_HOST_ID })).toBe(false);
 });
+
+async function simulateCutover({
+  appId,
+  configId,
+}: Pick<Parameters<VolumeStorageMigrationsRepository['complete']>[0], 'appId' | 'configId'>) {
+  await sql.begin(async function cutover(transaction) {
+    await transaction.unsafe(
+      `UPDATE nibrun.deployments d SET state = 'superseded'
+       FROM nibrun.apps a WHERE a.id = d.app_id AND a.id = $1 AND a.owner_id = $2`,
+      [appId, OWNER_ID],
+    );
+    await transaction.unsafe(
+      `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state)
+       SELECT a.id, d.artifact_id, $3, 'running'
+       FROM nibrun.apps a
+       JOIN LATERAL (SELECT artifact_id FROM nibrun.deployments d WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1) d ON true
+       WHERE a.id = $1 AND a.owner_id = $2`,
+      [appId, OWNER_ID, configId],
+    );
+  });
+}
 
 async function createApp({
   name,

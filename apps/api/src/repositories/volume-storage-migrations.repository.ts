@@ -38,6 +38,7 @@ export abstract class VolumeStorageMigrationsRepositoryContract {
   ): Promise<VolumeStorageMigrationRow | null>;
   abstract findByApp(input: OwnedApp): Promise<VolumeStorageMigrationRow | null>;
   abstract start(input: MigrationAttempt & { hostId: HostId }): Promise<boolean>;
+  abstract complete(input: MigrationAttempt & { hostId: HostId }): Promise<boolean>;
   abstract listUnstarted(input: {
     createdBefore: Date;
     limit: number;
@@ -68,7 +69,7 @@ export class VolumeStorageMigrationsRepository
       if (app.volume_storage_migration_state === 'pending') {
         return this.read({ tx, appId, ownerId });
       }
-      const source = await this.source({ tx, appId, ownerId });
+      const source = await this.deployedConfig({ tx, appId, ownerId });
       if (!source || source.volume_storage_endpoint !== null) {
         return null;
       }
@@ -137,6 +138,44 @@ export class VolumeStorageMigrationsRepository
     });
   }
 
+  // The owning host must verify the copy and stop source access before acknowledging cutover.
+  complete({
+    appId,
+    ownerId,
+    configId,
+    hostId,
+  }: MigrationAttempt & { hostId: HostId }): Promise<boolean> {
+    return this.sql.begin(async (tx) => {
+      const app = await lockApp({ tx, appId, ownerId });
+      if (
+        !app ||
+        (app.volume_storage_migration_state !== 'pending' &&
+          app.volume_storage_migration_state !== 'completed') ||
+        app.volume_storage_migration_started_at === null ||
+        app.volume_storage_migration_host_id !== hostId
+      ) {
+        return false;
+      }
+      const migration = await this.read({ tx, appId, ownerId });
+      if (migration?.config_id !== configId || migration.volume_storage_endpoint === null) {
+        return false;
+      }
+      const deployed = await this.deployedConfig({ tx, appId, ownerId });
+      if (deployed?.config_id !== configId) {
+        return false;
+      }
+      if (app.volume_storage_migration_state === 'completed') {
+        return true;
+      }
+      await tx.CompleteVolumeStorageMigration`
+        UPDATE nibrun.apps
+        SET volume_storage_migration_state = 'completed', volume_storage_migration_message = NULL
+        WHERE id = ${appId} AND owner_id = ${ownerId}
+      `;
+      return true;
+    });
+  }
+
   listUnstarted({ createdBefore, limit }: { createdBefore: Date; limit: number }) {
     return this.sql.SelectUnstartedVolumeStorageMigrations`
       /* @notNull config_id */
@@ -197,7 +236,7 @@ export class VolumeStorageMigrationsRepository
       if (unstartedBefore !== undefined && migration.created_at >= unstartedBefore) {
         return false;
       }
-      const source = await this.source({ tx, appId, ownerId });
+      const source = await this.deployedConfig({ tx, appId, ownerId });
       if (!source || source.volume_storage_endpoint !== null) {
         return false;
       }
@@ -211,7 +250,7 @@ export class VolumeStorageMigrationsRepository
     });
   }
 
-  private async source({ tx, appId, ownerId }: TransactionInput) {
+  private async deployedConfig({ tx, appId, ownerId }: TransactionInput) {
     const [row] = await tx.SelectVolumeStorageMigrationSource`
       SELECT c.id AS config_id,
              c.volume_storage_endpoint, c.volume_storage_bucket, c.volume_storage_prefix,
