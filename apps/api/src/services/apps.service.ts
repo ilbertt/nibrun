@@ -37,6 +37,7 @@ import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
+import { toVolumeStorageMigration } from '#lib/volume-storage-migration.ts';
 import type {
   AppHostnameRow,
   AppHostnamesRepositoryContract,
@@ -775,6 +776,7 @@ function toComputeUsage(app: AppRow): ComputeUsage | null {
 }
 
 function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
+  const volumeStorageMigration = toVolumeStorageMigration(app);
   return {
     id: app.id,
     ownerId: app.owner_id,
@@ -786,6 +788,7 @@ function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
     computeUsage: toComputeUsage(app),
     expiresAt: app.expires_at === null ? null : toTimestamp(app.expires_at),
     state: app.state,
+    ...(volumeStorageMigration === undefined ? {} : { volumeStorageMigration }),
     activation: app.activation,
     idleTimeoutMs: app.idle_timeout_ms,
     createdAt: toTimestamp(app.created_at),

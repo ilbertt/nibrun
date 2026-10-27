@@ -106,6 +106,10 @@ function appRow(slug: DnsLabel): AppRow {
     state: 'active',
     activation: 'always',
     idle_timeout_ms: MIN_IDLE_TIMEOUT_MS,
+    config_id: 'config-1',
+    volume_storage_migration_state: null,
+    volume_storage_migration_message: null,
+    volume_storage_migration_started_at: null,
     created_at: new Date(),
     updated_at: new Date(),
     volume_total_bytes: null,
@@ -834,6 +838,64 @@ describe('the placeholder a read returns cannot be set as a value', () => {
 });
 
 // A 403 would confirm the app exists to someone with no right to know it does.
+test('app reads without migration configuration preserve their response shape', async () => {
+  const row = appRow(Value.Parse(DnsLabelSchema, APP_NAME));
+  const appsRepo = Object.assign(new StubAppsRepository({ failures: 0 }), {
+    findById() {
+      return Promise.resolve(row);
+    },
+    listByOwner() {
+      return Promise.resolve([row]);
+    },
+  });
+  const service = serviceWith({ appsRepo });
+  expect(await service.get({ appId: APP_ID, ownerId: OWNER_ID })).not.toHaveProperty(
+    'volumeStorageMigration',
+  );
+  expect((await service.list({ ownerId: OWNER_ID }))[0]).not.toHaveProperty(
+    'volumeStorageMigration',
+  );
+});
+
+test.each([
+  { state: 'pending' as const, startedAt: null, canCancel: true },
+  { state: 'pending' as const, startedAt: new Date(), canCancel: false },
+  { state: 'completed' as const, startedAt: new Date(), canCancel: false },
+  { state: 'failed' as const, startedAt: null, canCancel: false },
+  { state: 'cancelled' as const, startedAt: null, canCancel: false },
+])(
+  'app details and listing include $state migration status with canCancel=$canCancel',
+  async ({ state, startedAt, canCancel }) => {
+    const row = {
+      ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)),
+      volume_storage_migration_state: state,
+      volume_storage_migration_message: 'Migration status.',
+      volume_storage_migration_started_at: startedAt,
+    };
+    const appsRepo = Object.assign(new StubAppsRepository({ failures: 0 }), {
+      findById() {
+        return Promise.resolve(row);
+      },
+      listByOwner() {
+        return Promise.resolve([row]);
+      },
+    });
+    const service = serviceWith({ appsRepo });
+    const expected = {
+      configId: row.config_id,
+      state,
+      message: row.volume_storage_migration_message,
+      canCancel,
+    };
+    expect(
+      (await service.get({ appId: APP_ID, ownerId: OWNER_ID })).volumeStorageMigration,
+    ).toEqual(expected);
+    expect((await service.list({ ownerId: OWNER_ID }))[0]?.volumeStorageMigration).toEqual(
+      expected,
+    );
+  },
+);
+
 describe('an app the caller does not own is one that does not exist', () => {
   test('a statement that matches no row is a 404', async () => {
     const service = serviceWith({ appsRepo: new StubAppsRepository({ failures: 0 }) });

@@ -1,10 +1,23 @@
 import { t } from 'elysia';
 import { OwnedAppStateSchema } from '#lib/api/app.ts';
+import {
+  VolumeStorageMigrationSchema,
+  type VolumeStorageMigrationState,
+} from '#lib/api/volume-storage-migration.ts';
 
-// What state the app should be in, rather than an instruction to stop or start it: the host is
-// never sent either, and reads what it should be running off this. Narrowed to the two an owner
-// moves an app between, so a request cannot ask for a deletion or claim one is finished.
-export const AppStateRequestSchema = t.Object(
-  { state: OwnedAppStateSchema },
-  { additionalProperties: false },
-);
+// One transition per request prevents cancellation and suspension from being partially applied.
+export const AppStateRequestSchema = t.Union([
+  t.Object({ state: OwnedAppStateSchema }, { additionalProperties: false }),
+  t.Object(
+    {
+      volumeStorageMigration: t.Object(
+        {
+          configId: VolumeStorageMigrationSchema.properties.configId,
+          state: t.Literal('cancelled' satisfies VolumeStorageMigrationState),
+        },
+        { additionalProperties: false },
+      ),
+    },
+    { additionalProperties: false },
+  ),
+]);

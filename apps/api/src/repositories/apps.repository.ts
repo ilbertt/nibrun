@@ -225,8 +225,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       const [app] = await tx.SelectCreatedApp`
         /* @notNull environment_names */
         SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
-               a.created_at, a.updated_at,
-               c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
+               a.created_at, a.updated_at, a.volume_storage_migration_state,
+               a.volume_storage_migration_message, a.volume_storage_migration_started_at,
+               c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
                c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
@@ -256,8 +257,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return this.sql.SelectAppsByOwner`
       /* @notNull environment_names */
       SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
-             a.created_at, a.updated_at,
-             c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
+             a.created_at, a.updated_at, a.volume_storage_migration_state,
+             a.volume_storage_migration_message, a.volume_storage_migration_started_at,
+             c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
@@ -412,8 +414,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     const [app] = await this.sql.SelectAppById`
       /* @notNull environment_names */
       SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
-             a.created_at, a.updated_at,
-             c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
+             a.created_at, a.updated_at, a.volume_storage_migration_state,
+             a.volume_storage_migration_message, a.volume_storage_migration_started_at,
+             c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
              c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
@@ -846,8 +849,9 @@ async function appAsChanged({
   const [app] = await tx.SelectAppAsChanged`
     /* @notNull environment_names */
     SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
-           a.created_at, a.updated_at,
-           c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
+           a.created_at, a.updated_at, a.volume_storage_migration_state,
+           a.volume_storage_migration_message, a.volume_storage_migration_started_at,
+           c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
            c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
            c.health_check_grace_period_ms, c.health_check_healthy_threshold,
            c.health_check_unhealthy_threshold,
