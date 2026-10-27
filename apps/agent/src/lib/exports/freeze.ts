@@ -1,5 +1,5 @@
 import type { AppId } from '@repo/protocol';
-import { Data, Duration, Effect, Option } from 'effect';
+import { Data, Duration, Effect } from 'effect';
 import {
   connectRequest,
   dialGuest,
@@ -86,7 +86,19 @@ const NOTHING_TO_HOLD: FreezeLease = { assertHeld: Effect.void };
  * not answer is the case that must not be waved through — that is a guest whose journal still
  * holds writes the bundle would otherwise miss without saying so.
  */
-export const frozen = Effect.fn('frozen')(function* ({
+export function frozen(input: Parameters<typeof freezeRunningGuest>[0]) {
+  return freezeRunningGuest(input).pipe(
+    Effect.catchTag('GuestUnreachable', (error) =>
+      Effect.logInfo('no running guest to freeze; reading the volume as it lies').pipe(
+        Effect.annotateLogs({ appId: input.appId, socketPath: error.socketPath }),
+        Effect.as(NOTHING_TO_HOLD),
+      ),
+    ),
+    Effect.withSpan('frozen'),
+  );
+}
+
+export const freezeRunningGuest = Effect.fn('freezeRunningGuest')(function* ({
   appId,
   vmDir,
 }: {
@@ -94,22 +106,13 @@ export const frozen = Effect.fn('frozen')(function* ({
   vmDir: string;
 }) {
   const socketPath = guestVsockPath({ workingDir: vmWorkingDir({ vmDir, appId }) });
-  const dialled = yield* Effect.acquireRelease(
+  const wire = yield* Effect.acquireRelease(
     Effect.tryPromise({
       try: () => dialGuest({ socketPath }),
       catch: (cause) => new GuestUnreachable({ socketPath, cause }),
     }),
     (wire) => Effect.sync(() => wire.close()),
-  ).pipe(Effect.option);
-
-  if (Option.isNone(dialled)) {
-    yield* Effect.logInfo('no running guest to freeze; reading the volume as it lies').pipe(
-      Effect.annotateLogs({ appId, socketPath }),
-    );
-    return NOTHING_TO_HOLD;
-  }
-
-  const wire = dialled.value;
+  );
   wire.send(connectRequest(GUEST_CONTROL_VSOCK_PORT));
   yield* readConnectReply({
     reply: yield* readLine({ wire, socketPath }),

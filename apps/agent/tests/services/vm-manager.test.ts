@@ -257,6 +257,9 @@ function hostAsleepAndRefusing() {
       imageHost,
       paths,
       socketPath: Systemd.vmApiSocketPath({ runtimeDir, appId: APP_ID }),
+      stopForVolumeMigration: Effect.flatMap(VmManager, (vms) =>
+        vms.stopForVolumeMigration(APP_ID),
+      ).pipe(Effect.either, Effect.provide(services)),
       sleep: Effect.flatMap(VmManager, (vms) =>
         vms.sleep({ appId: APP_ID, deploymentId: DEPLOYMENT_ID, slot: SLOT }),
       ).pipe(Effect.either, Effect.provide(services)),
@@ -269,6 +272,16 @@ function hostAsleepAndRefusing() {
  * start that fails past the stamp check is recoverable only if it leaves nothing loadable behind.
  */
 describe('a wake whose unit systemd would not start', () => {
+  test('a migration invalidates the old snapshot even if its stop cannot be verified', () =>
+    run(
+      Effect.gen(function* () {
+        const host = yield* hostAsleepAndRefusing();
+        const outcome = yield* host.stopForVolumeMigration;
+        expect(Either.isLeft(outcome) && outcome.left._tag).toBe('VolumeMigrationSourceStopFailed');
+        expect(yield* host.kept).toEqual({ stamp: false, snapshot: false });
+      }),
+    ));
+
   test('a legacy snapshot cannot restore even when its version stamp matches', () =>
     run(
       Effect.gen(function* () {

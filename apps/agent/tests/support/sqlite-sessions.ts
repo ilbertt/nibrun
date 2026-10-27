@@ -89,6 +89,7 @@ export function sqliteHost(responses: readonly Buffer[]) {
           sleep: () => Effect.succeed(undefined),
           wake: () => Effect.void,
           stop: () => Effect.void,
+          stopForVolumeMigration: () => Effect.void,
           discard: () => Effect.void,
         }),
       ),
