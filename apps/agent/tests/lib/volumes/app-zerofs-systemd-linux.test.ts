@@ -1,20 +1,27 @@
 import { expect, test } from 'bun:test';
 import { dirname, join } from 'node:path';
-import { FileSystem } from '@effect/platform';
+import { FileSystem, Path } from '@effect/platform';
 import { Effect, Layer, Option } from 'effect';
 import { activateAppZerofs } from '#lib/volumes/app-zerofs-activation.ts';
 import { APP_ZEROFS_CACHE } from '#lib/volumes/app-zerofs-cache.ts';
 import { flushAndStopAppZerofs, flushAppZerofs } from '#lib/volumes/app-zerofs-durability.ts';
 import { assertAppZerofsStopped, observeAppZerofs } from '#lib/volumes/app-zerofs-observation.ts';
-import { assertMounted } from '#lib/volumes/device-file.ts';
+import { assertMounted, devicePathFor } from '#lib/volumes/device-file.ts';
 import { selectVolumeFilesystem } from '#lib/volumes/placement.ts';
+import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
+import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
+import { AppZerofs } from '#services/app-zerofs.service.ts';
 import { CommandRunner, stdoutOf } from '#services/command-runner.service.ts';
+import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
+import { SlotAllocator } from '#services/slot-allocator.service.ts';
+import { VolumeMigrationFences } from '#services/volume-migration-fences.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import {
   additionalAppZerofsInstance,
   appZerofsSystemdHost,
+  emptySharedMount,
 } from '#tests/support/app-zerofs-systemd.ts';
-import { desiredVolume } from '#tests/support/fixtures.ts';
+import { desiredVolume, VOLUME_SIZE_BYTES } from '#tests/support/fixtures.ts';
 import { platform, provided } from '#tests/support/run.ts';
 import { s3Backend } from '#tests/support/s3-backend.ts';
 import { s3Storage } from '#tests/support/s3-storage.ts';
@@ -29,6 +36,77 @@ function unitPid(unit: string) {
     Effect.map((value) => value.trim()),
   );
 }
+
+test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS_SYSTEMD !== '1')(
+  'a real migration destination starts beside the shared source without attaching a device',
+  async () => {
+    await run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const backend = yield* s3Backend();
+        const host = yield* appZerofsSystemdHost(backend.certificate);
+        const sharedMount = yield* emptySharedMount().pipe(Effect.provide(host.config));
+        const dependencies = Layer.mergeAll(
+          AppVolumeFiles.Default,
+          AppVolumeNbd.DefaultWithoutDependencies,
+          SlotAllocator.DefaultWithoutDependencies,
+          ZerofsTopology.DefaultWithoutDependencies,
+          VolumeMigrationFences.Default,
+        ).pipe(
+          Layer.provideMerge(
+            DesiredStateCache.DefaultWithoutDependencies.pipe(Layer.provideMerge(host.config)),
+          ),
+        );
+        const agent = AppZerofs.DefaultWithoutDependencies.pipe(Layer.provideMerge(dependencies));
+        yield* Effect.gen(function* () {
+          const files = yield* AppVolumeFiles;
+          const app = yield* AppZerofs;
+          const fences = yield* VolumeMigrationFences;
+          const allocator = yield* SlotAllocator;
+          const path = yield* Path.Path;
+          const target = desiredVolume({ appId: host.appId, storage: backend.storage });
+          yield* files.ensure({
+            mountPath: sharedMount,
+            volumeId: target.volumeId,
+            sizeBytes: VOLUME_SIZE_BYTES,
+          });
+          const image = devicePathFor({ mount: sharedMount, volumeId: target.volumeId, path });
+          const payload = new Uint8Array(VOLUME_SIZE_BYTES);
+          payload.set(new TextEncoder().encode(PAYLOAD));
+          yield* fs.writeFile(image, payload);
+          yield* fences.during({
+            appId: host.appId,
+            effect: Effect.gen(function* () {
+              const prepared = yield* app.prepareMigration(target);
+              yield* assertMounted(prepared.destination.mountPath);
+              const pid = yield* unitPid(host.units.server);
+              expect(pid).not.toBe('0');
+              expect(yield* app.prepareMigration(target)).toEqual(prepared);
+              expect(yield* unitPid(host.units.server)).toBe(pid);
+              expect(yield* fs.readFile(image)).toEqual(payload);
+              expect(
+                Option.isNone(
+                  yield* files.size({
+                    mountPath: prepared.destination.mountPath,
+                    volumeId: target.volumeId,
+                  }),
+                ),
+              ).toBe(true);
+              expect(Option.isNone(yield* allocator.lookup(host.appId))).toBe(true);
+              expect(yield* Effect.isFailure(app.ensure(target))).toBe(true);
+              yield* flushAndStopAppZerofs(host.appId);
+              expect(yield* fs.readFile(image)).toEqual(payload);
+            }),
+          });
+        }).pipe(
+          Effect.provide(agent),
+          Effect.onError(() => host.journal),
+        );
+      }).pipe(Effect.timeout('4 minutes')),
+    );
+  },
+  TEST_TIMEOUT_MS,
+);
 
 test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS_SYSTEMD !== '1')(
   'the installed per-app systemd templates activate, preserve their writer and stop cleanly',

@@ -17,6 +17,7 @@ import { AppZerofs } from '#services/app-zerofs.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
+import { VolumeMigrationFences } from '#services/volume-migration-fences.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { appZerofsSystemdHost, emptySharedMount } from '#tests/support/app-zerofs-systemd.ts';
 import { desiredVolume, VOLUME_SIZE_BYTES } from '#tests/support/fixtures.ts';
@@ -46,6 +47,7 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS_SYSTE
         const absent = { ...present, desiredState: 'absent' as const };
         const dependencies = Layer.mergeAll(
           AppVolumeNbd.DefaultWithoutDependencies,
+          VolumeMigrationFences.Default,
           ZerofsTopology.DefaultWithoutDependencies,
           SlotAllocator.DefaultWithoutDependencies,
         ).pipe(

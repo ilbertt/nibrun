@@ -48,6 +48,7 @@ test('a fence refuses new admissions and waits for all already-admitted lifecycl
         .pipe(Effect.forkScoped);
       yield* Effect.yieldNow();
       expect(yield* Deferred.isDone(entered)).toBe(false);
+      expect(yield* Effect.isFailure(fences.requireHeld(APP_ID))).toBe(true);
       yield* fences.access({
         appIds: [APP_ID, OTHER_APP],
         use: (blocked) =>
@@ -62,6 +63,7 @@ test('a fence refuses new admissions and waits for all already-admitted lifecycl
       yield* Deferred.succeed(secondFinish, undefined);
       yield* Fiber.join(second);
       yield* Deferred.await(entered);
+      yield* fences.requireHeld(APP_ID);
       expect(yield* Effect.isFailure(fences.during({ appId: APP_ID, effect: Effect.void }))).toBe(
         true,
       );
@@ -69,6 +71,7 @@ test('a fence refuses new admissions and waits for all already-admitted lifecycl
       yield* AgentState.modify((current) => ({ ...current, deferredWork: false }));
       yield* Deferred.succeed(release, undefined);
       yield* Fiber.join(held);
+      expect(yield* Effect.isFailure(fences.requireHeld(APP_ID))).toBe(true);
       expect((yield* AgentState.snapshot).deferredWork).toBe(true);
       yield* fences.access({
         appIds: [APP_ID],
