@@ -1187,6 +1187,10 @@ export interface IMarkVolumeStorageMigrationPendingResult {
 export interface IStartVolumeStorageMigrationResult {
 }
 
+/** Result of query `CompleteVolumeStorageMigration`. */
+export interface ICompleteVolumeStorageMigrationResult {
+}
+
 /** Result of query `SelectUnstartedVolumeStorageMigrations`. */
 export interface ISelectUnstartedVolumeStorageMigrationsResult {
     app_id: IAppsColumns["id"];
@@ -1341,6 +1345,7 @@ export interface Queries {
     SelectExportBlockingVolumeStorageMigration: ISelectExportBlockingVolumeStorageMigrationResult;
     MarkVolumeStorageMigrationPending: IMarkVolumeStorageMigrationPendingResult;
     StartVolumeStorageMigration: IStartVolumeStorageMigrationResult;
+    CompleteVolumeStorageMigration: ICompleteVolumeStorageMigrationResult;
     SelectUnstartedVolumeStorageMigrations: ISelectUnstartedVolumeStorageMigrationsResult;
     AbortVolumeStorageMigration: IAbortVolumeStorageMigrationResult;
     SelectVolumeStorageMigrationSource: ISelectVolumeStorageMigrationSourceResult;
