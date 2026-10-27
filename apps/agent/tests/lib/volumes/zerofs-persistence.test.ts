@@ -1,10 +1,12 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
-import { Effect, Layer, Option } from 'effect';
-import { devicePathFor } from '#lib/volumes/device-file.ts';
+import { Deferred, Effect, Exit, Fiber, Layer, Option } from 'effect';
+import { devicePathFor, NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
 import { FILESYSTEM_LABEL, format } from '#lib/volumes/ext4.ts';
 import { isAttached } from '#lib/volumes/nbd.ts';
+import type { VolumeImageCopyInput } from '#lib/volumes/volume-image-copy.ts';
+import { preflightVolumeImageCopy } from '#lib/volumes/volume-migration-preflight.ts';
 import { createCheckpoint, flush } from '#lib/volumes/zerofs.ts';
 import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
@@ -36,8 +38,50 @@ const run = provided(
   ).pipe(Layer.provideMerge(platform)),
 );
 
+function failedPreflight({
+  input,
+  mode,
+}: {
+  input: VolumeImageCopyInput;
+  mode: 'failure' | 'interruption';
+}) {
+  return Effect.gen(function* () {
+    const commands = yield* CommandRunner;
+    const entered = yield* Deferred.make<void>();
+    let first = true;
+    const intercepted = CommandRunner.make({
+      run: (request) => {
+        if (!first) {
+          return commands.run(request);
+        }
+        first = false;
+        return mode === 'failure'
+          ? Effect.succeed({ code: 1, stdout: '', stderr: 'private backend details' })
+          : Deferred.succeed(entered, undefined).pipe(Effect.andThen(Effect.never));
+      },
+    });
+    const check = preflightVolumeImageCopy(input).pipe(
+      Effect.provideService(CommandRunner, intercepted),
+    );
+    if (mode === 'failure') {
+      const result = yield* Effect.either(check);
+      expect(result._tag).toBe('Left');
+      if (result._tag === 'Left') {
+        expect(result.left._tag).toBe('VolumeMigrationPreflightFailed');
+        expect(result.left.message).not.toContain('private backend details');
+      }
+    } else {
+      const fiber = yield* Effect.forkScoped(check);
+      yield* Deferred.await(entered);
+      expect(Exit.isInterrupted(yield* Fiber.interrupt(fiber))).toBe(true);
+    }
+    const fs = yield* FileSystem.FileSystem;
+    expect(yield* fs.readDirectory(join(input.destination.mountPath, NBD_DIRECTORY))).toEqual([]);
+  });
+}
+
 test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '1')(
-  'a copied image survives a destination cache-free restart while its source remains intact',
+  'preflight cleans up failed probes and a copied image survives a cache-free restart',
   async () => {
     await run(
       Effect.gen(function* () {
@@ -67,6 +111,13 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '
         yield* source.run(
           destination.run(
             Effect.gen(function* () {
+              const input = {
+                source: source.filesystem,
+                destination: destination.filesystem,
+                volumeId: VOLUME_ID,
+                sizeBytes: COPY_IMAGE_BYTES,
+              };
+              expect(yield* Effect.isFailure(copier.preflight(input))).toBe(true);
               yield* files.ensure({
                 mountPath: source.filesystem.mountPath,
                 volumeId: VOLUME_ID,
@@ -77,12 +128,31 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '
                 Effect.flatMap(fs.open(sourcePath, { flag: 'r+' }), (file) => file.sync),
               );
               yield* flush(source.admin);
-              const input = {
-                source: source.filesystem,
-                destination: destination.filesystem,
+              expect(yield* Effect.isFailure(copier.preflight({ ...input, sizeBytes: 512 }))).toBe(
+                true,
+              );
+              yield* failedPreflight({ input, mode: 'failure' });
+              yield* failedPreflight({ input, mode: 'interruption' });
+              yield* copier.preflight(input);
+              expect(
+                yield* fs.readDirectory(join(destination.filesystem.mountPath, NBD_DIRECTORY)),
+              ).toEqual([]);
+              expect(
+                Option.isNone(
+                  yield* files.size({
+                    mountPath: destination.filesystem.mountPath,
+                    volumeId: VOLUME_ID,
+                  }),
+                ),
+              ).toBe(true);
+              yield* fs.writeFile(destinationPath, new Uint8Array());
+              expect(yield* Effect.isFailure(copier.preflight(input))).toBe(true);
+              expect(Number((yield* fs.stat(destinationPath)).size)).toBe(0);
+              yield* files.remove({
+                mountPath: destination.filesystem.mountPath,
                 volumeId: VOLUME_ID,
-                sizeBytes: COPY_IMAGE_BYTES,
-              };
+              });
+              yield* flush(destination.admin);
               const receipt = yield* copier.copy(input);
               expect(receipt.sizeBytes).toBe(COPY_IMAGE_BYTES);
               expect(String(receipt.digest)).toBe(
@@ -90,6 +160,7 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '
               );
               expect(yield* fs.readFile(destinationPath)).toEqual(payload);
               expect(yield* Effect.isFailure(copier.copy(input))).toBe(true);
+              expect(yield* Effect.isFailure(copier.preflight(input))).toBe(true);
               expect(yield* fs.readFile(sourcePath)).toEqual(payload);
               expect(yield* fs.readFile(destinationPath)).toEqual(payload);
             }),
