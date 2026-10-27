@@ -119,3 +119,125 @@ describe('cron idle protection', () => {
       }),
     ));
 });
+
+test('exclusive activity drains existing work and blocks new work only for its app', () =>
+  run(
+    Effect.gen(function* () {
+      const activity = yield* GuestActivity;
+      const first = yield* heldRun(activity);
+      const second = yield* heldRun(activity);
+      const entered = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const exclusive = yield* activity
+        .exclusively({
+          appId: APP_ID,
+          effect: Deferred.succeed(entered, undefined).pipe(
+            Effect.andThen(Deferred.await(release)),
+          ),
+        })
+        .pipe(Effect.forkScoped);
+      yield* Effect.yieldNow();
+      const waiting = yield* Deferred.make<void>();
+      const later = yield* activity
+        .run({ appId: APP_ID, effect: Deferred.succeed(waiting, undefined) })
+        .pipe(Effect.forkScoped);
+      yield* activity.run({ appId: OTHER_APP, effect: Effect.void });
+      expect(yield* Deferred.isDone(entered)).toBe(false);
+      yield* first.finish;
+      expect(yield* Deferred.isDone(entered)).toBe(false);
+      yield* second.finish;
+      yield* Deferred.await(entered);
+      expect(yield* Deferred.isDone(waiting)).toBe(false);
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(exclusive);
+      yield* Fiber.join(later);
+      expect(yield* Deferred.isDone(waiting)).toBe(true);
+    }),
+  ));
+
+test('cancelling an exclusive drain releases admission without cancelling existing work', () =>
+  run(
+    Effect.gen(function* () {
+      const activity = yield* GuestActivity;
+      const current = yield* heldRun(activity);
+      const entered = yield* Ref.make(false);
+      const exclusive = yield* activity
+        .exclusively({ appId: APP_ID, effect: Ref.set(entered, true) })
+        .pipe(Effect.forkScoped);
+      yield* Effect.yieldNow();
+      yield* Fiber.interrupt(exclusive);
+      expect(yield* Ref.get(entered)).toBe(false);
+      expect((yield* Fiber.poll(current.fiber))._tag).toBe('None');
+      yield* activity.run({ appId: APP_ID, effect: Effect.void });
+      yield* current.finish;
+      expect(yield* activity.exclusively({ appId: APP_ID, effect: Effect.succeed('next') })).toBe(
+        'next',
+      );
+    }),
+  ));
+
+test('failed or interrupted exclusive work releases its gate and preserves the outcome', () =>
+  run(
+    Effect.gen(function* () {
+      const activity = yield* GuestActivity;
+      expect(
+        yield* activity
+          .exclusively({ appId: APP_ID, effect: Effect.fail('copy failed') })
+          .pipe(Effect.flip),
+      ).toBe('copy failed');
+      const entered = yield* Deferred.make<void>();
+      const exclusive = yield* activity
+        .exclusively({
+          appId: APP_ID,
+          effect: Deferred.succeed(entered, undefined).pipe(Effect.andThen(Effect.never)),
+        })
+        .pipe(Effect.forkScoped);
+      yield* Deferred.await(entered);
+      yield* Fiber.interrupt(exclusive);
+      yield* activity.run({ appId: APP_ID, effect: Effect.void });
+      expect(yield* activity.exclusively({ appId: APP_ID, effect: Effect.succeed('next') })).toBe(
+        'next',
+      );
+    }),
+  ));
+
+test('a later drain waits for the next activity generation and cancellation of its last run', () =>
+  run(
+    Effect.gen(function* () {
+      const activity = yield* GuestActivity;
+      const earlier = yield* heldRun(activity);
+      const holding = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const firstDrain = yield* activity
+        .exclusively({
+          appId: APP_ID,
+          effect: Deferred.succeed(holding, undefined).pipe(
+            Effect.andThen(Deferred.await(release)),
+          ),
+        })
+        .pipe(Effect.forkScoped);
+      yield* Effect.yieldNow();
+      const started = yield* Deferred.make<void>();
+      const current = yield* activity
+        .run({
+          appId: APP_ID,
+          effect: Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)),
+        })
+        .pipe(Effect.forkScoped);
+      yield* Effect.yieldNow();
+      yield* earlier.finish;
+      yield* Deferred.await(holding);
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(firstDrain);
+      yield* Deferred.await(started);
+      const entered = yield* Deferred.make<void>();
+      const exclusive = yield* activity
+        .exclusively({ appId: APP_ID, effect: Deferred.succeed(entered, undefined) })
+        .pipe(Effect.forkScoped);
+      yield* Effect.yieldNow();
+      expect(yield* Deferred.isDone(entered)).toBe(false);
+      yield* Fiber.interrupt(current);
+      yield* Fiber.join(exclusive);
+      expect(yield* Deferred.isDone(entered)).toBe(true);
+    }),
+  ));
