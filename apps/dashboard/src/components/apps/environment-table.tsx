@@ -4,14 +4,7 @@ import {
   RUNTIME_VALUE_NAMES,
 } from '@repo/protocol/runtime-values';
 import { Button } from '@repo/ui/components/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@repo/ui/components/table';
+import { Table, TableBody, TableHead, TableHeader, TableRow } from '@repo/ui/components/table';
 import { PlusIcon } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
 import { EnvironmentRow } from '#components/apps/environment-row.tsx';
@@ -65,13 +58,6 @@ export function EnvironmentTable({
               onRemove={() => remove(variable.id)}
             />
           ))}
-          {variables.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={3} className="whitespace-normal px-1 text-muted-foreground">
-                Nothing set — the binary runs with whatever the guest gives it.
-              </TableCell>
-            </TableRow>
-          )}
         </TableBody>
       </Table>
       <div className="flex flex-wrap items-center gap-1">

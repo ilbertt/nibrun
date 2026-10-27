@@ -1,3 +1,4 @@
+import { Badge } from '@repo/ui/components/badge';
 import { AppEnvironmentDialog } from '#components/apps/app-environment-dialog.tsx';
 import { storedNames } from '#lib/environment-variables.ts';
 import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
@@ -18,14 +19,13 @@ export function AppEnvironment({ app }: { app: AppSummary }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-4">
-        <span className="text-muted-foreground">Environment variables</span>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Environment variables</span>
+          <Badge variant="outline">{names.length}</Badge>
+        </div>
         {editable && <AppEnvironmentDialog app={app} />}
       </div>
-      {names.length === 0 ? (
-        <span className="text-muted-foreground">
-          Nothing set — the binary runs with whatever the guest gives it.
-        </span>
-      ) : (
+      {names.length > 0 && (
         <ul className="flex flex-wrap items-center gap-1">
           {names.slice(0, NAMES_SHOWN).map((name) => (
             <li key={name} className="rounded-md bg-muted px-2 py-0.5 font-mono">
