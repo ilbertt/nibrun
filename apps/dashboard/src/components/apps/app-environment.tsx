@@ -21,12 +21,7 @@ export function AppEnvironment({ app }: { app: AppSummary }) {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">Environment variables</span>
-          <Badge
-            variant="outline"
-            className="border-transparent bg-muted text-muted-foreground tabular-nums"
-          >
-            {names.length}
-          </Badge>
+          <Badge variant="outline">{names.length}</Badge>
         </div>
         {editable && <AppEnvironmentDialog app={app} />}
       </div>
