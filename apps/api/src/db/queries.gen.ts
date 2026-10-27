@@ -241,6 +241,12 @@ export interface ISelectCreatedAppResult {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
+    /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
+    volume_storage_migration_state: IAppsColumns["volume_storage_migration_state"];
+    volume_storage_migration_message: IAppsColumns["volume_storage_migration_message"];
+    /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
+    volume_storage_migration_started_at: IAppsColumns["volume_storage_migration_started_at"];
+    config_id: IAppConfigsColumns["id"];
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -290,6 +296,12 @@ export interface ISelectAppsByOwnerResult {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
+    /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
+    volume_storage_migration_state: IAppsColumns["volume_storage_migration_state"];
+    volume_storage_migration_message: IAppsColumns["volume_storage_migration_message"];
+    /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
+    volume_storage_migration_started_at: IAppsColumns["volume_storage_migration_started_at"];
+    config_id: IAppConfigsColumns["id"];
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -339,6 +351,12 @@ export interface ISelectAppByIdResult {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
+    /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
+    volume_storage_migration_state: IAppsColumns["volume_storage_migration_state"];
+    volume_storage_migration_message: IAppsColumns["volume_storage_migration_message"];
+    /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
+    volume_storage_migration_started_at: IAppsColumns["volume_storage_migration_started_at"];
+    config_id: IAppConfigsColumns["id"];
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -528,6 +546,12 @@ export interface ISelectAppAsChangedResult {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
+    /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
+    volume_storage_migration_state: IAppsColumns["volume_storage_migration_state"];
+    volume_storage_migration_message: IAppsColumns["volume_storage_migration_message"];
+    /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
+    volume_storage_migration_started_at: IAppsColumns["volume_storage_migration_started_at"];
+    config_id: IAppConfigsColumns["id"];
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -1928,6 +1952,11 @@ export interface ILiveAppsColumns {
     data_initialized_at: Date | null;
     /** What its owner calls the app, and names it by. */
     name: import("#lib/api/app.ts").AppName | null;
+    /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
+    volume_storage_migration_state: import("#lib/api/volume-storage-migration.ts").VolumeStorageMigrationState | null;
+    volume_storage_migration_message: string | null;
+    /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
+    volume_storage_migration_started_at: Date | null;
 }
 
 /** Schema of `live_apps`. */
@@ -2613,7 +2642,10 @@ export const schema = {
             activation: { _columnName: "activation", _foreignKeys: {} },
             idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} },
             data_initialized_at: { _columnName: "data_initialized_at", _foreignKeys: {} },
-            name: { _columnName: "name", _foreignKeys: {} }
+            name: { _columnName: "name", _foreignKeys: {} },
+            volume_storage_migration_state: { _columnName: "volume_storage_migration_state", _foreignKeys: {} },
+            volume_storage_migration_message: { _columnName: "volume_storage_migration_message", _foreignKeys: {} },
+            volume_storage_migration_started_at: { _columnName: "volume_storage_migration_started_at", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}

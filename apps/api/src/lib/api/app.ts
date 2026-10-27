@@ -9,6 +9,7 @@ import { type Brand, type BrandedSchema, stringEnum } from '@repo/typebox-extens
 import { type TString, Type } from '@sinclair/typebox';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { VolumeStorageMigrationSchema } from '#lib/api/volume-storage-migration.ts';
 
 // An app is always reachable at the hostname nibrun issued it, so every list of them has one.
 // Exported because the api narrows this array for its own response and would otherwise restate
@@ -69,6 +70,7 @@ export const AppSchema = Type.Object({
   hostnames: Type.Array(AppHostnameSchema, { minItems: MIN_HOSTNAMES }),
   config: AppConfigSchema,
   state: AppStateSchema,
+  volumeStorageMigration: Type.Optional(VolumeStorageMigrationSchema),
   activation: AppActivationSchema,
   // Carried on every app rather than only on the ones it is read for, so that how an app comes up
   // is one field and not two — and so an app moved off `on-request` and back keeps the timeout it

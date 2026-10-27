@@ -294,6 +294,10 @@ export const ExportsServicePlugin = new Elysia({ name: 'service.exports' }).deco
   exportsService,
 );
 
+export const VolumeStorageMigrationsServicePlugin = new Elysia({
+  name: 'service.volumeStorageMigrations',
+}).decorate('volumeStorageMigrationsService', volumeStorageMigrationsService);
+
 export const ImportsServicePlugin = new Elysia({ name: 'service.imports' }).decorate(
   'importsService',
   importsService,
