@@ -113,9 +113,10 @@ const trustedWorkflowsRepository = new TrustedWorkflowsRepository(sql);
 const paidRequestsRepository = new PaidRequestsRepository(sql);
 const volumeStorageMigrationsRepository = new VolumeStorageMigrationsRepository(sql);
 
-const volumeStorageMigrationsService = new VolumeStorageMigrationsService(
-  volumeStorageMigrationsRepository,
-);
+const volumeStorageMigrationsService = new VolumeStorageMigrationsService({
+  migrationsRepo: volumeStorageMigrationsRepository,
+  appsRepo: appsRepository,
+});
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
@@ -293,6 +294,10 @@ export const ExportsServicePlugin = new Elysia({ name: 'service.exports' }).deco
   'exportsService',
   exportsService,
 );
+
+export const VolumeStorageMigrationsServicePlugin = new Elysia({
+  name: 'service.volumeStorageMigrations',
+}).decorate('volumeStorageMigrationsService', volumeStorageMigrationsService);
 
 export const ImportsServicePlugin = new Elysia({ name: 'service.imports' }).decorate(
   'importsService',
