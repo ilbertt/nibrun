@@ -12,7 +12,7 @@ export abstract class PaidRequestsRepositoryContract {
 
 export class PaidRequestsRepository extends Repository implements PaidRequestsRepositoryContract {
   async save({ ownerId, request }: SavePaidRequestInput): Promise<PaidRequestRow | null> {
-    const appId = request.requestType === 'custom-bucket' ? request.appId : null;
+    const appId = request.requestType === 'apps' ? null : request.appId;
     const [row] = await this.sql.UpsertPaidRequest`
       INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount, app_id)
       SELECT ${ownerId}, ${request.requestType}, ${request.requestType === 'apps' ? request.requestedAppsAmount : null}, ${appId}

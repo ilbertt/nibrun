@@ -19,6 +19,7 @@ const SERVICE_UNAVAILABLE_STATUS = 503;
 const FORBIDDEN_STATUS = 403;
 const APPS_ALLOWED = 3;
 const ASKED_TOTAL = 10;
+const APP_REQUEST_TYPES = ['custom-bucket', 'always-on'] as const;
 
 let output: string[];
 let errors: string[];
@@ -104,8 +105,11 @@ function responseFor([resource, init]: Parameters<typeof fetch>): Response {
   if (responseStatus !== SUCCESS_STATUS) {
     return Response.json({ error: 'Please retry this request.' }, { status: responseStatus });
   }
-  if (url === `${API_URL}/api/paid-requests/custom-bucket`) {
-    return Response.json({ requestType: 'custom-bucket', appId: body.appId });
+  const requestType = APP_REQUEST_TYPES.find(
+    (type) => url === `${API_URL}/api/paid-requests/${type}`,
+  );
+  if (requestType !== undefined) {
+    return Response.json({ requestType, appId: body.appId });
   }
   return Response.json({ requestType: 'apps', requestedAppsAmount: body.requestedAppsAmount });
 }
@@ -315,27 +319,20 @@ test('a deployment refused at the app limit points to paid-request', async funct
   expect(requests[0]?.url).toBe(`${API_URL}/api/apps`);
 });
 
-test.each([NAME, SLUG])(
-  'a bucket request resolves --app %s and saves only its app ID',
-  async (app) => {
+test.each(
+  APP_REQUEST_TYPES.flatMap((requestType) => [NAME, SLUG].map((app) => ({ requestType, app }))),
+)(
+  '$requestType requests resolve --app $app and save only its app ID',
+  async ({ requestType, app }) => {
     expect(
-      await paidRequestCli().run([
-        'paid-request',
-        '--type',
-        'custom-bucket',
-        '--app',
-        app,
-        '--json',
-      ]),
+      await paidRequestCli().run(['paid-request', '--type', requestType, '--app', app, '--json']),
     ).toBe(0);
     expect(errors).toEqual([]);
-    expect(output).toEqual([
-      `${JSON.stringify({ requestType: 'custom-bucket', appId: APP_ID })}\n`,
-    ]);
+    expect(output).toEqual([`${JSON.stringify({ requestType, appId: APP_ID })}\n`]);
     expect(requests).toEqual([
       { url: `${API_URL}/api/apps`, method: 'GET', authorization: `Bearer ${TOKEN}`, body: null },
       {
-        url: `${API_URL}/api/paid-requests/custom-bucket`,
+        url: `${API_URL}/api/paid-requests/${requestType}`,
         method: 'PUT',
         authorization: `Bearer ${TOKEN}`,
         body: { appId: APP_ID },
@@ -344,43 +341,53 @@ test.each([NAME, SLUG])(
   },
 );
 
-test('a bucket request in a script requires --app without prompting or calling the API', async () => {
-  const ask = spyOn(prompts, 'select').mockResolvedValue(APP_ID);
-  expect(await paidRequestCli().run(['paid-request', '--type', 'custom-bucket', '--json'])).toBe(1);
-  expect(errors.join('')).toContain('--app');
-  expect(ask).not.toHaveBeenCalled();
-  expect(requests).toEqual([]);
-  expect(output).toEqual([]);
-});
+test.each(APP_REQUEST_TYPES)(
+  '%s requests in scripts require --app without prompting or calling the API',
+  async (requestType) => {
+    const ask = spyOn(prompts, 'select').mockResolvedValue(APP_ID);
+    expect(await paidRequestCli().run(['paid-request', '--type', requestType, '--json'])).toBe(1);
+    expect(errors.join('')).toContain('--app');
+    expect(ask).not.toHaveBeenCalled();
+    expect(requests).toEqual([]);
+    expect(output).toEqual([]);
+  },
+);
 
-test('a terminal can choose an app and cancel the bucket request', async () => {
-  const ask = spyOn(prompts, 'select').mockResolvedValue(APP_ID);
-  const options = {
-    type: 'custom-bucket' as const,
-    app: undefined,
-    'requested-apps-amount': undefined,
-  };
-  expect(await completePaidRequest({ options, interactive: true, api: paidRequestApi() })).toEqual({
-    requestType: 'custom-bucket',
-    appId: APP_ID,
-  });
-  expect(ask.mock.calls[0]?.[0]).toMatchObject({
-    message: 'Which app?',
-    options: [{ value: APP_ID, label: NAME, hint: SLUG }],
-  });
-  const cancellation = Symbol('cancel');
-  spyOn(prompts, 'isCancel').mockImplementation((value) => value === cancellation);
-  ask.mockResolvedValue(cancellation);
-  await expect(
-    completePaidRequest({ options, interactive: true, api: paidRequestApi() }),
-  ).rejects.toThrow('Cancelled.');
-  expect(requests.every((request) => request.method === 'GET')).toBe(true);
-});
+test.each(APP_REQUEST_TYPES)(
+  'a terminal can choose an app and cancel the %s request',
+  async (requestType) => {
+    const ask = spyOn(prompts, 'select').mockResolvedValue(APP_ID);
+    const options = {
+      type: requestType,
+      app: undefined,
+      'requested-apps-amount': undefined,
+    };
+    expect(
+      await completePaidRequest({ options, interactive: true, api: paidRequestApi() }),
+    ).toEqual({
+      requestType,
+      appId: APP_ID,
+    });
+    expect(ask.mock.calls[0]?.[0]).toMatchObject({
+      message: 'Which app?',
+      options: [{ value: APP_ID, label: NAME, hint: SLUG }],
+    });
+    const cancellation = Symbol('cancel');
+    spyOn(prompts, 'isCancel').mockImplementation((value) => value === cancellation);
+    ask.mockResolvedValue(cancellation);
+    await expect(
+      completePaidRequest({ options, interactive: true, api: paidRequestApi() }),
+    ).rejects.toThrow('Cancelled.');
+    expect(requests.every((request) => request.method === 'GET')).toBe(true);
+  },
+);
 
 test.each([
   { args: ['--type', 'apps', '--app', NAME] },
   { args: ['--type', 'apps', '--app', NAME, '--requested-apps-amount', '10'] },
-  { args: ['--type', 'custom-bucket', '--app', NAME, '--requested-apps-amount', '10'] },
+  ...APP_REQUEST_TYPES.map((type) => ({
+    args: ['--type', type, '--app', NAME, '--requested-apps-amount', '10'],
+  })),
 ])(
   'flags for another request type are refused before prompting or API calls: $args',
   async ({ args }) => {
@@ -393,12 +400,12 @@ test.each([
   },
 );
 
-test('an unknown app cannot submit a bucket request', async () => {
+test.each(APP_REQUEST_TYPES)('unknown apps cannot submit %s requests', async (requestType) => {
   expect(
     await paidRequestCli().run([
       'paid-request',
       '--type',
-      'custom-bucket',
+      requestType,
       '--app',
       'missing',
       '--json',
@@ -410,37 +417,36 @@ test('an unknown app cannot submit a bucket request', async () => {
   expect(output).toEqual([]);
 });
 
-test('bucket requests require sign-in before listing apps or submitting', async () => {
-  expect(
-    await paidRequestCli(false).run([
-      'paid-request',
-      '--type',
-      'custom-bucket',
-      '--app',
-      NAME,
-      '--json',
-    ]),
-  ).toBe(1);
-  expect(errors).toEqual(['Not signed in. Run `nib login`.']);
-  expect(requests).toEqual([]);
-});
+test.each(APP_REQUEST_TYPES)(
+  '%s requests require sign-in before listing apps or submitting',
+  async (requestType) => {
+    expect(
+      await paidRequestCli(false).run([
+        'paid-request',
+        '--type',
+        requestType,
+        '--app',
+        NAME,
+        '--json',
+      ]),
+    ).toBe(1);
+    expect(errors).toEqual(['Not signed in. Run `nib login`.']);
+    expect(requests).toEqual([]);
+  },
+);
 
-test('a failed bucket request does not emit a JSON success result', async () => {
-  responseStatus = SERVICE_UNAVAILABLE_STATUS;
-  expect(
-    await paidRequestCli().run([
-      'paid-request',
-      '--type',
-      'custom-bucket',
-      '--app',
-      NAME,
-      '--json',
-    ]),
-  ).toBe(1);
-  expect(errors.join('')).toContain('Please retry this request.');
-  expect(requests).toHaveLength(2);
-  expect(output).toEqual([]);
-});
+test.each(APP_REQUEST_TYPES)(
+  'a failed %s request does not emit a JSON success result',
+  async (requestType) => {
+    responseStatus = SERVICE_UNAVAILABLE_STATUS;
+    expect(
+      await paidRequestCli().run(['paid-request', '--type', requestType, '--app', NAME, '--json']),
+    ).toBe(1);
+    expect(errors.join('')).toContain('Please retry this request.');
+    expect(requests).toHaveLength(2);
+    expect(output).toEqual([]);
+  },
+);
 
 test('the bucket confirmation describes a feature request without enabling or charging', async () => {
   expect(
@@ -451,9 +457,20 @@ test('the bucket confirmation describes a feature request without enabling or ch
   expect(output.join('')).toContain('does not enable the feature or charge you');
 });
 
-test('paid-request help lists bucket requests and the app selector', async () => {
+test('the always-on confirmation names the app without enabling the feature or charging', async () => {
+  expect(await paidRequestCli().run(['paid-request', '--type', 'always-on', '--app', NAME])).toBe(
+    0,
+  );
+  expect(errors).toEqual([]);
+  expect(output.join('')).toContain(`recorded your request to keep app ${APP_ID} always on`);
+  expect(output.join('')).toContain('does not enable the feature or charge you');
+});
+
+test('paid-request help lists app feature requests and the app selector', async () => {
   expect(await paidRequestCli(false).run(['paid-request', '--help'])).toBe(0);
-  expect(output.join('')).toContain('custom-bucket');
+  for (const requestType of APP_REQUEST_TYPES) {
+    expect(output.join('')).toContain(requestType);
+  }
   expect(output.join('')).toContain('--app');
   expect(requests).toEqual([]);
 });
