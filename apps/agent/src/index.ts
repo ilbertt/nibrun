@@ -33,6 +33,7 @@ import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
+import { VolumeMigrationFences } from '#services/volume-migration-fences.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
 const platform = Layer.mergeAll(BunContext.layer, FetchHttpClient.layer);
@@ -62,6 +63,7 @@ const agent = Layer.mergeAll(
   ZerofsTopology.Default,
   HostFirewall.Default,
   AppWaker.Default,
+  VolumeMigrationFences.Default,
   AppActivator.Default,
   CaddyProxy.Default,
   TenantLogQueue.Default,

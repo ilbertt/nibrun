@@ -1,4 +1,4 @@
-import type { HostDesiredState } from '@repo/protocol';
+import type { AppId, HostDesiredState } from '@repo/protocol';
 import { Effect, Option } from 'effect';
 import { readLastActive } from '#lib/agent/activity.ts';
 import { readExportReports } from '#lib/exports/manager.ts';
@@ -12,8 +12,9 @@ import {
   startInstance,
   stopInstance,
 } from '#lib/reconcile/instances.ts';
+import { duringUnfencedReconciliation } from '#lib/reconcile/migration-fences.ts';
 import { applyActivators, applyNetwork, applyRoutes } from '#lib/reconcile/network.ts';
-import { hasDeferredWork, type ObservedState, planReconcile } from '#lib/reconcile/plan.ts';
+import { hasDeferredWork, type ObservedState, type planReconcile } from '#lib/reconcile/plan.ts';
 import { duringReplacements } from '#lib/reconcile/replacements.ts';
 import {
   applyTeardowns,
@@ -35,6 +36,7 @@ import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { VolumeManager } from '#services/volume-manager.service.ts';
+import { VolumeMigrationFences } from '#services/volume-migration-fences.service.ts';
 
 /**
  * Pull, converge, report. Nothing here is driven by a command: desired state describes a world,
@@ -100,9 +102,14 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
      * The union of what systemd knows and what this agent has notes on: a unit with no note is an
      * orphan to stop, and a note with no unit is an instance that is gone.
      */
-    const observe = Effect.fn('Reconciler.observe')(function* (desired: HostDesiredState) {
+    const observeUnits = Effect.fn('Reconciler.observe')(function* ({
+      desired,
+      unitIds,
+    }: {
+      desired: HostDesiredState;
+      unitIds: readonly AppId[];
+    }) {
       const current = yield* AgentState.snapshot;
-      const unitIds = yield* Systemd.listAppIds.pipe(Effect.orElseSucceed(() => []));
       const ids = [...new Set([...unitIds, ...current.records.keys()])];
       const statuses = yield* Systemd.statuses(ids).pipe(
         Effect.orElseSucceed(() => new Map<(typeof ids)[number], typeof UNKNOWN_UNIT>()),
@@ -148,6 +155,12 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
         })),
       } satisfies ObservedState;
     });
+
+    function observe(desired: HostDesiredState) {
+      return Effect.flatMap(Systemd.listAppIds.pipe(Effect.orElseSucceed(() => [])), (unitIds) =>
+        observeUnits({ desired, unitIds }),
+      );
+    }
 
     const persist = Effect.gen(function* () {
       const current = yield* AgentState.snapshot;
@@ -265,69 +278,85 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
       yield* sqlite.syncDeployments({ instances: desired.instances });
       yield* executions.syncDeployments({ instances: desired.instances });
       yield* crons.syncDeployments({ deployments: desired.instances });
-      const observed = yield* observe(desired);
-      const plan = planReconcile({ desired, observed });
-      yield* AgentState.modify((current) => ({
-        ...current,
-        deferredWork:
-          hasDeferredWork(plan) ||
-          [...current.records.values()].some(
-            (record) => record.recovery?.nextAttemptAtMs !== undefined,
-          ),
-      }));
-      yield* syncDesired(desired);
+      yield* duringUnfencedReconciliation({
+        desired,
+        observe: (unitIds) => observeUnits({ desired, unitIds }),
+        use: ({ plan, blocked, observed }) =>
+          Effect.gen(function* () {
+            yield* AgentState.modify((current) => ({
+              ...current,
+              deferredWork:
+                blocked.size > 0 ||
+                hasDeferredWork(plan) ||
+                [...current.records.values()].some(
+                  (record) => record.recovery?.nextAttemptAtMs !== undefined,
+                ),
+            }));
+            yield* syncDesired(
+              blocked.size === 0
+                ? desired
+                : {
+                    ...desired,
+                    instances: desired.instances.filter((instance) => !blocked.has(instance.appId)),
+                  },
+            );
 
-      yield* prefetchArtifacts(plan);
-      yield* duringReplacements({
-        plan,
-        effect: Effect.gen(function* () {
-          yield* applyStops(plan).pipe(Effect.withSpan('reconcile.stops'));
-          yield* applyVolumes({ plan, observed, desired }).pipe(
-            Effect.withSpan('reconcile.volumes'),
-          );
-          yield* applySleeps(plan).pipe(Effect.withSpan('reconcile.sleeps'));
-          yield* applyActivators.pipe(Effect.withSpan('reconcile.activators'));
-          yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
-          yield* applyStarts(plan).pipe(Effect.withSpan('reconcile.starts'));
-        }),
-      });
-      yield* applyCheckpoints({ plan, desired }).pipe(Effect.withSpan('reconcile.checkpoints'));
-      // After starts, so an export never competes with a boot for the device it reads, and
-      // before teardowns, so a volume marked absent this generation is still there to read.
-      yield* applyExports({ plan, desired }).pipe(Effect.withSpan('reconcile.exports'));
-      yield* applyTeardowns(plan).pipe(Effect.withSpan('reconcile.teardowns'));
-      yield* AgentState.modify((current) => ({
-        ...current,
-        deferredWork:
-          current.deferredWork ||
-          hasPendingAppRetirements({
-            desiredVolumes: desired.volumes,
-            deletedVolumes: current.deletedVolumes,
+            yield* prefetchArtifacts(plan);
+            yield* duringReplacements({
+              plan,
+              effect: Effect.gen(function* () {
+                yield* applyStops(plan).pipe(Effect.withSpan('reconcile.stops'));
+                yield* applyVolumes({ plan, observed, desired, fencedApps: blocked }).pipe(
+                  Effect.withSpan('reconcile.volumes'),
+                );
+                yield* applySleeps(plan).pipe(Effect.withSpan('reconcile.sleeps'));
+                yield* applyActivators.pipe(Effect.withSpan('reconcile.activators'));
+                yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
+                yield* applyStarts(plan).pipe(Effect.withSpan('reconcile.starts'));
+              }),
+            });
+            yield* applyCheckpoints({ plan, desired }).pipe(
+              Effect.withSpan('reconcile.checkpoints'),
+            );
+            // After starts, so an export never competes with a boot for the device it reads, and
+            // before teardowns, so a volume marked absent this generation is still there to read.
+            yield* applyExports({ plan, desired }).pipe(Effect.withSpan('reconcile.exports'));
+            yield* applyTeardowns(plan).pipe(Effect.withSpan('reconcile.teardowns'));
+            yield* AgentState.modify((current) => ({
+              ...current,
+              deferredWork:
+                current.deferredWork ||
+                hasPendingAppRetirements({
+                  desiredVolumes: desired.volumes,
+                  deletedVolumes: current.deletedVolumes,
+                }),
+            }));
+            yield* volumes
+              .reclaim(
+                new Set([
+                  ...blocked,
+                  ...desired.instances.map((instance) => instance.appId),
+                  ...desired.volumes.map((volume) => volume.appId),
+                ]),
+              )
+              .pipe(
+                Effect.catchAll((error) =>
+                  AgentState.modify((current) => ({ ...current, deferredWork: true })).pipe(
+                    Effect.andThen(Effect.logWarning('app filesystem reclamation deferred', error)),
+                  ),
+                ),
+              );
+            // Again, because the instances started above are the ones whose forwards this renders.
+            yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
+            yield* applyRoutes.pipe(Effect.withSpan('reconcile.routes'));
+            yield* persist.pipe(Effect.withSpan('reconcile.persist'));
+
+            yield* AgentState.modify((current) => ({ ...current, converged: true }));
+            // Everything a reconcile touches is something the control plane is waiting to hear about:
+            // the instance it just asked for, a volume it may now delete, a bundle it can hand over.
+            yield* ReportSignal.raise;
           }),
-      }));
-      yield* volumes
-        .reclaim(
-          new Set([
-            ...desired.instances.map((instance) => instance.appId),
-            ...desired.volumes.map((volume) => volume.appId),
-          ]),
-        )
-        .pipe(
-          Effect.catchAll((error) =>
-            AgentState.modify((current) => ({ ...current, deferredWork: true })).pipe(
-              Effect.andThen(Effect.logWarning('app filesystem reclamation deferred', error)),
-            ),
-          ),
-        );
-      // Again, because the instances started above are the ones whose forwards this renders.
-      yield* applyNetwork.pipe(Effect.withSpan('reconcile.network'));
-      yield* applyRoutes.pipe(Effect.withSpan('reconcile.routes'));
-      yield* persist.pipe(Effect.withSpan('reconcile.persist'));
-
-      yield* AgentState.modify((current) => ({ ...current, converged: true }));
-      // Everything a reconcile touches is something the control plane is waiting to hear about:
-      // the instance it just asked for, a volume it may now delete, a bundle it can hand over.
-      yield* ReportSignal.raise;
+      });
     });
 
     return {
@@ -352,5 +381,6 @@ export class Reconciler extends Effect.Service<Reconciler>()('Reconciler', {
     CronRegistry.Default,
     CronExecutions.Default,
     SqliteSessions.Default,
+    VolumeMigrationFences.Default,
   ],
 }) {}

@@ -41,6 +41,7 @@ import { GuestActivity } from '#services/guest-activity.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
+import { VolumeMigrationFences } from '#services/volume-migration-fences.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
 const ONE_RESTART = 1;
@@ -215,15 +216,23 @@ const captureIdleInstance = Effect.fn('captureIdleInstance')(function* ({
 export function suspendInstance(
   request: Parameters<typeof captureIdleInstance>[0] & { quietSinceMs: number | undefined },
 ) {
-  return Effect.flatMap(GuestActivity, (activity) =>
-    activity.whenIdle({
-      appId: request.appId,
-      effect: Effect.flatMap(AgentState.snapshot, (current) =>
-        request.quietSinceMs === undefined ||
-        current.lastActiveAtMs.get(request.appId) === request.quietSinceMs
-          ? captureIdleInstance(request)
-          : Effect.void,
-      ),
+  return Effect.flatMap(VolumeMigrationFences, (fences) =>
+    fences.access({
+      appIds: [request.appId],
+      use: (blocked) =>
+        blocked.has(request.appId)
+          ? Effect.void
+          : Effect.flatMap(GuestActivity, (activity) =>
+              activity.whenIdle({
+                appId: request.appId,
+                effect: Effect.flatMap(AgentState.snapshot, (current) =>
+                  request.quietSinceMs === undefined ||
+                  current.lastActiveAtMs.get(request.appId) === request.quietSinceMs
+                    ? captureIdleInstance(request)
+                    : Effect.void,
+                ),
+              }),
+            ),
     }),
   );
 }
@@ -893,20 +902,33 @@ function logVmRecovery({ record, state }: { record: InstanceRecord; state: Insta
  * lets two of these land at once.
  */
 export const refreshStates = Effect.gen(function* () {
-  const current = yield* AgentState.snapshot;
-  const statuses = yield* Systemd.statuses([...current.records.keys()]);
-  const nowMs = yield* Clock.currentTimeMillis;
+  const fences = yield* VolumeMigrationFences;
+  const appIds = [...(yield* AgentState.snapshot).records.keys()];
+  yield* fences.access({
+    appIds,
+    use: (blocked) =>
+      Effect.gen(function* () {
+        const current = yield* AgentState.snapshot;
+        const statuses = yield* Systemd.statuses(appIds);
+        const nowMs = yield* Clock.currentTimeMillis;
 
-  yield* Effect.forEach(
-    [...current.records.values()].filter((record) => !current.starting.has(record.appId)),
-    (record) =>
-      settle({
-        record,
-        status: statuses.get(record.appId) ?? UNKNOWN_UNIT,
-        due: nowMs >= (current.nextProbeAtMs.get(record.appId) ?? 0),
-        snapshotting: current.snapshotting.has(record.appId),
-        nowMs,
+        yield* Effect.forEach(
+          appIds.flatMap((appId) => {
+            const record = current.records.get(appId);
+            return record && !current.starting.has(appId) ? [record] : [];
+          }),
+          (record) =>
+            blocked.has(record.appId)
+              ? Effect.void
+              : settle({
+                  record,
+                  status: statuses.get(record.appId) ?? UNKNOWN_UNIT,
+                  due: nowMs >= (current.nextProbeAtMs.get(record.appId) ?? 0),
+                  snapshotting: current.snapshotting.has(record.appId),
+                  nowMs,
+                }),
+          { discard: true, concurrency: 'unbounded' },
+        );
       }),
-    { discard: true, concurrency: 'unbounded' },
-  );
+  });
 });
