@@ -13,12 +13,15 @@ import {
 import { VM_RECOVERY_POLICY } from '#lib/vm/recovery.ts';
 import { SleepRefused, SnapshotUnusable } from '#lib/vm/snapshot.ts';
 import { AgentState } from '#services/agent-state.service.ts';
+import { AppWaker } from '#services/app-waker.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { GuestActivity } from '#services/guest-activity.service.ts';
+import { RefreshSignal } from '#services/refresh-signal.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
+import { VolumeMigrationFences } from '#services/volume-migration-fences.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
@@ -48,6 +51,7 @@ const run = provided(
   Layer.mergeAll(
     AgentState.Default,
     GuestActivity.Default,
+    VolumeMigrationFences.Default,
     ReportSignal.Default,
     FetchHttpClient.layer,
   ).pipe(Layer.provideMerge(platform)),
@@ -265,6 +269,9 @@ function onHost({
     Layer.mergeAll(
       AgentState.Default,
       GuestActivity.Default,
+      VolumeMigrationFences.Default,
+      DesiredStateCache.DefaultWithoutDependencies,
+      RefreshSignal.Default,
       ReportSignal.Default,
       FetchHttpClient.layer,
       SlotAllocator.DefaultWithoutDependencies.pipe(
@@ -279,6 +286,87 @@ function onHost({
 function withMicroVmDown(vms: ReturnType<typeof recordingVms>) {
   return onHost({ vms, unit: INACTIVE_UNIT });
 }
+
+test('the real waker refuses a fenced app before boot and resumes its normal checks after release', () => {
+  const vms = recordingVms();
+  return withMicroVmDown(vms)(
+    Effect.gen(function* () {
+      const fences = yield* VolumeMigrationFences;
+      const waker = yield* AppWaker;
+      const original = instanceRecord({
+        state: 'running',
+        onRequest: true,
+        startedAt: OBSERVED_AT,
+      });
+      yield* AgentState.putRecord(original);
+      yield* fences.during({
+        appId: APP_ID,
+        effect: Effect.gen(function* () {
+          const error = yield* waker.wake(APP_ID).pipe(Effect.flip);
+          expect(error._tag).toBe('WakeFailed');
+          if (error._tag === 'WakeFailed') {
+            expect(error.reason).toBe('its volume storage is being migrated');
+          }
+          yield* refreshStates;
+          yield* suspendInstance({
+            appId: APP_ID,
+            deploymentId: DEPLOYMENT_ID,
+            reason: 'idle',
+            quietSinceMs: undefined,
+          });
+          expect(yield* recordOf).toEqual(original);
+          expect(vms.calls).toEqual([]);
+        }),
+      });
+      const error = yield* waker.wake(APP_ID).pipe(Effect.flip);
+      expect(error._tag).toBe('WakeFailed');
+      if (error._tag === 'WakeFailed') {
+        expect(error.reason).toBe('the control plane no longer names it');
+      }
+    }).pipe(Effect.provide(AppWaker.DefaultWithoutDependencies)),
+  );
+});
+
+test('fencing wakes before draining guest activity lets admitted guest work finish without deadlock', () => {
+  const vms = recordingVms();
+  return withMicroVmDown(vms)(
+    Effect.gen(function* () {
+      const activity = yield* GuestActivity;
+      const fences = yield* VolumeMigrationFences;
+      const waker = yield* AppWaker;
+      const started = yield* Deferred.make<void>();
+      const wake = yield* Deferred.make<void>();
+      const guest = yield* activity
+        .run({
+          appId: APP_ID,
+          effect: Deferred.succeed(started, undefined).pipe(
+            Effect.andThen(Deferred.await(wake)),
+            Effect.andThen(waker.wake(APP_ID)),
+            Effect.either,
+          ),
+        })
+        .pipe(Effect.forkScoped);
+      yield* Deferred.await(started);
+      const entered = yield* Deferred.make<void>();
+      const migration = yield* fences
+        .during({
+          appId: APP_ID,
+          effect: activity.exclusively({
+            appId: APP_ID,
+            effect: Deferred.succeed(entered, undefined),
+          }),
+        })
+        .pipe(Effect.forkScoped);
+      yield* Effect.yieldNow();
+      expect(yield* Deferred.isDone(entered)).toBe(false);
+      yield* Deferred.succeed(wake, undefined);
+      expect((yield* Fiber.join(guest))._tag).toBe('Left');
+      yield* Fiber.join(migration);
+      expect(yield* Deferred.isDone(entered)).toBe(true);
+      expect(vms.calls).toEqual([]);
+    }).pipe(Effect.provide(AppWaker.DefaultWithoutDependencies)),
+  );
+});
 
 const KVM_CONSOLE =
   '2026-10-08T16:31:45.422502 [anonymous-instance:vcpu 0] Received KVM_EXIT_FAIL_ENTRY signal: 7 on cpu 1';

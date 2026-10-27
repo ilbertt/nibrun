@@ -80,10 +80,12 @@ export const applyVolumes = ({
   plan,
   observed,
   desired,
+  fencedApps,
 }: {
   plan: ReconcilePlan;
   observed: ObservedState;
   desired: HostDesiredState;
+  fencedApps: ReadonlySet<AppId>;
 }) =>
   Effect.gen(function* () {
     const updates: ReportedVolume[] = [];
@@ -108,10 +110,17 @@ export const applyVolumes = ({
     yield* AgentState.modify((current) => ({
       ...current,
       volumeReports: mergeVolumeReports({
-        existing: observed.volumes.map(toReportedVolume),
+        existing: [
+          ...observed.volumes
+            .filter((volume) => !fencedApps.has(volume.appId))
+            .map(toReportedVolume),
+          ...current.volumeReports.filter((volume) => fencedApps.has(volume.appId)),
+        ],
         // After the observation, because a removal this host carried out is not something the
         // next observation can find: the device file it would have been read from is gone.
-        updates: [...current.deletedVolumes.values(), ...updates],
+        updates: [...current.deletedVolumes.values()]
+          .filter((volume) => !fencedApps.has(volume.appId))
+          .concat(updates),
       }),
     }));
   });

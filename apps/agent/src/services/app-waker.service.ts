@@ -18,6 +18,7 @@ import { RefreshSignal } from '#services/refresh-signal.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
+import { VolumeMigrationFences } from '#services/volume-migration-fences.service.ts';
 
 /**
  * Tighter than the startup grid the status loop probes on, because somebody is holding a browser
@@ -89,6 +90,7 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
     const config = yield* AgentConfig;
     const cache = yield* DesiredStateCache;
     const refresh = yield* RefreshSignal;
+    const fences = yield* VolumeMigrationFences;
     const context = yield* Effect.context<WakeContext>();
     /**
      * The joiners are counted beside the deferred rather than derived afterwards: a cold page
@@ -214,37 +216,47 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
       );
     });
 
-    return {
-      wake: Effect.fn('AppWaker.wake')(function* (appId: AppId) {
-        const claim: Claim = {
-          deferred: yield* Deferred.make<void, WakeFailed | HostHasNoRoom>(),
-          joined: yield* Ref.make(0),
-        };
-        const held = yield* Ref.modify(inFlight, (current) => {
-          const existing = current.get(appId);
-          return existing
-            ? ([Option.some(existing), current] as const)
-            : ([Option.none<Claim>(), new Map(current).set(appId, claim)] as const);
-        });
-        if (Option.isSome(held)) {
-          yield* Ref.update(held.value.joined, (count) => count + 1);
-          return yield* Deferred.await(held.value.deferred);
-        }
-        return yield* boot({ appId, joined: claim.joined }).pipe(
-          Effect.provide(context),
-          Effect.onExit((exit) =>
-            Deferred.done(claim.deferred, exit).pipe(
-              Effect.andThen(
-                Ref.update(inFlight, (current) => {
-                  const remaining = new Map(current);
-                  remaining.delete(appId);
-                  return remaining;
-                }),
-              ),
+    const wake = Effect.fn('AppWaker.wake')(function* (appId: AppId) {
+      const claim: Claim = {
+        deferred: yield* Deferred.make<void, WakeFailed | HostHasNoRoom>(),
+        joined: yield* Ref.make(0),
+      };
+      const held = yield* Ref.modify(inFlight, (current) => {
+        const existing = current.get(appId);
+        return existing
+          ? ([Option.some(existing), current] as const)
+          : ([Option.none<Claim>(), new Map(current).set(appId, claim)] as const);
+      });
+      if (Option.isSome(held)) {
+        yield* Ref.update(held.value.joined, (count) => count + 1);
+        return yield* Deferred.await(held.value.deferred);
+      }
+      return yield* boot({ appId, joined: claim.joined }).pipe(
+        Effect.provide(context),
+        Effect.onExit((exit) =>
+          Deferred.done(claim.deferred, exit).pipe(
+            Effect.andThen(
+              Ref.update(inFlight, (current) => {
+                const remaining = new Map(current);
+                remaining.delete(appId);
+                return remaining;
+              }),
             ),
           ),
-        );
-      }),
+        ),
+      );
+    });
+    return {
+      wake: (appId: AppId) =>
+        fences.access({
+          appIds: [appId],
+          use: (blocked) =>
+            blocked.has(appId)
+              ? Effect.fail(
+                  new WakeFailed({ appId, reason: 'its volume storage is being migrated' }),
+                )
+              : wake(appId),
+        }),
     };
   }),
   dependencies: [
@@ -256,5 +268,6 @@ export class AppWaker extends Effect.Service<AppWaker>()('AppWaker', {
     ReportSignal.Default,
     SlotAllocator.Default,
     VmManager.Default,
+    VolumeMigrationFences.Default,
   ],
 }) {}
