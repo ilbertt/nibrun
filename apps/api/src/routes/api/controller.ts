@@ -20,7 +20,6 @@ import { AppsAppIdSqliteConnectionsController } from '#routes/api/apps/[appId]/s
 import { AppsAppIdStateController } from '#routes/api/apps/[appId]/state/controller.ts';
 import { AppsAppIdTrustedWorkflowsWorkflowIdController } from '#routes/api/apps/[appId]/trusted-workflows/[workflowId]/controller.ts';
 import { AppsAppIdTrustedWorkflowsController } from '#routes/api/apps/[appId]/trusted-workflows/controller.ts';
-import { AppsAppIdVolumeStorageMigrationController } from '#routes/api/apps/[appId]/volume-storage-migration/controller.ts';
 import { AppsController } from '#routes/api/apps/controller.ts';
 import { AuthController } from '#routes/api/auth/controller.ts';
 import { HealthController } from '#routes/api/health/controller.ts';
@@ -52,7 +51,6 @@ export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(AppsAppIdStateController)
   .use(AppsAppIdTrustedWorkflowsController)
   .use(AppsAppIdTrustedWorkflowsWorkflowIdController)
-  .use(AppsAppIdVolumeStorageMigrationController)
   .use(AppsAppIdSqliteConnectionsController)
   .use(AppsAppIdSqliteConnectionsConnectionIdController)
   .use(SqliteConnectionsConnectionIdController)

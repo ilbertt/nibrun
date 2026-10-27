@@ -17,7 +17,10 @@ export type AppHostname = App['hostnames'][number];
 export type AppHostnameState = AppHostname['state'];
 export type AppHostnameKind = AppHostname['kind'];
 export type AppPatch = NonNullable<Parameters<AppRoutes['patch']>[0]>;
-export type OwnedAppState = Parameters<AppRoutes['state']['put']>[0]['state'];
+export type OwnedAppState = Extract<
+  Parameters<AppRoutes['state']['put']>[0],
+  { state: unknown }
+>['state'];
 export type TenantArguments = App['config']['args'];
 export type TenantEnvironmentPatch = NonNullable<AppPatch['environment']>;
 export type Deployment = Treaty.Data<DeploymentRoutes['get']>;
