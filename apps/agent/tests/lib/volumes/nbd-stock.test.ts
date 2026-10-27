@@ -6,8 +6,11 @@ import { Value } from '@sinclair/typebox/value';
 import { Effect, Either, Layer, Schedule } from 'effect';
 import { SLOT_COUNT } from '#lib/network/slot.ts';
 import {
+  attach,
   attachmentLock,
   attachmentScope,
+  detach,
+  detachAndWaitForDisconnect,
   detachVerified,
   inspectAttachment,
   isAttached,
@@ -117,6 +120,12 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_NBD !== '1')
           ),
           Effect.retry(poll),
         );
+        yield* Effect.addFinalizer(() => detach(target.devicePath).pipe(Effect.ignore));
+        yield* attach(target);
+        expect(yield* isAttached(target.devicePath)).toBe(true);
+        yield* detachAndWaitForDisconnect(target.devicePath);
+        expect(yield* isAttached(target.devicePath)).toBe(false);
+        yield* detachAndWaitForDisconnect(target.devicePath);
       }),
     );
   },
