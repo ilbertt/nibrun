@@ -39,7 +39,7 @@ function native<A>(operation: () => Promise<A>) {
   );
 }
 
-function imageStat({ image, sizeBytes }: { image: FileHandle; sizeBytes: number }) {
+export function inspectVolumeImage({ image, sizeBytes }: { image: FileHandle; sizeBytes: number }) {
   return Effect.gen(function* () {
     const current = yield* native(() => image.stat());
     if (
@@ -98,7 +98,7 @@ export function copyImageBytes({
   sizeBytes: number;
 }) {
   return Effect.gen(function* () {
-    const before = yield* imageStat({ image: source, sizeBytes });
+    const before = yield* inspectVolumeImage({ image: source, sizeBytes });
     const target = yield* native(() => destination.stat());
     if (!target.isFile() || target.size !== 0) {
       return yield* new VolumeImageCopyFailed();
@@ -141,7 +141,7 @@ export function verifyImageBytes({
   digest,
 }: VolumeImageCopy & { image: FileHandle }) {
   return Effect.gen(function* () {
-    const before = yield* imageStat({ image, sizeBytes });
+    const before = yield* inspectVolumeImage({ image, sizeBytes });
     const buffer = Buffer.allocUnsafe(COPY_BUFFER_BYTES);
     const hash = new Bun.CryptoHasher('sha256');
     let offset = 0;
@@ -172,7 +172,7 @@ export function copyVolumeImage(input: VolumeImageCopyInput) {
         volumeId: input.volumeId,
         access: 'read',
       });
-      const sourceBefore = yield* imageStat({ image: source, sizeBytes: input.sizeBytes });
+      const sourceBefore = yield* inspectVolumeImage({ image: source, sizeBytes: input.sizeBytes });
       const destination = yield* openAppVolumeImage({
         mountPath: input.destination.mountPath,
         volumeId: input.volumeId,
