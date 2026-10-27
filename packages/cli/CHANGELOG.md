@@ -2,6 +2,13 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.10.27-1]
+
+### 🚀 Features
+
+- Collect app always-on paid requests (#1029)
+- *(api)* Add migration status and cancellation to app state (#1026)
+
 ## [2026.10.26-1]
 
 ### 🚀 Features
