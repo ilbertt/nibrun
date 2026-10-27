@@ -3,6 +3,7 @@ import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import type { OwnerId } from '#lib/api/identifiers.ts';
+import { VOLUME_STORAGE_MIGRATION_STATES } from '#lib/api/volume-storage-migration.ts';
 import { configWithDefaults } from '#lib/app-config.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
 import { AppResponseSchema } from '#routes/api/apps/model.ts';
@@ -128,7 +129,9 @@ test('invalid, spoofed and combined state transitions are rejected before either
     {},
     { volumeStorageMigration: { state: 'cancelled' } },
     { volumeStorageMigration: { configId: '', state: 'cancelled' } },
-    { volumeStorageMigration: { configId: 'destination', state: 'completed' } },
+    ...VOLUME_STORAGE_MIGRATION_STATES.filter((state) => state !== 'cancelled').map((state) => ({
+      volumeStorageMigration: { configId: 'destination', state },
+    })),
     { ...CANCELLATION, ownerId: 'someone-else' },
     { ...CANCELLATION, state: 'suspended' },
   ]) {

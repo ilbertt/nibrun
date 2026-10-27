@@ -4,6 +4,7 @@ import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { AuthCaller } from '#lib/auth/caller.ts';
+import { BadRequestError } from '#lib/errors.ts';
 import { AppStateRequestSchema } from '#routes/api/apps/[appId]/state/model.ts';
 import { AppResponseSchema } from '#routes/api/apps/model.ts';
 import {
@@ -37,6 +38,9 @@ export const AppsAppIdStateController = new Elysia()
         ownerId: Value.Parse(OwnerIdSchema, user.id),
       };
       if ('volumeStorageMigration' in body) {
+        if (body.volumeStorageMigration.state !== 'cancelled') {
+          throw new BadRequestError('Unsupported storage migration state.');
+        }
         await volumeStorageMigrationsService.cancel({
           ...ownedApp,
           configId: body.volumeStorageMigration.configId,
