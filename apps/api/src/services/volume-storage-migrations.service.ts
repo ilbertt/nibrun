@@ -1,12 +1,7 @@
 import type { AppId } from '@repo/protocol';
 import type { OwnerId } from '#lib/api/identifiers.ts';
-import type { VolumeStorageMigration } from '#lib/api/volume-storage-migration.ts';
 import { ConflictError, NotFoundError } from '#lib/errors.ts';
-import type {
-  VolumeStorageMigrationRow,
-  VolumeStorageMigrationsRepositoryContract,
-} from '#repositories/volume-storage-migrations.repository.ts';
-import type { AppOwnershipRepositoryContract } from '#services/artifacts.service.ts';
+import type { VolumeStorageMigrationsRepositoryContract } from '#repositories/volume-storage-migrations.repository.ts';
 import { Service } from '#services/service.ts';
 
 const QUEUED_TIMEOUT_MINUTES = 15;
@@ -20,30 +15,8 @@ export type VolumeStorageMigrationStatusRepositoryContract = Pick<
 >;
 
 export class VolumeStorageMigrationsService extends Service {
-  private readonly migrationsRepo: VolumeStorageMigrationStatusRepositoryContract;
-  private readonly appsRepo: AppOwnershipRepositoryContract;
-
-  constructor({
-    migrationsRepo,
-    appsRepo,
-  }: {
-    migrationsRepo: VolumeStorageMigrationStatusRepositoryContract;
-    appsRepo: AppOwnershipRepositoryContract;
-  }) {
+  constructor(private readonly migrationsRepo: VolumeStorageMigrationStatusRepositoryContract) {
     super();
-    this.migrationsRepo = migrationsRepo;
-    this.appsRepo = appsRepo;
-  }
-
-  async get(input: { appId: AppId; ownerId: OwnerId }): Promise<VolumeStorageMigration | null> {
-    const migration = await this.migrationsRepo.findByApp(input);
-    if (migration) {
-      return toMigration(migration);
-    }
-    if (!(await this.appsRepo.isOwnedBy(input))) {
-      throw new NotFoundError('App not found.');
-    }
-    return null;
   }
 
   async cancel({
@@ -98,13 +71,4 @@ export class VolumeStorageMigrationsService extends Service {
       }
     }
   }
-}
-
-function toMigration(row: VolumeStorageMigrationRow): VolumeStorageMigration {
-  return {
-    configId: row.config_id,
-    state: row.state,
-    message: row.message,
-    canCancel: row.state === 'pending' && row.volume_storage_migration_started_at === null,
-  };
 }

@@ -115,6 +115,17 @@ test.each([
     });
     expect(job.created_at).toBeInstanceOf(Date);
     expect(job.updated_at).toBeInstanceOf(Date);
+    const apps = new AppsRepository(withTypes<Queries>(sql));
+    const status = {
+      id: appId,
+      config_id: job.config_id,
+      volume_storage_migration_state: 'pending',
+      volume_storage_migration_started_at: null,
+    };
+    expect(await apps.findById({ appId, ownerId: OWNER_ID })).toMatchObject(status);
+    expect(await apps.listByOwner({ ownerId: OWNER_ID })).toContainEqual(
+      expect.objectContaining(status),
+    );
     expect(String(job.volume_storage_prefix).startsWith(`apps/${appId}/`)).toBe(true);
     expect(job).not.toHaveProperty('volume_storage_access_key_id');
     expect(job).not.toHaveProperty('volume_storage_secret_access_key');

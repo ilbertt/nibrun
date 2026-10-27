@@ -4,27 +4,13 @@ import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap, t } from 'elysia';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { AuthCaller } from '#lib/auth/caller.ts';
-import {
-  CancelVolumeStorageMigrationQuerySchema,
-  VolumeStorageMigrationResponseSchema,
-} from '#routes/api/apps/[appId]/volume-storage-migration/model.ts';
+import { CancelVolumeStorageMigrationQuerySchema } from '#routes/api/apps/[appId]/volume-storage-migration/model.ts';
 import { AuthPlugin, VolumeStorageMigrationsServicePlugin } from '#services/plugins.ts';
 
 export const AppsAppIdVolumeStorageMigrationController = new Elysia()
   .use(AuthPlugin)
   .use(VolumeStorageMigrationsServicePlugin)
   .guard({ auth: { policies: [AuthCaller.RegisteredAccount] } })
-  .get(
-    '/apps/:appId/volume-storage-migration',
-    async function getMigration({ volumeStorageMigrationsService, params, user }) {
-      const migration = await volumeStorageMigrationsService.get({
-        appId: Value.Parse(AppIdSchema, params.appId),
-        ownerId: Value.Parse(OwnerIdSchema, user.id),
-      });
-      return { migration };
-    },
-    { response: publicSchema(VolumeStorageMigrationResponseSchema) },
-  )
   .delete(
     '/apps/:appId/volume-storage-migration',
     async function cancelMigration({

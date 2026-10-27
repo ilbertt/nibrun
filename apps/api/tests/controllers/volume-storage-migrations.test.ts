@@ -16,41 +16,19 @@ afterEach(function restoreMocks() {
   mock.restore();
 });
 
-test('only status and queued cancellation are mounted; migration creation stays unavailable', () => {
+test('only queued cancellation is mounted; app reads carry status', () => {
   expect(routesUnder('/api/apps/:appId/volume-storage-migration')).toEqual([
-    { method: 'GET', path: '/api/apps/:appId/volume-storage-migration' },
     { method: 'DELETE', path: '/api/apps/:appId/volume-storage-migration' },
   ]);
 });
 
-test('status and cancellation require an authenticated account', async () => {
-  expect((await send({ url: URL })).status).toBe(StatusMap.Unauthorized);
+test('cancellation requires an authenticated account', async () => {
   expect((await send({ method: 'DELETE', url: CANCEL_URL })).status).toBe(StatusMap.Unauthorized);
   const anonymous = await auth.api.signInAnonymous({ returnHeaders: true });
   const headers = { authorization: `Bearer ${anonymous.response.token}` };
-  expect((await send({ url: URL, headers })).status).toBe(StatusMap.Forbidden);
   expect((await send({ method: 'DELETE', url: CANCEL_URL, headers })).status).toBe(
     StatusMap.Forbidden,
   );
-});
-
-test('status for an app without migration configuration is null and uses the authenticated owner', async () => {
-  const account = await registeredAccount();
-  const get = spyOn(service, 'get').mockResolvedValue(null);
-  const response = await send({ url: URL, headers: { cookie: account.cookie } });
-  expect(response.status).toBe(StatusMap.OK);
-  expect(await response.json()).toEqual({ migration: null });
-  expect(get).toHaveBeenCalledWith({ appId: APP_ID, ownerId: account.ownerId });
-  const migration = {
-    configId: 'destination',
-    state: 'pending' as const,
-    message: null,
-    canCancel: true,
-  };
-  get.mockResolvedValue(migration);
-  const pending = await send({ url: URL, headers: { cookie: account.cookie } });
-  expect(pending.status).toBe(StatusMap.OK);
-  expect(await pending.json()).toEqual({ migration });
 });
 
 test('cancellation requires a config token and never accepts an owner from the query', async () => {
@@ -81,11 +59,11 @@ test('cancellation requires a config token and never accepts an owner from the q
 
 test('unowned apps and started migrations preserve not-found and conflict responses', async () => {
   const account = await registeredAccount();
-  spyOn(service, 'get').mockRejectedValue(new NotFoundError());
-  expect((await send({ url: URL, headers: { cookie: account.cookie } })).status).toBe(
-    StatusMap['Not Found'],
-  );
-  spyOn(service, 'cancel').mockRejectedValue(new ConflictError());
+  const cancel = spyOn(service, 'cancel').mockRejectedValue(new NotFoundError());
+  expect(
+    (await send({ method: 'DELETE', url: CANCEL_URL, headers: { cookie: account.cookie } })).status,
+  ).toBe(StatusMap['Not Found']);
+  cancel.mockRejectedValue(new ConflictError());
   expect(
     (await send({ method: 'DELETE', url: CANCEL_URL, headers: { cookie: account.cookie } })).status,
   ).toBe(StatusMap.Conflict);

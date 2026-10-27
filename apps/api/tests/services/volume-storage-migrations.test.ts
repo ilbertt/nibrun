@@ -25,7 +25,6 @@ class RecoveryRepository implements VolumeStorageMigrationStatusRepositoryContra
   rows: UnstartedVolumeStorageMigrationRow[] = [];
   failConfigId: string | undefined;
   migration: VolumeStorageMigrationRow | null = null;
-  owned = true;
   cancelled = true;
   readonly cancellations: Parameters<VolumeStorageMigrationsRepositoryContract['abort']>[0][] = [];
   readonly reads: Parameters<VolumeStorageMigrationsRepositoryContract['findByApp']>[0][] = [];
@@ -55,14 +54,7 @@ class RecoveryRepository implements VolumeStorageMigrationStatusRepositoryContra
 }
 
 function service(repo: RecoveryRepository) {
-  return new VolumeStorageMigrationsService({
-    migrationsRepo: repo,
-    appsRepo: {
-      isOwnedBy() {
-        return Promise.resolve(repo.owned);
-      },
-    },
-  });
+  return new VolumeStorageMigrationsService(repo);
 }
 
 function migrationRow(
@@ -131,33 +123,6 @@ test('apps without pending storage requests receive no writes', async () => {
   const repo = new RecoveryRepository();
   await service(repo).sweepAbandoned();
   expect(repo.attempts).toEqual([]);
-});
-
-test('status returns null for an owned app without a migration and hides unowned apps', async () => {
-  const repo = new RecoveryRepository();
-  const input = { appId: APP_ID, ownerId: OWNER_ID };
-  expect(await service(repo).get(input)).toBeNull();
-  repo.owned = false;
-  await expect(service(repo).get(input)).rejects.toBeInstanceOf(NotFoundError);
-  expect(repo.reads).toEqual([input, input]);
-  expect(repo.cancellations).toEqual([]);
-});
-
-test('status exposes only the current config, state, message and safe cancellation availability', async () => {
-  const repo = new RecoveryRepository();
-  repo.migration = migrationRow();
-  expect(await service(repo).get({ appId: APP_ID, ownerId: OWNER_ID })).toEqual({
-    configId: 'destination',
-    state: 'pending',
-    message: null,
-    canCancel: true,
-  });
-  repo.migration = migrationRow({ volume_storage_migration_started_at: new Date() });
-  expect((await service(repo).get({ appId: APP_ID, ownerId: OWNER_ID }))?.canCancel).toBe(false);
-  for (const state of ['completed', 'failed', 'cancelled'] as const) {
-    repo.migration = migrationRow({ state });
-    expect((await service(repo).get({ appId: APP_ID, ownerId: OWNER_ID }))?.canCancel).toBe(false);
-  }
 });
 
 test('cancellation passes the client config token to the atomic unstarted-only abort', async () => {

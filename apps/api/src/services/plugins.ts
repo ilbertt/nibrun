@@ -113,10 +113,9 @@ const trustedWorkflowsRepository = new TrustedWorkflowsRepository(sql);
 const paidRequestsRepository = new PaidRequestsRepository(sql);
 const volumeStorageMigrationsRepository = new VolumeStorageMigrationsRepository(sql);
 
-const volumeStorageMigrationsService = new VolumeStorageMigrationsService({
-  migrationsRepo: volumeStorageMigrationsRepository,
-  appsRepo: appsRepository,
-});
+const volumeStorageMigrationsService = new VolumeStorageMigrationsService(
+  volumeStorageMigrationsRepository,
+);
 
 const deploymentsService = new DeploymentsService({ deploymentsRepo: deploymentsRepository });
 const appsService = new AppsService({
