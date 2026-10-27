@@ -14,6 +14,10 @@ import { renderFirecrackerConfig } from '#lib/vm/firecracker-config.ts';
 import { adoptedGuestImage, type GuestImage } from '#lib/vm/guest-image.ts';
 import { buildInstanceConfigImage } from '#lib/vm/instance-env.ts';
 import {
+  stopVmForVolumeMigration,
+  VolumeMigrationSourceStopFailed,
+} from '#lib/vm/migration-stop.ts';
+import {
   ensureLoadable,
   readHostBootId,
   readSnapshotBytes,
@@ -34,6 +38,7 @@ import { readCacheDiskBytes } from '#lib/volumes/zerofs.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
+import { CommandRunner } from '#services/command-runner.service.ts';
 import { CronRegistrationReceiver } from '#services/cron-registration-receiver.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
@@ -62,6 +67,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     const zerofs = yield* ZerofsTopology;
     const agentState = yield* AgentState;
     const desiredCache = yield* DesiredStateCache;
+    const commands = yield* CommandRunner;
 
     function requireDataVolume({ appId, devicePath }: { appId: AppId; devicePath: string }) {
       return Effect.gen(function* () {
@@ -496,6 +502,15 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
         yield* discardSnapshot(appId);
         yield* Systemd.stop(appId);
       }),
+      stopForVolumeMigration: Effect.fn('VmManager.stopForVolumeMigration')((appId: AppId) =>
+        discardSnapshot(appId).pipe(
+          Effect.andThen(
+            stopVmForVolumeMigration({ appId, vmDir: config.vmDir, runtimeDir: config.runtimeDir }),
+          ),
+          Effect.mapError(() => new VolumeMigrationSourceStopFailed()),
+          Effect.provideService(CommandRunner, commands),
+        ),
+      ),
       discard: Effect.fn('VmManager.discard')(function* (appId: AppId) {
         yield* Effect.annotateCurrentSpan({ appId });
         yield* discardSnapshot(appId);
@@ -509,6 +524,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     AgentConfig.Default,
     AgentState.Default,
     ArtifactImages.Default,
+    CommandRunner.Default,
     TenantLogReceiver.Default,
     CronRegistrationReceiver.Default,
     ZerofsTopology.Default,

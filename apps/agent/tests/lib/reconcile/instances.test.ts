@@ -236,6 +236,7 @@ function recordingVms({
         sleep: () => taking({ call: 'sleep', outcome: onSleep }),
         wake: () => taking({ call: 'wake', outcome: onWake }),
         stop: () => taking({ call: 'stop', outcome: Effect.void }),
+        stopForVolumeMigration: () => Effect.void,
         discard: () => taking({ call: 'discard', outcome: Effect.void }),
       }),
     ),
