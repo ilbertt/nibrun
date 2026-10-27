@@ -838,10 +838,6 @@ export interface IStampDeploymentActivationResult {
 export interface IFailDeploymentResult {
 }
 
-/** Result of query `SupersedeLiveDeployment`. */
-export interface ISupersedeLiveDeploymentResult {
-}
-
 /** Result of query `SelectInsertedDeployment`. */
 export interface ISelectInsertedDeploymentResult {
     id: IDeploymentsColumns["id"];
@@ -888,6 +884,10 @@ export interface ISelectInsertedDeploymentResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+}
+
+/** Result of query `SupersedeLiveDeployment`. */
+export interface ISupersedeLiveDeploymentResult {
 }
 
 /** Result of query `SelectAppForOnlyDeployment`. */
@@ -1202,8 +1202,15 @@ export interface ISelectUnstartedVolumeStorageMigrationsResult {
 export interface IAbortVolumeStorageMigrationResult {
 }
 
+/** Result of query `InsertVolumeStorageMigrationDeployment`. */
+export interface IInsertVolumeStorageMigrationDeploymentResult {
+    id: IDeploymentsColumns["id"];
+}
+
 /** Result of query `SelectVolumeStorageMigrationSource`. */
 export interface ISelectVolumeStorageMigrationSourceResult {
+    deployment_id: IDeploymentsColumns["id"];
+    artifact_id: IDeploymentsColumns["artifact_id"];
     config_id: IAppConfigsColumns["id"];
     volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
     volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
@@ -1307,8 +1314,8 @@ export interface Queries {
     ApplyReportedDeployment: IApplyReportedDeploymentResult;
     StampDeploymentActivation: IStampDeploymentActivationResult;
     FailDeployment: IFailDeploymentResult;
-    SupersedeLiveDeployment: ISupersedeLiveDeploymentResult;
     SelectInsertedDeployment: ISelectInsertedDeploymentResult;
+    SupersedeLiveDeployment: ISupersedeLiveDeploymentResult;
     SelectAppForOnlyDeployment: ISelectAppForOnlyDeploymentResult;
     SelectDeploymentHeldByApp: ISelectDeploymentHeldByAppResult;
     SelectAppAwaitingData: ISelectAppAwaitingDataResult;
@@ -1348,6 +1355,7 @@ export interface Queries {
     CompleteVolumeStorageMigration: ICompleteVolumeStorageMigrationResult;
     SelectUnstartedVolumeStorageMigrations: ISelectUnstartedVolumeStorageMigrationsResult;
     AbortVolumeStorageMigration: IAbortVolumeStorageMigrationResult;
+    InsertVolumeStorageMigrationDeployment: IInsertVolumeStorageMigrationDeploymentResult;
     SelectVolumeStorageMigrationSource: ISelectVolumeStorageMigrationSourceResult;
     SelectVolumeStorageMigration: ISelectVolumeStorageMigrationResult;
 }

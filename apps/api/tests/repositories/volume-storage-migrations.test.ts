@@ -334,6 +334,47 @@ test('a deployment racing with migration cannot select the pending destination',
   );
 });
 
+test('only the owning started attempt can switch storage and concurrent retries reuse one deployment', async () => {
+  const appId = await createApp({ name: 'atomic-cutover', deployed: true, configured: false });
+  const owned = { appId, ownerId: OWNER_ID };
+  const deployments = new DeploymentsRepository(withTypes<Queries>(sql));
+  const before = await deployments.listByApp(owned);
+  const volumes = await desiredVolumes();
+  const migration = await repository().request({
+    ...owned,
+    destination: destination(ACCESS_KEY_AUTH),
+  });
+  const attempt = { ...owned, configId: migration!.config_id, hostId: HOST_ID };
+  expect(await repository().cutover(attempt)).toBeNull();
+  expect(await repository().start(attempt)).toBe(true);
+  expect(await repository().cutover({ ...attempt, hostId: OTHER_HOST_ID })).toBeNull();
+  expect(await repository().cutover({ ...attempt, ownerId: OTHER_OWNER_ID })).toBeNull();
+  expect(await repository().cutover({ ...attempt, configId: crypto.randomUUID() })).toBeNull();
+  expect(await deployments.listByApp(owned)).toEqual(before);
+  expect(await desiredVolumes()).toEqual(volumes);
+  const [first, retry] = await Promise.all([
+    repository().cutover(attempt),
+    repository().cutover(attempt),
+  ]);
+  expect(first).not.toBeNull();
+  expect(retry).toBe(first);
+  const after = await deployments.listByApp(owned);
+  expect(after).toHaveLength(2);
+  expect(after.find((deployment) => deployment.id === first)).toMatchObject({
+    artifact_id: before[0]!.artifact_id,
+    state: 'pending',
+  });
+  expect(after.find((deployment) => deployment.id === before[0]!.id)?.state).toBe('superseded');
+  expect((await desiredVolumes()).find((volume) => volume.appId === appId)?.storage).toMatchObject({
+    bucket: 'customer-data',
+    prefix: migration!.volume_storage_prefix,
+  });
+  expect((await repository().findByApp(owned))?.state).toBe('pending');
+  expect(await repository().complete(attempt)).toBe(true);
+  expect(await repository().cutover(attempt)).toBe(first);
+  expect(await deployments.listByApp(owned)).toEqual(after);
+});
+
 test('host recovery cannot return to shared storage after the destination was deployed', async () => {
   const appId = await createApp({ name: 'cutover', deployed: true, configured: false });
   const migration = await repository().request({
@@ -349,7 +390,14 @@ test('host recovery cannot return to shared storage after the destination was de
       hostId: HOST_ID,
     }),
   ).toBe(true);
-  await simulateCutover({ appId, configId: migration!.config_id });
+  expect(
+    await repository().cutover({
+      appId,
+      ownerId: OWNER_ID,
+      configId: migration!.config_id,
+      hostId: HOST_ID,
+    }),
+  ).not.toBeNull();
   expect(
     await repository().abortStarted({
       appId,
@@ -381,7 +429,7 @@ test('only the owning host can complete a deployed destination, unlocking edits 
   expect((await desiredVolumes()).find((volume) => volume.appId === appId)).not.toHaveProperty(
     'storage',
   );
-  await simulateCutover(attempt);
+  expect(await repository().cutover(attempt)).not.toBeNull();
   expect(await repository().complete({ ...attempt, hostId: OTHER_HOST_ID })).toBe(false);
   expect(await repository().complete({ ...attempt, ownerId: OTHER_OWNER_ID })).toBe(false);
   expect(await repository().complete({ ...attempt, configId: crypto.randomUUID() })).toBe(false);
@@ -415,6 +463,7 @@ test('only the owning host can complete a deployed destination, unlocking edits 
     bucket: 'customer-data',
     prefix: migration!.volume_storage_prefix,
   });
+  expect(await repository().cutover(attempt)).toBeNull();
 });
 
 test('completion cannot release a cancelled attempt or a newer pending migration', async () => {
@@ -431,12 +480,14 @@ test('completion cannot release a cancelled attempt or a newer pending migration
     true,
   );
   expect(await repository().complete(stale)).toBe(false);
+  expect(await repository().cutover(stale)).toBeNull();
   const next = await repository().request(request);
   const current = { ...stale, configId: next!.config_id };
   expect(await repository().complete(stale)).toBe(false);
   expect(await repository().complete(current)).toBe(false);
   expect(await repository().start(current)).toBe(true);
-  await simulateCutover(current);
+  expect(await repository().cutover(stale)).toBeNull();
+  expect(await repository().cutover(current)).not.toBeNull();
   expect(await repository().complete(stale)).toBe(false);
   expect((await repository().findByApp(current))?.state).toBe('pending');
   expect(await repository().complete(current)).toBe(true);
@@ -740,27 +791,6 @@ test('legacy started attempts without a known host cannot be released by a guess
   expect(await repository().abortStarted({ ...recovery, hostId: HOST_ID })).toBe(false);
   expect(await repository().abortStarted({ ...recovery, hostId: OTHER_HOST_ID })).toBe(false);
 });
-
-async function simulateCutover({
-  appId,
-  configId,
-}: Pick<Parameters<VolumeStorageMigrationsRepository['complete']>[0], 'appId' | 'configId'>) {
-  await sql.begin(async function cutover(transaction) {
-    await transaction.unsafe(
-      `UPDATE nibrun.deployments d SET state = 'superseded'
-       FROM nibrun.apps a WHERE a.id = d.app_id AND a.id = $1 AND a.owner_id = $2`,
-      [appId, OWNER_ID],
-    );
-    await transaction.unsafe(
-      `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state)
-       SELECT a.id, d.artifact_id, $3, 'running'
-       FROM nibrun.apps a
-       JOIN LATERAL (SELECT artifact_id FROM nibrun.deployments d WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1) d ON true
-       WHERE a.id = $1 AND a.owner_id = $2`,
-      [appId, OWNER_ID, configId],
-    );
-  });
-}
 
 async function createApp({
   name,

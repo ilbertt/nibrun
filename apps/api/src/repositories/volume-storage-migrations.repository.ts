@@ -1,12 +1,13 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
-import { type AppId, type HostId, ObjectKeySchema } from '@repo/protocol';
+import { type AppId, type DeploymentId, type HostId, ObjectKeySchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
-import type { OwnerId } from '#lib/api/identifiers.ts';
+import type { ArtifactId, OwnerId } from '#lib/api/identifiers.ts';
 import type { VolumeStorageMigrationState } from '#lib/api/volume-storage-migration.ts';
 import { ConflictError } from '#lib/errors.ts';
 import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
 import { appendConfigVersion, lockApp } from '#repositories/apps.repository.ts';
+import { supersedeLiveDeployment } from '#repositories/deployments.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type VolumeStorageMigrationRow = Queries['SelectVolumeStorageMigration'];
@@ -38,6 +39,7 @@ export abstract class VolumeStorageMigrationsRepositoryContract {
   ): Promise<VolumeStorageMigrationRow | null>;
   abstract findByApp(input: OwnedApp): Promise<VolumeStorageMigrationRow | null>;
   abstract start(input: MigrationAttempt & { hostId: HostId }): Promise<boolean>;
+  abstract cutover(input: MigrationAttempt & { hostId: HostId }): Promise<DeploymentId | null>;
   abstract complete(input: MigrationAttempt & { hostId: HostId }): Promise<boolean>;
   abstract listUnstarted(input: {
     createdBefore: Date;
@@ -135,6 +137,51 @@ export class VolumeStorageMigrationsRepository
         WHERE id = ${appId} AND owner_id = ${ownerId}
       `;
       return true;
+    });
+  }
+
+  // The owning host must verify the copy and prevent source access before requesting cutover.
+  cutover({
+    appId,
+    ownerId,
+    configId,
+    hostId,
+  }: MigrationAttempt & { hostId: HostId }): Promise<DeploymentId | null> {
+    return this.sql.begin(async (tx) => {
+      const app = await lockApp({ tx, appId, ownerId });
+      if (
+        !app ||
+        (app.volume_storage_migration_state !== 'pending' &&
+          app.volume_storage_migration_state !== 'completed') ||
+        app.volume_storage_migration_started_at === null ||
+        app.volume_storage_migration_host_id !== hostId
+      ) {
+        return null;
+      }
+      const migration = await this.read({ tx, appId, ownerId });
+      if (migration?.config_id !== configId || migration.volume_storage_endpoint === null) {
+        return null;
+      }
+      const deployed = await this.deployedConfig({ tx, appId, ownerId });
+      if (!deployed) {
+        return null;
+      }
+      if (deployed.config_id === configId) {
+        return deployed.deployment_id;
+      }
+      if (
+        app.volume_storage_migration_state !== 'pending' ||
+        deployed.volume_storage_endpoint !== null
+      ) {
+        return null;
+      }
+      return this.deployDestination({
+        tx,
+        appId,
+        ownerId,
+        configId,
+        artifactId: deployed.artifact_id,
+      });
     });
   }
 
@@ -250,16 +297,39 @@ export class VolumeStorageMigrationsRepository
     });
   }
 
+  private async deployDestination({
+    tx,
+    appId,
+    ownerId,
+    configId,
+    artifactId,
+  }: TransactionInput & { configId: string; artifactId: ArtifactId }): Promise<DeploymentId> {
+    await supersedeLiveDeployment({ tx, appId, ownerId });
+    const [inserted] = await tx.InsertVolumeStorageMigrationDeployment`
+      INSERT INTO nibrun.deployments (app_id, artifact_id, config_id)
+      SELECT a.id, ${artifactId}, ${configId}
+      FROM nibrun.apps a
+      WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND a.state IN ('active', 'suspended')
+      RETURNING id
+    `;
+    if (!inserted) {
+      throw new ConflictError(
+        'The app changed before its storage migration could switch deployments.',
+      );
+    }
+    return inserted.id;
+  }
+
   private async deployedConfig({ tx, appId, ownerId }: TransactionInput) {
     const [row] = await tx.SelectVolumeStorageMigrationSource`
-      SELECT c.id AS config_id,
+      SELECT d.id AS deployment_id, d.artifact_id, c.id AS config_id,
              c.volume_storage_endpoint, c.volume_storage_bucket, c.volume_storage_prefix,
              c.volume_storage_region, c.volume_storage_auth_kind, c.volume_storage_access_key_id,
              c.volume_storage_secret_access_key, c.volume_storage_session_token,
              c.volume_storage_encryption_password
       FROM nibrun.apps a
       JOIN LATERAL (
-        SELECT config_id FROM nibrun.deployments d
+        SELECT id, artifact_id, config_id FROM nibrun.deployments d
         WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
       ) d ON true
       JOIN nibrun.app_configs c ON c.id = d.config_id AND c.app_id = a.id

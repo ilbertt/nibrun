@@ -200,7 +200,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
         return { outcome: 'held' };
       }
       await lockAppForMutation({ tx, appId, ownerId });
-      await this.supersedeLive({ tx, appId, ownerId });
+      await supersedeLiveDeployment({ tx, appId, ownerId });
 
       // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one
       // the row is written through rather than one checked beside it.
@@ -250,7 +250,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
         return null;
       }
       await lockAppForMutation({ tx, appId, ownerId });
-      await this.supersedeLive({ tx, appId, ownerId });
+      await supersedeLiveDeployment({ tx, appId, ownerId });
 
       const [inserted] = await tx.InsertReplayedDeployment`
         WITH replay_source AS (
@@ -456,22 +456,6 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     `;
   }
 
-  private async supersedeLive({
-    tx,
-    appId,
-    ownerId,
-  }: OwnedApp & { tx: Transaction }): Promise<void> {
-    await tx.SupersedeLiveDeployment`
-      UPDATE nibrun.deployments d
-      SET state = 'superseded'
-      FROM nibrun.live_apps a
-      WHERE a.id = d.app_id
-        AND d.app_id = ${appId}
-        AND a.owner_id = ${ownerId}
-        AND d.state NOT IN ('superseded', 'failed')
-    `;
-  }
-
   private async selectDeployment({
     tx,
     deploymentId,
@@ -500,6 +484,22 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     `;
     return row ?? null;
   }
+}
+
+export async function supersedeLiveDeployment({
+  tx,
+  appId,
+  ownerId,
+}: OwnedApp & { tx: Transaction }): Promise<void> {
+  await tx.SupersedeLiveDeployment`
+    UPDATE nibrun.deployments d
+    SET state = 'superseded'
+    FROM nibrun.live_apps a
+    WHERE a.id = d.app_id
+      AND d.app_id = ${appId}
+      AND a.owner_id = ${ownerId}
+      AND d.state NOT IN ('superseded', 'failed')
+  `;
 }
 
 /**
