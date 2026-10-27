@@ -58,31 +58,34 @@ async function savedRequests(ownerId: OwnerId): Promise<PaidRequestRow[]> {
   )) as PaidRequestRow[];
 }
 
-test('the upgrade preserves legacy requests while requiring app IDs on new app feature requests', async () => {
+test('the upgrade preserves valid requests and requires app IDs for app features', async () => {
   const migrations = getMigrations();
   await sql.begin(async function upgradePaidRequests(transaction) {
     await transaction.unsafe('DROP TABLE nibrun.paid_requests');
-    for (const name of ['0067_paid_requests.sql', '0069_custom_bucket_paid_requests.sql']) {
+    for (const name of [
+      '0067_paid_requests.sql',
+      '0069_custom_bucket_paid_requests.sql',
+      '0070_bucket_requests_name_an_app.sql',
+    ]) {
       await transaction.unsafe(await migrations.get(name)!.text());
     }
     await transaction.unsafe(
-      `INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount)
-       VALUES ($1, 'apps', 10), ($1, 'custom-bucket', NULL)`,
-      [OWNER_ID],
+      `INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount, app_id)
+       VALUES ($1, 'apps', 10, NULL), ($1, 'custom-bucket', NULL, $2)`,
+      [OWNER_ID, CUSTOM_BUCKET_REQUEST.appId],
     );
     const before = await transaction.unsafe<
-      Pick<IPaidRequestsColumns, 'id' | 'request_type' | 'requested_apps_amount'>[]
+      Pick<IPaidRequestsColumns, 'id' | 'request_type' | 'requested_apps_amount' | 'app_id'>[]
     >(
-      'SELECT id, request_type, requested_apps_amount FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
+      'SELECT id, request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
       [OWNER_ID],
     );
-    await transaction.unsafe(await migrations.get('0070_bucket_requests_name_an_app.sql')!.text());
     await transaction.unsafe(await migrations.get('0075_always_on_paid_requests.sql')!.text());
     const after = await transaction.unsafe(
       'SELECT id, request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
       [OWNER_ID],
     );
-    expect([...after]).toEqual(before.map((row) => ({ ...row, app_id: null })));
+    expect([...after]).toEqual([...before]);
     for (const request of APP_PAID_REQUESTS) {
       await expect(
         transaction.savepoint(async function refuseUnscopedAppRequest(savepoint) {
