@@ -5,6 +5,7 @@ import { SHARED_OPTIONS } from '#config.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { createOutput } from '#lib/output.ts';
 import {
+  APP_PAID_REQUEST_TYPE_SCHEMA,
   completePaidRequest,
   PAID_REQUEST_OUTPUT,
   PAID_REQUEST_TYPE_SCHEMA,
@@ -25,8 +26,7 @@ export const command = defineCommand('paid-request', {
     },
     [SHARED_OPTIONS.app.name]: {
       ...SHARED_OPTIONS.app.option,
-      description:
-        'App name or slug. Only for --type custom-bucket; asked for when omitted in a terminal.',
+      description: `App name or slug. Only for --type ${APP_PAID_REQUEST_TYPE_SCHEMA.options.join(' or ')}; asked for when omitted in a terminal.`,
     },
   },
   beforeHandler: function signedIn({ context }) {

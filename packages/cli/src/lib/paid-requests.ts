@@ -11,12 +11,18 @@ import { UsageError } from '#lib/errors.ts';
 import { defineOutput } from '#lib/output.ts';
 import { answered } from '#lib/prompts.ts';
 
-const REQUEST_TYPES = ['apps', 'custom-bucket'] as const satisfies readonly PaidRequestType[];
+const REQUEST_TYPES = [
+  'apps',
+  'custom-bucket',
+  'always-on',
+] as const satisfies readonly PaidRequestType[];
 type CliPaidRequestType = (typeof REQUEST_TYPES)[number];
 
 export const PAID_REQUEST_TYPE_SCHEMA = z.enum(REQUEST_TYPES, {
   error: `Supported paid request types: ${REQUEST_TYPES.join(', ')}.`,
 });
+
+export const APP_PAID_REQUEST_TYPE_SCHEMA = PAID_REQUEST_TYPE_SCHEMA.exclude(['apps']);
 
 export const REQUESTED_APPS_AMOUNT_FLAG = 'requested-apps-amount';
 
@@ -32,7 +38,7 @@ const PaidRequestOptionsSchema = z.discriminatedUnion('type', [
     [REQUESTED_APPS_AMOUNT_FLAG]: REQUESTED_APPS_AMOUNT_SCHEMA.optional(),
   }),
   z.strictObject({
-    type: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum['custom-bucket']),
+    type: APP_PAID_REQUEST_TYPE_SCHEMA,
     [SHARED_OPTIONS.app.name]: SHARED_OPTIONS.app.option.schema,
   }),
 ]);
@@ -46,20 +52,24 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
       requestedAppsAmount: REQUESTED_APPS_AMOUNT_SCHEMA,
     }),
     z.object({
-      requestType: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum['custom-bucket']),
+      requestType: APP_PAID_REQUEST_TYPE_SCHEMA,
       appId: z.string(),
     }),
   ]),
   render: function renderRequest({ value, out }) {
-    if (value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum['custom-bucket']) {
+    if (value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum.apps) {
+      const { requestedAppsAmount } = value;
       out.success(
-        `Thanks! We recorded your request to use your own S3-compatible bucket for app ${value.appId}. This does not enable the feature or charge you.`,
+        `Thanks! We recorded your request for ${requestedAppsAmount} app${requestedAppsAmount === 1 ? '' : 's'} in total. Paid apps are coming.`,
       );
       return;
     }
-    const { requestedAppsAmount } = value;
+    const requestedFeature =
+      value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum['always-on']
+        ? `keep app ${value.appId} always on`
+        : `use your own S3-compatible bucket for app ${value.appId}`;
     out.success(
-      `Thanks! We recorded your request for ${requestedAppsAmount} app${requestedAppsAmount === 1 ? '' : 's'} in total. Paid apps are coming.`,
+      `Thanks! We recorded your request to ${requestedFeature}. This does not enable the feature or charge you.`,
     );
   },
 });
