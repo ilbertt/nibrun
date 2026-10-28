@@ -10,6 +10,10 @@ output "api_hostname" {
   value = var.api_hostname
 }
 
+output "api_default_host_id" {
+  value = var.api_default_host_id
+}
+
 output "dozzle_hostname" {
   value = var.dozzle_hostname
 }

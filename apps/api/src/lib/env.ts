@@ -1,4 +1,8 @@
+import { type HostId, HostIdSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
+
 interface CustomProcessEnv {
+  readonly API_DEFAULT_HOST_ID?: string;
   // Entries here must match the .env.example file
   readonly PORT?: string;
   readonly BASE_URL?: string;
@@ -48,6 +52,7 @@ function optional({
 }
 
 type Env = {
+  API_DEFAULT_HOST_ID: HostId | undefined;
   PORT: number;
   BASE_URL: URL;
   DATABASE_URL: string;
@@ -71,6 +76,9 @@ type Env = {
 
 function loadEnv(): Env {
   return {
+    API_DEFAULT_HOST_ID: process.env.API_DEFAULT_HOST_ID
+      ? Value.Parse(HostIdSchema, process.env.API_DEFAULT_HOST_ID)
+      : undefined,
     PORT: Number(optional({ name: 'PORT', defaultValue: DEFAULT_PORT })),
     BASE_URL: new URL(optional({ name: 'BASE_URL', defaultValue: DEFAULT_BASE_URL })),
     DATABASE_URL: required('DATABASE_URL'),

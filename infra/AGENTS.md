@@ -82,6 +82,18 @@ domain arrives whenever an owner adds one — which is what the token is for.
 
 ## Deploying
 
+Roll out agent identity persistence before the API requires IDs for first-time registration.
+Existing hosts already send their saved identity.
+
+Before deploying host ownership, set the `API_DEFAULT_HOST_ID` repository variable to the
+existing agent's `/var/lib/nibrun/host-id`, read over SSM. Registration retains this original
+identity in `hosts.origin_id` and returns a UUIDv7 `hosts.id` for the session and reports.
+The agent keeps its original registration identity on disk. Legacy saved canonical IDs also resolve
+to the same host. Unassigned latest deployments are adopted by that explicitly configured host;
+already assigned deployments keep their host. The deploy refuses an empty setting before
+changing the control-plane services. Changing the default later only affects unassigned work.
+Superseded history and deleted apps remain unassigned when their original host is unknown.
+
 `.github/workflows/cd.yml`, on every push to main. No SSH and no key material in CI: the last leg
 triggers `on_box_deploy.sh` over SSM RunCommand.
 

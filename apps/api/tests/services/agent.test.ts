@@ -10,7 +10,7 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { AgentSessions } from '#lib/agent/sessions.ts';
-import { ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
+import { ConflictError, ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
 import {
   AgentService,
@@ -27,9 +27,12 @@ const SESSION_REQUEST = Value.Parse(AgentSessionRequestSchema, {
   capacity: { vcpuCount: 2, memoryMib: 8192, cacheBytes: 100_000_000_000 },
 });
 
+const DEFAULT_HOST_ID = Value.Parse(HostIdSchema, 'configured-default-host');
+
 class FakeAgentRepository implements AgentRepositoryContract {
   readonly registeredOrigins: string[] = [];
   readonly hosts = new Map<string, HostId>();
+  readonly assignedHosts: HostId[] = [];
   readonly #sessions = new AgentSessions();
   observed: HostObservation | undefined;
   sessionExpiresAt: Date | undefined;
@@ -62,6 +65,11 @@ class FakeAgentRepository implements AgentRepositoryContract {
 
   hostForSession({ sessionToken }: { sessionToken: string }): Promise<HostId | undefined> {
     return Promise.resolve(this.#sessions.hostFor({ sessionToken, now: new Date() }));
+  }
+
+  assignUnplacedDeployments({ hostId }: { hostId: HostId }): Promise<void> {
+    this.assignedHosts.push(hostId);
+    return Promise.resolve();
   }
 
   desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
@@ -173,8 +181,13 @@ class FakeHostnameReconcileService implements HostnameReconcileServiceContract {
   }
 }
 
-function build() {
+function build(
+  { defaultHostId }: { defaultHostId: HostId | undefined } = { defaultHostId: DEFAULT_HOST_ID },
+) {
   const agentRepo = new FakeAgentRepository();
+  if (defaultHostId !== undefined) {
+    agentRepo.hosts.set(defaultHostId, defaultHostId);
+  }
   const deployments = new FakeDeploymentsService();
   const apps = new FakeAppsService();
   const exports = new FakeExportsService();
@@ -192,6 +205,7 @@ function build() {
     hostnames,
     volumeStorageMigrations,
     service: new AgentService({
+      defaultHostId,
       agentRepo,
       deploymentsService: deployments as unknown as DeploymentsService,
       appsService: apps as unknown as AppsService,
@@ -205,6 +219,37 @@ function build() {
 }
 
 describe('a session is the identity a host is answered as', () => {
+  test('bootstrap waits for the configured origin and adopts under its canonical id', async () => {
+    const originId = Value.Parse(HostIdSchema, crypto.randomUUID());
+    const { service, agentRepo } = build({ defaultHostId: originId });
+    agentRepo.hosts.delete(originId);
+    await expect(service.desiredState({ hostId: DEFAULT_HOST_ID })).rejects.toThrow(
+      'The configured default host has not registered yet.',
+    );
+    expect(agentRepo.assignedHosts).toEqual([]);
+    const session = await service.openSession({ ...SESSION_REQUEST, hostId: originId });
+    await service.desiredState({ hostId: session.hostId });
+    expect(session.hostId).not.toBe(originId);
+    expect(agentRepo.assignedHosts).toEqual([session.hostId]);
+  });
+
+  test('only the configured default host can adopt unplaced executions', async () => {
+    const { service, agentRepo } = build();
+    await expect(
+      service.desiredState({ hostId: Value.Parse(HostIdSchema, 'a-new-host') }),
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect(agentRepo.assignedHosts).toEqual([]);
+    await service.desiredState({ hostId: DEFAULT_HOST_ID });
+    expect(agentRepo.assignedHosts).toEqual([DEFAULT_HOST_ID]);
+  });
+
+  test('a missing default refuses the poll instead of clearing a running hosts desired state', async () => {
+    const { service, agentRepo } = build({ defaultHostId: undefined });
+    await expect(
+      service.desiredState({ hostId: Value.Parse(HostIdSchema, 'existing-host') }),
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect(agentRepo.assignedHosts).toEqual([]);
+  });
   test('an origin identity and its returned canonical id renew the same host', async () => {
     const { service, agentRepo } = build();
     const hostId = Value.Parse(HostIdSchema, 'host-of-record');
@@ -260,8 +305,8 @@ describe('a session is held for the lifetime its host was told about', () => {
 describe('a host is told the whole of what it should be running', () => {
   // Desired state carries no host id of its own, so a host can only ever be told about itself.
   test('and told it about itself', async () => {
-    const { service } = build();
     const hostId = Value.Parse(HostIdSchema, 'host-1');
+    const { service } = build({ defaultHostId: hostId });
 
     expect(await service.desiredState({ hostId })).toEqual({
       hostId,

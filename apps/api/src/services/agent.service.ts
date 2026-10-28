@@ -9,7 +9,7 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { DEFAULT_AGENT_POLL_SETTINGS } from '#lib/agent-poll-settings.ts';
-import { ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
+import { ConflictError, ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
@@ -35,6 +35,7 @@ export type ImportSweepServiceContract = UploadSweepServiceContract &
 export type HostnameReconcileServiceContract = Pick<HostnamesService, 'reconcile'>;
 
 export class AgentService extends Service {
+  private readonly defaultHostId: HostId | undefined;
   private readonly agentRepo: AgentRepositoryContract;
   private readonly deploymentsService: DeploymentsService;
   private readonly appsService: AppsService;
@@ -48,6 +49,7 @@ export class AgentService extends Service {
   >;
 
   constructor({
+    defaultHostId,
     agentRepo,
     deploymentsService,
     appsService,
@@ -57,6 +59,7 @@ export class AgentService extends Service {
     hostnamesService,
     volumeStorageMigrationsService,
   }: {
+    defaultHostId: HostId | undefined;
     agentRepo: AgentRepositoryContract;
     deploymentsService: DeploymentsService;
     appsService: AppsService;
@@ -67,6 +70,7 @@ export class AgentService extends Service {
     volumeStorageMigrationsService: Pick<VolumeStorageMigrationsService, 'sweepAbandoned'>;
   }) {
     super();
+    this.defaultHostId = defaultHostId;
     this.agentRepo = agentRepo;
     this.deploymentsService = deploymentsService;
     this.appsService = appsService;
@@ -119,7 +123,18 @@ export class AgentService extends Service {
     return hostId;
   }
 
-  desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+  async desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+    if (this.defaultHostId === undefined) {
+      throw new ConflictError('Configure API_DEFAULT_HOST_ID before assigning apps to a host.');
+    }
+    const defaultHostId = await this.agentRepo.hostForIdentity({ identity: this.defaultHostId });
+    if (defaultHostId === undefined) {
+      throw new ConflictError('The configured default host has not registered yet.');
+    }
+    if (hostId !== defaultHostId) {
+      throw new ConflictError('Only the configured default host can initiate deployment adoption.');
+    }
+    await this.agentRepo.assignUnplacedDeployments({ hostId });
     return this.agentRepo.desiredState({ hostId });
   }
 

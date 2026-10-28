@@ -199,6 +199,7 @@ const importsService = new ImportsService({
   appsRepo: appsRepository,
 });
 const agentService = new AgentService({
+  defaultHostId: env.API_DEFAULT_HOST_ID,
   agentRepo: agentRepository,
   deploymentsService,
   appsService,

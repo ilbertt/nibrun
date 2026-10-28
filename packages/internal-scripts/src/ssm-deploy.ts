@@ -17,6 +17,7 @@ const deployGroup = requiredEnv('DEPLOY_GROUP');
 const onBoxEnv: Record<string, string> = {
   API_IMAGE_URI: requiredEnv('API_IMAGE_URI'),
   API_HOSTNAME: requiredEnv('API_HOSTNAME'),
+  API_DEFAULT_HOST_ID: requiredEnv('API_DEFAULT_HOST_ID'),
   DOZZLE_HOSTNAME: requiredEnv('DOZZLE_HOSTNAME'),
   VICTORIALOGS_HOSTNAME: requiredEnv('VICTORIALOGS_HOSTNAME'),
   UMAMI_HOSTNAME: requiredEnv('UMAMI_HOSTNAME'),

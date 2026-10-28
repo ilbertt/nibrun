@@ -13,6 +13,10 @@ export interface ISelectHostForIdentityResult {
     id: IHostsColumns["id"];
 }
 
+/** Result of query `AssignUnplacedDeployments`. */
+export interface IAssignUnplacedDeploymentsResult {
+}
+
 /** Result of query `SelectDesiredDeployments`. */
 export interface ISelectDesiredDeploymentsResult {
     id: IDeploymentsColumns["id"];
@@ -1265,6 +1269,7 @@ export interface ISelectVolumeStorageMigrationResult {
 export interface Queries {
     RegisterHost: IRegisterHostResult;
     SelectHostForIdentity: ISelectHostForIdentityResult;
+    AssignUnplacedDeployments: IAssignUnplacedDeploymentsResult;
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
     SelectDesiredHostnames: ISelectDesiredHostnamesResult;

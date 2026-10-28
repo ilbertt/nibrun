@@ -3,6 +3,7 @@ import { withTypes } from '@ilbertt/bun-sqlgen';
 import type { DeploymentId, HostId } from '@repo/protocol';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
+import { AgentRepository } from '#repositories/agent.repository.ts';
 import {
   DeploymentsRepository,
   type ReportedDeployment,
@@ -11,6 +12,7 @@ import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts'
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
 import { registerHost } from '#tests/support/hosts.ts';
 import { refusedBy } from '#tests/support/postgres.ts';
+import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
 let sql: SQL;
@@ -235,3 +237,53 @@ function deploymentReport(deploymentId: DeploymentId): ReportedDeployment {
     lastHealthyAt: null,
   };
 }
+
+test('bootstrap adopts unassigned executions and never moves an assigned one', async () => {
+  const legacy = await createDeployedApp({ sql, name: 'bootstrap-legacy' });
+  const placed = await createDeployedApp({ sql, name: 'bootstrap-placed' });
+  await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
+    OTHER_HOST_ID,
+    placed.deploymentId,
+  ]);
+  const repository = new AgentRepository({
+    sql: withTypes<Queries>(sql),
+    secretsKey: TEST_SECRETS_KEY,
+  });
+  await repository.assignUnplacedDeployments({ hostId: HOST_ID });
+  await repository.assignUnplacedDeployments({ hostId: OTHER_HOST_ID });
+  const rows = await sql.unsafe(
+    'SELECT id, host_id, state FROM nibrun.deployments WHERE id IN ($1, $2)',
+    [legacy.deploymentId, placed.deploymentId],
+  );
+  expect([...rows]).toContainEqual({ id: legacy.deploymentId, host_id: HOST_ID, state: 'running' });
+  expect([...rows]).toContainEqual({
+    id: placed.deploymentId,
+    host_id: OTHER_HOST_ID,
+    state: 'running',
+  });
+});
+
+test('initial adoption assigns only the latest retained execution', async () => {
+  const app = await createDeployedApp({ sql, name: 'initial-history' });
+  await sql.unsafe("UPDATE nibrun.deployments SET state = 'superseded' WHERE id = $1", [
+    app.deploymentId,
+  ]);
+  const [current] = await sql.unsafe(
+    `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id)
+     SELECT app_id, artifact_id, config_id FROM nibrun.deployments WHERE id = $1 RETURNING id`,
+    [app.deploymentId],
+  );
+  const deleted = await createDeployedApp({ sql, name: 'initial-deleted' });
+  await sql.unsafe("UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1", [deleted.appId]);
+  await new AgentRepository({
+    sql: withTypes<Queries>(sql),
+    secretsKey: TEST_SECRETS_KEY,
+  }).assignUnplacedDeployments({ hostId: HOST_ID });
+  const rows = await sql.unsafe(
+    'SELECT id, host_id FROM nibrun.deployments WHERE id IN ($1, $2, $3)',
+    [app.deploymentId, current.id, deleted.deploymentId],
+  );
+  expect([...rows]).toContainEqual({ id: app.deploymentId, host_id: null });
+  expect([...rows]).toContainEqual({ id: current.id, host_id: HOST_ID });
+  expect([...rows]).toContainEqual({ id: deleted.deploymentId, host_id: null });
+});

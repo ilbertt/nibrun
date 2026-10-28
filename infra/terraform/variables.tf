@@ -3,6 +3,12 @@ variable "region" {
   default = "eu-central-1"
 }
 
+variable "api_default_host_id" {
+  type        = string
+  default     = ""
+  description = "Logical agent host ID assigned to unplaced deployments. Set to the existing host before enabling host ownership; this is not its EC2 instance ID."
+}
+
 variable "instance_type" {
   type        = string
   default     = "t3.large"
