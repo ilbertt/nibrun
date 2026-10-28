@@ -5,6 +5,8 @@ import {
   type ExportId,
   ExportIdSchema,
   type ExportState,
+  type HostId,
+  HostIdSchema,
   type HostReportedState,
   type ObjectKey,
   ObjectKeySchema,
@@ -59,6 +61,7 @@ function exportRow(overrides: Partial<ExportRow> = {}): ExportRow {
  * a fake that inserted freely would be testing a repository this service never talks to.
  */
 class FakeExportsRepository implements ExportsRepositoryContract {
+  readonly reportedHosts: HostId[] = [];
   readonly requested: RequestExportInput[] = [];
   readonly reported: ReportedExportRow[][] = [];
   rows: ExportRow[] = [];
@@ -100,7 +103,14 @@ class FakeExportsRepository implements ExportsRepositoryContract {
     return Promise.resolve(this.rows.find((row) => row.id === exportId) ?? null);
   }
 
-  applyReport({ reported }: { reported: ReportedExportRow[] }): Promise<void> {
+  applyReport({
+    reported,
+    hostId,
+  }: {
+    reported: ReportedExportRow[];
+    hostId: HostId;
+  }): Promise<void> {
+    this.reportedHosts.push(hostId);
     this.reported.push(reported);
     return Promise.resolve();
   }
@@ -280,6 +290,7 @@ describe('what a host says about the bundles it was told to write', () => {
 
     await service.applyHostReport({
       reported: {
+        hostId: Value.Parse(HostIdSchema, 'export-host'),
         exports: [
           {
             exportId: EXPORT_ID,
@@ -304,6 +315,7 @@ describe('what a host says about the bundles it was told to write', () => {
         },
       ],
     ]);
+    expect(exportsRepo.reportedHosts).toEqual([Value.Parse(HostIdSchema, 'export-host')]);
   });
 
   // An agent that predates checkpoint-backed exports reports without one, and the two are out of
