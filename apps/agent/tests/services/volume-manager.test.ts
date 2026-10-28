@@ -229,6 +229,7 @@ function host({
       Layer.succeed(
         AppZerofs,
         AppZerofs.make({
+          abortMigration: () => Effect.die('Normal lifecycle must not abort a migration.'),
           prepareMigration: () => Effect.die('Normal provisioning must not prepare a migration.'),
           reclaim: () => Effect.void,
           retire: (desired) =>

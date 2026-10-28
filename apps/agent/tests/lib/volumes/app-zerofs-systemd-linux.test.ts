@@ -38,7 +38,7 @@ function unitPid(unit: string) {
 }
 
 test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS_SYSTEMD !== '1')(
-  'a real migration destination starts beside the shared source without attaching a device',
+  'a real migration destination starts and aborts without changing the shared source',
   async () => {
     await run(
       Effect.gen(function* () {
@@ -94,7 +94,26 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS_SYSTE
               ).toBe(true);
               expect(Option.isNone(yield* allocator.lookup(host.appId))).toBe(true);
               expect(yield* Effect.isFailure(app.ensure(target))).toBe(true);
-              yield* flushAndStopAppZerofs(host.appId);
+              yield* app.abortMigration(target);
+              yield* assertAppZerofsStopped(host.appId);
+              expect(yield* fs.exists(dirname(host.paths.configFile))).toBe(false);
+              expect(yield* fs.exists(host.paths.cacheDirectory)).toBe(false);
+              expect(Option.isNone(yield* allocator.lookup(host.appId))).toBe(true);
+              expect(yield* selectVolumeFilesystem({ ...target, storage: undefined })).toEqual(
+                prepared.source,
+              );
+              expect(yield* fs.readFile(image)).toEqual(payload);
+              yield* app.abortMigration(target);
+              const retry = {
+                ...target,
+                storage: s3Storage({
+                  ...backend.storage,
+                  prefix: `${backend.storage.prefix}/retry`,
+                }),
+              };
+              yield* app.prepareMigration(retry);
+              yield* assertMounted(prepared.destination.mountPath);
+              yield* app.abortMigration(retry);
               expect(yield* fs.readFile(image)).toEqual(payload);
             }),
           });
