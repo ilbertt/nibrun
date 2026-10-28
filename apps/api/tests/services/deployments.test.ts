@@ -3,6 +3,8 @@ import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api
 import {
   type DeploymentId,
   DeploymentIdSchema,
+  type HostId,
+  HostIdSchema,
   HostPortSchema,
   type HostReportedState,
   HttpPortSchema,
@@ -64,6 +66,7 @@ const HEALTHY_AT = new Date('2026-08-04T11:31:00.000Z');
 const REPORTED_AT = new Date('2026-08-04T11:32:00.000Z');
 const HOST_PORT = Value.Parse(HostPortSchema, HOST_PORT_NUMBER);
 const GUEST_IPV4 = Value.Parse(Ipv4AddressSchema, '10.0.0.2');
+const HOST_ID = Value.Parse(HostIdSchema, 'reporting-host');
 const RESTART_COUNT = 2;
 
 // The config version this deployment pins. `app_configs` never changes a row, so this is what
@@ -131,6 +134,7 @@ type FakeBehaviour = {
 };
 
 class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
+  readonly polledHosts: HostId[] = [];
   readonly calls: Array<Record<string, unknown>> = [];
   readonly applied: ReportedDeployment[] = [];
   readonly activations: { deploymentId: DeploymentId; at: Date }[] = [];
@@ -141,7 +145,8 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
     this.#behaviour = behaviour;
   }
 
-  listLive(): Promise<LiveDeploymentRow[]> {
+  listLive({ hostId }: { hostId: HostId }): Promise<LiveDeploymentRow[]> {
+    this.polledHosts.push(hostId);
     return Promise.resolve(this.#behaviour.live ?? []);
   }
 
@@ -151,12 +156,12 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
   }
 
   stampActivation(input: { deploymentId: DeploymentId; at: Date }): Promise<void> {
-    this.activations.push(input);
+    this.activations.push({ deploymentId: input.deploymentId, at: input.at });
     return Promise.resolve();
   }
 
   fail(input: { deploymentId: DeploymentId; message: string }): Promise<void> {
-    this.failed.push(input);
+    this.failed.push({ deploymentId: input.deploymentId, message: input.message });
     return Promise.resolve();
   }
 
@@ -250,6 +255,7 @@ function reportOf({
   return {
     instances,
     volumes,
+    hostId: HOST_ID,
     reportedAt: REPORTED_AT.toISOString(),
   } as unknown as HostReportedState;
 }
@@ -536,6 +542,7 @@ describe('a host reporting is what moves a release through its states', () => {
 
     await service.applyHostReport({ reported: report([instance({ state: 'running' })]) });
 
+    expect(deploymentsRepo.polledHosts).toEqual([HOST_ID]);
     expect(deploymentsRepo.applied).toEqual([
       expect.objectContaining({ deploymentId: DEPLOYMENT_ID, state: 'running' }),
     ]);

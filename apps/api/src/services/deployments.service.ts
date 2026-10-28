@@ -176,7 +176,7 @@ export class DeploymentsService extends Service {
         .map((volume) => [volume.appId, volume]),
     );
     const now = new Date();
-    const live = await this.deploymentsRepo.listLive();
+    const live = await this.deploymentsRepo.listLive({ hostId: reported.hostId });
 
     const observed: ReportedDeployment[] = [];
     const activated: DeploymentId[] = [];
@@ -218,15 +218,16 @@ export class DeploymentsService extends Service {
       }
     }
 
-    await this.deploymentsRepo.applyReport({ reported: observed });
+    await this.deploymentsRepo.applyReport({ reported: observed, hostId: reported.hostId });
     for (const deploymentId of activated) {
       await this.deploymentsRepo.stampActivation({
         deploymentId,
+        hostId: reported.hostId,
         at: servedFrom({ instance: instances.get(deploymentId), reportedAt: reported.reportedAt }),
       });
     }
     for (const failure of failed) {
-      await this.deploymentsRepo.fail(failure);
+      await this.deploymentsRepo.fail({ ...failure, hostId: reported.hostId });
     }
   }
 

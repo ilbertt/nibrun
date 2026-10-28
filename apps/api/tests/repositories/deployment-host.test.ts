@@ -1,9 +1,12 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
-import type { HostId } from '@repo/protocol';
+import type { DeploymentId, HostId } from '@repo/protocol';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
-import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import {
+  DeploymentsRepository,
+  type ReportedDeployment,
+} from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
 import { registerHost } from '#tests/support/hosts.ts';
@@ -166,3 +169,69 @@ test('an artifact rollback keeps the current host rather than replaying the orig
   ]);
   expect(current.host_id).toBe(DESTINATION_HOST_ID);
 });
+
+test('a host lifecycle pass cannot inspect deployments assigned to another host', async () => {
+  const app = await createDeployedApp({ sql, name: 'scoped-live-host' });
+  await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
+    HOST_ID,
+    app.deploymentId,
+  ]);
+  const repository = new DeploymentsRepository(withTypes<Queries>(sql));
+  expect(await repository.listLive({ hostId: HOST_ID })).toContainEqual(
+    expect.objectContaining({ id: app.deploymentId }),
+  );
+  expect(await repository.listLive({ hostId: OTHER_HOST_ID })).not.toContainEqual(
+    expect.objectContaining({ id: app.deploymentId }),
+  );
+});
+
+test('a foreign host cannot report, activate or fail an assigned deployment', async () => {
+  const app = await createDeployedApp({ sql, name: 'scoped-write-host' });
+  await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
+    HOST_ID,
+    app.deploymentId,
+  ]);
+  const repository = new DeploymentsRepository(withTypes<Queries>(sql));
+  const [before] = await sql.unsafe('SELECT * FROM nibrun.deployments WHERE id = $1', [
+    app.deploymentId,
+  ]);
+  await repository.applyReport({
+    reported: [deploymentReport(app.deploymentId)],
+    hostId: OTHER_HOST_ID,
+  });
+  await repository.stampActivation({
+    deploymentId: app.deploymentId,
+    at: new Date(),
+    hostId: OTHER_HOST_ID,
+  });
+  await repository.fail({
+    deploymentId: app.deploymentId,
+    message: 'A different host did not start it.',
+    hostId: OTHER_HOST_ID,
+  });
+  const [unchanged] = await sql.unsafe('SELECT * FROM nibrun.deployments WHERE id = $1', [
+    app.deploymentId,
+  ]);
+  expect(unchanged).toEqual(before);
+  await repository.applyReport({ reported: [deploymentReport(app.deploymentId)], hostId: HOST_ID });
+  const [updated] = await sql.unsafe('SELECT restart_count FROM nibrun.deployments WHERE id = $1', [
+    app.deploymentId,
+  ]);
+  expect(updated.restart_count).toBe(1);
+});
+
+function deploymentReport(deploymentId: DeploymentId): ReportedDeployment {
+  return {
+    deploymentId,
+    state: 'running',
+    instanceState: 'running',
+    hostPort: null,
+    guestIpv4: null,
+    publicIpv4: null,
+    extraPublicPort: null,
+    restartCount: 1,
+    message: null,
+    startedAt: null,
+    lastHealthyAt: null,
+  };
+}
