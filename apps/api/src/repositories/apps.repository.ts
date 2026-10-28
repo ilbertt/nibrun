@@ -3,6 +3,7 @@ import type {
   AppHostnameKind,
   AppId,
   ComputeUsage,
+  DeploymentId,
   FilesystemUsage,
   HostId,
   Hostname,
@@ -87,8 +88,14 @@ export abstract class AppsRepositoryContract {
     readings: ReadonlyMap<AppId, FilesystemUsage>;
     hostId: HostId;
   }): Promise<void>;
-  abstract recordComputeUsage(input: { readings: ReadonlyMap<AppId, ComputeUsage> }): Promise<void>;
-  abstract clearComputeUsage(input: { appIds: readonly AppId[] }): Promise<void>;
+  abstract recordComputeUsage(input: {
+    readings: ReadonlyMap<DeploymentId, ComputeUsage>;
+    hostId: HostId;
+  }): Promise<void>;
+  abstract clearComputeUsage(input: {
+    deploymentIds: readonly DeploymentId[];
+    hostId: HostId;
+  }): Promise<void>;
   abstract update(input: OwnedApp & { patch: SealedAppPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract stampDataInitialized(input: { appIds: readonly AppId[]; hostId: HostId }): Promise<void>;
@@ -355,8 +362,10 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    */
   async recordComputeUsage({
     readings,
+    hostId,
   }: {
-    readings: ReadonlyMap<AppId, ComputeUsage>;
+    readings: ReadonlyMap<DeploymentId, ComputeUsage>;
+    hostId: HostId;
   }): Promise<void> {
     const taken = [...readings];
     await this.sql`
@@ -366,7 +375,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              NULLIF(reading.cpu_share, '')::double precision, reading.measured_at::timestamptz
       FROM UNNEST(
         ${this.sql.array(
-          taken.map(([appId]) => appId),
+          taken.map(([deploymentId]) => deploymentId),
           TEXT_ARRAY,
         )},
         ${this.sql.array(
@@ -385,8 +394,10 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           taken.map(([, usage]) => usage.measuredAt),
           TEXT_ARRAY,
         )}
-      ) AS reading(app_id, memory_total_bytes, memory_used_bytes, cpu_share, measured_at)
-      JOIN nibrun.apps a ON a.id = reading.app_id::uuid
+      ) AS reading(deployment_id, memory_total_bytes, memory_used_bytes, cpu_share, measured_at)
+      JOIN nibrun.app_hosts h ON h.deployment_id = reading.deployment_id::uuid
+        AND h.host_id = ${hostId}
+      JOIN nibrun.apps a ON a.id = h.app_id
       ON CONFLICT ON CONSTRAINT app_usage_app_id_key DO UPDATE
         SET memory_total_bytes  = EXCLUDED.memory_total_bytes,
             memory_used_bytes   = EXCLUDED.memory_used_bytes,
@@ -407,12 +418,22 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    *
    * The volume half is untouched: a filesystem is still there when the microVM holding it is not.
    */
-  async clearComputeUsage({ appIds }: { appIds: readonly AppId[] }): Promise<void> {
+  async clearComputeUsage({
+    deploymentIds,
+    hostId,
+  }: {
+    deploymentIds: readonly DeploymentId[];
+    hostId: HostId;
+  }): Promise<void> {
     await this.sql`
       UPDATE nibrun.app_usage
       SET memory_total_bytes = NULL, memory_used_bytes = NULL, cpu_share = NULL,
           compute_measured_at = NULL
-      WHERE app_id = ANY(${this.sql.array([...appIds], TEXT_ARRAY)}::uuid[])
+      WHERE app_id IN (
+        SELECT app_id FROM nibrun.app_hosts
+        WHERE deployment_id = ANY(${this.sql.array([...deploymentIds], TEXT_ARRAY)}::uuid[])
+          AND host_id = ${hostId}
+      )
     `;
   }
 
