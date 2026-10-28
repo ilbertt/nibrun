@@ -1,5 +1,10 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
+import {
+  DownloadDiagnostics,
+  type DownloadLogger,
+  downloadOrigin,
+} from '#lib/download-diagnostics.ts';
 import { hostnameOf, IP_V6, isPublicAddress } from '#lib/public-address.ts';
 import { isRemoteUrl } from '#lib/remote-url.ts';
 
@@ -21,6 +26,7 @@ const MAX_REDIRECTS = 10;
 
 const FIRST_REDIRECT_STATUS = 300;
 const FIRST_ERROR_STATUS = 400;
+const PROGRESS_INTERVAL_MS = 10_000;
 
 /**
  * A url the api was asked to fetch a file from, opened but not read. The body is handed over as
@@ -56,13 +62,14 @@ export class InterruptedSourceError extends Error {
 }
 
 export abstract class RemoteSourceRepositoryContract {
-  abstract open(input: { url: string }): Promise<RemoteSource>;
+  abstract open(input: { url: string; diagnostics?: DownloadDiagnostics }): Promise<RemoteSource>;
 }
 
 export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
   private readonly mayDial: AddressPolicy;
   private readonly resolveAddresses: ResolveAddresses;
   private readonly timeouts: Timeouts;
+  private readonly logger: DownloadLogger | undefined;
 
   /**
    * Which addresses this will dial, defaulting to the only answer production has any business
@@ -73,14 +80,17 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
     mayDial = isPublicAddress,
     resolveAddresses = addressesOf,
     timeouts,
+    logger,
   }: {
     mayDial?: AddressPolicy;
     resolveAddresses?: ResolveAddresses;
     timeouts?: Partial<Timeouts>;
+    logger?: DownloadLogger;
   } = {}) {
     this.mayDial = mayDial;
     this.resolveAddresses = resolveAddresses;
     this.timeouts = { ...DEFAULT_TIMEOUTS, ...timeouts };
+    this.logger = logger;
   }
 
   /**
@@ -88,12 +98,39 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
    * rules mean anything: every store that hosts a release answers the address people share with a
    * redirect, and a rule applied to the first address alone is one a `302` walks straight around.
    */
-  async open({ url }: { url: string }): Promise<RemoteSource> {
+  async open({
+    url,
+    diagnostics = new DownloadDiagnostics({
+      logger: this.logger,
+      fields: { origin: downloadOrigin(url) },
+    }),
+  }: {
+    url: string;
+    diagnostics?: DownloadDiagnostics;
+  }): Promise<RemoteSource> {
     const deadline = AbortSignal.timeout(this.timeouts.totalMs);
+    return await diagnostics.phase({
+      phase: 'transport',
+      fields: this.timeouts,
+      deadline,
+      run: () => this.follow({ url, deadline, diagnostics }),
+      result: (source) => ({ outcome: source.outcome }),
+    });
+  }
+
+  private async follow({
+    url,
+    deadline,
+    diagnostics,
+  }: {
+    url: string;
+    deadline: AbortSignal;
+    diagnostics: DownloadDiagnostics;
+  }): Promise<RemoteSource> {
     let target = url;
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      const reached = await this.reach({ url: target, deadline });
+      const reached = await this.reach({ url: target, deadline, diagnostics, hop });
       if (reached.outcome !== 'answered') {
         return reached;
       }
@@ -103,9 +140,18 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
           response: reached.response,
           deadline,
           idleMs: this.timeouts.idleMs,
+          diagnostics,
         });
       }
       await discard(reached.response);
+      diagnostics.event({
+        phase: 'redirect',
+        event: isRemoteUrl(location) ? 'followed' : 'refused',
+        hop,
+        status: reached.response.status,
+        fromOrigin: downloadOrigin(target),
+        toOrigin: downloadOrigin(location),
+      });
       if (!isRemoteUrl(location)) {
         return { outcome: 'insecure-redirect', to: location };
       }
@@ -123,27 +169,47 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
    * around — so the address that passed is the address dialled, with the name carried in the
    * handshake and in `Host` so the certificate is still checked against it.
    */
-  private async reach({ url, deadline }: { url: string; deadline: AbortSignal }): Promise<Reached> {
+  private async reach({
+    url,
+    deadline,
+    diagnostics,
+    hop,
+  }: {
+    url: string;
+    deadline: AbortSignal;
+    diagnostics: DownloadDiagnostics;
+    hop: number;
+  }): Promise<Reached> {
     const parsed = parse(url);
     if (parsed === undefined) {
       return { outcome: 'unreachable' };
     }
     const host = hostnameOf(parsed);
-    const addresses = await beforeTimeout({
-      run: () => this.resolveAddresses(host),
-      deadline,
-      timeoutMs: this.timeouts.responseMs,
-    }).catch(() => undefined);
+    const addresses = await diagnostics
+      .phase({
+        phase: 'dns',
+        fields: { host, hop, timeoutMs: this.timeouts.responseMs },
+        deadline,
+        run: () =>
+          beforeTimeout({
+            run: () => this.resolveAddresses(host),
+            deadline,
+            timeoutMs: this.timeouts.responseMs,
+          }),
+        result: (resolved) => ({ addresses: resolved ?? [] }),
+      })
+      .catch(() => undefined);
     if (addresses === undefined) {
       return { outcome: 'unreachable' };
     }
     // Every one of them: a name answering with an address anyone can reach and one only this box
     // can is a name that would otherwise be judged on whichever happened to come first.
     if (!addresses.every(this.mayDial)) {
+      diagnostics.event({ phase: 'address-policy', event: 'refused', host, hop });
       return { outcome: 'private-address', host };
     }
 
-    for (const address of addresses) {
+    for (const [attempt, address] of addresses.entries()) {
       if (deadline.aborted) {
         break;
       }
@@ -152,6 +218,9 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
         address,
         deadline,
         timeoutMs: this.timeouts.responseMs,
+        diagnostics,
+        hop,
+        attempt,
       });
       if (response !== undefined) {
         return { outcome: 'answered', response };
@@ -176,12 +245,8 @@ async function addressesOf(host: string): Promise<string[] | undefined> {
   if (isIP(host) !== 0) {
     return [host];
   }
-  try {
-    const found = await lookup(host, { all: true });
-    return found.length === 0 ? undefined : found.map((each) => each.address);
-  } catch {
-    return undefined;
-  }
+  const found = await lookup(host, { all: true });
+  return found.length === 0 ? undefined : found.map((each) => each.address);
 }
 
 /**
@@ -194,11 +259,17 @@ async function get({
   address,
   deadline,
   timeoutMs,
+  diagnostics,
+  hop,
+  attempt,
 }: {
   url: URL;
   address: string;
   deadline: AbortSignal;
   timeoutMs: number;
+  diagnostics: DownloadDiagnostics;
+  hop: number;
+  attempt: number;
 }): Promise<Response | undefined> {
   const request: BunFetchRequestInit = { redirect: 'manual', proxy: false };
   const dialled = pinnedTo({ url, address });
@@ -207,10 +278,20 @@ async function get({
     request.tls = { serverName: url.hostname };
   }
   try {
-    return await beforeTimeout({
-      run: (signal) => fetch(dialled, { ...request, signal }),
+    return await diagnostics.phase({
+      phase: 'response',
+      fields: { host: url.host, address, hop, attempt, timeoutMs },
       deadline,
-      timeoutMs,
+      run: () =>
+        beforeTimeout({
+          run: (signal) => fetch(dialled, { ...request, signal }),
+          deadline,
+          timeoutMs,
+        }),
+      result: (response) => ({
+        status: response.status,
+        declaredSizeBytes: declaredLength(response.headers),
+      }),
     });
   } catch {
     return undefined;
@@ -228,7 +309,10 @@ async function beforeTimeout<T>({
 }): Promise<T> {
   const controller = new AbortController();
   const signal = AbortSignal.any([deadline, controller.signal]);
-  const timer = setTimeout(() => controller.abort(new Error('The source timed out.')), timeoutMs);
+  const timer = setTimeout(
+    () => controller.abort(new DOMException('The source timed out.', 'TimeoutError')),
+    timeoutMs,
+  );
   const interrupted = Promise.withResolvers<never>();
   function abort() {
     interrupted.reject(signal.reason);
@@ -261,10 +345,12 @@ async function answered({
   response,
   deadline,
   idleMs,
+  diagnostics,
 }: {
   response: Response;
   deadline: AbortSignal;
   idleMs: number;
+  diagnostics: DownloadDiagnostics;
 }): Promise<RemoteSource> {
   if (!response.ok) {
     await discard(response);
@@ -275,7 +361,7 @@ async function answered({
   }
   return {
     outcome: 'open',
-    body: saidAsTheSource({ body: response.body, deadline, idleMs }),
+    body: saidAsTheSource({ body: response.body, deadline, idleMs, diagnostics }),
     declaredSizeBytes: declaredLength(response.headers),
   };
 }
@@ -325,31 +411,76 @@ function saidAsTheSource({
   body,
   deadline,
   idleMs,
+  diagnostics,
 }: {
   body: ReadableStream<Uint8Array>;
   deadline: AbortSignal;
   idleMs: number;
+  diagnostics: DownloadDiagnostics;
 }): ReadableStream<Uint8Array> {
   const reader = body.getReader();
+  const startedAt = performance.now();
+  let bytesReceived = 0;
+  let readWaitMs = 0;
+  let nextProgressAt = startedAt + PROGRESS_INTERVAL_MS;
+  let finished = false;
+
+  function metrics() {
+    return {
+      phase: 'body',
+      bytesReceived,
+      durationMs: Math.round(performance.now() - startedAt),
+      readWaitMs: Math.round(readWaitMs),
+      idleTimeoutMs: idleMs,
+    };
+  }
+
+  function finish({ event, error }: { event: string; error?: unknown }) {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    if (event === 'failed') {
+      diagnostics.failure({ ...metrics(), event, error, totalDeadlineExceeded: deadline.aborted });
+    } else {
+      diagnostics.event({ ...metrics(), event });
+    }
+  }
+
+  diagnostics.event({ ...metrics(), event: 'started' });
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
+        const readingAt = performance.now();
         const { done, value } = await beforeTimeout({
           run: () => reader.read(),
           deadline,
           timeoutMs: idleMs,
+        }).finally(() => {
+          readWaitMs += performance.now() - readingAt;
         });
         if (done) {
           controller.close();
+          finish({ event: 'completed' });
           return;
+        }
+        const firstChunk = bytesReceived === 0;
+        bytesReceived += value.byteLength;
+        if (firstChunk) {
+          diagnostics.event({ ...metrics(), event: 'first-byte' });
+        } else if (performance.now() >= nextProgressAt) {
+          diagnostics.event({ ...metrics(), event: 'progress' });
+          nextProgressAt = performance.now() + PROGRESS_INTERVAL_MS;
         }
         controller.enqueue(value);
       } catch (failure) {
+        finish({ event: 'failed', error: failure });
         controller.error(new InterruptedSourceError(failure));
         void reader.cancel(failure).catch(() => undefined);
       }
     },
     cancel(reason) {
+      finish({ event: 'cancelled' });
       return reader.cancel(reason);
     },
   });
