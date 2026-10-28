@@ -589,6 +589,7 @@ export const DEPLOY_PRESETS = {
         `BASE_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
         `DATABASE_URL=sqlite://${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/calnode.db`,
         `DATA_DIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        'TRUSTED_PROXY_CIDRS=127.0.0.1',
         'CALNODE_ENCRYPTION_KEY',
         'CALNODE_RECOVERY_SECRET',
       ],
