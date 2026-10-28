@@ -1543,6 +1543,22 @@ export interface IAppHostnamesTable {
     constraints: keyof (typeof schema)["app_hostnames"]["_constraints"];
 }
 
+/** Columns of `app_hosts`. */
+export interface IAppHostsColumns {
+    app_id: import("@repo/protocol").AppId | null;
+    deployment_id: import("@repo/protocol").DeploymentId | null;
+    /** An app keeps its last execution host while stopped, failed or awaiting volume deletion. */
+    host_id: import("@repo/protocol").HostId;
+}
+
+/** Schema of `app_hosts`. */
+export interface IAppHostsTable {
+    columns: IAppHostsColumns;
+    relationType: (typeof schema)["app_hosts"]["_relationType"];
+    indexes: keyof (typeof schema)["app_hosts"]["_indexes"];
+    constraints: keyof (typeof schema)["app_hosts"]["_constraints"];
+}
+
 /** Columns of `app_quotas`. */
 export interface IAppQuotasColumns {
     owner_id: import("#lib/api/identifiers.ts").OwnerId | null;
@@ -2306,6 +2322,17 @@ export const schema = {
             app_hostnames_state_check: { _constraintName: "app_hostnames_state_check" }
         }
     },
+    app_hosts: {
+        _relationName: "app_hosts",
+        _relationType: "view",
+        _columns: {
+            app_id: { _columnName: "app_id", _foreignKeys: {} },
+            deployment_id: { _columnName: "deployment_id", _foreignKeys: {} },
+            host_id: { _columnName: "host_id", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
     app_quotas: {
         _relationName: "app_quotas",
         _relationType: "view",
@@ -2878,6 +2905,7 @@ export interface Tables {
     app_configs_with_environment: IAppConfigsWithEnvironmentTable;
     app_deadlines: IAppDeadlinesTable;
     app_hostnames: IAppHostnamesTable;
+    app_hosts: IAppHostsTable;
     app_quotas: IAppQuotasTable;
     app_usage: IAppUsageTable;
     apps: IAppsTable;

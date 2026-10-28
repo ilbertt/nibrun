@@ -42,6 +42,10 @@ beforeAll(async function startDatabase() {
   sql = await startTestDatabase();
   HOST_ID = await registerHost({ sql, originId: 'migration-host' });
   OTHER_HOST_ID = await registerHost({ sql, originId: 'migration-other-host' });
+  await sql.unsafe(
+    "UPDATE nibrun.hosts SET reported_state = 'ready', last_seen_at = now() WHERE id = $1",
+    [HOST_ID],
+  );
   for (const ownerId of [OWNER_ID, OTHER_OWNER_ID]) {
     await sql.unsafe(
       `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
@@ -78,12 +82,11 @@ function destination(auth: S3VolumeAuth): VolumeStorageMigrationDestination {
 }
 
 async function desiredVolumes() {
-  return (
-    await new AgentRepository({
-      sql: withTypes<Queries>(sql),
-      secretsKey: TEST_SECRETS_KEY,
-    }).desiredState({ hostId: HOST_ID })
-  ).volumes;
+  const repository = new AgentRepository({
+    sql: withTypes<Queries>(sql),
+    secretsKey: TEST_SECRETS_KEY,
+  });
+  return (await repository.desiredState({ hostId: HOST_ID })).volumes;
 }
 
 test.each([

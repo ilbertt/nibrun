@@ -12,6 +12,8 @@ It references `hosts.id`, a UUIDv7 assigned before the agent receives a session.
 request must carry it. Legacy agents may present a saved canonical id; both resolve to the same host.
 Moving an app creates a new deployment; its volume survives the execution it belonged to.
 Keep host ownership on deployments rather than duplicating it on apps or placements.
+`nibrun.app_hosts` derives each app's current host from its latest deployment, including
+failed and stopped executions. Desired-state queries share one repeatable-read snapshot.
 
 Bun + Elysia service.
 
