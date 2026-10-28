@@ -30,7 +30,7 @@ afterAll(async function stopDatabase() {
 }, DATABASE_START_TIMEOUT_MS);
 
 async function hostedApp(name: string) {
-  const app = await createDeployedApp({ sql, name });
+  const app = await createDeployedApp({ sql, name, hostId: HOST_ID });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
     HOST_ID,
     app.deploymentId,

@@ -273,7 +273,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       ORDER BY d.id DESC LIMIT 1
     `;
     if (previous !== undefined) {
-      return previous.host_id ?? undefined;
+      return previous.host_id;
     }
     const [host] = await tx.SelectReadyDeploymentHost`
       SELECT id FROM nibrun.hosts

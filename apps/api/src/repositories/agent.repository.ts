@@ -40,7 +40,6 @@ export abstract class AgentRepositoryContract {
   }): Promise<void>;
   abstract hostForSession(input: { sessionToken: string }): Promise<HostId | undefined>;
   abstract desiredState(input: { hostId: HostId }): Promise<HostDesiredState>;
-  abstract hasUnplacedDeployments(): Promise<boolean>;
   abstract observeReport(input: { reported: HostReportedState }): Promise<void>;
   abstract lastObservation(): Promise<HostObservation | undefined>;
 }
@@ -97,15 +96,6 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
 
   hostForSession({ sessionToken }: { sessionToken: string }): Promise<HostId | undefined> {
     return Promise.resolve(this.#sessions.hostFor({ sessionToken, now: new Date() }));
-  }
-
-  async hasUnplacedDeployments(): Promise<boolean> {
-    const [row] = await this.sql.SelectUnplacedDeployment`
-      SELECT latest.deployment_id FROM nibrun.latest_app_deployments latest
-      JOIN nibrun.desired_volumes v ON v.app_id = latest.app_id
-      WHERE latest.host_id IS NULL LIMIT 1
-    `;
-    return row !== undefined;
   }
 
   async observeReport({ reported }: { reported: HostReportedState }): Promise<void> {

@@ -8,7 +8,7 @@ import { AgentRepository } from '#repositories/agent.repository.ts';
 import { DeploymentHostsRepository } from '#repositories/deployment-hosts.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
-import { registerHost } from '#tests/support/hosts.ts';
+import { registerHost, TEST_HOST_ID } from '#tests/support/hosts.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
@@ -37,7 +37,7 @@ function repository() {
 }
 
 async function createHostedApp({ name, hostId }: { name: string; hostId: HostId }) {
-  const app = await createDeployedApp({ sql, name });
+  const app = await createDeployedApp({ sql, name, hostId: hostId });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
     hostId,
     app.deploymentId,
@@ -111,12 +111,12 @@ test('current execution lookup is scoped to the app owner', async () => {
   ).toBeUndefined();
 });
 
-test('an unplaced execution is not offered to whichever host asks first', async () => {
-  const unplaced = await createDeployedApp({ sql, name: 'unplaced-app' });
+test('an execution assigned elsewhere is not offered to whichever host asks first', async () => {
+  const elsewhere = await createDeployedApp({ sql, name: 'elsewhere-app', hostId: TEST_HOST_ID });
   for (const hostId of [SOURCE_HOST, DESTINATION_HOST, STANDBY_HOST]) {
     const desired = await repository().desiredState({ hostId });
-    expect(desired.instances.some((instance) => instance.appId === unplaced.appId)).toBe(false);
-    expect(desired.volumes.some((volume) => volume.appId === unplaced.appId)).toBe(false);
+    expect(desired.instances.some((instance) => instance.appId === elsewhere.appId)).toBe(false);
+    expect(desired.volumes.some((volume) => volume.appId === elsewhere.appId)).toBe(false);
   }
 });
 

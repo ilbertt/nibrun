@@ -9,7 +9,7 @@ import { AgentRepository } from '#repositories/agent.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
-import { registerHost } from '#tests/support/hosts.ts';
+import { registerHost, TEST_HOST_ID } from '#tests/support/hosts.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
@@ -53,7 +53,7 @@ async function availableHost() {
 }
 
 async function newApp(name: string) {
-  const app = await createDeployedApp({ sql, name });
+  const app = await createDeployedApp({ sql, name, hostId: TEST_HOST_ID });
   await sql.unsafe('DELETE FROM nibrun.deployments WHERE id = $1', [app.deploymentId]);
   return app;
 }
@@ -132,8 +132,8 @@ test('a ready host with a stale report cannot receive a new app', async () => {
 });
 
 test('a redeploy retains its current host even when only a different host is ready', async () => {
-  const app = await createDeployedApp({ sql, name: 'retained-placement' });
   const hostId = await registerHost({ sql, originId: 'retained-host' });
+  const app = await createDeployedApp({ sql, name: 'retained-placement', hostId });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
     hostId,
     app.deploymentId,
@@ -146,14 +146,4 @@ test('a redeploy retains its current host even when only a different host is rea
   for (const row of rows) {
     expect(row.host_id).toBe(hostId);
   }
-});
-
-test('an existing unassigned execution is preserved instead of being claimed by another host', async () => {
-  const app = await createDeployedApp({ sql, name: 'missing-placement' });
-  await availableHost();
-  expect(await deploy(app)).toEqual({ outcome: 'no-host' });
-  const [row] = await sql.unsafe('SELECT state, host_id FROM nibrun.deployments WHERE id = $1', [
-    app.deploymentId,
-  ]);
-  expect(row).toEqual({ state: 'running', host_id: null });
 });
