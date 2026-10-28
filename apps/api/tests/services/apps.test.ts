@@ -4,6 +4,7 @@ import {
   AppIdSchema,
   type ComputeUsage,
   type FilesystemUsage,
+  HostIdSchema,
   type Hostname,
   HostnameSchema,
   MIN_IDLE_TIMEOUT_MS,
@@ -19,6 +20,9 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
+
+const HOST_ID = Value.Parse(HostIdSchema, 'reporting-host');
+
 import { type AppName, AppNameSchema, type AppState, OWNED_APP_STATES } from '#lib/api/app.ts';
 import { type DnsLabel, DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { type TenantEnvironmentPatch, TenantEnvironmentPatchSchema } from '#lib/api/environment.ts';
@@ -193,6 +197,10 @@ class StubAppsRepository implements AppsRepositoryContract {
     this.deleting = this.deleting.filter((id) => id !== appId);
     this.deleted.push(appId);
     return Promise.resolve(true);
+  }
+
+  finishDeletingVolume({ appId }: { appId: AppId }): Promise<boolean> {
+    return this.finishDeleting({ appId });
   }
 
   /** The ceilings each create was given, so a test can see what a stranger's is held to. */
@@ -1013,7 +1021,10 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.deleting = [APP_ID];
 
-    await serviceWith({ appsRepo }).completeDeletions({ volumes: [reportedVolume('deleted')] });
+    await serviceWith({ appsRepo }).completeDeletions({
+      hostId: HOST_ID,
+      volumes: [reportedVolume('deleted')],
+    });
 
     expect(appsRepo.deleted).toEqual([APP_ID]);
   });
@@ -1026,7 +1037,10 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
       const appsRepo = new StubAppsRepository({ failures: 0 });
       appsRepo.deleting = [APP_ID];
 
-      await serviceWith({ appsRepo }).completeDeletions({ volumes: [reportedVolume(state)] });
+      await serviceWith({ appsRepo }).completeDeletions({
+        hostId: HOST_ID,
+        volumes: [reportedVolume(state)],
+      });
 
       expect(appsRepo.deleted).toEqual([]);
     });
@@ -1039,8 +1053,8 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     appsRepo.deleting = [APP_ID];
     const apps = serviceWith({ appsRepo });
 
-    await apps.completeDeletions({ volumes: [reportedVolume('deleted')] });
-    await apps.completeDeletions({ volumes: [reportedVolume('deleted')] });
+    await apps.completeDeletions({ hostId: HOST_ID, volumes: [reportedVolume('deleted')] });
+    await apps.completeDeletions({ hostId: HOST_ID, volumes: [reportedVolume('deleted')] });
 
     expect(appsRepo.deleted).toEqual([APP_ID]);
   });
@@ -1050,7 +1064,10 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
   test('an app nobody asked to delete survives its volume going missing', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await serviceWith({ appsRepo }).completeDeletions({ volumes: [reportedVolume('deleted')] });
+    await serviceWith({ appsRepo }).completeDeletions({
+      hostId: HOST_ID,
+      volumes: [reportedVolume('deleted')],
+    });
 
     expect(appsRepo.deleted).toEqual([]);
   });
@@ -1080,7 +1097,10 @@ describe('how full a filesystem is, as the host that holds it last measured it',
   test('a reading a host took is recorded against the app that owns the volume', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await serviceWith({ appsRepo }).recordVolumeUsage({ volumes: [reportedVolume(MEASURED)] });
+    await serviceWith({ appsRepo }).recordVolumeUsage({
+      hostId: HOST_ID,
+      volumes: [reportedVolume(MEASURED)],
+    });
 
     expect(appsRepo.measured).toEqual([new Map([[APP_ID, MEASURED]])]);
   });
@@ -1090,7 +1110,10 @@ describe('how full a filesystem is, as the host that holds it last measured it',
   test('a report carrying no reading writes nothing rather than writing nothing down', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await serviceWith({ appsRepo }).recordVolumeUsage({ volumes: [reportedVolume()] });
+    await serviceWith({ appsRepo }).recordVolumeUsage({
+      hostId: HOST_ID,
+      volumes: [reportedVolume()],
+    });
 
     expect(appsRepo.measured).toEqual([]);
   });
@@ -1105,6 +1128,7 @@ describe('how full a filesystem is, as the host that holds it last measured it',
     };
 
     await serviceWith({ appsRepo }).recordVolumeUsage({
+      hostId: HOST_ID,
       volumes: [reportedVolume(earlier), reportedVolume(MEASURED)],
     });
 
@@ -1124,7 +1148,10 @@ describe('an app records the moment its filesystem stopped being creatable', () 
   test('a volume reported ready stamps the app it belongs to', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await serviceWith({ appsRepo }).recordDataInitialized({ volumes: [reportedVolume('ready')] });
+    await serviceWith({ appsRepo }).recordDataInitialized({
+      hostId: HOST_ID,
+      volumes: [reportedVolume('ready')],
+    });
 
     expect(appsRepo.initialized).toEqual([APP_ID]);
   });
@@ -1136,7 +1163,10 @@ describe('an app records the moment its filesystem stopped being creatable', () 
     async (state) => {
       const appsRepo = new StubAppsRepository({ failures: 0 });
 
-      await serviceWith({ appsRepo }).recordDataInitialized({ volumes: [reportedVolume(state)] });
+      await serviceWith({ appsRepo }).recordDataInitialized({
+        hostId: HOST_ID,
+        volumes: [reportedVolume(state)],
+      });
 
       expect(appsRepo.initialized).toEqual([]);
     },
@@ -1148,8 +1178,8 @@ describe('an app records the moment its filesystem stopped being creatable', () 
     const appsRepo = new StubAppsRepository({ failures: 0 });
     const apps = serviceWith({ appsRepo });
 
-    await apps.recordDataInitialized({ volumes: [reportedVolume('ready')] });
-    await apps.recordDataInitialized({ volumes: [reportedVolume('ready')] });
+    await apps.recordDataInitialized({ hostId: HOST_ID, volumes: [reportedVolume('ready')] });
+    await apps.recordDataInitialized({ hostId: HOST_ID, volumes: [reportedVolume('ready')] });
 
     expect(appsRepo.initialized).toEqual([APP_ID]);
   });

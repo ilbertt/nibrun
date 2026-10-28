@@ -433,6 +433,11 @@ export interface IFinishDeletingAppResult {
     id: IAppsColumns["id"];
 }
 
+/** Result of query `FinishDeletingOwnedVolume`. */
+export interface IFinishDeletingOwnedVolumeResult {
+    id: IAppsColumns["id"];
+}
+
 /** Result of query `SelectPurgeableApps`. */
 export interface ISelectPurgeableAppsResult {
     app_id: IAppsColumns["id"];
@@ -1315,6 +1320,7 @@ export interface Queries {
     SelectFinishableDeletion: ISelectFinishableDeletionResult;
     SelectFinishableDeletions: ISelectFinishableDeletionsResult;
     FinishDeletingApp: IFinishDeletingAppResult;
+    FinishDeletingOwnedVolume: IFinishDeletingOwnedVolumeResult;
     SelectPurgeableApps: ISelectPurgeableAppsResult;
     SelectExpirableApps: ISelectExpirableAppsResult;
     ReassignApps: IReassignAppsResult;

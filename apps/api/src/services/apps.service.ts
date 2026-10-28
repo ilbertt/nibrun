@@ -2,6 +2,7 @@ import type {
   AppId,
   ComputeUsage,
   FilesystemUsage,
+  HostId,
   ReportedInstance,
   ReportedVolume,
   TenantEnvironment,
@@ -394,7 +395,13 @@ export class AppsService extends Service {
    * Deduplicated because `ON CONFLICT DO UPDATE` refuses to touch a row twice in one statement,
    * and a host that reported two volumes for one app would take its whole report down with it.
    */
-  async recordVolumeUsage({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
+  async recordVolumeUsage({
+    volumes,
+    hostId,
+  }: {
+    volumes: readonly ReportedVolume[];
+    hostId: HostId;
+  }): Promise<void> {
     const readings = new Map<AppId, FilesystemUsage>();
     for (const volume of volumes) {
       if (volume.usage) {
@@ -402,7 +409,7 @@ export class AppsService extends Service {
       }
     }
     if (readings.size > 0) {
-      await this.appsRepo.recordVolumeUsage({ readings });
+      await this.appsRepo.recordVolumeUsage({ readings, hostId });
     }
   }
 
@@ -414,10 +421,16 @@ export class AppsService extends Service {
    * thing here: a host reports what it observes, and which of those is the first is the column's
    * own question. `stampDataInitialized` answers it, and writes nothing for an app already stamped.
    */
-  async recordDataInitialized({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
+  async recordDataInitialized({
+    volumes,
+    hostId,
+  }: {
+    volumes: readonly ReportedVolume[];
+    hostId: HostId;
+  }): Promise<void> {
     const ready = volumes.filter((volume) => volume.state === 'ready').map((one) => one.appId);
     if (ready.length > 0) {
-      await this.appsRepo.stampDataInitialized({ appIds: ready });
+      await this.appsRepo.stampDataInitialized({ appIds: ready, hostId });
     }
   }
 
@@ -467,12 +480,18 @@ export class AppsService extends Service {
    * Read off the volumes rather than their absence: a report that lost some would otherwise
    * delete the apps it forgot to mention.
    */
-  async completeDeletions({ volumes }: { volumes: readonly ReportedVolume[] }): Promise<void> {
+  async completeDeletions({
+    volumes,
+    hostId,
+  }: {
+    volumes: readonly ReportedVolume[];
+    hostId: HostId;
+  }): Promise<void> {
     for (const volume of volumes) {
       if (volume.state !== 'deleted') {
         continue;
       }
-      if (await this.appsRepo.finishDeleting({ appId: volume.appId })) {
+      if (await this.appsRepo.finishDeletingVolume({ appId: volume.appId, hostId })) {
         this.logger.info('app deleted', { appId: volume.appId, volumeId: volume.volumeId });
       }
     }
