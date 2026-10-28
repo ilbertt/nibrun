@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import {
   AGENT_API_PREFIX,
   AGENT_ROUTES,
@@ -10,7 +10,11 @@ import {
 } from '@repo/protocol';
 import { StatusMap } from 'elysia';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
+import { stubHostRegistration } from '#tests/controllers/support/hosts.ts';
 import { CRON_DEPLOYMENT, CRON_LISTING } from '#tests/support/crons.ts';
+
+beforeEach(stubHostRegistration);
+afterEach(() => mock.restore());
 
 function post({
   route,
@@ -41,6 +45,7 @@ async function session() {
   const response = await post({
     route: AGENT_ROUTES.session,
     body: {
+      hostId: 'cron-agent-origin',
       versions: { agent: 'a', guestImage: 'b', zerofs: 'c', firecracker: 'd' },
       capacity: { vcpuCount: 2, memoryMib: 4096, cacheBytes: 100 },
     },

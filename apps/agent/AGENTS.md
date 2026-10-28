@@ -5,6 +5,10 @@ plane, long-polls for desired state, converges the host onto it, and reports wha
 is never sent a command. Read `lib/reconcile/`, `lib/volumes/topology.ts` and
 `lib/network/slot.ts` first.
 
+Persist the registration identity before the first session request and reuse it on renewal.
+Keep it unchanged when the API returns its canonical host id. A corrupt identity refuses
+registration; silently replacing it would abandon the host's deployment ownership.
+
 Besides converging, it answers directory reads through `lib/agent/filesystem.ts` and cron
 listings through `lib/agent/cron-query.ts`, each on routes of its own.
 Directory reads wake idle apps through `AppWaker` and hold `GuestActivity` through the wake
