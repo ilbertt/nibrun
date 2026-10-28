@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppCard } from '#components/app-card.tsx';
 import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
-import { APPS, CATALOG } from '#lib/apps.ts';
+import { APPS, CATALOG, type CatalogApp } from '#lib/apps.ts';
 import {
   ALL,
   asCategory,
@@ -20,7 +20,12 @@ import { pageHead } from '#lib/page-head.ts';
 import { pageTitle } from '#lib/page-title.ts';
 import '#styles/panel.css';
 
-const RECOMMENDED_APPS = APPS.filter((app) => app.isRecommended);
+const SORTED_APPS = APPS.toSorted(byTitle);
+const RECOMMENDED_APPS = SORTED_APPS.filter((app) => app.isRecommended);
+
+function byTitle(...[first, second]: [CatalogApp, CatalogApp]): number {
+  return first.title.localeCompare(second.title, 'en', { sensitivity: 'base' });
+}
 
 export const Route = createFileRoute('/apps/')({
   validateSearch: (search: Record<string, unknown>): CatalogSearch => ({
@@ -75,7 +80,7 @@ function RouteComponent() {
 
   const shown = useMemo(
     () =>
-      APPS.filter(
+      SORTED_APPS.filter(
         (app) => (category === undefined || app.category === category) && matches({ app, query }),
       ),
     [query, category],
