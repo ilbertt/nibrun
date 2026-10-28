@@ -101,14 +101,9 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
 
   async hasUnplacedDeployments(): Promise<boolean> {
     const [row] = await this.sql.SelectUnplacedDeployment`
-      SELECT d.id FROM nibrun.deployments d
-      WHERE d.host_id IS NULL
-        AND d.app_id IN (SELECT app_id FROM nibrun.desired_volumes)
-        AND NOT EXISTS (
-          SELECT 1 FROM nibrun.deployments newer
-          WHERE newer.app_id = d.app_id AND newer.id > d.id
-        )
-      LIMIT 1
+      SELECT latest.deployment_id FROM nibrun.latest_app_deployments latest
+      JOIN nibrun.desired_volumes v ON v.app_id = latest.app_id
+      WHERE latest.host_id IS NULL LIMIT 1
     `;
     return row !== undefined;
   }

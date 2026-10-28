@@ -447,7 +447,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       FROM nibrun.deployments d
       JOIN nibrun.apps a ON a.id = d.app_id
       WHERE d.state NOT IN ('superseded', 'failed')
-        AND (d.host_id IS NULL OR d.host_id = ${hostId})
+        AND d.host_id = ${hostId}
     `;
   }
 
@@ -484,7 +484,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
             started_at = ${instance.startedAt},
             last_healthy_at = ${instance.lastHealthyAt}
           WHERE id = ${instance.deploymentId} AND state NOT IN ('superseded', 'failed')
-            AND (host_id IS NULL OR host_id = ${hostId})
+            AND host_id = ${hostId}
         `;
       }
     });
@@ -511,7 +511,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       UPDATE nibrun.deployments SET activated_at = ${at}
       WHERE id = ${deploymentId} AND activated_at IS NULL
         AND state NOT IN ('superseded', 'failed')
-        AND (host_id IS NULL OR host_id = ${hostId})
+        AND host_id = ${hostId}
     `;
   }
 
@@ -527,7 +527,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     await this.sql.FailDeployment`
       UPDATE nibrun.deployments SET state = 'failed', message = ${message}
       WHERE id = ${deploymentId} AND state NOT IN ('superseded', 'failed')
-        AND (host_id IS NULL OR host_id = ${hostId})
+        AND host_id = ${hostId}
     `;
   }
 

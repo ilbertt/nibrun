@@ -250,3 +250,26 @@ test('a missing current assignment blocks ownership until the operator backfills
     app.deploymentId,
   ]);
 });
+
+test('an unassigned deployment cannot be changed by a host report', async () => {
+  const app = await createDeployedApp({ sql, name: 'unassigned-report' });
+  const repository = new DeploymentsRepository(withTypes<Queries>(sql));
+  const [before] = await sql.unsafe('SELECT * FROM nibrun.deployments WHERE id = $1', [
+    app.deploymentId,
+  ]);
+  await repository.applyReport({ hostId: HOST_ID, reported: [deploymentReport(app.deploymentId)] });
+  await repository.stampActivation({
+    hostId: HOST_ID,
+    deploymentId: app.deploymentId,
+    at: new Date(),
+  });
+  await repository.fail({
+    hostId: HOST_ID,
+    deploymentId: app.deploymentId,
+    message: 'Unassigned.',
+  });
+  const [after] = await sql.unsafe('SELECT * FROM nibrun.deployments WHERE id = $1', [
+    app.deploymentId,
+  ]);
+  expect(after).toEqual(before);
+});
