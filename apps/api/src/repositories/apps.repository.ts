@@ -4,6 +4,7 @@ import type {
   AppId,
   ComputeUsage,
   FilesystemUsage,
+  HostId,
   Hostname,
   ObjectKey,
 } from '@repo/protocol';
@@ -84,12 +85,14 @@ export abstract class AppsRepositoryContract {
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
   abstract recordVolumeUsage(input: {
     readings: ReadonlyMap<AppId, FilesystemUsage>;
+    hostId: HostId;
   }): Promise<void>;
   abstract recordComputeUsage(input: { readings: ReadonlyMap<AppId, ComputeUsage> }): Promise<void>;
   abstract clearComputeUsage(input: { appIds: readonly AppId[] }): Promise<void>;
   abstract update(input: OwnedApp & { patch: SealedAppPatch }): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
-  abstract stampDataInitialized(input: { appIds: readonly AppId[] }): Promise<void>;
+  abstract stampDataInitialized(input: { appIds: readonly AppId[]; hostId: HostId }): Promise<void>;
+  abstract finishDeletingVolume(input: { appId: AppId; hostId: HostId }): Promise<boolean>;
   abstract finishDeleting(input: { appId: AppId }): Promise<boolean>;
   abstract isDeletionFinishable(input: { appId: AppId }): Promise<boolean>;
   abstract listFinishableDeletions(input: { limit: number }): Promise<AppId[]>;
@@ -299,8 +302,10 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    */
   async recordVolumeUsage({
     readings,
+    hostId,
   }: {
     readings: ReadonlyMap<AppId, FilesystemUsage>;
+    hostId: HostId;
   }): Promise<void> {
     const taken = [...readings];
     await this.sql`
@@ -327,6 +332,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         )}
       ) AS reading(app_id, total_bytes, used_bytes, measured_at)
       JOIN nibrun.apps a ON a.id = reading.app_id::uuid
+      JOIN nibrun.app_hosts h ON h.app_id = a.id AND h.host_id = ${hostId}
       ON CONFLICT ON CONSTRAINT app_usage_app_id_key DO UPDATE
         SET volume_total_bytes = EXCLUDED.volume_total_bytes,
             volume_used_bytes  = EXCLUDED.volume_used_bytes,
@@ -504,7 +510,13 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * reports `ready` on every pass, and an app whose `updated_at` moved every time a host spoke
    * would look to its owner like somebody had just changed it.
    */
-  async stampDataInitialized({ appIds }: { appIds: readonly AppId[] }): Promise<void> {
+  async stampDataInitialized({
+    appIds,
+    hostId,
+  }: {
+    appIds: readonly AppId[];
+    hostId: HostId;
+  }): Promise<void> {
     // Untagged, as `updateState` is: `sql.array` is a clause the generator blanks out before it
     // parses the statement, and there is no row type to lose — this returns nothing.
     await this.sql`
@@ -512,6 +524,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       SET data_initialized_at = now()
       WHERE id = ANY(${this.sql.array([...appIds], TEXT_ARRAY)}::uuid[])
         AND data_initialized_at IS NULL
+        AND id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
     `;
   }
 
@@ -519,7 +532,25 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     const rows = await this.sql.FinishDeletingApp`
       UPDATE nibrun.apps SET state = 'deleted'
       WHERE id = ${appId} AND state = 'deleting'
+        AND id IN (SELECT app_id FROM nibrun.finishable_deletions)
       RETURNING id
+    `;
+    return rows.length > 0;
+  }
+
+  async finishDeletingVolume({
+    appId,
+    hostId,
+  }: {
+    appId: AppId;
+    hostId: HostId;
+  }): Promise<boolean> {
+    const rows = await this.sql.FinishDeletingOwnedVolume`
+      UPDATE nibrun.apps a SET state = 'deleted'
+      FROM nibrun.app_hosts h
+      WHERE a.id = ${appId} AND a.state = 'deleting'
+        AND h.app_id = a.id AND h.host_id = ${hostId}
+      RETURNING a.id
     `;
     return rows.length > 0;
   }

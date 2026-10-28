@@ -152,14 +152,14 @@ export class AgentService extends Service {
     // still arrived — which is the whole of what liveness asks.
     await this.agentRepo.observeReport({ reported });
     await this.deploymentsService.applyHostReport({ reported });
-    await this.appsService.recordVolumeUsage({ volumes: reported.volumes });
+    await this.appsService.recordVolumeUsage({ volumes: reported.volumes, hostId });
     // Before the deletions below, which read the same list for `deleted`: a filesystem that is
     // ready and one that is gone are different volumes, so the order between them carries nothing
     // — but a stamp is what stops the next deployment offering to create data that already exists,
     // and the sooner it lands the smaller that window is.
-    await this.appsService.recordDataInitialized({ volumes: reported.volumes });
+    await this.appsService.recordDataInitialized({ volumes: reported.volumes, hostId });
     await this.appsService.recordComputeUsage({ instances: reported.instances });
-    await this.appsService.completeDeletions({ volumes: reported.volumes });
+    await this.appsService.completeDeletions({ volumes: reported.volumes, hostId });
     await this.exportsService.applyHostReport({ reported });
     // Nothing to do with this report: an app whose time is up is found by the clock, and the
     // report is the clock. Before the two below, so one that never had a filesystem is finished
