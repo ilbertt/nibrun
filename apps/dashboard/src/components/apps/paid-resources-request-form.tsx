@@ -20,8 +20,8 @@ export function PaidResourcesRequestForm() {
       }}
     >
       <p className="text-muted-foreground text-sm">
-        Enter how much to add to this app’s current resources. Use 0 to leave a resource unchanged.
-        Request an increase for at least one resource.
+        Enter the total resources you need. Keep the current value for any resource you don’t need
+        to increase.
       </p>
       {Object.entries(PAID_RESOURCE_LABELS).map(([name, label]) => {
         const resource = name as keyof PaidResourceValues;
@@ -33,7 +33,7 @@ export function PaidResourcesRequestForm() {
               id={id}
               type="number"
               inputMode="numeric"
-              min={0}
+              min={1}
               max={MAX_PAID_RESOURCE_AMOUNT}
               step={1}
               required
@@ -50,9 +50,9 @@ export function PaidResourcesRequestForm() {
       </Button>
       {form.savedAmounts !== undefined && (
         <p role="status" className="text-sm">
-          Thanks! We recorded your request for +{form.savedAmounts.additionalVcpuCount} vCPUs, +
-          {form.savedAmounts.additionalMemoryMib} MiB RAM, and +
-          {form.savedAmounts.additionalVolumeGib} GiB volume for this app.
+          Thanks! We recorded your request for {form.savedAmounts.requestedVcpuCount} vCPUs,
+          {form.savedAmounts.requestedMemoryMib} MiB RAM, and
+          {form.savedAmounts.requestedVolumeGib} GiB volume in total for this app.
         </p>
       )}
       {form.error !== undefined && <FieldError role="alert">{form.error}</FieldError>}

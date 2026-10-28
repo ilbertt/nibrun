@@ -1,85 +1,92 @@
 import { text } from '@clack/prompts';
-import type { PaidRequest } from '@repo/api-client/models';
 import { MAX_PAID_RESOURCE_AMOUNT } from '@repo/api-constants';
+import type { PaidResourceAmounts } from '@repo/app-operations';
 import { z } from 'zod';
 import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
 
-export const ADDITIONAL_VCPU_COUNT_FLAG = 'additional-vcpu-count';
-export const ADDITIONAL_MEMORY_MIB_FLAG = 'additional-memory-mib';
-export const ADDITIONAL_VOLUME_GIB_FLAG = 'additional-volume-gib';
+export const REQUESTED_VCPU_COUNT_FLAG = 'requested-vcpu-count';
+export const REQUESTED_MEMORY_MIB_FLAG = 'requested-memory-mib';
+export const REQUESTED_VOLUME_GIB_FLAG = 'requested-volume-gib';
 
-const AdditionalResourceAmountSchema = z.number().int().min(0).max(MAX_PAID_RESOURCE_AMOUNT);
+const RequestedResourceAmountSchema = z.number().int().min(1).max(MAX_PAID_RESOURCE_AMOUNT);
 
 export const PAID_RESOURCE_OPTIONS_SCHEMA = z.object({
-  [ADDITIONAL_VCPU_COUNT_FLAG]: AdditionalResourceAmountSchema.optional(),
-  [ADDITIONAL_MEMORY_MIB_FLAG]: AdditionalResourceAmountSchema.optional(),
-  [ADDITIONAL_VOLUME_GIB_FLAG]: AdditionalResourceAmountSchema.optional(),
+  [REQUESTED_VCPU_COUNT_FLAG]: RequestedResourceAmountSchema.optional(),
+  [REQUESTED_MEMORY_MIB_FLAG]: RequestedResourceAmountSchema.optional(),
+  [REQUESTED_VOLUME_GIB_FLAG]: RequestedResourceAmountSchema.optional(),
 });
 
-export const PAID_RESOURCE_AMOUNTS_SCHEMA = z
-  .object({
-    additionalVcpuCount: AdditionalResourceAmountSchema,
-    additionalMemoryMib: AdditionalResourceAmountSchema,
-    additionalVolumeGib: AdditionalResourceAmountSchema,
-  })
-  .refine((amounts) => Object.values(amounts).some((amount) => amount > 0), {
-    error: 'Request an increase for at least one resource.',
-  });
-
-type PaidResourceAmounts = Omit<
-  Extract<PaidRequest, { requestType: 'resources' }>,
-  'requestType' | 'appId'
->;
+export const PAID_RESOURCE_AMOUNTS_SCHEMA = z.object({
+  requestedVcpuCount: RequestedResourceAmountSchema,
+  requestedMemoryMib: RequestedResourceAmountSchema,
+  requestedVolumeGib: RequestedResourceAmountSchema,
+});
 
 export async function completePaidResourceAmounts({
   options,
   interactive,
+  current,
 }: {
   options: z.infer<typeof PAID_RESOURCE_OPTIONS_SCHEMA>;
   interactive: boolean;
+  current: PaidResourceAmounts;
 }): Promise<PaidResourceAmounts> {
   const amounts = {
-    additionalVcpuCount: options[ADDITIONAL_VCPU_COUNT_FLAG],
-    additionalMemoryMib: options[ADDITIONAL_MEMORY_MIB_FLAG],
-    additionalVolumeGib: options[ADDITIONAL_VOLUME_GIB_FLAG],
+    requestedVcpuCount: options[REQUESTED_VCPU_COUNT_FLAG],
+    requestedMemoryMib: options[REQUESTED_MEMORY_MIB_FLAG],
+    requestedVolumeGib: options[REQUESTED_VOLUME_GIB_FLAG],
   };
-  const shouldPrompt =
-    interactive && Object.values(amounts).every((amount) => amount === undefined);
-  const parsed = PAID_RESOURCE_AMOUNTS_SCHEMA.safeParse({
-    additionalVcpuCount: shouldPrompt
-      ? await promptAdditionalAmount('How many additional vCPUs do you need?')
-      : (amounts.additionalVcpuCount ?? 0),
-    additionalMemoryMib: shouldPrompt
-      ? await promptAdditionalAmount('How much additional RAM do you need (MiB)?')
-      : (amounts.additionalMemoryMib ?? 0),
-    additionalVolumeGib: shouldPrompt
-      ? await promptAdditionalAmount('How much additional volume do you need (GiB)?')
-      : (amounts.additionalVolumeGib ?? 0),
-  });
-  if (!parsed.success) {
+  const noAmounts = Object.values(amounts).every((amount) => amount === undefined);
+  if (noAmounts && !interactive) {
     throw new UsageError(
-      `Pass --${ADDITIONAL_VCPU_COUNT_FLAG}, --${ADDITIONAL_MEMORY_MIB_FLAG}, or --${ADDITIONAL_VOLUME_GIB_FLAG} with a positive amount. Omitted amounts are 0.`,
+      `Pass --${REQUESTED_VCPU_COUNT_FLAG}, --${REQUESTED_MEMORY_MIB_FLAG}, or --${REQUESTED_VOLUME_GIB_FLAG} with the total you need. Omitted resources keep their current allocation.`,
     );
   }
-  return parsed.data;
+  const shouldPrompt = interactive && noAmounts;
+  return PAID_RESOURCE_AMOUNTS_SCHEMA.parse({
+    requestedVcpuCount: shouldPrompt
+      ? await promptRequestedAmount({
+          message: 'How many vCPUs do you need in total?',
+          current: current.requestedVcpuCount,
+        })
+      : (amounts.requestedVcpuCount ?? current.requestedVcpuCount),
+    requestedMemoryMib: shouldPrompt
+      ? await promptRequestedAmount({
+          message: 'How much RAM do you need in total (MiB)?',
+          current: current.requestedMemoryMib,
+        })
+      : (amounts.requestedMemoryMib ?? current.requestedMemoryMib),
+    requestedVolumeGib: shouldPrompt
+      ? await promptRequestedAmount({
+          message: 'How much volume do you need in total (GiB)?',
+          current: current.requestedVolumeGib,
+        })
+      : (amounts.requestedVolumeGib ?? current.requestedVolumeGib),
+  });
 }
 
-async function promptAdditionalAmount(message: string): Promise<number> {
+async function promptRequestedAmount({
+  message,
+  current,
+}: {
+  message: string;
+  current: number;
+}): Promise<number> {
   return Number(
     answered(
       await text({
         message,
-        defaultValue: '0',
-        placeholder: '0',
-        validate: validateAdditionalAmount,
+        defaultValue: String(current),
+        placeholder: String(current),
+        validate: validateRequestedAmount,
       }),
     ),
   );
 }
 
-function validateAdditionalAmount(value: string | undefined): string | undefined {
-  return AdditionalResourceAmountSchema.safeParse(Number(value)).success
+function validateRequestedAmount(value: string | undefined): string | undefined {
+  return RequestedResourceAmountSchema.safeParse(Number(value)).success
     ? undefined
-    : `Enter a whole number from 0 to ${MAX_PAID_RESOURCE_AMOUNT}.`;
+    : `Enter a whole number from 1 to ${MAX_PAID_RESOURCE_AMOUNT}.`;
 }

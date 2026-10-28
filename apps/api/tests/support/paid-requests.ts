@@ -16,9 +16,9 @@ export const ALWAYS_ON_REQUEST = {
 export const RESOURCES_REQUEST = {
   requestType: 'resources' as const,
   appId: CUSTOM_BUCKET_REQUEST.appId,
-  additionalVcpuCount: 2,
-  additionalMemoryMib: 512,
-  additionalVolumeGib: 16,
+  requestedVcpuCount: 1,
+  requestedMemoryMib: 512,
+  requestedVolumeGib: 16,
 };
 
 export const APP_PAID_REQUESTS = [CUSTOM_BUCKET_REQUEST, ALWAYS_ON_REQUEST, RESOURCES_REQUEST];
@@ -32,8 +32,8 @@ export function paidRequestRow(request: PaidRequest): PaidRequestRow {
     request_type: request.requestType,
     app_id: request.requestType === 'apps' ? null : request.appId,
     requested_apps_amount: request.requestType === 'apps' ? request.requestedAppsAmount : null,
-    additional_vcpu_count: request.requestType === 'resources' ? request.additionalVcpuCount : null,
-    additional_memory_mib: request.requestType === 'resources' ? request.additionalMemoryMib : null,
-    additional_volume_gib: request.requestType === 'resources' ? request.additionalVolumeGib : null,
+    requested_vcpu_count: request.requestType === 'resources' ? request.requestedVcpuCount : null,
+    requested_memory_mib: request.requestType === 'resources' ? request.requestedMemoryMib : null,
+    requested_volume_gib: request.requestType === 'resources' ? request.requestedVolumeGib : null,
   };
 }

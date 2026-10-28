@@ -58,8 +58,8 @@ function repository() {
 
 async function savedRequests(ownerId: OwnerId): Promise<PaidRequestRow[]> {
   return (await sql.unsafe(
-    `SELECT request_type, requested_apps_amount, app_id, additional_vcpu_count,
-       additional_memory_mib, additional_volume_gib FROM nibrun.paid_requests WHERE owner_id = $1`,
+    `SELECT request_type, requested_apps_amount, app_id, requested_vcpu_count,
+       requested_memory_mib, requested_volume_gib FROM nibrun.paid_requests WHERE owner_id = $1`,
     [ownerId],
   )) as PaidRequestRow[];
 }
@@ -296,9 +296,9 @@ test('resubmitting resource amounts replaces the previous amounts on the same re
   );
   const request = {
     ...RESOURCES_REQUEST,
-    additionalVcpuCount: 0,
-    additionalMemoryMib: 1_024,
-    additionalVolumeGib: 0,
+    requestedVcpuCount: RESOURCES_REQUEST.requestedVcpuCount,
+    requestedMemoryMib: 1_024,
+    requestedVolumeGib: RESOURCES_REQUEST.requestedVolumeGib,
   };
   expect(await repository().save({ ownerId: OWNER_ID, request })).toEqual(paidRequestRow(request));
   const [after] = await sql.unsafe(
@@ -309,10 +309,10 @@ test('resubmitting resource amounts replaces the previous amounts on the same re
   expect(await savedRequests(OWNER_ID)).toContainEqual(paidRequestRow(request));
 });
 
-test.each(['additional_vcpu_count', 'additional_memory_mib', 'additional_volume_gib'])(
+test.each(['requested_vcpu_count', 'requested_memory_mib', 'requested_volume_gib'])(
   'database constraints require %s only for resources requests',
   async (column) => {
-    for (const amount of [null, -1]) {
+    for (const amount of [null, 0, -1]) {
       await expect(
         sql
           .unsafe(
@@ -332,17 +332,6 @@ test.each(['additional_vcpu_count', 'additional_memory_mib', 'additional_volume_
     ).rejects.toMatchObject({ errno: '23514' });
   },
 );
-
-test('database constraints refuse resource requests that increase nothing', async () => {
-  await expect(
-    sql
-      .unsafe(
-        `UPDATE nibrun.paid_requests SET additional_vcpu_count = 0, additional_memory_mib = 0, additional_volume_gib = 0 WHERE owner_id = $1 AND request_type = 'resources'`,
-        [OWNER_ID],
-      )
-      .execute(),
-  ).rejects.toMatchObject({ errno: '23514' });
-});
 
 test('deleted apps cannot be requested and hard deletion removes their requests', async () => {
   await sql.unsafe('UPDATE nibrun.apps SET state = $2 WHERE id = $1 AND owner_id = $3', [

@@ -64,6 +64,7 @@ export {
 } from '#imports.ts';
 export { type FollowInput, followLogs } from '#logs.ts';
 export { APP_OPERATIONS, type AppOperation, operationRefusal } from '#operations.ts';
+export { currentPaidResourceAmounts, type PaidResourceAmounts } from '#paid-resources.ts';
 export { type RedeployInput, redeploy } from '#redeploy.ts';
 export type {
   AppEdit,

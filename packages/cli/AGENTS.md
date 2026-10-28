@@ -74,10 +74,11 @@ the layout under `src/commands/` is the command tree.
   Both use the shared app selector: a terminal can choose an app, while scripts and
   `--json` require `--app`. Their JSON results include the request type and app ID.
 - `nib paid-request --type resources --app <name-or-slug>` uses the same app-scoped
-  flow with `--additional-vcpu-count`, `--additional-memory-mib`, and
-  `--additional-volume-gib`. Amounts are increases, not desired totals; omitted amounts
-  are 0, and at least one must be positive. A terminal prompts for all three when no
-  amount flags are given. The request records the amounts without resizing or charging.
+  flow with `--requested-vcpu-count`, `--requested-memory-mib`, and
+  `--requested-volume-gib`. Amounts are desired totals; omitted resources keep their
+  current allocation. A terminal prompts for all three with current values as defaults
+  when no amount flags are given. Scripts require at least one amount flag.
+  The request records the totals without resizing or charging.
 - `nib run <binary> --github-trusted-oidc --app-id <id>` deploys an existing app
   from GitHub Actions with `id-token: write`. It obtains temporary credentials in
   memory and uses only the binary upload and deployment-creation endpoints. It

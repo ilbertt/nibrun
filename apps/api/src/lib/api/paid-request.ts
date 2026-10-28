@@ -6,8 +6,8 @@ import {
 import { AppIdSchema } from '@repo/protocol';
 import { type Static, Type } from '@sinclair/typebox';
 
-const AdditionalResourceAmountSchema = Type.Integer({
-  minimum: 0,
+const RequestedResourceAmountSchema = Type.Integer({
+  minimum: 1,
   maximum: MAX_PAID_RESOURCE_AMOUNT,
 });
 
@@ -35,9 +35,9 @@ export const PaidRequestSchema = Type.Union([
     {
       requestType: Type.Literal('resources'),
       appId: AppIdSchema,
-      additionalVcpuCount: AdditionalResourceAmountSchema,
-      additionalMemoryMib: AdditionalResourceAmountSchema,
-      additionalVolumeGib: AdditionalResourceAmountSchema,
+      requestedVcpuCount: RequestedResourceAmountSchema,
+      requestedMemoryMib: RequestedResourceAmountSchema,
+      requestedVolumeGib: RequestedResourceAmountSchema,
     },
     { additionalProperties: false },
   ),

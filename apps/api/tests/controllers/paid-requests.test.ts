@@ -134,14 +134,15 @@ test('saving a request uses the authenticated owner', async () => {
   expect(save).toHaveBeenCalledWith({ ownerId: account.ownerId, request: REQUEST });
 });
 
-test.each(['additionalVcpuCount', 'additionalMemoryMib', 'additionalVolumeGib'])(
-  'resource requests validate %s as a required nonnegative whole amount',
+test.each(['requestedVcpuCount', 'requestedMemoryMib', 'requestedVolumeGib'])(
+  'resource requests validate %s as a required positive whole total',
   async (field) => {
     const account = await registeredAccount();
     const save = spyOn(PaidRequestsServicePlugin.decorator.paidRequestsService, 'save');
     for (const amount of [
       undefined,
       null,
+      0,
       -1,
       FRACTIONAL_RESOURCE_AMOUNT,
       '1',
@@ -166,9 +167,9 @@ test('all-zero resource amounts return a client error', async () => {
     url: `${URL}/resources`,
     body: {
       appId: RESOURCES_REQUEST.appId,
-      additionalVcpuCount: 0,
-      additionalMemoryMib: 0,
-      additionalVolumeGib: 0,
+      requestedVcpuCount: 0,
+      requestedMemoryMib: 0,
+      requestedVolumeGib: 0,
     },
     headers: { cookie: account.cookie },
   });

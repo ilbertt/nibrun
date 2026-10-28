@@ -13,10 +13,10 @@ import {
   REQUESTED_APPS_AMOUNT_SCHEMA,
 } from '#lib/paid-requests.ts';
 import {
-  ADDITIONAL_MEMORY_MIB_FLAG,
-  ADDITIONAL_VCPU_COUNT_FLAG,
-  ADDITIONAL_VOLUME_GIB_FLAG,
   PAID_RESOURCE_OPTIONS_SCHEMA,
+  REQUESTED_MEMORY_MIB_FLAG,
+  REQUESTED_VCPU_COUNT_FLAG,
+  REQUESTED_VOLUME_GIB_FLAG,
 } from '#lib/paid-resource-requests.ts';
 
 export const command = defineCommand('paid-request', {
@@ -30,17 +30,20 @@ export const command = defineCommand('paid-request', {
       schema: REQUESTED_APPS_AMOUNT_SCHEMA.optional(),
       description: `Total apps you need (${MIN_PAID_APPS_REQUEST}–${MAX_PAID_APPS_REQUEST}). Only for --type apps; asked when omitted in a terminal.`,
     },
-    [ADDITIONAL_VCPU_COUNT_FLAG]: {
-      schema: PAID_RESOURCE_OPTIONS_SCHEMA.shape[ADDITIONAL_VCPU_COUNT_FLAG],
-      description: 'Additional vCPUs. Only for --type resources; omitted amounts are 0.',
+    [REQUESTED_VCPU_COUNT_FLAG]: {
+      schema: PAID_RESOURCE_OPTIONS_SCHEMA.shape[REQUESTED_VCPU_COUNT_FLAG],
+      description:
+        'Requested total vCPUs. Only for --type resources; omitted resources keep their current allocation.',
     },
-    [ADDITIONAL_MEMORY_MIB_FLAG]: {
-      schema: PAID_RESOURCE_OPTIONS_SCHEMA.shape[ADDITIONAL_MEMORY_MIB_FLAG],
-      description: 'Additional RAM in MiB. Only for --type resources; omitted amounts are 0.',
+    [REQUESTED_MEMORY_MIB_FLAG]: {
+      schema: PAID_RESOURCE_OPTIONS_SCHEMA.shape[REQUESTED_MEMORY_MIB_FLAG],
+      description:
+        'Requested total RAM in MiB. Only for --type resources; omitted resources keep their current allocation.',
     },
-    [ADDITIONAL_VOLUME_GIB_FLAG]: {
-      schema: PAID_RESOURCE_OPTIONS_SCHEMA.shape[ADDITIONAL_VOLUME_GIB_FLAG],
-      description: 'Additional volume in GiB. Only for --type resources; omitted amounts are 0.',
+    [REQUESTED_VOLUME_GIB_FLAG]: {
+      schema: PAID_RESOURCE_OPTIONS_SCHEMA.shape[REQUESTED_VOLUME_GIB_FLAG],
+      description:
+        'Requested total volume in GiB. Only for --type resources; omitted resources keep their current allocation.',
     },
     [SHARED_OPTIONS.app.name]: {
       ...SHARED_OPTIONS.app.option,

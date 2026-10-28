@@ -1,13 +1,11 @@
 import { unwrap } from '@repo/api-client/unwrap';
-import { useMutation } from '@tanstack/react-query';
+import { currentPaidResourceAmounts, type PaidResourceAmounts } from '@repo/app-operations';
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '#lib/api.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
-import {
-  type PaidResourceAmounts,
-  type PaidResourceValues,
-  paidResourceAmounts,
-} from '#lib/paid-resources-request.ts';
+import { type PaidResourceValues, paidResourceAmounts } from '#lib/paid-resources-request.ts';
+import { appQueryOptions } from '#queries/apps.ts';
 
 type PaidResourcesRequestForm = {
   values: PaidResourceValues;
@@ -21,16 +19,20 @@ type PaidResourcesRequestForm = {
 
 export function usePaidResourcesRequest(): PaidResourcesRequestForm {
   const appId = useAppId();
-  const [values, setValues] = useState<PaidResourceValues>({
-    additionalVcpuCount: '0',
-    additionalMemoryMib: '0',
-    additionalVolumeGib: '0',
+  const { data: app } = useSuspenseQuery(appQueryOptions(appId));
+  const [values, setValues] = useState<PaidResourceValues>(function currentValues() {
+    const current = currentPaidResourceAmounts(app.config);
+    return {
+      requestedVcpuCount: String(current.requestedVcpuCount),
+      requestedMemoryMib: String(current.requestedMemoryMib),
+      requestedVolumeGib: String(current.requestedVolumeGib),
+    };
   });
   const amounts = paidResourceAmounts(values);
   const save = useMutation({
-    mutationFn: async function savePaidResourcesRequest(additional: PaidResourceAmounts) {
+    mutationFn: async function savePaidResourcesRequest(requested: PaidResourceAmounts) {
       return unwrap(
-        await api.api['paid-requests']({ requestType: 'resources' }).put({ appId, ...additional }),
+        await api.api['paid-requests']({ requestType: 'resources' }).put({ appId, ...requested }),
       );
     },
   });

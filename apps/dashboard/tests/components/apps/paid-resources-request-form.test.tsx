@@ -8,12 +8,21 @@ import {
   RouterContextProvider,
 } from '@tanstack/react-router';
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { AppSummary } from '#queries/apps.ts';
 import { setupBrowserLocation } from '#tests/support/browser.ts';
 
 setupBrowserLocation();
 const { PaidResourcesRequestForm } = await import(
   '#components/apps/paid-resources-request-form.tsx'
 );
+const { appQueryOptions } = await import('#queries/apps.ts');
+const queryClient = new QueryClient();
+queryClient.setQueryData(appQueryOptions('resource-request-app').queryKey, {
+  config: {
+    resources: { vcpuCount: 1, memoryMib: 256 },
+    volumeSizeBytes: 8_589_934_592,
+  },
+} as AppSummary);
 
 const root = createRootRoute();
 const dashboard = createRoute({ getParentRoute: () => root, id: '(dashboard)' });
@@ -24,23 +33,26 @@ const router = createRouter({
 });
 await router.load();
 
-test('the form offers separate additional CPU, RAM and volume amounts with explicit units', () => {
+test('the form starts with current resource totals so unchanged resources can be retained', () => {
   const markup = renderToStaticMarkup(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={queryClient}>
       <RouterContextProvider router={router}>
         <PaidResourcesRequestForm />
       </RouterContextProvider>
     </QueryClientProvider>,
   );
-  const labels = ['Additional vCPUs', 'Additional RAM (MiB)', 'Additional volume (GiB)'];
+  const labels = ['Requested vCPUs', 'Requested RAM (MiB)', 'Requested volume (GiB)'];
   for (const label of labels) {
     expect(markup).toContain(label);
   }
   const inputs = [...markup.matchAll(/<input[^>]*>/g)].map((match) => match[0]);
   expect(inputs).toHaveLength(labels.length);
-  expect(inputs.every((input) => input.includes('value="0"') && input.includes('min="0"'))).toBe(
-    true,
-  );
-  expect(markup).toContain('Use 0 to leave a resource unchanged');
-  expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Send request<\/button>/);
+  const expectedValues = ['1', '256', '8'];
+  for (const [index, input] of inputs.entries()) {
+    expect(input).toContain(`value="${expectedValues[index]}"`);
+    expect(input).toContain('min="1"');
+  }
+  expect(markup).toContain('Enter the total resources you need');
+  expect(markup).toContain('Keep the current value');
+  expect(markup).not.toMatch(/<button[^>]*disabled=""[^>]*>Send request<\/button>/);
 });

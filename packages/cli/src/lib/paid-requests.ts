@@ -2,7 +2,9 @@ import { text } from '@clack/prompts';
 import type { InferOptions } from '@parshjs/core';
 import type { PaidRequest, PaidRequestType } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
+import { unwrap } from '@repo/api-client/unwrap';
 import { MAX_PAID_APPS_REQUEST, MIN_PAID_APPS_REQUEST } from '@repo/api-constants';
+import { currentPaidResourceAmounts } from '@repo/app-operations';
 import { z } from 'zod';
 import type { command } from '#commands/paid-request.ts';
 import { PROGRAM_NAME, SHARED_OPTIONS } from '#config.ts';
@@ -82,7 +84,7 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
     }
     if (value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum.resources) {
       out.success(
-        `Thanks! We recorded your request for +${value.additionalVcpuCount} vCPUs, +${value.additionalMemoryMib} MiB RAM, and +${value.additionalVolumeGib} GiB volume for app ${value.appId}. This does not resize the app or charge you.`,
+        `Thanks! We recorded your request for ${value.requestedVcpuCount} vCPUs, ${value.requestedMemoryMib} MiB RAM, and ${value.requestedVolumeGib} GiB volume in total for app ${value.appId}. This does not resize the app or charge you.`,
       );
       return;
     }
@@ -132,10 +134,15 @@ export async function completePaidRequest({
     interactive,
   });
   if (parsed.data.type === PAID_REQUEST_TYPE_SCHEMA.enum.resources) {
+    const selected = unwrap(await api.api.apps({ appId: app.id }).get());
     return {
       requestType: parsed.data.type,
       appId: app.id,
-      ...(await completePaidResourceAmounts({ options: parsed.data, interactive })),
+      ...(await completePaidResourceAmounts({
+        options: parsed.data,
+        interactive,
+        current: currentPaidResourceAmounts(selected.config),
+      })),
     };
   }
   return { requestType: parsed.data.type, appId: app.id };
