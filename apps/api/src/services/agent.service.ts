@@ -9,7 +9,7 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { DEFAULT_AGENT_POLL_SETTINGS } from '#lib/agent-poll-settings.ts';
-import { UnauthorizedError } from '#lib/errors.ts';
+import { ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
@@ -131,7 +131,16 @@ export class AgentService extends Service {
    * passing observation liveness reads —
    * see `observeReport`.
    */
-  async acceptReport({ reported }: { reported: HostReportedState }): Promise<void> {
+  async acceptReport({
+    reported,
+    hostId,
+  }: {
+    reported: HostReportedState;
+    hostId: HostId;
+  }): Promise<void> {
+    if (reported.hostId !== hostId) {
+      throw new ForbiddenError('The report does not belong to this host session.');
+    }
     this.logger.info('host reported', {
       hostId: reported.hostId,
       state: reported.state,
