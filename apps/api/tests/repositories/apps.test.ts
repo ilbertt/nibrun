@@ -4,6 +4,7 @@ import {
   type AppId,
   AppIdSchema,
   type ComputeUsage,
+  DeploymentIdSchema,
   FilenameSchema,
   type HostId,
   HostnameSchema,
@@ -16,7 +17,7 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
-import type { Queries } from '#db/queries.gen.ts';
+import type { Queries, Tables } from '#db/queries.gen.ts';
 import { AppNameSchema, OWNED_APP_STATES } from '#lib/api/app.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
@@ -129,6 +130,27 @@ async function createHostedUsageApp(slug: string): Promise<AppId> {
     [appId, artifact.id, HOST_ID],
   );
   return appId;
+}
+
+async function recordComputeUsageForApps({
+  readings,
+}: {
+  readings: ReadonlyMap<AppId, ComputeUsage>;
+}) {
+  const rows = (await sql`
+    SELECT app_id, deployment_id FROM nibrun.app_hosts
+    WHERE app_id = ANY(${sql.array([...readings.keys()], 'TEXT')}::uuid[])
+  `) as Pick<Tables['app_hosts']['columns'], 'app_id' | 'deployment_id'>[];
+  const executions = new Map(rows.map((row) => [String(row.app_id), String(row.deployment_id)]));
+  await repo.recordComputeUsage({
+    hostId: HOST_ID,
+    readings: new Map(
+      [...readings].map(([appId, usage]) => [
+        Value.Parse(DeploymentIdSchema, executions.get(appId) ?? appId),
+        usage,
+      ]),
+    ),
+  });
 }
 
 async function storedState(appId: AppId): Promise<string | undefined> {
@@ -494,7 +516,7 @@ describe('what a host measured of a guest is kept beside how full its filesystem
   test('a reading is written and read back beside the app', async () => {
     const appId = await createHostedUsageApp('spending');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [
           appId,
@@ -518,7 +540,7 @@ describe('what a host measured of a guest is kept beside how full its filesystem
   test('a reading with no share yet writes no share rather than none spent', async () => {
     const appId = await createHostedUsageApp('unrated');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([[appId, spending({ memoryUsedBytes: BUSY_BYTES, measuredAt: EARLIER })]]),
     });
     const app = await readBack(appId);
@@ -530,7 +552,7 @@ describe('what a host measured of a guest is kept beside how full its filesystem
   test('a later reading replaces the one before it', async () => {
     const appId = await createHostedUsageApp('quietened');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [
           appId,
@@ -538,7 +560,7 @@ describe('what a host measured of a guest is kept beside how full its filesystem
         ],
       ]),
     });
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [appId, spending({ memoryUsedBytes: IDLE_BYTES, cpuShare: IDLE_SHARE, measuredAt: LATER })],
       ]),
@@ -550,12 +572,12 @@ describe('what a host measured of a guest is kept beside how full its filesystem
   test('an older reading arriving late leaves the newer one standing', async () => {
     const appId = await createHostedUsageApp('reordered-compute');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [appId, spending({ memoryUsedBytes: IDLE_BYTES, cpuShare: IDLE_SHARE, measuredAt: LATER })],
       ]),
     });
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [
           appId,
@@ -576,7 +598,7 @@ describe('what a host measured of a guest is kept beside how full its filesystem
   test('either family alone makes the row, and the other lands on it afterwards', async () => {
     const appId = await createHostedUsageApp('half-measured');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [
           appId,
@@ -676,10 +698,10 @@ describe('what a host measured of a guest is kept beside how full its filesystem
   });
 
   test('every reading in one report is written by one statement', async () => {
-    const first = await createApp('batched-compute-one');
-    const second = await createApp('batched-compute-two');
+    const first = await createHostedUsageApp('batched-compute-one');
+    const second = await createHostedUsageApp('batched-compute-two');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [
           first,

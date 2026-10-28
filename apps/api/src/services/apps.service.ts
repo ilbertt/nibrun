@@ -1,6 +1,7 @@
 import type {
   AppId,
   ComputeUsage,
+  DeploymentId,
   FilesystemUsage,
   HostId,
   ReportedInstance,
@@ -448,23 +449,25 @@ export class AppsService extends Service {
    */
   async recordComputeUsage({
     instances,
+    hostId,
   }: {
     instances: readonly ReportedInstance[];
+    hostId: HostId;
   }): Promise<void> {
-    const readings = new Map<AppId, ComputeUsage>();
-    const asleep = new Set<AppId>();
+    const readings = new Map<DeploymentId, ComputeUsage>();
+    const asleep = new Set<DeploymentId>();
     for (const instance of instances) {
       if (instance.compute) {
-        readings.set(instance.appId, instance.compute);
+        readings.set(instance.deploymentId, instance.compute);
       } else if (instance.state === 'idle') {
-        asleep.add(instance.appId);
+        asleep.add(instance.deploymentId);
       }
     }
     if (readings.size > 0) {
-      await this.appsRepo.recordComputeUsage({ readings });
+      await this.appsRepo.recordComputeUsage({ readings, hostId });
     }
     if (asleep.size > 0) {
-      await this.appsRepo.clearComputeUsage({ appIds: [...asleep] });
+      await this.appsRepo.clearComputeUsage({ deploymentIds: [...asleep], hostId });
     }
   }
 

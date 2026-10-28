@@ -158,7 +158,7 @@ export class AgentService extends Service {
     // — but a stamp is what stops the next deployment offering to create data that already exists,
     // and the sooner it lands the smaller that window is.
     await this.appsService.recordDataInitialized({ volumes: reported.volumes, hostId });
-    await this.appsService.recordComputeUsage({ instances: reported.instances });
+    await this.appsService.recordComputeUsage({ instances: reported.instances, hostId });
     await this.appsService.completeDeletions({ volumes: reported.volumes, hostId });
     await this.exportsService.applyHostReport({ reported });
     // Nothing to do with this report: an app whose time is up is found by the clock, and the

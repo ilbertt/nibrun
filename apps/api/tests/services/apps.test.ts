@@ -3,6 +3,7 @@ import {
   type AppId,
   AppIdSchema,
   type ComputeUsage,
+  type DeploymentId,
   type FilesystemUsage,
   HostIdSchema,
   type Hostname,
@@ -142,8 +143,8 @@ class StubAppsRepository implements AppsRepositoryContract {
   readonly trace: string[] = [];
   readonly leftovers = new Map<AppId, Leftovers>();
   readonly measured: ReadonlyMap<AppId, FilesystemUsage>[] = [];
-  readonly spending: ReadonlyMap<AppId, ComputeUsage>[] = [];
-  readonly forgotten: AppId[][] = [];
+  readonly spending: ReadonlyMap<DeploymentId, ComputeUsage>[] = [];
+  readonly forgotten: DeploymentId[][] = [];
   deleting: AppId[] = [];
   purgeable: AppId[] = [];
   expirable: ExpirableAppRow[] = [];
@@ -286,13 +287,17 @@ class StubAppsRepository implements AppsRepositoryContract {
     return Promise.resolve();
   }
 
-  recordComputeUsage({ readings }: { readings: ReadonlyMap<AppId, ComputeUsage> }): Promise<void> {
+  recordComputeUsage({
+    readings,
+  }: {
+    readings: ReadonlyMap<DeploymentId, ComputeUsage>;
+  }): Promise<void> {
     this.spending.push(new Map(readings));
     return Promise.resolve();
   }
 
-  clearComputeUsage({ appIds }: { appIds: readonly AppId[] }): Promise<void> {
-    this.forgotten.push([...appIds]);
+  clearComputeUsage({ deploymentIds }: { deploymentIds: readonly DeploymentId[] }): Promise<void> {
+    this.forgotten.push([...deploymentIds]);
     return Promise.resolve();
   }
 
@@ -1218,9 +1223,12 @@ describe('what a guest is spending, as the host running it last measured it', ()
   test('a reading a host took is recorded against the app it is running', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await serviceWith({ appsRepo }).recordComputeUsage({ instances: [reportedInstance(SPENDING)] });
+    await serviceWith({ appsRepo }).recordComputeUsage({
+      hostId: HOST_ID,
+      instances: [reportedInstance(SPENDING)],
+    });
 
-    expect(appsRepo.spending).toEqual([new Map([[APP_ID, SPENDING]])]);
+    expect(appsRepo.spending).toEqual([new Map([[DEPLOYMENT_ID, SPENDING]])]);
   });
 
   // Every report between two measurements carries instances and no readings, and a write on each
@@ -1228,7 +1236,10 @@ describe('what a guest is spending, as the host running it last measured it', ()
   test('a report carrying no reading writes nothing', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await serviceWith({ appsRepo }).recordComputeUsage({ instances: [reportedInstance()] });
+    await serviceWith({ appsRepo }).recordComputeUsage({
+      hostId: HOST_ID,
+      instances: [reportedInstance()],
+    });
 
     expect(appsRepo.spending).toEqual([]);
   });
@@ -1241,16 +1252,19 @@ describe('what a guest is spending, as the host running it last measured it', ()
   test('an app reported asleep is forgotten rather than left as it was', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await serviceWith({ appsRepo }).recordComputeUsage({ instances: [ASLEEP] });
+    await serviceWith({ appsRepo }).recordComputeUsage({ hostId: HOST_ID, instances: [ASLEEP] });
 
-    expect(appsRepo.forgotten).toEqual([[APP_ID]]);
+    expect(appsRepo.forgotten).toEqual([[DEPLOYMENT_ID]]);
     expect(appsRepo.spending).toEqual([]);
   });
 
   test('and a running app that simply was not measured is left exactly as it was', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await serviceWith({ appsRepo }).recordComputeUsage({ instances: [reportedInstance()] });
+    await serviceWith({ appsRepo }).recordComputeUsage({
+      hostId: HOST_ID,
+      instances: [reportedInstance()],
+    });
 
     expect(appsRepo.forgotten).toEqual([]);
   });
@@ -1263,10 +1277,11 @@ describe('what a guest is spending, as the host running it last measured it', ()
     };
 
     await serviceWith({ appsRepo }).recordComputeUsage({
+      hostId: HOST_ID,
       instances: [reportedInstance(earlier), reportedInstance(SPENDING)],
     });
 
-    expect(appsRepo.spending).toEqual([new Map([[APP_ID, SPENDING]])]);
+    expect(appsRepo.spending).toEqual([new Map([[DEPLOYMENT_ID, SPENDING]])]);
   });
 });
 
