@@ -1,5 +1,12 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
-import type { AppId, DeploymentId, HostPort, InstanceState, Ipv4Address } from '@repo/protocol';
+import type {
+  AppId,
+  DeploymentId,
+  HostId,
+  HostPort,
+  InstanceState,
+  Ipv4Address,
+} from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { Deployment, DeploymentState } from '#lib/api/deployment.ts';
 import type {
@@ -100,10 +107,18 @@ export abstract class DeploymentsRepositoryContract {
   abstract insertRollback(input: RollbackDeploymentInput): Promise<DeploymentRow | null>;
   abstract listByApp(input: DeploymentsByAppInput): Promise<DeploymentRow[]>;
   abstract findById(input: DeploymentByIdInput): Promise<DeploymentRow | null>;
-  abstract listLive(): Promise<LiveDeploymentRow[]>;
-  abstract applyReport(input: { reported: ReportedDeployment[] }): Promise<void>;
-  abstract stampActivation(input: { deploymentId: DeploymentId; at: Date }): Promise<void>;
-  abstract fail(input: { deploymentId: DeploymentId; message: string }): Promise<void>;
+  abstract listLive(input: { hostId: HostId }): Promise<LiveDeploymentRow[]>;
+  abstract applyReport(input: { reported: ReportedDeployment[]; hostId: HostId }): Promise<void>;
+  abstract stampActivation(input: {
+    deploymentId: DeploymentId;
+    at: Date;
+    hostId: HostId;
+  }): Promise<void>;
+  abstract fail(input: {
+    deploymentId: DeploymentId;
+    message: string;
+    hostId: HostId;
+  }): Promise<void>;
 }
 
 /**
@@ -383,7 +398,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
    * told about every app it runs. `desired_running` is the app's own state read as the question
    * the deployment's clock asks — a suspended app's deployment is not late for anything.
    */
-  listLive(): Promise<LiveDeploymentRow[]> {
+  listLive({ hostId }: { hostId: HostId }): Promise<LiveDeploymentRow[]> {
     return this.sql.SelectLiveDeployments`
       /* @notNull desired_running */
       SELECT d.id, d.app_id, d.state, d.created_at, a.updated_at AS state_changed_at,
@@ -391,6 +406,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       FROM nibrun.deployments d
       JOIN nibrun.apps a ON a.id = d.app_id
       WHERE d.state NOT IN ('superseded', 'failed')
+        AND (d.host_id IS NULL OR d.host_id = ${hostId})
     `;
   }
 
@@ -405,7 +421,13 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
    * Every column here is whatever the host last said. The one that is not — when the release
    * began serving — is written by `stampActivation` instead.
    */
-  applyReport({ reported }: { reported: ReportedDeployment[] }): Promise<void> {
+  applyReport({
+    reported,
+    hostId,
+  }: {
+    reported: ReportedDeployment[];
+    hostId: HostId;
+  }): Promise<void> {
     return this.sql.begin(async (tx) => {
       for (const instance of reported) {
         await tx.ApplyReportedDeployment`
@@ -421,6 +443,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
             started_at = ${instance.startedAt},
             last_healthy_at = ${instance.lastHealthyAt}
           WHERE id = ${instance.deploymentId} AND state NOT IN ('superseded', 'failed')
+            AND (host_id IS NULL OR host_id = ${hostId})
         `;
       }
     });
@@ -437,26 +460,33 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   async stampActivation({
     deploymentId,
     at,
+    hostId,
   }: {
     deploymentId: DeploymentId;
     at: Date;
+    hostId: HostId;
   }): Promise<void> {
     await this.sql.StampDeploymentActivation`
       UPDATE nibrun.deployments SET activated_at = ${at}
       WHERE id = ${deploymentId} AND activated_at IS NULL
+        AND state NOT IN ('superseded', 'failed')
+        AND (host_id IS NULL OR host_id = ${hostId})
     `;
   }
 
   async fail({
     deploymentId,
     message,
+    hostId,
   }: {
     deploymentId: DeploymentId;
     message: string;
+    hostId: HostId;
   }): Promise<void> {
     await this.sql.FailDeployment`
       UPDATE nibrun.deployments SET state = 'failed', message = ${message}
       WHERE id = ${deploymentId} AND state NOT IN ('superseded', 'failed')
+        AND (host_id IS NULL OR host_id = ${hostId})
     `;
   }
 
