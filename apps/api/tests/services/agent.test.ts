@@ -10,7 +10,7 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { AgentSessions } from '#lib/agent/sessions.ts';
-import { UnauthorizedError } from '#lib/errors.ts';
+import { ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
 import {
   AgentService,
@@ -274,6 +274,21 @@ describe('a host is told the whole of what it should be running', () => {
 });
 
 describe('a report is read by whatever owns what it talks about', () => {
+  test('a mismatched host is refused before any observation or mutation', async () => {
+    const { apps, deployments, exports, service } = build();
+    const reported = {
+      hostId: Value.Parse(HostIdSchema, 'another-host'),
+      instances: [],
+      volumes: [],
+      exports: [],
+    } as unknown as HostReportedState;
+    await expect(
+      service.acceptReport({ reported, hostId: Value.Parse(HostIdSchema, 'session-host') }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(apps.trace).toEqual([]);
+    expect(deployments.reports).toEqual([]);
+    expect(exports.reports).toEqual([]);
+  });
   test('and by each of them, so no part of it is dropped on the way in', async () => {
     const { deployments, exports, service } = build();
     const reported = {
@@ -283,7 +298,7 @@ describe('a report is read by whatever owns what it talks about', () => {
       exports: [],
     } as unknown as HostReportedState;
 
-    await service.acceptReport({ reported });
+    await service.acceptReport({ reported, hostId: reported.hostId });
 
     expect(deployments.reports).toEqual([reported]);
     expect(exports.reports).toEqual([reported]);
@@ -301,7 +316,7 @@ describe('a report is read by whatever owns what it talks about', () => {
       exports: [],
     } as unknown as HostReportedState;
 
-    await service.acceptReport({ reported });
+    await service.acceptReport({ reported, hostId: reported.hostId });
 
     expect(apps.trace).toEqual([
       'recordVolumeUsage',
@@ -325,7 +340,7 @@ describe('a report is read by whatever owns what it talks about', () => {
       exports: [],
     } as unknown as HostReportedState;
 
-    await service.acceptReport({ reported });
+    await service.acceptReport({ reported, hostId: reported.hostId });
 
     expect(artifacts.swept).toBe(1);
     expect(imports.swept).toBe(1);
