@@ -134,6 +134,6 @@ describe('what an app is using is read against what it was given', () => {
 test('the resources card offers a request dialog in its header', () => {
   const markup = resourcesMarkup(app());
   expect(markup).toMatch(
-    /data-slot="card-action"[\s\S]*?<button[^>]*aria-haspopup="dialog"[^>]*>Request more<\/button>/,
+    /data-slot="card-action"[\s\S]*?<button[^>]*aria-haspopup="dialog"[^>]*><svg[^>]*data-icon="inline-start"[^>]*>[\s\S]*?<\/svg>Request more<\/button>/,
   );
 });
