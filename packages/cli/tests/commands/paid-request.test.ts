@@ -19,7 +19,7 @@ const SERVICE_UNAVAILABLE_STATUS = 503;
 const FORBIDDEN_STATUS = 403;
 const APPS_ALLOWED = 3;
 const ASKED_TOTAL = 10;
-const APP_REQUEST_TYPES = ['custom-bucket', 'always-on'] as const;
+const APP_REQUEST_TYPES = ['custom-bucket', 'always-on', 'resources'] as const;
 
 let output: string[];
 let errors: string[];
@@ -473,4 +473,13 @@ test('paid-request help lists app feature requests and the app selector', async 
   }
   expect(output.join('')).toContain('--app');
   expect(requests).toEqual([]);
+});
+
+test('the resources confirmation names the app and the requested resources', async () => {
+  expect(await paidRequestCli().run(['paid-request', '--type', 'resources', '--app', NAME])).toBe(
+    0,
+  );
+  expect(errors).toEqual([]);
+  expect(output.join('')).toContain(`get more CPU, RAM, and volume for app ${APP_ID}`);
+  expect(output.join('')).toContain('does not enable the feature or charge you');
 });

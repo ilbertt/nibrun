@@ -15,6 +15,7 @@ const REQUEST_TYPES = [
   'apps',
   'custom-bucket',
   'always-on',
+  'resources',
 ] as const satisfies readonly PaidRequestType[];
 type CliPaidRequestType = (typeof REQUEST_TYPES)[number];
 
@@ -64,12 +65,13 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
       );
       return;
     }
-    const requestedFeature =
-      value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum['always-on']
-        ? `keep app ${value.appId} always on`
-        : `use your own S3-compatible bucket for app ${value.appId}`;
+    const requestedFeatures = {
+      'always-on': `keep app ${value.appId} always on`,
+      'custom-bucket': `use your own S3-compatible bucket for app ${value.appId}`,
+      resources: `get more CPU, RAM, and volume for app ${value.appId}`,
+    } satisfies Record<z.infer<typeof APP_PAID_REQUEST_TYPE_SCHEMA>, string>;
     out.success(
-      `Thanks! We recorded your request to ${requestedFeature}. This does not enable the feature or charge you.`,
+      `Thanks! We recorded your request to ${requestedFeatures[value.requestType]}. This does not enable the feature or charge you.`,
     );
   },
 });

@@ -73,6 +73,8 @@ the layout under `src/commands/` is the command tree.
   record interest for the selected app without enabling the feature or charging.
   Both use the shared app selector: a terminal can choose an app, while scripts and
   `--json` require `--app`. Their JSON results include the request type and app ID.
+- `nib paid-request --type resources --app <name-or-slug>` uses the same app-scoped
+  flow to request more CPU, RAM, and volume without resizing the app or charging.
 - `nib run <binary> --github-trusted-oidc --app-id <id>` deploys an existing app
   from GitHub Actions with `id-token: write`. It obtains temporary credentials in
   memory and uses only the binary upload and deployment-creation endpoints. It

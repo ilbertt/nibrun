@@ -66,12 +66,13 @@ test('the upgrade preserves valid requests and requires app IDs for app features
       '0067_paid_requests.sql',
       '0069_custom_bucket_paid_requests.sql',
       '0070_bucket_requests_name_an_app.sql',
+      '0075_always_on_paid_requests.sql',
     ]) {
       await transaction.unsafe(await migrations.get(name)!.text());
     }
     await transaction.unsafe(
       `INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount, app_id)
-       VALUES ($1, 'apps', 10, NULL), ($1, 'custom-bucket', NULL, $2)`,
+       VALUES ($1, 'apps', 10, NULL), ($1, 'custom-bucket', NULL, $2), ($1, 'always-on', NULL, $2)`,
       [OWNER_ID, CUSTOM_BUCKET_REQUEST.appId],
     );
     const before = await transaction.unsafe<
@@ -80,7 +81,7 @@ test('the upgrade preserves valid requests and requires app IDs for app features
       'SELECT id, request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
       [OWNER_ID],
     );
-    await transaction.unsafe(await migrations.get('0075_always_on_paid_requests.sql')!.text());
+    await transaction.unsafe(await migrations.get('0076_resources_paid_requests.sql')!.text());
     const after = await transaction.unsafe(
       'SELECT id, request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
       [OWNER_ID],

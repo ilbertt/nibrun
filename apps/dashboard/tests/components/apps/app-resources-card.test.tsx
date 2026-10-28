@@ -1,7 +1,30 @@
 import { describe, expect, test } from 'bun:test';
+import { QueryClient } from '@tanstack/react-query';
+import { createMemoryHistory, createRouter, RouterContextProvider } from '@tanstack/react-router';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { AppResourcesCard } from '#components/apps/app-resources-card.tsx';
 import type { AppSummary } from '#queries/apps.ts';
+import { setupBrowserLocation } from '#tests/support/browser.ts';
+
+setupBrowserLocation();
+const { AppResourcesCard } = await import('#components/apps/app-resources-card.tsx');
+const { routeTree } = await import('#routeTree.gen.ts');
+const { sessionQueryOptions } = await import('#queries/session.ts');
+const queryClient = new QueryClient();
+queryClient.setQueryData(sessionQueryOptions.queryKey, null);
+const router = createRouter({
+  routeTree,
+  context: { queryClient },
+  history: createMemoryHistory({ initialEntries: ['/login'] }),
+});
+await router.load();
+
+function resourcesMarkup(app: AppSummary): string {
+  return renderToStaticMarkup(
+    <RouterContextProvider router={router}>
+      <AppResourcesCard app={app} />
+    </RouterContextProvider>,
+  );
+}
 
 const VCPU_COUNT = 2;
 const MEMORY_MIB = 1_024;
@@ -44,7 +67,7 @@ const measured = app({
 
 describe('what an app is using is read against what it was given', () => {
   test('each resource reads as what is spent over what was allocated', () => {
-    const markup = renderToStaticMarkup(<AppResourcesCard app={measured} />);
+    const markup = resourcesMarkup(measured);
 
     expect(markup).toContain('0.36');
     expect(markup).toContain('(18%)');
@@ -59,7 +82,7 @@ describe('what an app is using is read against what it was given', () => {
    * so the bar keeps its track and says nothing, rather than saying nought.
    */
   test('a resource nothing has measured says so rather than reading as none spent', () => {
-    const markup = renderToStaticMarkup(<AppResourcesCard app={app()} />);
+    const markup = resourcesMarkup(app());
 
     expect(markup).toContain('—');
     expect(markup).not.toContain('aria-valuenow');
@@ -70,19 +93,20 @@ describe('what an app is using is read against what it was given', () => {
    * the app. Eighty and ninety are where disk and memory alerting has settled almost everywhere.
    */
   test('a bar turns from green through amber to red as what is left runs out', () => {
-    const barsAt = (memoryUsedBytes: number) =>
-      renderToStaticMarkup(
-        <AppResourcesCard
-          app={app({
-            computeUsage: {
-              memoryTotalBytes: MEMORY_MIB,
-              memoryUsedBytes,
-              measuredAt: MEASURED_AT,
-            },
-          } as Partial<AppSummary>)}
-        />,
+    function barsAt(memoryUsedBytes: number): string {
+      return resourcesMarkup(
+        app({
+          computeUsage: {
+            memoryTotalBytes: MEMORY_MIB,
+            memoryUsedBytes,
+            measuredAt: MEASURED_AT,
+          },
+        } as Partial<AppSummary>),
       );
-    const bytesAt = (share: number) => Math.round(MEMORY_MIB * BYTES_PER_MIB * share);
+    }
+    function bytesAt(share: number): number {
+      return Math.round(MEMORY_MIB * BYTES_PER_MIB * share);
+    }
 
     expect(barsAt(bytesAt(HEALTHY_SHARE))).toContain('bg-primary');
     expect(barsAt(bytesAt(NEARLY_FULL_SHARE))).toContain('bg-warning');
@@ -92,19 +116,24 @@ describe('what an app is using is read against what it was given', () => {
   // Memory arrives whole on the first reading and a share cannot, because a share needs a reading
   // behind it — so the vCPU row is the one that can be empty while the row under it is not.
   test('a guest measured before it had a cpu share still reads its memory', () => {
-    const markup = renderToStaticMarkup(
-      <AppResourcesCard
-        app={app({
-          computeUsage: {
-            memoryTotalBytes: MEMORY_MIB,
-            memoryUsedBytes: MEMORY_USED_BYTES,
-            measuredAt: MEASURED_AT,
-          },
-        } as Partial<AppSummary>)}
-      />,
+    const markup = resourcesMarkup(
+      app({
+        computeUsage: {
+          memoryTotalBytes: MEMORY_MIB,
+          memoryUsedBytes: MEMORY_USED_BYTES,
+          measuredAt: MEASURED_AT,
+        },
+      } as Partial<AppSummary>),
     );
 
     expect(markup).toContain('393.3 MiB');
     expect(markup).toContain('—');
   });
+});
+
+test('the resources card offers a request dialog in its header', () => {
+  const markup = resourcesMarkup(app());
+  expect(markup).toMatch(
+    /data-slot="card-action"[\s\S]*?<button[^>]*aria-haspopup="dialog"[^>]*>Request more<\/button>/,
+  );
 });

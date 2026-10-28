@@ -1,5 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
+import { Button } from '@repo/ui/components/button';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@repo/ui/components/card';
 import { CpuIcon, HardDriveIcon, MemoryStickIcon } from 'lucide-react';
+import { PaidResourcesRequestDialog } from '#components/apps/paid-resources-request-dialog.tsx';
 import { ResourceMeter } from '#components/apps/resource-meter.tsx';
 import { formatBytes } from '#lib/format-bytes.ts';
 import type { AppSummary } from '#queries/apps.ts';
@@ -30,6 +32,15 @@ export function AppResourcesCard({ app }: { app: AppSummary }) {
     <Card>
       <CardHeader>
         <CardTitle>Resources</CardTitle>
+        <CardAction>
+          <PaidResourcesRequestDialog
+            trigger={
+              <Button variant="outline" size="xs">
+                Request more
+              </Button>
+            }
+          />
+        </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 text-sm">
         <ResourceMeter

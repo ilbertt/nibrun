@@ -11,4 +11,9 @@ export const ALWAYS_ON_REQUEST = {
   appId: CUSTOM_BUCKET_REQUEST.appId,
 };
 
-export const APP_PAID_REQUESTS = [CUSTOM_BUCKET_REQUEST, ALWAYS_ON_REQUEST];
+export const RESOURCES_REQUEST = {
+  requestType: 'resources' as const,
+  appId: CUSTOM_BUCKET_REQUEST.appId,
+};
+
+export const APP_PAID_REQUESTS = [CUSTOM_BUCKET_REQUEST, ALWAYS_ON_REQUEST, RESOURCES_REQUEST];
