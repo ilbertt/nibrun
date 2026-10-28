@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   AGENT_API_PREFIX,
   AGENT_ROUTES,
+  AgentSessionRequestSchema,
   HostIdSchema,
   type HostReportedState,
   PROTOCOL_VERSION,
@@ -43,10 +44,11 @@ const VALID_SESSION = {
   poll: { minIntervalMs: 1_000, reportIntervalMs: 15_000 },
 };
 
-const SESSION_REQUEST = {
+const SESSION_REQUEST = Value.Parse(AgentSessionRequestSchema, {
+  hostId: 'agent-origin',
   versions: { agent: 'a', guestImage: 'b', zerofs: 'c', firecracker: 'd' },
   capacity: { vcpuCount: 2, memoryMib: 4096, cacheBytes: 100 },
-} as Parameters<ReturnType<typeof makeControlPlaneClient>['openSession']>[0];
+});
 
 type Reply = { body?: unknown; status?: number };
 

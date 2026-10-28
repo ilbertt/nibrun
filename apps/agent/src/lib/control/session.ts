@@ -1,12 +1,11 @@
 import {
   type AgentSession,
   type HostCapacity,
-  type HostId,
   HostIdSchema,
   type HostVersions,
-  isValidMessage,
 } from '@repo/protocol';
-import { Effect, Option } from 'effect';
+import { Value } from '@sinclair/typebox/value';
+import { Data, Effect, Option } from 'effect';
 import { toEpochMs } from '#lib/clock.ts';
 import { readTextFile, writeTextFile } from '#lib/json-store.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
@@ -28,30 +27,38 @@ export function isSessionExpiring({
   return toEpochMs(session.expiresAt) - skewMs <= nowMs;
 }
 
-/** A corrupted file is discarded rather than sent: registering twice is recoverable, claiming a
- * malformed identity is not. */
-const readHostId = Effect.gen(function* () {
+export class InvalidHostIdentity extends Data.TaggedError('InvalidHostIdentity')<{
+  readonly path: string;
+}> {
+  override get message() {
+    return `The persisted host identity at ${this.path} is invalid.`;
+  }
+}
+
+const readOrCreateRegistrationId = Effect.gen(function* () {
   const config = yield* AgentConfig;
   const value = yield* readTextFile(config.hostIdFile);
-  return Option.filter(value, (hostId) =>
-    isValidMessage({ schema: HostIdSchema, value: hostId }),
-  ) as Option.Option<HostId>;
+  if (Option.isSome(value)) {
+    return yield* Effect.try({
+      try: () => Value.Parse(HostIdSchema, value.value),
+      catch: () => new InvalidHostIdentity({ path: config.hostIdFile }),
+    });
+  }
+  const hostId = yield* Effect.sync(() => Value.Parse(HostIdSchema, crypto.randomUUID()));
+  // A lost first response must retry with the same identity, before any canonical id is known.
+  yield* writeTextFile({ path: config.hostIdFile, value: `${hostId}\n` });
+  return hostId;
 });
 
 export const openSession = Effect.fn('openSession')(function* (inputs: {
   versions: HostVersions;
   capacity: HostCapacity;
 }) {
-  const config = yield* AgentConfig;
   const control = yield* ControlPlane;
-  const hostId = yield* readHostId;
-  const session = yield* control.openSession({
-    ...Option.match(hostId, { onNone: () => ({}), onSome: (value) => ({ hostId: value }) }),
+  const hostId = yield* readOrCreateRegistrationId;
+  return yield* control.openSession({
+    hostId,
     versions: inputs.versions,
     capacity: inputs.capacity,
   });
-  if (!Option.contains(hostId, session.hostId)) {
-    yield* writeTextFile({ path: config.hostIdFile, value: `${session.hostId}\n` });
-  }
-  return session;
 });

@@ -3,7 +3,6 @@ import {
   type AgentSessionRequest,
   type HostDesiredState,
   type HostId,
-  HostIdSchema,
   type HostReportedState,
   SecretStringSchema,
   TimestampSchema,
@@ -87,9 +86,9 @@ export class AgentService extends Service {
    * defending against from the ones it was admitting.
    */
   async openSession(request: AgentSessionRequest): Promise<AgentSession> {
-    // The agent persists what it is given and presents it next time, so a host keeps its
-    // identity across a reinstall. Nothing allocates one yet, so its own is honoured.
-    const hostId = request.hostId ?? Value.Parse(HostIdSchema, crypto.randomUUID());
+    const hostId = await this.agentRepo.registerHost({
+      originId: request.hostId,
+    });
     const sessionToken = Value.Parse(SecretStringSchema, crypto.randomUUID());
     const expiresAt = new Date(Date.now() + SESSION_LIFETIME_MS);
     await this.agentRepo.saveSession({ sessionToken, hostId, expiresAt });
@@ -128,9 +127,8 @@ export class AgentService extends Service {
    * Read by the things that own what it talks about: the releases running on the host, the apps
    * whose filesystems it is holding or has just let go of, and the bundles it was told to write.
    *
-   * The rest is dropped. Capacity and versions have no table to land in while hosts are not
-   * modelled, and holding them in this process would be a second source of truth to unpick once
-   * they do. The host's own state is kept, but only as the passing observation liveness reads —
+   * Capacity and versions are not persisted. The host's own state is kept only as the
+   * passing observation liveness reads —
    * see `observeReport`.
    */
   async acceptReport({ reported }: { reported: HostReportedState }): Promise<void> {

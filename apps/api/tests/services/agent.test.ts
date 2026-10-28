@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import {
-  type AgentSessionRequest,
+  AgentSessionRequestSchema,
   type HostDesiredState,
   type HostId,
   HostIdSchema,
@@ -21,15 +21,30 @@ import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { ExportsService } from '#services/exports.service.ts';
 
-const SESSION_REQUEST = {
+const SESSION_REQUEST = Value.Parse(AgentSessionRequestSchema, {
+  hostId: 'agent-origin',
   versions: { agent: 'abc123', guestImage: 'linux-6.1', zerofs: 'v2', firecracker: 'v1' },
   capacity: { vcpuCount: 2, memoryMib: 8192, cacheBytes: 100_000_000_000 },
-} as unknown as AgentSessionRequest;
+});
 
 class FakeAgentRepository implements AgentRepositoryContract {
+  readonly registeredOrigins: string[] = [];
+  readonly hosts = new Map<string, HostId>();
   readonly #sessions = new AgentSessions();
   observed: HostObservation | undefined;
   sessionExpiresAt: Date | undefined;
+
+  registerHost({ originId }: { originId: string }): Promise<HostId> {
+    this.registeredOrigins.push(originId);
+    const hostId = this.hosts.get(originId) ?? Value.Parse(HostIdSchema, Bun.randomUUIDv7());
+    this.hosts.set(originId, hostId);
+    this.hosts.set(hostId, hostId);
+    return Promise.resolve(hostId);
+  }
+
+  hostForIdentity({ identity }: { identity: string }): Promise<HostId | undefined> {
+    return Promise.resolve(this.hosts.get(identity));
+  }
 
   saveSession({
     sessionToken,
@@ -190,17 +205,35 @@ function build() {
 }
 
 describe('a session is the identity a host is answered as', () => {
-  test('a host presenting its own id keeps it across a reinstall', async () => {
-    const { service } = build();
+  test('an origin identity and its returned canonical id renew the same host', async () => {
+    const { service, agentRepo } = build();
     const hostId = Value.Parse(HostIdSchema, 'host-of-record');
 
-    expect((await service.openSession({ ...SESSION_REQUEST, hostId })).hostId).toBe(hostId);
+    const session = await service.openSession({ ...SESSION_REQUEST, hostId });
+    expect(session.hostId).not.toBe(hostId);
+    expect((await service.openSession({ ...SESSION_REQUEST, hostId })).hostId).toBe(session.hostId);
+    expect((await service.openSession({ ...SESSION_REQUEST, hostId: session.hostId })).hostId).toBe(
+      session.hostId,
+    );
+    expect(agentRepo.registeredOrigins).toEqual([hostId, hostId, session.hostId]);
   });
 
-  test('one that has never registered is given an id to persist', async () => {
-    const { service } = build();
+  test('a new origin receives a canonical host id', async () => {
+    const { service, agentRepo } = build();
 
-    expect((await service.openSession(SESSION_REQUEST)).hostId).toBeTruthy();
+    const session = await service.openSession(SESSION_REQUEST);
+    expect(session.hostId).toBeTruthy();
+    expect(agentRepo.registeredOrigins).toEqual([SESSION_REQUEST.hostId]);
+    expect(session.hostId).not.toBe(SESSION_REQUEST.hostId);
+  });
+
+  test('failed registration cannot issue a session', async () => {
+    const { service, agentRepo } = build();
+    spyOn(agentRepo, 'registerHost').mockRejectedValue(new Error('registry unavailable'));
+    const saveSession = spyOn(agentRepo, 'saveSession');
+
+    await expect(service.openSession(SESSION_REQUEST)).rejects.toThrow('registry unavailable');
+    expect(saveSession).not.toHaveBeenCalled();
   });
 
   // A default host would hand desired state to anything that reached the port.

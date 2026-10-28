@@ -31,6 +31,8 @@ export type HostObservation = {
 };
 
 export abstract class AgentRepositoryContract {
+  abstract registerHost(input: { originId: string }): Promise<HostId>;
+  abstract hostForIdentity(input: { identity: string }): Promise<HostId | undefined>;
   abstract saveSession(input: {
     sessionToken: SecretString;
     hostId: HostId;
@@ -50,6 +52,33 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
   constructor({ sql, secretsKey }: { sql: TypedSQL<Queries>; secretsKey: TenantSecretsKey }) {
     super(sql);
     this.#secretsKey = secretsKey;
+  }
+
+  async registerHost({ originId }: { originId: string }): Promise<HostId> {
+    const existing = await this.hostForIdentity({ identity: originId });
+    if (existing !== undefined) {
+      return existing;
+    }
+    const [registered] = await this.sql.RegisterHost`
+      INSERT INTO nibrun.hosts (origin_id) VALUES (${originId})
+      ON CONFLICT (origin_id) DO UPDATE SET origin_id = EXCLUDED.origin_id
+      RETURNING id
+    `;
+    if (registered === undefined) {
+      throw new Error('Host registration returned no identity.');
+    }
+    return registered.id;
+  }
+
+  async hostForIdentity({ identity }: { identity: string }): Promise<HostId | undefined> {
+    // Existing agents persist the returned id and present it instead of their original identity.
+    const [host] = await this.sql.SelectHostForIdentity`
+      SELECT id FROM nibrun.hosts
+      WHERE id::text = ${identity} OR origin_id = ${identity}
+      ORDER BY (id::text = ${identity}) DESC
+      LIMIT 1
+    `;
+    return host?.id;
   }
 
   saveSession({
@@ -90,8 +119,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
   }
 
   /**
-   * The same state for whichever host asks. Hosts are not modelled and there is one, so the id
-   * here is the one the agent registered under rather than one this end assigned.
+   * The same state for whichever host asks until desired state is scoped to assignments.
    *
    * `checkpoints` is empty until it has a table to be requested through: it is per-request work,
    * so a host can only be told to do one once something has recorded that someone asked.

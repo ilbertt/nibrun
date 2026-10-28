@@ -6,6 +6,13 @@ socket. Compiles to a single binary that also serves `@repo/dashboard`.
 Owns the Postgres schema. Never connects to hosts — it pushes work down the
 agent socket (see `@repo/protocol`).
 
+A deployment's `host_id` names its execution host and cannot change after assignment.
+It references `hosts.id`, a UUIDv7 assigned before the agent receives a session.
+`hosts.origin_id` uniquely retains the agent's persisted registration identity. Every session
+request must carry it. Legacy agents may present a saved canonical id; both resolve to the same host.
+Moving an app creates a new deployment; its volume survives the execution it belonged to.
+Keep host ownership on deployments rather than duplicating it on apps or placements.
+
 Bun + Elysia service.
 
 `src/lib/api/` contains public resource schemas and their derived types. API-only defaults,
