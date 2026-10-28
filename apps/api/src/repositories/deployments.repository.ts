@@ -206,14 +206,18 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       // the row is written through rather than one checked beside it.
       const [inserted] = await tx.InsertDeployment`
         INSERT INTO nibrun.deployments
-          (app_id, artifact_id, config_id, initial_data_import_id, github_deployment_grant_id, mcp_client_id, mcp_chat_id)
-        SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}, ${mcpClientId}, ${mcpChatId}
+          (app_id, artifact_id, config_id, initial_data_import_id, github_deployment_grant_id, mcp_client_id, mcp_chat_id, host_id)
+        SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}, ${mcpClientId}, ${mcpChatId}, previous.host_id
         FROM nibrun.live_apps a
         JOIN nibrun.artifacts ar ON ar.app_id = a.id
         JOIN LATERAL (
           SELECT id FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
+        LEFT JOIN LATERAL (
+          SELECT d.host_id FROM nibrun.deployments d
+          WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
+        ) previous ON true
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND ar.id = ${artifactId}
           AND ar.digest IS NOT NULL
         RETURNING id
@@ -255,11 +259,11 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       const [inserted] = await tx.InsertReplayedDeployment`
         WITH replay_source AS (
           SELECT src.id, src.app_id, src.artifact_id, src.config_id,
-                 latest.config_id AS storage_config_id
+                 latest.config_id AS storage_config_id, latest.host_id
           FROM nibrun.deployments src
           JOIN nibrun.live_apps a ON a.id = src.app_id
           JOIN LATERAL (
-            SELECT d.config_id FROM nibrun.deployments d
+            SELECT d.config_id, d.host_id FROM nibrun.deployments d
             WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
           ) latest ON true
           WHERE src.id = ${rollbackOf} AND src.app_id = ${appId} AND a.owner_id = ${ownerId}
@@ -312,8 +316,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
           JOIN nibrun.app_config_environment e ON e.config_id = source.config_id
         )
         INSERT INTO nibrun.deployments
-          (app_id, artifact_id, config_id, rollback_of_deployment_id)
-        SELECT source.app_id, source.artifact_id, COALESCE(config.id, source.config_id), source.id
+          (app_id, artifact_id, config_id, rollback_of_deployment_id, host_id)
+        SELECT source.app_id, source.artifact_id, COALESCE(config.id, source.config_id), source.id, source.host_id
         FROM replay_source source
         LEFT JOIN rollback_config config ON true
         RETURNING id

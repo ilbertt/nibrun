@@ -3,7 +3,7 @@ import { withTypes } from '@ilbertt/bun-sqlgen';
 import {
   AppIdSchema,
   DeploymentIdSchema,
-  HostIdSchema,
+  type HostId,
   type S3VolumeAuth,
   S3VolumeAuthSchema,
 } from '@repo/protocol';
@@ -22,14 +22,15 @@ import {
   VolumeStorageMigrationsRepository,
 } from '#repositories/volume-storage-migrations.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
+import { registerHost } from '#tests/support/hosts.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
 const EXPORT_RETENTION_MS = 86_400_000;
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'migration-owner');
 const OTHER_OWNER_ID = Value.Parse(OwnerIdSchema, 'migration-other');
-const HOST_ID = Value.Parse(HostIdSchema, 'migration-host');
-const OTHER_HOST_ID = Value.Parse(HostIdSchema, 'migration-other-host');
+let HOST_ID: HostId;
+let OTHER_HOST_ID: HostId;
 const ACCESS_KEY_AUTH = Value.Parse(S3VolumeAuthSchema, {
   kind: 'access-key',
   accessKeyId: 'test-access',
@@ -39,6 +40,8 @@ let sql: SQL;
 
 beforeAll(async function startDatabase() {
   sql = await startTestDatabase();
+  HOST_ID = await registerHost({ sql, originId: 'migration-host' });
+  OTHER_HOST_ID = await registerHost({ sql, originId: 'migration-other-host' });
   for (const ownerId of [OWNER_ID, OTHER_OWNER_ID]) {
     await sql.unsafe(
       `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
@@ -336,6 +339,10 @@ test('a deployment racing with migration cannot select the pending destination',
 
 test('only the owning started attempt can switch storage and concurrent retries reuse one deployment', async () => {
   const appId = await createApp({ name: 'atomic-cutover', deployed: true, configured: false });
+  await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE app_id = $2', [
+    HOST_ID,
+    appId,
+  ]);
   const owned = { appId, ownerId: OWNER_ID };
   const deployments = new DeploymentsRepository(withTypes<Queries>(sql));
   const before = await deployments.listByApp(owned);
@@ -358,6 +365,10 @@ test('only the owning started attempt can switch storage and concurrent retries 
   ]);
   expect(first).not.toBeNull();
   expect(retry).toBe(first);
+  const [placed] = await sql.unsafe('SELECT host_id FROM nibrun.deployments WHERE id = $1', [
+    first,
+  ]);
+  expect(placed.host_id).toBe(HOST_ID);
   const after = await deployments.listByApp(owned);
   expect(after).toHaveLength(2);
   expect(after.find((deployment) => deployment.id === first)).toMatchObject({

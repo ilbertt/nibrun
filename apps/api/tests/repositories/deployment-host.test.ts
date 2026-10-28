@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
+import { withTypes } from '@ilbertt/bun-sqlgen';
 import type { HostId } from '@repo/protocol';
 import type { SQL } from 'bun';
+import type { Queries } from '#db/queries.gen.ts';
+import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
 import { registerHost } from '#tests/support/hosts.ts';
@@ -10,11 +13,13 @@ const DATABASE_START_TIMEOUT_MS = 180_000;
 let sql: SQL;
 let HOST_ID: HostId;
 let OTHER_HOST_ID: HostId;
+let DESTINATION_HOST_ID: HostId;
 
 beforeAll(async function startDatabase() {
   sql = await startTestDatabase();
   HOST_ID = await registerHost({ sql, originId: 'original-host' });
   OTHER_HOST_ID = await registerHost({ sql, originId: 'another-host' });
+  DESTINATION_HOST_ID = await registerHost({ sql, originId: 'destination-host' });
 }, DATABASE_START_TIMEOUT_MS);
 
 afterAll(async function stopDatabase() {
@@ -115,4 +120,49 @@ test('concurrent registrations share one origin and canonical identity', async (
   expect(first).toBe(second);
   const rows = await sql.unsafe('SELECT id FROM nibrun.hosts WHERE origin_id = $1', [originId]);
   expect([...rows]).toEqual([{ id: first }]);
+});
+
+test('a redeploy inherits the previous execution host', async () => {
+  const app = await createDeployedApp({ sql, name: 'redeploy-host' });
+  await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
+    HOST_ID,
+    app.deploymentId,
+  ]);
+  const deployed = await new DeploymentsRepository(withTypes<Queries>(sql)).insert({
+    appId: app.appId,
+    ownerId: app.ownerId,
+    artifactId: app.artifactId,
+    initialDataFrom: null,
+    onlyOne: false,
+  });
+  expect(deployed.outcome).toBe('created');
+  const [current] = await sql.unsafe(
+    'SELECT host_id FROM nibrun.deployments WHERE app_id = $1 ORDER BY id DESC LIMIT 1',
+    [app.appId],
+  );
+  expect(current.host_id).toBe(HOST_ID);
+});
+
+test('an artifact rollback keeps the current host rather than replaying the original host', async () => {
+  const app = await createDeployedApp({ sql, name: 'rollback-host' });
+  await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1, state = $2 WHERE id = $3', [
+    HOST_ID,
+    'superseded',
+    app.deploymentId,
+  ]);
+  await sql.unsafe(
+    `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, host_id)
+     SELECT app_id, artifact_id, config_id, $1 FROM nibrun.deployments WHERE id = $2`,
+    [DESTINATION_HOST_ID, app.deploymentId],
+  );
+  const replayed = await new DeploymentsRepository(withTypes<Queries>(sql)).insertRollback({
+    appId: app.appId,
+    ownerId: app.ownerId,
+    rollbackOf: app.deploymentId,
+  });
+  expect(replayed).not.toBeNull();
+  const [current] = await sql.unsafe('SELECT host_id FROM nibrun.deployments WHERE id = $1', [
+    replayed!.id,
+  ]);
+  expect(current.host_id).toBe(DESTINATION_HOST_ID);
 });
