@@ -13,6 +13,15 @@ export interface ISelectHostForIdentityResult {
     id: IHostsColumns["id"];
 }
 
+/** Result of query `SelectUnplacedDeployment`. */
+export interface ISelectUnplacedDeploymentResult {
+    id: IDeploymentsColumns["id"];
+}
+
+/** Result of query `ObserveHostReport`. */
+export interface IObserveHostReportResult {
+}
+
 /** Result of query `SelectDesiredDeployments`. */
 export interface ISelectDesiredDeploymentsResult {
     id: IDeploymentsColumns["id"];
@@ -721,6 +730,18 @@ export interface IInsertDeploymentResult {
     id: IDeploymentsColumns["id"];
 }
 
+/** Result of query `SelectPreviousDeploymentHost`. */
+export interface ISelectPreviousDeploymentHostResult {
+    /** The host assigned to this execution. Null until an existing deployment is adopted or a new one is placed. */
+    host_id: IDeploymentsColumns["host_id"];
+}
+
+/** Result of query `SelectReadyDeploymentHost`. */
+export interface ISelectReadyDeploymentHostResult {
+    /** The canonical identity assigned by the control plane. */
+    id: IHostsColumns["id"];
+}
+
 /** Result of query `SelectDeploymentToReplay`. */
 export interface ISelectDeploymentToReplayResult {
     id: IDeploymentsColumns["id"];
@@ -1265,6 +1286,8 @@ export interface ISelectVolumeStorageMigrationResult {
 export interface Queries {
     RegisterHost: IRegisterHostResult;
     SelectHostForIdentity: ISelectHostForIdentityResult;
+    SelectUnplacedDeployment: ISelectUnplacedDeploymentResult;
+    ObserveHostReport: IObserveHostReportResult;
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
     SelectDesiredHostnames: ISelectDesiredHostnamesResult;
@@ -1323,6 +1346,8 @@ export interface Queries {
     SelectCachedBinary: ISelectCachedBinaryResult;
     SelectDeployableArtifact: ISelectDeployableArtifactResult;
     InsertDeployment: IInsertDeploymentResult;
+    SelectPreviousDeploymentHost: ISelectPreviousDeploymentHostResult;
+    SelectReadyDeploymentHost: ISelectReadyDeploymentHostResult;
     SelectDeploymentToReplay: ISelectDeploymentToReplayResult;
     InsertReplayedDeployment: IInsertReplayedDeploymentResult;
     SelectDeploymentsByApp: ISelectDeploymentsByAppResult;
@@ -1954,6 +1979,9 @@ export interface IHostsColumns {
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
+    reported_state: import("@repo/protocol").HostState;
+    /** When the control plane last received a report from this host. */
+    last_seen_at: Date | null;
 }
 
 /** Schema of `hosts`. */
@@ -2670,7 +2698,9 @@ export const schema = {
             id: { _columnName: "id", _foreignKeys: {} },
             origin_id: { _columnName: "origin_id", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
-            updated_at: { _columnName: "updated_at", _foreignKeys: {} }
+            updated_at: { _columnName: "updated_at", _foreignKeys: {} },
+            reported_state: { _columnName: "reported_state", _foreignKeys: {} },
+            last_seen_at: { _columnName: "last_seen_at", _foreignKeys: {} }
         },
         _indexes: {
             hosts_origin_id_key: { _indexName: "hosts_origin_id_key" },
@@ -2679,7 +2709,8 @@ export const schema = {
         _constraints: {
             hosts_origin_id_check: { _constraintName: "hosts_origin_id_check" },
             hosts_origin_id_key: { _constraintName: "hosts_origin_id_key" },
-            hosts_pkey: { _constraintName: "hosts_pkey" }
+            hosts_pkey: { _constraintName: "hosts_pkey" },
+            hosts_reported_state_check: { _constraintName: "hosts_reported_state_check" }
         }
     },
     imports: {

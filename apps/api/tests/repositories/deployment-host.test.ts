@@ -3,6 +3,7 @@ import { withTypes } from '@ilbertt/bun-sqlgen';
 import type { DeploymentId, HostId } from '@repo/protocol';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
+import { AgentRepository } from '#repositories/agent.repository.ts';
 import {
   DeploymentsRepository,
   type ReportedDeployment,
@@ -11,6 +12,7 @@ import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts'
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
 import { registerHost } from '#tests/support/hosts.ts';
 import { refusedBy } from '#tests/support/postgres.ts';
+import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
 let sql: SQL;
@@ -235,3 +237,16 @@ function deploymentReport(deploymentId: DeploymentId): ReportedDeployment {
     lastHealthyAt: null,
   };
 }
+
+test('a missing current assignment blocks ownership until the operator backfills it', async () => {
+  const app = await createDeployedApp({ sql, name: 'unassigned-host' });
+  const repository = new AgentRepository({
+    sql: withTypes<Queries>(sql),
+    secretsKey: TEST_SECRETS_KEY,
+  });
+  expect(await repository.hasUnplacedDeployments()).toBe(true);
+  await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
+    HOST_ID,
+    app.deploymentId,
+  ]);
+});

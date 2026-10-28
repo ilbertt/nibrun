@@ -401,6 +401,18 @@ describe('the latest deployment follows release order rather than running state'
   });
 });
 
+test('a deployment without an available execution host is refused as a conflict', async () => {
+  const { service } = serviceWith({ refusal: { outcome: 'no-host' } });
+  await expect(
+    service.createOrRollback({
+      isAnonymous: false,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      source: { artifactId: ARTIFACT_ID },
+    }),
+  ).rejects.toBeInstanceOf(ConflictError);
+});
+
 describe('an app the caller does not own is indistinguishable from one that does not exist', () => {
   test('creating against an unowned app or a foreign artifact is a 404, never a 403', async () => {
     const { service } = serviceWith({ row: null });

@@ -9,7 +9,7 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { DEFAULT_AGENT_POLL_SETTINGS } from '#lib/agent-poll-settings.ts';
-import { ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
+import { ConflictError, ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
@@ -119,7 +119,10 @@ export class AgentService extends Service {
     return hostId;
   }
 
-  desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+  async desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+    if (await this.agentRepo.hasUnplacedDeployments()) {
+      throw new ConflictError('Backfill existing deployment hosts before enabling host ownership.');
+    }
     return this.agentRepo.desiredState({ hostId });
   }
 
@@ -127,9 +130,6 @@ export class AgentService extends Service {
    * Read by the things that own what it talks about: the releases running on the host, the apps
    * whose filesystems it is holding or has just let go of, and the bundles it was told to write.
    *
-   * Capacity and versions are not persisted. The host's own state is kept only as the
-   * passing observation liveness reads —
-   * see `observeReport`.
    */
   async acceptReport({
     reported,

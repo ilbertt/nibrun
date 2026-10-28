@@ -16,6 +16,7 @@ import type {
   OAuthClientId,
   OwnerId,
 } from '#lib/api/identifiers.ts';
+import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
 import { lockAppForMutation } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -47,6 +48,7 @@ export type CreatedDeployment =
   | { outcome: 'no-artifact' }
   | { outcome: 'no-grant' }
   | { outcome: 'no-import' }
+  | { outcome: 'no-host' }
   | { outcome: 'data-exists' }
   | { outcome: 'held' };
 
@@ -204,17 +206,15 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if (!(await validDeploymentGrant({ tx, appId, ownerId, deploymentGrantId }))) {
         return { outcome: 'no-grant' };
       }
-      const refusal =
-        initialDataFrom === null
-          ? undefined
-          : await seedRefusal({ tx, appId, ownerId, initialDataFrom });
+      const refusal = await this.creationRefusal({ tx, appId, ownerId, initialDataFrom, onlyOne });
       if (refusal) {
         return refusal;
       }
-      if (onlyOne && (await alreadyDeployed({ tx, appId, ownerId }))) {
-        return { outcome: 'held' };
-      }
       await lockAppForMutation({ tx, appId, ownerId });
+      const hostId = await this.hostForDeployment({ tx, appId, ownerId });
+      if (hostId === undefined) {
+        return { outcome: 'no-host' };
+      }
       await supersedeLiveDeployment({ tx, appId, ownerId });
 
       // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one
@@ -222,17 +222,13 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       const [inserted] = await tx.InsertDeployment`
         INSERT INTO nibrun.deployments
           (app_id, artifact_id, config_id, initial_data_import_id, github_deployment_grant_id, mcp_client_id, mcp_chat_id, host_id)
-        SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}, ${mcpClientId}, ${mcpChatId}, previous.host_id
+        SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}, ${mcpClientId}, ${mcpChatId}, ${hostId}
         FROM nibrun.live_apps a
         JOIN nibrun.artifacts ar ON ar.app_id = a.id
         JOIN LATERAL (
           SELECT id FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
-        LEFT JOIN LATERAL (
-          SELECT d.host_id FROM nibrun.deployments d
-          WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
-        ) previous ON true
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND ar.id = ${artifactId}
           AND ar.digest IS NOT NULL
         RETURNING id
@@ -243,6 +239,51 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       const row = await this.selectDeployment({ tx, deploymentId: inserted.id });
       return row ? { outcome: 'created', row } : { outcome: 'no-artifact' };
     });
+  }
+
+  private async creationRefusal({
+    tx,
+    appId,
+    ownerId,
+    initialDataFrom,
+    onlyOne,
+  }: Pick<CreateDeploymentInput, 'appId' | 'ownerId' | 'initialDataFrom' | 'onlyOne'> & {
+    tx: Transaction;
+  }): Promise<CreatedDeployment | undefined> {
+    if (initialDataFrom !== null) {
+      const refusal = await seedRefusal({ tx, appId, ownerId, initialDataFrom });
+      if (refusal !== undefined) {
+        return refusal;
+      }
+    }
+    return onlyOne && (await alreadyDeployed({ tx, appId, ownerId }))
+      ? { outcome: 'held' }
+      : undefined;
+  }
+
+  private async hostForDeployment({
+    tx,
+    appId,
+    ownerId,
+  }: OwnedApp & { tx: Transaction }): Promise<HostId | undefined> {
+    const [previous] = await tx.SelectPreviousDeploymentHost`
+      SELECT d.host_id FROM nibrun.deployments d
+      JOIN nibrun.live_apps a ON a.id = d.app_id
+      WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+      ORDER BY d.id DESC LIMIT 1
+    `;
+    if (previous !== undefined) {
+      return previous.host_id ?? undefined;
+    }
+    const [host] = await tx.SelectReadyDeploymentHost`
+      SELECT id FROM nibrun.hosts
+      WHERE reported_state = 'ready'
+        AND last_seen_at >= now() - ${HOST_REPORT_MAX_AGE_MS} * interval '1 millisecond'
+      ORDER BY last_seen_at DESC, id
+      LIMIT 1
+      FOR SHARE
+    `;
+    return host?.id;
   }
 
   /**

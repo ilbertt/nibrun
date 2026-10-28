@@ -40,6 +40,7 @@ export abstract class AgentRepositoryContract {
   }): Promise<void>;
   abstract hostForSession(input: { sessionToken: string }): Promise<HostId | undefined>;
   abstract desiredState(input: { hostId: HostId }): Promise<HostDesiredState>;
+  abstract hasUnplacedDeployments(): Promise<boolean>;
   abstract observeReport(input: { reported: HostReportedState }): Promise<void>;
   abstract lastObservation(): Promise<HostObservation | undefined>;
 }
@@ -98,20 +99,31 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     return Promise.resolve(this.#sessions.hostFor({ sessionToken, now: new Date() }));
   }
 
-  /**
-   * In memory and only in memory. A restarted api has heard from no host yet, which is the truth
-   * — the last report was made to a process that is gone, and the next one is a poll away.
-   *
-   * One host, like `desiredState`: the newest report wins, and a second host would need this to
-   * become a map keyed on the id it already carries.
-   */
-  observeReport({ reported }: { reported: HostReportedState }): Promise<void> {
+  async hasUnplacedDeployments(): Promise<boolean> {
+    const [row] = await this.sql.SelectUnplacedDeployment`
+      SELECT d.id FROM nibrun.deployments d
+      WHERE d.host_id IS NULL
+        AND d.app_id IN (SELECT app_id FROM nibrun.desired_volumes)
+        AND NOT EXISTS (
+          SELECT 1 FROM nibrun.deployments newer
+          WHERE newer.app_id = d.app_id AND newer.id > d.id
+        )
+      LIMIT 1
+    `;
+    return row !== undefined;
+  }
+
+  async observeReport({ reported }: { reported: HostReportedState }): Promise<void> {
     this.#lastObservation = {
       hostId: reported.hostId,
       reportedAt: reported.reportedAt,
       state: reported.state,
     };
-    return Promise.resolve();
+    await this.sql.ObserveHostReport`
+      UPDATE nibrun.hosts
+      SET reported_state = ${reported.state}, last_seen_at = now()
+      WHERE id = ${reported.hostId}
+    `;
   }
 
   lastObservation(): Promise<HostObservation | undefined> {

@@ -261,6 +261,11 @@ export class DeploymentsService extends Service {
     if (outcome.outcome === 'held') {
       throw new ForbiddenError(ONE_DEPLOYMENT);
     }
+    if (outcome.outcome === 'no-host') {
+      throw new ConflictError(
+        'No execution host is available for this deployment. Please retry shortly.',
+      );
+    }
     throw outcome.outcome === 'no-import'
       ? new NotFoundError(NO_SUCH_IMPORT)
       : new ConflictError(DATA_EXISTS);
