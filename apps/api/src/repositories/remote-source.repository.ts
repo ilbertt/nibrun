@@ -9,7 +9,9 @@ import { isRemoteUrl } from '#lib/remote-url.ts';
  * that may be stored coming over an ordinary link, and short enough that a source which stopped
  * saying anything is a request that failed rather than one still being held.
  */
-const FETCH_DEADLINE_MS = 300_000;
+const DEFAULT_TIMEOUTS = { responseMs: 5_000, idleMs: 30_000, totalMs: 300_000 };
+type Timeouts = typeof DEFAULT_TIMEOUTS;
+type ResolveAddresses = (host: string) => Promise<string[] | undefined>;
 
 /**
  * A chain no longer than the ones release hosts actually serve — an address to a store, and the
@@ -59,14 +61,26 @@ export abstract class RemoteSourceRepositoryContract {
 
 export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
   private readonly mayDial: AddressPolicy;
+  private readonly resolveAddresses: ResolveAddresses;
+  private readonly timeouts: Timeouts;
 
   /**
    * Which addresses this will dial, defaulting to the only answer production has any business
    * using. It is an argument at all so that a test can point one of these at a server on the
    * machine running it — which is, by definition, an address the default refuses.
    */
-  constructor({ mayDial = isPublicAddress }: { mayDial?: AddressPolicy } = {}) {
+  constructor({
+    mayDial = isPublicAddress,
+    resolveAddresses = addressesOf,
+    timeouts,
+  }: {
+    mayDial?: AddressPolicy;
+    resolveAddresses?: ResolveAddresses;
+    timeouts?: Partial<Timeouts>;
+  } = {}) {
     this.mayDial = mayDial;
+    this.resolveAddresses = resolveAddresses;
+    this.timeouts = { ...DEFAULT_TIMEOUTS, ...timeouts };
   }
 
   /**
@@ -75,7 +89,7 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
    * redirect, and a rule applied to the first address alone is one a `302` walks straight around.
    */
   async open({ url }: { url: string }): Promise<RemoteSource> {
-    const deadline = AbortSignal.timeout(FETCH_DEADLINE_MS);
+    const deadline = AbortSignal.timeout(this.timeouts.totalMs);
     let target = url;
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -85,7 +99,11 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
       }
       const location = redirectTarget({ response: reached.response, from: target });
       if (location === undefined) {
-        return await answered(reached.response);
+        return await answered({
+          response: reached.response,
+          deadline,
+          idleMs: this.timeouts.idleMs,
+        });
       }
       await discard(reached.response);
       if (!isRemoteUrl(location)) {
@@ -111,7 +129,11 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
       return { outcome: 'unreachable' };
     }
     const host = hostnameOf(parsed);
-    const addresses = await addressesOf(host);
+    const addresses = await beforeTimeout({
+      run: () => this.resolveAddresses(host),
+      deadline,
+      timeoutMs: this.timeouts.responseMs,
+    }).catch(() => undefined);
     if (addresses === undefined) {
       return { outcome: 'unreachable' };
     }
@@ -122,7 +144,15 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
     }
 
     for (const address of addresses) {
-      const response = await get({ url: parsed, address, deadline });
+      if (deadline.aborted) {
+        break;
+      }
+      const response = await get({
+        url: parsed,
+        address,
+        deadline,
+        timeoutMs: this.timeouts.responseMs,
+      });
       if (response !== undefined) {
         return { outcome: 'answered', response };
       }
@@ -163,21 +193,53 @@ async function get({
   url,
   address,
   deadline,
+  timeoutMs,
 }: {
   url: URL;
   address: string;
   deadline: AbortSignal;
+  timeoutMs: number;
 }): Promise<Response | undefined> {
-  const request: BunFetchRequestInit = { redirect: 'manual', signal: deadline, proxy: false };
+  const request: BunFetchRequestInit = { redirect: 'manual', proxy: false };
   const dialled = pinnedTo({ url, address });
   if (dialled.hostname !== url.hostname) {
     request.headers = { host: url.host };
     request.tls = { serverName: url.hostname };
   }
   try {
-    return await fetch(dialled, request);
+    return await beforeTimeout({
+      run: (signal) => fetch(dialled, { ...request, signal }),
+      deadline,
+      timeoutMs,
+    });
   } catch {
     return undefined;
+  }
+}
+
+async function beforeTimeout<T>({
+  run,
+  deadline,
+  timeoutMs,
+}: {
+  run: (signal: AbortSignal) => Promise<T>;
+  deadline: AbortSignal;
+  timeoutMs: number;
+}): Promise<T> {
+  const controller = new AbortController();
+  const signal = AbortSignal.any([deadline, controller.signal]);
+  const timer = setTimeout(() => controller.abort(new Error('The source timed out.')), timeoutMs);
+  const interrupted = Promise.withResolvers<never>();
+  function abort() {
+    interrupted.reject(signal.reason);
+  }
+  try {
+    signal.throwIfAborted();
+    signal.addEventListener('abort', abort, { once: true });
+    return await Promise.race([run(signal), interrupted.promise]);
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', abort);
   }
 }
 
@@ -195,7 +257,15 @@ function parse(url: string): URL | undefined {
   }
 }
 
-async function answered(response: Response): Promise<RemoteSource> {
+async function answered({
+  response,
+  deadline,
+  idleMs,
+}: {
+  response: Response;
+  deadline: AbortSignal;
+  idleMs: number;
+}): Promise<RemoteSource> {
   if (!response.ok) {
     await discard(response);
     return { outcome: 'refused', status: response.status };
@@ -205,7 +275,7 @@ async function answered(response: Response): Promise<RemoteSource> {
   }
   return {
     outcome: 'open',
-    body: saidAsTheSource(response.body),
+    body: saidAsTheSource({ body: response.body, deadline, idleMs }),
     declaredSizeBytes: declaredLength(response.headers),
   };
 }
@@ -251,12 +321,24 @@ async function discard(response: Response): Promise<void> {
  * reads an object back out of the store, and a socket that dropped part way through is the one
  * thing in that chain nibrun is not the one to answer for.
  */
-function saidAsTheSource(body: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
+function saidAsTheSource({
+  body,
+  deadline,
+  idleMs,
+}: {
+  body: ReadableStream<Uint8Array>;
+  deadline: AbortSignal;
+  idleMs: number;
+}): ReadableStream<Uint8Array> {
   const reader = body.getReader();
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
-        const { done, value } = await reader.read();
+        const { done, value } = await beforeTimeout({
+          run: () => reader.read(),
+          deadline,
+          timeoutMs: idleMs,
+        });
         if (done) {
           controller.close();
           return;
@@ -264,6 +346,7 @@ function saidAsTheSource(body: ReadableStream<Uint8Array>): ReadableStream<Uint8
         controller.enqueue(value);
       } catch (failure) {
         controller.error(new InterruptedSourceError(failure));
+        void reader.cancel(failure).catch(() => undefined);
       }
     },
     cancel(reason) {
