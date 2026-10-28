@@ -1,6 +1,7 @@
 import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime-values';
 import type { DeployLink } from '#link.ts';
 import boopPage from '../content/boop.md?raw';
+import calnodePage from '../content/calnode.md?raw';
 import contextUsePage from '../content/context-use.md?raw';
 import drizzleGatewayPage from '../content/drizzle-gateway.md?raw';
 import filebrowserPage from '../content/filebrowser.md?raw';
@@ -566,6 +567,30 @@ export const DEPLOY_PRESETS = {
         `IMAGE_FS_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/pictures`,
         `AVATAR_FS_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/avatars`,
         'SECRET',
+      ],
+      minimal: true,
+    },
+  },
+  calnode: {
+    isRecommended: false,
+    projectUrl: 'https://github.com/Calnode/calnode',
+    version: 'v0.11.2',
+    markdownContent: calnodePage,
+    title: 'Calnode',
+    subtitle: 'A scheduling and booking app with calendar integrations, an API and an MCP server.',
+    category: DeployCategory.Productivity,
+    deployLink: {
+      name: 'calnode',
+      binary:
+        'https://github.com/Calnode/calnode/releases/download/v0.11.2/calnode_0.11.2_linux_amd64.tar.gz',
+      sha256: 'dc69723becc79ab23125e6e8ff2c030c8fc268b54ec5de4313684702c7b2c03b',
+      port: 3000,
+      env: [
+        `BASE_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
+        `DATABASE_URL=sqlite://${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/calnode.db`,
+        `DATA_DIR=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        'CALNODE_ENCRYPTION_KEY',
+        'CALNODE_RECOVERY_SECRET',
       ],
       minimal: true,
     },
