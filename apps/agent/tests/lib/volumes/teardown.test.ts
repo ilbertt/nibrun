@@ -250,6 +250,8 @@ describe('teardown on a selected live filesystem', () => {
                   Layer.succeed(
                     AppZerofs,
                     AppZerofs.make({
+                      abortMigration: () =>
+                        Effect.die('Normal lifecycle must not abort a migration.'),
                       prepareMigration: () => Effect.die('Teardown must not prepare a migration.'),
                       reclaim: () => Effect.die('shared volumes must not reclaim ZeroFS files'),
                       retire: () => Effect.die('shared volumes must not retire ZeroFS'),

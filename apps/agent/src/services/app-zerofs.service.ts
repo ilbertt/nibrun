@@ -1,5 +1,6 @@
 import type { AppId, DesiredVolume } from '@repo/protocol';
 import { Effect } from 'effect';
+import { abortVolumeMigration } from '#lib/volumes/abort-volume-migration.ts';
 import { activateAppVolume } from '#lib/volumes/activate-app-volume.ts';
 import { prepareVolumeMigration } from '#lib/volumes/prepare-volume-migration.ts';
 import { reclaimAppZerofs } from '#lib/volumes/reclaim-app-zerofs.ts';
@@ -21,6 +22,7 @@ export class AppZerofs extends Effect.Service<AppZerofs>()('AppZerofs', {
           | ReturnType<typeof retireAppVolume>
           | ReturnType<typeof reclaimAppZerofs>
           | ReturnType<typeof prepareVolumeMigration>
+          | ReturnType<typeof abortVolumeMigration>
         >
       >();
     const lifecycle = yield* Effect.makeSemaphore(1);
@@ -29,6 +31,8 @@ export class AppZerofs extends Effect.Service<AppZerofs>()('AppZerofs', {
         lifecycle.withPermits(1)(activateAppVolume(desired).pipe(Effect.provide(context))),
       prepareMigration: (desired: DesiredVolume) =>
         lifecycle.withPermits(1)(prepareVolumeMigration(desired).pipe(Effect.provide(context))),
+      abortMigration: (desired: DesiredVolume) =>
+        lifecycle.withPermits(1)(abortVolumeMigration(desired).pipe(Effect.provide(context))),
       retire: (desired: DesiredVolume) =>
         lifecycle.withPermits(1)(retireAppVolume(desired).pipe(Effect.provide(context))),
       reclaim: (retainedApps: ReadonlySet<AppId>) =>

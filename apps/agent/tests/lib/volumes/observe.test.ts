@@ -245,6 +245,8 @@ describe('observation on a selected live filesystem', () => {
                   Layer.succeed(
                     AppZerofs,
                     AppZerofs.make({
+                      abortMigration: () =>
+                        Effect.die('Normal lifecycle must not abort a migration.'),
                       prepareMigration: () =>
                         Effect.die('Observation must not prepare a migration.'),
                       reclaim: () => Effect.die('observation must not reclaim ZeroFS files'),

@@ -67,7 +67,10 @@ export function appZerofsLifecycleHost() {
       | 'cache-remove'
       | 'config-remove'
       | 'data-mount'
+      | 'device-state'
+      | 'config-sync'
     >();
+    const source: { size: number | undefined } = { size: undefined };
     const state = { attached: true, allocated: true, image: true, running: true, mounted: true };
     const slot = describeSlot({ slot: FIRST_SLOT, appId: APP_ID });
     const target = {
@@ -91,7 +94,10 @@ export function appZerofsLifecycleHost() {
       return Effect.void;
     }
     const files = FileSystem.layerNoop({
-      exists: (name) => Effect.succeed(persisted.has(name)),
+      exists: (name) =>
+        Effect.succeed(
+          [...persisted.keys()].some((file) => file === name || file.startsWith(`${name}/`)),
+        ),
       readDirectory: (directory) =>
         Effect.succeed([
           ...new Set(
@@ -100,15 +106,31 @@ export function appZerofsLifecycleHost() {
               .map((name) => name.slice(directory.length + 1).split('/')[0] ?? ''),
           ),
         ]),
-      stat: (name) =>
-        Effect.succeed({
+      stat: (name) => {
+        if (
+          [dirname(paths.configFile), paths.cacheDirectory].includes(name) &&
+          ![...persisted.keys()].some((file) => file.startsWith(`${name}/`))
+        ) {
+          return Effect.fail(missing('stat'));
+        }
+        return Effect.succeed({
           ...info,
           dev:
             name === AGENT_CONFIG.zerofsMount || (name === paths.mountPath && state.mounted)
               ? info.dev + 1
               : info.dev,
-        }),
+        });
+      },
       readFileString: (name) => {
+        if (name === '/sys/block/nbd0/pid' && faults.has('device-state')) {
+          return Effect.fail(
+            new SystemError({
+              module: 'FileSystem',
+              method: 'readFileString',
+              reason: 'PermissionDenied',
+            }),
+          );
+        }
         const attrs: Record<string, string | undefined> = {
           '/sys/block/nbd0/pid': state.attached ? '123\n' : undefined,
           '/proc/123/cmdline': process.cmdline,
@@ -119,12 +141,15 @@ export function appZerofsLifecycleHost() {
       },
       makeDirectory: () => Effect.void,
       chmod: () => Effect.void,
-      open: () =>
+      open: (name) =>
         Effect.succeed({
           ...syncFile,
           sync: Effect.gen(function* () {
             events.push('sync');
-            if (faults.has('sync')) {
+            if (
+              faults.has('sync') ||
+              (faults.has('config-sync') && name === dirname(dirname(paths.configFile)))
+            ) {
               return yield* new SystemError({
                 module: 'FileSystem',
                 method: 'sync',
@@ -241,7 +266,10 @@ export function appZerofsLifecycleHost() {
       AppVolumeFiles,
       AppVolumeFiles.make({
         ensure: () => Effect.die('retirement must not create an image'),
-        size: () => Effect.die('retirement must not inspect image size'),
+        size: ({ mountPath }) =>
+          mountPath === AGENT_CONFIG.zerofsMount
+            ? Effect.succeed(Option.fromNullable(source.size))
+            : Effect.die('cleanup must not inspect the destination image'),
         remove: () =>
           Effect.sync(() => {
             state.image = false;
@@ -276,6 +304,18 @@ export function appZerofsLifecycleHost() {
         ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provideMerge(dependencies)),
       ),
     );
-    return { desired, paths, receipt, contents, persisted, events, faults, state, commands, layer };
+    return {
+      desired,
+      paths,
+      receipt,
+      contents,
+      persisted,
+      events,
+      faults,
+      state,
+      source,
+      commands,
+      layer,
+    };
   });
 }
