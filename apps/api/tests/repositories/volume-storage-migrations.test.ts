@@ -694,7 +694,9 @@ test.each(['pending', 'preparing', 'ready', 'failed'] as const)(
       ownerId: OWNER_ID,
       expiresAt: new Date(Date.now() + EXPORT_RETENTION_MS),
     });
+    await desiredVolumes();
     await exports.applyReport({
+      hostId: HOST_ID,
       reported: [
         {
           exportId: bundle!.id,
