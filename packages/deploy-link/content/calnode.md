@@ -16,3 +16,7 @@ domain, update `BASE_URL` to its full HTTPS URL and update any registered OAuth 
 
 The standalone release does not bundle Litestream: setting `LITESTREAM_REPLICA_URL` alone does
 not enable database backups or restore.
+
+The preset trusts nibrun's loopback proxy for forwarded client addresses. Visitors routed through
+the same Cloudflare edge address can still share rate limits because nibrun's proxy does not
+preserve the original visitor address in the forwarded chain.
