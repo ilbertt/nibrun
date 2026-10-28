@@ -2,19 +2,27 @@ import { text } from '@clack/prompts';
 import type { InferOptions } from '@parshjs/core';
 import type { PaidRequest, PaidRequestType } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
+import { unwrap } from '@repo/api-client/unwrap';
 import { MAX_PAID_APPS_REQUEST, MIN_PAID_APPS_REQUEST } from '@repo/api-constants';
+import { currentPaidResourceAmounts } from '@repo/app-operations';
 import { z } from 'zod';
 import type { command } from '#commands/paid-request.ts';
 import { PROGRAM_NAME, SHARED_OPTIONS } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';
 import { defineOutput } from '#lib/output.ts';
+import {
+  completePaidResourceAmounts,
+  PAID_RESOURCE_AMOUNTS_SCHEMA,
+  PAID_RESOURCE_OPTIONS_SCHEMA,
+} from '#lib/paid-resource-requests.ts';
 import { answered } from '#lib/prompts.ts';
 
 const REQUEST_TYPES = [
   'apps',
   'custom-bucket',
   'always-on',
+  'resources',
 ] as const satisfies readonly PaidRequestType[];
 type CliPaidRequestType = (typeof REQUEST_TYPES)[number];
 
@@ -23,6 +31,7 @@ export const PAID_REQUEST_TYPE_SCHEMA = z.enum(REQUEST_TYPES, {
 });
 
 export const APP_PAID_REQUEST_TYPE_SCHEMA = PAID_REQUEST_TYPE_SCHEMA.exclude(['apps']);
+const AppFeatureRequestTypeSchema = APP_PAID_REQUEST_TYPE_SCHEMA.exclude(['resources']);
 
 export const REQUESTED_APPS_AMOUNT_FLAG = 'requested-apps-amount';
 
@@ -38,8 +47,13 @@ const PaidRequestOptionsSchema = z.discriminatedUnion('type', [
     [REQUESTED_APPS_AMOUNT_FLAG]: REQUESTED_APPS_AMOUNT_SCHEMA.optional(),
   }),
   z.strictObject({
-    type: APP_PAID_REQUEST_TYPE_SCHEMA,
+    type: AppFeatureRequestTypeSchema,
     [SHARED_OPTIONS.app.name]: SHARED_OPTIONS.app.option.schema,
+  }),
+  z.strictObject({
+    type: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum.resources),
+    [SHARED_OPTIONS.app.name]: SHARED_OPTIONS.app.option.schema,
+    ...PAID_RESOURCE_OPTIONS_SCHEMA.shape,
   }),
 ]);
 
@@ -52,7 +66,11 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
       requestedAppsAmount: REQUESTED_APPS_AMOUNT_SCHEMA,
     }),
     z.object({
-      requestType: APP_PAID_REQUEST_TYPE_SCHEMA,
+      requestType: AppFeatureRequestTypeSchema,
+      appId: z.string(),
+    }),
+    PAID_RESOURCE_AMOUNTS_SCHEMA.safeExtend({
+      requestType: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum.resources),
       appId: z.string(),
     }),
   ]),
@@ -64,12 +82,18 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
       );
       return;
     }
-    const requestedFeature =
-      value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum['always-on']
-        ? `keep app ${value.appId} always on`
-        : `use your own S3-compatible bucket for app ${value.appId}`;
+    if (value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum.resources) {
+      out.success(
+        `Thanks! We recorded your request for ${value.requestedVcpuCount} vCPUs, ${value.requestedMemoryMib} MiB RAM, and ${value.requestedVolumeGib} GiB volume in total for app ${value.appId}. This does not resize the app or charge you.`,
+      );
+      return;
+    }
+    const requestedFeatures = {
+      'always-on': `keep app ${value.appId} always on`,
+      'custom-bucket': `use your own S3-compatible bucket for app ${value.appId}`,
+    } satisfies Record<z.infer<typeof AppFeatureRequestTypeSchema>, string>;
     out.success(
-      `Thanks! We recorded your request to ${requestedFeature}. This does not enable the feature or charge you.`,
+      `Thanks! We recorded your request to ${requestedFeatures[value.requestType]}. This does not enable the feature or charge you.`,
     );
   },
 });
@@ -109,6 +133,18 @@ export async function completePaidRequest({
     name: parsed.data[SHARED_OPTIONS.app.name],
     interactive,
   });
+  if (parsed.data.type === PAID_REQUEST_TYPE_SCHEMA.enum.resources) {
+    const selected = unwrap(await api.api.apps({ appId: app.id }).get());
+    return {
+      requestType: parsed.data.type,
+      appId: app.id,
+      ...(await completePaidResourceAmounts({
+        options: parsed.data,
+        interactive,
+        current: currentPaidResourceAmounts(selected.config),
+      })),
+    };
+  }
   return { requestType: parsed.data.type, appId: app.id };
 }
 

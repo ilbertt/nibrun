@@ -11,5 +11,6 @@ export { MCP_TOOL_NAMES } from '#mcp-tool-names.ts';
 export {
   APP_QUOTA_EXCEEDED_CODE,
   MAX_PAID_APPS_REQUEST,
+  MAX_PAID_RESOURCE_AMOUNT,
   MIN_PAID_APPS_REQUEST,
 } from '#paid-requests.ts';

@@ -1,15 +1,22 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test';
+import { MAX_PAID_RESOURCE_AMOUNT } from '@repo/api-constants';
 import { StatusMap } from 'elysia';
 import { AppQuotaExceededError } from '#lib/app-quota.ts';
 import { NotFoundError } from '#lib/errors.ts';
 import { registeredAccount } from '#tests/controllers/support/accounts.ts';
 import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
-import { APP_PAID_REQUESTS, CUSTOM_BUCKET_REQUEST } from '#tests/support/paid-requests.ts';
+import {
+  APP_PAID_REQUESTS,
+  CUSTOM_BUCKET_REQUEST,
+  paidRequestBody,
+  RESOURCES_REQUEST,
+} from '#tests/support/paid-requests.ts';
 
 const { auth, AppsServicePlugin, PaidRequestsServicePlugin } = await import('#services/plugins.ts');
 const URL = `${ORIGIN}/api/paid-requests`;
 const REQUEST = { requestType: 'apps' as const, requestedAppsAmount: 10 };
 const APPS_ALLOWED = 3;
+const FRACTIONAL_RESOURCE_AMOUNT = 1.5;
 
 afterEach(function restoreMocks() {
   mock.restore();
@@ -21,7 +28,9 @@ test.each(['apps', ...APP_PAID_REQUESTS.map((request) => request.requestType)])(
     const body =
       requestType === 'apps'
         ? { requestedAppsAmount: REQUEST.requestedAppsAmount }
-        : { appId: CUSTOM_BUCKET_REQUEST.appId };
+        : paidRequestBody(
+            APP_PAID_REQUESTS.find((request) => request.requestType === requestType)!,
+          );
     expect(
       (
         await sendJson({
@@ -57,7 +66,7 @@ test.each(APP_PAID_REQUESTS)(
     const response = await sendJson({
       method: 'PUT',
       url: `${URL}/${request.requestType}`,
-      body: { appId: request.appId },
+      body: paidRequestBody(request),
       headers: { cookie: account.cookie },
     });
     expect(response.status).toBe(StatusMap.OK);
@@ -76,9 +85,9 @@ test.each(APP_PAID_REQUESTS)(
       { appId: null },
       { appId: '' },
       { appId: 123 },
-      { appId: CUSTOM_BUCKET_REQUEST.appId, requestedAppsAmount: 10 },
-      { appId: CUSTOM_BUCKET_REQUEST.appId, ownerId: 'someone-else' },
-      { appId: CUSTOM_BUCKET_REQUEST.appId, bucket: 'customer-data', secretAccessKey: 'private' },
+      { ...paidRequestBody(request), requestedAppsAmount: 10 },
+      { ...paidRequestBody(request), ownerId: 'someone-else' },
+      { ...paidRequestBody(request), bucket: 'customer-data', secretAccessKey: 'private' },
     ]) {
       const response = await sendJson({
         method: 'PUT',
@@ -102,7 +111,7 @@ test.each(APP_PAID_REQUESTS)(
     const response = await sendJson({
       method: 'PUT',
       url: `${URL}/${request.requestType}`,
-      body: { appId: CUSTOM_BUCKET_REQUEST.appId },
+      body: paidRequestBody(request),
       headers: { cookie: account.cookie },
     });
     expect(response.status).toBe(StatusMap['Not Found']);
@@ -123,6 +132,48 @@ test('saving a request uses the authenticated owner', async () => {
   expect(saved.status).toBe(StatusMap.OK);
   expect(await saved.json()).toEqual(REQUEST);
   expect(save).toHaveBeenCalledWith({ ownerId: account.ownerId, request: REQUEST });
+});
+
+test.each(['requestedVcpuCount', 'requestedMemoryMib', 'requestedVolumeGib'])(
+  'resource requests validate %s as a required positive whole total',
+  async (field) => {
+    const account = await registeredAccount();
+    const save = spyOn(PaidRequestsServicePlugin.decorator.paidRequestsService, 'save');
+    for (const amount of [
+      undefined,
+      null,
+      0,
+      -1,
+      FRACTIONAL_RESOURCE_AMOUNT,
+      '1',
+      MAX_PAID_RESOURCE_AMOUNT + 1,
+    ]) {
+      const response = await sendJson({
+        method: 'PUT',
+        url: `${URL}/resources`,
+        body: { ...paidRequestBody(RESOURCES_REQUEST), [field]: amount },
+        headers: { cookie: account.cookie },
+      });
+      expect(response.status).toBe(StatusMap['Bad Request']);
+    }
+    expect(save).not.toHaveBeenCalled();
+  },
+);
+
+test('all-zero resource amounts return a client error', async () => {
+  const account = await registeredAccount();
+  const response = await sendJson({
+    method: 'PUT',
+    url: `${URL}/resources`,
+    body: {
+      appId: RESOURCES_REQUEST.appId,
+      requestedVcpuCount: 0,
+      requestedMemoryMib: 0,
+      requestedVolumeGib: 0,
+    },
+    headers: { cookie: account.cookie },
+  });
+  expect(response.status).toBe(StatusMap['Bad Request']);
 });
 
 test('the API refuses unsupported types, invalid totals and owner spoofing', async () => {

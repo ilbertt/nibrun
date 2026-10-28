@@ -25,6 +25,13 @@ export class PaidRequestsService extends Service {
       ...(row.request_type === 'apps'
         ? { requestedAppsAmount: row.requested_apps_amount }
         : { appId: row.app_id }),
+      ...(row.request_type === 'resources'
+        ? {
+            requestedVcpuCount: row.requested_vcpu_count,
+            requestedMemoryMib: row.requested_memory_mib,
+            requestedVolumeGib: row.requested_volume_gib,
+          }
+        : {}),
     });
   }
 }

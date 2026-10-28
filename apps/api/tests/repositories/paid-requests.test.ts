@@ -12,7 +12,12 @@ import {
   PaidRequestsRepository,
 } from '#repositories/paid-requests.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
-import { APP_PAID_REQUESTS, CUSTOM_BUCKET_REQUEST } from '#tests/support/paid-requests.ts';
+import {
+  APP_PAID_REQUESTS,
+  CUSTOM_BUCKET_REQUEST,
+  paidRequestRow,
+  RESOURCES_REQUEST,
+} from '#tests/support/paid-requests.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'paid-owner');
@@ -53,7 +58,8 @@ function repository() {
 
 async function savedRequests(ownerId: OwnerId): Promise<PaidRequestRow[]> {
   return (await sql.unsafe(
-    'SELECT request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1',
+    `SELECT request_type, requested_apps_amount, app_id, requested_vcpu_count,
+       requested_memory_mib, requested_volume_gib FROM nibrun.paid_requests WHERE owner_id = $1`,
     [ownerId],
   )) as PaidRequestRow[];
 }
@@ -66,12 +72,13 @@ test('the upgrade preserves valid requests and requires app IDs for app features
       '0067_paid_requests.sql',
       '0069_custom_bucket_paid_requests.sql',
       '0070_bucket_requests_name_an_app.sql',
+      '0075_always_on_paid_requests.sql',
     ]) {
       await transaction.unsafe(await migrations.get(name)!.text());
     }
     await transaction.unsafe(
       `INSERT INTO nibrun.paid_requests (owner_id, request_type, requested_apps_amount, app_id)
-       VALUES ($1, 'apps', 10, NULL), ($1, 'custom-bucket', NULL, $2)`,
+       VALUES ($1, 'apps', 10, NULL), ($1, 'custom-bucket', NULL, $2), ($1, 'always-on', NULL, $2)`,
       [OWNER_ID, CUSTOM_BUCKET_REQUEST.appId],
     );
     const before = await transaction.unsafe<
@@ -80,7 +87,7 @@ test('the upgrade preserves valid requests and requires app IDs for app features
       'SELECT id, request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
       [OWNER_ID],
     );
-    await transaction.unsafe(await migrations.get('0075_always_on_paid_requests.sql')!.text());
+    await transaction.unsafe(await migrations.get('0076_resources_paid_requests.sql')!.text());
     const after = await transaction.unsafe(
       'SELECT id, request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
       [OWNER_ID],
@@ -121,11 +128,9 @@ test('repeated and concurrent submissions keep one latest request per owner and 
   );
   expect(before.created_at).toBeInstanceOf(Date);
   const updated = { ...request, requestedAppsAmount: 100 };
-  expect(await repository().save({ ownerId: OWNER_ID, request: updated })).toEqual({
-    request_type: 'apps',
-    requested_apps_amount: updated.requestedAppsAmount,
-    app_id: null,
-  });
+  expect(await repository().save({ ownerId: OWNER_ID, request: updated })).toEqual(
+    paidRequestRow(updated),
+  );
   const [after] = await sql.unsafe(
     'SELECT id, created_at, updated_at FROM nibrun.paid_requests WHERE owner_id = $1',
     [OWNER_ID],
@@ -133,9 +138,7 @@ test('repeated and concurrent submissions keep one latest request per owner and 
   expect(after.id).toBe(before.id);
   expect(after.created_at).toEqual(before.created_at);
   expect(after.updated_at.getTime()).toBeGreaterThanOrEqual(before.updated_at.getTime());
-  expect(await savedRequests(OWNER_ID)).toEqual([
-    { request_type: 'apps', requested_apps_amount: updated.requestedAppsAmount, app_id: null },
-  ]);
+  expect(await savedRequests(OWNER_ID)).toEqual([paidRequestRow(updated)]);
 });
 
 test('another owner’s submission cannot overwrite the first owner’s request', async () => {
@@ -147,7 +150,7 @@ test('another owner’s submission cannot overwrite the first owner’s request'
   });
   expect(await savedRequests(OWNER_ID)).toEqual(first);
   expect(await savedRequests(OTHER_OWNER_ID)).toEqual([
-    { request_type: 'apps', requested_apps_amount: 1, app_id: null },
+    paidRequestRow({ requestType: 'apps', requestedAppsAmount: 1 }),
   ]);
 });
 
@@ -216,11 +219,7 @@ test.each(APP_PAID_REQUESTS)(
   async (request) => {
     const before = await savedRequests(OWNER_ID);
     const otherBefore = await savedRequests(OTHER_OWNER_ID);
-    const expected: PaidRequestRow = {
-      request_type: request.requestType,
-      requested_apps_amount: null,
-      app_id: request.appId,
-    };
+    const expected = paidRequestRow(request);
     const [first, repeated] = await Promise.all([
       repository().save({ ownerId: OWNER_ID, request }),
       repository().save({ ownerId: OWNER_ID, request }),
@@ -261,11 +260,9 @@ test.each(APP_PAID_REQUESTS)(
   '$requestType requests for two apps owned by the same account are retained independently',
   async (featureRequest) => {
     const request = { ...featureRequest, appId: SECOND_APP_ID };
-    expect(await repository().save({ ownerId: OWNER_ID, request })).toEqual({
-      request_type: request.requestType,
-      requested_apps_amount: null,
-      app_id: SECOND_APP_ID,
-    });
+    expect(await repository().save({ ownerId: OWNER_ID, request })).toEqual(
+      paidRequestRow(request),
+    );
     const requests = (await savedRequests(OWNER_ID)).filter(
       (row) => row.request_type === request.requestType,
     );
@@ -289,6 +286,50 @@ test.each(APP_PAID_REQUESTS)(
       ).toBeNull();
     }
     expect(await savedRequests(OWNER_ID)).toEqual(before);
+  },
+);
+
+test('resubmitting resource amounts replaces the previous amounts on the same request', async () => {
+  const [before] = await sql.unsafe(
+    `SELECT id FROM nibrun.paid_requests WHERE owner_id = $1 AND request_type = 'resources' AND app_id = $2`,
+    [OWNER_ID, RESOURCES_REQUEST.appId],
+  );
+  const request = {
+    ...RESOURCES_REQUEST,
+    requestedVcpuCount: RESOURCES_REQUEST.requestedVcpuCount,
+    requestedMemoryMib: 1_024,
+    requestedVolumeGib: RESOURCES_REQUEST.requestedVolumeGib,
+  };
+  expect(await repository().save({ ownerId: OWNER_ID, request })).toEqual(paidRequestRow(request));
+  const [after] = await sql.unsafe(
+    `SELECT id FROM nibrun.paid_requests WHERE owner_id = $1 AND request_type = 'resources' AND app_id = $2`,
+    [OWNER_ID, RESOURCES_REQUEST.appId],
+  );
+  expect(after.id).toBe(before.id);
+  expect(await savedRequests(OWNER_ID)).toContainEqual(paidRequestRow(request));
+});
+
+test.each(['requested_vcpu_count', 'requested_memory_mib', 'requested_volume_gib'])(
+  'database constraints require %s only for resources requests',
+  async (column) => {
+    for (const amount of [null, 0, -1]) {
+      await expect(
+        sql
+          .unsafe(
+            `UPDATE nibrun.paid_requests SET ${column} = $1 WHERE owner_id = $2 AND request_type = 'resources'`,
+            [amount, OWNER_ID],
+          )
+          .execute(),
+      ).rejects.toMatchObject({ errno: '23514' });
+    }
+    await expect(
+      sql
+        .unsafe(
+          `UPDATE nibrun.paid_requests SET ${column} = 1 WHERE owner_id = $1 AND request_type <> 'resources'`,
+          [OWNER_ID],
+        )
+        .execute(),
+    ).rejects.toMatchObject({ errno: '23514' });
   },
 );
 
