@@ -843,9 +843,9 @@ async function createApp({
       [app.id],
     );
     await sql.unsafe(
-      `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state)
-       VALUES ($1, $2, $3, 'running')`,
-      [app.id, artifact.id, config.id],
+      `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state, host_id)
+       VALUES ($1, $2, $3, 'running', $4)`,
+      [app.id, artifact.id, config.id, HOST_ID],
     );
   }
   return Value.Parse(AppIdSchema, app.id);

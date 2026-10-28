@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { SQL } from 'bun';
 import { getMigrations } from '#lib/assets.ts';
+import { seedReadyHost } from '#tests/support/hosts.ts';
 
 const COMPOSE_FILE = resolve(import.meta.dir, '..', '..', '..', '..', 'docker-compose.test.yml');
 
@@ -31,6 +32,7 @@ export async function startTestDatabase(): Promise<SQL> {
   for (const [, file] of getMigrations()) {
     await sql.unsafe(await file.text());
   }
+  await seedReadyHost(sql);
   return sql;
 }
 

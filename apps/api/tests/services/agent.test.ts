@@ -10,7 +10,7 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { AgentSessions } from '#lib/agent/sessions.ts';
-import { ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
+import { ConflictError, ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
 import {
   AgentService,
@@ -30,6 +30,7 @@ const SESSION_REQUEST = Value.Parse(AgentSessionRequestSchema, {
 class FakeAgentRepository implements AgentRepositoryContract {
   readonly registeredOrigins: string[] = [];
   readonly hosts = new Map<string, HostId>();
+  unplaced = false;
   readonly #sessions = new AgentSessions();
   observed: HostObservation | undefined;
   sessionExpiresAt: Date | undefined;
@@ -62,6 +63,10 @@ class FakeAgentRepository implements AgentRepositoryContract {
 
   hostForSession({ sessionToken }: { sessionToken: string }): Promise<HostId | undefined> {
     return Promise.resolve(this.#sessions.hostFor({ sessionToken, now: new Date() }));
+  }
+
+  hasUnplacedDeployments(): Promise<boolean> {
+    return Promise.resolve(this.unplaced);
   }
 
   desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
@@ -205,6 +210,14 @@ function build() {
 }
 
 describe('a session is the identity a host is answered as', () => {
+  test('unassigned existing deployments refuse a poll without returning an empty workload', async () => {
+    const { service, agentRepo } = build();
+    agentRepo.unplaced = true;
+    await expect(
+      service.desiredState({ hostId: Value.Parse(HostIdSchema, 'existing-host') }),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
   test('an origin identity and its returned canonical id renew the same host', async () => {
     const { service, agentRepo } = build();
     const hostId = Value.Parse(HostIdSchema, 'host-of-record');
@@ -260,8 +273,8 @@ describe('a session is held for the lifetime its host was told about', () => {
 describe('a host is told the whole of what it should be running', () => {
   // Desired state carries no host id of its own, so a host can only ever be told about itself.
   test('and told it about itself', async () => {
-    const { service } = build();
     const hostId = Value.Parse(HostIdSchema, 'host-1');
+    const { service } = build();
 
     expect(await service.desiredState({ hostId })).toEqual({
       hostId,
