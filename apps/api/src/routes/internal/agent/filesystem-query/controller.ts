@@ -43,13 +43,11 @@ export const AgentFilesystemQueryController = new Elysia()
     agentRoutePath(AGENT_ROUTES.filesystemQuery),
     async ({ agentService, filesystemService, body, headers, request }) => {
       assertProtocolVersion(headers);
-      // Resolved and discarded: nothing below needs the host id, but an expired session must not
-      // be able to collect another tenant's query. Decided before the wait, so a session that
-      // expires while a host is parked is caught on the poll after this one and not this one.
-      await agentService.hostForSession({ sessionToken: sessionTokenFrom(headers) });
+      const hostId = await agentService.hostForSession({ sessionToken: sessionTokenFrom(headers) });
 
       const query = await filesystemService.pendingQuery({
         servedAppIds: body.servedAppIds,
+        hostId,
         signal: AbortSignal.any([request.signal, AbortSignal.timeout(HOLD_MS)]),
       });
       return query ? { result: 'query' as const, query } : { result: 'none' as const };

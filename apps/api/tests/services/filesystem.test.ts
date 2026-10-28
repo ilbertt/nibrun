@@ -2,15 +2,17 @@ import { describe, expect, test } from 'bun:test';
 import {
   type AppId,
   AppIdSchema,
+  DeploymentIdSchema,
   type DirectoryListing,
   type FilesystemQuery,
   GUEST_PATH_ROOT,
   type GuestPath,
   GuestPathSchema,
+  HostIdSchema,
   TimestampSchema,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
+import { BadGatewayError, ConflictError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import type { DeploymentRow } from '#repositories/deployments.repository.ts';
 import { FilesystemService } from '#services/filesystem.service.ts';
 import {
@@ -21,7 +23,10 @@ import {
   OTHER_OWNER_ID,
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
+import { deploymentHostsRepository } from '#tests/support/deployment-hosts.ts';
 
+const HOST_ID = Value.Parse(HostIdSchema, 'host-1');
+const OTHER_HOST_ID = Value.Parse(HostIdSchema, 'host-2');
 const OTHER_APP = Value.Parse(AppIdSchema, 'app-somebody-else');
 const DATA = Value.Parse(GuestPathSchema, '/pb_data');
 
@@ -45,7 +50,15 @@ const LISTING: DirectoryListing = {
 
 function service({ row = A_DEPLOYMENT_ROW }: { row?: DeploymentRow | null } = {}) {
   const deploymentsRepo = deploymentLookupRepository(row);
-  return { deploymentsRepo, filesystemService: new FilesystemService({ deploymentsRepo }) };
+  const deploymentHostsRepo = deploymentHostsRepository({
+    hostId: HOST_ID,
+    deploymentId: DEPLOYMENT_ID,
+  });
+  return {
+    deploymentsRepo,
+    deploymentHostsRepo,
+    filesystemService: new FilesystemService({ deploymentsRepo, deploymentHostsRepo }),
+  };
 }
 
 /**
@@ -85,7 +98,11 @@ function handedTo({
   filesystemService: FilesystemService;
   servedAppIds?: readonly AppId[];
 }) {
-  return filesystemService.pendingQuery({ servedAppIds, signal: AbortSignal.abort() });
+  return filesystemService.pendingQuery({
+    hostId: HOST_ID,
+    servedAppIds,
+    signal: AbortSignal.abort(),
+  });
 }
 
 /**
@@ -101,7 +118,7 @@ function polling({
   servedAppIds?: readonly AppId[];
   signal?: AbortSignal;
 }) {
-  return filesystemService.pendingQuery({ servedAppIds, signal });
+  return filesystemService.pendingQuery({ hostId: HOST_ID, servedAppIds, signal });
 }
 
 /** The ownership lookup is awaited first, because a read is only offered once somebody waits on it. */
@@ -118,6 +135,68 @@ async function claimed(filesystemService: FilesystemService): Promise<Filesystem
   return query;
 }
 
+test('a host cannot claim or answer another hosts directory read', async () => {
+  const { filesystemService } = service();
+  const listing = read({ filesystemService });
+  await Bun.sleep(0);
+  expect(
+    await filesystemService.pendingQuery({
+      hostId: OTHER_HOST_ID,
+      servedAppIds: [APP_ID],
+      signal: AbortSignal.abort(),
+    }),
+  ).toBeUndefined();
+  const query = await claimed(filesystemService);
+  filesystemService.acceptResult({
+    hostId: OTHER_HOST_ID,
+    queryId: query.queryId,
+    outcome: { status: 'listed', listing: LISTING },
+  });
+  expect(Bun.peek.status(listing)).toBe('pending');
+  filesystemService.acceptResult({
+    hostId: HOST_ID,
+    queryId: query.queryId,
+    outcome: { status: 'listed', listing: LISTING },
+  });
+  expect(await listing).toEqual(LISTING);
+});
+
+test('an app without an assigned host is refused before a directory query is offered', async () => {
+  const { filesystemService, deploymentHostsRepo } = service();
+  deploymentHostsRepo.currentForApp = function unplaced() {
+    return Promise.resolve(null);
+  };
+  await expect(read({ filesystemService })).rejects.toBeInstanceOf(ConflictError);
+  expect(await handedTo({ filesystemService })).toBeUndefined();
+});
+
+test('reads from different executions do not coalesce after an app returns to the same host', async () => {
+  const { filesystemService, deploymentHostsRepo } = service();
+  const first = read({ filesystemService });
+  const originalQuery = await claimed(filesystemService);
+  deploymentHostsRepo.currentForApp = function reassigned() {
+    return Promise.resolve({
+      host_id: HOST_ID,
+      deployment_id: Value.Parse(DeploymentIdSchema, 'new-execution'),
+    });
+  };
+  const second = read({ filesystemService });
+  const currentQuery = await claimed(filesystemService);
+  expect(currentQuery.queryId).not.toBe(originalQuery.queryId);
+  filesystemService.acceptResult({
+    hostId: HOST_ID,
+    queryId: originalQuery.queryId,
+    outcome: { status: 'listed', listing: LISTING },
+  });
+  expect(Bun.peek.status(second)).toBe('pending');
+  filesystemService.acceptResult({
+    hostId: HOST_ID,
+    queryId: currentQuery.queryId,
+    outcome: { status: 'listed', listing: LISTING },
+  });
+  await Promise.all([first, second]);
+});
+
 describe('a read waits for the host that holds the volume', () => {
   test('nothing is offered to a host until somebody asks for something', async () => {
     const { filesystemService } = service();
@@ -131,6 +210,7 @@ describe('a read waits for the host that holds the volume', () => {
     const query = await claimed(filesystemService);
 
     filesystemService.acceptResult({
+      hostId: HOST_ID,
       queryId: query.queryId,
       outcome: { status: 'listed', listing: LISTING },
     });
@@ -148,6 +228,7 @@ describe('a read waits for the host that holds the volume', () => {
     const secondQuery = await claimed(filesystemService);
 
     filesystemService.acceptResult({
+      hostId: HOST_ID,
       queryId: secondQuery.queryId,
       outcome: { status: 'listed', listing: LISTING },
     });
@@ -195,6 +276,7 @@ describe('people looking at the same directory wait on one read', () => {
     const query = await claimed(filesystemService);
 
     filesystemService.acceptResult({
+      hostId: HOST_ID,
       queryId: query.queryId,
       outcome: { status: 'listed', listing: LISTING },
     });
@@ -213,6 +295,7 @@ describe('people looking at the same directory wait on one read', () => {
 
     expect(await offered(filesystemService)).toBeUndefined();
     filesystemService.acceptResult({
+      hostId: HOST_ID,
       queryId: query.queryId,
       outcome: { status: 'listed', listing: LISTING },
     });
@@ -241,6 +324,7 @@ describe('people looking at the same directory wait on one read', () => {
     giveUp.abort();
     await expect(leaving).rejects.toThrow(GatewayTimeoutError);
     filesystemService.acceptResult({
+      hostId: HOST_ID,
       queryId: query.queryId,
       outcome: { status: 'listed', listing: LISTING },
     });
@@ -338,6 +422,7 @@ describe('a read that gets no usable answer says so rather than hanging', () => 
     const query = await claimed(filesystemService);
 
     filesystemService.acceptResult({
+      hostId: HOST_ID,
       queryId: query.queryId,
       outcome: { status: 'failed', message: UNREADABLE_DEVICE },
     });
@@ -352,6 +437,7 @@ describe('a read that gets no usable answer says so rather than hanging', () => 
     const query = await claimed(filesystemService);
 
     filesystemService.acceptResult({
+      hostId: HOST_ID,
       queryId: query.queryId,
       outcome: { status: 'failed', message: UNREADABLE_DEVICE },
     });
@@ -390,6 +476,7 @@ describe('a read that gets no usable answer says so rather than hanging', () => 
 
     expect(() =>
       filesystemService.acceptResult({
+        hostId: HOST_ID,
         queryId: 'query-nobody-asked-for' as never,
         outcome: { status: 'listed', listing: LISTING },
       }),
