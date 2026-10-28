@@ -1,6 +1,9 @@
 import type { AppId } from '@repo/protocol';
 import { Deferred, Effect, Either, Option, Ref } from 'effect';
-import { VolumeMigrationFenceBusy } from '#lib/volumes/volume-migration-fence.ts';
+import {
+  VolumeMigrationFenceBusy,
+  VolumeMigrationFenceRequired,
+} from '#lib/volumes/volume-migration-fence.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 
 type Entry = {
@@ -146,7 +149,16 @@ export class VolumeMigrationFences extends Effect.Service<VolumeMigrationFences>
         );
       }
 
-      return { access, during };
+      function requireHeld(appId: AppId) {
+        return Effect.flatMap(Ref.get(entries), (current) => {
+          const entry = current.get(appId);
+          return entry?.held && entry.active === 0
+            ? Effect.void
+            : Effect.fail(new VolumeMigrationFenceRequired());
+        });
+      }
+
+      return { access, during, requireHeld };
     }),
     dependencies: [AgentState.Default],
   },

@@ -12,6 +12,7 @@ import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
 import { AppZerofs } from '#services/app-zerofs.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
+import { VolumeMigrationFences } from '#services/volume-migration-fences.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { AGENT_CONFIG, agentConfig } from '#tests/support/config.ts';
@@ -267,6 +268,7 @@ export function appZerofsLifecycleHost() {
       allocator,
       images,
       nbd,
+      VolumeMigrationFences.Default,
       Layer.succeed(Path.Path, path),
     );
     const layer = AppZerofs.DefaultWithoutDependencies.pipe(

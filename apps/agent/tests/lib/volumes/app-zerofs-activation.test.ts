@@ -14,10 +14,11 @@ import { AppVolumeFiles } from '#services/app-volume-files.service.ts';
 import { AppVolumeNbd } from '#services/app-volume-nbd.service.ts';
 import { AppZerofs } from '#services/app-zerofs.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
+import { VolumeMigrationFences } from '#services/volume-migration-fences.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { AGENT_CONFIG, agentConfig } from '#tests/support/config.ts';
-import { APP_ID, desiredVolume, VOLUME_ID } from '#tests/support/fixtures.ts';
+import { APP_ID, desiredVolume, VOLUME_ID, VOLUME_SIZE_BYTES } from '#tests/support/fixtures.ts';
 import { platform, provided, runScoped, temporaryDirectory } from '#tests/support/run.ts';
 import { s3Storage } from '#tests/support/s3-storage.ts';
 import { systemdUnitProperties as unit } from '#tests/support/systemd.ts';
@@ -60,6 +61,7 @@ function host({
     config,
     commands.layer,
     files.layer,
+    VolumeMigrationFences.Default,
     ZerofsTopology.DefaultWithoutDependencies.pipe(Layer.provide(config)),
   );
 }
@@ -144,7 +146,11 @@ function configuredHost({
             AppVolumeFiles,
             AppVolumeFiles.make({
               ensure: () => Effect.die('activation must not create images'),
-              size: () => Effect.die('activation must not inspect images'),
+              size: ({ mountPath, volumeId }) => {
+                expect(mountPath).toBe(AGENT_CONFIG.zerofsMount);
+                expect(volumeId).toBe(VOLUME_ID);
+                return Effect.succeed(sharedImage ? Option.some(VOLUME_SIZE_BYTES) : Option.none());
+              },
               remove: () => Effect.die('activation must not remove images'),
             }),
           ),
@@ -164,6 +170,104 @@ function configuredHost({
 
 describe('activation from configured desired volumes', () => {
   const run = provided(platform);
+
+  test('migration preparation requires a fence and preserves shared storage without allocating or attaching', () =>
+    run(
+      Effect.gen(function* () {
+        const stage = yield* configuredHost({ sharedImage: true });
+        yield* Effect.gen(function* () {
+          const app = yield* AppZerofs;
+          const fences = yield* VolumeMigrationFences;
+          const topology = yield* ZerofsTopology;
+          const desired = desiredVolume({ storage: s3Storage() });
+          expect(yield* Effect.isFailure(app.prepareMigration(desired))).toBe(true);
+          expect(stage.commands.commands).toEqual([]);
+          yield* fences.during({
+            appId: APP_ID,
+            effect: Effect.gen(function* () {
+              const prepared = yield* app.prepareMigration(desired);
+              expect(prepared.source).toEqual(topology.place());
+              expect(prepared.volumeId).toBe(VOLUME_ID);
+              expect(prepared.sizeBytes).toBe(VOLUME_SIZE_BYTES);
+              expect(prepared.destination).toEqual(
+                yield* topology.resolveAppFilesystem({ appId: APP_ID, storage: s3Storage() }),
+              );
+              expect(yield* app.prepareMigration(desired)).toEqual(prepared);
+              const beforeConflict = stage.commands.commands.length;
+              expect(yield* Effect.isFailure(app.ensure(desired))).toBe(true);
+              expect(
+                yield* Effect.isFailure(
+                  app.prepareMigration(
+                    desiredVolume({ storage: s3Storage({ bucket: 'another-bucket' }) }),
+                  ),
+                ),
+              ).toBe(true);
+              expect(stage.commands.commands).toHaveLength(beforeConflict);
+            }),
+          });
+          expect(stage.allocations).toEqual([]);
+          expect(stage.commands.commands.filter(({ command }) => command[1] === 'stop')).toEqual(
+            [],
+          );
+        }).pipe(Effect.provide(stage.layer));
+      }),
+    ));
+
+  test.each(['no-source', 'wrong-size', 'unconfigured', 'absent'] as const)(
+    'migration preparation refuses %s before staging or starting a destination',
+    (scenario) =>
+      run(
+        Effect.gen(function* () {
+          const stage = yield* configuredHost({ sharedImage: scenario !== 'no-source' });
+          yield* Effect.gen(function* () {
+            const app = yield* AppZerofs;
+            const fences = yield* VolumeMigrationFences;
+            const target = desiredVolume({
+              storage: scenario === 'unconfigured' ? undefined : s3Storage(),
+              sizeBytes: scenario === 'wrong-size' ? VOLUME_SIZE_BYTES * 2 : VOLUME_SIZE_BYTES,
+              desiredState: scenario === 'absent' ? 'absent' : 'present',
+            });
+            const outcome = yield* Effect.either(
+              fences.during({ appId: APP_ID, effect: app.prepareMigration(target) }),
+            );
+            expect(Either.isLeft(outcome) && outcome.left._tag).toBe(
+              'VolumeMigrationDestinationUnavailable',
+            );
+            expect(stage.commands.commands).toEqual([]);
+            expect(stage.files.written).toEqual([]);
+            expect(stage.allocations).toEqual([]);
+          }).pipe(Effect.provide(stage.layer));
+        }),
+      ),
+  );
+
+  test.each(['start', 'unready'] as const)(
+    'failed migration destination %s preserves source ownership',
+    (failure) =>
+      run(
+        Effect.gen(function* () {
+          const stage = yield* configuredHost({ sharedImage: true, failure });
+          yield* Effect.gen(function* () {
+            const app = yield* AppZerofs;
+            const fences = yield* VolumeMigrationFences;
+            const topology = yield* ZerofsTopology;
+            expect(
+              yield* Effect.isFailure(
+                fences.during({
+                  appId: APP_ID,
+                  effect: app.prepareMigration(desiredVolume({ storage: s3Storage() })),
+                }),
+              ),
+            ).toBe(true);
+            expect(Option.isNone(yield* topology.lookupAppFilesystem(APP_ID))).toBe(true);
+            expect(stage.allocations).toEqual([]);
+            expect(stage.commands.commands.filter(({ command }) => command[1] === 'stop')).toEqual(
+              [],
+            );
+          }).pipe(Effect.provide(stage.layer));
+        }),
+      ),
+  );
 
   test('starts and registers the app before provisioning and enrolls it in durability flushes once', async () => {
     await run(
