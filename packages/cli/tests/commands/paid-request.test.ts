@@ -4,6 +4,7 @@ import { createCli } from '@parshjs/core';
 import {
   APP_QUOTA_EXCEEDED_CODE,
   MAX_PAID_APPS_REQUEST,
+  MAX_PAID_RESOURCE_AMOUNT,
   MIN_PAID_APPS_REQUEST,
 } from '@repo/api-constants';
 import { commandTree } from '#command-tree.gen.ts';
@@ -19,7 +20,17 @@ const SERVICE_UNAVAILABLE_STATUS = 503;
 const FORBIDDEN_STATUS = 403;
 const APPS_ALLOWED = 3;
 const ASKED_TOTAL = 10;
-const APP_REQUEST_TYPES = ['custom-bucket', 'always-on', 'resources'] as const;
+const APP_REQUEST_TYPES = ['custom-bucket', 'always-on'] as const;
+const NO_RESOURCE_OPTIONS = {
+  'additional-vcpu-count': undefined,
+  'additional-memory-mib': undefined,
+  'additional-volume-gib': undefined,
+};
+const RESOURCE_AMOUNTS = {
+  additionalVcpuCount: 2,
+  additionalMemoryMib: 512,
+  additionalVolumeGib: 16,
+};
 
 let output: string[];
 let errors: string[];
@@ -104,6 +115,9 @@ function responseFor([resource, init]: Parameters<typeof fetch>): Response {
   }
   if (responseStatus !== SUCCESS_STATUS) {
     return Response.json({ error: 'Please retry this request.' }, { status: responseStatus });
+  }
+  if (url === `${API_URL}/api/paid-requests/resources`) {
+    return Response.json({ requestType: 'resources', ...body });
   }
   const requestType = APP_REQUEST_TYPES.find(
     (type) => url === `${API_URL}/api/paid-requests/${type}`,
@@ -202,7 +216,12 @@ test('scripts and JSON require an explicit amount without prompting or submittin
 
 test('a terminal can answer the total and can cancel without submitting', async function interactiveAmount() {
   const ask = spyOn(prompts, 'text').mockResolvedValue(String(ASKED_TOTAL));
-  const options = { type: 'apps' as const, 'requested-apps-amount': undefined, app: undefined };
+  const options = {
+    ...NO_RESOURCE_OPTIONS,
+    type: 'apps' as const,
+    'requested-apps-amount': undefined,
+    app: undefined,
+  };
   expect(await completePaidRequest({ options, interactive: true, api: paidRequestApi() })).toEqual({
     requestType: 'apps',
     requestedAppsAmount: ASKED_TOTAL,
@@ -241,6 +260,7 @@ test('the previous positional type and generic amount flag are refused', async f
 
 test('unset options from another feature are allowed', async function unsetOption() {
   const options = {
+    ...NO_RESOURCE_OPTIONS,
     type: 'apps' as const,
     'requested-apps-amount': ASKED_TOTAL,
     app: undefined,
@@ -258,6 +278,7 @@ test.each(['bucket', 0, false])(
   'a supplied option from another feature is refused: %s',
   async function unrelatedOption(value) {
     const options = {
+      ...NO_RESOURCE_OPTIONS,
       type: 'apps' as const,
       'requested-apps-amount': ASKED_TOTAL,
       app: undefined,
@@ -358,6 +379,7 @@ test.each(APP_REQUEST_TYPES)(
   async (requestType) => {
     const ask = spyOn(prompts, 'select').mockResolvedValue(APP_ID);
     const options = {
+      ...NO_RESOURCE_OPTIONS,
       type: requestType,
       app: undefined,
       'requested-apps-amount': undefined,
@@ -476,10 +498,196 @@ test('paid-request help lists app feature requests and the app selector', async 
 });
 
 test('the resources confirmation names the app and the requested resources', async () => {
-  expect(await paidRequestCli().run(['paid-request', '--type', 'resources', '--app', NAME])).toBe(
-    0,
-  );
+  expect(
+    await paidRequestCli().run([
+      'paid-request',
+      '--type',
+      'resources',
+      '--app',
+      NAME,
+      '--additional-vcpu-count',
+      '2',
+      '--additional-memory-mib',
+      '512',
+      '--additional-volume-gib',
+      '16',
+    ]),
+  ).toBe(0);
   expect(errors).toEqual([]);
-  expect(output.join('')).toContain(`get more CPU, RAM, and volume for app ${APP_ID}`);
-  expect(output.join('')).toContain('does not enable the feature or charge you');
+  expect(output.join('')).toContain(`+2 vCPUs, +512 MiB RAM, and +16 GiB volume for app ${APP_ID}`);
+  expect(output.join('')).toContain('does not resize the app or charge you');
+});
+
+test.each([NAME, SLUG])(
+  'resources requests preserve all amounts and resolve app %s',
+  async (app) => {
+    expect(
+      await paidRequestCli().run([
+        'paid-request',
+        '--type',
+        'resources',
+        '--app',
+        app,
+        '--additional-vcpu-count',
+        '2',
+        '--additional-memory-mib',
+        '512',
+        '--additional-volume-gib',
+        '16',
+        '--json',
+      ]),
+    ).toBe(0);
+    expect(errors).toEqual([]);
+    expect(JSON.parse(output.join(''))).toEqual({
+      requestType: 'resources',
+      appId: APP_ID,
+      ...RESOURCE_AMOUNTS,
+    });
+    expect(requests.at(-1)).toEqual({
+      url: `${API_URL}/api/paid-requests/resources`,
+      method: 'PUT',
+      authorization: `Bearer ${TOKEN}`,
+      body: { appId: APP_ID, ...RESOURCE_AMOUNTS },
+    });
+  },
+);
+
+test('a RAM-only request defaults omitted resource amounts to zero', async () => {
+  expect(
+    await paidRequestCli().run([
+      'paid-request',
+      '--type',
+      'resources',
+      '--app',
+      NAME,
+      '--additional-memory-mib',
+      '512',
+      '--json',
+    ]),
+  ).toBe(0);
+  expect(JSON.parse(output.join(''))).toEqual({
+    requestType: 'resources',
+    appId: APP_ID,
+    additionalVcpuCount: 0,
+    additionalMemoryMib: 512,
+    additionalVolumeGib: 0,
+  });
+});
+
+test.each(['additional-vcpu-count', 'additional-memory-mib', 'additional-volume-gib'])(
+  'invalid --%s values are refused before any API call',
+  async (flag) => {
+    for (const value of ['-1', '1.5', 'NaN', String(MAX_PAID_RESOURCE_AMOUNT + 1)]) {
+      expect(
+        await paidRequestCli().run([
+          'paid-request',
+          '--type',
+          'resources',
+          '--app',
+          NAME,
+          `--${flag}`,
+          value,
+          '--json',
+        ]),
+      ).toBe(1);
+    }
+    expect(requests).toEqual([]);
+    expect(output).toEqual([]);
+  },
+);
+
+test('scripts require a positive resource increase without prompting or submitting', async () => {
+  const ask = spyOn(prompts, 'text').mockResolvedValue('1');
+  for (const flags of [[], ['--additional-memory-mib', '0']]) {
+    expect(
+      await paidRequestCli().run([
+        'paid-request',
+        '--type',
+        'resources',
+        '--app',
+        NAME,
+        ...flags,
+        '--json',
+      ]),
+    ).toBe(1);
+  }
+  expect(errors.join('')).toContain('positive amount');
+  expect(ask).not.toHaveBeenCalled();
+  expect(requests.every((request) => request.method === 'GET')).toBe(true);
+  expect(output).toEqual([]);
+});
+
+test('a terminal can enter each resource amount and cancel before submitting', async () => {
+  const ask = spyOn(prompts, 'text')
+    .mockResolvedValueOnce('2')
+    .mockResolvedValueOnce('512')
+    .mockResolvedValueOnce('16');
+  const options = {
+    ...NO_RESOURCE_OPTIONS,
+    type: 'resources' as const,
+    app: NAME,
+    'requested-apps-amount': undefined,
+  };
+  expect(await completePaidRequest({ options, interactive: true, api: paidRequestApi() })).toEqual({
+    requestType: 'resources',
+    appId: APP_ID,
+    ...RESOURCE_AMOUNTS,
+  });
+  expect(ask.mock.calls.map((call) => call[0].message)).toEqual([
+    'How many additional vCPUs do you need?',
+    'How much additional RAM do you need (MiB)?',
+    'How much additional volume do you need (GiB)?',
+  ]);
+  const cancellation = Symbol('cancel');
+  spyOn(prompts, 'isCancel').mockImplementation((value) => value === cancellation);
+  ask.mockResolvedValue(cancellation);
+  await expect(
+    completePaidRequest({ options, interactive: true, api: paidRequestApi() }),
+  ).rejects.toThrow('Cancelled.');
+  expect(requests.every((request) => request.method === 'GET')).toBe(true);
+});
+
+test.each(['apps', ...APP_REQUEST_TYPES])(
+  'resource amount flags cannot be used for %s requests',
+  async (type) => {
+    expect(
+      await paidRequestCli().run([
+        'paid-request',
+        '--type',
+        type,
+        '--additional-memory-mib',
+        '512',
+        '--json',
+      ]),
+    ).toBe(1);
+    expect(errors.join('')).toContain('Invalid options for --type');
+    expect(requests).toEqual([]);
+  },
+);
+
+test('resources requests require sign-in and an app before submitting', async () => {
+  const flags = ['paid-request', '--type', 'resources', '--additional-memory-mib', '512', '--json'];
+  expect(await paidRequestCli(false).run([...flags, '--app', NAME])).toBe(1);
+  expect(errors.join('')).toContain('Not signed in');
+  expect(await paidRequestCli().run(flags)).toBe(1);
+  expect(errors.join('')).toContain('--app');
+  expect(requests).toEqual([]);
+});
+
+test('failed resources requests emit no JSON success', async () => {
+  responseStatus = SERVICE_UNAVAILABLE_STATUS;
+  expect(
+    await paidRequestCli().run([
+      'paid-request',
+      '--type',
+      'resources',
+      '--app',
+      NAME,
+      '--additional-memory-mib',
+      '512',
+      '--json',
+    ]),
+  ).toBe(1);
+  expect(errors.join('')).toContain('Please retry this request');
+  expect(output).toEqual([]);
 });

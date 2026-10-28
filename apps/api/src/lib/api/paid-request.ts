@@ -1,6 +1,15 @@
-import { MAX_PAID_APPS_REQUEST, MIN_PAID_APPS_REQUEST } from '@repo/api-constants';
+import {
+  MAX_PAID_APPS_REQUEST,
+  MAX_PAID_RESOURCE_AMOUNT,
+  MIN_PAID_APPS_REQUEST,
+} from '@repo/api-constants';
 import { AppIdSchema } from '@repo/protocol';
 import { type Static, Type } from '@sinclair/typebox';
+
+const AdditionalResourceAmountSchema = Type.Integer({
+  minimum: 0,
+  maximum: MAX_PAID_RESOURCE_AMOUNT,
+});
 
 export const PaidRequestSchema = Type.Union([
   Type.Object(
@@ -23,7 +32,13 @@ export const PaidRequestSchema = Type.Union([
     { additionalProperties: false },
   ),
   Type.Object(
-    { requestType: Type.Literal('resources'), appId: AppIdSchema },
+    {
+      requestType: Type.Literal('resources'),
+      appId: AppIdSchema,
+      additionalVcpuCount: AdditionalResourceAmountSchema,
+      additionalMemoryMib: AdditionalResourceAmountSchema,
+      additionalVolumeGib: AdditionalResourceAmountSchema,
+    },
     { additionalProperties: false },
   ),
 ]);

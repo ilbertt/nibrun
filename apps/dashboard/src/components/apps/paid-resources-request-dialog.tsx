@@ -25,8 +25,8 @@ export function PaidResourcesRequestDialog({ trigger }: { trigger: ReactElement 
         <DialogHeader>
           <DialogTitle>Need more resources?</DialogTitle>
           <DialogDescription>
-            Get more CPU, RAM, and volume for this app. This is an upcoming paid feature. Send a
-            request to let us know you’re interested.
+            Tell us how much more CPU, RAM, and volume you need for this app. This is an upcoming
+            paid feature.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="flex flex-col gap-4">

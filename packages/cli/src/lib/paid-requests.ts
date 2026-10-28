@@ -9,6 +9,11 @@ import { PROGRAM_NAME, SHARED_OPTIONS } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';
 import { defineOutput } from '#lib/output.ts';
+import {
+  completePaidResourceAmounts,
+  PAID_RESOURCE_AMOUNTS_SCHEMA,
+  PAID_RESOURCE_OPTIONS_SCHEMA,
+} from '#lib/paid-resource-requests.ts';
 import { answered } from '#lib/prompts.ts';
 
 const REQUEST_TYPES = [
@@ -24,6 +29,7 @@ export const PAID_REQUEST_TYPE_SCHEMA = z.enum(REQUEST_TYPES, {
 });
 
 export const APP_PAID_REQUEST_TYPE_SCHEMA = PAID_REQUEST_TYPE_SCHEMA.exclude(['apps']);
+const AppFeatureRequestTypeSchema = APP_PAID_REQUEST_TYPE_SCHEMA.exclude(['resources']);
 
 export const REQUESTED_APPS_AMOUNT_FLAG = 'requested-apps-amount';
 
@@ -39,8 +45,13 @@ const PaidRequestOptionsSchema = z.discriminatedUnion('type', [
     [REQUESTED_APPS_AMOUNT_FLAG]: REQUESTED_APPS_AMOUNT_SCHEMA.optional(),
   }),
   z.strictObject({
-    type: APP_PAID_REQUEST_TYPE_SCHEMA,
+    type: AppFeatureRequestTypeSchema,
     [SHARED_OPTIONS.app.name]: SHARED_OPTIONS.app.option.schema,
+  }),
+  z.strictObject({
+    type: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum.resources),
+    [SHARED_OPTIONS.app.name]: SHARED_OPTIONS.app.option.schema,
+    ...PAID_RESOURCE_OPTIONS_SCHEMA.shape,
   }),
 ]);
 
@@ -53,7 +64,11 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
       requestedAppsAmount: REQUESTED_APPS_AMOUNT_SCHEMA,
     }),
     z.object({
-      requestType: APP_PAID_REQUEST_TYPE_SCHEMA,
+      requestType: AppFeatureRequestTypeSchema,
+      appId: z.string(),
+    }),
+    PAID_RESOURCE_AMOUNTS_SCHEMA.safeExtend({
+      requestType: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum.resources),
       appId: z.string(),
     }),
   ]),
@@ -65,11 +80,16 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
       );
       return;
     }
+    if (value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum.resources) {
+      out.success(
+        `Thanks! We recorded your request for +${value.additionalVcpuCount} vCPUs, +${value.additionalMemoryMib} MiB RAM, and +${value.additionalVolumeGib} GiB volume for app ${value.appId}. This does not resize the app or charge you.`,
+      );
+      return;
+    }
     const requestedFeatures = {
       'always-on': `keep app ${value.appId} always on`,
       'custom-bucket': `use your own S3-compatible bucket for app ${value.appId}`,
-      resources: `get more CPU, RAM, and volume for app ${value.appId}`,
-    } satisfies Record<z.infer<typeof APP_PAID_REQUEST_TYPE_SCHEMA>, string>;
+    } satisfies Record<z.infer<typeof AppFeatureRequestTypeSchema>, string>;
     out.success(
       `Thanks! We recorded your request to ${requestedFeatures[value.requestType]}. This does not enable the feature or charge you.`,
     );
@@ -111,6 +131,13 @@ export async function completePaidRequest({
     name: parsed.data[SHARED_OPTIONS.app.name],
     interactive,
   });
+  if (parsed.data.type === PAID_REQUEST_TYPE_SCHEMA.enum.resources) {
+    return {
+      requestType: parsed.data.type,
+      appId: app.id,
+      ...(await completePaidResourceAmounts({ options: parsed.data, interactive })),
+    };
+  }
   return { requestType: parsed.data.type, appId: app.id };
 }
 
