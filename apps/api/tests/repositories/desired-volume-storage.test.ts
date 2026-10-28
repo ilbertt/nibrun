@@ -4,7 +4,7 @@ import { DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api-constants';
 import {
   AppIdSchema,
   DeploymentIdSchema,
-  HostIdSchema,
+  type HostId,
   HttpPortSchema,
   type S3VolumeAuth,
   type S3VolumeStorage,
@@ -19,12 +19,13 @@ import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
+import { registerHost } from '#tests/support/hosts.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
 const SHARED_APP = 'shared';
 const PRIVATE_APP = 'private';
-const HOST_ID = Value.Parse(HostIdSchema, 'storage-test-host');
+let HOST_ID: HostId;
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner');
 const PREVIOUS_HTTP_PORT = 8181;
 const ACCESS_KEY_AUTH = Value.Parse(S3VolumeStorageSchema.properties.auth, {
@@ -36,6 +37,7 @@ let sql: SQL;
 
 beforeAll(async function startDatabase() {
   sql = await startTestDatabase();
+  HOST_ID = await registerHost({ sql, originId: 'storage-test-host' });
   await sql.unsafe(
     `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
      VALUES ('owner', 'owner', 'owner@example.test', true, now(), now())`,
@@ -51,12 +53,11 @@ afterAll(async function stopDatabase() {
 }, DATABASE_START_TIMEOUT_MS);
 
 async function desiredVolumes() {
-  return (
-    await new AgentRepository({
-      sql: withTypes<Queries>(sql),
-      secretsKey: TEST_SECRETS_KEY,
-    }).desiredState({ hostId: HOST_ID })
-  ).volumes;
+  const repository = new AgentRepository({
+    sql: withTypes<Queries>(sql),
+    secretsKey: TEST_SECRETS_KEY,
+  });
+  return (await repository.desiredState({ hostId: HOST_ID })).volumes;
 }
 
 function storage(auth: S3VolumeAuth) {
@@ -399,8 +400,8 @@ async function deployApp(slug: string) {
     [slug],
   );
   const [deployment] = await sql.unsafe(
-    `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state)
-     SELECT a.id, ar.id, c.id, 'running'
+    `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state, host_id)
+     SELECT a.id, ar.id, c.id, 'running', $2
      FROM nibrun.apps a
      JOIN LATERAL (
        SELECT id FROM nibrun.artifacts ar WHERE ar.app_id = a.id ORDER BY ar.id DESC LIMIT 1
@@ -408,7 +409,7 @@ async function deployApp(slug: string) {
      JOIN LATERAL (SELECT id FROM nibrun.app_configs c WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1) c ON true
      WHERE a.slug = $1
      RETURNING id, config_id, artifact_id`,
-    [slug],
+    [slug, HOST_ID],
   );
   return deployment;
 }

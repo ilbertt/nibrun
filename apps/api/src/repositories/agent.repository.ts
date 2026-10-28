@@ -1,4 +1,4 @@
-import type { TypedSQL } from '@ilbertt/bun-sqlgen';
+import type { TypedSQL, TypedTransactionSQL } from '@ilbertt/bun-sqlgen';
 import type {
   HostDesiredState,
   HostId,
@@ -130,13 +130,20 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     return Promise.resolve(this.#lastObservation);
   }
 
-  /**
-   * The same state for whichever host asks until desired state is scoped to assignments.
-   *
-   * `checkpoints` is empty until it has a table to be requested through: it is per-request work,
-   * so a host can only be told to do one once something has recorded that someone asked.
-   */
-  async desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+  desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+    // A handoff must not split one desired document across two host assignments.
+    return this.sql.begin('ISOLATION LEVEL REPEATABLE READ, READ ONLY', (sql) =>
+      this.selectDesiredState({ sql, hostId }),
+    );
+  }
+
+  private async selectDesiredState({
+    sql,
+    hostId,
+  }: {
+    sql: TypedTransactionSQL<Queries>;
+    hostId: HostId;
+  }): Promise<HostDesiredState> {
     // An artifact still awaiting its upload cannot be deployed or exported — the deployment
     // that would name it is refused — so what reaches a host here always has its bytes.
     //
@@ -144,7 +151,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     // runs on every poll of every host.
     const [deployments, volumes, hostnameRows, environmentRows, exports, exportEnvironmentRows] =
       await Promise.all([
-        this.sql.SelectDesiredDeployments`
+        sql.SelectDesiredDeployments`
           /* @notNull digest */
           /* @notNull size_bytes */
           /* @notNull object_key */
@@ -158,8 +165,9 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
                  restart_backoff_factor, restart_reset_after_ms, config_id,
                  activation, idle_timeout_ms, deployment_state
           FROM nibrun.desired_deployments
+          WHERE id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `,
-        this.sql.SelectDesiredVolumes`
+        sql.SelectDesiredVolumes`
           SELECT v.app_id, v.state,
                  v.seed_digest, v.seed_size_bytes, v.seed_object_key, v.seed_original_file_name,
                  s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
@@ -178,23 +186,32 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
             ORDER BY d.id DESC
             LIMIT 1
           ) s ON true
+          WHERE v.app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `,
-        this.sql.SelectDesiredHostnames`
+        sql.SelectDesiredHostnames`
           SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
+          WHERE app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `,
-        this.sql.SelectDesiredEnvironment`
+        sql.SelectDesiredEnvironment`
           SELECT deployment_id, name, value FROM nibrun.desired_environment
+          WHERE deployment_id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `,
-        this.sql.SelectDesiredExports`
+        sql.SelectDesiredExports`
           /* @notNull artifact_object_key */
           /* @notNull digest */
           /* @notNull size_bytes */
           SELECT id, app_id, object_key, state,
                  digest, size_bytes, artifact_object_key, original_file_name, config_id
           FROM nibrun.desired_exports
+          WHERE app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `,
-        this.sql.SelectDesiredExportEnvironment`
+        sql.SelectDesiredExportEnvironment`
           SELECT export_id, name, value FROM nibrun.desired_export_environment
+          WHERE export_id IN (
+            SELECT e.id FROM nibrun.exports e
+            JOIN nibrun.app_hosts h ON h.app_id = e.app_id
+            WHERE h.host_id = ${hostId}
+          )
         `,
       ]);
 
