@@ -103,6 +103,12 @@ test('current execution lookup is scoped to the app owner', async () => {
   expect(
     await hosts.currentForApp({ appId: source.appId, ownerId: destination.ownerId }),
   ).toBeNull();
+  expect(
+    await hosts.hostForExecution({ appId: source.appId, deploymentId: source.deploymentId }),
+  ).toBe(SOURCE_HOST);
+  expect(
+    await hosts.hostForExecution({ appId: destination.appId, deploymentId: source.deploymentId }),
+  ).toBeUndefined();
 });
 
 test('an unplaced execution is not offered to whichever host asks first', async () => {
@@ -148,6 +154,12 @@ test('a new execution transfers all desired work without deleting the source vol
     );
   });
   const oldHost = await repository().desiredState({ hostId: SOURCE_HOST });
+  expect(
+    await new DeploymentHostsRepository(withTypes<Queries>(sql)).hostForExecution({
+      appId: source.appId,
+      deploymentId: source.deploymentId,
+    }),
+  ).toBeUndefined();
   expect(oldHost.instances).toEqual([]);
   expect(oldHost.volumes).toEqual([]);
   expect(oldHost.exports).toEqual([]);

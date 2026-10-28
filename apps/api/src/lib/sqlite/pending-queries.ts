@@ -16,7 +16,7 @@ const MAX_PARKED_HOSTS = 1024;
 type Answer = { outcome: SqliteOutcome; hostId: HostId };
 type Pending = {
   readonly query: SqliteQuery;
-  readonly targetHostId: HostId | undefined;
+  readonly targetHostId: HostId;
   readonly settle: (answer: Answer) => void;
   claimedBy: HostId | undefined;
 };
@@ -34,7 +34,7 @@ export class PendingSqliteQueries {
     targetHostId,
     signal,
     ...input
-  }: Omit<SqliteQuery, 'queryId'> & { targetHostId: HostId | undefined; signal: AbortSignal }) {
+  }: Omit<SqliteQuery, 'queryId'> & { targetHostId: HostId; signal: AbortSignal }) {
     if (this.#queries.size >= MAX_PENDING_QUERIES) {
       throw new TooManyRequestsError('Too many SQLite operations are pending.');
     }
@@ -129,7 +129,7 @@ function eligible({
 }): boolean {
   return (
     pending.claimedBy === undefined &&
-    (pending.targetHostId === undefined || pending.targetHostId === host.hostId) &&
+    pending.targetHostId === host.hostId &&
     host.servedDeployments.some(function matches(deployment) {
       return (
         deployment.appId === pending.query.appId &&

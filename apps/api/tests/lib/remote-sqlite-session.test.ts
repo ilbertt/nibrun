@@ -3,6 +3,7 @@ import { GuestPathSchema, type SqliteOutcome, type SqliteQuery } from '@repo/pro
 import { Value } from '@sinclair/typebox/value';
 import { openRemoteSqliteSession } from '#lib/sqlite/remote-session.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
+import { deploymentHostsRepository } from '#tests/support/deployment-hosts.ts';
 import {
   SQLITE_DEPLOYMENT,
   SQLITE_HOST_ID,
@@ -57,7 +58,12 @@ function answer({
 }
 
 async function fixture() {
-  const relay = new SqliteRelayService();
+  const relay = new SqliteRelayService({
+    deploymentHostsRepo: deploymentHostsRepository({
+      hostId: SQLITE_HOST_ID,
+      deploymentId: SQLITE_DEPLOYMENT.deploymentId,
+    }),
+  });
   const opening = openRemoteSqliteSession({ relay, ...SQLITE_DEPLOYMENT, path, signal });
   const query = await claim(relay);
   answer({ relay, query, outcome: { status: 'opened' } });
@@ -138,7 +144,12 @@ test('cancellation closes through an independent signal and never replays SQL', 
 });
 
 test('an opening request can abort promptly while a late answer still closes the new session', async () => {
-  const relay = new SqliteRelayService();
+  const relay = new SqliteRelayService({
+    deploymentHostsRepo: deploymentHostsRepository({
+      hostId: SQLITE_HOST_ID,
+      deploymentId: SQLITE_DEPLOYMENT.deploymentId,
+    }),
+  });
   const controller = new AbortController();
   const opening = openRemoteSqliteSession({
     relay,
