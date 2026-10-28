@@ -246,6 +246,8 @@ describe('provisioning on a selected live filesystem', () => {
                   Layer.succeed(
                     AppZerofs,
                     AppZerofs.make({
+                      abortMigration: () =>
+                        Effect.die('Normal lifecycle must not abort a migration.'),
                       prepareMigration: () =>
                         Effect.die('Normal provisioning must not prepare a migration.'),
                       reclaim: () => Effect.die('provisioning must not reclaim ZeroFS files'),
