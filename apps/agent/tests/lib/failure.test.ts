@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { AppIdSchema, Sha256DigestSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
+import { ArtifactTransferError } from '#lib/artifacts/store.ts';
 import { InstanceCredentialsError } from '#lib/aws/credentials.ts';
 import { ControlPlaneError } from '#lib/control/client.ts';
 import { CommandFailed, CommandTimedOut } from '#lib/exec.ts';
@@ -21,7 +22,6 @@ import { ArtifactSizeMismatch, DigestMismatch } from '#lib/vm/artifacts.ts';
 import { UnrepresentableEnvironment } from '#lib/vm/instance-env.ts';
 import { VolumeShrinkRefused } from '#lib/volumes/device-file.ts';
 import { SuperblockUnreadable } from '#lib/volumes/ext4.ts';
-import { ArtifactTransferError } from '#services/artifact-store.service.ts';
 import { NoDeviceForApp } from '#services/filesystem-reader.service.ts';
 
 const DIGEST_HEX_LENGTH = 64;

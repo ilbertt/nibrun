@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import { FileSystem } from '@effect/platform';
 import { Deferred, Duration, Effect, Either, Fiber, Layer, Ref, Schedule } from 'effect';
+import { ArtifactTransferError } from '#lib/artifacts/store.ts';
 import { ArtifactImages } from '#services/artifact-images.service.ts';
-import { ArtifactStore, ArtifactTransferError } from '#services/artifact-store.service.ts';
+import { ArtifactStore } from '#services/artifact-store.service.ts';
 import type { CommandRunner } from '#services/command-runner.service.ts';
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST, artifactStore } from '#tests/support/artifacts.ts';
 import { recordingCommands } from '#tests/support/commands.ts';
