@@ -1,0 +1,40 @@
+max_apps = 4
+max_concurrent_vm_starts = 2
+
+[cron]
+max_jobs_per_app = 10
+time_zone = "UTC"
+
+[paths]
+state_dir = "/var/lib/nibrunner"
+runtime_dir = "/run/nibrunner"
+snapshot_dir = "/var/lib/nibrunner/snapshots"
+guest_image_dir = "/var/lib/nibrunner/guest"
+desired_state_file = "/var/lib/nibrunner/desired.json"
+versions_file = "/var/lib/nibrunner/versions.json"
+
+[artifacts]
+store_url = "/var/lib/nibrunner/artifact-store"
+
+[volumes]
+backend = "local-file"
+storage_prefix = "volumes"
+
+[exports]
+store_url = "/var/lib/nibrunner/export-store"
+staging_dir = "/var/lib/nibrunner/exports"
+
+[network]
+denied_egress_addresses_v4 = ["{{VPC_IPV4_CIDR_BLOCK}}"]
+denied_egress_addresses_v6 = ["{{VPC_IPV6_CIDR_BLOCK}}"]
+
+[proxy.http]
+listen_address = "127.0.0.1"
+port = 8080
+
+[metrics]
+listen_address = "127.0.0.1"
+port = 9100
+
+[filesystem]
+socket = "/run/nibrunner/filesystem.sock"
