@@ -13,12 +13,6 @@ export interface ISelectHostForIdentityResult {
     id: IHostsColumns["id"];
 }
 
-/** Result of query `SelectUnplacedDeployment`. */
-export interface ISelectUnplacedDeploymentResult {
-    /** The latest requested execution for this app. */
-    deployment_id: IDeploymentsColumns["id"];
-}
-
 /** Result of query `ObserveHostReport`. */
 export interface IObserveHostReportResult {
 }
@@ -735,7 +729,7 @@ export interface ISelectCachedBinaryResult {
 /** Result of query `SelectExecutionHost`. */
 export interface ISelectExecutionHostResult {
     /** An app keeps its last execution host while stopped, failed or awaiting volume deletion. */
-    host_id: NonNullable<IDeploymentsColumns["host_id"]>;
+    host_id: IDeploymentsColumns["host_id"];
 }
 
 /** Result of query `SelectCurrentAppExecution`. */
@@ -743,7 +737,7 @@ export interface ISelectCurrentAppExecutionResult {
     /** The latest execution, including while its app is stopped or failed. */
     deployment_id: IDeploymentsColumns["id"];
     /** An app keeps its last execution host while stopped, failed or awaiting volume deletion. */
-    host_id: NonNullable<IDeploymentsColumns["host_id"]>;
+    host_id: IDeploymentsColumns["host_id"];
 }
 
 /** Result of query `SelectDeployableArtifact`. */
@@ -758,7 +752,7 @@ export interface IInsertDeploymentResult {
 
 /** Result of query `SelectPreviousDeploymentHost`. */
 export interface ISelectPreviousDeploymentHostResult {
-    /** The host assigned to this execution. Null until an existing deployment is adopted or a new one is placed. */
+    /** The immutable execution host assigned when this deployment is created. */
     host_id: IDeploymentsColumns["host_id"];
 }
 
@@ -1312,7 +1306,6 @@ export interface ISelectVolumeStorageMigrationResult {
 export interface Queries {
     RegisterHost: IRegisterHostResult;
     SelectHostForIdentity: ISelectHostForIdentityResult;
-    SelectUnplacedDeployment: ISelectUnplacedDeploymentResult;
     ObserveHostReport: IObserveHostReportResult;
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
@@ -1750,8 +1743,8 @@ export interface IDeploymentsColumns {
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: import("#lib/api/identifiers.ts").OAuthClientId | null;
     mcp_chat_id: string | null;
-    /** The host assigned to this execution. Null until an existing deployment is adopted or a new one is placed. */
-    host_id: import("@repo/protocol").HostId | null;
+    /** The immutable execution host assigned when this deployment is created. */
+    host_id: import("@repo/protocol").HostId;
 }
 
 /** Schema of `deployments`. */
@@ -2070,8 +2063,8 @@ export interface ILatestAppDeploymentsColumns {
     app_id: import("@repo/protocol").AppId;
     /** The latest requested execution for this app. */
     deployment_id: import("@repo/protocol").DeploymentId;
-    /** The host assigned to this execution. Null until an existing deployment is adopted or a new one is placed. */
-    host_id: import("@repo/protocol").HostId | null;
+    /** The latest execution always has an assigned host. */
+    host_id: import("@repo/protocol").HostId;
 }
 
 /** Schema of `latest_app_deployments`. */

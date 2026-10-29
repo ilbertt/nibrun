@@ -25,7 +25,7 @@ afterAll(async function stopDatabase() {
 }, DATABASE_START_TIMEOUT_MS);
 
 test('an export report can only be applied by the apps assigned host', async () => {
-  const app = await createDeployedApp({ sql, name: 'export-owner' });
+  const app = await createDeployedApp({ sql, name: 'export-owner', hostId: HOST_ID });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
     HOST_ID,
     app.deploymentId,

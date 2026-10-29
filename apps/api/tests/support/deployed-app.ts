@@ -1,11 +1,19 @@
-import { AppIdSchema, DeploymentIdSchema } from '@repo/protocol';
+import { AppIdSchema, DeploymentIdSchema, type HostId } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 
 const SHA256_HEX_LENGTH = 64;
 
-export async function createDeployedApp({ sql, name }: { sql: SQL; name: string }) {
+export async function createDeployedApp({
+  sql,
+  name,
+  hostId,
+}: {
+  sql: SQL;
+  name: string;
+  hostId: HostId;
+}) {
   const ownerId = Value.Parse(OwnerIdSchema, `${name}-owner`);
   await sql.unsafe(
     `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
@@ -34,9 +42,9 @@ export async function createDeployedApp({ sql, name }: { sql: SQL; name: string 
     [appId],
   );
   const [deployment] = await sql.unsafe(
-    `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state)
-     VALUES ($1, $2, $3, 'running') RETURNING id`,
-    [appId, artifact.id, config.id],
+    `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state, host_id)
+     VALUES ($1, $2, $3, 'running', $4) RETURNING id`,
+    [appId, artifact.id, config.id, hostId],
   );
   return {
     appId,

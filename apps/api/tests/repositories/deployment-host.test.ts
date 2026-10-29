@@ -3,7 +3,6 @@ import { withTypes } from '@ilbertt/bun-sqlgen';
 import type { DeploymentId, HostId } from '@repo/protocol';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
-import { AgentRepository } from '#repositories/agent.repository.ts';
 import {
   DeploymentsRepository,
   type ReportedDeployment,
@@ -11,8 +10,7 @@ import {
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
 import { registerHost } from '#tests/support/hosts.ts';
-import { refusedBy } from '#tests/support/postgres.ts';
-import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
+import { NOT_NULL_VIOLATION, refusedBy } from '#tests/support/postgres.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
 let sql: SQL;
@@ -31,28 +29,8 @@ afterAll(async function stopDatabase() {
   await stopTestDatabase(sql);
 }, DATABASE_START_TIMEOUT_MS);
 
-test('an existing deployment can be adopted once without changing its execution', async () => {
-  const { deploymentId } = await createDeployedApp({ sql, name: 'adopt-host' });
-  const [before] = await sql.unsafe('SELECT * FROM nibrun.deployments WHERE id = $1', [
-    deploymentId,
-  ]);
-  expect(before.host_id).toBeNull();
-  await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
-    HOST_ID,
-    deploymentId,
-  ]);
-  const [after] = await sql.unsafe('SELECT * FROM nibrun.deployments WHERE id = $1', [
-    deploymentId,
-  ]);
-  expect(after).toMatchObject({
-    ...before,
-    host_id: HOST_ID,
-    updated_at: after.updated_at,
-  });
-});
-
 test('moving or clearing an assigned host requires a new deployment', async () => {
-  const { deploymentId } = await createDeployedApp({ sql, name: 'fixed-host' });
+  const { deploymentId } = await createDeployedApp({ sql, name: 'fixed-host', hostId: HOST_ID });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
     HOST_ID,
     deploymentId,
@@ -74,19 +52,39 @@ test('moving or clearing an assigned host requires a new deployment', async () =
 });
 
 test('an execution cannot be assigned to an unregistered host', async () => {
-  const { deploymentId } = await createDeployedApp({ sql, name: 'unknown-host' });
+  const app = await createDeployedApp({ sql, name: 'unknown-host', hostId: HOST_ID });
+  await sql.unsafe("UPDATE nibrun.deployments SET state = 'superseded' WHERE id = $1", [
+    app.deploymentId,
+  ]);
   expect(
     await refusedBy(async function assignUnknownHost() {
-      await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
-        Bun.randomUUIDv7(),
-        deploymentId,
-      ]);
+      await sql.unsafe(
+        `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, host_id)
+      SELECT app_id, artifact_id, config_id, $1 FROM nibrun.deployments WHERE id = $2`,
+        [Bun.randomUUIDv7(), app.deploymentId],
+      );
     }),
   ).toBe('deployments_host_id_fkey');
 });
 
+test('every new deployment must include an assigned host', async () => {
+  const app = await createDeployedApp({ sql, name: 'required-host', hostId: HOST_ID });
+  await sql.unsafe("UPDATE nibrun.deployments SET state = 'superseded' WHERE id = $1", [
+    app.deploymentId,
+  ]);
+  await expect(
+    (async function insertWithoutHost() {
+      await sql.unsafe(
+        `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id)
+      SELECT app_id, artifact_id, config_id FROM nibrun.deployments WHERE id = $1`,
+        [app.deploymentId],
+      );
+    })(),
+  ).rejects.toMatchObject({ errno: NOT_NULL_VIOLATION });
+});
+
 test('a referenced host cannot be deleted', async () => {
-  const { deploymentId } = await createDeployedApp({ sql, name: 'retained-host' });
+  const { deploymentId } = await createDeployedApp({ sql, name: 'retained-host', hostId: HOST_ID });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
     HOST_ID,
     deploymentId,
@@ -128,7 +126,7 @@ test('concurrent registrations share one origin and canonical identity', async (
 });
 
 test('a redeploy inherits the previous execution host', async () => {
-  const app = await createDeployedApp({ sql, name: 'redeploy-host' });
+  const app = await createDeployedApp({ sql, name: 'redeploy-host', hostId: HOST_ID });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
     HOST_ID,
     app.deploymentId,
@@ -149,7 +147,7 @@ test('a redeploy inherits the previous execution host', async () => {
 });
 
 test('an artifact rollback keeps the current host rather than replaying the original host', async () => {
-  const app = await createDeployedApp({ sql, name: 'rollback-host' });
+  const app = await createDeployedApp({ sql, name: 'rollback-host', hostId: HOST_ID });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1, state = $2 WHERE id = $3', [
     HOST_ID,
     'superseded',
@@ -173,7 +171,7 @@ test('an artifact rollback keeps the current host rather than replaying the orig
 });
 
 test('a host lifecycle pass cannot inspect deployments assigned to another host', async () => {
-  const app = await createDeployedApp({ sql, name: 'scoped-live-host' });
+  const app = await createDeployedApp({ sql, name: 'scoped-live-host', hostId: HOST_ID });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
     HOST_ID,
     app.deploymentId,
@@ -188,7 +186,7 @@ test('a host lifecycle pass cannot inspect deployments assigned to another host'
 });
 
 test('a foreign host cannot report, activate or fail an assigned deployment', async () => {
-  const app = await createDeployedApp({ sql, name: 'scoped-write-host' });
+  const app = await createDeployedApp({ sql, name: 'scoped-write-host', hostId: HOST_ID });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
     HOST_ID,
     app.deploymentId,
@@ -237,39 +235,3 @@ function deploymentReport(deploymentId: DeploymentId): ReportedDeployment {
     lastHealthyAt: null,
   };
 }
-
-test('a missing current assignment blocks ownership until the operator backfills it', async () => {
-  const app = await createDeployedApp({ sql, name: 'unassigned-host' });
-  const repository = new AgentRepository({
-    sql: withTypes<Queries>(sql),
-    secretsKey: TEST_SECRETS_KEY,
-  });
-  expect(await repository.hasUnplacedDeployments()).toBe(true);
-  await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
-    HOST_ID,
-    app.deploymentId,
-  ]);
-});
-
-test('an unassigned deployment cannot be changed by a host report', async () => {
-  const app = await createDeployedApp({ sql, name: 'unassigned-report' });
-  const repository = new DeploymentsRepository(withTypes<Queries>(sql));
-  const [before] = await sql.unsafe('SELECT * FROM nibrun.deployments WHERE id = $1', [
-    app.deploymentId,
-  ]);
-  await repository.applyReport({ hostId: HOST_ID, reported: [deploymentReport(app.deploymentId)] });
-  await repository.stampActivation({
-    hostId: HOST_ID,
-    deploymentId: app.deploymentId,
-    at: new Date(),
-  });
-  await repository.fail({
-    hostId: HOST_ID,
-    deploymentId: app.deploymentId,
-    message: 'Unassigned.',
-  });
-  const [after] = await sql.unsafe('SELECT * FROM nibrun.deployments WHERE id = $1', [
-    app.deploymentId,
-  ]);
-  expect(after).toEqual(before);
-});

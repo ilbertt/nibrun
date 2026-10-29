@@ -64,7 +64,7 @@ async function moveExecution({
 }
 
 test('returning to a host does not let an old execution overwrite or clear current compute usage', async () => {
-  const app = await createDeployedApp({ sql, name: 'returning-execution' });
+  const app = await createDeployedApp({ sql, name: 'returning-execution', hostId: HOST_ID });
   await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
     HOST_ID,
     app.deploymentId,

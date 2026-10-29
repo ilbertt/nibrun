@@ -1,6 +1,7 @@
 import { SQL } from 'bun';
 
 export const UNIQUE_VIOLATION = '23505';
+export const NOT_NULL_VIOLATION = '23502';
 export const MALFORMED_IDENTIFIER = '22P02';
 
 // Bun keeps its own name on `code` and the SQLSTATE on `errno`, so a helper reading `code`
