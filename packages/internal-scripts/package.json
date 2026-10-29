@@ -20,6 +20,7 @@
     "seed-umami": "bun run src/seed-umami.ts",
     "ssm-deploy": "bun run src/ssm-deploy.ts",
     "ssm-deploy-app-hosts": "bun run src/ssm-deploy-app-hosts.ts",
+    "ssm-deploy-nibrunner-host": "bun run src/ssm-deploy-nibrunner-host.ts",
     "terraform-apply": "bun run src/terraform-apply.ts",
     "terraform-check": "bun run src/terraform-check.ts",
     "terraform-plan": "bun run src/terraform-plan.ts",
