@@ -6,6 +6,7 @@ import {
   RUNTIME_VALUES,
 } from '@repo/protocol/runtime-values';
 import { Value } from '@sinclair/typebox/value';
+import { localArtifactReference } from '#lib/nibrunner/artifact.ts';
 import type { DesiredInstance as NibrunnerInstance } from '#lib/nibrunner/desired.gen.ts';
 import { UnsupportedNibrunnerFeature } from '#lib/nibrunner/failure.ts';
 import {
@@ -64,8 +65,7 @@ export function nibrunnerInstance(instance: DesiredInstance): NibrunnerInstance 
       {
         kind: 'executable',
         destinationPath: NIBRUNNER_EXECUTABLE_PATH,
-        digest: instance.artifact.digest,
-        objectKey: instance.artifact.digest,
+        ...localArtifactReference(instance.artifact),
       },
     ],
     config: {
