@@ -52,7 +52,10 @@ function reportedHostState({
   if (!Number.isFinite(ageMs) || Math.abs(ageMs) > context.maxAgeMs) {
     return 'unreachable';
   }
-  if (!isRecord(context.value) || context.value.acceptedDigest !== context.desiredDigest) {
+  if (
+    report.state === 'ready' &&
+    (!isRecord(context.value) || context.value.acceptedDigest !== context.desiredDigest)
+  ) {
     return 'registering';
   }
   return report.state === 'ready' ? context.admissionState : report.state;

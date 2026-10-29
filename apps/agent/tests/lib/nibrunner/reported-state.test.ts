@@ -86,6 +86,13 @@ test('placement is ready only after the current desired digest is accepted', asy
       )
     ).state,
   ).toBe('draining');
+  expect(
+    (
+      await runScoped(
+        nibrunnerReportedState({ ...input, value: { ...previous, state: 'unreachable' } }),
+      )
+    ).state,
+  ).toBe('unreachable');
 });
 
 test('stale and far-future reports cannot keep placement ready', async () => {
