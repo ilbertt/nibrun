@@ -105,7 +105,7 @@ export const DEPLOY_PRESETS = {
   opencloud: {
     isRecommended: false,
     projectUrl: 'https://github.com/opencloud-eu/opencloud',
-    version: 'v8.1.0',
+    version: 'v9.0.0',
     markdownContent: opencloudPage,
     category: DeployCategory.FilesAndSharing,
     title: 'OpenCloud',
@@ -113,8 +113,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'opencloud',
       binary:
-        'https://github.com/opencloud-eu/opencloud/releases/download/v8.1.0/opencloud-8.1.0-linux-amd64',
-      sha256: 'dcc57274dc9d66c02314f1bc45387bf41fd77a8662452c549adfb2e1a05783eb',
+        'https://github.com/opencloud-eu/opencloud/releases/download/v9.0.0/opencloud-9.0.0-linux-amd64',
+      sha256: '2944b956461107cf8d73424c3602d83ac157988e28dc6ce95370c45633de45c4',
       port: 9200,
       arg: ['server'],
       env: [
