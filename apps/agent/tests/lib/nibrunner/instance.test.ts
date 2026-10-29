@@ -81,7 +81,9 @@ test('public ports and their references are refused without exposing tenant valu
     nibrunnerInstance(instance);
   }).toThrow(UnsupportedNibrunnerFeature);
   instance.config.hasExtraPublicPort = false;
-  instance.config.environment = tenantEnvironment({ SECRET: `sensitive-${interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}` });
+  instance.config.environment = tenantEnvironment({
+    SECRET: `sensitive-${interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}`,
+  });
   expect(function translateReference() {
     nibrunnerInstance(instance);
   }).toThrow('public port references');
