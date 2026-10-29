@@ -12,6 +12,7 @@ import { SqliteService } from '#services/sqlite.service.ts';
 import { SqliteRelayService } from '#services/sqlite-relay.service.ts';
 import { sendRequest } from '#tests/controllers/support/api.ts';
 import { APP_ID, DEPLOYMENT_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
+import { deploymentHostsRepository } from '#tests/support/deployment-hosts.ts';
 import { SQLITE_HOST_ID } from '#tests/support/sqlite.ts';
 import { sqliteConnectionsFixture } from '#tests/support/sqlite-connections.ts';
 
@@ -75,7 +76,12 @@ function guestResponse(request: HranaStreamRequest): HranaStreamResult {
 }
 
 async function fixture() {
-  const relay = new SqliteRelayService();
+  const relay = new SqliteRelayService({
+    deploymentHostsRepo: deploymentHostsRepository({
+      hostId: SQLITE_HOST_ID,
+      deploymentId: DEPLOYMENT_ID,
+    }),
+  });
   const queries: SqliteQuery[] = [];
   const stopping = new AbortController();
   async function serveGuest() {

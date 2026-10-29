@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { HostIdSchema } from '@repo/protocol';
+import { DeploymentIdSchema, HostIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
+import { BadGatewayError, ConflictError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import type { DeploymentRow } from '#repositories/deployments.repository.ts';
 import { CronsService } from '#services/crons.service.ts';
 import {
@@ -11,12 +11,22 @@ import {
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
 import { CRON_DEPLOYMENT, CRON_LISTING } from '#tests/support/crons.ts';
+import { deploymentHostsRepository } from '#tests/support/deployment-hosts.ts';
 
 const HOST_ID = Value.Parse(HostIdSchema, 'host-1');
 
 function service(row: DeploymentRow | null = A_DEPLOYMENT_ROW) {
   const deploymentsRepo = deploymentLookupRepository(row);
-  return { deploymentsRepo, crons: new CronsService({ deploymentsRepo }) };
+  return {
+    deploymentsRepo,
+    crons: new CronsService({
+      deploymentsRepo,
+      deploymentHostsRepo: deploymentHostsRepository({
+        hostId: HOST_ID,
+        deploymentId: CRON_DEPLOYMENT.deploymentId,
+      }),
+    }),
+  };
 }
 
 function read(crons: CronsService) {
@@ -44,6 +54,19 @@ function standing(crons: CronsService) {
 }
 
 describe('authorized realtime cron reads', () => {
+  test('unassigned and superseded executions are refused before querying a host', async () => {
+    for (const execution of [
+      { hostId: undefined, deploymentId: CRON_DEPLOYMENT.deploymentId },
+      { hostId: HOST_ID, deploymentId: Value.Parse(DeploymentIdSchema, 'new-execution') },
+    ]) {
+      const crons = new CronsService({
+        deploymentsRepo: deploymentLookupRepository(A_DEPLOYMENT_ROW),
+        deploymentHostsRepo: deploymentHostsRepository(execution),
+      });
+      await expect(read(crons)).rejects.toBeInstanceOf(ConflictError);
+      expect(await standing(crons)).toBeUndefined();
+    }
+  });
   test('returns the host listing unchanged, including suspended registrations', async () => {
     const { crons, deploymentsRepo } = service();
     const host = poll(crons);

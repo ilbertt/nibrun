@@ -731,6 +731,12 @@ export interface ISelectCachedBinaryResult {
     original_file_name: ICachedBinariesColumns["original_file_name"];
 }
 
+/** Result of query `SelectExecutionHost`. */
+export interface ISelectExecutionHostResult {
+    /** An app keeps its last execution host while stopped, failed or awaiting volume deletion. */
+    host_id: NonNullable<IDeploymentsColumns["host_id"]>;
+}
+
 /** Result of query `SelectCurrentAppExecution`. */
 export interface ISelectCurrentAppExecutionResult {
     /** The latest execution, including while its app is stopped or failed. */
@@ -1364,6 +1370,7 @@ export interface Queries {
     SelectArtifactsByApp: ISelectArtifactsByAppResult;
     SelectArtifactById: ISelectArtifactByIdResult;
     SelectCachedBinary: ISelectCachedBinaryResult;
+    SelectExecutionHost: ISelectExecutionHostResult;
     SelectCurrentAppExecution: ISelectCurrentAppExecutionResult;
     SelectDeployableArtifact: ISelectDeployableArtifactResult;
     InsertDeployment: IInsertDeploymentResult;

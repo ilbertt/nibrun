@@ -16,6 +16,8 @@ Keep host ownership on deployments rather than duplicating it on apps or placeme
 failed and stopped executions. Desired-state queries share one repeatable-read snapshot.
 Directory reads authorize the requested deployment but target the app's current execution,
 because its filesystem outlives a release. Coalesce only within that execution and host.
+Cron queries and new SQLite sessions target the current deployment's assigned host.
+Established SQLite sessions retain their original host for cleanup after a handoff.
 
 Bun + Elysia service.
 

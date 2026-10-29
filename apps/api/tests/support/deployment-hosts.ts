@@ -9,6 +9,9 @@ export function deploymentHostsRepository({
   deploymentId: DeploymentId;
 }): DeploymentHostsRepositoryContract {
   return {
+    hostForExecution({ deploymentId: requested }) {
+      return Promise.resolve(requested === deploymentId ? hostId : undefined);
+    },
     currentForApp() {
       return Promise.resolve(
         hostId === undefined ? null : { host_id: hostId, deployment_id: deploymentId },

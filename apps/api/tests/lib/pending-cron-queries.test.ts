@@ -20,10 +20,33 @@ function claim(pending: PendingCronQueries) {
 }
 
 function open(pending: PendingCronQueries) {
-  return pending.open({ ...CRON_DEPLOYMENT, signal: new AbortController().signal });
+  return pending.open({
+    targetHostId: HOST_ID,
+    ...CRON_DEPLOYMENT,
+    signal: new AbortController().signal,
+  });
 }
 
 describe('live cron queries', () => {
+  test('another host cannot claim the assigned deployment by advertising the same deployment id', async () => {
+    const pending = new PendingCronQueries();
+    const read = open(pending);
+    expect(
+      await pending.claim({
+        hostId: OTHER_HOST_ID,
+        servedDeployments: [CRON_DEPLOYMENT],
+        signal: AbortSignal.abort(),
+      }),
+    ).toBeUndefined();
+    const query = await claim(pending);
+    expect(query?.queryId).toBe(read.queryId);
+    pending.answer({
+      hostId: HOST_ID,
+      queryId: read.queryId,
+      outcome: { status: 'listed', listing: CRON_LISTING },
+    });
+    await read.answered;
+  });
   test('concurrent readers share a query, including after it is claimed', async () => {
     const pending = new PendingCronQueries();
     const first = open(pending);
@@ -49,7 +72,11 @@ describe('live cron queries', () => {
 
   test('an old deployment cannot claim or satisfy the new deployment query', async () => {
     const pending = new PendingCronQueries();
-    const read = pending.open({ ...NEXT_DEPLOYMENT, signal: new AbortController().signal });
+    const read = pending.open({
+      targetHostId: HOST_ID,
+      ...NEXT_DEPLOYMENT,
+      signal: new AbortController().signal,
+    });
     expect(await claim(pending)).toBeUndefined();
     expect(
       await pending.claim({
@@ -125,8 +152,12 @@ describe('live cron queries', () => {
     const pending = new PendingCronQueries();
     const first = new AbortController();
     const second = new AbortController();
-    const read = pending.open({ ...CRON_DEPLOYMENT, signal: first.signal });
-    const joined = pending.open({ ...CRON_DEPLOYMENT, signal: second.signal });
+    const read = pending.open({ targetHostId: HOST_ID, ...CRON_DEPLOYMENT, signal: first.signal });
+    const joined = pending.open({
+      targetHostId: HOST_ID,
+      ...CRON_DEPLOYMENT,
+      signal: second.signal,
+    });
     const rejected = Promise.allSettled([read.answered, joined.answered]);
     first.abort();
     expect(Bun.peek.status(joined.answered)).toBe('pending');
@@ -144,7 +175,11 @@ describe('live cron queries', () => {
 
   test('an already disconnected reader creates no standing query', async () => {
     const pending = new PendingCronQueries();
-    const read = pending.open({ ...CRON_DEPLOYMENT, signal: AbortSignal.abort() });
+    const read = pending.open({
+      targetHostId: HOST_ID,
+      ...CRON_DEPLOYMENT,
+      signal: AbortSignal.abort(),
+    });
     await expect(read.answered).rejects.toThrow();
     expect(await claim(pending)).toBeUndefined();
   });

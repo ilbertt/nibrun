@@ -177,8 +177,13 @@ const filesystemService = new FilesystemService({
   deploymentsRepo: deploymentsRepository,
   deploymentHostsRepo: deploymentHostsRepository,
 });
-const cronsService = new CronsService({ deploymentsRepo: deploymentsRepository });
-const sqliteRelayService = new SqliteRelayService();
+const cronsService = new CronsService({
+  deploymentsRepo: deploymentsRepository,
+  deploymentHostsRepo: deploymentHostsRepository,
+});
+const sqliteRelayService = new SqliteRelayService({
+  deploymentHostsRepo: deploymentHostsRepository,
+});
 const sqliteService = new SqliteService({
   connectionsRepo: new SqliteConnectionsRepository(sql),
   deploymentsRepo: deploymentsRepository,
